@@ -18,8 +18,8 @@ Same machine, 2026-11-15.
 | PASS | `install.sh` | With `FORM_SOURCE` set to a locally built wheel, an isolated uv tool folder and a fresh cache: FORM installed with uv's Python 3.12, and `form setup --check` ran (no terminal, so no prompts). |
 | PASS | Bench with a new recipe | The Gridfinity project opens on its Fit tab by deep link, with a section cut through the magnet pocket. Wording comes from the recipe ("Measure the magnet diameter with calipers"). Screenshot 15. |
 | PASS | Animated session SVG | Plays in the browser. Its lines are taken from the v6 Claude Code session, trimmed. |
-| NOT RUN | GitHub Actions CI | The workflow is written but cannot run until the repository is pushed. Its config was run locally on macOS only. |
-| NOT RUN | Linux, Windows/WSL, Gemini CLI, Cursor | Unchanged from v6. |
+| PASS | GitHub Actions CI | Run 43769203354 on github.com/kaizensx/form-studio. ubuntu-latest: 53 tests, 1 skipped (slicer), 31.7 s. macos-latest: the same, 66.2 s. The MCP reference was confirmed up to date. |
+| NOT RUN | Slicing on Linux; Windows/WSL; Gemini CLI; Cursor | Linux passes the test suite in CI, but Bambu Studio slicing was not run there. |
 | NOT RUN | `curl … \| sh` from GitHub | There is no public URL yet; tested with a local wheel. |
 | NOT RUN | Gridfinity compatibility with a real baseplate, hook load, planter print | Nothing was printed. The hook safety factor is a beam model with assumed material strength and layer factor. |
 

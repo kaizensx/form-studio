@@ -198,7 +198,7 @@ While it's open, it follows what agents change, and labels each revision with th
 
 ## Status and roadmap
 
-FORM is tested on macOS (Apple Silicon). Linux should work: the defaults and the CI workflow exist, but it hasn't been run there yet. On Windows, use WSL (untested).
+FORM is tested on macOS (Apple Silicon, full pipeline with slicing) and Linux (Ubuntu in CI: all tests, no slicer). On Windows, use WSL (untested).
 
 Wanted next:
 
