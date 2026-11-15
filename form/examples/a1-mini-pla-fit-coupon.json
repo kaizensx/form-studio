@@ -1,0 +1,70 @@
+{
+ "schema": "form-project/1",
+ "id": "a1-mini-pla-fit-coupon",
+ "name": "A1 mini PLA fit coupon",
+ "recipe": "coupon",
+ "created": 1794762048.864238,
+ "brief": {
+  "text": "Calibrate internal-width accuracy for this printer profile.",
+  "references": []
+ },
+ "fit": {
+  "gap_min": 0.1,
+  "gap_max": 0.8
+ },
+ "orientation": "as_modelled",
+ "auto_slice": true,
+ "revisions": [
+  {
+   "n": 1,
+   "parent": null,
+   "ts": 1794762048.864238,
+   "values": {
+    "gauge": 10.0,
+    "step": 0.1,
+    "slots": 5,
+    "wall": 4.0,
+    "height": 10.0,
+    "depth": 12.0,
+    "floor": 3.0
+   },
+   "note": "Starting point from recipe defaults",
+   "origin": "recipe",
+   "provenance": {
+    "gauge": {
+     "source": "assumed"
+    },
+    "step": {
+     "source": "assumed"
+    },
+    "slots": {
+     "source": "assumed"
+    },
+    "wall": {
+     "source": "assumed"
+    },
+    "height": {
+     "source": "assumed"
+    },
+    "depth": {
+     "source": "assumed"
+    },
+    "floor": {
+     "source": "assumed"
+    }
+   }
+  }
+ ],
+ "head": 1,
+ "produced": {
+  "geometry": [],
+  "exports": [],
+  "checks": [],
+  "slice": []
+ },
+ "decisions": [],
+ "evidence": [],
+ "approvals": [],
+ "updated": 1794778370.0229812,
+ "auto_run": true
+}

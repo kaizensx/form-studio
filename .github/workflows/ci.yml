@@ -1,0 +1,29 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Environment
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python -r requirements.lock
+          uv pip install --python .venv/bin/python --no-deps -e .
+      - name: Tests (no slicer on CI runners; slicing tests skip)
+        env:
+          FORM_CONFIG: ${{ github.workspace }}/.github/ci-studio.toml
+        run: .venv/bin/python -m unittest discover -s tests -v
+      - name: MCP reference is up to date
+        run: |
+          .venv/bin/python scripts/gen_mcp_docs.py
+          git diff --exit-code docs/MCP.md

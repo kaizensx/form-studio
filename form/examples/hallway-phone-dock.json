@@ -1,0 +1,444 @@
+{
+ "schema": "form-project/1",
+ "id": "hallway-phone-dock",
+ "name": "Hallway phone dock",
+ "recipe": "dock",
+ "created": 1794761358.4211252,
+ "brief": {
+  "text": "A dock for my phone on the hallway shelf. It charges there overnight, so the USB-C cable must route out the back. I tap the screen while it is docked, so it must not tip.",
+  "references": []
+ },
+ "fit": {
+  "gap_min": 0.1,
+  "gap_max": 0.8
+ },
+ "orientation": "as_modelled",
+ "auto_slice": true,
+ "revisions": [
+  {
+   "n": 1,
+   "parent": null,
+   "ts": 1794761358.4211252,
+   "values": {
+    "device_width": 71.5,
+    "device_thickness": 7.8,
+    "device_height": 147.0,
+    "device_mass": 170.0,
+    "clearance": 0.25,
+    "plug_width": 13.0,
+    "plug_thickness": 7.0,
+    "cable_diameter": 4.5,
+    "lean": 15.0,
+    "floor": 7.0,
+    "side_wall": 7.0,
+    "lip": 6.0,
+    "front_height": 18.0,
+    "back_height": 36.0,
+    "depth": 78.0,
+    "corner_r": 12.0,
+    "edge_r": 2.5,
+    "lead_in": 0.8,
+    "relief_width": 30.0,
+    "relief_depth": 6.0
+   },
+   "note": "Starting point from recipe defaults",
+   "origin": "recipe",
+   "provenance": {
+    "device_width": {
+     "source": "assumed"
+    },
+    "device_thickness": {
+     "source": "assumed"
+    },
+    "device_height": {
+     "source": "assumed"
+    },
+    "device_mass": {
+     "source": "assumed"
+    },
+    "clearance": {
+     "source": "assumed"
+    },
+    "plug_width": {
+     "source": "assumed"
+    },
+    "plug_thickness": {
+     "source": "assumed"
+    },
+    "cable_diameter": {
+     "source": "assumed"
+    },
+    "lean": {
+     "source": "assumed"
+    },
+    "floor": {
+     "source": "assumed"
+    },
+    "side_wall": {
+     "source": "assumed"
+    },
+    "lip": {
+     "source": "assumed"
+    },
+    "front_height": {
+     "source": "assumed"
+    },
+    "back_height": {
+     "source": "assumed"
+    },
+    "depth": {
+     "source": "assumed"
+    },
+    "corner_r": {
+     "source": "assumed"
+    },
+    "edge_r": {
+     "source": "assumed"
+    },
+    "lead_in": {
+     "source": "assumed"
+    },
+    "relief_width": {
+     "source": "assumed"
+    },
+    "relief_depth": {
+     "source": "assumed"
+    }
+   }
+  },
+  {
+   "n": 2,
+   "parent": 1,
+   "ts": 1794761686.5709498,
+   "values": {
+    "device_width": 71.5,
+    "device_thickness": 7.8,
+    "device_height": 147.0,
+    "device_mass": 170.0,
+    "clearance": 0.25,
+    "plug_width": 13.0,
+    "plug_thickness": 7.0,
+    "cable_diameter": 4.5,
+    "lean": 15.0,
+    "floor": 7.0,
+    "side_wall": 7.0,
+    "lip": 6.0,
+    "front_height": 18.0,
+    "back_height": 36.0,
+    "depth": 92.0,
+    "corner_r": 12.0,
+    "edge_r": 2.5,
+    "lead_in": 0.8,
+    "relief_width": 30.0,
+    "relief_depth": 6.0
+   },
+   "note": "opus: Base depth 78 to 92 mm. The dock tips backwards over its rear edge. A longer base puts that edge further behind the weight and adds mass, so tipping needs a harder push. Footprint grows from 86",
+   "summary": "Base depth 78 \u2192 92 mm",
+   "origin": "proposal:opus",
+   "provenance": {
+    "device_width": {
+     "source": "assumed"
+    },
+    "device_thickness": {
+     "source": "assumed"
+    },
+    "device_height": {
+     "source": "assumed"
+    },
+    "device_mass": {
+     "source": "assumed"
+    },
+    "clearance": {
+     "source": "assumed"
+    },
+    "plug_width": {
+     "source": "assumed"
+    },
+    "plug_thickness": {
+     "source": "assumed"
+    },
+    "cable_diameter": {
+     "source": "assumed"
+    },
+    "lean": {
+     "source": "assumed"
+    },
+    "floor": {
+     "source": "assumed"
+    },
+    "side_wall": {
+     "source": "assumed"
+    },
+    "lip": {
+     "source": "assumed"
+    },
+    "front_height": {
+     "source": "assumed"
+    },
+    "back_height": {
+     "source": "assumed"
+    },
+    "depth": {
+     "source": "assumed"
+    },
+    "corner_r": {
+     "source": "assumed"
+    },
+    "edge_r": {
+     "source": "assumed"
+    },
+    "lead_in": {
+     "source": "assumed"
+    },
+    "relief_width": {
+     "source": "assumed"
+    },
+    "relief_depth": {
+     "source": "assumed"
+    }
+   },
+   "touched": [
+    "body",
+    "soften",
+    "pocket",
+    "lead_in",
+    "cable",
+    "relief"
+   ]
+  },
+  {
+   "n": 3,
+   "parent": 2,
+   "ts": 1794761722.519455,
+   "values": {
+    "device_width": 71.5,
+    "device_thickness": 7.8,
+    "device_height": 147.0,
+    "device_mass": 170.0,
+    "clearance": 0.3,
+    "plug_width": 13.0,
+    "plug_thickness": 7.0,
+    "cable_diameter": 4.5,
+    "lean": 15.0,
+    "floor": 7.0,
+    "side_wall": 7.0,
+    "lip": 6.0,
+    "front_height": 18.0,
+    "back_height": 36.0,
+    "depth": 92.0,
+    "corner_r": 12.0,
+    "edge_r": 2.5,
+    "lead_in": 0.8,
+    "relief_width": 30.0,
+    "relief_depth": 6.0
+   },
+   "note": "Clearance / side 0.25 \u2192 0.3 mm",
+   "summary": "Clearance / side 0.25 \u2192 0.3 mm",
+   "origin": "user",
+   "provenance": {
+    "device_width": {
+     "source": "assumed"
+    },
+    "device_thickness": {
+     "source": "assumed"
+    },
+    "device_height": {
+     "source": "assumed"
+    },
+    "device_mass": {
+     "source": "assumed"
+    },
+    "clearance": {
+     "source": "assumed"
+    },
+    "plug_width": {
+     "source": "assumed"
+    },
+    "plug_thickness": {
+     "source": "assumed"
+    },
+    "cable_diameter": {
+     "source": "assumed"
+    },
+    "lean": {
+     "source": "assumed"
+    },
+    "floor": {
+     "source": "assumed"
+    },
+    "side_wall": {
+     "source": "assumed"
+    },
+    "lip": {
+     "source": "assumed"
+    },
+    "front_height": {
+     "source": "assumed"
+    },
+    "back_height": {
+     "source": "assumed"
+    },
+    "depth": {
+     "source": "assumed"
+    },
+    "corner_r": {
+     "source": "assumed"
+    },
+    "edge_r": {
+     "source": "assumed"
+    },
+    "lead_in": {
+     "source": "assumed"
+    },
+    "relief_width": {
+     "source": "assumed"
+    },
+    "relief_depth": {
+     "source": "assumed"
+    }
+   },
+   "touched": [
+    "body",
+    "soften",
+    "pocket",
+    "lead_in",
+    "cable",
+    "relief"
+   ]
+  },
+  {
+   "n": 4,
+   "parent": 3,
+   "ts": 1794762931.1220632,
+   "values": {
+    "device_width": 71.5,
+    "device_thickness": 7.8,
+    "device_height": 147.0,
+    "device_mass": 170.0,
+    "clearance": 0.3,
+    "plug_width": 13.0,
+    "plug_thickness": 7.0,
+    "cable_diameter": 4.5,
+    "lean": 15.0,
+    "floor": 7.0,
+    "side_wall": 7.0,
+    "lip": 6.0,
+    "front_height": 18.0,
+    "back_height": 36.0,
+    "depth": 92.0,
+    "corner_r": 12.0,
+    "edge_r": 2.5,
+    "lead_in": 0.8,
+    "relief_width": 30.0,
+    "relief_depth": 7.0
+   },
+   "note": "Thumb relief depth 6 \u2192 7 mm",
+   "summary": "Thumb relief depth 6 \u2192 7 mm",
+   "origin": "user",
+   "provenance": {
+    "device_width": {
+     "source": "assumed"
+    },
+    "device_thickness": {
+     "source": "assumed"
+    },
+    "device_height": {
+     "source": "assumed"
+    },
+    "device_mass": {
+     "source": "assumed"
+    },
+    "clearance": {
+     "source": "assumed"
+    },
+    "plug_width": {
+     "source": "assumed"
+    },
+    "plug_thickness": {
+     "source": "assumed"
+    },
+    "cable_diameter": {
+     "source": "assumed"
+    },
+    "lean": {
+     "source": "assumed"
+    },
+    "floor": {
+     "source": "assumed"
+    },
+    "side_wall": {
+     "source": "assumed"
+    },
+    "lip": {
+     "source": "assumed"
+    },
+    "front_height": {
+     "source": "assumed"
+    },
+    "back_height": {
+     "source": "assumed"
+    },
+    "depth": {
+     "source": "assumed"
+    },
+    "corner_r": {
+     "source": "assumed"
+    },
+    "edge_r": {
+     "source": "assumed"
+    },
+    "lead_in": {
+     "source": "assumed"
+    },
+    "relief_width": {
+     "source": "assumed"
+    },
+    "relief_depth": {
+     "source": "assumed"
+    }
+   },
+   "touched": [
+    "body",
+    "soften",
+    "pocket",
+    "lead_in",
+    "relief"
+   ]
+  }
+ ],
+ "head": 4,
+ "produced": {
+  "geometry": [],
+  "exports": [],
+  "checks": [],
+  "slice": []
+ },
+ "decisions": [
+  {
+   "ts": 1794761559.5412009,
+   "rev": 1,
+   "kind": "consult",
+   "text": "Asked opus: \u201cmake it harder to tip over when I tap the screen, without making it much bigger\u201d \u2192 Tip-over is a WARN at 0.74 N, against an assumed 1 N for a firm tap. Two changes: reduce lean from 15\u00b0 to 11\u00b0, so the phone's weight sits further forward of the rear edge. Increase base depth from 78 ",
+   "model": [
+    "claude-opus-5-5"
+   ],
+   "cost_usd": 0.088732,
+   "tier": "default"
+  },
+  {
+   "ts": 1794761671.5782971,
+   "rev": 1,
+   "kind": "consult",
+   "text": "Asked opus: \u201cmake it harder to tip over when I tap the screen, keep the footprint modest\u201d \u2192 Base depth 78 to 92 mm. The dock tips backwards over its rear edge. A longer base puts that edge further behind the weight and adds mass, so tipping needs a harder push. Footprint grows from 86 \u00d7 78 t",
+   "model": [
+    "claude-opus-5-5"
+   ],
+   "cost_usd": 0.0769856,
+   "tier": "default"
+  }
+ ],
+ "evidence": [],
+ "approvals": [],
+ "updated": 1794762932.5016582,
+ "auto_run": true
+}

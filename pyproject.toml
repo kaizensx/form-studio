@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "form-studio"
+version = "7.0.0"
+description = "Engine and MCP server that lets coding agents design 3D-printable parts with real CAD, real slicing and an honest evidence record."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12,<3.13"
+keywords = ["3d-printing", "cad", "mcp", "build123d", "slicer", "agents"]
+classifiers = [
+  "Programming Language :: Python :: 3.12",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = [
+  "build123d==0.13.0",
+  "numpy>=2",
+  "pillow>=10.1",
+  "mcp>=2.3,<3",
+]
+
+[project.urls]
+Homepage = "https://github.com/kaizensx/form-studio"
+Issues = "https://github.com/kaizensx/form-studio/issues"
+Changelog = "https://github.com/kaizensx/form-studio/blob/main/CHANGELOG.md"
+
+[project.scripts]
+form = "form.__main__:main"
+form-mcp = "form.mcp_server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["form"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["projects", ".venv", "docs/screenshots"]

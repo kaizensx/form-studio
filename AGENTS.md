@@ -1,0 +1,55 @@
+# FORM — instructions for coding agents
+
+This file is for any agent (Codex, Claude Code, Gemini CLI, Cursor, ...). `CLAUDE.md` and `GEMINI.md` point here.
+
+## Using FORM to design a part
+
+Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same and prints JSON.
+
+| Step | MCP tool | CLI |
+|---|---|---|
+| See what exists | `form_overview` | `form doctor`, `form list` |
+| Learn a recipe's parameters | `describe_recipe` | `form recipe dock` |
+| Start a design | `create_project` | `form new "Desk dock" dock device_width=75.6` |
+| Read the design | `get_project` | `form state <project>` |
+| Try a change, save nothing | `preview_change` | `form preview <project> lean=18` |
+| Look at it | `render` (`view="sheet"` for four views) | `form render <project> --view sheet` |
+| Keep a change | `commit_change` with `expect_head` | `form commit <project> lean=18 --expect-head 3` |
+| Regenerate outputs | `run_pipeline` / `get_job` | `form run <project>` |
+| Ask for release | `request_release` (gives the user a bench link) | — |
+| Find the best design under constraints | `optimize` | `form optimize <p> --vary arm_t:4:20 --minimize solid_mass_g --require "statics.safety_factor>=3"` |
+| Show motion | `animate` (turntable or morph) | `form animate <p> --morph 1:4` |
+| Check this machine | `setup_status` (never run fixes without asking) | `form setup --check` |
+
+Rules that keep the record honest:
+
+1. **Units:** mm, degrees, grams. Only use parameter keys that `describe_recipe` lists.
+2. **Preview, then commit.** Pass `expect_head` so you never overwrite someone else's newer revision.
+3. **Provenance is evidence.** Mark a value `measured` only when the user measured it and gave you the number. Ask how they measured it, for example with calipers. Otherwise it stays `assumed`.
+4. **Never invent physical results.** `record_physical_result` is only for what the user reports after a real print.
+5. **Name evidence classes correctly.** A slice is a simulation. Fit yield is a statistical model. Checks are labelled computed, heuristic or model. Say which one you are reporting.
+6. **You cannot approve a release.** The user approves on the bench, after reviewing the checks and acknowledging the warnings.
+7. **No printing, no uploads.** FORM never sends files to a printer or a service, and you must not either unless the user explicitly asks.
+
+## Recipes
+
+`dock`, `gridfinity`, `hook`, `planter`, `coupon`. To write a new one, see `docs/RECIPES.md`.
+
+## Working on FORM's code
+
+- **One geometry authority:** a recipe in `form/recipes/`, built by build123d (OCCT). STEP, STL, checks and slices are derived from it and are never edited by hand.
+- **Never mark anything current by hand.** An artifact is current only when it exists under the key `Studio.keys` computes from the head revision's inputs. If an input matters, put it in the key.
+- **OCCT runs only in the worker process** (`form/worker.py`). The MCP server, bench and CLI must stay importable without it.
+- **Software FORM drives sits behind adapters** (`form/adapters/`). To add a slicer, write a module with the interface described in `form/adapters/__init__.py`, register it in `SLICERS`, and select it with `[slicer].kind`.
+- **New recipe:** subclass `Recipe` with typed `Param`s, ordered `Stage`s named after `Feature`s, and `constraints()` that return `RecipeError`s naming a feature, the parameters involved and a hint.
+- **Project mutations take `Studio.lock(pid)`.** It locks across processes, because the bench, MCP and CLI can run at the same time.
+
+Commands:
+
+```
+./run.sh                                            # bench on http://127.0.0.1:4173
+.venv/bin/python -m unittest discover -s tests      # includes an MCP stdio end-to-end test
+.venv/bin/python scripts/acceptance.py              # writes docs/ACCEPTANCE_RUN.md
+.venv/bin/python scripts/make_media.py              # regenerates docs/assets from real builds
+.venv/bin/python scripts/gen_mcp_docs.py            # regenerates docs/MCP.md
+```

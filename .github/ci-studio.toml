@@ -1,0 +1,6 @@
+# CI: no slicer installed, projects in a temp folder.
+[data]
+dir = "/tmp/form-ci"
+
+[slicer]
+app = "/nonexistent/bambu-studio"

@@ -1,0 +1,145 @@
+{
+ "bin_morph": {
+  "file": "<repo>/docs/assets/morph-gridfinity.gif",
+  "frames": 48,
+  "bytes": 537530,
+  "fps": 11.1,
+  "kind": "morph",
+  "built_frames": 18,
+  "skipped": [],
+  "changed": [
+   "grid_x",
+   "grid_y",
+   "height_u",
+   "dividers_x",
+   "dividers_y",
+   "label_w"
+  ]
+ },
+ "planter_morph": {
+  "file": "<repo>/docs/assets/morph-planter.gif",
+  "frames": 56,
+  "bytes": 839940,
+  "fps": 11.1,
+  "kind": "morph",
+  "built_frames": 22,
+  "skipped": [],
+  "changed": [
+   "sides",
+   "twist",
+   "bulge"
+  ]
+ },
+ "dock_morph": {
+  "file": "<repo>/docs/assets/morph-dock.gif",
+  "frames": 48,
+  "bytes": 543287,
+  "fps": 11.1,
+  "kind": "morph",
+  "built_frames": 18,
+  "skipped": [],
+  "changed": [
+   "lean",
+   "back_height",
+   "depth",
+   "relief_width"
+  ]
+ },
+ "turntable_gridfinity": {
+  "file": "<repo>/docs/assets/turntable-gridfinity.gif",
+  "frames": 30,
+  "bytes": 312148,
+  "fps": 14.3,
+  "kind": "turntable"
+ },
+ "turntable_hook": {
+  "file": "<repo>/docs/assets/turntable-hook.gif",
+  "frames": 30,
+  "bytes": 159777,
+  "fps": 14.3,
+  "kind": "turntable"
+ },
+ "turntable_planter": {
+  "file": "<repo>/docs/assets/turntable-planter.gif",
+  "frames": 30,
+  "bytes": 441150,
+  "fps": 14.3,
+  "kind": "turntable"
+ },
+ "turntable_dock": {
+  "file": "<repo>/docs/assets/turntable-dock.gif",
+  "frames": 30,
+  "bytes": 324414,
+  "fps": 14.3,
+  "kind": "turntable"
+ },
+ "optimize": {
+  "objective": "minimize solid_mass_g",
+  "constraints": [
+   "statics.safety_factor >= 3"
+  ],
+  "evaluated": 36,
+  "feasible": 28,
+  "infeasible_reasons": [
+   "Upper screw sits 75 mm up; the plate is 80 mm tall",
+   "Upper screw sits 76 mm up; the plate is 80 mm tall",
+   "Upper screw sits 78 mm up; the plate is 80 mm tall",
+   "statics.safety_factor >= 3 (is 1.59)",
+   "statics.safety_factor >= 3 (is 1.85)",
+   "statics.safety_factor >= 3 (is 1.88)"
+  ],
+  "best": {
+   "values": {
+    "arm_t": 8.5,
+    "plate_w": 14.0
+   },
+   "solid_mass_g": 15.5941,
+   "statics.safety_factor": 3.0964
+  },
+  "current": {
+   "values": {
+    "arm_t": 9.0,
+    "plate_w": 28.0
+   },
+   "solid_mass_g": 32.1868,
+   "statics.safety_factor": 6.9427,
+   "feasible": true
+  },
+  "runners_up": [
+   {
+    "values": {
+     "arm_t": 8.6,
+     "plate_w": 14.0
+    },
+    "solid_mass_g": 15.6635,
+    "statics.safety_factor": 3.1697
+   },
+   {
+    "values": {
+     "arm_t": 8.7,
+     "plate_w": 14.0
+    },
+    "solid_mass_g": 15.733,
+    "statics.safety_factor": 3.2438
+   },
+   {
+    "values": {
+     "arm_t": 8.8,
+     "plate_w": 14.0
+    },
+    "solid_mass_g": 15.8024,
+    "statics.safety_factor": 3.3188
+   },
+   {
+    "values": {
+     "arm_t": 9.1,
+     "plate_w": 14.0
+    },
+    "solid_mass_g": 16.0107,
+    "statics.safety_factor": 3.5489
+   }
+  ],
+  "note": "Every candidate was built by the kernel. Search is local (Latin hypercube, then pattern search): good inside these ranges, not a proof of the global optimum. Nothing was saved; preview and commit the one you choose."
+ },
+ "seconds": 63.4
+}

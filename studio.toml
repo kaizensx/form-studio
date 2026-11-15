@@ -1,0 +1,39 @@
+# FORM studio configuration. Every value is optional; form/config.py holds the defaults.
+
+[server]
+host = "127.0.0.1"      # loopback only
+port = 4173
+
+[data]
+dir = "projects"        # projects, artifacts, releases and calibration live here
+
+[printer]
+name = "Bambu Lab A1 mini"
+envelope_mm = [180, 180, 180]
+plate_margin_mm = 2.0
+
+[slicer]
+kind = "bambu"           # adapter in form/adapters/
+# app and config_dir default per platform (see form/config.py). Override if installed elsewhere:
+# app = "/Applications/BambuStudio.app/Contents/MacOS/BambuStudio"
+# config_dir = "~/Library/Application Support/BambuStudio"
+# "auto" follows whatever is selected in Bambu Studio right now.
+machine = "auto"
+process = "auto"
+filament = "auto"
+timeout_s = 600
+
+[apps]
+# What open_in hands files to (macOS app names, or commands elsewhere). "" = system default.
+slicer = "BambuStudio"
+cad = ""
+viewer = ""
+
+[models]
+# Optional in-app consultation through a local `claude` CLI. Off by default:
+# over MCP, the agent that calls FORM is the intelligence. Set cli = "claude" to enable.
+cli = ""
+default = "opus"
+specialist = ""
+specialist_budget_usd = 0.50
+timeout_s = 120

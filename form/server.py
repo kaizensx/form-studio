@@ -1,0 +1,314 @@
+"""Loopback HTTP server: JSON API plus the static studio UI."""
+from __future__ import annotations
+
+import base64
+import json
+import mimetypes
+import re
+import threading
+import time
+import traceback
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+from . import advisor, config
+from .studio import NODES, Studio, StudioError
+
+WEB = Path(__file__).resolve().parent / "web"
+
+
+def make_handler(st: Studio):
+    class Handler(BaseHTTPRequestHandler):
+        server_version = "FORM"
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, fmt, *args):
+            pass
+
+        # -- plumbing ------------------------------------------------------
+        def _send(self, code, body: bytes, ctype="application/json", extra=None):
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            for k, v in (extra or {}).items():
+                self.send_header(k, v)
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _json(self, obj, code=200):
+            self._send(code, json.dumps(obj, allow_nan=False, default=str).encode())
+
+        def _body(self):
+            n = int(self.headers.get("Content-Length") or 0)
+            if n > 300_000_000:
+                raise StudioError("Upload too large.")
+            raw = self.rfile.read(n) if n else b""
+            if self.headers.get("Content-Type", "").startswith("application/json"):
+                try:
+                    return json.loads(raw or b"{}")
+                except ValueError:
+                    raise StudioError("Malformed request.")
+            return raw
+
+        def _guard(self, fn):
+            try:
+                host = (self.headers.get("Host") or "").split(":")[0]
+                if host not in ("127.0.0.1", "localhost", "[::1]"):
+                    return self._json({"error": {"message": "FORM only answers on loopback."}}, 403)
+                fn()
+            except StudioError as e:
+                self._json({"error": e.public()}, e.status)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            except Exception as e:
+                traceback.print_exc()
+                self._json({"error": {"message": f"Unexpected {type(e).__name__}: {e}",
+                                      "hint": "Your project state is unchanged. If this repeats, export the project and report it."}}, 500)
+
+        def do_GET(self):
+            self._guard(self._get)
+
+        def do_POST(self):
+            self._guard(self._post)
+
+        # -- GET -----------------------------------------------------------
+        def _get(self):
+            u = urlparse(self.path)
+            q = {k: v[0] for k, v in parse_qs(u.query).items()}
+            path = u.path
+            if not path.startswith("/api/"):
+                return self._static(path)
+            if path == "/api/studio":
+                return self._json({"env": st.environment(), "projects": st.list(),
+                                   "recipes": [r.public() for r in st.recipes.values()],
+                                   "assistant": advisor.cli_status(st.cfg)})
+            m = re.fullmatch(r"/api/projects/([a-z0-9-]+)(/.*)?", path)
+            if not m:
+                raise StudioError("Not found.", status=404)
+            pid, rest = m.group(1), m.group(2) or ""
+            if rest == "":
+                return self._json(st.state(pid))
+            p = st.load(pid)
+            if rest == "/stamp":
+                last = p["revisions"][-1]
+                return self._json({"head": p["head"], "updated": p.get("updated"),
+                                   "last": {"n": last["n"], "origin": last.get("origin"), "note": last["note"]}})
+            if rest == "/view":
+                n = int(q["rev"]) if q.get("rev") else None
+                return self._json(st.view(p, n))
+            if rest == "/layers":
+                layers = st.layers(p)
+                if "n" in q:
+                    i = max(0, min(len(layers) - 1, int(q["n"])))
+                    return self._json({"index": i, "count": len(layers), **layers[i]})
+                return self._json({"count": len(layers), "z": [l["z"] for l in layers],
+                                   "types": sorted({pp["t"] for l in layers for pp in l["paths"]})})
+            if rest == "/diff":
+                a, b = int(q["a"]), int(q["b"])
+                cand = st.head_summary(p, b)
+                return self._json({"a": a, "b": b, "impact": st.impact(p, st.rev(p, b)["values"], cand, base_rev=a),
+                                   "note_a": st.rev(p, a)["note"], "note_b": st.rev(p, b)["note"]})
+            if rest.startswith("/job/"):
+                job = st.jobs.get(rest[5:])
+                if not job:
+                    raise StudioError("Unknown job.", status=404)
+                return self._json(job)
+            if rest == "/archive":
+                f = st.export_archive(p)
+                return self._send(200, f.read_bytes(), "application/zip",
+                                  {"Content-Disposition": f'attachment; filename="{f.name}"'})
+            m2 = re.fullmatch(r"/file/(exports|slice|side|releases|references)/([A-Za-z0-9_.\-]+)(?:/([A-Za-z0-9_.\-]+))?", rest)
+            if m2:
+                node, a, b = m2.groups()
+                base = st.dir(pid) / (node if node in ("releases", "references") else f"artifacts/{node}")
+                if node in ("exports", "slice") and a == "current":
+                    a = st.keys(p)[node]
+                f = (base / a / b) if b else (base / a)
+                f = f.resolve()
+                if not f.is_relative_to(base.resolve()) or not f.is_file():
+                    raise StudioError("That file does not exist (it may be stale and regenerated under a new key).", status=404)
+                ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
+                extra = {} if ctype.startswith("image/") else {"Content-Disposition": f'attachment; filename="{f.name}"'}
+                return self._send(200, f.read_bytes(), ctype, extra)
+            m3 = re.fullmatch(r"/release/(r\d+-[0-9a-f]+)", rest)
+            if m3:
+                return self._json(st.verify_release(p, m3.group(1)))
+            raise StudioError("Not found.", status=404)
+
+        def _static(self, path):
+            rel = "index.html" if path in ("/", "") else path.lstrip("/")
+            f = (WEB / rel).resolve()
+            if not f.is_relative_to(WEB.resolve()) or not f.is_file():
+                return self._send(404, b"Not found", "text/plain")
+            ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
+            if f.suffix == ".js":
+                ctype = "text/javascript"
+            self._send(200, f.read_bytes(), ctype + ("; charset=utf-8" if ctype.startswith("text/") else ""))
+
+        # -- POST ----------------------------------------------------------
+        def _post(self):
+            path = urlparse(self.path).path
+            body = self._body()
+            if path == "/api/projects":
+                p = st.create(body.get("name", ""), body.get("recipe", ""), body.get("brief", ""), body.get("values"))
+                job = st.run(p["id"])
+                return self._json({"id": p["id"], "job": job})
+            if path == "/api/import":
+                p = st.import_archive(body if isinstance(body, bytes) else b"")
+                return self._json({"id": p["id"]})
+            if path == "/api/studio/refresh":
+                st.slicer_info(refresh=True)
+                return self._json({"env": st.environment()})
+            m = re.fullmatch(r"/api/projects/([a-z0-9-]+)/([a-z_]+)", path)
+            if not m:
+                raise StudioError("Not found.", status=404)
+            pid, action = m.groups()
+            p = st.load(pid)
+            recipe = st.recipes[p["recipe"]]
+            auto = lambda proj: st.run(pid) if proj.get("auto_run", True) else None
+            if action == "preview":
+                return self._json(st.preview(p, body.get("values", {})))
+            if action == "commit":
+                p = st.commit(p, body.get("values", {}), body.get("note", ""), body.get("origin", "user"), body.get("provenance"))
+                return self._json({"head": p["head"], "job": auto(p)})
+            if action == "checkout":
+                p = st.checkout(p, int(body["rev"]))
+                return self._json({"head": p["head"], "job": auto(p)})
+            if action == "settings":
+                p = st.settings(p, body)
+                return self._json({"job": auto(p)})
+            if action == "run":
+                nodes = [n for n in body.get("nodes", []) if n in NODES] or None
+                return self._json({"job": st.run(pid, nodes, bool(body.get("force")))})
+            if action == "intent":
+                values = st.rev(p)["values"]
+                text, feature = str(body.get("text", ""))[:2000], body.get("feature") or None
+                tier = body.get("tier", "rule")
+                if tier == "rule":
+                    prop = advisor.parse_intent(recipe, values, text, feature)
+                    if prop is None:
+                        return self._json({"proposal": None, "assistant": advisor.cli_status(st.cfg),
+                                           "message": "I could not read that as a single parameter change."})
+                else:
+                    state = st.state(pid)
+                    ctx = {"brief": p["brief"]["text"],
+                           "derived": recipe.derived(values),
+                           "checks": [{k: c[k] for k in ("label", "status", "value", "detail")} for c in (state["checks"] or {}).get("checks", [])],
+                           "fit": {k: state["fit"][k] for k in ("yield", "expected_gap", "window", "recommended_clearance")} if state["fit"] else None,
+                           "printer": st.profile()}
+                    try:
+                        prop = advisor.consult(st.cfg, recipe, values, ctx, text, feature, "specialist" if tier == "specialist" else "default")
+                    except RuntimeError as e:
+                        raise StudioError(str(e), "Nothing was changed. You can still edit parameters directly.", status=502)
+                    with st.lock(pid):
+                        p = st.load(pid)
+                        st.decide(p, "consult", f"Asked {prop['requested_model']}: “{text[:160]}” → {prop['summary'][:200]}",
+                                  model=prop["resolved_models"], cost_usd=prop["cost_usd"], tier=prop["tier"])
+                        st.save(p)
+                if prop["changes"]:
+                    try:
+                        pv = st.preview(p, {c["key"]: c["to"] for c in prop["changes"]})
+                        prop["impact"], prop["buildable"] = pv["impact"], True
+                    except StudioError as e:
+                        prop["buildable"], prop["build_error"] = False, e.public()
+                return self._json({"proposal": prop})
+            if action == "alternatives":
+                try:
+                    return self._json(advisor.alternatives(st, p, body.get("axes", []), body.get("weights", {})))
+                except (ValueError, KeyError) as e:
+                    raise StudioError(str(e))
+            if action == "evidence":
+                try:
+                    rec = st.add_evidence(p, body)
+                except ValueError as e:
+                    raise StudioError(str(e))
+                return self._json({"evidence": rec, "job": auto(st.load(pid))})
+            if action == "calibration_remove":
+                st.calibration.remove(str(body.get("id")))
+                return self._json({"job": auto(p)})
+            if action == "test_piece":
+                return self._json(st.side_slice(p, "test_piece"))
+            if action == "approve":
+                return self._json(st.approve(p, body.get("acknowledged", []), str(body.get("note", ""))[:500]))
+            if action == "reference":
+                m2 = re.fullmatch(r"data:image/(png|jpeg|webp);base64,(.+)", body.get("data", ""), re.S)
+                if not m2:
+                    raise StudioError("Only PNG, JPEG or WebP images can be attached.")
+                raw = base64.b64decode(m2.group(2))
+                if len(raw) > 25_000_000:
+                    raise StudioError("Image is larger than 25 MB.")
+                d = st.dir(pid) / "references"
+                d.mkdir(exist_ok=True)
+                name = f"ref_{int(time.time())}.{ 'jpg' if m2.group(1) == 'jpeg' else m2.group(1)}"
+                (d / name).write_bytes(raw)
+                with st.lock(pid):
+                    p = st.load(pid)
+                    p["brief"]["references"].append({"file": name, "ts": time.time(), "scale_mm_per_px": None, "measurements": []})
+                    st.save(p)
+                return self._json({"file": name})
+            if action == "reference_update":
+                with st.lock(pid):
+                    p = st.load(pid)
+                    for ref in p["brief"]["references"]:
+                        if ref["file"] == body.get("file"):
+                            ref["scale_mm_per_px"] = body.get("scale_mm_per_px")
+                            ref["scale_note"] = str(body.get("scale_note", ""))[:200]
+                            ref["measurements"] = body.get("measurements", [])[:40]
+                    st.save(p)
+                return self._json({"ok": True})
+            raise StudioError("Not found.", status=404)
+
+    return Handler
+
+
+def _is_form(url: str, data_dir: str) -> bool:
+    import urllib.request
+    try:
+        with urllib.request.urlopen(url + "/api/studio", timeout=2) as r:
+            return json.loads(r.read()).get("env", {}).get("data_dir") == data_dir
+    except Exception:
+        return False
+
+
+def start_bench(st: Studio, tries: int = 10) -> dict:
+    """Serve the bench from a background thread (used by the MCP server).
+
+    If a FORM bench for the same data folder is already listening on the
+    configured port, reuse it: both processes share the project files, and
+    project locks make concurrent edits safe.
+    """
+    host, port = st.cfg["server"]["host"], int(st.cfg["server"]["port"])
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        return {"url": None, "error": "FORM binds to loopback only."}
+    for p in range(port, port + tries):
+        url = f"http://{host}:{p}"
+        try:
+            httpd = ThreadingHTTPServer((host, p), make_handler(st))
+        except OSError:
+            if _is_form(url, str(st.root)):
+                return {"url": url, "shared": True}
+            continue
+        httpd.daemon_threads = True
+        threading.Thread(target=httpd.serve_forever, daemon=True, name="form-bench").start()
+        return {"url": url, "shared": False, "httpd": httpd}
+    return {"url": None, "error": f"No free port in {port}-{port + tries - 1}."}
+
+
+def serve(cfg=None):
+    cfg = cfg or config.load()
+    st = Studio(cfg)
+    threading.Thread(target=st.kernel_id, daemon=True).start()   # warm the kernel
+    host, port = cfg["server"]["host"], int(cfg["server"]["port"])
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        raise SystemExit("FORM binds to loopback only. Set [server].host to 127.0.0.1.")
+    httpd = ThreadingHTTPServer((host, port), make_handler(st))
+    httpd.daemon_threads = True
+    print(f"FORM studio → http://{host}:{port}   (data: {cfg['data']['dir']})", flush=True)
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        st.kernel.stop()

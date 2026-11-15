@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FORM — print studio</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+</head>
+<body>
+<header class="bar">
+  <button class="mark" id="mark" title="Projects">FORM</button>
+  <div class="proj" id="proj"></div>
+  <div class="ctx" id="ctx"></div>
+</header>
+<nav class="rail" id="rail" aria-label="Workflow"></nav>
+<main class="stage">
+  <div id="viewport" aria-label="3D view. Drag to orbit, scroll to zoom, click a feature to select it."></div>
+  <canvas id="layers" hidden></canvas>
+  <div class="hud tl" id="hud-tl"></div>
+  <div class="hud tr" id="hud-tr"></div>
+  <div class="hud bl" id="hud-bl"></div>
+  <div class="hud bc" id="hud-bc"></div>
+  <div id="chip" hidden></div>
+</main>
+<aside class="inspector" id="inspector"></aside>
+<footer class="graph" id="graph"></footer>
+<div id="sheet" hidden></div>
+<div id="toasts" role="status" aria-live="polite"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
