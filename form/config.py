@@ -42,6 +42,10 @@ DEFAULTS = {
     # Apps that `open_in` may hand files to. Values are application names (macOS)
     # or commands (Linux/Windows). Empty means the system default for the file type.
     "apps": {"slicer": "BambuStudio", "cad": "", "viewer": ""},
+    # Chat in the bench runs Claude Code headless on your account, with FORM's tools (and web lookups if web = true).
+    "chat": {"enabled": True, "cli": "claude", "model": "opus", "web": True, "budget_usd_per_message": 3.0},
+    # Open the bench in your browser when an agent starts working (MCP server).
+    "bench": {"auto_open": True},
     # Optional in-app model consultation through a local `claude` CLI. Off by
     # default: when FORM is used over MCP, the calling agent is the intelligence.
     "models": {

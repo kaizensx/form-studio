@@ -63,6 +63,8 @@ class Recipe:
     features: list[Feature] = []
     #: parameters whose pairing forms the fit interface: (cavity_param, mating_param, clearance_param)
     fit: dict | None = None
+    #: number of separate printed bodies the final stage contains (e.g. 2 for a case base + lid on one plate)
+    solids: int = 1
 
     def defaults(self) -> dict:
         return {p.key: p.default for p in self.params}

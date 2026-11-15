@@ -143,7 +143,7 @@ def main(argv=None):
             from . import render
             p = st.load(a.project)
             v = st.view(p)
-            feats = [{"id": f.id, "label": f.label} for f in st.recipes[p["recipe"]].features]
+            feats = [{"id": f.id, "label": f.label} for f in st.recipe(p).features]
             views = ["iso", "front", "top", "right"] if a.view == "sheet" else [a.view]
             size = (640, 460) if a.view == "sheet" else (960, 680)
             pngs = [render.render_png(v, feats, vw, a.highlight, size=size, title=f"{p['name']} - r{p['head']:02d}") for vw in views]

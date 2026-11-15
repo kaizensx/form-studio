@@ -19,8 +19,10 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
         out.append({"id": id, "label": label, "status": status, "value": value, "detail": detail, "evidence": evidence, **kw})
 
     b = analysis["brep"]
-    ok = b["valid"] and b["solids"] == 1
-    add("solid", "One valid solid", "PASS" if ok else "FAIL", f"{b['solids']} solid" + ("" if b["solids"] == 1 else "s"),
+    want = b.get("expected_solids", 1)
+    ok = b["valid"] and b["solids"] == want
+    add("solid", "One valid solid" if want == 1 else f"{want} valid parts", "PASS" if ok else "FAIL",
+        f"{b['solids']} solid" + ("" if b["solids"] == 1 else "s"),
         "OCCT validity check on the boundary representation.", "computed")
 
     worst = max((abs(a["modelled"] - a["intended"]) for a in analysis["interface_audit"]), default=None)

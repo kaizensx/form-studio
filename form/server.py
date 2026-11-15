@@ -19,6 +19,11 @@ WEB = Path(__file__).resolve().parent / "web"
 
 
 def make_handler(st: Studio):
+    from . import chat as chat_mod
+    from .setup import mcp_command
+    if not hasattr(st, "chat"):
+        st.chat = chat_mod.Chat(st.cfg, st.root, mcp_command())
+
     class Handler(BaseHTTPRequestHandler):
         server_version = "FORM"
         protocol_version = "HTTP/1.1"
@@ -80,9 +85,19 @@ def make_handler(st: Studio):
             path = u.path
             if not path.startswith("/api/"):
                 return self._static(path)
+            if path == "/api/activity":
+                return self._json({"events": st.activity_since(float(q.get("since") or 0)), "now": time.time()})
+            if path == "/api/chat":
+                return self._json(chat_mod.status(st.cfg))
+            mc = re.fullmatch(r"/api/chat/([0-9a-f]{10})", path)
+            if mc:
+                job = st.chat.jobs.get(mc.group(1))
+                if not job:
+                    raise StudioError("Unknown chat job.", status=404)
+                return self._json(job.public(int(q.get("from") or 0)))
             if path == "/api/studio":
-                return self._json({"env": st.environment(), "projects": st.list(),
-                                   "recipes": [r.public() for r in st.recipes.values()],
+                return self._json({"env": st.environment(), "projects": st.list(), "chat": chat_mod.status(st.cfg),
+                                   "recipes": [r.public() for r in st.recipes.builtins().values()],
                                    "assistant": advisor.cli_status(st.cfg)})
             m = re.fullmatch(r"/api/projects/([a-z0-9-]+)(/.*)?", path)
             if not m:
@@ -158,6 +173,20 @@ def make_handler(st: Studio):
             if path == "/api/import":
                 p = st.import_archive(body if isinstance(body, bytes) else b"")
                 return self._json({"id": p["id"]})
+            if path == "/api/chat":
+                msg = str(body.get("message", "")).strip()[:8000]
+                if not msg:
+                    raise StudioError("Write a message first.")
+                try:
+                    job = st.chat.start(msg, body.get("project") or None, body.get("session") or None)
+                except RuntimeError as e:
+                    raise StudioError(str(e), status=409)
+                st.activity(body.get("project"), "chat", msg[:200], by="you")
+                return self._json({"id": job.id})
+            mc = re.fullmatch(r"/api/chat/([0-9a-f]{10})/stop", path)
+            if mc:
+                st.chat.stop(mc.group(1))
+                return self._json({"ok": True})
             if path == "/api/studio/refresh":
                 st.slicer_info(refresh=True)
                 return self._json({"env": st.environment()})
@@ -166,7 +195,7 @@ def make_handler(st: Studio):
                 raise StudioError("Not found.", status=404)
             pid, action = m.groups()
             p = st.load(pid)
-            recipe = st.recipes[p["recipe"]]
+            recipe = st.recipe(p)
             auto = lambda proj: st.run(pid) if proj.get("auto_run", True) else None
             if action == "preview":
                 return self._json(st.preview(p, body.get("values", {})))

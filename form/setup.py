@@ -52,8 +52,7 @@ def mcp_command() -> str:
     here = Path(sys.executable).parent / "form-mcp"
     if here.exists():
         return str(here)
-    found = shutil.which("form-mcp")
-    return found or f"{sys.executable} -m form.mcp_server"
+    return shutil.which("form-mcp") or str(here)
 
 
 def _run(cmd: list[str], timeout=30) -> tuple[int, str]:

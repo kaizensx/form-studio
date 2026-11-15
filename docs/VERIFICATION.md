@@ -1,5 +1,18 @@
 # Verification
 
+## v8: design anything, chat in the page
+
+2026-11-16, same Mac.
+
+| Result | What | Evidence |
+|---|---|---|
+| PASS | Tests | 60 pass. `tests/test_v8.py` covers: the example design builds as 2 valid parts; a code update keeps saved values and both versions' code; checkout restores the older code; bad code reports its line; a wrong part count is refused; declared provenance; PDF pages render to PNG; https-only fetch; chat stream parsing, including live progress. |
+| PASS | Pi 5 case from the page | Clicked "Design a case for a Raspberry Pi 5 with a snap-on lid" in the bench chat (Claude Code, Opus, the user's account). Claude ran design_guide, web search, read_document (the official drawing as an image), create_design and render. It found the two parts were 194 mm wide, over the 180 mm A1 mini bed, and moved the lid (update_design r02). Result: 2 valid parts, 93 × 130 × 28.1 mm, thinnest wall 1.40 mm, no overhangs, simulated slice 63 min / 42.6 g, release gate ready with 2 warnings. 10 steps, $1.04. Screenshot 16; `docs/assets/pi5-case-by-claude.png`. |
+| PASS | Page follows the agent | During that run the page switched itself to the new project and refreshed on commit. |
+| PASS | Bugs found by the first real installs and runs, all fixed | Spaces in the launcher path broke the chat's MCP server (`ENOENT … posix_spawn`). Setup passed the terminal to `claude mcp add`, which then crashed (`EINVAL … kqueue`). A cold `claude mcp get` timed out and reported "not registered". The installer reused a cached commit. |
+| NOT CHECKED | Pi 5 case fit | The case dimensions follow the official drawing, but the USB stack height, opening sizes, microSD and button positions are Claude's estimates (it says so). Nothing was printed or test-fitted. |
+| NOT RUN | Chat with Codex or Gemini as the engine | The in-page chat uses Claude Code only. Other agents work through MCP, with the page following along. |
+
 ## v7: setup wizard, new recipes, goal seek, motion, repository
 
 Same machine, 2026-11-15.

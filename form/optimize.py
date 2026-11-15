@@ -36,7 +36,7 @@ def parse_constraints(items: list) -> list[tuple]:
 
 
 def run(studio, p: dict, vary: list, objective: dict, constraints: list, budget: int = 40, seed: int = 7) -> dict:
-    recipe = studio.recipes[p["recipe"]]
+    recipe = studio.recipe(p)
     base = studio.rev(p)["values"]
     if not 1 <= len(vary) <= 4:
         raise OptimizeError("Vary one to four parameters.")
@@ -73,7 +73,7 @@ def run(studio, p: dict, vary: list, objective: dict, constraints: list, budget:
                 fresh.append(pt)
         if not fresh:
             return
-        rows = studio._k("evaluate", timeout=240, recipe_id=p["recipe"], base=base, candidates=fresh, need_wall=need_wall)
+        rows = studio._k("evaluate", timeout=240, recipe_id=studio.rid(p), base=base, candidates=fresh, need_wall=need_wall)
         for r in rows:
             k = tuple(r["changes"][a["key"]] for a in axes)
             if r["ok"]:

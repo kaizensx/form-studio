@@ -17,6 +17,8 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Keep a change | `commit_change` with `expect_head` | `form commit <project> lean=18 --expect-head 3` |
 | Regenerate outputs | `run_pipeline` / `get_job` | `form run <project>` |
 | Ask for release | `request_release` (gives the user a bench link) | — |
+| Design something no recipe covers | `design_guide` → `create_design` → `update_design` | — |
+| Read a datasheet or drawing | `read_document` (PDF pages as images) | — |
 | Find the best design under constraints | `optimize` | `form optimize <p> --vary arm_t:4:20 --minimize solid_mass_g --require "statics.safety_factor>=3"` |
 | Show motion | `animate` (turntable or morph) | `form animate <p> --morph 1:4` |
 | Check this machine | `setup_status` (never run fixes without asking) | `form setup --check` |

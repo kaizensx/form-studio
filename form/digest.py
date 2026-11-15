@@ -13,7 +13,7 @@ def _fmt(v: float) -> str:
 def digest(st, pid: str, bench: str | None = None) -> dict:
     s = st.state(pid)
     p = s["project"]
-    recipe = st.recipes[p["recipe"]]
+    recipe = st.recipe(p)
     head = st.rev(p)
     params = {}
     for k, v in head["values"].items():
@@ -21,7 +21,7 @@ def digest(st, pid: str, bench: str | None = None) -> dict:
         src = head["provenance"].get(k, {}).get("source", "assumed")
         params[k] = f"{_fmt(v)} {sp.unit} ({src})"
     out: dict[str, Any] = {
-        "project": p["id"], "name": p["name"], "recipe": p["recipe"], "head": head["n"],
+        "project": p["id"], "name": p["name"], "recipe": p["recipe"] if not p["recipe"].startswith("src:") else "design written as code", "head": head["n"],
         "brief": p["brief"]["text"],
         "parameters": params,
         "outputs": {n: s["status"][n]["state"] + (f" (last made for r{s['status'][n]['last_rev']})" if s["status"][n].get("last_rev") else "")

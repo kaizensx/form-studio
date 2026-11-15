@@ -180,7 +180,7 @@ OBJECTIVES = {
 
 def alternatives(studio, p: dict, axes: list, weights: dict) -> dict:
     """axes: [{key, values:[...]}, ...] (1–2 axes). Every candidate is really built."""
-    recipe = studio.recipes[p["recipe"]]
+    recipe = studio.recipe(p)
     base = studio.rev(p)["values"]
     if not 1 <= len(axes) <= 2:
         raise ValueError("Choose one or two parameters to vary.")
@@ -189,7 +189,7 @@ def alternatives(studio, p: dict, axes: list, weights: dict) -> dict:
         sp = recipe.spec(ax["key"])
         vals = [min(sp.max, max(sp.min, float(v))) for v in ax["values"]][:5]
         grid = [{**g, ax["key"]: v} for g in grid for v in vals]
-    rows = studio._k("variants", timeout=120, recipe_id=p["recipe"], base=base, grid=grid)
+    rows = studio._k("variants", timeout=120, recipe_id=studio.rid(p), base=base, grid=grid)
     for r in rows:
         if not r["ok"]:
             continue

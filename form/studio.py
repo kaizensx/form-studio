@@ -18,7 +18,7 @@ import zipfile
 from pathlib import Path
 
 from . import __version__, checks as checks_mod, fit as fit_mod, slicer
-from .recipes import registry
+from .recipes import RecipeBook, RecipeError, SOURCE_PREFIX, store_source
 from .worker import Kernel, KernelFailure
 
 NODES = ["geometry", "exports", "checks", "slice"]
@@ -84,6 +84,15 @@ def sha_file(p: Path) -> str:
     return h.hexdigest()
 
 
+def _initial_provenance(param) -> dict:
+    """A design may declare where a default comes from (Param(..., provenance="specified", doc="Pi 5 drawing"))."""
+    src = getattr(param, "provenance", "assumed")
+    out = {"source": src if src in ("assumed", "specified", "measured", "calibrated", "photo") else "assumed"}
+    if out["source"] != "assumed" and param.doc:
+        out["note"] = param.doc[:200]
+    return out
+
+
 def slugify(name: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40]
     return s or "project"
@@ -94,8 +103,10 @@ class Studio:
         self.cfg = cfg
         self.root = Path(cfg["data"]["dir"])
         self.root.mkdir(parents=True, exist_ok=True)
+        self.sources = self.root / ".sources"
+        os.environ["FORM_SOURCES"] = str(self.sources)       # the kernel worker inherits this and resolves src: ids
         self.kernel = Kernel()
-        self.recipes = registry()
+        self.recipes = RecipeBook(self.sources)
         self.calibration = fit_mod.Calibration(self.root / "calibration.json")
         self.jobs: dict = {}
         self._locks: dict = {}
@@ -135,7 +146,8 @@ class Studio:
         if rid not in self._recipe_sha:
             base = Path(__file__).parent / "recipes"
             h = hashlib.sha256()
-            for f in (base / "base.py", base / f"{rid}.py"):
+            src = (self.sources / f"{rid[len(SOURCE_PREFIX):]}.py") if rid.startswith(SOURCE_PREFIX) else base / f"{rid}.py"
+            for f in (base / "base.py", src):
                 h.update(f.read_bytes())
             self._recipe_sha[rid] = h.hexdigest()[:16]
         return self._recipe_sha[rid]
@@ -212,6 +224,96 @@ class Studio:
                 pass
         tmp.replace(path)
 
+    def rid(self, p: dict, n: int | None = None) -> str:
+        """Recipe id a revision was built with (designs written as code change it per revision)."""
+        return self.rev(p, n).get("recipe") or p["recipe"]
+
+    def recipe(self, p: dict, n: int | None = None):
+        return self.recipes[self.rid(p, n)]
+
+    def _load_design(self, source: str) -> str:
+        if len(source) > 200_000:
+            raise StudioError("Design source is larger than 200 kB.")
+        rid = store_source(self.sources, source)
+        self.recipes.pop(rid, None)
+        try:
+            self.recipes[rid]
+        except RecipeError as e:
+            raise StudioError(str(e), e.hint, kind="source")
+        return rid
+
+    def create_design(self, name: str, source: str, brief: str = "", values: dict | None = None) -> dict:
+        """A new project whose geometry is defined by Python source (one Recipe subclass)."""
+        rid = self._load_design(source)
+        self._k("summary", key="pv-" + H(rid, values or {}), recipe_id=rid,
+                values={**self.recipes[rid].defaults(), **(values or {})}, tol=0.1)        # must build before it is saved
+        return self.create(name, rid, brief, values)
+
+    def update_design(self, p: dict, source: str, note: str = "", values: dict | None = None, origin: str = "agent",
+                      expect_head: int | None = None) -> dict:
+        """New revision with new source. Values for parameters that still exist carry over."""
+        rid = self._load_design(source)
+        new = self.recipes[rid]
+        with self.lock(p["id"]):
+            p = self.load(p["id"])
+            if expect_head is not None and p["head"] != expect_head:
+                raise StudioError(f"The design moved on: head is r{p['head']}, not r{expect_head}.",
+                                  "Read the project again, then re-apply your edit.", status=409, head=p["head"])
+            head = self.rev(p)
+            keep = {k: v for k, v in head["values"].items() if k in {q.key for q in new.params}}
+            vals = {**new.defaults(), **keep, **{k: float(v) for k, v in (values or {}).items()}}
+            vals = self._validate(rid, vals)
+            self._k("summary", key="pv-" + H(rid, vals), recipe_id=rid, values=vals, tol=0.1)
+            prov = {q.key: (head["provenance"][q.key] if q.key in head["provenance"] and q.key in keep
+                            and head["provenance"][q.key].get("source") != "assumed" else _initial_provenance(q)) for q in new.params}
+            n = max(r["n"] for r in p["revisions"]) + 1
+            old_keys = set(head["values"])
+            added = sorted(set(vals) - old_keys)
+            removed = sorted(old_keys - set(vals))
+            summ = "Design source changed" + (f"; new: {', '.join(added)}" if added else "") + (f"; removed: {', '.join(removed)}" if removed else "")
+            p["revisions"].append({"n": n, "parent": head["n"], "ts": time.time(), "values": vals, "note": note.strip() or summ,
+                                   "summary": summ, "origin": origin, "provenance": prov, "recipe": rid, "touched": []})
+            p["head"], p["recipe"] = n, rid
+            self.decide(p, "source", f"r{n}: {summ}.")
+            self.save(p)
+            return p
+
+    # ---- live activity: what agents are doing, for the bench to follow ------------------------------
+    def activity(self, pid: str | None, kind: str, text: str, by: str = "agent", **extra) -> dict:
+        ev = {"ts": time.time(), "project": pid, "kind": kind, "text": text[:400], "by": by, **extra}
+        f = self.root / ".activity.jsonl"
+        try:
+            with open(f, "a") as fh:
+                fh.write(json.dumps(ev, default=str) + "\n")
+            if f.stat().st_size > 2_000_000:                 # keep it small
+                lines = f.read_text().splitlines()[-2000:]
+                f.write_text("\n".join(lines) + "\n")
+        except OSError:
+            pass
+        return ev
+
+    def activity_since(self, ts: float = 0, limit: int = 60) -> list:
+        f = self.root / ".activity.jsonl"
+        if not f.exists():
+            return []
+        out = []
+        for line in f.read_text().splitlines()[-400:]:
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            if ev.get("ts", 0) > ts:
+                out.append(ev)
+        return out[-limit:]
+
+    def source_text(self, p: dict, n: int | None = None) -> str | None:
+        rid = self.rid(p, n)
+        if not rid.startswith(SOURCE_PREFIX):
+            f = Path(__file__).parent / "recipes" / f"{rid}.py"
+        else:
+            f = self.sources / f"{rid[len(SOURCE_PREFIX):]}.py"
+        return f.read_text() if f.exists() else None
+
     def create(self, name: str, recipe_id: str, brief: str = "", values: dict | None = None) -> dict:
         if recipe_id not in self.recipes:
             raise StudioError("Unknown recipe.")
@@ -228,8 +330,9 @@ class Studio:
              "brief": {"text": brief, "references": []},
              "fit": dict(zip(("gap_min", "gap_max"), (r.fit or {}).get("window", (0.10, 0.80)))),
              "orientation": "as_modelled", "auto_slice": True,
-             "revisions": [{"n": 1, "parent": None, "ts": now, "values": vals, "note": "Starting point from recipe defaults",
-                            "origin": "recipe", "provenance": {pp.key: {"source": "assumed"} for pp in r.params}}],
+             "revisions": [{"n": 1, "parent": None, "ts": now, "values": vals, "recipe": recipe_id,
+                            "note": "Starting point from recipe defaults" if not recipe_id.startswith(SOURCE_PREFIX) else "First version of the design",
+                            "origin": "recipe", "provenance": {pp.key: _initial_provenance(pp) for pp in r.params}}],
              "head": 1, "produced": {n: [] for n in NODES}, "decisions": [], "evidence": [], "approvals": []}
         self.save(p)
         return p
@@ -249,8 +352,9 @@ class Studio:
     def keys(self, p: dict, n: int | None = None) -> dict:
         r = self.rev(p, n)
         s = self.slicer_info()
-        recipe = self.recipes[p["recipe"]]
-        gk = H("geometry", p["recipe"], self.recipe_sha(p["recipe"]), self.kernel_id(), r["values"])
+        rid = self.rid(p, r["n"])
+        recipe = self.recipes[rid]
+        gk = H("geometry", rid, self.recipe_sha(rid), self.kernel_id(), r["values"])
         ek = H("exports", gk, p["orientation"], STL_TOL)
         fit_in = None
         if recipe.fit:
@@ -340,7 +444,7 @@ class Studio:
     def view(self, p: dict, n: int | None = None, tol=0.03) -> dict:
         r = self.rev(p, n)
         gk = self.keys(p, r["n"])["geometry"]
-        return self._k("view", key=gk, recipe_id=p["recipe"], values=r["values"], tol=tol, dock_mass_g=self._sliced_mass(p, r["n"]))
+        return self._k("view", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"], tol=tol, dock_mass_g=self._sliced_mass(p, r["n"]))
 
     def _sliced_mass(self, p, n=None):
         try:
@@ -351,7 +455,7 @@ class Studio:
 
     def fit(self, p: dict, values: dict | None = None, provenance: dict | None = None) -> dict | None:
         r = self.rev(p)
-        recipe = self.recipes[p["recipe"]]
+        recipe = self.recipe(p)
         corr = self.calibration.correction(self.profile())
         return fit_mod.analyse(recipe, values or r["values"], provenance or r["provenance"], p["fit"], corr)
 
@@ -361,9 +465,9 @@ class Studio:
         if unknown:
             raise StudioError("Unknown parameter(s): " + ", ".join(unknown) + ".", "List valid keys with describe_recipe (MCP) or `form recipe <id>` (CLI).")
         vals = {**self.rev(p)["values"], **{k: float(v) for k, v in values.items()}}
-        key = "pv-" + H(p["recipe"], vals)
+        key = "pv-" + H(self.rid(p), vals)
         t0 = time.perf_counter()
-        v = self._k("view", key=key, recipe_id=p["recipe"], values=vals, tol=0.06)
+        v = self._k("view", key=key, recipe_id=self.rid(p), values=vals, tol=0.06)
         v["impact"] = self.impact(p, vals, v)
         v["fit"] = self.fit(p, v["values"])
         v["round_trip_s"] = round(time.perf_counter() - t0, 4)
@@ -373,12 +477,12 @@ class Studio:
         r = self.rev(p, n)
         gk = self.keys(p, r["n"])["geometry"]
         cached = self.read(p, "geometry", gk)
-        return cached or self._k("summary", key=gk, recipe_id=p["recipe"], values=r["values"])
+        return cached or self._k("summary", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"])
 
     def impact(self, p: dict, vals: dict, cand: dict, base_rev: int | None = None) -> dict:
         """What a change touches: parameters, features, interfaces, artifacts."""
         r = self.rev(p, base_rev)
-        recipe = self.recipes[p["recipe"]]
+        recipe = self.recipe(p)
         base = self.head_summary(p, r["n"])
         changed = [{"key": k, "label": recipe.spec(k).label, "unit": recipe.spec(k).unit, "from": r["values"][k], "to": vals[k],
                     "group": recipe.spec(k).group}
@@ -441,12 +545,12 @@ class Studio:
                     prov[k] = {kk: v[kk] for kk in ("source", "sigma", "note", "instrument") if kk in v}
             if vals == head["values"] and prov == head["provenance"]:
                 raise StudioError("Nothing changed.", "Edit a parameter or its provenance first.")
-            key = "pv-" + H(p["recipe"], vals)
-            cand = self._k("summary", key=key, recipe_id=p["recipe"], values=vals, tol=0.06)   # must build before it becomes a revision
+            key = "pv-" + H(self.rid(p), vals)
+            cand = self._k("summary", key=key, recipe_id=self.rid(p), values=vals, tol=0.06)   # must build before it becomes a revision
             imp = self.impact(p, cand["values"], cand)
             n = max(r["n"] for r in p["revisions"]) + 1
             auto = ", ".join(f"{c['label']} {c['from']:g} → {c['to']:g} {c['unit']}" for c in imp["params"]) or "Provenance updated"
-            p["revisions"].append({"n": n, "parent": head["n"], "ts": time.time(), "values": cand["values"], "note": note.strip() or auto,
+            p["revisions"].append({"n": n, "parent": head["n"], "ts": time.time(), "values": cand["values"], "recipe": self.rid(p), "note": note.strip() or auto,
                                    "summary": auto, "origin": origin, "provenance": prov,
                                    "touched": [f["id"] for f in imp["features"]]})
             p["head"] = n
@@ -462,6 +566,7 @@ class Studio:
             if n != p["head"]:
                 self.decide(p, "checkout", f"Switched head from r{p['head']} to r{n}.")
                 p["head"] = n
+                p["recipe"] = self.rid(p, n)
                 self.save(p)
             return p
 
@@ -573,24 +678,24 @@ class Studio:
             job["finished"] = time.time()
 
     def _make_geometry(self, p, rev, keys, name):
-        s = self._k("summary", key=keys["geometry"], recipe_id=p["recipe"], values=rev["values"])
+        s = self._k("summary", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"])
         path = self.apath(p, "geometry", keys["geometry"])
         path.parent.mkdir(parents=True, exist_ok=True)
-        s.update({"rev": rev["n"], "recipe_sha": self.recipe_sha(p["recipe"])})
+        s.update({"rev": rev["n"], "recipe_sha": self.recipe_sha(self.rid(p))})
         path.write_text(json.dumps(s, indent=1))
 
     def _make_exports(self, p, rev, keys, name):
         out = self.apath(p, "exports", keys["exports"])
         tmp = out.with_name(out.name + ".tmp")
         shutil.rmtree(tmp, ignore_errors=True)
-        r = self._k("export", key=keys["geometry"], recipe_id=p["recipe"], values=rev["values"], out_dir=str(tmp),
+        r = self._k("export", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], out_dir=str(tmp),
                     name=name, orientation=p["orientation"], tol=STL_TOL)
         files = {}
         for kind in ("step", "stl"):
             f = Path(r[kind])
             files[kind] = {"name": f.name, "bytes": f.stat().st_size, "sha256": sha_file(f)}
         meta = {"rev": rev["n"], "files": files, "orientation": p["orientation"], "stl_tolerance_mm": STL_TOL,
-                "print_bbox": r["print_bbox"], "units": "mm", "source": f"recipe {p['recipe']}@{self.recipe_sha(p['recipe'])}",
+                "print_bbox": r["print_bbox"], "units": "mm", "source": f"recipe {self.rid(p)}@{self.recipe_sha(self.rid(p))}",
                 "kernel": self.kernel_id(), "geometry_key": keys["geometry"]}
         (tmp / "meta.json").write_text(json.dumps(meta, indent=1))
         shutil.rmtree(out, ignore_errors=True)
@@ -600,7 +705,7 @@ class Studio:
         ex = self.read(p, "exports", keys["exports"])
         stl = self.apath(p, "exports", keys["exports"]) / ex["files"]["stl"]["name"]
         s = self.slicer_info()
-        a = self._k("analyse", key=keys["geometry"], recipe_id=p["recipe"], values=rev["values"], stl_path=str(stl),
+        a = self._k("analyse", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], stl_path=str(stl),
                     nozzle=s.get("nozzle_mm", 0.4), envelope=self.cfg["printer"]["envelope_mm"], orientation=p["orientation"])
         if a.get("mesh", {}).get("sha256") and a["mesh"]["sha256"] != ex["files"]["stl"]["sha256"]:
             raise StudioError("The STL on disk is not the one that was exported.", "Run the pipeline again to regenerate exports.")
@@ -609,7 +714,7 @@ class Studio:
                "margin": self.cfg["printer"]["plate_margin_mm"], "printer": self.cfg["printer"]["name"],
                "nozzle": s.get("nozzle_mm", 0.4), "nozzle_assumed": not s.get("available")}
         fit = self.fit(p)
-        items = checks_mod.build(self.recipes[p["recipe"]], summary, a, ctx, fit)
+        items = checks_mod.build(self.recipe(p), summary, a, ctx, fit)
         path = self.apath(p, "checks", keys["checks"])
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"rev": rev["n"], "checks": items, "rollup": checks_mod.rollup(items),
@@ -641,7 +746,7 @@ class Studio:
             return json.loads(meta.read_text())
         name = f"{p['id']}_r{rev['n']:02d}_{kind}"
         tmp = out.with_name(out.name + ".src")
-        r = self._k("test_piece", key=keys["geometry"], recipe_id=p["recipe"], values=rev["values"], out_dir=str(tmp), name=name)
+        r = self._k("test_piece", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], out_dir=str(tmp), name=name)
         try:
             info = slicer.slice_stl(s, Path(r["stl"]), out, timeout=self.cfg["slicer"]["timeout_s"])
         except slicer.SlicerBlocked as e:
@@ -758,7 +863,7 @@ class Studio:
                     files[target] = sha_file(rel / target)
             manifest = {
                 "schema": "form-release/1", "project": p["id"], "name": p["name"], "revision": rev["n"], "approved": time.time(),
-                "units": "mm", "recipe": p["recipe"], "recipe_sha": self.recipe_sha(p["recipe"]), "kernel": self.kernel_id(),
+                "units": "mm", "recipe": self.rid(p), "recipe_sha": self.recipe_sha(self.rid(p)), "kernel": self.kernel_id(),
                 "values": rev["values"], "provenance": rev["provenance"], "keys": keys, "files": files,
                 "orientation": p["orientation"], "slicer": {k: sl.get(k) for k in ("slicer_version", "presets", "time_s", "filament_g", "layers", "support_used")},
                 "checks": [{k: c[k] for k in ("id", "label", "status", "value", "evidence")} for c in ch["checks"]],
@@ -849,7 +954,7 @@ class Studio:
     # ---- composed state for the UI --------------------------------------
     def state(self, pid: str) -> dict:
         p = self.load(pid)
-        recipe = self.recipes[p["recipe"]]
+        recipe = self.recipe(p)
         status = self.status(p)
         keys = {n: status[n]["key"] for n in NODES}
         fit = self.fit(p)

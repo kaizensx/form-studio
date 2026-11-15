@@ -6,7 +6,7 @@
   <a href="https://github.com/kaizensx/form-studio/actions"><img alt="CI" src="https://github.com/kaizensx/form-studio/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-1c1b19">
   <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-1c1b19">
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-22%20tools-e24d26">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-27%20tools-e24d26">
   <img alt="CAD" src="https://img.shields.io/badge/CAD-build123d%20%2F%20OpenCascade-1c1b19">
 </p>
 
@@ -22,6 +22,28 @@
 <p align="center"><sub>Every frame above is a separate build of the real parametric model, not a 3D-modelling trick.</sub></p>
 
 ---
+
+## Design anything. Watch it happen.
+
+Run `form serve`, or let any agent start FORM. A page opens with Claude on the left and your part on the right. Describe what you need:
+
+> *Design a case for a Raspberry Pi 5 with a snap-on lid*
+
+Claude then works through the request:
+
+1. **Finds the official mechanical drawing** and reads it as an image, so a drawing's dimensions aren't lost the way they are in text extraction.
+2. **Writes the design as CAD code inside FORM:** typed parameters, named features and constraints.
+3. **Builds, renders and checks it.** It slices it with your printer's settings, and fixes what the checks catch. In the run below it noticed the two parts were wider than an A1 mini bed and moved the lid.
+
+<p align="center"><img src="docs/screenshots/16-chat-pi5-case.jpg" width="820" alt="FORM page: Claude chat on the left, the Pi 5 case it designed on the right"></p>
+
+<p align="center"><img src="docs/assets/pi5-case-by-claude.png" width="820" alt="Four views of the Raspberry Pi 5 case Claude designed in FORM"><br>
+<sub>A real run from the page: 10 steps, $1.04 on the user's account. Base and lid print side by side. The answer lists which numbers came from the official drawing and which are estimates to check.</sub></p>
+
+How the page works:
+
+- **Same live view in every agent.** When you use FORM from Claude Code or Codex instead, the same page opens by itself and follows along: drafts, renders, commits.
+- **Five built-in recipes as examples, not the limit.** Anything else is written as a design: one Python file, built by build123d, with history kept for every version.
 
 ## Install in one line
 
@@ -142,6 +164,7 @@ FORM doesn't compete with your CAD program or your slicer. It sits between the a
 | Explore | Design | Check & prove | Ship |
 |---|---|---|---|
 | `form_overview` | `create_project` | `get_project` | `request_release` → bench link |
+| `design_guide` | `create_design` / `update_design` | `read_document` | `get_design_source` |
 | `describe_recipe` | `preview_change` | `run_pipeline` / `get_job` | `verify_release` |
 | `setup_status` | `commit_change` | `slice_test_piece` | `open_in` (Bambu Studio, CAD, ...) |
 | `render` | `optimize` | `record_physical_result` | `open_bench` |

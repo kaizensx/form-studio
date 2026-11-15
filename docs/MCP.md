@@ -38,9 +38,65 @@ Parameters (unit, range, group, the feature each one drives), features and what 
 |---|---|---|
 | `recipe` | string | yes |
 
+## `design_guide`  · read-only
+
+Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
+holder, mechanism...). Returns the contract for a design written as code, the rules, and a complete example
+that builds. Then call create_design.
+
+## `read_document`  · read-only
+
+Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). PDF pages come
+back as images, because a drawing's dimensions are graphics that text extraction loses, plus any text on the page.
+pages: "1", "1-3", "2,5" (at most 4). Use this for official dimensions of boards, devices and hardware.
+
+| Argument | Type | Required |
+|---|---|---|
+| `source` | string | yes |
+| `pages` | string |  |
+
+## `create_design`
+
+Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
+built with build123d. FORM builds it, and with run=True exports, checks and slices it. Load or build errors come
+back with the line and a hint; fix and call again. Then render(view="sheet") and look at it.
+
+| Argument | Type | Required |
+|---|---|---|
+| `name` | string | yes |
+| `source` | string | yes |
+| `brief` | string |  |
+| `values` | object | null |  |
+| `run` | boolean |  |
+
+## `update_design`
+
+Replace a design's code as a new revision (history keeps every version). Existing parameter values carry over;
+changing a default does not change a saved value, so pass values={...} to change them. New parameters start at
+their defaults. Use preview_change/commit_change instead when only values change.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `source` | string | yes |
+| `note` | string |  |
+| `values` | object | null |  |
+| `expect_head` | integer | null |  |
+| `run` | boolean |  |
+
+## `get_design_source`  · read-only
+
+The exact code a revision was built from (built-in recipes return their recipe file).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `rev` | integer | null |  |
+
 ## `create_project`
 
-Create a project from a recipe. values override recipe defaults (all start as 'assumed').
+Create a project from a built-in recipe (dock, gridfinity, hook, planter, coupon). For anything else, write a
+design: design_guide, then create_design. values override recipe defaults (all start as 'assumed').
 With run=True the solid, exports and checks are built (and sliced if a slicer is available).
 
 | Argument | Type | Required |

@@ -149,6 +149,7 @@ function shape() {
 }
 
 function intentSection(f) {
+  if (S.studio.chat && S.studio.chat.available) return null;      // the Claude panel on the left replaces this box
   const as = S.studio.assistant;
   const input = h('input', { type: 'text', id: 'intent', placeholder: f ? `e.g. “make the ${f.label.toLowerCase()} a bit ${f.role === 'interface' ? 'looser' : 'bolder'}”` : 'e.g. “make it harder to tip over”',
     onkeydown: e => { if (e.key === 'Enter') ask(input.value, f?.id, 'rule'); } });

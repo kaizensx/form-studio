@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "form-studio"
-version = "7.0.0"
+version = "8.0.0"
 description = "Engine and MCP server that lets coding agents design 3D-printable parts with real CAD, real slicing and an honest evidence record."
 readme = "README.md"
 license = "MIT"
@@ -22,6 +22,7 @@ dependencies = [
   "numpy>=2",
   "pillow>=10.1",
   "mcp>=2.3,<3",
+  "pypdfium2>=4.30",
 ]
 
 [project.urls]

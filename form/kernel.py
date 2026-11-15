@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .recipes import RecipeError, registry
+from .recipes import RecipeError, registry, resolve
 
 KERNEL_ID = None
 _cache: dict = {}     # geometry key -> built model (kept small)
@@ -45,7 +45,7 @@ def _skin(shape):
 def _build(recipe_id: str, values: dict, tol: float):
     """Build, attribute every face to a feature, and tessellate."""
     from build123d import CenterOf, Vertex
-    recipe = registry()[recipe_id]
+    recipe = resolve(recipe_id)
     v = recipe.validate(values)
     t0 = time.perf_counter()
     try:
@@ -58,10 +58,11 @@ def _build(recipe_id: str, values: dict, tol: float):
     final = stages[-1].shape
     t_build = time.perf_counter() - t0
     solids = final.solids()
-    if not final.is_valid or len(solids) != 1:
+    want = getattr(recipe, "solids", 1)
+    if not final.is_valid or len(solids) != want:
         raise RecipeError(
-            f"The result is not one valid solid ({len(solids)} solid(s), valid={final.is_valid})", stages[-1].feature,
-            "A cut has split or hollowed the body. Reduce the last change.")
+            f"The result is {len(solids)} solid(s) (valid={final.is_valid}); this design declares {want}", stages[-1].feature,
+            "A cut has split the body, or parts touch and fused. Separate parts by a gap, or reduce the last change.")
 
     skins = [_skin(s.shape) for s in stages[:-1]]
     faces, by_feature = [], {}
@@ -333,6 +334,7 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
     out = {"orientation_table": table, "thin": thin if thin["t"] < float("inf") else None,
            "thickness_samples": len(hist),
            "brep": {"valid": bool(model["shape"].is_valid), "solids": len(model["shape"].solids()),
+                    "expected_solids": getattr(model["recipe"], "solids", 1),
                     "volume_mm3": model["volume"]},
            "interface_audit": model["recipe"].measure(model["values"], model["by_feature"])}
     if stl_path:
@@ -340,7 +342,8 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
         row = next(r for r in table if r["id"] == orientation)
         size = [row["footprint_mm"][0], row["footprint_mm"][1], row["height_mm"]]
         try:
-            a = mesh_audit.audit(tris, bed=tuple(envelope), margin=2.0, expected_size=size, dimension_tolerance=0.05)
+            a = mesh_audit.audit(tris, bed=tuple(envelope), margin=2.0, expected_size=size, dimension_tolerance=0.05,
+                                 expected_components=getattr(model["recipe"], "solids", 1))
         except ValueError as e:
             a = {"status": "ERROR", "failures": [str(e)]}
         a.pop("limitations", None)

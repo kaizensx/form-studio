@@ -2,6 +2,7 @@
 import { Viewer } from './viewer.js';
 import { S, A, h, api, P, fmt, trim, dur, ago, toast, head, hasDraft, values } from './core.js';
 import { renderInspector, renderDraft, openProjects, openAlternatives } from './panels.js';
+import { initTalk, renderTalk } from './talk.js';
 
 const $ = id => document.getElementById(id);
 const STAGES = [
@@ -29,6 +30,7 @@ async function boot() {
     },
   });
   window.__form = { S, viewer, A };
+  initTalk(viewer);
   $('mark').onclick = () => openProjects();
   try {
     S.studio = await api('/studio');
@@ -36,7 +38,8 @@ async function boot() {
   const link = fromHash();
   const want = link.p || new URLSearchParams(location.search).get('p') || localStorage.getItem('form.project');
   const found = S.studio.projects.find(p => p.id === want && !p.error) || S.studio.projects.find(p => !p.error);
-  if (found) { await A.open(found.id); if (link.tab) A.stage(link.tab); } else { renderBar(); openProjects(true); }
+  if (found) { await A.open(found.id); if (link.tab) A.stage(link.tab); } else { renderBar(); }
+  renderTalk();
   window.addEventListener('hashchange', async () => {
     const l = fromHash();
     if (l.p && l.p !== S.pid) { S.studio = await api('/studio'); await A.open(l.p); }

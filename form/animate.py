@@ -43,7 +43,7 @@ def _save(frames: list, out: str | Path, ms: int) -> dict:
 
 
 def turntable(studio, p: dict, out, frames: int = 36, elevation: float = 24, size=(640, 480), ms: int = 70) -> dict:
-    recipe = studio.recipes[p["recipe"]]
+    recipe = studio.recipe(p)
     v = studio.view(p)
     lo, hi = _bbox(v)
     imgs = []
@@ -68,7 +68,7 @@ def _ease(t):
 def morph(studio, p: dict, a: dict, b: dict, out, frames: int = 24, size=(640, 480), ms: int = 90, title: str = "",
           azimuth: float = -55, elevation: float = 26, hold: int = 6, spin: float = 40) -> dict:
     """Interpolate every numeric parameter from a to b, build each frame, render with fixed framing."""
-    recipe = studio.recipes[p["recipe"]]
+    recipe = studio.recipe(p)
     changed = [k for k in a if abs(a[k] - b[k]) > 1e-9]
     views, skipped = [], []
     for i in range(frames):
@@ -79,7 +79,7 @@ def morph(studio, p: dict, a: dict, b: dict, out, frames: int = 24, size=(640, 4
             x = a[k] + (b[k] - a[k]) * t
             vals[k] = float(round(x)) if sp.step >= 1 and sp.unit in ("", "u") else round(x, 4)
         try:
-            v = studio._k("view", key="mv-" + H(p["recipe"], vals), recipe_id=p["recipe"], values=vals, tol=0.08)
+            v = studio._k("view", key="mv-" + H(studio.rid(p), vals), recipe_id=studio.rid(p), values=vals, tol=0.08)
             views.append((t, vals, v))
         except Exception as e:                                   # recipe constraint or kernel failure: show it, don't fake it
             skipped.append({"t": round(t, 3), "reason": str(e)[:160]})

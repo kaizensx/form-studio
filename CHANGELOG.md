@@ -1,5 +1,24 @@
 # Changelog
 
+## 8.0.0
+
+### Design anything
+- **Designs as code:** agents write designs (`design_guide`, `create_design`, `update_design`, `get_design_source`) that get the full pipeline. Every revision keeps its exact code.
+- **Multi-part designs:** `solids = N`, so a base and lid print on one plate.
+- **`read_document`:** renders datasheet and mechanical-drawing PDFs as images, so agents read real dimensions.
+- **Declared provenance:** a design can mark a value `Param(..., provenance="specified")`.
+
+### The page
+- **Chat with Claude in the page.** It runs on your Claude Code account, with FORM tools and web lookup, and streams what Claude is writing.
+- **The page follows any agent live:** it opens projects, shows drafts and views, and refreshes on commits.
+- **It opens by itself** the first time an agent starts working.
+
+### Fixes
+- The `form-mcp` path broke when it contained spaces.
+- Setup fixes no longer inherit the terminal.
+- Registration is detected from config files.
+- The installer always fetches the latest version.
+
 ## 7.0.0
 
 ### Installation

@@ -90,6 +90,19 @@ def _origin(ctx: Context | None) -> str:
         return "agent"
 
 
+def act(pid, kind: str, text: str, ctx=None, **extra):
+    """Tell the bench what the agent is doing; open it the first time there is something to show."""
+    st = studio()
+    st.activity(pid, kind, text, by=_origin(ctx).replace("agent:", "") or "agent", **extra)
+    url = S["bench"].get("url")
+    if url and pid and not S.get("opened") and st.cfg.get("bench", {}).get("auto_open", True):
+        S["opened"] = True
+        try:
+            webbrowser.open(f"{url}/#p={pid}")
+        except Exception:
+            pass
+
+
 def digest(st: Studio, pid: str) -> dict:
     return _digest(st, pid, S["bench"].get("url"))
 
@@ -121,7 +134,7 @@ def build() -> MCPServer:
                 "slicer": {k: env["slicer"].get(k) for k in ("kind", "available", "reason", "version")} |
                           {"presets": {k: v["name"] for k, v in env["slicer"].get("presets", {}).items()}},
                 "calibration_profile": env["profile"],
-                "recipes": [{"id": r.id, "title": r.title, "summary": r.summary} for r in st.recipes.values()],
+                "recipes": [{"id": r.id, "title": r.title, "summary": r.summary} for r in st.recipes.builtins().values()],
                 "projects": [{k: q.get(k) for k in ("id", "name", "recipe", "head", "approved_rev")} for q in st.list()],
                 "data_dir": env["data_dir"], "bench": _bench(),
             }
@@ -153,13 +166,85 @@ def build() -> MCPServer:
                 "groups": {"brief": "facts about the world (measure these)", "interface": "how parts meet",
                            "form": "free design choices"}}
 
+    @mcp.tool(annotations=RO)
+    async def design_guide() -> dict:
+        """Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
+        holder, mechanism...). Returns the contract for a design written as code, the rules, and a complete example
+        that builds. Then call create_design."""
+        from .design_guide import EXAMPLE, GUIDE
+        return {"guide": GUIDE, "example_source": EXAMPLE,
+                "built_in_recipes": "dock, gridfinity, hook, planter, coupon (use create_project for these)"}
+
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True), structured_output=False)
+    async def read_document(source: str, pages: str = "1") -> list:
+        """Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). PDF pages come
+        back as images, because a drawing's dimensions are graphics that text extraction loses, plus any text on the page.
+        pages: "1", "1-3", "2,5" (at most 4). Use this for official dimensions of boards, devices and hardware."""
+        st = studio()
+        def go():
+            from . import documents
+            try:
+                f = documents.fetch(source, st.root / ".references")
+                r = documents.render(f, pages)
+            except Exception as e:                       # network, format, size
+                raise StudioError(f"Could not read {source}: {e}", "Try the document's direct PDF link, or a local copy.")
+            return f, r
+        f, r = await _run(go)
+        act(None, "look", f"Reading {source.split('/')[-1][:60]}", None)
+        out: list = [Image(data=b, format="png") for b in r["images"]]
+        out.append(f"Pages {r['pages']} of {r['page_count']} from {source} (saved as {f.name})."
+                   + (f"\n\nText on the page:\n{r['text'][:4000]}" if r["text"] else ""))
+        return out
+
+    @mcp.tool(annotations=RW)
+    async def create_design(name: str, source: str, brief: str = "", values: dict[str, float] | None = None,
+                            run: bool = True, ctx: Context = None) -> dict:
+        """Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
+        built with build123d. FORM builds it, and with run=True exports, checks and slices it. Load or build errors come
+        back with the line and a hint; fix and call again. Then render(view="sheet") and look at it."""
+        st = studio()
+        act(None, "design", f"Writing a new design: {name}", ctx)
+        p = await _run(st.create_design, name, source, brief, values)
+        act(p["id"], "commit", f"Created {name} (r01)", ctx)
+        if run:
+            jid = st.run(p["id"])
+            await _wait_job(st, jid, 50)
+        return await _run(digest, st, p["id"])
+
+    @mcp.tool(annotations=RW)
+    async def update_design(project: str, source: str, note: str = "", values: dict[str, float] | None = None,
+                            expect_head: int | None = None, run: bool = True, ctx: Context = None) -> dict:
+        """Replace a design's code as a new revision (history keeps every version). Existing parameter values carry over;
+        changing a default does not change a saved value, so pass values={...} to change them. New parameters start at
+        their defaults. Use preview_change/commit_change instead when only values change."""
+        st = studio()
+        p = await _run(lambda: st.update_design(st.load(project), source, note, values, _origin(ctx), expect_head))
+        act(project, "commit", f"r{p['head']:02d}: {note or 'design code updated'}", ctx)
+        res: dict[str, Any] = {"head": p["head"]}
+        if run:
+            jid = st.run(project)
+            res["pipeline"] = job_digest(await _wait_job(st, jid, 45))
+        res["project"] = await _run(digest, st, project)
+        return res
+
+    @mcp.tool(annotations=RO)
+    async def get_design_source(project: str, rev: int | None = None) -> dict:
+        """The exact code a revision was built from (built-in recipes return their recipe file)."""
+        st = studio()
+        def go():
+            p = st.load(project)
+            return {"project": project, "rev": rev or p["head"], "recipe": st.rid(p, rev), "source": st.source_text(p, rev)}
+        return await _run(go)
+
     @mcp.tool(annotations=RW)
     async def create_project(name: str, recipe: str, brief: str = "", values: dict[str, float] | None = None,
-                             run: bool = True) -> dict:
-        """Create a project from a recipe. values override recipe defaults (all start as 'assumed').
+                             run: bool = True, ctx: Context = None) -> dict:
+        """Create a project from a built-in recipe (dock, gridfinity, hook, planter, coupon). For anything else, write a
+        design: design_guide, then create_design. values override recipe defaults (all start as 'assumed').
         With run=True the solid, exports and checks are built (and sliced if a slicer is available)."""
         st = studio()
         p = await _run(st.create, name, recipe, brief, values)
+        act(p["id"], "commit", f"Created {name} from the {recipe} recipe", ctx)
         if run:
             jid = st.run(p["id"])
             await _wait_job(st, jid, 50)
@@ -173,7 +258,7 @@ def build() -> MCPServer:
         return await _run(digest, st, project)
 
     @mcp.tool(annotations=RO)
-    async def preview_change(project: str, values: dict[str, float]) -> dict:
+    async def preview_change(project: str, values: dict[str, float], ctx: Context = None) -> dict:
         """Build a candidate change for real and report what it would touch, without saving anything:
         changed features, interface dimensions, stability, fit yield, which outputs it would invalidate.
         Invalid candidates come back as an error naming the feature, parameters and a fix."""
@@ -187,7 +272,9 @@ def build() -> MCPServer:
                 out["fit_after"] = f"{v['fit']['yield'] * 100:.0f}% modelled yield, expected gap {v['fit']['expected_gap']:.2f} mm"
             out["next"] = f"render(project, values=...) to look; commit_change(..., expect_head={p['head']}) to keep."
             return out
-        return await _run(go)
+        res = await _run(go)
+        act(project, "draft", "Trying " + ", ".join(res["changes"]), ctx, values=values)
+        return res
 
     @mcp.tool(annotations=RW)
     async def commit_change(project: str, values: dict[str, float], note: str = "", expect_head: int | None = None,
@@ -202,6 +289,7 @@ def build() -> MCPServer:
             st.commit(p, values, note, _origin(ctx), provenance, expect_head=expect_head)
             return st.load(project)["head"]
         head = await _run(go)
+        act(project, "commit", f"r{head:02d}: {note or ', '.join(f'{k}={v:g}' for k, v in values.items())}", ctx)
         res: dict[str, Any] = {"head": head}
         if run:
             jid = st.run(project)
@@ -229,20 +317,20 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO, structured_output=False)
     async def render(project: str, view: str = "iso", highlight: str | None = None, rev: int | None = None,
-                     values: dict[str, float] | None = None) -> list:
+                     values: dict[str, float] | None = None, ctx: Context = None) -> list:
         """Look at the part. Returns a PNG rendered from the real kernel geometry, coloured by feature.
         view: iso, iso_back, front, back, left, right, top, bottom, or "sheet" (four views at once).
         highlight: a feature id to pick out. values: render an uncommitted candidate (same as preview_change)."""
         st = studio()
         def go():
             p = st.load(project)
-            recipe = st.recipes[p["recipe"]]
+            recipe = st.recipe(p, rev)
             feats = [{"id": f.id, "label": f.label} for f in recipe.features]
             if highlight and highlight not in [f["id"] for f in feats]:
                 raise StudioError(f"Unknown feature “{highlight}”.", "Features: " + ", ".join(f["id"] for f in feats))
             if values:
                 v = st.preview(p, values)
-                title, key = f"{p['name']} - r{p['head']:02d} + DRAFT (not saved)", "pv-" + H(p["recipe"], v["values"])
+                title, key = f"{p['name']} - r{p['head']:02d} + DRAFT (not saved)", "pv-" + H(st.rid(p), v["values"])
             else:
                 n = rev or p["head"]
                 v = st.view(p, n)
@@ -262,6 +350,8 @@ def build() -> MCPServer:
                        f"bounding box {' x '.join(f'{b - a:.1f}' for a, b in zip(*v['bbox']))} mm. File: {f}")
             return f, caption
         f, caption = await _run(go)
+        act(project, "look", f"Looking at the {view} view" + (f", {highlight}" if highlight else "")
+            + (" of a draft" if values else ""), ctx, view=view, highlight=highlight, values=values)
         return [Image(path=f), caption]
 
     @mcp.tool(annotations=RO, structured_output=False)
@@ -360,7 +450,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def optimize(project: str, vary: list[dict], objective: dict[str, str], constraints: list[str] | None = None,
-                       budget: int = 40) -> dict:
+                       budget: int = 40, ctx: Context = None) -> dict:
         """Goal seek: search parameter ranges for the best design that meets constraints. Every candidate is built by the kernel.
         vary: [{"key": "arm_t", "min": 4, "max": 20}] (1-4 parameters).
         objective: {"minimize": "solid_mass_g"} or {"maximize": "statics.safety_factor"}.
@@ -375,7 +465,12 @@ def build() -> MCPServer:
                 return opt.run(st, p, vary, objective, constraints or [], budget)
             except (opt.OptimizeError, KeyError) as e:
                 raise StudioError(str(e).strip("'"), "Check parameter keys with describe_recipe.")
-        return await _run(go)
+        act(project, "search", f"Searching: {next(iter(objective))} {next(iter(objective.values()))}"
+            + (f" with {', '.join(constraints)}" if constraints else ""), ctx)
+        res = await _run(go)
+        if res.get("best"):
+            act(project, "draft", f"Best of {res['evaluated']} builds", ctx, values=res["best"]["values"])
+        return res
 
     @mcp.tool(annotations=RW)
     async def slice_test_piece(project: str) -> dict:
@@ -425,6 +520,7 @@ def build() -> MCPServer:
             g, ap = st.gate(p), st.approval_state(p)
             return p, g, ap
         p, g, ap = await _run(go)
+        act(project, "release", "Ready for your approval" if g["ready"] else "Not ready: " + "; ".join(g["reasons"])[:200], None)
         url = _bench(f"#p={project}&tab=release")
         if open_browser and url:
             webbrowser.open(url)
