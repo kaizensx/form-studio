@@ -325,6 +325,13 @@ def start_bench(st: Studio, tries: int = 10) -> dict:
     return {"url": None, "error": f"No free port in {port}-{port + tries - 1}."}
 
 
+def _open(url, cfg):
+    import os
+    import webbrowser
+    if cfg.get("bench", {}).get("auto_open", True) and not os.environ.get("FORM_NO_BROWSER"):
+        threading.Timer(0.6, lambda: webbrowser.open(url)).start()
+
+
 def serve(cfg=None):
     cfg = cfg or config.load()
     st = Studio(cfg)
@@ -332,9 +339,22 @@ def serve(cfg=None):
     host, port = cfg["server"]["host"], int(cfg["server"]["port"])
     if host not in ("127.0.0.1", "localhost", "::1"):
         raise SystemExit("FORM binds to loopback only. Set [server].host to 127.0.0.1.")
-    httpd = ThreadingHTTPServer((host, port), make_handler(st))
+    httpd = None
+    for p_try in range(port, port + 10):                 # a busy port is not a reason to fail
+        try:
+            httpd = ThreadingHTTPServer((host, p_try), make_handler(st))
+            port = p_try
+            break
+        except OSError:
+            if _is_form(f"http://{host}:{p_try}", str(st.root)):
+                print(f"FORM is already running for this project folder → http://{host}:{p_try}", flush=True)
+                _open(f"http://{host}:{p_try}", cfg)
+                return 0
+    if httpd is None:
+        raise SystemExit(f"No free port between {cfg['server']['port']} and {port + 9}.")
     httpd.daemon_threads = True
     print(f"FORM studio → http://{host}:{port}   (data: {cfg['data']['dir']})", flush=True)
+    _open(f"http://{host}:{port}", cfg)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
