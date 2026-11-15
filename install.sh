@@ -29,7 +29,7 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 bold "Installing FORM (first time: about 200 MB for the CAD kernel)"
-uv tool install --force --python 3.12 "$SOURCE"
+uv tool install --force --refresh-package form-studio --python 3.12 "$SOURCE"   # always fetch the latest, never a cached commit
 BIN="$(uv tool dir --bin)"
 case ":$PATH:" in *":$BIN:"*) ;; *)
   echo "Note: $BIN is not on your PATH. Run: uv tool update-shell"; PATH="$BIN:$PATH" ;;

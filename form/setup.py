@@ -92,6 +92,44 @@ def _json_has(path: Path, key: str = "mcpServers") -> bool:
         return False
 
 
+def _claude_command() -> str | None:
+    """Read Claude Code's user config directly. `claude mcp get` health-checks the server and can time out on a cold start."""
+    try:
+        srv = json.loads((HOME / ".claude.json").read_text()).get("mcpServers", {}).get("form")
+    except (OSError, ValueError):
+        return None
+    return srv.get("command") if srv else None
+
+
+def _codex_command() -> str | None:
+    import tomllib
+    path = Path(os.environ.get("CODEX_HOME", HOME / ".codex")) / "config.toml"
+    try:
+        srv = tomllib.loads(path.read_text()).get("mcp_servers", {}).get("form")
+    except (OSError, ValueError):
+        return None
+    return srv.get("command") if srv else None
+
+
+def _same(a: str, b: str) -> bool:
+    try:
+        return Path(a).resolve() == Path(b).resolve()
+    except OSError:
+        return a == b
+
+
+def _agent_item(iid, label, current, mcp, summary, add_cmds, replace_cmds) -> Item:
+    if not current:
+        return Item(iid, label, "missing", "Installed; FORM is not registered", Fix(summary, add_cmds))
+    if not Path(current).exists():
+        return Item(iid, label, "warn", f"Registered, but {current} no longer exists",
+                    Fix(f"Point {label} at this installation", replace_cmds))
+    if not _same(current, mcp):
+        return Item(iid, label, "warn", f"Registered to another FORM installation: {current}",
+                    Fix(f"Point {label} at this installation", replace_cmds, recommended=False))
+    return Item(iid, label, "ok", "FORM is registered")
+
+
 def check(cfg: dict | None = None, studio=None) -> list[Item]:
     from . import config, slicer
     cfg = cfg or config.load()
@@ -159,16 +197,13 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
 
     # --- agents -----------------------------------------------------------
     if shutil.which("claude"):
-        code, _ = _run(["claude", "mcp", "get", "form"])
-        items.append(Item("agent.claude", "Claude Code", "ok" if code == 0 else "missing",
-                          "FORM is registered" if code == 0 else "Installed; FORM is not registered",
-                          None if code == 0 else Fix("Register FORM with Claude Code (user scope)",
-                                                     [f"claude mcp add --scope user form -- {shlex.quote(mcp)}"])))
+        add = f"claude mcp add --scope user form -- {shlex.quote(mcp)}"
+        items.append(_agent_item("agent.claude", "Claude Code", _claude_command(), mcp, "Register FORM with Claude Code (user scope)",
+                                 [add], ["claude mcp remove --scope user form", add]))
     if shutil.which("codex"):
-        code, _ = _run(["codex", "mcp", "get", "form"])
-        items.append(Item("agent.codex", "Codex", "ok" if code == 0 else "missing",
-                          "FORM is registered" if code == 0 else "Installed; FORM is not registered",
-                          None if code == 0 else Fix("Register FORM with Codex", [f"codex mcp add form -- {shlex.quote(mcp)}"])))
+        add = f"codex mcp add form -- {shlex.quote(mcp)}"
+        items.append(_agent_item("agent.codex", "Codex", _codex_command(), mcp, "Register FORM with Codex", [add],
+                                 ["codex mcp remove form", add]))
     gem = HOME / ".gemini" / "settings.json"
     if shutil.which("gemini") or gem.parent.exists():
         ok = _json_has(gem)

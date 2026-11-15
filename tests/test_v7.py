@@ -81,5 +81,22 @@ class V7(unittest.TestCase):
             self.assertEqual(bad.read_text(), "{ // comment\n}")          # untouched
 
 
+class AgentDetection(unittest.TestCase):
+    def test_reads_config_not_health_check(self):
+        with tempfile.TemporaryDirectory() as d:
+            old = setup.HOME
+            setup.HOME = Path(d)
+            try:
+                me = setup.mcp_command()
+                self.assertEqual(setup._agent_item("a", "Claude Code", setup._claude_command(), me, "s", [], []).status, "missing")
+                (Path(d) / ".claude.json").write_text(json.dumps({"mcpServers": {"form": {"command": me}}}))
+                self.assertEqual(setup._agent_item("a", "Claude Code", setup._claude_command(), me, "s", [], []).status, "ok")
+                (Path(d) / ".claude.json").write_text(json.dumps({"mcpServers": {"form": {"command": "/gone/form-mcp"}}}))
+                it = setup._agent_item("a", "Claude Code", setup._claude_command(), me, "s", [], ["x"])
+                self.assertEqual((it.status, it.fix.commands), ("warn", ["x"]))
+            finally:
+                setup.HOME = old
+
+
 if __name__ == "__main__":
     unittest.main()
