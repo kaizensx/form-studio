@@ -238,7 +238,8 @@ def _apply(item: Item, dry: bool) -> tuple[bool, str]:
         print("   $", cmd)
         if dry:
             continue
-        code = subprocess.call(cmd, shell=True)
+        # no terminal stdin: Bun-based CLIs (claude) crash on /dev/tty with "EINVAL: invalid argument, kqueue" on macOS
+        code = subprocess.call(cmd, shell=True, stdin=subprocess.DEVNULL)
         if code != 0:
             return False, f"exited with {code}"
     return True, "done" if not dry else "(dry run)"
