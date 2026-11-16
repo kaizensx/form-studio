@@ -31,7 +31,7 @@ Column {
         }).then(function () {
             return Store.refresh()
         }).then(function () {
-            root.busy = false; Store.toast("Presets re-read from Bambu Studio")
+            root.busy = false; Store.toast("Presets re-read from " + (root.sl.label || "the slicer"))
         }, function (e) { root.busy = false; Store.fail(e) })
     }
 
@@ -96,10 +96,13 @@ Column {
             KV { k: "Walls · infill · supports"
                 value: root.sl.available ? root.sl.summary.walls + " · " + root.sl.summary.infill + " · " + (String(root.sl.summary.supports) === "1" ? "on" : "off") : "" } }
         Txt { kind: "fine"; width: parent.width; visible: !!root.sl.available
-            text: root.sl.available ? "Read from Bambu Studio " + root.sl.version + " (" + root.sl.source.machine + "). Change the selection there, or pin presets in studio.toml; the slice goes stale when they change." : "" }
-        Btn { visible: !!root.sl.available; kind: "quiet"; icon: "refresh_cw"; text: root.busy ? "Re-reading…" : "Re-read presets"; enabled: !root.busy; x: -8
-            onClicked: root.reread() }
-        Note { visible: !root.sl.available; kind: "red"; title: "Slicer unavailable"; text: root.sl.reason || "" } }
+            text: root.sl.available ? "Read from " + (root.sl.label || "Bambu Studio") + " " + root.sl.version + " (" + root.sl.source.machine + "). Change the selection there, or pin presets in studio.toml; the slice goes stale when they change." : "" }
+        Note { visible: !root.sl.available; kind: "red"; title: "Slicer unavailable"; text: root.sl.reason || "" }
+        Row { spacing: 4; x: -8
+            Btn { visible: !!root.sl.available; kind: "quiet"; icon: "refresh_cw"; text: root.busy ? "Re-reading…" : "Re-read presets"; enabled: !root.busy
+                onClicked: root.reread() }
+            // slicer picker (slicer workstream)
+            Btn { kind: "quiet"; icon: "printer"; text: "Slicer: " + (root.sl.label || "none") + "…"; onClicked: Store.openSheet("slicer") } } }
 
     Item { width: 1; height: 20 }
 

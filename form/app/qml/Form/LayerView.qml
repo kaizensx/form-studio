@@ -1,7 +1,7 @@
 import QtQuick
 import "F.js" as F
 
-// The slice, one layer at a time: the toolpaths Bambu Studio would send. Simulated, not a print.
+// The slice, one layer at a time: the toolpaths the slicer would send. Simulated, not a print.
 // Replaces the 3D viewport while Store.layers is set.
 Item {
     id: root

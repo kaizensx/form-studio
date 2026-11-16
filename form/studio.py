@@ -99,6 +99,12 @@ def H(*parts) -> str:
     return hashlib.sha256(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
+def _slicer_tag(s: dict) -> list:
+    """Artifact keys name the slicer kind, except Bambu Studio's, whose keys predate other slicers."""
+    kind = s.get("kind", "bambu")
+    return [] if kind == "bambu" else [kind]
+
+
 def sha_file(p: Path) -> str:
     h = hashlib.sha256()
     with open(p, "rb") as f:
@@ -419,7 +425,8 @@ class Studio:
         if fc and not getattr(recipe, "mesh", False):  # an installed FreeCAD adds a re-import check
             ck = H(ck, "freecad", fc)
         presets = {k: v["sha"] for k, v in s.get("presets", {}).items()} if s.get("available") else None
-        sk = H("slice", ek, presets, slicer.version(s["app"], s.get("kind", "bambu")) if s.get("available") else None)
+        sk = H("slice", ek, presets, slicer.version(s["app"], s.get("kind", "bambu")) if s.get("available") else None,
+               *_slicer_tag(s))
         return {"geometry": gk, "exports": ek, "checks": ck, "slice": sk}
 
     def apath(self, p: dict, node: str, key: str) -> Path:
@@ -815,7 +822,7 @@ class Studio:
         rev, keys = self.rev(p), self.keys(p)
         s = self.slicer_info()
         presets = {k: v["sha"] for k, v in s.get("presets", {}).items()}
-        key = H(kind, keys["geometry"], presets)
+        key = H(kind, keys["geometry"], presets, *_slicer_tag(s))
         out = self.dir(p["id"]) / "artifacts" / "side" / key
         meta = out / "meta.json"
         if meta.exists():
@@ -845,7 +852,7 @@ class Studio:
                 out["part"] = {"time_s": m.get("time_s"), "filament_g": m.get("filament_g")}
             s = self.slicer_info()
             presets = {k: v["sha"] for k, v in s.get("presets", {}).items()}
-            side = self.dir(p["id"]) / "artifacts" / "side" / H("test_piece", keys["geometry"], presets) / "meta.json"
+            side = self.dir(p["id"]) / "artifacts" / "side" / H("test_piece", keys["geometry"], presets, *_slicer_tag(s)) / "meta.json"
             if side.exists():
                 m = json.loads(side.read_text(encoding="utf-8"))
                 out["test_piece"] = {"time_s": m.get("time_s"), "filament_g": m.get("filament_g")}
@@ -943,7 +950,8 @@ class Studio:
                 "schema": "form-release/1", "project": p["id"], "name": p["name"], "revision": rev["n"], "approved": time.time(),
                 "units": "mm", "recipe": self.rid(p), "recipe_sha": self.recipe_sha(self.rid(p)), "kernel": self.kernel_id(),
                 "values": rev["values"], "provenance": rev["provenance"], "keys": keys, "files": files,
-                "orientation": p["orientation"], "slicer": {k: sl.get(k) for k in ("slicer_version", "presets", "time_s", "filament_g", "layers", "support_used")},
+                "orientation": p["orientation"], "slicer": {k: sl.get(k) for k in ("slicer_version", "presets", "time_s", "filament_g", "layers", "support_used")}
+                          | {k: sl[k] for k in ("slicer_kind", "slicer_name") if k in sl},
                 "checks": [{k: c[k] for k in ("id", "label", "status", "value", "evidence")} for c in ch["checks"]],
                 "acknowledged_warnings": [w for w in g["warnings"]], "note": note, "evidence_level": g["evidence_level"],
                 "physical_evidence": [e for e in p["evidence"] if e["rev"] == rev["n"] and (e["kind"] == "fit" or e.get("source") == "part")],
@@ -976,7 +984,7 @@ class Studio:
         if m["acknowledged_warnings"]:
             lines += ["", "Warnings acknowledged at approval: " + ", ".join(w["label"] for w in m["acknowledged_warnings"]) + "."]
         if s.get("time_s"):
-            lines += ["", "## Slice (simulated)", "", f"- Bambu Studio {s['slicer_version']}: {s['time_s']/60:.0f} min, {s['filament_g']:.1f} g, {s['layers']} layers, supports: {'yes' if s.get('support_used') else 'no'}",
+            lines += ["", "## Slice (simulated)", "", f"- {s.get('slicer_name') or 'Bambu Studio'} {s['slicer_version']}: {s['time_s']/60:.0f} min, {s['filament_g']:.1f} g, {s['layers']} layers, supports: {'yes' if s.get('support_used') else 'no'}",
                       "- Presets: " + " · ".join(v["name"] for v in s["presets"].values())]
         lines += ["", "## Limits", ""] + [f"- {x}" for x in m["limits"]] + [""]
         return "\n".join(lines)
@@ -1168,5 +1176,5 @@ class Studio:
             if not meta:
                 raise StudioError("There is no current slice to inspect.", "Run the pipeline first.", status=409)
             self._layers_cache.clear()
-            self._layers_cache[key] = slicer.parse_layers(self.apath(p, "slice", key) / meta["gcode"])
+            self._layers_cache[key] = slicer.parse_layers(self.apath(p, "slice", key) / meta["gcode"], meta.get("slicer_kind"))
         return self._layers_cache[key]

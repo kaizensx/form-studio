@@ -24,7 +24,7 @@ Column {
         Btn { text: "Save STL…"; icon: "download"; enabled: !!rs.r && !!rs.r.stl; onClicked: rs.saveAs(rs.r.stl, "Save the ring STL") }
         Btn { text: "Save sliced 3MF…"; icon: "download"; visible: !!rs.r && !!rs.r.threemf; onClicked: rs.saveAs(rs.r.threemf, "Save the sliced 3MF") } }
     Txt { kind: "fine"; width: parent.width
-        text: "FORM does not send anything to the printer. Open the 3MF in Bambu Studio to print it, then record the measured width under Fit." }
+        text: "FORM does not send anything to the printer. Open the 3MF in " + (Store.slicer.label || "Bambu Studio") + " to print it, then record the measured width under Fit." }
 
     FileDialog {
         id: dlg

@@ -35,6 +35,7 @@ Item {
             else if (u && !u.enabled) Store.toast("Update checks are off", "[updates] check = false or FORM_NO_UPDATE_CHECK=1")
             else if (u && u.latest) Store.toast("FORM " + u.current + " is up to date")
             else Store.toast("Could not reach GitHub", "Nothing changed. Try again later.") }) } })
+        c.push({ icon: "printer", text: "Choose slicer", hint: Store.slicer.label || "", run: function () { Store.openSheet("slicer") } })   // slicer workstream
         c.push({ icon: "folder_open", text: "Open the projects folder", hint: Bridge.dataDir, run: function () { Bridge.openDataFolder() } })
         if (Store.studio) Store.studio.projects.forEach(function (p) { if (!p.error && p.id !== Store.pid) c.push({ icon: "cuboid", text: p.name, hint: "Open design · " + F.pad(p.head), run: function () { Store.open(p.id) } }) })
         return c

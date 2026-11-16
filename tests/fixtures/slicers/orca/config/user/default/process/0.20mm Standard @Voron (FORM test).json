@@ -1,0 +1,8 @@
+{
+    "from": "User",
+    "inherits": "0.20mm Standard @Voron",
+    "name": "0.20mm Standard @Voron (FORM test)",
+    "print_settings_id": "0.20mm Standard @Voron (FORM test)",
+    "sparse_infill_density": "25%",
+    "version": "2.3.1.0"
+}
