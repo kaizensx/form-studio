@@ -7,6 +7,11 @@ import "F.js" as F
 Item {
     id: home
     readonly property var projects: Store.studio ? Store.studio.projects.filter(function (p) { return !p.error }).sort(function (a, b) { return b.updated - a.updated }) : []
+    // newest Blender render of each project's current geometry, shown on hover (form/photo.py)
+    property var photos: ({})
+    function loadPhotos() { Store.get("/photos").then(function (r) { home.photos = r.latest }, function () {}) }
+    Component.onCompleted: loadPhotos()
+    Connections { target: Store; function onStudioChanged() { home.loadPhotos() } }
     function recipeTitle(id) {
         if (!Store.studio) return ""
         if (String(id).indexOf("src:") === 0) return "Designed by an agent"
@@ -46,6 +51,17 @@ Item {
                             ParallelAnimation { NumberAnimation { target: card; property: "opacity"; to: 1; duration: 380; easing.type: Easing.OutCubic }
                                 NumberAnimation { target: ctr; property: "y"; to: 0; duration: 380; easing.type: Easing.OutCubic } } }
                         MiniView { x: 1; y: 1; width: parent.width - 2; height: parent.height - 62; projectId: card.modelData.id; turning: cm.containsMouse }
+                        Item {
+                            readonly property var ph: home.photos[card.modelData.id] || null
+                            x: 1; y: 1; width: parent.width - 2; height: parent.height - 62; clip: true
+                            visible: !!ph; opacity: cm.containsMouse && pim.status === Image.Ready ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                            Image { id: pim; anchors.fill: parent; fillMode: Image.PreserveAspectCrop; asynchronous: true; sourceSize.width: 640
+                                source: parent.ph ? Bridge.baseUrl + "/api/projects/" + card.modelData.id + "/photo/" + parent.ph.key + ".png" : "" }
+                            Rectangle { x: 8; anchors.bottom: parent.bottom; anchors.bottomMargin: 8; width: pl.implicitWidth + 12; height: 20; radius: Theme.rSm
+                                color: Theme.alpha(Theme.plate, 0.78)
+                                Txt { id: pl; anchors.centerIn: parent; font.pixelSize: 10; tone: 2; text: "Blender render · illustration" } }
+                        }
                         Rectangle { y: parent.height - 62; width: parent.width; height: 1; color: Theme.rule }
                         Column { x: 14; y: parent.height - 50; width: parent.width - 28 - rv.width - 8; spacing: 2
                             Txt { text: card.modelData.name; font.weight: 600; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }

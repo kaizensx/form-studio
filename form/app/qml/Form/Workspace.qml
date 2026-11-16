@@ -78,7 +78,9 @@ Item {
                     Txt { font.pixelSize: 12; tone: 3; text: "plate 180 × 180" } } }
             Btn { small: true; kind: "quiet"; active: Store.dims; icon: "ruler"; tip: "Overall dimensions"; onClicked: Store.toggleDims() }
             Btn { small: true; kind: "quiet"; active: Store.companions; icon: "box"; tip: "Show what the part holds"
-                visible: !!(Store.shown && Store.shown.companions && Store.shown.companions.length); onClicked: Store.toggleCompanions() } }
+                visible: !!(Store.shown && Store.shown.companions && Store.shown.companions.length); onClicked: Store.toggleCompanions() }
+            Btn { small: true; kind: "quiet"; icon: "camera"; text: "Photo"; tip: "Render the current revision in Blender (an illustration)"
+                enabled: !Store.hasDraft; onClicked: Store.openSheet("render") } }
 
         Pipeline { id: pipe; anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 12 }
     }
