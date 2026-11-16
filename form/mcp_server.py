@@ -173,7 +173,7 @@ def build() -> MCPServer:
         that builds. Then call create_design."""
         from .design_guide import EXAMPLE, GUIDE
         return {"guide": GUIDE, "example_source": EXAMPLE,
-                "built_in_recipes": "dock, gridfinity, hook, planter, coupon (use create_project for these)"}
+                "built_in_recipes": "dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob (use create_project for these)"}
 
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True), structured_output=False)
     async def read_document(source: str, pages: str = "1") -> list:
@@ -239,8 +239,8 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def create_project(name: str, recipe: str, brief: str = "", values: dict[str, float] | None = None,
                              run: bool = True, ctx: Context = None) -> dict:
-        """Create a project from a built-in recipe (dock, gridfinity, hook, planter, coupon). For anything else, write a
-        design: design_guide, then create_design. values override recipe defaults (all start as 'assumed').
+        """Create a project from a built-in recipe (dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob).
+        For anything else, write a design: design_guide, then create_design. values override recipe defaults (all start as 'assumed').
         With run=True the solid, exports and checks are built (and sliced if a slicer is available)."""
         st = studio()
         p = await _run(st.create, name, recipe, brief, values)

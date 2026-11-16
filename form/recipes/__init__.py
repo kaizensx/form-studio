@@ -4,10 +4,14 @@ from .base import Feature, Param, Recipe, RecipeError, Stage  # noqa: F401
 def registry() -> dict:
     from .coupon import Coupon
     from .dock import Dock
+    from .enclosure import Enclosure
+    from .gear_pair import GearPair
     from .gridfinity import GridfinityBin
     from .hook import WallHook
+    from .knob import Knob
     from .planter import TwistPlanter
-    return {r.id: r for r in (Dock(), GridfinityBin(), WallHook(), TwistPlanter(), Coupon())}
+    return {r.id: r for r in (Dock(), GridfinityBin(), WallHook(), TwistPlanter(), Coupon(),
+                              Enclosure(), GearPair(), Knob())}
 
 
 # ---- designs written as code (by an agent or a person) ---------------------------------------
