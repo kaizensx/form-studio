@@ -30,6 +30,10 @@
   form analyze <project> --map thickness|overhang|section|features [--json | --png out.png]
   form measure <project> --from x,y,z --to x,y,z   distance and its components; or --at x,y,z: what is at a point
   form orient <project> [--apply [id]]   rank the ways the part can lie on the plate; --apply sets the best (or the id given)
+  form variants list|save|promote|delete <project> [name] [k=v ...]   named variants of a design
+  form share <project> [--out card.png] [--photo]      1600 x 900 share card of the head revision
+  form history <project> [--gif out.gif]               revisions (who, when, stamp); --gif animates them (.gif or .webp)
+  form mark <project> --text "LABEL"                    label text for designs with a Label parameter
 """
 from __future__ import annotations
 
@@ -186,6 +190,24 @@ def main(argv=None):
     pk.add_argument("--copies", type=int, default=1)
     pk.add_argument("--spacing", type=float, help="gap between parts in mm (default 6)")
     pk.add_argument("--no-rotate", action="store_true")
+    # ---- design tools: variants, share card, history, label text ----
+    va = sub.add_parser("variants", help="named variants: list, save, promote, delete")
+    va.add_argument("action", choices=["list", "save", "promote", "delete"])
+    va.add_argument("project")
+    va.add_argument("name", nargs="?", default="")
+    va.add_argument("values", nargs="*", help="k=v changes on top of the head (save)")
+    va.add_argument("--rev", type=int, help="save this revision instead of the head")
+    va.add_argument("--note", default="")
+    sh = sub.add_parser("share", help="share card PNG of the head revision")
+    sh.add_argument("project")
+    sh.add_argument("--out")
+    sh.add_argument("--photo", action="store_true", help="use the newest current Blender render as the picture")
+    hi = sub.add_parser("history", help="revision list; --gif writes an animation through the revisions")
+    hi.add_argument("project")
+    hi.add_argument("--gif", metavar="FILE", help="write .gif or .webp")
+    mk = sub.add_parser("mark", help="label text for designs with marks")
+    mk.add_argument("project")
+    mk.add_argument("--text", required=True)
     a = ap.parse_args(argv)
 
     if a.cmd in (None, "serve"):
@@ -341,6 +363,37 @@ def main(argv=None):
             res = packing.project(st, st.load(a.project), a.copies, a.spacing, not a.no_rotate)
             _print(res)
             return 0 if res["fits"] else 1
+        elif a.cmd == "variants":
+            from . import variants
+            p = st.load(a.project)
+            if a.action == "list":
+                _print(variants.board(st, p))
+            elif not a.name:
+                raise StudioError("Name the variant.", f"form variants {a.action} {a.project} \"Thick walls\"")
+            elif a.action == "save":
+                _print(variants.save(st, p, a.name, _kv(a.values) or None, a.rev, a.note, "you (CLI)"))
+            elif a.action == "delete":
+                _print(variants.delete(st, p, a.name))
+            else:
+                res = variants.promote(st, p, a.name, "cli")
+                job = st.run_sync(a.project)
+                _print({**res, "pipeline": job_digest(job), "project": digest(st, a.project)})
+        elif a.cmd == "share":
+            from . import share
+            c = share.card(st, st.load(a.project), a.out or f"{a.project}_card.png", "photo" if a.photo else "model")
+            _print({"png": c["out"], "size": c["size"], "revision": c["rev"], "facts": c["facts"]["rows"],
+                    "evidence": c["facts"]["evidence_level"]})
+        elif a.cmd == "history":
+            from . import share
+            p = st.load(a.project)
+            out = {"project": p["id"], "head": p["head"], "revisions": share.revisions(st, p)}
+            if a.gif:
+                out["animation"] = share.history(st, p, a.gif)
+            _print(out)
+        elif a.cmd == "mark":
+            p = st.settings(st.load(a.project), {"mark_text": a.text})
+            _print({"project": p["id"], "label_text": p.get("mark_text") or p["name"],
+                    "note": "Used by designs with a Label parameter. Outputs for such a revision are stale until you run the pipeline."})
     except StudioError as e:
         _print({"error": e.public()})
         return 2

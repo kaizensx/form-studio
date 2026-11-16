@@ -297,6 +297,8 @@ Rectangle {
                     height: Math.min(200, Math.max((talk.hero ? 3 : 2) * 19 + 18, ta.implicitHeight))
                     TextArea {
                         id: ta
+                        // "Ask about this feature…" from the viewport's context menu lands here
+                        Connections { target: Store; function onChatPrefill(text) { Store.talkOpen = true; ta.text = text; ta.cursorPosition = text.length; ta.forceActiveFocus() } }
                         wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: 13
                         placeholderText: !Store.chat.available ? "No agent is connected" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to print…"
                         placeholderTextColor: Theme.ink4; enabled: Store.chat.available

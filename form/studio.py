@@ -263,11 +263,44 @@ class Studio:
                     recovered = "project.json was unreadable; restored from the previous save."
                     path.write_text(json.dumps(p, indent=1), encoding="utf-8")
                 p["_recovered"] = recovered
+                self._complete(p)
                 return p
             except (ValueError, OSError):
                 continue
         raise StudioError("This project's state file and its backup are both unreadable.",
                           "Restore the project from an exported .formproj archive.", status=500)
+
+    def _complete(self, p: dict) -> None:
+        """Built-in recipes gain parameters between versions (marks, vent patterns). A revision saved before
+        that gets the new parameter at its default, with provenance "assumed", so it can be edited like any other."""
+        for r in p.get("revisions", []):
+            rid = r.get("recipe") or p.get("recipe")
+            if not isinstance(rid, str) or is_source(rid) or not dict.__contains__(self.recipes, rid):
+                continue
+            for q in self.recipes[rid].params:
+                if q.key not in r["values"]:
+                    r["values"][q.key] = float(q.default)
+                    r.setdefault("provenance", {}).setdefault(q.key, _initial_provenance(q))
+
+    # ---- marks: label text and revision stamp (form/marks.py) ---------------
+    def mark_context(self, p: dict, rid: str, values: dict, n: int | None = None) -> dict | None:
+        """What a design that carries marks needs to know for this build: the revision the geometry is for, the
+        project's label text and the stamp hash. None unless one of the recipe's mark_params is switched on,
+        so designs without marks keep the keys (and outputs) they always had."""
+        try:
+            keys = getattr(self.recipes[rid], "mark_params", ())
+        except Exception:
+            return None
+        if not any(values.get(k) for k in keys):
+            return None
+        from . import marks
+        if n is None:                               # the revision these values belong to; a draft is the next one
+            same = lambda r: all(abs(float(values.get(k, v)) - v) < 1e-9 for k, v in r["values"].items()) and len(values) <= len(r["values"])
+            cands = [self.rev(p)] + sorted(p["revisions"], key=lambda r: -r["n"])
+            n = next((r["n"] for r in cands if (r.get("recipe") or p["recipe"]) == rid and same(r)),
+                     max(r["n"] for r in p["revisions"]) + 1)
+        full = {**self.recipes[rid].defaults(), **{k: float(v) for k, v in values.items()}}
+        return {"rev": int(n), "text": marks.clean(p.get("mark_text") or p["name"]), "hash": marks.short_hash(rid, full)}
 
     def save(self, p: dict) -> None:
         p = {k: v for k, v in p.items() if not k.startswith("_")}
@@ -441,6 +474,9 @@ class Studio:
         gk = H("geometry", rid, self.recipe_sha(rid), self.kernel_id(), r["values"])
         if self.uses_references(rid):                  # the design reads imported parts: their bytes are inputs too
             gk = H(gk, self._refs_fp(p))
+        mc = self.mark_context(p, rid, r["values"], r["n"])
+        if mc:                                         # label text and revision stamp are part of the solid
+            gk = H(gk, "mark", mc)
         ek = H("exports", gk, p["orientation"], STL_TOL)
         fit_in = None
         if recipe.fit:
@@ -523,8 +559,18 @@ class Studio:
             pub = e.public() if hasattr(e, "public") else {"message": str(e)}
             raise StudioError(pub["message"], pub.get("hint", ""), feature=pub.get("feature"), params=pub.get("params", []), kind="recipe")
 
-    def _k(self, op, timeout=60, p=None, refs=None, **kw):
-        """One kernel call. With p (the project), a design that reads imported parts gets their paths."""
+    def _k(self, op, timeout=60, p=None, refs=None, rev=None, **kw):
+        """One kernel call. With p (the project), a design that reads imported parts gets their paths, and a
+        design with marks gets the label text and the revision (rev, or the one the values belong to)."""
+        if p is not None and kw.get("recipe_id"):
+            vals = kw.get("values") if kw.get("values") is not None else kw.get("base")
+            mc = self.mark_context(p, kw["recipe_id"], vals, rev) if isinstance(vals, dict) else None
+            if mc and "key" in kw:
+                kw["key"] = f"{kw['key']}-{H(mc)}"
+            nz = self.slicer_info().get("nozzle_mm")
+            ctx = {**(mc or {}), **({"nozzle": nz} if nz else {})}
+            if ctx:
+                kw["_mark"] = ctx
         if refs is None and p is not None and self.uses_references(kw.get("recipe_id", "")):
             refs = self.reference_paths(p)
         if refs:
@@ -541,7 +587,8 @@ class Studio:
     def view(self, p: dict, n: int | None = None, tol=0.03) -> dict:
         r = self.rev(p, n)
         gk = self.keys(p, r["n"])["geometry"]
-        v = self._k("view", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"], tol=tol, dock_mass_g=self._sliced_mass(p, r["n"]), p=p)
+        v = self._k("view", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"], tol=tol, dock_mass_g=self._sliced_mass(p, r["n"]), p=p,
+                    rev=r["n"])
         v["companions"] = (v.get("companions") or []) + self.reference_companions(p)
         return v
 
@@ -577,7 +624,7 @@ class Studio:
         r = self.rev(p, n)
         gk = self.keys(p, r["n"])["geometry"]
         cached = self.read(p, "geometry", gk)
-        return cached or self._k("summary", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"], p=p)
+        return cached or self._k("summary", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"], p=p, rev=r["n"])
 
     def impact(self, p: dict, vals: dict, cand: dict, base_rev: int | None = None) -> dict:
         """What a change touches: parameters, features, interfaces, artifacts."""
@@ -694,6 +741,12 @@ class Studio:
                 p["brief"]["text"] = str(body["brief"])[:8000]
             if "name" in body and str(body["name"]).strip():
                 p["name"] = str(body["name"]).strip()[:80]
+            if "mark_text" in body:                    # label text for designs with marks; empty = the project name
+                from . import marks
+                text = marks.clean(str(body["mark_text"] or ""))
+                if text != (p.get("mark_text") or ""):
+                    self.decide(p, "mark", f"Label text set to “{text or p['name']}”.")
+                p["mark_text"] = text
             self.save(p)
             return p
 

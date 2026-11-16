@@ -101,5 +101,13 @@ QtObject {
         "ghost": "\ue20e",
         "coins": "\ue097",
         "layout_grid": "\ue0ff",
+        "share_2": "\ue156",
+        "keyboard": "\ue284",
+        "git_branch": "\ue0e2",
+        "film": "\ue0d0",
+        "type": "\ue198",
+        "clipboard": "\ue085",
+        "tag": "\ue17f",
+        "focus": "\ue29e",
     })
 }

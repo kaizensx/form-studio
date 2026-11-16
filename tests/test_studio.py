@@ -166,7 +166,7 @@ class Pipeline(unittest.TestCase):
 
     def test_02_every_face_is_attributed_to_a_declared_feature(self):
         v = self.st.view(self.load())
-        self.assertEqual({m["feature"] for m in v["mesh"]}, {f.id for f in registry()["dock"].features})
+        self.assertEqual({m["feature"] for m in v["mesh"]}, {f.id for f in registry()["dock"].features} - {"mark"})   # marks are off by default
         audit = {a["key"]: a for a in v["interface_audit"]}
         self.assertAlmostEqual(audit["pocket_width"]["modelled"], audit["pocket_width"]["intended"], places=6)
 

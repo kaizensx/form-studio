@@ -64,7 +64,7 @@ QtObject {
     readonly property var head: project ? revision(project.head) : null
     readonly property bool hasDraft: F.keys(draftValues).length > 0 || F.keys(draftProv).length > 0
     readonly property var values: head ? Object.assign({}, head.values, draftValues) : ({})
-    readonly property var shown: preview || view         // geometry currently on screen
+    readonly property var shown: (scrub && scrub.view) || preview || view         // geometry currently on screen
     readonly property var chat: studio && studio.chat ? studio.chat : ({ available: false, note: "" })
     readonly property var slicer: studio ? studio.env.slicer : ({ available: false })
     readonly property var stages: [
@@ -137,7 +137,7 @@ QtObject {
         viewer.showDims = dims && !sec
     }
     function showHead() {
-        if (!view || !viewer) return
+        if (!view || !viewer || scrub) return       // while a revision is being viewed from the timeline, leave it up
         viewer.setModel(view)
         viewer.setGhost(compare ? compare.view : null)
         viewer.selected = feature
@@ -856,5 +856,118 @@ QtObject {
         orientBusy = true
         var want = pid
         pget("/orient").then(function (r) { if (want !== s.pid) return; s.orient = r; s.orientBusy = false }, function (e) { s.orientBusy = false; s.fail(e) })
+
+    // ── design tools: revision timeline, variants, quick actions (design tools workstream) ─────────
+    // Scrubbing shows another revision read-only (engine /view?rev=); nothing changes until "Branch from here" (checkout).
+    property bool timelineOpen: false
+    property var revViews: ({})        // "<head stamp>:<n>" → engine view, so scrubbing does not rebuild
+    property var scrub: null           // { rev, view } while a revision other than the head is on screen
+    property bool morphing: false      // playing through the revisions
+    property int tlHover: -1           // timeline tick under the pointer (index into revList)
+    property var hidden: []            // feature ids hidden in the viewport (visual only; the solid is unchanged)
+    property var ctxMenu: null         // { feature, x, y } while the viewport's context menu is open
+    signal chatPrefill(string text)    // Talk puts this in the composer and focuses it
+    signal fadeTo(var apply)           // the workspace cross-fades the picture while apply() swaps the geometry
+    readonly property var revList: project ? project.revisions.slice().sort(function (a, b) { return a.n - b.n }) : []
+    function who(origin) {
+        var o = origin || "user"
+        if (o.indexOf("agent:") === 0) return o.slice(6) || "agent"
+        if (o.indexOf("proposal:") === 0) return "you (" + o.slice(9) + " proposal)"
+        return o === "user" || o === "recipe" || o === "variant" ? "you" : o === "cli" ? "you (CLI)" : o
+    }
+    function loadRev(n) {
+        var key = pid + ":" + (project ? project.updated : 0) + ":" + n
+        if (revViews[key]) return Promise.resolve(revViews[key])
+        if (n === project.head && view) return Promise.resolve(view)
+        return pget("/view?rev=" + n).then(function (v) {
+            v.rev = n
+            var c = ({}), ks = F.keys(revViews).filter(function (k) { return k.indexOf(pid + ":" + project.updated + ":") === 0 })
+            ks.forEach(function (k) { c[k] = revViews[k] })
+            c[key] = v; revViews = c
+            return v
+        })
+    }
+    function _showScrub(n, v) {
+        if (!viewer) return
+        if (n === project.head) { scrub = null; if (preview) { viewer.setModel(preview); viewer.setGhost(view) } else showHead() }
+        else { scrub = { rev: n, view: v }; viewer.flagged = []; viewer.setModel(v); viewer.setGhost(null) }
+    }
+    function showRev(n, fade) {
+        if (!project) return Promise.resolve()
+        return loadRev(n).then(function (v) {
+            if (fade) fadeTo(function () { s._showScrub(n, v) }); else s._showScrub(n, v)
+        }, fail)
+    }
+    function endScrub() { stopMorph(); if (scrub) showRev(project.head, true) }
+    property int _morphAt: 0
+    property var _morphTimer: Timer { interval: 950; onTriggered: s._morphStep() }
+    function playMorph() {
+        if (!project || revList.length < 2) return
+        if (morphing) return stopMorph()
+        morphing = true; _morphAt = 0
+        Promise.all(revList.map(function (r) { return s.loadRev(r.n) })).then(function () { if (s.morphing) s._morphStep() }, function (e) { s.morphing = false; s.fail(e) })
+    }
+    function _morphStep() {
+        if (!morphing) return
+        if (_morphAt >= revList.length) { morphing = false; showRev(project.head, true); return }
+        showRev(revList[_morphAt].n, true)
+        _morphAt += 1
+        _morphTimer.restart()
+    }
+    function stopMorph() { morphing = false; _morphTimer.stop() }
+    function branchFrom(n) { stopMorph(); scrub = null; checkout(n) }
+    property var _scrubReset: Connections { target: s
+        function onPidChanged() { s.scrub = null; s.morphing = false; s.hidden = []; s.ctxMenu = null; s.revViews = ({}) } }
+
+    // variants (form/variants.py): named sets of values kept in the project
+    function saveVariant(name, values, source, note) {
+        return ppost("/variant_save", { name: name, values: values || null, source: source || "", note: note || "" }).then(function (r) {
+            toast("Saved variant “" + r.variant.name + "”", r.variant.rev ? "It is " + F.pad(r.variant.rev) + "." : "A saved draft: not a revision until you promote it.")
+            return refresh()
+        }, fail)
+    }
+    function promoteVariant(id) {
+        if (hasDraft) return toast("Commit or discard the draft first.", "", true)
+        return ppost("/variant_promote", { id: id }).then(function (r) {
+            toast("Head is now " + F.pad(r.head), "Variant promoted: " + r.how + ".")
+            if (r.job) track(r.job)
+            return refresh(true)
+        }, fail)
+    }
+    function deleteVariant(id) { return ppost("/variant_delete", { id: id }).then(function () { return refresh() }, fail) }
+
+    // quick actions on the model
+    function toggleHidden(f) { if (!f) return; hidden = hidden.indexOf(f) >= 0 ? hidden.filter(function (x) { return x !== f }) : hidden.concat([f]) }
+    function showAll() { hidden = [] }
+    function frameSelection() { if (!viewer) return; if (feature) viewer.focusFeature(feature); else viewer.setView(viewName, true) }
+    function resetView() { section = null; viewName = "iso"; if (viewer) viewer.setView("iso", true); applyStageView() }
+    function toggleSection() { var now = sectionNow(); setSection(now ? "" : "y", 0.5) }
+    function featureDims(f) {
+        var b = viewer ? viewer.featureBox(f) : null
+        return b ? [b.hi.x - b.lo.x, b.hi.y - b.lo.y, b.hi.z - b.lo.z] : null
+    }
+    function featureText(f) {              // a feature's size and parameters as plain text
+        var ft = featureById(f); if (!ft || !project) return ""
+        var d = featureDims(f), lines = [ft.label + " — " + project.name + " " + F.pad(scrub ? scrub.rev : project.head)]
+        if (d) lines.push("Extent: " + F.fmt(d[0], 1) + " × " + F.fmt(d[1], 1) + " × " + F.fmt(d[2], 1) + " mm (computed)")
+        recipe.params.filter(function (p) { return p.feature === f }).forEach(function (p) {
+            lines.push(p.label + ": " + F.trim(values[p.key]) + (p.unit ? " " + p.unit : "")) })
+        if (shown && shown.derived) shown.derived.filter(function (x) { return x.feature === f }).forEach(function (x) {
+            lines.push(x.label + ": " + F.trim(x.value) + (x.unit ? " " + x.unit : "") + " (derived)") })
+        return lines.join("\n")
+    }
+    function overallText() {
+        if (!shown || !project) return ""
+        var b = shown.bbox
+        return project.name + " " + F.pad(scrub ? scrub.rev : project.head) + ": " + F.fmt(b[1][0] - b[0][0], 1) + " × " + F.fmt(b[1][1] - b[0][1], 1) + " × "
+            + F.fmt(b[1][2] - b[0][2], 1) + " mm, " + F.fmt(shown.volume_mm3 / 1000, 1) + " cm³ (computed)"
+    }
+    function copyDims(f) { var t = f ? featureText(f) : overallText(); if (t) { Bridge.copy(t); toast("Copied", t.split("\n")[0]) } }
+    function askAbout(f) {
+        var ft = featureById(f); if (!ft) return
+        var ps = recipe.params.filter(function (p) { return p.feature === f }).map(function (p) { return p.label + " " + F.trim(values[p.key]) + (p.unit ? " " + p.unit : "") })
+        talkOpen = true
+        chatPrefill("About the “" + ft.label + "” feature (" + f + ") of " + project.name + ", " + F.pad(project.head)
+            + (ps.length ? ": " + ps.join(", ") : "") + ". ")
     }
 }

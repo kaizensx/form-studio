@@ -10,6 +10,7 @@ import math
 
 from build123d import Align, Axis, Box, Cylinder, Pos, Rot, fillet
 
+from .. import marks
 from .assembly import Access, Assembly, Hardware, Part, hinge
 from .base import Feature, Param, Recipe, RecipeError, Stage
 
@@ -41,11 +42,20 @@ class HingedBox(Recipe):
               "Gap between the lip's front face and the front wall. The lip front swings on an arc as the lid opens."),
         Param("open_deg", "Opening angle", 110, 30, 170, 1, "deg", "form", "lid_knuckle", "How far the hinge is checked to open."),
         Param("mount", "Mounting holes", 1, 0, 1, 1, "", "form", "mount", "1 = two screw holes in the floor."),
+        # ---- marks (form.marks) ----
+        Param("label", "Label", 0, 0, 2, 1, "", "form", "mark",
+              "The project's label text on the front wall of the box. 0 = none, 1 = raised, 2 = sunk."),
+        Param("label_h", "Label height", 6, 3, 20, 0.5, "mm", "form", "mark", "Height of the capitals."),
+        Param("stamp", "Revision stamp", 0, 0, 1, 1, "", "form", "mark",
+              "1 = the revision and a short hash (\"r04 a3f1\") sunk 0.4 mm into the underside."),
     ]
+    wall_exempt = ("mark",)                   # letter corners are not walls; marks.checks() measures the strokes instead
+    mark_params = ("label", "stamp")          # these values make the geometry depend on the project's label and revision
     features = [Feature("body", "Box", "structure"), Feature("mount", "Mounting holes", "access"),
                 Feature("knuckles", "Box knuckles", "interface"), Feature("lid", "Lid", "structure"),
                 Feature("lip", "Lid lip", "interface"), Feature("lid_knuckle", "Lid knuckle", "interface"),
-                Feature("pin_hole", "Pin hole", "interface")]
+                Feature("pin_hole", "Pin hole", "interface"),
+                Feature("mark", "Label and stamp", "finish", "Lettering on the front wall; revision stamp under the floor.")]
 
     # ---- geometry helpers --------------------------------------------------------------------------
     @staticmethod
@@ -73,6 +83,9 @@ class HingedBox(Recipe):
             out.append(RecipeError("Lip is deeper than the box", "lip", "Shorten the lip.", ["lip_h"]))
         if za - R < v["wall"]:
             out.append(RecipeError("Knuckles reach below the floor", "knuckles", "Make the box taller or the knuckles smaller.", ["inner_h", "knuckle_r"]))
+        for k in ("label", "stamp"):
+            if abs(v.get(k, 0) - round(v.get(k, 0))) > 1e-9:
+                out.append(RecipeError(f"{self.spec(k).label} must be a whole number", "mark", "Use whole numbers.", [k]))
         if abs(v["mount"] - round(v["mount"])) > 1e-9 or abs(v["open_deg"] - round(v["open_deg"])) > 1e-9:
             out.append(RecipeError("Mounting holes and opening angle are whole numbers", "mount", "Use 0 or 1, and whole degrees.", ["mount", "open_deg"]))
         return out
@@ -121,7 +134,38 @@ class HingedBox(Recipe):
         hole = Pos(0, ya, za) * along * Cylinder(v["pin_d"] / 2 + v["pin_clear"], L + 2)
         s = s - hole - T * hole
         stages.append(Stage("pin_hole", s))
+        if v.get("label") or v.get("stamp"):
+            if v.get("label"):
+                text = marks.context().get("text") or "FORM"
+                info = marks.analyse(text, v["label_h"])
+                room_w, room_h = W - 2 * v["corner_r"] - 4, H - 4
+                if info["width_mm"] > room_w or v["label_h"] > room_h:
+                    raise RecipeError(f"The label “{info['text']}” is {info['width_mm']:.0f} × {v['label_h']:g} mm; the front wall has "
+                                      f"{max(room_w, 0):.0f} × {max(room_h, 0):.0f} mm", "mark",
+                                      "Lower the label height or shorten the label text.", ["label_h"])
+                if v["label"] > 1.5 and w < 1.6:
+                    raise RecipeError("A sunk label needs a wall of at least 1.6 mm", "mark", "Thicken the wall, or raise the label instead.",
+                                      ["wall", "label"])
+                fn = marks.emboss_text if v["label"] < 1.5 else marks.deboss_text
+                s = fn(s, text, on=(0, -D / 2, H / 2), normal=(0, -1, 0), height=v["label_h"], depth=0.6)
+            if v.get("stamp"):
+                # between the two mounting holes (they sit 8 mm in from the side walls, on y = 0)
+                s = marks.revision_stamp(s, at=(0, 0), height=6, depth=min(0.4, w / 3))
+            stages.append(Stage("mark", s))
         return stages
+
+    def _mark_checks(self, v):
+        ctx = marks.context()
+        out = []
+        if v.get("label") and ctx:                # the label text is only known while FORM builds for a project
+            out += marks.checks(marks.analyse(ctx.get("text") or "FORM", v["label_h"]), raised=v["label"] < 1.5)
+        if v.get("stamp") and ctx:
+            out += marks.checks(marks.analyse(marks.stamp_text(), 6, 0.4), raised=False, id="stamp", label="Revision stamp")
+        return out
+
+    def statics(self, v, solid_volume_mm3, com):
+        checks = self._mark_checks(v)
+        return {"checks": checks} if checks else None
 
     def derived(self, v):
         W, D, H, t, R, g, ya, za, L, k = self.dims(v)

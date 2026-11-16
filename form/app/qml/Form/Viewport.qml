@@ -25,6 +25,8 @@ Item {
     property string sectionAxis: ""
     property real sectionT: 0.5
     signal picked(string feature)
+    property var hiddenFeatures: []          // feature ids not drawn (their edges stay, so the part still reads)
+    signal contextRequested(string feature, real x, real y)     // right-click or long-press without dragging
     signal hoveredFeature(string feature, real x, real y)
 
     // ── analysis map and measuring (form/analysis.py) ────────
@@ -238,7 +240,7 @@ Item {
                     Model {
                         required property var modelData
                         readonly property string feature: modelData.feature || ""
-                        pickable: !vp.mapShown; visible: !vp.mapShown
+                        pickable: !vp.mapShown; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0
                         geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                         materials: CustomMaterial {
                             shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
@@ -271,7 +273,7 @@ Item {
                             Model {
                                 required property var modelData
                                 readonly property string feature: modelData.feature || ""
-                                pickable: !vp.mapShown; visible: !vp.mapShown
+                                pickable: !vp.mapShown; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0
                                 geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                                 materials: CustomMaterial {
                                     shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
@@ -499,9 +501,14 @@ Item {
             }
         }
         onReleased: function (e) {
-            if (moved || e.button !== Qt.LeftButton) return
+            if (held) { held = false; return }
+            if (moved) return
+            if (e.button === Qt.RightButton) { vp.contextRequested(hit(e.x, e.y), e.x, e.y); return }
+            if (e.button !== Qt.LeftButton) return
             if (vp.measuring) probe(e.x, e.y); else if (!vp.mapShown) vp.picked(hit(e.x, e.y))
         }
+        property bool held: false
+        onPressAndHold: function (e) { if (!moved && e.button === Qt.LeftButton && !vp.measuring) { held = true; vp.contextRequested(hit(e.x, e.y), e.x, e.y) } }
         onExited: { if (vp.hovered) vp.hovered = ""; vp.hoveredFeature("", 0, 0); valueAt.stop(); vp.hoveredValue(0, 0, 0, false) }
         onWheel: function (w) {
             vp.tween = false

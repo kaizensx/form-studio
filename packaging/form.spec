@@ -9,7 +9,9 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "form" / "app" / "assets"), "form/app/assets"),
          (str(ROOT / "form" / "web"), "form/web"),
          (str(ROOT / "form" / "recipes"), "form/recipes"),      # recipe sources are hashed into artifact keys
-         (str(ROOT / "form" / "examples"), "form/examples")]
+         (str(ROOT / "form" / "examples"), "form/examples"),
+         (str(ROOT / "form" / "fonts"), "form/fonts"),          # the font used for text on parts
+         (str(ROOT / "form" / "presets"), "form/presets")]
 binaries, hidden = [], []
 for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfium2", "pypdfium2_raw",
             "bd_warehouse", "py_gearworks"):     # parts libraries ship inside the app

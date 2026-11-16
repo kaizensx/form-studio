@@ -128,8 +128,13 @@ Column {
                         Rectangle { width: parent.width; height: 3; radius: 1.5; color: Theme.rule2
                             Rectangle { height: 3; radius: 1.5; width: parent.width * Math.max(0, Math.min(1, card.c.score || 0)); color: card.c.best ? Theme.datum : Theme.ink2 } } }
                     MouseArea { id: cm; anchors.fill: parent; enabled: !!card.c.ok; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: alt.load(card.c) }
+                    // design tools: keep a candidate as a named variant
+                    Btn { visible: !!card.c.ok && !card.c.is_current && (cm.containsMouse || hovered); small: true; icon: "layout_grid"; text: "Save as variant"
+                        anchors.right: parent.right; anchors.rightMargin: 8; y: 8
+                        onClicked: Store.saveVariant(alt.nameOf(card.c), card.c.changes, "alternative") }
                     Tip { text: card.c.pareto && !card.c.best ? "Frontier: no other candidate is better on every weighted objective" : "Bar: weighted score"; show: cm.containsMouse }
                 } } }
-        Txt { kind: "fine"; width: parent.width; text: alt.result ? alt.result.note + " Click a candidate to load it as a draft." : "" }
+        Txt { kind: "fine"; width: parent.width; text: alt.result ? alt.result.note + " Click a candidate to load it as a draft, or save it as a variant." : "" }
+        Btn { kind: "quiet"; icon: "layout_grid"; text: "Open the variants board"; onClicked: Store.openSheet("variants") }
     }
 }
