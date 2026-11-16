@@ -840,6 +840,37 @@ def build() -> MCPServer:
         rows = "; ".join(f"{r['k']}: {r['v']}" + (f" [{r['tag']}]" if r["tag"] else "") for r in c["facts"]["rows"])
         return [Image(path=c["file"]), f"Share card for {c['facts']['name']} r{c['rev']:02d}. {rows}. File: {c['file']}"]
 
+    # ---- project housekeeping: rename, duplicate, delete (Studio.rename_project and friends) ----
+    @mcp.tool(annotations=RW)
+    async def rename_project(project: str, name: str, ctx: Context = None) -> dict:
+        """Change a project's display name (up to 80 characters). The project id stays the same, so links, files and
+        releases keep working. Returns the project's summary: id, name, recipe, head, revisions, updated, approved_rev."""
+        st = studio()
+        row = await _run(st.rename_project, project, name)
+        act(project, "project", f"Renamed to “{row['name']}”", ctx)
+        return row
+
+    @mcp.tool(annotations=RW)
+    async def duplicate_project(project: str, name: str | None = None, ctx: Context = None) -> dict:
+        """Copy a project with its revisions, variants and built outputs under a new id (from the new name; default
+        "<old name> copy"). The copy is not approved: approvals and release folders belong to the original and are not
+        copied. Returns the new project's summary; use its id from then on."""
+        st = studio()
+        row = await _run(st.duplicate_project, project, name)
+        act(row["id"], "project", f"Copied from {project} as “{row['name']}”", ctx)
+        return row
+
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=False, open_world_hint=False))
+    async def delete_project(project: str, ctx: Context = None) -> dict:
+        """Delete a project by moving its whole folder to the trash folder inside the projects folder
+        (<projects folder>/.trash/<id>-<UTC time>). Nothing is erased, and moving the folder back restores it, but the
+        project disappears from FORM. Ask the user first and only call this after they said yes to deleting this
+        project. Returns {ok, id, trash}: tell the user the trash path."""
+        st = studio()
+        res = await _run(st.delete_project, project)
+        act(None, "project", f"Moved {project} to the trash folder", ctx)
+        return res
+
     return mcp
 
 
