@@ -48,7 +48,9 @@ Column {
                     ParamRow { required property var modelData; p: modelData } } } }
         Sec { title: "Explore"
             Txt { tone: 2; width: parent.width; text: "Build a grid of real candidates and rank them against objectives you weight." }
-            Btn { text: "Compare alternatives"; icon: "boxes"; enabled: !Store.hasDraft; onClicked: Store.openSheet("alternatives") } }
+            Row { spacing: 6
+                Btn { text: "Compare alternatives"; icon: "boxes"; enabled: !Store.hasDraft; onClicked: Store.openSheet("alternatives") }
+                Btn { kind: "quiet"; text: "Variants"; icon: "layout_grid"; onClicked: Store.openSheet("variants") } } }
     }
 
     // one feature
@@ -66,6 +68,16 @@ Column {
             Column { width: parent.width
                 Repeater { model: root.f ? root.paramsOf(root.f.id) : []
                     ParamRow { required property var modelData; p: modelData; prov: modelData.group === "brief" } } } }
+        // design tools: the text a Label parameter puts on the part (project setting; empty = the project name)
+        Sec { title: "Label text"; note: "used when Label is 1 or 2"
+            visible: !!root.f && root.f.id === "mark" && root.paramsOf("mark").some(function (p) { return p.key === "label" })
+            Field { id: markText; width: parent.width; placeholder: Store.project ? Store.project.name : ""
+                text: Store.project && Store.project.mark_text ? Store.project.mark_text : ""
+                onAccepted: function (t) {
+                    if (!Store.project || t === (Store.project.mark_text || "")) return
+                    Store.settings({ mark_text: t }).then(function () { Store.refresh(true); if (Store.hasDraft) Store.runPreview() }) } }
+            Txt { kind: "fine"; width: parent.width
+                text: "Press Enter to apply. Lettering uses FORM’s bundled font; the checks measure its stroke width against the nozzle. The revision stamp reads like “r04 a3f1”: revision, then a short hash of its values." } }
         Sec { title: "Follows from them"; note: "not editable"
             readonly property var rows: root.f && Store.shown ? Store.shown.derived.filter(function (x) { return x.feature === root.f.id }) : []
             visible: rows.length > 0

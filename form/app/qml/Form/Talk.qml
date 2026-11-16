@@ -130,6 +130,9 @@ Rectangle {
             placeholder: !Store.chat.available ? "Claude is not connected" : Store.project ? "Ask about " + Store.project.name + ", or describe something new…" : "Describe what you want to print…"
             enabled: Store.chat.available
             onSubmit: function (t) { if (t.trim() && !Store.chatBusy) { Store.send(t); text = "" } } }
+        // design tools: "Ask Claude about this feature…" puts its question here for the user to finish
+        Connections { target: Store
+            function onChatPrefill(t) { box.text = t; box.area.forceActiveFocus(); box.area.cursorPosition = box.area.length } }
         Txt { kind: "fine"; x: 14; anchors.top: box.bottom; anchors.topMargin: 8; width: parent.width - 110; elide: Text.ElideRight; wrapMode: Text.NoWrap
             text: Store.chatBusy ? "Claude is working. Watch the model." : "Enter to send · Shift+Enter for a new line" }
         Btn { kind: "primary"; small: true; icon: "send"; text: "Send"; anchors.right: parent.right; anchors.rightMargin: 12; anchors.top: box.bottom; anchors.topMargin: 5

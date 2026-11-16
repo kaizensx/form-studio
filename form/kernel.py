@@ -327,7 +327,10 @@ def _thickness(model, max_rays=1500):
     best = {"t": float("inf")}
     hist = []
     rng = np.random.default_rng(0)   # fixed seed: the same solid always gets the same samples
+    exempt = set(getattr(model["recipe"], "wall_exempt", ()))     # lettering: its sharp corners are not walls (form/marks.py checks strokes)
     for f in model["faces"]:
+        if f["feature"] in exempt:
+            continue
         P, T = f["P"], f["T"]
         a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
         areas = np.linalg.norm(np.cross(b - a, c - a), axis=1) / 2

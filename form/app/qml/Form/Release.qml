@@ -105,6 +105,16 @@ Column {
         Txt { kind: "fine"; width: parent.width; visible: !Store.chat.available; color: Theme.amber; text: Store.chat.note || "Claude is not connected." }
     }
 
+    // ── share (design tools) ────────────────────────────────
+    Sec { title: "Share"
+        Txt { kind: "fine"; width: parent.width
+            text: "A 1600 × 900 image of " + (root.p ? F.pad(root.p.head) : "the head revision") + ": the part with its dimensions, what is computed and what is simulated, and the revision. It states only what FORM knows." }
+        Row { spacing: 6
+            Btn { icon: "share_2"; text: "Share card…"; enabled: !Store.hasDraft; onClicked: Store.openSheet("share") }
+            Btn { kind: "quiet"; icon: "layout_grid"; text: "Variants"; onClicked: Store.openSheet("variants") }
+            Btn { kind: "quiet"; icon: "history"; text: "Timeline"; active: Store.timelineOpen; onClicked: Store.timelineOpen = !Store.timelineOpen } }
+    }
+
     // ── releases ────────────────────────────────────────────
     Sec { title: "Releases"; visible: !!root.d && root.d.releases.length > 0
         Column { width: parent.width

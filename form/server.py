@@ -160,10 +160,27 @@ def make_handler(st: Studio):
                 f = st.export_archive(p)
                 return self._send(200, f.read_bytes(), "application/zip",
                                   {"Content-Disposition": f'attachment; filename="{f.name}"'})
-            m2 = re.fullmatch(r"/file/(exports|slice|side|releases|references)/([A-Za-z0-9_.\-]+)(?:/([A-Za-z0-9_.\-]+))?", rest)
+            # -- design tools: revision timeline, variants board, share card (form/share.py, form/variants.py) --
+            if rest == "/revisions":
+                from . import share
+                return self._json({"head": p["head"], "revisions": share.revisions(st, p)})
+            if rest == "/variants":
+                from . import variants
+                return self._json(variants.board(st, p))
+            mv = re.fullmatch(r"/variants/(@head|[a-z0-9-]+)/view", rest)
+            if mv:
+                from . import variants
+                return self._json(variants.view(st, p, mv.group(1)))
+            if rest in ("/share", "/share.png"):
+                from . import share
+                c = share.card(st, p, picture="photo" if q.get("picture") == "photo" else "model")
+                if rest == "/share":
+                    return self._json(c)
+                return self._send(200, Path(c["file"]).read_bytes(), "image/png")
+            m2 = re.fullmatch(r"/file/(exports|slice|side|releases|references|share)/([A-Za-z0-9_.\-]+)(?:/([A-Za-z0-9_.\-]+))?", rest)
             if m2:
                 node, a, b = m2.groups()
-                base = st.dir(pid) / (node if node in ("releases", "references") else f"artifacts/{node}")
+                base = st.dir(pid) / (node if node in ("releases", "references", "share") else f"artifacts/{node}")
                 if node in ("exports", "slice") and a == "current":
                     a = st.keys(p)[node]
                 f = (base / a / b) if b else (base / a)
@@ -366,6 +383,24 @@ def make_handler(st: Studio):
                 return self._json({"reference": rec})
             if action == "open":
                 return self._json(open_output(st, pid, str(body.get("what", "step")), str(body.get("app", ""))))
+            # -- design tools: variants and the history animation --
+            if action in ("variant_save", "variant_delete", "variant_promote"):
+                from . import variants
+                if action == "variant_save":
+                    rev = body.get("rev")
+                    return self._json({"variant": variants.save(st, p, str(body.get("name", "")), body.get("values") or None,
+                                                                 int(rev) if rev else None, str(body.get("note", "")),
+                                                                 str(body.get("by") or "you")[:40], str(body.get("source") or "")[:20])})
+                if action == "variant_delete":
+                    return self._json(variants.delete(st, p, str(body.get("id", ""))))
+                res = variants.promote(st, p, str(body.get("id", "")))
+                return self._json({**res, "job": auto(st.load(pid))})
+            if action == "history_export":
+                from . import share
+                fmt = "webp" if body.get("format") == "webp" else "gif"
+                out = st.dir(pid) / "share" / f"{pid}_history.{fmt}"
+                info = share.history(st, p, out)
+                return self._json({**info, "name": out.name})
             if action == "reference_update":
                 with st.lock(pid):
                     p = st.load(pid)

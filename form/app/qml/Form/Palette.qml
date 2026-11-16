@@ -19,6 +19,13 @@ Item {
             c.push({ icon: "play", text: "Regenerate everything", hint: "Solid, exports, checks, slice", run: function () { Store.run() } })
             c.push({ icon: "boxes", text: "Compare alternatives", hint: "Build a grid of candidates", run: function () { Store.openSheet("alternatives") } })
             c.push({ icon: "camera", text: "Render in Blender", hint: "An illustration of the current revision", run: function () { Store.openSheet("render") } })
+            // design tools
+            c.push({ icon: "share_2", text: "Share card", hint: "A 1600 × 900 image of this design", run: function () { Store.openSheet("share") } })
+            c.push({ icon: "layout_grid", text: "Variants board", hint: "Named variants side by side", run: function () { Store.openSheet("variants") } })
+            c.push({ icon: "history", text: (Store.timelineOpen ? "Hide" : "Show") + " the revision timeline", hint: "Scrub through revisions", run: function () { Store.timelineOpen = !Store.timelineOpen; if (!Store.timelineOpen) Store.endScrub() } })
+            c.push({ icon: "play", text: "Play the revision history", hint: "Morph through every revision", run: function () { Store.timelineOpen = true; Store.playMorph() } })
+            if (Store.hidden.length) c.push({ icon: "eye", text: "Show all features", hint: F.plural(Store.hidden.length, "feature") + " hidden", run: function () { Store.showAll() } })
+            c.push({ icon: "keyboard", text: "Keyboard shortcuts", hint: "?", run: function () { Store.openSheet("shortcuts") } })
             if (Store.hasDraft) { c.push({ icon: "git_commit_horizontal", text: "Commit the draft", hint: "Saves a revision", run: function () { Store.commit() } })
                 c.push({ icon: "undo_2", text: "Discard the draft", hint: "", run: function () { Store.discard() } }) }
             c.push({ icon: "home", text: "All designs", hint: "Home", run: function () { Store.home() } })

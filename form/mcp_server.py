@@ -649,6 +649,42 @@ def build() -> MCPServer:
                    + (" (cached)" if m.get("cached") else f", {m['seconds']:.0f} s") + f". File: {f}")
         return [Image(path=f), caption]
 
+    # ---- design tools: variants, share card, revision history (form/variants.py, form/share.py) ----
+    @mcp.tool(annotations=RW)
+    async def save_variant(project: str, name: str, values: dict[str, float] | None = None, rev: int | None = None,
+                           note: str = "", ctx: Context = None) -> dict:
+        """Save a named variant of the design ("Travel version", "Thick walls"): a complete set of parameter values kept
+        in the project next to the revisions. values are changes on top of the head (or of rev); leave them out to save
+        the head (or rev) as it is. The candidate is built before it is saved; saving a name again replaces it. Nothing
+        is committed: promote a variant on the bench or with `form variants promote`."""
+        st = studio()
+        from . import variants
+        v = await _run(lambda: variants.save(st, st.load(project), name, values, rev, note, _origin(ctx).replace("agent:", "") or "agent"))
+        act(project, "variant", f"Saved variant “{v['name']}”", ctx)
+        return v
+
+    @mcp.tool(annotations=RO)
+    async def list_variants(project: str) -> dict:
+        """The head and every saved variant side by side: size and volume (computed), print time and grams (simulated,
+        only when the variant is a revision with a current slice), fit yield (modelled), checks, and each variant's
+        differences from the head."""
+        st = studio()
+        from . import variants
+        return await _run(lambda: variants.board(st, st.load(project)))
+
+    @mcp.tool(annotations=RO, structured_output=False)
+    async def share_card(project: str, picture: str = "model", ctx: Context = None) -> list:
+        """A 1600 x 900 share image of the head revision: the part with dimension lines, its name, size and volume
+        (computed), print time and grams (simulated; only if the slice is current), checks, the revision and
+        "Designed with FORM". picture: "model" (kernel geometry) or "photo" (the newest current Blender render, an
+        illustration). The card states only what FORM knows; it is not evidence of a print."""
+        st = studio()
+        from . import share
+        c = await _run(lambda: share.card(st, st.load(project), picture=picture))
+        act(project, "look", "Made the share card", ctx)
+        rows = "; ".join(f"{r['k']}: {r['v']}" + (f" [{r['tag']}]" if r["tag"] else "") for r in c["facts"]["rows"])
+        return [Image(path=c["file"]), f"Share card for {c['facts']['name']} r{c['rev']:02d}. {rows}. File: {c['file']}"]
+
     return mcp
 
 

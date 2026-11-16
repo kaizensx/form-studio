@@ -83,5 +83,15 @@ QtObject {
         "hammer": "\ue0ec",
         "cog": "\ue30b",
         "monitor": "\ue11d",
+        "pause": "\ue12e",
+        "share_2": "\ue156",
+        "keyboard": "\ue284",
+        "git_branch": "\ue0e2",
+        "film": "\ue0d0",
+        "type": "\ue198",
+        "clipboard": "\ue085",
+        "tag": "\ue17f",
+        "layout_grid": "\ue0ff",
+        "focus": "\ue29e",
     })
 }

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from build123d import Align, Axis, Box, Circle, Cylinder, Plane, Pos, Rot, SlotOverall, extrude, fillet
 
-from .. import parts
+from .. import marks, parts, patterns
 from .base import Feature, Param, Recipe, RecipeError, Stage
 from ..parts import checked
 
@@ -77,7 +77,18 @@ class Enclosure(Recipe):
         Param("vents", "Vent slots", 8, 0, 30, 1, "", "form", "vents", "Through the lid."),
         Param("vent_w", "Vent slot width", 2, 1, 6, 0.1, "mm", "form", "vents"),
         Param("vent_l", "Vent slot length", 40, 5, 150, 0.5, "mm", "form", "vents"),
+        # ---- patterns and marks (form.patterns, form.marks) ----
+        Param("vent_style", "Vent pattern", 0, 0, 2, 1, "", "form", "vents",
+              "0 = slots, 1 = honeycomb, 2 = round-hole grid. Honeycomb cells are 2.5 × the slot width across flats, "
+              "grid holes 1.5 ×; both fill the area the slots would cover."),
+        Param("label", "Label", 0, 0, 2, 1, "", "form", "mark",
+              "The project's label text on the right-hand wall. 0 = none, 1 = raised, 2 = sunk."),
+        Param("label_h", "Label height", 6, 3, 20, 0.5, "mm", "form", "mark", "Height of the capitals."),
+        Param("stamp", "Revision stamp", 0, 0, 1, 1, "", "form", "mark",
+              "1 = the revision and a short hash (\"r04 a3f1\") sunk 0.4 mm into the underside of the box."),
     ]
+    wall_exempt = ("mark",)                   # letter corners are not walls; marks.checks() measures the strokes instead
+    mark_params = ("label", "stamp")          # these values make the geometry depend on the project's label and revision
     features = [
         Feature("body", "Shell", "structure"),
         Feature("cavity", "Cavity", "access"),
@@ -91,6 +102,7 @@ class Enclosure(Recipe):
         Feature("lip", "Lid lip", "interface", "Keeps the lid square on the box."),
         Feature("lid_screws", "Lid screw holes", "interface"),
         Feature("vents", "Vent slots", "access"),
+        Feature("mark", "Label and stamp", "finish", "Lettering on the side wall; revision stamp under the floor."),
     ]
 
     # ---- geometry helpers -----------------------------------------------------------------------------
@@ -124,9 +136,20 @@ class Enclosure(Recipe):
         head = {0: "pan", 1: "socket", 2: "countersunk"}[int(v["lid_head"])]
         return parts.screw_clearance(self.g(v)["size"], v["lid_t"], head=head, fit="normal", recess=bool(v["lid_head"]))
 
+    def _vent(self, v):
+        """The lid's vent pattern (form.patterns): slots, honeycomb or a round-hole grid over the same area."""
+        n, vw, depth = int(v["vents"]), v["vent_w"], v["lid_t"] + 0.2
+        style = int(round(v.get("vent_style", 0)))
+        rw = n * vw * 2.2 - 1.2 * vw
+        if style == 1:
+            return patterns.hex_vents(rw, v["vent_l"], cell=2.5 * vw, web=max(1.2, 0.6 * vw), depth=depth)
+        if style == 2:
+            return patterns.perforation_grid(rw, v["vent_l"], hole_d=1.5 * vw, web=max(1.2, 0.6 * vw), depth=depth)
+        return patterns.slot_array(vw, v["vent_l"], count=n, web=1.2 * vw, depth=depth)
+
     def constraints(self, v):
         out = []
-        for k in ("fasten", "lid_head", "usbc", "round_n", "vents"):
+        for k in ("fasten", "lid_head", "usbc", "round_n", "vents", "vent_style", "label", "stamp"):
             if abs(v[k] - round(v[k])) > 1e-9:
                 out.append(RecipeError(f"{self.spec(k).label} must be a whole number", self.spec(k).feature, "Use whole numbers.", [k]))
         for k in ("lid_screw", "pcb_screw"):
@@ -211,6 +234,12 @@ class Enclosure(Recipe):
                                        ["vents", "vent_w"]))
             if v["vent_l"] > v["inner_d"] - 2 * (v["lip_wall"] + v["lip_clearance"] + 3):
                 out.append(RecipeError("Vent slots are longer than the lid allows", "vents", "Shorten them.", ["vent_l"]))
+            if v.get("vent_style") and self._vent(v)["count"] < 1:
+                out.append(RecipeError("The vent area is too small for one cell of this pattern", "vents",
+                                       "Use more or longer slots, or the slot pattern.", ["vents", "vent_l", "vent_style"]))
+        if v.get("label") == 2 and v["wall"] < 1.6:
+            out.append(RecipeError("A sunk label needs a wall of at least 1.6 mm", "mark", "Thicken the wall, or raise the label instead.",
+                                   ["wall", "label"]))
         if v["lip_h"] and v["lip_wall"] + v["lip_clearance"] > v["boss_d"]:
             out.append(RecipeError("Lid lip is thicker than the corner bosses", "lip", "Thin the lip.", ["lip_wall"]))
         return out
@@ -305,15 +334,22 @@ class Enclosure(Recipe):
         s = s - cut
         stages.append(Stage("lid_screws", s))
         if v["vents"]:
-            n = int(v["vents"])
-            pitch = v["vent_w"] * 2.2
-            cut = None
-            for i in range(n):
-                x = (i - (n - 1) / 2) * pitch
-                c = Pos(x, Y0, -0.5) * extrude(Plane.XY * SlotOverall(v["vent_l"], v["vent_w"], rotation=90), amount=lt + 1)
-                cut = c if cut is None else cut + c
-            s = s - cut
+            s = s - Pos(0, Y0, lt) * self._vent(v).shape
             stages.append(Stage("vents", s))
+        if v.get("label") or v.get("stamp"):
+            if v.get("label"):
+                text = marks.context().get("text") or "FORM"
+                info = marks.analyse(text, v["label_h"])
+                room_w, room_h = D - 2 * v["corner_r"] - 4, H - 4
+                if info["width_mm"] > room_w or v["label_h"] > room_h:
+                    raise RecipeError(f"The label “{info['text']}” is {info['width_mm']:.0f} × {v['label_h']:g} mm; the side wall has "
+                                      f"{max(room_w, 0):.0f} × {max(room_h, 0):.0f} mm", "mark",
+                                      "Lower the label height or shorten the label text.", ["label_h"])
+                fn = marks.emboss_text if v["label"] < 1.5 else marks.deboss_text
+                s = fn(s, text, on=(W / 2, 0, H / 2), normal=(1, 0, 0), height=v["label_h"], depth=0.6)
+            if v.get("stamp"):
+                s = marks.revision_stamp(s, at=(0, 0), height=6, depth=min(0.4, v["floor"] / 3))
+            stages.append(Stage("mark", s))
         return checked(stages)
 
     def derived(self, v):
@@ -334,7 +370,7 @@ class Enclosure(Recipe):
              "feature": "standoffs", "formula": "standoff + 1.6 mm board (assumed)"},
         ]
         return rows + fx.derived("inserts", "lid_fastener.", ("hole_d",)) + bf.derived("board_holes", "board_fastener.") \
-            + lh.derived("lid_screws", "lid_hole.")
+            + lh.derived("lid_screws", "lid_hole.") + (self._vent(v).derived("vents", "vent.") if v["vents"] else [])
 
     def measure(self, v, faces_by_feature):
         out = []
@@ -368,6 +404,13 @@ class Enclosure(Recipe):
                        "detail": "Inner height − standoff − 1.6 mm board (assumed thickness). Check your tallest part "
                                  "(USB and Ethernet jacks on a Raspberry Pi stand about 16 mm).",
                        "evidence": "computed", "feature": "standoffs"})
+        if v["vents"]:
+            checks.append(self._vent(v).check(id="vent_webs", feature="vents"))
+        ctx = marks.context()
+        if v.get("label") and ctx:                # the label text is only known while FORM builds for a project
+            checks += marks.checks(marks.analyse(ctx.get("text") or "FORM", v["label_h"]), raised=v["label"] < 1.5)
+        if v.get("stamp") and ctx:
+            checks += marks.checks(marks.analyse(marks.stamp_text(), 6, 0.4), raised=False, id="stamp", label="Revision stamp")
         return {"insert_wall_mm": (v["boss_d"] - fx["hole_d"]) / 2, "headroom_mm": head, "checks": checks}
 
     def test_piece(self, v, shape):

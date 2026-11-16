@@ -10,6 +10,7 @@ import math
 from build123d import (Align, Axis, Box, Cylinder, Plane, Polygon, Pos, Rot,
                        chamfer, extrude, fillet)
 
+from .. import marks
 from .base import Feature, Param, Recipe, RecipeError, Stage
 
 PLA_DENSITY = 1.24e-3  # g/mm³
@@ -57,7 +58,15 @@ class Dock(Recipe):
         Param("relief_width", "Thumb relief width", 30.0, 0, 80, 0.5, "mm", "form", "relief",
               "Scoop in the front lip. 0 removes it."),
         Param("relief_depth", "Thumb relief depth", 6.0, 0, 40, 0.5, "mm", "form", "relief"),
+        # ---- marks (form.marks) ----
+        Param("label", "Label", 0, 0, 2, 1, "", "form", "mark",
+              "The project's label text on the front face, under the thumb relief. 0 = none, 1 = raised, 2 = sunk."),
+        Param("label_h", "Label height", 5, 3, 20, 0.5, "mm", "form", "mark", "Height of the capitals."),
+        Param("stamp", "Revision stamp", 0, 0, 1, 1, "", "form", "mark",
+              "1 = the revision and a short hash (\"r04 a3f1\") sunk 0.4 mm into the underside."),
     ]
+    wall_exempt = ("mark",)                   # letter corners are not walls; marks.checks() measures the strokes instead
+    mark_params = ("label", "stamp")          # these values make the geometry depend on the project's label and revision
 
     features = [
         Feature("body", "Body", "structure", "Wedge block that carries the load to the desk."),
@@ -66,6 +75,7 @@ class Dock(Recipe):
         Feature("lead_in", "Lead-in", "access", "Chamfered mouth so the device finds the pocket."),
         Feature("cable", "Cable path", "access", "Plug opening and bridged channel to the rear."),
         Feature("relief", "Thumb relief", "access", "Scoop that keeps the bottom of the screen reachable."),
+        Feature("mark", "Label and stamp", "finish", "Lettering on the front face; revision stamp under the base."),
     ]
 
     # ---- geometry helpers ------------------------------------------------
@@ -133,6 +143,9 @@ class Dock(Recipe):
                 "Raise the pocket floor or use a thinner channel.", ["floor", "cable_diameter"])
         if v["relief_width"] > g["pw"] - 4 and v["relief_width"] > 0:
             bad("Thumb relief is wider than the pocket", "relief", "Narrow the relief.", ["relief_width"])
+        for k in ("label", "stamp"):
+            if abs(v.get(k, 0) - round(v.get(k, 0))) > 1e-9:
+                bad(f"{self.spec(k).label} must be a whole number", "mark", "Use whole numbers.", [k])
         if v["relief_width"] > 0 and v["relief_depth"] > g["sf"] - 3:
             bad("Thumb relief removes the front lip that retains the device", "relief",
                 f"Keep relief depth under {max(g['sf']-3,0):.1f} mm.", ["relief_depth"])
@@ -196,6 +209,27 @@ class Dock(Recipe):
                 R, (g["yf"] - g["front"]) + 1 + 0.01, align=(Align.CENTER, Align.CENTER, Align.MIN))
             s = s - scoop
             stages.append(Stage("relief", s))
+        if v.get("label") or v.get("stamp"):
+            if v.get("label"):
+                text = marks.context().get("text") or "FORM"
+                info = marks.analyse(text, v["label_h"])
+                # the flat part of the front face: between the corner radii, from the base chamfer to the relief (or the top edge)
+                top = v["front_height"] - v["edge_r"] - 1
+                if v["relief_width"] > 0 and v["relief_depth"] > 0:
+                    top = min(top, g["zf"] - v["relief_depth"] - 1)
+                room_w, room_h = g["W"] - 2 * v["corner_r"] - 2, top - 1.5
+                if info["width_mm"] > room_w or v["label_h"] > room_h:
+                    raise RecipeError(f"The label “{info['text']}” is {info['width_mm']:.0f} × {v['label_h']:g} mm; the front face has "
+                                      f"{max(room_w, 0):.0f} × {max(room_h, 0):.1f} mm of flat area", "mark",
+                                      "Lower the label height, shorten the label text, raise the front or reduce the thumb relief.",
+                                      ["label_h", "front_height", "relief_depth", "corner_r"])
+                fn = marks.emboss_text if v["label"] < 1.5 else marks.deboss_text
+                s = fn(s, text, on=(0, g["front"], 1.5 + room_h / 2), normal=(0, -1, 0), height=v["label_h"], depth=0.6)
+            if v.get("stamp"):
+                # beside the cable channel, which runs along x = 0 under the pocket
+                x = max(v["plug_width"], v["cable_diameter"]) / 2 + (g["W"] / 2 - max(v["plug_width"], v["cable_diameter"]) / 2) / 2
+                s = marks.revision_stamp(s, at=(x, 0), height=6, depth=0.4)
+            stages.append(Stage("mark", s))
         return stages
 
     # ---- derived ---------------------------------------------------------
@@ -248,10 +282,19 @@ class Dock(Recipe):
         margin = rear - ycom
         h_top = v["floor"] + L * math.cos(g["th"])
         tip_n = max(margin, 0) * m * 9.81e-3 / h_top
-        return {"dock_mass_g": m_dock, "dock_mass_assumed": assumed, "com_y": ycom,
+        return {"checks": self._mark_checks(v), "dock_mass_g": m_dock, "dock_mass_assumed": assumed, "com_y": ycom,
                 "margin_back_mm": margin, "margin_front_mm": ycom - g["front"],
                 "tip_force_n": tip_n, "push_height_mm": h_top,
                 "model": "Rigid bodies, device as a uniform slab, friction and cable drag ignored."}
+
+    def _mark_checks(self, v):
+        ctx = marks.context()
+        out = []
+        if v.get("label") and ctx:                # the label text is only known while FORM builds for a project
+            out += marks.checks(marks.analyse(ctx.get("text") or "FORM", v["label_h"]), raised=v["label"] < 1.5)
+        if v.get("stamp") and ctx:
+            out += marks.checks(marks.analyse(marks.stamp_text(), 6, 0.4), raised=False, id="stamp", label="Revision stamp")
+        return out
 
     def companions(self, v):
         g = self.g(v)

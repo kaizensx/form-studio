@@ -96,6 +96,29 @@ ASSEMBLIES (optional, for solids >= 2)
   overlap and the angle), and tool access. Sampled motion never proves the motion is free between samples.
   The app shows Assembled / Exploded / Print layout, and a release adds BOM.csv and ASSEMBLY.md.
 
+TEXT AND MARKS: form.marks   PATTERNS: form.patterns
+  from form import marks, patterns
+  marks.emboss_text(shape, "DOCK", on=(x, y, z), normal=(0, -1, 0), height=6, depth=0.6)   # raised; returns the new shape
+  marks.deboss_text(shape, "v2", on=a_planar_face, height=5, depth=0.5)                    # sunk
+  marks.revision_stamp(shape)        # "r04 a3f1" (revision + hash of its values) sunk 0.4 mm into the underside
+       on = a planar Face, a Plane, or a point with normal=. height is the CAP height in mm. Flat faces only.
+       The font ships with FORM (never a system font). Text reads left to right seen from outside; on walls capitals point up.
+       marks.context() gives {"rev", "text", "hash", "nozzle"} while FORM builds for a project: "text" is the project's
+       label text (form mark <project> --text ..., or the Label text field), so use marks.context().get("text") or "FORM".
+       If the geometry depends on it, declare on the class:  mark_params = ("label", "stamp")  (the parameters that switch
+       marks on; FORM then keys the geometry by label text and revision) and  wall_exempt = ("mark",)  (the feature whose
+       faces are lettering, so letter corners are not reported as thin walls).
+       Printability: statics() can return checks from marks.checks(marks.analyse(text, height), raised=True): stroke
+       width against the nozzle (computed) and cap height against a 4 mm legibility floor (heuristic). Raised text on a
+       wall is a small overhang; sunk text prints cleaner. Keep capitals >= 5 mm on a 0.4 mm nozzle.
+  patterns.hex_vents(w, d, cell, web, depth)   patterns.perforation_grid(w, d, hole_d, web, depth, stagger)
+  patterns.slot_array(slot_w, slot_l, count | w=, web, depth)   patterns.knurl(diameter, height, pitch, depth)
+  patterns.grip_ribs(w, d, rib_w, pitch, height)      # kind "add"; the others are cutters
+       Each returns a Pattern: .shape (cutter: centred, opening at z = 0, going down, like form.parts), .computed
+       {"count", "open_area_ratio", "min_web_mm", ...}, .derived(feature, prefix) rows, .check() (webs >= 2 perimeters),
+       .apply(body, on=(x, y, z), normal=(0, 0, 1)). Through-cut: depth = wall + 0.2.
+       lid = lid - Pos(0, 0, lid_t) * patterns.hex_vents(60, 36, cell=5, web=1.2, depth=lid_t + 0.2).shape
+
 WORKFLOW
   design_guide -> write source -> create_design (or update_design) -> render -> get_project (checks, slice)
   -> fix -> request_release. Parameter-only changes: preview_change / commit_change, as for any project.

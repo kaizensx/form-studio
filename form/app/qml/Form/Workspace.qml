@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import "F.js" as F
+import "." as Tools      // Timeline and ContextMenu are also Qt type names; qualify ours
 
 // A project: the part in the middle, the question being asked of it on the right.
 Item {
@@ -31,6 +32,8 @@ Item {
             anchors.fill: parent
             visible: !Store.layers
             asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
+            hiddenFeatures: Store.hidden                                             // design tools: quick actions
+            onContextRequested: function (f, x, y) { Store.ctxMenu = { feature: f, x: x, y: y } }
             Component.onCompleted: { Store.viewer = vp; if (Store.view) { Store.showHead(); vp.setView("iso", false) } }
             Component.onDestruction: if (Store.viewer === vp) Store.viewer = null
             onPicked: function (f) { Store.pick(f) }
@@ -86,7 +89,7 @@ Item {
             Seg { model: [{ value: "assembled", text: "Assembled" }, { value: "exploded", text: "Exploded" }, { value: "print", text: "Print layout" }]
                 value: Store.asmMode; onPicked: function (v) { Store.setAsmMode(v) } } }
         // HUD — bottom left: what you are looking at
-        Row { x: 16; anchors.bottom: pipe.top; anchors.bottomMargin: 12; spacing: 8; visible: !Store.layers && !!Store.shown
+        Row { x: 16; anchors.bottom: pipe.top; anchors.bottomMargin: 12 + (Store.timelineOpen ? 54 : 0); spacing: 8; visible: !Store.layers && !!Store.shown
             Rectangle { width: ro.implicitWidth + 20; height: 26; radius: Theme.rSm; color: Theme.alpha(Theme.plate1, 0.86); border.color: Theme.rule
                 Row { id: ro; anchors.centerIn: parent; spacing: 8
                     Txt { mono: true; font.pixelSize: 12
@@ -100,7 +103,13 @@ Item {
             Btn { small: true; kind: "quiet"; active: Store.companions; icon: "box"; tip: "Show what the part holds"
                 visible: !!(Store.shown && Store.shown.companions && Store.shown.companions.length); onClicked: Store.toggleCompanions() }
             Btn { small: true; kind: "quiet"; icon: "camera"; text: "Photo"; tip: "Render the current revision in Blender (an illustration)"
-                enabled: !Store.hasDraft; onClicked: Store.openSheet("render") } }
+                enabled: !Store.hasDraft; onClicked: Store.openSheet("render") }
+            Btn { small: true; kind: "quiet"; icon: "history"; text: "History"; active: Store.timelineOpen; tip: "Scrub through the revisions"
+                onClicked: { Store.timelineOpen = !Store.timelineOpen; if (!Store.timelineOpen) Store.endScrub() } } }
+
+        // design tools: revision timeline (above the pipeline) and the model's context menu
+        Tools.Timeline { anchors.fill: parent; viewport: vp; bottomInset: pipe.height + 24; visible: !Store.layers }
+        Tools.ContextMenu { anchors.fill: parent; z: 8 }
 
         Pipeline { id: pipe; anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 12 }
     }

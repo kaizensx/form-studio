@@ -144,6 +144,24 @@ class Bridge(QObject):
     def copy(self, text: str):
         QGuiApplication.clipboard().setText(text)
 
+    @Slot(str, result=bool)
+    def copyImage(self, api_path: str) -> bool:
+        """Put an engine image (the share card) on the clipboard."""
+        from PySide6.QtGui import QImage
+        try:
+            conn = http.client.HTTPConnection(self.host, self.port, timeout=120)
+            conn.request("GET", "/api" + api_path)
+            res = conn.getresponse()
+            data = res.read()
+            conn.close()
+        except OSError:
+            return False
+        img = QImage.fromData(data)
+        if res.status != 200 or img.isNull():
+            return False
+        QGuiApplication.clipboard().setImage(img)
+        return True
+
     @Slot(result=bool)
     def hasClaude(self) -> bool:
         return bool(shutil.which("claude"))

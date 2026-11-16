@@ -25,6 +25,8 @@ Item {
     property string sectionAxis: ""
     property real sectionT: 0.5
     signal picked(string feature)
+    property var hiddenFeatures: []          // feature ids not drawn (their edges stay, so the part still reads)
+    signal contextRequested(string feature, real x, real y)     // right-click or long-press without dragging
     signal hoveredFeature(string feature, real x, real y)
 
     // ── assembly (designs that declare one): parts drawn as printed, assembled, or pulled apart ──
@@ -215,6 +217,7 @@ Item {
                     Model {
                         required property var modelData
                         readonly property string feature: modelData.feature || ""
+                        visible: vp.hiddenFeatures.indexOf(feature) < 0
                         pickable: true
                         geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                         materials: CustomMaterial {
@@ -247,6 +250,7 @@ Item {
                             Model {
                                 required property var modelData
                                 readonly property string feature: modelData.feature || ""
+                                visible: vp.hiddenFeatures.indexOf(feature) < 0
                                 pickable: true
                                 geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                                 materials: CustomMaterial {
@@ -397,7 +401,13 @@ Item {
                 vp.target = vp.target.minus(right.times(dx * k)).plus(up.times(dy * k))
             }
         }
-        onReleased: function (e) { if (!moved && e.button === Qt.LeftButton) vp.picked(hit(e.x, e.y)) }
+        onReleased: function (e) {
+            if (held) { held = false; return }
+            if (!moved && e.button === Qt.LeftButton) vp.picked(hit(e.x, e.y))
+            else if (!moved && e.button === Qt.RightButton) vp.contextRequested(hit(e.x, e.y), e.x, e.y)
+        }
+        property bool held: false
+        onPressAndHold: function (e) { if (!moved && e.button === Qt.LeftButton) { held = true; vp.contextRequested(hit(e.x, e.y), e.x, e.y) } }
         onExited: { if (vp.hovered) vp.hovered = ""; vp.hoveredFeature("", 0, 0) }
         onWheel: function (w) {
             vp.tween = false
