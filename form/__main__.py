@@ -16,6 +16,10 @@
   form optimize <project> --vary arm_t:4:20 --minimize solid_mass_g --require "statics.safety_factor>=3"
   form animate <project> [--morph 1:4] [--out x.gif]   turntable or revision morph
   form verify <project> <release>    re-hash a release against its manifest
+  form simulate <project> --gif out.gif | --frames dir | --png out.png [--layers a:b] [--layer n]
+                                     the sliced toolpaths building up, from the slicer's G-code (not a print)
+  form cost <project> [--price-per-kg X --kwh-price Y --watts Z --copies N] [--save]
+  form pack <project> --copies N [--spacing mm]   do N copies fit on one plate?
 """
 from __future__ import annotations
 
@@ -101,6 +105,30 @@ def main(argv=None):
     v = sub.add_parser("verify")
     v.add_argument("project")
     v.add_argument("release")
+    # -- print simulation, cost, plate packing --
+    sm = sub.add_parser("simulate", help="pictures of the sliced toolpaths building up (from the slicer's G-code)")
+    sm.add_argument("project")
+    sm.add_argument("--gif", help="write an animated GIF")
+    sm.add_argument("--frames", help="write PNG frames into this folder")
+    sm.add_argument("--png", help="write one picture (use --layer)")
+    sm.add_argument("--layers", help="a:b, 1-based and inclusive (default: the whole print)")
+    sm.add_argument("--layer", type=int, help="for --png and the statistics: the print at the end of this layer")
+    sm.add_argument("--count", type=int, default=72, help="number of frames")
+    sm.add_argument("--size", default="720x540")
+    sm.add_argument("--max-mb", type=float, default=4.0, help="shrink the GIF until it is at most this large")
+    co = sub.add_parser("cost", help="filament, electricity and machine time for the current slice")
+    co.add_argument("project")
+    co.add_argument("--price-per-kg", type=float)
+    co.add_argument("--kwh-price", type=float)
+    co.add_argument("--watts", type=float)
+    co.add_argument("--machine-rate", type=float, help="per hour")
+    co.add_argument("--copies", type=int, default=1)
+    co.add_argument("--save", action="store_true", help="remember the given prices in <data dir>/cost.json")
+    pk = sub.add_parser("pack", help="do N copies fit on one plate?")
+    pk.add_argument("project")
+    pk.add_argument("--copies", type=int, default=1)
+    pk.add_argument("--spacing", type=float, help="gap between parts in mm (default 6)")
+    pk.add_argument("--no-rotate", action="store_true")
     a = ap.parse_args(argv)
 
     if a.cmd in (None, "serve"):
@@ -184,6 +212,43 @@ def main(argv=None):
             res = st.verify_release(st.load(a.project), a.release)
             _print(res)
             return 0 if res["intact"] else 1
+        elif a.cmd == "simulate":
+            from . import simulate, toolpath
+            p = st.load(a.project)
+            tp = toolpath.for_project(st, p)
+            first, last = toolpath.parse_range(a.layers, tp.layers)
+            size = tuple(int(x) for x in a.size.lower().split("x"))
+            title = f"{p['name']}  r{p['head']:02d}"
+            at = (a.layer - 1) if a.layer else last
+            out = {"project": p["id"], "rev": p["head"], "layers": [first + 1, last + 1], "of": tp.layers,
+                   "time_source": tp.time_source, "time_note": toolpath.TIME_NOTES[tp.time_source],
+                   "at": toolpath.stats_at(tp, at), "label": simulate.LABEL}
+            if a.gif:
+                out["gif"] = simulate.save_gif(tp, a.gif, first=first, last=last, count=a.count, size=size, title=title,
+                                               max_bytes=int(a.max_mb * 1_000_000))
+            if a.frames:
+                out["frames"] = simulate.save_frames(tp, a.frames, first=first, last=last, count=a.count, size=size, title=title)
+            if a.png:
+                with open(a.png, "wb") as f:
+                    f.write(simulate.png_at(tp, at + 1, size=size, title=title))
+                out["png"] = a.png
+            _print(out)
+        elif a.cmd == "cost":
+            from . import cost
+            p = st.load(a.project)
+            given = {"price_per_kg": a.price_per_kg, "kwh_price": a.kwh_price, "watts": a.watts, "machine_rate_per_h": a.machine_rate}
+            if a.save:
+                body = {k: v for k, v in given.items() if v is not None and k != "price_per_kg"}
+                if a.price_per_kg is not None:
+                    ftype = cost.project(st, p, with_materials=False)["filament"]["filament_type"]
+                    body |= {"price_per_kg": a.price_per_kg, "filament_type": ftype}
+                cost.save_prefs(st.cfg, body)
+            _print(cost.project(st, p, a.copies, given))
+        elif a.cmd == "pack":
+            from . import packing
+            res = packing.project(st, st.load(a.project), a.copies, a.spacing, not a.no_rotate)
+            _print(res)
+            return 0 if res["fits"] else 1
     except StudioError as e:
         _print({"error": e.public()})
         return 2

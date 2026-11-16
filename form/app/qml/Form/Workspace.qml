@@ -141,6 +141,7 @@ Item {
             anchors.top: tabs.bottom; anchors.topMargin: 6; anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
             contentHeight: body.implicitHeight + 40; clip: true; boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { width: 6 }
+            Connections { target: Store; function onRevealInspector(y) { scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, y)) } }
             Column {
                 id: body; x: 20; y: 6; width: parent.width - 40; spacing: 14
                 Loader { id: panel; width: parent.width; active: !!Store.data

@@ -83,5 +83,11 @@ QtObject {
         "hammer": "\ue0ec",
         "cog": "\ue30b",
         "monitor": "\ue11d",
+        "pause": "\ue12e",
+        "repeat": "\ue146",
+        "skip_forward": "\ue160",
+        "ghost": "\ue20e",
+        "coins": "\ue097",
+        "layout_grid": "\ue0ff",
     })
 }
