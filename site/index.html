@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FORM — describe a part, watch an AI agent build it in real CAD</title>
+<meta name="description" content="FORM is an open-source desktop app. An AI agent designs 3D-printable parts with a real CAD kernel, slices them with your slicer, and every number says how it is known.">
+<meta name="theme-color" content="#0e1113">
+<link rel="canonical" href="https://kaizensx.github.io/form-studio/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="FORM">
+<meta property="og:title" content="FORM — describe a part, watch it get built in real CAD">
+<meta property="og:description" content="Open-source desktop app: an AI agent designs 3D-printable parts with a real CAD kernel and your slicer. Every number says how it is known.">
+<meta property="og:url" content="https://kaizensx.github.io/form-studio/">
+<meta property="og:image" content="https://kaizensx.github.io/form-studio/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A phone dock on a graphite build plate with its dimensions drawn as dimension lines.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="FORM — describe a part, watch it get built in real CAD">
+<meta name="twitter:description" content="Open-source desktop app: an AI agent designs 3D-printable parts with a real CAD kernel and your slicer.">
+<meta name="twitter:image" content="https://kaizensx.github.io/form-studio/assets/og.png">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preload" href="fonts/InstrumentSans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/GeistMono.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/site.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a class="mark" href="./" aria-label="FORM, home" translate="no">FORM</a>
+    <ul class="nav-links">
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#app">The app</a></li>
+      <li><a href="#works-with">Works with</a></li>
+      <li><a href="#agents">For agents</a></li>
+      <li><a href="docs/">Docs</a></li>
+      <li><a href="https://github.com/kaizensx/form-studio">GitHub</a></li>
+    </ul>
+    <a class="nav-docs" href="docs/">Docs</a>
+    <a class="btn primary small" href="#get">Download</a>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ================= hero ================= -->
+<section class="hero" id="top">
+  <div class="stage" id="stage">
+    <picture>
+      <source media="(max-width: 1000px)" srcset="assets/hero-poster-m.webp" width="780" height="738">
+      <img class="poster" src="assets/hero-poster.webp" width="1600" height="992" alt="A phone dock standing on a graphite build plate with a 10 mm grid. Its width, depth and height are drawn as dimension lines." fetchpriority="high">
+    </picture>
+    <canvas id="view" tabindex="0" aria-label="3D view of the part. Drag to orbit, or use the arrow keys."></canvas>
+    <div class="dims" id="dims" aria-hidden="true"></div>
+  </div>
+
+  <div class="wrap hero-copy">
+    <h1>Describe a part. Watch it get built in <em>real CAD</em>.</h1>
+    <p class="lead">FORM is an open-source desktop app. An AI agent writes your part as CAD code, a real kernel builds the solid, your own slicer slices it, and every number says how it is known.</p>
+    <div class="actions">
+      <a class="btn primary" href="#get">Download FORM
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/></svg></a>
+      <a class="btn" href="https://github.com/kaizensx/form-studio">Source on GitHub</a>
+    </div>
+    <p class="fine">macOS, Windows and Linux. MIT licence. Runs on your computer; it never uploads a design or starts a print.</p>
+  </div>
+
+  <div class="wrap bench">
+    <div class="instrument" id="instrument">
+      <div class="seg" role="radiogroup" aria-label="Part" id="parts">
+        <button type="button" role="radio" aria-checked="true" data-part="dock">Phone dock</button>
+        <button type="button" role="radio" aria-checked="false" tabindex="-1" data-part="enclosure">Enclosure</button>
+        <button type="button" role="radio" aria-checked="false" tabindex="-1" data-part="gears">Gear pair</button>
+        <button type="button" role="radio" aria-checked="false" tabindex="-1" data-part="box">Hinged box</button>
+      </div>
+      <div class="scrub">
+        <label for="scrub"><span id="p-label">Device width</span><b id="p-value">70 mm</b></label>
+        <div class="rule-track">
+          <div class="ticks" id="ticks" aria-hidden="true"></div>
+          <input type="range" id="scrub" min="0" max="12" step="1" value="2" aria-describedby="bench-note">
+        </div>
+      </div>
+      <div class="readout" aria-live="off">
+        <span class="dimtxt" id="r-size">84.6 × 92.0 × 35.5 mm</span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span id="r-vol">195.2 cm³</span>
+        <span class="tag datum" id="r-tag">computed</span>
+      </div>
+    </div>
+    <div class="bench-note" id="bench-note">
+      <span><b id="n-count">13 real builds</b> by the CAD kernel, exported from the app's sample project. The slider moves between them; nothing is interpolated.</span>
+      <span id="n-build" class="num">bed outline 180 × 180 mm · kernel build 86 ms · 56 faces</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= pipeline ================= -->
+<section class="sec" id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2>From a sentence to a file you can print</h2>
+      <p>Six steps, and each one leaves a record. The strip below is the one that runs along the bottom of the app.</p>
+    </div>
+
+    <div class="pipe reveal" style="--d:80ms">
+      <div class="pipe-strip" role="tablist" aria-label="Pipeline" id="pipe-tabs">
+        <button type="button" role="tab" id="t-describe" aria-controls="p-describe" aria-selected="true"><span class="n">Describe</span><span class="s">words, photos</span></button>
+        <button type="button" role="tab" id="t-design" aria-controls="p-design" aria-selected="false" tabindex="-1"><span class="n">Design</span><span class="s">CAD code</span></button>
+        <button type="button" role="tab" id="t-build" aria-controls="p-build" aria-selected="false" tabindex="-1"><span class="n">Build</span><span class="s">B-rep solid</span></button>
+        <button type="button" role="tab" id="t-check" aria-controls="p-check" aria-selected="false" tabindex="-1"><span class="n">Check</span><span class="s">on the solid</span></button>
+        <button type="button" role="tab" id="t-slice" aria-controls="p-slice" aria-selected="false" tabindex="-1"><span class="n">Slice</span><span class="s">your slicer</span></button>
+        <button type="button" role="tab" id="t-release" aria-controls="p-release" aria-selected="false" tabindex="-1"><span class="n">Release</span><span class="s">by a person</span></button>
+      </div>
+      <div class="pipe-panels">
+        <div class="pipe-panel" role="tabpanel" id="p-describe" aria-labelledby="t-describe">
+          <div>
+            <h3>Say what you need, in your own words</h3>
+            <p>Claude sits in the left column and runs on your own Claude Code account. Ask for a new part or a change, and attach a photo or a drawing. Each answer shows its steps, including the ones that failed, with the time, the cost and the model. You pick the model under the message box.</p>
+            <p class="known"><span class="tag amber">assumed</span> Anything you have not measured is carried as an assumption all the way to release.</p>
+          </div>
+          <div class="pipe-shot" style="--pos: 0% 0%"><img src="assets/shots/conversation.webp" width="1300" height="1106" loading="lazy" decoding="async" alt="The app: a conversation about tilting the phone dock, with its steps, one failed preview, a four-view sheet Claude looked at, and the answer. The part is in the viewport beside it."></div>
+        </div>
+        <div class="pipe-panel" role="tabpanel" id="p-design" aria-labelledby="t-design" hidden>
+          <div>
+            <h3>The design is code, with typed parameters</h3>
+            <p>The agent writes a build123d program: parameters with units and ranges, named features, and constraints that explain themselves when a change cannot be built. Every revision keeps its exact code.</p>
+            <p class="known"><span class="tag datum">specified</span> A design can declare where a default comes from, for example a board's official drawing.</p>
+          </div>
+          <div class="pipe-shot"><pre class="mono" translate="no" tabindex="0" aria-label="Part of a recipe, from docs/RECIPES.md"><code><span class="f">Param</span>(<span class="st">"screw_d"</span>, <span class="st">"Screw shank diameter"</span>, <span class="nn">4.0</span>, <span class="nn">2</span>, <span class="nn">8</span>, <span class="nn">0.05</span>, <span class="st">"mm"</span>,
+      <span class="st">"brief"</span>, <span class="st">"screws"</span>, <span class="st">"Measure the shank, not the thread tips."</span>)
+
+features = [<span class="f">Feature</span>(<span class="st">"plate"</span>, <span class="st">"Wall plate"</span>, <span class="st">"structure"</span>),
+            <span class="f">Feature</span>(<span class="st">"arm"</span>, <span class="st">"Arm"</span>, <span class="st">"structure"</span>), ...]
+
+<span class="k">def</span> <span class="f">constraints</span>(self, v):
+    <span class="k">if</span> g[<span class="st">"z2"</span>] + v[<span class="st">"screw_head_d"</span>] / <span class="nn">2</span> + <span class="nn">2</span> &gt; v[<span class="st">"plate_h"</span>]:
+        <span class="k">return</span> [<span class="f">RecipeError</span>(
+            <span class="st">"Upper screw sits 75 mm up; the plate is 80 mm tall"</span>,
+            <span class="st">"screws"</span>,
+            <span class="st">"Raise the plate height or reduce the screw spacing."</span>,
+            [<span class="st">"plate_h"</span>, <span class="st">"screw_spacing"</span>])]
+
+<span class="c"># from docs/RECIPES.md: the wall hook recipe</span></code></pre></div>
+        </div>
+        <div class="pipe-panel" role="tabpanel" id="p-build" aria-labelledby="t-build" hidden>
+          <div>
+            <h3>A real kernel builds a real solid</h3>
+            <p>Every change rebuilds a boundary-representation solid in OpenCascade, in 0.1 to 1.5 seconds depending on the part. You get STEP and STL out, and each face knows which feature made it.</p>
+            <p class="known"><span class="tag datum">computed</span> Dimensions are read back off the built solid, not copied from the parameters.</p>
+          </div>
+          <div class="pipe-shot" style="--pos: 0% 30%"><img src="assets/shots/viewport.webp" width="1376" height="1104" loading="lazy" decoding="async" alt="The viewport with the pocket feature selected and its dimensions drawn on the plate."></div>
+        </div>
+        <div class="pipe-panel" role="tabpanel" id="p-check" aria-labelledby="t-check" hidden>
+          <div>
+            <h3>Checks run on the geometry, and say what kind they are</h3>
+            <p>One valid solid, a closed export mesh, the thinnest wall, unsupported overhangs, whether it fits your printer. A rule of thumb is labelled a heuristic. A formula with assumptions is labelled a model.</p>
+            <p class="known"><span class="tag pass">pass</span><span class="tag amber">heuristic</span> In this run: 9 pass, 2 to review, 0 fail.</p>
+          </div>
+          <div class="pipe-shot" style="--pos: 100% 12%"><img src="assets/shots/layers-wide.webp" width="1376" height="1104" loading="lazy" decoding="async" alt="The checks list: one valid solid, interfaces as modelled, export mesh is closed, thinnest wall 1.93 mm, each with its evidence tag."></div>
+        </div>
+        <div class="pipe-panel" role="tabpanel" id="p-slice" aria-labelledby="t-slice" hidden>
+          <div>
+            <h3>Sliced by the slicer you already use</h3>
+            <p>FORM runs your slicer with your printer, filament and process presets, then reads the toolpaths back so you can step through them layer by layer. Bambu Studio, OrcaSlicer and PrusaSlicer are supported.</p>
+            <p class="known"><span class="tag amber">simulated</span> A slice is a simulation. FORM never calls it a print.</p>
+          </div>
+          <div class="pipe-shot" style="--pos: 0% 8%"><img src="assets/shots/layers-wide.webp" width="1376" height="1104" loading="lazy" decoding="async" alt="Layer 4 of 127 of the sliced dock: outer walls and sparse infill drawn from the slicer's toolpaths."></div>
+        </div>
+        <div class="pipe-panel" role="tabpanel" id="p-release" aria-labelledby="t-release" hidden>
+          <div>
+            <h3>Only a person can release</h3>
+            <p>A release is a frozen copy of files whose hashes match the revision they claim to be. Change one dimension and the old G-code can no longer be released. Agents can do everything except press the approve button.</p>
+            <p class="known"><span class="tag plain">not physically validated</span> The release says so until you print it and report what you measured.</p>
+          </div>
+          <div class="pipe-shot" style="--pos: 100% 0%"><img src="assets/shots/release-wide.webp" width="1376" height="1104" loading="lazy" decoding="async" alt="The Release stage: r04 is released, with file hashes and the revision history."></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= the app ================= -->
+<section class="sec" id="app">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2>One window: the conversation, the part, the question</h2>
+      <p>A native app drawn on the GPU, in the same process as the CAD engine. No browser and no web view.</p>
+    </div>
+
+    <figure class="shot tour reveal" style="--d:80ms">
+      <div class="dims-row" aria-hidden="true">
+        <div class="dim draw"><span>the conversation</span></div>
+        <div class="dim draw"><span>the part, from the kernel</span></div>
+        <div class="dim draw"><span>the question</span></div>
+      </div>
+      <div class="frame"><picture><source media="(max-width: 700px)" srcset="assets/shots/app-m.webp" width="876" height="1104"><img src="assets/shots/app.webp" width="1800" height="1160" loading="lazy" decoding="async" alt="FORM: Claude on the left, a phone dock in the 3D viewport with a blue uncommitted draft, and the change with its consequences on the right."></picture></div>
+      <figcaption>A real run. Claude previewed a deeper body, the kernel rebuilt it in 175 ms, and the app shows what the change would cause before anything is saved. 4 steps, $0.11 on the user's own account.</figcaption>
+    </figure>
+
+    <div class="tour-notes">
+      <div class="reveal">
+        <h3>Claude, on the left</h3>
+        <p>Each message runs Claude Code with FORM's tools. The same column shows what any other agent is doing to your designs, live.</p>
+      </div>
+      <div class="reveal" style="--d:60ms">
+        <h3>The part, in the middle</h3>
+        <p>The kernel's own geometry, one mesh per feature. Click a feature to select it. Overall dimensions are drawn on the plate as dimension lines, and a section cut shows solid cut faces. A draft is drawn in blue until you commit it.</p>
+      </div>
+      <div class="reveal" style="--d:120ms">
+        <h3>The question, on the right</h3>
+        <p>Five stages: Brief, Shape, Fit, Prove, Release. Each one answers one question about the design.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= fit ================= -->
+<section class="plateband" id="fit">
+  <div class="wrap split">
+    <div class="copy reveal">
+      <h2>Will it fit? FORM gives you the odds, and how to improve them.</h2>
+      <p class="lede">A pocket that is 0.3 mm too tight is a failed print. FORM models the gap between the printed cavity and the real device from what is known about each.</p>
+      <p>It then names the cheapest next step: measure the device, print a coupon, or print a small test piece cut from the real geometry. Coupons you print teach it your printer.</p>
+      <ul class="facts">
+        <li><span>Chance the gap lands in your window</span><span>66% <span class="tag amber">modelled</span></span></li>
+        <li><span>Device width, never measured</span><span>71.50 ±0.30 mm <span class="tag amber">assumed</span></span></li>
+        <li><span>After measuring with calipers</span><span>98% <span class="tag amber">modelled</span></span></li>
+      </ul>
+    </div>
+    <div class="panel-shot reveal" style="--d:100ms">
+      <div class="dim vdim draw quiet" style="--dim-bg: var(--plate1)" aria-hidden="true"><span>Fit stage</span></div>
+      <figure class="shot">
+        <div class="frame"><img src="assets/shots/fit-panel.webp" width="500" height="764" loading="lazy" decoding="async" alt="The Fit stage: 66% modelled chance the gap lands in the window, a bell curve of the expected gap, and where the uncertainty comes from."></div>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ================= prove ================= -->
+<section class="sec" id="prove">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2>See the print before you print it</h2>
+      <p>The slice comes from your slicer. The checks come from the solid. Neither is a photo of a finished part, and the app says so.</p>
+    </div>
+    <div class="prove">
+      <figure class="shot reveal">
+        <div class="frame" style="--ar: 876 / 760"><img src="assets/shots/layers.webp" data-slot="print-simulation" width="876" height="1104" loading="lazy" decoding="async" alt="Layer 4 of 127: outer walls, sparse infill and bottom surface drawn from the sliced toolpaths, with a layer slider."></div>
+        <h3>The slice, layer by layer</h3>
+        <p>Step through the real toolpaths: walls, infill, bridges, overhang walls. Print time and filament come from the slicer and are labelled simulated.</p>
+      </figure>
+      <figure class="shot reveal" style="--d:100ms">
+        <div class="frame" style="--ar: 500 / 660"><img src="assets/shots/checks.webp" data-slot="analysis-map" width="500" height="1024" loading="lazy" decoding="async" alt="Checks for revision 4: one valid solid, interfaces as modelled, export mesh is closed, fits the build volume, thinnest wall 1.93 mm."></div>
+        <h3>Checks on the real solid</h3>
+        <p>The thinnest wall is found from 1,354 samples of the surface. Overhangs are measured on the mesh in the print orientation.</p>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ================= assemblies ================= -->
+<section class="sec" id="assemblies">
+  <div class="wrap split wide-left">
+    <figure class="shot reveal">
+      <div class="frame"><img src="assets/shots/assembly.webp" width="876" height="1104" loading="lazy" decoding="async" alt="A hinged box shown assembled, with a slider for the lid hinge angle and the features of both parts."></div>
+    </figure>
+    <div class="copy reveal" style="--d:100ms">
+      <h2>Parts that go together are checked together</h2>
+      <p class="lede">See a design assembled, exploded, or laid out for printing. Move a hinge or a slide through its range.</p>
+      <p>FORM checks overlap, the smallest gap, each joint at sampled positions, and whether a screwdriver can reach. The check text says that sampled motion does not prove the motion is free between samples.</p>
+      <p>Hardware comes from <code>form.parts</code>: screw clearances to ISO 273, heat-set insert pockets, nut traps, magnet pockets, bearing seats, printable threads and gears, each with its published dimension and source.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= works with ================= -->
+<section class="sec" id="works-with">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2>It drives the tools you already have</h2>
+      <p>FORM does not replace your slicer or your CAD program. On first launch it shows what it found on your computer and sets up only what you tick.</p>
+    </div>
+    <table class="compat reveal" style="--d:80ms">
+      <thead><tr><th scope="col">Tool</th><th scope="col">What FORM does with it</th><th scope="col">Tested how</th></tr></thead>
+      <tbody>
+        <tr><td>build123d / OpenCascade</td><td>The CAD kernel: every solid, STEP export and B-rep check.</td><td><span class="tag pass">run for real</span></td></tr>
+        <tr><td>Bambu Studio</td><td>Slices with your printer, filament and process presets.</td><td><span class="tag pass">run for real</span></td></tr>
+        <tr><td>OrcaSlicer, PrusaSlicer <small>also SuperSlicer, QIDISlicer</small></td><td>The same, picked automatically or in the Slicer sheet.</td><td><span class="tag amber">fixtures only</span></td></tr>
+        <tr><td>OpenSCAD</td><td>Designs written in <code>.scad</code>. Customizer ranges become parameters.</td><td><span class="tag pass">run for real</span></td></tr>
+        <tr><td>Blender</td><td>Illustrative renders of the current revision, and its 3D-Print Toolbox checks when the add-on is installed.</td><td><span class="tag pass">renders run</span></td></tr>
+        <tr><td>FreeCAD</td><td>Opens the STEP, an optional re-import check, and a macro with every parameter.</td><td><span class="tag amber">fixtures only</span></td></tr>
+        <tr><td>STEP and STL from makers</td><td>Imported as reference parts to design around.</td><td><span class="tag pass">run for real</span></td></tr>
+        <tr><td>Claude Code, Codex <small>also Gemini CLI, Cursor, Claude Desktop</small></td><td>Use FORM's 31 MCP tools. The open app follows along live.</td><td><span class="tag pass">Claude Code, Codex</span></td></tr>
+      </tbody>
+    </table>
+    <p class="compat-note">“Run for real” means on the release machine, an Apple Silicon Mac. “Fixtures only” means the adapter is tested against recorded files and has not been run against a real installation yet.</p>
+
+    <div class="pair">
+      <figure class="shot reveal">
+        <div class="frame" style="--ar: 876 / 1104"><img src="assets/shots/reference.webp" width="876" height="1104" loading="lazy" decoding="async" alt="A circuit board imported as a STEP file, drawn in blueprint inside the case being designed around it."></div>
+        <figcaption>A board imported as STEP, drawn in blueprint. The case is designed around it.</figcaption>
+      </figure>
+      <figure class="shot reveal" style="--d:100ms">
+        <div class="frame" style="--ar: 1400 / 964"><img src="assets/shots/render.webp" width="1400" height="964" loading="lazy" decoding="async" alt="The Render sheet: the phone dock rendered in Blender in silk PLA on a dark backdrop, with scene and filament choices."></div>
+        <figcaption>Rendered in Blender from the real export. The app labels it an illustration, not a photo of a print.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ================= evidence ================= -->
+<section class="plateband" id="evidence">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2>Every number says how it is known</h2>
+      <p>These are numbers from one design in the app, with the tag each one carries. A measured value and a guessed value never look the same.</p>
+    </div>
+    <div class="ledger" style="--dim-bg: var(--plate1)">
+      <div class="ledger-row reveal"><span class="v" data-settle>71.50<small>mm</small></span><span class="what">Device width</span><span class="tagcell"><span class="tag amber">assumed</span></span><span class="how">Nobody has measured it yet. The ±0.30 mm is carried into the fit.</span></div>
+      <div class="ledger-row reveal"><span class="v" data-settle>0.28<small>mm</small></span><span class="what">Layer height</span><span class="tagcell"><span class="tag datum">specified</span></span><span class="how">Read from the slicer's process preset.</span></div>
+      <div class="ledger-row reveal"><span class="v" data-settle>72.10<small>mm</small></span><span class="what">Pocket width</span><span class="tagcell"><span class="tag datum">computed</span></span><span class="how">Measured on the built solid by the kernel.</span></div>
+      <div class="ledger-row reveal"><span class="v" data-settle>1 h 42<small>min</small></span><span class="what">Print time</span><span class="tagcell"><span class="tag amber">simulated</span></span><span class="how">From Bambu Studio's slice. A simulation, not a print.</span></div>
+      <div class="ledger-row reveal"><span class="v" data-settle>66<small>%</small></span><span class="what">Chance of a good fit</span><span class="tagcell"><span class="tag amber">modelled</span></span><span class="how">A statistical model built from stated inputs. Not a measured success rate.</span></div>
+      <div class="ledger-row reveal"><span class="v" data-settle>4.5<small>mm</small></span><span class="what">Bridged ceiling span</span><span class="tagcell"><span class="tag amber">heuristic</span></span><span class="how">A rule of thumb about what bridges cleanly, labelled as one.</span></div>
+      <div class="ledger-row reveal"><span class="v">—</span><span class="what">Gap on the printed part</span><span class="tagcell"><span class="tag pass">physical</span></span><span class="how">Empty until you print it and report the number. Agents are told never to invent one.</span></div>
+    </div>
+    <div class="kinds reveal">
+      <span class="cap">The nine kinds</span>
+      <span class="tag pass">measured</span><span class="tag datum">specified</span><span class="tag amber">assumed</span><span class="tag amber">photo</span><span class="tag datum">computed</span><span class="tag amber">simulated</span><span class="tag amber">modelled</span><span class="tag amber">heuristic</span><span class="tag pass">physical</span>
+    </div>
+    <div class="rules3">
+      <div class="reveal"><h3>Local only</h3><p>FORM listens on loopback. It never uploads a file and never starts a print.</p></div>
+      <div class="reveal" style="--d:60ms"><h3>Outputs cannot go stale quietly</h3><p>Every output is keyed by a hash of its inputs. Change one dimension and the old slice is marked stale.</p></div>
+      <div class="reveal" style="--d:120ms"><h3>Not printed by us</h3><p>Nothing in the repository has been physically printed by the authors as part of verification. The docs list what was tested and what was not.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= agents ================= -->
+<section class="sec" id="agents">
+  <div class="wrap split wide-right">
+    <div class="copy reveal">
+      <h2>No window needed</h2>
+      <p class="lede">The app, the <code>form</code> command and the MCP server are one engine working on one project folder.</p>
+      <p>Your coding agent gets 31 MCP tools: design, preview, commit, render, optimise, slice, request a release. Every action is also a <code>form</code> command that prints JSON. If the app is open, it follows along.</p>
+      <ul class="tools" aria-label="Some of the MCP tools">
+        <li>design_guide</li><li>create_design</li><li>preview_change</li><li>commit_change</li><li>render</li><li>optimize</li><li>run_pipeline</li><li>slice_test_piece</li><li>record_physical_result</li><li>request_release</li>
+      </ul>
+      <p style="margin-top:1.5rem"><a href="docs/mcp.html">All 31 tools</a></p>
+    </div>
+    <div class="term reveal" style="--d:100ms">
+      <div class="term-bar">
+        <div class="seg" role="tablist" aria-label="Example" id="term-tabs">
+          <button type="button" role="tab" id="tt-cli" aria-controls="tp-cli" aria-selected="true">form CLI</button>
+          <button type="button" role="tab" id="tt-mcp" aria-controls="tp-mcp" aria-selected="false" tabindex="-1">MCP session</button>
+        </div>
+        <button type="button" class="copy-btn" aria-live="polite" data-copy="form preview hallway-phone-dock depth=98">Copy</button>
+      </div>
+<pre class="mono" translate="no" role="tabpanel" id="tp-cli" aria-labelledby="tt-cli" tabindex="0"><span class="p">$ </span><span class="u">form preview hallway-phone-dock depth=98</span>
+{
+ "buildable": true,
+ "base_rev": 4,
+ "changes": [
+  "Base depth: 92 -> 98 mm"
+ ],
+ "derived": [
+  "Front lip engagement: 10.925 -> 10.81 mm",
+  "Back support length: 15.035 -> 14.8 mm"
+ ],
+ "metrics": [
+  "Material volume: 198.79 -> 212.69 cm³",
+  "Tip-over force: 0.98 -> 1.09 N"
+ ],
+ "would_invalidate": [
+  "Solid", "STEP + STL", "Checks", "Slice"
+ ],
+ "revokes_current_approval": false
+}
+<span class="o"># real output, shortened: the list of resized features is left out</span>
+
+<span class="p">$ </span><span class="u">form commit hallway-phone-dock depth=98 --expect-head 4</span>
+<span class="p">$ </span><span class="u">form run hallway-phone-dock</span>
+<span class="p">$ </span><span class="u">form render hallway-phone-dock --view sheet --out dock.png</span></pre>
+<pre class="mono" translate="no" role="tabpanel" id="tp-mcp" aria-labelledby="tt-mcp" tabindex="0" hidden><span class="u">&gt; I measured my phone with calipers: 75.6 mm wide, 8.4 mm thick
+  with the case. Make me a desk dock and tell me if it's ready.</span>
+
+<span class="t">● form_overview</span>
+<span class="o">  build123d 0.13.0 / OCP 8.0.1.1 · Bambu Studio 02.09.01.70 · A1 mini</span>
+<span class="t">● describe_recipe dock</span>
+<span class="o">  20 parameters (mm, deg, g) · 6 features · fit: pocket &lt;-&gt; device</span>
+<span class="t">● create_project "Desk phone dock"</span>
+<span class="t">● preview_change device_width=75.6 device_thickness=8.4</span>
+<span class="o">  Pocket resized · Solid, STEP+STL, Checks, Slice would go stale</span>
+<span class="t">● commit_change expect_head=1 provenance=measured (calipers)</span>
+<span class="o">  r02 · solid 0.33 s · exports · checks · slice done</span>
+<span class="t">● render view=sheet</span>
+<span class="o">  [image: four views, coloured by feature]</span>
+<span class="t">● request_release</span>
+<span class="a">  ready · acknowledge: tip-over resistance 0.75 N (model)</span>
+
+<span class="u">Nearly ready. Pocket 76.1 x 8.9 mm, 0.25 mm per side.
+Slice: 94 min, 57.6 g, no supports (simulated, not a print).
+Tip-over uses a default phone height and mass. Tell me yours.
+I can't approve it. Review it on the bench.</span>
+<span class="o"># a real Claude Code session, trimmed: 8 turns, 36 seconds, $0.23</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ================= get it ================= -->
+<section class="sec" id="get">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2>Get FORM</h2>
+      <p>The bundles are not signed or notarized yet, so your system will ask before the first launch. Each bundle is about 800 MB unpacked, because it carries the CAD kernel and Qt.</p>
+    </div>
+
+    <div class="get-grid reveal" style="--d:80ms" id="downloads">
+      <a class="dl" data-os="mac-arm" data-asset="FORM-macos-arm64.zip" href="https://github.com/kaizensx/form-studio/releases">
+        <span class="os">macOS</span><span class="arch">Apple Silicon</span>
+        <span class="file">FORM-macos-arm64.zip</span><span class="hint">First launch: right-click FORM, then Open.</span>
+        <span class="go"><span data-go>Releases on GitHub</span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/></svg></span>
+      </a>
+      <a class="dl" data-os="mac-x64" data-asset="FORM-macos-x64.zip" href="https://github.com/kaizensx/form-studio/releases">
+        <span class="os">macOS</span><span class="arch">Intel</span>
+        <span class="file">FORM-macos-x64.zip</span><span class="hint">First launch: right-click FORM, then Open.</span>
+        <span class="go"><span data-go>Releases on GitHub</span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/></svg></span>
+      </a>
+      <a class="dl" data-os="win" data-asset="FORM-windows-x64.zip" href="https://github.com/kaizensx/form-studio/releases">
+        <span class="os">Windows</span><span class="arch">10 and 11, x64</span>
+        <span class="file">FORM-windows-x64.zip</span><span class="hint">First launch: More info, then Run anyway.</span>
+        <span class="go"><span data-go>Releases on GitHub</span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/></svg></span>
+      </a>
+      <a class="dl" data-os="linux" data-asset="FORM-linux-x64.tar.gz" href="https://github.com/kaizensx/form-studio/releases">
+        <span class="os">Linux</span><span class="arch">x64</span>
+        <span class="file">FORM-linux-x64.tar.gz</span><span class="hint">Unpack, then run FORM/FORM.</span>
+        <span class="go"><span data-go>Releases on GitHub</span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/></svg></span>
+      </a>
+    </div>
+    <p class="rel-status" id="rel-status" role="status">
+      <span id="rel-text">Downloads are on the GitHub releases page.</span>
+      <a href="https://github.com/kaizensx/form-studio/actions/workflows/app.yml">Builds of every push</a>
+    </p>
+    <p class="compat-note">The app was built, packaged and run on an Apple Silicon Mac. The Windows, Linux and Intel macOS bundles are built by CI and have not been run by a person yet. Please report what you find.</p>
+
+    <div class="cmds">
+      <div class="reveal">
+        <h3>With uv, from a terminal</h3>
+        <p>Installs FORM with its own Python 3.12, including the desktop app. Your system Python is not touched.</p>
+        <div class="cmd"><code translate="no"><span class="p">$ </span>uv tool install --force --python 3.12 "form-studio[all] @ git+https://github.com/kaizensx/form-studio"</code><button type="button" class="copy-btn" aria-live="polite" data-copy='uv tool install --force --python 3.12 "form-studio[all] @ git+https://github.com/kaizensx/form-studio"'>Copy</button></div>
+        <div class="cmd"><code translate="no"><span class="p">$ </span>form app</code><button type="button" class="copy-btn" aria-live="polite" data-copy="form app">Copy</button></div>
+      </div>
+      <div class="reveal" style="--d:80ms">
+        <h3>As a Claude Code plugin</h3>
+        <p>13 skills that carry the design and print-engineering practice, plus the MCP server. FORM itself must be installed first.</p>
+        <div class="cmd"><code translate="no"><span class="p">&gt; </span>/plugin marketplace add kaizensx/form-studio</code><button type="button" class="copy-btn" aria-live="polite" data-copy="/plugin marketplace add kaizensx/form-studio">Copy</button></div>
+        <div class="cmd"><code translate="no"><span class="p">&gt; </span>/plugin install form@form-studio</code><button type="button" class="copy-btn" aria-live="polite" data-copy="/plugin install form@form-studio">Copy</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= open source ================= -->
+<section class="sec" id="open">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <h2>Open source, and meant to stay honest</h2>
+    </div>
+    <div class="open" style="margin-top:3rem">
+      <ol class="north reveal">
+        <li>You describe a physical part, and an AI agent designs it with a real CAD kernel while you watch.</li>
+        <li>FORM checks the part, slices it with your real slicer, and tells you honestly what is known.</li>
+        <li>Nothing is faked, nothing prints or uploads by itself, and only a person approves a release.</li>
+      </ol>
+      <aside class="reveal" style="--d:100ms">
+        <h3>MIT licence</h3>
+        <p>The engine, the app, the recipes and this site are in one repository. The CAD kernel and the slicers are separate programs with their own licences, and are not bundled into FORM's code.</p>
+        <h3 style="margin-top:2rem">What helps most</h3>
+        <ul>
+          <li><b>Physical results.</b> Print a coupon or a test piece and report the numbers. It is the only way the models get checked against reality.</li>
+          <li><b>Recipes.</b> About 200 lines of build123d each.</li>
+          <li><b>Slicer and CAD runs</b> on real OrcaSlicer, PrusaSlicer and FreeCAD installations.</li>
+        </ul>
+        <div class="actions">
+          <a class="btn" href="https://github.com/kaizensx/form-studio">Star on GitHub</a>
+          <a class="btn" href="https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md">How to contribute</a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <a class="mark" href="./">FORM</a>
+    <nav aria-label="Footer">
+      <a href="docs/">Docs</a>
+      <a href="docs/changelog.html">Changelog</a>
+      <a href="https://github.com/kaizensx/form-studio">GitHub</a>
+      <a href="https://github.com/kaizensx/form-studio/issues">Issues</a>
+      <a href="https://github.com/kaizensx/form-studio/blob/main/LICENSE">MIT licence</a>
+    </nav>
+    <p>This site sets no cookies and loads no trackers, analytics or third-party fonts. The download section asks GitHub's public API for the latest release. Every 3D model and screenshot on this page comes from a real build or a real run of the app.</p>
+  </div>
+</footer>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
