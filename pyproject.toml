@@ -28,6 +28,7 @@ dependencies = [
 
 [project.optional-dependencies]
 app = ["PySide6>=6.9,<7"]
+parts = ["bd_warehouse==0.4.0", "py_gearworks==0.0.24"]  # form.parts: fasteners, threads, bearings, gears
 
 [project.urls]
 Homepage = "https://github.com/kaizensx/form-studio"

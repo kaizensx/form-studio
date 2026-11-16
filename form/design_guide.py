@@ -61,6 +61,25 @@ OPENSCAD (create_design(..., language="openscad"))
   wall thickness (ray-cast on the triangles), overhangs, build volume and the slice still run. Prefer Python
   (build123d) when the part needs STEP, feature-level edits or a fit interface.
 
+HARDWARE: form.parts  (use it; do not guess screw, nut, insert, bearing or gear dimensions)
+  from form import parts
+  Each call returns a HardwarePart: .shape (build123d solid), .kind ("cut" or "add"), .dims {name: {value, unit,
+  provenance, source}}; part["hole_d"] reads one value; part.derived(feature, prefix) gives derived() rows.
+  Cutters: axis on Z, opening at z = 0, going down (-Z). Place with body - Pos(x, y, z_top) * part.shape;
+  turn with Rot(180, 0, 0) for a hole opening on the bed face, Rot(90, 0, 0) for a hole along +Y.
+    parts.screw_clearance("M3", length, head="socket"|"pan"|"countersunk", fit="close"|"normal", recess=True)
+    parts.heat_insert_pocket("M3")      # CNC Kitchen hole; ["boss_min_d"] = smallest boss that keeps the wall
+    parts.self_tap_pilot("M3", depth)   parts.nut_trap("M3", "hex"|"square", slot=0)   parts.magnet_pocket(d, h)
+    parts.bearing_seat("608")           parts.thread(major_d, pitch, length, external=True)   # pitch >= 1 mm
+    parts.spur_gear(module, teeth, thickness, bore)   parts.gear_pair(module, z1, z2, thickness, bore_a, bore_b,
+    backlash)  -> .a, .b (b at +X, in mesh), .centre_distance = m (z1 + z2) / 2, .contact_ratio
+  M2-M6 screws, nuts, inserts and 6xx bearings work everywhere. Other sizes, threads and gears need the
+  [parts] extra (bd_warehouse, py_gearworks); without it they raise a RecipeError that says how to install.
+  Example: a boss with an insert, sized from the published minimum wall
+    ins = parts.heat_insert_pocket("M3")
+    boss = Cylinder(ins["boss_min_d"] / 2 + 0.4, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    boss = boss - Pos(0, 0, 10) * ins.shape        # derived(): rows += ins.derived("boss", "insert.")
+
 WORKFLOW
   design_guide -> write source -> create_design (or update_design) -> render -> get_project (checks, slice)
   -> fix -> request_release. Parameter-only changes: preview_change / commit_change, as for any project.
