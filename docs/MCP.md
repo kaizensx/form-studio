@@ -30,6 +30,18 @@ Start here. Engine, slicer, printer, available recipes, existing projects and th
 What FORM can use on this machine (kernel, slicer, printer, agents) and the exact command that fixes each gap.
 Never run a fix without asking the user; the simplest path is to ask them to run `form setup` in a terminal.
 
+## `install_software`
+
+Install one thing from FORM's registry (ids come from setup_status → software), e.g. "parts", "claude",
+"slicer.orca". Without confirm=True nothing runs: you get the exact commands to show the user. Ask the user
+first, then call again with confirm=True. Never asks for a password; sign-in is not an install.
+
+| Argument | Type | Required |
+|---|---|---|
+| `id` | string | yes |
+| `confirm` | boolean |  |
+| `method` | string | null |  |
+
 ## `describe_recipe`  · read-only
 
 Parameters (unit, range, group, the feature each one drives), features and what the recipe checks.
@@ -222,7 +234,8 @@ Make an earlier revision the head again (nothing is deleted). Outputs for it are
 
 ## `set_print_setup`
 
-Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted), the acceptable total fit gap
+Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from
+suggest_orientation), the acceptable total fit gap
 window, and whether the pipeline slices automatically. The checks include an orientation comparison table.
 
 | Argument | Type | Required |
@@ -359,6 +372,91 @@ from the STEP (hash-checked) with a spreadsheet of FORM's parameters and their p
 |---|---|---|
 | `project` | string | yes |
 
+## `analyze`  · read-only
+
+An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics.
+map: thickness (opposing-wall distance by ray, the same ray as the Thinnest-wall check; colours follow the nozzle),
+overhang (angle past vertical in the print orientation; plate contact and bridged ceilings are separate classes),
+section (area of each layer's slice by height, with the weakest neck: computed geometry, NOT a strength analysis),
+features (walls and gaps under one nozzle width, holes too small to print true).
+Every result is `computed` on the stated tessellation and says what it does not tell you; repeat that caveat.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `map` | string |  |
+| `view` | string |  |
+| `rev` | integer | null |  |
+
+## `measure`  · read-only
+
+Measure the part. Points are [x, y, z] in millimetres in the design frame.
+from_point + to_point: straight-line distance with dX/dY/dZ, and how far each point is from the surface.
+at: what is at that point: the nearest face (type, area, tilt to the bed), the nearest edge, and for a hole or
+round boss the diameter: exact from the CAD solid, or "fitted" to mesh edges for a mesh design (with its residual).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `from_point` | array | null |  |
+| `to_point` | array | null |  |
+| `at` | array | null |  |
+| `rev` | integer | null |  |
+
+## `suggest_orientation`  · read-only
+
+Rank the ways the part can lie on the plate: the six axis orientations plus every flat face on its convex hull.
+Returns a picture of the top three as printed and, for each candidate, the numbers behind its score (support
+volume, overhang area, plate contact, height, smallest layer cross-section through the structure features) and
+each term's contribution. The score formula is in the result. It ranks computed geometry; it does not predict
+print success. Apply one with set_print_setup(project, orientation=<id>).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+
+## `print_simulation`  · read-only
+
+Look at the sliced print as it would stand at the end of `layer` (1-based; default: finished). Returns a
+picture drawn from the slicer's G-code toolpaths, coloured by line type, plus statistics: z, line types in
+that layer, whether it has bridges or overhang walls, slicer time elapsed and remaining, and the list of
+bridge and overhang layers. only: draw just these line types (e.g. ["Bridge", "Overhang wall"]).
+Needs a current slice (run_pipeline). This is a simulation of the slice, not a print: say so.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `layer` | integer | null |  |
+| `only` | array | null |  |
+
+## `estimate_cost`  · read-only
+
+Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same
+volume in the other materials the slicer has presets for. Grams and hours are the slicer's simulation; prices
+are the user's (saved ones are used when you pass none). Never invent a price: when a cost is null, "needs"
+says which number to ask the user for. No currency is assumed.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `price_per_kg` | number | null |  |
+| `kwh_price` | number | null |  |
+| `watts` | number | null |  |
+| `machine_rate_per_h` | number | null |  |
+| `copies` | integer |  |
+
+## `pack_plate`  · read-only
+
+Do `copies` of this design fit on one plate? Bounding-box packing with a gap (default 6 mm) and 90° turns,
+on the selected printer's bed. Returns the layout and the most copies this packer can place. Computed by FORM;
+the slicer arranges again when it slices, and FORM's export stays one plate.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `copies` | integer |  |
+| `spacing_mm` | number | null |  |
+
 ## `render_photo`
 
 A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed).
@@ -376,6 +474,43 @@ invented light and material, not a photo of a print: never present it as evidenc
 | `color` | string |  |
 | `fast` | boolean |  |
 | `layer_lines` | boolean |  |
+
+## `save_variant`
+
+Save a named variant of the design ("Travel version", "Thick walls"): a complete set of parameter values kept
+in the project next to the revisions. values are changes on top of the head (or of rev); leave them out to save
+the head (or rev) as it is. The candidate is built before it is saved; saving a name again replaces it. Nothing
+is committed: promote a variant on the bench or with `form variants promote`.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `name` | string | yes |
+| `values` | object | null |  |
+| `rev` | integer | null |  |
+| `note` | string |  |
+
+## `list_variants`  · read-only
+
+The head and every saved variant side by side: size and volume (computed), print time and grams (simulated,
+only when the variant is a revision with a current slice), fit yield (modelled), checks, and each variant's
+differences from the head.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+
+## `share_card`  · read-only
+
+A 1600 x 900 share image of the head revision: the part with dimension lines, its name, size and volume
+(computed), print time and grams (simulated; only if the slice is current), checks, the revision and
+"Designed with FORM". picture: "model" (kernel geometry) or "photo" (the newest current Blender render, an
+illustration). The card states only what FORM knows; it is not evidence of a print.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `picture` | string |  |
 
 ## Prompt `design_part(goal)`
 

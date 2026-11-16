@@ -1,5 +1,39 @@
 # Changelog
 
+## 11.0.0
+
+### One app, zero terminal
+- **First start is three steps** (FORM itself, your printer and slicer, your AI) and installs what FORM needs from inside the app. Every command is shown first and nothing runs until you press the button. Installs were tested with stand-in commands, not real installers.
+- **No example projects.** A new projects folder starts empty. Examples are one click away ("Open an example", or `form examples add`).
+- **Settings** (gear, Ctrl/⌘ ,) edits everything that used to need `studio.toml`, with a backup of the file.
+- **Claude sign-in** status and a sign-in link in the app.
+
+### Conversations
+- **Saved conversations** per design and free-standing: switch, search, pin, rename, delete. They live in `<data>/.conversations`.
+- **Agent, model and effort per conversation:** Claude Code and Codex (Gemini CLI when installed). Models come from the agent's own list; FORM does not invent ids. Codex and Gemini have not been run live yet.
+- **Attachments:** images, PDFs, STEP/STL by drop or paperclip. Replies stream as they are written, with the agent's steps folded into a group and the views it looked at shown inline.
+
+### See it
+- **Watch it print:** the slicer's G-code played back in 3D with a nozzle marker, line-type filters, a per-layer chart and the slicer's own time. Simulated, not a print.
+- **Analysis on the model:** wall thickness, overhang, layer cross-section and small-feature maps, computed from the real geometry. Each legend says what the map does not tell you.
+- **Measure tool** (M): distance, face area and tilt, hole diameter (exact from the solid).
+- **Find the best orientation,** with the numbers behind the ranking.
+
+### Design tools
+- **Revision timeline** you can scrub and play as a morph; export as GIF/WebP.
+- **Variants** and a variants board.
+- **Text, revision stamps and vent/grip patterns** for any design (`form.marks`, `form.patterns`).
+- **Cost:** filament, electricity and machine time from the slice and your prices. FORM never guesses a price.
+- **Copies on a plate:** does N fit?
+- **Share card,** right-click quick actions, viewport keys (`?`).
+
+### Headless
+- New commands: `form chat`, `conversations`, `install`, `config`, `examples`, `simulate`, `cost`, `pack`, `analyze`, `measure`, `orient`, `variants`, `share`, `history`, `mark`.
+- 41 MCP tools.
+
+### Website
+- https://kaizensx.github.io/form-studio/ (source in `site/`; the docs pages are generated from `docs/*.md`).
+
 ## 10.0.0
 
 ### Works with the tools you already have

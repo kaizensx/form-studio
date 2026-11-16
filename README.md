@@ -6,7 +6,7 @@
   <a href="https://github.com/kaizensx/form-studio/actions"><img alt="CI" src="https://github.com/kaizensx/form-studio/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-1c1b19">
   <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-1c1b19">
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-31%20tools-e24d26">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-41%20tools-e24d26">
   <img alt="CAD" src="https://img.shields.io/badge/CAD-build123d%20%2F%20OpenCascade-1c1b19">
 </p>
 
@@ -55,6 +55,28 @@ What is in the app:
 
 Get it from the [Desktop app workflow](https://github.com/kaizensx/form-studio/actions/workflows/app.yml) (bundles for every platform, not yet signed), or run `form app` after installing with the `all` extra. Details: [docs/APP.md](docs/APP.md).
 
+## See what you are about to print
+
+<p align="center"><img src="docs/assets/print-sim.gif" width="720" alt="The phone dock printing layer by layer, drawn from the slicer's real G-code"><br>
+<sub>The slicer's own G-code, played back in 3D. Simulated, not a print. Made with <code>form simulate hallway-phone-dock --gif out.gif</code>.</sub></p>
+
+<table><tr>
+<td width="50%"><img src="docs/screenshots/app-print-sim.jpg" alt="Print simulation: nozzle marker, line types, per-layer chart, the slicer's time estimate"></td>
+<td width="50%"><img src="docs/screenshots/app-thickness.jpg" alt="Wall-thickness map on the part with its legend"></td>
+</tr><tr>
+<td><img src="docs/screenshots/app-measure.jpg" alt="Measure tool: distances, a face area and a hole diameter on the model"></td>
+<td><img src="docs/screenshots/app-conversation.jpg" alt="A saved conversation: steps, a failed preview explained, the views the agent looked at, the model picker"></td>
+</tr></table>
+
+- **Watch it print:** play, scrub, filter by line type, jump to the next bridge. Time is the slicer's estimate.
+- **Analysis on the model:** wall thickness, overhang, layer cross-section and small features, computed from the real geometry. Each legend says what the map does not tell you. None of them is a strength analysis.
+- **Measure** distances, faces and holes; **find the best orientation** with the numbers behind the ranking.
+- **Conversations** are saved per design. Pick the agent and model per conversation, attach photos, drawings and STEP files.
+- **Design tools:** a revision timeline you can scrub, variants, text and revision stamps, vent patterns, cost from your prices, copies on a plate, a share card.
+- **First start installs what FORM needs from inside the app.** No terminal, no example projects.
+
+Website: **https://kaizensx.github.io/form-studio/**
+
 ## Works with what you already use
 
 FORM drives existing software instead of replacing it. On first launch it shows what it found and sets up only what you tick.
@@ -73,7 +95,7 @@ FORM drives existing software instead of replacing it. On first launch it shows 
 | **Blender** | Illustrative renders; its 3D-Print Toolbox checks when installed | renders yes |
 | **FreeCAD** | Open the STEP, an optional re-import check, a macro with every parameter | fixtures only |
 | **STEP / STL from makers** | Imported as reference parts to design around | yes |
-| **Claude Code, Codex, Gemini CLI, Cursor** | Use FORM's 31 MCP tools; the app follows along live | Claude Code, Codex |
+| **Claude Code, Codex, Gemini CLI, Cursor** | Use FORM's 41 MCP tools; the app follows along live | Claude Code, Codex |
 
 <table><tr>
 <td width="50%"><img src="docs/screenshots/app-reference-part.jpg" alt="A board imported as a STEP file, drawn in blueprint inside the case being designed"></td>
