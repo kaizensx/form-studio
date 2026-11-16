@@ -657,6 +657,65 @@ def build() -> MCPServer:
                 "(measure, coupon, test piece) over guessing. 6) request_release and give me the bench link. "
                 "Report slices as simulated and fit as modelled; never claim a print succeeded.")
 
+    # ---- print simulation, cost, plate packing -------------------------------------------------
+    @mcp.tool(annotations=RO, structured_output=False)
+    async def print_simulation(project: str, layer: int | None = None, only: list[str] | None = None,
+                               ctx: Context = None) -> list:
+        """Look at the sliced print as it would stand at the end of `layer` (1-based; default: finished). Returns a
+        picture drawn from the slicer's G-code toolpaths, coloured by line type, plus statistics: z, line types in
+        that layer, whether it has bridges or overhang walls, slicer time elapsed and remaining, and the list of
+        bridge and overhang layers. only: draw just these line types (e.g. ["Bridge", "Overhang wall"]).
+        Needs a current slice (run_pipeline). This is a simulation of the slice, not a print: say so."""
+        st = studio()
+        def go():
+            from . import simulate, toolpath
+            p = st.load(project)
+            tp = toolpath.for_project(st, p)
+            n = tp.layers if layer is None else max(1, min(tp.layers, int(layer)))
+            bad = [t for t in (only or []) if t not in tp.types]
+            if bad:
+                raise StudioError(f"Unknown line type “{bad[0]}”.", "This slice has: " + ", ".join(tp.types))
+            cache = st.dir(p["id"]) / "artifacts" / "renders"
+            cache.mkdir(parents=True, exist_ok=True)
+            f = cache / f"sim-{st.keys(p)['slice']}-{n}-{H(sorted(only or []))}.png"
+            if not f.exists():
+                f.write_bytes(simulate.png_at(tp, float(n), title=f"{p['name']}  r{p['head']:02d}", only=only))
+            s = tp.summary()
+            stats = toolpath.stats_at(tp, n - 1) | {
+                "bridge_layers": [i + 1 for i in s["bridge_layers"]], "overhang_layers": [i + 1 for i in s["overhang_layers"]],
+                "line_type_length_mm": s["type_length_mm"], "time_note": s["time_note"], "file": str(f)}
+            return f, stats
+        f, stats = await _run(go)
+        act(project, "look", f"Looking at the print simulation, layer {stats['layer']} of {stats['layers']}", ctx)
+        return [Image(path=f), "Simulated from the slicer's G-code. Not a print.\n" + json.dumps(stats, ensure_ascii=False)]
+
+    @mcp.tool(annotations=RO)
+    async def estimate_cost(project: str, price_per_kg: float | None = None, kwh_price: float | None = None,
+                            watts: float | None = None, machine_rate_per_h: float | None = None, copies: int = 1) -> dict:
+        """Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same
+        volume in the other materials the slicer has presets for. Grams and hours are the slicer's simulation; prices
+        are the user's (saved ones are used when you pass none). Never invent a price: when a cost is null, "needs"
+        says which number to ask the user for. No currency is assumed."""
+        st = studio()
+        def go():
+            from . import cost
+            given = {"price_per_kg": price_per_kg, "kwh_price": kwh_price, "watts": watts, "machine_rate_per_h": machine_rate_per_h}
+            out = cost.project(st, st.load(project), copies, given)
+            out.pop("prefs", None)
+            return out
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def pack_plate(project: str, copies: int = 1, spacing_mm: float | None = None) -> dict:
+        """Do `copies` of this design fit on one plate? Bounding-box packing with a gap (default 6 mm) and 90° turns,
+        on the selected printer's bed. Returns the layout and the most copies this packer can place. Computed by FORM;
+        the slicer arranges again when it slices, and FORM's export stays one plate."""
+        st = studio()
+        def go():
+            from . import packing
+            return packing.project(st, st.load(project), copies, spacing_mm)
+        return await _run(go)
+
     # ---- Blender (optional): illustrative renders ---------------------------------------------
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True,
                                           open_world_hint=False), structured_output=False)

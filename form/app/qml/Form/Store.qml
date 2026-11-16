@@ -323,6 +323,12 @@ QtObject {
         pget("/layers").then(function (m) { m.n = Math.min(m.count - 1, 3); layers = m }, fail)
     }
     function setLayer(n) { if (layers) layers = Object.assign({}, layers, { n: n }) }
+    // ── print simulation (LayerView.qml): open it in a given state from anywhere ──
+    // o: { at: 0..1 of the slicer's time, layer: 1-based, fraction, ghost, only: [line types] | null, mode: "3d" | "2d" | "plate",
+    //      copies: N (plate preview), play: true, speed }
+    property var simAsk: null
+    signal revealInspector(real y)     // scroll the stage inspector (y in its content; a large value = the end)
+    function simulate(o) { simAsk = o || ({}); if (!layers) showLayers(true) }
     function openSheet(kind, props) { sheet = kind ? { kind: kind, props: props || ({}) } : null }
 
     function create(name, recipeId, brief) {

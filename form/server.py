@@ -153,6 +153,22 @@ def make_handler(st: Studio):
                     return self._json({"index": i, "count": len(layers), **layers[i]})
                 return self._json({"count": len(layers), "z": [l["z"] for l in layers],
                                    "types": sorted({pp["t"] for l in layers for pp in l["paths"]})})
+            # -- print simulation, cost, plate packing (form/toolpath.py, simulate.py, cost.py, packing.py) --
+            if rest == "/toolpath":
+                from . import toolpath
+                return self._json(toolpath.for_project(st, p).public())
+            if rest == "/simulation.png":
+                from . import simulate, toolpath
+                tp = toolpath.for_project(st, p)
+                pr = float(q["progress"]) if q.get("progress") else float(int(q.get("layer") or tp.layers))
+                return self._send(200, simulate.png_at(tp, pr, title=f"{p['name']}  r{p['head']:02d}"), "image/png")
+            if rest == "/cost":
+                from . import cost
+                return self._json(cost.project(st, p, int(q.get("copies") or 1)))
+            if rest == "/pack":
+                from . import packing
+                return self._json(packing.project(st, p, int(q.get("copies") or 1),
+                                                  float(q["spacing"]) if q.get("spacing") else None))
             if rest == "/diff":
                 a, b = int(q["a"]), int(q["b"])
                 cand = st.head_summary(p, b)
@@ -377,6 +393,13 @@ def make_handler(st: Studio):
             if action == "checkout":
                 p = st.checkout(p, int(body["rev"]))
                 return self._json({"head": p["head"], "job": auto(p)})
+            if action == "cost":                           # prices and printer power: kept in <data dir>/cost.json
+                from . import cost
+                try:
+                    cost.save_prefs(st.cfg, body if isinstance(body, dict) else {})
+                except ValueError as e:
+                    raise StudioError(str(e))
+                return self._json(cost.project(st, p, int(body.get("copies") or 1)))
             if action == "settings":
                 p = st.settings(p, body)
                 return self._json({"job": auto(p)})

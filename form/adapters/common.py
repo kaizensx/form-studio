@@ -145,6 +145,7 @@ def parse_layers(path: Path, style: str = "bambu", type_map: dict | None = None)
     type_map renames feature types (PrusaSlicer's names to the ones FORM's viewer colours)."""
     layers, cur, x, y, z, feat, path_pts = [], None, 0.0, 0.0, 0.0, "", None
     relative_e, last_e = True, 0.0
+    before_r = None                                 # last M73 R seen before the first layer
     if style == "auto":
         style = None
     lay, zh, ft = STYLES[style] if style else ("", "", "")
@@ -196,6 +197,19 @@ def parse_layers(path: Path, style: str = "bambu", type_map: dict | None = None)
                 for w in code[1:]:
                     if w[0] == "E":
                         last_e = float(w[1:])
+            elif g == "M73":
+                # print simulation (form/toolpath.py): the slicer's own "R minutes remain" markers, with where in
+                # the layer they sit: [paths finished, points in the open path, minutes]. One seen before the
+                # first layer is kept at the very start of it.
+                r = next((w[1:] for w in code[1:] if w[0] == "R"), None)
+                if r is not None and r.isdigit():
+                    if cur is None:
+                        before_r = int(r)
+                    else:
+                        if before_r is not None and "marks" not in cur:
+                            cur["marks"] = [[0, 0, before_r]]
+                        before_r = None
+                        cur.setdefault("marks", []).append([len(cur["paths"]), len(path_pts["p"]) // 2 if path_pts else 0, int(r)])
             elif g in ("G0", "G1", "G2", "G3"):
                 nx, ny, e, i, j = x, y, None, 0.0, 0.0
                 try:

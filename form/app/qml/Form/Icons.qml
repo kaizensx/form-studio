@@ -95,5 +95,11 @@ QtObject {
         "message_square_plus": "\ue40c",
         "list_checks": "\ue1d0",
         "circle_x": "\ue084",
+        "pause": "\ue12e",
+        "repeat": "\ue146",
+        "skip_forward": "\ue160",
+        "ghost": "\ue20e",
+        "coins": "\ue097",
+        "layout_grid": "\ue0ff",
     })
 }

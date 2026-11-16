@@ -133,13 +133,19 @@ Column {
             Rectangle { anchors.fill: parent; radius: Theme.rMd; color: "transparent"; border.width: 1; border.color: Theme.rule2 }
         }
         Txt { kind: "fine"; visible: plate.visible; text: "Plate preview rendered by " + ((root.sl && root.sl.slicer_name) || "Bambu Studio") + "." }
-        Row { spacing: 8; topPadding: 2
-            Btn { icon: Store.layers ? "arrow_left" : "layers"; text: Store.layers ? "Back to 3D" : "Inspect layers"; onClicked: Store.showLayers(!Store.layers) }
+        Flow { spacing: 8; topPadding: 2; width: parent.width
+            Btn { visible: !Store.layers; icon: "play"; text: "Watch it print"; tip: "Play the slicer's toolpaths in 3D (a simulation, not a print)"
+                onClicked: Store.simulate({ at: 0, play: true }) }
+            Btn { icon: Store.layers ? "arrow_left" : "layers"; text: Store.layers ? "Back to the design" : "Inspect layers"
+                onClicked: { if (Store.layers) Store.showLayers(false); else Store.simulate({ mode: "2d", layer: 4 }) } }
             Btn { kind: "quiet"; icon: "download"; text: "Save sliced 3MF…"; visible: !!root.sl && !!root.sl.threemf
                 onClicked: { save.selectedFile = Bridge.downloads() + "/" + root.sl.threemf; save.open() } } }
         Txt { kind: "fine"; width: parent.width
             text: "A slice shows the toolpaths " + ((root.sl && root.sl.slicer_name) || "Bambu Studio") + " would send with these presets. It is not a print: adhesion, warping and fit are only known after printing." }
     }
+
+    // ── cost, copies, other materials (CostSection.qml) ──────
+    CostSection { sl: root.sl }
 
     // ── slice: not current ───────────────────────────────────
     Sec { title: "Slice"; visible: !root.sl
