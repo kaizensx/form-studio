@@ -93,6 +93,15 @@ Column {
             text: "Commit or discard the draft first. Only a committed revision can be released." }
     }
 
+    // ── design review (in the chat) ─────────────────────────
+    Sec { title: "Design review"; note: "subjective"
+        Txt { kind: "fine"; width: parent.width
+            text: "Claude looks at " + (root.p ? F.pad(root.p.head) : "the head revision") + " at three scales (silhouette, relationships, details) as designer, engineer and print technician, scores six criteria and lists concrete fixes. It changes nothing." }
+        Btn { kind: "default"; icon: "eye"; text: Store.chatBusy ? "Claude is answering…" : "Ask Claude for a design review"
+            enabled: Store.canAskReview; onClicked: Store.askReview() }
+        Txt { kind: "fine"; width: parent.width; visible: !Store.chat.available; color: Theme.amber; text: Store.chat.note || "Claude is not connected." }
+    }
+
     // ── releases ────────────────────────────────────────────
     Sec { title: "Releases"; visible: !!root.d && root.d.releases.length > 0
         Column { width: parent.width

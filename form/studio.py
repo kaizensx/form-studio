@@ -355,6 +355,10 @@ class Studio:
                             "note": "Starting point from recipe defaults" if not recipe_id.startswith(SOURCE_PREFIX) else "First version of the design",
                             "origin": "recipe", "provenance": {pp.key: _initial_provenance(pp) for pp in r.params}}],
              "head": 1, "produced": {n: [] for n in NODES}, "decisions": [], "evidence": [], "approvals": []}
+        from . import presets                       # a brief filled in from a template carries its answers
+        filled = presets.attach(self.root, brief)
+        if filled:
+            p["brief"].update(filled)
         self.save(p)
         return p
 

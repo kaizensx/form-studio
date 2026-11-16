@@ -95,6 +95,10 @@ def make_handler(st: Studio):
                 if not job:
                     raise StudioError("Unknown chat job.", status=404)
                 return self._json(job.public(int(q.get("from") or 0)))
+            # -- brief templates (presets) --
+            if path == "/api/presets":
+                from . import presets
+                return self._json({"presets": presets.all_presets()})
             if path == "/api/studio":
                 return self._json({"env": st.environment(), "projects": st.list(), "chat": chat_mod.status(st.cfg),
                                    "recipes": [r.public() for r in st.recipes.builtins().values()],
@@ -187,6 +191,14 @@ def make_handler(st: Studio):
             if mc:
                 st.chat.stop(mc.group(1))
                 return self._json({"ok": True})
+            # -- brief templates: save a filled-in brief, get the chat prompt that carries it --
+            if path == "/api/briefs":
+                from . import presets
+                try:
+                    return self._json(presets.start_brief(st.root, str(body.get("preset", "")), body.get("answers") or {},
+                                                          bool(body.get("measured"))))
+                except ValueError as e:
+                    raise StudioError(str(e), "Fill in the required fields; numbers use the unit shown.")
             if path == "/api/studio/refresh":
                 st.slicer_info(refresh=True)
                 return self._json({"env": st.environment()})

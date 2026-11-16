@@ -23,6 +23,8 @@ Item {
             c.push({ icon: "home", text: "All designs", hint: "Home", run: function () { Store.home() } })
         }
         c.push({ icon: "plus", text: "New design from a recipe", hint: "", run: function () { Store.openSheet("new") } })
+        c.push({ icon: "file_text", text: "New design from a brief", hint: "Guided questions, then Claude designs it", run: function () { Store.openSheet("new", { tab: "brief" }) } })
+        if (w && Store.canAskReview) c.push({ icon: "eye", text: "Ask Claude for a design review", hint: "Silhouette, relationships, details", run: function () { Store.askReview() } })
         c.push({ icon: "message_square", text: "New conversation with Claude", hint: "", run: function () { Store.newChat(); Store.talkOpen = true } })
         c.push({ icon: "folder_open", text: "Open the projects folder", hint: Bridge.dataDir, run: function () { Bridge.openDataFolder() } })
         if (Store.studio) Store.studio.projects.forEach(function (p) { if (!p.error && p.id !== Store.pid) c.push({ icon: "cuboid", text: p.name, hint: "Open design · " + F.pad(p.head), run: function () { Store.open(p.id) } }) })

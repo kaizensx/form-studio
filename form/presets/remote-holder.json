@@ -1,0 +1,30 @@
+{
+  "id": "remote-holder",
+  "title": "Remote holder",
+  "summary": "A pocket or cradle that holds a remote control, free-standing or mounted.",
+  "closest_recipe": "dock",
+  "questions": [
+    {"key": "width", "label": "Remote width", "kind": "number", "unit": "mm", "required": true,
+     "why": "Sets the pocket width. Measure across the widest point."},
+    {"key": "thickness", "label": "Remote thickness", "kind": "number", "unit": "mm", "required": true,
+     "why": "Sets the pocket depth front to back."},
+    {"key": "height", "label": "Remote length", "kind": "number", "unit": "mm",
+     "why": "Decides how much of the remote the pocket covers and how tall the holder is."},
+    {"key": "corner_r", "label": "Corner radius of the remote", "kind": "number", "unit": "mm",
+     "why": "A pocket with sharper corners than the remote leaves gaps; rounder corners bind."},
+    {"key": "insertion", "label": "How it goes in", "kind": "choice", "choices": ["Dropped in from the top", "Slid in from the front", "Not sure"],
+     "why": "Decides where the opening and the entry chamfer go."},
+    {"key": "mounting", "label": "Mounting", "kind": "choice", "choices": ["Free-standing", "Adhesive pad", "Screws", "Not sure"],
+     "why": "Free-standing needs a stable base; a wall mount needs a flat back or screw access."}
+  ],
+  "environment": {"setting": "indoor", "temperature_c": [15, 30], "humidity": "normal", "uv": "none",
+                  "load": {"kind": "static", "mass_g": 200, "note": "Remote weight plus a hand pulling it out."}},
+  "material": {"suggested": "PLA", "why": "Indoor, low load, stiff and easy to print.",
+               "consider": "PETG if it lives near a window or a heater."},
+  "checks": [
+    {"name": "Pocket clearance", "why": "The remote slides in and out without rattling."},
+    {"name": "Finger access", "why": "A finger can reach the remote to pull it out."},
+    {"name": "Retention coupon", "why": "A thin ring or slice of the pocket printed first to check the fit."},
+    {"name": "Mounting interface", "why": "The base is stable or the wall fixing has a flat face and tool access."}
+  ]
+}

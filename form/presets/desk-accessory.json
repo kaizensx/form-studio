@@ -1,0 +1,33 @@
+{
+  "id": "desk-accessory",
+  "title": "Desk accessory",
+  "summary": "A stand, tray, cable guide or holder that sits on or clamps to a desk.",
+  "closest_recipe": "dock",
+  "questions": [
+    {"key": "purpose", "label": "What it is for", "kind": "text", "required": true,
+     "placeholder": "e.g. hold a phone upright while charging",
+     "why": "The use decides the form and which surfaces are visible."},
+    {"key": "object", "label": "Objects or cables it touches, with sizes", "kind": "text",
+     "placeholder": "e.g. phone 75.6 x 8.3 mm, USB-C plug 12 x 6 mm",
+     "why": "Every interface needs a measured size."},
+    {"key": "cable_d", "label": "Cable diameter", "kind": "number", "unit": "mm",
+     "why": "Sets the cable channel and the bend radius."},
+    {"key": "footprint_w", "label": "Largest footprint width", "kind": "number", "unit": "mm",
+     "why": "Limits the base; a wider base is more stable."},
+    {"key": "footprint_d", "label": "Largest footprint depth", "kind": "number", "unit": "mm",
+     "why": "Limits how far it reaches into the desk."},
+    {"key": "restriction", "label": "Mounting or reach restrictions", "kind": "text",
+     "placeholder": "e.g. desk edge 25 mm thick, must not block a drawer",
+     "why": "A clamp or a no-go zone changes the whole construction."}
+  ],
+  "environment": {"setting": "indoor", "temperature_c": [15, 35], "humidity": "normal", "uv": "indirect",
+                  "load": {"kind": "static", "mass_g": 300, "note": "Object weight plus a push when using it."}},
+  "material": {"suggested": "PLA", "why": "Indoor, low load, good surface finish.",
+               "consider": "PETG for parts that flex, such as a clamp or a clip."},
+  "checks": [
+    {"name": "Cable bend and access", "why": "The cable fits its channel without a tight bend, and the plug reaches."},
+    {"name": "Base stability", "why": "It does not tip when the object is in it or when it is touched."},
+    {"name": "Visible surface and seam", "why": "The face people see is printed cleanly, away from supports and the seam."},
+    {"name": "Contact protection", "why": "Surfaces that touch the object or the desk do not scratch them."}
+  ]
+}

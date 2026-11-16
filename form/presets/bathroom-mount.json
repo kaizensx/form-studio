@@ -1,0 +1,33 @@
+{
+  "id": "bathroom-mount",
+  "title": "Bathroom mount",
+  "summary": "A holder or shelf for a wet room: tile, glass or a painted wall.",
+  "closest_recipe": "hook",
+  "questions": [
+    {"key": "holds", "label": "What it holds", "kind": "text", "required": true,
+     "placeholder": "e.g. a shampoo bottle, a razor, a toothbrush cup",
+     "why": "The held object defines the pocket and the load."},
+    {"key": "object_w", "label": "Object width", "kind": "number", "unit": "mm",
+     "why": "Measured envelope of the object sets the holder size."},
+    {"key": "object_d", "label": "Object depth", "kind": "number", "unit": "mm",
+     "why": "Sets how far the holder stands off the wall."},
+    {"key": "mass", "label": "Object mass when full", "kind": "number", "unit": "g",
+     "why": "Sets the peel load on adhesive or the screw load."},
+    {"key": "fixing", "label": "Fixing", "kind": "choice", "choices": ["Adhesive pad", "Screws", "Suction cup", "Not sure"],
+     "why": "Adhesive needs a flat rear bonding face; screws need holes in the wall and tool access."},
+    {"key": "surface", "label": "Wall surface", "kind": "choice", "choices": ["Tile", "Glass", "Painted wall", "Other"],
+     "why": "Adhesive strength and grout lines depend on the surface."},
+    {"key": "water", "label": "Water exposure", "kind": "choice", "choices": ["Splashes only", "Direct shower spray", "Dry"],
+     "why": "Standing water needs drainage; direct spray rules out some materials."}
+  ],
+  "environment": {"setting": "indoor wet room", "temperature_c": [15, 45], "humidity": "wet", "uv": "none",
+                  "load": {"kind": "sustained", "mass_g": 500, "note": "Held object plus water, applied for months."}},
+  "material": {"suggested": "PETG", "why": "Tolerates water and warm showers better than PLA; still creeps under sustained load.",
+               "consider": "Check that cleaning products do not attack the filament."},
+  "checks": [
+    {"name": "Mounting load path", "why": "The load goes into the wall as shear, not as peel on the adhesive."},
+    {"name": "Drainage and cleaning", "why": "No pocket holds standing water; every surface can be wiped."},
+    {"name": "Bonding area or fixing access", "why": "Enough flat area for the pad, or room for a screwdriver."},
+    {"name": "Material exposure", "why": "Heat, water and cleaning chemicals are within what the filament tolerates."}
+  ]
+}
