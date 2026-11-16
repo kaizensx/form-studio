@@ -1,0 +1,17 @@
+{
+    "type": "machine",
+    "name": "fdm_klipper_common",
+    "from": "system",
+    "instantiation": "false",
+    "gcode_flavor": "klipper",
+    "nozzle_diameter": [
+        "0.4"
+    ],
+    "printable_height": "250",
+    "printable_area": [
+        "0x0",
+        "250x0",
+        "250x250",
+        "0x250"
+    ]
+}

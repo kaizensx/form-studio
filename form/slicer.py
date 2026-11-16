@@ -1,32 +1,69 @@
-"""Facade over the configured slicer adapter ([slicer].kind, default "bambu").
+"""Facade over the configured slicer adapter ([slicer].kind: "auto" (default), "bambu", "orca", "prusa", …).
+
+"auto" uses the first installed slicer in adapters.AUTO_ORDER (Bambu Studio first, so a machine
+with Bambu Studio behaves exactly as when kind = "bambu").
 
 A slice is a simulation by the slicer. It is not a print.
 """
 from __future__ import annotations
 
 import importlib
+import os
+import re
+import shutil
+import time
+import tomllib
+from pathlib import Path
 
-from .adapters import SLICERS
-from .adapters.bambu import SlicerBlocked, SlicerFailed, flatten, parse_gcode_header, parse_layers  # noqa: F401
+from .adapters import AUTO_ORDER, SLICERS
+from .adapters.bambu import flatten, parse_gcode_header  # noqa: F401
+from .adapters.common import SlicerBlocked, SlicerFailed  # noqa: F401
 
 _loaded: dict = {}
 
 
 def adapter(kind: str):
     if kind not in SLICERS:
-        raise SlicerBlocked(f"Unknown slicer kind “{kind}”. Known: {', '.join(SLICERS)}.")
+        raise SlicerBlocked(f"Unknown slicer kind “{kind}”. Known: auto, {', '.join(SLICERS)}.")
     if kind not in _loaded:
         _loaded[kind] = importlib.import_module(SLICERS[kind])
     return _loaded[kind]
 
 
+def label(kind: str) -> str:
+    try:
+        return adapter(kind).LABEL
+    except SlicerBlocked:
+        return kind
+
+
+def auto_kind(cfg: dict) -> str | None:
+    """The first installed slicer, or None."""
+    for kind in AUTO_ORDER:
+        try:
+            if adapter(kind).find_app(cfg):
+                return kind
+        except Exception:                                  # a broken adapter must not hide the others
+            continue
+    return None
+
+
 def resolve(cfg: dict) -> dict:
-    kind = cfg["slicer"].get("kind", "bambu")
+    want = cfg["slicer"].get("kind", "auto")
+    kind = want
+    if want == "auto":
+        kind = auto_kind(cfg) or "bambu"
     try:
         out = adapter(kind).resolve(cfg)
     except SlicerBlocked as e:
         out = {"available": False, "reason": str(e), "presets": {}, "app": ""}
     out["kind"] = kind
+    out["chosen"] = want
+    out.setdefault("label", label(kind))
+    if want == "auto" and auto_kind(cfg) is None:
+        others = ", ".join(label(k) for k in AUTO_ORDER if k != "bambu")
+        out["reason"] = (f"{label('bambu')} was not found at {out.get('app') or 'its usual place'}, and neither was {others}. "
+                         "Install one of them, or set [slicer].kind and its app in studio.toml.")
     return out
 
 
@@ -45,4 +82,91 @@ def public(resolved: dict) -> dict:
 
 
 def slice_stl(resolved: dict, stl, out_dir, timeout: float = 600) -> dict:
-    return _for(resolved).slice_stl(resolved, stl, out_dir, timeout)
+    info = _for(resolved).slice_stl(resolved, stl, out_dir, timeout)
+    kind = resolved.get("kind", "bambu")
+    info.setdefault("slicer_kind", kind)
+    info.setdefault("slicer_name", label(kind))
+    return info
+
+
+def parse_layers(path, kind: str | None = None) -> list:
+    """Layers of a G-code file written by `kind` (default Bambu Studio)."""
+    return adapter(kind or "bambu").parse_layers(Path(path))
+
+
+def detect_all(cfg: dict) -> list[dict]:
+    """Every slicer FORM knows, whether it is installed, its version and the presets it would use."""
+    active = resolve(cfg)["kind"]
+    out = []
+    for kind in AUTO_ORDER:
+        a = adapter(kind)
+        try:
+            app = a.find_app(cfg)
+            r = a.resolve(cfg)
+        except Exception as e:                             # report, never hide
+            app, r = None, {"available": False, "reason": f"Could not check {a.LABEL}: {e}", "presets": {}}
+        entry = {
+            "kind": kind, "label": a.LABEL, "installed": bool(app), "app": app or r.get("app", ""),
+            "available": bool(r.get("available")), "reason": r.get("reason", ""), "active": kind == active,
+            "presets": {k: v["name"] for k, v in r.get("presets", {}).items()},
+            "source": r.get("source", {}), "config_dir": r.get("config_dir", ""),
+            "envelope_mm": r.get("envelope_mm"), "nozzle_mm": r.get("nozzle_mm"),
+            "version": a.version(app) if app else None,
+            "install": None if app else a.install_hint(),
+        }
+        out.append(entry)
+    return out
+
+
+# ---- studio.toml: [slicer].kind ----------------------------------------------
+def config_target(cfg: dict) -> Path:
+    """The studio.toml that `form` reads (or would read once it exists)."""
+    from .config import USER_CONFIG
+    p = Path(cfg.get("_path", ""))
+    if os.environ.get("FORM_CONFIG") or p.exists():
+        return Path(os.environ.get("FORM_CONFIG") or p).expanduser()
+    return USER_CONFIG
+
+
+def set_kind_text(text: str, kind: str) -> str:
+    """Set [slicer].kind in TOML text; every other line stays as it was."""
+    lines = text.splitlines(keepends=True)
+    start = next((i for i, ln in enumerate(lines) if re.match(r"^\s*\[slicer\]\s*(#.*)?$", ln)), None)
+    new = f'kind = "{kind}"'
+    if start is None:
+        return text.rstrip("\n") + ("\n\n" if text.strip() else "") + f"[slicer]\n{new}\n"
+    end = next((i for i in range(start + 1, len(lines)) if re.match(r"^\s*\[", lines[i])), len(lines))
+    for i in range(start + 1, end):
+        m = re.match(r"^(\s*)kind\s*=\s*(\"[^\"]*\"|'[^']*'|[^#\s]+)(\s*#.*)?(\r?\n)?$", lines[i])
+        if m:
+            lines[i] = f"{m.group(1)}{new}{m.group(3) or ''}{m.group(4) or ''}"
+            return "".join(lines)
+    nl = "\r\n" if lines[start].endswith("\r\n") else "\n"
+    if not lines[start].endswith(("\n", "\r\n")):
+        lines[start] += nl
+    lines.insert(start + 1, new + nl)
+    return "".join(lines)
+
+
+def set_kind(cfg: dict, kind: str) -> dict:
+    """Write [slicer].kind to studio.toml (backing the file up first). Nothing else in the file changes."""
+    if kind != "auto" and kind not in SLICERS:
+        raise SlicerBlocked(f"Unknown slicer kind “{kind}”. Known: auto, {', '.join(SLICERS)}.")
+    path = config_target(cfg)
+    old = path.read_text(encoding="utf-8") if path.exists() else ""
+    new = set_kind_text(old or "# FORM configuration (written by FORM)\n", kind)
+    before = tomllib.loads(old) if old else {}
+    after = tomllib.loads(new)
+    a, b = dict(after), dict(before)
+    a_s, b_s = dict(a.pop("slicer", {})), dict(b.pop("slicer", {}))
+    a_s.pop("kind", None), b_s.pop("kind", None)
+    if a != b or a_s != b_s or after["slicer"]["kind"] != kind:
+        raise SlicerBlocked(f"Could not change only [slicer].kind in {path}; it was left as it was.")
+    backup = None
+    if path.exists():
+        backup = path.with_name(path.name + f".bak-form-{int(time.time())}")
+        shutil.copyfile(path, backup)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(new, encoding="utf-8")
+    cfg["slicer"]["kind"] = kind
+    return {"path": str(path), "backup": str(backup) if backup else None, "kind": kind}

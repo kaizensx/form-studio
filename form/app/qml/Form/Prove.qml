@@ -115,7 +115,7 @@ Column {
                     Repeater { model: root.sl ? F.vals(root.sl.presets) : []
                         Txt { required property var modelData; kind: "fine"; tone: 2; text: modelData.name; width: 250; horizontalAlignment: Text.AlignRight
                             wrapMode: Text.NoWrap; elide: Text.ElideLeft } } } }
-            KV { k: "Slicer"; value: root.sl ? "Bambu Studio " + root.sl.slicer_version + " · " + root.sl.seconds + "s" : "" }
+            KV { k: "Slicer"; value: root.sl ? (root.sl.slicer_name || "Bambu Studio") + " " + root.sl.slicer_version + " · " + root.sl.seconds + "s" : "" }
         }
         Txt { kind: "fine"; width: parent.width
             visible: !!root.sl && (root.sl.plate_warnings || []).length > 0
@@ -132,13 +132,13 @@ Column {
                 layer.effect: MultiEffect { maskEnabled: true; maskSource: mask } }
             Rectangle { anchors.fill: parent; radius: Theme.rMd; color: "transparent"; border.width: 1; border.color: Theme.rule2 }
         }
-        Txt { kind: "fine"; visible: plate.visible; text: "Plate preview rendered by Bambu Studio." }
+        Txt { kind: "fine"; visible: plate.visible; text: "Plate preview rendered by " + ((root.sl && root.sl.slicer_name) || "Bambu Studio") + "." }
         Row { spacing: 8; topPadding: 2
             Btn { icon: Store.layers ? "arrow_left" : "layers"; text: Store.layers ? "Back to 3D" : "Inspect layers"; onClicked: Store.showLayers(!Store.layers) }
-            Btn { kind: "quiet"; icon: "download"; text: "Save sliced 3MF…"
+            Btn { kind: "quiet"; icon: "download"; text: "Save sliced 3MF…"; visible: !!root.sl && !!root.sl.threemf
                 onClicked: { save.selectedFile = Bridge.downloads() + "/" + root.sl.threemf; save.open() } } }
         Txt { kind: "fine"; width: parent.width
-            text: "A slice shows the toolpaths Bambu Studio would send with these presets. It is not a print: adhesion, warping and fit are only known after printing." }
+            text: "A slice shows the toolpaths " + ((root.sl && root.sl.slicer_name) || "Bambu Studio") + " would send with these presets. It is not a print: adhesion, warping and fit are only known after printing." }
     }
 
     // ── slice: not current ───────────────────────────────────

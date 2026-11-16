@@ -24,6 +24,7 @@ Item {
         }
         c.push({ icon: "plus", text: "New design from a recipe", hint: "", run: function () { Store.openSheet("new") } })
         c.push({ icon: "message_square", text: "New conversation with Claude", hint: "", run: function () { Store.newChat(); Store.talkOpen = true } })
+        c.push({ icon: "printer", text: "Choose slicer", hint: Store.slicer.label || "", run: function () { Store.openSheet("slicer") } })   // slicer workstream
         c.push({ icon: "folder_open", text: "Open the projects folder", hint: Bridge.dataDir, run: function () { Bridge.openDataFolder() } })
         if (Store.studio) Store.studio.projects.forEach(function (p) { if (!p.error && p.id !== Store.pid) c.push({ icon: "cuboid", text: p.name, hint: "Open design · " + F.pad(p.head), run: function () { Store.open(p.id) } }) })
         return c

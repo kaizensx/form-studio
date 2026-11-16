@@ -26,12 +26,17 @@ Rectangle {
                 : bar.ap.state === "superseded" ? F.pad(bar.ap.rev) + " released · " + F.pad(Store.project.head) + " is not" : "unreleased" }
     }
     Row { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 10
-        Row { spacing: 6; anchors.verticalCenter: parent.verticalCenter; visible: !!Store.studio && bar.width > 1180
+        Item { width: chip.implicitWidth + 12; height: 26; anchors.verticalCenter: parent.verticalCenter; visible: !!Store.studio && bar.width > 1180
+            Rectangle { anchors.fill: parent; radius: Theme.rSm; color: cm.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent" }
+        Row { id: chip; x: 6; spacing: 6; anchors.verticalCenter: parent.verticalCenter
             Rectangle { width: 6; height: 6; radius: 3; color: Store.slicer.available ? Theme.pass : Theme.ink4; anchors.verticalCenter: parent.verticalCenter }
             Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; color: Theme.ink2
                 text: Store.slicer.available ? Store.slicer.presets.machine.name : "Slicer unavailable" }
             Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; visible: Store.slicer.available && bar.width > 1380
                 text: Store.slicer.available ? "/  " + Store.slicer.presets.filament.name + "  /  " + Store.slicer.presets.process.name : "" } }
+            // opens the slicer picker (slicer workstream)
+            MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSheet("slicer") }
+            Tip { show: cm.containsMouse; text: (Store.slicer.label || "Slicer") + (Store.slicer.version ? " " + Store.slicer.version : "") + " · choose slicer" } }
         Rectangle { width: 214; height: 26; radius: Theme.rSm; color: sm.containsMouse ? Theme.plate3 : Theme.well; border.color: Theme.rule2; anchors.verticalCenter: parent.verticalCenter
             Icon { x: 8; name: "search"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
             Txt { x: 28; text: "Search and commands"; tone: 3; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }

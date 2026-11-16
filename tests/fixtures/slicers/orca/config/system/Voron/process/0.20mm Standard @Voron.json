@@ -1,0 +1,12 @@
+{
+    "type": "process",
+    "setting_id": "GP_VORON_020",
+    "name": "0.20mm Standard @Voron",
+    "from": "system",
+    "instantiation": "true",
+    "inherits": "fdm_process_common",
+    "wall_loops": "3",
+    "compatible_printers": [
+        "Voron 2.4 350 0.4 nozzle"
+    ]
+}

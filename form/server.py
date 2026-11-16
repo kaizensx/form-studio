@@ -99,6 +99,11 @@ def make_handler(st: Studio):
                 return self._json({"env": st.environment(), "projects": st.list(), "chat": chat_mod.status(st.cfg),
                                    "recipes": [r.public() for r in st.recipes.builtins().values()],
                                    "assistant": advisor.cli_status(st.cfg)})
+            # -- slicer picker: every slicer FORM knows, installed or not --
+            if path == "/api/studio/slicers":
+                from . import slicer as slicer_mod
+                return self._json({"chosen": st.cfg["slicer"].get("kind", "auto"), "config": str(slicer_mod.config_target(st.cfg)).replace(str(Path.home()), "~"),
+                                   "slicers": slicer_mod.detect_all(st.cfg)})
             m = re.fullmatch(r"/api/projects/([a-z0-9-]+)(/.*)?", path)
             if not m:
                 raise StudioError("Not found.", status=404)
@@ -190,6 +195,18 @@ def make_handler(st: Studio):
             if path == "/api/studio/refresh":
                 st.slicer_info(refresh=True)
                 return self._json({"env": st.environment()})
+            # -- slicer picker: change only [slicer].kind in studio.toml (backed up first) --
+            if path == "/api/studio/slicer":
+                from . import slicer as slicer_mod
+                try:
+                    done = slicer_mod.set_kind(st.cfg, str(body.get("kind", "")))
+                except slicer_mod.SlicerBlocked as e:
+                    raise StudioError(str(e), "Known kinds: auto, bambu, orca, prusa, superslicer, qidi.")
+                except OSError as e:
+                    raise StudioError(f"Could not write studio.toml: {e}", "Check that the file and its folder are writable.")
+                st.slicer_info(refresh=True)
+                st.activity(None, "slicer", f"Slicer set to {done['kind']} in {Path(done['path']).name}.", by="you")
+                return self._json({**done, "env": st.environment()})
             m = re.fullmatch(r"/api/projects/([a-z0-9-]+)/([a-z_]+)", path)
             if not m:
                 raise StudioError("Not found.", status=404)

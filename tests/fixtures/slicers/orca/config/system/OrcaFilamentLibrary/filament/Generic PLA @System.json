@@ -1,0 +1,12 @@
+{
+    "type": "filament",
+    "filament_id": "OGFL99",
+    "setting_id": "OGFSL99",
+    "name": "Generic PLA @System",
+    "from": "system",
+    "instantiation": "true",
+    "inherits": "fdm_filament_pla",
+    "filament_vendor": [
+        "Generic"
+    ]
+}
