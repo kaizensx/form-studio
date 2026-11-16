@@ -21,8 +21,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: macOS arm64, os: macos-14, asset: FORM-macos-arm64.zip }
-          - { name: macOS x64, os: macos-13, asset: FORM-macos-x64.zip }
+          - { name: macOS arm64, os: macos-latest, asset: FORM-macos-arm64.zip }
+          - { name: macOS x64, os: macos-15-intel, asset: FORM-macos-x64.zip }
           - { name: Windows x64, os: windows-latest, asset: FORM-windows-x64.zip }
           - { name: Linux x64, os: ubuntu-22.04, asset: FORM-linux-x64.tar.gz }
     steps:
