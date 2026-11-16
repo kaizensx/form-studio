@@ -74,10 +74,21 @@ Item {
                     }
                 }
             }
-            Rectangle { visible: home.projects.length === 0 && !!Store.studio; width: parent.width; height: 220; radius: Theme.rLg; color: Theme.plate1; border.color: Theme.rule
-                Column { anchors.centerIn: parent; spacing: 8
-                    Icon { name: "cuboid"; size: 28; color: Theme.ink4; anchors.horizontalCenter: parent.horizontalCenter }
-                    Txt { text: "Describe a part to Claude on the left, or start from a recipe."; tone: 2 } } }
+            // An empty folder stays empty: no example projects are created. This is the whole of Home until the first design.
+            Rectangle { visible: home.projects.length === 0 && !!Store.studio; width: parent.width; height: Math.max(380, home.height - 150); radius: Theme.rLg
+                color: Theme.plate1; border.color: Theme.rule
+                Column { anchors.centerIn: parent; spacing: 14; width: Math.min(460, parent.width - 48)
+                    Rectangle { width: 56; height: 56; radius: Theme.rLg; color: Theme.plate3; anchors.horizontalCenter: parent.horizontalCenter
+                        Icon { name: "cuboid"; size: 26; color: Theme.datum; anchors.centerIn: parent } }
+                    Txt { kind: "h2"; text: "Your first design starts here"; anchors.horizontalCenter: parent.horizontalCenter }
+                    Txt { tone: 2; width: parent.width; horizontalAlignment: Text.AlignHCenter; lineHeight: 1.35
+                        text: "Describe a part to Claude on the left: what it holds, where it goes, what you measured. Or start from a recipe and change its numbers yourself." }
+                    Row { spacing: 8; anchors.horizontalCenter: parent.horizontalCenter; topPadding: 4
+                        Btn { kind: "primary"; icon: "plus"; text: "New from a recipe"; onClicked: Store.openSheet("new") }
+                        Btn { icon: "file_text"; text: "Start from a brief"; onClicked: Store.openSheet("new", { tab: "brief" }) }
+                        Btn { kind: "quiet"; icon: "box"; text: "Open an example"; onClicked: Store.openSheet("new", { examples: true }) } }
+                    Txt { kind: "fine"; width: parent.width; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
+                        text: "Designs are saved in " + Bridge.dataDirShort } } }
         }
     }
 }

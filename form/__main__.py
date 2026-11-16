@@ -1,6 +1,10 @@
 """Command line. Every command except `serve` and `mcp` prints JSON, so any agent with a shell can drive FORM.
 
   form setup                         find what is missing, fix what you pick (--check, --yes, --dry-run)
+  form install --list                everything FORM uses: found or not, and the command that installs it
+  form install <id> [--yes] [--dry-run]   install one thing (ids from --list, or "recommended")
+  form config get [key] | set <key> <value>   read or change studio.toml (backup first)
+  form examples [add [id ...]]       list the shipped examples, or add them to your projects
   form serve                         the bench on http://127.0.0.1:4173
   form mcp                           MCP server over stdio (what agents launch)
   form update [--check]              is there a newer release on GitHub? (never installs)
@@ -52,6 +56,26 @@ def main(argv=None):
     if argv[:1] == ["setup"]:                     # its own flags; keep argparse out of the way
         from .setup import main as setup_main
         return setup_main(argv[1:])
+    # -- setup workstream: installer, settings, examples (each prints JSON; none starts the kernel) --
+    if argv[:1] == ["install"]:
+        from .installer import main as install_main
+        return install_main(argv[1:])
+    if argv[:1] == ["config"]:
+        from .config_edit import main as config_main
+        return config_main(argv[1:])
+    if argv[:1] == ["examples"]:
+        from . import config
+        from .studio import StudioError, add_examples, list_examples
+        root = config.load()["data"]["dir"]
+        try:
+            if argv[1:2] == ["add"]:
+                _print({"added": add_examples(root, argv[2:] or None), "data_dir": root})
+            else:
+                _print({"examples": list_examples(root), "add_with": "form examples add [id ...]"})
+        except StudioError as e:
+            _print({"error": e.public()})
+            return 2
+        return 0
     ap = argparse.ArgumentParser(prog="form", description="FORM print-design studio",
                                  formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split("\n", 2)[2])
     sub = ap.add_subparsers(dest="cmd")
@@ -61,6 +85,9 @@ def main(argv=None):
     m.add_argument("--no-bench", action="store_true")
     sub.add_parser("setup", help="find what is missing and fix what you choose (--check, --yes, --dry-run)")
     sub.add_parser("update", help="is there a newer FORM? (--check prints JSON; never installs)")
+    sub.add_parser("install", help="install what FORM uses (--list, <id>, --yes, --dry-run)")
+    sub.add_parser("config", help="get [key] | set <key> <value>: read or change studio.toml")
+    sub.add_parser("examples", help="list the shipped examples; `add` copies them into your projects")
     sub.add_parser("doctor")
     sub.add_parser("list")
     r = sub.add_parser("recipe")

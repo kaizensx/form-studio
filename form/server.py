@@ -103,12 +103,17 @@ def make_handler(st: Studio):
             if path == "/api/setup":
                 return self._json(st.setup_app.report())
             if path == "/api/setup/state":                  # instant: no checks run
-                return self._json({"first_run": setup_app.first_run(st.cfg), "fresh": st.setup_app.fresh})
+                return self._json({"first_run": setup_app.first_run(st.cfg), "fresh": st.setup_app.fresh,
+                                   "onboarding": setup_app.onboarding(st.cfg)})
             ms = re.fullmatch(r"/api/setup/job/([0-9a-f]{10})", path)
             if ms:
                 return self._json(st.setup_app.job(ms.group(1)).public())
             if path == "/api/updates":
                 return self._json(updates.check(st.cfg, force=q.get("force") == "1"))
+            # -- installer, sign-in, settings, examples (setup workstream; routes live in form/setup_app.py) --
+            owned = setup_app.route_get(st, path, q)
+            if owned is not None:
+                return self._json(owned)
             # -- brief templates (presets) --
             if path == "/api/presets":
                 from . import presets
@@ -243,6 +248,10 @@ def make_handler(st: Studio):
                 return self._json({"job": job.id, **job.public()})
             if path == "/api/setup/seen":
                 return self._json(setup_app.mark_seen(st.cfg, str(body.get("how") or "seen")[:20]))
+            # -- installer, sign-in, settings, examples (setup workstream; routes live in form/setup_app.py) --
+            owned = setup_app.route_post(st, path, body)
+            if owned is not None:
+                return self._json(owned)
             # -- brief templates: save a filled-in brief, get the chat prompt that carries it --
             if path == "/api/briefs":
                 from . import presets

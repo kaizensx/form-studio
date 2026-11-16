@@ -20,7 +20,12 @@ Column {
     readonly property var preset: { for (var i = 0; i < presets.length; i++) if (presets[i].id === presetId) return presets[i]; return null }
     readonly property var missing: preset ? preset.questions.filter(function (q) { return q.required && !String(answers[q.key] || "").trim() }) : []
     spacing: 12; bottomPadding: 20
-    Component.onCompleted: Store.get("/presets").then(function (r) { ns.presets = r.presets }, Store.fail)
+    Component.onCompleted: { Store.get("/presets").then(function (r) { ns.presets = r.presets }, Store.fail); if (showExamples) loadExamples() }
+    // ── examples (only on request) ──
+    property bool showExamples: !!props.examples
+    property var examples: []
+    onShowExamplesChanged: if (showExamples) loadExamples()
+    function loadExamples() { Store.get("/examples").then(function (r) { ns.examples = r.examples }, Store.fail) }
 
     function chosen() { var r = Store.studio.recipes; for (var i = 0; i < r.length; i++) if (r[i].id === pickId) return r[i]; return null }
     function setAnswer(k, v) { var o = Object.assign({}, answers); o[k] = v; answers = o }
@@ -55,7 +60,18 @@ Column {
         Row { spacing: 8
             Btn { kind: "primary"; text: "Create"; icon: "plus"; enabled: ns.pickId !== ""
                 onClicked: Store.create(name.text.trim() || (ns.chosen() ? ns.chosen().title : "Design"), ns.pickId, brief.text) }
-            Btn { kind: "quiet"; text: "Restore a .formproj…"; icon: "upload"; onClicked: dlg.open() } }
+            Btn { kind: "quiet"; text: "Restore a .formproj…"; icon: "upload"; onClicked: dlg.open() }
+            Btn { kind: "quiet"; text: "Open an example"; icon: "box"; active: ns.showExamples; onClicked: ns.showExamples = !ns.showExamples } }
+        // examples are added only when asked for here (setup workstream); a new projects folder starts empty
+        Column { visible: ns.showExamples; width: parent.width; spacing: 6
+            Txt { kind: "fine"; width: parent.width; text: "Finished designs that ship with FORM. Opening one copies its design history into your projects; its outputs are rebuilt on your computer." }
+            Repeater { model: ns.examples
+                Rectangle { id: ex; required property var modelData
+                    width: ns.width; height: 40; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+                    Txt { x: 12; text: ex.modelData.name; font.weight: 600; anchors.verticalCenter: parent.verticalCenter }
+                    Btn { small: true; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
+                        text: ex.modelData.present ? "Open" : "Add and open"
+                        onClicked: { if (ex.modelData.present) { Store.openSheet(null); Store.open(ex.modelData.id) } else Store.addExample(ex.modelData.id) } } } } }
         Txt { kind: "fine"; width: parent.width; text: "FORM works from a written brief, dimensions you measure, and reference photos with a marked scale. It does not reconstruct geometry from photos or scans." }
     }
 
