@@ -39,15 +39,23 @@ QtObject {
     property var viewer: null          // the Viewport item; set by it
     property var thumbTick: ({})       // pid → counter, bumps when a project's thumbnail should reload
 
-    // chat with Claude, and the live feed of what any agent does
+    // chat: saved conversations with an agent, and the live feed of what any agent does (chat workstream)
     property bool talkOpen: true
-    property string chatSession: ""
-    property string chatJob: ""
-    property int chatNext: 0
-    property bool chatBusy: false
-    property var chatItems: []
-    property var chatTools: ({})
-    property var chatLive: null
+    property string convId: ""         // the open conversation; "" = a new one that is not saved yet
+    property var conv: null            // its record: { id, title, project, agent, model, effort, resolved_model, cost_usd, … }
+    property var convs: []             // every saved conversation, pinned first, then newest
+    property int chatNext: 0           // how many saved events of the open conversation are loaded
+    property bool chatBusy: false      // the open conversation is answering
+    property var chatItems: []         // its events (user, start, text, tool, act, end, error), plus unsent local ones
+    property var chatTools: ({})       // tool call id → its result
+    property var chatLive: null        // what is streaming right now: { kind, name, chars, text }
+    property real chatSeconds: 0
+    property string chatAgent: ""      // the composer's choice; "" until the studio is loaded
+    property string chatModel: ""
+    property string chatEffort: ""
+    property var chatAttach: []        // files attached to the next message: { id, name, kind, file, size }
+    property int chatFocus: 0          // bumps when the composer should take the keyboard
+    property string chatRecall: ""     // text to put back into the composer (edit the last message)
     property real actTs: Date.now() / 1000
 
     // ── derived ──────────────────────────────────────────────
@@ -370,7 +378,7 @@ QtObject {
                 var ev = r.events[i]
                 s.actTs = Math.max(s.actTs, ev.ts)
                 if (ev.by === "you") continue
-                if (!s.chatBusy) s.chatItems = s.chatItems.concat([{ t: "act", by: ev.by, text: ev.text }])
+                s.noteAct(ev)
                 s.follow(ev)
             }
         }, function () {})
@@ -424,38 +432,173 @@ QtObject {
     }
     property var _asmReset: Connections { target: s; function onPidChanged() { s.asmMode = "print"; s.pose = ({}); s.explode = 1.0 } }
 
-    // ── chat with Claude ─────────────────────────────────────
-    property var _chatPoll: Timer { interval: 600; onTriggered: s._chatTick() }
+    // ── chat: conversations with an agent (chat workstream) ──
+    // A conversation is saved by the engine as it streams (form/conversations.py). The open one is polled while it
+    // answers; others keep running in the background (up to three at once) and show a dot in the list.
+    readonly property var chatAgents: chat.agents || []
+    readonly property var chatDefault: chat["default"] || ({ agent: "claude", model: "default", effort: "" })
+    function agentInfo(id) { for (var i = 0; i < chatAgents.length; i++) if (chatAgents[i].id === id) return chatAgents[i]; return null }
+    readonly property var chatAgentInfo: agentInfo(chatAgent)
+    readonly property bool chatReady: !!chatAgentInfo && chatAgentInfo.available
+    readonly property string chatAgentLabel: chatAgentInfo ? chatAgentInfo.label : "Claude Code"
+    function modelLabel(agent, model) {
+        var a = agentInfo(agent), ms = a ? a.models : []
+        for (var i = 0; i < ms.length; i++) if (ms[i].id === model) return ms[i].label
+        return model || "Default"
+    }
+    property var _chatInit: Connections { target: s; function onStudioChanged() { if (s.studio && !s.chatAgent) s._useDefaults() } }
+    function _useDefaults() { chatAgent = chatDefault.agent; chatModel = chatDefault.model; chatEffort = chatDefault.effort }
+
+    property var _chatPoll: Timer { interval: 250; onTriggered: s._chatTick() }
+    property var _convPoll: Timer {
+        interval: 3000; repeat: true
+        running: s.screen !== "boot" && (s.chatBusy || s.convs.some(function (c) { return c.state === "running" }))
+        onTriggered: s.loadConvs()
+    }
+    function loadConvs() { return get("/conversations").then(function (r) { convs = r.conversations }, function () {}) }
+    function convTitle() { return conv ? conv.title : "New conversation" }
+
+    function newChat() {
+        _chatPoll.stop()
+        convId = ""; conv = null; chatItems = []; chatTools = ({}); chatLive = null; chatNext = 0; chatBusy = false; chatAttach = []
+        if (studio) _useDefaults()
+        talkOpen = true; chatFocus++
+    }
+    function openConv(id) {
+        if (!id) return newChat()
+        _chatPoll.stop()
+        convId = id; chatItems = []; chatTools = ({}); chatLive = null; chatNext = 0; chatBusy = false; chatAttach = []
+        talkOpen = true
+        return get("/conversations/" + id).then(function (r) {
+            if (convId !== id) return
+            _take(r)
+            chatAgent = r.agent; chatModel = r.model; chatEffort = r.effort || ""
+            if (r.state === "running") _chatPoll.restart()
+            chatFocus++
+        }, function (e) { fail(e); newChat(); loadConvs() })
+    }
+    // merge a reply from GET /conversations/<id>?from=chatNext into the feed
+    function _take(r) {
+        var items = chatItems.filter(function (it) { return !it.local }), tools = Object.assign({}, chatTools)
+        for (var i = 0; i < r.items.length; i++) {
+            var ev = r.items[i]
+            if (ev.t === "result") tools[ev.id] = ev
+            else items.push(ev)
+        }
+        if (r.items.length || items.length !== chatItems.length) { chatItems = items; chatTools = tools }
+        chatNext = r.next; chatLive = r.live; chatSeconds = r.seconds || 0
+        chatBusy = r.state === "running"
+        var m = Object.assign({}, r); delete m.items; delete m.live
+        conv = m
+    }
+    function _chatTick() {
+        var id = convId
+        if (!id) return
+        get("/conversations/" + id + "?from=" + chatNext).then(function (r) {
+            if (convId !== id) return
+            var was = chatBusy
+            _take(r)
+            if (r.state === "running") { _chatPoll.restart(); return }
+            if (was) { loadConvs(); reloadStudio(); if (pid) refresh(true) }
+        }, function () { if (convId === id) _chatPoll.restart() })
+    }
     function send(text) {
         text = (text || "").trim()
         if (!text || chatBusy) return
-        chatBusy = true; talkOpen = true
-        chatItems = chatItems.concat([{ t: "user", text: text }])
-        post("/chat", { message: text, project: pid || null, session: chatSession || null }).then(function (r) {
-            chatJob = r.id; chatNext = 1; _chatPoll.restart()
-        }, function (e) { chatBusy = false; chatItems = chatItems.concat([{ t: "error", text: e.message }]) })
+        var att = chatAttach, id = convId
+        chatBusy = true; talkOpen = true; chatAttach = []; chatLive = null
+        chatItems = chatItems.concat([{ t: "user", text: text, attachments: att, local: true }])
+        var body = { message: text, project: pid || null, agent: chatAgent, model: chatModel || "default", effort: chatEffort,
+                     attachments: att.map(function (a) { return a.id }) }
+        post(id ? "/conversations/" + id + "/send" : "/conversations/send", body).then(function (r) {
+            if (convId !== id) return
+            convId = r.conversation; conv = r.meta
+            _chatPoll.restart(); loadConvs()
+        }, function (e) {
+            if (convId !== id) return
+            chatBusy = false; chatAttach = att
+            chatItems = chatItems.concat([{ t: "error", text: e.message, local: true }])
+        })
     }
-    function _chatTick() {
-        if (!chatJob) return
-        get("/chat/" + chatJob + "?from=" + chatNext).then(function (r) {
-            var items = chatItems.slice(), tools = Object.assign({}, chatTools), changed = false
-            for (var i = 0; i < r.events.length; i++) {
-                var ev = r.events[i]
-                if (ev.t === "result") { tools[ev.id] = ev; changed = true }
-                else if (ev.t !== "start" && ev.t !== "user") { items.push(ev); changed = true }
-            }
-            if (changed) { chatItems = items; chatTools = tools }
-            chatNext = r.next; chatLive = r.live
-            if (r.session) chatSession = r.session
-            if (r.state === "running") { _chatPoll.restart(); return }
-            chatBusy = false; chatJob = ""; chatLive = null
-            if (r.state === "failed") chatItems = chatItems.concat([{ t: "error", text: r.error || "Claude stopped with an error." }])
-            reloadStudio()
-            if (pid) refresh(true)
-        }, function () { _chatPoll.restart() })
+    function stopChat() { if (convId) post("/conversations/" + convId + "/stop", {}).then(function () { s._chatTick() }, function () {}) }
+    function lastUserText() {
+        for (var i = chatItems.length - 1; i >= 0; i--) if (chatItems[i].t === "user") return chatItems[i].text
+        return ""
     }
-    function stopChat() { if (chatJob) post("/chat/" + chatJob + "/stop", {}) }
-    function newChat() { chatSession = ""; chatItems = []; chatTools = ({}) }
+    function retryChat() { var t = lastUserText(); if (t && !chatBusy) send(t) }
+    function recallChat(text) { chatRecall = ""; chatRecall = text || lastUserText(); chatFocus++ }
+
+    // what another agent did while you watch: a quiet line in the open conversation
+    function noteAct(ev) {
+        if (chatBusy) return
+        if (convId && conv && (!ev.project || !conv.project || ev.project === conv.project))
+            post("/conversations/" + convId + "/note", { by: ev.by, text: ev.text }).then(function () { s._chatTick() }, function () {})
+        else if (!convId) chatItems = chatItems.concat([{ t: "act", by: ev.by, text: ev.text, local: true }])
+    }
+
+    // the agent, model and effort for this conversation; remembered as the default for new ones
+    function setChatChoice(agent, model, effort) {
+        if (agent !== undefined && agent !== chatAgent) {
+            chatAgent = agent
+            if (model === undefined) model = "default"
+            if (effort === undefined) effort = ""
+        }
+        if (model !== undefined) chatModel = model || "default"
+        if (effort !== undefined) chatEffort = effort || ""
+        var body = { agent: chatAgent, model: chatModel, effort: chatEffort }
+        post("/chat/defaults", body).then(function (r) {
+            if (studio) studio = Object.assign({}, studio, { chat: Object.assign({}, studio.chat, { "default": r["default"] }) })
+        }, function () {})
+        if (convId) post("/conversations/" + convId + "/settings", body).then(function (m) { if (convId === m.id) conv = Object.assign({}, conv, m) }, function () {})
+    }
+
+    // attachments: images, PDFs, STEP/STL. Copied into the conversation's folder; sent with the next message.
+    function attachFiles(urls) {
+        var list = []
+        for (var i = 0; i < urls.length; i++) list.push(urls[i])
+        if (!list.length) return
+        var go = function (id) {
+            list.forEach(function (u) {
+                var name = decodeURIComponent(String(u).replace(/^.*[\/\\]/, ""))
+                upload("/conversations/" + id + "/attach?name=" + encodeURIComponent(name), u).then(function (r) {
+                    if (convId === id) chatAttach = chatAttach.concat(r.attachments)
+                }, fail)
+            })
+        }
+        if (convId) return go(convId)
+        post("/conversations", { project: pid || null, agent: chatAgent, model: chatModel, effort: chatEffort }).then(function (m) {
+            if (convId !== "") return
+            convId = m.id; conv = m; go(m.id)
+        }, fail)
+    }
+    function dropAttachment(id) { chatAttach = chatAttach.filter(function (a) { return a.id !== id }) }
+    function attachmentUrl(file, cid) { return Bridge.baseUrl + "/api/conversations/" + (cid || convId) + "/file/" + file }
+
+    function renameConv(id, title) {
+        return post("/conversations/" + id + "/rename", { title: title }).then(function (m) { if (convId === id) conv = Object.assign({}, conv, m); return loadConvs() }, fail)
+    }
+    function pinConv(id, on) { return post("/conversations/" + id + "/pin", { on: on }).then(function () { return loadConvs() }, fail) }
+    function deleteConv(id) {
+        return post("/conversations/" + id + "/delete", {}).then(function () { if (convId === id) newChat(); return loadConvs() }, fail)
+    }
+    // opening a design shows its most recent conversation; going home shows a fresh prompt
+    property var _convFollow: Connections {
+        target: s
+        function onPidChanged() {
+            var id = s.pid
+            if (id === "") { if (!s.chatBusy && s.convId) s.newChat(); return }
+            if (s.conv && s.conv.project === id) return
+            if (s.chatBusy) return                       // the running conversation is probably making this design
+            s.get("/conversations?project=" + id).then(function (r) {
+                if (s.pid !== id || s.chatBusy) return
+                var best = null
+                r.conversations.forEach(function (c) { if (c.messages && (!best || c.updated > best.updated)) best = c })
+                if (best) { if (best.id !== s.convId) s.openConv(best.id) }
+                else if (s.convId || s.chatItems.length) s.newChat()
+            }, function () {})
+        }
+        function onScreenChanged() { if (s.screen !== "boot") s.loadConvs() }
+    }
 
     // ── setup and updates (app setup workstream) ─────────────
     // Nothing is installed unless the user ticks an item and presses Apply; the engine re-checks the

@@ -92,7 +92,9 @@ def make_handler(st: Studio):
             if path == "/api/activity":
                 return self._json({"events": st.activity_since(float(q.get("since") or 0)), "now": time.time()})
             if path == "/api/chat":
-                return self._json(chat_mod.status(st.cfg))
+                return self._json(st.chat.status())
+            if path.startswith("/api/conversations"):       # saved conversations (chat workstream)
+                return self._conv_get(path, q)
             mc = re.fullmatch(r"/api/chat/([0-9a-f]{10})", path)
             if mc:
                 job = st.chat.jobs.get(mc.group(1))
@@ -202,6 +204,89 @@ def make_handler(st: Studio):
                 return self._send(200, photo.file(st, p, m4.group(1)).read_bytes(), "image/png")
             raise StudioError("Not found.", status=404)
 
+        # -- conversations: saved chats, attachments, the agent/model choice (chat workstream) ----------------
+        def _conv(self, fn):
+            from .conversations import ConversationError
+            try:
+                return fn()
+            except ConversationError as e:
+                raise StudioError(str(e), status=404 if "Unknown conversation" in str(e) else 400)
+            except RuntimeError as e:
+                raise StudioError(str(e), status=409)
+
+        def _conv_get(self, path, q):
+            if path == "/api/conversations":
+                proj = q.get("project")
+                return self._json({"conversations": st.chat.list(proj if proj else None, q.get("q")),
+                                   "running": len(st.chat.running())})
+            mr = re.fullmatch(r"/api/conversations/render/([a-z0-9-]+)/([A-Za-z0-9_.\-]+\.png)", path)
+            if mr:                                          # a render the agent looked at, for the inline thumbnail
+                base = (st.root / mr.group(1) / "artifacts" / "renders").resolve()
+                f = (base / mr.group(2)).resolve()
+                if not f.is_relative_to(base) or not f.is_file():
+                    raise StudioError("That render is no longer on disk.", status=404)
+                return self._send(200, f.read_bytes(), "image/png")
+            mf = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/file/([A-Za-z0-9_.\-]+)", path)
+            if mf:
+                f = self._conv(lambda: st.chat.store.attachment(mf.group(1), mf.group(2)))
+                return self._send(200, f.read_bytes(), mimetypes.guess_type(f.name)[0] or "application/octet-stream")
+            m = re.fullmatch(r"/api/conversations/([0-9a-f]{12})", path)
+            if m:
+                return self._json(self._conv(lambda: st.chat.conversation(m.group(1), int(q.get("from") or 0))))
+            raise StudioError("Not found.", status=404)
+
+        def _conv_post(self, path, body):
+            from . import chat as chat_mod2
+            u = urlparse(self.path)
+            q = {k: v[0] for k, v in parse_qs(u.query).items()}
+            if path == "/api/chat/defaults":
+                try:
+                    return self._json(chat_mod2.set_defaults(st.cfg, body.get("agent"), body.get("model"), body.get("effort")))
+                except ValueError as e:
+                    raise StudioError(str(e))
+            if path == "/api/conversations":
+                d = st.chat.status()["default"]
+                return self._json(st.chat.store.create(body.get("project") or None, body.get("agent") or d["agent"],
+                                                       body.get("model") or d["model"],
+                                                       body.get("effort") if body.get("effort") is not None else d["effort"],
+                                                       str(body.get("title") or "")))
+            if path == "/api/conversations/send":           # first message of a new conversation
+                cid = None
+            else:
+                m = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/(send|stop|rename|pin|delete|attach|settings|note)", path)
+                if not m:
+                    raise StudioError("Not found.", status=404)
+                cid, verb = m.group(1), m.group(2)
+                if verb == "stop":
+                    return self._json({"stopped": st.chat.stop(cid)})
+                if verb == "rename":
+                    return self._json(self._conv(lambda: st.chat.store.rename(cid, str(body.get("title", "")))))
+                if verb == "pin":
+                    return self._json(self._conv(lambda: st.chat.store.pin(cid, bool(body.get("on", True)))))
+                if verb == "delete":
+                    self._conv(lambda: st.chat.delete(cid))
+                    return self._json({"deleted": cid})
+                if verb == "note":
+                    return self._json(self._conv(lambda: st.chat.note(cid, body.get("by", "agent"), body.get("text", ""))))
+                if verb == "settings":
+                    keep = {k: str(body[k]) for k in ("agent", "model", "effort") if body.get(k) is not None}
+                    if "project" in body:
+                        keep["project"] = body["project"] or None
+                    return self._json(self._conv(lambda: st.chat.store.update(cid, **keep)))
+                if verb == "attach":
+                    if isinstance(body, bytes):             # raw upload: ?name=file.png
+                        rec = self._conv(lambda: st.chat.store.attach(cid, name=q.get("name") or "file", data=body))
+                        return self._json({"attachments": [rec]})
+                    recs = self._conv(lambda: [st.chat.store.attach(cid, Path(str(p))) for p in (body.get("paths") or [])])
+                    return self._json({"attachments": recs})
+            msg = str(body.get("message", "")).strip()[:16000]
+            if not msg:
+                raise StudioError("Write a message first.")
+            job = self._conv(lambda: st.chat.send(msg, cid, body.get("project") or None, body.get("agent") or None,
+                                                  body.get("model") or None, body.get("effort"), body.get("attachments") or []))
+            st.activity(job.project, "chat", msg[:200], by="you")
+            return self._json({"id": job.id, "conversation": job.conversation, "meta": st.chat.store.meta(job.conversation)})
+
         def _static(self, path):
             rel = "index.html" if path in ("/", "") else path.lstrip("/")
             f = (WEB / rel).resolve()
@@ -223,6 +308,8 @@ def make_handler(st: Studio):
             if path == "/api/import":
                 p = st.import_archive(body if isinstance(body, bytes) else b"")
                 return self._json({"id": p["id"]})
+            if path.startswith("/api/conversations") or path == "/api/chat/defaults":   # chat workstream
+                return self._conv_post(path, body)
             if path == "/api/chat":
                 msg = str(body.get("message", "")).strip()[:8000]
                 if not msg:

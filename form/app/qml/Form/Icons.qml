@@ -83,5 +83,17 @@ QtObject {
         "hammer": "\ue0ec",
         "cog": "\ue30b",
         "monitor": "\ue11d",
+        "paperclip": "\ue12d",
+        "pin": "\ue259",
+        "pin_off": "\ue2b6",
+        "pencil": "\ue1f9",
+        "rotate_cw": "\ue149",
+        "chevrons_up_down": "\ue211",
+        "chevron_up": "\ue070",
+        "file": "\ue0c0",
+        "bot": "\ue1bb",
+        "message_square_plus": "\ue40c",
+        "list_checks": "\ue1d0",
+        "circle_x": "\ue084",
     })
 }

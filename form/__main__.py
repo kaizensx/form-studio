@@ -16,6 +16,9 @@
   form optimize <project> --vary arm_t:4:20 --minimize solid_mass_g --require "statics.safety_factor>=3"
   form animate <project> [--morph 1:4] [--out x.gif]   turntable or revision morph
   form verify <project> <release>    re-hash a release against its manifest
+  form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
+                                     one message to an agent with FORM's tools; streams the reply, saves the conversation
+  form conversations list|show|delete|rename|pin    saved conversations
 """
 from __future__ import annotations
 
@@ -52,6 +55,12 @@ def main(argv=None):
     if argv[:1] == ["setup"]:                     # its own flags; keep argparse out of the way
         from .setup import main as setup_main
         return setup_main(argv[1:])
+    if argv[:1] == ["chat"]:                      # chat workstream: one message to an agent, streamed, saved
+        from .chat import main_chat
+        return main_chat(argv[1:])
+    if argv[:1] == ["conversations"]:             # saved conversations: list | show | delete | rename | pin
+        from .chat import main_conversations
+        return main_conversations(argv[1:])
     ap = argparse.ArgumentParser(prog="form", description="FORM print-design studio",
                                  formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split("\n", 2)[2])
     sub = ap.add_subparsers(dest="cmd")
@@ -61,6 +70,8 @@ def main(argv=None):
     m.add_argument("--no-bench", action="store_true")
     sub.add_parser("setup", help="find what is missing and fix what you choose (--check, --yes, --dry-run)")
     sub.add_parser("update", help="is there a newer FORM? (--check prints JSON; never installs)")
+    sub.add_parser("chat", help='send one message to an agent: form chat "message" [--project ID] [--model X] [--json]')
+    sub.add_parser("conversations", help="saved conversations: list | show ID | delete ID | rename ID TITLE | pin ID")
     sub.add_parser("doctor")
     sub.add_parser("list")
     r = sub.add_parser("recipe")
