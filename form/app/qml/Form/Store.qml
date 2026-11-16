@@ -856,6 +856,7 @@ QtObject {
         orientBusy = true
         var want = pid
         pget("/orient").then(function (r) { if (want !== s.pid) return; s.orient = r; s.orientBusy = false }, function (e) { s.orientBusy = false; s.fail(e) })
+    }
 
     // ── design tools: revision timeline, variants, quick actions (design tools workstream) ─────────
     // Scrubbing shows another revision read-only (engine /view?rev=); nothing changes until "Branch from here" (checkout).
