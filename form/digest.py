@@ -21,7 +21,9 @@ def digest(st, pid: str, bench: str | None = None) -> dict:
         src = head["provenance"].get(k, {}).get("source", "assumed")
         params[k] = f"{_fmt(v)} {sp.unit} ({src})"
     out: dict[str, Any] = {
-        "project": p["id"], "name": p["name"], "recipe": p["recipe"] if not p["recipe"].startswith("src:") else "design written as code", "head": head["n"],
+        "project": p["id"], "name": p["name"], "head": head["n"],
+        "recipe": p["recipe"] if not p["recipe"].startswith(("src:", "scad:")) else
+                  ("design written in OpenSCAD" if p["recipe"].startswith("scad:") else "design written as code"),
         "brief": p["brief"]["text"],
         "parameters": params,
         "outputs": {n: s["status"][n]["state"] + (f" (last made for r{s['status'][n]['last_rev']})" if s["status"][n].get("last_rev") else "")
@@ -32,6 +34,12 @@ def digest(st, pid: str, bench: str | None = None) -> dict:
         "approval": s["approval"],
         "orientation": p["orientation"],
     }
+    if getattr(recipe, "mesh", False):
+        out["mesh_design"] = recipe.public().get("notes", [])
+    parts = [r for r in p["brief"].get("references", []) if r.get("kind") == "part"]
+    if parts:
+        out["reference_parts"] = [f"{r['file']}: " + " × ".join(f"{b - a:.1f}" for a, b in zip(*r["bbox"])) + " mm (computed); "
+                                  f"use self.reference({r['file']!r}) in a Python design" for r in parts]
     if s["status"]["slice"].get("unavailable"):
         out["slicer_unavailable"] = s["status"]["slice"]["unavailable"]
     if s["checks"]:

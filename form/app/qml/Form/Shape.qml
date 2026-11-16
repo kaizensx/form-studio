@@ -9,6 +9,13 @@ Column {
     readonly property var params: Store.recipe ? Store.recipe.params : []
     function paramsOf(id) { return params.filter(function (p) { return p.feature === id }) }
 
+    // a design written in OpenSCAD is a mesh: say what that rules out (CAD bridges)
+    Note { visible: !!Store.recipe && !!Store.recipe.mesh; kind: "amber"; width: parent.width
+        title: "Mesh design · OpenSCAD"
+        text: Store.recipe && Store.recipe.mesh ? Store.recipe.notes.join("\n")
+              + (Store.recipe.fixed_in_source.length ? "\nFixed in the source (no range comment): " + Store.recipe.fixed_in_source.join(", ") + "." : "") : "" }
+    Item { width: 1; height: 8; visible: !!Store.recipe && !!Store.recipe.mesh }
+
     // all features
     Column {
         visible: !root.f; width: parent.width

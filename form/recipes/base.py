@@ -118,6 +118,15 @@ class Recipe:
         """A small coupon cut from the real geometry around the fit interface."""
         return None
 
+    def reference(self, name: str):
+        """A part imported into this project (STEP as its B-rep, STL as a sewn mesh), in its own coordinates.
+
+        Use it for clearance cuts around a real board or device: `body - offset(self.reference("pi5.step"), 0.5)`.
+        Import the file first (MCP import_reference, or Brief > Import part in the app).
+        """
+        from .meshsolid import load
+        return load(name)
+
     def public(self) -> dict:
         return {
             "id": self.id, "title": self.title, "summary": self.summary,

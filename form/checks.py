@@ -10,6 +10,7 @@ evidence:
 from __future__ import annotations
 
 CHECKS_VERSION = 4
+NA = "N/A"           # a check that cannot run for this kind of design; never counted as a pass
 
 
 def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) -> list[dict]:
@@ -21,9 +22,15 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
     b = analysis["brep"]
     want = b.get("expected_solids", 1)
     ok = b["valid"] and b["solids"] == want
-    add("solid", "One valid solid" if want == 1 else f"{want} valid parts", "PASS" if ok else "FAIL",
-        f"{b['solids']} solid" + ("" if b["solids"] == 1 else "s"),
-        "OCCT validity check on the boundary representation.", "computed")
+    mesh = bool(b.get("mesh_design") or getattr(recipe, "mesh", False))
+    if mesh:                       # OpenSCAD and other mesh designs: say what cannot be known, never fake it
+        add("solid", "One valid solid", NA, "mesh design",
+            "Not available for mesh designs. OCCT validity checks a boundary representation. This design is a triangle mesh from OpenSCAD, so there is "
+            "none to check; the closed-mesh check below runs on the exported triangles instead.", "none")
+    else:
+        add("solid", "One valid solid" if want == 1 else f"{want} valid parts", "PASS" if ok else "FAIL",
+            f"{b['solids']} solid" + ("" if b["solids"] == 1 else "s"),
+            "OCCT validity check on the boundary representation.", "computed")
 
     worst = max((abs(a["modelled"] - a["intended"]) for a in analysis["interface_audit"]), default=None)
     if worst is not None:
@@ -39,9 +46,14 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
             "No open, non-manifold, flipped, duplicate or degenerate faces in the exported STL."
             if not fails else "Problems: " + ", ".join(fails) + ".", "computed")
         dv = abs(m["volume_mm3"] - b["volume_mm3"]) / max(b["volume_mm3"], 1e-9)
-        add("conversion", "STL matches the CAD solid", "PASS" if dv <= 0.002 else ("WARN" if dv <= 0.01 else "FAIL"),
-            f"{dv*100:.3f}% volume", f"CAD {b['volume_mm3']/1000:.2f} cm³, mesh {m['volume_mm3']/1000:.2f} cm³. "
-            "Guards against unit or tessellation errors in conversion.", "computed")
+        if mesh:
+            add("conversion", "STL matches the CAD solid", NA, "mesh design",
+                "Not available for mesh designs. There is no CAD solid to compare the STL with: the design itself is a mesh. "
+                f"Mesh volume {m['volume_mm3']/1000:.2f} cm³.", "none")
+        else:
+            add("conversion", "STL matches the CAD solid", "PASS" if dv <= 0.002 else ("WARN" if dv <= 0.01 else "FAIL"),
+                f"{dv*100:.3f}% volume", f"CAD {b['volume_mm3']/1000:.2f} cm³, mesh {m['volume_mm3']/1000:.2f} cm³. "
+                "Guards against unit or tessellation errors in conversion.", "computed")
 
     row = next(r for r in analysis["orientation_table"] if r["id"] == ctx["orientation"])
     env, margin = ctx["envelope"], ctx["margin"]
@@ -55,7 +67,8 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
     if thin:
         st = "PASS" if thin["t"] >= 3 * nz else ("WARN" if thin["t"] >= 2 * nz else "FAIL")
         add("wall", "Thinnest wall", st, f"{thin['t']:.2f} mm",
-            f"Smallest opposing-wall distance over {analysis['thickness_samples']:,} surface samples. "
+            f"Smallest opposing-wall distance over {analysis['thickness_samples']:,} surface samples"
+            + (" of the mesh. " if mesh else ". ") +
             f"Under {2*nz:.1f} mm cannot hold two perimeters on a {nz:g} mm nozzle"
             + (" (nozzle size assumed)." if ctx.get("nozzle_assumed") else "."),
             "computed", feature=thin.get("feature"), at=thin.get("at"), to=thin.get("to"))

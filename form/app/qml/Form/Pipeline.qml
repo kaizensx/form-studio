@@ -23,7 +23,7 @@ Rectangle {
         if (s === "running") return Store.running[id] === "queued" ? "queued" : "working…"
         if (s !== "current") return n.error ? n.error.message : (id === "slice" && n.unavailable) ? "slicer unavailable" : s === "stale" ? "made for " + F.pad(n.last_rev || 0) : s === "blocked" ? "waiting" : "not made"
         if (id === "geometry") return Store.view ? Store.view.faces + " faces" : ""
-        if (id === "exports") return d.exports ? ".step  .stl  .3mf" : ""
+        if (id === "exports") return d.exports ? (d.exports.files.step ? ".step  .stl  .3mf" : ".stl only (mesh)") : ""
         if (id === "checks") { var r = d.checks ? d.checks.rollup : null; return r ? r.PASS + " pass · " + r.WARN + " review · " + r.FAIL + " fail" : "" }
         if (id === "slice") return d.slice ? F.dur(d.slice.time_s) + " · " + F.fmt(d.slice.filament_g, 1) + " g" : ""
         return ""

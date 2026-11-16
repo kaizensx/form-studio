@@ -59,7 +59,8 @@ def _build(recipe_id: str, values: dict, tol: float):
     t_build = time.perf_counter() - t0
     solids = final.solids()
     want = getattr(recipe, "solids", 1)
-    if not final.is_valid or len(solids) != want:
+    mesh = getattr(recipe, "mesh", False)          # a sewn triangle mesh: OCCT validity is not meaningful for it
+    if (not mesh and not final.is_valid) or len(solids) != want:
         raise RecipeError(
             f"The result is {len(solids)} solid(s) (valid={final.is_valid}); this design declares {want}", stages[-1].feature,
             "A cut has split the body, or parts touch and fused. Separate parts by a gap, or reduce the last change.")
@@ -129,6 +130,37 @@ def _edges(shape) -> np.ndarray:
     return np.array(segs, dtype=np.float32)
 
 
+def _mesh_edges(P, T, angle_deg=30.0) -> np.ndarray:
+    """Crease and boundary edges of a triangle mesh (drawing every triangle edge of a mesh design is noise)."""
+    if not len(T):
+        return np.zeros((0, 6), dtype=np.float32)
+    q = np.round(P / 1e-4).astype(np.int64)                    # weld coincident vertices
+    _, inv = np.unique(q, axis=0, return_inverse=True)
+    inv = inv.reshape(-1)
+    V = inv[T]
+    a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+    n = np.cross(b - a, c - a)
+    n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
+    e = np.concatenate([V[:, [0, 1]], V[:, [1, 2]], V[:, [2, 0]]])
+    src = np.concatenate([T[:, [0, 1]], T[:, [1, 2]], T[:, [2, 0]]])
+    tri = np.tile(np.arange(len(T)), 3)
+    key = np.sort(e, axis=1)
+    order = np.lexsort((key[:, 1], key[:, 0]))
+    key, src, tri = key[order], src[order], tri[order]
+    start = np.ones(len(key), dtype=bool)
+    start[1:] = np.any(key[1:] != key[:-1], axis=1)
+    first = np.flatnonzero(start)                           # one entry per distinct edge, in sorted order
+    count = np.diff(np.append(first, len(key)))
+    shared = count >= 2
+    nxt = np.minimum(first + 1, len(key) - 1)
+    crease = np.einsum("ij,ij->i", n[tri[first]], n[tri[nxt]]) < np.cos(np.radians(angle_deg))
+    keep = first[~shared | crease]                          # boundary edges, and creases between two triangles
+    if not len(keep):
+        return np.zeros((0, 6), dtype=np.float32)
+    s0 = src[keep]
+    return np.hstack([P[s0[:, 0]], P[s0[:, 1]]]).astype(np.float32)
+
+
 def _mesh_arrays(model):
     P = np.concatenate([f["P"] for f in model["faces"]])
     off, T = 0, []
@@ -189,7 +221,7 @@ def op_view(key, recipe_id, values, tol=0.05, edges=True, dock_mass_g=None):
     out = _summary(model, dock_mass_g)
     out["mesh"] = mesh
     if edges:
-        out["edges"] = _b64(_edges(model["shape"]))
+        out["edges"] = _b64(_mesh_edges(*_mesh_arrays(model)) if getattr(model["recipe"], "mesh", False) else _edges(model["shape"]))
     return out
 
 
@@ -213,13 +245,18 @@ def op_export(key, recipe_id, values, out_dir, name, orientation="as_modelled", 
     out.mkdir(parents=True, exist_ok=True)
     step, stl = out / f"{name}.step", out / f"{name}.stl"
     t = time.perf_counter()
-    export_step(model["shape"], str(step))
+    mesh = getattr(model["recipe"], "mesh", False)
+    if not mesh:
+        export_step(model["shape"], str(step))
     oriented = _oriented(model["shape"], orientation)
     export_stl(oriented, str(stl), tolerance=tol, angular_tolerance=ang)
     bb = oriented.bounding_box()
-    return {"step": str(step), "stl": str(stl), "orientation": orientation,
-            "stl_tolerance_mm": tol, "print_bbox": [bb.size.X, bb.size.Y, bb.size.Z],
-            "brep_volume_mm3": model["volume"], "seconds": round(time.perf_counter() - t, 3)}
+    out = {"step": None if mesh else str(step), "stl": str(stl), "orientation": orientation,
+           "stl_tolerance_mm": tol, "print_bbox": [bb.size.X, bb.size.Y, bb.size.Z],
+           "brep_volume_mm3": model["volume"], "seconds": round(time.perf_counter() - t, 3)}
+    if mesh:
+        out["unavailable"] = {"step": "Not available for mesh designs: OpenSCAD produces triangles, not a CAD solid."}
+    return out
 
 
 def op_test_piece(key, recipe_id, values, out_dir, name, tol=0.01):
@@ -281,6 +318,7 @@ def _thickness(model, max_rays=1500):
     inter = IntCurvesFace_ShapeIntersector()
     inter.Load(model["shape"].wrapped, 1e-6)
     total = sum(f["area"] for f in model["faces"]) or 1
+    kmin = 3 if len(model["faces"]) * 3 <= max_rays * 2 else 0      # a mesh has thousands of faces: sample by area only
     best = {"t": float("inf")}
     hist = []
     rng = np.random.default_rng(0)   # fixed seed: the same solid always gets the same samples
@@ -288,7 +326,9 @@ def _thickness(model, max_rays=1500):
         P, T = f["P"], f["T"]
         a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
         areas = np.linalg.norm(np.cross(b - a, c - a), axis=1) / 2
-        k = max(3, int(round(max_rays * f["area"] / total)))
+        k = max(kmin, int(round(max_rays * f["area"] / total)))
+        if k == 0:
+            continue
         pick = rng.choice(len(T), size=k, p=areas / areas.sum())
         u, w_ = rng.random(k), rng.random(k)
         flip = u + w_ > 1
@@ -335,7 +375,7 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
            "thickness_samples": len(hist),
            "brep": {"valid": bool(model["shape"].is_valid), "solids": len(model["shape"].solids()),
                     "expected_solids": getattr(model["recipe"], "solids", 1),
-                    "volume_mm3": model["volume"]},
+                    "volume_mm3": model["volume"], "mesh_design": bool(getattr(model["recipe"], "mesh", False))},
            "interface_audit": model["recipe"].measure(model["values"], model["by_feature"])}
     if stl_path:
         tris, stl_format, stl_sha = mesh_audit.read_stl(Path(stl_path))
@@ -406,6 +446,82 @@ def op_evaluate(recipe_id, base, candidates, need_wall=False, tol=0.2):
         except RecipeError as e:
             rows.append({"changes": changes, "ok": False, "error": e.public()})
     return rows
+
+
+def _tessellate(shape, tol):
+    """All faces of a shape as one triangle mesh (for drawing a reference part)."""
+    from OCP.BRep import BRep_Tool
+    from OCP.BRepMesh import BRepMesh_IncrementalMesh
+    from OCP.TopAbs import TopAbs_REVERSED
+    from OCP.TopLoc import TopLoc_Location
+    BRepMesh_IncrementalMesh(shape.wrapped, tol, False, 0.35, True)
+    Ps, Ts, off = [], [], 0
+    for face in shape.faces():
+        loc = TopLoc_Location()
+        tri = BRep_Tool.Triangulation_s(face.wrapped, loc)
+        if tri is None or tri.NbTriangles() == 0:
+            continue
+        trsf = loc.Transformation()
+        P = np.empty((tri.NbNodes(), 3), dtype=np.float64)
+        for i in range(1, tri.NbNodes() + 1):
+            q = tri.Node(i).Transformed(trsf)
+            P[i - 1] = (q.X(), q.Y(), q.Z())
+        T = np.array([tri.Triangle(i).Get() for i in range(1, tri.NbTriangles() + 1)], dtype=np.int64) - 1
+        if face.wrapped.Orientation() == TopAbs_REVERSED:
+            T = T[:, [0, 2, 1]]
+        Ps.append(P)
+        Ts.append(T + off)
+        off += len(P)
+    if not Ps:
+        return np.zeros((0, 3)), np.zeros((0, 3), dtype=np.int64)
+    return np.concatenate(Ps), np.concatenate(Ts)
+
+
+def op_reference(path, fmt, out):
+    """Read an imported STEP or STL: measure it and write a display mesh (positions, indices, edges) to `out`.
+
+    STEP: volume and box from the B-rep. STL: signed mesh volume and box from the triangles (not sewn: drawing only).
+    """
+    import json
+    from . import mesh_audit
+    p = Path(path)
+    fmt = fmt.lower()
+    if fmt in (".step", ".stp"):
+        from build123d import import_step
+        shape = import_step(str(p))
+        bb = shape.bounding_box()
+        diag = max(bb.diagonal, 1.0)
+        P, T = _tessellate(shape, min(0.5, max(0.02, diag / 600)))
+        edges = shape.edges()
+        segs = []
+        if len(edges) <= 20000:
+            for e in edges:                          # draw curves coarsely: a reference is context, not the design
+                n = 2 if e.geom_type.name == "LINE" else max(4, min(24, int(e.length / 2.5)))
+                pts = [e.position_at(i / (n - 1)) for i in range(n)]
+                segs += [(a.X, a.Y, a.Z, b.X, b.Y, b.Z) for a, b in zip(pts, pts[1:])]
+        E = np.array(segs, dtype=np.float32) if segs else _mesh_edges(P, T)
+        info = {"format": "step", "bbox": [[bb.min.X, bb.min.Y, bb.min.Z], [bb.max.X, bb.max.Y, bb.max.Z]],
+                "volume_mm3": float(shape.volume), "solids": len(shape.solids()), "faces": len(shape.faces())}
+    elif fmt == ".stl":
+        tris, _f, _sha = mesh_audit.read_stl(p)
+        if not tris:
+            raise RecipeError("The STL has no triangles.", "", "Export the part again.")
+        P = np.array(tris, dtype=np.float64).reshape(-1, 3)
+        T = np.arange(len(P), dtype=np.int64).reshape(-1, 3)
+        a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+        vol = float(np.einsum("ij,ij->i", a, np.cross(b, c)).sum() / 6.0)
+        lo, hi = P.min(axis=0), P.max(axis=0)
+        E = _mesh_edges(P, T)
+        info = {"format": "stl", "bbox": [lo.tolist(), hi.tolist()], "volume_mm3": abs(vol), "solids": None}
+    else:
+        raise RecipeError(f"Unsupported format {fmt}", "", "Import a STEP (.step/.stp) or STL file.")
+    if len(T) > 400_000:
+        raise RecipeError(f"The part has {len(T):,} triangles to draw; FORM draws up to 400,000.", "",
+                          "Export a simplified version of the part.")
+    info["triangles"] = int(len(T))
+    view = {"positions": _b64(P.astype(np.float32)), "indices": _b64(T.astype(np.uint32)), "edges": _b64(E)}
+    Path(out).write_text(json.dumps(view), encoding="utf-8")
+    return info
 
 
 def op_ping():

@@ -198,13 +198,17 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def create_design(name: str, source: str, brief: str = "", values: dict[str, float] | None = None,
-                            run: bool = True, ctx: Context = None) -> dict:
+                            run: bool = True, language: str = "python", references: list[str] | None = None,
+                            ctx: Context = None) -> dict:
         """Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
         built with build123d. FORM builds it, and with run=True exports, checks and slices it. Load or build errors come
-        back with the line and a hint; fix and call again. Then render(view="sheet") and look at it."""
+        back with the line and a hint; fix and call again. Then render(view="sheet") and look at it.
+        language="openscad": source is an OpenSCAD file; parameters come from Customizer comments (`w = 40; // [20:1:120]`).
+        OpenSCAD output is a mesh: no STEP, no B-rep checks (reported as not available, never faked).
+        references: absolute paths of STEP/STL parts to import first, so a Python design can use self.reference("name.step")."""
         st = studio()
         act(None, "design", f"Writing a new design: {name}", ctx)
-        p = await _run(st.create_design, name, source, brief, values)
+        p = await _run(st.create_design, name, source, brief, values, language, references)
         act(p["id"], "commit", f"Created {name} (r01)", ctx)
         if run:
             jid = st.run(p["id"])
@@ -213,12 +217,14 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def update_design(project: str, source: str, note: str = "", values: dict[str, float] | None = None,
-                            expect_head: int | None = None, run: bool = True, ctx: Context = None) -> dict:
+                            expect_head: int | None = None, run: bool = True, language: str | None = None,
+                            ctx: Context = None) -> dict:
         """Replace a design's code as a new revision (history keeps every version). Existing parameter values carry over;
         changing a default does not change a saved value, so pass values={...} to change them. New parameters start at
-        their defaults. Use preview_change/commit_change instead when only values change."""
+        their defaults. Use preview_change/commit_change instead when only values change. language defaults to the
+        project's current one ("python" or "openscad")."""
         st = studio()
-        p = await _run(lambda: st.update_design(st.load(project), source, note, values, _origin(ctx), expect_head))
+        p = await _run(lambda: st.update_design(st.load(project), source, note, values, _origin(ctx), expect_head, language))
         act(project, "commit", f"r{p['head']:02d}: {note or 'design code updated'}", ctx)
         res: dict[str, Any] = {"head": p["head"]}
         if run:
@@ -546,34 +552,11 @@ def build() -> MCPServer:
     @mcp.tool(annotations=OPEN)
     async def open_in(project: str, what: str = "3mf", app: str = "") -> dict:
         """Open a current output in the user's own software: what = step | stl | 3mf | gcode | folder.
-        app overrides studio.toml [apps] (e.g. "BambuStudio", "FreeCAD"). Uses the system's open command; nothing is uploaded."""
+        app overrides studio.toml [apps] (e.g. "BambuStudio"); app="freecad" finds FreeCAD. Uses the system's open command;
+        nothing is uploaded."""
         st = studio()
-        def go():
-            d = digest(st, project)
-            files = d.get("files", {})
-            if what == "folder":
-                target = str(st.dir(project))
-            elif what in files:
-                target = files[what]
-            else:
-                raise StudioError(f"No current {what} file.", "Run the pipeline first; available now: " + (", ".join(files) or "none"))
-            apps = st.cfg.get("apps", {})
-            chosen = app or {"3mf": apps.get("slicer"), "gcode": apps.get("slicer"), "step": apps.get("cad"),
-                             "stl": apps.get("viewer")}.get(what, "") or ""
-            if sys.platform == "darwin":
-                cmd = ["open"] + (["-a", chosen] if chosen else []) + [target]
-            elif shutil.which("xdg-open") and not chosen:
-                cmd = ["xdg-open", target]
-            elif chosen:
-                cmd = [chosen, target]
-            else:
-                raise StudioError("No way to open files on this system.", "Set [apps] in studio.toml.")
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=20, stdin=subprocess.DEVNULL)
-            if r.returncode != 0:
-                raise StudioError(f"Could not open {Path(target).name}: {(r.stderr or r.stdout).strip()[:300]}",
-                                  "Check the app name in studio.toml [apps].")
-            return {"opened": target, "with": chosen or "system default"}
-        return await _run(go)
+        from .cad_bridges import open_output
+        return await _run(open_output, st, project, what, app)
 
     @mcp.tool(annotations=OPEN)
     async def open_bench(project: str | None = None, open_browser: bool = True) -> dict:
@@ -597,6 +580,39 @@ def build() -> MCPServer:
             return pr.get(preset)
         except KeyError:
             raise ToolError(f"Unknown preset “{preset}”. Known: {', '.join(p['id'] for p in pr.all_presets())}.") from None
+
+    # ---- bridges to other CAD tools -----------------------------------------------------------------------------
+
+    @mcp.tool(annotations=RW)
+    async def import_reference(project: str, path: str, name: str | None = None, ctx: Context = None) -> dict:
+        """Import an existing part (STEP or STL, e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's
+        references. FORM copies it, measures it in the kernel (bounding box, volume: computed) and draws it in the 3D
+        view as a blueprint companion, in its own coordinates. A Python design can then read it with
+        self.reference("<name>") for clearance cuts. path: absolute local path. Re-importing a name replaces it."""
+        st = studio()
+        rec = await _run(lambda: st.import_reference(st.load(project), Path(path).expanduser(), name))
+        act(project, "look", f"Imported reference part {rec['file']}", ctx)
+        size = [round(b - a, 2) for a, b in zip(*rec["bbox"])]
+        return {"reference": rec["file"], "format": rec["format"], "bbox_mm": rec["bbox"], "size_mm": size,
+                "volume_mm3": round(rec["volume_mm3"], 1) if rec.get("volume_mm3") is not None else None,
+                "evidence": "computed (read by FORM's kernel from the file)",
+                "use_in_design": f'self.reference("{rec["file"]}") returns it as a build123d shape in the same coordinates.',
+                "note": "The part is drawn where its file puts it. Model your design around those coordinates, or move "
+                        "the reference inside your design code (Pos(...) * self.reference(...))."}
+
+    @mcp.tool(annotations=RO)
+    async def freecad_macro(project: str) -> dict:
+        """Write a FreeCAD macro (.FCMacro) next to the current STEP export. Run it in FreeCAD to rebuild the part
+        from the STEP (hash-checked) with a spreadsheet of FORM's parameters and their provenance. Not for mesh designs."""
+        st = studio()
+        def go():
+            p = st.load(project)
+            fname, text = st.freecad_macro(p)
+            out = st.apath(p, "exports", st.keys(p)["exports"]) / fname
+            out.write_text(text, encoding="utf-8")
+            return {"macro": str(out), "step": str(out.with_name(st.read(p, "exports", st.keys(p)["exports"])["files"]["step"]["name"])),
+                    "note": "The spreadsheet records values; the STEP is a frozen solid. Edit the design in FORM and export again."}
+        return await _run(go)
 
     @mcp.prompt(title="Design a printable part")
     def design_part(goal: str) -> str:

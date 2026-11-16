@@ -21,6 +21,8 @@ Item {
             if (Store.hasDraft) { c.push({ icon: "git_commit_horizontal", text: "Commit the draft", hint: "Saves a revision", run: function () { Store.commit() } })
                 c.push({ icon: "undo_2", text: "Discard the draft", hint: "", run: function () { Store.discard() } }) }
             c.push({ icon: "home", text: "All designs", hint: "Home", run: function () { Store.home() } })
+            c.push({ icon: "box", text: "Import a reference part…", hint: "STEP or STL, shown in blueprint", run: function () { Store.askImportPart() } })
+            c.push({ icon: "external_link", text: "Open the STEP in FreeCAD", hint: "Release · working files", run: function () { Store.openIn("step", "freecad") } })
         }
         c.push({ icon: "plus", text: "New design from a recipe", hint: "", run: function () { Store.openSheet("new") } })
         c.push({ icon: "file_text", text: "New design from a brief", hint: "Guided questions, then Claude designs it", run: function () { Store.openSheet("new", { tab: "brief" }) } })

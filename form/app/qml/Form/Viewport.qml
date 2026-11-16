@@ -176,14 +176,25 @@ Item {
                 Repeater3D {
                     model: vp.showCompanions && vp.model && vp.model.companions ? vp.model.companions : []
                     Node {
+                        id: comp
                         required property var modelData
-                        position: Qt.vector3d(modelData.origin[0], modelData.origin[1], modelData.origin[2])
-                        eulerRotation.x: modelData.rot_x_deg || 0
-                        Model { source: "#Cube"; pickable: false; castsShadows: false
+                        readonly property bool isMesh: !!modelData.mesh      // an imported part (STEP/STL), in design coordinates
+                        position: isMesh ? Qt.vector3d(0, 0, 0) : Qt.vector3d(modelData.origin[0], modelData.origin[1], modelData.origin[2])
+                        eulerRotation.x: isMesh ? 0 : (modelData.rot_x_deg || 0)
+                        Model { visible: comp.isMesh; pickable: false; castsShadows: false
+                            geometry: MeshGeometry { positions: comp.isMesh ? comp.modelData.mesh.positions : ""; indices: comp.isMesh ? comp.modelData.mesh.indices : "" }
+                            materials: PrincipledMaterial { baseColor: Theme.blueprint; opacity: 0.14; alphaMode: PrincipledMaterial.Blend; lighting: PrincipledMaterial.NoLighting
+                                cullMode: Material.NoCulling; depthDrawMode: Material.NeverDepthDraw } }
+                        Model { visible: comp.isMesh && !!comp.modelData.edges; pickable: false; castsShadows: false
+                            geometry: LineGeometry { segments: comp.isMesh ? (comp.modelData.edges || "") : "" }
+                            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
+                                property color uColor: Theme.alpha(Theme.blueprint, 0.75); property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                        Model { visible: !comp.isMesh; source: "#Cube"; pickable: false; castsShadows: false
                             scale: Qt.vector3d(modelData.size[0] / 100, modelData.size[1] / 100, modelData.size[2] / 100); z: modelData.size[2] / 2
                             materials: PrincipledMaterial { baseColor: Theme.blueprint; opacity: 0.1; alphaMode: PrincipledMaterial.Blend; lighting: PrincipledMaterial.NoLighting; depthDrawMode: Material.NeverDepthDraw } }
-                        Model { pickable: false; castsShadows: false
+                        Model { visible: !comp.isMesh; pickable: false; castsShadows: false
                             geometry: LineGeometry { points: {
+                                if (comp.isMesh) return []
                                 var w = modelData.size[0] / 2, t = modelData.size[1] / 2, l = modelData.size[2], p = []
                                 var c = [[-w, -t], [w, -t], [w, t], [-w, t]]
                                 for (var i = 0; i < 4; i++) { var a = c[i], b = c[(i + 1) % 4]

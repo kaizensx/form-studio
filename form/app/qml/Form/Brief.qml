@@ -8,7 +8,9 @@ Column {
     id: root
     width: parent ? parent.width : 0
     readonly property var brief: Store.project && Store.project.brief ? Store.project.brief : ({ text: "", references: [] })
-    readonly property var refs: brief.references || []
+    readonly property var refs: (brief.references || []).filter(function (r) { return r.kind !== "part" })
+    readonly property var parts: (brief.references || []).filter(function (r) { return r.kind === "part" })
+    function size(b) { return [0, 1, 2].map(function (i) { return F.fmt(b[1][i] - b[0][i], 1) }).join(" × ") }
     readonly property var known: Store.recipe ? Store.recipe.params.filter(function (p) { return p.group === "brief" }) : []
     readonly property var sl: Store.slicer || ({ available: false })
     property bool busy: false
@@ -74,6 +76,18 @@ Column {
                     Btn { kind: "quiet"; small: true; icon: "ruler"; text: "Measure"; onClicked: Store.openSheet("photo", { ref: rr.modelData }) } } } }
         Btn { text: "Attach photo"; icon: "image"; onClicked: dlg.open() } }
 
+    Sec { title: "Reference parts"; note: root.parts.length ? root.parts.length + " imported" : ""
+        Txt { kind: "fine"; width: parent.width
+            text: "A STEP or STL of something the design must fit around, such as a board from its maker. It is drawn in blueprint where its file places it. Designs written as code can cut around it with self.reference(\"name\")." }
+        Column { width: parent.width; visible: root.parts.length > 0
+            Repeater { model: root.parts
+                KV { id: pr; required property var modelData; required property int index; first: index === 0
+                    k: modelData.file
+                    sub: modelData.format.toUpperCase() + (modelData.volume_mm3 ? " · " + F.fmt(modelData.volume_mm3 / 1000, 2) + " cm³" : "")
+                    Txt { mono: true; tone: 2; text: root.size(pr.modelData.bbox) + " mm"; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter }
+                    Tag { text: pr.modelData.evidence || "computed"; anchors.verticalCenter: parent.verticalCenter } } } }
+        Btn { text: "Import part…"; icon: "box"; onClicked: partDlg.open() } }
+
     Sec { title: "Printer context"; tag: root.sl.available ? "specified" : ""
         Column { width: parent.width; visible: !!root.sl.available
             KV { first: true; k: "Printer"; value: root.sl.available ? root.sl.presets.machine.name : "" }
@@ -91,4 +105,7 @@ Column {
 
     FileDialog { id: dlg; title: "Attach a reference photo"; nameFilters: ["Images (*.png *.jpg *.jpeg *.webp)"]
         onAccepted: root.attach(selectedFile) }
+    FileDialog { id: partDlg; title: "Import a reference part"; nameFilters: ["STEP or STL (*.step *.stp *.stl)"]
+        onAccepted: Store.importPart(selectedFile) }
+    Connections { target: Store; function onImportPartRequested() { partDlg.open() } }
 }

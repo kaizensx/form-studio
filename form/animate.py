@@ -79,7 +79,7 @@ def morph(studio, p: dict, a: dict, b: dict, out, frames: int = 24, size=(640, 4
             x = a[k] + (b[k] - a[k]) * t
             vals[k] = float(round(x)) if sp.step >= 1 and sp.unit in ("", "u") else round(x, 4)
         try:
-            v = studio._k("view", key="mv-" + H(studio.rid(p), vals), recipe_id=studio.rid(p), values=vals, tol=0.08)
+            v = studio._k("view", key="mv-" + H(studio.rid(p), vals), recipe_id=studio.rid(p), values=vals, tol=0.08, p=p)
             views.append((t, vals, v))
         except Exception as e:                                   # recipe constraint or kernel failure: show it, don't fake it
             skipped.append({"t": round(t, 3), "reason": str(e)[:160]})
