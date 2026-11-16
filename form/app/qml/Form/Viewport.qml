@@ -27,6 +27,29 @@ Item {
     signal picked(string feature)
     signal hoveredFeature(string feature, real x, real y)
 
+    // ── analysis map and measuring (form/analysis.py) ────────
+    // `analysis` is an engine map: its own refined mesh with a colour and a value per vertex, drawn instead of the clay
+    // parts. mapMix cross-fades clay → map in the shader. Markers, the legend and the numbers come from the engine.
+    property var analysis: null
+    property var _map: null                  // what is drawn (kept while fading out)
+    property real mapMix: 0
+    readonly property bool mapShown: !!_map
+    Behavior on mapMix { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+    onAnalysisChanged: { if (analysis) { mapOff.stop(); _map = analysis; mapMix = 1 } else { mapMix = 0; mapOff.restart() } }
+    Timer { id: mapOff; interval: 300; onTriggered: if (!vp.analysis) vp._map = null }
+    signal hoveredValue(real value, real x, real y, bool on)
+    property bool measuring: false           // a click probes the surface instead of selecting a feature
+    property var measures: []                // drawn by MeasureLayer; labels below
+    property var measureFrom: null
+    signal probed(var at, real reach)        // design-frame point on the surface, snap radius in mm (about 10 px)
+    readonly property var labels: {          // 2D labels pinned to 3D points (design frame)
+        var out = [], i, mk = _map && mapMix > 0.5 ? (_map.markers || []) : []
+        for (i = 0; i < mk.length && i < 8; i++)
+            out.push({ p: mk[i].at, text: mk[i].label, tint: mk[i].kind === "thin" || mk[i].severity === "fail" ? Theme.signal : Theme.amber })
+        for (i = 0; i < measures.length; i++) out.push({ p: measures[i].label_at, text: measures[i].label, tint: Theme.datum })
+        return out
+    }
+
     // ── assembly (designs that declare one): parts drawn as printed, assembled, or pulled apart ──
     // The engine sends each part's meshes in the print frame plus its placement; parts move here, in the scene.
     property string asmMode: "print"         // print | assembled | exploded
@@ -215,10 +238,11 @@ Item {
                     Model {
                         required property var modelData
                         readonly property string feature: modelData.feature || ""
-                        pickable: true
+                        pickable: !vp.mapShown; visible: !vp.mapShown
                         geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                         materials: CustomMaterial {
                             shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                            property real uMap: 0
                             property color uColor: vp.partColor(feature)
                             property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
                             property vector3d uClipN: vp.clipN
@@ -247,10 +271,11 @@ Item {
                             Model {
                                 required property var modelData
                                 readonly property string feature: modelData.feature || ""
-                                pickable: true
+                                pickable: !vp.mapShown; visible: !vp.mapShown
                                 geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                                 materials: CustomMaterial {
                                     shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                                    property real uMap: 0
                                     property color uColor: vp.partColor(feature)
                                     property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
                                     property vector3d uClipN: vp.clipN
@@ -307,6 +332,47 @@ Item {
                                 property color uColor: Theme.blueprint; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
                     }
                 }
+
+                // the analysis map: the whole part as one mesh, coloured per vertex by the engine
+                Model {
+                    id: amodel
+                    visible: vp.mapShown; pickable: vp.mapShown
+                    geometry: MeshGeometry { id: ageo; source: vp._map }
+                    materials: CustomMaterial {
+                        shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                        property real uMap: vp.mapMix
+                        property color uColor: Theme.clay
+                        property color uGlow: "#000000"
+                        property vector3d uClipN: vp.clipN
+                        property real uClipD: vp.clipD
+                        property real uClip: vp.clipOn ? 1 : 0
+                    }
+                }
+                // what the map points at: a ray from each flagged sample to the face opposite, and outlines (the neck slice)
+                Node {
+                    visible: vp.mapShown && vp.mapMix > 0.5
+                    Model { pickable: false; castsShadows: false
+                        geometry: LineGeometry { points: {
+                            var p = [], mk = vp._map ? (vp._map.markers || []) : []
+                            for (var i = 0; i < mk.length; i++) p.push(mk[i].at[0], mk[i].at[1], mk[i].at[2], mk[i].to[0], mk[i].to[1], mk[i].to[2])
+                            return p } }
+                        materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/overlay.vert"; depthDrawMode: Material.NeverDepthDraw
+                            property vector3d uOff: Qt.vector3d(0, 0, 0)
+                            property color uColor: Theme.signal; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                    Model { pickable: false; castsShadows: false; depthBias: -4
+                        geometry: LineGeometry { segments: vp._map && vp._map.lines ? vp._map.lines : "" }
+                        materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
+                            property color uColor: Theme.amber; property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
+                    Repeater3D {
+                        model: vp._map ? (vp._map.markers || []).slice(0, 60) : []
+                        Model { required property var modelData; source: "#Sphere"; pickable: false; castsShadows: false
+                            readonly property real k: vp.dist * 0.00003
+                            scale: Qt.vector3d(k, k, k)
+                            position: Qt.vector3d(modelData.at[0], modelData.at[1], modelData.at[2])
+                            materials: PrincipledMaterial { baseColor: modelData.kind === "thin" || modelData.severity === "fail" ? Theme.signal : Theme.amber; lighting: PrincipledMaterial.NoLighting } }
+                    }
+                }
+                MeasureLayer { measures: vp.measures; from: vp.measureFrom; dot: vp.dist * 0.00004; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height)) }
 
                 // a check pointing at a place: thin signal line between two points
                 Node {
@@ -366,6 +432,27 @@ Item {
         }
     }
 
+    // labels of map markers and measurements, placed where their 3D points are
+    Repeater {
+        model: vp.labels
+        Rectangle {
+            id: pl
+            required property var modelData
+            property point at: Qt.point(-999, -999)
+            x: Math.round(at.x + 9); y: Math.round(at.y - height - 5)
+            width: pt.implicitWidth + 12; height: 19; radius: 3; color: Theme.alpha(Theme.plate, 0.88); border.color: Theme.alpha(modelData.tint, 0.45)
+            visible: at.x > 0 && at.y > 0
+            Text { id: pt; anchors.centerIn: parent; text: pl.modelData.text; color: pl.modelData.tint; font.family: Theme.mono; font.pixelSize: 11; renderType: Text.NativeRendering }
+            FrameAnimation {
+                running: vp.visible
+                onTriggered: {
+                    var q = pl.modelData.p, sp = view.mapFrom3DScene(vp.scene(Qt.vector3d(q[0], q[1], q[2]).plus(vp.shift)))
+                    pl.at = sp.z > 0 ? Qt.point(sp.x, sp.y) : Qt.point(-999, -999)
+                }
+            }
+        }
+    }
+
     // ── input: drag to orbit, right-drag or shift to pan, wheel or pinch to zoom, click to select ──
     MouseArea {
         id: ma
@@ -374,12 +461,26 @@ Item {
         property point last
         property point down
         property bool moved: false
-        cursorShape: vp.hovered ? Qt.PointingHandCursor : pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+        cursorShape: pressed && moved ? Qt.ClosedHandCursor : vp.measuring ? Qt.CrossCursor : vp.hovered ? Qt.PointingHandCursor : pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
         function hit(x, y) { var r = view.pick(x, y); return r.objectHit && r.objectHit.feature !== undefined ? r.objectHit.feature : "" }
+        property point hoverAt
+        Timer { id: valueAt; interval: 30                // the map's value under the pointer: pick, then interpolate on the mesh
+            onTriggered: {
+                var r = view.pick(ma.hoverAt.x, ma.hoverAt.y)
+                if (r.objectHit === amodel) vp.hoveredValue(ageo.valueAt(r.position), ma.hoverAt.x, ma.hoverAt.y, true)
+                else vp.hoveredValue(0, 0, 0, false)
+            } }
+        function probe(x, y) {                           // a click while measuring: the surface point, in design millimetres
+            var r = view.pick(x, y)
+            if (!r.objectHit) return
+            var sp = r.scenePosition, d = Qt.vector3d(sp.x, -sp.z, sp.y).minus(vp.shift)
+            vp.probed([d.x, d.y, d.z], vp.dist * 2 * Math.tan(13 * Math.PI / 180) / Math.max(1, height) * 10)
+        }
         onPressed: function (e) { last = Qt.point(e.x, e.y); down = last; moved = false; vp.tween = false }
         onPositionChanged: function (e) {
             if (!pressed) {
-                var f = hit(e.x, e.y)
+                if (vp.mapShown) { hoverAt = Qt.point(e.x, e.y); valueAt.restart(); return }
+                var f = vp.measuring ? "" : hit(e.x, e.y)
                 if (f !== vp.hovered) vp.hovered = f
                 vp.hoveredFeature(f, e.x, e.y)
                 return
@@ -397,8 +498,11 @@ Item {
                 vp.target = vp.target.minus(right.times(dx * k)).plus(up.times(dy * k))
             }
         }
-        onReleased: function (e) { if (!moved && e.button === Qt.LeftButton) vp.picked(hit(e.x, e.y)) }
-        onExited: { if (vp.hovered) vp.hovered = ""; vp.hoveredFeature("", 0, 0) }
+        onReleased: function (e) {
+            if (moved || e.button !== Qt.LeftButton) return
+            if (vp.measuring) probe(e.x, e.y); else if (!vp.mapShown) vp.picked(hit(e.x, e.y))
+        }
+        onExited: { if (vp.hovered) vp.hovered = ""; vp.hoveredFeature("", 0, 0); valueAt.stop(); vp.hoveredValue(0, 0, 0, false) }
         onWheel: function (w) {
             vp.tween = false
             var d = w.pixelDelta.y !== 0 ? w.pixelDelta.y * 0.0035 : w.angleDelta.y / 120 * 0.12

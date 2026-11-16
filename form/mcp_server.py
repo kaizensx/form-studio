@@ -453,7 +453,8 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def set_print_setup(project: str, orientation: str | None = None, fit_gap_min_mm: float | None = None,
                               fit_gap_max_mm: float | None = None, auto_slice: bool | None = None) -> dict:
-        """Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted), the acceptable total fit gap
+        """Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from
+        suggest_orientation), the acceptable total fit gap
         window, and whether the pipeline slices automatically. The checks include an orientation comparison table."""
         st = studio()
         body: dict[str, Any] = {}
@@ -644,6 +645,70 @@ def build() -> MCPServer:
             return {"macro": str(out), "step": str(out.with_name(st.read(p, "exports", st.keys(p)["exports"])["files"]["step"]["name"])),
                     "note": "The spreadsheet records values; the STEP is a frozen solid. Edit the design in FORM and export again."}
         return await _run(go)
+
+    # ---- analysis on the model (form/analysis.py): maps, measuring, print orientation -------------
+    @mcp.tool(annotations=RO, structured_output=False)
+    async def analyze(project: str, map: str = "thickness", view: str = "iso", rev: int | None = None, ctx: Context = None) -> list:
+        """An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics.
+        map: thickness (opposing-wall distance by ray, the same ray as the Thinnest-wall check; colours follow the nozzle),
+        overhang (angle past vertical in the print orientation; plate contact and bridged ceilings are separate classes),
+        section (area of each layer's slice by height, with the weakest neck: computed geometry, NOT a strength analysis),
+        features (walls and gaps under one nozzle width, holes too small to print true).
+        Every result is `computed` on the stated tessellation and says what it does not tell you; repeat that caveat."""
+        st = studio()
+        from . import analysis
+        def go():
+            p = st.load(project)
+            r = analysis.run_map(st, p, map, rev)
+            cache = st.dir(p["id"]) / "artifacts" / "analysis"
+            f = cache / f"{map}-{st.keys(p, r['rev'])['geometry']}-{p['orientation'].replace(':', '_').replace(',', '_')}-{view}-v{analysis.ANALYSIS_VERSION}.png"
+            if not f.exists():
+                try:
+                    f.write_bytes(analysis.render_map_png(r, f"{p['name']} - r{r['rev']:02d}", view, edges=st.view(p, r["rev"]).get("edges")))
+                except ValueError as e:
+                    raise StudioError(str(e))
+            return f, analysis.digest(r)
+        f, d = await _run(go)
+        act(project, "look", f"Looking at the {d['label'].lower()} map", ctx, view=view if view in ("iso", "front", "top") else None)
+        return [Image(path=f), json.dumps(d, default=str, ensure_ascii=False)]
+
+    @mcp.tool(annotations=RO)
+    async def measure(project: str, from_point: list[float] | None = None, to_point: list[float] | None = None,
+                      at: list[float] | None = None, rev: int | None = None) -> dict:
+        """Measure the part. Points are [x, y, z] in millimetres in the design frame.
+        from_point + to_point: straight-line distance with dX/dY/dZ, and how far each point is from the surface.
+        at: what is at that point: the nearest face (type, area, tilt to the bed), the nearest edge, and for a hole or
+        round boss the diameter: exact from the CAD solid, or "fitted" to mesh edges for a mesh design (with its residual)."""
+        st = studio()
+        from . import analysis
+        def go():
+            p = st.load(project)
+            if at is not None:
+                return analysis.probe(st, p, at, rev)
+            if from_point is None or to_point is None:
+                raise StudioError("Give from_point and to_point, or at.", "Each is [x, y, z] in millimetres.")
+            return analysis.measure(st, p, from_point, to_point, rev)
+        return await _run(go)
+
+    @mcp.tool(annotations=RO, structured_output=False)
+    async def suggest_orientation(project: str, ctx: Context = None) -> list:
+        """Rank the ways the part can lie on the plate: the six axis orientations plus every flat face on its convex hull.
+        Returns a picture of the top three as printed and, for each candidate, the numbers behind its score (support
+        volume, overhang area, plate contact, height, smallest layer cross-section through the structure features) and
+        each term's contribution. The score formula is in the result. It ranks computed geometry; it does not predict
+        print success. Apply one with set_print_setup(project, orientation=<id>)."""
+        st = studio()
+        from . import analysis
+        def go():
+            p = st.load(project)
+            r = analysis.orientations(st, p)
+            f = st.dir(p["id"]) / "artifacts" / "analysis" / f"orient-{st.keys(p)['geometry']}-v{analysis.ANALYSIS_VERSION}.png"
+            if not f.exists():
+                f.write_bytes(analysis.orientation_thumbs(st, p, r))
+            return f, analysis.orientation_digest(r)
+        f, d = await _run(go)
+        act(project, "look", "Comparing print orientations", ctx)
+        return [Image(path=f), json.dumps(d, default=str, ensure_ascii=False)]
 
     @mcp.prompt(title="Design a printable part")
     def design_part(goal: str) -> str:

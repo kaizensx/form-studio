@@ -27,6 +27,9 @@
                                      the sliced toolpaths building up, from the slicer's G-code (not a print)
   form cost <project> [--price-per-kg X --kwh-price Y --watts Z --copies N] [--save]
   form pack <project> --copies N [--spacing mm]   do N copies fit on one plate?
+  form analyze <project> --map thickness|overhang|section|features [--json | --png out.png]
+  form measure <project> --from x,y,z --to x,y,z   distance and its components; or --at x,y,z: what is at a point
+  form orient <project> [--apply [id]]   rank the ways the part can lie on the plate; --apply sets the best (or the id given)
 """
 from __future__ import annotations
 
@@ -140,6 +143,22 @@ def main(argv=None):
     an.add_argument("--morph", help="from:to revision numbers, e.g. 1:4")
     an.add_argument("--frames", type=int, default=36)
     an.add_argument("--out")
+    # -- analysis on the model (form/analysis.py) --
+    az = sub.add_parser("analyze", help="an analysis map: wall thickness, overhangs, layer cross-section, small features")
+    az.add_argument("project")
+    az.add_argument("--map", default="thickness", choices=["thickness", "overhang", "section", "features"])
+    az.add_argument("--json", action="store_true", help="print the statistics (the default)")
+    az.add_argument("--png", metavar="FILE", help="also draw the map, with its legend, to this file")
+    az.add_argument("--view", default="iso")
+    ms = sub.add_parser("measure", help="distance between two points, or what is at one point")
+    ms.add_argument("project")
+    ms.add_argument("--from", dest="a", metavar="x,y,z")
+    ms.add_argument("--to", dest="b", metavar="x,y,z")
+    ms.add_argument("--at", metavar="x,y,z", help="face, edge and hole diameter at a point")
+    orp = sub.add_parser("orient", help="rank print orientations by a documented score")
+    orp.add_argument("project")
+    orp.add_argument("--apply", nargs="?", const="best", metavar="ID", help="set the best orientation (or the id given) and re-run")
+    orp.add_argument("--png", metavar="FILE", help="draw the top three as printed")
     v = sub.add_parser("verify")
     v.add_argument("project")
     v.add_argument("release")
@@ -246,6 +265,41 @@ def main(argv=None):
                 out = a.out or f"{a.project}_r{p['head']:02d}_turntable.gif"
                 info = animate.turntable(st, p, out, frames=a.frames)
             _print(info)
+        elif a.cmd == "analyze":
+            from . import analysis
+            p = st.load(a.project)
+            r = analysis.run_map(st, p, a.map)
+            out = analysis.digest(r)
+            if a.png:
+                with open(a.png, "wb") as f:
+                    f.write(analysis.render_map_png(r, f"{p['name']} - r{r['rev']:02d}", a.view, edges=st.view(p).get("edges")))
+                out["png"] = a.png
+            _print(out)
+        elif a.cmd == "measure":
+            from . import analysis
+            xyz = lambda t: [float(x) for x in t.split(",")]
+            p = st.load(a.project)
+            if a.at:
+                _print(analysis.probe(st, p, xyz(a.at)))
+            elif a.a and a.b:
+                _print(analysis.measure(st, p, xyz(a.a), xyz(a.b)))
+            else:
+                raise StudioError("Give --from x,y,z and --to x,y,z, or --at x,y,z.", "Points are in millimetres in the design frame.")
+        elif a.cmd == "orient":
+            from . import analysis
+            p = st.load(a.project)
+            r = analysis.orientations(st, p)
+            out = analysis.orientation_digest(r)
+            if a.png:
+                with open(a.png, "wb") as f:
+                    f.write(analysis.orientation_thumbs(st, p, r))
+                out["png"] = a.png
+            if a.apply:
+                pick = r["candidates"][0]["id"] if a.apply == "best" else a.apply
+                st.settings(p, {"orientation": pick})
+                job = st.run_sync(a.project)
+                out["applied"] = {"orientation": pick, "label": analysis.orientation_label(pick), "pipeline": job_digest(job)}
+            _print(out)
         elif a.cmd == "verify":
             res = st.verify_release(st.load(a.project), a.release)
             _print(res)
