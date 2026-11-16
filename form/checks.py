@@ -6,6 +6,9 @@ evidence:
   model     — a statistical or rigid-body model with stated assumptions
   simulated — reported by the slicer
   physical  — recorded by the user from a real print
+
+Assembly checks (form/assembly.py) carry frame="assembled": their at/to markers are in the assembled frame,
+and a motion check's pose names the joint position where it was found.
 """
 from __future__ import annotations
 
@@ -100,6 +103,7 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
             f"{fit['window'][0]:.2f}–{fit['window'][1]:.2f} mm. {fit.get('mating_label', 'Device width')} is {fit['sources']['mating']['source']}; "
             f"printer accuracy is {p['source']}" + (f" from {p['n']} measurements" if p["n"] else "") + ".",
             "model", feature=_fit_feature(recipe))
+    out.extend(analysis.get("assembly") or [])     # interference, clearance, motion, tool access (form/assembly.py)
     return out
 
 

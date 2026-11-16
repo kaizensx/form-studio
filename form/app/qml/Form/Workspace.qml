@@ -30,6 +30,7 @@ Item {
             id: vp
             anchors.fill: parent
             visible: !Store.layers
+            asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
             Component.onCompleted: { Store.viewer = vp; if (Store.view) { Store.showHead(); vp.setView("iso", false) } }
             Component.onDestruction: if (Store.viewer === vp) Store.viewer = null
             onPicked: function (f) { Store.pick(f) }
@@ -66,16 +67,35 @@ Item {
                 value: Store.sectionNow() ? Store.sectionNow().axis : ""
                 onPicked: function (v) { var s = Store.sectionNow(); Store.setSection(s && s.axis === v ? "" : v, 0.5) } }
             Seg { model: ["iso", "front", "side", "top", "under"]; value: Store.viewName; onPicked: function (v) { Store.setView(v) } } }
+        // HUD — top right, second row: assembly (only for designs that declare how their parts go together)
+        Row { anchors.right: parent.right; anchors.rightMargin: 16; y: 48; spacing: 8; visible: !Store.layers && !!Store.assembly
+            Repeater { model: Store.assembly && Store.asmMode !== "print" ? Store.assembly.joints : []
+                Rectangle { id: jr; required property var modelData
+                    readonly property string unit: modelData.kind === "hinge" ? "°" : " mm"
+                    readonly property real val: Store.pose[modelData.id] || 0
+                    width: jl.implicitWidth + 150; height: 26; radius: Theme.rSm; color: Theme.alpha(Theme.plate1, 0.86); border.color: Theme.rule
+                    Txt { id: jl; x: 10; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap
+                        text: jr.modelData.label + " " + Math.round(jr.val) + jr.unit }
+                    Beam { x: jl.implicitWidth + 18; width: 120; anchors.verticalCenter: parent.verticalCenter
+                        from: jr.modelData.range[0]; to: jr.modelData.range[1]; step: 1; value: jr.val; base: 0
+                        onMoved: function (v) { Store.setPose(jr.modelData.id, v) } } } }
+            Rectangle { visible: Store.asmMode === "exploded"; width: el.implicitWidth + 150; height: 26; radius: Theme.rSm; color: Theme.alpha(Theme.plate1, 0.86); border.color: Theme.rule
+                Txt { id: el; x: 10; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; tone: 2; text: "Spread"; wrapMode: Text.NoWrap }
+                Beam { x: el.implicitWidth + 18; width: 120; anchors.verticalCenter: parent.verticalCenter; from: 0; to: 1.6; step: 0.05; value: Store.explode; base: 1
+                    onMoved: function (v) { Store.setExplode(v) } } }
+            Seg { model: [{ value: "assembled", text: "Assembled" }, { value: "exploded", text: "Exploded" }, { value: "print", text: "Print layout" }]
+                value: Store.asmMode; onPicked: function (v) { Store.setAsmMode(v) } } }
         // HUD — bottom left: what you are looking at
         Row { x: 16; anchors.bottom: pipe.top; anchors.bottomMargin: 12; spacing: 8; visible: !Store.layers && !!Store.shown
             Rectangle { width: ro.implicitWidth + 20; height: 26; radius: Theme.rSm; color: Theme.alpha(Theme.plate1, 0.86); border.color: Theme.rule
                 Row { id: ro; anchors.centerIn: parent; spacing: 8
                     Txt { mono: true; font.pixelSize: 12
-                        text: Store.shown ? F.fmt(Store.shown.bbox[1][0] - Store.shown.bbox[0][0], 1) + " × " + F.fmt(Store.shown.bbox[1][1] - Store.shown.bbox[0][1], 1) + " × " + F.fmt(Store.shown.bbox[1][2] - Store.shown.bbox[0][2], 1) + " mm" : "" }
+                        readonly property var bb: Store.assembly && Store.asmMode === "assembled" ? Store.assembly.bbox : (Store.shown ? Store.shown.bbox : null)
+                        text: bb ? F.fmt(bb[1][0] - bb[0][0], 1) + " × " + F.fmt(bb[1][1] - bb[0][1], 1) + " × " + F.fmt(bb[1][2] - bb[0][2], 1) + " mm" : "" }
                     Txt { text: "·"; tone: 4 }
                     Txt { mono: true; font.pixelSize: 12; text: Store.shown ? F.fmt(Store.shown.volume_mm3 / 1000, 1) + " cm³" : "" }
                     Txt { text: "·"; tone: 4 }
-                    Txt { font.pixelSize: 12; tone: 3; text: "plate 180 × 180" } } }
+                    Txt { font.pixelSize: 12; tone: 3; text: Store.assembly && Store.asmMode === "assembled" ? "assembled" : Store.assembly && Store.asmMode === "exploded" ? "as printed" : "plate 180 × 180" } } }
             Btn { small: true; kind: "quiet"; active: Store.dims; icon: "ruler"; tip: "Overall dimensions"; onClicked: Store.toggleDims() }
             Btn { small: true; kind: "quiet"; active: Store.companions; icon: "box"; tip: "Show what the part holds"
                 visible: !!(Store.shown && Store.shown.companions && Store.shown.companions.length); onClicked: Store.toggleCompanions() } }
@@ -115,6 +135,7 @@ Item {
         Rectangle { anchors.top: tabs.bottom; anchors.topMargin: 5; width: parent.width; height: 1; color: Theme.rule }
         Flickable {
             id: scroll
+            objectName: "inspector"
             anchors.top: tabs.bottom; anchors.topMargin: 6; anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
             contentHeight: body.implicitHeight + 40; clip: true; boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { width: 6 }

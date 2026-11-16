@@ -7,7 +7,8 @@ def registry() -> dict:
     from .gridfinity import GridfinityBin
     from .hook import WallHook
     from .planter import TwistPlanter
-    return {r.id: r for r in (Dock(), GridfinityBin(), WallHook(), TwistPlanter(), Coupon())}
+    from .hinged_box import HingedBox
+    return {r.id: r for r in (Dock(), GridfinityBin(), WallHook(), TwistPlanter(), Coupon(), HingedBox())}
 
 
 # ---- designs written as code (by an agent or a person) ---------------------------------------
