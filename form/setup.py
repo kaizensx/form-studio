@@ -49,10 +49,13 @@ class Item:
 
 def mcp_command() -> str:
     """Absolute path of the form-mcp launcher for this installation."""
-    here = Path(sys.executable).parent / "form-mcp"
-    if here.exists():
-        return str(here)
-    return shutil.which("form-mcp") or str(here)
+    exe = Path(sys.executable).parent
+    names = ("form-mcp.exe", "form-mcp") if sys.platform.startswith("win") else ("form-mcp",)
+    for d in (exe, exe / "Scripts"):            # Windows venvs keep launchers in Scripts\
+        for n in names:
+            if (d / n).exists():
+                return str(d / n)
+    return shutil.which("form-mcp") or str(exe / names[0])
 
 
 def _run(cmd: list[str], timeout=30) -> tuple[int, str]:
@@ -69,7 +72,7 @@ def _json_register(path: Path, key: str = "mcpServers") -> Callable[[], str]:
         data = {}
         if path.exists():
             try:
-                data = json.loads(path.read_text() or "{}")
+                data = json.loads(path.read_text(encoding="utf-8") or "{}")
             except ValueError:
                 raise RuntimeError(f"{path} is not valid JSON (comments?). Add FORM by hand: "
                                    f'"{key}": {{"form": {{"command": "{mcp_command()}"}}}}')
@@ -79,14 +82,14 @@ def _json_register(path: Path, key: str = "mcpServers") -> Callable[[], str]:
             shutil.copyfile(path, backup)
         path.parent.mkdir(parents=True, exist_ok=True)
         data.setdefault(key, {})["form"] = {"command": mcp_command()}
-        path.write_text(json.dumps(data, indent=2) + "\n")
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
         return f"added “form” to {path}" + (f" (backup: {backup.name})" if backup else "")
     return act
 
 
 def _json_has(path: Path, key: str = "mcpServers") -> bool:
     try:
-        return "form" in json.loads(path.read_text()).get(key, {})
+        return "form" in json.loads(path.read_text(encoding="utf-8")).get(key, {})
     except (OSError, ValueError, AttributeError):
         return False
 
@@ -94,7 +97,7 @@ def _json_has(path: Path, key: str = "mcpServers") -> bool:
 def _claude_command() -> str | None:
     """Read Claude Code's user config directly. `claude mcp get` health-checks the server and can time out on a cold start."""
     try:
-        srv = json.loads((HOME / ".claude.json").read_text()).get("mcpServers", {}).get("form")
+        srv = json.loads((HOME / ".claude.json").read_text(encoding="utf-8")).get("mcpServers", {}).get("form")
     except (OSError, ValueError):
         return None
     return srv.get("command") if srv else None
@@ -104,7 +107,7 @@ def _codex_command() -> str | None:
     import tomllib
     path = Path(os.environ.get("CODEX_HOME", HOME / ".codex")) / "config.toml"
     try:
-        srv = tomllib.loads(path.read_text()).get("mcp_servers", {}).get("form")
+        srv = tomllib.loads(path.read_text(encoding="utf-8")).get("mcp_servers", {}).get("form")
     except (OSError, ValueError):
         return None
     return srv.get("command") if srv else None
@@ -154,7 +157,7 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
     try:
         data.mkdir(parents=True, exist_ok=True)
         probe = data / ".write-test"
-        probe.write_text("ok")
+        probe.write_text("ok", encoding="utf-8")
         probe.unlink()
         items.append(Item("data", "Project folder", "ok", str(data)))
     except OSError as e:
@@ -233,7 +236,7 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
 def _write_printer(cfg, name, env):
     def act():
         path = Path(cfg["_path"]) if Path(cfg["_path"]).exists() else Path("~/.config/form-studio/studio.toml").expanduser()
-        text = path.read_text() if path.exists() else "# FORM configuration (written by `form setup`)\n"
+        text = path.read_text(encoding="utf-8") if path.exists() else "# FORM configuration (written by `form setup`)\n"
         if path.exists():
             shutil.copyfile(path, path.with_name(path.name + f".bak-form-{int(time.time())}"))
         block = f'[printer]\nname = "{name}"\nenvelope_mm = [{env[0]:g}, {env[1]:g}, {env[2]:g}]\nplate_margin_mm = 2.0\n'
@@ -243,7 +246,7 @@ def _write_printer(cfg, name, env):
         else:
             text = text.rstrip() + "\n\n" + block
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
+        path.write_text(text, encoding="utf-8")
         return f"wrote [printer] to {path}"
     return act
 

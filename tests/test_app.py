@@ -17,19 +17,19 @@ except ImportError:
 
 class AppFiles(unittest.TestCase):
     def test_every_registered_component_exists(self):
-        for line in (QML / "Form" / "qmldir").read_text().splitlines():
+        for line in (QML / "Form" / "qmldir").read_text(encoding="utf-8").splitlines():
             parts = line.split()
             if len(parts) >= 3 and parts[-1].endswith(".qml"):
                 self.assertTrue((QML / "Form" / parts[-1]).is_file(), parts[-1])
 
     def test_every_sheet_and_stage_file_exists(self):
         for host in ("SheetHost.qml", "Workspace.qml"):
-            for name in re.findall(r'"(\w+\.qml)"', (QML / "Form" / host).read_text()):
+            for name in re.findall(r'"(\w+\.qml)"', (QML / "Form" / host).read_text(encoding="utf-8")):
                 self.assertTrue((QML / "Form" / name).is_file(), f"{host} loads {name}")
 
     def test_font_sizes_are_whole_pixels(self):
         for f in (QML / "Form").glob("*.qml"):
-            for m in re.finditer(r"pixelSize:[^;\n}]*", f.read_text()):
+            for m in re.finditer(r"pixelSize:[^;\n}]*", f.read_text(encoding="utf-8")):
                 self.assertNotRegex(m.group(0), r"\d\.\d", f"{f.name}: {m.group(0)}")
 
     def test_fonts_and_icon_ship(self):
@@ -38,9 +38,9 @@ class AppFiles(unittest.TestCase):
             self.assertTrue((assets / name).is_file(), name)
 
     def test_icon_names_used_are_defined(self):
-        defined = set(re.findall(r'"(\w+)": "\\u', (QML / "Form" / "Icons.qml").read_text()))
+        defined = set(re.findall(r'"(\w+)": "\\u', (QML / "Form" / "Icons.qml").read_text(encoding="utf-8")))
         for f in (QML / "Form").glob("*.qml"):
-            for name in re.findall(r'\b(?:icon|name): "([a-z0-9_]+)"', f.read_text()):
+            for name in re.findall(r'\b(?:icon|name): "([a-z0-9_]+)"', f.read_text(encoding="utf-8")):
                 if f.name != "Icons.qml":
                     self.assertIn(name, defined, f"{f.name} uses icon {name}")
 

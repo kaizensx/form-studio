@@ -178,7 +178,7 @@ def main():
     rendered = json.dumps(result, indent=2, allow_nan=False)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(rendered + '\n')
+        args.out.write_text(rendered + '\n', encoding="utf-8")
     print(rendered)
     return code
 

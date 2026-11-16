@@ -174,7 +174,7 @@ def main():
         assert st.load(p["id"])["head"] == head and st.view(st.load(p["id"]))["triangles"] > 100
         path = st.dir(p["id"]) / "project.json"
         st.settings(st.load(p["id"]), {"name": "Acceptance dock"})
-        path.write_text("{ truncated")
+        path.write_text("{ truncated", encoding="utf-8")
         q = st.load(p["id"])
         assert q["_recovered"] and q["head"] == head
         msgs.append(f"corrupt project.json: “{q['_recovered']}”")
@@ -199,7 +199,7 @@ def main():
              "Each row is what the run observed; rerun the script to reproduce it.", "",
              "| Step | Result | s | Observed |", "|---|---|---|---|"]
     lines += [f"| {n} | **{s}** | {t} | {d.replace('|', '/')} |" for n, s, t, d in rows]
-    out.write_text("\n".join(lines) + "\n")
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\nwrote", out)
     return 0 if ok_all else 1
 

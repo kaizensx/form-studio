@@ -110,11 +110,11 @@ def main():
         card.paste(im, (700 + i * 230, 90 + i * 230), mask)
     card.save(OUT / "social-preview.png", optimize=True)
 
-    (OUT / "agent-session.svg").write_text(agent_svg())
+    (OUT / "agent-session.svg").write_text(agent_svg(), encoding="utf-8")
     st.kernel.stop()
     log["seconds"] = round(time.time() - t0, 1)
     (OUT / "MEDIA_LOG.json").write_text(json.dumps(log, indent=1, default=str)
-                                     .replace(str(ROOT), "<repo>").replace(tmp, "<tmp>").replace(str(Path.home()), "~"))
+                                     .replace(str(ROOT), "<repo>").replace(tmp, "<tmp>").replace(str(Path.home()), "~"), encoding="utf-8")
     print(json.dumps({k: (v.get("bytes") if isinstance(v, dict) else v) for k, v in log.items() if k != "optimize"}, indent=1))
 
 

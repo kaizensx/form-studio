@@ -106,8 +106,8 @@ class SlicerParsing(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             base = Path(d) / "system" / "BBL" / "process"
             base.mkdir(parents=True)
-            (base / "root.json").write_text(json.dumps({"name": "root", "layer_height": "0.2", "wall_loops": "2"}))
-            (base / "child.json").write_text(json.dumps({"name": "child", "inherits": "root", "layer_height": "0.28"}))
+            (base / "root.json").write_text(json.dumps({"name": "root", "layer_height": "0.2", "wall_loops": "2"}), encoding="utf-8")
+            (base / "child.json").write_text(json.dumps({"name": "child", "inherits": "root", "layer_height": "0.28"}), encoding="utf-8")
             flat = slicer.flatten(Path(d), "process", "child")
             self.assertEqual((flat["layer_height"], flat["wall_loops"]), ("0.28", "2"))
             self.assertNotIn("inherits", flat)
@@ -120,7 +120,7 @@ class SlicerParsing(unittest.TestCase):
                        "; CHANGE_LAYER", "; Z_HEIGHT: 0.4", "G1 X0 Y0", "; FEATURE: Sparse infill", "G3 X10 Y10 I5 J5 E1"])
         with tempfile.TemporaryDirectory() as d:
             f = Path(d) / "a.gcode"
-            f.write_text(g)
+            f.write_text(g, encoding="utf-8")
             L = slicer.parse_layers(f)
         self.assertEqual([l["z"] for l in L], [0.2, 0.4])
         self.assertEqual([p["t"] for p in L[0]["paths"]], ["Outer wall", "Bridge"])
@@ -247,7 +247,7 @@ class Pipeline(unittest.TestCase):
         self.assertEqual(self.st.approval_state(self.load())["state"], "approved")
         self.assertTrue(self.st.verify_release(self.load(), rel)["intact"])
         # the coupon measurements from test_05 calibrate the printer; they are not validation of this part
-        self.assertIn("not physically validated", (self.st.dir(p["id"]) / "releases" / rel / "REPORT.md").read_text())
+        self.assertIn("not physically validated", (self.st.dir(p["id"]) / "releases" / rel / "REPORT.md").read_text(encoding="utf-8"))
         p = self.st.commit(self.load(), {"relief_depth": 5})
         ap = self.st.approval_state(p)
         self.assertEqual(ap["state"], "superseded")
@@ -276,7 +276,7 @@ class Pipeline(unittest.TestCase):
         p = self.load()
         self.st.settings(p, {"name": "Renamed"})                   # guarantees a .bak exists
         path = self.st.dir(p["id"]) / "project.json"
-        path.write_text("{ not json")
+        path.write_text("{ not json", encoding="utf-8")
         q = self.st.load(p["id"])
         self.assertTrue(q["_recovered"])
         self.assertEqual(q["head"], p["head"])

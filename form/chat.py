@@ -87,7 +87,7 @@ class Chat:
                                            "env": {"FORM_DATA": str(self.data),
                                                    **({"FORM_CONFIG": self.cfg["_path"]} if Path(self.cfg["_path"]).exists() else {})}}}}
         tmp = Path(tempfile.mkdtemp(prefix="form-chat-"))
-        (tmp / "mcp.json").write_text(json.dumps(mcp_cfg))
+        (tmp / "mcp.json").write_text(json.dumps(mcp_cfg), encoding="utf-8")
         tools = ["WebSearch", "WebFetch"] if st["web"] else []
         cmd = [st["cli"], "-p", job.message, "--output-format", "stream-json", "--verbose", "--include-partial-messages",
                "--model", st["model"], "--mcp-config", str(tmp / "mcp.json"), "--strict-mcp-config",

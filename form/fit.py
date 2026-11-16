@@ -34,7 +34,7 @@ class Calibration:
     def _load(self) -> dict:
         if self.path.exists():
             try:
-                return json.loads(self.path.read_text())
+                return json.loads(self.path.read_text(encoding="utf-8"))
             except ValueError:
                 pass
         return {"schema": "form-calibration/1", "records": []}
@@ -56,14 +56,14 @@ class Calibration:
                "pairs": clean, "note": note, "ref": ref or {}}
         data["records"].append(rec)
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data, indent=1))
+        tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
         tmp.replace(self.path)
         return rec
 
     def remove(self, rec_id: str) -> None:
         data = self._load()
         data["records"] = [r for r in data["records"] if r["id"] != rec_id]
-        self.path.write_text(json.dumps(data, indent=1))
+        self.path.write_text(json.dumps(data, indent=1), encoding="utf-8")
 
     def correction(self, profile: str) -> dict:
         devs = [p["measured"] - p["nominal"] for r in self.records() if r["profile"] == profile for p in r["pairs"]]

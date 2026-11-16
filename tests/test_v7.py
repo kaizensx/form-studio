@@ -68,17 +68,17 @@ class V7(unittest.TestCase):
         self.assertEqual(items["kernel"].status, "ok")
         with tempfile.TemporaryDirectory() as d:
             f = Path(d) / "settings.json"
-            f.write_text(json.dumps({"theme": "x", "mcpServers": {"other": {"command": "y"}}}))
+            f.write_text(json.dumps({"theme": "x", "mcpServers": {"other": {"command": "y"}}}), encoding="utf-8")
             msg = setup._json_register(f)()
-            data = json.loads(f.read_text())
+            data = json.loads(f.read_text(encoding="utf-8"))
             self.assertEqual(set(data["mcpServers"]), {"other", "form"})
             self.assertEqual(data["theme"], "x")
             self.assertIn("backup", msg)
             bad = Path(d) / "bad.json"
-            bad.write_text("{ // comment\n}")
+            bad.write_text("{ // comment\n}", encoding="utf-8")
             with self.assertRaises(RuntimeError):
                 setup._json_register(bad)()
-            self.assertEqual(bad.read_text(), "{ // comment\n}")          # untouched
+            self.assertEqual(bad.read_text(encoding="utf-8"), "{ // comment\n}")          # untouched
 
 
 class AgentDetection(unittest.TestCase):
@@ -89,9 +89,9 @@ class AgentDetection(unittest.TestCase):
             try:
                 me = setup.mcp_command()
                 self.assertEqual(setup._agent_item("a", "Claude Code", setup._claude_command(), me, "s", [], []).status, "missing")
-                (Path(d) / ".claude.json").write_text(json.dumps({"mcpServers": {"form": {"command": me}}}))
+                (Path(d) / ".claude.json").write_text(json.dumps({"mcpServers": {"form": {"command": me}}}), encoding="utf-8")
                 self.assertEqual(setup._agent_item("a", "Claude Code", setup._claude_command(), me, "s", [], []).status, "ok")
-                (Path(d) / ".claude.json").write_text(json.dumps({"mcpServers": {"form": {"command": "/gone/form-mcp"}}}))
+                (Path(d) / ".claude.json").write_text(json.dumps({"mcpServers": {"form": {"command": "/gone/form-mcp"}}}), encoding="utf-8")
                 it = setup._agent_item("a", "Claude Code", setup._claude_command(), me, "s", [], ["x"])
                 self.assertEqual((it.status, it.fix.commands), ("warn", ["x"]))
             finally:

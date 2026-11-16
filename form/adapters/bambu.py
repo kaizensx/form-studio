@@ -58,7 +58,7 @@ def flatten(config_dir: Path, kind: str, name: str, _depth=0) -> dict:
     """Resolve the inheritance chain into one self-contained preset."""
     if _depth > 12:
         raise SlicerBlocked(f"Preset “{name}” has a circular inheritance chain.")
-    d = json.loads(_find(config_dir, kind, name).read_text())
+    d = json.loads(_find(config_dir, kind, name).read_text(encoding="utf-8"))
     parent = d.get("inherits")
     if parent:
         base = flatten(config_dir, kind, parent, _depth + 1)
@@ -159,7 +159,7 @@ def slice_stl(resolved: dict, stl: Path, out_dir: Path, timeout: float = 600) ->
     files = {}
     for kind, p in resolved["presets"].items():
         files[kind] = out_dir / f"preset_{kind}.json"
-        files[kind].write_text(json.dumps(p["data"], indent=1))
+        files[kind].write_text(json.dumps(p["data"], indent=1), encoding="utf-8")
     local = out_dir / "model.stl"
     shutil.copyfile(stl, local)
     cmd = [resolved["app"], "--debug", "3",
@@ -176,11 +176,11 @@ def slice_stl(resolved: dict, stl: Path, out_dir: Path, timeout: float = 600) ->
     except OSError as e:
         raise SlicerBlocked(f"Bambu Studio could not be started: {e}")
     log = _private(r.stdout + "\n" + r.stderr)
-    (out_dir / "slicer.log").write_text(log[-200_000:])
+    (out_dir / "slicer.log").write_text(log[-200_000:], encoding="utf-8")
     result = {}
     if (out_dir / "result.json").exists():
         try:
-            result = json.loads((out_dir / "result.json").read_text())
+            result = json.loads((out_dir / "result.json").read_text(encoding="utf-8"))
         except ValueError:
             pass
     gcode = out_dir / "plate_1.gcode"

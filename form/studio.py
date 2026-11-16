@@ -218,12 +218,12 @@ class Studio:
         recovered = None
         for cand in (path, path.with_suffix(".json.bak")):
             try:
-                p = json.loads(cand.read_text())
+                p = json.loads(cand.read_text(encoding="utf-8"))
                 if p.get("schema") != SCHEMA:
                     raise ValueError("unsupported schema")
                 if cand != path:
                     recovered = "project.json was unreadable; restored from the previous save."
-                    path.write_text(json.dumps(p, indent=1))
+                    path.write_text(json.dumps(p, indent=1), encoding="utf-8")
                 p["_recovered"] = recovered
                 return p
             except (ValueError, OSError):
@@ -236,10 +236,10 @@ class Studio:
         p["updated"] = time.time()
         path = self.dir(p["id"]) / "project.json"
         tmp = path.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(p, indent=1))
+        tmp.write_text(json.dumps(p, indent=1), encoding="utf-8")
         if path.exists():
             try:
-                json.loads(path.read_text())          # never back up a corrupt file over a good backup
+                json.loads(path.read_text(encoding="utf-8"))          # never back up a corrupt file over a good backup
                 shutil.copyfile(path, path.with_suffix(".json.bak"))
             except ValueError:
                 pass
@@ -304,11 +304,11 @@ class Studio:
         ev = {"ts": time.time(), "project": pid, "kind": kind, "text": text[:400], "by": by, **extra}
         f = self.root / ".activity.jsonl"
         try:
-            with open(f, "a") as fh:
+            with open(f, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(ev, default=str) + "\n")
             if f.stat().st_size > 2_000_000:                 # keep it small
-                lines = f.read_text().splitlines()[-2000:]
-                f.write_text("\n".join(lines) + "\n")
+                lines = f.read_text(encoding="utf-8").splitlines()[-2000:]
+                f.write_text("\n".join(lines) + "\n", encoding="utf-8")
         except OSError:
             pass
         return ev
@@ -318,7 +318,7 @@ class Studio:
         if not f.exists():
             return []
         out = []
-        for line in f.read_text().splitlines()[-400:]:
+        for line in f.read_text(encoding="utf-8").splitlines()[-400:]:
             try:
                 ev = json.loads(line)
             except ValueError:
@@ -333,7 +333,7 @@ class Studio:
             f = Path(__file__).parent / "recipes" / f"{rid}.py"
         else:
             f = self.sources / f"{rid[len(SOURCE_PREFIX):]}.py"
-        return f.read_text() if f.exists() else None
+        return f.read_text(encoding="utf-8") if f.exists() else None
 
     def create(self, name: str, recipe_id: str, brief: str = "", values: dict | None = None) -> dict:
         if recipe_id not in self.recipes:
@@ -398,7 +398,7 @@ class Studio:
         meta = path / "meta.json" if node in ("exports", "slice") else path
         if meta.exists():
             try:
-                return json.loads(meta.read_text())
+                return json.loads(meta.read_text(encoding="utf-8"))
             except ValueError:
                 return None
         return None
@@ -421,7 +421,7 @@ class Studio:
                 st = "missing"
             entry = {"state": st, "key": key, "label": NODE_LABEL[node], "blocked": not upstream_ok and st != "current"}
             if st == "failed":
-                entry["error"] = json.loads(fail.read_text())
+                entry["error"] = json.loads(fail.read_text(encoding="utf-8"))
             if st == "stale":
                 last = next(h for h in reversed(hist) if h["ok"])
                 entry["last_rev"], entry["last_key"] = last["rev"], last["key"]
@@ -626,7 +626,7 @@ class Studio:
         if ok:
             fail.unlink(missing_ok=True)
         else:
-            fail.write_text(json.dumps(error, indent=1))
+            fail.write_text(json.dumps(error, indent=1), encoding="utf-8")
 
     def run(self, pid: str, nodes: list | None = None, force: bool = False) -> str:
         job = {"id": uuid.uuid4().hex[:10], "project": pid, "state": "running", "started": time.time(), "steps": []}
@@ -703,7 +703,7 @@ class Studio:
         path = self.apath(p, "geometry", keys["geometry"])
         path.parent.mkdir(parents=True, exist_ok=True)
         s.update({"rev": rev["n"], "recipe_sha": self.recipe_sha(self.rid(p))})
-        path.write_text(json.dumps(s, indent=1))
+        path.write_text(json.dumps(s, indent=1), encoding="utf-8")
 
     def _make_exports(self, p, rev, keys, name):
         out = self.apath(p, "exports", keys["exports"])
@@ -718,7 +718,7 @@ class Studio:
         meta = {"rev": rev["n"], "files": files, "orientation": p["orientation"], "stl_tolerance_mm": STL_TOL,
                 "print_bbox": r["print_bbox"], "units": "mm", "source": f"recipe {self.rid(p)}@{self.recipe_sha(self.rid(p))}",
                 "kernel": self.kernel_id(), "geometry_key": keys["geometry"]}
-        (tmp / "meta.json").write_text(json.dumps(meta, indent=1))
+        (tmp / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
         shutil.rmtree(out, ignore_errors=True)
         tmp.replace(out)
 
@@ -740,7 +740,7 @@ class Studio:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"rev": rev["n"], "checks": items, "rollup": checks_mod.rollup(items),
                                     "orientation_table": a["orientation_table"], "fit": fit, "context": ctx,
-                                    "stl_sha256": ex["files"]["stl"]["sha256"]}, indent=1))
+                                    "stl_sha256": ex["files"]["stl"]["sha256"]}, indent=1), encoding="utf-8")
 
     def _make_slice(self, p, rev, keys, name):
         ex = self.read(p, "exports", keys["exports"])
@@ -752,7 +752,7 @@ class Studio:
         info = slicer.slice_stl(s, stl, out, timeout=self.cfg["slicer"]["timeout_s"])
         info.update({"rev": rev["n"], "stl_sha256": ex["files"]["stl"]["sha256"], "orientation": p["orientation"],
                      "evidence": "simulated"})
-        (out / "meta.json").write_text(json.dumps(info, indent=1))
+        (out / "meta.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
 
     # ---- side prints: coupon / test piece --------------------------------
     def side_slice(self, p: dict, kind: str) -> dict:
@@ -764,7 +764,7 @@ class Studio:
         out = self.dir(p["id"]) / "artifacts" / "side" / key
         meta = out / "meta.json"
         if meta.exists():
-            return json.loads(meta.read_text())
+            return json.loads(meta.read_text(encoding="utf-8"))
         name = f"{p['id']}_r{rev['n']:02d}_{kind}"
         tmp = out.with_name(out.name + ".src")
         r = self._k("test_piece", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], out_dir=str(tmp), name=name)
@@ -778,7 +778,7 @@ class Studio:
         shutil.rmtree(tmp, ignore_errors=True)
         info.update({"kind": kind, "rev": rev["n"], "piece": {k: r[k] for k in ("bbox", "volume_mm3", "label", "doc")},
                      "stl": Path(r["stl"]).name, "key": key, "evidence": "simulated"})
-        meta.write_text(json.dumps(info, indent=1))
+        meta.write_text(json.dumps(info, indent=1), encoding="utf-8")
         return info
 
     def costs(self, p: dict) -> dict:
@@ -792,7 +792,7 @@ class Studio:
             presets = {k: v["sha"] for k, v in s.get("presets", {}).items()}
             side = self.dir(p["id"]) / "artifacts" / "side" / H("test_piece", keys["geometry"], presets) / "meta.json"
             if side.exists():
-                m = json.loads(side.read_text())
+                m = json.loads(side.read_text(encoding="utf-8"))
                 out["test_piece"] = {"time_s": m.get("time_s"), "filament_g": m.get("filament_g")}
         except (StudioError, ValueError):
             pass
@@ -893,8 +893,8 @@ class Studio:
                 "limits": ["Slicer output is a simulation, not a print.", "No structural analysis was performed.",
                            "Fit yield is a statistical model; see checks for the source of each input."],
             }
-            (rel / "MANIFEST.json").write_text(json.dumps(manifest, indent=1))
-            (rel / "REPORT.md").write_text(self._report(p, manifest))
+            (rel / "MANIFEST.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+            (rel / "REPORT.md").write_text(self._report(p, manifest), encoding="utf-8")
             p["approvals"].append({"rev": rev["n"], "ts": manifest["approved"], "keys": keys, "release": rel.name, "note": note,
                                    "acknowledged": [w["id"] for w in g["warnings"]]})
             self.decide(p, "approval", f"r{rev['n']} approved and released as {rel.name}. {g['evidence_level']}.")
@@ -927,7 +927,7 @@ class Studio:
         rel = self.dir(p["id"]) / "releases" / name
         if not re.fullmatch(r"r\d+-[0-9a-f]+", name) or not (rel / "MANIFEST.json").exists():
             raise StudioError("Unknown release.", status=404)
-        m = json.loads((rel / "MANIFEST.json").read_text())
+        m = json.loads((rel / "MANIFEST.json").read_text(encoding="utf-8"))
         rows = []
         for fname, sha in m["files"].items():
             f = rel / fname

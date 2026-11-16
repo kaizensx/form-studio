@@ -30,7 +30,7 @@ def store_source(store: _Path, text: str) -> str:
     store.mkdir(parents=True, exist_ok=True)
     f = store / f"{rid[len(SOURCE_PREFIX):]}.py"
     if not f.exists():
-        f.write_text(text)
+        f.write_text(text, encoding="utf-8")
     return rid
 
 

@@ -26,7 +26,7 @@ def main():
             lines.append("")
     lines += ["## Prompt `design_part(goal)`", "", "A guided session: measure first, look at renders, preview before commit, hand release to the user.", ""]
     out = Path(__file__).resolve().parents[1] / "docs" / "MCP.md"
-    out.write_text("\n".join(lines))
+    out.write_text("\n".join(lines), encoding="utf-8")
     print(out, len(tools), "tools")
 
 

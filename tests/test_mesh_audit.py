@@ -80,7 +80,7 @@ class AuditTests(unittest.TestCase):
                 lines+=['facet normal 0 0 0','outer loop']
                 lines+=['vertex '+' '.join(map(str,v)) for v in t]
                 lines+=['endloop','endfacet']
-            p.write_text('\n'.join(lines+['endsolid test']))
+            p.write_text('\n'.join(lines+['endsolid test']), encoding="utf-8")
             t,fmt,_=m.read_stl(p)
             self.assertEqual(fmt,'ascii');self.assertEqual(t,cube())
     def test_truncated_binary(self):
