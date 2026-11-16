@@ -220,6 +220,11 @@ def op_view(key, recipe_id, values, tol=0.05, edges=True, dock_mass_g=None):
              "indices": _b64(np.concatenate(g["T"]).astype(np.uint32))} for k, g in groups.items()]
     out = _summary(model, dock_mass_g)
     out["mesh"] = mesh
+    from . import assembly as asm                      # parts, placements and per-part meshes when the design declares an assembly
+    if asm.get(model) is not None:
+        out["assembly"] = asm.view(model, _b64, _edges)
+        if not out["assembly"]["error"]:
+            out["mesh"] = asm.mesh(model, _b64)
     if edges:
         out["edges"] = _b64(_mesh_edges(*_mesh_arrays(model)) if getattr(model["recipe"], "mesh", False) else _edges(model["shape"]))
     return out
@@ -377,6 +382,10 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
                     "expected_solids": getattr(model["recipe"], "solids", 1),
                     "volume_mm3": model["volume"], "mesh_design": bool(getattr(model["recipe"], "mesh", False))},
            "interface_audit": model["recipe"].measure(model["values"], model["by_feature"])}
+    from . import assembly as asm
+    assembly_checks = asm.analyse(model)               # [] for a single part
+    if assembly_checks:
+        out["assembly"] = assembly_checks
     if stl_path:
         tris, stl_format, stl_sha = mesh_audit.read_stl(Path(stl_path))
         row = next(r for r in table if r["id"] == orientation)

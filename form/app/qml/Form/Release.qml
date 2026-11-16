@@ -120,7 +120,9 @@ Column {
                         Row { spacing: 4; x: -8
                             Btn { kind: "quiet"; small: true; icon: "badge_check"; text: "Verify"; tip: "Re-hash every file against the manifest"; onClicked: root.verify(rr.modelData) }
                             Btn { kind: "quiet"; small: true; icon: "download"; text: "Save report…"
-                                onClicked: root.saveAs(rr.modelData + "-REPORT.md", "/projects/" + Store.pid + "/file/releases/" + rr.modelData + "/REPORT.md", "Markdown (*.md)", false) } } } } } }
+                                onClicked: root.saveAs(rr.modelData + "-REPORT.md", "/projects/" + Store.pid + "/file/releases/" + rr.modelData + "/REPORT.md", "Markdown (*.md)", false) }
+                            Btn { kind: "quiet"; small: true; icon: "download"; text: "Documents…"; tip: "BOM, assembly, print report and measurement plan of this release (.zip)"
+                                onClicked: root.saveAs(rr.modelData + "-docs.zip", "/projects/" + Store.pid + "/docs/docs.zip?release=" + rr.modelData, "Zip archives (*.zip)", true) } } } } } }
     }
 
     // ── working files ───────────────────────────────────────
@@ -151,6 +153,32 @@ Column {
                 onClicked: root.saveAs(Store.pid + "_" + F.pad(root.d.exports.rev) + ".FCMacro", "/projects/" + Store.pid + "/freecad_macro", "FreeCAD macros (*.FCMacro)", true) } }
         Txt { kind: "fine"; width: parent.width; visible: root.hasStep
             text: root.fc.available ? "FreeCAD found: each export is also re-imported there as a check." : "FreeCAD was not found here, so it cannot open the STEP or re-check it. The macro works wherever FreeCAD is installed." }
+    }
+
+    // ── maker documents: BOM, assembly steps, print report, measurement plan (form/maker_docs.py) ──
+    readonly property var docInfo: ({
+        "BOM.csv": "Printed parts with grams from the slice, and bought hardware",
+        "ASSEMBLY.md": "Numbered steps, an exploded image for each",
+        "PRINT_REPORT.md": "Checks with evidence classes, presets, blanks for measured results",
+        "MEASUREMENT_PLAN.md": "Which brief dimensions are assumed, and how to measure each",
+        "MOTION_CHECKS.csv": "Every joint position checked, with overlap and clearance" })
+    Sec { title: root.p ? "Maker documents for " + F.pad(root.p.head) : "Maker documents"; note: "not a release"
+        visible: !!root.d && !!root.d.documents && root.d.documents.length > 0
+        Txt { kind: "fine"; width: parent.width
+            text: "Made from this revision's solids, checks and slice when you save them. A value FORM does not have stays blank or NOT RUN. A release keeps its own copy." }
+        Column { width: parent.width
+            Repeater { model: root.d && root.d.documents ? root.d.documents : []
+                Item { id: mr; required property var modelData; required property int index
+                    width: parent.width; implicitHeight: mc.implicitHeight + 14
+                    Rectangle { visible: mr.index > 0; width: parent.width; height: 1; color: Theme.rule }
+                    Column { id: mc; anchors.left: parent.left; anchors.right: mb.left; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 1
+                        Txt { text: mr.modelData; tone: 2; mono: true; font.pixelSize: 12; width: parent.width; wrapMode: Text.NoWrap; elide: Text.ElideRight }
+                        Txt { kind: "fine"; width: parent.width; text: root.docInfo[mr.modelData] || "" } }
+                    Btn { id: mb; kind: "quiet"; small: true; icon: "download"; text: "Save…"; anchors.right: parent.right; anchors.rightMargin: -8; anchors.verticalCenter: parent.verticalCenter
+                        onClicked: root.saveAs(Store.pid + "_" + F.pad(root.p.head) + "_" + mr.modelData, "/projects/" + Store.pid + "/docs/" + mr.modelData,
+                                               "Same type (*." + String(mr.modelData).split(".").pop() + ")", true) } } } }
+        Btn { text: "Save all with images (.zip)…"; icon: "download"
+            onClicked: root.saveAs(Store.pid + "_" + F.pad(root.p.head) + "_docs.zip", "/projects/" + Store.pid + "/docs/docs.zip", "Zip archives (*.zip)", true) }
     }
 
     // ── revisions ───────────────────────────────────────────

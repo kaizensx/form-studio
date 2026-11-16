@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 from typing import Any, Callable
 
+from .assembly import Access, Assembly, Hardware, Joint, Part, hinge, slide  # noqa: F401  (part of the recipe contract)
+
 
 @dataclass(frozen=True)
 class Param:
@@ -126,6 +128,15 @@ class Recipe:
         """
         from .meshsolid import load
         return load(name)
+
+    def assembly(self, v: dict):
+        """How the printed parts go together: an Assembly (form.recipes.assembly), or None for a single part.
+
+        Parts are the result's solids (numbered left to right on the plate), each with its assembled placement,
+        an exploded-view offset, optional joints (hinge/slide) and purchased hardware. Designs without it
+        behave exactly as before.
+        """
+        return None
 
     def public(self) -> dict:
         return {

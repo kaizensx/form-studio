@@ -946,6 +946,9 @@ class Studio:
                 if fname and (sdir / fname).exists():
                     shutil.copyfile(sdir / fname, rel / target)
                     files[target] = sha_file(rel / target)
+            from . import maker_docs                      # BOM, ASSEMBLY, PRINT_REPORT, MEASUREMENT_PLAN (+ images), hashed like the rest
+            documents = maker_docs.write(self, p, rel, release=rel.name)
+            files.update(documents)
             manifest = {
                 "schema": "form-release/1", "project": p["id"], "name": p["name"], "revision": rev["n"], "approved": time.time(),
                 "units": "mm", "recipe": self.rid(p), "recipe_sha": self.recipe_sha(self.rid(p)), "kernel": self.kernel_id(),
@@ -954,6 +957,7 @@ class Studio:
                           | {k: sl[k] for k in ("slicer_kind", "slicer_name") if k in sl},
                 "checks": [{k: c[k] for k in ("id", "label", "status", "value", "evidence")} for c in ch["checks"]],
                 "acknowledged_warnings": [w for w in g["warnings"]], "note": note, "evidence_level": g["evidence_level"],
+                "documents": sorted(documents),
                 "physical_evidence": [e for e in p["evidence"] if e["rev"] == rev["n"] and (e["kind"] == "fit" or e.get("source") == "part")],
                 "limits": ["Slicer output is a simulation, not a print.", "No structural analysis was performed.",
                            "Fit yield is a statistical model; see checks for the source of each input."]
@@ -1167,6 +1171,8 @@ class Studio:
             "releases": sorted(d.name for d in (self.dir(pid) / "releases").glob("r*")) if (self.dir(pid) / "releases").exists() else [],
             "recovered": p.get("_recovered"),
         }
+        from . import maker_docs
+        out["documents"] = maker_docs.available(self, p)          # maker documents the working files can produce
         return out
 
     def layers(self, p: dict) -> list:

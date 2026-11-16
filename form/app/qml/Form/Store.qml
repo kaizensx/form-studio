@@ -306,6 +306,7 @@ QtObject {
     }
     function marker(c) {
         if (!viewer) return
+        asmFor(c)
         if (c.at) viewer.setMarker({ at: c.at, to: c.to })
         else if (c.feature) { viewer.setMarker(null); feature = c.feature; viewer.selected = c.feature; viewer.focusFeature(c.feature) }
     }
@@ -396,6 +397,32 @@ QtObject {
         if (ev.kind === "look" && ev.view && _viewMap[ev.view]) setView(_viewMap[ev.view])
         if (ev.kind === "look" && ev.highlight) select(ev.highlight)
     }
+
+    // ── assembly: Assembled / Exploded / Print layout (designs that declare assembly()) ──
+    // The Workspace viewport binds asmMode, explode and pose; the engine's view carries `assembly` (parts, placements, joints).
+    property string asmMode: "print"   // print | assembled | exploded
+    property real explode: 1.0
+    property var pose: ({})            // joint id → degrees or mm
+    readonly property var assembly: shown && shown.assembly && !shown.assembly.error ? shown.assembly : null
+    function setAsmMode(m) { asmMode = m; if (viewer) viewer.setMarker(null) }
+    function setExplode(f) { explode = f }
+    function setPose(id, v) { var o = Object.assign({}, pose); o[id] = v; pose = o }
+    function asmFor(c) {               // a check's marker is in the frame it was computed in
+        if (!assembly) return
+        if (c.frame === "assembled") {
+            if (asmMode !== "assembled") asmMode = "assembled"
+            var o = ({}); if (c.pose && c.pose.joint) o[c.pose.joint] = c.pose.value
+            pose = o
+            if (c.at && c.status !== "PASS" && viewer) {   // overlaps hide inside parts: cut through the middle of the marked region
+                var d = [Math.abs(c.to[0] - c.at[0]), Math.abs(c.to[1] - c.at[1]), Math.abs(c.to[2] - c.at[2])]
+                var i = d[0] >= d[1] && d[0] >= d[2] ? 0 : d[1] >= d[2] ? 1 : 2, ax = ["x", "y", "z"][i]
+                var b = viewer.bounds, sh = viewer.shiftTo, mid = (c.at[i] + c.to[i]) / 2 + sh[ax]
+                setView(["side", "front", "top"][i])
+                setSection(ax, Math.min(0.98, Math.max(0.02, (mid - b.lo[ax]) / Math.max(1e-6, b.hi[ax] - b.lo[ax]))))
+            }
+        } else if (c.at && asmMode !== "print") asmMode = "print"
+    }
+    property var _asmReset: Connections { target: s; function onPidChanged() { s.asmMode = "print"; s.pose = ({}); s.explode = 1.0 } }
 
     // ── chat with Claude ─────────────────────────────────────
     property var _chatPoll: Timer { interval: 600; onTriggered: s._chatTick() }

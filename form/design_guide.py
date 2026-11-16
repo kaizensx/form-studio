@@ -22,6 +22,7 @@ CONTRACT
       def measure(self, v, faces_by_feature): return [{"key", "label", "intended", "modelled"}]   # read back off the solid
       def statics(self, v, volume_mm3, com): return {"some_metric": x, "checks": [{...}]}          # optional models
       def test_piece(self, v, shape): return (small_solid, {"label", "doc", "height"})              # optional
+      def assembly(self, v): return Assembly(parts=[Part(...)], joints=[hinge(...)], hardware=[Hardware(...)])  # optional
 
 RULES
   1. Units: mm, degrees, grams. Every Param has a unit and a range. Integers use step=1 and unit "".
@@ -80,6 +81,21 @@ HARDWARE: form.parts  (use it; do not guess screw, nut, insert, bearing or gear 
     boss = Cylinder(ins["boss_min_d"] / 2 + 0.4, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))
     boss = boss - Pos(0, 0, 10) * ins.shape        # derived(): rows += ins.derived("boss", "insert.")
 
+ASSEMBLIES (optional, for solids >= 2)
+  from form.recipes.base import Access, Assembly, Hardware, Part, hinge, slide
+  Part(id, label, solid, move, rotate, explode, note)   solid = index of the printed body, numbered left to right on the
+       plate (bounding-box centre X, then Y). Assembled placement = Pos(*move) * Rot(*rotate) applied to the part as printed.
+       explode = offset in mm along the separation direction for the exploded view. List parts in assembly order;
+       note is the assembly step ("Press the lid on.").
+  hinge(part, axis, origin, (lo_deg, hi_deg), samples) / slide(part, axis, (lo_mm, hi_mm), samples): the part moves,
+       every other part stays put; 0 is the assembled position. Use about one sample per 5 degrees.
+  Hardware(name, size, qty, source, note, after=part_id, access=(Access(at, axis, tool_d, length),))
+       bought parts for the BOM; access = a straight tool path ending at the screw head, pointing the way it is driven,
+       checked against the parts in place after `after`.
+  FORM then checks, from the solids: overlap when assembled, the smallest gap, each joint swept at its samples (worst
+  overlap and the angle), and tool access. Sampled motion never proves the motion is free between samples.
+  The app shows Assembled / Exploded / Print layout, and a release adds BOM.csv and ASSEMBLY.md.
+
 WORKFLOW
   design_guide -> write source -> create_design (or update_design) -> render -> get_project (checks, slice)
   -> fix -> request_release. Parameter-only changes: preview_change / commit_change, as for any project.
@@ -89,7 +105,7 @@ EXAMPLE = '''\
 """Two-part box with a press-fit lid and a cable notch. FORM example design."""
 from build123d import Align, Axis, Box, Pos, fillet
 
-from form.recipes.base import Feature, Param, Recipe, RecipeError, Stage
+from form.recipes.base import Assembly, Feature, Param, Part, Recipe, RecipeError, Stage
 
 A = (Align.CENTER, Align.CENTER, Align.MIN)
 
@@ -141,4 +157,13 @@ class Design(Recipe):
                  "formula": "inner width", "interface": True},
                 {"key": "plug_w", "label": "Lid plug width", "value": v["inner_w"] - 2 * v["lid_clearance"], "unit": "mm",
                  "feature": "plug", "formula": "inner width - 2 x clearance", "interface": True}]
+
+    def assembly(self, v):
+        """The lid is printed upside down beside the box: flip it about X, move it over the box, rest it on the walls."""
+        W, H, t = v["inner_w"] + 2 * v["wall"], v["inner_h"] + v["wall"], v["wall"]
+        return Assembly(parts=[
+            Part("box", "Box", 0, note="Set the box down, open side up."),
+            Part("lid", "Lid", 1, move=(-(W + 8), 0, H + t), rotate=(180, 0, 0), explode=(0, 0, 30),
+                 note="Press the lid on, plug first."),
+        ])
 '''

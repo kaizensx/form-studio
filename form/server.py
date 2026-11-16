@@ -177,6 +177,18 @@ def make_handler(st: Studio):
                 name, text = st.freecad_macro(p)
                 return self._send(200, text.encode("utf-8"), "text/x-python; charset=utf-8",
                                   {"Content-Disposition": f'attachment; filename="{name}"'})
+
+            # ---- maker documents (BOM, ASSEMBLY, PRINT_REPORT, MEASUREMENT_PLAN): working files, or a release's as .zip ----
+            md = re.fullmatch(r"/docs/([A-Za-z0-9_.\-]+)", rest)
+            if md:
+                from . import maker_docs
+                rel = q.get("release")
+                if rel and not re.fullmatch(r"r\d+-[0-9a-f]+", rel):
+                    raise StudioError("Unknown release.", status=404)
+                f = maker_docs.release_zip(st, p, rel) if rel else maker_docs.working(st, p, md.group(1))
+                ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
+                extra = {} if ctype.startswith("image/") else {"Content-Disposition": f'attachment; filename="{f.name}"'}
+                return self._send(200, f.read_bytes(), ctype, extra)
             m3 = re.fullmatch(r"/release/(r\d+-[0-9a-f]+)", rest)
             if m3:
                 return self._json(st.verify_release(p, m3.group(1)))

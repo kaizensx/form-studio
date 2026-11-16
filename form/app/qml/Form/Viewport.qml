@@ -26,6 +26,58 @@ Item {
     signal picked(string feature)
     signal hoveredFeature(string feature, real x, real y)
 
+    // ── assembly (designs that declare one): parts drawn as printed, assembled, or pulled apart ──
+    // The engine sends each part's meshes in the print frame plus its placement; parts move here, in the scene.
+    property string asmMode: "print"         // print | assembled | exploded
+    property real explode: 1.0               // exploded-view factor (1 = the design's separation offsets)
+    property var pose: ({})                  // joint id → degrees (hinge) or mm (slide)
+    property bool asmTween: false
+    property vector3d shiftTo: Qt.vector3d(0, 0, 0)   // where shift is going (it animates between modes)
+    readonly property var asm: model && model.assembly && !model.assembly.error ? model.assembly : null
+    readonly property bool asmOn: !!asm && asmMode !== "print"
+    onAsmModeChanged: { asmTween = true; _frame(); asmTweenOff.restart(); if (interactive && model && model.assembly) setView(Store.viewName, true) }
+    onExplodeChanged: _frame()
+    Timer { id: asmTweenOff; interval: 360; onTriggered: vp.asmTween = false }
+    function jointOf(id) {
+        var js = asm ? asm.joints : []
+        for (var i = 0; i < js.length; i++) if (js[i].part === id) return js[i]
+        return null
+    }
+    function partXf(x) {                     // part as printed → where it is drawn: { pos, rot }
+        if (!asmOn) return { pos: Qt.vector3d(0, 0, 0), rot: Qt.quaternion(1, 0, 0, 0) }
+        var pl = x.placement, t = Qt.vector3d(pl.t[0], pl.t[1], pl.t[2]), q = Qt.quaternion(pl.q[0], pl.q[1], pl.q[2], pl.q[3])
+        var j = jointOf(x.id), v = j ? (pose[j.id] || 0) : 0
+        if (j && v) {
+            var ax = Qt.vector3d(j.axis[0], j.axis[1], j.axis[2]).normalized()
+            if (j.kind === "hinge") {
+                var r = Quaternion.fromAxisAndAngle(ax, v), o = Qt.vector3d(j.origin[0], j.origin[1], j.origin[2])
+                t = r.times(t.minus(o)).plus(o); q = r.times(q)
+            } else t = t.plus(ax.times(v))
+        }
+        if (asmMode === "exploded") t = t.plus(Qt.vector3d(x.explode[0], x.explode[1], x.explode[2]).times(explode))
+        return { pos: t, rot: q }
+    }
+    function _frame() {                      // centre what is shown on the plate; bounds follow the mode
+        if (!model) return
+        // read the mode directly: this runs from onAsmModeChanged, possibly before the asmOn binding has updated
+        var a = model.assembly && !model.assembly.error ? model.assembly : null, on = !!a && asmMode !== "print"
+        var b = on ? a.bbox : model.bbox
+        var sh = Qt.vector3d(-(b[0][0] + b[1][0]) / 2, -(b[0][1] + b[1][1]) / 2, -b[0][2])
+        shift = sh                           // may animate; bounds use the target, not the value mid-animation
+        shiftTo = sh
+        var lo = Qt.vector3d(b[0][0], b[0][1], b[0][2]), hi = Qt.vector3d(b[1][0], b[1][1], b[1][2])
+        if (on && asmMode === "exploded") {
+            var asm = a
+            for (var i = 0; i < asm.parts.length; i++) {
+                var x = asm.parts[i], e = Qt.vector3d(x.explode[0], x.explode[1], x.explode[2]).times(explode)
+                lo = Qt.vector3d(Math.min(lo.x, x.bbox[0][0] + e.x), Math.min(lo.y, x.bbox[0][1] + e.y), Math.min(lo.z, x.bbox[0][2] + e.z))
+                hi = Qt.vector3d(Math.max(hi.x, x.bbox[1][0] + e.x), Math.max(hi.y, x.bbox[1][1] + e.y), Math.max(hi.z, x.bbox[1][2] + e.z))
+            }
+        }
+        bounds = { lo: lo.plus(sh), hi: hi.plus(sh) }
+    }
+    Behavior on shift { enabled: vp.asmTween; Vector3dAnimation { duration: 320; easing.type: Easing.OutCubic } }
+
     // ── camera (orbit around target; angles in degrees) ─────
     property vector3d target: Qt.vector3d(0, 0, 20)
     property real az: -34
@@ -50,6 +102,20 @@ Item {
         az = a; el = v[1]; target = center(b); dist = frame(b, box ? 1.25 : 1.5)
     }
     function featureBox(id) {
+        for (var k = 0; k < asmParts.count; k++) {          // assembly: transform the feature's box with its part
+            var n = asmParts.objectAt(k)
+            for (var j = 0; n && j < n.meshes.count; j++) {
+                var g = n.meshes.objectAt(j)
+                if (!g || g.feature !== id) continue
+                var a = g.geometry.lo, c = g.geometry.hi, lo = Qt.vector3d(1e9, 1e9, 1e9), hi = Qt.vector3d(-1e9, -1e9, -1e9)
+                for (var m = 0; m < 8; m++) {
+                    var p = n.rotation.times(Qt.vector3d(m & 1 ? c.x : a.x, m & 2 ? c.y : a.y, m & 4 ? c.z : a.z)).plus(n.position).plus(shift)
+                    lo = Qt.vector3d(Math.min(lo.x, p.x), Math.min(lo.y, p.y), Math.min(lo.z, p.z))
+                    hi = Qt.vector3d(Math.max(hi.x, p.x), Math.max(hi.y, p.y), Math.max(hi.z, p.z))
+                }
+                return { lo: lo, hi: hi }
+            }
+        }
         for (var i = 0; i < parts.count; i++) {
             var m = parts.objectAt(i)
             if (m && m.feature === id) return { lo: m.geometry.lo.plus(shift), hi: m.geometry.hi.plus(shift) }
@@ -63,9 +129,7 @@ Item {
     function setModel(v) {
         model = v
         if (!v) return
-        var b = v.bbox
-        shift = Qt.vector3d(-(b[0][0] + b[1][0]) / 2, -(b[0][1] + b[1][1]) / 2, -b[0][2])
-        bounds = { lo: Qt.vector3d(b[0][0], b[0][1], b[0][2]).plus(shift), hi: Qt.vector3d(b[1][0], b[1][1], b[1][2]).plus(shift) }
+        _frame()
     }
     function setGhost(v) { ghost = v }
     function setSection(axis, t) { sectionAxis = axis || ""; sectionT = t === undefined ? 0.5 : t }
@@ -146,7 +210,7 @@ Item {
                 position: vp.shift
                 Repeater3D {
                     id: parts
-                    model: vp.model ? vp.model.mesh : []
+                    model: vp.model && !vp.asm ? vp.model.mesh : []
                     Model {
                         required property var modelData
                         readonly property string feature: modelData.feature || ""
@@ -163,18 +227,56 @@ Item {
                         }
                     }
                 }
-                Model { visible: !!(vp.model && vp.model.edges); pickable: false; castsShadows: false; depthBias: -2
+                // assembly: one node per part, placed (and swung about its joint) in the scene
+                Repeater3D {
+                    id: asmParts
+                    model: vp.asm ? vp.asm.parts : []
+                    Node {
+                        id: pn
+                        required property var modelData
+                        readonly property var xf: vp.partXf(modelData)
+                        readonly property alias meshes: pm
+                        position: xf.pos
+                        rotation: xf.rot
+                        Behavior on position { enabled: vp.asmTween; Vector3dAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                        Behavior on rotation { enabled: vp.asmTween; QuaternionAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                        Repeater3D {
+                            id: pm
+                            model: vp.model ? vp.model.mesh.filter(function (m) { return m.part === pn.modelData.id }) : []
+                            Model {
+                                required property var modelData
+                                readonly property string feature: modelData.feature || ""
+                                pickable: true
+                                geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
+                                materials: CustomMaterial {
+                                    shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                                    property color uColor: vp.partColor(feature)
+                                    property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
+                                    property vector3d uClipN: vp.clipN
+                                    property real uClipD: vp.clipD
+                                    property real uClip: vp.clipOn ? 1 : 0
+                                    Behavior on uColor { ColorAnimation { duration: 140 } }
+                                }
+                            }
+                        }
+                        Model { pickable: false; castsShadows: false; depthBias: -2
+                            geometry: LineGeometry { segments: pn.modelData.edges || "" }
+                            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
+                                property color uColor: "#2b2925"; property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
+                    }
+                }
+                Model { visible: !!(vp.model && vp.model.edges) && !vp.asm; pickable: false; castsShadows: false; depthBias: -2
                     geometry: LineGeometry { segments: vp.model && vp.model.edges ? vp.model.edges : "" }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
                         property color uColor: "#2b2925"; property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
-                Model { visible: !!(vp.ghost && vp.ghost.edges); pickable: false; castsShadows: false
+                Model { visible: !!(vp.ghost && vp.ghost.edges) && !vp.asmOn; pickable: false; castsShadows: false
                     geometry: LineGeometry { segments: vp.ghost && vp.ghost.edges ? vp.ghost.edges : "" }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"; depthDrawMode: Material.NeverDepthDraw
                         property color uColor: Theme.blueprint; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
 
                 // the thing the part holds, as a blueprint volume
                 Repeater3D {
-                    model: vp.showCompanions && vp.model && vp.model.companions ? vp.model.companions : []
+                    model: vp.showCompanions && !vp.asmOn && vp.model && vp.model.companions ? vp.model.companions : []
                     Node {
                         id: comp
                         required property var modelData
@@ -222,7 +324,7 @@ Item {
             }
 
             // overall dimensions, drawn like a drawing: extension lines, a dimension line, the number
-            Model { visible: vp.showDims && !!vp.model; pickable: false; castsShadows: false
+            Model { visible: vp.showDims && !!vp.model && vp.asmMode !== "exploded"; pickable: false; castsShadows: false
                 geometry: LineGeometry { points: {
                     var b = vp.bounds, o = 7, t = 2.2, p = []
                     var x0 = b.lo.x, x1 = b.hi.x, y0 = b.lo.y, y1 = b.hi.y, z1 = b.hi.z
@@ -238,7 +340,7 @@ Item {
 
     // dimension numbers, placed where the 3D dimension lines are
     Repeater {
-        model: vp.showDims && vp.model ? 3 : 0
+        model: vp.showDims && vp.model && !(vp.asmOn && vp.asmMode === "exploded") ? 3 : 0
         Rectangle {
             id: dl
             required property int index

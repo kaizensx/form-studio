@@ -10,8 +10,9 @@ def registry() -> dict:
     from .hook import WallHook
     from .knob import Knob
     from .planter import TwistPlanter
+    from .hinged_box import HingedBox
     return {r.id: r for r in (Dock(), GridfinityBin(), WallHook(), TwistPlanter(), Coupon(),
-                              Enclosure(), GearPair(), Knob())}
+                              Enclosure(), GearPair(), Knob(), HingedBox())}
 
 
 # ---- designs written as code (by an agent or a person) ---------------------------------------
