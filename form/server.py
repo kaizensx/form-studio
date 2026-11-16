@@ -136,6 +136,18 @@ def make_handler(st: Studio):
                 last = p["revisions"][-1]
                 return self._json({"head": p["head"], "updated": p.get("updated"),
                                    "last": {"n": last["n"], "origin": last.get("origin"), "note": last["note"]}})
+            # -- analysis on the model (form/analysis.py): maps, orientations --
+            if rest == "/analysis":
+                from . import analysis
+                return self._json(analysis.run_map(st, p, q.get("map") or "thickness", int(q["rev"]) if q.get("rev") else None))
+            if rest == "/analysis.png":
+                from . import analysis
+                r = analysis.run_map(st, p, q.get("map") or "thickness", int(q["rev"]) if q.get("rev") else None)
+                return self._send(200, analysis.render_map_png(r, f"{p['name']} - r{r['rev']:02d}", q.get("view") or "iso",
+                                                               edges=st.view(p, r["rev"]).get("edges")), "image/png")
+            if rest == "/orient":
+                from . import analysis
+                return self._json(analysis.orientations(st, p))
             if rest == "/view":
                 n = int(q["rev"]) if q.get("rev") else None
                 return self._json(st.view(p, n))
@@ -273,6 +285,13 @@ def make_handler(st: Studio):
             p = st.load(pid)
             recipe = st.recipe(p)
             auto = lambda proj: st.run(pid) if proj.get("auto_run", True) else None
+            # -- measuring (form/analysis.py) --
+            if action == "probe":
+                from . import analysis
+                return self._json(analysis.probe(st, p, body.get("at"), body.get("rev")))
+            if action == "measure":
+                from . import analysis
+                return self._json(analysis.measure(st, p, body.get("from"), body.get("to"), body.get("rev")))
             if action == "preview":
                 return self._json(st.preview(p, body.get("values", {})))
             if action == "commit":

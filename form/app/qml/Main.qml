@@ -48,6 +48,7 @@ Window {
     Shortcut { sequence: "Escape"; onActivated: {
         if (Store.paletteOpen) Store.paletteOpen = false
         else if (Store.sheet) Store.openSheet(null)
+        else if (Store.measuring) Store.setMeasuring(false)
         else if (Store.layers) Store.showLayers(false)
         else if (Store.feature) Store.select("") } }
     Shortcut { sequence: "Ctrl+1"; onActivated: if (Store.data) Store.setStage("brief") }

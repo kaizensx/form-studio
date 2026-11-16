@@ -64,22 +64,26 @@ def _font(size: int):
 
 def render_png(view_data: dict, features: list, view: str = "iso", highlight: str | None = None,
                size=(960, 680), title: str = "", ss: int = 2, camera: tuple | None = None, frame_box=None,
-               overlay: bool = True, caption: str = "", as_image: bool = False):
+               overlay: bool = True, caption: str = "", as_image: bool = False, lines: list | None = None):
     """features: [{"id","label"}] in recipe order. Returns PNG bytes (or a PIL image with as_image).
 
     camera=(azimuth, elevation) in degrees overrides view. frame_box=(lo, hi) fixes the framing so a
     sequence of frames (turntable, morph) does not jump. overlay=False draws only title and caption.
+    lines=[(segments (n, 6), rgb)] draws extra visible line sets in a colour (an analysis outline, a measurement).
     """
     W, Hh = size
     w, h = W * ss, Hh * ss
     right, up, fwd = _camera_ae(*camera) if camera else _camera(view)
     order = [f["id"] for f in features]
-    tris, tri_feat = [], []
+    tris, tri_feat, tri_rgb = [], [], []
     for m in view_data["mesh"]:
         P = _arr(m["positions"], np.float32, 3).astype(np.float64)
         T = _arr(m["indices"], np.uint32, 3)
         tris.append(P[T])
         tri_feat.append(np.full(len(T), order.index(m["feature"]) if m["feature"] in order else len(order)))
+        # an analysis map carries a colour per vertex (form/analysis.py): a triangle takes the mean of its corners
+        tri_rgb.append(_arr(m["colors"], np.uint8, 4)[:, :3].astype(np.float64)[T].mean(axis=1) if m.get("colors")
+                       else np.full((len(T), 3), np.nan))
     V = np.concatenate(tris)                       # (n, 3, 3) world
     F = np.concatenate(tri_feat)
     lo, hi = V.reshape(-1, 3).min(0), V.reshape(-1, 3).max(0)
@@ -154,17 +158,22 @@ def render_png(view_data: dict, features: list, view: str = "iso", highlight: st
     if hl is not None:
         base[:] = (200, 197, 190)
         base[hl] = SIGNAL
-    col = base[F] * shade[:, None]
+    col = base[F]
+    mapped = np.concatenate(tri_rgb)
+    has = ~np.isnan(mapped[:, 0])
+    col[has] = mapped[has]
+    col = col * shade[:, None]
     img = np.empty((h, w, 3), dtype=np.float64)
     img[:] = PAPER
     hit = ibuf >= 0
     img[hit] = col[ibuf[hit]]
 
     # visible edges: sample each segment, keep samples not behind the surface
-    if view_data.get("edges"):
-        E = _arr(view_data["edges"], np.float32, 6).astype(np.float64)
+    edge_sets = [(_arr(view_data["edges"], np.float32, 6).astype(np.float64), INK, 1)] if view_data.get("edges") else []
+    edge_sets += [(np.asarray(L, dtype=np.float64).reshape(-1, 6), c, 2) for L, c in (lines or []) if len(L)]
+    for E, ink, wide in edge_sets:
         diag = float(np.linalg.norm(hi - lo))
-        eps = diag * 0.004
+        eps = diag * 0.004 * wide
         for a, b in ((E[:, :3], E[:, 3:]),):
             pa, pb = a - centre, b - centre
             ax, ay, az_ = pa @ right, pa @ up, pa @ fwd
@@ -180,8 +189,8 @@ def render_png(view_data: dict, features: list, view: str = "iso", highlight: st
                 ok = (xs >= 0) & (xs < w) & (ys >= 0) & (ys < h)
                 xs, ys, zs = xs[ok], ys[ok], zs[ok]
                 vis = zs <= zbuf[ys, xs] + eps
-                for dx, dy in ((0, 0), (1, 0), (0, 1)):
-                    img[np.clip(ys[vis] + dy, 0, h - 1), np.clip(xs[vis] + dx, 0, w - 1)] = INK
+                for dx, dy in (((0, 0), (1, 0), (0, 1)) if wide == 1 else ((0, 0), (1, 0), (0, 1), (1, 1), (2, 0), (0, 2), (2, 1), (1, 2), (2, 2))):
+                    img[np.clip(ys[vis] + dy, 0, h - 1), np.clip(xs[vis] + dx, 0, w - 1)] = ink
 
     out = Image.fromarray(img.clip(0, 255).astype(np.uint8)).resize((W, Hh), Image.LANCZOS)
     d = ImageDraw.Draw(out)

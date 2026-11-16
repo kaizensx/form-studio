@@ -90,6 +90,7 @@ Column {
                 }
             }
         }
+        OrientFinder {}
         Txt { kind: "fine"; width: parent.width
             text: "Areas in mm², computed from the solid. Overhang is surface steeper than 45°; ceilings are flat faces that must bridge or be supported. Changing orientation makes the exports, checks and slice stale." }
     }

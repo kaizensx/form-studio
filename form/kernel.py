@@ -235,9 +235,16 @@ def op_summary(key, recipe_id, values, tol=0.05, dock_mass_g=None):
 
 
 def _oriented(shape, orientation):
-    from build123d import Pos, Rot
-    rx, ry = ORIENTATIONS[orientation]
-    s = Rot(rx, ry, 0) * shape if (rx or ry) else shape
+    from build123d import Axis, Pos, Rot
+    from . import analysis
+    if orientation in ORIENTATIONS:
+        rx, ry = ORIENTATIONS[orientation]
+        s = Rot(rx, ry, 0) * shape if (rx or ry) else shape
+    else:                                              # "down:x,y,z": the design direction that faces the plate (form/analysis.py)
+        aa = analysis.axis_angle(orientation)
+        if aa is None:
+            raise RecipeError(f"Unknown print orientation “{orientation}”.", "", "Pick one from the orientation table.")
+        s = shape.rotate(Axis((0, 0, 0), aa[0]), aa[1]) if abs(aa[1]) > 1e-9 else shape
     bb = s.bounding_box()
     return Pos(-(bb.min.X + bb.max.X) / 2, -(bb.min.Y + bb.max.Y) / 2, -bb.min.Z) * s
 
@@ -286,42 +293,18 @@ def Pos0(shape, bb):
     return Pos(-(bb.min.X + bb.max.X) / 2, -(bb.min.Y + bb.max.Y) / 2, -bb.min.Z) * shape
 
 
-def _orientation_table(P, T):
-    a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
-    n = np.cross(b - a, c - a)
-    area = np.linalg.norm(n, axis=1) / 2
-    n = n / np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
-    cen = (a + b + c) / 3
-    rows = []
-    for name, (rx, ry) in ORIENTATIONS.items():
-        ax, ay = math.radians(rx), math.radians(ry)
-        Rx = np.array([[1, 0, 0], [0, math.cos(ax), -math.sin(ax)], [0, math.sin(ax), math.cos(ax)]])
-        Ry = np.array([[math.cos(ay), 0, math.sin(ay)], [0, 1, 0], [-math.sin(ay), 0, math.cos(ay)]])
-        R = Ry @ Rx
-        nn, cc, pp = n @ R.T, cen @ R.T, P @ R.T
-        zmin = pp[:, 2].min()
-        size = pp.max(axis=0) - pp.min(axis=0)
-        down = -nn[:, 2]
-        contact = (down > 0.999) & (cc[:, 2] - zmin < 0.05)
-        over = (down > math.cos(math.radians(45)) + 1e-6) & ~contact
-        # flat downward faces above the plate are bridges or need support
-        ceilings = (down > 0.999) & ~contact
-        rows.append({"id": name, "label": ORIENT_LABEL[name], "height_mm": float(size[2]),
-                     "footprint_mm": [float(size[0]), float(size[1])],
-                     "contact_mm2": float(area[contact].sum()),
-                     "overhang_mm2": float(area[over].sum()),
-                     "ceiling_mm2": float(area[ceilings].sum()),
-                     "steep_mm2": float(area[over & ~ceilings].sum())})
-    return rows
+def _orientation_table(P, T, extra=()):
+    """One row per named orientation, plus any "down:x,y,z" orientation in `extra` (the project's, when it is not a named one)."""
+    from . import analysis
+    names = list(ORIENTATIONS) + [o for o in extra if o not in ORIENTATIONS and analysis.valid_orientation(o)]
+    return [analysis.orientation_row(P, T, name) for name in names]
 
 
 def _thickness(model, max_rays=1500):
     """Opposing-wall thickness by casting rays inward from surface samples."""
-    from OCP.gp import gp_Dir, gp_Lin, gp_Pnt
-    from OCP.IntCurvesFace import IntCurvesFace_ShapeIntersector
-    from build123d import Face, Vector
-    inter = IntCurvesFace_ShapeIntersector()
-    inter.Load(model["shape"].wrapped, 1e-6)
+    from build123d import Vector
+    from . import analysis
+    inter = analysis.intersector(model["shape"])
     total = sum(f["area"] for f in model["faces"]) or 1
     kmin = 3 if len(model["faces"]) * 3 <= max_rays * 2 else 0      # a mesh has thousands of faces: sample by area only
     best = {"t": float("inf")}
@@ -344,28 +327,13 @@ def _thickness(model, max_rays=1500):
                 n = f["face"].normal_at(Vector(*p))
             except Exception:
                 continue
-            d = (-n.X, -n.Y, -n.Z)
-            o = p + np.array(d) * 1e-4
-            inter.Perform(gp_Lin(gp_Pnt(*o), gp_Dir(*d)), 1e-4, 1e4)
-            hit = None
-            for j in range(1, inter.NbPnt() + 1):
-                w = inter.WParameter(j)
-                if w > 1e-3 and (hit is None or w < hit[0]):
-                    hit = (w, j)
-            if hit is None:
+            hit = analysis.wall_hit(inter, p, (n.X, n.Y, n.Z))   # the same ray the thickness map casts
+            if hit is None:                                      # nothing opposite, or a wedge at an edge or chamfer, not a wall
                 continue
-            w, j = hit
-            q = inter.Pnt(j)
-            try:
-                m = Face(inter.Face(j)).normal_at(Vector(q.X(), q.Y(), q.Z()))
-                opposed = -(m.X * n.X + m.Y * n.Y + m.Z * n.Z)
-            except Exception:
-                opposed = 1.0
-            if opposed < 0.5:   # wedge at an edge or chamfer, not a wall
-                continue
+            w, qq = hit
             hist.append(w)
             if w < best["t"]:
-                best = {"t": float(w), "at": [float(x) for x in p], "to": [q.X(), q.Y(), q.Z()], "feature": f["feature"]}
+                best = {"t": float(w), "at": [float(x) for x in p], "to": [float(x) for x in qq], "feature": f["feature"]}
     return best, hist
 
 
@@ -374,7 +342,7 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
     from . import mesh_audit
     model = _get(key, recipe_id, values, 0.05)
     P, T = _mesh_arrays(model)
-    table = _orientation_table(P, T)
+    table = _orientation_table(P, T, extra=(orientation,))
     thin, hist = _thickness(model)
     out = {"orientation_table": table, "thin": thin if thin["t"] < float("inf") else None,
            "thickness_samples": len(hist),
@@ -538,3 +506,7 @@ def op_ping():
 
 
 OPS = {k[3:]: v for k, v in list(globals().items()) if k.startswith("op_")}
+
+# analysis maps, measuring and print orientations (form/analysis.py)
+from .analysis import KERNEL_OPS as _ANALYSIS_OPS  # noqa: E402
+OPS.update(_ANALYSIS_OPS)

@@ -35,6 +35,11 @@ Item {
             Component.onDestruction: if (Store.viewer === vp) Store.viewer = null
             onPicked: function (f) { Store.pick(f) }
             onHoveredFeature: function (f, x, y) { chip.feat = Store.featureById(f); chip.x = x + 14; chip.y = y + 14 }
+            // analysis maps and measuring (maps describe the committed revision, so a draft hides them)
+            analysis: Store.hasDraft || Store.compare ? null : Store.analysis
+            measuring: Store.measuring; measures: Store.measures; measureFrom: Store.measureFrom
+            onProbed: function (at, reach) { Store.measureClick(at, reach) }
+            onHoveredValue: function (v, x, y, on) { vchip.on = on; vchip.v = v; vchip.x = x + 14; vchip.y = y + 14 }
         }
         Loader { anchors.fill: parent; active: !!Store.layers; source: "LayerView.qml" }
         // soft vignette so the plate falls away at the edges
@@ -49,8 +54,35 @@ Item {
                 Txt { text: chip.feat ? chip.feat.label : ""; font.pixelSize: 12; font.weight: 550 }
                 Txt { text: chip.feat ? chip.feat.role : ""; kind: "fine" } } }
 
+        // the map's value under the pointer
+        Rectangle { id: vchip; property bool on: false; property real v: 0; z: 5
+            readonly property var lg: Store.analysis ? Store.analysis.legend : null
+            readonly property string say: !lg ? "" : isNaN(v) ? (lg.none || "") : String(lg.hover || "{v}").replace("{v}", F.fmt(v, Store.analysisMap === "thickness" || Store.analysisMap === "features" ? 2 : Store.analysisMap === "overhang" ? 0 : 0))
+            visible: on && !Store.layers && say !== "" && !!vp.analysis
+            width: vt.implicitWidth + 16; height: 24; radius: Theme.rSm; color: Theme.plate3; border.color: Theme.rule2
+            Txt { id: vt; anchors.centerIn: parent; mono: true; font.pixelSize: 12; text: vchip.say; wrapMode: Text.NoWrap } }
+
+        // HUD — top left: analyze and measure
+        Column { id: tools; x: 16; spacing: 8; visible: !Store.layers && !!Store.view
+            y: centre.width >= 1010 ? 14 : Store.assembly ? 82 : 48          // a narrow viewport: under the view controls
+            Row { spacing: 8
+                Seg { model: Store.analysisMaps; value: Store.analysisMap; onPicked: function (v) { Store.setAnalysis(v === Store.analysisMap ? "" : v) } }
+                Btn { small: true; kind: "quiet"; active: Store.measuring; icon: "pencil_ruler"; height: 26; width: 30
+                    tip: "Measure distances, faces and hole diameters (M). Values are computed from the part’s surface, tessellated at 0.05 mm; a hole diameter is exact when it comes from the CAD solid."
+                    onClicked: Store.setMeasuring(!Store.measuring) } }
+            Rectangle { visible: !!Store.analysisMap && (Store.hasDraft || !!Store.compare); width: mh.implicitWidth + 20; height: 26; radius: Theme.rSm
+                color: Theme.alpha(Theme.amber, 0.12); border.color: Theme.alpha(Theme.amber, 0.3)
+                Txt { id: mh; anchors.centerIn: parent; font.pixelSize: 12; color: Qt.lighter(Theme.amber, 1.3)
+                    text: "The map describes " + (Store.project ? F.pad(Store.project.head) : "the head") + ". " + (Store.hasDraft ? "Commit or discard the draft to see it." : "Stop comparing to see it.") } }
+            MeasurePanel { visible: Store.measureOpen } }
+        AnalysisLegend { anchors.right: parent.right; anchors.rightMargin: 16; anchors.bottom: pipe.top; anchors.bottomMargin: 46; z: 4
+            visible: !Store.layers && !!Store.analysisMap && !(Store.hasDraft || !!Store.compare)
+            map: Store.analysis; busy: Store.analysisBusy; pending: Store.analysisLabel(Store.analysisMap); check: Store.analysis ? Store.analysisCheck() : null
+            opacity: visible ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.base; easing.type: Easing.OutCubic } } }
+        Shortcut { sequence: "M"; enabled: !Store.sheet && !Store.paletteOpen && !Store.layers; onActivated: Store.setMeasuring(!Store.measuring) }
+
         // HUD — top left: state banners
-        Column { x: 16; y: 14; spacing: 6; visible: !Store.layers
+        Column { x: 16; y: tools.y + 34; spacing: 6; visible: !Store.layers && !Store.measureOpen && !(Store.analysisMap && (Store.hasDraft || Store.compare))
             Rectangle { visible: Store.hasDraft && !!Store.preview; width: b1.implicitWidth + 20; height: 26; radius: Theme.rSm; color: Theme.alpha(Theme.blueprint, 0.14); border.color: Theme.alpha(Theme.blueprint, 0.3)
                 Txt { id: b1; anchors.centerIn: parent; font.pixelSize: 12; color: "#cdd9ff"
                     text: "Draft, not committed · blue lines are " + (Store.project ? F.pad(Store.project.head) : "") } }

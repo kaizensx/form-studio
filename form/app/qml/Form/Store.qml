@@ -534,4 +534,88 @@ QtObject {
             + "not a certification and not physical validation."
     }
     function askReview() { if (canAskReview) send(reviewPrompt()) }
+
+    // ── analysis on the model: maps, measuring, print orientation (form/analysis.py) ──
+    // Maps describe the committed head revision; the Workspace hides them while a draft is open.
+    property string analysisMap: ""            // "" | thickness | overhang | section | features
+    property var analysis: null                // the engine's map: mesh, per-vertex values and colours, legend, stats, markers
+    property bool analysisBusy: false
+    property int _aseq: 0
+    readonly property var analysisMaps: [{ value: "", text: "None" }, { value: "thickness", text: "Thickness" }, { value: "overhang", text: "Overhang" },
+                                         { value: "section", text: "Section" }, { value: "features", text: "Features" }]
+    function analysisLabel(m) { for (var i = 0; i < analysisMaps.length; i++) if (analysisMaps[i].value === m) return analysisMaps[i].text; return "" }
+    function setAnalysis(map) {
+        analysisMap = map || ""
+        var seq = ++_aseq
+        if (!analysisMap) { analysis = null; analysisBusy = false; return }
+        if (assembly && asmMode !== "print") setAsmMode("print")          // maps are computed on the parts as printed
+        if (viewer) viewer.setMarker(null)
+        analysisBusy = true
+        pget("/analysis?map=" + analysisMap).then(function (r) { if (seq !== s._aseq) return; s.analysis = r; s.analysisBusy = false },
+            function (e) { if (seq !== s._aseq) return; s.analysisBusy = false; s.analysisMap = ""; s.analysis = null; s.fail(e) })
+    }
+    function analysisCheck() {                 // the pipeline check that the shown map belongs to, if it is current
+        var id = ({ thickness: "wall", overhang: "overhang" })[analysisMap], cs = data && data.checks ? data.checks.checks : []
+        for (var i = 0; id && i < cs.length; i++) if (cs[i].id === id) return cs[i]
+        return null
+    }
+    // head geometry or print orientation changed: what is shown no longer describes the part
+    readonly property string analysisKey: project ? pid + "|" + project.head + "|" + project.orientation : ""
+    onAnalysisKeyChanged: { if (analysisMap) setAnalysis(analysisMap); if (orient) findOrientation(); if (measures.length || measureFrom) clearMeasures() }
+    property var _analysisReset: Connections { target: s; function onPidChanged() {
+        s._aseq++; s.analysisMap = ""; s.analysis = null; s.analysisBusy = false; s.orient = null; s.measures = []; s.measureFrom = null; s.measuring = false; s.measureOpen = false } }
+
+    // measure tool: click points on the part. Every number comes back from the engine (POST /probe, /measure).
+    property bool measuring: false             // clicks on the part measure instead of selecting
+    property bool measureOpen: false           // the readout panel is showing
+    property string measureKind: "distance"    // distance | face | diameter
+    property var measures: []                  // [{ id, kind, label, detail, how, label_at, ... }], kept until cleared
+    property var measureFrom: null             // first point of a distance: { at: [x, y, z], snap }
+    property int _mid: 0
+    function setMeasuring(on) {
+        measuring = !!on; measureFrom = null
+        if (on) { measureOpen = true; if (assembly && asmMode !== "print") setAsmMode("print"); if (viewer) viewer.setMarker(null) }
+    }
+    function clearMeasures() { measures = []; measureFrom = null }
+    function dropMeasure(id) { measures = measures.filter(function (m) { return m.id !== id }) }
+    function _addMeasure(m) { m.id = ++_mid; measures = measures.concat([m]) }
+    function measureClick(pt, reach) {         // pt: [x, y, z] on the surface, design frame; reach: snap radius in mm
+        var kind = measureKind
+        return ppost("/probe", { at: pt }).then(function (pr) {
+            if (kind === "distance") {
+                var at = pr.on, snap = "surface"
+                if (pr.snaps.length && pr.snaps[0].distance_mm <= reach) { at = pr.snaps[0].at; snap = pr.snaps[0].kind }    // nearest first
+                if (!s.measureFrom) { s.measureFrom = { at: at, snap: snap }; return }
+                var from = s.measureFrom
+                s.measureFrom = null
+                return s.ppost("/measure", { from: from.at, to: at }).then(function (r) {
+                    s._addMeasure({ kind: "distance", a: r.from, b: r.to, how: "computed", label: F.fmt(r.distance_mm, 2) + " mm",
+                        detail: "dX " + F.fmt(Math.abs(r.dx_mm), 2) + "  dY " + F.fmt(Math.abs(r.dy_mm), 2) + "  dZ " + F.fmt(Math.abs(r.dz_mm), 2) + "  ·  " + from.snap + " to " + snap,
+                        label_at: [(r.from[0] + r.to[0]) / 2, (r.from[1] + r.to[1]) / 2, (r.from[2] + r.to[2]) / 2] })
+                }, s.fail)
+            } else if (kind === "face") {
+                var f = pr.face, feat = s.featureById(pr.feature)
+                s._addMeasure({ kind: "face", at: pr.on, face: f, how: "computed", label: F.fmt(f.area_mm2, f.area_mm2 < 100 ? 2 : 1) + " mm²",
+                    detail: f.type + (feat ? " of " + feat.label : "") + " · normal " + F.fmt(f.tilt_deg, 1) + "° from straight up: " + f.tilt + " · " + f.method,
+                    label_at: [pr.on[0] + f.normal[0] * 7, pr.on[1] + f.normal[1] * 7, pr.on[2] + f.normal[2] * 7] })
+            } else {
+                var c = pr.circle
+                if (!c || (c.edge_distance_mm !== undefined && c.edge_distance_mm > Math.max(reach * 2, 1.5)))
+                    return s.toast("No circle here", "Click the wall of a hole or round boss, or close to its rim.")
+                s._addMeasure({ kind: "diameter", at: pr.on, circle: c, how: c.method === "fitted" ? "fitted" : "computed", label: "Ø " + F.fmt(c.diameter_mm, 2) + " mm",
+                    detail: (c.hole === true ? "hole" : c.hole === false ? "round boss" : c.surface || "circle") + " · "
+                        + (c.method === "fitted" ? "fitted to " + c.points + " mesh edge points, rms " + F.fmt(c.rms_mm, 3) + " mm" : "exact, from the CAD solid"),
+                    label_at: c.center || pr.on })
+            }
+        }, fail)
+    }
+
+    // print orientation finder (GET /orient): candidates ranked by a score whose terms are shown
+    property var orient: null
+    property bool orientBusy: false
+    function findOrientation() {
+        orientBusy = true
+        var want = pid
+        pget("/orient").then(function (r) { if (want !== s.pid) return; s.orient = r; s.orientBusy = false }, function (e) { s.orientBusy = false; s.fail(e) })
+    }
 }

@@ -648,11 +648,12 @@ class Studio:
         with self.lock(p["id"]):
             p = self.load(p["id"])
             if "orientation" in body:
-                from .kernel import ORIENT_LABEL
-                if body["orientation"] not in ORIENT_LABEL:
-                    raise StudioError("Unknown orientation.")
+                from . import analysis             # named orientations, or "down:x,y,z" from the orientation finder
+                if not analysis.valid_orientation(body["orientation"]):
+                    raise StudioError("Unknown orientation.", "Use one of: " + ", ".join(analysis.NAMED) + ", or a "
+                                      "“down:x,y,z” id from suggest_orientation / `form orient`.")
                 if body["orientation"] != p["orientation"]:
-                    self.decide(p, "orientation", f"Print orientation set to “{ORIENT_LABEL[body['orientation']]}”.")
+                    self.decide(p, "orientation", f"Print orientation set to “{analysis.orientation_label(body['orientation'])}”.")
                 p["orientation"] = body["orientation"]
             if "fit" in body:
                 lo, hi = float(body["fit"]["gap_min"]), float(body["fit"]["gap_max"])
