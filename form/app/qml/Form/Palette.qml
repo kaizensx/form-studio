@@ -18,6 +18,7 @@ Item {
             c.push({ icon: "ruler", text: (Store.dims ? "Hide" : "Show") + " overall dimensions", hint: "Viewport", run: function () { Store.toggleDims() } })
             c.push({ icon: "play", text: "Regenerate everything", hint: "Solid, exports, checks, slice", run: function () { Store.run() } })
             c.push({ icon: "boxes", text: "Compare alternatives", hint: "Build a grid of candidates", run: function () { Store.openSheet("alternatives") } })
+            c.push({ icon: "camera", text: "Render in Blender", hint: "An illustration of the current revision", run: function () { Store.openSheet("render") } })
             if (Store.hasDraft) { c.push({ icon: "git_commit_horizontal", text: "Commit the draft", hint: "Saves a revision", run: function () { Store.commit() } })
                 c.push({ icon: "undo_2", text: "Discard the draft", hint: "", run: function () { Store.discard() } }) }
             c.push({ icon: "home", text: "All designs", hint: "Home", run: function () { Store.home() } })

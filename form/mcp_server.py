@@ -626,6 +626,29 @@ def build() -> MCPServer:
                 "(measure, coupon, test piece) over guessing. 6) request_release and give me the bench link. "
                 "Report slices as simulated and fit as modelled; never claim a print succeeded.")
 
+    # ---- Blender (optional): illustrative renders ---------------------------------------------
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True,
+                                          open_world_hint=False), structured_output=False)
+    async def render_photo(project: str, preset: str = "studio", material: str = "matte", color: str = "#eeece6",
+                           fast: bool = False, layer_lines: bool = True, ctx: Context = None) -> list:
+        """A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed).
+        preset: studio (soft box, light backdrop) | desk (wooden desk) | dark (graphite, rim light).
+        material: matte (PLA) | petg (gloss) | silk (silk PLA). color: hex, e.g. "#3d6fb6".
+        layer_lines draws faint lines at the slicer's layer height when a process preset is selected.
+        fast=True uses EEVEE instead of Cycles. Cached per geometry and settings. This is an illustration with
+        invented light and material, not a photo of a print: never present it as evidence of anything."""
+        st = studio()
+        from . import photo
+        m = await _run(lambda: photo.render(st, st.load(project), preset, material, color, fast, layer_lines))
+        f = st.dir(project) / "artifacts" / "photo" / m["file"]
+        act(project, "look", f"Rendered in Blender ({m['preset_label']}, {m['finish_label']})", ctx)
+        lh = m["layer"]
+        caption = (f"{m['label']}. r{m['rev']:02d}, {m['preset_label']} · {m['finish_label']} {m['color']}, "
+                   f"{m['engine']} on {m['device']}, {m['samples']} samples, Blender {m['blender']}"
+                   + (f", layer lines at {lh['mm']:g} mm ({lh['note']})" if lh.get("mm") else "")
+                   + (" (cached)" if m.get("cached") else f", {m['seconds']:.0f} s") + f". File: {f}")
+        return [Image(path=f), caption]
+
     return mcp
 
 

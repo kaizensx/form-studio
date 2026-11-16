@@ -50,6 +50,8 @@ DEFAULTS = {
     "cad": {"openscad": "", "freecad": "", "timeout_s": 120},
     # Chat in the bench runs Claude Code headless on your account, with FORM's tools (and web lookups if web = true).
     "chat": {"enabled": True, "cli": "claude", "model": "opus", "web": True, "budget_usd_per_message": 3.0},
+    # Optional: Blender, run headless for illustrative renders (render_photo). Empty app = look in the usual places.
+    "blender": {"app": "", "timeout_s": 180, "samples": 128},
     # Open the bench in your browser when an agent starts working (MCP server).
     "bench": {"auto_open": True},
     # Look for a newer FORM release on GitHub at most once a day (public release metadata only; nothing is

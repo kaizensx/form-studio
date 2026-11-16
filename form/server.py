@@ -122,6 +122,9 @@ def make_handler(st: Studio):
                 from . import slicer as slicer_mod
                 return self._json({"chosen": st.cfg["slicer"].get("kind", "auto"), "config": str(slicer_mod.config_target(st.cfg)).replace(str(Path.home()), "~"),
                                    "slicers": slicer_mod.detect_all(st.cfg)})
+            if path == "/api/photos":                      # Blender renders: newest current one per project
+                from . import photo
+                return self._json({"latest": photo.latest_all(st)})
             m = re.fullmatch(r"/api/projects/([a-z0-9-]+)(/.*)?", path)
             if not m:
                 raise StudioError("Not found.", status=404)
@@ -177,6 +180,14 @@ def make_handler(st: Studio):
             m3 = re.fullmatch(r"/release/(r\d+-[0-9a-f]+)", rest)
             if m3:
                 return self._json(st.verify_release(p, m3.group(1)))
+            # -- Blender renders (form/photo.py) --
+            if rest == "/photo":
+                from . import photo
+                return self._json(photo.state(st, p))
+            m4 = re.fullmatch(r"/photo/([0-9a-f]{16}|latest)\.png", rest)
+            if m4:
+                from . import photo
+                return self._send(200, photo.file(st, p, m4.group(1)).read_bytes(), "image/png")
             raise StudioError("Not found.", status=404)
 
         def _static(self, path):
@@ -310,6 +321,9 @@ def make_handler(st: Studio):
             if action == "calibration_remove":
                 st.calibration.remove(str(body.get("id")))
                 return self._json({"job": auto(p)})
+            if action == "render_photo":                   # Blender render, in the background (form/photo.py)
+                from . import photo
+                return self._json(photo.start(st, pid, body if isinstance(body, dict) else {}))
             if action == "test_piece":
                 return self._json(st.side_slice(p, "test_piece"))
             if action == "approve":

@@ -231,6 +231,19 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
                       "Not found. Only needed for “Open in FreeCAD” and the FreeCAD re-import check; "
                       "get it from https://www.freecad.org/downloads.php."))
 
+    # --- Blender (optional): illustrative renders; its 3D-Print Toolbox if installed ---------------------
+    from .adapters import blender as bl
+    b = bl.resolve(cfg)
+    if b["available"]:
+        tb = bl.print_toolbox(b["app"])
+        items.append(Item("blender", "Blender (optional)", "ok", f"Blender {b['version']} found, used for illustrative renders · {b['app']}"))
+        items.append(Item("blender.print3d", "Blender print checks", "ok" if tb["available"] else "info", tb["reason"]))
+    else:
+        items.append(Item("blender", "Blender (optional)", "info" if not b["app"] else "warn",
+                          b["reason"] + " Only illustrative renders need it.",
+                          Fix("Install Blender (about 400 MB, optional)", [], recommended=False,
+                              note=f"Download from {bl.DOWNLOAD_URL}, or set [blender].app in studio.toml.")))
+
     # --- agents -----------------------------------------------------------
     if shutil.which("claude"):
         add = f"claude mcp add --scope user form -- {shlex.quote(mcp)}"
