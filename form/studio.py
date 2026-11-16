@@ -31,8 +31,29 @@ SCHEMA = "form-project/1"
 
 try:
     import fcntl
-except ImportError:          # Windows: in-process locking only
+except ImportError:           # Windows
     fcntl = None
+try:
+    import msvcrt
+except ImportError:           # not Windows
+    msvcrt = None
+
+
+def _flock(fd: int, lock: bool) -> None:
+    """Exclusive whole-file lock across processes: flock on POSIX, a one-byte region lock on Windows."""
+    if fcntl:
+        fcntl.flock(fd, fcntl.LOCK_EX if lock else fcntl.LOCK_UN)
+    elif msvcrt:
+        os.lseek(fd, 0, os.SEEK_SET)
+        if lock:
+            while True:
+                try:
+                    msvcrt.locking(fd, msvcrt.LK_LOCK, 1)      # retries for ~10 s, then raises
+                    break
+                except OSError:
+                    continue
+        else:
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
 
 
 class ProjectLock:
@@ -47,17 +68,17 @@ class ProjectLock:
 
     def __enter__(self):
         self._r.acquire()
-        if self._depth == 0 and fcntl:
+        if self._depth == 0 and (fcntl or msvcrt):
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self._fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o644)
-            fcntl.flock(self._fd, fcntl.LOCK_EX)
+            _flock(self._fd, True)
         self._depth += 1
         return self
 
     def __exit__(self, *exc):
         self._depth -= 1
         if self._depth == 0 and self._fd is not None:
-            fcntl.flock(self._fd, fcntl.LOCK_UN)
+            _flock(self._fd, False)
             os.close(self._fd)
             self._fd = None
         self._r.release()

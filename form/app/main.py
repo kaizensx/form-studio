@@ -1,0 +1,127 @@
+"""FORM desktop app: a native Qt Quick interface over the same engine the MCP server and CLI use.
+
+    form app                      open the app
+    form app --check              load every screen once and report QML errors (CI, development)
+    form app --shot out.png       render a screenshot and quit (see --project, --stage, --size, --wait, --eval)
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import signal
+import sys
+import threading
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+
+
+def _engine(cfg):
+    """The engine API on a loopback port chosen by the OS, served from this process."""
+    from ..server import make_handler
+    from ..studio import Studio
+    st = Studio(cfg)
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(st))
+    httpd.daemon_threads = True
+    threading.Thread(target=httpd.serve_forever, daemon=True, name="form-engine").start()
+
+    def warm():
+        try:
+            st.kernel_id()
+        except Exception:
+            pass                     # reported on the first real kernel call
+    threading.Thread(target=warm, daemon=True, name="form-kernel-warm").start()
+    return st, httpd
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(prog="form app", description="FORM desktop app")
+    ap.add_argument("--check", action="store_true", help="load the interface, report QML errors, quit")
+    ap.add_argument("--shot", metavar="PNG", help="save a screenshot and quit")
+    ap.add_argument("--project", help="open this project id")
+    ap.add_argument("--stage", choices=["brief", "shape", "fit", "prove", "release"])
+    ap.add_argument("--size", default="1440x900")
+    ap.add_argument("--wait", type=int, default=2600, help="ms to wait before --shot")
+    ap.add_argument("--eval", dest="js", help="QML/JS expression run in Main.qml before --shot (development)")
+    ap.add_argument("--after", type=int, default=900, help="ms between --eval and the screenshot")
+    args = ap.parse_args(argv)
+
+    try:
+        from PySide6.QtCore import QCoreApplication, Qt, QTimer, QUrl
+        from PySide6.QtGui import QFontDatabase, QGuiApplication, QIcon
+        from PySide6.QtQml import QQmlApplicationEngine, qmlRegisterSingletonInstance
+        from PySide6.QtQuick import QQuickWindow
+    except ImportError:
+        print("The desktop app needs Qt. Install it with:\n\n    uv tool install --force 'form-studio[app]'\n\n"
+              "or, in a checkout:  pip install PySide6", file=sys.stderr)
+        return 2
+
+    from .. import __version__, config
+    from . import geometry  # noqa: F401  (registers the FormNative QML types)
+    from .bridge import Bridge
+
+    cfg = config.load()
+    QCoreApplication.setOrganizationName("FORM")
+    QCoreApplication.setApplicationName("FORM")
+    QCoreApplication.setApplicationVersion(__version__)
+    os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
+    app = QGuiApplication(sys.argv[:1])
+    app.setWindowIcon(QIcon(str(HERE / "assets" / "icon.png")))
+    for f in ("InstrumentSans.ttf", "GeistMono.ttf", "lucide.ttf"):
+        QFontDatabase.addApplicationFont(str(HERE / "assets" / "fonts" / f))
+
+    st, httpd = _engine(cfg)
+    bridge = Bridge("127.0.0.1", httpd.server_address[1], cfg["data"]["dir"], __version__)
+    qmlRegisterSingletonInstance(Bridge, "FormNative", 1, 0, "Bridge", bridge)
+
+    engine = QQmlApplicationEngine()
+    errors: list[str] = []
+    engine.warnings.connect(lambda ws: errors.extend(w.toString() for w in ws))
+    engine.addImportPath(str(HERE / "qml"))
+    w, h = (int(x) for x in args.size.lower().split("x"))
+    engine.setInitialProperties({"startProject": args.project or "", "startStage": args.stage or "",
+                                 "headless": bool(args.shot or args.check), "width": w, "height": h})
+    engine.load(QUrl.fromLocalFile(str(HERE / "qml" / "Main.qml")))
+    code = {"rc": 0}
+
+    def finish(rc: int):
+        code["rc"] = rc
+        app.quit()
+
+    if not engine.rootObjects():
+        print("FORM could not load its interface:", *errors, sep="\n  ", file=sys.stderr)
+        httpd.shutdown(); st.kernel.stop()
+        return 1
+    win: QQuickWindow = engine.rootObjects()[0]
+
+    if args.check or args.shot:
+        def done():
+            if args.js:
+                from PySide6.QtQml import QQmlExpression
+                from PySide6.QtQml import QQmlEngine
+                ex = QQmlExpression(QQmlEngine.contextForObject(win), win, args.js)
+                ex.evaluate()
+                if ex.hasError():
+                    errors.append("--eval: " + ex.error().toString())
+            def snap():
+                if args.shot:
+                    win.grabWindow().save(args.shot)
+                bad = [e for e in errors if "Binding loop" not in e]
+                for e in bad:
+                    print("QML:", e, file=sys.stderr)
+                print(f"ok: {len(bad)} warning(s)" + (f", saved {args.shot}" if args.shot else ""))
+                finish(1 if (args.check and bad) else 0)
+            QTimer.singleShot(args.after if args.js else 0, snap)
+        QTimer.singleShot(args.wait, done)
+
+    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    tick = QTimer(); tick.start(250); tick.timeout.connect(lambda: None)     # let Python see Ctrl+C
+    app.exec()
+    httpd.shutdown()
+    st.kernel.stop()
+    return code["rc"]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

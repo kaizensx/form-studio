@@ -1,5 +1,18 @@
 # Changelog
 
+## 9.0.0
+
+### A desktop app
+- **FORM is now a native app** for macOS, Windows and Linux (`form app`, or the downloadable bundle). It is built with Qt Quick and runs in one process with the CAD engine. No browser, no web view.
+- **Native 3D viewport:** the kernel's meshes and edges, feature picking, section cuts with solid cut faces, and overall dimensions drawn as dimension lines.
+- **Home** shows every design as a live 3D card. **Claude** has its own column. A **command palette** (Ctrl/⌘ K) reaches every action and design.
+- **All five stages** are in the app: Brief (with photo measuring), Shape, Fit, Prove (with the slice layer viewer) and Release.
+- **Installers for every platform** are built by the *Desktop app* workflow. They are not signed or notarized yet.
+
+### Engine
+- Project locks now also work across processes on Windows.
+- `form serve` no longer prints a traceback when FORM is already running.
+
 ## 8.0.0
 
 ### Design anything

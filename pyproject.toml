@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "form-studio"
-version = "8.0.0"
-description = "Engine and MCP server that lets coding agents design 3D-printable parts with real CAD, real slicing and an honest evidence record."
+version = "9.0.0"
+description = "Desktop app, engine and MCP server for designing 3D-printable parts with an AI agent: real CAD, real slicing and an honest evidence record."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -15,6 +15,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Operating System :: MacOS",
   "Operating System :: POSIX :: Linux",
+  "Operating System :: Microsoft :: Windows",
   "Topic :: Scientific/Engineering",
 ]
 dependencies = [
@@ -25,6 +26,9 @@ dependencies = [
   "pypdfium2>=4.30",
 ]
 
+[project.optional-dependencies]
+app = ["PySide6>=6.9,<7"]
+
 [project.urls]
 Homepage = "https://github.com/kaizensx/form-studio"
 Issues = "https://github.com/kaizensx/form-studio/issues"
@@ -33,6 +37,9 @@ Changelog = "https://github.com/kaizensx/form-studio/blob/main/CHANGELOG.md"
 [project.scripts]
 form = "form.__main__:main"
 form-mcp = "form.mcp_server:main"
+
+[project.gui-scripts]
+form-app = "form.app.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["form"]

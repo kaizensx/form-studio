@@ -23,27 +23,40 @@
 
 ---
 
-## Design anything. Watch it happen.
+## A desktop app. Describe a part, watch it get built.
 
-Run `form serve`, or let any agent start FORM. A page opens with Claude on the left and your part on the right. Describe what you need:
+FORM is a native app for macOS, Windows and Linux. Claude is on the left and your part is in the middle. Describe what you need:
 
 > *Design a case for a Raspberry Pi 5 with a snap-on lid*
+
+<p align="center"><img src="docs/screenshots/app-chat.jpg" width="900" alt="FORM app: Claude on the left, a phone dock in the 3D viewport with a blue draft, the change and its consequences on the right"><br>
+<sub>A real run in the app: Claude previewed a change, the kernel rebuilt it in 175 ms, and the app shows what it would cause before anything is saved. 4 steps, $0.11 on the user's account.</sub></p>
 
 Claude then works through the request:
 
 1. **Finds the official mechanical drawing** and reads it as an image, so a drawing's dimensions aren't lost the way they are in text extraction.
 2. **Writes the design as CAD code inside FORM:** typed parameters, named features and constraints.
-3. **Builds, renders and checks it.** It slices it with your printer's settings, and fixes what the checks catch. In the run below it noticed the two parts were wider than an A1 mini bed and moved the lid.
+3. **Builds, renders and checks it.** It slices it with your printer's settings, and fixes what the checks catch.
 
-<p align="center"><img src="docs/screenshots/16-chat-pi5-case.jpg" width="820" alt="FORM page: Claude chat on the left, the Pi 5 case it designed on the right"></p>
+<table><tr>
+<td><img src="docs/screenshots/app-home.jpg" alt="Home: every design as a live 3D card"></td>
+<td><img src="docs/screenshots/app-fit.jpg" alt="Fit: a section cut through the pocket and the modelled yield"></td>
+</tr><tr>
+<td><img src="docs/screenshots/app-layers.jpg" alt="Prove: the sliced toolpaths, layer by layer"></td>
+<td><img src="docs/screenshots/app-release.jpg" alt="Release: the gate, releases with hashes, revisions"></td>
+</tr></table>
+
+What is in the app:
+
+- **A native 3D viewport.** The kernel's real geometry, one mesh per feature. Click a feature to edit it. Dimensions are drawn on the plate; a section cut shows solid cut faces.
+- **Five stages:** Brief, Shape, Fit, Prove, Release. Each one answers one question about the design and says how each number is known.
+- **It follows any agent.** Use FORM from Claude Code or Codex and the open app follows along: drafts, views, commits.
+- **No browser.** The interface is Qt Quick, drawn on the GPU, in the same process as the CAD engine.
+
+Get it from the [Desktop app workflow](https://github.com/kaizensx/form-studio/actions/workflows/app.yml) (bundles for every platform, not yet signed), or run `form app` after installing with the `app` extra. Details: [docs/APP.md](docs/APP.md).
 
 <p align="center"><img src="docs/assets/pi5-case-by-claude.png" width="820" alt="Four views of the Raspberry Pi 5 case Claude designed in FORM"><br>
-<sub>A real run from the page: 10 steps, $1.04 on the user's account. Base and lid print side by side. The answer lists which numbers came from the official drawing and which are estimates to check.</sub></p>
-
-How the page works:
-
-- **Same live view in every agent.** When you use FORM from Claude Code or Codex instead, the same page opens by itself and follows along: drafts, renders, commits.
-- **Five built-in recipes as examples, not the limit.** Anything else is written as a design: one Python file, built by build123d, with history kept for every version.
+<sub>A case Claude designed in FORM from the official drawing: 10 steps, $1.04. Base and lid print side by side. The answer lists which numbers came from the drawing and which are estimates to check.</sub></p>
 
 ## Install in one line
 
@@ -74,6 +87,16 @@ Set up which? [Enter = recommended 1,2,3 · a = all · 1,3 · n = none]
 ```
 
 Restart your agent, then ask it for a part.
+
+To add the desktop app to this install:
+
+```bash
+uv tool install --force --python 3.12 "form-studio[app] @ git+https://github.com/kaizensx/form-studio"
+```
+
+```bash
+form app
+```
 
 ## Watch an agent use it
 
@@ -197,7 +220,7 @@ codex mcp add form -- form-mcp
 </details>
 
 <details>
-<summary><b>The bench</b>: your local review page</summary>
+<summary><b>The bench</b>: the same review tools as a local web page (<code>form serve</code>)</summary>
 
 `form-mcp` also serves `http://127.0.0.1:4173`. Run `form serve` to open it on its own. There you can:
 
@@ -221,7 +244,7 @@ While it's open, it follows what agents change, and labels each revision with th
 
 ## Status and roadmap
 
-FORM is tested on macOS (Apple Silicon, full pipeline with slicing) and Linux (Ubuntu in CI: all tests, no slicer). On Windows, use WSL (untested).
+The engine is tested on macOS (Apple Silicon, full pipeline with slicing) and Linux (Ubuntu in CI: all tests, no slicer). The desktop app was built, packaged and run on macOS (Apple Silicon). The Windows, Linux and Intel macOS app bundles are built by CI and have not been run by a person yet; please report what you find.
 
 Wanted next:
 

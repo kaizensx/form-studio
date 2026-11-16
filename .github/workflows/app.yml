@@ -1,0 +1,81 @@
+name: Desktop app
+
+# Builds the FORM desktop app for macOS (Apple Silicon and Intel), Windows and Linux.
+# Every push to main or app builds and uploads the bundles as workflow artifacts.
+# A tag like v9.0.0 also attaches them to a draft GitHub release.
+on:
+  push:
+    branches: [main, app]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS arm64, os: macos-14, asset: FORM-macos-arm64.zip }
+          - { name: macOS x64, os: macos-13, asset: FORM-macos-x64.zip }
+          - { name: Windows x64, os: windows-latest, asset: FORM-windows-x64.zip }
+          - { name: Linux x64, os: ubuntu-22.04, asset: FORM-linux-x64.tar.gz }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Linux libraries for Qt
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 libfontconfig1 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-xfixes0 libgl1-mesa-dri xvfb
+      - name: Install
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv -e ".[app]" pyinstaller
+      - name: Engine tests
+        shell: bash
+        run: |
+          PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
+          FORM_CONFIG=.github/ci-studio.toml FORM_DATA="$RUNNER_TEMP/form-data" "$PY" -m unittest discover -s tests
+      - name: Interface loads without errors
+        continue-on-error: true      # CI runners have no GPU; the 3D viewport may warn there
+        shell: bash
+        run: |
+          PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
+          RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a"
+          FORM_CONFIG=.github/ci-studio.toml FORM_DATA="$RUNNER_TEMP/form-data" $RUN "$PY" -m form.app --check --wait 6000
+      - name: Build the app
+        shell: bash
+        run: |
+          PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
+          "$PY" -m PyInstaller packaging/form.spec --noconfirm
+      - name: Package
+        shell: bash
+        run: |
+          cd dist
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            codesign --force --deep --sign - FORM.app        # ad-hoc: lets it run after "Open Anyway"; not notarized
+            ditto -c -k --keepParent FORM.app "../${{ matrix.asset }}"
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            7z a -tzip "../${{ matrix.asset }}" FORM
+          else
+            tar -czf "../${{ matrix.asset }}" FORM
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+      - name: Attach to draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: ${{ matrix.asset }}

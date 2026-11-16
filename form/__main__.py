@@ -42,12 +42,16 @@ def _print(obj) -> None:
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ["app"]:                       # the desktop app has its own flags
+        from .app.main import main as app_main
+        return app_main(argv[1:])
     if argv[:1] == ["setup"]:                     # its own flags; keep argparse out of the way
         from .setup import main as setup_main
         return setup_main(argv[1:])
     ap = argparse.ArgumentParser(prog="form", description="FORM print-design studio",
                                  formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split("\n", 2)[2])
     sub = ap.add_subparsers(dest="cmd")
+    sub.add_parser("app", help="open the desktop app (needs the [app] extra)")
     sub.add_parser("serve", help="start the bench on loopback")
     m = sub.add_parser("mcp", help="MCP server over stdio")
     m.add_argument("--no-bench", action="store_true")
