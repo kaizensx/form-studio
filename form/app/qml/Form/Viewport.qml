@@ -17,6 +17,7 @@ Item {
     property bool showDims: true
     property bool interactive: true
     property bool spin: false                // slow turntable (home screen)
+    property bool lite: false                // thumbnails: no shadow map, no AO, lighter MSAA (many on screen at once)
     property real plateSize: 180
     property var bounds: ({ lo: Qt.vector3d(-40, -40, 0), hi: Qt.vector3d(40, 40, 40) })   // on the plate
     property vector3d shift: Qt.vector3d(0, 0, 0)
@@ -165,8 +166,8 @@ Item {
         camera: cam
         environment: SceneEnvironment {
             clearColor: Theme.plate; backgroundMode: SceneEnvironment.Color
-            antialiasingMode: SceneEnvironment.MSAA; antialiasingQuality: SceneEnvironment.VeryHigh
-            aoEnabled: true; aoStrength: 55; aoDistance: 6; aoSoftness: 30; aoSampleRate: 3
+            antialiasingMode: SceneEnvironment.MSAA; antialiasingQuality: vp.lite ? SceneEnvironment.Medium : SceneEnvironment.VeryHigh
+            aoEnabled: !vp.lite; aoStrength: 55; aoDistance: 6; aoSoftness: 30; aoSampleRate: 3
             tonemapMode: SceneEnvironment.TonemapModeFilmic
         }
         PerspectiveCamera {
@@ -181,7 +182,7 @@ Item {
             rotation: Quaternion.lookAt(vp.scene(zpos), vp.scene(vp.target))
         }
         DirectionalLight { eulerRotation: Qt.vector3d(-52, -32, 0); brightness: 2.1; color: "#ffffff"
-            castsShadow: true; shadowFactor: 85; shadowMapQuality: Light.ShadowMapQualityVeryHigh; softShadowQuality: Light.PCF32; pcfFactor: 5; shadowMapFar: 1400; csmNumSplits: 1 }
+            castsShadow: !vp.lite; shadowFactor: 85; shadowMapQuality: Light.ShadowMapQualityVeryHigh; softShadowQuality: Light.PCF32; pcfFactor: 5; shadowMapFar: 1400; csmNumSplits: 1 }
         DirectionalLight { eulerRotation: Qt.vector3d(-18, 118, 0); brightness: 0.7; color: "#fff1e0" }
         DirectionalLight { eulerRotation: Qt.vector3d(40, -150, 0); brightness: 0.35; color: "#cfe0ff" }
         DirectionalLight { eulerRotation: Qt.vector3d(-90, 0, 0); brightness: 0.25 }

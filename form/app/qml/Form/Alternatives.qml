@@ -109,7 +109,7 @@ Column {
                         Item { width: 1; height: 6 }
                         Rectangle { width: parent.width; height: 132; radius: Theme.rSm; color: Theme.plate; clip: true
                             Loader { anchors.fill: parent; active: !!card.c.ok
-                                sourceComponent: Viewport { id: vp; selected: "-"; interactive: false; showDims: false; showCompanions: false
+                                sourceComponent: Viewport { id: vp; selected: "-"; lite: true; interactive: false; showDims: false; showCompanions: false
                                     Component.onCompleted: {
                                         setModel({ mesh: [{ feature: "", positions: card.c.mesh.positions, indices: card.c.mesh.indices }], bbox: card.c.bbox, edges: "", companions: [] })
                                         setView("iso", false)

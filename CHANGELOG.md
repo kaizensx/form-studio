@@ -1,5 +1,32 @@
 # Changelog
 
+## 10.0.0
+
+### Works with the tools you already have
+- **Slicers:** OrcaSlicer and PrusaSlicer (and SuperSlicer, QIDISlicer) join Bambu Studio. `[slicer].kind = "auto"` uses the first one installed; the Slicer sheet switches between them. Only Bambu Studio was run for real on the release machine; the others are tested against fixtures written from their source.
+- **Import a real part:** bring in a STEP or STL (a board, a device, a motor). It is drawn in blueprint around your design, and a design can cut clearance from it with `self.reference("pi5.step")`.
+- **OpenSCAD designs:** `create_design(..., language="openscad")`. Customizer range comments become FORM parameters. Mesh designs say clearly which checks and exports do not apply.
+- **FreeCAD:** open the STEP in FreeCAD, an optional re-import check when FreeCAD is installed, and a `.FCMacro` with every parameter in a spreadsheet. Not run against a real FreeCAD yet.
+- **Blender:** illustrative renders of the current revision (studio, desk, dark; matte PLA, PETG, silk), cached like every other artifact. Blender's 3D-Print Toolbox checks run when the add-on is installed.
+
+### Designs with real hardware
+- **`form.parts`:** screw clearances (ISO 273), heat-set insert pockets, nut traps, magnet pockets, bearing seats, printable threads and spur gears, each with its dimensions and their source.
+- **New recipes:** electronics enclosure, gear pair, control knob, hinged box.
+
+### Assemblies
+- **Assembled / Exploded / Print layout** in the viewport, with hinge and slide joints you can move.
+- **Checks from the solids:** overlap when assembled, the smallest gap, each joint swept at sampled positions, and screwdriver access. The check text says that sampled motion does not prove the motion is free between samples.
+- **Maker documents on release:** `BOM.csv`, `ASSEMBLY.md` (an exploded image per step), `PRINT_REPORT.md`, `MEASUREMENT_PLAN.md`, `MOTION_CHECKS.csv`.
+
+### The app sets itself up
+- **First-run welcome:** what FORM found on this computer, and what it can set up. Nothing is installed until you tick it and press Apply, and every command is shown first.
+- **Update notices:** FORM checks GitHub's latest release at most once a day and tells you when one exists. It never downloads or installs anything itself. Turn it off with `[updates] check = false`.
+
+### Expertise
+- **Claude Code plugin:** 13 skills (intake, parametric design, FDM engineering, fit calibration, hardware, assemblies, industrial design, design review, release and more) plus the MCP server, in `plugins/form`.
+- **Start from a brief:** six brief templates (remote holder, desk accessory, organizer, bathroom mount, enclosure, car accessory) with the questions worth answering; your answers go to Claude.
+- **Design review on demand** from the Release stage.
+
 ## 9.0.0
 
 ### A desktop app

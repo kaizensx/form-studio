@@ -16,6 +16,6 @@ Item {
             vp.setModel(v); vp.setView("iso", false); vp.dist *= 0.82; mv.loaded = true
         }, function () {})
     }
-    Viewport { id: vp; anchors.fill: parent; interactive: false; showDims: false; showCompanions: false; spin: mv.turning
+    Viewport { id: vp; anchors.fill: parent; lite: true; interactive: false; showDims: false; showCompanions: false; spin: mv.turning
         opacity: mv.loaded ? 1 : 0; Behavior on opacity { NumberAnimation { duration: 400 } } }
 }

@@ -60,6 +60,9 @@ pages: "1", "1-3", "2,5" (at most 4). Use this for official dimensions of boards
 Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
 built with build123d. FORM builds it, and with run=True exports, checks and slices it. Load or build errors come
 back with the line and a hint; fix and call again. Then render(view="sheet") and look at it.
+language="openscad": source is an OpenSCAD file; parameters come from Customizer comments (`w = 40; // [20:1:120]`).
+OpenSCAD output is a mesh: no STEP, no B-rep checks (reported as not available, never faked).
+references: absolute paths of STEP/STL parts to import first, so a Python design can use self.reference("name.step").
 
 | Argument | Type | Required |
 |---|---|---|
@@ -68,12 +71,15 @@ back with the line and a hint; fix and call again. Then render(view="sheet") and
 | `brief` | string |  |
 | `values` | object | null |  |
 | `run` | boolean |  |
+| `language` | string |  |
+| `references` | array | null |  |
 
 ## `update_design`
 
 Replace a design's code as a new revision (history keeps every version). Existing parameter values carry over;
 changing a default does not change a saved value, so pass values={...} to change them. New parameters start at
-their defaults. Use preview_change/commit_change instead when only values change.
+their defaults. Use preview_change/commit_change instead when only values change. language defaults to the
+project's current one ("python" or "openscad").
 
 | Argument | Type | Required |
 |---|---|---|
@@ -83,6 +89,7 @@ their defaults. Use preview_change/commit_change instead when only values change
 | `values` | object | null |  |
 | `expect_head` | integer | null |  |
 | `run` | boolean |  |
+| `language` | string | null |  |
 
 ## `get_design_source`  · read-only
 
@@ -95,8 +102,8 @@ The exact code a revision was built from (built-in recipes return their recipe f
 
 ## `create_project`
 
-Create a project from a built-in recipe (dock, gridfinity, hook, planter, coupon). For anything else, write a
-design: design_guide, then create_design. values override recipe defaults (all start as 'assumed').
+Create a project from a built-in recipe (dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob).
+For anything else, write a design: design_guide, then create_design. values override recipe defaults (all start as 'assumed').
 With run=True the solid, exports and checks are built (and sliced if a slicer is available).
 
 | Argument | Type | Required |
@@ -302,7 +309,8 @@ Re-hash every file of a release against its manifest and say whether it still ma
 ## `open_in`
 
 Open a current output in the user's own software: what = step | stl | 3mf | gcode | folder.
-app overrides studio.toml [apps] (e.g. "BambuStudio", "FreeCAD"). Uses the system's open command; nothing is uploaded.
+app overrides studio.toml [apps] (e.g. "BambuStudio"); app="freecad" finds FreeCAD. Uses the system's open command;
+nothing is uploaded.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -318,6 +326,56 @@ The bench is the local web page where the user inspects the 3D model, compares r
 |---|---|---|
 | `project` | string | null |  |
 | `open_browser` | boolean |  |
+
+## `brief_presets`  · read-only
+
+Brief templates for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure,
+car accessory): the questions worth asking, environment defaults (temperature, humidity, UV, load), a material to
+start from and the checks to plan for. Defaults are assumptions to confirm with the user, never measurements.
+
+| Argument | Type | Required |
+|---|---|---|
+| `preset` | string |  |
+
+## `import_reference`
+
+Import an existing part (STEP or STL, e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's
+references. FORM copies it, measures it in the kernel (bounding box, volume: computed) and draws it in the 3D
+view as a blueprint companion, in its own coordinates. A Python design can then read it with
+self.reference("<name>") for clearance cuts. path: absolute local path. Re-importing a name replaces it.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `path` | string | yes |
+| `name` | string | null |  |
+
+## `freecad_macro`  · read-only
+
+Write a FreeCAD macro (.FCMacro) next to the current STEP export. Run it in FreeCAD to rebuild the part
+from the STEP (hash-checked) with a spreadsheet of FORM's parameters and their provenance. Not for mesh designs.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+
+## `render_photo`
+
+A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed).
+preset: studio (soft box, light backdrop) | desk (wooden desk) | dark (graphite, rim light).
+material: matte (PLA) | petg (gloss) | silk (silk PLA). color: hex, e.g. "#3d6fb6".
+layer_lines draws faint lines at the slicer's layer height when a process preset is selected.
+fast=True uses EEVEE instead of Cycles. Cached per geometry and settings. This is an illustration with
+invented light and material, not a photo of a print: never present it as evidence of anything.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `preset` | string |  |
+| `material` | string |  |
+| `color` | string |  |
+| `fast` | boolean |  |
+| `layer_lines` | boolean |  |
 
 ## Prompt `design_part(goal)`
 

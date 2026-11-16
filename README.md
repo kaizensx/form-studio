@@ -6,7 +6,7 @@
   <a href="https://github.com/kaizensx/form-studio/actions"><img alt="CI" src="https://github.com/kaizensx/form-studio/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-1c1b19">
   <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-1c1b19">
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-27%20tools-e24d26">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-31%20tools-e24d26">
   <img alt="CAD" src="https://img.shields.io/badge/CAD-build123d%20%2F%20OpenCascade-1c1b19">
 </p>
 
@@ -53,7 +53,51 @@ What is in the app:
 - **It follows any agent.** Use FORM from Claude Code or Codex and the open app follows along: drafts, views, commits.
 - **No browser.** The interface is Qt Quick, drawn on the GPU, in the same process as the CAD engine.
 
-Get it from the [Desktop app workflow](https://github.com/kaizensx/form-studio/actions/workflows/app.yml) (bundles for every platform, not yet signed), or run `form app` after installing with the `app` extra. Details: [docs/APP.md](docs/APP.md).
+Get it from the [Desktop app workflow](https://github.com/kaizensx/form-studio/actions/workflows/app.yml) (bundles for every platform, not yet signed), or run `form app` after installing with the `all` extra. Details: [docs/APP.md](docs/APP.md).
+
+## Works with what you already use
+
+FORM drives existing software instead of replacing it. On first launch it shows what it found and sets up only what you tick.
+
+<table><tr>
+<td width="50%"><img src="docs/screenshots/app-welcome.jpg" alt="First run: what FORM found on this computer, and what it can set up"></td>
+<td width="50%"><img src="docs/screenshots/app-slicers.jpg" alt="Slicer picker: Bambu Studio in use, OrcaSlicer and PrusaSlicer detected or not"></td>
+</tr></table>
+
+| | What FORM does with it | Run for real here |
+|---|---|---|
+| **build123d / OpenCascade** | The CAD kernel: every solid, STEP, B-rep checks | yes |
+| **Bambu Studio** | Slices with your printer, filament and process presets | yes |
+| **OrcaSlicer, PrusaSlicer** (SuperSlicer, QIDISlicer) | Same, picked automatically or in the Slicer sheet | fixtures only |
+| **OpenSCAD** | Designs written in `.scad`; Customizer ranges become parameters | yes |
+| **Blender** | Illustrative renders; its 3D-Print Toolbox checks when installed | renders yes |
+| **FreeCAD** | Open the STEP, an optional re-import check, a macro with every parameter | fixtures only |
+| **STEP / STL from makers** | Imported as reference parts to design around | yes |
+| **Claude Code, Codex, Gemini CLI, Cursor** | Use FORM's 31 MCP tools; the app follows along live | Claude Code, Codex |
+
+<table><tr>
+<td width="50%"><img src="docs/screenshots/app-reference-part.jpg" alt="A board imported as a STEP file, drawn in blueprint inside the case being designed"></td>
+<td width="50%"><img src="docs/assets/render-dock-studio.jpg" alt="Blender render of the phone dock in matte blue PLA"></td>
+</tr><tr>
+<td><sub>A board imported as STEP. The case is designed around it.</sub></td>
+<td><sub>Rendered in Blender from the real export. An illustration, not a photo of a print.</sub></td>
+</tr></table>
+
+## Real hardware, real assemblies
+
+Designs use **`form.parts`**: screw clearances (ISO 273), heat-set insert pockets, nut traps, magnet pockets, bearing seats, printable threads and gears, each with its published dimension and source. Parts that go together are checked **assembled**: overlap, the smallest gap, each hinge or slide swept through its range, and screwdriver access. A release writes the bill of materials, assembly steps with exploded images, a print report and a measurement plan.
+
+<table><tr>
+<td width="50%"><img src="docs/screenshots/app-assembly.jpg" alt="Hinged box assembled, with the hinge slider"></td>
+<td width="50%"><img src="docs/screenshots/app-home.jpg" alt="Home: enclosure, gear pair, knob, hinged box, dock, hanger and coupon as live 3D cards"></td>
+</tr></table>
+
+## Expertise, not just tools
+
+- **A Claude Code plugin** with 13 skills (intake, parametric design, FDM engineering, fit calibration, hardware, assemblies, industrial design, design review, release, print feedback…) and the MCP server: `/plugin marketplace add kaizensx/form-studio`, then `/plugin install form@form-studio`.
+- **Start from a brief:** six templates (remote holder, desk accessory, organizer, bathroom mount, enclosure, car accessory) ask the questions that matter, then hand your answers to Claude.
+- **Design review on demand:** silhouette, relationships and details, scored with evidence, from the Release stage.
+- **Updates:** FORM tells you when a new release is on GitHub. It never downloads or installs anything by itself.
 
 <p align="center"><img src="docs/assets/pi5-case-by-claude.png" width="820" alt="Four views of the Raspberry Pi 5 case Claude designed in FORM"><br>
 <sub>A case Claude designed in FORM from the official drawing: 10 steps, $1.04. Base and lid print side by side. The answer lists which numbers came from the drawing and which are estimates to check.</sub></p>
@@ -91,7 +135,7 @@ Restart your agent, then ask it for a part.
 To add the desktop app to this install:
 
 ```bash
-uv tool install --force --python 3.12 "form-studio[app] @ git+https://github.com/kaizensx/form-studio"
+uv tool install --force --python 3.12 "form-studio[all] @ git+https://github.com/kaizensx/form-studio"
 ```
 
 ```bash
@@ -246,12 +290,12 @@ While it's open, it follows what agents change, and labels each revision with th
 
 The engine is tested on macOS (Apple Silicon, full pipeline with slicing) and Linux (Ubuntu in CI: all tests, no slicer). The desktop app was built, packaged and run on macOS (Apple Silicon). The Windows, Linux and Intel macOS app bundles are built by CI and have not been run by a person yet; please report what you find.
 
-Wanted next:
+Not verified yet, and wanted next:
 
-- Orca and Prusa slicer adapters
-- more recipes: enclosures, brackets, cable management, organisers
-- section views in renders
-- photo-to-dimensions
+- OrcaSlicer, PrusaSlicer and FreeCAD runs on real installations (the adapters are tested against fixtures)
+- signed and notarized app bundles, and in-app updates beyond a notice
+- printer monitoring (left off on purpose until it can be read-only and local)
+- scan-to-CAD and photo-to-dimensions
 - a recipe gallery site
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

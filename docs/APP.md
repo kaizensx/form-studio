@@ -18,7 +18,7 @@ system from the workflow run (or from a release), unpack it and open FORM.
 **From Python.** If you already use FORM's CLI:
 
 ```bash
-uv tool install --force --python 3.12 "form-studio[app] @ git+https://github.com/kaizensx/form-studio"
+uv tool install --force --python 3.12 "form-studio[all] @ git+https://github.com/kaizensx/form-studio"
 ```
 
 ```bash
@@ -60,7 +60,7 @@ a fit yield *modelled*, and only you can approve a release, with a deliberate bu
 
 ```bash
 uv venv --python 3.12 .venv
-uv pip install --python .venv -e ".[app]" pyinstaller
+uv pip install --python .venv -e ".[all]" pyinstaller
 .venv/bin/python -m form.app            # run from source
 .venv/bin/pyinstaller packaging/form.spec --noconfirm
 ```

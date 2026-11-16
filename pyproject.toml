@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "form-studio"
-version = "9.0.0"
+version = "10.0.0"
 description = "Desktop app, engine and MCP server for designing 3D-printable parts with an AI agent: real CAD, real slicing and an honest evidence record."
 readme = "README.md"
 license = "MIT"
@@ -28,6 +28,7 @@ dependencies = [
 
 [project.optional-dependencies]
 app = ["PySide6>=6.9,<7"]
+all = ["form-studio[app,parts]"]
 parts = ["bd_warehouse==0.4.0", "py_gearworks==0.0.24"]  # form.parts: fasteners, threads, bearings, gears
 
 [project.urls]

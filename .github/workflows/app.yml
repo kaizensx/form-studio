@@ -38,7 +38,7 @@ jobs:
       - name: Install
         run: |
           uv venv --python 3.12 .venv
-          uv pip install --python .venv -e ".[app]" pyinstaller
+          uv pip install --python .venv -e ".[all]" pyinstaller
       - name: Engine tests
         shell: bash
         run: |
