@@ -42,6 +42,9 @@ DEFAULTS = {
     # Apps that `open_in` may hand files to. Values are application names (macOS)
     # or commands (Linux/Windows). Empty means the system default for the file type.
     "apps": {"slicer": "BambuStudio", "cad": "", "viewer": ""},
+    # Other CAD tools (optional). Empty = look in the usual places. OpenSCAD builds `language="openscad"` designs;
+    # FreeCADCmd, when found, re-imports each exported STEP as an extra check.
+    "cad": {"openscad": "", "freecad": "", "timeout_s": 120},
     # Chat in the bench runs Claude Code headless on your account, with FORM's tools (and web lookups if web = true).
     "chat": {"enabled": True, "cli": "claude", "model": "opus", "web": True, "budget_usd_per_message": 3.0},
     # Open the bench in your browser when an agent starts working (MCP server).

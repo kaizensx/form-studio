@@ -189,7 +189,7 @@ def alternatives(studio, p: dict, axes: list, weights: dict) -> dict:
         sp = recipe.spec(ax["key"])
         vals = [min(sp.max, max(sp.min, float(v))) for v in ax["values"]][:5]
         grid = [{**g, ax["key"]: v} for g in grid for v in vals]
-    rows = studio._k("variants", timeout=120, recipe_id=studio.rid(p), base=base, grid=grid)
+    rows = studio._k("variants", timeout=120, recipe_id=studio.rid(p), base=base, grid=grid, p=p)
     for r in rows:
         if not r["ok"]:
             continue

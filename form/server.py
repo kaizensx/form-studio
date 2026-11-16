@@ -13,6 +13,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import advisor, config
+from .cad_bridges import open_output
 from .studio import NODES, Studio, StudioError
 
 WEB = Path(__file__).resolve().parent / "web"
@@ -147,6 +148,10 @@ def make_handler(st: Studio):
                 ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
                 extra = {} if ctype.startswith("image/") else {"Content-Disposition": f'attachment; filename="{f.name}"'}
                 return self._send(200, f.read_bytes(), ctype, extra)
+            if rest == "/freecad_macro":                         # CAD bridges: FreeCAD macro download
+                name, text = st.freecad_macro(p)
+                return self._send(200, text.encode("utf-8"), "text/x-python; charset=utf-8",
+                                  {"Content-Disposition": f'attachment; filename="{name}"'})
             m3 = re.fullmatch(r"/release/(r\d+-[0-9a-f]+)", rest)
             if m3:
                 return self._json(st.verify_release(p, m3.group(1)))
@@ -277,6 +282,16 @@ def make_handler(st: Studio):
                     p["brief"]["references"].append({"file": name, "ts": time.time(), "scale_mm_per_px": None, "measurements": []})
                     st.save(p)
                 return self._json({"file": name})
+            # -- CAD bridges: import a reference part, open a file in another program ------------------
+            if action == "import_part":
+                q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+                if isinstance(body, bytes):
+                    rec = st.import_reference(p, Path(q.get("name", "part.step")), q.get("name"), data=body)
+                else:
+                    rec = st.import_reference(p, Path(str(body.get("path", ""))).expanduser(), body.get("name"))
+                return self._json({"reference": rec})
+            if action == "open":
+                return self._json(open_output(st, pid, str(body.get("what", "step")), str(body.get("app", ""))))
             if action == "reference_update":
                 with st.lock(pid):
                     p = st.load(pid)

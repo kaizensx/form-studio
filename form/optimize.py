@@ -73,7 +73,7 @@ def run(studio, p: dict, vary: list, objective: dict, constraints: list, budget:
                 fresh.append(pt)
         if not fresh:
             return
-        rows = studio._k("evaluate", timeout=240, recipe_id=studio.rid(p), base=base, candidates=fresh, need_wall=need_wall)
+        rows = studio._k("evaluate", timeout=240, recipe_id=studio.rid(p), base=base, candidates=fresh, need_wall=need_wall, p=p)
         for r in rows:
             k = tuple(r["changes"][a["key"]] for a in axes)
             if r["ok"]:

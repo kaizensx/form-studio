@@ -197,6 +197,18 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
                               "Not found. Everything except slicing works without it; slices show as BLOCKED.",
                               Fix("Install Bambu Studio (about 200 MB)", cmds, recommended=False, note=note)))
 
+    # --- other CAD tools (optional bridges) ---------------------------------
+    from . import cad_bridges
+    osc = cad_bridges.find_openscad(cfg)
+    items.append(Item("cad.openscad", "OpenSCAD (optional)", "ok" if osc else "info",
+                      f"{cad_bridges.version(osc)} at {osc}. Designs can be written in OpenSCAD (mesh designs: no STEP)." if osc else
+                      "Not found. Only needed for designs written in OpenSCAD; get it from https://openscad.org/downloads.html."))
+    fc = cad_bridges.find_freecad(cfg)
+    items.append(Item("cad.freecad", "FreeCAD (optional)", "ok" if fc else "info",
+                      f"FreeCADCmd at {fc}. Each exported STEP is re-imported in FreeCAD as an extra check." if fc else
+                      "Not found. Only needed for “Open in FreeCAD” and the FreeCAD re-import check; "
+                      "get it from https://www.freecad.org/downloads.php."))
+
     # --- agents -----------------------------------------------------------
     if shutil.which("claude"):
         add = f"claude mcp add --scope user form -- {shlex.quote(mcp)}"

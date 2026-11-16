@@ -15,6 +15,9 @@ Column {
     readonly property var warnings: g && g.warnings ? g.warnings : []
     readonly property bool allAcked: warnings.every(function (w) { return Store.ack.indexOf(w.id) >= 0 })
     readonly property var revs: p ? p.revisions.slice().sort(function (a, b) { return b.n - a.n }) : []
+    readonly property bool hasStep: !!d && !!d.exports && !!d.exports.files.step
+    readonly property bool noStep: !!d && !!d.exports && !d.exports.files.step
+    readonly property var fc: Store.studio && Store.studio.env.cad ? Store.studio.env.cad.freecad : ({ available: false })
     property var verified: ({})          // release name → result line from the last Verify
     property bool approving: false
 
@@ -117,14 +120,28 @@ Column {
         Column { width: parent.width
             Repeater { model: root.d && root.d.exports ? F.vals(root.d.exports.files) : []
                 Item { id: xr; required property var modelData; required property int index
+                    readonly property bool step: /\.(step|stp)$/i.test(String(modelData.name))
                     width: parent.width; implicitHeight: xc.implicitHeight + 14
                     Rectangle { visible: xr.index > 0; width: parent.width; height: 1; color: Theme.rule }
-                    Column { id: xc; anchors.left: parent.left; anchors.right: xb.left; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 1
+                    Btn { id: fcb; visible: xr.step; kind: "quiet"; small: true; icon: "external_link"; text: "FreeCAD"
+                        tip: root.fc.gui ? "Open this STEP in FreeCAD" : "FreeCAD was not found on this computer (freecad.org)"
+                        anchors.right: xb.left; anchors.verticalCenter: parent.verticalCenter
+                        enabled: !!root.fc.gui; onClicked: Store.openIn("step", "freecad") }
+                    Column { id: xc; anchors.left: parent.left; anchors.right: xr.step ? fcb.left : xb.left; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 1
                         Txt { text: xr.modelData.name; tone: 2; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap }
                         Txt { kind: "fine"; mono: true; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
                             text: (xr.modelData.bytes / 1024).toFixed(0) + " kB · sha256 " + String(xr.modelData.sha256).slice(0, 12) + "…" } }
                     Btn { id: xb; kind: "quiet"; small: true; icon: "download"; text: "Save…"; anchors.right: parent.right; anchors.rightMargin: -8; anchors.verticalCenter: parent.verticalCenter
                         onClicked: root.saveAs(xr.modelData.name, "/projects/" + Store.pid + "/file/exports/current/" + xr.modelData.name, "Same type (*." + String(xr.modelData.name).split(".").pop() + ")", true) } } } }
+        // other CAD tools: a FreeCAD macro that rebuilds the part from the STEP, or why there is no STEP
+        Note { visible: root.noStep; kind: "plain"; title: "No STEP file"
+            text: root.d && root.d.exports && root.d.exports.unavailable ? root.d.exports.unavailable.step : "" }
+        Row { visible: root.hasStep; spacing: 4; x: -8
+            Btn { kind: "quiet"; small: true; icon: "file_down"; text: "Save FreeCAD macro…"
+                tip: "A .FCMacro that opens the STEP next to it and adds a spreadsheet of these parameters"
+                onClicked: root.saveAs(Store.pid + "_" + F.pad(root.d.exports.rev) + ".FCMacro", "/projects/" + Store.pid + "/freecad_macro", "FreeCAD macros (*.FCMacro)", true) } }
+        Txt { kind: "fine"; width: parent.width; visible: root.hasStep
+            text: root.fc.available ? "FreeCAD found: each export is also re-imported there as a check." : "FreeCAD was not found here, so it cannot open the STEP or re-check it. The macro works wherever FreeCAD is installed." }
     }
 
     // ── revisions ───────────────────────────────────────────

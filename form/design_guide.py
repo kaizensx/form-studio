@@ -42,6 +42,25 @@ RULES
   9. After every create/update: render(view="sheet") and LOOK. Most mistakes are visible before any check.
  10. Fit: if something must slide in/onto the part, declare `fit`, derive the cavity and measure() it.
 
+ 11. Designing around an existing part (a board, a device, a motor): import its STEP or STL with
+     import_reference(project, path) (or create_design(..., references=[path])). It is drawn in the 3D view as a
+     blueprint companion. In build(), self.reference("pi5.step") returns it as a build123d shape in the file's own
+     coordinates (STEP: its B-rep; STL: a sewn mesh). Use it for clearance cuts, e.g.
+         pi = self.reference("pi5.step"); bb = pi.bounding_box()
+         body = body - Pos(bb.center().X, bb.center().Y, bb.min.Z) * Box(bb.size.X + 2 * c, bb.size.Y + 2 * c, bb.size.Z, align=A)
+     Boolean cuts with a full manufacturer STEP are slow and fragile; cut its bounding box or a few chosen
+     features rather than the whole assembly. Its dimensions are "computed" from the file, not "measured".
+
+OPENSCAD (create_design(..., language="openscad"))
+  The source is a .scad file. Each top-level number with a Customizer range comment becomes a FORM parameter:
+      // Inner width (mm)          <- the comment line above is the label; "(deg)" sets the unit to degrees
+      width = 40; // [20:1:120]    <- [min:step:max] or [min:max]; /* [Hidden] */ ends the parameters
+  FORM runs `openscad -o part.stl -D width=...` and brings the mesh into the pipeline. It is a mesh design:
+  no STEP export, no B-rep validity check, one feature only (no per-feature picking or impact), no FreeCAD
+  re-check. Those are reported as "not available for mesh designs", never faked. Mesh volume, closed-mesh,
+  wall thickness (ray-cast on the triangles), overhangs, build volume and the slice still run. Prefer Python
+  (build123d) when the part needs STEP, feature-level edits or a fit interface.
+
 WORKFLOW
   design_guide -> write source -> create_design (or update_design) -> render -> get_project (checks, slice)
   -> fix -> request_release. Parameter-only changes: preview_change / commit_change, as for any project.

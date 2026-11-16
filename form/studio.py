@@ -18,7 +18,8 @@ import zipfile
 from pathlib import Path
 
 from . import __version__, checks as checks_mod, fit as fit_mod, slicer
-from .recipes import RecipeBook, RecipeError, SOURCE_PREFIX, store_source
+from . import cad_bridges
+from .recipes import RecipeBook, RecipeError, SCAD_PREFIX, SOURCE_PREFIX, is_source, source_path, store_source
 from .worker import Kernel, KernelFailure
 
 NODES = ["geometry", "exports", "checks", "slice"]
@@ -26,6 +27,7 @@ STATICS_LABELS = {"tip_force_n": ("Tip-over force", "N"), "safety_factor": ("Ben
                   "root_stress_mpa": ("Arm root stress", "MPa"), "upper_screw_pull_n": ("Upper screw load", "N")}
 NODE_LABEL = {"geometry": "Solid", "exports": "STEP + STL", "checks": "Checks", "slice": "Slice"}
 STL_TOL = 0.01
+REF_FORMATS = (".step", ".stp", ".stl")
 SCHEMA = "form-project/1"
 
 
@@ -126,6 +128,8 @@ class Studio:
         self.root.mkdir(parents=True, exist_ok=True)
         self.sources = self.root / ".sources"
         os.environ["FORM_SOURCES"] = str(self.sources)       # the kernel worker inherits this and resolves src: ids
+        if (cfg.get("cad") or {}).get("openscad"):
+            os.environ["FORM_OPENSCAD"] = str(cfg["cad"]["openscad"])   # OpenSCAD designs build in the worker
         self.kernel = Kernel()
         self.recipes = RecipeBook(self.sources)
         self.calibration = fit_mod.Calibration(self.root / "calibration.json")
@@ -167,8 +171,9 @@ class Studio:
         if rid not in self._recipe_sha:
             base = Path(__file__).parent / "recipes"
             h = hashlib.sha256()
-            src = (self.sources / f"{rid[len(SOURCE_PREFIX):]}.py") if rid.startswith(SOURCE_PREFIX) else base / f"{rid}.py"
-            for f in (base / "base.py", src):
+            src = source_path(self.sources, rid) if is_source(rid) else base / f"{rid}.py"
+            extra = (base / "scad.py", base / "meshsolid.py") if rid.startswith(SCAD_PREFIX) else ()
+            for f in (base / "base.py", src, *extra):
                 h.update(f.read_bytes())
             self._recipe_sha[rid] = h.hexdigest()[:16]
         return self._recipe_sha[rid]
@@ -186,7 +191,8 @@ class Studio:
                 "printer": self.cfg["printer"], "profile": self.profile(),
                 "models": {k: v for k, v in self.cfg["models"].items()},
                 "config_path": self.cfg["_path"], "data_dir": str(self.root),
-                "kernel_restarts": self.kernel.restarts, "kernel_last_failure": self.kernel.last_failure}
+                "kernel_restarts": self.kernel.restarts, "kernel_last_failure": self.kernel.last_failure,
+                "cad": cad_bridges.status(self.cfg)}
 
     # ---- project store ---------------------------------------------------
     def dir(self, pid: str) -> Path:
@@ -252,10 +258,16 @@ class Studio:
     def recipe(self, p: dict, n: int | None = None):
         return self.recipes[self.rid(p, n)]
 
-    def _load_design(self, source: str) -> str:
+    def _load_design(self, source: str, language: str = "python") -> str:
         if len(source) > 200_000:
             raise StudioError("Design source is larger than 200 kB.")
-        rid = store_source(self.sources, source)
+        if language not in ("python", "openscad"):
+            raise StudioError(f"Unknown design language “{language}”.", "Use language=\"python\" (build123d) or \"openscad\".")
+        if language == "openscad" and not cad_bridges.find_openscad(self.cfg):
+            raise StudioError("OpenSCAD is not installed, so an OpenSCAD design cannot be built.",
+                              "Install it from https://openscad.org/downloads.html (or set [cad].openscad in studio.toml), "
+                              "or write the design in Python with build123d.", status=409)
+        rid = store_source(self.sources, source, language)
         self.recipes.pop(rid, None)
         try:
             self.recipes[rid]
@@ -263,17 +275,32 @@ class Studio:
             raise StudioError(str(e), e.hint, kind="source")
         return rid
 
-    def create_design(self, name: str, source: str, brief: str = "", values: dict | None = None) -> dict:
-        """A new project whose geometry is defined by Python source (one Recipe subclass)."""
-        rid = self._load_design(source)
-        self._k("summary", key="pv-" + H(rid, values or {}), recipe_id=rid,
+    def create_design(self, name: str, source: str, brief: str = "", values: dict | None = None,
+                      language: str = "python", references: list | None = None) -> dict:
+        """A new project whose geometry is defined by source: Python (one Recipe subclass) or OpenSCAD.
+
+        references: STEP/STL files to import first, so the design can call self.reference(name) on its first build.
+        """
+        rid = self._load_design(source, language)
+        refs = {}
+        for r in references or []:
+            src = Path(r).expanduser()
+            if not src.is_file() or src.suffix.lower() not in REF_FORMATS:
+                raise StudioError(f"Not a STEP or STL file: {src}", "Give the absolute path of a .step, .stp or .stl file.")
+            refs[self._ref_name(src.name)] = str(src.resolve())
+        self._k("summary", key="pv-" + H(rid, values or {}), recipe_id=rid, refs=refs,
                 values={**self.recipes[rid].defaults(), **(values or {})}, tol=0.1)        # must build before it is saved
-        return self.create(name, rid, brief, values)
+        p = self.create(name, rid, brief, values)
+        for path in refs.values():
+            self.import_reference(p, Path(path))
+        return self.load(p["id"])
 
     def update_design(self, p: dict, source: str, note: str = "", values: dict | None = None, origin: str = "agent",
-                      expect_head: int | None = None) -> dict:
+                      expect_head: int | None = None, language: str | None = None) -> dict:
         """New revision with new source. Values for parameters that still exist carry over."""
-        rid = self._load_design(source)
+        if language is None:                       # keep the project's language unless told otherwise
+            language = "openscad" if self.rid(p).startswith(SCAD_PREFIX) else "python"
+        rid = self._load_design(source, language)
         new = self.recipes[rid]
         with self.lock(p["id"]):
             p = self.load(p["id"])
@@ -284,7 +311,7 @@ class Studio:
             keep = {k: v for k, v in head["values"].items() if k in {q.key for q in new.params}}
             vals = {**new.defaults(), **keep, **{k: float(v) for k, v in (values or {}).items()}}
             vals = self._validate(rid, vals)
-            self._k("summary", key="pv-" + H(rid, vals), recipe_id=rid, values=vals, tol=0.1)
+            self._k("summary", key="pv-" + H(rid, vals), recipe_id=rid, values=vals, tol=0.1, p=p)
             prov = {q.key: (head["provenance"][q.key] if q.key in head["provenance"] and q.key in keep
                             and head["provenance"][q.key].get("source") != "assumed" else _initial_provenance(q)) for q in new.params}
             n = max(r["n"] for r in p["revisions"]) + 1
@@ -329,10 +356,10 @@ class Studio:
 
     def source_text(self, p: dict, n: int | None = None) -> str | None:
         rid = self.rid(p, n)
-        if not rid.startswith(SOURCE_PREFIX):
+        if not is_source(rid):
             f = Path(__file__).parent / "recipes" / f"{rid}.py"
         else:
-            f = self.sources / f"{rid[len(SOURCE_PREFIX):]}.py"
+            f = source_path(self.sources, rid)
         return f.read_text(encoding="utf-8") if f.exists() else None
 
     def create(self, name: str, recipe_id: str, brief: str = "", values: dict | None = None) -> dict:
@@ -352,7 +379,7 @@ class Studio:
              "fit": dict(zip(("gap_min", "gap_max"), (r.fit or {}).get("window", (0.10, 0.80)))),
              "orientation": "as_modelled", "auto_slice": True,
              "revisions": [{"n": 1, "parent": None, "ts": now, "values": vals, "recipe": recipe_id,
-                            "note": "Starting point from recipe defaults" if not recipe_id.startswith(SOURCE_PREFIX) else "First version of the design",
+                            "note": "Starting point from recipe defaults" if not is_source(recipe_id) else "First version of the design",
                             "origin": "recipe", "provenance": {pp.key: _initial_provenance(pp) for pp in r.params}}],
              "head": 1, "produced": {n: [] for n in NODES}, "decisions": [], "evidence": [], "approvals": []}
         self.save(p)
@@ -376,12 +403,17 @@ class Studio:
         rid = self.rid(p, r["n"])
         recipe = self.recipes[rid]
         gk = H("geometry", rid, self.recipe_sha(rid), self.kernel_id(), r["values"])
+        if self.uses_references(rid):                  # the design reads imported parts: their bytes are inputs too
+            gk = H(gk, self._refs_fp(p))
         ek = H("exports", gk, p["orientation"], STL_TOL)
         fit_in = None
         if recipe.fit:
             fit_in = [p["fit"], self.calibration.fingerprint(self.profile()), r["provenance"].get(recipe.fit["mating"])]
         ck = H("checks", ek, self.cfg["printer"]["envelope_mm"], self.cfg["printer"]["plate_margin_mm"],
                s.get("nozzle_mm", 0.4), checks_mod.CHECKS_VERSION, fit_in)
+        fc = self._freecad()
+        if fc and not getattr(recipe, "mesh", False):  # an installed FreeCAD adds a re-import check
+            ck = H(ck, "freecad", fc)
         presets = {k: v["sha"] for k, v in s.get("presets", {}).items()} if s.get("available") else None
         sk = H("slice", ek, presets, slicer.version(s["app"], s.get("kind", "bambu")) if s.get("available") else None)
         return {"geometry": gk, "exports": ek, "checks": ck, "slice": sk}
@@ -454,7 +486,14 @@ class Studio:
             pub = e.public() if hasattr(e, "public") else {"message": str(e)}
             raise StudioError(pub["message"], pub.get("hint", ""), feature=pub.get("feature"), params=pub.get("params", []), kind="recipe")
 
-    def _k(self, op, timeout=60, **kw):
+    def _k(self, op, timeout=60, p=None, refs=None, **kw):
+        """One kernel call. With p (the project), a design that reads imported parts gets their paths."""
+        if refs is None and p is not None and self.uses_references(kw.get("recipe_id", "")):
+            refs = self.reference_paths(p)
+        if refs:
+            kw["_refs"] = refs
+            if "key" in kw:
+                kw["key"] = f"{kw['key']}-{H(sorted((k, sha_file(Path(v))) for k, v in refs.items()))}"
         try:
             return self.kernel.call(op, timeout=timeout, **kw)
         except KernelFailure as e:
@@ -465,7 +504,9 @@ class Studio:
     def view(self, p: dict, n: int | None = None, tol=0.03) -> dict:
         r = self.rev(p, n)
         gk = self.keys(p, r["n"])["geometry"]
-        return self._k("view", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"], tol=tol, dock_mass_g=self._sliced_mass(p, r["n"]))
+        v = self._k("view", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"], tol=tol, dock_mass_g=self._sliced_mass(p, r["n"]), p=p)
+        v["companions"] = (v.get("companions") or []) + self.reference_companions(p)
+        return v
 
     def _sliced_mass(self, p, n=None):
         try:
@@ -488,7 +529,8 @@ class Studio:
         vals = {**self.rev(p)["values"], **{k: float(v) for k, v in values.items()}}
         key = "pv-" + H(self.rid(p), vals)
         t0 = time.perf_counter()
-        v = self._k("view", key=key, recipe_id=self.rid(p), values=vals, tol=0.06)
+        v = self._k("view", key=key, recipe_id=self.rid(p), values=vals, tol=0.06, p=p)
+        v["companions"] = (v.get("companions") or []) + self.reference_companions(p)
         v["impact"] = self.impact(p, vals, v)
         v["fit"] = self.fit(p, v["values"])
         v["round_trip_s"] = round(time.perf_counter() - t0, 4)
@@ -498,7 +540,7 @@ class Studio:
         r = self.rev(p, n)
         gk = self.keys(p, r["n"])["geometry"]
         cached = self.read(p, "geometry", gk)
-        return cached or self._k("summary", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"])
+        return cached or self._k("summary", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"], p=p)
 
     def impact(self, p: dict, vals: dict, cand: dict, base_rev: int | None = None) -> dict:
         """What a change touches: parameters, features, interfaces, artifacts."""
@@ -567,7 +609,7 @@ class Studio:
             if vals == head["values"] and prov == head["provenance"]:
                 raise StudioError("Nothing changed.", "Edit a parameter or its provenance first.")
             key = "pv-" + H(self.rid(p), vals)
-            cand = self._k("summary", key=key, recipe_id=self.rid(p), values=vals, tol=0.06)   # must build before it becomes a revision
+            cand = self._k("summary", key=key, recipe_id=self.rid(p), values=vals, tol=0.06, p=p)   # must build before it becomes a revision
             imp = self.impact(p, cand["values"], cand)
             n = max(r["n"] for r in p["revisions"]) + 1
             auto = ", ".join(f"{c['label']} {c['from']:g} → {c['to']:g} {c['unit']}" for c in imp["params"]) or "Provenance updated"
@@ -699,7 +741,7 @@ class Studio:
             job["finished"] = time.time()
 
     def _make_geometry(self, p, rev, keys, name):
-        s = self._k("summary", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"])
+        s = self._k("summary", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], p=p)
         path = self.apath(p, "geometry", keys["geometry"])
         path.parent.mkdir(parents=True, exist_ok=True)
         s.update({"rev": rev["n"], "recipe_sha": self.recipe_sha(self.rid(p))})
@@ -710,14 +752,18 @@ class Studio:
         tmp = out.with_name(out.name + ".tmp")
         shutil.rmtree(tmp, ignore_errors=True)
         r = self._k("export", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], out_dir=str(tmp),
-                    name=name, orientation=p["orientation"], tol=STL_TOL)
+                    name=name, orientation=p["orientation"], tol=STL_TOL, p=p)
         files = {}
         for kind in ("step", "stl"):
+            if not r.get(kind):
+                continue                                  # mesh designs have no STEP
             f = Path(r[kind])
             files[kind] = {"name": f.name, "bytes": f.stat().st_size, "sha256": sha_file(f)}
         meta = {"rev": rev["n"], "files": files, "orientation": p["orientation"], "stl_tolerance_mm": STL_TOL,
                 "print_bbox": r["print_bbox"], "units": "mm", "source": f"recipe {self.rid(p)}@{self.recipe_sha(self.rid(p))}",
                 "kernel": self.kernel_id(), "geometry_key": keys["geometry"]}
+        if r.get("unavailable"):
+            meta["unavailable"] = r["unavailable"]
         (tmp / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
         shutil.rmtree(out, ignore_errors=True)
         tmp.replace(out)
@@ -727,7 +773,7 @@ class Studio:
         stl = self.apath(p, "exports", keys["exports"]) / ex["files"]["stl"]["name"]
         s = self.slicer_info()
         a = self._k("analyse", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], stl_path=str(stl),
-                    nozzle=s.get("nozzle_mm", 0.4), envelope=self.cfg["printer"]["envelope_mm"], orientation=p["orientation"])
+                    nozzle=s.get("nozzle_mm", 0.4), envelope=self.cfg["printer"]["envelope_mm"], orientation=p["orientation"], p=p)
         if a.get("mesh", {}).get("sha256") and a["mesh"]["sha256"] != ex["files"]["stl"]["sha256"]:
             raise StudioError("The STL on disk is not the one that was exported.", "Run the pipeline again to regenerate exports.")
         summary = self.read(p, "geometry", keys["geometry"])
@@ -736,6 +782,11 @@ class Studio:
                "nozzle": s.get("nozzle_mm", 0.4), "nozzle_assumed": not s.get("available")}
         fit = self.fit(p)
         items = checks_mod.build(self.recipe(p), summary, a, ctx, fit)
+        fc = self._freecad()
+        if fc and "step" in ex["files"]:                # optional: re-read the exported STEP in FreeCAD
+            step = self.apath(p, "exports", keys["exports"]) / ex["files"]["step"]["name"]
+            res = cad_bridges.freecad_recheck(fc, step, timeout=(self.cfg.get("cad") or {}).get("timeout_s", 120))
+            items.append(cad_bridges.recheck_item(res, a["brep"]["volume_mm3"], summary["bbox"]))
         path = self.apath(p, "checks", keys["checks"])
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"rev": rev["n"], "checks": items, "rollup": checks_mod.rollup(items),
@@ -767,7 +818,7 @@ class Studio:
             return json.loads(meta.read_text(encoding="utf-8"))
         name = f"{p['id']}_r{rev['n']:02d}_{kind}"
         tmp = out.with_name(out.name + ".src")
-        r = self._k("test_piece", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], out_dir=str(tmp), name=name)
+        r = self._k("test_piece", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], out_dir=str(tmp), name=name, p=p)
         try:
             info = slicer.slice_stl(s, Path(r["stl"]), out, timeout=self.cfg["slicer"]["timeout_s"])
         except slicer.SlicerBlocked as e:
@@ -874,6 +925,8 @@ class Studio:
             ch = self.read(p, "checks", keys["checks"])
             files = {}
             for kind in ("step", "stl"):
+                if kind not in ex["files"]:
+                    continue
                 src = self.apath(p, "exports", keys["exports"]) / ex["files"][kind]["name"]
                 shutil.copyfile(src, rel / src.name)
                 files[src.name] = ex["files"][kind]["sha256"]
@@ -891,7 +944,8 @@ class Studio:
                 "acknowledged_warnings": [w for w in g["warnings"]], "note": note, "evidence_level": g["evidence_level"],
                 "physical_evidence": [e for e in p["evidence"] if e["rev"] == rev["n"] and (e["kind"] == "fit" or e.get("source") == "part")],
                 "limits": ["Slicer output is a simulation, not a print.", "No structural analysis was performed.",
-                           "Fit yield is a statistical model; see checks for the source of each input."],
+                           "Fit yield is a statistical model; see checks for the source of each input."]
+                          + (["Mesh design (OpenSCAD): no STEP file and no B-rep checks."] if getattr(self.recipe(p), "mesh", False) else []),
             }
             (rel / "MANIFEST.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
             (rel / "REPORT.md").write_text(self._report(p, manifest), encoding="utf-8")
@@ -971,6 +1025,115 @@ class Studio:
         p["id"] = pid
         self.save(p)
         return self.load(pid)
+
+    # ---- other CAD tools: imported reference parts, FreeCAD -------------
+    def _freecad(self) -> str | None:
+        """FreeCADCmd for the optional re-import check; cached briefly like the slicer."""
+        now = time.time()
+        if getattr(self, "_fc_at", 0) < now - 30:
+            self._fc, self._fc_at = cad_bridges.find_freecad(self.cfg), now
+        return self._fc
+
+    @staticmethod
+    def _ref_name(name: str) -> str:
+        base, ext = os.path.splitext(Path(name).name)
+        base = re.sub(r"[^A-Za-z0-9_.\-]+", "_", base).strip("._-")[:60] or "part"
+        return base + ext.lower()
+
+    def references(self, p: dict) -> list:
+        return [r for r in p["brief"].get("references", []) if r.get("kind") == "part"]
+
+    def reference_paths(self, p: dict) -> dict:
+        d = self.dir(p["id"]) / "references"
+        return {r["file"]: str(d / r["file"]) for r in self.references(p) if (d / r["file"]).exists()}
+
+    def _refs_fp(self, p: dict) -> str:
+        return H(sorted((r["file"], r.get("sha256")) for r in self.references(p)))
+
+    def uses_references(self, rid: str) -> bool:
+        """Only designs that call self.reference(...) depend on imported parts (cheap text test, cached per source)."""
+        if not rid.startswith(SOURCE_PREFIX):
+            return False
+        cache = self.__dict__.setdefault("_uses_refs", {})
+        if rid not in cache:
+            f = source_path(self.sources, rid)
+            cache[rid] = f.exists() and "reference(" in f.read_text(encoding="utf-8")
+        return cache[rid]
+
+    def import_reference(self, p: dict, src: Path, name: str | None = None, data: bytes | None = None) -> dict:
+        """Copy a STEP or STL into the project's references, measure it in the kernel, keep a display mesh.
+
+        The part is drawn as a blueprint companion in its own coordinates (the design's frame), and a design can
+        read it with self.reference(name). Re-importing the same name replaces the file.
+        """
+        name = self._ref_name(name or src.name)
+        if Path(name).suffix not in REF_FORMATS:
+            raise StudioError("Only STEP (.step, .stp) and STL (.stl) parts can be imported.",
+                              "Export the part from its CAD program as STEP, or as STL for a mesh.")
+        d = self.dir(p["id"]) / "references"
+        d.mkdir(parents=True, exist_ok=True)
+        target = d / name
+        tmp = d / (name + ".tmp")
+        if data is not None:
+            if len(data) > 200_000_000:
+                raise StudioError("The file is larger than 200 MB.")
+            tmp.write_bytes(data)
+        else:
+            if not src.is_file():
+                raise StudioError(f"File not found: {src}", "Give the absolute path of a STEP or STL file.")
+            shutil.copyfile(src, tmp)
+        try:
+            info = self._k("reference", timeout=180, path=str(tmp), fmt=Path(name).suffix,
+                           out=str(d / (name + ".view.json")))
+        except StudioError as e:
+            tmp.unlink(missing_ok=True)
+            raise StudioError(f"Could not read {name}: {e}", e.hint or "Check that the file is a valid STEP or a closed STL.")
+        tmp.replace(target)
+        rec = {"file": name, "kind": "part", "format": "step" if name.endswith((".step", ".stp")) else "stl",
+               "ts": time.time(), "sha256": sha_file(target), "bytes": target.stat().st_size,
+               "bbox": info["bbox"], "volume_mm3": info["volume_mm3"], "solids": info.get("solids"),
+               "triangles": info.get("triangles"), "evidence": "computed", "imported_from": src.name if src else name}
+        with self.lock(p["id"]):
+            p = self.load(p["id"])
+            refs = [r for r in p["brief"]["references"] if not (r.get("kind") == "part" and r["file"] == name)]
+            p["brief"]["references"] = refs + [rec]
+            self.decide(p, "reference", f"Imported reference part {name}: "
+                        + " × ".join(f"{b - a:.1f}" for a, b in zip(*info["bbox"])) + " mm"
+                        + (f", {info['volume_mm3'] / 1000:.2f} cm³" if info.get("volume_mm3") else "") + " (computed).")
+            self.save(p)
+        self.__dict__.get("_uses_refs", {}).clear()
+        return rec
+
+    def reference_companions(self, p: dict) -> list:
+        """Imported parts as viewport companions. `size`/`origin` give older viewers a bounding box to draw."""
+        out, d = [], self.dir(p["id"]) / "references"
+        for r in self.references(p):
+            f = d / (r["file"] + ".view.json")
+            try:
+                v = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            (x0, y0, z0), (x1, y1, z1) = r["bbox"]
+            out.append({"kind": "part", "label": r["file"], "size": [x1 - x0, y1 - y0, z1 - z0],
+                        "origin": [(x0 + x1) / 2, (y0 + y1) / 2, z0], "rot_x_deg": 0,
+                        "mesh": {"positions": v["positions"], "indices": v["indices"]}, "edges": v.get("edges", "")})
+        return out
+
+    def freecad_macro(self, p: dict) -> tuple[str, str]:
+        """(file name, text) of a FreeCAD macro that rebuilds the current export from its STEP."""
+        keys = self.keys(p)
+        ex = self.read(p, "exports", keys["exports"])
+        if not ex:
+            raise StudioError("There is no current export.", "Run the pipeline first.", status=409)
+        if "step" not in ex["files"]:
+            raise StudioError("This is a mesh design (OpenSCAD); there is no STEP file for FreeCAD to rebuild from.",
+                              "Open the STL in FreeCAD instead (Mesh workbench).", status=409)
+        rev, recipe = self.rev(p), self.recipe(p)
+        params = [{"key": k, "label": recipe.spec(k).label, "value": v, "unit": recipe.spec(k).unit,
+                   "source": rev["provenance"].get(k, {}).get("source", "assumed")} for k, v in rev["values"].items()]
+        st = ex["files"]["step"]
+        name = f"{p['id']}_r{rev['n']:02d}.FCMacro"
+        return name, cad_bridges.freecad_macro(p["name"], rev["n"], st["name"], st["sha256"], params)
 
     # ---- composed state for the UI --------------------------------------
     def state(self, pid: str) -> dict:

@@ -19,16 +19,28 @@ import os as _os
 from pathlib import Path as _Path
 
 SOURCE_PREFIX = "src:"
+SCAD_PREFIX = "scad:"            # OpenSCAD designs: <data>/.sources/<sha>.scad (see recipes/scad.py)
+
+
+def is_source(rid: str) -> bool:
+    """A design written as code (Python or OpenSCAD), as opposed to a built-in recipe."""
+    return isinstance(rid, str) and rid.startswith((SOURCE_PREFIX, SCAD_PREFIX))
+
+
+def source_path(store: _Path, rid: str) -> _Path:
+    if rid.startswith(SCAD_PREFIX):
+        return store / f"{rid[len(SCAD_PREFIX):]}.scad"
+    return store / f"{rid[len(SOURCE_PREFIX):]}.py"
 
 
 def source_id(text: str) -> str:
     return SOURCE_PREFIX + _hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
-def store_source(store: _Path, text: str) -> str:
-    rid = source_id(text)
+def store_source(store: _Path, text: str, language: str = "python") -> str:
+    rid = source_id(text) if language == "python" else SCAD_PREFIX + source_id(text)[len(SOURCE_PREFIX):]
     store.mkdir(parents=True, exist_ok=True)
-    f = store / f"{rid[len(SOURCE_PREFIX):]}.py"
+    f = source_path(store, rid)
     if not f.exists():
         f.write_text(text, encoding="utf-8")
     return rid
@@ -78,10 +90,22 @@ class RecipeBook(dict):
             r = load_source(self.store / f"{key[len(SOURCE_PREFIX):]}.py", key)
             self[key] = r
             return r
+        if isinstance(key, str) and key.startswith(SCAD_PREFIX) and self.store is not None:
+            from .scad import ScadRecipe
+            r = ScadRecipe(source_path(self.store, key), key)
+            self[key] = r
+            return r
         raise KeyError(key)
 
+    def __contains__(self, key):
+        if dict.__contains__(self, key):
+            return True
+        if isinstance(key, str) and key.startswith(SCAD_PREFIX) and self.store is not None:
+            return source_path(self.store, key).exists()
+        return False
+
     def builtins(self):
-        return {k: v for k, v in self.items() if not k.startswith(SOURCE_PREFIX)}
+        return {k: v for k, v in self.items() if not is_source(k)}
 
 
 _book = None

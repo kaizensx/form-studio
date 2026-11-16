@@ -330,6 +330,21 @@ QtObject {
         }, fail)
     }
 
+    // ── CAD bridges: imported reference parts, opening files in FreeCAD ──
+    signal importPartRequested()                 // the palette asks the Brief stage to show its file dialog
+    function askImportPart() { setStage("brief"); Qt.callLater(function () { s.importPartRequested() }) }
+    function importPart(fileUrl) {
+        var name = String(fileUrl).replace(/^.*[\/\\]/, "")
+        return upload("/projects/" + pid + "/import_part?name=" + encodeURIComponent(decodeURIComponent(name)), fileUrl).then(function (r) {
+            var b = r.reference.bbox, sz = [0, 1, 2].map(function (i) { return F.fmt(b[1][i] - b[0][i], 1) }).join(" × ")
+            toast("Imported " + r.reference.file, sz + " mm, computed from the file. Shown in blueprint in the 3D view.")
+            return refresh(true)
+        }, fail)
+    }
+    function openIn(what, app) {
+        ppost("/open", { what: what, app: app || "" }).then(function (r) { toast("Opened in " + (app === "freecad" ? "FreeCAD" : r.with), String(r.opened).replace(/^.*[\/\\]/, "")) }, fail)
+    }
+
     // ── follow agents: any agent that writes the activity log (Claude here, Claude Code, Codex, CLI) ──
     property string _stamp: ""
     property var _watch: Timer {

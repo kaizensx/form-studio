@@ -32,6 +32,8 @@ def _serve(conn):
             return
         op, kwargs = msg
         try:
+            from .recipes import meshsolid                 # imported parts a design may read with self.reference()
+            meshsolid.set_paths(kwargs.pop("_refs", None))
             conn.send(("ok", kernel.OPS[op](**kwargs)))
         except RecipeError as e:
             conn.send(("recipe_error", e.public()))
