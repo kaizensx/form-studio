@@ -46,6 +46,9 @@ DEFAULTS = {
     "chat": {"enabled": True, "cli": "claude", "model": "opus", "web": True, "budget_usd_per_message": 3.0},
     # Open the bench in your browser when an agent starts working (MCP server).
     "bench": {"auto_open": True},
+    # Look for a newer FORM release on GitHub at most once a day (public release metadata only; nothing is
+    # downloaded or installed). Off: check = false, or set FORM_NO_UPDATE_CHECK=1.
+    "updates": {"check": True},
     # Optional in-app model consultation through a local `claude` CLI. Off by
     # default: when FORM is used over MCP, the calling agent is the intelligence.
     "models": {

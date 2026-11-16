@@ -30,3 +30,6 @@ TopBar 1.0 TopBar.qml
 Toasts 1.0 Toasts.qml
 Palette 1.0 Palette.qml
 SheetHost 1.0 SheetHost.qml
+SetupList 1.0 SetupList.qml
+Welcome 1.0 Welcome.qml
+StatusChips 1.0 StatusChips.qml

@@ -414,4 +414,60 @@ QtObject {
     }
     function stopChat() { if (chatJob) post("/chat/" + chatJob + "/stop", {}) }
     function newChat() { chatSession = ""; chatItems = []; chatTools = ({}) }
+
+    // ── setup and updates (app setup workstream) ─────────────
+    // Nothing is installed unless the user ticks an item and presses Apply; the engine re-checks the
+    // commands it runs against the ones shown here (setupShown). Updates: notice only, never installed.
+    property var setup: null           // GET /setup: { items, groups, detected, required_ok, first_run, attention }
+    property bool setupChecking: false
+    property bool welcome: false       // the full-window first-run screen
+    property var setupPick: ({})       // item id → ticked
+    property var setupJob: null        // GET /setup/job/<id> while fixes run, and after
+    property var update: null          // GET /updates
+    property bool updateHidden: false
+    readonly property var setupAttention: setup ? setup.attention : []
+    function setupItem(id) { if (!setup) return null; for (var i = 0; i < setup.items.length; i++) if (setup.items[i].id === id) return setup.items[i]; return null }
+    function bootSetup(headless) {
+        // headless (--shot/--check) shows the welcome only for an empty data folder, so other screenshots are unaffected
+        get("/setup/state").then(function (r) {
+            var empty = r.fresh
+            if (r.first_run && (!headless || empty)) welcome = true
+            checkSetup().then(function (st) { if (st && !st.required_ok && (!headless || empty)) welcome = true })
+        }, function () {})
+        if (!headless) checkUpdates(false)
+    }
+    function checkSetup() {
+        setupChecking = true
+        return get("/setup").then(function (st) {
+            setup = st; setupChecking = false
+            var p = ({})
+            for (var i = 0; i < st.items.length; i++) { var it = st.items[i]; if (it.runnable) p[it.id] = setupPick[it.id] !== undefined ? setupPick[it.id] : it["default"] }
+            setupPick = p
+            return st
+        }, function (e) { setupChecking = false; fail(e); return null })
+    }
+    function setPick(id, on) { var p = Object.assign({}, setupPick); p[id] = on; setupPick = p }
+    readonly property var setupChosen: F.keys(setupPick).filter(function (k) { return setupPick[k] })
+    function applySetup() {
+        var ids = setupChosen, shown = ({})
+        if (!ids.length) return
+        ids.forEach(function (id) { var it = setupItem(id); shown[id] = it && it.fix ? it.fix.commands : [] })
+        post("/setup/apply", { ids: ids, shown: shown }).then(function (j) { setupJob = j; _setupPoll.restart() }, function (e) { fail(e); checkSetup() })
+    }
+    property var _setupPoll: Timer { interval: 500; onTriggered: s._setupTick() }
+    function _setupTick() {
+        if (!setupJob) return
+        get("/setup/job/" + setupJob.id).then(function (j) {
+            setupJob = j
+            if (j.state === "running") { _setupPoll.restart(); return }
+            setupPick = ({})
+            checkSetup(); reloadStudio()
+            toast(j.state === "done" ? "Setup finished" : "Some setup steps failed", j.state === "done" ? "Each item was checked again." : "The output is shown under each step.", j.state !== "done")
+        }, function () { _setupPoll.restart() })
+    }
+    function closeWelcome(how) { welcome = false; post("/setup/seen", { how: how || "skipped" }).then(function () {}, function () {}) }
+    function openSetup() { setupJob = setupJob && setupJob.state === "running" ? setupJob : null; openSheet("setup"); checkSetup() }
+    function checkUpdates(force) {
+        return get("/updates" + (force ? "?force=1" : "")).then(function (u) { update = u; return u }, function () {})
+    }
 }

@@ -3,6 +3,7 @@
   form setup                         find what is missing, fix what you pick (--check, --yes, --dry-run)
   form serve                         the bench on http://127.0.0.1:4173
   form mcp                           MCP server over stdio (what agents launch)
+  form update [--check]              is there a newer release on GitHub? (never installs)
   form doctor                        what is installed and usable
   form list                          projects
   form recipe <id>                   parameters, units, ranges, features
@@ -45,6 +46,9 @@ def main(argv=None):
     if argv[:1] == ["app"]:                       # the desktop app has its own flags
         from .app.main import main as app_main
         return app_main(argv[1:])
+    if argv[:1] == ["update"]:                    # checks only; never installs
+        from .updates import main as update_main
+        return update_main(argv[1:])
     if argv[:1] == ["setup"]:                     # its own flags; keep argparse out of the way
         from .setup import main as setup_main
         return setup_main(argv[1:])
@@ -56,6 +60,7 @@ def main(argv=None):
     m = sub.add_parser("mcp", help="MCP server over stdio")
     m.add_argument("--no-bench", action="store_true")
     sub.add_parser("setup", help="find what is missing and fix what you choose (--check, --yes, --dry-run)")
+    sub.add_parser("update", help="is there a newer FORM? (--check prints JSON; never installs)")
     sub.add_parser("doctor")
     sub.add_parser("list")
     r = sub.add_parser("recipe")

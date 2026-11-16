@@ -23,6 +23,9 @@ def make_handler(st: Studio):
     from .setup import mcp_command
     if not hasattr(st, "chat"):
         st.chat = chat_mod.Chat(st.cfg, st.root, mcp_command())
+    from . import setup_app, updates           # first-run setup and update notices (desktop app)
+    if not hasattr(st, "setup_app"):
+        st.setup_app = setup_app.Setup(st.cfg, st)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "FORM"
@@ -95,6 +98,16 @@ def make_handler(st: Studio):
                 if not job:
                     raise StudioError("Unknown chat job.", status=404)
                 return self._json(job.public(int(q.get("from") or 0)))
+            # -- setup and updates (app setup workstream) --
+            if path == "/api/setup":
+                return self._json(st.setup_app.report())
+            if path == "/api/setup/state":                  # instant: no checks run
+                return self._json({"first_run": setup_app.first_run(st.cfg), "fresh": st.setup_app.fresh})
+            ms = re.fullmatch(r"/api/setup/job/([0-9a-f]{10})", path)
+            if ms:
+                return self._json(st.setup_app.job(ms.group(1)).public())
+            if path == "/api/updates":
+                return self._json(updates.check(st.cfg, force=q.get("force") == "1"))
             if path == "/api/studio":
                 return self._json({"env": st.environment(), "projects": st.list(), "chat": chat_mod.status(st.cfg),
                                    "recipes": [r.public() for r in st.recipes.builtins().values()],
@@ -187,6 +200,12 @@ def make_handler(st: Studio):
             if mc:
                 st.chat.stop(mc.group(1))
                 return self._json({"ok": True})
+            # -- setup (app setup workstream) --
+            if path == "/api/setup/apply":
+                job = st.setup_app.apply(body.get("ids"), body.get("shown"))
+                return self._json({"job": job.id, **job.public()})
+            if path == "/api/setup/seen":
+                return self._json(setup_app.mark_seen(st.cfg, str(body.get("how") or "seen")[:20]))
             if path == "/api/studio/refresh":
                 st.slicer_info(refresh=True)
                 return self._json({"env": st.environment()})

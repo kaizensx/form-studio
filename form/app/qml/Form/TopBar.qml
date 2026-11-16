@@ -26,6 +26,7 @@ Rectangle {
                 : bar.ap.state === "superseded" ? F.pad(bar.ap.rev) + " released · " + F.pad(Store.project.head) + " is not" : "unreleased" }
     }
     Row { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 10
+        StatusChips { anchors.verticalCenter: parent.verticalCenter }      // setup / update notices
         Row { spacing: 6; anchors.verticalCenter: parent.verticalCenter; visible: !!Store.studio && bar.width > 1180
             Rectangle { width: 6; height: 6; radius: 3; color: Store.slicer.available ? Theme.pass : Theme.ink4; anchors.verticalCenter: parent.verticalCenter }
             Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; color: Theme.ink2

@@ -15,7 +15,7 @@ Window {
     minimumWidth: 1120; minimumHeight: 700
     // on macOS the content runs under a transparent title bar, so the window buttons sit in our own bar
     flags: mac ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window
-    Component.onCompleted: Store.boot(startProject, startStage)
+    Component.onCompleted: { Store.boot(startProject, startStage); Store.bootSetup(headless) }
 
     TopBar { id: top; width: parent.width; inset: win.mac && win.visibility !== Window.FullScreen ? 70 : 0; z: 10 }
 
@@ -39,6 +39,7 @@ Window {
             Txt { text: "FORM"; font.weight: 700; font.letterSpacing: 6; font.pixelSize: 22; anchors.horizontalCenter: parent.horizontalCenter }
             Txt { kind: "fine"; text: "Starting the CAD kernel…"; anchors.horizontalCenter: parent.horizontalCenter } }
     }
+    Loader { anchors.top: top.bottom; anchors.bottom: parent.bottom; width: parent.width; z: 30; active: Store.welcome; sourceComponent: Welcome {} }
     Toasts { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 18; z: 60 }
     SheetHost {}
     Palette {}

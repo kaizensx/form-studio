@@ -145,10 +145,13 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
                       None if (v.major, v.minor) == (3, 12) else
                       Fix("Reinstall FORM with uv's managed Python 3.12", ["uv tool upgrade --reinstall form-studio"])))
     try:
-        from .worker import Kernel
-        k = Kernel()
-        kid = k.call("ping", timeout=120)["kernel"]
-        k.stop()
+        if studio is not None:                                     # the app: reuse its running kernel
+            kid = studio.kernel_id()
+        else:
+            from .worker import Kernel
+            k = Kernel()
+            kid = k.call("ping", timeout=120)["kernel"]
+            k.stop()
         items.append(Item("kernel", "CAD kernel", "ok", kid))
     except Exception as e:                                         # broken wheel, missing OCP
         items.append(Item("kernel", "CAD kernel", "missing", f"build123d/OCP did not start: {e}",
@@ -226,6 +229,14 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
                           "FORM is registered" if ok else f"FORM is not in {desk.name}",
                           None if ok else Fix(f"Add FORM to {desk.name} (restart Claude Desktop afterwards)",
                                               action=_json_register(desk), recommended=False)))
+    # --- chat in the desktop app (app setup workstream) ------------------------
+    if not shutil.which("claude"):
+        cmds = ["npm install -g @anthropic-ai/claude-code"] if shutil.which("npm") else []
+        items.append(Item("chat.claude", "Claude Code (chat)", "missing",
+                          "Not found. Chat in the app runs Claude Code on your account; everything else works without it.",
+                          Fix("Install Claude Code", cmds, recommended=False,
+                              note="Then run `claude` once in a terminal to sign in. "
+                                   "Other ways to install: https://docs.claude.com/en/docs/claude-code/setup")))
     if not any(i.id.startswith("agent.") for i in items):
         items.append(Item("agent.none", "Coding agent", "info",
                           "No MCP-capable agent found. Install Claude Code, Codex, Gemini CLI or Cursor, then re-run `form setup`. "
