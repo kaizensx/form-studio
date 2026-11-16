@@ -325,6 +325,13 @@ def start_bench(st: Studio, tries: int = 10) -> dict:
     return {"url": None, "error": f"No free port in {port}-{port + tries - 1}."}
 
 
+def _quiet(fn):
+    try:
+        fn()
+    except Exception:
+        pass   # a failed warm-up is reported on the first real kernel call
+
+
 def _open(url, cfg):
     import os
     import webbrowser
@@ -335,7 +342,6 @@ def _open(url, cfg):
 def serve(cfg=None):
     cfg = cfg or config.load()
     st = Studio(cfg)
-    threading.Thread(target=st.kernel_id, daemon=True).start()   # warm the kernel
     host, port = cfg["server"]["host"], int(cfg["server"]["port"])
     if host not in ("127.0.0.1", "localhost", "::1"):
         raise SystemExit("FORM binds to loopback only. Set [server].host to 127.0.0.1.")
@@ -353,6 +359,8 @@ def serve(cfg=None):
     if httpd is None:
         raise SystemExit(f"No free port between {cfg['server']['port']} and {port + 9}.")
     httpd.daemon_threads = True
+    # warm the kernel only once this process owns a port; an early "already running" exit must not leave it mid-call
+    threading.Thread(target=lambda: _quiet(st.kernel_id), daemon=True).start()
     print(f"FORM studio → http://{host}:{port}   (data: {cfg['data']['dir']})", flush=True)
     _open(f"http://{host}:{port}", cfg)
     try:
