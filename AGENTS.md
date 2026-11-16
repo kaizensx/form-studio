@@ -37,6 +37,15 @@ Rules that keep the record honest:
 
 `dock`, `gridfinity`, `hook`, `planter`, `coupon`. To write a new one, see `docs/RECIPES.md`.
 
+## Skills
+
+FORM's design and print-engineering practice is written as skills in `plugins/form/skills/<name>/SKILL.md`
+(intake, parametric-design, industrial-design, design-review, explore-variants, fdm-engineering, fit-calibration,
+hardware-integration, assemblies-and-mechanisms, modular-storage, verify-print, print-feedback, release). Each says when
+to use it and which MCP tools to call. Claude Code installs them as a plugin (`claude plugin marketplace add
+kaizensx/form-studio`, then `claude plugin install form@form-studio`); other agents: read the matching `SKILL.md`
+before that kind of task.
+
 ## Working on FORM's code
 
 - **One geometry authority:** a recipe in `form/recipes/`, built by build123d (OCCT). STEP, STL, checks and slices are derived from it and are never edited by hand.

@@ -108,6 +108,10 @@ def make_handler(st: Studio):
                 return self._json(st.setup_app.job(ms.group(1)).public())
             if path == "/api/updates":
                 return self._json(updates.check(st.cfg, force=q.get("force") == "1"))
+            # -- brief templates (presets) --
+            if path == "/api/presets":
+                from . import presets
+                return self._json({"presets": presets.all_presets()})
             if path == "/api/studio":
                 return self._json({"env": st.environment(), "projects": st.list(), "chat": chat_mod.status(st.cfg),
                                    "recipes": [r.public() for r in st.recipes.builtins().values()],
@@ -206,6 +210,14 @@ def make_handler(st: Studio):
                 return self._json({"job": job.id, **job.public()})
             if path == "/api/setup/seen":
                 return self._json(setup_app.mark_seen(st.cfg, str(body.get("how") or "seen")[:20]))
+            # -- brief templates: save a filled-in brief, get the chat prompt that carries it --
+            if path == "/api/briefs":
+                from . import presets
+                try:
+                    return self._json(presets.start_brief(st.root, str(body.get("preset", "")), body.get("answers") or {},
+                                                          bool(body.get("measured"))))
+                except ValueError as e:
+                    raise StudioError(str(e), "Fill in the required fields; numbers use the unit shown.")
             if path == "/api/studio/refresh":
                 st.slicer_info(refresh=True)
                 return self._json({"env": st.environment()})

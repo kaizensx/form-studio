@@ -585,6 +585,19 @@ def build() -> MCPServer:
             webbrowser.open(url)
         return {"url": url, "opened": open_browser}
 
+    @mcp.tool(annotations=RO)
+    async def brief_presets(preset: str = "") -> dict:
+        """Brief templates for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure,
+        car accessory): the questions worth asking, environment defaults (temperature, humidity, UV, load), a material to
+        start from and the checks to plan for. Defaults are assumptions to confirm with the user, never measurements."""
+        from . import presets as pr
+        if not preset:
+            return {"presets": [{k: p[k] for k in ("id", "title", "summary")} for p in pr.all_presets()]}
+        try:
+            return pr.get(preset)
+        except KeyError:
+            raise ToolError(f"Unknown preset “{preset}”. Known: {', '.join(p['id'] for p in pr.all_presets())}.") from None
+
     @mcp.prompt(title="Design a printable part")
     def design_part(goal: str) -> str:
         """A guided FORM session for a printable part."""

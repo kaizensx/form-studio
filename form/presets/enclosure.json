@@ -1,0 +1,37 @@
+{
+  "id": "enclosure",
+  "title": "Enclosure",
+  "summary": "A case with a lid for a circuit board, with connector openings and mounting posts.",
+  "closest_recipe": null,
+  "questions": [
+    {"key": "board", "label": "Board name or model", "kind": "text", "required": true,
+     "placeholder": "e.g. Raspberry Pi 5, or a custom board",
+     "why": "A known board has an official mechanical drawing to read the dimensions from."},
+    {"key": "board_l", "label": "Board length", "kind": "number", "unit": "mm",
+     "why": "Sets the inner length."},
+    {"key": "board_w", "label": "Board width", "kind": "number", "unit": "mm",
+     "why": "Sets the inner width."},
+    {"key": "hole_dx", "label": "Mounting hole spacing, long side", "kind": "number", "unit": "mm",
+     "why": "Positions the posts; a wrong spacing means the board does not mount."},
+    {"key": "hole_dy", "label": "Mounting hole spacing, short side", "kind": "number", "unit": "mm",
+     "why": "Positions the posts."},
+    {"key": "connectors", "label": "Connectors that need openings", "kind": "text",
+     "placeholder": "e.g. 2 x USB-A on the short side, USB-C power, HDMI",
+     "why": "Each opening needs its position and size from the board drawing."},
+    {"key": "ventilation", "label": "Cooling", "kind": "choice", "choices": ["None", "Passive slots", "A fan", "Not sure"],
+     "why": "Heat decides the openings and may change the material."},
+    {"key": "lid", "label": "Lid", "kind": "choice", "choices": ["Press-fit lid", "Screwed lid", "Snap-fit lid", "Not sure"],
+     "why": "Screws need inserts or bosses; a snap or press fit needs a test print."}
+  ],
+  "environment": {"setting": "indoor", "temperature_c": [15, 45], "humidity": "normal", "uv": "none",
+                  "load": {"kind": "static", "mass_g": 100, "note": "Board weight; the board itself makes heat."}},
+  "material": {"suggested": "PETG", "why": "Holds its shape better than PLA near a warm board.",
+               "consider": "PLA for a board that stays cool."},
+  "checks": [
+    {"name": "Board and connector clearance", "why": "The board drops in and every connector lines up with its opening."},
+    {"name": "Lid fit", "why": "The lid closes and stays closed; test the fit on a small piece first."},
+    {"name": "Screwdriver access", "why": "Every screw can be reached with a real screwdriver."},
+    {"name": "Assembly order", "why": "The board, cables and lid go together in an order that works."},
+    {"name": "Ventilation", "why": "The openings match the heat the board makes."}
+  ]
+}

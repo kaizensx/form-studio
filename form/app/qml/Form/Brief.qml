@@ -44,6 +44,19 @@ Column {
             Connections { target: root
                 function onBriefChanged() { if (!intent.area.activeFocus && intent.text !== (root.brief.text || "")) intent.text = root.brief.text || "" } } } }
 
+    Sec { title: "Answers from the brief"; note: root.brief.preset_title || ""
+        visible: !!root.brief.answers && root.brief.answers.length > 0
+        Column { width: parent.width
+            Repeater { model: root.brief.answers || []
+                KV { required property var modelData; required property int index; first: index === 0
+                    k: modelData.label
+                    value: modelData.kind === "number" ? F.trim(modelData.value) + " " + modelData.unit : ""
+                    sub: modelData.kind === "number" ? "" : String(modelData.value)
+                    tag: modelData.source || "" } } }
+        Txt { kind: "fine"; width: parent.width; visible: !!root.brief.material
+            text: "Template defaults (assumed): " + (root.brief.material || "") + "; " + (root.brief.environment ? root.brief.environment.setting + ", "
+                  + root.brief.environment.temperature_c[0] + " to " + root.brief.environment.temperature_c[1] + " °C" : "") + "." } }
+
     Sec { title: "Known about the object"; note: "value · source · ±1σ"
         visible: root.known.length > 0
         Column { width: parent.width

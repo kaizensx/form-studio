@@ -470,4 +470,26 @@ QtObject {
     function checkUpdates(force) {
         return get("/updates" + (force ? "?force=1" : "")).then(function (u) { update = u; return u }, function () {})
     }
+    // ── design review on demand (skills workstream) ─────────
+    // Sends the design-review approach (silhouette / relationships / details, three passes, six-criterion rubric)
+    // for the head revision into the existing chat. No model call outside the chat.
+    readonly property bool canAskReview: !!project && chat.available && !chatBusy
+    function reviewPrompt() {
+        if (!project) return ""
+        return "Give me a design review of " + F.pad(project.head) + " of “" + project.name + "” (project " + pid + "). "
+            + "Look at the current head with the FORM tools, not from memory: get_project, then render(view=\"sheet\"), "
+            + "render(view=\"bottom\") and render(view=\"iso_back\").\n\n"
+            + "Review at three scales. Silhouette: is the mass balanced, the useful volume clear, does it look stable and intentional? "
+            + "Relationships: spacing, wall thickness, radius families, repeated features, contact points. "
+            + "Details: seam, entry chamfers, finger relief, drainage, support scars, tool access, the underside and the assembled state.\n\n"
+            + "Do three passes: designer (proportion, interaction, finish); engineer (interfaces, load path, assembly, tolerances, "
+            + "from the checks and the fit model); print technician (orientation, layer direction at loaded roots, overhangs, "
+            + "supports, seams, from the simulated slice).\n\n"
+            + "Score 0 to 5: function and fit, proportion, geometric coherence, manufacturing integration, assembly and use, "
+            + "visual restraint. Explain the two weakest with evidence from the renders or checks. Then list concrete defects, "
+            + "each with the parameter or feature to change. Call out any critical functional defect regardless of the scores.\n\n"
+            + "Do not commit anything; you may preview_change the most important fix. Say that the scores are subjective, "
+            + "not a certification and not physical validation."
+    }
+    function askReview() { if (canAskReview) send(reviewPrompt()) }
 }

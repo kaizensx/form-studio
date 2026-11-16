@@ -1,0 +1,10 @@
+{
+  "name": "form",
+  "version": "9.0.0",
+  "description": "Design 3D-printable parts with FORM: real CAD, real slicing and an honest evidence record. Skills for intake, CAD, fit, print engineering, design review and release, plus the form-mcp server.",
+  "author": { "name": "FORM contributors" },
+  "homepage": "https://github.com/kaizensx/form-studio",
+  "repository": "https://github.com/kaizensx/form-studio",
+  "license": "MIT",
+  "keywords": ["3d-printing", "cad", "build123d", "slicer", "fdm"]
+}

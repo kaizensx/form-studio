@@ -1,0 +1,29 @@
+{
+  "id": "organizer",
+  "title": "Drawer organizer",
+  "summary": "Bins or a tool insert for a drawer, optionally on a Gridfinity grid.",
+  "closest_recipe": "gridfinity",
+  "questions": [
+    {"key": "drawer_w", "label": "Drawer inner width", "kind": "number", "unit": "mm", "required": true,
+     "why": "Sets how many grid cells or how wide the insert can be."},
+    {"key": "drawer_d", "label": "Drawer inner depth", "kind": "number", "unit": "mm", "required": true,
+     "why": "Sets the other side of the grid."},
+    {"key": "drawer_h", "label": "Usable height", "kind": "number", "unit": "mm",
+     "why": "The drawer must still close; measure to the lowest obstruction."},
+    {"key": "base", "label": "Base system", "kind": "choice", "choices": ["Gridfinity", "None, one insert", "Not sure"],
+     "why": "Gridfinity separates a reusable base from the bins."},
+    {"key": "items", "label": "What goes in it, with sizes", "kind": "text",
+     "placeholder": "e.g. 4 screwdrivers, 22 mm handles; a tape measure 65 x 65 x 40 mm",
+     "why": "Each pocket needs the measured size of its tool."}
+  ],
+  "environment": {"setting": "indoor", "temperature_c": [15, 30], "humidity": "normal", "uv": "none",
+                  "load": {"kind": "static", "mass_g": 500, "note": "Tools resting in pockets."}},
+  "material": {"suggested": "PLA", "why": "Indoor, low load, fast to print in large areas.",
+               "consider": "PETG if the drawer is in a garage or a car."},
+  "checks": [
+    {"name": "Pocket fit", "why": "Each tool goes in and comes out without binding."},
+    {"name": "Finger access", "why": "Every tool can be gripped and lifted."},
+    {"name": "Base mating coupon", "why": "A single cell printed first to check it seats on the base."},
+    {"name": "Drawer closure", "why": "The tallest bin and tool stay below the usable height."}
+  ]
+}

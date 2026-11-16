@@ -1,0 +1,36 @@
+{
+  "id": "automotive-accessory",
+  "title": "Car accessory",
+  "summary": "A holder, clip or trim part inside a car. Heat, sunlight and vibration decide the material.",
+  "closest_recipe": null,
+  "questions": [
+    {"key": "location", "label": "Where it goes and how it attaches", "kind": "text", "required": true,
+     "placeholder": "e.g. clips onto the left air vent slats",
+     "why": "Location sets the temperature and the attachment method."},
+    {"key": "interface", "label": "Measured size of what it attaches to", "kind": "text",
+     "placeholder": "e.g. vent slat 2.1 mm thick, 11 mm pitch",
+     "why": "The mating interface must be measured; it decides whether it fits at all."},
+    {"key": "max_temp", "label": "Hottest the spot gets", "kind": "number", "unit": "°C",
+     "why": "A parked car in sun can exceed 80 °C at the dashboard; PLA softens near 55 °C."},
+    {"key": "sun", "label": "Direct sunlight", "kind": "choice", "choices": ["Direct sun", "Shade", "Not sure"],
+     "why": "UV weakens and discolours most filaments."},
+    {"key": "load", "label": "What it carries", "kind": "text",
+     "placeholder": "e.g. a 200 g phone, over bumpy roads",
+     "why": "Vibration and sustained load set the clip and wall sizes."},
+    {"key": "safety", "label": "Could it obstruct controls, view or airbags if it came loose?", "kind": "choice",
+     "choices": ["No", "Yes", "Not sure"],
+     "why": "If yes, a printed part may not be acceptable at all."}
+  ],
+  "environment": {"setting": "car cabin", "temperature_c": [-20, 85], "humidity": "normal", "uv": "direct",
+                  "load": {"kind": "vibration", "mass_g": 200, "note": "Road vibration and occasional impact."}},
+  "material": {"suggested": "ASA or PETG, then reassess",
+               "why": "PLA deforms in a hot car. ASA resists heat and UV but warps on an open printer.",
+               "consider": "Do not promise that PLA or PETG on an open printer is adequate; test in the real spot."},
+  "checks": [
+    {"name": "Material and process suitability", "why": "The filament survives the hottest temperature and the sun."},
+    {"name": "Retention under vibration", "why": "It stays attached on rough roads; test it in the car."},
+    {"name": "Thermal expansion", "why": "Fits that are snug when cold may loosen or bind when hot."},
+    {"name": "Clearance to controls", "why": "Nothing blocks a control, the view or an airbag."},
+    {"name": "Physical validation scope", "why": "State which conditions a real test covered and which it did not."}
+  ]
+}
