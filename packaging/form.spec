@@ -11,7 +11,8 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "form" / "recipes"), "form/recipes"),      # recipe sources are hashed into artifact keys
          (str(ROOT / "form" / "examples"), "form/examples")]
 binaries, hidden = [], []
-for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfium2", "pypdfium2_raw"):
+for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfium2", "pypdfium2_raw",
+            "bd_warehouse", "py_gearworks"):     # parts libraries ship inside the app
     try:
         d, b, h = collect_all(pkg)
         datas += d; binaries += b; hidden += h

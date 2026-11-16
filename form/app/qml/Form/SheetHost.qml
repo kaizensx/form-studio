@@ -6,7 +6,7 @@ Item {
     id: host
     anchors.fill: parent; z: 40
     visible: !!Store.sheet
-    readonly property var files: ({ "new": "NewSheet.qml", alternatives: "Alternatives.qml", photo: "PhotoSheet.qml", ring: "RingSheet.qml", setup: "SetupSheet.qml", update: "UpdateSheet.qml", slicer: "SlicerSheet.qml", render: "PhotoRenderSheet.qml" })
+    readonly property var files: ({ "new": "NewSheet.qml", alternatives: "Alternatives.qml", photo: "PhotoSheet.qml", ring: "RingSheet.qml", setup: "SetupSheet.qml", settings: "SettingsSheet.qml", update: "UpdateSheet.qml", slicer: "SlicerSheet.qml", render: "PhotoRenderSheet.qml" })
     Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.5); opacity: host.visible ? 1 : 0; Behavior on opacity { NumberAnimation { duration: 160 } }
         MouseArea { anchors.fill: parent; onClicked: Store.openSheet(null); onWheel: function (w) { w.accepted = true } } }
     Rectangle {

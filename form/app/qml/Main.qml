@@ -58,4 +58,5 @@ Window {
     Shortcut { sequence: "Ctrl+Return"; onActivated: if (Store.hasDraft && !Store.draftError) Store.commit() }
     Shortcut { sequences: [StandardKey.New]; onActivated: Store.openSheet("new") }
     Shortcut { sequence: "Ctrl+J"; onActivated: Store.talkOpen = !Store.talkOpen }
+    Shortcut { sequences: ["Ctrl+,"]; onActivated: Store.openSettings("general") }      // Settings (⌘, on macOS)
 }

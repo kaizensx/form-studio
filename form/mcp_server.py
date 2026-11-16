@@ -145,9 +145,40 @@ def build() -> MCPServer:
         """What FORM can use on this machine (kernel, slicer, printer, agents) and the exact command that fixes each gap.
         Never run a fix without asking the user; the simplest path is to ask them to run `form setup` in a terminal."""
         def go():
-            from . import setup
+            from . import installer, setup
+            rows = installer.survey(studio().cfg)
             return {"items": [i.public() for i in setup.check(studio().cfg)],
-                    "tell_the_user": "Run `form setup` in a terminal to fix these interactively."}
+                    # the installer registry: what each thing is for, whether it was found, and the exact commands
+                    "software": [{k: r[k] for k in ("id", "label", "why", "level", "status", "detail", "size", "installable", "manual")}
+                                 | {"commands": (r["plan"] or {}).get("commands", [])} for r in rows],
+                    **installer.summary(rows),
+                    "tell_the_user": "FORM's app installs these under Settings, Software. Headless: `form install <id>`, "
+                                     "or install_software(id, confirm=True) after the user agrees to the command shown."}
+        return await _run(go)
+
+    @mcp.tool()
+    async def install_software(id: str, confirm: bool = False, method: str | None = None) -> dict:
+        """Install one thing from FORM's registry (ids come from setup_status → software), e.g. "parts", "claude",
+        "slicer.orca". Without confirm=True nothing runs: you get the exact commands to show the user. Ask the user
+        first, then call again with confirm=True. Never asks for a password; sign-in is not an install."""
+        def go():
+            from . import installer
+            cfg = studio().cfg
+            inst = installer.Installer(cfg)
+            try:
+                pairs = inst.prepare([id], None, {id: method} if method else None)
+            except installer.InstallError as e:
+                return {"installed": False, "error": e.public()}
+            sw, m = pairs[0]
+            plan = {"id": sw.id, "label": sw.label, "why": sw.why, "size": sw.size, "method": m.label, "commands": m.commands,
+                    **({"edits_a_file": m.note} if m.kind == "action" else {})}
+            if confirm is not True:
+                return {"installed": False, "refused": "confirm=True is required.", "would_run": plan,
+                        "tell_the_user": "Show these commands and ask before installing."}
+            job = installer.run_blocking(cfg, [id], {id: method} if method else None)
+            lines = [l["text"] for l in job.public(0)["log"]]
+            return {"installed": job.state == "done", "state": job.state, "ran": plan, "steps": job.steps,
+                    "log_tail": lines[-40:], "after": {k: {"status": v["status"], "detail": v["detail"]} for k, v in job.after.items()}}
         return await _run(go)
 
     @mcp.tool(annotations=RO)

@@ -2,8 +2,8 @@
 
 Every fix states its exact command or file change before it runs. Config files
 are backed up before they are edited. Nothing is downloaded or installed unless
-the user selects it (or passes --yes, which applies only the recommended fixes;
-large downloads are never recommended automatically).
+the user selects it (or passes --yes, which applies the recommended fixes and then
+installs what form/installer.py marks recommended and missing, printing each command first).
 """
 from __future__ import annotations
 
@@ -132,6 +132,43 @@ def _agent_item(iid, label, current, mcp, summary, add_cmds, replace_cmds) -> It
     return Item(iid, label, "ok", "FORM is registered")
 
 
+def agent_items(mcp: str | None = None) -> list[Item]:
+    """One item per MCP-capable agent found on this computer: is FORM registered, and the fix if not.
+    Shared by `form setup` and the installer registry (form/installer.py)."""
+    mcp = mcp or mcp_command()
+    items: list[Item] = []
+    if shutil.which("claude"):
+        add = f"claude mcp add --scope user form -- {shlex.quote(mcp)}"
+        items.append(_agent_item("agent.claude", "Claude Code", _claude_command(), mcp, "Register FORM with Claude Code (user scope)",
+                                 [add], ["claude mcp remove --scope user form", add]))
+    if shutil.which("codex"):
+        add = f"codex mcp add form -- {shlex.quote(mcp)}"
+        items.append(_agent_item("agent.codex", "Codex", _codex_command(), mcp, "Register FORM with Codex", [add],
+                                 ["codex mcp remove form", add]))
+    gem = HOME / ".gemini" / "settings.json"
+    if shutil.which("gemini") or gem.parent.exists():
+        ok = _json_has(gem)
+        items.append(Item("agent.gemini", "Gemini CLI", "ok" if ok else "missing",
+                          "FORM is registered" if ok else f"FORM is not in {gem}",
+                          None if ok else Fix(f"Add FORM to {gem}", action=_json_register(gem))))
+    cur = HOME / ".cursor" / "mcp.json"
+    if cur.parent.exists() or Path("/Applications/Cursor.app").exists():
+        ok = _json_has(cur)
+        items.append(Item("agent.cursor", "Cursor", "ok" if ok else "missing",
+                          "FORM is registered" if ok else f"FORM is not in {cur}",
+                          None if ok else Fix(f"Add FORM to {cur}", action=_json_register(cur))))
+    desk = (HOME / "Library/Application Support/Claude/claude_desktop_config.json" if sys.platform == "darwin"
+            else Path(os.environ.get("APPDATA", HOME / "AppData/Roaming")) / "Claude/claude_desktop_config.json"
+            if sys.platform.startswith("win") else HOME / ".config/Claude/claude_desktop_config.json")
+    if desk.parent.exists() and (Path("/Applications/Claude.app").exists() or sys.platform != "darwin"):
+        ok = _json_has(desk)
+        items.append(Item("agent.desktop", "Claude Desktop", "ok" if ok else "missing",
+                          "FORM is registered" if ok else f"FORM is not in {desk.name}",
+                          None if ok else Fix(f"Add FORM to {desk.name} (restart Claude Desktop afterwards)",
+                                              action=_json_register(desk), recommended=False)))
+    return items
+
+
 def check(cfg: dict | None = None, studio=None) -> list[Item]:
     from . import config, slicer
     cfg = cfg or config.load()
@@ -245,42 +282,16 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
                               note=f"Download from {bl.DOWNLOAD_URL}, or set [blender].app in studio.toml.")))
 
     # --- agents -----------------------------------------------------------
-    if shutil.which("claude"):
-        add = f"claude mcp add --scope user form -- {shlex.quote(mcp)}"
-        items.append(_agent_item("agent.claude", "Claude Code", _claude_command(), mcp, "Register FORM with Claude Code (user scope)",
-                                 [add], ["claude mcp remove --scope user form", add]))
-    if shutil.which("codex"):
-        add = f"codex mcp add form -- {shlex.quote(mcp)}"
-        items.append(_agent_item("agent.codex", "Codex", _codex_command(), mcp, "Register FORM with Codex", [add],
-                                 ["codex mcp remove form", add]))
-    gem = HOME / ".gemini" / "settings.json"
-    if shutil.which("gemini") or gem.parent.exists():
-        ok = _json_has(gem)
-        items.append(Item("agent.gemini", "Gemini CLI", "ok" if ok else "missing",
-                          "FORM is registered" if ok else f"FORM is not in {gem}",
-                          None if ok else Fix(f"Add FORM to {gem}", action=_json_register(gem))))
-    cur = HOME / ".cursor" / "mcp.json"
-    if cur.parent.exists() or Path("/Applications/Cursor.app").exists():
-        ok = _json_has(cur)
-        items.append(Item("agent.cursor", "Cursor", "ok" if ok else "missing",
-                          "FORM is registered" if ok else f"FORM is not in {cur}",
-                          None if ok else Fix(f"Add FORM to {cur}", action=_json_register(cur))))
-    desk = (HOME / "Library/Application Support/Claude/claude_desktop_config.json" if sys.platform == "darwin"
-            else HOME / ".config/Claude/claude_desktop_config.json")
-    if desk.parent.exists() and (Path("/Applications/Claude.app").exists() or sys.platform != "darwin"):
-        ok = _json_has(desk)
-        items.append(Item("agent.desktop", "Claude Desktop", "ok" if ok else "missing",
-                          "FORM is registered" if ok else f"FORM is not in {desk.name}",
-                          None if ok else Fix(f"Add FORM to {desk.name} (restart Claude Desktop afterwards)",
-                                              action=_json_register(desk), recommended=False)))
+    items += agent_items(mcp)
     # --- chat in the desktop app (app setup workstream) ------------------------
-    if not shutil.which("claude"):
-        cmds = ["npm install -g @anthropic-ai/claude-code"] if shutil.which("npm") else []
+    from . import installer
+    if not installer.find_claude(cfg):
+        m = installer.plan(installer.get("claude"))
         items.append(Item("chat.claude", "Claude Code (chat)", "missing",
                           "Not found. Chat in the app runs Claude Code on your account; everything else works without it.",
-                          Fix("Install Claude Code", cmds, recommended=False,
-                              note="Then run `claude` once in a terminal to sign in. "
-                                   "Other ways to install: https://docs.claude.com/en/docs/claude-code/setup")))
+                          Fix("Install Claude Code", list(m.commands) if m else [], recommended=False,
+                              note="Then sign in: the app does it under Settings, Software; in a terminal run `claude auth login`. "
+                                   f"Other ways to install: {installer.CLAUDE_DOCS}")))
     if not any(i.id.startswith("agent.") for i in items):
         items.append(Item("agent.none", "Coding agent", "info",
                           "No MCP-capable agent found. Install Claude Code, Codex, Gemini CLI or Cursor, then re-run `form setup`. "
@@ -341,7 +352,7 @@ def main(argv=None) -> int:
     import argparse
     ap = argparse.ArgumentParser(prog="form setup", description="Find what FORM needs, and fix what you choose.")
     ap.add_argument("--check", action="store_true", help="report as JSON, change nothing")
-    ap.add_argument("--yes", action="store_true", help="apply recommended fixes without asking (never large downloads)")
+    ap.add_argument("--yes", action="store_true", help="apply recommended fixes and install recommended software without asking")
     ap.add_argument("--dry-run", action="store_true", help="show what would run")
     a = ap.parse_args(argv)
     items = check()
@@ -358,6 +369,8 @@ def main(argv=None) -> int:
             line += _c("2", f"   [{len(fixable)}]")
         print(line)
     if not fixable:
+        if a.yes:
+            return _install_recommended(a.dry_run)
         print(_c("32", "\nEverything FORM uses is set up.") + " Ask your agent for a part, or run `form serve` for the bench.\n")
         return 0
     print()
@@ -396,5 +409,38 @@ def main(argv=None) -> int:
             i = after.get(fixable[n - 1].id)
             if i:
                 print(f" {MARK[i.status]} {i.label:<24} {i.detail}")
+    if a.yes:
+        failed += _install_recommended(a.dry_run)
     print("\nRestart your agent so it loads FORM. Then ask it: “design me a Gridfinity bin for my screwdrivers”.\n")
     return 1 if failed else 0
+
+
+def _install_recommended(dry: bool) -> int:
+    """`form setup --yes`: install what the registry (form/installer.py) marks recommended and missing. No questions;
+    each command is printed before it runs. Sign-in is never automatic."""
+    from . import config, installer
+    cfg = config.load()
+    rows = installer.survey(cfg)
+    ids = installer.recommended_ids(rows)
+    by = {r["id"]: r for r in rows}
+    if not ids:
+        print(_c("32", "\nNothing recommended is missing."))
+    else:
+        print(_c("1", "\nInstalling recommended software"))
+        for i in ids:
+            print(f"  {by[i]['label']}" + (f" ({by[i]['size']})" if by[i]["size"] else ""))
+            for c in by[i]["plan"]["commands"]:
+                print(_c("2", f"        $ {c}"))
+    failed = 0
+    if ids and not dry:
+        job = installer.run_blocking(cfg, ids, echo=lambda line: print("   " + line))
+        for st in job.steps:
+            ok = st["state"] == "done"
+            print(f" {MARK['ok'] if ok else MARK['missing']} {st['label']:<24} {st['message']}")
+            failed += not ok
+    elif ids:
+        print("  (dry run: nothing was installed)")
+    sign = by.get("claude.signin")
+    if sign and sign["status"] == "missing":
+        print("\nClaude Code is not signed in. Sign in from the FORM app (Settings, Software), or run: claude auth login")
+    return failed

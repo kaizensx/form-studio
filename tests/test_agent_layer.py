@@ -69,13 +69,15 @@ class Locking(unittest.TestCase):
 
 
 class FirstRun(unittest.TestCase):
-    def test_empty_data_folder_gets_examples(self):
+    def test_empty_data_folder_stays_empty_and_examples_are_added_on_request(self):
         from form import config
         from form.studio import Studio
         with tempfile.TemporaryDirectory() as d:
             os.environ["FORM_DATA"] = d
             try:
                 st = Studio(config.load())
+                self.assertEqual(st.list(), [])                # nothing is seeded
+                st.seed_examples()
                 ids = [p["id"] for p in st.list()]
                 self.assertIn("hallway-phone-dock", ids)
                 p = st.load("hallway-phone-dock")

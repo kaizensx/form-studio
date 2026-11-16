@@ -616,7 +616,8 @@ QtObject {
         // headless (--shot/--check) shows the welcome only for an empty data folder, so other screenshots are unaffected
         get("/setup/state").then(function (r) {
             var empty = r.fresh
-            if (r.first_run && (!headless || empty)) welcome = true
+            if (r.onboarding) onboardStep = r.onboarding.step
+            if (r.first_run && (!headless || empty)) { welcome = true; checkSoftware() }
             checkSetup().then(function (st) { if (st && !st.required_ok && (!headless || empty)) welcome = true })
         }, function () {})
         if (!headless) checkUpdates(false)
@@ -651,7 +652,96 @@ QtObject {
         }, function () { _setupPoll.restart() })
     }
     function closeWelcome(how) { welcome = false; post("/setup/seen", { how: how || "skipped" }).then(function () {}, function () {}) }
-    function openSetup() { setupJob = setupJob && setupJob.state === "running" ? setupJob : null; openSheet("setup"); checkSetup() }
+    function openSetup() { openSettings("software"); checkSetup() }
+
+    // ── installer, sign-in, settings, examples (setup workstream) ─────────────
+    // The registry is form/installer.py. An install runs only for ids the user ticked (or pressed Install on), and the
+    // engine refuses if the commands differ from the ones shown here. FORM never asks for a password.
+    property var software: null        // GET /install: { software: [...], groups, required_ok, onboarding, platform, packaged }
+    property bool softwareChecking: false
+    property var installPick: ({})     // registry id → ticked
+    property var installJob: null      // { id, state, steps, after, seconds, fake }
+    property var installLog: []        // every log line of the current or last job
+    property bool installLogOpen: false // the log drawer (opens by itself when an install fails)
+    property var claudeLogin: null     // { id, state, url, lines, message }
+    property var config: null          // GET /config
+    property int onboardStep: 0        // first-run step the user reached (kept in the data folder)
+    readonly property bool installing: !!installJob && installJob.state === "running"
+    readonly property var installChosen: F.keys(installPick).filter(function (k) { return installPick[k] })
+    function softwareItem(id) {
+        if (!software) return null
+        for (var i = 0; i < software.software.length; i++) if (software.software[i].id === id) return software.software[i]
+        return null
+    }
+    function installStep(id) {
+        if (!installJob) return null
+        for (var i = 0; i < installJob.steps.length; i++) if (installJob.steps[i].id === id) return installJob.steps[i]
+        return null
+    }
+    function checkSoftware() {
+        softwareChecking = true
+        return get("/install").then(function (r) {
+            software = r; softwareChecking = false
+            var p = ({})
+            r.software.forEach(function (it) { if (it.installable) p[it.id] = installPick[it.id] !== undefined ? installPick[it.id] : it["default"] })
+            installPick = p
+            return r
+        }, function (e) { softwareChecking = false; fail(e); return null })
+    }
+    function setInstallPick(id, on) { var p = Object.assign({}, installPick); p[id] = on; installPick = p }
+    function installSoftware(ids) {
+        var shown = ({})
+        ids = (ids || installChosen).filter(function (id) { var it = softwareItem(id); return it && it.installable })
+        if (!ids.length || installing) return
+        ids.forEach(function (id) { shown[id] = softwareItem(id).plan.commands })
+        post("/install", { ids: ids, shown: shown }).then(function (j) { installLog = j.log; installJob = j; _installPoll.restart() },
+                                                           function (e) { fail(e); checkSoftware() })
+    }
+    function cancelInstall() { if (installJob) post("/install/job/" + installJob.id + "/cancel", {}).then(function () {}, fail) }
+    property var _installPoll: Timer { interval: 400; onTriggered: s._installTick() }
+    function _installTick() {
+        if (!installJob) return
+        get("/install/job/" + installJob.id + "?from=" + (installLog.length ? installLog[installLog.length - 1].n + 1 : 0)).then(function (j) {
+            if (j.log.length) installLog = installLog.concat(j.log).slice(-800)
+            installJob = j
+            if (j.state === "running") { _installPoll.restart(); return }
+            installPick = ({})
+            checkSoftware(); checkSetup(); reloadStudio()
+            toast(j.state === "done" ? "Installed" : j.state === "cancelled" ? "Install cancelled" : "Some installs failed",
+                  j.state === "done" ? "Each item was checked again." : j.state === "cancelled" ? "" : "The log shows what happened.", j.state === "failed")
+        }, function () { _installPoll.restart() })
+    }
+    function startClaudeLogin() {
+        post("/claude/login", {}).then(function (j) { claudeLogin = j; _loginPoll.restart() }, fail)
+    }
+    function cancelClaudeLogin() { if (claudeLogin) post("/claude/login/" + claudeLogin.id + "/cancel", {}).then(function () {}, function () {}) }
+    function sendClaudeCode(code) { if (claudeLogin) post("/claude/login/" + claudeLogin.id + "/code", { code: code }).then(function (j) { claudeLogin = j }, fail) }
+    property var _loginPoll: Timer { interval: 700; onTriggered: s._loginTick() }
+    function _loginTick() {
+        if (!claudeLogin) return
+        get("/claude/login/" + claudeLogin.id).then(function (j) {
+            claudeLogin = j
+            if (j.state === "running") { _loginPoll.restart(); return }
+            checkSoftware(); reloadStudio()
+            if (j.state === "done") toast("Signed in to Claude")
+            else if (j.state === "failed") toast("Sign-in did not finish", j.message, true)
+        }, function () { _loginPoll.restart() })
+    }
+    function loadConfig() { return get("/config").then(function (c) { config = c; return c }, function (e) { fail(e); return null }) }
+    function saveConfig(values) {
+        return post("/config", { values: values }).then(function (r) {
+            config = r.config; reloadStudio()
+            var n = F.keys(r.changed).length
+            if (!n) toast("Nothing to change")
+            else toast("Saved " + F.plural(n, "setting"), r.restart ? "The project folder changes when FORM restarts." : r.backup ? "The previous file was kept as a backup next to it." : "", false)
+            return r
+        }, function (e) { fail(e); return null })
+    }
+    function setOnboardStep(n) { onboardStep = Math.max(0, Math.min(2, n)); post("/setup/step", { step: onboardStep }).then(function () {}, function () {}) }
+    function openSettings(tab) { openSheet("settings", { tab: tab || "general" }); loadConfig(); checkSoftware() }
+    function addExample(id) {
+        return post("/examples", { ids: [id] }).then(function () { sheet = null; return reloadStudio().then(function () { return open(id) }) }, fail)
+    }
     function checkUpdates(force) {
         return get("/updates" + (force ? "?force=1" : "")).then(function (u) { update = u; return u }, function () {})
     }

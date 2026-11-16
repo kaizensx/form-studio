@@ -43,6 +43,7 @@ Rectangle {
             Txt { x: 28; text: "Search and commands"; tone: 3; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
             Txt { anchors.right: parent.right; anchors.rightMargin: 8; mono: true; font.pixelSize: 11; tone: 4; text: Bridge.platform === "darwin" ? "⌘K" : "Ctrl K"; anchors.verticalCenter: parent.verticalCenter }
             MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.paletteOpen = true } }
+        Btn { kind: "quiet"; icon: "settings"; tip: "Settings"; active: !!Store.sheet && Store.sheet.kind === "settings"; onClicked: Store.openSettings("general") }   // setup workstream
         Btn { kind: "quiet"; icon: "message_square"; active: Store.talkOpen; tip: "Claude"; visible: Store.screen === "work"; onClicked: Store.talkOpen = !Store.talkOpen }
     }
 }

@@ -30,7 +30,9 @@ Item {
         if (w && Store.canAskReview) c.push({ icon: "eye", text: "Ask Claude for a design review", hint: "Silhouette, relationships, details", run: function () { Store.askReview() } })
         c.push({ icon: "message_square", text: "New conversation with Claude", hint: "", run: function () { Store.newChat(); Store.talkOpen = true } })
         // setup and updates (app setup workstream)
-        c.push({ icon: "wrench", text: "Check setup", hint: "Kernel, slicer, agents", run: function () { Store.openSetup() } })
+        c.push({ icon: "settings", text: "Settings", hint: Bridge.platform === "darwin" ? "⌘," : "Ctrl ,", run: function () { Store.openSettings("general") } })
+        c.push({ icon: "wrench", text: "Software: install or check", hint: "Slicer, Claude Code, CAD apps, agents", run: function () { Store.openSetup() } })
+        c.push({ icon: "sparkles", text: "Run the first-time setup again", hint: "Three short steps", run: function () { Store.setOnboardStep(0); Store.checkSoftware(); Store.welcome = true } })
         c.push({ icon: "refresh_cw", text: "Check for updates", hint: "FORM " + Bridge.version, run: function () { Store.checkUpdates(true).then(function (u) {
             if (u && u.available) { Store.updateHidden = false; Store.openSheet("update") }
             else if (u && !u.enabled) Store.toast("Update checks are off", "[updates] check = false or FORM_NO_UPDATE_CHECK=1")
