@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and setup help
+    url: https://github.com/kaizensx/form-studio/discussions/categories/q-a
+    about: Ask how to do something, or get help installing Form Studio, a slicer or an agent.
+  - name: Ideas
+    url: https://github.com/kaizensx/form-studio/discussions/categories/ideas
+    about: Talk through an idea before it becomes a feature request.
+  - name: Show and tell
+    url: https://github.com/kaizensx/form-studio/discussions/categories/show-and-tell
+    about: Share something you designed and printed with Form Studio.
+  - name: Documentation
+    url: https://kaizensx.github.io/form-studio/docs/
+    about: The guide, the MCP reference, recipes, compatibility and the changelog.
+  - name: Security vulnerability
+    url: https://github.com/kaizensx/form-studio/security/advisories/new
+    about: Report a vulnerability privately. Please do not open a public issue.
