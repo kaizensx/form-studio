@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick3D
 import FormNative
 import "F.js" as F
+import "Labels.js" as Labels
 
 // The part on its build plate. Millimetres, Z up. Everything the engine returns is drawn as-is:
 // one mesh per feature, the kernel's own edges, and overall dimensions as drawing-style dimension lines.
@@ -104,6 +105,33 @@ Item {
         bounds = { lo: lo.plus(sh), hi: hi.plus(sh) }
     }
     Behavior on shift { enabled: vp.asmTween; Vector3dAnimation { duration: Motion.part; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+
+    // ── what the part holds (companions): a reference outline, not part of the print ──
+    // A device can be several times taller than the part that holds it. The camera frames the part, so a tall
+    // companion is drawn only as far as a little above the part and fades out there; a label says what it is and how
+    // tall it really is. One that already fits in that height is drawn whole.
+    readonly property real compFrom: bounds.hi.z + Math.max(6, 0.15 * bounds.hi.z)                  // fully drawn up to here (mm above the plate)
+    readonly property real compTo: bounds.hi.z + Math.max(20, Math.min(60, 0.7 * bounds.hi.z))      // gone from here
+    function compAxis(c) { var a = (c.rot_x_deg || 0) * Math.PI / 180; return Qt.vector3d(0, -Math.sin(a), Math.cos(a)) }
+    function compTop(c) {                    // its highest point, mm above the plate
+        if (c.mesh) return c.origin[2] + c.size[2] + shiftTo.z
+        var ax = compAxis(c)
+        return c.origin[2] + c.size[2] * ax.z + c.size[1] / 2 * Math.abs(ax.y) + shiftTo.z
+    }
+    function compCut(c) { return compTop(c) > compTo + 4 }
+    function compLabelAt(c) {                // where its outline ends, on its axis (design frame)
+        if (c.mesh) return Qt.vector3d(c.origin[0], c.origin[1], compTo - shiftTo.z)
+        var ax = compAxis(c), o = Qt.vector3d(c.origin[0], c.origin[1], c.origin[2])
+        return o.plus(ax.times((compTo - shiftTo.z - o.z) / Math.max(0.2, ax.z)))
+    }
+    readonly property var compNotes: {       // one note per companion that is cut short
+        var out = [], cs = showCompanions && !asmOn && !lite && interactive && model && model.companions ? model.companions : []
+        for (var i = 0; i < cs.length; i++) if (compCut(cs[i])) {
+            var c = cs[i], at = compLabelAt(c)
+            out.push({ p: [at.x, at.y, at.z], text: (c.label || "Reference") + " · " + F.trim(c.size[2], 1) + " mm tall · not printed" })
+        }
+        return out
+    }
 
     // ── camera (orbit around target; angles in degrees) ─────
     property vector3d target: Qt.vector3d(0, 0, 20)
@@ -368,17 +396,26 @@ Item {
                         readonly property bool isMesh: !!modelData.mesh      // an imported part (STEP/STL), in design coordinates
                         position: isMesh ? Qt.vector3d(0, 0, 0) : Qt.vector3d(modelData.origin[0], modelData.origin[1], modelData.origin[2])
                         eulerRotation.x: isMesh ? 0 : (modelData.rot_x_deg || 0)
+                        readonly property bool cut: vp.compCut(modelData)
+                        readonly property real f0: cut ? vp.compFrom : 1e9
+                        readonly property real f1: cut ? vp.compTo : 2e9
                         Model { visible: comp.isMesh; pickable: false; castsShadows: false
                             geometry: MeshGeometry { positions: comp.isMesh ? comp.modelData.mesh.positions : ""; indices: comp.isMesh ? comp.modelData.mesh.indices : "" }
-                            materials: PrincipledMaterial { baseColor: Theme.blueprint; opacity: 0.14; alphaMode: PrincipledMaterial.Blend; lighting: PrincipledMaterial.NoLighting
-                                cullMode: Material.NoCulling; depthDrawMode: Material.NeverDepthDraw } }
+                            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/companion.frag"; vertexShader: "shaders/line.vert"
+                                cullMode: Material.NoCulling; depthDrawMode: Material.NeverDepthDraw
+                                sourceBlend: CustomMaterial.One; destinationBlend: CustomMaterial.OneMinusSrcAlpha
+                                property color uColor: Theme.alpha(Theme.blueprint, 0.14); property real uFade0: comp.f0; property real uFade1: comp.f1 } }
                         Model { visible: comp.isMesh && !!comp.modelData.edges; pickable: false; castsShadows: false
                             geometry: LineGeometry { segments: comp.isMesh ? (comp.modelData.edges || "") : "" }
-                            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
-                                property color uColor: Theme.alpha(Theme.blueprint, 0.75); property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/companion.frag"; vertexShader: "shaders/line.vert"
+                                sourceBlend: CustomMaterial.One; destinationBlend: CustomMaterial.OneMinusSrcAlpha
+                                property color uColor: Theme.alpha(Theme.blueprint, 0.75); property real uFade0: comp.f0; property real uFade1: comp.f1 } }
                         Model { visible: !comp.isMesh; source: "#Cube"; pickable: false; castsShadows: false
                             scale: Qt.vector3d(modelData.size[0] / 100, modelData.size[1] / 100, modelData.size[2] / 100); z: modelData.size[2] / 2
-                            materials: PrincipledMaterial { baseColor: Theme.blueprint; opacity: 0.1; alphaMode: PrincipledMaterial.Blend; lighting: PrincipledMaterial.NoLighting; depthDrawMode: Material.NeverDepthDraw } }
+                            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/companion.frag"; vertexShader: "shaders/line.vert"
+                                depthDrawMode: Material.NeverDepthDraw
+                                sourceBlend: CustomMaterial.One; destinationBlend: CustomMaterial.OneMinusSrcAlpha
+                                property color uColor: Theme.alpha(Theme.blueprint, 0.055); property real uFade0: comp.f0; property real uFade1: comp.f1 } }
                         Model { visible: !comp.isMesh; pickable: false; castsShadows: false
                             geometry: LineGeometry { points: {
                                 if (comp.isMesh) return []
@@ -387,8 +424,9 @@ Item {
                                 for (var i = 0; i < 4; i++) { var a = c[i], b = c[(i + 1) % 4]
                                     p.push(a[0], a[1], 0, b[0], b[1], 0, a[0], a[1], l, b[0], b[1], l, a[0], a[1], 0, a[0], a[1], l) }
                                 return p } }
-                            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
-                                property color uColor: Theme.blueprint; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/companion.frag"; vertexShader: "shaders/line.vert"
+                                sourceBlend: CustomMaterial.One; destinationBlend: CustomMaterial.OneMinusSrcAlpha
+                                property color uColor: Theme.blueprint; property real uFade0: comp.f0; property real uFade1: comp.f1 } }
                     }
                 }
 
@@ -472,53 +510,104 @@ Item {
         NumberAnimation { target: still; property: "opacity"; from: 1; to: 0; duration: Motion.slow; easing.type: Easing.InOutQuad }
         ScriptAction { script: { still.z = -1; still.opacity = 1; still.live = true } } }
 
-    // dimension numbers, placed where the 3D dimension lines are
+    // ── 2D labels pinned to 3D points: dimension numbers, findings and measurements, notes on what the part holds.
+    // One pass per frame projects their points and lets Labels.js seat them, so a marker never sits on a dimension.
+    function _px(p) {                        // plate-frame millimetres → view pixels, or null behind the camera
+        var s = view.mapFrom3DScene(vp.scene(p))
+        return s.z > 0 ? Qt.point(s.x, s.y) : null
+    }
+    function _dimLine(i) {                   // the two ends of dimension line i, on the plate (see the Model above)
+        var b = bounds, o = 7, xs = camRight ? b.hi.x + o : b.lo.x - o, ys = camFront ? b.lo.y - o : b.hi.y + o
+        return i === 0 ? [Qt.vector3d(b.lo.x, ys, 0), Qt.vector3d(b.hi.x, ys, 0)]
+             : i === 1 ? [Qt.vector3d(xs, b.lo.y, 0), Qt.vector3d(xs, b.hi.y, 0)]
+             : [Qt.vector3d(xs, camFront ? b.hi.y : b.lo.y, 0), Qt.vector3d(xs, camFront ? b.hi.y : b.lo.y, b.hi.z)]
+    }
+    function _seatLabels() {
+        var items = [], refs = [], i, k, it, w, h, p, c
+        for (i = 0; i < dimLabels.count; i++) {
+            it = dimLabels.itemAt(i); if (!it) continue
+            var ends = _dimLine(i), a = _px(ends[0]), e = _px(ends[1]), ts = [0.5, 0.3, 0.7, 0.16, 0.84]
+            w = it.width; h = it.height; c = []
+            for (k = 0; a && e && k < ts.length; k++)
+                c.push({ x: Math.round(a.x + (e.x - a.x) * ts[k] - w / 2), y: Math.round(a.y + (e.y - a.y) * ts[k] - h / 2) })
+            items.push({ kind: "dim", w: w, h: h, cands: c, prev: it.cand }); refs.push(it)
+        }
+        for (i = 0; i < pinLabels.count; i++) {
+            it = pinLabels.itemAt(i); if (!it) continue
+            var q = it.modelData.p
+            p = _px(Qt.vector3d(q[0], q[1], q[2]).plus(shift)); w = it.width; h = it.height
+            // right of its point and above it, then the other three corners
+            c = p ? [{ x: Math.round(p.x + 9), y: Math.round(p.y - h - 5) }, { x: Math.round(p.x - 9 - w), y: Math.round(p.y - h - 5) },
+                     { x: Math.round(p.x + 9), y: Math.round(p.y + 5) }, { x: Math.round(p.x - 9 - w), y: Math.round(p.y + 5) }] : []
+            items.push({ kind: "pin", w: w, h: h, cands: c, prev: it.cand }); refs.push(it)
+        }
+        for (i = 0; i < refLabels.count; i++) {
+            it = refLabels.itemAt(i); if (!it) continue
+            var g = it.modelData.p
+            p = _px(Qt.vector3d(g[0], g[1], g[2]).plus(shift)); w = it.width; h = it.height
+            c = p ? [{ x: Math.round(p.x - w / 2), y: Math.round(p.y - h - 6) }, { x: Math.round(p.x + 12), y: Math.round(p.y - h / 2) },
+                     { x: Math.round(p.x - 12 - w), y: Math.round(p.y - h / 2) }] : []
+            items.push({ kind: "ref", w: w, h: h, cands: c, prev: it.cand }); refs.push(it)
+        }
+        if (!items.length) return
+        // labels of markers and measurements stay left of labelRight (the dock sits right of it)
+        var out = Labels.place(items, { l: 4, t: 4, r: labelRight - 6, b: height - 4 })
+        for (i = 0; i < refs.length; i++) {
+            it = refs[i]; var r = out[i]
+            if (it.cand !== r.c) it.cand = r.c
+            if (it.shown !== r.visible) it.shown = r.visible
+            if (r.visible && (it.x !== r.x || it.y !== r.y)) { it.x = r.x; it.y = r.y }
+        }
+    }
+    FrameAnimation { running: vp.visible && (dimLabels.count + pinLabels.count + refLabels.count) > 0; onTriggered: vp._seatLabels() }
+
+    // dimension numbers, on the 3D dimension lines
     Repeater {
+        id: dimLabels
         model: vp.showDims && vp.model && !(vp.asmOn && vp.asmMode === "exploded") ? 3 : 0
         Rectangle {
             id: dl
+            objectName: "dimLabel"
             required property int index
-            property point at: Qt.point(-999, -999)
+            property bool shown: false
+            property int cand: -1
             readonly property var b: vp.bounds
             readonly property real mm: index === 0 ? b.hi.x - b.lo.x : index === 1 ? b.hi.y - b.lo.y : b.hi.z
-            x: Math.round(at.x - width / 2); y: Math.round(at.y - height / 2)
             width: t.implicitWidth + 10; height: 17; radius: Theme.rXs; color: Theme.plate; border.color: Theme.alpha(Theme.datum, 0.28)
-            visible: at.x > 0 && at.y > 0
-            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.datum; font.family: Theme.mono; font.pixelSize: 11; font.weight: 500; renderType: Text.NativeRendering }
-            FrameAnimation {
-                running: dl.visible || vp.visible
-                onTriggered: {
-                    var o = 7, b = dl.b
-                    var xs = vp.camRight ? b.hi.x + o : b.lo.x - o
-                    var p = dl.index === 0 ? Qt.vector3d((b.lo.x + b.hi.x) / 2, vp.camFront ? b.lo.y - o : b.hi.y + o, 0)
-                          : dl.index === 1 ? Qt.vector3d(xs, (b.lo.y + b.hi.y) / 2, 0)
-                          : Qt.vector3d(xs, vp.camFront ? b.hi.y : b.lo.y, b.hi.z / 2)
-                    var s = view.mapFrom3DScene(vp.scene(p))
-                    dl.at = s.z > 0 ? Qt.point(Math.round(s.x), Math.round(s.y)) : Qt.point(-999, -999)
-                }
-            }
+            visible: shown
+            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.datum; font.family: Theme.mono; font.pixelSize: Theme.tFine; font.weight: 500; renderType: Text.NativeRendering }
         }
     }
 
-    // labels of map markers and measurements, placed where their 3D points are
+    // labels of map markers and measurements, beside their 3D points
     Repeater {
+        id: pinLabels
         model: vp.labels
         Rectangle {
             id: pl
+            objectName: "pinLabel"
             required property var modelData
-            property point at: Qt.point(-999, -999)
-            // to the right of its point, or to the left when that would run under the dock or off the view
-            x: Math.round(at.x + 9 + width > vp.labelRight - 6 ? Math.max(4, at.x - 9 - width) : at.x + 9); y: Math.round(Math.max(4, at.y - height - 5))
-            width: pt.implicitWidth + 12; height: 19; radius: 3; color: Theme.alpha(Theme.plate, 0.88); border.color: Theme.alpha(modelData.tint, 0.45)
-            visible: at.x > 0 && at.y > 0
-            Text { id: pt; anchors.centerIn: parent; text: pl.modelData.text; color: pl.modelData.tint; font.family: Theme.mono; font.pixelSize: 11; renderType: Text.NativeRendering }
-            FrameAnimation {
-                running: vp.visible
-                onTriggered: {
-                    var q = pl.modelData.p, sp = view.mapFrom3DScene(vp.scene(Qt.vector3d(q[0], q[1], q[2]).plus(vp.shift)))
-                    pl.at = sp.z > 0 ? Qt.point(sp.x, sp.y) : Qt.point(-999, -999)
-                }
-            }
+            property bool shown: false
+            property int cand: -1
+            width: pt.implicitWidth + 12; height: 19; radius: Theme.rXs; color: Theme.alpha(Theme.plate, 0.88); border.color: Theme.alpha(modelData.tint, 0.45)
+            visible: shown
+            Text { id: pt; anchors.centerIn: parent; text: pl.modelData.text; color: pl.modelData.tint; font.family: Theme.mono; font.pixelSize: Theme.tFine; renderType: Text.NativeRendering }
+        }
+    }
+
+    // what the part holds, where its outline is cut short: what it is, how tall it really is, and that it is not printed
+    Repeater {
+        id: refLabels
+        model: vp.compNotes
+        Rectangle {
+            id: rl
+            objectName: "companionNote"
+            required property var modelData
+            property bool shown: false
+            property int cand: -1
+            width: rt.implicitWidth + 12; height: 19; radius: Theme.rXs; color: Theme.alpha(Theme.plate, 0.88); border.color: Theme.alpha(Theme.blueprint, 0.4)
+            visible: shown
+            Txt { id: rt; anchors.centerIn: parent; kind: "fine"; text: rl.modelData.text; color: Theme.blueprint; wrapMode: Text.NoWrap }
         }
     }
 

@@ -2,6 +2,8 @@
 check's marker, the orientation finder, acknowledging warnings, approving, verifying, saving files."""
 import zipfile
 
+from PySide6.QtCore import QPointF
+
 from _lib import example, fold, head, toasts_gone, wait_job
 
 DATA = "fresh"
@@ -15,6 +17,30 @@ def data(ui):
 def journey_setup(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     S["pid"] = example(ui, "hallway-phone-dock")
+
+
+def journey_companion(ui):
+    # the phone is four times taller than the dock: its outline stops a little above the part, with a note
+    ui.key("Ctrl+2")
+    ui.wait_until(lambda: ui.store.get("stage") == "shape", 3, "the Shape stage")
+    vp = ui.item("viewport")
+    h = ui.js("Store.values.device_height")
+    for key in ("1", "2", "3", "4"):
+        ui.key(key)
+        ui.settle(700)
+        note = ui.wait_until(lambda: ui.find(name="companionNote"), 5, "the note on what the dock holds")
+        ui.check(ui.sees("%g mm tall" % h, note), "the note gives the device's real height")
+        ui.check(ui.sees("not printed", note), "the note says it is not printed")
+        p = note.mapToItem(vp, QPointF(0, 0))
+        ui.check(p.x() >= 0 and p.y() >= 0 and p.x() + note.width() <= vp.width() and p.y() + note.height() <= vp.height(), f"the note is inside the view ({key})")
+    ui.key("1")
+    ui.check(vp.property("compTo") < h, "the outline is cut below the device's full height")
+    ui.settle(500)
+    ui.shot("companion")
+    ui.run_js("Store.toggleCompanions()")                            # hide what the part holds: the note goes with it
+    ui.wait_until(lambda: ui.find(name="companionNote") is None, 3, "the note to leave with the outline")
+    ui.run_js("Store.toggleCompanions()")
+    ui.wait_until(lambda: ui.find(name="companionNote") is not None, 3, "the note to come back")
 
 
 def journey_fit(ui):

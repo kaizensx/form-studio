@@ -12,6 +12,13 @@ def tool(ui):
     return ui.js("Ws.tool")
 
 
+def box(it):
+    """An item's rectangle in window pixels: (left, top, right, bottom)."""
+    from PySide6.QtCore import QPointF
+    p = it.mapToScene(QPointF(0, 0))
+    return (p.x(), p.y(), p.x() + it.width(), p.y() + it.height())
+
+
 def journey_setup(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     S["box"] = make(ui, "enclosure", "Tool box", open=False)
@@ -122,6 +129,11 @@ def journey_analyze(ui):
         ui.check(len(ui.texts(legend)) >= 3, f"the {label} legend shows")
         ui.wait_until(lambda: ui.item("viewport").property("mapShown") is True, 5, "the map on the part")
         ui.settle(500)
+        # a marker's label never sits on a dimension number
+        pins, dims = [box(p) for p in ui.find_all(name="pinLabel")], [box(d) for d in ui.find_all(name="dimLabel")]
+        for p in pins:
+            for d in dims:
+                ui.check(not (p[0] < d[2] and d[0] < p[2] and p[1] < d[3] and d[1] < p[3]), f"a {label} marker label sits on a dimension: {p} {d}")
         ui.shot("tools-analyze-" + mid)
     ui.click_text("Clear map")
     ui.wait_until(lambda: ui.store.get("analysisMap") == "" and ui.store.get("analysis") is None, 2, "the map to clear")
