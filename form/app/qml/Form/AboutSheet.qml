@@ -29,7 +29,7 @@ Column {
             Row { spacing: 10
                 Txt { text: "FORM"; font.weight: Theme.wBold; font.letterSpacing: 3; font.pixelSize: 18 }
                 Txt { mono: true; tone: 2; text: Bridge.version; anchors.baseline: parent.children[0].baseline } }
-            Txt { tone: 2; text: "An agent designs printable parts with a real CAD kernel, a real slicer and an honest record of what is known." } } }
+            Txt { tone: 2; width: ab.width - 72; text: "An agent designs printable parts with a real CAD kernel, a real slicer and an honest record of what is known." } } }
 
     Column { width: parent.width
         KV { first: true; k: "CAD kernel"; value: ab.env && ab.env.kernel ? String(ab.env.kernel) : "starting…" }

@@ -36,3 +36,15 @@ StatusChips 1.0 StatusChips.qml
 PhotoRenderSheet 1.0 PhotoRenderSheet.qml
 Timeline 1.0 Timeline.qml
 ContextMenu 1.0 ContextMenu.qml
+Lightbox 1.0 Lightbox.qml
+MacMenu 1.0 MacMenu.qml
+Glide 1.0 Glide.qml
+Kbd 1.0 Kbd.qml
+Spinner 1.0 Spinner.qml
+Tint 1.0 Tint.qml
+FocusRing 1.0 FocusRing.qml
+Shadow 1.0 Shadow.qml
+Toggle 1.0 Toggle.qml
+Tabs 1.0 Tabs.qml
+Pop 1.0 Pop.qml
+PopMenu 1.0 PopMenu.qml

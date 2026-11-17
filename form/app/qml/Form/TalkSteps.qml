@@ -39,7 +39,7 @@ Column {
     // header
     Item {
         width: sg.width; height: 24
-        Rectangle { anchors.fill: parent; radius: Theme.rXs; color: hm.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : "transparent" }
+        Rectangle { anchors.fill: parent; radius: Theme.rXs; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent" }
         Icon { x: 2; name: sg.expanded ? "chevron_down" : "chevron_right"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
         Row { x: 20; spacing: 8; anchors.verticalCenter: parent.verticalCenter
             Txt { kind: "fine"; tone: 2; font.weight: 550; text: sg.steps.length + (sg.steps.length === 1 ? " step" : " steps") }
@@ -70,18 +70,27 @@ Column {
                     text: st.how ? st.modelData.tool : (st.modelData.input || "") }
             }
             Txt { visible: !!st.r && !st.r.ok && !!st.r.text; x: 38; width: parent.width - 38; kind: "fine"; color: Qt.lighter(Theme.signal, 1.2)
-                text: st.r ? st.r.text : ""; maximumLineCount: sg.expanded ? 8 : 2; elide: Text.ElideRight }
+                text: st.r && st.r.text ? st.r.text : ""; maximumLineCount: sg.expanded ? 8 : 2; elide: Text.ElideRight }
             // the picture the agent looked at
             Rectangle {
                 visible: !!st.r && !!st.r.img; x: 38; width: Math.min(parent.width - 38, 300)
                 height: visible ? (im.status === Image.Ready ? Math.round(width * im.implicitHeight / Math.max(1, im.implicitWidth)) : Math.round(width * 0.7)) : 0
-                radius: Theme.rMd; color: Theme.plate2; border.color: tm.containsMouse ? Theme.rule2 : Theme.rule; clip: true
+                radius: Theme.rMd; color: Theme.plate2; border.color: tm.containsMouse ? Theme.rule3 : Theme.rule; clip: true
+                Behavior on border.color { Tint {} }
                 Image { id: im; anchors.fill: parent; anchors.margins: 1; asynchronous: true; fillMode: Image.PreserveAspectFit; sourceSize.width: 640; mipmap: true
                     source: st.r && st.r.img ? Bridge.baseUrl + "/api/conversations/render/" + st.r.img.project + "/" + st.r.img.file : "" }
                 Txt { anchors.centerIn: parent; kind: "fine"; visible: im.status === Image.Error; text: "This render is no longer on disk" }
-                MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    onClicked: if (st.r.img.project !== Store.pid) Store.open(st.r.img.project); else if (sg.arg(st.modelData, "view") && Store._viewMap[sg.arg(st.modelData, "view")]) Store.setView(Store._viewMap[sg.arg(st.modelData, "view")]) }
-                Tip { show: tm.containsMouse; text: "Rendered by FORM from the kernel geometry. Click to show this view in 3D." }
+                // click: the picture, large. The corner button turns the 3D view to the same angle instead.
+                MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true
+                    onClicked: Store.showImage(im.source, st.how ? st.how[1] : "Render", "Rendered by FORM from the kernel geometry") }
+                Rectangle { anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 6; width: 26; height: 26; radius: Theme.rSm; color: Theme.alpha(Theme.plate, 0.8); border.color: Theme.rule2
+                    opacity: tm.containsMouse || vb.hovered ? 1 : 0; visible: opacity > 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } }
+                    Btn { id: vb; anchors.centerIn: parent; small: true; kind: "quiet"; icon: st.r && st.r.img && st.r.img.project !== Store.pid ? "arrow_up_right" : "rotate_3d"
+                        tip: st.r && st.r.img && st.r.img.project !== Store.pid ? "Open this design" : "Show this view in 3D"
+                        onClicked: if (st.r.img.project !== Store.pid) Store.open(st.r.img.project); else if (sg.arg(st.modelData, "view") && Store._viewMap[sg.arg(st.modelData, "view")]) Store.setView(Store._viewMap[sg.arg(st.modelData, "view")]) } }
+                Rectangle { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 6; width: 24; height: 24; radius: Theme.rSm; color: Theme.alpha(Theme.plate, 0.8)
+                    opacity: tm.containsMouse ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } }
+                    Icon { anchors.centerIn: parent; name: "expand"; size: 12; color: Theme.ink } }
             }
             Item { visible: !!st.r && !!st.r.img; width: 1; height: 2 }
         }

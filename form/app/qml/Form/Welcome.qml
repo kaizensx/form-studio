@@ -35,6 +35,11 @@ Rectangle {
         return ok + " of " + rows.length + " ready"
     }
     function go(n) { Store.setOnboardStep(n) }
+    // each step arrives the same way: the page fades in and settles upward
+    onStepChanged: { fl.contentY = 0; arrive.restart() }
+    ParallelAnimation { id: arrive
+        Glide { target: body; property: "opacity"; from: 0; to: 1; duration: Theme.slow }
+        Glide { target: bodyShift; property: "y"; from: Theme.shift(10); to: 0; duration: Theme.slow } }
     function primary() {
         if (wl.chosen.length) Store.installSoftware(wl.chosen)
         else if (wl.step < 2) wl.go(wl.step + 1)
@@ -71,10 +76,11 @@ Rectangle {
                         Txt { visible: rs.state_ !== "done"; anchors.centerIn: parent; mono: true; font.pixelSize: 12; text: rs.index + 1
                             color: rs.current ? Theme.datumInk : Theme.ink3 } }
                     Column { x: 40; y: 3; width: parent.width - 40; spacing: 2
-                        Txt { text: rs.modelData.title; font.weight: rs.current ? 650 : 500; tone: rs.current ? 1 : 2; wrapMode: Text.NoWrap }
+                        Txt { text: rs.modelData.title; font.weight: rs.current ? Theme.wSemi : Theme.wMedium; tone: rs.current ? 1 : 2; wrapMode: Text.NoWrap }
                         Txt { kind: "fine"; text: wl.stepNote(rs.index); wrapMode: Text.NoWrap
                             color: rs.state_ === "done" ? Theme.pass : rs.state_ === "todo" && rs.index < wl.step ? Theme.amber : Theme.ink3 } }
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; enabled: !Store.installing; onClicked: wl.go(rs.index) }
+                    Rectangle { x: -10; y: -8; width: parent.width + 20; height: 54; radius: Theme.rMd; z: -1; color: sm.pressed ? Theme.washPress : sm.containsMouse && !rs.current ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
+                    MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; enabled: !Store.installing; onClicked: wl.go(rs.index) }
                 }
             }
         }
@@ -92,12 +98,13 @@ Rectangle {
         ScrollBar.vertical: ScrollBar { width: 6 }
         Column {
             id: body
-            width: Math.min(680, fl.width - 96); x: Math.max(48, (fl.width - width) / 2); y: 44
-            spacing: 16
-            Column { width: parent.width; spacing: 6
-                Txt { kind: "fine"; text: "Step " + (wl.step + 1) + " of 3" }
-                Txt { kind: "h1"; text: wl.here.title; width: parent.width }
-                Txt { kind: "lead"; tone: 2; width: parent.width
+            width: Math.min(680, fl.width - 96); x: Math.max(48, (fl.width - width) / 2); y: 52
+            spacing: 20
+            transform: Translate { id: bodyShift }
+            Column { width: parent.width; spacing: 8
+                Txt { kind: "cap"; text: "Step " + (wl.step + 1) + " of 3" }
+                Txt { kind: "h1"; text: wl.here.title; width: parent.width; font.weight: Theme.wSemi }
+                Txt { kind: "lead"; tone: 2; width: parent.width; lineHeight: 1.35
                     text: wl.step === 0 ? "FORM builds real geometry with a CAD kernel and keeps every design in a folder you own. This is checked for you."
                         : wl.step === 1 ? "A slicer turns a design into a print plan. FORM drives one that is installed here and reads the printer, filament and process selected in it."
                         : "Chat in FORM runs Claude Code on your own Claude account. FORM also offers its tools to other coding agents on this computer." } }
@@ -131,8 +138,7 @@ Rectangle {
                                         border.color: ck.shownOk ? Theme.pass : (!ck.pending && !ck.ok) ? Theme.amber : Theme.rule2
                                         Behavior on border.color { ColorAnimation { duration: Theme.slow } } }
                                     Icon { id: mark; visible: ck.shownOk; anchors.centerIn: parent; name: "check"; size: 13; color: Theme.pass }
-                                    Icon { visible: !ck.shownOk && (ck.pending || ck.ok); anchors.centerIn: parent; name: "loader_circle"; size: 12; color: Theme.ink3
-                                        RotationAnimation on rotation { from: 0; to: 360; duration: 1000; loops: Animation.Infinite; running: wl.step === 0 && !ck.shownOk } } }
+                                    Spinner { visible: !ck.shownOk && (ck.pending || ck.ok); anchors.centerIn: parent; size: 12; color: Theme.ink3; running: visible && wl.step === 0 } }
                                 Column { x: 56; width: parent.width - 56 - 120; anchors.verticalCenter: parent.verticalCenter; spacing: 2
                                     Txt { text: ck.r ? ck.r.label : ({ kernel: "CAD kernel", data: "Project folder", parts: "Standard-parts libraries" })[ck.modelData]; font.weight: 600 }
                                     Txt { kind: "fine"; tone: 2; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
@@ -218,10 +224,10 @@ Rectangle {
             Row { spacing: 10; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                 Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; visible: !Store.installing && wl.chosen.length > 0
                     text: "Untick everything to continue without installing" }
-                Btn { visible: Store.installing; icon: "x"; text: "Cancel install"; onClicked: Store.cancelInstall() }
-                Btn { kind: "primary"; enabled: !Store.installing && !!wl.sw
+                Btn { visible: Store.installing; large: true; icon: "x"; text: "Cancel install"; onClicked: Store.cancelInstall() }
+                Btn { kind: "primary"; large: true; busy: Store.installing || !wl.sw
                     icon: wl.chosen.length ? "download" : wl.step < 2 ? "arrow_right" : "check"
-                    text: Store.installing ? "Installing…" : !wl.sw ? "Checking…" : wl.chosen.length ? "Install selected (" + wl.chosen.length + ")"
+                    text: Store.installing ? "Installing…" : !wl.sw ? "Checking…" : wl.chosen.length ? "Install " + wl.chosen.length + " selected"
                         : wl.step < 2 ? "Continue" : "Open FORM"
                     onClicked: wl.primary() } }
         }

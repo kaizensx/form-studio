@@ -13,16 +13,17 @@ Rectangle {
     property string error: ""
     property bool busy: false
     readonly property bool invalid: error !== ""
+    property bool bare: false                // no well, no edge, no halo: the field is part of a larger surface (the palette)
     signal accepted(string text)
     signal edited(string text)
     implicitHeight: Theme.hMd; implicitWidth: 120; radius: Theme.rSm
     opacity: enabled ? 1 : 0.5
-    color: Theme.well; border.width: 1
+    color: bare ? "transparent" : Theme.well; border.width: bare ? 0 : 1
     border.color: invalid ? Theme.signal : input.activeFocus ? Theme.datum : hh.hovered ? Theme.rule3 : Theme.rule2
     Behavior on border.color { Tint {} }
     HoverHandler { id: hh; cursorShape: Qt.IBeamCursor }
     // the focus halo: a soft second edge, so focus reads from across the room
-    Rectangle { anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3
+    Rectangle { visible: !f.bare; anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3
         border.color: Theme.alpha(f.invalid ? Theme.signal : Theme.datum, 0.16); opacity: input.activeFocus ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
     TextInput {

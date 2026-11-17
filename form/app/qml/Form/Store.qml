@@ -971,4 +971,23 @@ QtObject {
         chatPrefill("About the “" + ft.label + "” feature (" + f + ") of " + project.name + ", " + F.pad(project.head)
             + (ps.length ? ": " + ps.join(", ") : "") + ". ")
     }
+
+    // ── app shell: column width, lightbox, palette memory, project housekeeping ──
+    property real talkWidth: 340                 // the agent column in a project; dragged by its edge, remembered by Main.qml
+    property var lightbox: null                  // { url, caption, note } — an image shown large over the window
+    function showImage(url, caption, note) { lightbox = { url: url, caption: caption || "", note: note || "" } }
+    property var paletteRecent: []               // ids of the commands run last, newest first (remembered by Main.qml)
+    function notePaletteRun(id) { if (!id) return; var r = paletteRecent.filter(function (x) { return x !== id }); r.unshift(id); paletteRecent = r.slice(0, 8) }
+    function renameProject(id, name) {
+        return post("/projects/" + id + "/rename", { name: name }).then(function (r) { reloadStudio(); if (id === s.pid) refresh(false); return r }, fail)
+    }
+    function duplicateProject(id) {
+        return post("/projects/" + id + "/duplicate", {}).then(function (r) { reloadStudio(); toast("Duplicated as “" + r.name + "”", "The copy is not released; approve it on its own."); return r }, fail)
+    }
+    // Moves the folder to .trash inside the projects folder. Nothing is erased.
+    function deleteProject(id) {
+        return post("/projects/" + id + "/delete", {}).then(function (r) {
+            if (id === s.pid) home(); else reloadStudio()
+            toast("Moved to the trash", "It is in .trash inside your projects folder until you remove it."); return r }, fail)
+    }
 }
