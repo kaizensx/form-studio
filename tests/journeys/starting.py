@@ -145,8 +145,15 @@ def journey_new_design_flow(ui):
     # community: the index from the website (a local copy in this test); install after review
     ui.click_text("New design")
     open_sheet_wait(ui, "new")
-    card = ui.item("sheetCard")
-    ui.click_text("Community", within=card, exact=False)
+    for attempt in range(3):              # the sheet can still be swapping in: a card found a moment ago may be gone
+        try:
+            ui.settle(200)
+            card = ui.item("sheetCard")
+            ui.click_text("Community", within=card, exact=False)
+            break
+        except RuntimeError:
+            if attempt == 2:
+                raise
     ui.item(text="Cable clip", within=card, timeout=10)
     ui.click_text("Cable clip", within=card)
     ui.wait_until(lambda: ui.item("recipePrimary").property("text") == "Review and install…", 3, "Review and install")
