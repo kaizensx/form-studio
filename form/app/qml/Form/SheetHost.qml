@@ -97,6 +97,7 @@ Item {
         // body
         Flickable {
             id: flick
+            objectName: "sheetScroll"
             x: 0; y: card.headH + card.tabsH; width: parent.width; height: parent.height - y - card.footH - (foot.visible ? 0 : 4)
             clip: true; contentHeight: (host.sheet ? host.sheet.implicitHeight : 0) + card.pad + (tabs.visible ? 18 : 2); boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { width: 6; policy: flick.contentHeight > flick.height + 1 ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }

@@ -40,7 +40,18 @@ Column {
     readonly property int dirty: F.keys(edits).length
     readonly property var rows: cfg ? cfg.settings.filter(function (r) { return r.tab === st.tab }) : []
     spacing: 14
-    Component.onCompleted: { if (!Store.config) Store.loadConfig(); if (!Store.software) Store.checkSoftware() }
+    Component.onCompleted: { if (!Store.config) Store.loadConfig(); if (!Store.software) Store.checkSoftware(); st.loadKeys() }
+
+    // agent keys (Gemini): kept by FORM in a private file, never shown back; only "set" or "not set" comes from the engine
+    property var keys: []
+    function loadKeys() { Store.get("/secrets").then(function (r) { st.keys = r.keys }, function () {}) }
+    function saveKey(name, value) {
+        return Store.post("/secrets", { name: name, value: value }).then(function (r) {
+            st.keys = r.keys; Store.toast(r.key.label + " saved", "Kept in a private file on this computer and given only to its agent.")
+            Store.checkSoftware() }, Store.fail) }
+    function clearKey(name) {
+        return Store.post("/secrets", { name: name, clear: true }).then(function (r) {
+            st.keys = r.keys; Store.toast(r.key.label + " removed", ""); Store.checkSoftware() }, Store.fail) }
 
     function same(a, b) { return JSON.stringify(a) === JSON.stringify(b) }
     function current(r) { return st.edits[r.key] !== undefined ? st.edits[r.key] : r.value }
@@ -95,7 +106,7 @@ Column {
                                 Toggle { checked: !!row.v; anchors.verticalCenter: parent.verticalCenter; onToggled: function (on) { st.setEdit(row.r, on) } } }
                             // one of
                             Pick { visible: row.r.type === "choice"; width: 200; value: row.v
-                                model: (row.r.choices || []).map(function (c) { return { value: c, text: ({ auto: "Automatic", bambu: "Bambu Studio", orca: "OrcaSlicer", prusa: "PrusaSlicer", superslicer: "SuperSlicer", qidi: "QIDI Studio" })[c] || c } })
+                                model: (row.r.choices || []).map(function (c) { return { value: c, text: ({ auto: "Automatic", bambu: "Bambu Studio", orca: "OrcaSlicer", prusa: "PrusaSlicer", superslicer: "SuperSlicer", qidi: "QIDISlicer" })[c] || c } })
                                 onPicked: function (val) { st.setEdit(row.r, val) } }
                             // text and paths
                             Field { visible: row.r.type === "str" || row.r.type === "path"; width: row.r.type === "path" ? 270 : 300
@@ -115,6 +126,42 @@ Column {
                                     onEdited: function (t) { if (t !== "" && !isNaN(Number(t))) { var a = row.v.slice(); a[index] = Number(t); st.setEdit(row.r, a) } } } }
                             Txt { visible: row.r.type === "vec3"; kind: "fine"; text: "mm"; anchors.verticalCenter: parent.verticalCenter }
                         }
+                    }
+                }
+            } }
+        // ── keys: one row per agent key ─────────────────────────
+        Rectangle { visible: st.tab === "chat" && st.keys.length > 0; width: parent.width; height: keyList.implicitHeight; radius: Theme.rMd
+            color: Theme.plate1; border.color: Theme.rule
+            Column { id: keyList; width: parent.width
+                Repeater {
+                    model: st.tab === "chat" ? st.keys : []
+                    Item {
+                        id: krow
+                        required property var modelData
+                        required property int index
+                        readonly property var k: modelData
+                        objectName: "secretRow"
+                        width: keyList.width; height: Math.max(kleft.implicitHeight, 28) + 26
+                        Rectangle { visible: krow.index > 0; x: 16; width: parent.width - 32; height: 1; color: Theme.rule }
+                        Column { id: kleft; x: 16; width: parent.width * 0.5 - 24; anchors.verticalCenter: parent.verticalCenter; spacing: 2
+                            Row { spacing: 6
+                                Icon { name: "lock"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
+                                Txt { text: krow.k.label; font.weight: Theme.wMedium } }
+                            Txt { kind: "fine"; text: krow.k.help; width: parent.width }
+                            Txt { kind: "fine"; width: parent.width; color: krow.k.set || krow.k.from_env ? Theme.pass : Theme.ink3
+                                text: krow.k.from_env ? "Set in the environment for this run. That one is used."
+                                    : krow.k.set ? "Stored privately on this computer. It is not shown again." : "Not set." } }
+                        Row { anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+                            Field { id: kf; objectName: "secretField"; visible: !krow.k.set; width: 220; placeholder: "Paste the key"; mono: true
+                                input.echoMode: TextInput.Password
+                                onAccepted: function (t) { if (t.trim()) st.saveKey(krow.k.name, t).then(function () { kf.text = "" }) } }
+                            Btn { visible: !krow.k.set; small: true; kind: "quiet"; icon: "external_link"; text: "Get a key"
+                                anchors.verticalCenter: parent.verticalCenter; onClicked: Bridge.openLink(krow.k.url) }
+                            Btn { visible: !krow.k.set; small: true; kind: "primary"; text: "Save key"; enabled: kf.text.trim().length > 0
+                                anchors.verticalCenter: parent.verticalCenter
+                                onClicked: st.saveKey(krow.k.name, kf.text).then(function () { kf.text = "" }) }
+                            Btn { visible: krow.k.set; small: true; kind: "quiet"; icon: "trash_2"; text: "Remove"
+                                anchors.verticalCenter: parent.verticalCenter; onClicked: st.clearKey(krow.k.name) } }
                     }
                 }
             } }

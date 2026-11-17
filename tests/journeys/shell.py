@@ -3,6 +3,7 @@ palette, and every key the Shortcuts sheet lists.
 
 Environment the test suite sets for this journey: FORM_INSTALL_FAKE (installs are simulated),
 FORM_SETUP_PRETEND_MISSING=openscad (something to "install"), FORM_FAKE_LATEST (an update to offer)."""
+import json
 import os
 from pathlib import Path
 
@@ -146,6 +147,30 @@ def journey_settings_saves_to_the_file(ui):
         ui.click_text(tab, within=card)
         ui.settle(300)
     ui.shot("sheet-settings-software")
+    close_sheet_esc(ui)
+    toasts_gone(ui)
+
+
+def journey_agent_key_saved_and_removed(ui):
+    """The Gemini API key: pasted in Settings, Chat; stored privately; never shown again; removable."""
+    ui.run_js('Store.openSettings("chat")')
+    ui.wait_until(lambda: ui.find(name="secretRow") is not None, 10, "the key row on the Chat tab")
+    f = ui.item("sheetScroll")
+    f.setProperty("contentY", max(0, f.property("contentHeight") - f.property("height")))
+    ui.settle(300)
+    row = ui.item("secretRow")
+    ui.click(ui.item("secretField", within=row))
+    ui.type("AIzaJourneyKeyNotReal42")
+    ui.click(ui.item(text="Save key", within=row))
+    ui.wait_until(lambda: ui.api("/secrets")["keys"][0]["set"] is True, 10, "the key to be stored")
+    ui.check("AIzaJourneyKeyNotReal42" not in json.dumps(ui.api("/secrets")), "the API never returns the key")
+    ui.wait_until(lambda: ui.find(text="Stored privately on this computer", within=ui.item("secretRow"), exact=False) is not None, 5,
+                  "the row to say it is stored")
+    ui.check(ui.find(name="secretField", within=ui.item("secretRow")) is None or
+             not ui.item("secretField", within=ui.item("secretRow")).property("visible"), "the field is gone once stored")
+    ui.shot("settings-key-stored")
+    ui.click(ui.item(text="Remove", within=ui.item("secretRow")))
+    ui.wait_until(lambda: ui.api("/secrets")["keys"][0]["set"] is False, 10, "the key to be removed")
     close_sheet_esc(ui)
     toasts_gone(ui)
 
