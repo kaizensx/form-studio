@@ -10,3 +10,4 @@ build/
 projects/
 .dev/
 .claude/worktrees/
+.venv-x64/

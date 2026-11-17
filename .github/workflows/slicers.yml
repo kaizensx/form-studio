@@ -4,9 +4,15 @@ name: Real slicers
 # on the runner and never opened; FORM finds it, resolves the pinned presets from the profiles inside the program,
 # slices the example dock, and reads time, grams and layers back from that G-code. A job fails unless a real slice
 # exists. (PrusaSlicer runs in ui.yml; Bambu Studio and OrcaSlicer on macOS are run on a real Mac.)
-# Runs only when started by hand (Actions tab, or `gh workflow run`): the repository is private, so every run
-# is billed against the owner's Actions minutes. Builds and tests also run locally before a release.
+# The repository is public: GitHub's standard runners are free. Runs on pushes to main and on version tags.
 on:
+  push:
+    branches: [main]
+    paths:
+      - form/adapters/**
+      - form/slicer.py
+      - .github/workflows/slicers.yml
+      - .github/ci-*.toml
   workflow_dispatch:
 
 jobs:
