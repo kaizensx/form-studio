@@ -109,5 +109,17 @@ QtObject {
         "clipboard": "\ue085",
         "tag": "\ue17f",
         "focus": "\ue29e",
+        // app shell
+        "ellipsis": "\ue0b6",
+        "arrow_up_down": "\ue37d",
+        "menu": "\ue115",
+        "copy_plus": "\ue3fd",
+        "arrow_up_right": "\ue04d",
+        "book_open": "\ue05f",
+        "scroll_text": "\ue45f",
+        "list_filter": "\ue460",
+        "panel_left_close": "\ue21c",
+        "panel_left_open": "\ue21d",
+        "expand": "\ue21a",
     })
 }

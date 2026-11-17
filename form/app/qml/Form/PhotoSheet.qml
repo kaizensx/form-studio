@@ -6,7 +6,8 @@ import "F.js" as F
 Column {
     id: ps
     property string title: "Measure from photo"
-    property int sheetWidth: 900
+    property string note: mode === "scale" ? "Step 1 of 2 · set the scale" : "Step 2 of 2 · measure · rough, never fit-critical"
+    property int sheetWidth: Theme.sheetL
     readonly property var ref: Store.sheet && Store.sheet.props && Store.sheet.props.ref ? Store.sheet.props.ref : ({ file: "", measurements: [] })
     property var pts: []               // 0–2 points, [x, y] in image pixels
     property real mmPerPx: 0
@@ -18,7 +19,11 @@ Column {
     readonly property real sigma: Math.max(0.6, mm * 0.02 + 2 * mmPerPx)
     readonly property var targets: Store.recipe ? Store.recipe.params.filter(function (p) { return p.unit === "mm" && p.group === "brief" })
                                                        .map(function (p) { return { value: p.key, text: p.label } }) : []
-    spacing: 12; bottomPadding: 20
+    readonly property bool photoReady: img.status === Image.Ready
+    // the photo gives way to a short window, so the readout and the actions stay on screen
+    readonly property int photoMax: Math.max(220, Math.min(520, (Window.height > 0 ? Window.height : 900) - 88 - 58 - 60 - 28 - 150))
+    property Item firstFocus: mode === "scale" && px > 0 ? len.input : null
+    spacing: 14
 
     Component.onCompleted: {
         mmPerPx = ref.scale_mm_per_px || 0
@@ -52,19 +57,39 @@ Column {
         Store.setParam(key, v, true)
         Store.toast("Loaded as a draft", "Marked “from photo”. Replace with a caliper measurement before trusting the fit.")
     }
+    function accept() {
+        if (mode === "scale") setScale(len.text)
+        else if (px > 0) { if (targets.length > 0) load(); else keep() }
+    }
+
+    // the action bar follows the step
+    property Component footerLeft: ps.mode === "measure" ? leftMeasure : leftScale
+    property Component footer: ps.mode === "measure" ? rightMeasure : rightScale
+    Component { id: leftScale; Txt { kind: "fine"; elide: Text.ElideRight; wrapMode: Text.NoWrap; verticalAlignment: Text.AlignVCenter
+        text: !ps.photoReady ? "" : ps.px > 0 ? "Type the real length of the red line, then set the scale." : ps.pts.length === 1 ? "Now click the other end." : "Click both ends of a known length on the photo." } }
+    Component { id: rightScale; Row { spacing: 8
+        Btn { kind: "quiet"; text: "Cancel"; onClicked: Store.openSheet(null) }
+        Btn { kind: "primary"; icon: "ruler"; text: "Set scale"; enabled: ps.px > 0 && parseFloat(len.text) > 0; keys: "Return"; onClicked: ps.setScale(len.text) } } }
+    Component { id: leftMeasure; Row { spacing: 4
+        Btn { kind: "quiet"; icon: "rotate_ccw"; text: "Reset scale"; onClicked: { ps.mode = "scale"; ps.pts = [] } } } }
+    Component { id: rightMeasure; Row { spacing: 8
+        Btn { kind: "quiet"; text: "Close"; onClicked: Store.openSheet(null) }
+        Btn { kind: ps.targets.length > 0 ? "default" : "primary"; icon: "pin"; text: "Keep on photo"; enabled: ps.px > 0; onClicked: ps.keep() }
+        Btn { visible: ps.targets.length > 0; kind: "primary"; icon: "arrow_down_to_line"; text: "Load as draft"; enabled: ps.px > 0; keys: "Return"; onClicked: ps.load() } } }
 
     // the photo, with segments drawn over it
     Rectangle {
-        width: parent.width; height: Math.max(160, frame.height); radius: Theme.rMd; color: Theme.well; border.color: Theme.rule; clip: true
+        width: parent.width; height: ps.photoReady ? Math.max(160, frame.height) : 220; radius: Theme.rMd; color: Theme.well; border.color: Theme.rule; clip: true
         Item {
             id: frame
             readonly property real iw: img.sourceSize.width
             readonly property real ih: img.sourceSize.height
-            readonly property real k: iw > 0 && ih > 0 ? Math.min(parent.width / iw, 520 / ih) : 0   // screen px per image px
+            readonly property real k: iw > 0 && ih > 0 ? Math.min(parent.width / iw, ps.photoMax / ih) : 0   // screen px per image px
             width: Math.round(iw * k); height: Math.round(ih * k)
             anchors.horizontalCenter: parent.horizontalCenter
             onKChanged: overlay.requestPaint()
-            Image { id: img; anchors.fill: parent; source: ps.ref.file ? Store.file("references/" + ps.ref.file) : ""; asynchronous: true; cache: false; smooth: true }
+            Image { id: img; anchors.fill: parent; source: ps.ref.file ? Store.file("references/" + ps.ref.file) : ""; asynchronous: true; cache: false; smooth: true
+                opacity: status === Image.Ready ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.base } } }
             Canvas {
                 id: overlay; anchors.fill: parent
                 function seg(c, a, b, col, text) {
@@ -89,29 +114,41 @@ Column {
                     ps.pts = ps.pts.length >= 2 ? [p] : ps.pts.concat([p])
                 } }
         }
-        Txt { anchors.centerIn: parent; visible: img.status !== Image.Ready; tone: 3
-            text: img.status === Image.Loading ? "Loading photo…" : "The photo could not be loaded." }
+        // loading, and the photo that is not there
+        Column { anchors.centerIn: parent; spacing: 8; visible: !ps.photoReady
+            Spinner { visible: img.status === Image.Loading; size: 18; anchors.horizontalCenter: parent.horizontalCenter }
+            Icon { visible: img.status !== Image.Loading; name: "image"; size: 24; color: Theme.ink4; anchors.horizontalCenter: parent.horizontalCenter }
+            Txt { tone: 2; anchors.horizontalCenter: parent.horizontalCenter
+                text: img.status === Image.Loading ? "Loading photo…" : "The photo could not be loaded." }
+            Txt { kind: "fine"; visible: img.status !== Image.Loading; anchors.horizontalCenter: parent.horizontalCenter
+                text: ps.ref.file ? "Attach it again under Brief › Reference photos." : "Attach a photo under Brief › Reference photos, then press Measure." } }
+        // kept measurements, counted on the photo
+        Rectangle { visible: ps.photoReady && ps.list.length > 0; x: 10; y: 10; width: kept.implicitWidth + 16; height: 24; radius: Theme.rSm; color: Theme.alpha(Theme.plate, 0.78)
+            Txt { id: kept; anchors.centerIn: parent; kind: "fine"; tone: 2; text: F.plural(ps.list.length, "measurement") + " kept" } }
     }
 
     // step 1 — scale
     Note { visible: ps.mode === "scale"; kind: "amber"; title: "Step 1 — set the scale"
         text: "Click both ends of something whose real length you know (a ruler, a card: 85.6 mm), lying in the same plane as the object." }
-    Row { visible: ps.mode === "scale" && ps.px > 0; spacing: 8
-        Txt { text: "That length is"; tone: 2; anchors.verticalCenter: parent.verticalCenter }
-        Field { id: len; numeric: true; width: 96; unit: "mm"; placeholder: "0.0"; anchors.verticalCenter: parent.verticalCenter }
-        Btn { text: "Set scale"; kind: "primary"; enabled: parseFloat(len.text) > 0; anchors.verticalCenter: parent.verticalCenter; onClicked: ps.setScale(len.text) } }
+    Column { visible: ps.mode === "scale" && ps.px > 0; spacing: 6
+        Txt { kind: "cap"; text: "That length is" }
+        Row { spacing: 10
+            Field { id: len; numeric: true; width: 120; unit: "mm"; placeholder: "0.0" }
+            Txt { kind: "fine"; mono: true; anchors.verticalCenter: parent.verticalCenter; text: F.fmt(ps.px, 0) + " px on the photo" } } }
+    // Enter in the length field sets the scale (the field's own `accepted` also fires when it loses focus, so it is not used)
+    Connections { target: len.input; function onAccepted() { ps.setScale(len.text) } }
 
     // step 2 — measure
     Note { visible: ps.mode === "measure"; title: "Step 2 — measure"
         text: "Scale " + F.fmt(ps.mmPerPx, 4) + " mm per pixel. Click two points. Perspective and lens distortion are not corrected, so treat results as rough: ±0.6 mm or worse, never fit-critical." }
-    Row { visible: ps.mode === "measure" && ps.px > 0; spacing: 8
-        Txt { mono: true; font.weight: 600; text: F.fmt(ps.mm, 1) + " mm ±" + F.fmt(ps.sigma, 1); wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter }
-        Tag { text: "photo"; kind: "photo"; anchors.verticalCenter: parent.verticalCenter }
-        Txt { visible: ps.targets.length > 0; text: "use as"; tone: 2; anchors.verticalCenter: parent.verticalCenter }
-        Pick { visible: ps.targets.length > 0; width: 220; model: ps.targets; value: ps.target; anchors.verticalCenter: parent.verticalCenter
-            onPicked: function (v) { ps.target = v } }
-        Btn { visible: ps.targets.length > 0; text: "Load as draft"; kind: "primary"; anchors.verticalCenter: parent.verticalCenter; onClicked: ps.load() }
-        Btn { text: "Keep on photo"; kind: "quiet"; anchors.verticalCenter: parent.verticalCenter; onClicked: ps.keep() } }
-    Btn { visible: ps.mode === "measure"; kind: "quiet"; small: true; icon: "rotate_ccw"; text: "Reset scale"; x: -8
-        onClicked: { ps.mode = "scale"; ps.pts = [] } }
+    // the reading: the one number this sheet is for
+    Rectangle { visible: ps.mode === "measure" && ps.px > 0; width: parent.width; height: 60; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+        Row { x: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 10
+            Txt { mono: true; kind: "h2"; font.weight: Theme.wMedium; text: F.fmt(ps.mm, 1); wrapMode: Text.NoWrap; anchors.baseline: unit.baseline }
+            Txt { id: unit; mono: true; tone: 2; text: "mm ±" + F.fmt(ps.sigma, 1); wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter }
+            Tag { text: "photo"; kind: "photo"; anchors.verticalCenter: parent.verticalCenter } }
+        Row { visible: ps.targets.length > 0; anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 10
+            Txt { kind: "cap"; text: "Use as"; anchors.verticalCenter: parent.verticalCenter }
+            Pick { width: 240; model: ps.targets; value: ps.target; anchors.verticalCenter: parent.verticalCenter
+                onPicked: function (v) { ps.target = v } } } }
 }

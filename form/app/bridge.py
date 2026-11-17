@@ -51,6 +51,29 @@ class _Call(QRunnable):
                                                  "hint": f"Restart FORM. Your projects are saved on disk. ({e})", "status": 0})
 
 
+def _reduced_motion() -> bool:
+    """The OS "reduce motion" preference, or FORM_REDUCED_MOTION=1/0 to force it. Never raises."""
+    import os
+    env = os.environ.get("FORM_REDUCED_MOTION", "").strip().lower()
+    if env:
+        return env not in ("0", "false", "no", "off")
+    try:
+        if sys.platform == "darwin":
+            out = subprocess.run(["defaults", "read", "com.apple.universalaccess", "reduceMotion"],
+                                 capture_output=True, text=True, timeout=2).stdout.strip()
+            return out == "1"
+        if sys.platform.startswith("win"):
+            import ctypes
+            on = ctypes.c_int(1)
+            ctypes.windll.user32.SystemParametersInfoW(0x1042, 0, ctypes.byref(on), 0)   # SPI_GETCLIENTAREAANIMATION
+            return on.value == 0
+        out = subprocess.run(["gsettings", "get", "org.gnome.desktop.interface", "enable-animations"],
+                             capture_output=True, text=True, timeout=2).stdout.strip()
+        return out == "false"
+    except Exception:
+        return False
+
+
 class Bridge(QObject):
     reply = Signal(int, bool, "QVariant")
 
@@ -99,6 +122,36 @@ class Bridge(QObject):
 
     dataDirShort = Property(str, _short, constant=True)
     platform = Property(str, lambda self: sys.platform, constant=True)
+
+    # -- app shell: reduced motion, read once at start ----------------------
+    def _reduced(self) -> bool:
+        if not hasattr(self, "_rm"):
+            self._rm = _reduced_motion()
+        return self._rm
+
+    reducedMotion = Property(bool, _reduced, constant=True)
+
+    def _qt(self) -> str:
+        import PySide6
+        return PySide6.__version__
+
+    qtVersion = Property(str, _qt, constant=True)
+    pythonVersion = Property(str, lambda self: sys.version.split()[0], constant=True)
+
+    @Slot(str, result=str)
+    def licence(self, name: str) -> str:
+        """The licence text of a bundled font ("InstrumentSans", "GeistMono", "lucide") or of FORM itself ("FORM")."""
+        here = Path(__file__).resolve().parent
+        if name == "FORM":
+            for p in (here.parent.parent / "LICENSE", here / "assets" / "LICENSE"):
+                if p.exists():
+                    return p.read_text(encoding="utf-8", errors="replace")
+            return "MIT License. The full text is in the LICENSE file of the form-studio repository."
+        if name in ("InstrumentSans", "GeistMono", "lucide"):
+            p = here / "assets" / "fonts" / f"{name}-LICENSE.txt"
+            if p.exists():
+                return p.read_text(encoding="utf-8", errors="replace")
+        return ""
 
     # -- desktop integration -------------------------------------------------
     @Slot(str, QUrl, result=bool)

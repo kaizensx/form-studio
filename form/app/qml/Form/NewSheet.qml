@@ -7,7 +7,28 @@ import FormNative
 Column {
     id: ns
     property string title: "New design"
-    property int sheetWidth: 720
+    property int sheetWidth: Theme.sheetM + 80
+    readonly property var tabs: [{ value: "recipe", text: "From a recipe" }, { value: "brief", text: "From a brief" }]
+    property Item firstFocus: tab === "recipe" ? name.input : null
+    function make() { if (pickId !== "") Store.create(name.text.trim() || (chosen() ? chosen().title : "Design"), pickId, brief.text) }
+    function accept() { if (tab === "recipe") make(); else if (preset && missing.length === 0 && !sending && Store.chat.available && !Store.chatBusy) ask() }
+    property Component footerLeft: ns.tab === "recipe" ? leftRecipe : ns.preset ? leftBrief : null
+    property Component footer: ns.tab === "recipe" ? rightRecipe : ns.preset ? rightBrief : null
+    Component { id: leftRecipe; Row { spacing: 4
+        Btn { kind: "quiet"; text: "Restore a .formproj…"; icon: "upload"; onClicked: dlg.open() }
+        Btn { kind: "quiet"; text: "Open an example"; icon: "box"; active: ns.showExamples; onClicked: ns.showExamples = !ns.showExamples } } }
+    Component { id: rightRecipe; Row { spacing: 8
+        Btn { kind: "quiet"; text: "Cancel"; onClicked: Store.openSheet(null) }
+        Btn { kind: "primary"; text: "Create design"; icon: "plus"; enabled: ns.pickId !== ""; keys: "Return"; onClicked: ns.make() } } }
+    Component { id: leftBrief; Txt { kind: "fine"; elide: Text.ElideRight; wrapMode: Text.NoWrap; verticalAlignment: Text.AlignVCenter
+        color: ns.missing.length > 0 ? Theme.amber : Theme.ink3
+        text: ns.missing.length > 0 ? "Still needed: " + ns.missing.map(function (q) { return q.label }).join(", ") + "." : "Your answers are saved with the project. Nothing is printed or uploaded." } }
+    Component { id: rightBrief; Row { spacing: 8
+        Btn { kind: "quiet"; icon: "copy"; text: "Copy the prompt"; enabled: !!ns.preset && ns.missing.length === 0 && !ns.sending; onClicked: ns.copy() }
+        Btn { kind: "primary"; icon: "message_square"; text: "Ask Claude to design it"; busy: ns.sending
+            enabled: !!ns.preset && ns.missing.length === 0 && Store.chat.available && !Store.chatBusy
+            tip: Store.chatBusy ? "Claude is still answering the previous message" : ""
+            onClicked: ns.ask() } } }
     readonly property var props: Store.sheet && Store.sheet.props ? Store.sheet.props : ({})
     property string tab: props.tab || "recipe"
     property string pickId: Store.studio && Store.studio.recipes.length ? Store.studio.recipes[0].id : ""
@@ -19,7 +40,7 @@ Column {
     property bool sending: false
     readonly property var preset: { for (var i = 0; i < presets.length; i++) if (presets[i].id === presetId) return presets[i]; return null }
     readonly property var missing: preset ? preset.questions.filter(function (q) { return q.required && !String(answers[q.key] || "").trim() }) : []
-    spacing: 12; bottomPadding: 20
+    spacing: 14
     Component.onCompleted: { Store.get("/presets").then(function (r) { ns.presets = r.presets }, Store.fail); if (showExamples) loadExamples() }
     // ── examples (only on request) ──
     property bool showExamples: !!props.examples
@@ -39,8 +60,6 @@ Column {
     function copy() { startBrief(function (r) { Bridge.copy(r.prompt); Store.toast("Prompt copied", "Paste it into any agent that has FORM's MCP tools.") }) }
     function envLine(e) { return e.setting + " · humidity " + e.humidity + " · UV " + e.uv }
 
-    Seg { model: [{ value: "recipe", text: "Start from a recipe" }, { value: "brief", text: "Start from a brief" }]
-        value: ns.tab; onPicked: function (v) { ns.tab = v } }
 
     // ── recipe ──────────────────────────────────────────────
     Column { width: parent.width; spacing: 12; visible: ns.tab === "recipe"
@@ -48,20 +67,22 @@ Column {
         Grid { width: parent.width; columns: 2; spacing: 8
             Repeater { model: Store.studio ? Store.studio.recipes : []
                 Rectangle { id: rc; required property var modelData
-                    width: (ns.width - 8) / 2; height: 62; radius: Theme.rMd
-                    color: ns.pickId === modelData.id ? Theme.alpha(Theme.datum, 0.08) : rm.containsMouse ? Theme.plate3 : Theme.plate1
-                    border.color: ns.pickId === modelData.id ? Theme.alpha(Theme.datum, 0.6) : Theme.rule
-                    Column { x: 12; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 24; spacing: 2
-                        Txt { text: rc.modelData.title; font.weight: 600 }
+                    readonly property bool on: ns.pickId === modelData.id
+                    width: (ns.width - 8) / 2; height: 58; radius: Theme.rMd
+                    color: on ? Theme.alpha(Theme.datum, 0.07) : rm.pressed ? Theme.plate : rm.containsMouse ? Theme.plate3 : Theme.plate1
+                    border.color: on ? Theme.alpha(Theme.datum, 0.55) : rm.containsMouse ? Theme.rule2 : Theme.rule
+                    Behavior on color { Tint {} }
+                    Column { x: 14; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 28 - 22; spacing: 2
+                        Txt { text: rc.modelData.title; font.weight: Theme.wSemi }
                         Txt { kind: "fine"; text: rc.modelData.summary || ""; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
-                    MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true; onClicked: ns.pickId = rc.modelData.id } } } }
-        Field { id: name; width: parent.width; placeholder: "Name, e.g. “Hallway phone dock”" }
-        Area { id: brief; width: parent.width; minLines: 2; placeholder: "What is it for? (optional; you can write this later)" }
-        Row { spacing: 8
-            Btn { kind: "primary"; text: "Create"; icon: "plus"; enabled: ns.pickId !== ""
-                onClicked: Store.create(name.text.trim() || (ns.chosen() ? ns.chosen().title : "Design"), ns.pickId, brief.text) }
-            Btn { kind: "quiet"; text: "Restore a .formproj…"; icon: "upload"; onClicked: dlg.open() }
-            Btn { kind: "quiet"; text: "Open an example"; icon: "box"; active: ns.showExamples; onClicked: ns.showExamples = !ns.showExamples } }
+                    Icon { visible: rc.on; name: "check"; size: 14; color: Theme.datum; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter }
+                    MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true; onClicked: ns.pickId = rc.modelData.id; onDoubleClicked: { ns.pickId = rc.modelData.id; ns.make() } } } } }
+        Column { width: parent.width; spacing: 6
+            Txt { kind: "cap"; text: "Name" }
+            Field { id: name; width: parent.width; placeholder: ns.chosen() ? ns.chosen().title : "e.g. Hallway phone dock"; onAccepted: ns.make() } }
+        Column { width: parent.width; spacing: 6
+            Txt { kind: "cap"; text: "What it is for" }
+            Area { id: brief; width: parent.width; minLines: 2; placeholder: "Optional. You can write this later." } }
         // examples are added only when asked for here (setup workstream); a new projects folder starts empty
         Column { visible: ns.showExamples; width: parent.width; spacing: 6
             Txt { kind: "fine"; width: parent.width; text: "Finished designs that ship with FORM. Opening one copies its design history into your projects; its outputs are rebuilt on your computer." }
@@ -82,7 +103,8 @@ Column {
             Repeater { model: ns.presets
                 Rectangle { id: pc; required property var modelData
                     width: (ns.width - 8) / 2; height: 94; radius: Theme.rMd
-                    color: pm.containsMouse ? Theme.plate3 : Theme.plate1; border.color: Theme.rule
+                    color: pm.pressed ? Theme.plate : pm.containsMouse ? Theme.plate3 : Theme.plate1; border.color: pm.containsMouse ? Theme.rule2 : Theme.rule
+                    Behavior on color { Tint {} }
                     Column { x: 12; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 24; spacing: 2
                         Txt { text: pc.modelData.title; font.weight: 600 }
                         Txt { kind: "fine"; text: pc.modelData.summary; width: parent.width; maximumLineCount: 2; elide: Text.ElideRight }
@@ -128,17 +150,6 @@ Column {
 
         Note { visible: !Store.chat.available; kind: "amber"; title: "Claude is not connected"
             text: (Store.chat.note || "") + " You can copy the prompt and paste it into any agent that has FORM's tools." }
-        Txt { kind: "fine"; width: parent.width; visible: ns.missing.length > 0; color: Theme.amber
-            text: "Still needed: " + ns.missing.map(function (q) { return q.label }).join(", ") + "." }
-        Row { spacing: 8
-            Btn { kind: "primary"; icon: "message_square"; text: ns.sending ? "Sending…" : "Ask Claude to design it"
-                enabled: !!ns.preset && ns.missing.length === 0 && !ns.sending && Store.chat.available && !Store.chatBusy
-                tip: Store.chatBusy ? "Claude is still answering the previous message" : ""
-                onClicked: ns.ask() }
-            Btn { kind: "quiet"; icon: "copy"; text: "Copy the prompt"; enabled: !!ns.preset && ns.missing.length === 0 && !ns.sending
-                onClicked: ns.copy() } }
-        Txt { kind: "fine"; width: parent.width
-            text: "Your answers are saved with the project when Claude creates it. Nothing is printed or uploaded." }
 
         Sec { title: "Template defaults"; tag: "assumed"
             Txt { kind: "fine"; width: parent.width; text: "Claude starts from these and corrects them from your answers. Tell it where they are wrong." }

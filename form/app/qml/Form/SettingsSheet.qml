@@ -10,7 +10,28 @@ import "F.js" as F
 Column {
     id: st
     property string title: "Settings"
-    property int sheetWidth: 820
+    property int sheetWidth: Theme.sheetL
+    property int sheetHeight: 520
+    readonly property var tabs: [{ value: "general", text: "General" }, { value: "printer", text: "Printer and slicer" }, { value: "chat", text: "Chat" },
+                                 { value: "apps", text: "Other apps" }, { value: "software", text: "Software", badge: Store.setupAttention && Store.setupAttention.length ? Store.setupAttention.length : 0 }]
+    function accept() { if (tab !== "software" && dirty > 0) save() }
+    // the action bar: what is saved where on the left, the actions on the right
+    property Component footerLeft: Txt { kind: "fine"; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; verticalAlignment: Text.AlignVCenter
+        color: st.tab !== "software" && st.cfg && st.cfg.env_overrides.length > 0 ? Theme.amber : Theme.ink3
+        text: st.tab === "software" ? (Store.installing ? "Installing. Each command is in the log." : Store.softwareChecking ? "Looking at what is installed…" : "Nothing is installed until you press Install.")
+            : !st.cfg ? ""
+            : st.cfg.env_overrides.length > 0 ? "Set outside the file for this run: " + st.cfg.env_overrides.join(", ") + ". Those win."
+            : (st.cfg.exists ? "Saved to " : "Will create ") + st.cfg.path_short + " · a backup is kept on every save" }
+    property Component footer: Row { spacing: 8
+        Btn { visible: st.tab !== "software" && st.dirty > 0; kind: "quiet"; text: "Revert"; onClicked: { st.edits = ({}); st.rev++ } }
+        Btn { visible: st.tab !== "software"; kind: "primary"; icon: "check"; enabled: st.dirty > 0; keys: "Return"
+            text: st.dirty ? "Save " + F.plural(st.dirty, "change") : "Saved"; onClicked: st.save() }
+        Btn { visible: st.tab === "software" && Store.installing; icon: "x"; text: "Cancel"; onClicked: Store.cancelInstall() }
+        Btn { visible: st.tab === "software"; icon: "refresh_cw"; text: "Check again"; busy: Store.softwareChecking; enabled: !Store.installing
+            onClicked: { Store.checkSoftware(); Store.checkSetup() } }
+        Btn { visible: st.tab === "software"; kind: "primary"; icon: "download"; enabled: Store.installChosen.length > 0; busy: Store.installing
+            text: Store.installing ? "Installing…" : Store.installChosen.length ? "Install " + Store.installChosen.length + " selected" : "Install selected"
+            onClicked: Store.installSoftware() } }
     readonly property var props: Store.sheet && Store.sheet.props ? Store.sheet.props : ({})
     property string tab: props.tab || "general"
     property var edits: ({})                   // key → new value, not yet saved
@@ -18,7 +39,7 @@ Column {
     readonly property var cfg: Store.config
     readonly property int dirty: F.keys(edits).length
     readonly property var rows: cfg ? cfg.settings.filter(function (r) { return r.tab === st.tab }) : []
-    spacing: 14; bottomPadding: 20
+    spacing: 14
     Component.onCompleted: { if (!Store.config) Store.loadConfig(); if (!Store.software) Store.checkSoftware() }
 
     function same(a, b) { return JSON.stringify(a) === JSON.stringify(b) }
@@ -38,9 +59,6 @@ Column {
     FolderDialog { id: folderDlg; title: "Choose the project folder"; onAccepted: if (st.pathRow) st.setEdit(st.pathRow, st.localPath(selectedFolder)) }
     FileDialog { id: fileDlg; title: "Choose the program"; onAccepted: if (st.pathRow) st.setEdit(st.pathRow, st.localPath(selectedFile)) }
 
-    Seg { value: st.tab; onPicked: function (v) { st.tab = v }
-        model: [{ value: "general", text: "General" }, { value: "printer", text: "Printer and slicer" }, { value: "chat", text: "Chat" },
-                { value: "apps", text: "Other apps" }, { value: "software", text: "Software" }] }
 
     // ── settings tabs ───────────────────────────────────────
     Column { visible: st.tab !== "software"; width: parent.width; spacing: 14
@@ -63,18 +81,18 @@ Column {
                         readonly property var r: modelData
                         readonly property var v: st.current(r)
                         readonly property bool changed: st.edits[r.key] !== undefined
-                        width: list.width; height: Math.max(left.implicitHeight, 28) + 24
-                        Rectangle { visible: row.index > 0; width: parent.width; height: 1; color: Theme.rule }
-                        Rectangle { visible: row.changed; x: 0; y: 10; width: 2; height: parent.height - 20; color: Theme.blueprint }
+                        width: list.width; height: Math.max(left.implicitHeight, 28) + 26
+                        Rectangle { visible: row.index > 0; x: 16; width: parent.width - 32; height: 1; color: Theme.rule }
+                        Rectangle { visible: row.changed; x: 5; y: 14; width: 3; height: parent.height - 28; radius: 2; color: Theme.blueprint }
                         Column { id: left; x: 16; width: parent.width * 0.5 - 24; anchors.verticalCenter: parent.verticalCenter; spacing: 2
-                            Txt { text: row.r.label; width: parent.width; font.weight: 550 }
+                            Txt { text: row.r.label; width: parent.width; font.weight: Theme.wMedium }
                             Txt { kind: "fine"; visible: !!row.r.help; text: row.r.help || ""; width: parent.width }
                             Txt { kind: "fine"; tone: 4; mono: true; font.pixelSize: 10; text: row.r.key + (row.r.in_file ? "" : "  ·  default") } }
                         Row { anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                             // true / false
                             Row { visible: row.r.type === "bool"; spacing: 8; anchors.verticalCenter: parent.verticalCenter
                                 Txt { kind: "fine"; text: row.v ? "on" : "off"; anchors.verticalCenter: parent.verticalCenter }
-                                Check { checked: !!row.v; anchors.verticalCenter: parent.verticalCenter; onToggled: function (on) { st.setEdit(row.r, on) } } }
+                                Toggle { checked: !!row.v; anchors.verticalCenter: parent.verticalCenter; onToggled: function (on) { st.setEdit(row.r, on) } } }
                             // one of
                             Pick { visible: row.r.type === "choice"; width: 200; value: row.v
                                 model: (row.r.choices || []).map(function (c) { return { value: c, text: ({ auto: "Automatic", bambu: "Bambu Studio", orca: "OrcaSlicer", prusa: "PrusaSlicer", superslicer: "SuperSlicer", qidi: "QIDI Studio" })[c] || c } })
@@ -103,18 +121,8 @@ Column {
         Row { visible: st.tab === "printer"; spacing: 8
             Btn { small: true; icon: "printer"; text: "Compare slicers…"; onClicked: Store.openSheet("slicer") }
             Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; text: "Shows every slicer FORM knows and the presets each would use." } }
-        // save bar
-        Item { width: parent.width; height: 30
-            Row { spacing: 8; anchors.verticalCenter: parent.verticalCenter
-                Btn { kind: "primary"; icon: "check"; enabled: st.dirty > 0; text: st.dirty ? "Save changes (" + st.dirty + ")" : "Save changes"; onClicked: st.save() }
-                Btn { kind: "quiet"; text: "Revert"; visible: st.dirty > 0; onClicked: { st.edits = ({}); st.rev++ } } }
-            Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; kind: "fine"; width: parent.width - 300; horizontalAlignment: Text.AlignRight
-                elide: Text.ElideMiddle; wrapMode: Text.NoWrap
-                text: st.cfg ? (st.cfg.exists ? "Saved to " : "Will create ") + st.cfg.path_short + "  ·  a backup copy is kept on every save" : "" } }
-        Txt { visible: !!st.cfg && st.cfg.env_overrides.length > 0; kind: "fine"; width: parent.width; color: Theme.amber
-            text: st.cfg ? "Set outside the file for this run: " + st.cfg.env_overrides.join(", ") + ". Those win over the values here." : "" }
     }
 
     // ── software ───────────────────────────────────────────
-    SoftwarePanel { visible: st.tab === "software"; width: parent.width }
+    SoftwarePanel { visible: st.tab === "software"; width: parent.width; actions: false }
 }
