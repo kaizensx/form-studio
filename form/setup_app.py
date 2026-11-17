@@ -33,6 +33,7 @@ import time
 from pathlib import Path
 
 from . import config_edit, installer
+from . import secrets as agent_keys          # FORM's store of agent keys (the stdlib secrets is used below too)
 from . import setup as setup_mod
 from .studio import StudioError
 
@@ -291,6 +292,8 @@ def _wrap(fn):
         raise StudioError(e.message, hint=e.hint, status=e.status)
     except config_edit.ConfigError as e:
         raise StudioError(e.message, hint=e.hint)
+    except agent_keys.SecretError as e:
+        raise StudioError(str(e), hint=e.hint)
     except RuntimeError as e:
         raise StudioError(str(e))
 
@@ -316,6 +319,8 @@ def route_get(st, path: str, q: dict):
         return _wrap(lambda: sa.installer.login_job(m.group(1)).public())
     if path == "/api/config":
         return config_edit.describe(st.cfg)
+    if path == "/api/secrets":                    # which agent keys are stored: never their values
+        return {"keys": list(agent_keys.status().values())}
     if path == "/api/examples":
         from .studio import list_examples
         return {"examples": list_examples(st.root)}
@@ -361,6 +366,15 @@ def route_post(st, path: str, body):
                 pass
             st.activity(None, "settings", "Settings changed: " + ", ".join(done["changed"]) + ".", by="you")
         return {**done, "config": config_edit.describe(st.cfg)}
+    if path == "/api/secrets":                    # {name, value} stores a key; {name, clear: true} removes it
+        name = str(body.get("name") or "")
+        if body.get("clear"):
+            row = _wrap(lambda: agent_keys.clear(name))
+            st.activity(None, "settings", f"{row['label']} removed.", by="you")
+        else:
+            row = _wrap(lambda: agent_keys.set_value(name, str(body.get("value") or "")))
+            st.activity(None, "settings", f"{row['label']} saved.", by="you")
+        return {"key": row, "keys": list(agent_keys.status().values())}
     if path == "/api/examples":
         ids = body.get("ids")
         if ids is not None and not (isinstance(ids, list) and all(isinstance(x, str) for x in ids)):

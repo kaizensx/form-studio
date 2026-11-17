@@ -370,6 +370,67 @@ def _m_agent(aid: str):
     return methods
 
 
+def _d_cli(cli: str, label: str):
+    """An agent CLI on PATH (or set as [chat].<id>_cli), with its version."""
+    def detect(cfg, ctx) -> Found:
+        from .agents import ADAPTERS
+        ad = ADAPTERS.get(cli)
+        exe = ad.executable(cfg) if ad else shutil.which(cli)
+        if not exe:
+            return Found("missing", f"Not found. FORM works without it; {label} is one more agent to choose in chat.")
+        code, out = _run([exe, "--version"], timeout=30)
+        v = out.strip().splitlines()[-1].strip() if code == 0 and out.strip() else ""
+        return Found("ok", (v or "installed") + f" · {exe}", version=v, path=exe)
+    return detect
+
+
+def _m_npm_cli(package: str, brew_cask: str, docs: str):
+    """The publisher's npm package (and a Homebrew cask where the publisher's package is one)."""
+    def methods(platform, ctx) -> list[Method]:
+        out = []
+        if platform == "darwin" and brew_cask:
+            out.append(Method("brew", "Homebrew", commands=[f"brew install --cask {brew_cask}"], needs=("brew",)))
+        out.append(Method("npm", "npm", commands=[f"npm install -g {package}"], needs=("npm",),
+                          note="Needs Node.js. Installs for this user."))
+        out.append(_open(docs, "Open the install guide"))
+        return out
+    return methods
+
+
+def gemini_signed_in(cfg: dict | None = None) -> tuple[bool, str]:
+    """How Gemini CLI can sign in without its own screen: an API key (FORM's or the environment), or a sign-in it kept."""
+    from . import secrets as agent_keys
+    for var in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENAI_USE_VERTEXAI", "GOOGLE_GENAI_USE_GCA"):
+        if os.environ.get(var):
+            return True, f"{var} is set in the environment."
+    if agent_keys.status()["gemini_api_key"]["set"]:
+        return True, "Uses the Gemini API key stored in FORM."
+    home = Path(os.environ.get("GEMINI_CLI_HOME") or Path.home()) / ".gemini"
+    if (home / "oauth_creds.json").exists():
+        return True, "Signed in with Google in Gemini CLI."
+    try:
+        st = json.loads((home / "settings.json").read_text(encoding="utf-8"))
+        kind = ((st.get("security") or {}).get("auth") or {}).get("selectedType") or st.get("selectedAuthType")
+        if kind:
+            return True, f"Gemini CLI is set to sign in with {kind}."
+    except (OSError, ValueError, AttributeError):
+        pass
+    return False, "Not signed in. Add a Gemini API key in Settings, Chat tab, or sign in once with Google in Gemini CLI."
+
+
+def _d_gemini_signin(cfg, ctx) -> Found:
+    if not _d_cli("gemini", "Gemini CLI")(cfg, ctx).status == "ok":
+        return Found("info", "Install Gemini CLI first.")
+    ok, why = gemini_signed_in(cfg)
+    return Found("ok" if ok else "missing", why)
+
+
+def _m_gemini_signin(platform, ctx) -> list[Method]:
+    return [Method("key", "Create an API key", kind="open", url="https://aistudio.google.com/apikey",
+                   note="Create a key on Google's page, then paste it in Settings, Chat tab. FORM keeps it in a private "
+                        "file on this computer and gives it only to Gemini CLI.")]
+
+
 def _slicer(kind, label, why, brew, winget, flatpak, url, size, level) -> Software:
     return Software(f"slicer.{kind}", label, why, level, "slicer", _d_slicer(kind),
                     _app_methods(brew, winget, flatpak, url), size=size, homepage=url, one_of="slicer")
@@ -391,12 +452,26 @@ REGISTRY: list[Software] = [
     _slicer("prusa", "PrusaSlicer", "Slices for Prusa printers and many others.",
             "prusaslicer", "Prusa3D.PrusaSlicer", "com.prusa3d.PrusaSlicer", "https://www.prusa3d.com/page/prusaslicer_424/",
             "about 100 MB", "optional"),
+    _slicer("superslicer", "SuperSlicer", "A PrusaSlicer fork with more settings. Homebrew withdrew its package because it fails "
+            "Apple's Gatekeeper check; the project's own downloads are the source.",
+            "", "", "", "https://github.com/supermerill/SuperSlicer/releases", "about 120 MB", "optional"),
+    _slicer("qidi", "QIDISlicer", "Slices for QIDI printers (Q1 Pro, Q2, X-Plus 4 and more).",
+            "", "", "", "https://github.com/QIDITECH/QIDISlicer/releases", "about 170 MB", "optional"),
     Software("claude", "Claude Code", "Chat in FORM runs Claude Code on your own Claude account. Everything else works without it.",
              "recommended", "ai", _d_claude, _m_claude, size="about 280 MB", homepage=CLAUDE_DOCS),
     Software("claude.signin", "Claude sign-in", "Chat needs Claude Code signed in to your account.",
              "recommended", "ai", _d_signin, _m_signin, needs=("claude",)),
     Software("agent.claude", "FORM tools in Claude Code", "Lets Claude Code call FORM (design, check, slice) from chat and from a terminal.",
              "recommended", "ai", _d_agent("agent.claude", "Claude Code"), _m_agent("agent.claude"), needs=("claude",)),
+    Software("codex", "Codex", "OpenAI's agent. Pick it per conversation; it runs on your own OpenAI account.",
+             "optional", "agents", _d_cli("codex", "Codex"), _m_npm_cli("@openai/codex", "codex", "https://developers.openai.com/codex/cli"),
+             size="about 90 MB", homepage="https://developers.openai.com/codex/cli"),
+    Software("gemini", "Gemini CLI", "Google's agent. Pick it per conversation; it runs on your own Google account or API key.",
+             "optional", "agents", _d_cli("gemini", "Gemini CLI"),
+             _m_npm_cli("@google/gemini-cli", "", "https://github.com/google-gemini/gemini-cli"),
+             size="about 150 MB", homepage="https://github.com/google-gemini/gemini-cli"),
+    Software("gemini.signin", "Gemini sign-in", "Gemini CLI answers only when it is signed in or has an API key.",
+             "optional", "agents", _d_gemini_signin, _m_gemini_signin, needs=("gemini",)),
     Software("agent.codex", "FORM tools in Codex", "Lets Codex call FORM.",
              "recommended", "agents", _d_agent("agent.codex", "Codex"), _m_agent("agent.codex")),
     Software("agent.gemini", "FORM tools in Gemini CLI", "Lets Gemini CLI call FORM.",

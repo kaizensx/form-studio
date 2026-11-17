@@ -19,6 +19,8 @@ import sys
 import tempfile
 import threading
 import time
+
+from . import secrets
 import tomllib
 import uuid
 from pathlib import Path
@@ -329,7 +331,7 @@ class Chat:
                     cmd = adapter.command(run, exe)
                     job.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
                                                 text=True, encoding="utf-8", errors="replace", cwd=str(cwd), bufsize=1,
-                                                env=dict(os.environ, **getattr(adapter, "env", {})))
+                                                env=dict(os.environ, **getattr(adapter, "env", {}), **secrets.agent_env(adapter.id)))
                     err_buf: list[str] = []
                     drain = threading.Thread(target=lambda p=job.proc: err_buf.extend(p.stderr), daemon=True)
                     drain.start()
@@ -369,7 +371,12 @@ class Chat:
                 job.state = "failed"
                 if not job.error:
                     job.error = err_text.strip()[-800:] or f"{adapter.label} exited with code {rc}"
-                    self._add(job, {"t": "error", "text": job.error})
+                    known = adapter.explain(job.error)
+                    if known:                                   # a known failure, said plainly with the fix inside FORM
+                        job.error = known["message"]
+                        self._add(job, {"t": "error", "text": known["message"], "hint": known.get("hint", "")})
+                    else:
+                        self._add(job, {"t": "error", "text": job.error})
         except (OSError, ConversationError) as e:
             job.state, job.error = "failed", str(e)
             self._add(job, {"t": "error", "text": job.error})

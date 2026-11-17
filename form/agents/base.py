@@ -93,6 +93,10 @@ class Adapter:
     def parser(self) -> Parser:
         raise NotImplementedError
 
+    def explain(self, error: str) -> dict | None:
+        """A known failure of this CLI, in plain words with what to do in FORM: {"message", "hint"}. None: show it as is."""
+        return None
+
     def resume_failed(self, stderr: str, events: list[dict]) -> bool:
         """True when the run died because the CLI no longer has the session (FORM then retries without it)."""
         s = (stderr or "").lower()

@@ -13,6 +13,9 @@ from pathlib import Path
 
 from .base import LIVE_TEXT_MAX, Adapter, Parser, Run, short, tool_name
 
+# What Gemini CLI prints when it has no way to sign in (seen with Gemini CLI 0.68.0, never signed in).
+NOT_SIGNED_IN = ("please set an auth method", "gemini_api_key")
+
 
 class GeminiParser(Parser):
     def __init__(self):
@@ -75,6 +78,14 @@ class Gemini(Adapter):
     install_hint = "Install the Gemini CLI (gemini) and sign in to use it here."
     verified = "not run: written from the Gemini CLI documentation; the first real run is a test"
     images, cost = False, False
+
+    def explain(self, error: str) -> dict | None:
+        s = (error or "").lower()
+        if all(k in s for k in NOT_SIGNED_IN[:1]) or ("auth method" in s and "gemini" in s):
+            return {"message": "Gemini CLI is not signed in, so it cannot answer.",
+                    "hint": "Add a Gemini API key in Settings, Chat tab. FORM keeps it in a private file on this computer "
+                            "and gives it only to Gemini CLI."}
+        return None
 
     def command(self, run: Run, exe: str) -> list[str]:
         conf = Path(run.cwd) / ".gemini"

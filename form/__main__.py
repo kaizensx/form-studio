@@ -98,6 +98,9 @@ def main(argv=None):
     if argv[:1] == ["config"]:
         from .config_edit import main as config_main
         return config_main(argv[1:])
+    if argv[:1] == ["secrets"]:                    # agent keys (Gemini); values never on the command line
+        from .secrets import main as secrets_main
+        return secrets_main(argv[1:])
     if argv[:1] == ["examples"]:
         from . import config
         from .studio import StudioError, add_examples, list_examples
@@ -124,6 +127,7 @@ def main(argv=None):
     sub.add_parser("conversations", help="saved conversations: list | show ID | delete ID | rename ID TITLE | pin ID")
     sub.add_parser("install", help="install what FORM uses (--list, <id>, --yes, --dry-run)")
     sub.add_parser("config", help="get [key] | set <key> <value>: read or change studio.toml")
+    sub.add_parser("secrets", help="status | set NAME (value from stdin or a hidden prompt) | clear NAME: agent keys such as gemini_api_key")
     sub.add_parser("examples", help="list the shipped examples; `add` copies them into your projects")
     sub.add_parser("doctor")
     sub.add_parser("list")
