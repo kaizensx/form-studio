@@ -7,7 +7,7 @@ def wait_job(ui, pid, timeout=300):
     def done():
         d = ui.api("/projects/" + pid)
         return isinstance(d, dict) and d.get("status") and not d.get("job") and all(
-            v["state"] in ("current", "blocked", "failed") for v in d["status"].values())
+            v["state"] in ("current", "blocked", "failed") or v.get("unavailable") for v in d["status"].values())
     ui.wait_until(done, timeout, f"the pipeline of {pid}")
 
 

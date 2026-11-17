@@ -33,12 +33,29 @@ jobs:
         run: |
           uv venv --python 3.12 .venv
           uv pip install --python .venv -e ".[all]"
+      - name: Install PrusaSlicer
+        # A real slicer on every platform, so the journeys slice, simulate and release for real.
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then brew install --cask prusaslicer
+          elif [ "$RUNNER_OS" = "Windows" ]; then choco install prusaslicer -y --no-progress
+          else sudo apt-get install -y prusa-slicer; fi
+      - name: FORM finds the slicer and slices
+        shell: bash
+        run: |
+          PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
+          export FORM_CONFIG=.github/ci-prusa.toml FORM_DATA="$RUNNER_TEMP/form-slice"
+          "$PY" -m form examples add
+          "$PY" -m form run hallway-phone-dock
+          "$PY" -m form state hallway-phone-dock > "$RUNNER_TEMP/state.json"
+          "$PY" -c "import sys,json; s=json.load(open(sys.argv[1],encoding='utf-8')).get('slice_simulated') or {}; print('sliced:', {k:s.get(k) for k in ('time_s','filament_g','layers','slicer','slicer_version')}); sys.exit(0 if s.get('layers') else 1)" "$RUNNER_TEMP/state.json"
+          "$PY" -m form cost hallway-phone-dock
       - name: Use the app
         shell: bash
         run: |
           PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
           RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a -s '-screen 0 1920x1200x24'"
-          export FORM_UI_TESTS=1 FORM_UI_SHOTS="$RUNNER_TEMP/ui-shots" FORM_CONFIG=.github/ci-studio.toml FORM_NO_UPDATE_CHECK=1
+          export FORM_UI_TESTS=1 FORM_UI_SHOTS="$RUNNER_TEMP/ui-shots" FORM_UI_STUDIO_TOML="$PWD/.github/ci-prusa.toml" FORM_NO_UPDATE_CHECK=1
           eval $RUN "$PY" -m unittest -v tests.test_ui_journeys
       - uses: actions/upload-artifact@v4
         if: always()
