@@ -5,7 +5,7 @@ helpers are used by the studio after export. Every external program is optional:
 says so and FORM carries on without it.
 
 FreeCAD was written against its documented command-line and Python API (FreeCADCmd runs a .py file it is given;
-Part.Shape.read / isValid / Volume / BoundBox). It is not installed on the machine this was developed on; the script
+Part.Shape.read / isValid / Volume / BoundBox). It was first written against the documented API; since FORM 11 it is also run against FreeCAD 1.1.4. The script
 it generates and the output parser are tested with fixtures.
 """
 from __future__ import annotations
@@ -246,7 +246,11 @@ try:
     import FreeCAD, Part
     s = Part.Shape()
     s.read({str(step_path)!r})
-    bb = s.BoundBox
+    # The exact box: the default BoundBox is padded on curved faces (0.5 mm on a filleted part with FreeCAD 1.1).
+    try:
+        bb = s.optimalBoundingBox(False, False)
+    except Exception:
+        bb = s.BoundBox
     out = {{"ok": True, "valid": bool(s.isValid()), "volume_mm3": float(s.Volume), "solids": len(s.Solids),
            "bbox": [[bb.XMin, bb.YMin, bb.ZMin], [bb.XMax, bb.YMax, bb.ZMax]],
            "version": ".".join(str(x) for x in FreeCAD.Version()[:3])}}
