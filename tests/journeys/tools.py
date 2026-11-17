@@ -133,8 +133,17 @@ def journey_history(ui):
     ui.wait_until(lambda: ui.store.get("timelineOpen") is True and tool(ui) == "history", 3, "the timeline")
     ui.settle(300)
     track = ui.item("timelineTrack")
-    ui.drag(track, (-track.width() * 0.9, 0), fx=0.97)
-    ui.wait_until(lambda: (ui.store.get("scrub") or {}).get("rev") == 1, 90, "scrubbing to r01")
+    def at_r01():
+        return (ui.store.get("scrub") or {}).get("rev") == 1
+    for attempt in range(3):          # a synthetic drag is sometimes dropped by a virtual display: drag again
+        ui.drag(track, (-track.width() * 0.9, 0), fx=0.97)
+        try:
+            ui.wait_until(at_r01, 30, "scrubbing to r01")
+            break
+        except Exception:
+            if attempt == 2:
+                raise
+            print("  (drag did not register; trying again)")
     ui.expect("Back to head")
     ui.click_text("Back to head")
     ui.wait_until(lambda: ui.store.get("scrub") is None, 20, "back to the head")

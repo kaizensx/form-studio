@@ -50,6 +50,11 @@ jobs:
           "$PY" -m form state hallway-phone-dock > "$RUNNER_TEMP/state.json"
           "$PY" -c "import sys,json; s=json.load(open(sys.argv[1],encoding='utf-8')).get('slice_simulated') or {}; print('sliced:', {k:s.get(k) for k in ('time_s','filament_g','layers','slicer','slicer_version')}); sys.exit(0 if s.get('layers') else 1)" "$RUNNER_TEMP/state.json"
           "$PY" -m form cost hallway-phone-dock
+      - name: A screen large enough for the window
+        # Windows runners start at 1024x768, which clips the 1440x900 window the journeys ask for.
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Set-DisplayResolution -Width 1920 -Height 1080 -Force
       - name: Use the app
         shell: bash
         run: |
