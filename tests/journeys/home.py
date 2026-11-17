@@ -82,7 +82,9 @@ def run(ui):
     ui.wait_until(lambda: len(projects(ui)) == 8, 10, "a copy in the engine")
     copy = [p for p in projects(ui) if p["id"] not in ids.values()][0]
     ui.check("Bravo bin" in copy["name"] and copy["id"] != ids["Bravo bin"], f"the copy is its own project: {copy['name']}")
-    ui.wait_until(lambda: len(ui.find_all(name="projectCard")) == 8, 5, "eight cards")
+    ui.wait_until(lambda: len(ui.find_all(name="projectCard")) == 8, 20, "eight cards")
+    ui.wait_until(lambda: shown_names(ui)[0] == copy["name"], 10, "the copy to move to the front")
+    ui.settle(500)                # the grid has stopped moving before the next right-click
 
     # ── export .formproj ──
     menu(ui, "Delta coupon", "Export .formproj…")

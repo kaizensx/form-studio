@@ -8,7 +8,14 @@ def wait_job(ui, pid, timeout=300):
         d = ui.api("/projects/" + pid)
         return isinstance(d, dict) and d.get("status") and not d.get("job") and all(
             v["state"] in ("current", "blocked", "failed") or v.get("unavailable") for v in d["status"].values())
-    ui.wait_until(done, timeout, f"the pipeline of {pid}")
+    try:
+        ui.wait_until(done, timeout, f"the pipeline of {pid}")
+    except Exception as e:                 # say where it stopped: a timeout alone explains nothing on a remote runner
+        d = ui.api("/projects/" + pid)
+        st = {k: {x: v.get(x) for x in ("state", "blocked", "unavailable", "error") if v.get(x)} for k, v in (d.get("status") or {}).items()} if isinstance(d, dict) else d
+        jobs = getattr(ui.studio, "jobs", {})
+        last = [{"state": j.get("state"), "steps": [(s.get("node"), s.get("state"), str(s.get("error"))[:300]) for s in j.get("steps", [])]} for j in list(jobs.values())[-2:]]
+        raise type(e)(f"{e}; job={d.get('job') if isinstance(d, dict) else None} status={st} last jobs={last}") from None
 
 
 def make(ui, recipe, name, values=None, open=True):

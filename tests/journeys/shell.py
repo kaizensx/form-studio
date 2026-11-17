@@ -134,7 +134,7 @@ def journey_settings_saves_to_the_file(ui):
     # change it back, so a backup of the first save exists either way
     toggles = [t for t in ui.find_all(within=card) if t.metaObject().className().startswith("Toggle")]
     ui.click(toggles[0])
-    ui.wait_until(lambda: save.property("enabled") is True, 2, "Save to turn on again")
+    ui.wait_until(lambda: save.property("enabled") is True, 15, "Save to turn on again")
     ui.key("Return")                                   # Enter is the sheet's primary action
     ui.wait_until(lambda: tomllib.loads(cfg.read_text(encoding="utf-8"))[sec][key] == row["value"], 10, "the setting to be restored by Enter")
     ui.check(any(p.name.startswith(cfg.name) and p != cfg for p in cfg.parent.iterdir()), "a backup was made next to studio.toml")

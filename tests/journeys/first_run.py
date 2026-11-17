@@ -40,6 +40,9 @@ def run(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "work", 120, "the example project to open")
     pid = ui.store.get("pid")
     ui.check(pid and any(p["id"] == pid for p in ui.api("/studio")["projects"]), "the example exists in the engine")
+    # the pipeline starts a moment after the design opens: wait for it to finish, not for "nothing running yet"
+    ui.wait_until(lambda: all(v["state"] in ("current", "failed") or v.get("unavailable")
+                              for v in ui.api("/projects/" + pid)["status"].values()), 300, "the example's pipeline")
     ui.idle(300)
     st = ui.api("/projects/" + pid)["status"]
     ui.check(all(v["state"] == "current" or v.get("unavailable") for v in st.values()), f"the pipeline finished: {st}")
