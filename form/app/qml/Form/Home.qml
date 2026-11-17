@@ -46,6 +46,7 @@ Item {
         onAccepted: { if (Bridge.save("/projects/" + pid + "/archive", selectedFile)) Store.toast("Exported", "The whole history is in the file. Outputs are rebuilt where it is opened.")
                       else Store.toast("Could not write that file", "Choose another place.", true) } }
     PopMenu { id: pm; model: home.menuFor ? home.menu(home.menuFor) : [] }
+    function openMenu(p, item, x, y) { menuFor = p; pm.parent = item; pm.openAt(item, x, y) }
 
     Flickable {
         id: flick
@@ -127,12 +128,12 @@ Item {
                                     kind: card.p.approved_rev === card.p.head ? "PASS" : card.p.approved_rev ? "WARN" : "" } }
                             MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.LeftButton | Qt.RightButton; enabled: !card.editing && !card.asking
                                 onClicked: function (e) {
-                                    if (e.button === Qt.RightButton) { home.menuFor = card.p; pm.parent = card; pm.openAt(cm, e.x, e.y) }
+                                    if (e.button === Qt.RightButton) home.openMenu(card.p, card, e.x, e.y)
                                     else Store.open(card.p.id) } }
                             Btn { id: more; kind: "quiet"; icon: "ellipsis"; tip: "Rename, duplicate, export, delete"; x: parent.width - width - 8; y: 8; z: 3
                                 opacity: card.hot && !card.asking && !card.editing ? 1 : 0; visible: opacity > 0
                                 Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-                                onClicked: { home.menuFor = card.p; pm.parent = card; pm.openAt(more, 0, more.height + 4) } }
+                                onClicked: home.openMenu(card.p, card, more.x, more.y + more.height + 4) }
                             // rename in place
                             Field { id: rf; visible: card.editing; x: 12; y: parent.height - card.foot + 18; width: parent.width - 24
                                 onVisibleChanged: if (visible) { text = card.p.name; input.forceActiveFocus(); input.selectAll() }
@@ -143,8 +144,8 @@ Item {
                             Rectangle { visible: card.asking; x: 1; y: 1; width: parent.width - 2; height: parent.height - card.foot - 1; radius: Theme.rLg - 1; color: Theme.alpha(Theme.plate, 0.72) }
                             Item { visible: card.asking; x: 16; y: parent.height - card.foot; width: parent.width - 32; height: card.foot
                                 Column { anchors.verticalCenter: parent.verticalCenter; width: parent.width - acts.width - 10; spacing: 2
-                                    Txt { text: "Move “" + card.p.name + "” to the trash?"; font.weight: Theme.wMedium; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
-                                    Txt { kind: "fine"; text: "It stays in .trash in your projects folder."; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
+                                    Txt { text: "Move to the trash?"; font.weight: Theme.wMedium; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                                    Txt { kind: "fine"; text: card.p.name + " · kept in .trash"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
                                 Row { id: acts; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 6
                                     Btn { small: true; kind: "quiet"; text: "Keep"; onClicked: home.confirming = "" }
                                     Btn { small: true; kind: "danger"; text: "Move to trash"; onClicked: { home.confirming = ""; Store.deleteProject(card.p.id) } } } }

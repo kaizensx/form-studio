@@ -13,7 +13,8 @@ Row {
     Rectangle { visible: sc.setupShown; height: 24; width: sc.compact ? 24 : sl.implicitWidth + 30; radius: Theme.rSm; anchors.verticalCenter: parent.verticalCenter
         color: sm.pressed ? Theme.alpha(Theme.amber, 0.22) : sm.containsMouse ? Theme.alpha(Theme.amber, 0.15) : sc.compact ? "transparent" : Theme.alpha(Theme.amber, 0.08)
         Behavior on color { Tint {} }
-        Rectangle { x: sc.compact ? 9 : 10; width: 6; height: 6; radius: 3; color: Theme.amber; anchors.verticalCenter: parent.verticalCenter }
+        Rectangle { visible: !sc.compact; x: 10; width: 6; height: 6; radius: 3; color: Theme.amber; anchors.verticalCenter: parent.verticalCenter }
+        Icon { visible: sc.compact; anchors.centerIn: parent; name: "triangle_alert"; size: 13; color: Theme.amber }
         Txt { id: sl; visible: !sc.compact; x: 23; kind: "fine"; color: Theme.amber; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
             text: sc.st && !sc.st.required_ok ? "Setup needed" : "Setup: " + sc.need + " to check" }
         MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSetup() }

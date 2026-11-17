@@ -20,7 +20,7 @@ Column {
             text: us.packaged ? (us.u && us.u.download && us.u.download.name ? "Download " + us.u.download.name : "Open the download page") : "Copy command"
             onClicked: us.accept() } }
 
-    Note { visible: !!us.rel && us.rel.fake; kind: "amber"; title: "Development"
+    Note { visible: !!us.rel && !!us.rel.fake; kind: "amber"; title: "Development"
         text: "This release comes from FORM_FAKE_LATEST. Nothing was fetched from GitHub." }
     Rectangle { visible: !!us.rel && us.rel.notes !== ""
         width: parent.width; height: Math.min(notes.implicitHeight, 320) + 24; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule; clip: true

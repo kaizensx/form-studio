@@ -286,7 +286,7 @@ Rectangle {
         id: foot; width: parent.width; height: comp.height + 36; z: 2
         y: talk.landing ? intro.y + intro.height + 8 : talk.height - height
         Rectangle {
-            id: comp; x: 12; y: 8; width: parent.width - 24; height: inner.implicitHeight; radius: Theme.rLg
+            id: comp; x: talk.hero ? 22 : 12; y: 8; width: parent.width - 2 * x; height: inner.implicitHeight; radius: Theme.rLg
             color: Theme.well; border.width: 1; border.color: ta.activeFocus ? Theme.alpha(Theme.datum, 0.7) : ch.hovered ? Theme.rule3 : Theme.rule2
             Behavior on border.color { Tint {} }
             HoverHandler { id: ch }
@@ -374,7 +374,7 @@ Rectangle {
                 }
             }
         }
-        Txt { kind: "fine"; x: 16; anchors.top: comp.bottom; anchors.topMargin: 7; width: parent.width - 32; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 4
+        Txt { kind: "fine"; x: talk.hero ? 28 : 16; anchors.top: comp.bottom; anchors.topMargin: 7; width: parent.width - 2 * x; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 4
             text: Store.chatBusy ? "Working. Other conversations can run meanwhile."
                 : Store.conv && Store.conv.messages ? "Enter sends · ↑ brings back your last message"
                 : "Enter sends · Shift+Enter for a new line · drop files to attach" }

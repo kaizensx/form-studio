@@ -42,21 +42,21 @@ Column {
         Column { width: parent.width
             Repeater {
                 model: [
-                    { id: "FORM", name: "FORM", what: "This program", lic: "MIT" },
-                    { id: "InstrumentSans", name: "Instrument Sans", what: "Interface typeface", lic: "SIL OFL 1.1" },
-                    { id: "GeistMono", name: "Geist Mono", what: "Numbers and code", lic: "SIL OFL 1.1" },
-                    { id: "lucide", name: "Lucide", what: "Icons", lic: "ISC" },
-                    { id: "", name: "Qt and PySide6", what: "Interface toolkit", lic: "LGPL-3.0", url: "https://doc.qt.io/qtforpython-6/licenses.html" },
-                    { id: "", name: "build123d", what: "Modelling library", lic: "Apache-2.0", url: "https://github.com/gumyr/build123d" },
-                    { id: "", name: "Open CASCADE Technology", what: "Geometry kernel", lic: "LGPL-2.1 with exception", url: "https://dev.opencascade.org/resources/licensing" },
-                    { id: "", name: "NumPy, Pillow, pypdfium2, MCP SDK", what: "Numerics, images, PDFs, agent protocol", lic: "their own open licences", url: "https://github.com/kaizensx/form-studio/blob/main/pyproject.toml" }
+                    { id: "FORM", label: "FORM", what: "This program", lic: "MIT" },
+                    { id: "InstrumentSans", label: "Instrument Sans", what: "Interface typeface", lic: "SIL OFL 1.1" },
+                    { id: "GeistMono", label: "Geist Mono", what: "Numbers and code", lic: "SIL OFL 1.1" },
+                    { id: "lucide", label: "Lucide", what: "Icons", lic: "ISC" },
+                    { id: "", label: "Qt and PySide6", what: "Interface toolkit", lic: "LGPL-3.0", url: "https://doc.qt.io/qtforpython-6/licenses.html" },
+                    { id: "", label: "build123d", what: "Modelling library", lic: "Apache-2.0", url: "https://github.com/gumyr/build123d" },
+                    { id: "", label: "Open CASCADE Technology", what: "Geometry kernel", lic: "LGPL-2.1 with exception", url: "https://dev.opencascade.org/resources/licensing" },
+                    { id: "", label: "NumPy, Pillow, pypdfium2, MCP SDK", what: "Numerics, images, PDFs, agent protocol", lic: "their own open licences", url: "https://github.com/kaizensx/form-studio/blob/main/pyproject.toml" }
                 ]
                 Column {
                     id: lr
                     required property var modelData
                     required property int index
                     width: parent.width
-                    KV { first: lr.index === 0; k: lr.modelData.name; sub: lr.modelData.what
+                    KV { first: lr.index === 0; k: lr.modelData.label; sub: lr.modelData.what
                         Txt { kind: "fine"; tone: 2; text: lr.modelData.lic; anchors.verticalCenter: parent.verticalCenter }
                         Btn { small: true; kind: "quiet"; visible: lr.modelData.id !== ""; text: ab.shown === lr.modelData.id ? "Hide" : "Read"; anchors.verticalCenter: parent.verticalCenter
                             onClicked: ab.shown = ab.shown === lr.modelData.id ? "" : lr.modelData.id }
