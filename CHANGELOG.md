@@ -2,8 +2,13 @@
 
 ## 11.1.0
 
-### Every slicer FORM supports, run for real on Windows and Linux
-- A new CI workflow, **Real slicers**, installs the official builds and slices a design through FORM on Windows and Linux, weekly and whenever the slicer code changes. All eight jobs pass:
+### Form Studio
+- **A name and a mark.** FORM is now **Form Studio**, with the Frame mark: an F drawn as a coordinate frame, its origin in datum mint. A new app icon on macOS, Windows and Linux, and the mark in the title bar, first start and About. The `form` command, file names and release assets are unchanged, so updates and existing installs keep working.
+- **A new website**, with Form Studio itself drawn live in the page from the engine's own data: the phone dock's real geometry, its twelve checks, the fit model and the toolpaths from Bambu Studio's G-code. It plays on its own and you can take over: orbit the part, switch stages, scrub the print.
+- **A new README** with retina screenshots of the app.
+
+### Every slicer Form Studio supports, run for real on Windows and Linux
+- A new CI workflow, **Real slicers**, installs the official builds and slices a design through Form Studio on Windows and Linux, weekly and whenever the slicer code changes. All eight jobs pass:
 
   | Slicer | Linux | Windows |
   |---|---|---|
@@ -16,7 +21,7 @@
 - **QIDISlicer 1.2.5 on macOS** sliced for real too: QIDI Q1 Pro, 1 h 40 min, 61.24 g.
 - Fixed on the way: Bambu Studio presets on a copy that was never opened; Bambu Studio as an unpacked AppImage; QIDISlicer not found on Windows (it has no console program); SuperSlicer and QIDISlicer profiles in their Linux and AppImage layouts; SuperSlicer's version read as unknown; slicer versions on Windows, where window programs print nothing; and a SuperSlicer Flathub id that does not exist.
 
-### Gemini CLI inside FORM
+### Gemini CLI inside Form Studio
 - **Paste a Gemini API key once in Settings, Chat.** FORM keeps it in a private file on this computer (never in `studio.toml`), never shows it again, and gives it only to Gemini CLI. `form secrets set gemini_api_key` does the same without a window; the value is read from a hidden prompt, never from the command line. MCP cannot read or change it.
 - A real run of Gemini CLI 0.68.0 through FORM showed it stops when it is not signed in. FORM now says that plainly and points to Settings instead of to a file in your home folder.
 - The installer offers **Gemini CLI** and **Codex** (the publishers' npm packages), shows whether Gemini is signed in, and lists **SuperSlicer** and **QIDISlicer** with their official downloads. Homebrew withdrew SuperSlicer because it fails Apple's Gatekeeper check, so FORM does not offer it there.
@@ -28,7 +33,7 @@
 - **Folds** open with a short fade and settle; reduced motion keeps only the fade.
 - **Labels in the viewport** no longer sit on each other: a dimension moves along its line or steps aside for a marker.
 
-Not verified: a live Gemini reply (it needs your key); the Windows, Linux and Intel macOS apps used by a person; signed bundles.
+- **Windows:** deleting a design now always detaches its conversations; a read that met a file being replaced used to fail silently.
 
 ## 11.0.3
 
