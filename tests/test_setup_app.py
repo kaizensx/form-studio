@@ -240,8 +240,11 @@ class UpdateCheck(unittest.TestCase):
         self.cfg = {"data": {"dir": self.tmp}, "updates": {"check": True}}
         self.env = mock.patch.dict(os.environ, {"FORM_NO_UPDATE_CHECK": "", "FORM_FAKE_LATEST": ""})
         self.env.start()
+        self.ver = mock.patch.object(updates, "__version__", "10.0.0")     # the tests below are written against 10.0.0
+        self.ver.start()
 
     def tearDown(self):
+        self.ver.stop()
         self.env.stop()
 
     def test_available_and_asset_for_this_machine(self):
