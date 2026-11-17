@@ -216,7 +216,8 @@ def journey_photo_render_sheet(ui):
     rs = ui.item("renderSheet")
     ui.wait_until(lambda: rs.property("st") is not None, 30, "the render sheet to load what Blender it has")
     card = ui.item("sheetCard")
-    btn = ui.item(text="Render", within=card, exact=False)
+    btn = ui.wait_until(lambda: next((b for b in ui.find_all(within=card) if b.metaObject().className().startswith("Btn")
+                                      and b.property("text") in ("Render", "Render again")), None), 5, "the Render button")
     ui.shot("tools-render-sheet")
     if not rs.property("ready"):
         print("  (Blender is not installed: the Render button is off, as it should be)")
