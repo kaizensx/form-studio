@@ -56,6 +56,24 @@ jobs:
         run: |
           PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
           "$PY" -m PyInstaller packaging/form.spec --noconfirm
+      - name: Start the packaged app
+        # Proves the bundle launches on this platform: the window loads, the engine answers, the CAD kernel starts.
+        # Runners have no GPU, so interface warnings are printed but do not fail the build; not starting does.
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then BIN=dist/FORM.app/Contents/MacOS/FORM
+          elif [ "$RUNNER_OS" = "Windows" ]; then BIN=dist/FORM/FORM.exe
+          else BIN=dist/FORM/FORM; fi
+          RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a"
+          export FORM_DATA="$RUNNER_TEMP/form-smoke" FORM_CONFIG=.github/ci-studio.toml FORM_CHECK_OUT="$RUNNER_TEMP/form-check.txt"
+          export FORM_NO_UPDATE_CHECK=1
+          set +e
+          $RUN "$BIN" --check --wait 20000
+          echo "exit code: $?"
+          set -e
+          cat "$FORM_CHECK_OUT" || { echo "The packaged app did not reach its interface."; exit 1; }
+          grep -q "^ok:" "$FORM_CHECK_OUT"
+          grep -q "^kernel: build123d" "$FORM_CHECK_OUT" || { echo "The CAD kernel did not start inside the packaged app."; exit 1; }
       - name: Package
         shell: bash
         run: |

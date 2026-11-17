@@ -427,5 +427,21 @@ class Adapters(unittest.TestCase):
         self.assertIn("Install", st["why"])
 
 
+
+class AgentDefaults(unittest.TestCase):
+    """Found by a live Codex run: FORM passed Claude's default model ("opus") to Codex, which refused it."""
+
+    def test_codex_notice_is_not_an_error(self):
+        from form.agents.codex import CodexParser
+        out = CodexParser().feed(json.dumps({"type": "item.completed", "item": {
+            "id": "i1", "type": "error", "message": "Under-development features enabled: chronicle."}}))
+        self.assertEqual([e["t"] for e in out], ["act"])
+        self.assertIn("Under-development", out[0]["text"])
+
+    def test_default_model_belongs_to_the_default_agent(self):
+        src = (Path(__file__).resolve().parents[1] / "form" / "chat.py").read_text(encoding="utf-8")
+        self.assertIn('mine = agent == d["agent"]', src)
+        self.assertIn('(d["model"] if mine else "")', src)
+
 if __name__ == "__main__":
     unittest.main()

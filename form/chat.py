@@ -222,8 +222,10 @@ class Chat:
             exe = adapter.executable(self.cfg)
             if not exe:
                 raise RuntimeError(adapter.install_hint or f"{adapter.label} is not installed.")
-            model = model or (meta["model"] if meta else d["model"]) or "default"
-            effort = effort if effort is not None else (meta["effort"] if meta else d["effort"])
+            # the configured default model and effort belong to the default agent: "opus" means nothing to Codex
+            mine = agent == d["agent"]
+            model = model or (meta["model"] if meta else (d["model"] if mine else "")) or "default"
+            effort = effort if effort is not None else (meta["effort"] if meta else (d["effort"] if mine else ""))
             if meta is None:
                 meta = self.store.create(project, agent, model, effort or "")
             fields = {"agent": agent, "model": model, "effort": effort or ""}
@@ -480,7 +482,10 @@ def main_chat(argv: list[str]) -> int:
         if a.attach:
             if not cid:
                 d = chat.status()["default"]
-                cid = chat.store.create(a.project, a.agent or d["agent"], a.model or d["model"], a.effort or d["effort"])["id"]
+                ag = a.agent or d["agent"]
+                mine = ag == d["agent"]                    # defaults for model and effort are the default agent's
+                cid = chat.store.create(a.project, ag, a.model or (d["model"] if mine else "default"),
+                                        a.effort or (d["effort"] if mine else ""))["id"]
             ids = [chat.store.attach(cid, Path(f))["id"] for f in a.attach]
         else:
             ids = []

@@ -139,9 +139,21 @@ def main(argv=None) -> int:
                 if args.shot:
                     win.grabWindow().save(args.shot)
                 bad = [e for e in errors if "Binding loop" not in e]
-                for e in bad:
-                    print("QML:", e, file=sys.stderr)
-                print(f"ok: {len(bad)} warning(s)" + (f", saved {args.shot}" if args.shot else ""))
+                try:
+                    kernel = st.kernel_id()          # the CAD kernel answers: the engine really works in this build
+                except Exception as e:
+                    kernel, bad = "", bad + [f"CAD kernel did not start: {e}"]
+                lines = [f"QML: {e}" for e in bad] + [f"kernel: {kernel}" if kernel else "kernel: not running",
+                         f"ok: {len(bad)} warning(s)" + (f", saved {args.shot}" if args.shot else "")]
+                # A windowed Windows build has no console, so the result is also written to a file when asked.
+                out = os.environ.get("FORM_CHECK_OUT")
+                if out:
+                    Path(out).write_text("\n".join(lines) + "\n", encoding="utf-8")
+                for line in lines:
+                    try:
+                        print(line, file=sys.stderr if line.startswith("QML:") else sys.stdout)
+                    except Exception:
+                        pass
                 finish(1 if (args.check and bad) else 0)
             QTimer.singleShot(args.after if args.js else 0, snap)
         QTimer.singleShot(args.wait, done)

@@ -69,7 +69,9 @@ class CodexParser(Parser):
             txt = str(it.get("aggregated_output") or "")
             return [{"t": "result", "id": iid, "ok": ok, "image": False, "text": txt[:300], "full": txt}]
         if kind == "error" and done:
-            return [{"t": "error", "text": str(it.get("message", ""))}]
+            # An item-level error does not end the turn (a failed turn arrives as turn.failed). Codex uses it for
+            # notices such as "Under-development features enabled": show those quietly, not as a failure.
+            return [{"t": "act", "by": "Codex notice", "text": str(it.get("message", ""))[:400]}]
         return []
 
     def feed(self, line: str) -> list[dict]:
