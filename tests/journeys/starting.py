@@ -41,6 +41,18 @@ def prompts(ui):
     return ui.api("/starters")["prompts"]
 
 
+def hover_for(ui, card, name):
+    """Hover a starter card until its hover-only button shows (synthetic hover can be missed on a busy runner)."""
+    for _ in range(5):
+        ui.hover(card, 0.5, 0.5)
+        ui.settle(300)
+        b = ui.find(name=name, within=card)
+        if b is not None and b.property("visible"):
+            return b
+        ui.hover(card, 0.2, 0.2)
+    return ui.item(name, within=card)
+
+
 def journey_learned_starters(ui):
     home(ui)
     ui.wait_until(lambda: len(ui.find_all(name="starterCard")) >= 6, 15, "the suggested starters")
@@ -48,16 +60,12 @@ def journey_learned_starters(ui):
     ui.shot("starters-fresh")
     # pin one: it moves to the front, in the engine and on Home
     card = starter_card(ui, "Gridfinity bin")
-    ui.hover(card, 0.5, 0.5)
-    ui.settle(200)
-    ui.click(ui.item("starterPin", within=card))
+    ui.click(hover_for(ui, card, "starterPin"))
     ui.wait_until(lambda: prompts(ui)[0]["id"] == "d-gridfinity" and prompts(ui)[0]["pinned"], 15, "the pinned starter first in the engine")
     ui.wait_until(lambda: "Gridfinity bin" in (ui.find_all(name="starterCard")[0].property("text") or ""), 5, "the pinned starter first on Home")
     # remove one: hidden, and it stays hidden
     card = starter_card(ui, "lightest wall hook")
-    ui.hover(card, 0.5, 0.5)
-    ui.settle(200)
-    ui.click(ui.item("starterRemove", within=card))
+    ui.click(hover_for(ui, card, "starterRemove"))
     ui.wait_until(lambda: "d-hook" not in [p["id"] for p in prompts(ui)], 15, "the removed starter gone from the engine")
     ui.wait_until(lambda: not any("lightest wall hook" in (c.property("text") or "") for c in ui.find_all(name="starterCard")), 5, "and from Home")
     # add your own
@@ -90,7 +98,7 @@ def journey_new_design_flow(ui):
     # search the library
     ui.click("recipeSearch")
     ui.type("gear")
-    ui.wait_until(lambda: ui.item("recipeGrid").property("count") == 1 and ui.exists(text="Spur gear pair", within=card), 5, "only the gears")
+    ui.wait_until(lambda: ui.item("recipeGrid").property("count") == 1 and ui.exists(text="Spur gear pair", within=card), 30, "only the gears")    # live previews keep a software-rendered runner busy
     ui.click_text("Spur gear pair", within=card)
     ui.click("newName")
     ui.type("Clock gears")

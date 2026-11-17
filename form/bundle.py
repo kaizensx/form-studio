@@ -184,7 +184,7 @@ def import_bytes(st, data: bytes) -> dict:
         if pp.parts[:1] == ("sources",) and not i.is_dir():
             if len(pp.parts) != 2 or not SOURCE_RE.fullmatch(pp.name):
                 raise BundleError("The archive has a design source with an unexpected name.", pp.name[:80])
-            text = z.read(i).decode("utf-8", errors="strict")
+            text = z.read(i).decode("utf-8", errors="strict").replace("\r\n", "\n")   # written on Windows: CRLF on disk
             if source_id(text)[len(SOURCE_PREFIX):] != pp.name.split(".")[0]:
                 raise BundleError("A design source in the archive does not match its checksum; nothing was imported.", pp.name)
             sources[pp.name] = text

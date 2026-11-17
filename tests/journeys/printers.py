@@ -25,9 +25,12 @@ def row(ui, pid):
 
 
 def pick(ui, pid):
+    sh = ui.item("printerSheet")
+    ui.wait_until(lambda: sh.property("busy") == "", 20, "the sheet to finish saving")    # rows ignore clicks while it saves
     r = row(ui, pid)
     ui.scroll_to(r, 0.5)
     ui.click(r, 0.3, 0.5)
+    ui.wait_until(lambda: sh.property("pickId") == pid, 10, f"the row {pid} to be chosen")
     ui.wait_until(lambda: ui.find(name="printerFilament") is not None and ui.find(name="printerFilament").property("value"),
                   15, "the filament of the chosen printer")
     ui.settle(200)

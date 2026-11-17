@@ -17,6 +17,7 @@ Column {
     property bool loading: false
     property string busy: ""                  // "project" | "default" | "clear"
     property var pick: null                   // the printer row chosen in the list
+    readonly property string pickId: pick ? pick.id : ""
     property var opts: null                   // GET /printers/options for `pick`
     property bool optsLoading: false
     property string filament: ""

@@ -253,8 +253,8 @@ class CLI(unittest.TestCase):
         tmp = Path(tempfile.mkdtemp(prefix="form-printers-cli-"))
         d = bambu_dir(tmp)
         toml = tmp / "studio.toml"
-        toml.write_text(f'[slicer]\nkind = "bambu"\napp = "{sys.executable}"\nconfig_dir = "{d}"\n'
-                        + "".join(f'[slicer.{k}]\napp = "{NOWHERE}"\n' for k in slicer.SLICERS if k != "bambu"), encoding="utf-8")
+        toml.write_text(f'[slicer]\nkind = "bambu"\napp = {json.dumps(sys.executable)}\nconfig_dir = {json.dumps(str(d))}\n'
+                        + "".join(f'[slicer.{k}]\napp = {json.dumps(str(NOWHERE))}\n' for k in slicer.SLICERS if k != "bambu"), encoding="utf-8")
         old = os.environ.get("FORM_CONFIG")
         os.environ["FORM_CONFIG"] = str(toml)
         printers.clear_cache()
