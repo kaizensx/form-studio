@@ -47,7 +47,7 @@ Window {
         function onTalkWidthChanged() { later.restart() }
         function onTalkOpenChanged() { later.restart() }
         function onPaletteRecentChanged() { later.restart() } }
-    Component.onCompleted: { restore(); Store.boot(startProject, startStage); Store.bootSetup(headless) }
+    Component.onCompleted: { restore(); Store.boot(startProject, startStage); Store.bootSetup(headless); Store.checkWhatsNew(headless) }
 
     // the native menu bar (macOS). Elsewhere the same actions are in the top bar's menu button and the palette.
     Loader { active: win.mac; sourceComponent: MacMenu { onFullScreen: win.visibility = win.full ? Window.Windowed : Window.FullScreen } }
@@ -118,6 +118,7 @@ Window {
     Loader { anchors.top: top.bottom; anchors.bottom: parent.bottom; width: parent.width; z: 30; active: Store.welcome; sourceComponent: Welcome {} }
     Toasts { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 18; z: 80 }
     SheetHost {}
+    Exports {}
     Palette { id: palette }
     Lightbox {}
 

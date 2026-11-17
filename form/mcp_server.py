@@ -968,6 +968,66 @@ def build() -> MCPServer:
         opts = ask_mod.clean_suggestions(options)
         return {"shown": opts, "note": "Shown as buttons under your reply when this runs in Form Studio's chat."}
 
+    # ---- home workstream: starters, recipe library, archives (form/starters.py, recipe_lib.py, bundle.py) ----
+    def _home(fn, *a, **kw):
+        from .home_api import _call
+        return _call(fn, *a, **kw)
+
+    @mcp.tool(annotations=RO)
+    async def list_starters() -> dict:
+        """The starting points Home offers, ranked from what this person designs (their projects' recipes and briefs,
+        their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}.
+        Use them to suggest what to design next; the person edits them in the app or with `form starters`."""
+        from . import starters
+        st = studio()
+        return await _run(starters.for_studio, st)
+
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
+    async def recipe_library(q: str = "", section: str = "", tag: str = "") -> dict:
+        """Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index
+        on the project website. section: builtin | mine | community. Installing code is the person's decision and
+        happens only in the app or with `form recipes install` after they review the source and its SHA-256."""
+        from . import recipe_lib
+        st = studio()
+        def go():
+            lib = recipe_lib.everything(st.root, st.recipes.builtins())
+            return {"recipes": recipe_lib.search(lib["items"], q, section, tag), "community_error": lib["community_error"]}
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def export_project(project: str, path: str | None = None, conversations: bool = True, ctx: Context = None) -> dict:
+        """Write the project, its conversations and the code its revisions were built from to one .formstudio file
+        (default: <projects folder>/<project>.formstudio). Returns {file, bytes}. Nothing is uploaded."""
+        from pathlib import Path as _P
+
+        from . import bundle
+        st = studio()
+        f = await _run(_home, bundle.export_project, st, project, _P(path).expanduser() if path else None, conversations)
+        act(project, "project", f"Exported to {f.name}", ctx)
+        return {"file": str(f), "bytes": f.stat().st_size}
+
+    @mcp.tool(annotations=RW)
+    async def import_project(path: str, ctx: Context = None) -> dict:
+        """Import a .formstudio or .formproj archive (or a conversation .json) from an absolute path. The archive is
+        checked first; a project or conversation id that already exists gets a new one. Returns the new ids."""
+        from pathlib import Path as _P
+
+        from . import bundle
+        st = studio()
+        res = await _run(_home, bundle.import_file, st, _P(path))
+        if res.get("id"):
+            act(res["id"], "project", f"Imported “{res['name']}”", ctx)
+        return res
+
+    @mcp.tool(annotations=RO)
+    async def export_conversation(conversation: str, format: str = "md") -> dict:
+        """A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again)."""
+        from . import bundle
+        st = studio()
+        if format == "json":
+            return await _run(_home, bundle.conversation_json, st.root, conversation)
+        return {"markdown": await _run(_home, bundle.conversation_markdown, st.root, conversation)}
+
     return mcp
 
 

@@ -317,7 +317,7 @@ class UpdateCheck(unittest.TestCase):
 
     def test_config_default(self):
         from form import config
-        self.assertEqual(config.DEFAULTS["updates"], {"check": True})
+        self.assertEqual(config.DEFAULTS["updates"], {"check": True, "channel": "stable"})
 
 
 if __name__ == "__main__":

@@ -1,7 +1,10 @@
 """Is there a newer FORM? Reads the latest public GitHub release, at most once a day. Never downloads or installs.
 
 The only network request is a GET of public release metadata:
-    https://api.github.com/repos/kaizensx/form-studio/releases/latest
+    https://api.github.com/repos/kaizensx/form-studio/releases/latest        (Stable channel)
+    https://api.github.com/repos/kaizensx/form-studio/releases?per_page=30   (Preview channel: pre-releases too)
+`main` is stable releases; `dev` is the integration branch whose preview tags are published as pre-releases.
+Choose with `[updates] channel = "stable" | "preview"` in studio.toml (Settings, General).
 No token, no identifiers, 5 s timeout. Any failure (offline, rate limit, bad JSON) is silent: the result just
 says no update is known. The answer is cached in the data folder (`.form-updates.json`) for a day.
 
@@ -26,6 +29,8 @@ from . import __version__
 
 REPO = "kaizensx/form-studio"
 API = f"https://api.github.com/repos/{REPO}/releases/latest"
+LIST_API = f"https://api.github.com/repos/{REPO}/releases?per_page=30"
+CHANNELS = ("stable", "preview")
 RELEASES = f"https://github.com/{REPO}/releases"
 CACHE = ".form-updates.json"
 DAY = 24 * 3600
@@ -107,12 +112,40 @@ def enabled(cfg: dict | None) -> bool:
     return bool(((cfg or {}).get("updates") or {}).get("check", True))
 
 
-def _fetch() -> dict | None:
-    req = urllib.request.Request(API, headers={"Accept": "application/vnd.github+json",
+def channel(cfg: dict | None) -> str:
+    """Stable: releases from main. Preview: also pre-releases built from the dev branch, where features are tested."""
+    c = str(((cfg or {}).get("updates") or {}).get("channel") or "stable").strip().lower()
+    return c if c in CHANNELS else "stable"
+
+
+def pick(releases: list, chan: str = "stable") -> dict | None:
+    """The newest release a channel offers, from GitHub's release list. Drafts never; pre-releases only on preview."""
+    best, best_v = None, None
+    for d in releases or []:
+        if not isinstance(d, dict) or d.get("draft") or not d.get("tag_name"):
+            continue
+        if d.get("prerelease") and chan != "preview":
+            continue
+        v = parse(str(d["tag_name"]))
+        if v and (best_v is None or v > best_v):
+            best, best_v = d, v
+    return best
+
+
+def _get(url: str):
+    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
                                                "User-Agent": f"FORM/{__version__} update-check"})
     from . import net
     with net.urlopen(req, timeout=TIMEOUT) as r:
-        data = json.loads(r.read().decode("utf-8"))
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _fetch(chan: str = "stable") -> dict | None:
+    data = pick(_get(LIST_API), "preview") if chan == "preview" else _get(API)
+    return _release(data)
+
+
+def _release(data) -> dict | None:
     if not isinstance(data, dict) or not data.get("tag_name"):
         return None
     return {"version": str(data["tag_name"]).lstrip("vV"), "name": data.get("name") or data["tag_name"],
@@ -133,8 +166,9 @@ def _fake(v: str) -> dict:
 def check(cfg: dict | None = None, force: bool = False, data_dir: str | None = None) -> dict:
     """What is known about updates. Never raises, never takes longer than about TIMEOUT seconds."""
     kind = install_kind()
+    chan = channel(cfg)
     out = {"current": __version__, "enabled": enabled(cfg), "available": False, "kind": kind,
-           "command": upgrade_command(kind), "releases": RELEASES}
+           "command": upgrade_command(kind), "releases": RELEASES, "channel": chan}
     fake = os.environ.get("FORM_FAKE_LATEST", "").strip()
     if fake:
         out["enabled"] = True
@@ -149,17 +183,18 @@ def check(cfg: dict | None = None, force: bool = False, data_dir: str | None = N
     except (OSError, ValueError):
         pass
     now = time.time()
-    if isinstance(cached, dict) and not force and now - float(cached.get("checked", 0)) < DAY:
+    same = isinstance(cached, dict) and cached.get("channel", "stable") == chan
+    if same and not force and now - float(cached.get("checked", 0)) < DAY:
         return _finish(out, cached.get("latest"), cached.get("checked"))
     try:
-        latest = _fetch()
+        latest = _fetch(chan)
     except Exception:                       # offline, DNS, HTTP 403 rate limit, timeout, bad JSON: say nothing
         latest = None
-        if isinstance(cached, dict):        # keep what we knew; try again tomorrow
+        if same:                            # keep what we knew; try again tomorrow
             return _finish(out, cached.get("latest"), cached.get("checked"))
     try:
         data.mkdir(parents=True, exist_ok=True)
-        cache.write_text(json.dumps({"checked": now, "latest": latest}), encoding="utf-8")
+        cache.write_text(json.dumps({"checked": now, "latest": latest, "channel": chan}), encoding="utf-8")
     except OSError:
         pass
     return _finish(out, latest, now)
@@ -170,6 +205,7 @@ def _finish(out: dict, latest: dict | None, checked) -> dict:
     if not isinstance(latest, dict) or not latest.get("version"):
         return out
     out["latest"] = latest["version"]
+    out["prerelease"] = bool(latest.get("prerelease"))
     out["available"] = newer(latest["version"], out["current"])
     if out["available"]:
         want = asset_name()

@@ -18,7 +18,7 @@ import QtQuick.Controls
 Item {
     id: host
     anchors.fill: parent; z: 40
-    readonly property var files: ({ "new": "NewSheet.qml", alternatives: "Alternatives.qml", photo: "PhotoSheet.qml", ring: "RingSheet.qml", setup: "SetupSheet.qml", settings: "SettingsSheet.qml", update: "UpdateSheet.qml", slicer: "SlicerSheet.qml", printer: "PrinterSheet.qml", render: "PhotoRenderSheet.qml", variants: "VariantsSheet.qml", share: "ShareSheet.qml", shortcuts: "ShortcutsSheet.qml", about: "AboutSheet.qml" })
+    readonly property var files: ({ "new": "NewSheet.qml", alternatives: "Alternatives.qml", photo: "PhotoSheet.qml", ring: "RingSheet.qml", setup: "SetupSheet.qml", settings: "SettingsSheet.qml", update: "UpdateSheet.qml", slicer: "SlicerSheet.qml", render: "PhotoRenderSheet.qml", variants: "VariantsSheet.qml", share: "ShareSheet.qml", shortcuts: "ShortcutsSheet.qml", about: "AboutSheet.qml", whatsnew: "WhatsNew.qml", recipe: "RecipeSheet.qml", printer: "PrinterSheet.qml" })
     readonly property bool open: !!Store.sheet
     readonly property Item sheet: ld.item
     property string file: ""                 // stays set while the sheet fades out

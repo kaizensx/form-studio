@@ -1,4 +1,4 @@
-"""Home: filter, sort, a card's menu (rename, duplicate, export, move to trash), and what happens to a deleted
+"""Home: filter, sort, a card's menu (rename, duplicate, export as .formstudio, move to trash), and what happens to a deleted
 design's conversations."""
 import zipfile
 
@@ -86,10 +86,11 @@ def run(ui):
     ui.wait_until(lambda: shown_names(ui)[0] == copy["name"], 10, "the copy to move to the front")
     ui.settle(500)                # the grid has stopped moving before the next right-click
 
-    # ── export .formproj ──
-    menu(ui, "Delta coupon", "Export .formproj…")
-    arch = ui.saved(ids["Delta coupon"] + ".formproj", 30)
-    ui.check(zipfile.is_zipfile(arch) and any("project.json" in n for n in zipfile.ZipFile(arch).namelist()), "the archive holds the project")
+    # ── export: one .formstudio file ──
+    menu(ui, "Delta coupon", "Export…")
+    arch = ui.saved(ids["Delta coupon"] + ".formstudio", 30)
+    names = zipfile.ZipFile(arch).namelist() if zipfile.is_zipfile(arch) else []
+    ui.check("manifest.json" in names and "project/project.json" in names, f"the archive holds the project: {names[:5]}")
 
     # ── the "…" button opens the same menu ──
     c = card(ui, "Kilo box")

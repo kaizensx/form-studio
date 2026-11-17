@@ -4,64 +4,238 @@ import QtQuick.Dialogs
 import FormNative
 import "F.js" as F
 
-// Home: your designs as live objects. The prompt is the hero, on the left in the agent column.
-// A card opens on click; right-click (or the ⋯ button) renames, duplicates, exports or moves it to the trash.
+// Home. The composer is in the agent column on the left; this pane is everything else about starting and finding work:
+//   · ways to start (describe it, a recipe, a brief, an import)
+//   · starters learned from what this person designs, which they can pin, edit, remove and add to (form/starters.py)
+//   · brief templates in the order they use them, their own saved templates first
+//   · on a new install: live recipes on their plates; afterwards: every design as a live object
+// No example projects are created; "Open an example" adds one only when asked.
 Item {
     id: home
     objectName: "homeView"
+    clip: true
     property string filter: "all"             // all | released | open
     property string order: "recent"           // recent | name
     property string renaming: ""
     property string renameDraft: ""      // what has been typed so far: kept here so a list refresh that rebuilds the card does not wipe it
     property string confirming: ""
+    property string editingStarter: ""   // id of the starter being edited in place; "+" while a new one is typed
     property var menuFor: null
     readonly property var everything: Store.studio ? Store.studio.projects.filter(function (p) { return !p.error }) : []
     readonly property var broken: Store.studio ? Store.studio.projects.filter(function (p) { return !!p.error }) : []
+    readonly property bool fresh: everything.length === 0
     readonly property var projects: {
         var l = everything.filter(function (p) { return home.filter === "all" || (home.filter === "released") === (p.approved_rev === p.head) })
         return l.sort(function (a, b) { return home.order === "name" ? String(a.name).localeCompare(String(b.name)) : b.updated - a.updated })
     }
     readonly property int released: everything.filter(function (p) { return p.approved_rev === p.head }).length
+    readonly property var prompts: Store.starters ? Store.starters.prompts.slice(0, fresh ? 6 : 3) : []
+    readonly property var briefs: Store.starters ? Store.starters.briefs.slice(0, 7) : []
+    readonly property real cw: Math.min(width - 80, 1240)          // content width: a long line stays readable on a wide screen
     // newest Blender render of each project's current geometry (form/photo.py)
     property var photos: ({})
     function loadPhotos() { Store.get("/photos").then(function (r) { home.photos = r.latest }, function () {}) }
-    Component.onCompleted: loadPhotos()
-    // The cards rise in once, when Home appears. Sorting, filtering or a reload afterwards puts them in place at once:
+    Component.onCompleted: { loadPhotos(); Store.loadStarters() }
+    // Everything rises in once, when Home appears. Sorting, filtering or a reload afterwards puts things in place at once:
     // a grid you work in all day does not replay its entrance.
     property bool entered: false
     Timer { interval: 40 + 9 * Theme.stagger + Theme.slow; running: true; onTriggered: home.entered = true }
     Connections { target: Store; function onStudioChanged() { home.loadPhotos() } }
     function recipeTitle(id) {
         if (!Store.studio) return ""
-        if (String(id).indexOf("src:") === 0) return "Designed by an agent"
+        if (String(id).indexOf("src:") === 0 || String(id).indexOf("scad:") === 0) return "Designed as code"
         for (var i = 0; i < Store.studio.recipes.length; i++) if (Store.studio.recipes[i].id === id) return Store.studio.recipes[i].title
         return id
     }
+    function greeting() {
+        var h = new Date().getHours()
+        return h < 5 ? "Working late" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"
+    }
+    function exportProject(p) { saveDlg.pid = p.id; saveDlg.currentFile = Bridge.downloads() + "/" + p.id + ".formstudio"; Store.ask(saveDlg) }
     function menu(p) {
         return [
             { icon: "arrow_up_right", text: "Open", run: function () { Store.open(p.id) } },
             { sep: true },
             { icon: "pencil", text: "Rename", run: function () { home.confirming = ""; home.renameDraft = p.name; home.renaming = p.id } },
             { icon: "copy_plus", text: "Duplicate", run: function () { Store.duplicateProject(p.id) } },
-            { icon: "package", text: "Export .formproj…", run: function () { saveDlg.pid = p.id; saveDlg.currentFile = Bridge.downloads() + "/" + p.id + ".formproj"; Store.ask(saveDlg) } },
+            { icon: "archive", text: "Export…", run: function () { home.exportProject(p) } },
             { sep: true },
             { icon: "trash_2", text: "Move to trash…", danger: true, run: function () { home.renaming = ""; home.confirming = p.id } }
         ]
     }
-    FileDialog { id: saveDlg; property string pid: ""; title: "Export the design"; fileMode: FileDialog.SaveFile; nameFilters: ["Form Studio projects (*.formproj)"]
-        onAccepted: { if (Bridge.save("/projects/" + pid + "/archive", selectedFile)) Store.toast("Exported", "The whole history is in the file. Outputs are rebuilt where it is opened.")
+    FileDialog { id: saveDlg; property string pid: ""; title: "Export the design"; fileMode: FileDialog.SaveFile; nameFilters: ["Form Studio projects (*.formstudio)"]
+        onAccepted: { if (Bridge.save("/archive/" + pid + ".formstudio", selectedFile)) Store.toast("Exported", "The design, its history, its conversations and its code are in one file. Outputs are rebuilt where it is opened.")
                       else Store.toast("Could not write that file", "Choose another place.", true) } }
     PopMenu { id: pm; model: home.menuFor ? home.menu(home.menuFor) : [] }
     function openMenu(p, item, x, y) { menuFor = p; pm.parent = item; pm.openAt(item, x, y) }
+    property var briefFor: null
+    PopMenu { id: bm; model: home.briefFor ? [
+            { icon: "arrow_up_right", text: "Open the questions", run: function () { Store.useBrief(home.briefFor) } },
+            { icon: home.briefFor.pinned ? "pin_off" : "pin", text: home.briefFor.pinned ? "Unpin" : "Pin to the front", run: function () { Store.pinStarter(home.briefFor.id, !home.briefFor.pinned) } },
+            { sep: true },
+            { icon: "x", text: home.briefFor.kind === "template" ? "Delete this template" : "Hide", danger: home.briefFor.kind === "template", run: function () { Store.removeStarter(home.briefFor.id) } }] : [] }
+
+    // a faint datum wash behind the header: the bench under a lamp. It scrolls away with the header.
+    Rectangle { width: parent.width; height: 360; y: -flick.contentY * 0.5
+        gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.datum, 0.035) } GradientStop { position: 1; color: Theme.alpha(Theme.datum, 0.0) } } }
 
     Flickable {
         id: flick
-        anchors.fill: parent; contentHeight: col.implicitHeight + 72; clip: true; boundsBehavior: Flickable.StopAtBounds
+        anchors.fill: parent; contentHeight: col.implicitHeight + 80; clip: true; boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { width: 6 }
         Column {
-            id: col; x: 36; y: 30; width: parent.width - 72; spacing: 22
-            // ── header: what is here, and how to look at it ──
-            Item { width: parent.width; height: 34; visible: home.everything.length > 0
+            id: col; x: Math.round((parent.width - width) / 2); y: home.fresh ? Math.max(36, Math.min(72, home.height * 0.07)) : 30; width: home.cw; spacing: 0
+
+            // ── header ──
+            Item { id: header; width: parent.width; height: hcol.implicitHeight
+                opacity: 0; Component.onCompleted: hIn.start()
+                ParallelAnimation { id: hIn; Glide { target: header; property: "opacity"; to: 1; duration: Theme.slow } Glide { target: htr; property: "y"; from: Theme.shift(10); to: 0; duration: Theme.slow } }
+                transform: Translate { id: htr }
+                Column { id: hcol; width: parent.width - acts.width - 20; spacing: 6
+                    Txt { kind: "cap"; color: Theme.datum; text: home.fresh ? "Form Studio " + Bridge.version : home.greeting() }
+                    Txt { kind: "h1"; font.pixelSize: home.fresh ? (home.cw > 860 ? 40 : 34) : 30; font.letterSpacing: -0.6; lineHeight: 1.05; width: parent.width
+                        text: home.fresh ? "Design your first part" : "Your designs" }
+                    Txt { tone: 2; width: Math.min(parent.width, 640); lineHeight: 1.4; font.pixelSize: home.fresh ? Theme.tLead : Theme.tBody
+                        text: home.fresh ? "Describe it to the agent on the left, answer a short brief, or start from a parametric recipe. Every part is built in a real CAD kernel, checked, and sliced before you print it."
+                              : F.plural(home.everything.length, "design") + "  ·  " + home.released + " released" + (home.everything.length ? "  ·  last change " + F.ago(Math.max.apply(null, home.everything.map(function (p) { return p.updated })))
+                                : "") } }
+                Row { id: acts; anchors.right: parent.right; anchors.bottom: parent.bottom; spacing: 8
+                    Btn { kind: "quiet"; icon: "import"; text: "Import…"; tip: "A .formstudio project, a .formproj, or a conversation"; onClicked: Store.openSheet("new", { tab: "import" }) }
+                    Btn { kind: "quiet"; icon: "folder_open"; tip: "Open the projects folder: " + Bridge.dataDirShort; onClicked: Bridge.openDataFolder() }
+                    Btn { kind: "primary"; icon: "plus"; text: "New design"; keys: "Ctrl+N"; tip: "Describe it, a recipe, a brief or an import"; onClicked: Store.openSheet("new") } } }
+
+            Item { width: 1; height: home.fresh ? 30 : 22 }
+            Note { visible: !!Store.fatal; width: parent.width; kind: "red"; title: Store.fatal ? Store.fatal.message : ""; text: Store.fatal ? (Store.fatal.hint || "") : "" }
+            Note { visible: home.broken.length > 0; width: parent.width; kind: "amber"; title: F.plural(home.broken.length, "folder") + " could not be read"
+                text: home.broken.map(function (p) { return p.id }).join(", ") + ". Nothing was changed; open the projects folder to look." }
+
+            // ── ways to start (a new install: large; afterwards the New design button does it) ──
+            Grid {
+                id: ways
+                visible: home.fresh
+                width: parent.width; columns: home.cw > 900 ? 4 : 2; spacing: 12
+                readonly property real tw: Math.floor((width - (columns - 1) * spacing) / columns)
+                Repeater {
+                    model: [{ icon: "message_square", title: "Describe it", text: "Tell the agent what it holds and where it goes. It writes the design as code.", run: function () { Store.newChat(); Store.chatFocus++ } },
+                            { icon: "sliders_horizontal", title: "Start from a recipe", text: "A parametric design with engineering checks: change numbers, see the part.", run: function () { Store.openSheet("new", { tab: "recipe" }) } },
+                            { icon: "file_text", title: "Start from a brief", text: "Answer the questions that decide fit, material and mounting.", run: function () { Store.openSheet("new", { tab: "brief" }) } },
+                            { icon: "import", title: "Import a project", text: "A .formstudio file from another computer, with its history and conversations.", run: function () { Store.openSheet("new", { tab: "import" }) } }]
+                    Rectangle {
+                        id: way
+                        required property var modelData
+                        required property int index
+                        width: ways.tw; height: 132; radius: Theme.rLg
+                        color: wm.pressed ? Theme.plate1 : wm.containsMouse ? Theme.plate3 : Theme.plate2
+                        border.color: wm.containsMouse ? Theme.rule3 : Theme.rule
+                        Behavior on color { Tint {} }
+                        scale: wm.pressed ? Theme.from(0.985) : 1
+                        Behavior on scale { Glide { duration: Theme.press } }
+                        opacity: 0; Component.onCompleted: wIn.start()
+                        SequentialAnimation { id: wIn; PauseAnimation { duration: 60 + way.index * Theme.stagger }
+                            ParallelAnimation { Glide { target: way; property: "opacity"; to: 1; duration: Theme.slow } Glide { target: wtr; property: "y"; from: Theme.shift(10); to: 0; duration: Theme.slow } } }
+                        transform: Translate { id: wtr }
+                        Rectangle { x: 16; y: 16; width: 34; height: 34; radius: Theme.rMd; color: way.index === 0 ? Theme.alpha(Theme.datum, 0.14) : Theme.plate4
+                            Icon { anchors.centerIn: parent; name: way.modelData.icon; size: 16; color: way.index === 0 ? Theme.datum : Theme.ink2 } }
+                        Icon { name: "arrow_up_right"; size: 14; color: wm.containsMouse ? Theme.datum : Theme.ink4; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 16 }
+                        Column { x: 16; y: 62; width: parent.width - 32; spacing: 3
+                            Txt { text: way.modelData.title; font.weight: Theme.wSemi }
+                            Txt { kind: "fine"; width: parent.width; text: way.modelData.text; maximumLineCount: 2; elide: Text.ElideRight } }
+                        MouseArea { id: wm; anchors.fill: parent; hoverEnabled: true; onClicked: way.modelData.run() } } } }
+            Item { visible: home.fresh; width: 1; height: 34 }
+
+            // ── starters, learned from what this person designs ──
+            Item { width: parent.width; height: 30; visible: home.prompts.length > 0 || home.editingStarter === "+"
+                Row { spacing: 10; anchors.verticalCenter: parent.verticalCenter
+                    Txt { kind: "h3"; text: home.fresh ? "Starters" : "Start something new"; font.letterSpacing: -0.2 }
+                    Txt { kind: "fine"; tone: 3; anchors.baseline: parent.children[0].baseline
+                        text: Store.starters && Store.starters.history ? "learned from your designs, your printer and your material" : "suggestions until you have designs of your own" } }
+                Row { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 4
+                    Btn { visible: !!Store.starters && Store.starters.hidden > 0; small: true; kind: "quiet"; icon: "rotate_ccw"; text: "Restore suggestions"; onClicked: Store.restoreStarters() }
+                    Btn { objectName: "starterAdd"; small: true; kind: "quiet"; icon: "plus"; text: "Add a starter"; onClicked: home.editingStarter = "+" } } }
+            Item { width: 1; height: 12; visible: home.prompts.length > 0 || home.editingStarter === "+" }
+            Grid {
+                id: sgrid
+                width: parent.width; columns: home.cw > 900 ? 3 : 2; spacing: 12
+                visible: home.prompts.length > 0 || home.editingStarter === "+"
+                readonly property real tw: Math.floor((width - (columns - 1) * spacing) / columns)
+                Repeater { model: home.prompts
+                    StarterCard {
+                        required property var modelData
+                        required property int index
+                        item: modelData; index: index; width: sgrid.tw; entered: home.entered
+                        editing: home.editingStarter === modelData.id
+                        onEditRequested: home.editingStarter = modelData.id
+                        onEditCancelled: home.editingStarter = ""
+                        onEditDone: function (t) { home.editingStarter = ""; if (t.trim() && t.trim() !== modelData.text) Store.editStarter(modelData.id, t.trim()) } } }
+                StarterCard {
+                    visible: home.editingStarter === "+"; width: sgrid.tw; item: ({ id: "+", text: "", source: "mine" }); editing: visible
+                    onEditCancelled: home.editingStarter = ""
+                    onEditDone: function (t) { home.editingStarter = ""; if (t.trim()) Store.addStarter(t.trim()) } } }
+            Item { width: 1; height: 18; visible: home.briefs.length > 0 }
+
+            // ── brief templates, in the order this person uses them ──
+            Flow { width: parent.width; spacing: 8; visible: home.briefs.length > 0
+                Txt { kind: "cap"; text: "Or answer a few questions"; height: 30; verticalAlignment: Text.AlignVCenter; rightPadding: 6 }
+                Repeater { model: home.briefs
+                    Rectangle { id: bc; objectName: "briefChip"; required property var modelData; required property int index
+                        readonly property bool mine: modelData.kind === "template"
+                        width: brow.implicitWidth + 24; height: 30; radius: 15
+                        color: bmouse.pressed ? Theme.washPress : bmouse.containsMouse ? Theme.plate3 : Theme.alpha(Theme.plate2, 0.6)
+                        border.color: bc.mine || bc.modelData.pinned ? Theme.alpha(Theme.datum, 0.45) : bmouse.containsMouse ? Theme.rule3 : Theme.rule2
+                        Behavior on color { Tint {} }
+                        Row { id: brow; anchors.centerIn: parent; spacing: 6
+                            Icon { visible: bc.mine || bc.modelData.pinned; name: bc.modelData.pinned ? "pin" : "bookmark"; size: 12; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
+                            Txt { font.pixelSize: 12; text: bc.modelData.title; tone: bmouse.containsMouse ? 1 : 2; anchors.verticalCenter: parent.verticalCenter } }
+                        MouseArea { id: bmouse; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onClicked: function (e) { if (e.button === Qt.RightButton) { home.briefFor = bc.modelData; bm.parent = bc; bm.openAt(bc, e.x, e.y) } else Store.useBrief(bc.modelData) } }
+                        Tip { show: bmouse.containsMouse; text: bc.modelData.summary || "" } } } }
+
+            // ── a new install: the recipes, live on their plates ──
+            Item { visible: home.fresh && !!Store.studio; width: 1; height: 40 }
+            Item { visible: home.fresh && !!Store.studio; width: parent.width; height: 30
+                Txt { kind: "h3"; text: "Recipes"; font.letterSpacing: -0.2; anchors.verticalCenter: parent.verticalCenter }
+                Btn { small: true; kind: "quiet"; icon: "arrow_right"; text: "All recipes"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    onClicked: Store.openSheet("new", { tab: "recipe" }) } }
+            Item { visible: home.fresh && !!Store.studio; width: 1; height: 12 }
+            Grid {
+                id: rgrid
+                visible: home.fresh && !!Store.studio
+                width: parent.width; columns: home.cw > 900 ? 4 : 3; spacing: 12
+                readonly property real tw: Math.floor((width - (columns - 1) * spacing) / columns)
+                Repeater {
+                    model: ["dock", "enclosure", "gridfinity", "hook"].slice(0, rgrid.columns)
+                    Rectangle {
+                        id: rc
+                        objectName: "recipeCard"
+                        required property string modelData
+                        required property int index
+                        readonly property var r: { var l = Store.studio ? Store.studio.recipes : []; for (var i = 0; i < l.length; i++) if (l[i].id === modelData) return l[i]; return { title: modelData, summary: "" } }
+                        width: rgrid.tw; height: Math.round(rgrid.tw * 0.62) + 62; radius: Theme.rLg
+                        color: Theme.plate1; border.color: rcm.containsMouse ? Theme.rule3 : Theme.rule
+                        Behavior on border.color { Tint {} }
+                        y: rcm.containsMouse && !rcm.pressed ? Theme.shift(-3) : 0
+                        Behavior on y { Glide { duration: Theme.base } }
+                        opacity: 0; Component.onCompleted: rIn.start()
+                        SequentialAnimation { id: rIn; PauseAnimation { duration: 260 + rc.index * Theme.stagger }
+                            Glide { target: rc; property: "opacity"; to: 1; duration: Theme.slow } }
+                        Shadow { radius: parent.radius; spread: 26; drop: 12; opacity: rcm.containsMouse ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.base } } }
+                        Item { x: 1; y: 1; width: parent.width - 2; height: parent.height - 63; clip: true
+                            RecipeView { anchors.fill: parent; recipeId: rc.modelData; turning: rcm.containsMouse } }
+                        Rectangle { y: parent.height - 62; x: 1; width: parent.width - 2; height: 1; color: Theme.rule }
+                        Column { x: 14; y: parent.height - 50; width: parent.width - 28; spacing: 2
+                            Txt { text: rc.r.title; font.weight: Theme.wSemi; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                            Txt { kind: "fine"; text: rc.r.summary; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
+                        MouseArea { id: rcm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSheet("new", { tab: "recipe", section: "builtin", pick: rc.modelData }) }
+                        Tip { show: rcm.containsMouse; text: "Built at its default values, live. Click to start from it." } } } }
+            Item { visible: home.fresh && !!Store.studio; width: 1; height: 26 }
+            Row { visible: home.fresh && !!Store.studio; spacing: 6; anchors.horizontalCenter: parent.horizontalCenter
+                Btn { kind: "quiet"; icon: "box"; text: "Open an example"; onClicked: Store.openSheet("new", { tab: "import", examples: true }) }
+                Txt { kind: "fine"; tone: 4; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; width: Math.min(implicitWidth, home.cw - 200)
+                    text: "·   Designs are saved in " + Bridge.dataDirShort } }
+
+            // ── the designs ──
+            Item { visible: !home.fresh; width: 1; height: 40 }
+            Item { width: parent.width; height: 34; visible: !home.fresh
                 Row { spacing: 12; anchors.verticalCenter: parent.verticalCenter
                     Txt { kind: "h3"; text: "Designs"; font.letterSpacing: -0.2 }
                     Txt { mono: true; tone: 3; font.pixelSize: 12; text: home.everything.length; anchors.baseline: parent.children[0].baseline } }
@@ -69,16 +243,11 @@ Item {
                     Seg { visible: home.everything.length > 6; anchors.verticalCenter: parent.verticalCenter; value: home.filter; onPicked: function (v) { home.filter = v }
                         model: [{ value: "all", text: "All" }, { value: "open", text: "In progress" }, { value: "released", text: "Released" }] }
                     Btn { visible: home.everything.length > 6; kind: "quiet"; icon: "arrow_up_down"; text: home.order === "recent" ? "Last changed" : "Name"; tip: "Sort order"
-                        onClicked: home.order = home.order === "recent" ? "name" : "recent" }
-                    Rectangle { visible: home.everything.length > 6; width: 1; height: 16; color: Theme.rule2; anchors.verticalCenter: parent.verticalCenter }
-                    Btn { kind: "quiet"; icon: "folder_open"; tip: "Open the projects folder: " + Bridge.dataDirShort; onClicked: Bridge.openDataFolder() }
-                    Btn { icon: "plus"; text: "New design"; keys: "Ctrl+N"; tip: "From a recipe or a brief"; onClicked: Store.openSheet("new") } } }
-            Note { visible: !!Store.fatal; kind: "red"; title: Store.fatal ? Store.fatal.message : ""; text: Store.fatal ? (Store.fatal.hint || "") : "" }
-            Note { visible: home.broken.length > 0; kind: "amber"; title: F.plural(home.broken.length, "folder") + " could not be read"
-                text: home.broken.map(function (p) { return p.id }).join(", ") + ". Nothing was changed; open the projects folder to look." }
+                        onClicked: home.order = home.order === "recent" ? "name" : "recent" } } }
+            Item { visible: !home.fresh; width: 1; height: 14 }
             Grid {
-                id: grid; width: parent.width
-                columns: Math.max(1, Math.floor((width + 18) / 318)); spacing: 18
+                id: grid; width: parent.width; visible: !home.fresh
+                columns: Math.max(1, Math.floor((width + 18) / 300)); spacing: 18
                 readonly property real cw: Math.floor((width - (columns - 1) * 18) / columns)
                 Repeater {
                     model: home.projects
@@ -97,7 +266,7 @@ Item {
                         width: grid.cw; height: Math.round(grid.cw * 0.7) + foot
                         opacity: 0
                         Component.onCompleted: { if (home.entered) opacity = 1; else appear.start() }
-                        SequentialAnimation { id: appear; PauseAnimation { duration: 40 + Math.min(card.index, 9) * Theme.stagger }
+                        SequentialAnimation { id: appear; PauseAnimation { duration: 120 + Math.min(card.index, 9) * Theme.stagger }
                             ParallelAnimation { Glide { target: card; property: "opacity"; to: 1; duration: Theme.slow }
                                 Glide { target: rise; property: "y"; from: Theme.shift(12); to: 0; duration: Theme.slow } } }
                         transform: Translate { id: rise; y: 0 }
@@ -165,10 +334,10 @@ Item {
                             // move to trash?
                             Rectangle { visible: card.asking; x: 1; y: 1; width: parent.width - 2; height: parent.height - card.foot - 1; radius: Theme.rLg - 1; color: Theme.alpha(Theme.plate, 0.72) }
                             Item { visible: card.asking; x: 16; y: parent.height - card.foot; width: parent.width - 32; height: card.foot
-                                Column { anchors.verticalCenter: parent.verticalCenter; width: parent.width - acts.width - 10; spacing: 2
+                                Column { anchors.verticalCenter: parent.verticalCenter; width: parent.width - tacts.width - 10; spacing: 2
                                     Txt { text: "Move to the trash?"; font.weight: Theme.wMedium; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
                                     Txt { kind: "fine"; text: card.p.name + " · kept in .trash"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
-                                Row { id: acts; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 6
+                                Row { id: tacts; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 6
                                     Btn { small: true; kind: "quiet"; text: "Keep"; onClicked: home.confirming = "" }
                                     Btn { small: true; kind: "danger"; text: "Move to trash"; onClicked: { home.confirming = ""; Store.deleteProject(card.p.id) } } } }
                         }
@@ -176,33 +345,6 @@ Item {
                 }
             }
             Txt { visible: home.everything.length > 0 && home.projects.length === 0; tone: 3; text: home.filter === "released" ? "Nothing is released yet. A design is released from its Release stage." : "Every design here is released." }
-
-            // ── a clean install: no examples are created; this is the whole of Home until the first design ──
-            Item { visible: home.everything.length === 0 && !!Store.studio; width: parent.width; height: Math.max(460, home.height - 110)
-                Column { anchors.centerIn: parent; anchors.verticalCenterOffset: -10; spacing: 26; width: Math.min(520, parent.width - 48)
-                    // an empty build plate with its datum: where the first part will sit
-                    Item { id: plate; width: 340; height: 150; anchors.horizontalCenter: parent.horizontalCenter
-                        opacity: 0; Component.onCompleted: pin.start()
-                        ParallelAnimation { id: pin; Glide { target: plate; property: "opacity"; to: 1; duration: Theme.slow } Glide { target: plate; property: "scale"; from: Theme.from(0.96); to: 1; duration: Theme.slow } }
-                        Rectangle { width: 240; height: 240; radius: Theme.rLg; color: Theme.plate2; border.color: Theme.rule3
-                            // a square plate seen from above and to the side: x' = x − 0.5·y + 110, y' = 0.55·y + 9
-                            transform: Matrix4x4 { matrix: Qt.matrix4x4(1, -0.5, 0, 110, 0, 0.55, 0, 9, 0, 0, 1, 0, 0, 0, 0, 1) }
-                            Repeater { model: 7; Rectangle { required property int index; x: (index + 1) * parent.width / 8; width: 1; height: parent.height; color: Theme.rule2 } }
-                            Repeater { model: 7; Rectangle { required property int index; y: (index + 1) * parent.height / 8; height: 1; width: parent.width; color: Theme.rule2 } }
-                            // the datum: origin corner, two axes
-                            Rectangle { x: 18; y: parent.height - 20; width: 72; height: 3; radius: 1; color: Theme.datum }
-                            Rectangle { x: 18; y: parent.height - 90; width: 3; height: 72; radius: 1; color: Theme.datum }
-                            Rectangle { x: 12; y: parent.height - 26; width: 14; height: 14; radius: 7; color: Theme.plate2; border.width: 3; border.color: Theme.datum } } }
-                    Column { width: parent.width; spacing: 10
-                        Txt { kind: "h2"; text: "An empty plate"; anchors.horizontalCenter: parent.horizontalCenter }
-                        Txt { tone: 2; width: parent.width; horizontalAlignment: Text.AlignHCenter; lineHeight: 1.4; font.pixelSize: Theme.tLead - 1
-                            text: "Tell the agent on the left what you need: what it holds, where it goes, what you measured. It builds the part in a real CAD kernel and shows its work." } }
-                    Row { spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
-                        Btn { large: true; icon: "file_text"; text: "Start from a brief"; onClicked: Store.openSheet("new", { tab: "brief" }) }
-                        Btn { large: true; icon: "sliders_horizontal"; text: "Start from a recipe"; onClicked: Store.openSheet("new") }
-                        Btn { large: true; kind: "quiet"; icon: "box"; text: "Open an example"; onClicked: Store.openSheet("new", { examples: true }) } }
-                    Txt { kind: "fine"; tone: 4; width: parent.width; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
-                        text: "Designs are saved in " + Bridge.dataDirShort } } }
         }
     }
 }

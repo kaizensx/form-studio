@@ -14,11 +14,9 @@ Rectangle {
     readonly property bool landing: hero && empty      // home with nothing open: the prompt sits at the top, recent conversations under it
     property var openGroups: ({})             // step group key → unfolded
     property var presets: []
-    readonly property var ideas: [
-        "A case for a Raspberry Pi 5 with a snap-on lid",
-        "A Gridfinity bin, 3 × 1, for screwdrivers",
-        "The lightest wall hook that safely holds 5 kg"
-    ]
+    // starting points are learned from the person's designs (form/starters.py); on Home they are shown, pinned and
+    // edited in the Home pane (home workstream), so the landing column keeps only the composer and recent conversations
+    readonly property var ideas: talk.landing || !Store.starters ? [] : Store.starters.prompts.slice(0, 3).map(function (p) { return p.text })
     // suggestions for the open design, from its real state
     readonly property var forProject: {
         var d = Store.data, out = []
@@ -193,9 +191,9 @@ Rectangle {
                 }
             }
             // brief templates: guided questions first, then the agent designs it
-            Item { visible: !Store.project && talk.presets.length > 0; width: 1; height: 6 }
-            Txt { visible: !Store.project && talk.presets.length > 0; kind: "cap"; text: "Or answer a few questions first" }
-            Flow { visible: !Store.project && talk.presets.length > 0; width: sc.width; spacing: 6
+            Item { visible: !Store.project && !talk.landing && talk.presets.length > 0; width: 1; height: 6 }
+            Txt { visible: !Store.project && !talk.landing && talk.presets.length > 0; kind: "cap"; text: "Or answer a few questions first" }
+            Flow { visible: !Store.project && !talk.landing && talk.presets.length > 0; width: sc.width; spacing: 6
                 Repeater { model: Store.project ? [] : talk.presets
                     Rectangle { id: pc; required property var modelData
                         width: pt.implicitWidth + 20; height: 26; radius: 13; color: pm.pressed ? Theme.plate1 : pm.containsMouse ? Theme.plate3 : "transparent"; border.color: pm.containsMouse ? Theme.rule3 : Theme.rule2

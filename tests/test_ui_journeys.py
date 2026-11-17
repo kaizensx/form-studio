@@ -86,6 +86,11 @@ class Journeys(unittest.TestCase):
     def test_home(self):
         self.journey("home.py")
 
+    def test_starting_a_design(self):
+        # learned starters, the new-design sheet and its recipe library, archives, What's New; the community index
+        # is a local copy (tests/fixtures/community), so nothing is fetched
+        self.journey("starting.py", env_extra={"FORM_RECIPES_INDEX": str(HERE / "fixtures" / "community" / "index.json")})
+
     def test_sheets_palette_shortcuts(self):
         # installs and the upgrade are simulated, one item is reported missing so there is something to install,
         # and a newer release is pretended so the update sheet has something to offer
