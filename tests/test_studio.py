@@ -259,6 +259,40 @@ class Pipeline(unittest.TestCase):
         self.assertFalse(self.st.verify_release(p, rel)["intact"])
         self.st.run_sync(p["id"])
 
+    def test_08b_release_over_a_failed_check_needs_each_one_and_a_reason(self):
+        if not self.has_slicer:
+            self.skipTest("release needs a slice")
+        import copy
+        from unittest import mock
+        real = self.st.read
+
+        def failing(p, kind, key):                                  # the same revision, with one check failed
+            r = real(p, kind, key)
+            if kind == "checks":
+                r = copy.deepcopy(r)
+                c = next(c for c in r["checks"] if c["status"] == "PASS")
+                c["status"], c["value"] = "FAIL", "0.24 mm"
+            return r
+        with mock.patch.object(self.st, "read", side_effect=failing):
+            p = self.load()
+            g = self.st.gate(p)
+            self.assertFalse(g["ready"])
+            self.assertTrue(g["can_override"], g)
+            self.assertEqual(len(g["failures"]), 1)
+            warns = [w["id"] for w in g["warnings"]]
+            with self.assertRaises(StudioError):                   # not without acknowledging the failure
+                self.st.approve(p, warns, "fine")
+            with self.assertRaises(StudioError):                   # not without a reason
+                self.st.approve(p, warns, "", override_failures=[g["failures"][0]["id"]])
+            r = self.st.approve(p, warns, "Printed one already; the thin spot is cosmetic.",
+                                override_failures=[g["failures"][0]["id"]])
+        m = r["manifest"]
+        self.assertEqual([f["id"] for f in m["released_with_failed_checks"]], [g["failures"][0]["id"]])
+        self.assertIn("released with failed checks", m["evidence_level"])
+        report = (self.st.dir(p["id"]) / "releases" / r["release"] / "REPORT.md").read_text(encoding="utf-8")
+        self.assertIn("Released with failed checks", report)
+        self.assertIn("thin spot is cosmetic", report)
+
     def test_09_save_restore_round_trip(self):
         p = self.load()
         archive = self.st.export_archive(p).read_bytes()

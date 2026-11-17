@@ -155,6 +155,25 @@ class Thickness(unittest.TestCase):
         self.assertIn("Not a strength analysis", lg["not"])
         self.assertIn("mm", lg["unit"])
 
+    def test_parts_that_touch_are_not_a_thin_wall(self):
+        # a 5 mm plate with a 5 mm block resting on it: two parts, each 5 mm thick where they touch
+        from build123d import Compound
+        two = Compound([Box(40, 30, 5, align=A), Pos(0, 0, 5) * Box(20, 20, 5, align=A)])
+        thin, _ = kernel._thickness(put("touching", two))
+        self.assertGreater(thin["t"], 4.9)
+        r = an.op_analysis("touching", "x", {}, map="thickness", nozzle=0.4)
+        self.assertGreater(r["stats"]["min_mm"], 4.9)
+
+    def test_a_sharp_edge_is_not_a_wall_but_a_thin_fin_is(self):
+        # a wedge whose slanted side meets the floor at 45°: its edge tapers to nothing but has no wall
+        wedge = Solid.extrude(Face(Wire.make_polygon([(0, 0, 0), (20, 0, 0), (20, 0, 20)], close=True)), Vector(0, 30, 0))
+        thin, _ = kernel._thickness(put("wedge", wedge))
+        self.assertGreater(thin["t"], 2.0)
+        # a real 0.5 mm fin standing on a block still fails
+        fin = Box(30, 30, 4, align=A) + Pos(0, 0, 4) * Box(0.5, 20, 10, align=A)
+        thin, _ = kernel._thickness(put("fin", fin))
+        self.assertAlmostEqual(thin["t"], 0.5, places=2)
+
     def test_a_wall_under_two_perimeters_is_signal_coloured(self):
         put("tray06", tray(0.6))
         r = an.op_analysis("tray06", "x", {}, map="thickness", nozzle=0.4)

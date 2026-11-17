@@ -304,7 +304,7 @@ def _thickness(model, max_rays=1500):
     """Opposing-wall thickness by casting rays inward from surface samples."""
     from build123d import Vector
     from . import analysis
-    inter = analysis.intersector(model["shape"])
+    inter_for = analysis.wall_intersectors(model)     # each part measured on its own: parts touching are not walls
     total = sum(f["area"] for f in model["faces"]) or 1
     kmin = 3 if len(model["faces"]) * 3 <= max_rays * 2 else 0      # a mesh has thousands of faces: sample by area only
     best = {"t": float("inf")}
@@ -330,7 +330,7 @@ def _thickness(model, max_rays=1500):
                 n = f["face"].normal_at(Vector(*p))
             except Exception:
                 continue
-            hit = analysis.wall_hit(inter, p, (n.X, n.Y, n.Z))   # the same ray the thickness map casts
+            hit = analysis.wall_hit(inter_for(f["face"]), p, (n.X, n.Y, n.Z))   # the same ray the thickness map casts
             if hit is None:                                      # nothing opposite, or a wedge at an edge or chamfer, not a wall
                 continue
             w, qq = hit

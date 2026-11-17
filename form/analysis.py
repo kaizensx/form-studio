@@ -431,11 +431,16 @@ def overhang_colours(angle, cls) -> np.ndarray:
 
 # ── kernel side: rays on the B-rep ────────────────────────────────────────────
 
+WALL_PARALLEL = 0.866        # cos 30°: a wall's two faces are close to parallel; anything wider is a wedge at an edge
+
+
 def wall_hit(inter, p, n, outward: bool = False, want_face: bool = False):
     """One ray from surface point p along −n (into the material) or +n (across a gap) to the nearest opposing face.
 
-    Returns (distance, hit point) or None. A hit whose normal does not oppose n (a wedge at an edge or chamfer, not a
-    wall) is discarded. This is the single ray both the Thinnest-wall check and the thickness map cast.
+    Returns (distance, hit point) or None. A hit whose face is not within 30° of parallel to the start face is discarded:
+    that is a wedge where two faces meet at an edge or chamfer (a slanted side running into the plate face), not a
+    wall, and the slicer prints it as a tapered edge. This is the single ray both the Thinnest-wall check and the
+    thickness map cast.
     """
     from OCP.gp import gp_Dir, gp_Lin, gp_Pnt
     from build123d import Face, Vector
@@ -457,11 +462,41 @@ def wall_hit(inter, p, n, outward: bool = False, want_face: bool = False):
         opposed = -(m.X * n[0] + m.Y * n[1] + m.Z * n[2])
     except Exception:
         opposed = 1.0
-    if opposed < 0.5:
+    if opposed < WALL_PARALLEL:
         return None
     if want_face:
         return float(w), (q.X(), q.Y(), q.Z()), inter.Face(j)
     return float(w), (q.X(), q.Y(), q.Z())
+
+
+def wall_intersectors(model):
+    """face -> the intersector a wall ray from that face should use.
+
+    A wall is measured inside one part. In a design of several parts (a bolt in its nut, a lid on its box) a ray that
+    leaves one part's material and meets the next part's surface measures the contact between them, not a wall: so
+    each part gets an intersector of its own solid. One solid: the whole shape, as before."""
+    shape = model["shape"]
+    try:
+        solids = shape.solids()
+    except Exception:
+        solids = []
+    whole = intersector(shape)
+    if len(solids) <= 1:
+        return lambda face: whole
+    own = [None] * len(solids)
+    owner = {}
+    for i, sol in enumerate(solids):
+        for fc in sol.faces():
+            owner[hash(fc.wrapped)] = i
+
+    def pick(face):
+        i = owner.get(hash(face.wrapped))
+        if i is None:
+            return whole
+        if own[i] is None:
+            own[i] = intersector(solids[i])
+        return own[i]
+    return pick
 
 
 def intersector(shape):
@@ -550,13 +585,15 @@ def _rays(f, model, outward: bool = False):
     name = "gap" if outward else "wall"
     if name not in f:
         inter = intersector(model["shape"])
+        per_part = None if outward else wall_intersectors(model)     # a wall stays inside its own part
         S, N, reps = f["S"], f["N"], f["rep"]
         t = np.full(len(reps), np.nan)
         to = np.full((len(reps), 3), np.nan)
         index = {hash(x["face"].wrapped): i for i, x in enumerate(model["faces"])} if outward else {}
         touching = {}
         for g, i in enumerate(reps):
-            hit = wall_hit(inter, S[i], N[i], outward, want_face=outward)
+            ray = per_part(model["faces"][int(f["face_of"][i])]["face"]) if per_part else inter
+            hit = wall_hit(ray, S[i], N[i], outward, want_face=outward)
             if hit is None:
                 continue
             if outward:

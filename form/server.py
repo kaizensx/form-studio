@@ -538,7 +538,8 @@ def make_handler(st: Studio):
             if action == "test_piece":
                 return self._json(st.side_slice(p, "test_piece"))
             if action == "approve":
-                return self._json(st.approve(p, body.get("acknowledged", []), str(body.get("note", ""))[:500]))
+                return self._json(st.approve(p, body.get("acknowledged", []), str(body.get("note", ""))[:500],
+                                             override_failures=body.get("override_failures") or None))
             if action == "reference":
                 m2 = re.fullmatch(r"data:image/(png|jpeg|webp);base64,(.+)", body.get("data", ""), re.S)
                 if not m2:

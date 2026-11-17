@@ -14,6 +14,11 @@ Column {
     readonly property bool approved: !!ap && ap.state === "approved"
     readonly property var warnings: g && g.warnings ? g.warnings : []
     readonly property bool allAcked: warnings.every(function (w) { return Store.ack.indexOf(w.id) >= 0 })
+    // failed checks: a person may release over them, each one acknowledged and a reason written (never an agent)
+    readonly property var failures: g && g.can_override ? g.failures : []
+    readonly property bool overriding: failures.length > 0
+    readonly property bool allOverridden: failures.every(function (f) { return Store.ack.indexOf("fail:" + f.id) >= 0 })
+    property string noteText: ""
     readonly property var revs: p ? p.revisions.slice().sort(function (a, b) { return b.n - a.n }) : []
     readonly property bool hasStep: !!d && !!d.exports && !!d.exports.files.step
     readonly property bool noStep: !!d && !!d.exports && !d.exports.files.step
@@ -33,9 +38,11 @@ Column {
     }
     function approve() {
         approving = true
-        Store.ppost("/approve", { acknowledged: Store.ack, note: note.text }).then(function (r) {
+        var over = overriding ? failures.map(function (f) { return f.id }) : []
+        Store.ppost("/approve", { acknowledged: Store.ack, note: note.text, override_failures: over }).then(function (r) {
             approving = false
-            Store.toast("Released " + r.release, "Files copied with a hash manifest.")
+            Store.toast("Released " + r.release, over.length ? "Released with " + over.length + " failed check" + (over.length > 1 ? "s" : "") + ", recorded in its report."
+                                                              : "Files copied with a hash manifest.")
             Store.refresh()
         }, function (e) { approving = false; Store.fail(e) })
     }
@@ -75,7 +82,8 @@ Column {
                 Icon { anchors.centerIn: parent; size: 22; color: root.gateInk; name: root.approved ? "badge_check" : root.ready ? "shield_check" : "lock" } }
             Column { width: parent.width - 62; anchors.verticalCenter: seal.verticalCenter; spacing: 3
                 Txt { kind: "h2"; width: parent.width
-                    text: root.approved ? "Released" : root.ready ? (root.allAcked ? "Ready to approve" : "Ready, with warnings") : "Not ready" }
+                    text: root.approved ? "Released" : root.ready ? (root.allAcked ? "Ready to approve" : "Ready, with warnings")
+                        : root.overriding ? "Failed checks" : "Not ready" }
                 Txt { kind: "fine"; tone: 2; width: parent.width
                     text: root.p ? "Gate for " + F.pad(root.p.head) + (root.g ? " · " + root.g.evidence_level : "") : "" } } }
         Txt { kind: "fine"; width: parent.width; text: "A release is a frozen copy of files whose hashes match the revision they claim to be." }
@@ -87,8 +95,20 @@ Column {
         Note { visible: !!root.ap && root.ap.state === "superseded"; kind: "amber"
             title: visible ? F.pad(root.ap.rev) + " was released; " + F.pad(root.p.head) + " has not been." : ""
             text: visible ? "Changed since: " + (root.ap.changed || []).join(", ") + ". The earlier release folder is intact but is a different design." : "" }
-        Note { visible: !root.approved && !!root.g && root.g.reasons.length > 0; kind: "red"; title: "Not ready"
+        Note { visible: !root.approved && !!root.g && root.g.reasons.length > 0 && !root.overriding; kind: "red"; title: "Not ready"
             text: root.g ? root.g.reasons.join("\n") : "" }
+        Column { width: parent.width; spacing: 6; visible: !root.approved && root.overriding
+            Note { width: parent.width; kind: "red"; title: root.failures.length === 1 ? "1 check failed" : root.failures.length + " checks failed"
+                text: "Fix them, or release anyway: tick each one and say why in the release note. The release and its report will state that it was released with failed checks." }
+            Repeater { model: root.approved ? [] : root.failures
+                Item { id: fr; required property var modelData
+                    readonly property bool on: Store.ack.indexOf("fail:" + modelData.id) >= 0
+                    width: parent.width; implicitHeight: Math.max(ft.implicitHeight, 16) + 8
+                    Check { objectName: "overrideCheck"; y: 5; checked: fr.on; onToggled: function (c) { Store.setAck("fail:" + fr.modelData.id, c) } }
+                    Column { id: ft; x: 26; y: 4; width: parent.width - 26; spacing: 1
+                        Txt { text: "Release with: " + fr.modelData.label; width: parent.width; font.weight: 600 }
+                        Txt { kind: "fine"; tone: 2; text: String(fr.modelData.value) + " · failed"; width: parent.width; color: Theme.signal } }
+                    MouseArea { x: 20; width: parent.width - 20; height: parent.height; onClicked: Store.setAck("fail:" + fr.modelData.id, !fr.on) } } } }
         Column { width: parent.width; spacing: 6; visible: !root.approved && root.warnings.length > 0
             Txt { kind: "fine"; width: parent.width; text: "Acknowledge each warning to release with it" }
             Repeater { model: root.approved ? [] : root.warnings
@@ -101,10 +121,13 @@ Column {
                         Txt { kind: "fine"; tone: 2; text: String(wr.modelData.value); width: parent.width; color: Theme.amber } }
                     MouseArea { x: 20; width: parent.width - 20; height: parent.height; onClicked: Store.setAck(wr.modelData.id, !wr.on) } } } }
         Txt { visible: !root.approved; kind: "fine"; width: parent.width; text: root.g ? "Releasing states: " + root.g.evidence_level + "." : "" }
-        Field { id: note; visible: !root.approved; width: parent.width; placeholder: "Release note (optional)" }
+        Field { id: note; objectName: "releaseNote"; visible: !root.approved; width: parent.width
+            placeholder: root.overriding ? "Why release with failed checks? (required)" : "Release note (optional)"
+            onEdited: function (t) { root.noteText = t } }
         Btn { visible: !root.approved; kind: "primary"; icon: "shield_check"
-            text: root.p ? "Approve and release " + F.pad(root.p.head) : "Approve and release"
-            enabled: !!root.g && root.g.ready && root.allAcked && !Store.hasDraft && !root.approving
+            text: root.p ? (root.overriding ? "Release " + F.pad(root.p.head) + " with failed checks" : "Approve and release " + F.pad(root.p.head)) : "Approve and release"
+            enabled: !!root.g && (root.g.ready || (root.overriding && root.allOverridden && root.noteText.trim().length >= 3))
+                     && root.allAcked && !Store.hasDraft && !root.approving
             onClicked: root.approve() }
         Txt { kind: "fine"; width: parent.width; visible: !root.approved && Store.hasDraft
             text: "Commit or discard the draft first. Only a committed revision can be released." }

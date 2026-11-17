@@ -44,6 +44,8 @@ def prompts(ui):
 def hover_for(ui, card, name):
     """Hover a starter card until its hover-only button shows (synthetic hover can be missed on a busy runner)."""
     for _ in range(5):
+        ui.hover((4, 4))                     # leave first: the cards reorder under a resting pointer, so no hover arrives
+        ui.settle(100)
         ui.hover(card, 0.5, 0.5)
         ui.settle(300)
         b = ui.find(name=name, within=card)

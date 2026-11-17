@@ -18,6 +18,8 @@
 - **More slicers:** ElegooSlicer and Snapmaker Orca.
 - **Setup by itself.** First start installs what Form Studio needs and pauses only when you have to sign in or download something, then carries on once it is done. `form setup --auto` does the same headless.
 - **Exploded views for every multi-part design.** The enclosure and the gear pair declare how their parts go together, with interference and clearance checks; any design with several bodies gets As modelled and Exploded views.
+- **Thinnest wall measures walls, not contacts or edges.** In a design of several parts, a wall is now measured inside its own part: a bolt resting in its nut no longer reads as a 0 mm wall. A wedge where a slanted face meets another (a tapered edge at the plate) is no longer a wall either; only faces within 30° of parallel count. A real thin fin still fails.
+- **Release over failed checks, on the record.** A failed check no longer makes a release impossible: tick each failed check and write why, and the release, its manifest and its report say it was released with failed checks. Missing or stale files still block, and agents still cannot approve.
 - **What's New** after every update, once, and any time from About and Help.
 - **Update channel:** Stable (releases) or Preview (pre-releases from the `dev` branch), in Settings.
 - **A new website and README,** with every feature, a recipe gallery, documentation pages and a guide to contributing. Issue forms, discussions and labels on GitHub.

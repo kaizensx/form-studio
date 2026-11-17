@@ -1042,7 +1042,7 @@ class Studio:
     def gate(self, p: dict, status: dict | None = None) -> dict:
         status = status or self.status(p)
         keys = self.keys(p)
-        reasons, warns = [], []
+        reasons, warns, failures = [], [], []
         for n in NODES:
             st = status[n]
             if st["state"] != "current":
@@ -1051,25 +1051,42 @@ class Studio:
                 if n == "slice" and st.get("unavailable"):
                     why = "is blocked: " + st["unavailable"]
                 reasons.append(f"{NODE_LABEL[n]} {why}.")
+        blocking = list(reasons)                  # outputs that are missing, stale or failed: there is nothing to release
         ch = self.read(p, "checks", keys["checks"]) if status["checks"]["state"] == "current" else None
         if ch:
             for c in ch["checks"]:
                 if c["status"] == "FAIL":
                     reasons.append(f"Check failed: {c['label']} ({c['value']}).")
+                    failures.append({"id": c["id"], "label": c["label"], "value": c["value"]})
                 elif c["status"] == "WARN":
                     warns.append({"id": c["id"], "label": c["label"], "value": c["value"]})
         # a coupon calibrates the printer; only a result from this part speaks for this revision
         physical = [e for e in p["evidence"] if e["rev"] == p["head"] and (e["kind"] == "fit" or e.get("source") == "part")]
         level = "Geometry computed · slice simulated · " + ("physical result recorded for this revision" if physical else "not physically validated")
-        return {"ready": not reasons, "reasons": reasons, "warnings": warns, "evidence_level": level, "physical": len(physical)}
+        # a person may still release over failed checks: each one acknowledged and a reason written, and the release
+        # says so in its manifest and report. Missing or stale outputs always block: there would be no files to freeze.
+        return {"ready": not reasons, "reasons": reasons, "warnings": warns, "failures": failures, "blocking": blocking,
+                "can_override": not blocking and bool(failures), "evidence_level": level, "physical": len(physical)}
 
-    def approve(self, p: dict, acknowledged: list, note: str = "") -> dict:
+    def approve(self, p: dict, acknowledged: list, note: str = "", override_failures: list | None = None) -> dict:
+        """Release the head revision. Warnings must each be acknowledged. Failed checks block, unless the person
+        acknowledges every one of them in `override_failures` and writes the reason in `note`."""
         with self.lock(p["id"]):
             p = self.load(p["id"])
             status = self.status(p)
             g = self.gate(p, status)
+            overridden = []
             if not g["ready"]:
-                raise StudioError("This revision cannot be released yet.", " ".join(g["reasons"]), status=409)
+                if not g["can_override"] or not override_failures:
+                    raise StudioError("This revision cannot be released yet.", " ".join(g["reasons"]), status=409)
+                left = [f["label"] for f in g["failures"] if f["id"] not in override_failures]
+                if left:
+                    raise StudioError("Every failed check must be acknowledged to release with it.",
+                                      "Not acknowledged: " + ", ".join(left) + ".", status=409)
+                if len(note.strip()) < 3:
+                    raise StudioError("Say why this revision is released with failed checks.",
+                                      "The reason goes into the release note, the report and the manifest.", status=409)
+                overridden = g["failures"]
             missing = [w["label"] for w in g["warnings"] if w["id"] not in (acknowledged or [])]
             if missing:
                 raise StudioError("Every warning must be acknowledged before release.", "Unacknowledged: " + ", ".join(missing) + ".", status=409)
@@ -1102,7 +1119,8 @@ class Studio:
                 "orientation": p["orientation"], "slicer": {k: sl.get(k) for k in ("slicer_version", "presets", "time_s", "filament_g", "layers", "support_used")}
                           | {k: sl[k] for k in ("slicer_kind", "slicer_name") if k in sl},
                 "checks": [{k: c[k] for k in ("id", "label", "status", "value", "evidence")} for c in ch["checks"]],
-                "acknowledged_warnings": [w for w in g["warnings"]], "note": note, "evidence_level": g["evidence_level"],
+                "acknowledged_warnings": [w for w in g["warnings"]], "released_with_failed_checks": overridden,
+                "note": note, "evidence_level": g["evidence_level"] + (" · released with failed checks" if overridden else ""),
                 "documents": sorted(documents),
                 "physical_evidence": [e for e in p["evidence"] if e["rev"] == rev["n"] and (e["kind"] == "fit" or e.get("source") == "part")],
                 "limits": ["Slicer output is a simulation, not a print.", "No structural analysis was performed.",
@@ -1112,8 +1130,10 @@ class Studio:
             (rel / "MANIFEST.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
             (rel / "REPORT.md").write_text(self._report(p, manifest), encoding="utf-8")
             p["approvals"].append({"rev": rev["n"], "ts": manifest["approved"], "keys": keys, "release": rel.name, "note": note,
-                                   "acknowledged": [w["id"] for w in g["warnings"]]})
-            self.decide(p, "approval", f"r{rev['n']} approved and released as {rel.name}. {g['evidence_level']}.")
+                                   "acknowledged": [w["id"] for w in g["warnings"]], "overridden": [f["id"] for f in overridden]})
+            self.decide(p, "approval", f"r{rev['n']} approved and released as {rel.name}. {manifest['evidence_level']}."
+                        + (" Released with failed checks: " + ", ".join(f"{f['label']} ({f['value']})" for f in overridden)
+                           + f". Reason: {note.strip()}" if overridden else ""))
             self.save(p)
             return {"release": rel.name, "manifest": manifest}
 
@@ -1133,6 +1153,9 @@ class Studio:
         lines += [f"| {c['label']} | {c['status']} | {c['value']} | {c['evidence']} |" for c in m["checks"]]
         if m["acknowledged_warnings"]:
             lines += ["", "Warnings acknowledged at approval: " + ", ".join(w["label"] for w in m["acknowledged_warnings"]) + "."]
+        if m.get("released_with_failed_checks"):
+            lines += ["", "**Released with failed checks:** " + ", ".join(f"{f['label']} ({f['value']})" for f in m["released_with_failed_checks"])
+                      + f". Reason given at approval: {m.get('note') or '—'}"]
         if s.get("time_s"):
             lines += ["", "## Slice (simulated)", "", f"- {s.get('slicer_name') or 'Bambu Studio'} {s['slicer_version']}: {s['time_s']/60:.0f} min, {s['filament_g']:.1f} g, {s['layers']} layers, supports: {'yes' if s.get('support_used') else 'no'}",
                       "- Presets: " + " · ".join(v["name"] for v in s["presets"].values())]
