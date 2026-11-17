@@ -431,6 +431,76 @@ def _m_gemini_signin(platform, ctx) -> list[Method]:
                         "file on this computer and gives it only to Gemini CLI.")]
 
 
+# ---- more agent CLIs (chat workstream): install commands as each publisher documents them -------------------------
+
+def _m_agent_cli(npm: str = "", brew: str = "", curl: str = "", winget: str = "", docs: str = ""):
+    def methods(platform, ctx) -> list[Method]:
+        out = []
+        if curl and platform != "windows":
+            out.append(Method("script", "Official installer", commands=[curl], needs=("curl", "bash"),
+                              note="The publisher's install script. It installs into your home folder; no password needed."))
+        if brew and platform == "darwin":
+            out.append(Method("brew", "Homebrew", commands=[f"brew install {brew}"], needs=("brew",)))
+        if winget and platform == "windows":
+            out.append(Method("winget", "winget", commands=[f"winget install {winget}"], needs=("winget",)))
+        if npm:
+            out.append(Method("npm", "npm", commands=[f"npm install -g {npm}"], needs=("npm",),
+                              note="Needs Node.js. Installs for this user."))
+        if docs:
+            out.append(_open(docs, "Open the install guide"))
+        return out
+    return methods
+
+
+def _d_agent_signin(aid: str, label: str):
+    """Sign-in as the agent's adapter can tell it without a prompt or a network call."""
+    def detect(cfg, ctx) -> Found:
+        from .agents import ADAPTERS
+        ad = ADAPTERS[aid]
+        exe = ad.executable(cfg)
+        if not exe:
+            return Found("info", f"Install {label} first.")
+        s = ad.signin(cfg, exe) or {"signed_in": None, "how": "Not checked."}
+        return Found({True: "ok", False: "missing"}.get(s["signed_in"], "info"), s["how"])
+    return detect
+
+
+def _m_agent_signin(how: str, docs: str):
+    def methods(platform, ctx) -> list[Method]:
+        return [Method("docs", "How to sign in", kind="open", url=docs, note=how)]
+    return methods
+
+
+AGENT_CLIS = [
+    # (id, label, why, methods, sign-in note, docs)
+    ("cursor", "Cursor CLI", "Cursor's agent. Pick it per conversation; it runs on your own Cursor account.",
+     _m_agent_cli(curl="curl https://cursor.com/install -fsS | bash", docs="https://cursor.com/docs/cli/headless"),
+     "Run `cursor-agent login` once in a terminal, or set CURSOR_API_KEY.", "https://cursor.com/docs/cli/headless"),
+    ("opencode", "OpenCode", "An open-source agent that works with many model providers. Pick it per conversation.",
+     _m_agent_cli(npm="opencode-ai", brew="opencode", curl="curl -fsSL https://opencode.ai/install | bash",
+                  docs="https://opencode.ai/docs/"),
+     "Run `opencode auth login` once in a terminal to connect a provider.", "https://opencode.ai/docs/config"),
+    ("qwen", "Qwen Code", "Qwen's agent. Pick it per conversation; it runs on your own API key.",
+     _m_agent_cli(npm="@qwen-code/qwen-code@latest", brew="qwen-code", docs="https://github.com/QwenLM/qwen-code"),
+     "Run `qwen` once in a terminal to choose how it signs in, or set an API key (for example DASHSCOPE_API_KEY).",
+     "https://github.com/QwenLM/qwen-code"),
+    ("copilot", "GitHub Copilot CLI", "GitHub's agent. Pick it per conversation; it needs a GitHub Copilot plan.",
+     _m_agent_cli(npm="@github/copilot", brew="copilot-cli", winget="GitHub.Copilot",
+                  docs="https://github.com/github/copilot-cli"),
+     "Run `copilot` once in a terminal and use /login, or set COPILOT_GITHUB_TOKEN.",
+     "https://github.com/github/copilot-cli"),
+]
+
+
+def _agent_software() -> list["Software"]:
+    out = []
+    for aid, label, why, methods, how, docs in AGENT_CLIS:
+        out.append(Software(aid, label, why, "optional", "agents", _d_cli(aid, label), methods, homepage=docs))
+        out.append(Software(f"{aid}.signin", f"{label} sign-in", f"{label} answers only when it is signed in.",
+                            "optional", "agents", _d_agent_signin(aid, label), _m_agent_signin(how, docs), needs=(aid,)))
+    return out
+
+
 def _slicer(kind, label, why, brew, winget, flatpak, url, size, level) -> Software:
     return Software(f"slicer.{kind}", label, why, level, "slicer", _d_slicer(kind),
                     _app_methods(brew, winget, flatpak, url), size=size, homepage=url, one_of="slicer")
@@ -472,6 +542,7 @@ REGISTRY: list[Software] = [
              size="about 150 MB", homepage="https://github.com/google-gemini/gemini-cli"),
     Software("gemini.signin", "Gemini sign-in", "Gemini CLI answers only when it is signed in or has an API key.",
              "optional", "agents", _d_gemini_signin, _m_gemini_signin, needs=("gemini",)),
+    *_agent_software(),
     Software("agent.codex", "Form Studio tools in Codex", "Lets Codex call Form Studio.",
              "recommended", "agents", _d_agent("agent.codex", "Codex"), _m_agent("agent.codex")),
     Software("agent.gemini", "Form Studio tools in Gemini CLI", "Lets Gemini CLI call Form Studio.",

@@ -26,6 +26,8 @@ import uuid
 from pathlib import Path
 
 from . import agents as agents_mod
+from . import ask as ask_mod
+from .agents.models import Learned
 from .agents.base import Run, short as _short  # noqa: F401  (_short: kept for callers of the old name)
 from .conversations import ConversationError, Conversations
 
@@ -41,7 +43,11 @@ tool you call shows up there live (3D model, drafts, checks, slice), so you do n
 - Look up exact dimensions of commercial parts: find the official datasheet or mechanical drawing with web search,
   then open it with Form Studio's read_document (it shows PDF pages as images; web fetch loses a drawing's dimensions).
   Name the source. Put such numbers in params with group "brief" and the source in doc.
-- Ask the user only for measurements that change the fit or safety, and only when you cannot find them.
+- Ask the user only for measurements that change the fit or safety, or to settle an intent you cannot tell apart,
+  and only when you cannot find the answer yourself: use Form Studio's ask_user (one question at a time, with
+  choices when there are obvious options, at most three questions per task). Before an action the user should
+  agree to (deleting, replacing their design), ask_user with kind="confirm".
+- When the reply is done, call suggest_replies once with up to three short next steps the user might want.
 - Files the user attaches are listed at the end of their message with full paths. Look at images and PDFs before
   answering. A dimension read off a photo or sketch is an estimate: say so and record it as assumed, not measured.
   STEP/STL parts: import_reference(project, path), never read them as text.
@@ -70,13 +76,18 @@ def status(cfg: dict) -> dict:
     c = cfg.get("chat", {})
     on = c.get("enabled", True)
     ags = [a.status(cfg) for a in _adapters(cfg).values()] if on else []
+    if cfg.get("data", {}).get("dir"):                    # the versions each alias resolved to on its last run
+        learned = Learned(Path(cfg["data"]["dir"]))
+        learned.seed()
+        ags = [learned.decorate(a) for a in ags]
     d = defaults(cfg, ags)
     cur = next((a for a in ags if a["id"] == d["agent"] and a["available"]), None)
     note = None
     if not on:
         note = "Chat is off in studio.toml."
     elif not cur:
-        note = "Install Claude Code (claude) or Codex (codex) to chat here. Everything else works without it."
+        note = ("Install an agent CLI (Claude Code, Codex, Gemini CLI, Cursor, OpenCode, Qwen Code or GitHub Copilot) "
+                "to chat here. Everything else works without it.")
     return {"available": bool(cur), "cli": cur["cli"] if cur else None, "model": d["model"], "web": bool(c.get("web", True)),
             "note": note, "agents": ags, "default": d, "max_running": MAX_RUNNING,
             "label": cur["label"] if cur else "Claude Code"}
@@ -152,11 +163,16 @@ class ChatJob:
         self.before: set | None = None         # project ids that existed when the message was sent
         self.attachments: list[dict] = []
         self.stop_asked = False
+        self.ask = False                       # someone can answer ask_user (the app, or a terminal)
+        self.asked: set = set()                # question ids already shown in the conversation
+        self.waiting: dict | None = None       # the open question, while the agent waits for an answer
+        self.model_id: str | None = None       # the model the CLI reported for this run
+        self.head0: int | None = None          # the project's head revision when the message was sent
 
     def public(self, start: int = 0) -> dict:
         return {"id": self.id, "state": self.state, "session": self.session, "cost_usd": self.cost,
                 "events": self.events[start:], "next": len(self.events), "error": self.error, "live": self.live,
-                "conversation": self.conversation, "agent": self.agent,
+                "conversation": self.conversation, "agent": self.agent, "asking": self.waiting,
                 "seconds": round(time.time() - self.started, 1)}
 
 
@@ -165,6 +181,7 @@ class Chat:
         self.cfg, self.data, self.mcp = cfg, Path(data_dir), mcp_command
         self.adapters = adapters or _adapters(cfg)
         self.store = Conversations(self.data)
+        self.learned = Learned(self.data)
         self.jobs: dict[str, ChatJob] = {}
         self._lock = threading.Lock()
 
@@ -186,12 +203,19 @@ class Chat:
         j = self.job_for(cid)
         run = bool(j and j.state == "running")
         out.update({"state": "running" if run else "idle", "live": j.live if run else None, "job": j.id if run else None,
-                    "seconds": round(time.time() - j.started, 1) if run else None})
+                    "seconds": round(time.time() - j.started, 1) if run else None,
+                    "asking": j.waiting if run else None})
+        ad = self.adapters.get(out.get("agent"))
+        for ev in out.get("items", []):                  # conversations saved before model names were shown
+            if ev.get("t") == "start" and ev.get("model") and not ev.get("label"):
+                ev["label"] = ad.model_label(ev["model"]) if ad else ev["model"]
+        if out.get("resolved_model"):
+            out["resolved_label"] = ad.model_label(out["resolved_model"]) if ad else out["resolved_model"]
         return out
 
     def list(self, project: str | None = None, q: str | None = None) -> list[dict]:
-        busy = {j.conversation for j in self.running()}
-        return [dict(m, state="running" if m["id"] in busy else "idle") for m in self.store.list(project, q)]
+        busy = {j.conversation: ("asking" if j.waiting else "running") for j in self.running()}
+        return [dict(m, state=busy.get(m["id"], "idle")) for m in self.store.list(project, q)]
 
     def delete(self, cid: str) -> None:
         for j in self.running(cid):
@@ -200,7 +224,9 @@ class Chat:
 
     # ---- sending -----------------------------------------------------------------------------------------------
     def send(self, message: str, conversation: str | None = None, project: str | None = None, agent: str | None = None,
-             model: str | None = None, effort: str | None = None, attachments: list[str] | None = None) -> ChatJob:
+             model: str | None = None, effort: str | None = None, attachments: list[str] | None = None,
+             ask: bool = True) -> ChatJob:
+        """ask: a person can answer the agent's questions (the app; `form chat` in a terminal)."""
         message = (message or "").strip()
         if not message:
             raise RuntimeError("Write a message first.")
@@ -239,6 +265,8 @@ class Chat:
             job = ChatJob(message, meta.get("project") or project, session, cid, agent, model, effort or "")
             job.attachments = self.store.attachments(cid, attachments or [])
             job.before = self._project_ids()
+            job.ask = bool(ask)
+            job.head0 = self._head(job.project)
             user = {"t": "user", "text": message}
             if job.attachments:
                 user["attachments"] = job.attachments
@@ -263,6 +291,8 @@ class Chat:
         if not j or j.state != "running":
             return False
         j.stop_asked = True
+        if j.conversation:
+            ask_mod.close_all(self.ask_dir(j.conversation), "stopped")
         if j.proc and j.proc.poll() is None:
             try:
                 j.proc.terminate()
@@ -274,23 +304,87 @@ class Chat:
         """Record what another agent did while this conversation was open (shown as a quiet line)."""
         return self.store.append(cid, {"t": "act", "by": str(by)[:60], "text": str(text)[:400]})
 
+    # ---- questions from the agent (ask_user) -------------------------------------------------------------------
+    def ask_dir(self, cid: str) -> Path:
+        return self.store.dir(cid) / "ask"
+
+    def answer(self, cid: str, qid: str, text: str = "", choices: list | None = None) -> dict:
+        """The person's answer to the agent's question: handed to the waiting tool and kept in the conversation."""
+        try:
+            a = ask_mod.answer(self.ask_dir(cid), qid, text, choices)
+        except ask_mod.AskError as e:
+            raise ConversationError(str(e))
+        j = self.job_for(cid)
+        ev = {"t": "answer", "id": qid, "text": a["text"], "choices": a["choices"]}
+        if j and j.state == "running":
+            if j.waiting and j.waiting.get("id") == qid:
+                j.waiting = None
+            self._add(j, ev)
+            return ev
+        return self.store.append(cid, ev)
+
+    def _watch_asks(self, job: ChatJob) -> None:
+        """While the agent runs: show each new question in the conversation, and close the ones nobody answered."""
+        folder = self.ask_dir(job.conversation)
+        while job.state == "running":
+            try:
+                for q in ask_mod.questions(folder):
+                    if q["id"] not in job.asked and q["state"] == "open":
+                        job.asked.add(q["id"])
+                        self._add(job, {"t": "ask", "id": q["id"], "question": q["question"], "choices": q["choices"],
+                                        "multi": q["multi"], "free": q["free"], "why": q["why"], "kind": q["kind"],
+                                        "timeout": q.get("timeout")})
+                        job.waiting = {k: q[k] for k in ("id", "question", "choices", "multi", "free", "why", "kind")}
+                    elif q["id"] in job.asked and q["state"] == "closed" and job.waiting and job.waiting["id"] == q["id"]:
+                        job.waiting = None
+                        self._add(job, {"t": "answer", "id": q["id"], "closed": q.get("reason") or "timeout"})
+            except (OSError, ConversationError):
+                pass
+            time.sleep(0.2)
+
+    def _close_asks(self, job: ChatJob) -> None:
+        if not job.conversation:
+            return
+        reason = "stopped" if job.stop_asked else "ended"
+        ask_mod.close_all(self.ask_dir(job.conversation), reason)
+        if job.waiting:
+            self._add(job, {"t": "answer", "id": job.waiting["id"], "closed": reason})
+            job.waiting = None
+
     # ---- one run -----------------------------------------------------------------------------------------------
+    def _head(self, pid: str | None) -> int | None:
+        if not pid:
+            return None
+        try:
+            return int(json.loads((self.data / pid / "project.json").read_text(encoding="utf-8")).get("head"))
+        except (OSError, ValueError, TypeError):
+            return None
+
     def _project_ids(self) -> set:
         try:
             return {d.name for d in self.data.iterdir() if (d / "project.json").exists()}
         except OSError:
             return set()
 
-    def _mcp(self) -> dict:
+    def _mcp(self, job: ChatJob | None = None) -> dict:
         # the launcher path may contain spaces ("Application Support"): never split it
         if getattr(sys, "frozen", False):           # the packaged app is its own MCP server; never a form-mcp on PATH
             cmd0, args0 = sys.executable, ["-m", "form.mcp_server"]
         else:
             cmd0, args0 = (self.mcp, []) if Path(self.mcp).exists() else (sys.executable, ["-m", "form.mcp_server"])
         env = {"FORM_DATA": str(self.data)}
-        if Path(str(self.cfg.get("_path", ""))).exists():
+        if self.cfg.get("_path") and Path(str(self.cfg["_path"])).exists():
             env["FORM_CONFIG"] = self.cfg["_path"]
+        if job is not None and job.ask and job.conversation:          # ask_user reaches this conversation
+            env[ask_mod.ENV_DIR] = str(self.ask_dir(job.conversation))
+            env[ask_mod.ENV_TIMEOUT] = str(int(self._ask_timeout()))
         return {"command": cmd0, "args": args0 + ["--no-bench"], "env": env}
+
+    def _ask_timeout(self) -> float:
+        try:
+            return max(30.0, float(self.cfg.get("chat", {}).get("ask_timeout_s", ask_mod.DEFAULT_TIMEOUT)))
+        except (TypeError, ValueError):
+            return ask_mod.DEFAULT_TIMEOUT
 
     def _prompt(self, job: ChatJob, with_recap: bool) -> str:
         parts = []
@@ -317,6 +411,8 @@ class Chat:
         c = self.cfg.get("chat", {})
         cwd = self.store.dir(job.conversation) if job.conversation else self.data
         had_history = bool(job.conversation) and self.store.meta(job.conversation).get("messages", 0) > 1
+        if job.conversation:
+            threading.Thread(target=self._watch_asks, args=(job,), daemon=True, name=f"form-ask-{job.id}").start()
         try:
             for attempt in (1, 2):
                 tmp = Path(tempfile.mkdtemp(prefix="form-chat-"))
@@ -324,7 +420,8 @@ class Chat:
                 files = [fdir / a["file"] for a in job.attachments]
                 run = Run(message=self._prompt(job, with_recap=had_history and not job.session),
                           system=PROMPT.format(project=job.project or "none (start a new one if asked)"),
-                          model=job.model, effort=job.effort, session=job.session, cwd=cwd, scratch=tmp, mcp=self._mcp(),
+                          model=job.model, effort=job.effort, session=job.session, cwd=cwd, scratch=tmp, mcp=self._mcp(job),
+                          tool_timeout_s=self._ask_timeout() + 300,
                           web=bool(c.get("web", True)), budget_usd=float(c.get("budget_usd_per_message", 3.0)),
                           images=[f for f, a in zip(files, job.attachments) if a["kind"] == "image"], files=files)
                 job.parser = adapter.parser()
@@ -334,13 +431,15 @@ class Chat:
                     cmd = adapter.command(run, exe)
                     job.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
                                                 text=True, encoding="utf-8", errors="replace", cwd=str(cwd), bufsize=1,
-                                                env=dict(os.environ, **getattr(adapter, "env", {}), **secrets.agent_env(adapter.id)))
+                                                env=dict(os.environ, **getattr(adapter, "env", {}), **secrets.agent_env(adapter.id),
+                                                         **adapter.run_env(run)))
                     err_buf: list[str] = []
                     drain = threading.Thread(target=lambda p=job.proc: err_buf.extend(p.stderr), daemon=True)
                     drain.start()
                     for line in job.proc.stdout:
                         self._event(job, line)
                     job.proc.wait()
+                    self._event(job, None)                      # what the parser still owes (CLIs without an end event)
                     drain.join(timeout=2)
                     err_text = "".join(err_buf)
                     for pipe in (job.proc.stdout, job.proc.stderr):
@@ -362,6 +461,7 @@ class Chat:
                         self.store.update(job.conversation, session=None, session_agent=None)
                     continue
                 break
+            self._close_asks(job)                           # before the state changes: a reader sees it with the end
             ended = any(e["t"] == "end" for e in job.events[n0:])
             # Save the last events first and only then say the job is over: a reader that sees "failed" or
             # "stopped" must also find its error or end event (found on a slow Windows runner).
@@ -388,6 +488,7 @@ class Chat:
             job.state = "failed"
         finally:
             job.live = None
+            self._close_asks(job)
 
     def _add(self, job: ChatJob, ev: dict) -> None:
         if job.conversation:
@@ -403,7 +504,8 @@ class Chat:
         """One line of the CLI's output: update what is live, save what is finished."""
         if job.parser is None:
             job.parser = self.adapters[job.agent].parser()
-        for ev in job.parser.feed(line):
+        adapter = self.adapters[job.agent]
+        for ev in (job.parser.finish() if line is None else job.parser.feed(line)):
             t = ev["t"]
             if t == "live":
                 job.live = ev["live"]
@@ -422,22 +524,71 @@ class Chat:
             if t == "start":
                 ev["agent"] = job.agent
                 ev["asked"] = job.model
+                if ev.get("model"):
+                    job.model_id = ev["model"]
+                    ev["label"] = adapter.model_label(ev["model"])
+                    self.learned.learn(job.agent, job.model, ev["model"], ev["label"])
             elif t == "tool":
                 job.steps += 1
                 job.tools[ev.get("id")] = ev.get("name", "")
             elif t == "result":
                 full = ev.pop("full", "") or ""
                 self._enrich(job, ev, full)
+                if ev.get("name") == "suggest_replies" and ev.get("ok"):
+                    opts = self._suggestions(full)
+                    self._add(job, ev)
+                    if opts:
+                        self._add(job, {"t": "suggest", "options": opts})
+                    continue
             elif t == "end":
                 job.cost = ev.get("cost_usd")
                 err = ev.pop("error", None)
                 ev.update({"steps": job.steps, "seconds": round(time.time() - job.started, 1), "agent": job.agent})
+                self._end_model(job, adapter, ev)
+                pid = job.project
+                h1 = self._head(pid)
+                if pid and h1 is not None and h1 != job.head0:
+                    ev["change"] = {"project": pid, "from": job.head0, "to": h1}
                 self._add(job, ev)
                 if err:
                     job.error = str(err)
                     self._add(job, {"t": "error", "text": job.error})
                 continue
             self._add(job, ev)
+
+    def _end_model(self, job: ChatJob, adapter, ev: dict) -> None:
+        """Name the model on the reply's footer: from the stream, or from the CLI's own files when it did not say."""
+        model = ev.pop("model", None) or job.model_id
+        if not model:
+            try:
+                model = adapter.resolve_model(job.session)
+            except Exception:
+                model = None
+            if model and job.conversation:
+                try:
+                    self.store.update(job.conversation, resolved_model=model)
+                except ConversationError:
+                    pass
+        if model:
+            if model != job.model_id:
+                self.learned.learn(job.agent, job.model, model, adapter.model_label(model))
+            job.model_id = model
+            ev["model"], ev["label"] = model, adapter.model_label(model)
+
+    @staticmethod
+    def _suggestions(full: str) -> list[str]:
+        try:
+            d = json.loads(full)
+            opts = d.get("shown") if isinstance(d, dict) else None
+        except ValueError:
+            opts = None
+        if opts is None:
+            m = re.search(r"\[.*\]", full, re.S)
+            try:
+                opts = json.loads(m.group(0)) if m else []
+            except ValueError:
+                opts = []
+        return ask_mod.clean_suggestions(opts if isinstance(opts, list) else [])
 
     def _enrich(self, job: ChatJob, ev: dict, full: str) -> None:
         """Make a tool result useful to the page: the render it produced, the project it created."""
@@ -477,7 +628,7 @@ def main_chat(argv: list[str]) -> int:
     ap.add_argument("message")
     ap.add_argument("--project")
     ap.add_argument("--conversation", help="continue this conversation (id from `form conversations list`)")
-    ap.add_argument("--agent", help="claude, codex or gemini (default: [chat] agent)")
+    ap.add_argument("--agent", help="claude, codex, gemini, cursor, opencode, qwen or copilot (default: [chat] agent)")
     ap.add_argument("--model", help="a model alias or id the agent's CLI accepts (default: [chat] model)")
     ap.add_argument("--effort")
     ap.add_argument("--attach", action="append", default=[], metavar="FILE", help="image, PDF, STEP or STL (repeat)")
@@ -502,7 +653,8 @@ def main_chat(argv: list[str]) -> int:
             ids = [chat.store.attach(cid, Path(f))["id"] for f in a.attach]
         else:
             ids = []
-        job = chat.send(a.message, cid, a.project, a.agent, a.model, a.effort, ids)
+        interactive = not a.json and sys.stdin.isatty()     # someone at this terminal can answer the agent's questions
+        job = chat.send(a.message, cid, a.project, a.agent, a.model, a.effort, ids, ask=interactive)
     except (RuntimeError, ConversationError) as e:
         return fail(str(e))
     seen, shown_live = 1, 0
@@ -519,7 +671,12 @@ def main_chat(argv: list[str]) -> int:
                     continue
                 t = ev["t"]
                 if t == "start":
-                    print(f"[{ev.get('agent')} · model {ev.get('model') or 'not reported'}]", file=sys.stderr, flush=True)
+                    name = ev.get("label") or ev.get("model") or "not reported"
+                    print(f"[{ev.get('agent')} · model {name}]", file=sys.stderr, flush=True)
+                elif t == "ask" and interactive:
+                    _ask_terminal(chat, job, ev)
+                elif t == "suggest":
+                    print("  next: " + " | ".join(ev.get("options", [])), file=sys.stderr, flush=True)
                 elif t == "text":
                     print(ev["text"][shown_live:] if shown_live else ev["text"], flush=True)
                     shown_live = 0
@@ -546,6 +703,43 @@ def main_chat(argv: list[str]) -> int:
         print(json.dumps({"t": "done", "state": job.state, "conversation": job.conversation, "session": job.session,
                           "cost_usd": job.cost, "error": job.error}, ensure_ascii=False), flush=True)
     return 0 if job.state == "done" else 1
+
+
+def ask_parse(reply: str, q: dict) -> tuple[list[str], str]:
+    """A terminal answer: numbers pick choices ("1" or "1,3"), anything else is the answer in words."""
+    cs, r = q.get("choices") or [], reply.strip()
+    nums = [x for x in re.split(r"[,\s]+", r) if x]
+    if cs and nums and all(x.isdigit() and 1 <= int(x) <= len(cs) for x in nums):
+        picked = [cs[int(x) - 1] for x in nums]
+        return (picked if q.get("multi") else picked[:1]), ""
+    if cs and r in cs:
+        return [r], ""
+    return [], r
+
+
+def _ask_terminal(chat: "Chat", job: ChatJob, q: dict) -> None:
+    print("\n? " + q.get("question", ""), file=sys.stderr, flush=True)
+    if q.get("why"):
+        print("  (" + q["why"] + ")", file=sys.stderr, flush=True)
+    for i, c in enumerate(q.get("choices") or [], 1):
+        print(f"  {i}. {c}", file=sys.stderr, flush=True)
+    hint = ("numbers, comma-separated" if q.get("multi") else "a number") if q.get("choices") else ""
+    hint += (" or " if hint else "") + "your answer" if q.get("free") else ""
+    while True:
+        try:
+            reply = input(f"  answer ({hint}): ")
+        except EOFError:
+            return
+        picked, text = ask_parse(reply, q)
+        if not picked and not text:
+            continue
+        try:
+            chat.answer(job.conversation, q["id"], text, picked)
+            return
+        except ConversationError as e:
+            print(f"  {e}", file=sys.stderr, flush=True)
+            if "Pick" not in str(e):
+                return
 
 
 def main_conversations(argv: list[str]) -> int:

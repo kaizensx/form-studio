@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tomllib
 from pathlib import Path
 
@@ -137,6 +138,44 @@ class Codex(Adapter):
                         "efforts": [x.get("effort") for x in m.get("supported_reasoning_levels") or [] if isinstance(x, dict) and x.get("effort")]})
         return out
 
+    def signin(self, cfg, exe):
+        if os.environ.get("OPENAI_API_KEY") or os.environ.get("CODEX_API_KEY"):
+            return {"signed_in": True, "how": "An OpenAI API key is set in the environment."}
+        if (_home() / "auth.json").exists():
+            return {"signed_in": True, "how": "Signed in to Codex on this computer."}
+        return {"signed_in": False, "how": "Not signed in. Run `codex login` once in a terminal."}
+
+    def resolve_model(self, session):
+        """Codex's stream does not name the model; its own session file does (turn_context.model)."""
+        if not session or not re.fullmatch(r"[0-9a-fA-F-]{8,64}", str(session)):
+            return None
+        files = sorted((_home() / "sessions").glob(f"*/*/*/rollout-*{session}.jsonl"))
+        model = None
+        for f in files[-1:]:
+            try:
+                with open(f, encoding="utf-8") as fh:
+                    for line in fh:
+                        if '"turn_context"' not in line:
+                            continue
+                        try:
+                            p = json.loads(line).get("payload") or {}
+                        except ValueError:
+                            continue
+                        model = p.get("model") or model
+            except OSError:
+                pass
+        return model
+
+    def model_label(self, model_id):
+        try:
+            cache = json.loads((_home() / "models_cache.json").read_text(encoding="utf-8"))
+            for m in cache.get("models", []):
+                if isinstance(m, dict) and m.get("slug") == model_id and m.get("display_name"):
+                    return m["display_name"]
+        except (OSError, ValueError, AttributeError):
+            pass
+        return super().model_label(model_id)
+
     def efforts(self, cfg, exe):
         # model_reasoning_effort is a Codex config key; per-model lists come with each model above
         return ["low", "medium", "high"]
@@ -149,7 +188,9 @@ class Codex(Adapter):
                 "-c", "sandbox_mode=" + _toml("read-only"),
                 "-c", "mcp_servers.form.command=" + _toml(run.mcp.get("command", "")),
                 "-c", "mcp_servers.form.args=" + _toml(run.mcp.get("args", [])),
-                "-c", "mcp_servers.form.env=" + _toml(run.mcp.get("env", {}))]
+                "-c", "mcp_servers.form.env=" + _toml(run.mcp.get("env", {})),
+                # Codex stops waiting for an MCP tool after tool_timeout_sec; ask_user waits for a person
+                "-c", "mcp_servers.form.tool_timeout_sec=" + _toml(int(run.tool_timeout_s))]
         if run.model and run.model != "default":
             cmd += ["-m", run.model]
         if run.effort:

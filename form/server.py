@@ -303,7 +303,7 @@ def make_handler(st: Studio):
             if path == "/api/conversations/send":           # first message of a new conversation
                 cid = None
             else:
-                m = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/(send|stop|rename|pin|delete|attach|settings|note)", path)
+                m = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/(send|stop|rename|pin|delete|attach|settings|note|answer)", path)
                 if not m:
                     raise StudioError("Not found.", status=404)
                 cid, verb = m.group(1), m.group(2)
@@ -316,6 +316,9 @@ def make_handler(st: Studio):
                 if verb == "delete":
                     self._conv(lambda: st.chat.delete(cid))
                     return self._json({"deleted": cid})
+                if verb == "answer":                        # the person's answer to the agent's ask_user question
+                    return self._json(self._conv(lambda: st.chat.answer(cid, str(body.get("id", "")), str(body.get("text") or ""),
+                                                                        [str(c) for c in (body.get("choices") or [])])))
                 if verb == "note":
                     return self._json(self._conv(lambda: st.chat.note(cid, body.get("by", "agent"), body.get("text", ""))))
                 if verb == "settings":

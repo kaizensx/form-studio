@@ -79,6 +79,9 @@ class Journeys(unittest.TestCase):
     def test_conversations(self):
         self.journey("chat.py")
 
+    def test_chat_ask_fix(self):
+        self.journey("chat_ask.py")
+
     def test_home(self):
         self.journey("home.py")
 

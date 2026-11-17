@@ -111,6 +111,13 @@ Rectangle {
                         NumberAnimation on x { running: nd.s === "running"; from: -40; to: 160; duration: 900; loops: Animation.Infinite; easing.type: Easing.InOutQuad } } }
                 MouseArea { id: nm; anchors.fill: parent; hoverEnabled: true
                     onClicked: (nd.nid === "release" && pl.dirty && !Store.job) ? Store.run() : Store.setStage(nd.modelData.stage) }
+                // a failed step: hand it to the agent (on hover; the strip stays quiet otherwise)
+                FixBtn { objectName: "fixPipeline"; compact: true; z: 2
+                    anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
+                    visible: nd.s === "failed" && !pl.tiny && Store.chatReady && !!Store.chat.available && (nm.containsMouse || hovered)
+                    subject: "the " + nd.modelData.label.toLowerCase() + " step failed for " + pl.rev
+                    details: pl.st[nd.nid] && pl.st[nd.nid].error ? "Pipeline step: " + nd.nid + "\nError: " + pl.st[nd.nid].error.message
+                        + (pl.st[nd.nid].error.hint ? "\nHint: " + pl.st[nd.nid].error.hint : "") : "Pipeline step: " + nd.nid }
                 Tip { show: nm.containsMouse
                     text: (pl.narrow && nd.say ? nd.modelData.label + ": " + nd.say + "\n" : "")
                         + (nd.nid === "params" && nd.what ? pl.rev + ": " + nd.what

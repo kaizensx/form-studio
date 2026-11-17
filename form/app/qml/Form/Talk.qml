@@ -36,6 +36,7 @@ Rectangle {
 
     function liveText() {
         var L = Store.chatLive, who = Store.chatAgentLabel
+        if (Store.chatAsking) return who + " is waiting for your answer"
         if (!L) return who + " is thinking…"
         if (L.kind === "tool") return (L.name === "create_design" || L.name === "update_design") ? "Writing design code… " + (L.chars / 1000).toFixed(1) + " kB" : "Calling " + L.name + "…"
         if (L.kind === "text") return "Writing…"
@@ -50,24 +51,43 @@ Rectangle {
     // ── the feed as blocks: messages, folded step groups, footers ──
     ListModel { id: blocks }
     function build() {
-        var out = [], items = Store.chatItems, group = null, model = "", agent = ""
+        var out = [], items = Store.chatItems, group = null, model = "", agent = "", answers = ({})
+        for (var a = 0; a < items.length; a++) if (items[a].t === "answer") answers[items[a].id] = items[a]
         for (var i = 0; i < items.length; i++) {
             var ev = items[i]
+            if (ev.t === "tool" && ev.name === "suggest_replies") continue      // shown as the follow-up chips, not as a step
             if (ev.t === "tool") {
                 if (!group) { group = { t: "steps", k: "s" + i, steps: [] }; out.push(group) }
-                group.steps.push({ id: ev.id, tool: ev.name, input: ev.input })
+                group.steps.push({ id: ev.id, tool: ev.name, input: ev.input, ts: ev.ts || 0 })
                 continue
             }
-            if (ev.t === "start") { model = ev.model || ""; agent = ev.agent || ""; continue }
+            if (ev.t === "start") { model = Store.modelName(ev); agent = ev.agent || ""; continue }
+            if (ev.t === "answer") continue
             group = null
+            if (ev.t === "ask") {
+                out.push({ t: "ask", k: "q" + i, q: { id: ev.id, question: ev.question, choices: ev.choices || [], multi: !!ev.multi, free: ev.free !== false,
+                                                     why: ev.why || "", kind: ev.kind || "question", answer: answers[ev.id] || null,
+                                                     open: !!Store.chatAsking && Store.chatAsking.id === ev.id && !answers[ev.id] } })
+                continue
+            }
+            if (ev.t === "suggest") { out.push({ t: "suggest", k: "g" + i, options: ev.options || [] }); continue }
             if (ev.t === "user") out.push({ t: "user", k: "u" + i, text: ev.text, attachments: ev.attachments || [], local: !!ev.local })
             else if (ev.t === "text") out.push({ t: "text", k: "t" + i, text: ev.text })
             else if (ev.t === "act") out.push({ t: "act", k: "a" + i, by: ev.by, text: ev.text })
-            else if (ev.t === "end") out.push({ t: "end", k: "e" + i, cost: ev.cost_usd, steps: ev.steps, seconds: ev.seconds, stopped: !!ev.stopped, model: model, agent: ev.agent || agent })
+            else if (ev.t === "end") out.push({ t: "end", k: "e" + i, cost: ev.cost_usd, steps: ev.steps, seconds: ev.seconds, stopped: !!ev.stopped,
+                                                model: Store.modelName(ev) || model, agent: ev.agent || agent, change: ev.change || null })
             else if (ev.t === "error") out.push({ t: "error", k: "x" + i, text: ev.text })
         }
+        // follow-ups: only the newest, only until you write again, and shown under the reply's footer
+        var sg = -1
+        for (var g = 0; g < out.length; g++) if (out[g].t === "suggest") sg = g
+        var keep = sg >= 0 && !Store.chatBusy && !out.slice(sg).some(function (b) { return b.t === "user" || b.t === "error" })
+        var tip = keep ? out[sg] : null
+        out = out.filter(function (b) { return b.t !== "suggest" })
+        if (tip && tip.options.length) out.push(tip)
         if (out.length) {
             var last = out[out.length - 1]
+            if (last.t === "suggest" && out.length > 1) last = out[out.length - 2]
             if (last.t === "steps") last.running = Store.chatBusy
             if (last.t === "end" || last.t === "error") last.last = !Store.chatBusy
         }
@@ -85,6 +105,7 @@ Rectangle {
     Connections { target: Store
         function onChatItemsChanged() { talk.sync() }
         function onChatBusyChanged() { talk.sync() }
+        function onChatAskingChanged() { talk.sync() }
         function onConvIdChanged() { talk.openGroups = ({}); feed.stick = true }
         function onChatFocusChanged() { ta.forceActiveFocus() }
         function onChatRecallChanged() { if (Store.chatRecall) { ta.text = Store.chatRecall; ta.cursorPosition = ta.text.length } } }
@@ -100,7 +121,7 @@ Rectangle {
         Item { id: sw; objectName: "convSwitch"; x: 8; width: parent.width - 16 - tools.width; height: 28; anchors.verticalCenter: parent.verticalCenter
             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: swm.pressed ? Theme.washPress : swm.containsMouse || list.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
             Rectangle { id: sdot; x: 8; width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter
-                color: Store.chatBusy ? Theme.datum : Store.chatReady ? Theme.pass : Theme.ink4
+                color: Store.chatAsking ? Theme.amber : Store.chatBusy ? Theme.datum : Store.chatReady ? Theme.pass : Theme.ink4
                 SequentialAnimation on opacity { running: Store.chatBusy; loops: Animation.Infinite; alwaysRunToEnd: true
                     NumberAnimation { to: 0.3; duration: 600 } NumberAnimation { to: 1; duration: 600 } } }
             Txt { id: ttl; x: 23; anchors.verticalCenter: parent.verticalCenter; font.weight: Theme.wSemi; wrapMode: Text.NoWrap; elide: Text.ElideRight
@@ -218,7 +239,8 @@ Rectangle {
             width: feed.width; implicitHeight: body.item ? body.item.implicitHeight : 0; height: implicitHeight
             HoverHandler { id: hh }
             Loader { id: body; x: 16; width: parent.width - 32
-                sourceComponent: it.m.t === "user" ? cUser : it.m.t === "text" ? cText : it.m.t === "steps" ? cSteps : it.m.t === "act" ? cAct : it.m.t === "end" ? cEnd : cErr }
+                sourceComponent: it.m.t === "user" ? cUser : it.m.t === "text" ? cText : it.m.t === "steps" ? cSteps : it.m.t === "act" ? cAct
+                               : it.m.t === "end" ? cEnd : it.m.t === "ask" ? cAsk : it.m.t === "suggest" ? cSuggest : cErr }
             // actions on hover: copy, and for your own message, edit and send again
             Rectangle { readonly property bool want: (hh.hovered || cb.hovered || eb.hovered) && (it.m.t === "user" || it.m.t === "text") && !it.m.local
                 opacity: want ? 1 : 0; visible: opacity > 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } }
@@ -251,20 +273,40 @@ Rectangle {
                                     HoverHandler { id: ah }
                                     Tip { show: ah.hovered; text: ach.modelData.name } } } }
                         Txt { id: ut; width: Math.min(implicitWidth, body.width - 54); text: it.m.text; lineHeight: 1.4 } } } } }
-            Component { id: cText; Md { objectName: "replyText"; source: it.m.text; width: body.width } }
+            Component { id: cText; Md { objectName: "replyText"; source: it.m.text; width: body.width; revs: true } }
+            Component { id: cAsk; TalkAsk { width: body.width; q: it.m.q } }
+            // what you might say next, offered by the agent (suggest_replies): one click sends it
+            Component { id: cSuggest; Flow { objectName: "suggestions"; width: body.width; spacing: 6
+                Repeater { model: it.m.options
+                    Rectangle { id: sgc; objectName: "suggestChip"; required property string modelData; required property int index
+                        width: Math.min(body.width, sgt.implicitWidth + 40); height: 28; radius: 14
+                        color: sgm.pressed ? Theme.washPress : sgm.containsMouse ? Theme.plate3 : "transparent"; border.color: sgm.containsMouse ? Theme.rule3 : Theme.rule2
+                        Behavior on color { Tint {} }
+                        opacity: 0; Component.onCompleted: sgIn.start()
+                        SequentialAnimation { id: sgIn; PauseAnimation { duration: 60 + sgc.index * Theme.stagger }
+                            Glide { target: sgc; property: "opacity"; to: 1; duration: Theme.base } }
+                        Icon { x: 11; name: "corner_down_left"; size: 11; color: sgm.containsMouse ? Theme.datum : Theme.ink4; anchors.verticalCenter: parent.verticalCenter }
+                        Txt { id: sgt; x: 27; width: parent.width - 38; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; elide: Text.ElideRight; wrapMode: Text.NoWrap
+                            text: sgc.modelData; tone: sgm.containsMouse ? 1 : 2 }
+                        MouseArea { id: sgm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; enabled: Store.chatReady
+                            onClicked: Store.send(sgc.modelData) }
+                        Tip { show: sgm.containsMouse && sgt.truncated; text: sgc.modelData } } } } }
             Component { id: cSteps; TalkSteps { objectName: "stepGroup"; width: body.width; steps: it.m.steps; running: !!it.m.running
                 expanded: !!talk.openGroups[it.k]
                 onToggle: { var o = Object.assign({}, talk.openGroups); o[it.k] = !o[it.k]; talk.openGroups = o } } }
             Component { id: cAct; Row { spacing: 6
                 Icon { name: "zap"; size: 12; color: Theme.blueprint; anchors.verticalCenter: parent.verticalCenter }
                 Txt { kind: "fine"; width: body.width - 20; text: it.m.by + "  " + it.m.text; color: Theme.ink2 } } }
-            Component { id: cEnd; Item { implicitHeight: 22
+            Component { id: cEnd; Column { spacing: 8
+              Item { width: body.width; height: 22
                 Txt { id: ft; kind: "fine"; mono: true; tone: 3; anchors.verticalCenter: parent.verticalCenter; width: Math.min(implicitWidth, parent.width - (rb.visible ? rb.width + 6 : 0)); elide: Text.ElideRight; wrapMode: Text.NoWrap
                     text: (it.m.stopped ? "stopped · " : "") + F.plural(it.m.steps || 0, "step") + " · " + talk.secs(it.m.seconds)
                         + (it.m.cost !== null && it.m.cost !== undefined ? " · " + talk.money(it.m.cost) : it.m.stopped ? "" : " · cost not reported")
                         + (it.m.model ? " · " + it.m.model : "") }
                 Btn { id: rb; visible: !!it.m.last; small: true; kind: "quiet"; icon: "rotate_cw"; tip: "Send your last message again"
-                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.retryChat() } } }
+                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.retryChat() } }
+              // what this reply changed in the design: compare it, or go back
+              TalkChange { visible: !!it.m.change; width: body.width; change: it.m.change } } }
             Component { id: cErr; Column { spacing: 6
                 Note { kind: "red"; text: it.m.text; width: body.width }
                 Btn { visible: !!it.m.last; small: true; icon: "rotate_cw"; text: "Retry"; onClicked: Store.retryChat() } } }
@@ -325,11 +367,14 @@ Rectangle {
                         // "Ask about this feature…" from the viewport's context menu lands here
                         Connections { target: Store; function onChatPrefill(text) { Store.talkOpen = true; ta.text = text; ta.cursorPosition = text.length; ta.forceActiveFocus() } }
                         wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: 13
-                        placeholderText: !Store.chat.available ? "No agent is connected" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to print…"
+                        placeholderText: !Store.chat.available ? "No agent is connected" : Store.chatAsking && Store.chatAsking.free ? "Answer the question above…" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to print…"
                         placeholderTextColor: Theme.ink4; enabled: Store.chat.available
                         selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
                         leftPadding: 12; rightPadding: 12; topPadding: 10; bottomPadding: 6; background: null; renderType: Text.NativeRendering
-                        function submit() { if (text.trim() && !Store.chatBusy && Store.chatReady) { Store.send(text); text = "" } }
+                        function submit() {
+                            if (!text.trim()) return
+                            if (Store.chatAsking && Store.chatAsking.free) { Store.answerAsk(Store.chatAsking.id, text.trim(), []); text = ""; return }
+                            if (!Store.chatBusy && Store.chatReady) { Store.send(text); text = "" } }
                         Keys.onTabPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
                         Keys.onBacktabPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.BacktabFocusReason)
                         Keys.onPressed: function (e) {
@@ -350,7 +395,7 @@ Rectangle {
                             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: mcm.pressed ? Theme.washPress : mcm.containsMouse || mpop.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
                             Txt { id: ml; x: 7; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
                                 width: Math.min(implicitWidth, comp.width - 170); elide: Text.ElideRight
-                                text: Store.chatAgentLabel + " · " + Store.modelLabel(Store.chatAgent, Store.chatModel) + (Store.chatEffort ? " · " + Store.chatEffort : "") }
+                                text: Store.chatAgentLabel + " · " + Store.modelShort(Store.chatAgent, Store.chatModel) + (Store.chatEffort ? " · " + Store.chatEffort : "") }
                             Icon { x: ml.width + 12; name: "chevron_down"; size: 12; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
                             MouseArea { id: mcm; anchors.fill: parent; hoverEnabled: true; onClicked: mpop.opened ? mpop.close() : mpop.open() }
                             Tip { show: mcm.containsMouse && !mpop.opened; text: "Agent and model for this conversation" }
@@ -367,24 +412,28 @@ Rectangle {
                     }
                     // send, or stop while a reply is being written: one round button in one place
                     Rectangle { id: sendBtn; objectName: "sendBtn"
+                        readonly property bool answering: !!Store.chatAsking && !!Store.chatAsking.free && ta.text.trim() !== ""
+                        readonly property bool stops: Store.chatBusy && !answering
                         readonly property bool can: Store.chatBusy || (Store.chatReady && ta.text.trim() !== "")
                         anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
                         width: 28; height: 28; radius: 14
-                        color: Store.chatBusy ? (sbm.containsMouse ? Theme.plate4 : Theme.plate3) : can ? (sbm.containsMouse ? Theme.datumHi : Theme.datum) : Theme.plate3
-                        border.width: Store.chatBusy ? 1 : 0; border.color: Theme.rule2
+                        color: stops ? (sbm.containsMouse ? Theme.plate4 : Theme.plate3) : can ? (sbm.containsMouse ? Theme.datumHi : Theme.datum) : Theme.plate3
+                        border.width: stops ? 1 : 0; border.color: Theme.rule2
                         scale: sbm.pressed && can ? Theme.from(0.92) : 1
                         Behavior on scale { Glide { duration: Theme.press } }
                         Behavior on color { Tint {} }
-                        Icon { anchors.centerIn: parent; size: Store.chatBusy ? 11 : 15; name: Store.chatBusy ? "square" : "arrow_up"
-                            color: Store.chatBusy ? Theme.ink : sendBtn.can ? Theme.datumInk : Theme.ink4 }
-                        MouseArea { id: sbm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.chatBusy ? Store.stopChat() : ta.submit() }
-                        Tip { show: sbm.containsMouse; keys: Store.chatBusy ? "" : "Return"
-                            text: Store.chatBusy ? "Stop this reply. What was already committed stays." : sendBtn.can ? "Send" : !Store.chatReady ? "No agent is connected" : "Write a message first" } }
+                        Icon { anchors.centerIn: parent; size: sendBtn.stops ? 11 : 15; name: sendBtn.stops ? "square" : "arrow_up"
+                            color: sendBtn.stops ? Theme.ink : sendBtn.can ? Theme.datumInk : Theme.ink4 }
+                        MouseArea { id: sbm; anchors.fill: parent; hoverEnabled: true; onClicked: sendBtn.stops ? Store.stopChat() : ta.submit() }
+                        Tip { show: sbm.containsMouse; keys: sendBtn.stops ? "" : "Return"
+                            text: sendBtn.answering ? "Send your answer" : Store.chatBusy ? "Stop this reply. What was already committed stays." : sendBtn.can ? "Send" : !Store.chatReady ? "No agent is connected" : "Write a message first" } }
                 }
             }
         }
         Txt { kind: "fine"; x: talk.hero ? 28 : 16; anchors.top: comp.bottom; anchors.topMargin: 7; width: parent.width - 2 * x; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 3
-            text: Store.chatBusy ? "Working. Other conversations can run meanwhile."
+            color: Store.chatAsking ? Theme.amber : Theme.ink3
+            text: Store.chatAsking ? "The agent is waiting for your answer. Enter sends it."
+                : Store.chatBusy ? "Working. Other conversations can run meanwhile."
                 : Store.conv && Store.conv.messages ? "Enter sends · ↑ brings back your last message"
                 : "Enter sends · Shift+Enter for a new line · drop files to attach" }
     }

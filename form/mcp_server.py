@@ -47,6 +47,8 @@ Rules:
 - A slice is a simulation, not a print. Fit yield is a model. Say so when you report them.
 - You cannot approve a release. request_release returns a bench link for the user.
 - Nothing here starts a print or sends files anywhere.
+- Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time,
+  at most three per task. Outside Form Studio's chat it tells you to ask in your own interface.
 """
 
 S: dict[str, Any] = {"studio": None, "bench": {"url": None}, "lock": threading.Lock()}
@@ -870,6 +872,50 @@ def build() -> MCPServer:
         res = await _run(st.delete_project, project)
         act(None, "project", f"Moved {project} to the trash folder", ctx)
         return res
+
+    # ---- talking with the person (chat workstream): ask_user, suggest_replies ---------------------------------
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False))
+    async def ask_user(question: str, choices: list[str] | None = None, multi_select: bool = False,
+                       allow_text: bool = True, why: str = "", kind: str = "question") -> dict:
+        """Ask the person one question and wait for the answer. Use it only when the answer changes the design
+        and you cannot find it yourself: a measurement that sets a fit or a load, or an intent you cannot tell
+        apart (which device, which side opens). At most a few questions per task; ask them one at a time.
+        choices: up to 8 short options shown as buttons (multi_select lets the person pick several);
+        allow_text lets them type their own answer; why: one line on what the answer changes.
+        kind="confirm" shows an approval card (choices default to Yes / No) before an action the person
+        should agree to. Returns {answered, answer, choices, text} or, when nobody answered, {answered: false,
+        reason, note}: then continue with safe assumptions marked assumed. Outside Form Studio's chat nobody
+        can answer here and the result tells you to ask in your own interface."""
+        from . import ask as ask_mod
+        import os as _os
+        try:
+            q = ask_mod.question(question, choices, multi_select, allow_text, why, kind)
+        except ask_mod.AskError as e:
+            raise ToolError(str(e))
+        folder = _os.environ.get(ask_mod.ENV_DIR)
+        if not folder:
+            return ask_mod.unreachable(q)
+        timeout = ask_mod.timeout_from_env()
+        qid = ask_mod.post(Path(folder), q, timeout)
+        parent, t0 = _os.getppid(), time.time()
+        while True:
+            st_, extra = ask_mod.state(Path(folder), qid)
+            if st_ != "open":
+                return ask_mod.result(q, st_, extra)
+            if time.time() - t0 > timeout:
+                ask_mod.close(Path(folder), qid, "timeout")
+            elif _os.getppid() != parent:            # the agent that asked is gone
+                ask_mod.close(Path(folder), qid, "ended")
+            await anyio.sleep(0.25)
+
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False))
+    async def suggest_replies(options: list[str]) -> dict:
+        """Offer up to 3 short follow-up messages the person might send next (each under 80 characters, written
+        as the person would say it, e.g. "Make the walls 2 mm"). Form Studio's chat shows them as buttons under
+        your reply. Call it at most once, at the end of a reply, and only with useful next steps."""
+        from . import ask as ask_mod
+        opts = ask_mod.clean_suggestions(options)
+        return {"shown": opts, "note": "Shown as buttons under your reply when this runs in Form Studio's chat."}
 
     return mcp
 

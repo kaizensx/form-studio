@@ -16,9 +16,13 @@ FORM tools: `form_overview()`, `brief_presets()`, `describe_recipe()`, `read_doc
    **specified**.
 4. Classify every unknown as blocking (fit, attachment, load, temperature, safety) or reversible (proportions, colour,
    file names, camera angles). Decide the reversible ones yourself and say what you assumed.
-5. Ask at most three related questions in one batch. For each, say why it matters and offer two or three choices with
-   a recommendation. Example: "Adhesive pad or screws? I recommend a pad if you want no holes; it needs a flat rear face."
-   Keep working on independent parts of the design while you wait.
+5. Ask at most three questions per task, only for blocking unknowns. For each, say why it matters and offer two or three
+   choices with a recommendation. Example: "Adhesive pad or screws? I recommend a pad if you want no holes; it needs a
+   flat rear face." Use `ask_user(question, choices, why=...)`: in Form Studio's chat it shows the question as a card and
+   returns the answer; one question per call. Before an action the user should agree to (replacing or deleting their
+   design), use `ask_user(..., kind="confirm")`. If it returns `no_user` (you are outside Form Studio's chat), ask in
+   your own interface instead; if nobody answered, continue with safe values marked assumed and say which answer
+   would change the design.
 6. For a measurement, say what to measure, from which datum, and with what (calipers for anything that must fit).
    A number is **measured** only when the user measured it and told you how.
 

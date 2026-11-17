@@ -69,6 +69,10 @@ def _fake_adapter(script: Path, data: Path):
         def command(self, run, exe):
             return [exe, str(script), str(data), run.session or "-", run.model, run.message]
 
+        def run_env(self, run):            # the stand-in plays Form Studio's MCP server too: it answers ask_user itself
+            d = (run.mcp.get("env") or {}).get("FORM_ASK_DIR")
+            return {"FORM_ASK_DIR": d} if d else {}
+
         def parser(self):
             return ClaudeParser()
 

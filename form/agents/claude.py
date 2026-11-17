@@ -88,8 +88,8 @@ class Claude(Adapter):
         named = re.findall(r"'([a-z][a-z0-9.\-\[\]]*)'", m.group(1)) if m else []
         out = [{"id": "default", "label": "Default", "note": "Whatever Claude Code is set to use"}]
         for a in list(dict.fromkeys(named + list(DOCUMENTED_ALIASES))):
-            out.append({"id": a, "label": a.capitalize(),
-                        "note": "Alias for the latest " + a + " model; Claude Code resolves it"})
+            out.append({"id": a, "label": a.capitalize(), "alias": True,
+                        "note": "Alias for the latest " + a + " model. The version shows here after its first reply."})
         return out
 
     def efforts(self, cfg, exe):

@@ -81,6 +81,42 @@ Column {
         Note { visible: st.tab === "chat" && !Store.chat.available; kind: "amber"; title: "Chat is not available yet"
             text: (Store.chat.note || "") + " Install Claude Code and sign in under Software."
             Btn { small: true; text: "Open Software"; onClicked: st.tab = "software" } }
+        // ── agents: every CLI chat can drive, installed or not (chat workstream) ──
+        Txt { visible: st.tab === "chat"; kind: "cap"; text: "Agents" }
+        Rectangle { visible: st.tab === "chat" && Store.chatAgents.length > 0; width: parent.width; height: agList.implicitHeight; radius: Theme.rMd
+            color: Theme.plate1; border.color: Theme.rule
+            Column { id: agList; width: parent.width
+                Repeater {
+                    model: st.tab === "chat" ? Store.chatAgents : []
+                    Item {
+                        id: ag
+                        required property var modelData
+                        required property int index
+                        readonly property var a: modelData
+                        readonly property var si: a.signin || null
+                        readonly property string dflt: { var ms = a.models || []; return ms.length ? ms[0].label : "" }
+                        objectName: "agentRow"
+                        width: agList.width; height: Math.max(agl.implicitHeight, 28) + 22
+                        Rectangle { visible: ag.index > 0; x: 16; width: parent.width - 32; height: 1; color: Theme.rule }
+                        Rectangle { x: 16; y: 17; width: 7; height: 7; radius: 3.5
+                            color: !ag.a.available ? Theme.ink4 : ag.si && ag.si.signed_in === false ? Theme.amber : Theme.pass }
+                        Column { id: agl; x: 32; width: parent.width - 32 - agr.width - 28; anchors.verticalCenter: parent.verticalCenter; spacing: 2
+                            Row { spacing: 8
+                                Txt { text: ag.a.label; font.weight: Theme.wMedium }
+                                Tag { visible: ag.a.available && String(ag.a.verified).indexOf("not run") === 0; text: "untested"; kind: "assumed"; anchors.verticalCenter: parent.verticalCenter }
+                                Txt { visible: Store.chatDefault.agent === ag.a.id; kind: "fine"; text: "default for new conversations"; anchors.verticalCenter: parent.verticalCenter } }
+                            Txt { kind: "fine"; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
+                                text: !ag.a.available ? (ag.a.why || "Not installed.") : (ag.si ? ag.si.how : "Installed") }
+                            Txt { kind: "fine"; tone: 4; mono: true; font.pixelSize: 10; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; visible: ag.a.available
+                                text: (ag.a.cli || "") + (ag.dflt ? "  ·  " + ag.dflt : "") + ((ag.a.models || []).length > 1 ? "  ·  " + ((ag.a.models || []).length - 1) + " listed models" : "") } }
+                        Row { id: agr; anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 6
+                            Btn { visible: !ag.a.available; small: true; icon: "download"; text: "Install…"; onClicked: st.tab = "software" }
+                            Btn { visible: ag.a.available && Store.chatDefault.agent !== ag.a.id; small: true; kind: "quiet"; text: "Make default"
+                                onClicked: Store.post("/chat/defaults", { agent: ag.a.id, model: "default", effort: "" }).then(function () { Store.reloadStudio() }, Store.fail) } }
+                    }
+                }
+            } }
+        Txt { visible: st.tab === "chat" && st.rows.length > 0; kind: "cap"; text: "Defaults" }
         Rectangle { visible: st.rows.length > 0; width: parent.width; height: list.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
             Column { id: list; width: parent.width
                 Repeater {

@@ -22,6 +22,8 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Find the best design under constraints | `optimize` | `form optimize <p> --vary arm_t:4:20 --minimize solid_mass_g --require "statics.safety_factor>=3"` |
 | Show motion | `animate` (turntable or morph) | `form animate <p> --morph 1:4` |
 | Check this machine | `setup_status` (never run fixes without asking) | `form setup --check` |
+| Ask the person a blocking question | `ask_user` (a card in Form Studio's chat; elsewhere it tells you to ask yourself) | `form chat` prompts in the terminal |
+| Offer next steps | `suggest_replies` (up to three buttons under the reply) | — |
 
 Rules that keep the record honest:
 

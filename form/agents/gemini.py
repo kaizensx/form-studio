@@ -79,6 +79,11 @@ class Gemini(Adapter):
     verified = "not run: written from the Gemini CLI documentation; the first real run is a test"
     images, cost = False, False
 
+    def signin(self, cfg, exe):
+        from ..installer import gemini_signed_in
+        ok, how = gemini_signed_in(cfg)
+        return {"signed_in": ok, "how": how}
+
     def explain(self, error: str) -> dict | None:
         s = (error or "").lower()
         if all(k in s for k in NOT_SIGNED_IN[:1]) or ("auth method" in s and "gemini" in s):
@@ -91,7 +96,7 @@ class Gemini(Adapter):
         conf = Path(run.cwd) / ".gemini"
         conf.mkdir(parents=True, exist_ok=True)
         # trust: FORM's own tools run without a confirmation prompt (there is nobody to answer one in a headless run)
-        (conf / "settings.json").write_text(json.dumps({"mcpServers": {"form": dict(run.mcp, trust=True)}}, indent=1),
+        (conf / "settings.json").write_text(json.dumps({"mcpServers": {"form": dict(run.mcp, trust=True, timeout=int(run.tool_timeout_s * 1000))}}, indent=1),
                                             encoding="utf-8")
         prompt = run.message if run.session else (run.system + "\n\n" + run.message if run.system else run.message)
         cmd = [exe, "-p", prompt, "--output-format", "stream-json", "--allowed-mcp-server-names", "form"]

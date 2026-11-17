@@ -47,7 +47,8 @@ _INLINE = re.compile(
     r"|(?P<strong>(?P<sm>\*\*|__)(?=\S)(?P<strongbody>.+?)(?<=\S)(?P=sm))"
     r"|(?P<em>(?<![\w*])\*(?=[^\s*])(?P<em1>.+?)(?<=[^\s*])\*(?!\*)|(?<![\w_])_(?=[^\s_])(?P<em2>.+?)(?<=[^\s_])_(?![\w_]))"
     r"|(?P<del>~~(?=\S)(?P<delbody>.+?)(?<=\S)~~)"
-    r"|(?P<br>(?: {2,}|\\)\n)",
+    r"|(?P<br>(?: {2,}|\\)\n)"
+    r"|(?P<rev>(?<![\w/.#-])r(?P<revn>\d{1,4})(?![\w-]))",       # a revision ("r04"): a link only when style["revs"]
     re.S)
 
 
@@ -85,6 +86,9 @@ def inline(text: str, style: dict | None = None) -> str:
             out.append("<s>%s</s>" % inline(m.group("delbody"), st))
         elif m.group("br"):
             out.append("<br/>")
+        elif m.group("rev"):
+            word = _esc(m.group("rev"))
+            out.append(_link("form:rev/%d" % int(m.group("revn")), word, st) if st.get("revs") else word)
     out.append(_esc(text[pos:]))
     return "".join(out).replace("\n", " ")
 
