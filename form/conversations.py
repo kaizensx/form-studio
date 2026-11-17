@@ -24,6 +24,17 @@ ID_RE = re.compile(r"[0-9a-f]{12}")
 EVENT_KINDS = ("user", "start", "text", "tool", "result", "act", "end", "error")
 
 
+_last = [0.0]
+
+
+def _now() -> float:
+    """A timestamp that always moves forward. Windows' clock ticks about every 15 ms, so two changes made
+    back to back would otherwise share a time and "most recent first" would be a coin toss."""
+    t = max(time.time(), _last[0] + 1e-6)
+    _last[0] = t
+    return t
+
+
 class ConversationError(ValueError):
     pass
 
@@ -80,7 +91,7 @@ class Conversations:
 
     def create(self, project: str | None = None, agent: str = "claude", model: str = "default", effort: str = "",
                title: str = "") -> dict:
-        now = time.time()
+        now = _now()
         meta = {"id": uuid.uuid4().hex[:12], "title": title.strip()[:120] or "New conversation", "title_auto": not title.strip(),
                 "project": project or None, "agent": agent, "model": model or "default", "effort": effort or "",
                 "session": None, "session_agent": None, "resolved_model": None,
@@ -100,7 +111,7 @@ class Conversations:
             meta = self._read(cid)
             meta.update(fields)
             if touch:
-                meta["updated"] = time.time()
+                meta["updated"] = _now()
             return self._write(meta)
 
     def rename(self, cid: str, title: str) -> dict:
