@@ -11,7 +11,7 @@ Rectangle {
     readonly property var sw: Store.software
     readonly property int step: Store.onboardStep
     readonly property var steps: [
-        { title: "FORM itself", sub: "The CAD kernel and where your designs live", ids: ["kernel", "data", "parts"] },
+        { title: "Form Studio itself", sub: "The CAD kernel and where your designs live", ids: ["kernel", "data", "parts"] },
         { title: "Your printer and slicer", sub: "So a design can be sliced for your machine", ids: ["slicer.bambu", "slicer.orca", "slicer.prusa"] },
         { title: "Your AI", sub: "Claude designs with you in chat", ids: ["claude", "claude.signin", "agent.claude", "agent.codex", "agent.gemini", "agent.cursor", "agent.desktop"] }
     ]
@@ -19,7 +19,7 @@ Rectangle {
     // ticked rows of this step only
     readonly property var chosen: Store.installChosen.filter(function (id) { return wl.here.ids.indexOf(id) >= 0 })
     readonly property bool anySlicer: !!sw && ["slicer.bambu", "slicer.orca", "slicer.prusa"].some(function (id) { var it = Store.softwareItem(id); return it && it.status === "ok" })
-    readonly property var absentAgents: sw ? sw.software.filter(function (r) { return r.absent }).map(function (r) { return r.label.replace("FORM tools in ", "") }) : []
+    readonly property var absentAgents: sw ? sw.software.filter(function (r) { return r.absent }).map(function (r) { return r.label.replace("Form Studio tools in ", "") }) : []
     function stepState(i) {          // done | todo | open — for the rail
         if (!sw) return "open"
         var need = steps[i].ids.map(function (id) { return Store.softwareItem(id) }).filter(function (r) {
@@ -53,7 +53,9 @@ Rectangle {
         width: 320; height: parent.height; color: Theme.plate1
         Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.rule }
         Column { x: 32; y: 44; width: parent.width - 64; spacing: 6
-            Txt { kind: "cap"; text: "Set up FORM" }
+            Logo { size: 24 }
+            Item { width: 1; height: 22 }
+            Txt { kind: "cap"; text: "Set up Form Studio" }
             Txt { kind: "h2"; text: "Three short steps"; width: parent.width }
             Item { width: 1; height: 18 }
             Repeater {
@@ -87,7 +89,7 @@ Rectangle {
         Column { x: 32; anchors.bottom: parent.bottom; anchors.bottomMargin: 28; width: parent.width - 64; spacing: 6
             Icon { name: "shield_check"; size: 16; color: Theme.ink3 }
             Txt { kind: "fine"; width: parent.width
-                text: "Nothing is installed until you press the button on a step. Each command is shown first. FORM never asks for a password." } }
+                text: "Nothing is installed until you press the button on a step. Each command is shown first. Form Studio never asks for a password." } }
     }
 
     // ── the step ────────────────────────────────────────────
@@ -105,9 +107,9 @@ Rectangle {
                 Txt { kind: "cap"; text: "Step " + (wl.step + 1) + " of 3" }
                 Txt { kind: "h1"; text: wl.here.title; width: parent.width; font.weight: Theme.wSemi }
                 Txt { kind: "lead"; tone: 2; width: parent.width; lineHeight: 1.35
-                    text: wl.step === 0 ? "FORM builds real geometry with a CAD kernel and keeps every design in a folder you own. This is checked for you."
-                        : wl.step === 1 ? "A slicer turns a design into a print plan. FORM drives one that is installed here and reads the printer, filament and process selected in it."
-                        : "Chat in FORM runs Claude Code on your own Claude account. FORM also offers its tools to other coding agents on this computer." } }
+                    text: wl.step === 0 ? "Form Studio builds real geometry with a CAD kernel and keeps every design in a folder you own. This is checked for you."
+                        : wl.step === 1 ? "A slicer turns a design into a print plan. Form Studio drives one that is installed here and reads the printer, filament and process selected in it."
+                        : "Chat in Form Studio runs Claude Code on your own Claude account. Form Studio also offers its tools to other coding agents on this computer." } }
 
             // step 1: a checklist that fills in as each part answers
             Column { visible: wl.step === 0; width: parent.width; spacing: 16
@@ -166,19 +168,19 @@ Rectangle {
                     Column { id: uc; x: 16; y: 14; width: parent.width - 32; spacing: 4
                         Row { spacing: 8
                             Icon { name: "printer"; size: 15; color: Theme.pass; anchors.verticalCenter: parent.verticalCenter }
-                            Txt { font.weight: 600; text: "FORM will slice with " + (Store.slicer.label || "your slicer"); anchors.verticalCenter: parent.verticalCenter } }
+                            Txt { font.weight: 600; text: "Form Studio will slice with " + (Store.slicer.label || "your slicer"); anchors.verticalCenter: parent.verticalCenter } }
                         Txt { kind: "fine"; tone: 2; width: parent.width
                             text: Store.slicer.available ? Store.slicer.presets.machine.name + "  ·  " + Store.slicer.presets.filament.name + "  ·  " + Store.slicer.presets.process.name : "" }
-                        Txt { kind: "fine"; width: parent.width; text: "Read from what is selected in the slicer. Change the printer or filament there and FORM follows." } } }
+                        Txt { kind: "fine"; width: parent.width; text: "Read from what is selected in the slicer. Change the printer or filament there and Form Studio follows." } } }
                 Txt { visible: !!wl.sw && !wl.anySlicer; width: parent.width; tone: 2
-                    text: "No slicer was found. Pick the one that matches your printer; Bambu Studio is ticked because it is FORM's default. Everything except slicing also works without one." }
+                    text: "No slicer was found. Pick the one that matches your printer; Bambu Studio is ticked because it is Form Studio's default. Everything except slicing also works without one." }
                 SetupList { width: parent.width; ids: ["slicer.bambu", "slicer.orca", "slicer.prusa"] }
                 // no slicer: the bed size is the one thing FORM still needs to know
                 Rectangle { visible: !!wl.sw && !wl.anySlicer; width: parent.width; height: bc.implicitHeight + 28; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
                     Column { id: bc; x: 16; y: 14; width: parent.width - 32; spacing: 10
-                        Txt { font.weight: 600; text: "Or tell FORM your printer's size" }
+                        Txt { font.weight: 600; text: "Or tell Form Studio your printer's size" }
                         Txt { kind: "fine"; tone: 2; width: parent.width
-                            text: "Without a slicer FORM still checks that a part fits the bed. With a slicer, the printer selected there is used instead." }
+                            text: "Without a slicer Form Studio still checks that a part fits the bed. With a slicer, the printer selected there is used instead." }
                         Row { spacing: 8
                             Field { id: pn; width: 220; placeholder: "Printer name"; text: Store.studio ? Store.studio.env.printer.name : "" }
                             Field { id: px; width: 78; numeric: true; unit: "X"; text: Store.studio ? String(Store.studio.env.printer.envelope_mm[0]) : "" }
@@ -198,7 +200,7 @@ Rectangle {
                     Txt { kind: "cap"; text: "Other agents on this computer" }
                     SetupList { id: others; width: parent.width; ids: ["agent.codex", "agent.gemini", "agent.cursor", "agent.desktop"] } }
                 Txt { kind: "fine"; width: parent.width; visible: wl.absentAgents.length > 0
-                    text: "Not found here: " + wl.absentAgents.join(", ") + ". If you install one later, add FORM to it under Settings, Software." }
+                    text: "Not found here: " + wl.absentAgents.join(", ") + ". If you install one later, add Form Studio to it under Settings, Software." }
             }
         }
     }
@@ -228,7 +230,7 @@ Rectangle {
                 Btn { kind: "primary"; large: true; busy: Store.installing || !wl.sw
                     icon: wl.chosen.length ? "download" : wl.step < 2 ? "arrow_right" : "check"
                     text: Store.installing ? "Installing…" : !wl.sw ? "Checking…" : wl.chosen.length ? "Install " + wl.chosen.length + " selected"
-                        : wl.step < 2 ? "Continue" : "Open FORM"
+                        : wl.step < 2 ? "Continue" : "Open Form Studio"
                     onClicked: wl.primary() } }
         }
     }

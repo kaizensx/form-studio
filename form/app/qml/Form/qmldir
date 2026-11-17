@@ -44,6 +44,7 @@ MacMenu 1.0 MacMenu.qml
 Glide 1.0 Glide.qml
 Kbd 1.0 Kbd.qml
 Spinner 1.0 Spinner.qml
+Logo 1.0 Logo.qml
 Tint 1.0 Tint.qml
 FocusRing 1.0 FocusRing.qml
 Shadow 1.0 Shadow.qml

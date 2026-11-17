@@ -74,7 +74,7 @@ def _json_register(path: Path, key: str = "mcpServers") -> Callable[[], str]:
             try:
                 data = json.loads(path.read_text(encoding="utf-8") or "{}")
             except ValueError:
-                raise RuntimeError(f"{path} is not valid JSON (comments?). Add FORM by hand: "
+                raise RuntimeError(f"{path} is not valid JSON (comments?). Add Form Studio by hand: "
                                    f'"{key}": {{"form": {{"command": "{mcp_command()}"}}}}')
         backup = None
         if path.exists():
@@ -122,14 +122,14 @@ def _same(a: str, b: str) -> bool:
 
 def _agent_item(iid, label, current, mcp, summary, add_cmds, replace_cmds) -> Item:
     if not current:
-        return Item(iid, label, "missing", "Installed; FORM is not registered", Fix(summary, add_cmds))
+        return Item(iid, label, "missing", "Installed; Form Studio is not registered", Fix(summary, add_cmds))
     if not Path(current).exists():
         return Item(iid, label, "warn", f"Registered, but {current} no longer exists",
                     Fix(f"Point {label} at this installation", replace_cmds))
     if not _same(current, mcp):
-        return Item(iid, label, "warn", f"Registered to another FORM installation: {current}",
+        return Item(iid, label, "warn", f"Registered to another Form Studio installation: {current}",
                     Fix(f"Point {label} at this installation", replace_cmds, recommended=False))
-    return Item(iid, label, "ok", "FORM is registered")
+    return Item(iid, label, "ok", "Form Studio is registered")
 
 
 def agent_items(mcp: str | None = None) -> list[Item]:
@@ -139,32 +139,32 @@ def agent_items(mcp: str | None = None) -> list[Item]:
     items: list[Item] = []
     if shutil.which("claude"):
         add = f"claude mcp add --scope user form -- {shlex.quote(mcp)}"
-        items.append(_agent_item("agent.claude", "Claude Code", _claude_command(), mcp, "Register FORM with Claude Code (user scope)",
+        items.append(_agent_item("agent.claude", "Claude Code", _claude_command(), mcp, "Register Form Studio with Claude Code (user scope)",
                                  [add], ["claude mcp remove --scope user form", add]))
     if shutil.which("codex"):
         add = f"codex mcp add form -- {shlex.quote(mcp)}"
-        items.append(_agent_item("agent.codex", "Codex", _codex_command(), mcp, "Register FORM with Codex", [add],
+        items.append(_agent_item("agent.codex", "Codex", _codex_command(), mcp, "Register Form Studio with Codex", [add],
                                  ["codex mcp remove form", add]))
     gem = HOME / ".gemini" / "settings.json"
     if shutil.which("gemini") or gem.parent.exists():
         ok = _json_has(gem)
         items.append(Item("agent.gemini", "Gemini CLI", "ok" if ok else "missing",
-                          "FORM is registered" if ok else f"FORM is not in {gem}",
-                          None if ok else Fix(f"Add FORM to {gem}", action=_json_register(gem))))
+                          "Form Studio is registered" if ok else f"Form Studio is not in {gem}",
+                          None if ok else Fix(f"Add Form Studio to {gem}", action=_json_register(gem))))
     cur = HOME / ".cursor" / "mcp.json"
     if cur.parent.exists() or Path("/Applications/Cursor.app").exists():
         ok = _json_has(cur)
         items.append(Item("agent.cursor", "Cursor", "ok" if ok else "missing",
-                          "FORM is registered" if ok else f"FORM is not in {cur}",
-                          None if ok else Fix(f"Add FORM to {cur}", action=_json_register(cur))))
+                          "Form Studio is registered" if ok else f"Form Studio is not in {cur}",
+                          None if ok else Fix(f"Add Form Studio to {cur}", action=_json_register(cur))))
     desk = (HOME / "Library/Application Support/Claude/claude_desktop_config.json" if sys.platform == "darwin"
             else Path(os.environ.get("APPDATA", HOME / "AppData/Roaming")) / "Claude/claude_desktop_config.json"
             if sys.platform.startswith("win") else HOME / ".config/Claude/claude_desktop_config.json")
     if desk.parent.exists() and (Path("/Applications/Claude.app").exists() or sys.platform != "darwin"):
         ok = _json_has(desk)
         items.append(Item("agent.desktop", "Claude Desktop", "ok" if ok else "missing",
-                          "FORM is registered" if ok else f"FORM is not in {desk.name}",
-                          None if ok else Fix(f"Add FORM to {desk.name} (restart Claude Desktop afterwards)",
+                          "Form Studio is registered" if ok else f"Form Studio is not in {desk.name}",
+                          None if ok else Fix(f"Add Form Studio to {desk.name} (restart Claude Desktop afterwards)",
                                               action=_json_register(desk), recommended=False)))
     return items
 
@@ -180,7 +180,7 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
     items.append(Item("python", "Python 3.12", "ok" if (v.major, v.minor) == (3, 12) else "warn",
                       f"Running {v.major}.{v.minor}.{v.micro} at {sys.executable}",
                       None if (v.major, v.minor) == (3, 12) else
-                      Fix("Reinstall FORM with uv's managed Python 3.12", ["uv tool upgrade --reinstall form-studio"])))
+                      Fix("Reinstall Form Studio with uv's managed Python 3.12", ["uv tool upgrade --reinstall form-studio"])))
     try:
         if studio is not None:                                     # the app: reuse its running kernel
             kid = studio.kernel_id()
@@ -192,7 +192,7 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
         items.append(Item("kernel", "CAD kernel", "ok", kid))
     except Exception as e:                                         # broken wheel, missing OCP
         items.append(Item("kernel", "CAD kernel", "missing", f"build123d/OCP did not start: {e}",
-                          Fix("Reinstall FORM and its CAD kernel", ["uv tool upgrade --reinstall form-studio"])))
+                          Fix("Reinstall Form Studio and its CAD kernel", ["uv tool upgrade --reinstall form-studio"])))
     data = Path(cfg["data"]["dir"])
     try:
         data.mkdir(parents=True, exist_ok=True)
@@ -226,7 +226,7 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
                               Fix(f"Open {name} once and select your printer, filament and process",
                                   [f"open -a {name.replace(' ', '')}"] if sys.platform == "darwin" else [],
                                   recommended=False,
-                                  note="FORM follows whatever is selected there. Re-run `form setup` afterwards.")))
+                                  note="Form Studio follows whatever is selected there. Re-run `form setup` afterwards.")))
         elif s.get("kind", "bambu") == "bambu":
             cmds, note = [], f"Download from {BAMBU_URL}"
             if sys.platform == "darwin" and shutil.which("brew"):
@@ -235,7 +235,7 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
                 cmds = ["flatpak install -y flathub com.bambulab.BambuStudio"]
                 note = "Then set [slicer].app to the AppImage or a wrapper script; flatpak apps need `flatpak run`."
             if s.get("chosen") == "auto":
-                note += " OrcaSlicer or PrusaSlicer work too; FORM uses the first one it finds."
+                note += " OrcaSlicer or PrusaSlicer work too; Form Studio uses the first one it finds."
             items.append(Item("slicer", "Slicer (Bambu Studio)", "missing",
                               "Not found. Everything except slicing works without it; slices show as BLOCKED.",
                               Fix("Install Bambu Studio (about 200 MB)", cmds, recommended=False, note=note)))
@@ -302,7 +302,7 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
 def _write_printer(cfg, name, env):
     def act():
         path = Path(cfg["_path"]) if Path(cfg["_path"]).exists() else Path("~/.config/form-studio/studio.toml").expanduser()
-        text = path.read_text(encoding="utf-8") if path.exists() else "# FORM configuration (written by `form setup`)\n"
+        text = path.read_text(encoding="utf-8") if path.exists() else "# Form Studio configuration (written by `form setup`)\n"
         if path.exists():
             shutil.copyfile(path, path.with_name(path.name + f".bak-form-{int(time.time())}"))
         block = f'[printer]\nname = "{name}"\nenvelope_mm = [{env[0]:g}, {env[1]:g}, {env[2]:g}]\nplate_margin_mm = 2.0\n'
@@ -350,7 +350,7 @@ def _apply(item: Item, dry: bool) -> tuple[bool, str]:
 
 def main(argv=None) -> int:
     import argparse
-    ap = argparse.ArgumentParser(prog="form setup", description="Find what FORM needs, and fix what you choose.")
+    ap = argparse.ArgumentParser(prog="form setup", description="Find what Form Studio needs, and fix what you choose.")
     ap.add_argument("--check", action="store_true", help="report as JSON, change nothing")
     ap.add_argument("--yes", action="store_true", help="apply recommended fixes and install recommended software without asking")
     ap.add_argument("--dry-run", action="store_true", help="show what would run")
@@ -371,7 +371,7 @@ def main(argv=None) -> int:
     if not fixable:
         if a.yes:
             return _install_recommended(a.dry_run)
-        print(_c("32", "\nEverything FORM uses is set up.") + " Ask your agent for a part, or run `form serve` for the bench.\n")
+        print(_c("32", "\nEverything Form Studio uses is set up.") + " Ask your agent for a part, or run `form serve` for the bench.\n")
         return 0
     print()
     for n, i in enumerate(fixable, 1):
@@ -411,7 +411,7 @@ def main(argv=None) -> int:
                 print(f" {MARK[i.status]} {i.label:<24} {i.detail}")
     if a.yes:
         failed += _install_recommended(a.dry_run)
-    print("\nRestart your agent so it loads FORM. Then ask it: “design me a Gridfinity bin for my screwdrivers”.\n")
+    print("\nRestart your agent so it loads Form Studio. Then ask it: “design me a Gridfinity bin for my screwdrivers”.\n")
     return 1 if failed else 0
 
 
@@ -442,5 +442,5 @@ def _install_recommended(dry: bool) -> int:
         print("  (dry run: nothing was installed)")
     sign = by.get("claude.signin")
     if sign and sign["status"] == "missing":
-        print("\nClaude Code is not signed in. Sign in from the FORM app (Settings, Software), or run: claude auth login")
+        print("\nClaude Code is not signed in. Sign in from the Form Studio app (Settings, Software), or run: claude auth login")
     return failed

@@ -33,13 +33,13 @@ Rectangle {
                     { icon: "wrench", text: "Software: install or check…", run: function () { Store.openSetup() } },
                     { icon: "settings", text: "Settings…", keys: "Ctrl+,", run: function () { Store.openSettings("general") } },
                     { sep: true },
-                    { icon: "info", text: "About FORM", run: function () { Store.openSheet("about") } }
+                    { icon: "info", text: "About Form Studio", run: function () { Store.openSheet("about") } }
                 ] } }
         Btn { visible: bar.work; kind: "quiet"; icon: Store.talkOpen ? "panel_left_close" : "panel_left_open"; keys: "Ctrl+J"
             tip: Store.talkOpen ? "Hide the conversation" : "Show the conversation"; onClicked: Store.talkOpen = !Store.talkOpen }
         Item { width: mark.implicitWidth + 16; height: 28; anchors.verticalCenter: parent.verticalCenter
             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
-            Txt { id: mark; anchors.centerIn: parent; text: "FORM"; font.weight: Theme.wBold; font.letterSpacing: 2.4; font.pixelSize: 12; color: bar.work ? Theme.ink2 : Theme.ink }
+            Logo { id: mark; anchors.centerIn: parent; size: 18; ink: bar.work ? Theme.ink2 : Theme.ink; ink2: bar.work ? Theme.ink3 : Theme.ink2 }
             MouseArea { id: hm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.home() }
             Tip { show: hm.containsMouse && bar.work; text: "All designs"; keys: "Ctrl+Shift+H" } }
         Txt { visible: !!Store.project; text: "/"; tone: 4; anchors.verticalCenter: parent.verticalCenter; rightPadding: 6 }
@@ -77,7 +77,7 @@ Rectangle {
             MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSheet("slicer") }
             Tip { show: cm.containsMouse
                 text: Store.slicer.available ? (Store.slicer.label || "Slicer") + (Store.slicer.version ? " " + Store.slicer.version : "") + " · " + Store.slicer.presets.machine.name + " · " + Store.slicer.presets.filament.name + " · " + Store.slicer.presets.process.name + ". Click to choose the slicer."
-                    : "No slicer was found. Click to see which FORM can use." } }
+                    : "No slicer was found. Click to see which Form Studio can use." } }
         Rectangle { visible: !bar.tight; width: bar.roomy ? 220 : 170; height: 26; radius: Theme.rSm; anchors.verticalCenter: parent.verticalCenter
             color: sm.pressed ? Theme.plate : sm.containsMouse ? Theme.plate2 : Theme.well; border.color: sm.containsMouse ? Theme.rule2 : Theme.rule
             Behavior on color { Tint {} }

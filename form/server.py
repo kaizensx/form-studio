@@ -65,7 +65,7 @@ def make_handler(st: Studio):
             try:
                 host = (self.headers.get("Host") or "").split(":")[0]
                 if host not in ("127.0.0.1", "localhost", "[::1]"):
-                    return self._json({"error": {"message": "FORM only answers on loopback."}}, 403)
+                    return self._json({"error": {"message": "Form Studio only answers on loopback."}}, 403)
                 fn()
             except StudioError as e:
                 self._json({"error": e.public()}, e.status)
@@ -587,7 +587,7 @@ def start_bench(st: Studio, tries: int = 10) -> dict:
     """
     host, port = st.cfg["server"]["host"], int(st.cfg["server"]["port"])
     if host not in ("127.0.0.1", "localhost", "::1"):
-        return {"url": None, "error": "FORM binds to loopback only."}
+        return {"url": None, "error": "Form Studio binds to loopback only."}
     for p in range(port, port + tries):
         url = f"http://{host}:{p}"
         try:
@@ -621,7 +621,7 @@ def serve(cfg=None):
     st = Studio(cfg)
     host, port = cfg["server"]["host"], int(cfg["server"]["port"])
     if host not in ("127.0.0.1", "localhost", "::1"):
-        raise SystemExit("FORM binds to loopback only. Set [server].host to 127.0.0.1.")
+        raise SystemExit("Form Studio binds to loopback only. Set [server].host to 127.0.0.1.")
     httpd = None
     for p_try in range(port, port + 10):                 # a busy port is not a reason to fail
         try:
@@ -630,7 +630,7 @@ def serve(cfg=None):
             break
         except OSError:
             if _is_form(f"http://{host}:{p_try}", str(st.root)):
-                print(f"FORM is already running for this project folder → http://{host}:{p_try}", flush=True)
+                print(f"Form Studio is already running for this project folder → http://{host}:{p_try}", flush=True)
                 _open(f"http://{host}:{p_try}", cfg)
                 return 0
     if httpd is None:
@@ -638,7 +638,7 @@ def serve(cfg=None):
     httpd.daemon_threads = True
     # warm the kernel only once this process owns a port; an early "already running" exit must not leave it mid-call
     threading.Thread(target=lambda: _quiet(st.kernel_id), daemon=True).start()
-    print(f"FORM studio → http://{host}:{port}   (data: {cfg['data']['dir']})", flush=True)
+    print(f"Form Studio → http://{host}:{port}   (data: {cfg['data']['dir']})", flush=True)
     _open(f"http://{host}:{port}", cfg)
     try:
         httpd.serve_forever()

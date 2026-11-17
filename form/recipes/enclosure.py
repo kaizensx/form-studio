@@ -154,7 +154,7 @@ class Enclosure(Recipe):
                 out.append(RecipeError(f"{self.spec(k).label} must be a whole number", self.spec(k).feature, "Use whole numbers.", [k]))
         for k in ("lid_screw", "pcb_screw"):
             if parts.size_name(v[k]) not in parts.CLEARANCE:
-                out.append(RecipeError(f"M{v[k]:g} is not a size FORM has data for", self.spec(k).feature, "Use 2, 2.5, 3, 4 or 5.", [k]))
+                out.append(RecipeError(f"M{v[k]:g} is not a size Form Studio has data for", self.spec(k).feature, "Use 2, 2.5, 3, 4 or 5.", [k]))
         if out:
             return out
         g = self.g(v)

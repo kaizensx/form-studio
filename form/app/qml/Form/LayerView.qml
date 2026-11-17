@@ -214,7 +214,7 @@ Item {
                 Txt { kind: "fine"; width: parent.width; visible: !!sim.packed && sim.packed.parts_per_copy > 1
                     text: "This design prints as " + (sim.packed ? sim.packed.parts_per_copy : 0) + " parts; the outlines are their bounding boxes. Toolpaths are shown once, as sliced." }
                 Txt { kind: "fine"; width: parent.width
-                    text: "Bounding boxes with " + (sim.packed ? F.trim(sim.packed.spacing_mm) : 6) + " mm between parts, 90° turns allowed. A preview only: FORM still exports one part per plate, and your slicer arranges copies itself." }
+                    text: "Bounding boxes with " + (sim.packed ? F.trim(sim.packed.spacing_mm) : 6) + " mm between parts, 90° turns allowed. A preview only: Form Studio still exports one part per plate, and your slicer arranges copies itself." }
             }
         }
     }

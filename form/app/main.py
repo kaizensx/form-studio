@@ -58,7 +58,7 @@ def _reduced_motion() -> bool:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(prog="form app", description="FORM desktop app")
+    ap = argparse.ArgumentParser(prog="form app", description="Form Studio desktop app")
     ap.add_argument("--check", action="store_true", help="load the interface, report QML errors, quit")
     ap.add_argument("--shot", metavar="PNG", help="save a screenshot and quit")
     ap.add_argument("--project", help="open this project id")
@@ -87,14 +87,19 @@ def main(argv=None) -> int:
 
     cfg = config.load()
     QCoreApplication.setOrganizationName("FORM")
-    QCoreApplication.setApplicationName("FORM")
+    QCoreApplication.setApplicationName("FORM")             # the settings store key: keep, or saved window state is lost
+    QGuiApplication.setApplicationDisplayName("Form Studio")
     if args.uitest:
         from . import uitest
         uitest.prepare(cfg)          # its own window settings; a stand-in agent when $FORM_UITEST_AGENT is set
     QCoreApplication.setApplicationVersion(__version__)
     os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
     app = QGuiApplication(sys.argv[:1])
-    app.setWindowIcon(QIcon(str(HERE / "assets" / "icon.png")))
+    # the app icon (brand/build.py) in every size it ships in, so the dock, the taskbar and the title bar each pick a sharp one
+    icon = QIcon()
+    for name in ("icon.png", "icon-512.png", "icon-256.png", "icon-128.png", "icon-64.png", "icon-32.png", "icon-16.png"):
+        icon.addFile(str(HERE / "assets" / name))
+    app.setWindowIcon(icon)
     # Tab reaches every control, not only text fields (macOS limits it to text fields unless "Keyboard navigation"
     # is on in System Settings). Sheets rely on this to keep the keyboard inside them.
     app.styleHints().setTabFocusBehavior(Qt.TabFocusBehavior.TabFocusAllControls)
@@ -121,7 +126,7 @@ def main(argv=None) -> int:
         app.quit()
 
     if not engine.rootObjects():
-        print("FORM could not load its interface:", *errors, sep="\n  ", file=sys.stderr)
+        print("Form Studio could not load its interface:", *errors, sep="\n  ", file=sys.stderr)
         httpd.shutdown(); st.kernel.stop()
         return 1
     win: QQuickWindow = engine.rootObjects()[0]

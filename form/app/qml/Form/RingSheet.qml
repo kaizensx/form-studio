@@ -48,7 +48,7 @@ Column {
             value: rs.piece && rs.piece.bbox ? rs.piece.bbox.map(function (x) { return F.fmt(x, 1) }).join(" × ") + " mm" : "—" } }
 
     Txt { kind: "fine"; width: parent.width
-        text: "FORM does not send anything to the printer. Open the 3MF in " + (Store.slicer.label || "Bambu Studio") + " to print it, then record the measured width under Fit." }
+        text: "Form Studio does not send anything to the printer. Open the 3MF in " + (Store.slicer.label || "Bambu Studio") + " to print it, then record the measured width under Fit." }
 
     FileDialog {
         id: dlg

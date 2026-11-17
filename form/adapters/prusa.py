@@ -256,14 +256,14 @@ class Adapter:
                 out["presets"][kind] = {"name": name, "sha": hashlib.sha256(blob).hexdigest()[:16], "data": flat}
             m, p, f = (out["presets"][k]["data"] for k in ("machine", "process", "filament"))
             if m.get("printer_technology", "FFF") != "FFF":
-                raise SlicerBlocked(f"“{names['machine']}” is a resin (SLA) printer. FORM slices FFF printers only.")
+                raise SlicerBlocked(f"“{names['machine']}” is a resin (SLA) printer. Form Studio slices FFF printers only.")
             for what, data in (("Print", p), ("Filament", f)):
                 compat = split_list(data.get("compatible_printers", ""))
                 if compat and names["machine"] not in compat:
                     raise SlicerBlocked(f"{what} preset “{names[{'Print': 'process', 'Filament': 'filament'}[what]]}” "
                                         f"is not compatible with “{names['machine']}”.")
             if p.get("compatible_printers_condition") or f.get("compatible_printers_condition"):
-                out["unchecked"] = "compatible_printers_condition is not evaluated by FORM; the slicer still applies it."
+                out["unchecked"] = "compatible_printers_condition is not evaluated by Form Studio; the slicer still applies it."
             out["nozzle_mm"] = float((m.get("nozzle_diameter") or "0.4").split(",")[0])
             out["layer_height_mm"] = float(p.get("layer_height") or 0.2)
             pts = [tuple(float(c) for c in pt.split("x")) for pt in (m.get("bed_shape") or "").split(",") if "x" in pt]
@@ -313,7 +313,7 @@ class Adapter:
         cfg["filament_settings_id"] = resolved["presets"]["filament"]["name"]
         if self.v.binary_gcode or "binary_gcode" in cfg:
             cfg["binary_gcode"] = "0"                  # FORM reads text G-code
-        head = f"# merged by FORM from {self.v.label} presets: " + " / ".join(
+        head = f"# merged by Form Studio from {self.v.label} presets: " + " / ".join(
             resolved["presets"][k]["name"] for k in ("machine", "process", "filament"))
         return head + "\n" + "".join(f"{k} = {cfg[k]}\n" for k in sorted(cfg))
 

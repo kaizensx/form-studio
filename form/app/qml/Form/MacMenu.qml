@@ -22,7 +22,7 @@ P.MenuBar {
         P.MenuItem { text: "Render in Blender…"; enabled: mb.work; onTriggered: Store.openSheet("render") }
         P.MenuSeparator {}
         P.MenuItem { text: "Settings…"; role: P.MenuItem.PreferencesRole; shortcut: "Ctrl+,"; onTriggered: Store.openSettings("general") }
-        P.MenuItem { text: "About FORM"; role: P.MenuItem.AboutRole; onTriggered: Store.openSheet("about") }
+        P.MenuItem { text: "About Form Studio"; role: P.MenuItem.AboutRole; onTriggered: Store.openSheet("about") }
     }
     P.Menu { title: "Edit"
         P.MenuItem { text: "Commit the Draft"; shortcut: "Ctrl+Return"; enabled: Store.hasDraft && !Store.draftError; onTriggered: Store.commit() }
@@ -72,12 +72,12 @@ P.MenuBar {
     }
     P.Menu { title: "Help"
         P.MenuItem { text: "Keyboard Shortcuts"; onTriggered: Store.openSheet("shortcuts") }
-        P.MenuItem { text: "FORM on GitHub"; onTriggered: Bridge.openLink("https://github.com/kaizensx/form-studio") }
+        P.MenuItem { text: "Form Studio on GitHub"; onTriggered: Bridge.openLink("https://github.com/kaizensx/form-studio") }
         P.MenuItem { text: "Report a Problem"; onTriggered: Bridge.openLink("https://github.com/kaizensx/form-studio/issues") }
         P.MenuItem { text: "Check for Updates…"; onTriggered: Store.checkUpdates(true).then(function (u) {
             if (u && u.available) { Store.updateHidden = false; Store.openSheet("update") }
             else if (u && !u.enabled) Store.toast("Update checks are off", "[updates] check = false or FORM_NO_UPDATE_CHECK=1")
-            else if (u && u.latest) Store.toast("FORM " + u.current + " is up to date")
+            else if (u && u.latest) Store.toast("Form Studio " + u.current + " is up to date")
             else Store.toast("Could not reach GitHub", "Nothing changed. Try again later.") }) }
     }
 }

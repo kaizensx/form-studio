@@ -16,7 +16,7 @@ from pathlib import Path
 HERE = Path(__file__).parent
 ORDER = ["remote-holder", "desk-accessory", "organizer", "bathroom-mount", "enclosure", "automotive-accessory"]
 KINDS = ("number", "text", "choice")
-TOKEN = re.compile(r"\(FORM brief (b-[0-9a-f]{8})\)")
+TOKEN = re.compile(r"\((?:Form Studio|FORM) brief (b-[0-9a-f]{8})\)")   # FORM: briefs written before the rename
 PENDING = ".briefs"
 
 
@@ -114,13 +114,13 @@ def normalize(p: dict, answers: dict, measured: bool) -> list[dict]:
 def brief_text(p: dict, rows: list[dict], token: str) -> str:
     parts = [f"{r['label']}: {_fmt(r['value'])} {r['unit']}" if r["kind"] == "number" else f"{r['label']}: {r['value']}"
              for r in rows]
-    return f"{p['title']}. " + "; ".join(parts) + f". (FORM brief {token})"
+    return f"{p['title']}. " + "; ".join(parts) + f". (Form Studio brief {token})"
 
 
 def prompt(p: dict, rows: list[dict], measured: bool, token: str) -> str:
     env, mat = p["environment"], p["material"]
     answered = {r["key"] for r in rows}
-    lines = [f"Design a {p['title'].lower()} for me with FORM. I filled in FORM's “{p['title']}” brief.", "", "My answers:"]
+    lines = [f"Design a {p['title'].lower()} for me with Form Studio. I filled in Form Studio's “{p['title']}” brief.", "", "My answers:"]
     for r in rows:
         if r["kind"] == "number":
             lines.append(f"- {r['label']}: {_fmt(r['value'])} {r['unit']} ({r['source']})")

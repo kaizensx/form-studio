@@ -42,7 +42,7 @@ STEP_FILE = ".form-onboarding.json"          # which first-run step the user rea
 REQUIRED = ("kernel", "data")
 # id prefix → group. Items another workstream adds land in the group of their prefix, or in "other".
 GROUPS = [
-    ("engine", "FORM itself", ("kernel", "data", "python")),
+    ("engine", "Form Studio itself", ("kernel", "data", "python")),
     ("slicer", "Slicer and printer", ("slicer", "printer")),
     ("cad", "CAD and 3D apps", ("cad", "freecad", "blender", "openscad", "fusion", "onshape")),
     ("chat", "Claude Code for chat", ("chat.", "agent.claude")),
@@ -67,8 +67,8 @@ def _packaged_fix(fix: setup_mod.Fix | None) -> setup_mod.Fix | None:
     """In the packaged app there is no uv tool install to repair; point at the download instead."""
     if not fix or not getattr(sys, "frozen", False) or not any(c.startswith("uv tool") for c in fix.commands):
         return fix
-    return setup_mod.Fix("Download the FORM app again", [], recommended=fix.recommended,
-                         note=f"This copy of FORM is a packaged app. Get the current build from {RELEASES}")
+    return setup_mod.Fix("Download the Form Studio app again", [], recommended=fix.recommended,
+                         note=f"This copy of Form Studio is a packaged app. Get the current build from {RELEASES}")
 
 
 def items(cfg: dict, studio=None) -> list[setup_mod.Item]:
@@ -263,7 +263,7 @@ class Setup:
                 if i is None:
                     raise StudioError(f"Unknown setup item “{iid}”.", status=400)
                 if i.status == "ok" or not _runnable(i.fix):
-                    raise StudioError(f"{i.label}: there is nothing FORM can run for this.",
+                    raise StudioError(f"{i.label}: there is nothing Form Studio can run for this.",
                                       hint=(i.fix.note if i.fix else "") or "It is already set up.", status=400)
                 if list(shown.get(iid) or []) != list(i.fix.commands):
                     raise StudioError(f"{i.label}: the fix changed since it was shown.",
@@ -340,7 +340,7 @@ def route_post(st, path: str, body):
         return job.public()
     if path == "/api/updates/install":            # upgrade FORM itself: the command that was shown, as an install job
         job = _wrap(lambda: sa.installer.update(body.get("shown") if isinstance(body.get("shown"), str) else None))
-        st.activity(None, "setup", "Upgrading FORM", by="you")
+        st.activity(None, "setup", "Upgrading Form Studio", by="you")
         return job.public()
     m = re.fullmatch(r"/api/install/job/([0-9a-f]{10})/cancel", path)
     if m:

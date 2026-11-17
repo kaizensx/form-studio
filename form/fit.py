@@ -150,7 +150,7 @@ def next_actions(fit: dict | None, costs: dict) -> list[dict]:
     if fit["sources"]["printer"]["source"] != "calibrated":
         c = costs.get("coupon")
         acts.append({"id": "coupon", "title": "Print and measure the fit coupon",
-                     "why": "This printer profile has no measured bias or spread; FORM is assuming them. "
+                     "why": "This printer profile has no measured bias or spread; Form Studio is assuming them. "
                             "The result is reused by every later design on this profile.",
                      "after": centred(s_m, 0.06), "cost": _cost(c), "cost_s": (c or {}).get("time_s"), "stage": "fit"})
     c = costs.get("test_piece")

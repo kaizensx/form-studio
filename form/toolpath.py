@@ -299,7 +299,7 @@ def for_project(st, p: dict) -> Toolpath:
         raise StudioError("There is no current slice to simulate.", "Run the pipeline first (form run <project>).", status=409)
     layers = st.layers(p)
     if not layers:
-        raise StudioError("The slicer's G-code has no extrusion moves FORM can read.", status=409)
+        raise StudioError("The slicer's G-code has no extrusion moves Form Studio can read.", status=409)
     settings = gcode_settings(st.apath(p, "slice", key) / meta["gcode"])
     w, src = drawing_width(settings)
     tp = build(layers, meta.get("time_s"), w, src, settings)

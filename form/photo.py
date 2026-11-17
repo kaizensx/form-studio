@@ -113,7 +113,7 @@ def render(st, p, preset="studio", finish="matte", color=None, fast=False, layer
     """Render the current revision. Returns the render's record (cached if this exact render exists)."""
     b = blender(st.cfg, refresh=True)
     if not b["available"]:
-        raise StudioError("Blender is not available, so FORM cannot render.", b["reason"], status=409)
+        raise StudioError("Blender is not available, so Form Studio cannot render.", b["reason"], status=409)
     o = _options(st, preset, finish, color, fast, layer_lines)
 
     def say(frac, text):
@@ -189,7 +189,7 @@ def start(st, pid: str, body: dict) -> dict:
     args.setdefault("finish", "matte")
     b = blender(st.cfg)
     if not b["available"]:
-        raise StudioError("Blender is not available, so FORM cannot render.", b["reason"], status=409)
+        raise StudioError("Blender is not available, so Form Studio cannot render.", b["reason"], status=409)
     o = _options(st, args["preset"], args["finish"], args.get("color"), args.get("fast", False), args.get("layer_lines", True))
     try:
         key = key_for(st, p, o)

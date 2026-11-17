@@ -91,7 +91,7 @@ Column {
         Btn { kind: "primary"; icon: "camera"; text: rs.busy ? "Rendering…" : rs.shown ? "Render again" : "Render"; busy: rs.busy; enabled: rs.ready; keys: "Return"; onClicked: rs.go() } }
 
     Note { visible: !!rs.st && !rs.ready; kind: "amber"; title: "Blender is not available"
-        text: rs.st ? rs.st.blender.reason + " Everything else in FORM works without it." : "" }
+        text: rs.st ? rs.st.blender.reason + " Everything else in Form Studio works without it." : "" }
 
     Row {
         width: parent.width; spacing: 24

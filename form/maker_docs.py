@@ -127,7 +127,7 @@ def assembly_md(d, out_dir: Path, release=None) -> tuple[str, list]:
     lines = [f"# Assembly: {d['p']['name']}", "", f"{_stamp(d, release)}. Units: mm.", "",
              "Steps follow the part order the design declares. Images are drawn from the revision's solids, placed as "
              "the design's assembly declares, with the new part lifted along its separation direction (exploded). "
-             "They are diagrams; FORM has not seen the parts go together.", ""]
+             "They are diagrams; Form Studio has not seen the parts go together.", ""]
     ov = f"assembly-00.png"
     feats = [{"id": "placed", "label": "Assembled"}, {"id": "new", "label": "This step"}]
     png = render_png(_scene(d, {x["id"]: x["explode"] for x in asm["parts"]}, ""), feats[:1], "iso", None, size=(880, 600),
@@ -245,7 +245,7 @@ def print_report(d, release=None) -> str:
     lines += ["- No structural analysis was performed.", "- Slicer output is a simulation, not a print.", ""]
     brief_assumed = [sp for sp in assumed if sp.group == "brief"]
     nxt = (f"measure {', '.join(sp.label.lower() for sp in brief_assumed[:3])} (MEASUREMENT_PLAN.md)" if brief_assumed else
-           "print the fit test piece, or the part, and record the result in FORM")
+           "print the fit test piece, or the part, and record the result in Form Studio")
     lines += ["Next smallest useful test: " + nxt + ".", ""]
     return "\n".join(lines)
 
@@ -273,7 +273,7 @@ def measurement_plan(d, release=None) -> str:
     fit = recipe.fit or {}
     lines = ["# Measurement plan", "", f"Part/revision: {_stamp(d, release)}", "",
              "Only the dimensions below come from the world rather than from the design. Values marked assumed have not been "
-             "measured; FORM keeps them, labels every check that depends on them, and design work can continue. "
+             "measured; Form Studio keeps them, labels every check that depends on them, and design work can continue. "
              "Never write a value here that was not measured.", "",
              "| Feature | Parameter | Value now | Known as | Source |", "|---|---|---|---|---|"]
     for sp in brief:
@@ -298,7 +298,7 @@ def measurement_plan(d, release=None) -> str:
                   "Photo or sketch with marked locations: attach a photo of the object with the measured faces marked.",
                   "Can independent form development continue?: yes; the value stays assumed until a measurement is recorded.",
                   "", "Measured value: ______ mm   Tool: ______   By / date: ______", ""]
-    lines += ["Record results in FORM (Brief: set the value and choose 'measured'), so the next revision and its checks use them.", ""]
+    lines += ["Record results in Form Studio (Brief: set the value and choose 'measured'), so the next revision and its checks use them.", ""]
     return "\n".join(lines)
 
 
@@ -368,7 +368,7 @@ def release_zip(st, p, release: str) -> Path:
     docs = [f for f in m.get("documents", []) if (rel / f).is_file()]
     if not docs:
         from .studio import StudioError
-        raise StudioError("This release has no maker documents.", "Releases made before FORM generated them have only REPORT.md.", status=404)
+        raise StudioError("This release has no maker documents.", "Releases made before Form Studio generated them have only REPORT.md.", status=404)
     z = st.root / f".{p['id']}-{release}-docs.zip"
     with zipfile.ZipFile(z, "w", zipfile.ZIP_DEFLATED) as zf:
         for f in docs:

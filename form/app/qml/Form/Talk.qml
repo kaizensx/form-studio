@@ -24,7 +24,7 @@ Rectangle {
         var d = Store.data, out = []
         if (!d || !Store.project) return out
         var roll = d.checks ? d.checks.rollup : null, rev = F.pad(Store.project.head)
-        if (roll && roll.FAIL) out.push({ label: "Fix what fails in " + rev, prompt: "The checks on " + rev + " of this design report " + roll.FAIL + " failure(s). Read them with FORM's tools, explain each in one line, and preview the smallest change that fixes them. Do not commit until I say so." })
+        if (roll && roll.FAIL) out.push({ label: "Fix what fails in " + rev, prompt: "The checks on " + rev + " of this design report " + roll.FAIL + " failure(s). Read them with Form Studio's tools, explain each in one line, and preview the smallest change that fixes them. Do not commit until I say so." })
         else if (roll && roll.WARN) out.push({ label: "Explain the " + F.plural(roll.WARN, "warning") + " on " + rev, prompt: "Explain the warnings on " + rev + " of this design: what each one means for the print or the fit, and which I can safely acknowledge." })
         out.push({ label: "Review " + rev + ": design, engineering, print", review: true })
         out.push({ label: "Make it lighter without failing a check", prompt: "Make this design lighter without failing any check. Show me the candidate as a preview first, with the mass before and after." })
@@ -133,7 +133,7 @@ Rectangle {
             text: talk.hero ? "What do you need\nto print?" : Store.project ? "Ask about this design,\nor describe a change." : "Describe a change,\nor a new part." }
         Txt { tone: 2; width: parent.width; lineHeight: 1.4
             text: talk.hero ? "Describe it. The agent designs it in a real CAD kernel while you watch, with checks, a fit model and a real slice. Nothing prints or uploads."
-                            : "The agent works on the design with FORM's tools. Changes arrive as a draft or a new revision you can compare and undo." }
+                            : "The agent works on the design with Form Studio's tools. Changes arrive as a draft or a new revision you can compare and undo." }
         Note { visible: !Store.chat.available && !!Store.studio; kind: "amber"; title: "No agent is connected"
             text: (Store.chat.note || "") + " You can still start from a recipe and edit everything by hand." }
     }

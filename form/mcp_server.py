@@ -33,7 +33,7 @@ from .digest import digest as _digest
 from .studio import H, Studio, StudioError
 
 INSTRUCTIONS = """\
-FORM designs 3D-printable parts from parametric recipes and keeps an honest record of what is known.
+Form Studio designs 3D-printable parts from parametric recipes and keeps an honest record of what is known.
 
 Workflow: form_overview -> describe_recipe -> create_project (or get_project) -> preview_change ->
 render (look at it) -> commit_change -> run_pipeline -> get_project (gate, checks, next actions) ->
@@ -119,7 +119,7 @@ async def _wait_job(st: Studio, jid: str, wait_s: float) -> dict:
 # ---- server ---------------------------------------------------------------
 
 def build() -> MCPServer:
-    mcp = MCPServer("form", title="FORM print-design studio", version=__version__, instructions=INSTRUCTIONS)
+    mcp = MCPServer("form", title="Form Studio print-design studio", version=__version__, instructions=INSTRUCTIONS)
     RO = ToolAnnotations(read_only_hint=True, open_world_hint=False)
     RW = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
 
@@ -152,7 +152,7 @@ def build() -> MCPServer:
                     "software": [{k: r[k] for k in ("id", "label", "why", "level", "status", "detail", "size", "installable", "manual")}
                                  | {"commands": (r["plan"] or {}).get("commands", [])} for r in rows],
                     **installer.summary(rows),
-                    "tell_the_user": "FORM's app installs these under Settings, Software. Headless: `form install <id>`, "
+                    "tell_the_user": "Form Studio's app installs these under Settings, Software. Headless: `form install <id>`, "
                                      "or install_software(id, confirm=True) after the user agrees to the command shown."}
         return await _run(go)
 
@@ -568,7 +568,7 @@ def build() -> MCPServer:
         if url:
             out["approve_here"] = url
             out["tell_the_user"] = ("Open the bench link, review the checks and warnings, then press Approve. "
-                                    "FORM writes a release folder with STEP, STL, 3MF, G-code, MANIFEST.json and REPORT.md.")
+                                    "Form Studio writes a release folder with STEP, STL, 3MF, G-code, MANIFEST.json and REPORT.md.")
         else:
             out["tell_the_user"] = "Start the bench (`form serve`) to review and approve."
         return out
@@ -627,7 +627,7 @@ def build() -> MCPServer:
         size = [round(b - a, 2) for a, b in zip(*rec["bbox"])]
         return {"reference": rec["file"], "format": rec["format"], "bbox_mm": rec["bbox"], "size_mm": size,
                 "volume_mm3": round(rec["volume_mm3"], 1) if rec.get("volume_mm3") is not None else None,
-                "evidence": "computed (read by FORM's kernel from the file)",
+                "evidence": "computed (read by Form Studio's kernel from the file)",
                 "use_in_design": f'self.reference("{rec["file"]}") returns it as a build123d shape in the same coordinates.',
                 "note": "The part is drawn where its file puts it. Model your design around those coordinates, or move "
                         "the reference inside your design code (Pos(...) * self.reference(...))."}
@@ -643,7 +643,7 @@ def build() -> MCPServer:
             out = st.apath(p, "exports", st.keys(p)["exports"]) / fname
             out.write_text(text, encoding="utf-8")
             return {"macro": str(out), "step": str(out.with_name(st.read(p, "exports", st.keys(p)["exports"])["files"]["step"]["name"])),
-                    "note": "The spreadsheet records values; the STEP is a frozen solid. Edit the design in FORM and export again."}
+                    "note": "The spreadsheet records values; the STEP is a frozen solid. Edit the design in Form Studio and export again."}
         return await _run(go)
 
     # ---- analysis on the model (form/analysis.py): maps, measuring, print orientation -------------
@@ -714,7 +714,7 @@ def build() -> MCPServer:
     def design_part(goal: str) -> str:
         """A guided FORM session for a printable part."""
         return (f"Goal: {goal}\n\n"
-                "Use the FORM tools. 1) form_overview, then describe_recipe for the closest recipe. "
+                "Use the Form Studio tools. 1) form_overview, then describe_recipe for the closest recipe. "
                 "2) Ask me for any 'brief' dimensions you would otherwise assume, and how I measured them. "
                 "3) create_project, then render(view='sheet') and look at it. "
                 "4) For each change: preview_change, render with values=..., then commit_change with expect_head. "
@@ -875,7 +875,7 @@ def build() -> MCPServer:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(prog="form-mcp", description="FORM MCP server (stdio)")
+    ap = argparse.ArgumentParser(prog="form-mcp", description="Form Studio MCP server (stdio)")
     ap.add_argument("--no-bench", action="store_true", help="do not serve the local bench web page")
     a = ap.parse_args(argv)
     mcp = build()

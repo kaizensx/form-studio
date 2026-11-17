@@ -50,8 +50,8 @@ class _Call(QRunnable):
             return
         except Exception as e:      # the engine thread died or the socket closed
             try:
-                self.b.reply.emit(self.rid, False, {"message": "The FORM engine is not answering.",
-                                                     "hint": f"Restart FORM. Your projects are saved on disk. ({e})", "status": 0})
+                self.b.reply.emit(self.rid, False, {"message": "The Form Studio engine is not answering.",
+                                                     "hint": f"Restart Form Studio. Your projects are saved on disk. ({e})", "status": 0})
             except RuntimeError:
                 pass
 

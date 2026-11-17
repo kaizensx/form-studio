@@ -496,7 +496,7 @@ def op_reference(path, fmt, out):
     else:
         raise RecipeError(f"Unsupported format {fmt}", "", "Import a STEP (.step/.stp) or STL file.")
     if len(T) > 400_000:
-        raise RecipeError(f"The part has {len(T):,} triangles to draw; FORM draws up to 400,000.", "",
+        raise RecipeError(f"The part has {len(T):,} triangles to draw; Form Studio draws up to 400,000.", "",
                           "Export a simplified version of the part.")
     info["triangles"] = int(len(T))
     view = {"positions": _b64(P.astype(np.float32)), "indices": _b64(T.astype(np.uint32)), "edges": _b64(E)}

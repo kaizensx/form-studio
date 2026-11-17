@@ -202,7 +202,7 @@ def installed_filaments(slicer_info: dict) -> dict:
     kind, cdir = slicer_info.get("kind"), slicer_info.get("config_dir")
     machine = (slicer_info.get("presets", {}).get("machine") or {}).get("name")
     if kind not in ("bambu", "orca"):
-        return {"materials": [], "reason": "FORM reads installed filament presets from Bambu Studio and OrcaSlicer only."}
+        return {"materials": [], "reason": "Form Studio reads installed filament presets from Bambu Studio and OrcaSlicer only."}
     if not cdir or not Path(cdir).is_dir():
         return {"materials": [], "reason": "The slicer's preset folder was not found."}
     if not machine:

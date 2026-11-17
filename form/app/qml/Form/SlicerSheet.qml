@@ -7,7 +7,7 @@ import "F.js" as F
 Column {
     id: ss
     property string title: "Slicer"
-    property string note: "The program FORM slices with on this computer"
+    property string note: "The program Form Studio slices with on this computer"
     property int sheetWidth: Theme.sheetM
     property var info: null                     // GET /studio/slicers → { chosen, config, slicers: [...] }
     property var error: null
@@ -47,7 +47,7 @@ Column {
         Btn { icon: "refresh_cw"; text: "Look again"; busy: ss.loading; enabled: ss.busy === ""; onClicked: ss.load() } }
 
     Txt { tone: 2; width: parent.width
-        text: "FORM slices with one slicer program on this computer and reads the printer, filament and process presets selected in it. Changing the slicer makes the current slice stale; nothing is sliced until the pipeline runs." }
+        text: "Form Studio slices with one slicer program on this computer and reads the printer, filament and process presets selected in it. Changing the slicer makes the current slice stale; nothing is sliced until the pipeline runs." }
 
     // loading and error
     Row { visible: !ss.info && !ss.error; spacing: 8; height: 40

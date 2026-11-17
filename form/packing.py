@@ -127,8 +127,8 @@ def pack(parts: list, bed: tuple, spacing: float = DEFAULT_SPACING_MM, margin: f
             "bed_mm": [bed_w, bed_h], "spacing_mm": spacing, "margin_mm": margin,
             "used_mm": [round(x1, 2), round(y1, 2)], "rotation": "90° turns allowed" if rotate else "no rotation",
             "evidence": "computed",
-            "note": "Bounding boxes on one plate, computed by FORM. The slicer arranges again when it slices; "
-                    "FORM's export stays one part per plate."}
+            "note": "Bounding boxes on one plate, computed by Form Studio. The slicer arranges again when it slices; "
+                    "Form Studio's export stays one part per plate."}
 
 
 def copies(w: float, h: float, n: int, bed: tuple, spacing: float = DEFAULT_SPACING_MM, margin: float = 0.0,

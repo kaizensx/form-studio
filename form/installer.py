@@ -44,7 +44,7 @@ PARTS_PINS = ("bd_warehouse==0.4.0", "py_gearworks==0.0.24")  # the same pins as
 KERNEL_PIN = "build123d==0.13.0"
 DEFAULT_TIMEOUT_S = 1800
 LEVELS = ("required", "recommended", "optional")
-GROUPS = [("engine", "FORM itself"), ("slicer", "Printer and slicer"), ("ai", "Your AI"),
+GROUPS = [("engine", "Form Studio itself"), ("slicer", "Printer and slicer"), ("ai", "Your AI"),
           ("agents", "Other agents"), ("cad", "CAD and 3D apps")]
 
 
@@ -176,7 +176,7 @@ def _d_kernel(cfg, ctx) -> Found:
     have = all(importlib.util.find_spec(m) is not None for m in ("build123d", "OCP"))
     if have:
         return Found("ok", "build123d and OpenCascade are " + ("included in this app" if frozen() else "installed"))
-    return Found("missing", "build123d / OCP not found in FORM's Python environment")
+    return Found("missing", "build123d / OCP not found in Form Studio's Python environment")
 
 
 def _d_data(cfg, ctx) -> Found:
@@ -197,7 +197,7 @@ def _d_parts(cfg, ctx) -> Found:
     if not missing:
         return Found("ok", "bd_warehouse and py_gearworks are " + ("included in this app" if frozen() else "installed"))
     if frozen():
-        return Found("warn", f"This build of FORM was packaged without {' and '.join(missing)}.")
+        return Found("warn", f"This build of Form Studio was packaged without {' and '.join(missing)}.")
     return Found("missing", f"{' and '.join(missing)} not installed. Screws, threads, bearings and gears from the standard-parts "
                             "library need them; everything else works.")
 
@@ -303,7 +303,7 @@ def _app_methods(brew: str, winget: str, flatpak: str, url: str, apt: str = ""):
         if platform == "linux":
             if flatpak:
                 out.append(Method("flatpak", "Flathub", commands=[f"flatpak install -y flathub {flatpak}"], needs=("flatpak",),
-                                  note="Flatpak apps start with `flatpak run`; FORM looks for the exported launcher."))
+                                  note="Flatpak apps start with `flatpak run`; Form Studio looks for the exported launcher."))
             if apt:
                 out.append(Method("apt", "apt", commands=[f"sudo apt-get install -y {apt}"], needs=("apt-get",), elevation=True))
         out.append(_open(url))
@@ -314,8 +314,8 @@ def _app_methods(brew: str, winget: str, flatpak: str, url: str, apt: str = ""):
 def _m_kernel(platform, ctx) -> list[Method]:
     if frozen():
         return [Method("bundled", "Included in the app", kind="bundled",
-                       note="If it is missing, this copy is damaged: download FORM again."),
-                _open("https://github.com/kaizensx/form-studio/releases", "Download FORM again")]
+                       note="If it is missing, this copy is damaged: download Form Studio again."),
+                _open("https://github.com/kaizensx/form-studio/releases", "Download Form Studio again")]
     return [Method("uv", "uv", commands=[f"uv pip install --python {_q(sys.executable, platform)} {KERNEL_PIN}"], needs=("uv",)),
             Method("pip", "pip", commands=[f"{_q(sys.executable, platform)} -m pip install {KERNEL_PIN}"], needs=("#pip",))]
 
@@ -328,8 +328,8 @@ def _m_data(platform, ctx) -> list[Method]:
 def _m_parts(platform, ctx) -> list[Method]:
     if frozen():
         return [Method("bundled", "Included in the app", kind="bundled",
-                       note="A packaged FORM cannot add Python libraries to itself. Download a build that includes them."),
-                _open("https://github.com/kaizensx/form-studio/releases", "Download FORM again")]
+                       note="A packaged Form Studio cannot add Python libraries to itself. Download a build that includes them."),
+                _open("https://github.com/kaizensx/form-studio/releases", "Download Form Studio again")]
     pins = " ".join(PARTS_PINS)
     return [Method("uv", "uv", commands=[f"uv pip install --python {_q(sys.executable, platform)} {pins}"], needs=("uv",)),
             Method("pip", "pip", commands=[f"{_q(sys.executable, platform)} -m pip install {pins}"], needs=("#pip",))]
@@ -353,8 +353,8 @@ def _m_claude(platform, ctx) -> list[Method]:
 
 def _m_signin(platform, ctx) -> list[Method]:
     return [Method("login", "Sign in with your browser", kind="login", commands=["claude auth login"],
-                   note="FORM runs this in the background and shows the sign-in link. Your password goes to "
-                        "Anthropic's page in your browser, never to FORM.")]
+                   note="Form Studio runs this in the background and shows the sign-in link. Your password goes to "
+                        "Anthropic's page in your browser, never to Form Studio.")]
 
 
 def _m_agent(aid: str):
@@ -377,7 +377,7 @@ def _d_cli(cli: str, label: str):
         ad = ADAPTERS.get(cli)
         exe = ad.executable(cfg) if ad else shutil.which(cli)
         if not exe:
-            return Found("missing", f"Not found. FORM works without it; {label} is one more agent to choose in chat.")
+            return Found("missing", f"Not found. Form Studio works without it; {label} is one more agent to choose in chat.")
         code, out = _run([exe, "--version"], timeout=30)
         v = out.strip().splitlines()[-1].strip() if code == 0 and out.strip() else ""
         return Found("ok", (v or "installed") + f" · {exe}", version=v, path=exe)
@@ -404,7 +404,7 @@ def gemini_signed_in(cfg: dict | None = None) -> tuple[bool, str]:
         if os.environ.get(var):
             return True, f"{var} is set in the environment."
     if agent_keys.status()["gemini_api_key"]["set"]:
-        return True, "Uses the Gemini API key stored in FORM."
+        return True, "Uses the Gemini API key stored in Form Studio."
     home = Path(os.environ.get("GEMINI_CLI_HOME") or Path.home()) / ".gemini"
     if (home / "oauth_creds.json").exists():
         return True, "Signed in with Google in Gemini CLI."
@@ -427,7 +427,7 @@ def _d_gemini_signin(cfg, ctx) -> Found:
 
 def _m_gemini_signin(platform, ctx) -> list[Method]:
     return [Method("key", "Create an API key", kind="open", url="https://aistudio.google.com/apikey",
-                   note="Create a key on Google's page, then paste it in Settings, Chat tab. FORM keeps it in a private "
+                   note="Create a key on Google's page, then paste it in Settings, Chat tab. Form Studio keeps it in a private "
                         "file on this computer and gives it only to Gemini CLI.")]
 
 
@@ -443,7 +443,7 @@ REGISTRY: list[Software] = [
              "required", "engine", _d_data, _m_data),
     Software("parts", "Standard-parts libraries", "Real screws, threads, bearings and gears (bd_warehouse, py_gearworks).",
              "recommended", "engine", _d_parts, _m_parts, size="about 5 MB"),
-    _slicer("bambu", "Bambu Studio", "Slices for Bambu Lab printers. FORM reads the printer, filament and process selected in it.",
+    _slicer("bambu", "Bambu Studio", "Slices for Bambu Lab printers. Form Studio reads the printer, filament and process selected in it.",
             "bambu-studio", "Bambulab.Bambustudio", "com.bambulab.BambuStudio", "https://bambulab.com/en/download/studio",
             "about 200 MB", "recommended"),
     _slicer("orca", "OrcaSlicer", "Slices for most printers (Bambu Lab, Prusa, Creality, Voron and more).",
@@ -457,11 +457,11 @@ REGISTRY: list[Software] = [
             "", "", "", "https://github.com/supermerill/SuperSlicer/releases", "about 120 MB", "optional"),
     _slicer("qidi", "QIDISlicer", "Slices for QIDI printers (Q1 Pro, Q2, X-Plus 4 and more).",
             "", "", "", "https://github.com/QIDITECH/QIDISlicer/releases", "about 170 MB", "optional"),
-    Software("claude", "Claude Code", "Chat in FORM runs Claude Code on your own Claude account. Everything else works without it.",
+    Software("claude", "Claude Code", "Chat in Form Studio runs Claude Code on your own Claude account. Everything else works without it.",
              "recommended", "ai", _d_claude, _m_claude, size="about 280 MB", homepage=CLAUDE_DOCS),
     Software("claude.signin", "Claude sign-in", "Chat needs Claude Code signed in to your account.",
              "recommended", "ai", _d_signin, _m_signin, needs=("claude",)),
-    Software("agent.claude", "FORM tools in Claude Code", "Lets Claude Code call FORM (design, check, slice) from chat and from a terminal.",
+    Software("agent.claude", "Form Studio tools in Claude Code", "Lets Claude Code call Form Studio (design, check, slice) from chat and from a terminal.",
              "recommended", "ai", _d_agent("agent.claude", "Claude Code"), _m_agent("agent.claude"), needs=("claude",)),
     Software("codex", "Codex", "OpenAI's agent. Pick it per conversation; it runs on your own OpenAI account.",
              "optional", "agents", _d_cli("codex", "Codex"), _m_npm_cli("@openai/codex", "codex", "https://developers.openai.com/codex/cli"),
@@ -472,13 +472,13 @@ REGISTRY: list[Software] = [
              size="about 150 MB", homepage="https://github.com/google-gemini/gemini-cli"),
     Software("gemini.signin", "Gemini sign-in", "Gemini CLI answers only when it is signed in or has an API key.",
              "optional", "agents", _d_gemini_signin, _m_gemini_signin, needs=("gemini",)),
-    Software("agent.codex", "FORM tools in Codex", "Lets Codex call FORM.",
+    Software("agent.codex", "Form Studio tools in Codex", "Lets Codex call Form Studio.",
              "recommended", "agents", _d_agent("agent.codex", "Codex"), _m_agent("agent.codex")),
-    Software("agent.gemini", "FORM tools in Gemini CLI", "Lets Gemini CLI call FORM.",
+    Software("agent.gemini", "Form Studio tools in Gemini CLI", "Lets Gemini CLI call Form Studio.",
              "recommended", "agents", _d_agent("agent.gemini", "Gemini CLI"), _m_agent("agent.gemini")),
-    Software("agent.cursor", "FORM tools in Cursor", "Lets Cursor call FORM.",
+    Software("agent.cursor", "Form Studio tools in Cursor", "Lets Cursor call Form Studio.",
              "recommended", "agents", _d_agent("agent.cursor", "Cursor"), _m_agent("agent.cursor")),
-    Software("agent.desktop", "FORM tools in Claude Desktop", "Lets the Claude desktop app call FORM. Restart Claude Desktop afterwards.",
+    Software("agent.desktop", "Form Studio tools in Claude Desktop", "Lets the Claude desktop app call Form Studio. Restart Claude Desktop afterwards.",
              "optional", "agents", _d_agent("agent.desktop", "Claude Desktop"), _m_agent("agent.desktop")),
     Software("openscad", "OpenSCAD", "Builds designs written in OpenSCAD (mesh designs: no STEP).",
              "optional", "cad", _d_openscad, _app_methods("openscad", "OpenSCAD.OpenSCAD", "org.openscad.OpenSCAD",
@@ -515,7 +515,7 @@ def methods_for(sw: Software, platform: str | None = None, which: Callable[[str]
     for m in sw.methods(platform, ctx if ctx is not None else {}):
         lacking = [n for n in m.needs if (not _has_pip() if n == "#pip" else not which(n))]
         if m.elevation:
-            m.available, m.reason = False, ("Needs an administrator password. FORM never asks for one; "
+            m.available, m.reason = False, ("Needs an administrator password. Form Studio never asks for one; "
                                             "run it yourself in a terminal if you prefer this way.")
         elif lacking:
             names = ", ".join("pip" if n == "#pip" else n for n in lacking)
@@ -720,7 +720,7 @@ class Job:
             return False, f"ran, but checking it again failed: {e}"
         if f.status == "ok":
             return True, f.detail or msg
-        return False, "the command finished, but FORM still cannot find it. " + f.detail
+        return False, "the command finished, but Form Studio still cannot find it. " + f.detail
 
     def _one(self, sw: Software, m: Method) -> tuple[bool, str]:
         if m.kind == "action":
@@ -786,7 +786,7 @@ class Job:
             return False, "cancelled"
         if proc.returncode != 0:
             if wants_password:
-                return False, ("it asked for an administrator password. FORM never asks for one. "
+                return False, ("it asked for an administrator password. Form Studio never asks for one. "
                                "Run the command yourself in a terminal, or use the download page.")
             return False, f"exited with {proc.returncode}"
         return True, "done"
@@ -920,7 +920,7 @@ class Installer:
                 page = manual(sw, ctx=ctx)
                 if m is not None:
                     raise InstallError(f"{sw.label} is a sign-in, not an install.", "Use the Sign in button (or run `claude auth login`).")
-                raise InstallError(f"FORM cannot install {sw.label} by itself on this computer.",
+                raise InstallError(f"Form Studio cannot install {sw.label} by itself on this computer.",
                                    (why + ". " if why else "") + (f"Get it from {page}" if page else ""))
             if shown is not None and list(shown.get(sid) or []) != list(m.commands):
                 raise InstallError(f"{sw.label}: the install command changed since it was shown.",
@@ -948,12 +948,12 @@ class Installer:
         kind = updates.install_kind()
         cmd = updates.upgrade_command(kind)
         if not cmd:
-            raise InstallError("This copy of FORM is updated by downloading the new app.",
+            raise InstallError("This copy of Form Studio is updated by downloading the new app.",
                                "Use the download button; your projects stay where they are.")
         if shown is not None and shown != cmd:
             raise InstallError("The upgrade command changed since it was shown.", "Open the update sheet again and review it.", status=409)
-        sw = Software("form.update", "FORM", "Upgrades FORM itself.", "optional", "form",
-                      lambda cfg, ctx: Found("ok", "The new version is installed. Restart FORM to use it."),
+        sw = Software("form.update", "Form Studio", "Upgrades Form Studio itself.", "optional", "form",
+                      lambda cfg, ctx: Found("ok", "The new version is installed. Restart Form Studio to use it."),
                       lambda platform, ctx: [])
         m = Method("upgrade", "Upgrade a source checkout" if kind == "source" else "Upgrade with uv or pip", commands=[cmd])
         with self._lock:
@@ -1032,7 +1032,7 @@ def main(argv=None) -> int:
     """`form install …`"""
     import argparse
     from . import config
-    ap = argparse.ArgumentParser(prog="form install", description="Install what FORM uses. Shows each command before it runs.")
+    ap = argparse.ArgumentParser(prog="form install", description="Install what Form Studio uses. Shows each command before it runs.")
     ap.add_argument("ids", nargs="*", help="registry ids (see --list), or “recommended”")
     ap.add_argument("--list", action="store_true", help="the registry as JSON: what was found, and how each item is installed")
     ap.add_argument("--yes", action="store_true", help="do not ask before running the commands")

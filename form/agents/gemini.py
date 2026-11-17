@@ -83,7 +83,7 @@ class Gemini(Adapter):
         s = (error or "").lower()
         if all(k in s for k in NOT_SIGNED_IN[:1]) or ("auth method" in s and "gemini" in s):
             return {"message": "Gemini CLI is not signed in, so it cannot answer.",
-                    "hint": "Add a Gemini API key in Settings, Chat tab. FORM keeps it in a private file on this computer "
+                    "hint": "Add a Gemini API key in Settings, Chat tab. Form Studio keeps it in a private file on this computer "
                             "and gives it only to Gemini CLI."}
         return None
 

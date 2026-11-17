@@ -240,7 +240,7 @@ RESULT_TAG = "FORM_FREECAD_RESULT "
 
 def freecad_check_script(step_path: str) -> str:
     """Python for FreeCADCmd: import the STEP, report validity, volume and bounding box on one tagged line."""
-    return f'''# Written by FORM. Runs headless in FreeCADCmd; reads one STEP file and prints one line.
+    return f'''# Written by Form Studio. Runs headless in FreeCADCmd; reads one STEP file and prints one line.
 import json, sys
 try:
     import FreeCAD, Part
@@ -300,7 +300,7 @@ def recheck_item(result: dict, brep_volume: float, brep_bbox: list) -> dict:
     return {"id": "freecad", "label": "Re-imported in FreeCAD", "status": "PASS" if ok else "WARN",
             "value": ("valid" if result["valid"] else "not valid") + f" · Δ {dv*100:.3f}% volume",
             "detail": f"FreeCAD {result.get('version', '?')}: isValid() = {result['valid']}, {result.get('solids', '?')} solid(s), "
-                      f"volume {result['volume_mm3']/1000:.3f} cm³ (FORM {brep_volume/1000:.3f} cm³), bounding box within "
+                      f"volume {result['volume_mm3']/1000:.3f} cm³ (Form Studio {brep_volume/1000:.3f} cm³), bounding box within "
                       f"{db:.4f} mm. {base}", "evidence": "computed"}
 
 
@@ -314,10 +314,10 @@ def freecad_macro(name: str, rev: int, step_name: str, step_sha256: str, params:
     """
     rows = json.dumps([{k: p[k] for k in ("key", "label", "value", "unit", "source")} for p in params], indent=1)
     return f'''# -*- coding: utf-8 -*-
-# FreeCAD macro written by FORM for {name} r{rev:02d}.
+# FreeCAD macro written by Form Studio for {name} r{rev:02d}.
 # Rebuilds the part from {step_name} (put it in the same folder as this macro) and adds a
 # spreadsheet "FORM_parameters" with the values it was made from and how each one is known.
-# The STEP is a frozen solid: editing a cell does not change it. Change the design in FORM and export again.
+# The STEP is a frozen solid: editing a cell does not change it. Change the design in Form Studio and export again.
 import hashlib
 import os
 
@@ -366,10 +366,10 @@ shape.read(step)
 part = doc.addObject("Part::Feature", "FORM_part")
 part.Shape = shape
 part.Label = {f"{name} r{rev:02d}"!r}
-note = "STEP hash matches the FORM export." if digest == STEP_SHA256 else "WARNING: this STEP is not the file FORM exported for this revision."
+note = "STEP hash matches the Form Studio export." if digest == STEP_SHA256 else "WARNING: this STEP is not the file Form Studio exported for this revision."
 sheet.set("A%d" % (len(PARAMS) + 3), note)
 doc.recompute()
-App.Console.PrintMessage("FORM: " + note + "\\n")
+App.Console.PrintMessage("Form Studio: " + note + "\\n")
 try:
     import FreeCADGui as Gui
     Gui.SendMsgToActiveView("ViewFit")

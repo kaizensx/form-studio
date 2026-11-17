@@ -4,7 +4,7 @@ import FormNative
 // About FORM: the version you run, what it is built from, and the licences of what ships inside it.
 Column {
     id: ab
-    property string title: "About FORM"
+    property string title: "About Form Studio"
     property int sheetWidth: Theme.sheetM
     property string shown: ""                // which licence text is unfolded
     readonly property var env: Store.studio ? Store.studio.env : null
@@ -17,17 +17,15 @@ Column {
         Btn { text: "Check for updates"; icon: "refresh_cw"; onClicked: { Store.openSheet(null); Store.checkUpdates(true).then(function (u) {
             if (u && u.available) { Store.updateHidden = false; Store.openSheet("update") }
             else if (u && !u.enabled) Store.toast("Update checks are off", "[updates] check = false or FORM_NO_UPDATE_CHECK=1")
-            else if (u && u.latest) Store.toast("FORM " + u.current + " is up to date")
+            else if (u && u.latest) Store.toast("Form Studio " + u.current + " is up to date")
             else Store.toast("Could not reach GitHub", "Nothing changed. Try again later.") }) } } }
 
     Row { spacing: 16
         Rectangle { width: 56; height: 56; radius: Theme.rLg; color: Theme.plate; border.color: Theme.rule2
-            // the mark: a datum triangle on the plate
-            Rectangle { anchors.centerIn: parent; width: 22; height: 22; radius: 5; color: "transparent"; border.width: 2; border.color: Theme.datum; rotation: 45 }
-            Rectangle { anchors.centerIn: parent; width: 5; height: 5; radius: 3; color: Theme.datum } }
+            Logo { word: false; size: 24; anchors.centerIn: parent; anchors.horizontalCenterOffset: 1 } }   // optical centre: the F leans on its stem
         Column { spacing: 3; anchors.verticalCenter: parent.verticalCenter
             Row { spacing: 10
-                Txt { text: "FORM"; font.weight: Theme.wBold; font.letterSpacing: 3; font.pixelSize: 18 }
+                Logo { mark: false; size: 24 }
                 Txt { mono: true; tone: 2; text: Bridge.version; anchors.baseline: parent.children[0].baseline } }
             Txt { tone: 2; width: ab.width - 72; text: "An agent designs printable parts with a real CAD kernel, a real slicer and an honest record of what is known." } } }
 
@@ -42,7 +40,7 @@ Column {
         Column { width: parent.width
             Repeater {
                 model: [
-                    { id: "FORM", label: "FORM", what: "This program", lic: "MIT" },
+                    { id: "FORM", label: "Form Studio", what: "This program", lic: "MIT" },
                     { id: "InstrumentSans", label: "Instrument Sans", what: "Interface typeface", lic: "SIL OFL 1.1" },
                     { id: "GeistMono", label: "Geist Mono", what: "Numbers and code", lic: "SIL OFL 1.1" },
                     { id: "lucide", label: "Lucide", what: "Icons", lic: "ISC" },
@@ -72,5 +70,5 @@ Column {
         }
     }
     Txt { kind: "fine"; width: parent.width
-        text: "FORM runs on this computer. It sends nothing anywhere on its own; an agent you connect uses your own account with its provider." }
+        text: "Form Studio runs on this computer. It sends nothing anywhere on its own; an agent you connect uses your own account with its provider." }
 }

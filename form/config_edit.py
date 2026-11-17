@@ -25,12 +25,12 @@ from . import fsutil
 # key → what the Settings sheet and the CLI need to know. type: str | path | bool | float | int | choice | vec3
 SCHEMA: dict[str, dict] = {
     "data.dir": {"type": "path", "tab": "general", "label": "Project folder", "restart": True,
-                 "help": "Where designs, their history and releases are kept. Takes effect when FORM restarts; "
+                 "help": "Where designs, their history and releases are kept. Takes effect when Form Studio restarts; "
                          "existing projects are not moved."},
-    "updates.check": {"type": "bool", "tab": "general", "label": "Check for a newer FORM once a day",
+    "updates.check": {"type": "bool", "tab": "general", "label": "Check for a newer Form Studio once a day",
                       "help": "Reads public release information from GitHub. Nothing is downloaded or installed."},
-    "bench.auto_open": {"type": "bool", "tab": "general", "label": "Open FORM's page when an agent starts working",
-                        "help": "Applies to agents that use FORM over MCP outside this app."},
+    "bench.auto_open": {"type": "bool", "tab": "general", "label": "Open Form Studio's page when an agent starts working",
+                        "help": "Applies to agents that use Form Studio over MCP outside this app."},
     "slicer.kind": {"type": "choice", "tab": "printer", "label": "Slicer",
                     "choices": ["auto", "bambu", "orca", "prusa", "superslicer", "qidi"],
                     "help": "“auto” uses the first one installed: Bambu Studio, OrcaSlicer, PrusaSlicer."},
@@ -44,7 +44,7 @@ SCHEMA: dict[str, dict] = {
     "printer.envelope_mm": {"type": "vec3", "tab": "printer", "label": "Bed size (X, Y, Z)", "unit": "mm", "min": 20, "max": 2000},
     "printer.plate_margin_mm": {"type": "float", "tab": "printer", "label": "Keep-out margin at the bed edge", "unit": "mm",
                                 "min": 0, "max": 50},
-    "chat.enabled": {"type": "bool", "tab": "chat", "label": "Chat with Claude in FORM"},
+    "chat.enabled": {"type": "bool", "tab": "chat", "label": "Chat with Claude in Form Studio"},
     "chat.cli": {"type": "str", "tab": "chat", "label": "Agent program", "help": "The Claude Code command, or its full path."},
     "chat.agent": {"type": "str", "tab": "chat", "label": "Agent", "help": "Which agent program new conversations use: claude, codex or gemini."},
     "chat.model": {"type": "str", "tab": "chat", "label": "Model", "help": "A model name the agent accepts (for Claude Code: opus, sonnet, haiku, or a full id). You can also pick it per conversation."},
@@ -217,7 +217,7 @@ def set_values(cfg: dict, values: dict, path: Path | None = None) -> dict:
         old = path.read_text(encoding="utf-8") if path.exists() else ""
         before = tomllib.loads(old) if old else {}
     except ValueError as e:
-        raise ConfigError(f"{path} is not valid TOML, so FORM will not edit it: {e}", "Fix or remove the file, then try again.")
+        raise ConfigError(f"{path} is not valid TOML, so Form Studio will not edit it: {e}", "Fix or remove the file, then try again.")
     except OSError as e:
         raise ConfigError(f"Could not read {path}: {e}")
     changed = {k: v for k, v in clean.items()
@@ -226,7 +226,7 @@ def set_values(cfg: dict, values: dict, path: Path | None = None) -> dict:
     if not changed:
         _apply(cfg, clean)
         return {"path": str(path), "backup": None, "changed": {}, "restart": False}
-    text = old or "# FORM configuration (written by FORM; every value is optional)\n"
+    text = old or "# Form Studio configuration (written by Form Studio; every value is optional)\n"
     for k, v in changed.items():
         sec, name = k.split(".", 1)
         text = set_text(text, sec, name, v)

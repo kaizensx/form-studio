@@ -1,7 +1,7 @@
 """What an agent needs to write a FORM design: the contract, the rules, and an example that builds."""
 
 GUIDE = """\
-A FORM design is one Python file that defines one subclass of Recipe. FORM imports it, builds it in the
+A Form Studio design is one Python file that defines one subclass of Recipe. Form Studio imports it, builds it in the
 CAD kernel (build123d on OpenCascade), attributes every face to a feature, and runs the full pipeline:
 renders, checks, fit model, slice, revisions, optimizer, animation, release.
 
@@ -53,10 +53,10 @@ RULES
      features rather than the whole assembly. Its dimensions are "computed" from the file, not "measured".
 
 OPENSCAD (create_design(..., language="openscad"))
-  The source is a .scad file. Each top-level number with a Customizer range comment becomes a FORM parameter:
+  The source is a .scad file. Each top-level number with a Customizer range comment becomes a Form Studio parameter:
       // Inner width (mm)          <- the comment line above is the label; "(deg)" sets the unit to degrees
       width = 40; // [20:1:120]    <- [min:step:max] or [min:max]; /* [Hidden] */ ends the parameters
-  FORM runs `openscad -o part.stl -D width=...` and brings the mesh into the pipeline. It is a mesh design:
+  Form Studio runs `openscad -o part.stl -D width=...` and brings the mesh into the pipeline. It is a mesh design:
   no STEP export, no B-rep validity check, one feature only (no per-feature picking or impact), no FreeCAD
   re-check. Those are reported as "not available for mesh designs", never faked. Mesh volume, closed-mesh,
   wall thickness (ray-cast on the triangles), overhangs, build volume and the slice still run. Prefer Python
@@ -92,7 +92,7 @@ ASSEMBLIES (optional, for solids >= 2)
   Hardware(name, size, qty, source, note, after=part_id, access=(Access(at, axis, tool_d, length),))
        bought parts for the BOM; access = a straight tool path ending at the screw head, pointing the way it is driven,
        checked against the parts in place after `after`.
-  FORM then checks, from the solids: overlap when assembled, the smallest gap, each joint swept at its samples (worst
+  Form Studio then checks, from the solids: overlap when assembled, the smallest gap, each joint swept at its samples (worst
   overlap and the angle), and tool access. Sampled motion never proves the motion is free between samples.
   The app shows Assembled / Exploded / Print layout, and a release adds BOM.csv and ASSEMBLY.md.
 
@@ -102,11 +102,11 @@ TEXT AND MARKS: form.marks   PATTERNS: form.patterns
   marks.deboss_text(shape, "v2", on=a_planar_face, height=5, depth=0.5)                    # sunk
   marks.revision_stamp(shape)        # "r04 a3f1" (revision + hash of its values) sunk 0.4 mm into the underside
        on = a planar Face, a Plane, or a point with normal=. height is the CAP height in mm. Flat faces only.
-       The font ships with FORM (never a system font). Text reads left to right seen from outside; on walls capitals point up.
-       marks.context() gives {"rev", "text", "hash", "nozzle"} while FORM builds for a project: "text" is the project's
+       The font ships with Form Studio (never a system font). Text reads left to right seen from outside; on walls capitals point up.
+       marks.context() gives {"rev", "text", "hash", "nozzle"} while Form Studio builds for a project: "text" is the project's
        label text (form mark <project> --text ..., or the Label text field), so use marks.context().get("text") or "FORM".
        If the geometry depends on it, declare on the class:  mark_params = ("label", "stamp")  (the parameters that switch
-       marks on; FORM then keys the geometry by label text and revision) and  wall_exempt = ("mark",)  (the feature whose
+       marks on; Form Studio then keys the geometry by label text and revision) and  wall_exempt = ("mark",)  (the feature whose
        faces are lettering, so letter corners are not reported as thin walls).
        Printability: statics() can return checks from marks.checks(marks.analyse(text, height), raised=True): stroke
        width against the nozzle (computed) and cap height against a 4 mm legibility floor (heuristic). Raised text on a
@@ -125,7 +125,7 @@ WORKFLOW
 """
 
 EXAMPLE = '''\
-"""Two-part box with a press-fit lid and a cable notch. FORM example design."""
+"""Two-part box with a press-fit lid and a cable notch. Form Studio example design."""
 from build123d import Align, Axis, Box, Pos, fillet
 
 from form.recipes.base import Assembly, Feature, Param, Part, Recipe, RecipeError, Stage

@@ -13,7 +13,7 @@ Column {
     readonly property string phase: !job ? "idle" : job.state            // idle | running | done | failed | cancelled
     readonly property var tail: Store.updateLog.slice(-9)
     property bool showCommand: false
-    property string title: phase === "done" ? "FORM is upgraded" : u && u.latest ? "FORM " + u.latest + " is available" : "Updates"
+    property string title: phase === "done" ? "Form Studio is upgraded" : u && u.latest ? "Form Studio " + u.latest + " is available" : "Updates"
     property string note: u ? "You have " + u.current + (rel && rel.published ? " · released " + rel.published.slice(0, 10) : "") : ""
     property int sheetWidth: Theme.sheetM
     spacing: 14
@@ -31,7 +31,7 @@ Column {
         Btn { objectName: "updatePrimary"; kind: "primary"; busy: us.phase === "running"; keys: "Return"
             icon: us.packaged ? "external_link" : us.phase === "done" ? "power" : "download"
             text: us.packaged ? (us.u && us.u.download && us.u.download.name ? "Download " + us.u.download.name : "Open the download page")
-                : us.phase === "running" ? "Updating…" : us.phase === "done" ? "Quit FORM" : us.phase === "idle" ? "Update now" : "Try again"
+                : us.phase === "running" ? "Updating…" : us.phase === "done" ? "Quit Form Studio" : us.phase === "idle" ? "Update now" : "Try again"
             onClicked: us.accept() } }
 
     Note { visible: !!us.rel && !!us.rel.fake; kind: "amber"; title: "Development"
@@ -47,13 +47,13 @@ Column {
     // pip / uv / source: FORM runs the upgrade itself
     Column { visible: !!us.u && !us.packaged; width: parent.width; spacing: 10
         Txt { visible: us.phase === "idle"; width: parent.width; tone: 2
-            text: "Update now upgrades FORM in place, then asks you to restart it. Your projects are not touched." }
+            text: "Update now upgrades Form Studio in place, then asks you to restart it. Your projects are not touched." }
         Note { visible: us.phase === "done"; kind: "green"; width: parent.width; title: "The new version is installed"
-            text: "This window is still running " + (us.u ? us.u.current : "the old version") + ". Quit FORM and open it again to use the new one."
+            text: "This window is still running " + (us.u ? us.u.current : "the old version") + ". Quit Form Studio and open it again to use the new one."
                 + (us.job && us.job.fake ? " (FORM_INSTALL_FAKE is set: this was a simulation; nothing was installed.)" : "") }
         Note { visible: us.phase === "failed" || us.phase === "cancelled"; kind: us.phase === "failed" ? "red" : "plain"; width: parent.width
             title: us.phase === "failed" ? "The upgrade did not finish" : "The upgrade was cancelled"
-            text: (us.job && us.job.steps.length && us.job.steps[0].message ? us.job.steps[0].message + ". " : "") + "FORM is unchanged and keeps working. The output is below." }
+            text: (us.job && us.job.steps.length && us.job.steps[0].message ? us.job.steps[0].message + ". " : "") + "Form Studio is unchanged and keeps working. The output is below." }
         // what the command printed
         Rectangle { objectName: "updateLog"; visible: us.phase !== "idle"; width: parent.width; height: 178; radius: Theme.rSm; color: Theme.well; border.color: Theme.rule; clip: true
             Column { x: 12; width: parent.width - 24; spacing: 2; anchors.bottom: parent.bottom; anchors.bottomMargin: 10
@@ -74,5 +74,5 @@ Column {
             Btn { id: cp; small: true; kind: "quiet"; icon: "copy"; tip: "Copy the command"; anchors.right: parent.right; anchors.rightMargin: 4; y: 4
                 onClicked: { Bridge.copy(us.u.command); Store.toast("Copied the upgrade command") } } } }
     Txt { kind: "fine"; width: parent.width
-        text: "FORM checks GitHub for a new release at most once a day and never upgrades by itself. Turn the check off with [updates] check = false in studio.toml." }
+        text: "Form Studio checks GitHub for a new release at most once a day and never upgrades by itself. Turn the check off with [updates] check = false in studio.toml." }
 }

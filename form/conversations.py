@@ -260,7 +260,7 @@ class Conversations:
                 raise ConversationError("Nothing to attach.")
             src = Path(src).expanduser()
             if not src.is_file():
-                raise ConversationError(f"{src.name} is not a file FORM can read.")
+                raise ConversationError(f"{src.name} is not a file Form Studio can read.")
             if src.stat().st_size > MAX_ATTACHMENT:
                 raise ConversationError(f"{src.name} is larger than {MAX_ATTACHMENT // 1_000_000} MB.")
         elif len(data) > MAX_ATTACHMENT:

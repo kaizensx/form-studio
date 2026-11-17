@@ -79,7 +79,7 @@ class ClaudeParser(Parser):
 class Claude(Adapter):
     id, label, cli = "claude", "Claude Code", "claude"
     install_hint = "Install Claude Code (claude) to chat here. Everything else works without it."
-    verified = "run on this FORM version"
+    verified = "run on this Form Studio version"
     images, cost = True, True
 
     def models(self, cfg, exe):

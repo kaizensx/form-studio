@@ -96,7 +96,7 @@ class UpgradeJob(unittest.TestCase):
             rc = updates.install_now(self.cfg(), info, echo=lines.append)
         self.assertEqual(rc, 0)
         self.assertTrue(lines[0].startswith("$ "))
-        self.assertIn("Restart FORM", lines[-1])
+        self.assertIn("Restart Form Studio", lines[-1])
 
 
 class ThicknessMap(unittest.TestCase):

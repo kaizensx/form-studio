@@ -48,7 +48,7 @@ Item {
             { icon: "trash_2", text: "Move to trash…", danger: true, run: function () { home.renaming = ""; home.confirming = p.id } }
         ]
     }
-    FileDialog { id: saveDlg; property string pid: ""; title: "Export the design"; fileMode: FileDialog.SaveFile; nameFilters: ["FORM projects (*.formproj)"]
+    FileDialog { id: saveDlg; property string pid: ""; title: "Export the design"; fileMode: FileDialog.SaveFile; nameFilters: ["Form Studio projects (*.formproj)"]
         onAccepted: { if (Bridge.save("/projects/" + pid + "/archive", selectedFile)) Store.toast("Exported", "The whole history is in the file. Outputs are rebuilt where it is opened.")
                       else Store.toast("Could not write that file", "Choose another place.", true) } }
     PopMenu { id: pm; model: home.menuFor ? home.menu(home.menuFor) : [] }

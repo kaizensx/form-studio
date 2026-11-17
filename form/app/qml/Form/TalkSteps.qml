@@ -82,7 +82,7 @@ Column {
                 Txt { anchors.centerIn: parent; kind: "fine"; visible: im.status === Image.Error; text: "This render is no longer on disk" }
                 // click: the picture, large. The corner button turns the 3D view to the same angle instead.
                 MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true
-                    onClicked: Store.showImage(im.source, st.how ? st.how[1] : "Render", "Rendered by FORM from the kernel geometry") }
+                    onClicked: Store.showImage(im.source, st.how ? st.how[1] : "Render", "Rendered by Form Studio from the kernel geometry") }
                 Rectangle { anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 6; width: 26; height: 26; radius: Theme.rSm; color: Theme.alpha(Theme.plate, 0.8); border.color: Theme.rule2
                     opacity: tm.containsMouse || vb.hovered ? 1 : 0; visible: opacity > 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } }
                     Btn { id: vb; anchors.centerIn: parent; small: true; kind: "quiet"; icon: st.r && st.r.img && st.r.img.project !== Store.pid ? "arrow_up_right" : "rotate_3d"

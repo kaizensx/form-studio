@@ -25,7 +25,7 @@ def run(ui):
     ui.expect("Step 2 of 3")
     ui.click_text("Continue")
     ui.settle()
-    ui.click_text("Open FORM")
+    ui.click_text("Open Form Studio")
     ui.wait_until(lambda: ui.store.get("welcome") is False, 5, "the first-run screen to close")
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     ui.wait_until(lambda: ui.api("/setup/state")["first_run"] is False, 5, "the engine to remember that setup was seen")

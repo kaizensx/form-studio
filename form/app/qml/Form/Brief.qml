@@ -90,7 +90,7 @@ Column {
 
     Fold { title: "Reference photos"; note: root.refs.length ? root.refs.length + " attached" : "none"; key: "brief.photos"; openByDefault: root.refs.length > 0
         Txt { kind: "fine"; width: parent.width
-            text: "A photo can give a rough dimension once you mark a known length in it. FORM treats photo values as ±0.6 mm or worse and never as a fit-critical measurement." }
+            text: "A photo can give a rough dimension once you mark a known length in it. Form Studio treats photo values as ±0.6 mm or worse and never as a fit-critical measurement." }
         Column { width: parent.width; visible: root.refs.length > 0
             Repeater { model: root.refs
                 KV { id: rr; required property var modelData; required property int index; first: index === 0

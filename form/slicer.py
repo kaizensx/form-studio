@@ -154,7 +154,7 @@ def set_kind(cfg: dict, kind: str) -> dict:
         raise SlicerBlocked(f"Unknown slicer kind “{kind}”. Known: auto, {', '.join(SLICERS)}.")
     path = config_target(cfg)
     old = path.read_text(encoding="utf-8") if path.exists() else ""
-    new = set_kind_text(old or "# FORM configuration (written by FORM)\n", kind)
+    new = set_kind_text(old or "# Form Studio configuration (written by Form Studio)\n", kind)
     before = tomllib.loads(old) if old else {}
     after = tomllib.loads(new)
     a, b = dict(after), dict(before)

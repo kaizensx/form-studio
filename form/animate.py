@@ -51,7 +51,7 @@ def turntable(studio, p: dict, out, frames: int = 36, elevation: float = 24, siz
         az = -90 + 360 * i / frames
         imgs.append(render.render_png(v, _feats(recipe), camera=(az, elevation), frame_box=(lo, hi), size=size,
                                       overlay=False, title=f"{p['name']}  r{p['head']:02d}",
-                                      caption=f"{recipe.title} - built by build123d/OCCT, rendered headless by FORM",
+                                      caption=f"{recipe.title} - built by build123d/OCCT, rendered headless by Form Studio",
                                       as_image=True))
     return _save(imgs, out, ms) | {"kind": "turntable"}
 

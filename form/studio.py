@@ -1101,9 +1101,9 @@ class Studio:
             z = zipfile.ZipFile(io.BytesIO(data))
             p = json.loads(z.read("project.json"))
         except (zipfile.BadZipFile, KeyError, ValueError):
-            raise StudioError("That file is not a FORM project archive.", "Choose a .formproj file exported from FORM.")
+            raise StudioError("That file is not a Form Studio project archive.", "Choose a .formproj file exported from Form Studio.")
         if p.get("schema") != SCHEMA or p.get("recipe") not in self.recipes:
-            raise StudioError("This archive was made by an incompatible version of FORM.")
+            raise StudioError("This archive was made by an incompatible version of Form Studio.")
         base = slugify(p.get("id", "project"))
         pid, i = base, 2
         while (self.root / pid).exists():
@@ -1367,5 +1367,5 @@ class Studio:
             except Exception as e:
                 missed.append(f"{m['id']}: {type(e).__name__}: {e}")
         if missed:
-            self.activity(None, "warning", f"{len(missed)} conversation(s) still name the deleted design {name}.", by="FORM")
+            self.activity(None, "warning", f"{len(missed)} conversation(s) still name the deleted design {name}.", by="Form Studio")
         return {"ok": True, "id": pid, "trash": str(dest), "conversations_detached": detached, "conversations_missed": missed}

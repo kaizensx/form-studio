@@ -6,7 +6,7 @@ import FormNative
 Column {
     id: ss
     property string title: "Software"
-    property string note: "What FORM uses on this computer"
+    property string note: "What Form Studio uses on this computer"
     property int sheetWidth: Theme.sheetL
     spacing: 14
     Component.onCompleted: if (!Store.software) Store.checkSoftware()

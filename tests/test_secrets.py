@@ -95,7 +95,7 @@ class GeminiSignIn(unittest.TestCase):
             (home / ".gemini" / "settings.json").unlink()
             secrets.set_value("gemini_api_key", KEY)
             ok, why = installer.gemini_signed_in()
-            self.assertTrue(ok and "FORM" in why)
+            self.assertTrue(ok and "Form Studio" in why)
 
     def test_registry_offers_every_agent_and_slicer_form_can_drive(self):
         ids = {s.id for s in installer.REGISTRY}

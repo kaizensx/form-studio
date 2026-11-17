@@ -295,7 +295,7 @@ def read_header(data: bytes, path="") -> tuple:
     if version != FORMAT_VERSION:
         newer = "a newer" if version > FORMAT_VERSION else "an older"
         raise CacheTooNew(f"This preset cache is format version {version}, {newer} format than the version "
-                          f"{FORMAT_VERSION} FORM can read{where}. It was not read.")
+                          f"{FORMAT_VERSION} Form Studio can read{where}. It was not read.")
     body = data[HEADER.size:]
     if size == 0 or size != len(body):
         raise CacheError(f"Preset cache is truncated or padded: the header states {size} body bytes, "
@@ -310,7 +310,7 @@ def parse(data: bytes, path="") -> Cache:
     r = _Reader(body)
     stamp = r.u32()
     if stamp != FORMAT_VERSION:
-        raise CacheTooNew(f"This preset cache body is format version {stamp}; FORM reads version "
+        raise CacheTooNew(f"This preset cache body is format version {stamp}; Form Studio reads version "
                           f"{FORMAT_VERSION}. It was not read.")
     vendor, vendor_version = r.string(MAX_STAMP), r.string(MAX_STAMP)
     keys = r.strings()

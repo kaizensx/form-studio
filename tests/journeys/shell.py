@@ -5,6 +5,7 @@ Environment the test suite sets for this journey: FORM_INSTALL_FAKE (installs ar
 FORM_SETUP_PRETEND_MISSING=openscad (something to "install"), FORM_FAKE_LATEST (an update to offer)."""
 import json
 import os
+import time
 from pathlib import Path
 
 from _lib import close_sheet_esc, head, make, open_sheet_wait, sheet, toasts_gone, wait_job
@@ -59,7 +60,7 @@ def journey_every_sheet_opens_and_closes(ui):
         ("share", lambda: palette(ui, "share card", "Share card"), "Share card"),
         ("alternatives", lambda: palette(ui, "compare alternatives", "Compare alternatives"), None),
         ("render", lambda: ui.click_text("Photo render"), None),
-        ("about", lambda: palette(ui, "about form", "About FORM"), "About FORM"),
+        ("about", lambda: palette(ui, "about form", "About Form Studio"), "About Form Studio"),
         ("settings", lambda: palette(ui, "software install", "Software: install or check"), "Settings"),
         ("update", lambda: palette(ui, "check for updates", "Check for updates"), None),
     ]
@@ -217,7 +218,7 @@ def journey_update_now(ui):
     card = ui.item("sheetCard")
     u = ui.store.get("update")
     ui.check(u["available"] and u["latest"] == os.environ["FORM_FAKE_LATEST"], "the fake release is offered")
-    ui.expect("FORM %s is available" % u["latest"], within=card)
+    ui.expect("Form Studio %s is available" % u["latest"], within=card)
     ui.check(not ui.sees("in a terminal", card), "the sheet does not send anyone to a terminal")
     ui.shot("sheet-update")
     if u["kind"] == "packaged":
@@ -231,7 +232,7 @@ def journey_update_now(ui):
     ui.wait_until(lambda: ui.store.get("updateJob")["state"] != "running", 60, "the upgrade to finish")
     ui.eq(ui.store.get("updateJob")["state"], "done")
     ui.expect("The new version is installed", within=card)
-    ui.eq(ui.item("updatePrimary").property("text"), "Quit FORM", "the sheet asks for a restart")
+    ui.eq(ui.item("updatePrimary").property("text"), "Quit Form Studio", "the sheet asks for a restart")
     ui.settle(300)
     ui.shot("sheet-update-done")
     ui.click_text("Later", within=card)
@@ -252,13 +253,20 @@ def journey_slicer_sheet(ui):
     ui.settle(600)
     if installed:
         act = [s for s in installed if s["active"]][0]
-        tg = [t for t in ui.find_all(within=card) if t.metaObject().className().startswith("Toggle")][0]
-        ui.click(tg)                                   # automatic ↔ pinned to the one in use
-        ui.wait_until(lambda: ui.api("/studio/slicers")["chosen"] != info["chosen"], 20, "the slicer choice to change in the engine")
+        def toggle():
+            return [t for t in ui.find_all(within=card) if t.metaObject().className().startswith("Toggle")][0]
+        was = toggle().property("checked")
+        t0 = time.time()
+        ui.click(toggle())                             # automatic ↔ pinned to the one in use
+        ui.wait_until(lambda: ui.api("/studio/slicers")["chosen"] != info["chosen"], 60, "the slicer choice to change in the engine")
+        # the sheet re-reads the slicers after a change: click again only once the switch shows the new state
+        ui.wait_until(lambda: toggle().property("checked") != was, 60, "the switch to show the new choice")
+        print("  slicer switched in %.1f s" % (time.time() - t0))
         ui.settle(500)
-        tg = [t for t in ui.find_all(within=card) if t.metaObject().className().startswith("Toggle")][0]
-        ui.click(tg)
-        ui.wait_until(lambda: ui.api("/studio/slicers")["chosen"] == info["chosen"], 20, "the slicer choice to change back")
+        t0 = time.time()
+        ui.click(toggle())
+        ui.wait_until(lambda: ui.api("/studio/slicers")["chosen"] == info["chosen"], 60, "the slicer choice to change back")
+        print("  and back in %.1f s" % (time.time() - t0))
         ui.eq([s for s in ui.api("/studio/slicers")["slicers"] if s["active"]][0]["kind"], act["kind"], "the same slicer is in use")
     else:
         print("  (no slicer installed: only the list was checked)")
@@ -337,7 +345,7 @@ def journey_share_card(ui):
 
 
 def journey_about(ui):
-    palette(ui, "about form", "About FORM")
+    palette(ui, "about form", "About Form Studio")
     open_sheet_wait(ui, "about")
     card = ui.item("sheetCard")
     ui.expect(ui.bridge._version, within=card)

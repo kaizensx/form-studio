@@ -122,8 +122,8 @@ def _fetch() -> dict | None:
 
 
 def _fake(v: str) -> dict:
-    return {"version": v.lstrip("vV"), "name": f"FORM {v}", "url": RELEASES, "published": "", "prerelease": False,
-            "notes": f"## FORM {v}\n\nThis is a **fake release** from `FORM_FAKE_LATEST` (development only).\n\n"
+    return {"version": v.lstrip("vV"), "name": f"Form Studio {v}", "url": RELEASES, "published": "", "prerelease": False,
+            "notes": f"## Form Studio {v}\n\nThis is a **fake release** from `FORM_FAKE_LATEST` (development only).\n\n"
                      "- First-run setup inside the app\n- Update notices\n\nNothing was fetched from the network.",
             "assets": [{"name": asset_name(), "url": f"{RELEASES}/download/v{v}/{asset_name()}", "size": 0}],
             "fake": True}
@@ -187,7 +187,7 @@ def install_now(cfg: dict, info: dict | None = None, echo=print) -> int:
     from . import installer
     info = info or check(cfg)
     if info["kind"] == "packaged":
-        echo("This copy of FORM is updated by downloading the new app: " + (info.get("download") or {}).get("url", RELEASES))
+        echo("This copy of Form Studio is updated by downloading the new app: " + (info.get("download") or {}).get("url", RELEASES))
         return 2
     try:
         job = installer.Installer(cfg).update(info["command"])
@@ -203,13 +203,13 @@ def install_now(cfg: dict, info: dict | None = None, echo=print) -> int:
         if p["state"] != "running":
             break
         _t.sleep(0.3)
-    echo("Upgraded. Restart FORM to use the new version." if p["state"] == "done" else "The upgrade did not finish: " + p["steps"][0]["message"])
+    echo("Upgraded. Restart Form Studio to use the new version." if p["state"] == "done" else "The upgrade did not finish: " + p["steps"][0]["message"])
     return 0 if p["state"] == "done" else 1
 
 
 def main(argv=None) -> int:
     import argparse
-    ap = argparse.ArgumentParser(prog="form update", description="Is there a newer FORM? (checks only, unless --install)")
+    ap = argparse.ArgumentParser(prog="form update", description="Is there a newer Form Studio? (checks only, unless --install)")
     ap.add_argument("--check", action="store_true", help="ask GitHub now and print JSON")
     ap.add_argument("--install", action="store_true", help="run the upgrade command now (pip / uv / source installs), "
                     "the same job the app's Update now button runs")
@@ -225,14 +225,14 @@ def main(argv=None) -> int:
     if not info.get("enabled"):
         print("Update checks are off ([updates] check = false or FORM_NO_UPDATE_CHECK=1).")
     elif info.get("available"):
-        print(f"FORM {info['latest']} is available (you have {info['current']}).\n")
+        print(f"Form Studio {info['latest']} is available (you have {info['current']}).\n")
         if info["kind"] == "packaged":
             print(f"Download: {info['download']['url']}")
         else:
             print(f"To upgrade, run:\n\n    {info['command']}\n")
         print(f"Release notes: {info['release']['url']}")
     elif info.get("latest"):
-        print(f"FORM {info['current']} is up to date (latest release: {info['latest']}).")
+        print(f"Form Studio {info['current']} is up to date (latest release: {info['latest']}).")
     else:
-        print(f"FORM {info['current']}. Could not reach GitHub to check; nothing changed.")
+        print(f"Form Studio {info['current']}. Could not reach GitHub to check; nothing changed.")
     return 0

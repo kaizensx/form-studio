@@ -756,7 +756,7 @@ QtObject {
             config = r.config; reloadStudio()
             var n = F.keys(r.changed).length
             if (!n) toast("Nothing to change")
-            else toast("Saved " + F.plural(n, "setting"), r.restart ? "The project folder changes when FORM restarts." : r.backup ? "The previous file was kept as a backup next to it." : "", false)
+            else toast("Saved " + F.plural(n, "setting"), r.restart ? "The project folder changes when Form Studio restarts." : r.backup ? "The previous file was kept as a backup next to it." : "", false)
             return r
         }, function (e) { fail(e); return null })
     }
@@ -801,7 +801,7 @@ QtObject {
     function reviewPrompt() {
         if (!project) return ""
         return "Give me a design review of " + F.pad(project.head) + " of “" + project.name + "” (project " + pid + "). "
-            + "Look at the current head with the FORM tools, not from memory: get_project, then render(view=\"sheet\"), "
+            + "Look at the current head with the Form Studio tools, not from memory: get_project, then render(view=\"sheet\"), "
             + "render(view=\"bottom\") and render(view=\"iso_back\").\n\n"
             + "Review at three scales. Silhouette: is the mass balanced, the useful volume clear, does it look stable and intentional? "
             + "Relationships: spacing, wall thickness, radius families, repeated features, contact points. "

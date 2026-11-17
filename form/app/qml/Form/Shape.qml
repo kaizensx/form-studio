@@ -79,7 +79,7 @@ Column {
                     if (!Store.project || t === (Store.project.mark_text || "")) return
                     Store.settings({ mark_text: t }).then(function () { Store.refresh(true); if (Store.hasDraft) Store.runPreview() }) } }
             Txt { kind: "fine"; width: parent.width
-                text: "Press Enter to apply. Lettering uses FORM’s bundled font; the checks measure its stroke width against the nozzle. The revision stamp reads like “r04 a3f1”: revision, then a short hash of its values." } }
+                text: "Press Enter to apply. Lettering uses Form Studio’s bundled font; the checks measure its stroke width against the nozzle. The revision stamp reads like “r04 a3f1”: revision, then a short hash of its values." } }
         Sec { title: "Follows from them"; note: "not editable"
             readonly property var rows: root.f && Store.shown ? Store.shown.derived.filter(function (x) { return x.feature === root.f.id }) : []
             visible: rows.length > 0

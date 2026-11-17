@@ -123,7 +123,7 @@ Column {
     // ── share (design tools) ────────────────────────────────
     Fold { title: "Share"; key: "release.share"; note: "card, variants, timeline"
         Txt { kind: "fine"; width: parent.width
-            text: "A 1600 × 900 image of " + (root.p ? F.pad(root.p.head) : "the head revision") + ": the part with its dimensions, what is computed and what is simulated, and the revision. It states only what FORM knows." }
+            text: "A 1600 × 900 image of " + (root.p ? F.pad(root.p.head) : "the head revision") + ": the part with its dimensions, what is computed and what is simulated, and the revision. It states only what Form Studio knows." }
         Row { spacing: 6
             Btn { icon: "share_2"; text: "Share card…"; enabled: !Store.hasDraft; onClicked: Store.openSheet("share") }
             Btn { kind: "quiet"; icon: "layout_grid"; text: "Variants"; onClicked: Store.openSheet("variants") }
@@ -191,7 +191,7 @@ Column {
     Fold { title: root.p ? "Maker documents for " + F.pad(root.p.head) : "Maker documents"; note: "not a release"; key: "release.docs"
         visible: !!root.d && !!root.d.documents && root.d.documents.length > 0
         Txt { kind: "fine"; width: parent.width
-            text: "Made from this revision's solids, checks and slice when you save them. A value FORM does not have stays blank or NOT RUN. A release keeps its own copy." }
+            text: "Made from this revision's solids, checks and slice when you save them. A value Form Studio does not have stays blank or NOT RUN. A release keeps its own copy." }
         Column { width: parent.width
             Repeater { model: root.d && root.d.documents ? root.d.documents : []
                 Item { id: mr; required property var modelData; required property int index
@@ -279,6 +279,6 @@ Column {
     Fold { title: "Project file"; key: "release.archive"; note: ".formproj"
         Txt { tone: 2; width: parent.width; text: "Everything in one archive: revisions, provenance, artifacts, releases." }
         Btn { text: "Save .formproj…"; icon: "download"
-            onClicked: root.saveAs(Store.pid + ".formproj", "/projects/" + Store.pid + "/archive", "FORM projects (*.formproj)", true) }
+            onClicked: root.saveAs(Store.pid + ".formproj", "/projects/" + Store.pid + "/archive", "Form Studio projects (*.formproj)", true) }
     }
 }

@@ -42,7 +42,7 @@ class ScadRecipe(Recipe):
                        for p in parsed["params"]]
         self.features = [Feature("body", "Body", "structure", "The OpenSCAD model as one mesh.")]
         if not self.params:
-            raise RecipeError("This OpenSCAD file declares no parameters FORM can edit.", "",
+            raise RecipeError("This OpenSCAD file declares no parameters Form Studio can edit.", "",
                               "Give each editable top-level number a Customizer range comment, e.g. `width = 40; // [20:1:120]`.")
 
     def build(self, v):

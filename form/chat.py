@@ -33,13 +33,13 @@ MAX_RUNNING = 3
 RECAP_CHARS = 6000
 
 PROMPT = """\
-You are working inside FORM, a design studio for 3D-printed parts. The user is looking at FORM's page: every FORM
+You are working inside Form Studio, a design studio for 3D-printed parts. The user is looking at Form Studio's page: every Form Studio
 tool you call shows up there live (3D model, drafts, checks, slice), so you do not need to describe geometry at length.
-- Use FORM tools for all design work. Built-in recipes (dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob): create_project.
+- Use Form Studio tools for all design work. Built-in recipes (dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob): create_project.
   Anything else: call design_guide, then write the design as code with create_design; iterate with update_design.
 - After creating or changing a design, render(view="sheet") and look at it; fix what is wrong before replying.
 - Look up exact dimensions of commercial parts: find the official datasheet or mechanical drawing with web search,
-  then open it with FORM's read_document (it shows PDF pages as images; web fetch loses a drawing's dimensions).
+  then open it with Form Studio's read_document (it shows PDF pages as images; web fetch loses a drawing's dimensions).
   Name the source. Put such numbers in params with group "brief" and the source in doc.
 - Ask the user only for measurements that change the fit or safety, and only when you cannot find them.
 - Files the user attaches are listed at the end of their message with full paths. Look at images and PDFs before
@@ -117,7 +117,7 @@ def set_defaults(cfg: dict, agent: str | None = None, model: str | None = None, 
     path, saved, why = config_target(cfg), False, None
     try:
         old = path.read_text(encoding="utf-8") if path.exists() else ""
-        new = set_defaults_text(old or "# FORM configuration (written by FORM)\n", vals)
+        new = set_defaults_text(old or "# Form Studio configuration (written by Form Studio)\n", vals)
         before, after = (tomllib.loads(old) if old else {}), tomllib.loads(new)
         a, b = dict(after), dict(before)
         a_c, b_c = dict(a.pop("chat", {})), dict(b.pop("chat", {}))
@@ -301,7 +301,7 @@ class Chat:
             recap = "\n".join(lines)[-RECAP_CHARS:]
             if recap.strip():
                 parts.append("Earlier in this conversation (the earlier agent session is not available, so this is a "
-                             "transcript; check the project with FORM's tools rather than trusting it):\n" + recap + "\n\nNow:")
+                             "transcript; check the project with Form Studio's tools rather than trusting it):\n" + recap + "\n\nNow:")
         parts.append(job.message)
         if job.attachments:
             d = self.store.files_dir(job.conversation)
@@ -467,7 +467,7 @@ def main_chat(argv: list[str]) -> int:
     [--attach FILE ...] [--json]: send one message, stream the reply, save the conversation."""
     import argparse
     from . import config
-    ap = argparse.ArgumentParser(prog="form chat", description="Send one message to an agent with FORM's tools; the conversation is saved.")
+    ap = argparse.ArgumentParser(prog="form chat", description="Send one message to an agent with Form Studio's tools; the conversation is saved.")
     ap.add_argument("message")
     ap.add_argument("--project")
     ap.add_argument("--conversation", help="continue this conversation (id from `form conversations list`)")

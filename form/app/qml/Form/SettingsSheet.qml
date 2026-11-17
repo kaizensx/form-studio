@@ -76,7 +76,7 @@ Column {
         Txt { visible: !st.cfg; tone: 2; text: "Reading the settings…" }
         Note { visible: st.tab === "printer" && Store.slicer.available; kind: "plain"
             title: "The slicer decides the printer"
-            text: "FORM follows the printer, filament and process selected in " + (Store.slicer.label || "the slicer") + " (now: " +
+            text: "Form Studio follows the printer, filament and process selected in " + (Store.slicer.label || "the slicer") + " (now: " +
                   (Store.slicer.available ? Store.slicer.presets.machine.name : "") + "). The name and bed size below are used only when no slicer is available." }
         Note { visible: st.tab === "chat" && !Store.chat.available; kind: "amber"; title: "Chat is not available yet"
             text: (Store.chat.note || "") + " Install Claude Code and sign in under Software."
@@ -167,7 +167,7 @@ Column {
             } }
         Row { visible: st.tab === "printer"; spacing: 8
             Btn { small: true; icon: "printer"; text: "Compare slicers…"; onClicked: Store.openSheet("slicer") }
-            Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; text: "Shows every slicer FORM knows and the presets each would use." } }
+            Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; text: "Shows every slicer Form Studio knows and the presets each would use." } }
     }
 
     // ── software ───────────────────────────────────────────

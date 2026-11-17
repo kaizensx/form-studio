@@ -79,7 +79,7 @@ def _err(msg, hint="", feature="mark", params=None):
 def _font(font) -> str:
     f = Path(font) if font else FONT
     if not f.is_file():
-        raise _err(f"Font file not found: {f}", "Pass font=<path to a .ttf>, or leave it out to use FORM's bundled font.")
+        raise _err(f"Font file not found: {f}", "Pass font=<path to a .ttf>, or leave it out to use Form Studio's bundled font.")
     return str(f)
 
 

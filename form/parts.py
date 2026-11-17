@@ -182,7 +182,7 @@ def screw_clearance(size: str = "M3", length: float = 10.0, head: str = "socket"
     dk, k, hsrc = head_dims(s, head)
     hole = Pos(0, 0, OVERSHOOT) * Cylinder(d / 2, length + OVERSHOOT, align=TOP)
     dims = {"hole_d": _dim(d, source=f"{src}, {fit} fit"), "head_d": _dim(dk, source=hsrc), "head_h": _dim(k, source=hsrc),
-            "head_clearance": _dim(head_clearance, provenance="assumed", source="FORM default for FDM"),
+            "head_clearance": _dim(head_clearance, provenance="assumed", source="Form Studio default for FDM"),
             "length": _dim(length, provenance="assumed", source="caller")}
     shape = hole
     if recess:

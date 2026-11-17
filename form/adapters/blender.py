@@ -121,7 +121,7 @@ def resolve(cfg: dict | None = None) -> dict:
             major = int(v.split(".")[0])
             if major < 4:
                 return {"available": False, "app": c, "version": v,
-                        "reason": f"Blender {v} is too old; FORM needs Blender 4.2 or newer ({DOWNLOAD_URL})."}
+                        "reason": f"Blender {v} is too old; Form Studio needs Blender 4.2 or newer ({DOWNLOAD_URL})."}
             return {"available": True, "app": c, "version": v, "reason": ""}
     where = f"[blender].app = {conf} does not exist. " if conf else ""
     return {"available": False, "app": "", "version": "",
@@ -146,11 +146,11 @@ def print_toolbox(app: str, timeout: float = 90) -> dict:
     hit = next((m for m in mods if "print3d" in m.lower()), None)
     if hit:
         return {"available": True, "module": hit,
-                "reason": f"3D-Print Toolbox is installed ({hit}), but FORM does not run it yet: FORM's own mesh "
+                "reason": f"3D-Print Toolbox is installed ({hit}), but Form Studio does not run it yet: Form Studio's own mesh "
                           "checks cover manifold, thickness and overhang."}
     return {"available": False, "module": None,
             "reason": "The 3D-Print Toolbox is not installed (since Blender 4.2 it is an extension, not bundled), "
-                      "so FORM adds no Blender print checks. FORM's own mesh checks still run."}
+                      "so Form Studio adds no Blender print checks. Form Studio's own mesh checks still run."}
 
 
 # ---- numbers the scene needs -------------------------------------------------

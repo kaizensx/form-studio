@@ -411,7 +411,7 @@ def _compose(st, p: dict, f: dict, photo_file: Path | None) -> Image.Image:
         d.text((x, y), ln, fill=INK2, font=small)
         y += 25
     # footer
-    d.text((x, Hh - 86), "Designed with FORM", fill=INK, font=_font("bold", 26))
+    d.text((x, Hh - 86), "Designed with Form Studio", fill=INK, font=_font("bold", 26))
     d.text((x, Hh - 50), f"open-source CAD with an AI agent · v{__version__}", fill=INK3, font=_font("sans", 18))
     return img
 

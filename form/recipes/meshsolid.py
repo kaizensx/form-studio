@@ -21,7 +21,7 @@ def solid_from_triangles(tris, tol: float = 1e-4):
     from OCP.TopExp import TopExp_Explorer
     from OCP.TopoDS import TopoDS
     if len(tris) > MAX_TRIANGLES:
-        raise ValueError(f"The mesh has {len(tris):,} triangles; FORM handles up to {MAX_TRIANGLES:,}. Lower $fn or simplify.")
+        raise ValueError(f"The mesh has {len(tris):,} triangles; Form Studio handles up to {MAX_TRIANGLES:,}. Lower $fn or simplify.")
     sew = BRepBuilderAPI_Sewing(tol)
     added = 0
     for a, b, c in tris:

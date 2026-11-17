@@ -57,7 +57,7 @@ Column {
         }, function (e) { sending = false; Store.fail(e) })
     }
     function ask() { startBrief(function (r) { Store.openSheet(null); Store.send(r.prompt) }) }
-    function copy() { startBrief(function (r) { Bridge.copy(r.prompt); Store.toast("Prompt copied", "Paste it into any agent that has FORM's MCP tools.") }) }
+    function copy() { startBrief(function (r) { Bridge.copy(r.prompt); Store.toast("Prompt copied", "Paste it into any agent that has Form Studio's MCP tools.") }) }
     function envLine(e) { return e.setting + " · humidity " + e.humidity + " · UV " + e.uv }
 
 
@@ -85,7 +85,7 @@ Column {
             Area { id: brief; width: parent.width; minLines: 2; placeholder: "Optional. You can write this later." } }
         // examples are added only when asked for here (setup workstream); a new projects folder starts empty
         Column { visible: ns.showExamples; width: parent.width; spacing: 6
-            Txt { kind: "fine"; width: parent.width; text: "Finished designs that ship with FORM. Opening one copies its design history into your projects; its outputs are rebuilt on your computer." }
+            Txt { kind: "fine"; width: parent.width; text: "Finished designs that ship with Form Studio. Opening one copies its design history into your projects; its outputs are rebuilt on your computer." }
             Repeater { model: ns.examples
                 Rectangle { id: ex; required property var modelData
                     width: ns.width; height: 40; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
@@ -93,7 +93,7 @@ Column {
                     Btn { objectName: "exampleAdd"; small: true; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
                         text: ex.modelData.present ? "Open" : "Add and open"
                         onClicked: { if (ex.modelData.present) { Store.openSheet(null); Store.open(ex.modelData.id) } else Store.addExample(ex.modelData.id) } } } } }
-        Txt { kind: "fine"; width: parent.width; text: "FORM works from a written brief, dimensions you measure, and reference photos with a marked scale. It does not reconstruct geometry from photos or scans." }
+        Txt { kind: "fine"; width: parent.width; text: "Form Studio works from a written brief, dimensions you measure, and reference photos with a marked scale. It does not reconstruct geometry from photos or scans." }
     }
 
     // ── brief: pick a template ──────────────────────────────
@@ -149,7 +149,7 @@ Column {
                 MouseArea { x: 20; width: parent.width - 20; height: parent.height; onClicked: ns.measured = !ns.measured } } }
 
         Note { visible: !Store.chat.available; kind: "amber"; title: "Claude is not connected"
-            text: (Store.chat.note || "") + " You can copy the prompt and paste it into any agent that has FORM's tools." }
+            text: (Store.chat.note || "") + " You can copy the prompt and paste it into any agent that has Form Studio's tools." }
 
         Sec { title: "Template defaults"; tag: "assumed"
             Txt { kind: "fine"; width: parent.width; text: "Claude starts from these and corrects them from your answers. Tell it where they are wrong." }
@@ -167,5 +167,5 @@ Column {
                         text: "<b>" + modelData.name + "</b> — " + modelData.why; textFormat: Text.StyledText } } } }
     }
 
-    FileDialog { id: dlg; title: "Restore a FORM project"; nameFilters: ["FORM projects (*.formproj *.zip)"]; onAccepted: Store.importArchive(selectedFile) }
+    FileDialog { id: dlg; title: "Restore a Form Studio project"; nameFilters: ["Form Studio projects (*.formproj *.zip)"]; onAccepted: Store.importArchive(selectedFile) }
 }

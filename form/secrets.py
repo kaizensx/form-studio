@@ -23,7 +23,7 @@ KNOWN = {
         "label": "Gemini API key",
         "agent": "gemini",
         "env": "GEMINI_API_KEY",
-        "help": "Lets Gemini CLI run inside FORM. Create one at Google AI Studio; usage is billed to that Google account.",
+        "help": "Lets Gemini CLI run inside Form Studio. Create one at Google AI Studio; usage is billed to that Google account.",
         "url": "https://aistudio.google.com/apikey",
     },
 }

@@ -114,7 +114,7 @@ def main(argv=None):
             _print({"error": e.public()})
             return 2
         return 0
-    ap = argparse.ArgumentParser(prog="form", description="FORM print-design studio",
+    ap = argparse.ArgumentParser(prog="form", description="Form Studio print-design studio",
                                  formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split("\n", 2)[2])
     sub = ap.add_subparsers(dest="cmd")
     sub.add_parser("app", help="open the desktop app (needs the [app] extra)")
@@ -122,10 +122,10 @@ def main(argv=None):
     m = sub.add_parser("mcp", help="MCP server over stdio")
     m.add_argument("--no-bench", action="store_true")
     sub.add_parser("setup", help="find what is missing and fix what you choose (--check, --yes, --dry-run)")
-    sub.add_parser("update", help="is there a newer FORM? (--check prints JSON; never installs)")
+    sub.add_parser("update", help="is there a newer Form Studio? (--check prints JSON; never installs)")
     sub.add_parser("chat", help='send one message to an agent: form chat "message" [--project ID] [--model X] [--json]')
     sub.add_parser("conversations", help="saved conversations: list | show ID | delete ID | rename ID TITLE | pin ID")
-    sub.add_parser("install", help="install what FORM uses (--list, <id>, --yes, --dry-run)")
+    sub.add_parser("install", help="install what Form Studio uses (--list, <id>, --yes, --dry-run)")
     sub.add_parser("config", help="get [key] | set <key> <value>: read or change studio.toml")
     sub.add_parser("secrets", help="status | set NAME (value from stdin or a hidden prompt) | clear NAME: agent keys such as gemini_api_key")
     sub.add_parser("examples", help="list the shipped examples; `add` copies them into your projects")

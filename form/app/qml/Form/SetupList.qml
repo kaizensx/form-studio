@@ -65,7 +65,7 @@ Rectangle {
                             text: sl.word(row.r); color: sl.tint(row.r.status) } }
                     Txt { kind: "fine"; tone: 2; width: parent.width; text: row.r.status === "ok" ? row.r.detail : row.r.why
                         wrapMode: row.r.status === "ok" ? Text.NoWrap : Text.WordWrap; elide: row.r.status === "ok" ? Text.ElideMiddle : Text.ElideNone }
-                    Txt { visible: row.open && row.r.detail !== "" && row.r.detail.indexOf("Not installed.") !== 0 && row.r.detail.indexOf("Installed; FORM is not") !== 0
+                    Txt { visible: row.open && row.r.detail !== "" && row.r.detail.indexOf("Not installed.") !== 0 && row.r.detail.indexOf("Installed; Form Studio is not") !== 0
                         kind: "fine"; width: parent.width; text: row.r.detail; wrapMode: Text.Wrap }
                     Txt { visible: row.open && !!row.r.blocked_by; kind: "fine"; width: parent.width; color: Theme.amber
                         text: row.r.blocked_by ? "Install " + row.r.blocked_by.map(function (b) { var it = Store.softwareItem(b); return it ? it.label : b }).join(", ") + " first." : "" }
@@ -81,7 +81,7 @@ Rectangle {
                         text: {
                             var why = row.r.methods.filter(function (m) { return !m.available && m.reason }).map(function (m) { return m.label + ": " + m.reason })
                             var note = row.r.methods.filter(function (m) { return m.kind === "bundled" && m.note }).map(function (m) { return m.note })
-                            return note.concat(why.length ? ["FORM cannot install this by itself here (" + why.join("; ") + ")."] : []).join(" ")
+                            return note.concat(why.length ? ["Form Studio cannot install this by itself here (" + why.join("; ") + ")."] : []).join(" ")
                         } }
                     Row { visible: row.open && !row.step && (row.r.installable || row.r.manual !== ""); spacing: 8; topPadding: 1
                         Btn { small: true; visible: row.r.installable && !sl.selectable; icon: "download"; text: "Install"; enabled: !Store.installing

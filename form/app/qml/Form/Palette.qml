@@ -17,7 +17,7 @@ Item {
     function updates() { Store.checkUpdates(true).then(function (u) {
         if (u && u.available) { Store.updateHidden = false; Store.openSheet("update") }
         else if (u && !u.enabled) Store.toast("Update checks are off", "[updates] check = false or FORM_NO_UPDATE_CHECK=1")
-        else if (u && u.latest) Store.toast("FORM " + u.current + " is up to date")
+        else if (u && u.latest) Store.toast("Form Studio " + u.current + " is up to date")
         else Store.toast("Could not reach GitHub", "Nothing changed. Try again later.") }) }
     readonly property var all: {
         var c = [], w = Store.screen === "work"
@@ -55,7 +55,7 @@ Item {
         }
         add("Tools", "new", "plus", "New design from a recipe", "", function () { Store.openSheet("new") }, "Ctrl+N")
         add("Tools", "brief", "file_text", "New design from a brief", "Guided questions, then the agent designs it", function () { Store.openSheet("new", { tab: "brief" }) })
-        add("Tools", "example", "box", "Open an example", "Finished designs that ship with FORM", function () { Store.openSheet("new", { examples: true }) })
+        add("Tools", "example", "box", "Open an example", "Finished designs that ship with Form Studio", function () { Store.openSheet("new", { examples: true }) })
         if (Store.studio) Store.studio.projects.forEach(function (p) { if (!p.error && p.id !== Store.pid) add("Designs", "p." + p.id, "cuboid", p.name, F.pad(p.head) + " · " + F.ago(p.updated), function () { Store.open(p.id) }) })
         add("Conversations", "chat.new", "message_square_plus", "New conversation", "", function () { Store.newChat(); Store.talkOpen = true }, "Ctrl+Shift+O")
         if (w) add("Conversations", "chat.toggle", "panel_left", (Store.talkOpen ? "Hide" : "Show") + " the conversation", "", function () { Store.talkOpen = !Store.talkOpen }, "Ctrl+J")
@@ -69,12 +69,12 @@ Item {
         add("Settings", "settings.chat", "message_square", "Settings: chat", "", function () { Store.openSettings("chat") })
         add("Settings", "slicer", "printer", "Choose slicer", Store.slicer.label || "", function () { Store.openSheet("slicer") })
         add("Settings", "software", "wrench", "Software: install or check", "Slicer, Claude Code, CAD apps, agents", function () { Store.openSettings("software") })
-        add("Settings", "setup", "list_checks", "Setup checklist", "What FORM found on this computer", function () { Store.openSetup() })
+        add("Settings", "setup", "list_checks", "Setup checklist", "What Form Studio found on this computer", function () { Store.openSetup() })
         add("Settings", "onboard", "sparkles", "Run the first-time setup again", "Three short steps", function () { Store.setOnboardStep(0); Store.checkSoftware(); Store.welcome = true })
-        add("Settings", "updates", "refresh_cw", "Check for updates", "FORM " + Bridge.version, function () { pal.updates() })
+        add("Settings", "updates", "refresh_cw", "Check for updates", "Form Studio " + Bridge.version, function () { pal.updates() })
         add("Settings", "shortcuts", "keyboard", "Keyboard shortcuts", "", function () { Store.openSheet("shortcuts") }, "?")
         add("Settings", "folder", "folder_open", "Open the projects folder", Bridge.dataDirShort, function () { Bridge.openDataFolder() })
-        add("Settings", "about", "info", "About FORM", "Version and licences", function () { Store.openSheet("about") })
+        add("Settings", "about", "info", "About Form Studio", "Version and licences", function () { Store.openSheet("about") })
         return c
     }
     // loose match: every letter of the query, in order. Returns { score, at: [indices] } or null.

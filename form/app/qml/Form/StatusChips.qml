@@ -24,7 +24,7 @@ Row {
         Behavior on color { Tint {} }
         Icon { x: sc.compact ? 6 : 9; name: "arrow_down_to_line"; size: 12; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
         Txt { id: ul; visible: !sc.compact; x: 26; kind: "fine"; tone: 2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
-            text: Store.update && Store.update.latest ? "FORM " + Store.update.latest : "" }
+            text: Store.update && Store.update.latest ? "Form Studio " + Store.update.latest : "" }
         MouseArea { id: um; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSheet("update") }
-        Tip { show: um.containsMouse; text: Store.update && Store.update.latest ? "FORM " + Store.update.latest + " is available" : "" } }
+        Tip { show: um.containsMouse; text: Store.update && Store.update.latest ? "Form Studio " + Store.update.latest + " is available" : "" } }
 }

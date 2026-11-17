@@ -13,7 +13,7 @@ Window {
     readonly property bool mac: Bridge.platform === "darwin"
     readonly property bool full: visibility === Window.FullScreen
     visible: true; color: Theme.plate
-    title: Store.project ? Store.project.name + (Store.hasDraft ? " (draft)" : "") + " — FORM" : "FORM"
+    title: Store.project ? Store.project.name + (Store.hasDraft ? " (draft)" : "") + " — Form Studio" : "Form Studio"
     minimumWidth: 1120; minimumHeight: 700
     // on macOS the content runs under a transparent title bar, so the window buttons sit in our own bar
     flags: mac ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window
@@ -107,7 +107,8 @@ Window {
         Loader { id: homeLd; anchors.fill: parent; active: Store.screen === "home"; sourceComponent: Home {} }
         Loader { anchors.fill: parent; active: Store.screen === "work"; sourceComponent: Workspace {} }
         Column { anchors.centerIn: parent; visible: Store.screen === "boot"; spacing: 12
-            Txt { text: "FORM"; font.weight: Theme.wBold; font.letterSpacing: 6; font.pixelSize: 22; anchors.horizontalCenter: parent.horizontalCenter }
+            Logo { size: 36; anchors.horizontalCenter: parent.horizontalCenter }
+            Item { width: 1; height: 8 }
             Row { spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
                 Spinner { size: 12; anchors.verticalCenter: parent.verticalCenter }
                 Txt { kind: "fine"; text: "Starting the CAD kernel…" } } }
