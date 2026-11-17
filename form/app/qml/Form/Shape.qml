@@ -25,6 +25,7 @@ Column {
                 Rectangle {
                     id: fr
                     required property var modelData
+                    objectName: "feature-" + modelData.id
                     readonly property bool touched: root.paramsOf(modelData.id).some(function (p) { return Store.draftValues[p.key] !== undefined })
                     width: parent.width; height: 46; radius: Theme.rMd
                     color: fm.containsMouse ? Qt.rgba(1, 1, 1, 0.045) : "transparent"

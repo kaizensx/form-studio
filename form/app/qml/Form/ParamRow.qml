@@ -7,6 +7,7 @@ Item {
     id: r
     property var p                       // param spec from the recipe
     property bool prov: false
+    objectName: "param-" + (p ? p.key : "")
     readonly property real v: Store.values[p.key] !== undefined ? Store.values[p.key] : p.default
     readonly property bool changed: Store.draftValues[p.key] !== undefined
     readonly property bool bad: !!(Store.draftError && Store.draftError.params && Store.draftError.params.indexOf(p.key) >= 0)
@@ -22,7 +23,7 @@ Item {
             width: parent.width; height: 26
             Txt { text: r.p.label; anchors.left: parent.left; anchors.right: num.left; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
                 elide: Text.ElideRight; wrapMode: Text.NoWrap; color: r.bad ? Theme.signal : r.changed ? Theme.blueprint : Theme.ink }
-            Field { id: num; numeric: true; width: 86; height: 26; anchors.right: parent.right; unit: r.p.unit
+            Field { id: num; objectName: "paramField"; numeric: true; width: 86; height: 26; anchors.right: parent.right; unit: r.p.unit
                 text: F.trim(r.v, 4)
                 onAccepted: function (t) {
                     var x = parseFloat(t)
@@ -32,7 +33,7 @@ Item {
                     text = Qt.binding(function () { return F.trim(r.v, 4) })
                 } }
         }
-        Beam { width: parent.width; from: r.p.min; to: r.p.max; step: r.p.step; value: r.v
+        Beam { objectName: "paramBeam"; width: parent.width; from: r.p.min; to: r.p.max; step: r.p.step; value: r.v
             base: Store.head ? Store.head.values[r.p.key] : NaN
             tint: r.bad ? Theme.signal : r.changed ? Theme.blueprint : Theme.ink
             onMoved: function (v) { Store.setParam(r.p.key, v) } }

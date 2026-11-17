@@ -109,6 +109,7 @@ Item {
         anchors.left: parent.left; anchors.right: insp.left; anchors.top: parent.top; anchors.bottom: parent.bottom
         Viewport {
             id: vp
+            objectName: "viewport"
             anchors.fill: parent
             visible: !Store.layers
             asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
@@ -347,6 +348,7 @@ Item {
                     model: Store.stages
                     Item {
                         id: tab
+                        objectName: "stage-" + modelData.id
                         required property var modelData
                         required property int index
                         readonly property bool on: Store.stage === modelData.id

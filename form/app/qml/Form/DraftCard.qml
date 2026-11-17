@@ -5,6 +5,7 @@ import "F.js" as F
 // on every stage: what changed and the decision first, so Commit is always in reach; the consequences scroll below.
 Rectangle {
     id: d
+    objectName: "draftCard"
     readonly property var im: Store.preview ? Store.preview.impact : null
     readonly property string next: Store.project ? F.pad(Math.max.apply(null, Store.project.revisions.map(function (r) { return r.n })) + 1) : ""
     visible: Store.hasDraft || !!Store.draftError

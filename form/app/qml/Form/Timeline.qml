@@ -27,6 +27,7 @@ Item {
 
     Item {
         id: track
+        objectName: "timelineTrack"
         anchors.left: play.right; anchors.leftMargin: 10; anchors.right: side.left; anchors.rightMargin: 14     // the ticks get what the text leaves
         height: parent.height
         readonly property real gap: tl.revs.length > 1 ? Math.min(46, Math.max(3, (width - 28) / (tl.revs.length - 1))) : 0

@@ -1,0 +1,62 @@
+"""Shared steps for the UI journeys (tests/journeys/*.py). Setup goes through the engine API; the thing under
+test goes through the window."""
+
+
+def wait_job(ui, pid, timeout=300):
+    """Until the project's pipeline is current (solid, exports, checks; slice when a slicer is installed)."""
+    def done():
+        d = ui.api("/projects/" + pid)
+        return isinstance(d, dict) and d.get("status") and not d.get("job") and all(
+            v["state"] in ("current", "blocked", "failed") for v in d["status"].values())
+    ui.wait_until(done, timeout, f"the pipeline of {pid}")
+
+
+def make(ui, recipe, name, values=None, open=True):
+    """Create a project from a recipe through the engine, wait for its pipeline, open it in the window."""
+    r = ui.api("/projects", {"name": name, "recipe": recipe, "brief": "", "values": values})
+    pid = r["id"]
+    wait_job(ui, pid)
+    if open:
+        open_project(ui, pid)
+    return pid
+
+
+def example(ui, pid, open=True):
+    ui.api("/examples", {"ids": [pid]})
+    ui.api("/projects/" + pid + "/run", {"nodes": [], "force": False})
+    wait_job(ui, pid)
+    if open:
+        open_project(ui, pid)
+    return pid
+
+
+def open_project(ui, pid):
+    ui.run_js("Store.reloadStudio().then(function () { Store.open(%r) })" % pid)
+    ui.wait_until(lambda: ui.store.get("screen") == "work" and ui.store.get("pid") == pid, 60, f"{pid} to open")
+    ui.wait_until(lambda: ui.js("!!Store.view && !!Store.viewer"), 60, "the model to load")
+    ui.idle(300)
+    ui.settle(700)
+
+
+def sheet(ui):
+    s = ui.store.get("sheet")
+    return s["kind"] if s else None
+
+
+def open_sheet_wait(ui, kind):
+    ui.wait_until(lambda: sheet(ui) == kind, 6, f"the {kind} sheet")
+    ui.settle(300)
+
+
+def close_sheet_esc(ui):
+    ui.key("Escape")
+    ui.wait_until(lambda: sheet(ui) is None, 4, "the sheet to close on Esc")
+    ui.settle(200)
+
+
+def head(ui, pid=None):
+    return ui.api("/projects/" + (pid or ui.store.get("pid")))["project"]["head"]
+
+
+def has_slicer(ui):
+    return bool(ui.js("Store.slicer.available"))

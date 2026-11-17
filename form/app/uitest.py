@@ -345,7 +345,14 @@ class UI:
 
     def type(self, text: str):
         """Type into whatever has the keyboard."""
-        self.T.keyClicks(self.win, text)
+        from PySide6.QtCore import QEvent, Qt
+        from PySide6.QtGui import QKeyEvent
+        for ch in text:
+            code = ord(ch.upper()) if ch.isascii() and ch.isprintable() else 0
+            mods = Qt.KeyboardModifier.ShiftModifier if ch.isupper() else Qt.KeyboardModifier.NoModifier
+            for kind in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
+                self.app.sendEvent(self.win, QKeyEvent(kind, code, mods, ch))
+            self._pump(2)
         self._pump(20)
         self.log.append(f"type {text!r}")
 
