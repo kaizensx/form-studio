@@ -1,8 +1,7 @@
 name: CI
-# The repository is public: GitHub's standard runners are free. Runs on pushes to main and on version tags.
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
   workflow_dispatch:
 

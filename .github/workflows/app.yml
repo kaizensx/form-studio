@@ -1,12 +1,12 @@
 name: Desktop app
 
 # Builds the FORM desktop app for macOS (Apple Silicon and Intel), Windows and Linux.
-# Every push to main or app builds and uploads the bundles as workflow artifacts.
-# A tag like v9.0.0 also attaches them to a draft GitHub release.
-# The repository is public: GitHub's standard runners are free. Runs on pushes to main and on version tags.
+# Every push to main (stable) or dev (integration) builds and uploads the bundles as workflow artifacts.
+# A tag like v12.0.0 attaches them to a draft stable release; a tag like v12.0.0-preview.1 publishes a pre-release
+# for the Preview update channel.
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -91,9 +91,10 @@ jobs:
           name: ${{ matrix.asset }}
           path: ${{ matrix.asset }}
           if-no-files-found: error
-      - name: Attach to draft release
+      - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: ${{ !contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: ${{ matrix.asset }}
