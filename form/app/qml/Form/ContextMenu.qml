@@ -48,7 +48,7 @@ Item {
             Repeater { model: cm.items
                 Rectangle { id: row; required property var modelData
                     width: parent.width; height: 28; radius: Theme.rXs; opacity: modelData.off ? 0.4 : 1
-                    color: rm.containsMouse && !modelData.off ? Qt.rgba(1, 1, 1, 0.07) : "transparent"
+                    color: rm.containsMouse && !modelData.off ? Theme.washHover : "transparent"
                     Icon { x: 8; name: row.modelData.icon; size: 13; anchors.verticalCenter: parent.verticalCenter; color: rm.containsMouse ? Theme.datum : Theme.ink3 }
                     Txt { x: 30; text: row.modelData.text; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
                     Txt { visible: row.modelData.key !== ""; text: row.modelData.key; mono: true; font.pixelSize: 11; tone: 4

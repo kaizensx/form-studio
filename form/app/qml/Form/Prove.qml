@@ -75,7 +75,7 @@ Column {
                     required property int index
                     readonly property bool link: !!(modelData.at || modelData.feature)
                     width: parent.width; height: cc.implicitHeight + 18; radius: Theme.rMd
-                    color: link && cm.containsMouse ? Qt.rgba(1, 1, 1, 0.045) : "transparent"
+                    color: link && cm.containsMouse ? Theme.washHover : "transparent"
                     Rectangle { visible: cr.index > 0; x: 8; width: parent.width - 16; height: 1; color: Theme.rule }
                     Column { id: cc; x: 8; y: 9; width: parent.width - 16; spacing: 5
                         Item { width: parent.width; height: Math.max(lab.implicitHeight, 17)
@@ -111,7 +111,7 @@ Column {
                     readonly property bool link: !!(modelData.at || modelData.feature)
                     readonly property bool on: root.shown === index
                     width: parent.width; height: on ? 30 + pd.implicitHeight + 8 : 30; radius: Theme.rSm
-                    color: pm.containsMouse || on ? Qt.rgba(1, 1, 1, 0.04) : "transparent"
+                    color: pm.containsMouse || on ? Theme.washHover : "transparent"
                     Tag { x: 8; y: 7; text: pr.modelData.evidence || "pass"; kind: pr.modelData.evidence ? pr.modelData.evidence : "PASS" }
                     Txt { x: 92; y: 6; width: parent.width - 92 - pv.width - 16; text: pr.modelData.label; wrapMode: Text.NoWrap; elide: Text.ElideRight }
                     Txt { id: pv; mono: true; font.pixelSize: 12; tone: 2; anchors.right: parent.right; anchors.rightMargin: 8; y: 7
@@ -151,7 +151,7 @@ Column {
                     readonly property bool on: !!root.d && modelData.id === root.d.project.orientation
                     readonly property color ink: on ? Theme.datum : Theme.ink2
                     width: parent.width; height: 30; radius: Theme.rSm
-                    color: on ? Theme.alpha(Theme.datum, 0.07) : om.containsMouse ? Qt.rgba(1, 1, 1, 0.045) : "transparent"
+                    color: on ? Theme.alpha(Theme.datum, 0.07) : om.containsMouse ? Theme.washHover : "transparent"
                     Rectangle { visible: !orow.on; x: 8; width: parent.width - 16; height: 1; color: Theme.rule }
                     Txt { x: 8; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 16 - nums.width - 6
                         text: orow.modelData.label; color: orow.on ? Theme.datum : Theme.ink; font.weight: orow.on ? 600 : 420; wrapMode: Text.NoWrap; elide: Text.ElideRight }

@@ -17,10 +17,11 @@ Column {
     Item {
         width: parent.width; height: 40
         Rectangle { width: parent.width; height: 1; color: Theme.rule }
-        Rectangle { x: -8; y: 4; width: parent.width + 16; height: parent.height - 7; radius: Theme.rSm; color: hm.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent" }
+        Rectangle { x: -8; y: 4; width: parent.width + 16; height: parent.height - 7; radius: Theme.rSm; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent"
+            Behavior on color { Tint {} } }
         Icon { id: chev; y: 14; name: "chevron_right"; size: 12; color: hm.containsMouse ? Theme.ink2 : Theme.ink4
             rotation: f.open ? 90 : 0
-            Behavior on rotation { NumberAnimation { duration: Motion.move(140); easing.type: Easing.OutCubic } } }
+            Behavior on rotation { NumberAnimation { duration: Theme.move(Theme.fast); easing.type: Easing.OutCubic } } }
         Txt { id: cap; kind: "cap"; x: 20; y: 14; text: f.title; color: f.open || hm.containsMouse ? Theme.ink2 : Theme.ink3
             width: Math.min(implicitWidth, parent.width - 20 - 70); elide: Text.ElideRight; wrapMode: Text.NoWrap }
         Txt { kind: "fine"; visible: f.note !== "" && f.tag === ""; text: f.note; color: f.noteColor; anchors.right: parent.right; y: 13

@@ -16,7 +16,7 @@ Rectangle {
     color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.rule
 
     Item { id: head; width: parent.width; height: 36
-        Rectangle { anchors.fill: parent; anchors.margins: 3; radius: Theme.rSm; color: hm.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent" }
+        Rectangle { anchors.fill: parent; anchors.margins: 3; radius: Theme.rSm; color: hm.containsMouse ? Theme.washHover : "transparent" }
         MouseArea { id: hm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: mp.toggled() }
         Txt { kind: "cap"; x: 14; anchors.verticalCenter: parent.verticalCenter; text: "Measurements"; wrapMode: Text.NoWrap }
         Row { anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8

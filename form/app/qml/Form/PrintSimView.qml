@@ -43,10 +43,10 @@ Item {
     property bool framed: false               // the first frame is ours; after that the camera is the user's
     property point pan2: Qt.point(0, 0)       // 2D: plate point at the centre of the view
     property real zoom2: 4                    // 2D: pixels per millimetre
-    Behavior on az { enabled: v.tween; NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
-    Behavior on el { enabled: v.tween; NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
-    Behavior on dist { enabled: v.tween; NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
-    Behavior on target { enabled: v.tween; Vector3dAnimation { duration: 420; easing.type: Easing.OutCubic } }
+    Behavior on az { enabled: v.tween; NumberAnimation { duration: Theme.move(Theme.camera); easing.type: Easing.OutCubic } }
+    Behavior on el { enabled: v.tween; NumberAnimation { duration: Theme.move(Theme.camera); easing.type: Easing.OutCubic } }
+    Behavior on dist { enabled: v.tween; NumberAnimation { duration: Theme.move(Theme.camera); easing.type: Easing.OutCubic } }
+    Behavior on target { enabled: v.tween; Vector3dAnimation { duration: Theme.move(Theme.camera); easing.type: Easing.OutCubic } }
     function scene(p) { return Qt.vector3d(p.x, p.z, -p.y) }
     function frame(animate) {
         if (!box) return

@@ -11,6 +11,6 @@ Txt {
     property bool live: false               // the first value is simply shown
     mono: true; wrapMode: Text.NoWrap
     text: F.fmt(shown, decimals) + unit
-    Behavior on shown { enabled: t.live && !Motion.reduced; NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+    Behavior on shown { enabled: t.live && !Motion.reduced; NumberAnimation { duration: Theme.cross; easing.type: Easing.OutCubic } }
     Component.onCompleted: Qt.callLater(function () { t.live = true })
 }

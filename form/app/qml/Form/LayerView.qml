@@ -168,7 +168,7 @@ Item {
                 Repeater { model: sim.typesFold ? [] : sim.types
                     Rectangle { id: tr; objectName: "simType"; required property string modelData
                         readonly property bool on: !sim.hidden[modelData]
-                        width: parent.width; height: 22; radius: Theme.rXs; color: tma.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : "transparent"
+                        width: parent.width; height: 22; radius: Theme.rXs; color: tma.containsMouse ? Theme.washHover : "transparent"
                         Rectangle { x: 6; width: 10; height: 10; radius: 2; anchors.verticalCenter: parent.verticalCenter
                             color: tr.on ? sim.typeColor(tr.modelData) : "transparent"; border.width: 1; border.color: tr.on ? "transparent" : Theme.ink4 }
                         Txt { x: 24; width: parent.width - 24 - 52; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; tone: tr.on ? 1 : 4

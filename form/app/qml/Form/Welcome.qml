@@ -130,7 +130,7 @@ Rectangle {
                                 SequentialAnimation { id: tick
                                     PauseAnimation { duration: 180 + ck.index * 260 }
                                     ScriptAction { script: ck.shownOk = true }
-                                    NumberAnimation { target: mark; property: "scale"; from: 0.4; to: 1; duration: 260; easing.type: Easing.OutBack } }
+                                    Glide { target: mark; property: "scale"; from: Theme.from(0.6); to: 1; duration: Theme.cross } }
                                 width: cl.width; height: 62
                                 Rectangle { visible: ck.index > 0; width: parent.width; height: 1; color: Theme.rule }
                                 Item { x: 18; width: 22; height: 22; anchors.verticalCenter: parent.verticalCenter

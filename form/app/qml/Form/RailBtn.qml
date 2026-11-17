@@ -16,9 +16,10 @@ Item {
     opacity: enabled ? 1 : 0.35
     Rectangle {
         anchors.fill: parent; anchors.margins: 1; radius: Theme.rSm
-        color: b.active && !b.toggle ? Theme.alpha(Theme.datum, 0.14) : ma.containsMouse && b.enabled ? Qt.rgba(1, 1, 1, 0.07) : "transparent"
-        scale: ma.pressed && b.enabled ? 0.94 : 1
-        Behavior on scale { NumberAnimation { duration: Motion.move(Motion.quick); easing.type: Easing.OutCubic } }
+        color: b.active && !b.toggle ? Theme.alpha(Theme.datum, 0.14) : ma.pressed && b.enabled ? Theme.washPress : ma.containsMouse && b.enabled ? Theme.washHover : "transparent"
+        scale: ma.pressed && b.enabled ? Theme.from(0.94) : 1
+        Behavior on scale { Glide { duration: Theme.press } }
+        Behavior on color { Tint {} }
         Icon { anchors.centerIn: parent; name: b.icon; size: 16
             color: b.toggle ? (b.active ? Theme.ink : Theme.ink4) : b.active ? Theme.datum : ma.containsMouse && b.enabled ? Theme.ink : Theme.ink2 }
         Rectangle { visible: b.marked && !b.active; width: 5; height: 5; radius: 2.5; color: Theme.datum
@@ -37,7 +38,7 @@ Item {
         width: tc.implicitWidth + 18; height: tc.implicitHeight + 12; radius: Theme.rSm
         color: Theme.plate3; border.color: Theme.rule2
         visible: opacity > 0.01; opacity: on && b.label !== "" ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: tip.on && !Ws.tipWarm ? 120 : 0 } }
+        Behavior on opacity { NumberAnimation { duration: tip.on && !Ws.tipWarm ? Theme.fast : 0 } }
         Column { id: tc; x: 9; y: 6; spacing: 2
             Row { spacing: 8
                 Txt { text: b.label; font.pixelSize: 12; font.weight: 550; wrapMode: Text.NoWrap }

@@ -47,7 +47,7 @@ Rectangle {
 
     // header: always there
     Item { id: head; width: parent.width; height: 36
-        Rectangle { anchors.fill: parent; anchors.margins: 3; radius: Theme.rSm; color: hm.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent" }
+        Rectangle { anchors.fill: parent; anchors.margins: 3; radius: Theme.rSm; color: hm.containsMouse ? Theme.washHover : "transparent" }
         Txt { kind: "cap"; x: 14; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; elide: Text.ElideRight
             width: parent.width - 14 - right.width - 14
             text: lg.legend ? lg.legend.title : lg.pending }

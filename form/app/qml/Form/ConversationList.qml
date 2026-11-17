@@ -68,6 +68,7 @@ Item {
             readonly property bool editing: cl.renaming === c.id
             width: col.width; height: 44; radius: Theme.rSm
             color: asking ? Theme.alpha(Theme.signal, 0.09) : current ? Theme.washOn : rm.pressed ? Theme.washPress : rm.containsMouse ? Theme.washHover : "transparent"
+            Behavior on color { Tint {} }
             MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true
                 onClicked: { if (!row.asking && !row.editing) { Store.openConv(row.c.id); cl.chosen() } } }
             // normal

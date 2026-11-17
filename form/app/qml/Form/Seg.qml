@@ -26,6 +26,7 @@ Rectangle {
                 width: l.implicitWidth + 16; height: 22; radius: Theme.rXs       // concentric: 6 − 2
                 color: on ? Theme.plate4 : sm.pressed ? Theme.washPress : sm.containsMouse ? Theme.washHover : "transparent"
                 border.width: on ? 1 : 0; border.color: Theme.rule
+                Behavior on color { Tint {} }
                 Text { id: l; anchors.centerIn: parent; text: modelData.text !== undefined ? modelData.text : modelData; renderType: Text.NativeRendering
                     font.family: Theme.sans; font.pixelSize: 12; font.weight: Theme.wMedium; color: parent.on ? Theme.ink : sm.containsMouse ? Theme.ink2 : Theme.ink3 }
                 MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; onClicked: g.picked(parent.v) }
