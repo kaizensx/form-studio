@@ -41,5 +41,5 @@ exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="FORM", console=False,
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="FORM")
 if sys.platform == "darwin":
     app = BUNDLE(coll, name="FORM.app", icon=icon, bundle_identifier="net.form-studio.app",
-                 info_plist={"CFBundleShortVersionString": "11.0.3", "NSHighResolutionCapable": True,
+                 info_plist={"CFBundleShortVersionString": "11.1.0", "NSHighResolutionCapable": True,
                              "LSMinimumSystemVersion": "12.0", "NSRequiresAquaSystemAppearance": False})

@@ -290,15 +290,15 @@ features = [<span class="f">Feature</span>(<span class="st">"plate"</span>, <spa
       <thead><tr><th scope="col">Tool</th><th scope="col">What FORM does with it</th><th scope="col">Tested how</th></tr></thead>
       <tbody>
         <tr><td>build123d / OpenCascade</td><td>The CAD kernel: every solid, STEP export and B-rep check.</td><td><span class="tag pass">run for real</span></td></tr>
-        <tr><td>Bambu Studio</td><td>Slices with your printer, filament and process presets.</td><td><span class="tag pass">run for real</span></td></tr>
+        <tr><td>Bambu Studio</td><td>Slices with your printer, filament and process presets. Also run on Windows and Linux.</td><td><span class="tag pass">run for real</span></td></tr>
         <tr><td>PrusaSlicer</td><td>The same, picked automatically or in the Slicer sheet.</td><td><span class="tag pass">run for real</span></td></tr>
-        <tr><td>OrcaSlicer</td><td>The same. FORM reads the packed presets OrcaSlicer 2.5 ships: 471 of its 496 printers slice.</td><td><span class="tag pass">run for real</span></td></tr>
-        <tr><td>SuperSlicer, QIDISlicer</td><td>The same.</td><td><span class="tag amber">fixtures only</span></td></tr>
+        <tr><td>OrcaSlicer</td><td>The same. FORM reads the packed presets OrcaSlicer 2.5 ships: 471 of its 496 printers slice. Also run on Windows and Linux.</td><td><span class="tag pass">run for real</span></td></tr>
+        <tr><td>SuperSlicer, QIDISlicer</td><td>The same, on Windows and Linux; QIDISlicer on macOS too.</td><td><span class="tag pass">run for real</span></td></tr>
         <tr><td>OpenSCAD</td><td>Designs written in <code>.scad</code>. Customizer ranges become parameters.</td><td><span class="tag pass">run for real</span></td></tr>
         <tr><td>Blender</td><td>Illustrative renders of the current revision, and its 3D-Print Toolbox checks when the add-on is installed.</td><td><span class="tag pass">renders run</span></td></tr>
         <tr><td>FreeCAD</td><td>Opens the STEP, an optional re-import check, and a macro with every parameter.</td><td><span class="tag pass">run for real</span></td></tr>
         <tr><td>STEP and STL from makers</td><td>Imported as reference parts to design around.</td><td><span class="tag pass">run for real</span></td></tr>
-        <tr><td>Claude Code, Codex <small>also Gemini CLI, Cursor, Claude Desktop</small></td><td>Use FORM's 31 MCP tools. The open app follows along live.</td><td><span class="tag pass">Claude Code, Codex</span></td></tr>
+        <tr><td>Claude Code, Codex <small>also Gemini CLI, Cursor, Claude Desktop</small></td><td>Use FORM's 44 MCP tools. The open app follows along live. Claude Code, Codex and Gemini CLI also chat inside the app.</td><td><span class="tag pass">Claude Code, Codex</span></td></tr>
       </tbody>
     </table>
     <p class="compat-note">“Run for real” means on the release machine, an Apple Silicon Mac. “Fixtures only” means the adapter is tested against recorded files and has not been run against a real installation yet.</p>
@@ -487,7 +487,7 @@ I can't approve it. Review it on the bench.</span>
         <ul>
           <li><b>Physical results.</b> Print a coupon or a test piece and report the numbers. It is the only way the models get checked against reality.</li>
           <li><b>Recipes.</b> About 200 lines of build123d each.</li>
-          <li><b>Slicer and CAD runs</b> on Windows and Linux, and on SuperSlicer and QIDISlicer.</li>
+          <li><b>Using the app by hand</b> on Windows, Linux and Intel Macs. The tests drive it there; a person has not yet.</li>
         </ul>
         <div class="actions">
           <a class="btn" href="https://github.com/kaizensx/form-studio">Star on GitHub</a>

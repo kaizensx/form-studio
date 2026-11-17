@@ -90,14 +90,15 @@ FORM drives existing software instead of replacing it. On first launch it shows 
 | | What FORM does with it | Run for real here |
 |---|---|---|
 | **build123d / OpenCascade** | The CAD kernel: every solid, STEP, B-rep checks | yes |
-| **Bambu Studio** | Slices with your printer, filament and process presets | yes |
+| **Bambu Studio** | Slices with your printer, filament and process presets | yes (macOS by hand; 2.9.1 on Windows and Linux in CI) |
 | **PrusaSlicer** | Same, picked automatically or in the Slicer sheet | yes (2.9.7 on macOS and Windows, 2.4.0 on Linux: a full slice, layers, simulation, cost) |
-| **OrcaSlicer** (SuperSlicer, QIDISlicer) | Same; reads OrcaSlicer 2.5's packed presets (`.opc`) | OrcaSlicer yes (2.5.1 on macOS: 471 of the 496 printers it ships slice; the rest fail in OrcaSlicer itself). The others: fixtures only |
+| **OrcaSlicer** | Same; reads OrcaSlicer 2.5's packed presets (`.opc`) | yes (2.5.1 on macOS: 471 of the 496 printers it ships slice, the rest fail in OrcaSlicer itself; Windows and Linux in CI) |
+| **SuperSlicer, QIDISlicer** | Same | yes (SuperSlicer 2.5.59 and QIDISlicer 1.2.5 on Windows and Linux in CI; QIDISlicer on macOS too) |
 | **OpenSCAD** | Designs written in `.scad`; Customizer ranges become parameters | yes |
 | **Blender** | Illustrative renders; its 3D-Print Toolbox checks when installed | renders yes |
 | **FreeCAD** | Open the STEP, an optional re-import check, a macro with every parameter | yes (1.1.4: re-check and macro) |
 | **STEP / STL from makers** | Imported as reference parts to design around | yes |
-| **Claude Code, Codex, Gemini CLI, Cursor** | Use FORM's 44 MCP tools; the app follows along live. Claude Code and Codex also chat inside the app | Claude Code, Codex |
+| **Claude Code, Codex, Gemini CLI, Cursor** | Use FORM's 44 MCP tools; the app follows along live. Claude Code, Codex and Gemini CLI also chat inside the app | Claude Code, Codex. Gemini CLI 0.68.0 was run and stopped at sign-in: a live reply needs your Gemini API key (Settings, Chat) |
 
 <table><tr>
 <td width="50%"><img src="docs/screenshots/app-reference-part.jpg" alt="A board imported as a STEP file, drawn in blueprint inside the case being designed"></td>
@@ -312,11 +313,11 @@ While it's open, it follows what agents change, and labels each revision with th
 
 ## Status and roadmap
 
-The engine's tests run on macOS, Windows and Linux in CI (no slicer there; slicing is tested on a Mac with Bambu Studio, OrcaSlicer and PrusaSlicer). Every build also launches the packaged app on each platform and requires its interface to load and its CAD kernel to start. The macOS Apple Silicon app was also used by hand. On Windows and Linux the interface journeys also run in CI: the real window is driven with mouse and key events, with a real PrusaSlicer, through design, slice, simulation and release. Nobody has used the Windows, Linux or Intel macOS app by hand yet; please report what you find.
+The engine's tests run on macOS, Windows and Linux in CI (the Real slicers workflow also slices with OrcaSlicer, Bambu Studio, SuperSlicer and QIDISlicer on Windows and Linux). Every build also launches the packaged app on each platform and requires its interface to load and its CAD kernel to start. The macOS Apple Silicon app was also used by hand. On Windows and Linux the interface journeys also run in CI: the real window is driven with mouse and key events, with a real PrusaSlicer, through design, slice, simulation and release. Nobody has used the Windows, Linux or Intel macOS app by hand yet; please report what you find.
 
 Not verified yet, and wanted next:
 
-- OrcaSlicer on Windows and Linux, SuperSlicer, QIDISlicer and Gemini CLI
+- a live Gemini CLI reply (it needs a key; the sign-in path is built and tested)
 - signed and notarized app bundles, and in-app updates beyond a notice
 - printer monitoring (left off on purpose until it can be read-only and local)
 - scan-to-CAD and photo-to-dimensions
