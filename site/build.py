@@ -1,4 +1,4 @@
-"""Build the /docs pages of the FORM website from the repository's markdown.
+"""Build the /docs pages of the Form Studio website from the repository's markdown.
 
     python site/build.py            (needs the `markdown` package: pip install markdown)
 
@@ -32,7 +32,7 @@ PAGES = [
     ("app", "docs/APP.md", "The desktop app", "Run it, what you see, the keys, what it will not do."),
     ("mcp", "docs/MCP.md", "MCP tools", "Every tool an agent can call, generated from the server itself."),
     ("recipes", "docs/RECIPES.md", "Writing a recipe", "Parameters, features, constraints, fit and tests."),
-    ("verification", "docs/VERIFICATION.md", "Verification", "What was tested, on what, and what was not run."),
+    ("verification", "docs/VERIFICATION.md", "What is verified", "Which tools and platforms were run for real, and the record of every test run."),
     ("north-star", "docs/NORTH_STAR.md", "North star", "The brief every contributor works from."),
     ("changelog", "CHANGELOG.md", "Changelog", "What changed in each version."),
 ]
@@ -43,18 +43,23 @@ PAGE = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title} · FORM docs</title>
+<title>{title} · Form Studio docs</title>
 <meta name="description" content="{desc}">
 <meta name="theme-color" content="#0e1113">
 <link rel="canonical" href="{base}docs/{file}">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="FORM">
-<meta property="og:title" content="{title} · FORM docs">
+<meta property="og:site_name" content="Form Studio">
+<meta property="og:title" content="{title} · Form Studio docs">
 <meta property="og:description" content="{desc}">
 <meta property="og:image" content="{base}assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="../favicon.ico" sizes="48x48">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
 <link rel="icon" type="image/png" href="../assets/favicon.png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
 <link rel="preload" href="../fonts/InstrumentSans.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../css/site.css">
 </head>
@@ -62,17 +67,19 @@ PAGE = """<!doctype html>
 <a class="skip" href="#main">Skip to content</a>
 <header class="nav scrolled">
   <div class="wrap">
-    <a class="mark" href="../" aria-label="FORM, home">FORM</a>
+    <a class="brand" href="../"><img src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"></a>
     <ul class="nav-links">
-      <li><a href="../#how">How it works</a></li>
-      <li><a href="../#app">The app</a></li>
-      <li><a href="../#works-with">Works with</a></li>
-      <li><a href="../#agents">For agents</a></li>
+      <li><a href="../#fit">Fit</a></li>
+      <li><a href="../#checks">Checks</a></li>
+      <li><a href="../#print">Print</a></li>
+      <li><a href="../#assemblies">Assemblies</a></li>
+      <li><a href="../#agents">Agents</a></li>
       <li><a href="./" aria-current="page">Docs</a></li>
-      <li><a href="{repo}">GitHub</a></li>
     </ul>
-    <a class="nav-docs" href="./" aria-current="page">Docs</a>
-    <a class="btn primary small" href="../#get">Download</a>
+    <div class="end">
+      <a class="gh" href="{repo}">GitHub</a>
+      <a class="btn primary small" href="../#download">Download</a>
+    </div>
   </div>
 </header>
 <div class="wrap docs">
@@ -89,7 +96,7 @@ PAGE = """<!doctype html>
 </div>
 <footer class="foot">
   <div class="wrap">
-    <a class="mark" href="../">FORM</a>
+    <a class="brand" href="../"><img src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"></a>
     <nav aria-label="Footer">
       <a href="./">Docs</a>
       <a href="changelog.html">Changelog</a>
@@ -97,11 +104,44 @@ PAGE = """<!doctype html>
       <a href="{repo}/issues">Issues</a>
       <a href="{repo}/blob/main/LICENSE">MIT licence</a>
     </nav>
-    <p>This site sets no cookies and loads no trackers, analytics or third-party fonts. These pages are generated from the markdown in the repository.</p>
+    <p>No cookies, trackers or third-party requests. Generated from the repository’s markdown.</p>
   </div>
 </footer>
 </body>
 </html>
+"""
+
+
+# The top of the verification page: which external tools and platforms Form Studio has been run with, as stated
+# in the README's works-with table and status section. Keep it in step with the README when a tool is run again.
+VERIFIED_INTRO = """<h1>What is verified, and how</h1>
+<p class="lede">Each tool Form Studio drives, and how it was run. Below that is the record of every test run, by version,
+with what passed and what was not run.</p>
+<h2 id="tools">Tools Form Studio drives</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Tool</th><th>What Form Studio does with it</th><th>Run for real</th></tr></thead>
+<tbody>
+<tr><td>build123d / OpenCascade</td><td>The CAD kernel: every solid, STEP export and B-rep check</td><td class="r-run">Yes</td></tr>
+<tr><td>Bambu Studio</td><td>Slices with your printer, filament and process presets</td><td class="r-run">Yes: macOS by hand; 2.9.1 on Windows and Linux in CI</td></tr>
+<tr><td>PrusaSlicer</td><td>The same, picked automatically or in the Slicer sheet</td><td class="r-run">Yes: 2.9.7 on macOS and Windows, 2.4.0 on Linux (a full slice, layers, simulation, cost)</td></tr>
+<tr><td>OrcaSlicer</td><td>The same; reads OrcaSlicer 2.5’s packed presets (<code>.opc</code>)</td><td class="r-run">Yes: 2.5.1 on macOS, where 471 of the 496 printers it ships slice and the rest fail in OrcaSlicer itself; Windows and Linux in CI</td></tr>
+<tr><td>SuperSlicer, QIDISlicer</td><td>The same</td><td class="r-run">Yes: SuperSlicer 2.5.59 and QIDISlicer 1.2.5 on Windows and Linux in CI; QIDISlicer on macOS too</td></tr>
+<tr><td>OpenSCAD</td><td>Designs written in <code>.scad</code>; Customizer ranges become parameters</td><td class="r-run">Yes</td></tr>
+<tr><td>Blender</td><td>Illustrative renders; its 3D-Print Toolbox checks when installed</td><td class="r-run">Renders</td></tr>
+<tr><td>FreeCAD</td><td>Opens the STEP, an optional re-import check, a macro with every parameter</td><td class="r-run">Yes: 1.1.4, re-check and macro</td></tr>
+<tr><td>STEP and STL from makers</td><td>Imported as reference parts to design around</td><td class="r-run">Yes</td></tr>
+<tr><td>Claude Code, Codex, Gemini CLI, Cursor</td><td>Use Form Studio’s 44 MCP tools; the app follows along live. Claude Code, Codex and Gemini CLI also chat inside the app</td><td class="r-no">Claude Code and Codex. Gemini CLI 0.68.0 was run up to sign-in: a live reply needs a Gemini API key (Settings, Chat). Cursor was not run.</td></tr>
+</tbody></table></div>
+<h2 id="platforms">Platforms</h2>
+<p>The engine’s tests run on macOS, Windows and Linux in CI, and the Real slicers workflow slices with OrcaSlicer,
+Bambu Studio, SuperSlicer and QIDISlicer on Windows and Linux. Every build launches the packaged app on each platform
+and requires its interface to load and its CAD kernel to start. On Windows and Linux the interface journeys also run in
+CI: the real window is driven with mouse and key events, with a real PrusaSlicer, through design, slice, simulation and
+release. The macOS Apple Silicon app was also used by hand; the Windows, Linux and Intel macOS apps have not been used
+by hand yet.</p>
+<p>The app bundles are not signed or notarized. Nothing in the repository has been physically printed by the authors as
+part of verification: a slice is reported as simulated, fit as modelled, and strength as a model with stated
+assumptions.</p>
 """
 
 
@@ -159,6 +199,8 @@ def main() -> int:
     for slug, source, title, desc in PAGES:
         text = (ROOT / source).read_text(encoding="utf-8")
         body = rewrite(render(text), source)
+        if slug == "verification":
+            body = VERIFIED_INTRO + body.replace("<h1>Verification</h1>", '<h2 id="record">The test record</h2>', 1)
         src = f'<p class="src">Source: <a href="{REPO}/blob/main/{source}">{source}</a></p>'
         page = PAGE.format(title=html.escape(title), desc=html.escape(desc), file=f"{slug}.html", base=BASE, repo=REPO,
                            nav=nav(slug), src=src, body=body)
@@ -168,10 +210,9 @@ def main() -> int:
 
     items = "\n".join(f'<li><a href="{slug}.html"><b>{html.escape(title)}</b><span>{html.escape(desc)}</span></a></li>'
                       for slug, _, title, desc in PAGES)
-    index = (f"<h1>Docs</h1>\n<p>These pages are the repository's own markdown, built with the site. "
-             f"If a page and the code disagree, the code is right and the page has a bug: "
-             f'<a href="{REPO}/issues">please report it</a>.</p>\n<ul class="docs-index">\n{items}\n</ul>')
-    (OUT / "index.html").write_text(PAGE.format(title="Docs", desc="FORM documentation: the app, MCP tools, recipes, verification.",
+    index = (f"<h1>Docs</h1>\n<p>These pages are built from the markdown in the repository. "
+             f'If a page and the code disagree, <a href="{REPO}/issues">open an issue</a>.</p>\n<ul class="docs-index">\n{items}\n</ul>')
+    (OUT / "index.html").write_text(PAGE.format(title="Docs", desc="Form Studio documentation: the app, MCP tools, recipes, verification.",
                                                 file="", base=BASE, repo=REPO, nav=nav("index"), src="", body=index), encoding="utf-8")
 
     today = _dt.date.today().isoformat()

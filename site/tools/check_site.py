@@ -5,7 +5,7 @@
 Fails (exit 1) when:
 - a page links to a local file that does not exist, or to an #anchor that is not on the page
 - an <img> has no alt text, or no width and height (layout shift)
-- parts.json points outside its .bin files
+- the exported data (site.json, toolpath.bin) does not match its own layout
 - a page asks another host for a script, a stylesheet, a font or an image
 - the first view is heavier than the budget
 """
@@ -19,10 +19,11 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 SITE = Path(__file__).resolve().parents[1]
-BUDGET_FIRST_VIEW = 1_500_000        # bytes, uncompressed: page, CSS, fonts, poster, scripts, three.js, first part
-FIRST_VIEW = ["index.html", "css/site.css", "fonts/InstrumentSans.woff2", "fonts/GeistMono.woff2", "assets/hero-poster.webp",
-              "js/main.js", "js/hero.js", "js/viewer.js", "vendor/three.module.js", "vendor/OrbitControls.js",
-              "assets/parts/parts.json", "assets/parts/dock.bin"]
+BUDGET_FIRST_VIEW = 2_500_000        # bytes, uncompressed: page, CSS, fonts, scripts, three.js, the dock and its toolpath
+FIRST_VIEW = ["index.html", "css/site.css", "fonts/InstrumentSans.woff2", "fonts/GeistMono.woff2", "fonts/lucide-form.woff2",
+              "assets/lockup.svg", "js/main.js", "js/data.js", "js/app.js", "js/scene.js", "js/demos.js",
+              "vendor/three.module.js", "vendor/OrbitControls.js",
+              "assets/data/site.json", "assets/data/dock.glb", "assets/data/toolpath.bin"]
 
 
 class Page(HTMLParser):
@@ -81,18 +82,20 @@ def main() -> int:
         for url in p.remote:
             errors.append(f"{rel}: loads from another host: {url}")
 
-    parts = SITE / "assets" / "parts"
-    man = json.loads((parts / "parts.json").read_text(encoding="utf-8"))
-    for part in man["parts"]:
-        size = (parts / part["bin"]).stat().st_size
-        if size != part["bytes"]:
-            errors.append(f"{part['bin']}: {size} bytes, parts.json says {part['bytes']}")
-        if not 8 <= len(part["steps"]) <= 13:
-            errors.append(f"{part['id']}: {len(part['steps'])} builds, expected 8 to 13")
-        for st in part["steps"]:
-            end = max(st["v"][0] + st["v"][1] * 6, st["i"][0] + st["i"][1] * st["i"][2], st["e"][0] + st["e"][1] * 12)
-            if end > size:
-                errors.append(f"{part['id']} step {st['value']}: reads past the end of {part['bin']}")
+    data = SITE / "assets" / "data"
+    site = json.loads((data / "site.json").read_text(encoding="utf-8"))
+    tp = site["dock"]["toolpath"]
+    size = (data / "toolpath.bin").stat().st_size
+    if size != tp["bytes"]:
+        errors.append(f"toolpath.bin: {size} bytes, site.json says {tp['bytes']}")
+    widths = {"points": 2, "run_count": 2, "run_type": 1, "layer_runs": 4}
+    for name, (off, count) in tp["layout"].items():
+        if off + count * widths[name] > size:
+            errors.append(f"toolpath.bin: {name} reads past the end of the file")
+    for glb in ("dock.glb", "box.glb"):
+        head = (data / glb).read_bytes()[:12]
+        if head[:4] != b"glTF":
+            errors.append(f"{glb}: not a binary glTF file")
 
     weight = sum((SITE / f).stat().st_size for f in FIRST_VIEW)
     if weight > BUDGET_FIRST_VIEW:
