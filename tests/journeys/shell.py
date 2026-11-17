@@ -257,6 +257,11 @@ def journey_variants_save_and_promote(ui):
     palette(ui, "variants board", "Variants board")
     open_sheet_wait(ui, "variants")
     card = ui.item("sheetCard")
+    # nothing saved yet: the empty place beside the head says what a variant is and holds the one action
+    ui.expect("No variants yet", within=card)
+    ui.check(ui.sees("A variant is a named set of this design", card), "the empty state says what a variant is")
+    ui.check(ui.exists(name="saveFirstVariant", within=card), "the action sits in the empty state")
+    ui.shot("sheet-variants-empty")
     ui.click_text("Save the draft as a variant", within=card)
     ui.expect("Give the variant a name")                       # a toast: the name is required
     ui.eq(saved_variants(ui, pid), [], "nothing is saved without a name")
@@ -266,6 +271,8 @@ def journey_variants_save_and_promote(ui):
     ui.settle(400)
     ui.eq(len([t for t in ui.store.get("toasts") if t["msg"].startswith("Saved variant")]), 1, "one Enter saves the variant once")
     ui.wait_until(lambda: ui.exists(text="Promote to head", within=card), 20, "the variant's card")
+    ui.wait_until(lambda: not ui.sees("No variants yet", card), 5, "the empty state to leave once a variant is saved")
+    ui.check(not ui.exists(name="saveFirstVariant", within=card) and ui.exists(text="Save the draft as a variant", within=card), "the action moves to the sheet's action bar")
     ui.settle(600)
     ui.shot("sheet-variants")
     close_sheet_esc(ui)

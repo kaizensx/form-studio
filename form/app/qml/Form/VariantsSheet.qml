@@ -18,6 +18,7 @@ Column {
     property bool nameMissing: false
     readonly property var cards: board ? board.cards : []
     readonly property var differs: board ? board.differs : []
+    readonly property bool empty: !!board && cards.length < 2     // only the head: nothing saved yet
     readonly property int cols: Math.max(2, Math.min(3, cards.length))
     readonly property int gap: 12
     readonly property real cardW: Math.floor((width - (cols - 1) * gap) / cols)
@@ -30,7 +31,8 @@ Column {
 
     function load() {
         busy = true
-        Store.pget("/variants").then(function (r) { vs.board = r; vs.error = null; vs.busy = false },
+        Store.pget("/variants").then(function (r) { var first = !vs.board; vs.board = r; vs.error = null; vs.busy = false
+                                                    if (first) Qt.callLater(function () { nameField.input.forceActiveFocus() }) },
                                      function (e) { vs.error = e; vs.busy = false })
     }
     function save() {
@@ -49,24 +51,28 @@ Column {
             tip: Store.hasDraft ? "Commit or discard the draft first" : ""; onClicked: Store.openSheet("alternatives") } }
     property Component footer: Row { spacing: 8
         Btn { kind: "quiet"; text: "Close"; onClicked: Store.openSheet(null) }
-        Btn { kind: "primary"; icon: "plus"; keys: "Return"
+        Btn { kind: "primary"; icon: "plus"; keys: "Return"; visible: !vs.empty      // with nothing saved the action is in the body
             text: vs.fromDraft ? "Save the draft as a variant" : "Save " + (Store.project ? F.pad(Store.project.head) : "the head") + " as a variant"
             onClicked: vs.save() } }
 
     // ── save the design on screen ──
-    Rectangle { width: parent.width; height: form.implicitHeight + 32; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
-        Column { id: form; x: 16; y: 16; width: parent.width - 32; spacing: 10
-            Row { width: parent.width; spacing: 12
-                Column { width: 280; spacing: 6
-                    Txt { kind: "cap"; text: "Name this design" }
-                    Field { id: nameField; width: parent.width; placeholder: "e.g. Thick walls"; error: vs.nameMissing ? " " : ""
-                        onEdited: function (t) { if (t.trim()) vs.nameMissing = false } } }     // Enter: the sheet's accept()
-                Column { width: parent.width - 292; spacing: 6
-                    Txt { kind: "cap"; text: "Note" }
-                    Field { id: noteField; width: parent.width; placeholder: "Optional" } } }
-            Txt { kind: "fine"; width: parent.width
-                text: vs.fromDraft ? "Your open draft (" + F.plural(F.keys(vs.draftChanges).length, "change") + ") is saved as it is. It stays a draft: nothing is committed."
-                                   : "Saves the current head under a name. To save something different, change parameters first (a draft), or use Compare alternatives." } } }
+    // With variants on the board this is a strip above them. With none it moves into the empty place beside the head
+    // (see `slot`), so the sheet has one thing to look at and one thing to do.
+    Rectangle { id: strip; visible: !!vs.board && !vs.empty
+        width: parent.width; height: stripBody.height + 32; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+        Item { id: stripBody; x: 16; y: 16; width: parent.width - 32; height: form.implicitHeight } }
+    Column { id: form; parent: vs.empty ? slotForm : stripBody; width: parent ? parent.width : 0; spacing: vs.empty ? 12 : 10
+        Grid { width: parent.width; columns: vs.empty ? 1 : 2; spacing: 12
+            Column { width: vs.empty ? parent.width : 280; spacing: 6
+                Txt { kind: "cap"; text: "Name this design" }
+                Field { id: nameField; width: parent.width; placeholder: "e.g. Thick walls"; error: vs.nameMissing ? " " : ""
+                    onEdited: function (t) { if (t.trim()) vs.nameMissing = false } } }     // Enter: the sheet's accept()
+            Column { width: vs.empty ? parent.width : parent.width - 292; spacing: 6
+                Txt { kind: "cap"; text: "Note" }
+                Field { id: noteField; width: parent.width; placeholder: "Optional" } } }
+        Txt { kind: "fine"; width: parent.width; visible: !vs.empty
+            text: vs.fromDraft ? "Your open draft (" + F.plural(F.keys(vs.draftChanges).length, "change") + ") is saved as it is. It stays a draft: nothing is committed."
+                               : "Saves the current head under a name. To save something different, change parameters first (a draft), or use Compare alternatives." } }
 
     Note { visible: !!vs.error; kind: "red"; title: vs.error ? vs.error.message || "Could not load the variants" : ""; text: vs.error && vs.error.hint ? vs.error.hint : ""
         Btn { small: true; icon: "refresh_cw"; text: "Try again"; onClicked: vs.load() } }
@@ -77,7 +83,8 @@ Column {
             Spinner { size: 18; anchors.horizontalCenter: parent.horizontalCenter }
             Txt { tone: 2; text: "Building each variant…"; anchors.horizontalCenter: parent.horizontalCenter } } }
 
-    Grid { width: parent.width; columns: vs.cols; spacing: vs.gap; visible: vs.cards.length > 0
+    Item { width: parent.width; height: grid.height; visible: vs.cards.length > 0
+    Grid { id: grid; width: parent.width; columns: vs.cols; spacing: vs.gap
         Repeater { model: vs.cards
             Rectangle { id: card; required property var modelData
                 readonly property var c: modelData
@@ -152,7 +159,25 @@ Column {
                             onClicked: { var p = Store.deleteVariant(card.c.id); if (p) p.then(function () { vs.load() }) } } }
                 }
             } } }
-    Note { visible: !!vs.board && vs.cards.length < 2; kind: "plain"; title: "No variants yet"
-        text: "Name the current design above, or save a candidate from Compare alternatives." }
+        // ── no variants yet: the place the first one will take, with the one thing to do ──
+        Rectangle { id: slot; visible: vs.empty; x: vs.cardW + vs.gap; width: vs.cardW; height: grid.height
+            radius: Theme.rMd; color: "transparent"; border.color: Theme.rule
+            Column { anchors.centerIn: parent; width: Math.min(340, parent.width - 48); spacing: 0
+                Icon { name: "copy_plus"; size: 22; color: Theme.ink3 }
+                Item { width: 1; height: 16 }
+                Txt { kind: "h3"; font.weight: Theme.wSemi; text: "No variants yet"; width: parent.width }
+                Item { width: 1; height: 8 }
+                Txt { tone: 2; width: parent.width; lineHeight: 1.3
+                    text: "A variant is a named set of this design’s values, kept beside the head so the two can be compared and either promoted." }
+                Item { width: 1; height: 24 }
+                Item { id: slotForm; width: parent.width; height: form.implicitHeight }
+                Item { width: 1; height: 16 }
+                Btn { kind: "primary"; icon: "plus"; keys: "Return"; objectName: "saveFirstVariant"
+                    text: vs.fromDraft ? "Save the draft as a variant" : "Save " + (Store.project ? F.pad(Store.project.head) : "the head") + " as a variant"
+                    onClicked: vs.save() }
+                Item { width: 1; height: 12 }
+                Txt { kind: "fine"; width: parent.width
+                    text: vs.fromDraft ? "Your open draft (" + F.plural(F.keys(vs.draftChanges).length, "change") + ") is saved as it is. It stays a draft: nothing is committed."
+                                       : "Saves " + (Store.project ? F.pad(Store.project.head) : "the head") + " as it is. For something different, change parameters first, or use Compare alternatives." } } } }
     Txt { kind: "fine"; width: parent.width; visible: !!vs.board; text: vs.board ? vs.board.note : "" }
 }
