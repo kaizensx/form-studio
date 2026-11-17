@@ -89,7 +89,7 @@ Item {
             onClicked: Store.branchFrom(Store.scrub.rev) }
         Btn { small: true; kind: "quiet"; icon: tl.exporting ? "loader_circle" : "film"; anchors.verticalCenter: parent.verticalCenter
             enabled: !tl.exporting && tl.revs.length > 1; tip: tl.exporting ? "Rendering every revision…" : "Export the history as a GIF or animated WebP"
-            onClicked: { dlg.currentFolder = Bridge.downloads(); dlg.currentFile = Bridge.downloads() + "/" + Store.pid + "_history.gif"; dlg.open() } }
+            onClicked: { dlg.currentFolder = Bridge.downloads(); dlg.currentFile = Bridge.downloads() + "/" + Store.pid + "_history.gif"; Store.ask(dlg) } }
         Btn { small: true; kind: "quiet"; icon: "x"; anchors.verticalCenter: parent.verticalCenter; tip: "Close the timeline"
             onClicked: { Store.timelineOpen = false; Store.endScrub() } }
     }

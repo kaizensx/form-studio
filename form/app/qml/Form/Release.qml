@@ -51,7 +51,7 @@ Column {
         dlg.api = api; dlg.reveal = !!reveal; dlg.nameFilters = [filter, "All files (*)"]
         dlg.currentFolder = Bridge.downloads()
         dlg.currentFile = Bridge.downloads() + "/" + name
-        dlg.open()
+        Store.ask(dlg)
     }
     FileDialog {
         id: dlg
@@ -95,7 +95,7 @@ Column {
                 Item { id: wr; required property var modelData
                     readonly property bool on: Store.ack.indexOf(modelData.id) >= 0
                     width: parent.width; implicitHeight: Math.max(wt.implicitHeight, 16) + 8
-                    Check { id: wc; y: 5; checked: wr.on; onToggled: function (c) { Store.setAck(wr.modelData.id, c) } }
+                    Check { id: wc; objectName: "ackCheck"; y: 5; checked: wr.on; onToggled: function (c) { Store.setAck(wr.modelData.id, c) } }
                     Column { id: wt; x: 26; y: 4; width: parent.width - 26; spacing: 1
                         Txt { text: wr.modelData.label; width: parent.width; font.weight: 600 }
                         Txt { kind: "fine"; tone: 2; text: String(wr.modelData.value); width: parent.width; color: Theme.amber } }

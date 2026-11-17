@@ -88,6 +88,30 @@ class Bridge(QObject):
         self.pool = QThreadPool.globalInstance()
         self.pool.setMaxThreadCount(max(8, self.pool.maxThreadCount()))
 
+    # -- interaction tests (form/app/uitest.py): no native dialogs, nothing opened outside the app -------------
+    def _test_dir(self) -> str:
+        import os
+        return os.environ.get("FORM_UITEST_FILES", "") if getattr(self, "under_test", False) else ""
+
+    testDir = Property(str, _test_dir, constant=True)
+
+    @Slot(result=str)
+    def testPick(self) -> str:
+        """The file the test queued for the next open dialog ("" = none: a save dialog gets a path in testDir)."""
+        p, self._test_pick = getattr(self, "_test_pick", ""), ""
+        return p
+
+    @Slot(str, result=QUrl)
+    def fileUrl(self, path: str) -> QUrl:
+        return QUrl.fromLocalFile(path)
+
+    def _outside(self, what: str, arg: str) -> bool:
+        """True (and recorded) when a test is running: Finder, the browser and other apps stay closed."""
+        if not getattr(self, "under_test", False):
+            return False
+        self.__dict__.setdefault("outside", []).append((what, arg))
+        return True
+
     # -- engine -------------------------------------------------------------
     @Slot(int, str, str, "QVariant")
     def request(self, rid: int, method: str, path: str, body):
@@ -182,6 +206,8 @@ class Bridge(QObject):
     @Slot(QUrl)
     def reveal(self, file: QUrl):
         p = file.toLocalFile()
+        if self._outside("reveal", p):
+            return
         if sys.platform == "darwin":
             subprocess.Popen(["open", "-R", p])
         elif sys.platform.startswith("win"):
@@ -191,10 +217,14 @@ class Bridge(QObject):
 
     @Slot()
     def openDataFolder(self):
+        if self._outside("folder", self._data):
+            return
         QDesktopServices.openUrl(QUrl.fromLocalFile(self._data))
 
     @Slot(str)
     def openLink(self, url: str):
+        if self._outside("link", url):
+            return
         if url.startswith(("https://", "http://")):
             QDesktopServices.openUrl(QUrl(url))
 

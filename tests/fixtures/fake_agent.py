@@ -44,7 +44,8 @@ def main():
         pid = next((d.name for d in sorted(data.iterdir()) if (d / "project.json").exists()), "p")
         f = data / pid / "artifacts" / "renders" / "abc-sheet-all-v1.png"
         f.parent.mkdir(parents=True, exist_ok=True)
-        f.write_bytes(b"\x89PNG\r\n\x1a\n")
+        f.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"       # a valid 1 × 1 image
+                      b"\x00\x00\x00\x0cIDATx\x9ccHhX\x00\x00\x02\xc4\x01\x81HR\x04\xc4\x00\x00\x00\x00IEND\xaeB`\x82")
         out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t2", "name": "mcp__form__render",
                                                            "input": {"project": pid, "view": "sheet"}}]}})
         out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t2", "content": [

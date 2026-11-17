@@ -89,7 +89,7 @@ Column {
                             Icon { name: "crosshair"; size: 11; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
                             Txt { kind: "fine"; text: "Click to see where on the part" } }
                     }
-                    MouseArea { id: cm; anchors.fill: parent; enabled: cr.link; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    MouseArea { id: cm; objectName: "openCheckArea"; anchors.fill: parent; enabled: cr.link; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                         onClicked: Store.marker(cr.modelData) }
                 }
             }
@@ -105,6 +105,7 @@ Column {
                 model: root.passed
                 Rectangle {
                     id: pr
+                    objectName: "passedCheck"
                     required property var modelData
                     required property int index
                     readonly property bool link: !!(modelData.at || modelData.feature)
@@ -119,7 +120,11 @@ Column {
                     Txt { id: pd; visible: pr.on; kind: "fine"; x: 92; y: 30; width: parent.width - 100
                         text: (pr.modelData.label.length > 22 ? pr.modelData.label + ". " : "") + (pr.modelData.detail || "") + (pr.link ? " Shown on the part." : "") }
                     MouseArea { id: pm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onClicked: { root.shown = pr.on ? -1 : pr.index; if (!pr.on && pr.link) Store.marker(pr.modelData) } }
+                        onClicked: {
+                            var was = pr.on              // read first: setting `shown` flips `on` at once
+                            root.shown = was ? -1 : pr.index
+                            if (!was && pr.link) Store.marker(pr.modelData)
+                            else if (was && Store.viewer) Store.viewer.setMarker(null) } }
                 }
             }
         }
@@ -184,7 +189,7 @@ Column {
             Btn { icon: Store.layers ? "arrow_left" : "layers"; text: Store.layers ? "Back to the design" : "Inspect layers"
                 onClicked: { if (Store.layers) Store.showLayers(false); else Store.simulate({ mode: "2d", layer: 4 }) } }
             Btn { kind: "quiet"; icon: "download"; text: "Save sliced 3MF…"; visible: !!root.sl && !!root.sl.threemf
-                onClicked: { save.selectedFile = Bridge.downloads() + "/" + root.sl.threemf; save.open() } } }
+                onClicked: { save.selectedFile = Bridge.downloads() + "/" + root.sl.threemf; Store.ask(save) } } }
         Txt { kind: "fine"; width: parent.width
             text: "A slice shows the toolpaths " + ((root.sl && root.sl.slicer_name) || "Bambu Studio") + " would send with these presets. It is not a print: adhesion, warping and fit are only known after printing." }
         Fold { title: "Slice details"; key: "prove.slice"

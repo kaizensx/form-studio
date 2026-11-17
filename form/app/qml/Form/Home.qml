@@ -37,7 +37,7 @@ Item {
             { sep: true },
             { icon: "pencil", text: "Rename", run: function () { home.confirming = ""; home.renaming = p.id } },
             { icon: "copy_plus", text: "Duplicate", run: function () { Store.duplicateProject(p.id) } },
-            { icon: "package", text: "Export .formproj…", run: function () { saveDlg.pid = p.id; saveDlg.currentFile = Bridge.downloads() + "/" + p.id + ".formproj"; saveDlg.open() } },
+            { icon: "package", text: "Export .formproj…", run: function () { saveDlg.pid = p.id; saveDlg.currentFile = Bridge.downloads() + "/" + p.id + ".formproj"; Store.ask(saveDlg) } },
             { sep: true },
             { icon: "trash_2", text: "Move to trash…", danger: true, run: function () { home.renaming = ""; home.confirming = p.id } }
         ]

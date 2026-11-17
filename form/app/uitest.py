@@ -39,6 +39,12 @@ def prepare(cfg: dict) -> None:
     QCoreApplication.setApplicationName("FORM-uitest")
     QSettings.setDefaultFormat(QSettings.Format.IniFormat)
     QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, tempfile.mkdtemp(prefix="form-uitest-settings-"))
+    # QTest's click and key functions process events while this thread holds the interpreter lock. With Qt Quick's
+    # threaded render loop the window then waits for the render thread, which waits for the lock to read the
+    # Python-made geometry: a deadlock. Rendering on the main thread avoids it (the app itself is unaffected).
+    os.environ.setdefault("QSG_RENDER_LOOP", "basic")
+    if not os.environ.get("FORM_UITEST_FILES"):          # where "saved" files go instead of a native dialog
+        os.environ["FORM_UITEST_FILES"] = tempfile.mkdtemp(prefix="form-uitest-files-")
     fake = os.environ.get("FORM_UITEST_AGENT", "")
     if fake:
         cfg["_adapters"] = {"fake": _fake_adapter(Path(fake), Path(cfg["data"]["dir"]))}
@@ -86,9 +92,11 @@ class StoreProxy:
 
 
 class UI:
-    def __init__(self, app, engine, win, studio, base_url: str, warnings: list, out_dir: Path):
+    def __init__(self, app, engine, win, studio, bridge, warnings: list, out_dir: Path):
         from PySide6.QtTest import QTest
-        self.app, self.engine, self.win, self.studio, self.base = app, engine, win, studio, base_url
+        self.app, self.engine, self.win, self.studio, self.bridge = app, engine, win, studio, bridge
+        self.base = f"http://{bridge.host}:{bridge.port}"
+        self.files = Path(os.environ["FORM_UITEST_FILES"])          # native save dialogs write here
         self.warnings, self.out = warnings, out_dir
         self.store = StoreProxy(self)
         self.T = QTest
@@ -167,6 +175,22 @@ class UI:
             return json.loads(raw)
         except ValueError:
             return raw
+
+    # -- files and the world outside the window ---------------------------------
+    def pick_file(self, path):
+        """The next native open dialog answers with this file (save dialogs answer with a path in ui.files)."""
+        self.bridge._test_pick = str(path)
+
+    def saved(self, name: str, timeout: float = 30) -> Path:
+        """Wait for a file a save dialog wrote into ui.files; returns its path."""
+        p = self.files / name
+        self.wait_until(lambda: p.exists() and p.stat().st_size > 0, timeout, f"{name} to be saved")
+        return p
+
+    @property
+    def outside(self) -> list:
+        """What the app asked the desktop to open (Finder reveals, links, folders); recorded, not done."""
+        return list(getattr(self.bridge, "outside", []))
 
     # -- finding -------------------------------------------------------------
     def _roots(self):
@@ -271,7 +295,42 @@ class UI:
                   "alt": Qt.KeyboardModifier.AltModifier, "meta": Qt.KeyboardModifier.MetaModifier}[part.lower()]
         return m
 
+    def _flick(self, item):
+        p = item.parentItem()
+        while p is not None:
+            if p.property("contentY") is not None and p.property("contentHeight") is not None and p.property("interactive") is not None:
+                return p
+            p = p.parentItem()
+        return None
+
+    def scroll_to(self, target, fy: float = 0.5):
+        """Bring an item inside a scrolling panel into view with wheel events, the way a hand would."""
+        from PySide6.QtCore import QPointF
+        it = self.item(target) if isinstance(target, str) else target
+        fl = self._flick(it)
+        if fl is None:
+            return
+        for _ in range(60):
+            y = it.mapToItem(fl, QPointF(0, it.height() * fy)).y()
+            if 60 <= y <= fl.height() - 90:
+                for _ in range(80):                        # a press on a view that is still gliding only stops it
+                    if not fl.property("moving") and not fl.property("flicking"):
+                        break
+                    self._pump(25)
+                return
+            before = fl.property("contentY")
+            self.wheel(fl, -240 if y > fl.height() - 90 else 240)
+            self._pump(30)
+            if abs(fl.property("contentY") - before) < 0.5:        # at the end, or the wheel did nothing: place it
+                want = before + (y - fl.height() / 2)
+                top = max(0.0, float(fl.property("contentHeight")) - fl.height())
+                fl.setProperty("contentY", max(0.0, min(top, want)))
+                self._pump(30)
+                return
+
     def hover(self, target, fx: float = 0.5, fy: float = 0.5):
+        if not isinstance(target, (tuple, list)):
+            self.scroll_to(target, fy)
         p = self._pt(target, fx, fy)
         self.T.mouseMove(self.win, p)
         self._pump(15)
@@ -419,7 +478,7 @@ def _load(script: str):
     return [(n, getattr(mod, n)) for n in names]
 
 
-def run_script(app, engine, win, studio, base_url: str, script: str, warnings: list, finish) -> None:
+def run_script(app, engine, win, studio, bridge, script: str, warnings: list, finish) -> None:
     """Run the journey functions of `script`, then quit the app with 0 (all passed) or 1."""
     import faulthandler
     import signal
@@ -428,7 +487,7 @@ def run_script(app, engine, win, studio, base_url: str, script: str, warnings: l
     if hasattr(signal, "SIGUSR1"):
         faulthandler.register(signal.SIGUSR1, all_threads=True)
     out = Path(os.environ.get("FORM_UITEST_OUT", ".dev/uitest"))
-    ui = UI(app, engine, win, studio, base_url, warnings, out)
+    ui = UI(app, engine, win, studio, bridge, warnings, out)
     rc = 0
     try:
         win.requestActivate()

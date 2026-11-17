@@ -97,7 +97,7 @@ Rectangle {
     // ── header: the conversation switcher ──
     Item {
         id: head; width: parent.width; height: 40; z: 3
-        Item { id: sw; x: 8; width: parent.width - 16 - tools.width; height: 28; anchors.verticalCenter: parent.verticalCenter
+        Item { id: sw; objectName: "convSwitch"; x: 8; width: parent.width - 16 - tools.width; height: 28; anchors.verticalCenter: parent.verticalCenter
             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: swm.pressed ? Theme.washPress : swm.containsMouse || list.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
             Rectangle { id: sdot; x: 8; width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter
                 color: Store.chatBusy ? Theme.datum : Store.chatReady ? Theme.pass : Theme.ink4
@@ -246,7 +246,7 @@ Rectangle {
                         Txt { id: ut; width: Math.min(implicitWidth, body.width - 54); text: it.m.text; lineHeight: 1.4 } } } } }
             Component { id: cText; Txt { text: it.m.text; textFormat: Text.MarkdownText; width: body.width; lineHeight: 1.45; color: Theme.ink
                 linkColor: Theme.datum; onLinkActivated: function (l) { Bridge.openLink(l) } } }
-            Component { id: cSteps; TalkSteps { width: body.width; steps: it.m.steps; running: !!it.m.running
+            Component { id: cSteps; TalkSteps { objectName: "stepGroup"; width: body.width; steps: it.m.steps; running: !!it.m.running
                 expanded: !!talk.openGroups[it.k]
                 onToggle: { var o = Object.assign({}, talk.openGroups); o[it.k] = !o[it.k]; talk.openGroups = o } } }
             Component { id: cAct; Row { spacing: 6
@@ -298,7 +298,7 @@ Rectangle {
                 Item { visible: Store.chatAttach.length > 0; width: parent.width; height: visible ? chips.implicitHeight + 10 : 0
                     Flow { id: chips; x: 10; y: 10; width: parent.width - 20; spacing: 6
                         Repeater { model: Store.chatAttach
-                            Rectangle { id: chip; required property var modelData
+                            Rectangle { id: chip; objectName: "attachChip"; required property var modelData
                                 readonly property bool pic: modelData.kind === "image"
                                 width: Math.min(chips.width, (pic ? 30 : 26) + cn.implicitWidth + 30); height: 30; radius: Theme.rSm; color: Theme.plate2; border.color: Theme.rule2
                                 Rectangle { visible: chip.pic; x: 3; y: 3; width: 24; height: 24; radius: 4; clip: true; color: Theme.plate
@@ -315,6 +315,7 @@ Rectangle {
                     Behavior on height { NumberAnimation { duration: Theme.move(Theme.fast); easing.type: Easing.OutQuad } }
                     TextArea {
                         id: ta
+                        objectName: "composer"
                         // "Ask about this feature…" from the viewport's context menu lands here
                         Connections { target: Store; function onChatPrefill(text) { Store.talkOpen = true; ta.text = text; ta.cursorPosition = text.length; ta.forceActiveFocus() } }
                         wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: 13
@@ -335,9 +336,9 @@ Rectangle {
                 Item { width: parent.width; height: 38
                     Row { x: 6; anchors.verticalCenter: parent.verticalCenter; spacing: 2
                         Btn { small: true; kind: "quiet"; icon: "paperclip"; tip: "Attach a photo, sketch, PDF, or a STEP/STL part. You can also drop files here."
-                            enabled: Store.chat.available; onClicked: pick.open() }
+                            enabled: Store.chat.available; onClicked: Store.ask(pick) }
                         // agent and model for this conversation
-                        Item { id: mchip; width: ml.width + 31; height: 24
+                        Item { id: mchip; objectName: "modelChip"; width: ml.width + 31; height: 24
                             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: mcm.pressed ? Theme.washPress : mcm.containsMouse || mpop.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
                             Txt { id: ml; x: 7; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
                                 width: Math.min(implicitWidth, comp.width - 170); elide: Text.ElideRight
@@ -357,7 +358,7 @@ Rectangle {
                         }
                     }
                     // send, or stop while a reply is being written: one round button in one place
-                    Rectangle { id: sendBtn
+                    Rectangle { id: sendBtn; objectName: "sendBtn"
                         readonly property bool can: Store.chatBusy || (Store.chatReady && ta.text.trim() !== "")
                         anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
                         width: 28; height: 28; radius: 14

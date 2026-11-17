@@ -293,7 +293,7 @@ QtObject {
         stage = id; section = null
         if (id !== "prove") layers = null
         if (id !== "release" && compare) { compare = null; if (viewer) viewer.setGhost(hasDraft ? view : null) }
-        if (viewer) viewer.setMarker(null)
+        if (viewer) { var had = !!viewer.marker; viewer.setMarker(null); if (had) viewer.setView(viewName, true) }    // a check's marker zoomed in: frame the part again
         applyStageView()
     }
     function setView(name) { viewName = name; if (viewer) viewer.setView(name, true) }
@@ -329,6 +329,18 @@ QtObject {
     property var simAsk: null
     signal revealInspector(real y)     // scroll the stage inspector (y in its content; a large value = the end)
     function simulate(o) { simAsk = o || ({}); if (!layers) showLayers(true) }
+    // Open a native file or folder dialog. Under the interaction tests (form/app/uitest.py) no native window opens:
+    // the dialog is answered at once with a path in the test's folder, so its own onAccepted handler runs as usual.
+    function ask(dlg) {
+        if (!Bridge.testDir) { dlg.open(); return }
+        var pick = Bridge.testPick()
+        if (dlg.selectedFolder !== undefined && dlg.fileMode === undefined) dlg.selectedFolder = Bridge.fileUrl(pick || Bridge.testDir)
+        else {
+            var name = String(dlg.selectedFile || dlg.currentFile || "").replace(/^.*\//, "") || "file"
+            dlg.selectedFile = Bridge.fileUrl(pick || (Bridge.testDir + "/" + name))
+        }
+        dlg.accepted()
+    }
     function openSheet(kind, props) { sheet = kind ? { kind: kind, props: props || ({}) } : null }
 
     function create(name, recipeId, brief) {

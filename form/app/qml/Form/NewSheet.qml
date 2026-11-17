@@ -15,7 +15,7 @@ Column {
     property Component footerLeft: ns.tab === "recipe" ? leftRecipe : ns.preset ? leftBrief : null
     property Component footer: ns.tab === "recipe" ? rightRecipe : ns.preset ? rightBrief : null
     Component { id: leftRecipe; Row { spacing: 4
-        Btn { kind: "quiet"; text: "Restore a .formproj…"; icon: "upload"; onClicked: dlg.open() }
+        Btn { kind: "quiet"; text: "Restore a .formproj…"; icon: "upload"; onClicked: Store.ask(dlg) }
         Btn { kind: "quiet"; text: "Open an example"; icon: "box"; active: ns.showExamples; onClicked: ns.showExamples = !ns.showExamples } } }
     Component { id: rightRecipe; Row { spacing: 8
         Btn { kind: "quiet"; text: "Cancel"; onClicked: Store.openSheet(null) }

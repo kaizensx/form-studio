@@ -382,7 +382,8 @@ Item {
             id: scroll
             objectName: "inspector"
             anchors.top: stageHead.bottom; anchors.bottom: foot.top; anchors.left: parent.left; anchors.right: parent.right
-            contentHeight: body.implicitHeight + 32; clip: true; boundsBehavior: Flickable.StopAtBounds
+            // while a toast is up, the last rows can still be scrolled clear of it
+            contentHeight: body.implicitHeight + 32 + (Store.toasts.length ? 24 + 72 * Store.toasts.length : 0); clip: true; boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { width: 6 }
             Connections { target: Store; function onRevealInspector(y) { scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, y)) } }
             Column {

@@ -59,7 +59,7 @@ Column {
     }
     function savePng() {
         if (!shown) return
-        dlg.currentFolder = Bridge.downloads(); dlg.selectedFile = Bridge.downloads() + "/" + Store.pid + "_" + F.pad(shown.rev) + "_" + shown.preset + ".png"; dlg.open()
+        dlg.currentFolder = Bridge.downloads(); dlg.selectedFile = Bridge.downloads() + "/" + Store.pid + "_" + F.pad(shown.rev) + "_" + shown.preset + ".png"; Store.ask(dlg)
     }
     function accept() { go() }
     Timer {

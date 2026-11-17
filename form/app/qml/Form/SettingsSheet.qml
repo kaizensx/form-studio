@@ -103,7 +103,7 @@ Column {
                                 placeholder: row.r.type === "path" && row.r.key !== "data.dir" ? "found automatically" : ""
                                 onEdited: function (t) { st.setEdit(row.r, t) } }
                             Btn { visible: row.r.type === "path"; small: true; icon: "folder_open"; tip: "Choose…"; anchors.verticalCenter: parent.verticalCenter
-                                onClicked: { st.pathRow = row.r; if (row.r.key === "data.dir") folderDlg.open(); else fileDlg.open() } }
+                                onClicked: { st.pathRow = row.r; if (row.r.key === "data.dir") Store.ask(folderDlg); else Store.ask(fileDlg) } }
                             // numbers
                             Field { visible: row.r.type === "float" || row.r.type === "int"; width: 120; numeric: true; unit: row.r.unit || ""
                                 text: (st.rev, String(row.r.value))

@@ -99,6 +99,7 @@ def main(argv=None) -> int:
 
     st, httpd = _engine(cfg)
     bridge = Bridge("127.0.0.1", httpd.server_address[1], cfg["data"]["dir"], __version__)
+    bridge.under_test = bool(args.uitest)
     qmlRegisterSingletonInstance(Bridge, "FormNative", 1, 0, "Bridge", bridge)
 
     engine = QQmlApplicationEngine()
@@ -143,7 +144,7 @@ def main(argv=None) -> int:
         QTimer.singleShot(args.wait, done)
 
     if args.uitest:
-        QTimer.singleShot(200, lambda: uitest.run_script(app, engine, win, st, bridge.baseUrl, args.uitest, errors, finish))
+        QTimer.singleShot(200, lambda: uitest.run_script(app, engine, win, st, bridge, args.uitest, errors, finish))
 
     signal.signal(signal.SIGINT, lambda *_: app.quit())
     tick = QTimer(); tick.start(250); tick.timeout.connect(lambda: None)     # let Python see Ctrl+C

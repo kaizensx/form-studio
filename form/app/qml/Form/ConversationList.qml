@@ -60,6 +60,7 @@ Item {
         id: rowC
         Rectangle {
             id: row
+            objectName: "convRow"
             required property var modelData
             readonly property var c: modelData
             readonly property bool current: c.id === Store.convId
@@ -84,13 +85,13 @@ Item {
                     NumberAnimation { to: 0.3; duration: 600 } NumberAnimation { to: 1; duration: 600 } } }
             Row { id: acts; visible: rm.containsMouse && !row.asking && !row.editing || pb.hovered || eb.hovered || db.hovered
                 anchors.right: parent.right; anchors.rightMargin: 4; anchors.verticalCenter: parent.verticalCenter; spacing: 0
-                Btn { id: pb; small: true; kind: "quiet"; icon: row.c.pinned ? "pin_off" : "pin"; tip: row.c.pinned ? "Unpin" : "Pin to the top"
+                Btn { id: pb; objectName: "convPin"; small: true; kind: "quiet"; icon: row.c.pinned ? "pin_off" : "pin"; tip: row.c.pinned ? "Unpin" : "Pin to the top"
                     onClicked: Store.pinConv(row.c.id, !row.c.pinned) }
-                Btn { id: eb; small: true; kind: "quiet"; icon: "pencil"; tip: "Rename"
+                Btn { id: eb; objectName: "convRename"; small: true; kind: "quiet"; icon: "pencil"; tip: "Rename"
                     onClicked: { cl.confirming = ""; cl.renaming = row.c.id; rf.text = row.c.title; rf.input.forceActiveFocus(); rf.input.selectAll() } }
-                Btn { id: db; small: true; kind: "quiet"; icon: "trash_2"; tip: "Delete"; onClicked: { cl.renaming = ""; cl.confirming = row.c.id } } }
+                Btn { id: db; objectName: "convDelete"; small: true; kind: "quiet"; icon: "trash_2"; tip: "Delete"; onClicked: { cl.renaming = ""; cl.confirming = row.c.id } } }
             // rename
-            Field { id: rf; visible: row.editing; x: 6; width: parent.width - 12; anchors.verticalCenter: parent.verticalCenter
+            Field { id: rf; objectName: "convRenameField"; visible: row.editing; x: 6; width: parent.width - 12; anchors.verticalCenter: parent.verticalCenter
                 onAccepted: function (t) { if (!row.editing) return; cl.renaming = ""; if (t.trim() && t.trim() !== row.c.title) Store.renameConv(row.c.id, t) }
                 Keys.onEscapePressed: cl.renaming = ""
                 Connections { target: rf.input; function onActiveFocusChanged() { if (!rf.input.activeFocus && row.editing) cl.renaming = "" } } }
@@ -98,7 +99,7 @@ Item {
             Row { visible: row.asking; x: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8; width: parent.width - 20
                 Txt { text: "Delete this conversation and its attachments?"; width: parent.width - kb.width - xb.width - 16; elide: Text.ElideRight; wrapMode: Text.NoWrap
                     anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12 }
-                Btn { id: xb; small: true; kind: "danger"; text: "Delete"; onClicked: { cl.confirming = ""; Store.deleteConv(row.c.id) } }
+                Btn { id: xb; objectName: "convDeleteYes"; small: true; kind: "danger"; text: "Delete"; onClicked: { cl.confirming = ""; Store.deleteConv(row.c.id) } }
                 Btn { id: kb; small: true; kind: "quiet"; text: "Keep"; onClicked: cl.confirming = "" } }
         }
     }

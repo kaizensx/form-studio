@@ -58,5 +58,20 @@ def head(ui, pid=None):
     return ui.api("/projects/" + (pid or ui.store.get("pid")))["project"]["head"]
 
 
+def fold(ui, title):
+    """Open or close a folding section of the inspector by clicking its header."""
+    f = ui.item(text=title)
+    ui.scroll_to(f, 0.0)
+    ui.click(f, 0.5, 20.0 / max(40.0, f.height()))
+    ui.settle(250)
+
+
+def toasts_gone(ui):
+    """Toasts sit over the bottom right corner and wait while the pointer rests on them: move away, let them leave."""
+    ui.hover("viewport", 0.5, 0.3)
+    ui.wait_until(lambda: ui.store.get("toasts") == [], 15, "the toasts to leave")
+    ui.settle(200)
+
+
 def has_slicer(ui):
     return bool(ui.js("Store.slicer.available"))

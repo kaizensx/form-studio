@@ -122,9 +122,9 @@ Column {
                 sub: root.on ? F.fmt(root.f.cavity_nominal) + " mm " + root.signed(root.src.printer.bias, 3) + " bias ±" + F.fmt(root.src.printer.sigma) + " · " + root.pct(root.src.printer.share) + " of variance" : ""
                 tag: root.on ? (root.src.printer.source === "calibrated" ? "calibrated" : "assumed") : "" }
             KV { k: "Acceptable total gap"; sub: "your definition of a good fit"
-                Field { id: lo; width: 58; numeric: true; text: root.on ? F.trim(root.f.window[0]) : ""; onAccepted: root.setWindow() }
+                Field { id: lo; objectName: "fitLo"; width: 58; numeric: true; text: root.on ? F.trim(root.f.window[0]) : ""; onAccepted: root.setWindow() }
                 Txt { text: "–"; tone: 3; anchors.verticalCenter: parent.verticalCenter }
-                Field { id: hi; width: 58; numeric: true; text: root.on ? F.trim(root.f.window[1]) : ""; onAccepted: root.setWindow() }
+                Field { id: hi; objectName: "fitHi"; width: 58; numeric: true; text: root.on ? F.trim(root.f.window[1]) : ""; onAccepted: root.setWindow() }
                 Txt { text: "mm"; kind: "fine"; anchors.verticalCenter: parent.verticalCenter } } }
         Txt { kind: "fine"; width: parent.width; text: root.on ? (root.f.model || "") : "" }
     }

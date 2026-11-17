@@ -37,7 +37,7 @@ Column {
                         color: card.c.current ? Theme.datum : Theme.ink }
                     Item { id: act; anchors.right: parent.right; width: card.c.current ? cur.width : use.width; height: 20
                         Tag { id: cur; visible: card.c.current; text: "current"; kind: "specified"; anchors.verticalCenter: parent.verticalCenter }
-                        Btn { id: use; visible: !card.c.current; small: true; kind: "primary"; text: "Use"; enabled: !of.busy && card.c.fits; y: -2
+                        Btn { id: use; objectName: "orientUse"; visible: !card.c.current; small: true; kind: "primary"; text: "Use"; enabled: !of.busy && card.c.fits; y: -2
                             tip: card.c.fits ? "Set this print orientation (re-exports the STL, re-runs the checks and the slice)" : "Does not fit the build volume"
                             onClicked: Store.settings({ orientation: card.c.id }) } } }
                 Row { spacing: 6

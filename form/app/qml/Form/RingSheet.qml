@@ -14,7 +14,7 @@ Column {
     readonly property bool has3mf: !!r && !!r.threemf
     spacing: 14
 
-    function saveAs(name, title) { dlg.name = name; dlg.title = title; dlg.currentFolder = Bridge.downloads(); dlg.selectedFile = Bridge.downloads() + "/" + name; dlg.open() }
+    function saveAs(name, title) { dlg.name = name; dlg.title = title; dlg.currentFolder = Bridge.downloads(); dlg.selectedFile = Bridge.downloads() + "/" + name; Store.ask(dlg) }
     function saveStl() { if (r && r.stl) saveAs(r.stl, "Save the ring STL") }
     function save3mf() { if (has3mf) saveAs(r.threemf, "Save the sliced 3MF") }
     function accept() { if (has3mf) save3mf(); else saveStl() }

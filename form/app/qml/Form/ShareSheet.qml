@@ -27,7 +27,7 @@ Column {
         if (!ready) return
         if (Bridge.copyImage(sh.api)) Store.toast("Card copied", "Paste it anywhere an image goes."); else Store.toast("Could not copy the image", "", true)
     }
-    function savePng() { dlg.currentFolder = Bridge.downloads(); dlg.currentFile = Bridge.downloads() + "/" + Store.pid + "_" + F.pad(Store.project.head) + "_card.png"; dlg.open() }
+    function savePng() { dlg.currentFolder = Bridge.downloads(); dlg.currentFile = Bridge.downloads() + "/" + Store.pid + "_" + F.pad(Store.project.head) + "_card.png"; Store.ask(dlg) }
     function accept() { copy() }
 
     property Component footerLeft: Row { spacing: 8

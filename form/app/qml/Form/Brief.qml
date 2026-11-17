@@ -97,7 +97,7 @@ Column {
                     k: modelData.file
                     sub: modelData.scale_mm_per_px ? "scale set · " + F.plural((modelData.measurements || []).length, "measurement") : "no scale yet"
                     Btn { kind: "quiet"; small: true; icon: "ruler"; text: "Measure"; onClicked: Store.openSheet("photo", { ref: rr.modelData }) } } } }
-        Btn { text: "Attach photo"; icon: "image"; onClicked: dlg.open() } }
+        Btn { text: "Attach photo"; icon: "image"; onClicked: Store.ask(dlg) } }
 
     Fold { title: "Reference parts"; note: root.parts.length ? root.parts.length + " imported" : "none"; key: "brief.parts"; openByDefault: root.parts.length > 0
         Txt { kind: "fine"; width: parent.width
@@ -109,7 +109,7 @@ Column {
                     sub: modelData.format.toUpperCase() + (modelData.volume_mm3 ? " · " + F.fmt(modelData.volume_mm3 / 1000, 2) + " cm³" : "")
                     Txt { mono: true; tone: 2; text: root.size(pr.modelData.bbox) + " mm"; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter }
                     Tag { text: pr.modelData.evidence || "computed"; anchors.verticalCenter: parent.verticalCenter } } } }
-        Btn { text: "Import part…"; icon: "box"; onClicked: partDlg.open() } }
+        Btn { text: "Import part…"; icon: "box"; onClicked: Store.ask(partDlg) } }
 
     Fold { title: "Printer context"; key: "brief.printer"; openByDefault: !root.sl.available
         note: root.sl.available ? root.sl.presets.machine.name : "slicer unavailable"; noteColor: root.sl.available ? Theme.ink3 : Theme.signal
@@ -135,5 +135,5 @@ Column {
         onAccepted: root.attach(selectedFile) }
     FileDialog { id: partDlg; title: "Import a reference part"; nameFilters: ["STEP or STL (*.step *.stp *.stl)"]
         onAccepted: Store.importPart(selectedFile) }
-    Connections { target: Store; function onImportPartRequested() { Ws.setOpen("brief.parts", true); partDlg.open() } }
+    Connections { target: Store; function onImportPartRequested() { Ws.setOpen("brief.parts", true); Store.ask(partDlg) } }
 }
