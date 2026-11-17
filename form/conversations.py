@@ -152,7 +152,7 @@ class Conversations:
         if event.get("t") not in EVENT_KINDS:
             raise ConversationError(f"Unknown event kind “{event.get('t')}”.")
         ev = dict(event)
-        ev.setdefault("ts", time.time())
+        ev.setdefault("ts", _now())
         with self._lock:
             meta = self._read(cid)
             with open(self.dir(cid) / "events.jsonl", "a", encoding="utf-8") as fh:

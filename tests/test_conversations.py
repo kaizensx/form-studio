@@ -96,6 +96,17 @@ class Store(Base):
         with self.assertRaises(ConversationError):
             s.rename(m["id"], "   ")
 
+    def test_latest_is_right_when_the_clock_does_not_tick(self):
+        """Windows' clock is coarse: three writes can share one time.time(). The most recent must still win."""
+        from unittest import mock
+        with mock.patch("time.time", return_value=1_800_000_000.0):
+            s = Conversations(self.data)
+            a, b = s.create("dock"), s.create("dock")
+            s.append(a["id"], {"t": "user", "text": "one"})
+            s.append(a["id"], {"t": "text", "text": "two"})
+            s.append(b["id"], {"t": "user", "text": "three"})
+            self.assertEqual(s.latest("dock")["id"], b["id"])
+
     def test_list_filter_search_pin_delete(self):
         s = Conversations(self.data)
         a, b, c = s.create("dock"), s.create("dock"), s.create(None)
