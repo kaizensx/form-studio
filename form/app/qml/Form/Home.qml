@@ -24,6 +24,10 @@ Item {
     property var photos: ({})
     function loadPhotos() { Store.get("/photos").then(function (r) { home.photos = r.latest }, function () {}) }
     Component.onCompleted: loadPhotos()
+    // The cards rise in once, when Home appears. Sorting, filtering or a reload afterwards puts them in place at once:
+    // a grid you work in all day does not replay its entrance.
+    property bool entered: false
+    Timer { interval: 40 + 9 * Theme.stagger + Theme.slow; running: true; onTriggered: home.entered = true }
     Connections { target: Store; function onStudioChanged() { home.loadPhotos() } }
     function recipeTitle(id) {
         if (!Store.studio) return ""
@@ -90,7 +94,7 @@ Item {
                         readonly property int foot: 64
                         width: grid.cw; height: Math.round(grid.cw * 0.7) + foot
                         opacity: 0
-                        Component.onCompleted: appear.start()
+                        Component.onCompleted: { if (home.entered) opacity = 1; else appear.start() }
                         SequentialAnimation { id: appear; PauseAnimation { duration: 40 + Math.min(card.index, 9) * Theme.stagger }
                             ParallelAnimation { Glide { target: card; property: "opacity"; to: 1; duration: Theme.slow }
                                 Glide { target: rise; property: "y"; from: Theme.shift(12); to: 0; duration: Theme.slow } } }

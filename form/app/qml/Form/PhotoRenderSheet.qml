@@ -110,7 +110,7 @@ Column {
                             id: pc
                             required property var modelData
                             readonly property bool on: rs.preset === modelData.id
-                            width: ctl.width; height: 48; radius: Theme.rMd
+                            width: ctl.width; height: Math.max(48, pcc.implicitHeight + 16); radius: Theme.rMd
                             color: on ? Theme.alpha(Theme.datum, 0.07) : pm.pressed ? Theme.washPress : pm.containsMouse ? Theme.washHover : "transparent"
                             border.color: on ? Theme.alpha(Theme.datum, 0.5) : pm.containsMouse ? Theme.rule2 : Theme.rule
                             opacity: rs.busy && !on ? 0.5 : 1
@@ -121,9 +121,9 @@ Column {
                                     GradientStop { position: 0; color: pc.modelData.id === "dark" ? "#2a3136" : pc.modelData.id === "desk" ? "#a07a55" : "#d9d8d4" }
                                     GradientStop { position: 1; color: pc.modelData.id === "dark" ? "#0f1215" : pc.modelData.id === "desk" ? "#6b4a2c" : "#a9a9a6" } }
                                 Rectangle { x: 13; y: 11; width: 14; height: 12; radius: 3; color: rs.color; border.color: Theme.shade } }
-                            Column { x: 58; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 66 - 22; spacing: 1
+                            Column { id: pcc; x: 58; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 66 - 22; spacing: 1
                                 Txt { text: pc.modelData.label; font.weight: Theme.wSemi; tone: pc.on ? 1 : 2 }
-                                Txt { kind: "fine"; text: pc.modelData.note; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
+                                Txt { kind: "fine"; text: pc.modelData.note; width: parent.width; maximumLineCount: 2; elide: Text.ElideRight } }
                             Icon { visible: pc.on; name: "check"; size: 14; color: Theme.datum; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter }
                             MouseArea { id: pm; anchors.fill: parent; hoverEnabled: true; enabled: !rs.busy
                                 onClicked: rs.preset = pc.modelData.id }

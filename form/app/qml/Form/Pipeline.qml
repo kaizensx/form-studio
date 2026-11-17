@@ -10,6 +10,22 @@ Rectangle {
     property bool flat: false
     readonly property bool narrow: width < 620          // labels only; the detail moves into the tooltip
     readonly property bool tiny: width < 470            // dots only, and one sentence for whatever is not current
+    readonly property bool roomy: width >= 900          // room for the long form of each node's line; otherwise the short one
+    // Each node is as wide as what it says, and the slack is shared out, so a short line never crowds a long one.
+    property var needs: [0, 0, 0, 0, 0, 0]
+    function setNeed(i, w) { if (needs[i] === w) return; var n = needs.slice(); n[i] = w; needs = n }
+    readonly property real needSum: { var t = 0; for (var i = 0; i < needs.length; i++) t += needs[i]; return t }
+    // When the lines do not all fit, the revision note gives way first (it is the only one of no fixed length);
+    // only then do the others share the shortfall.
+    function widthOf(i, need, least, room) {
+        if (needSum <= 0) return room / nodes.length
+        if (needSum <= room) return need + (room - needSum) / nodes.length
+        var over = needSum - room, give = Math.min(over, Math.max(0, needs[0] - least0))
+        if (i === 0) return need - give
+        var rest = needSum - needs[0]
+        return rest > 0 ? need - (over - give) * need / rest : need
+    }
+    property real least0: 0
     readonly property string summary: {
         var order = ["geometry", "exports", "checks", "slice"], names = ({ geometry: "Solid", exports: "Exports", checks: "Checks", slice: "Slice" })
         for (var i = 0; i < order.length; i++) { var s = stateOf(order[i]); if (s !== "current") return names[order[i]] + ": " + (meta(order[i]) || s) }
@@ -33,9 +49,11 @@ Rectangle {
         if (s === "running") return Store.running[id] === "queued" ? "queued" : "working…"
         if (s !== "current") return n.error ? n.error.message : (id === "slice" && n.unavailable) ? "slicer unavailable" : s === "stale" ? "made for " + F.pad(n.last_rev || 0) : s === "blocked" ? "waiting" : "not made"
         if (id === "geometry") return Store.view ? Store.view.faces + " faces" : ""
-        if (id === "exports") return d.exports ? (d.exports.files.step ? ".step  .stl  .3mf" : ".stl only (mesh)") : ""
-        if (id === "checks") { var r = d.checks ? d.checks.rollup : null; return r ? r.PASS + " pass · " + r.WARN + " review · " + r.FAIL + " fail" : "" }
-        if (id === "slice") return d.slice ? F.dur(d.slice.time_s) + " · " + F.fmt(d.slice.filament_g, 1) + " g" : ""
+        if (id === "exports") return d.exports ? (d.exports.files.step ? ".step .stl .3mf" : ".stl only (mesh)") : ""
+        if (id === "checks") { var r = d.checks ? d.checks.rollup : null; if (!r) return ""
+            if (roomy) return r.PASS + " pass · " + r.WARN + " review · " + r.FAIL + " fail"
+            return r.FAIL ? r.FAIL + " fail · " + r.WARN + " review" : r.WARN ? r.PASS + " pass · " + r.WARN + " review" : r.PASS + " pass" }
+        if (id === "slice") return d.slice ? F.dur(d.slice.time_s) + (roomy ? " · " + F.fmt(d.slice.filament_g, 1) + " g" : "") : ""
         return ""
     }
     function tint(s) { return s === "current" ? Theme.pass : s === "running" ? Theme.datum : s === "failed" ? Theme.signal : s === "stale" ? Theme.amber : Theme.ink4 }
@@ -53,28 +71,38 @@ Rectangle {
                 readonly property string nid: modelData.id
                 readonly property var ap: pl.d ? pl.d.approval : ({})
                 readonly property string s: nid === "params" ? "current" : nid === "release" ? (ap.state === "approved" ? "current" : ap.state === "superseded" ? "stale" : "missing") : pl.stateOf(nid)
-                readonly property string say: nid === "params" ? pl.rev + " · " + (Store.head ? (Store.head.summary || Store.head.note || "") : "")
-                    : nid === "release" ? (ap.state === "approved" ? ap.release : ap.state === "superseded" ? "earlier design" : pl.d && pl.d.gate.ready ? "ready for approval" : pl.dirty && !Store.job ? "click to regenerate" : "not ready")
+                readonly property string what: Store.head ? (Store.head.summary || Store.head.note || "") : ""
+                readonly property string say: nid === "params" ? pl.rev + (Store.hasDraft ? " · draft open" : pl.roomy && what ? " · " + what : "")
+                    : nid === "release" ? (ap.state === "approved" ? ap.release : ap.state === "superseded" ? "earlier design" : pl.d && pl.d.gate.ready ? (pl.roomy ? "ready for approval" : "ready") : pl.dirty && !Store.job ? (pl.roomy ? "click to regenerate" : "regenerate") : "not ready")
                     : pl.meta(nid)
-                width: pl.tiny ? 16 : (row.width - auto.width) / pl.nodes.length; height: row.height
+                // the long line of a roomy strip may still be cut (a revision note has no fixed length): it is capped, not measured
+                readonly property real need: Math.ceil(Math.max(lbl.implicitWidth + 12, pl.narrow ? 0 : Math.min(sayTxt.implicitWidth, 400))) + 20
+                readonly property real least: Math.ceil(lbl.implicitWidth) + 32
+                onLeastChanged: if (index === 0) pl.least0 = least
+                readonly property real room: row.width - auto.width
+                onNeedChanged: pl.setNeed(index, need)
+                Component.onCompleted: { pl.setNeed(index, need); if (index === 0) pl.least0 = least }
+                width: pl.tiny ? 16 : pl.widthOf(index, need, least, room)
+                height: row.height
                 // a node that has just been made for this revision settles: the dot lands, nothing else moves
                 onSChanged: if (s === "current" && was === "running") settle.restart()
                 property string was: s
                 Timer { interval: 0; running: nd.was !== nd.s; onTriggered: nd.was = nd.s }
-                Rectangle { anchors.fill: parent; anchors.margins: 3; radius: Theme.rMd; color: nm.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : "transparent" }
+                Rectangle { anchors.fill: parent; anchors.margins: 3; radius: Theme.rMd; color: nm.pressed ? Theme.washPress : nm.containsMouse ? Theme.washHover : "transparent"
+                    Behavior on color { Tint {} } }
                 // the link from the node before: drawn in the state of this node, so the eye follows what is current
                 Rectangle { visible: nd.index > 0 && !pl.tiny; x: -3; y: pl.narrow ? 16 : 15; width: 6; height: 1; color: nd.s === "current" ? Theme.alpha(Theme.pass, 0.5) : Theme.rule2 }
-                Column { x: pl.tiny ? 5 : 12; anchors.verticalCenter: parent.verticalCenter; width: parent.width - (pl.tiny ? 5 : 18); spacing: 2
+                Column { x: pl.tiny ? 5 : 11; anchors.verticalCenter: parent.verticalCenter; width: parent.width - (pl.tiny ? 5 : 20); spacing: 2
                     Row { spacing: 6
                         Rectangle { id: dot; width: 6; height: 6; radius: 3; color: pl.tint(nd.s); anchors.verticalCenter: parent.verticalCenter
                             Behavior on color { ColorAnimation { duration: Motion.ui } }
                             SequentialAnimation on opacity { running: nd.s === "running"; loops: Animation.Infinite; alwaysRunToEnd: true
                                 NumberAnimation { to: 0.25; duration: 450 } NumberAnimation { to: 1; duration: 450 } }
                             SequentialAnimation { id: settle
-                                NumberAnimation { target: dot; property: "scale"; from: Motion.reduced ? 1 : 1.9; to: 1; duration: 260; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }
-                        Txt { visible: !pl.tiny; text: nd.modelData.label; font.weight: 600; font.pixelSize: 12; wrapMode: Text.NoWrap
+                                NumberAnimation { target: dot; property: "scale"; from: Theme.from(1.9); to: 1; duration: Theme.cross; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }
+                        Txt { id: lbl; visible: !pl.tiny; text: nd.modelData.label; font.weight: Theme.wSemi; font.pixelSize: 12; wrapMode: Text.NoWrap
                             width: Math.min(implicitWidth, nd.width - 30); elide: Text.ElideRight } }
-                    Txt { visible: !pl.narrow; kind: "fine"; mono: nd.s === "current"; font.pixelSize: 11; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
+                    Txt { id: sayTxt; visible: !pl.narrow; kind: "fine"; mono: nd.s === "current"; font.pixelSize: 11; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
                         color: nd.s === "failed" ? Theme.signal : nd.s === "stale" ? Theme.amber : Theme.ink3
                         text: nd.say } }
                 Rectangle { // running sweep
@@ -85,6 +113,8 @@ Rectangle {
                     onClicked: (nd.nid === "release" && pl.dirty && !Store.job) ? Store.run() : Store.setStage(nd.modelData.stage) }
                 Tip { show: nm.containsMouse
                     text: (pl.narrow && nd.say ? nd.modelData.label + ": " + nd.say + "\n" : "")
+                        + (nd.nid === "params" && nd.what ? pl.rev + ": " + nd.what
+                           : nd.nid === "slice" && pl.d && pl.d.slice && nd.s === "current" ? F.dur(pl.d.slice.time_s) + " · " + F.fmt(pl.d.slice.filament_g, 1) + " g, simulated\n" : "")
                         + (pl.st[nd.nid] && pl.st[nd.nid].error ? pl.st[nd.nid].error.message : pl.st[nd.nid] ? "Key " + pl.st[nd.nid].key : "") }
             }
         }

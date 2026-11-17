@@ -24,7 +24,7 @@ Column {
                 color: Theme.plate3; border.color: Theme.rule2
                 opacity: t.age > 250 ? 1 : 0; y: t.age > 250 ? 0 : Theme.shift(10)
                 Shadow { radius: parent.radius; spread: 18; drop: 8 }
-                Rectangle { x: 12; y: 13; width: 6; height: 6; radius: 3; color: t.modelData.bad ? Theme.signal : Theme.pass }
+                Rectangle { x: 12; y: 17; width: 6; height: 6; radius: 3; color: t.modelData.bad ? Theme.signal : Theme.pass }
                 Column { id: tcol; x: 28; y: 11; width: parent.width - 28 - 14; spacing: 2
                     Txt { text: t.modelData.msg; width: parent.width; font.weight: Theme.wSemi }
                     Txt { kind: "fine"; visible: t.modelData.hint !== ""; text: t.modelData.hint; width: parent.width; color: Theme.ink2 } }

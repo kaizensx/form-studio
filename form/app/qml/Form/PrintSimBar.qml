@@ -42,7 +42,8 @@ Rectangle {
                     Txt { visible: !bar.sim.finished && !!bar.sim.here.type; font.pixelSize: 12; wrapMode: Text.NoWrap; text: bar.sim.here.type || ""; width: bar.narrow ? Math.min(implicitWidth, 110) : 132; elide: Text.ElideRight } }
                 Row { anchors.right: bar.narrow ? undefined : parent.right; spacing: 8
                     Txt { mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
-                        text: !bar.ready ? "" : bar.sim.timed ? bar.clock(bar.sim.elapsed) + " elapsed  ·  " + bar.clock(info.total_time_s - bar.sim.elapsed) + " remaining"
+                        text: !bar.ready ? "" : bar.sim.timed ? (bar.narrow ? bar.clock(bar.sim.elapsed) + " of " + bar.clock(info.total_time_s)
+                                                                           : bar.clock(bar.sim.elapsed) + " elapsed  ·  " + bar.clock(info.total_time_s - bar.sim.elapsed) + " remaining")
                                                              : "the slicer gave no print time" }
                     Tag { visible: bar.ready && bar.sim.timed; anchors.verticalCenter: parent.verticalCenter
                         text: info && info.time_source === "interpolated" ? "interpolated" : "slicer estimate"; kind: "simulated"

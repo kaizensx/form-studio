@@ -19,13 +19,13 @@ Column {
             ["M", "Measure distances, faces and diameters"],
             ["X", "Section cut on or off"],
             ["A", "Analyze: thickness, overhang and other maps"],
-            ["E", "Assembly views and joints (designs with several parts)"],
+            ["E", "Assembly views and joints"],
             ["T", "History: the revision timeline"],
-            ["Esc", "Leave the tool, close what is open, or clear the selection"]] },
+            ["Esc", "Leave the tool or clear the selection"]] },
          { title: "Conversation", rows: [
             ["Return", "Send the message"],
             ["Shift+Return", "A new line in the message"],
-            ["Up", "Bring back your last message (when the box is empty)"]] }],
+            ["Up", "Bring back your last message"]] }],
         [{ title: "View and features", rows: [
             ["F", "Frame the selected feature, or the whole part"],
             ["1", "Iso view"], ["2", "Front view"], ["3", "Side view"], ["4", "Top view"], ["5", "Underside view"],
@@ -60,5 +60,5 @@ Column {
                                 Kbd { id: kr; keys: r.modelData[0]; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter } } } } } } } }
 
     Txt { kind: "fine"; width: parent.width
-        text: "Single keys work while a design is open, not while you type in a field or the conversation. Hiding a feature is visual only; the solid, checks and exports do not change." }
+        text: "Single keys work while a design is open, not while you type in a field or the conversation. E needs a design with several parts; Esc also closes whatever is open; ↑ works while the message box is empty. Hiding a feature is visual only; the solid, checks and exports do not change." }
 }

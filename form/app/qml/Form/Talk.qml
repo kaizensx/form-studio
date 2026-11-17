@@ -26,7 +26,7 @@ Rectangle {
         var roll = d.checks ? d.checks.rollup : null, rev = F.pad(Store.project.head)
         if (roll && roll.FAIL) out.push({ label: "Fix what fails in " + rev, prompt: "The checks on " + rev + " of this design report " + roll.FAIL + " failure(s). Read them with FORM's tools, explain each in one line, and preview the smallest change that fixes them. Do not commit until I say so." })
         else if (roll && roll.WARN) out.push({ label: "Explain the " + F.plural(roll.WARN, "warning") + " on " + rev, prompt: "Explain the warnings on " + rev + " of this design: what each one means for the print or the fit, and which I can safely acknowledge." })
-        out.push({ label: "Review " + rev + " as a designer, engineer and print technician", review: true })
+        out.push({ label: "Review " + rev + ": design, engineering, print", review: true })
         out.push({ label: "Make it lighter without failing a check", prompt: "Make this design lighter without failing any check. Show me the candidate as a preview first, with the mass before and after." })
         out.push({ label: "What should I measure before printing?", prompt: "Which numbers in this design are assumed rather than measured, and which of them matter for the fit? Tell me exactly what to measure and with what." })
         if (d.fit && d.fit.yield < 0.95) out.push({ label: "Improve the modelled fit yield", prompt: "The modelled fit yield is " + Math.round(d.fit.yield * 100) + "%. What drives it, and what change would raise it? It is a model, so say what a test print should confirm." })
@@ -189,7 +189,7 @@ Rectangle {
                 Txt { kind: "fine"; visible: rc.all.length > rc.limit; text: "All " + rc.all.length; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                     color: am.containsMouse ? Theme.ink : Theme.ink3
                     MouseArea { id: am; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; onClicked: list.open() } } }
-            ConversationList { id: rc; visible: talk.landing; compact: true; x: -8; width: sc.width + 16 }
+            ConversationList { id: rc; visible: talk.landing && rc.all.length > 0; compact: true; x: -8; width: sc.width + 16 }
         }
     }
 
@@ -203,6 +203,8 @@ Rectangle {
         topMargin: 16; bottomMargin: 12; clip: true; spacing: 14
         boundsBehavior: Flickable.StopAtBounds
         model: blocks
+        // a new message, step group or footer fades in where it lands; nothing moves, so the feed never jumps
+        add: Transition { Glide { property: "opacity"; from: 0; to: 1; duration: Theme.base } }
         function toEnd() { if (!stick) return; auto = true; positionViewAtEnd(); auto = false }
         onContentHeightChanged: Qt.callLater(toEnd)
         onHeightChanged: Qt.callLater(toEnd)
@@ -258,7 +260,7 @@ Rectangle {
                 Icon { name: "zap"; size: 12; color: Theme.blueprint; anchors.verticalCenter: parent.verticalCenter }
                 Txt { kind: "fine"; width: body.width - 20; text: it.m.by + "  " + it.m.text; color: Theme.ink2 } } }
             Component { id: cEnd; Item { implicitHeight: 22
-                Txt { id: ft; kind: "fine"; mono: true; tone: 4; anchors.verticalCenter: parent.verticalCenter; width: Math.min(implicitWidth, parent.width - (rb.visible ? rb.width + 6 : 0)); elide: Text.ElideRight; wrapMode: Text.NoWrap
+                Txt { id: ft; kind: "fine"; mono: true; tone: 3; anchors.verticalCenter: parent.verticalCenter; width: Math.min(implicitWidth, parent.width - (rb.visible ? rb.width + 6 : 0)); elide: Text.ElideRight; wrapMode: Text.NoWrap
                     text: (it.m.stopped ? "stopped · " : "") + F.plural(it.m.steps || 0, "step") + " · " + talk.secs(it.m.seconds)
                         + (it.m.cost !== null && it.m.cost !== undefined ? " · " + talk.money(it.m.cost) : it.m.stopped ? "" : " · cost not reported")
                         + (it.m.model ? " · " + it.m.model : "") }
@@ -382,7 +384,7 @@ Rectangle {
                 }
             }
         }
-        Txt { kind: "fine"; x: talk.hero ? 28 : 16; anchors.top: comp.bottom; anchors.topMargin: 7; width: parent.width - 2 * x; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 4
+        Txt { kind: "fine"; x: talk.hero ? 28 : 16; anchors.top: comp.bottom; anchors.topMargin: 7; width: parent.width - 2 * x; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 3
             text: Store.chatBusy ? "Working. Other conversations can run meanwhile."
                 : Store.conv && Store.conv.messages ? "Enter sends · ↑ brings back your last message"
                 : "Enter sends · Shift+Enter for a new line · drop files to attach" }
@@ -397,7 +399,7 @@ Rectangle {
             color: Theme.alpha(Theme.plate, 0.86); border.width: 1; border.color: Theme.datum
             Column { anchors.centerIn: parent; spacing: 8
                 Icon { name: "paperclip"; size: 22; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter }
-                Txt { text: "Drop to attach"; font.weight: 600; anchors.horizontalCenter: parent.horizontalCenter }
+                Txt { text: "Drop to attach"; font.weight: Theme.wSemi; anchors.horizontalCenter: parent.horizontalCenter }
                 Txt { kind: "fine"; text: "Images, PDFs, STEP or STL"; anchors.horizontalCenter: parent.horizontalCenter } } }
     }
 }

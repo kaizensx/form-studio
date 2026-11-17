@@ -205,7 +205,7 @@ Item {
                     onPicked: function (v) { Store.measureKind = v; Store.measureFrom = null } }
                 Rectangle { height: 26; width: Math.min(mh.implicitWidth + 20, opts.room); radius: Theme.rSm; color: Theme.alpha(Theme.plate1, 0.9); border.color: Theme.rule
                     Txt { id: mh; x: 10; width: parent.width - 20; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; elide: Text.ElideRight
-                        text: Store.measureKind === "distance" ? (Store.measureFrom ? "Click the second point" : ws.compact ? "Click two points; they snap" : "Click two points. They snap to corners, edge midpoints and face centres")
+                        text: Store.measureKind === "distance" ? (Store.measureFrom ? "Click the second point" : ws.compact ? "Click two points; they snap" : "Click two points. They snap to corners, midpoints and centres")
                             : Store.measureKind === "face" ? (ws.compact ? "Click a face: area and tilt" : "Click a face for its area and its tilt to the bed")
                             : ws.compact ? "Click a hole or round boss" : "Click the wall or rim of a hole or round boss" }
                     MouseArea { id: mhm; anchors.fill: parent; hoverEnabled: true }
@@ -341,12 +341,21 @@ Item {
         readonly property int at: { for (var i = 0; i < Store.stages.length; i++) if (Store.stages[i].id === Store.stage) return i; return 0 }
         Rectangle { width: 1; height: parent.height; color: Theme.rule }
         // stage tabs: the lit tab slides to the stage you pick
+        // each tab is as wide as its words plus an equal share of the slack, so "Release" has the same air as "Fit"
         Item { id: tabs; objectName: "stageTabs"; x: 8; y: 6; width: parent.width - 16; height: 52
-            Rectangle { y: 2; width: tabs.width / 5 - 4; height: tabs.height - 4; radius: Theme.rMd; color: Theme.plate3
-                x: insp.at * tabs.width / 5 + 2
-                Behavior on x { NumberAnimation { duration: Motion.move(200); easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }
+            property var needs: [0, 0, 0, 0, 0]
+            function setNeed(i, w) { if (needs[i] === w) return; var n = needs.slice(); n[i] = w; needs = n }
+            readonly property real needSum: { var t = 0; for (var i = 0; i < needs.length; i++) t += needs[i]; return t }
+            Rectangle { id: lit; y: 2; height: tabs.height - 4; radius: Theme.rMd; color: Theme.plate3
+                readonly property Item at: stageRep.count > insp.at ? stageRep.itemAt(insp.at) : null
+                property bool settled: false
+                x: at ? at.x + 2 : 0; width: at ? at.width - 4 : 0
+                Component.onCompleted: Qt.callLater(function () { lit.settled = true })
+                Behavior on x { enabled: lit.settled; NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
+                Behavior on width { enabled: lit.settled; NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } } }
             Row { anchors.fill: parent
                 Repeater {
+                    id: stageRep
                     model: Store.stages
                     Item {
                         id: tab
@@ -355,13 +364,18 @@ Item {
                         required property int index
                         readonly property bool on: Store.stage === modelData.id
                         readonly property var note: ws.stageNote(modelData.id)
-                        width: tabs.width / 5; height: tabs.height
-                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: Theme.rMd; color: !tab.on && tm.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent" }
+                        readonly property real need: Math.ceil(Math.max(tr.implicitWidth, tn.implicitWidth))
+                        onNeedChanged: tabs.setNeed(index, need)
+                        Component.onCompleted: tabs.setNeed(index, need)
+                        width: tabs.needSum > 0 && tabs.needSum < tabs.width ? need + (tabs.width - tabs.needSum) / 5 : tabs.width / 5
+                        height: tabs.height
+                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: Theme.rMd; color: tab.on ? "transparent" : tm.pressed ? Theme.washPress : tm.containsMouse ? Theme.washHover : "transparent"
+                            Behavior on color { Tint {} } }
                         Column { anchors.centerIn: parent; spacing: 2
-                            Row { spacing: 5; anchors.horizontalCenter: parent.horizontalCenter
+                            Row { id: tr; spacing: 5; anchors.horizontalCenter: parent.horizontalCenter
                                 Txt { mono: true; font.pixelSize: 10; tone: 4; text: "0" + (tab.index + 1); anchors.baseline: tl.baseline }
-                                Txt { id: tl; text: tab.modelData.title; font.weight: 600; font.pixelSize: 13; tone: tab.on ? 1 : 2 } }
-                            Txt { anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: 10; text: tab.note[0]; color: ws.noteColor(tab.note[1]); wrapMode: Text.NoWrap } }
+                                Txt { id: tl; text: tab.modelData.title; font.weight: Theme.wSemi; font.pixelSize: 13; tone: tab.on ? 1 : 2 } }
+                            Txt { id: tn; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: 10; text: tab.note[0]; color: ws.noteColor(tab.note[1]); wrapMode: Text.NoWrap } }
                         MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.setStage(tab.modelData.id) }
                         Tip { show: tm.containsMouse; text: tab.modelData.hint }
                     }
@@ -398,7 +412,7 @@ Item {
                     transform: Translate { id: slide }
                     ParallelAnimation { id: enter
                         NumberAnimation { target: panel; property: "opacity"; from: 0; to: 1; duration: Motion.ui; easing.type: Easing.OutCubic }
-                        NumberAnimation { target: slide; property: "x"; to: 0; duration: Motion.move(220); easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }
+                        NumberAnimation { target: slide; property: "x"; to: 0; duration: Theme.move(Theme.cross); easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }
             }
         }
         // the open draft and its Commit stay in reach at the foot of the inspector, whatever the panel's length

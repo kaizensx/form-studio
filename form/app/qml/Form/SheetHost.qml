@@ -35,7 +35,7 @@ Item {
         id: card
         objectName: "sheetCard"
         readonly property int pad: 24
-        readonly property int headH: 58
+        readonly property int headH: host.sheet && host.sheet.note ? 68 : 58       // a title with a line under it needs the same air above as beside
         readonly property int tabsH: tabs.visible ? 34 : 0
         readonly property int footH: foot.visible ? 60 : 0
         readonly property real bodyH: host.sheet ? (host.sheet.sheetHeight ? host.sheet.sheetHeight : host.sheet.implicitHeight) : 160

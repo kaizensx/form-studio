@@ -48,7 +48,7 @@ Column {
     onShowExamplesChanged: if (showExamples) loadExamples()
     function loadExamples() { Store.get("/examples").then(function (r) { ns.examples = r.examples }, Store.fail) }
 
-    function chosen() { var r = Store.studio.recipes; for (var i = 0; i < r.length; i++) if (r[i].id === pickId) return r[i]; return null }
+    function chosen() { var r = Store.studio ? Store.studio.recipes : []; for (var i = 0; i < r.length; i++) if (r[i].id === pickId) return r[i]; return null }
     function setAnswer(k, v) { var o = Object.assign({}, answers); o[k] = v; answers = o }
     function startBrief(then) {
         sending = true
@@ -68,13 +68,13 @@ Column {
             Repeater { model: Store.studio ? Store.studio.recipes : []
                 Rectangle { id: rc; required property var modelData
                     readonly property bool on: ns.pickId === modelData.id
-                    width: (ns.width - 8) / 2; height: 58; radius: Theme.rMd
+                    width: (ns.width - 8) / 2; height: 72; radius: Theme.rMd
                     color: on ? Theme.alpha(Theme.datum, 0.07) : rm.pressed ? Theme.plate : rm.containsMouse ? Theme.plate3 : Theme.plate1
                     border.color: on ? Theme.alpha(Theme.datum, 0.55) : rm.containsMouse ? Theme.rule2 : Theme.rule
                     Behavior on color { Tint {} }
                     Column { x: 14; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 28 - 22; spacing: 2
                         Txt { text: rc.modelData.title; font.weight: Theme.wSemi }
-                        Txt { kind: "fine"; text: rc.modelData.summary || ""; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
+                        Txt { kind: "fine"; text: rc.modelData.summary || ""; width: parent.width; maximumLineCount: 2; elide: Text.ElideRight } }
                     Icon { visible: rc.on; name: "check"; size: 14; color: Theme.datum; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter }
                     MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true; onClicked: ns.pickId = rc.modelData.id; onDoubleClicked: { ns.pickId = rc.modelData.id; ns.make() } } } } }
         Column { width: parent.width; spacing: 6
