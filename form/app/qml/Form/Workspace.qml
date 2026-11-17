@@ -197,7 +197,7 @@ Item {
             height: Math.max(sectionBar.shown ? sectionBar.height : 0, analyzeBar.shown ? analyzeBar.height : 0,
                              measureBar.shown ? measureBar.height : 0, asmBar.shown ? asmBar.height : 0)
 
-            HudBar { id: measureBar; shown: ws.tool === "measure"; maxWidth: opts.room
+            HudBar { id: measureBar; objectName: "measureBar"; shown: ws.tool === "measure"; maxWidth: opts.room
                 Seg { model: [{ value: "distance", text: "Distance" }, { value: "face", text: "Face" }, { value: "diameter", text: "Diameter" }]
                     value: Store.measureKind
                     onPicked: function (v) { Store.measureKind = v; Store.measureFrom = null } }
@@ -210,7 +210,7 @@ Item {
                     Tip { show: mhm.containsMouse; text: "Values are computed from the part’s surface, tessellated at 0.05 mm; a hole diameter is exact when it comes from the CAD solid. Points snap to corners, edge midpoints and face centres when close." } }
                 Btn { small: true; height: 26; text: "Clear"; visible: Store.measures.length > 0 || !!Store.measureFrom; onClicked: Store.clearMeasures() }
             }
-            HudBar { id: sectionBar; shown: ws.tool === "section"; maxWidth: opts.room
+            HudBar { id: sectionBar; objectName: "sectionBar"; shown: ws.tool === "section"; maxWidth: opts.room
                 readonly property var now: Store.sectionNow()
                 Seg { model: [{ value: "x", text: "X" }, { value: "y", text: "Y" }, { value: "z", text: "Z" }]
                     value: sectionBar.now ? sectionBar.now.axis : ""
@@ -220,13 +220,13 @@ Item {
                     onMoved: function (v) { Store.setSection(sectionBar.now ? sectionBar.now.axis : "y", v) } }
                 Btn { small: true; height: 26; text: "Remove cut"; visible: !!sectionBar.now; onClicked: Store.setSection("", 0.5) }
             }
-            HudBar { id: analyzeBar; shown: ws.tool === "analyze"; maxWidth: opts.room
+            HudBar { id: analyzeBar; objectName: "analyzeBar"; shown: ws.tool === "analyze"; maxWidth: opts.room
                 Seg { visible: !ws.compact; model: Store.analysisMaps.slice(1); value: Store.analysisMap
                     onPicked: function (v) { Store.setAnalysis(v === Store.analysisMap ? "" : v) } }
                 Pick { visible: ws.compact; width: 150; height: 26; model: Store.analysisMaps; value: Store.analysisMap; onPicked: function (v) { Store.setAnalysis(v) } }
                 Btn { small: true; height: 26; text: "Clear map"; visible: !!Store.analysisMap && !ws.compact; onClicked: Store.setAnalysis("") }
             }
-            HudBar { id: asmBar; shown: ws.tool === "assembly" && !!Store.assembly; maxWidth: opts.room
+            HudBar { id: asmBar; objectName: "asmBar"; shown: ws.tool === "assembly" && !!Store.assembly; maxWidth: opts.room
                 Seg { visible: !ws.compact; model: [{ value: "assembled", text: "Assembled" }, { value: "exploded", text: "Exploded" }, { value: "print", text: "Print layout" }]
                     value: Store.asmMode; onPicked: function (v) { Store.setAsmMode(v) } }
                 Pick { visible: ws.compact; width: 150; height: 26; value: Store.asmMode; onPicked: function (v) { Store.setAsmMode(v) }
@@ -264,12 +264,12 @@ Item {
             readonly property bool open: (showMap || showMeasures) && !folded
             readonly property real room: Math.max(120, strip.y - y - 46)
             function flip() { var now = folded; Ws.dockTouched = true; Ws.dockCollapsed = !now }
-            AnalysisLegend { visible: opacity > 0.01; opacity: dock.showMap ? 1 : 0
+            AnalysisLegend { objectName: "analysisLegend"; visible: opacity > 0.01; opacity: dock.showMap ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Motion.ui; easing.type: Easing.OutCubic } }
                 map: Store.analysis; busy: Store.analysisBusy; pending: Store.analysisLabel(Store.analysisMap); check: Store.analysis ? Store.analysisCheck() : null
                 collapsed: dock.folded || (dock.showMeasures && ws.tool === "measure")
                 maxHeight: dock.room - (dock.showMeasures ? 44 : 0); onToggled: dock.flip() }
-            MeasurePanel { visible: dock.showMeasures
+            MeasurePanel { objectName: "measurePanel"; visible: dock.showMeasures
                 collapsed: dock.folded || (dock.showMap && ws.tool !== "measure")
                 maxHeight: dock.room - (dock.showMap ? 44 : 0); onToggled: dock.flip() }
         }

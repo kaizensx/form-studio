@@ -54,7 +54,7 @@ Rectangle {
         // ── along the current layer ──────────────────────────
         Item { width: parent.width; height: 18; visible: bar.ready
             Txt { id: al; kind: "fine"; text: "Along the layer"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
-            Beam { anchors.left: al.right; anchors.leftMargin: 12; anchors.right: pc.left; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
+            Beam { objectName: "simAlong"; anchors.left: al.right; anchors.leftMargin: 12; anchors.right: pc.left; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                 from: 0; to: 1; step: 0.002; value: Math.min(1, bar.sim.frac); tint: Theme.datum
                 onMoved: function (f) { bar.sim.pause(); bar.sim.setNow(bar.sim.cur + Math.min(f, 0.9999)) } }
             Txt { id: pc; mono: true; font.pixelSize: 11; tone: 3; width: 34; horizontalAlignment: Text.AlignRight; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
@@ -63,6 +63,7 @@ Rectangle {
 
         // ── every layer: the chart is the scrubber ───────────
         PrintSimChart {
+            objectName: "simLayers"
             width: parent.width; visible: bar.ready
             values: !bar.ready ? [] : bar.metric === "time" && bar.sim.timed ? info.time_s : info.length_mm
             bridges: bar.ready ? info.bridge_layers : []

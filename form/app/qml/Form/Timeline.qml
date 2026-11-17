@@ -20,7 +20,7 @@ Item {
     function indexOf(n) { for (var i = 0; i < revs.length; i++) if (revs[i].n === n) return i; return -1 }
     implicitHeight: 40
 
-    Btn { id: play; x: 8; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "quiet"
+    Btn { id: play; objectName: "timelinePlay"; x: 8; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "quiet"
         icon: Store.morphing ? "pause" : "play"; enabled: tl.revs.length > 1
         tip: tl.revs.length > 1 ? "Play through every revision" : "There is only one revision"
         onClicked: Store.playMorph() }

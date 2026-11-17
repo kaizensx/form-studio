@@ -7,6 +7,7 @@ import "F.js" as F
 // Replaces the 3D viewport while Store.layers is set. Scene: PrintSimView. Transport: PrintSimBar.
 Item {
     id: sim
+    objectName: "printSim"
     // ── state ────────────────────────────────────────────────
     property var info: null                   // per-layer numbers from the engine (toolpath summary)
     property real now: 0                      // layer + fraction of that layer
@@ -165,7 +166,7 @@ Item {
                         text: sim.typesFold ? (F.keys(sim.hidden).length ? F.keys(sim.hidden).length + " hidden" : "all shown") : "m of path" }
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: sim.typesFold = !sim.typesFold } }
                 Repeater { model: sim.typesFold ? [] : sim.types
-                    Rectangle { id: tr; required property string modelData
+                    Rectangle { id: tr; objectName: "simType"; required property string modelData
                         readonly property bool on: !sim.hidden[modelData]
                         width: parent.width; height: 22; radius: Theme.rXs; color: tma.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : "transparent"
                         Rectangle { x: 6; width: 10; height: 10; radius: 2; anchors.verticalCenter: parent.verticalCenter
