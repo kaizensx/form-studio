@@ -42,5 +42,5 @@ coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="FORM")
 if sys.platform == "darwin":
     app = BUNDLE(coll, name="FORM.app", icon=icon, bundle_identifier="net.form-studio.app",
                  info_plist={"CFBundleName": "Form Studio", "CFBundleDisplayName": "Form Studio",   # the bundle file stays FORM.app
-                             "CFBundleShortVersionString": "11.1.0", "NSHighResolutionCapable": True,
+                             "CFBundleShortVersionString": "11.1.1", "NSHighResolutionCapable": True,
                              "LSMinimumSystemVersion": "12.0", "NSRequiresAquaSystemAppearance": False})

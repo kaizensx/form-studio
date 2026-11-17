@@ -1,5 +1,11 @@
 # Changelog
 
+## 11.1.1
+
+- **Timeline:** dragging through revisions and pressing "Back to head" always returns to the head; a late answer for an older revision could put it back on screen.
+- **Chat:** when an agent run fails or is stopped, its error or end is saved before the conversation shows it as finished.
+- The MCP reference uses the Form Studio name.
+
 ## 11.1.0
 
 ### Form Studio
