@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from xml.etree import ElementTree
 
-from .common import SlicerBlocked, SlicerFailed, private
+from .common import SlicerBlocked, SlicerFailed, gcode_version, private, program_version
 
 
 @dataclass
@@ -39,6 +39,7 @@ class Family:
     label: str                      # "Bambu Studio"
     conf_name: str                  # "BambuStudio.conf"
     version_re: str                 # r"BambuStudio-([\d.]+)"
+    program: str = ""               # the name in its G-code header and of its library on Windows ("BambuStudio")
     table: str = ""                 # studio.toml table holding app/config_dir/presets ("" = [slicer] itself)
     deep_search: bool = False       # also look in nested folders / by "name" field (OrcaSlicer's libraries)
     parse_header: object = None     # G-code statistics reader
@@ -237,15 +238,18 @@ def no_selection(fam: Family, config_dir: Path, kind: str, names: dict, has_conf
 
 def version(fam: Family, app: str) -> str:
     if app not in fam.version_cache:
-        try:
-            with tempfile.TemporaryDirectory() as scratch:     # the CLI drops result.json into its cwd
-                r = subprocess.run([app, "--help"], capture_output=True, text=True, timeout=30,
-                                   stdin=subprocess.DEVNULL, cwd=scratch)
-            m = re.search(fam.version_re, r.stdout + r.stderr)
-            fam.version_cache[app] = m.group(1) if m else "unknown"
-        except (OSError, subprocess.SubprocessError):
-            fam.version_cache[app] = "unavailable"
+        fam.version_cache[app] = program_version(app, fam.version_re, (fam.program + ".dll",))
     return fam.version_cache[app]
+
+
+def sliced_version(fam: Family, app: str, gcode: Path) -> str:
+    """The program's version for a slice: as the program reports it, else as that G-code states it."""
+    v = version(fam, app)
+    if v in ("unknown", "unavailable"):
+        said = gcode_version(gcode, fam.program)
+        if said:
+            v = fam.version_cache[app] = said
+    return v
 
 
 def public(fam: Family, resolved: dict) -> dict:
@@ -369,7 +373,7 @@ def slice_stl(fam: Family, resolved: dict, stl: Path, out_dir: Path, timeout: fl
     if threemf.exists():
         info.update(read_3mf(threemf, out_dir))
     info.update({
-        "seconds": round(time.time() - t0, 2), "slicer_version": version(fam, resolved["app"]),
+        "seconds": round(time.time() - t0, 2), "slicer_version": sliced_version(fam, resolved["app"], gcode),
         "gcode": gcode.name, "threemf": threemf.name if threemf.exists() else None,
         "gcode_sha256": hashlib.sha256(gcode.read_bytes()).hexdigest(),
         "presets": {k: {"name": v["name"], "sha": v["sha"]} for k, v in resolved["presets"].items()},

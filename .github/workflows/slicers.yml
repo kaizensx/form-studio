@@ -25,11 +25,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # reports: the version the program states, which the slice must carry.
           # url: the asset of the official release. sha256: the digest GitHub publishes for that asset
           # (SuperSlicer 2.5.59.13 predates asset digests, so upstream publishes none).
           - slicer: OrcaSlicer
             kind: orca
             version: 2.5.1
+            reports: "2.5.1"
             on: Linux
             os: ubuntu-24.04
             dir: OrcaSlicer
@@ -38,6 +40,7 @@ jobs:
           - slicer: OrcaSlicer
             kind: orca
             version: 2.5.1
+            reports: "2.5.1"
             on: Windows
             os: windows-latest
             dir: OrcaSlicer
@@ -46,6 +49,7 @@ jobs:
           - slicer: Bambu Studio
             kind: bambu
             version: 2.9.1.70
+            reports: "02.09.01.70"
             on: Linux
             os: ubuntu-24.04
             dir: BambuStudio
@@ -54,6 +58,7 @@ jobs:
           - slicer: Bambu Studio
             kind: bambu
             version: 2.9.1.70
+            reports: "02.09.01.70"
             on: Windows
             os: windows-latest
             dir: Bambu Studio
@@ -62,6 +67,7 @@ jobs:
           - slicer: SuperSlicer
             kind: superslicer
             version: 2.5.59.13
+            reports: "2.5.59.13"
             on: Linux
             os: ubuntu-22.04
             dir: SuperSlicer
@@ -70,6 +76,7 @@ jobs:
           - slicer: SuperSlicer
             kind: superslicer
             version: 2.5.59.13
+            reports: "2.5.59.13"
             on: Windows
             os: windows-latest
             dir: SuperSlicer
@@ -78,6 +85,7 @@ jobs:
           - slicer: QIDISlicer
             kind: qidi
             version: 1.2.5
+            reports: "1.2.5"
             on: Linux
             os: ubuntu-24.04
             dir: QIDISlicer
@@ -86,6 +94,7 @@ jobs:
           - slicer: QIDISlicer
             kind: qidi
             version: 1.2.5
+            reports: "1.2.5"
             on: Windows
             os: windows-latest
             dir: QIDISlicer
@@ -142,8 +151,17 @@ jobs:
           PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
           RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a"
           $RUN "$PY" -c "import json; from form import config, slicer; r = slicer.public(slicer.resolve(config.load())); print(json.dumps(r, indent=1)); raise SystemExit(0 if r.get('available') else 1)"
+          APP="$("$PY" -c "from form import config, slicer; print(slicer.resolve(config.load())['app'])")"
+          echo "--- $APP --help"
+          ($RUN "$APP" --help 2>&1 || true) | head -n 6 || true
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            powershell -NoProfile -Command "Get-ChildItem (Split-Path '$APP') -File | Where-Object { \$_.Name -match '(slicer|studio|slic3r).*\.(exe|dll)\$' } | ForEach-Object { '{0}: ProductVersion={1} FileVersion={2}' -f \$_.Name, \$_.VersionInfo.ProductVersion, \$_.VersionInfo.FileVersion }"
+          fi
       - name: FORM slices with it
+        # Fails unless the slice exists and carries layers, time, grams and the version the program reports.
         shell: bash
+        env:
+          REPORTS: ${{ matrix.reports }}
         run: |
           PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
           RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a"
@@ -152,7 +170,7 @@ jobs:
           "$PY" -m form examples add
           $RUN "$PY" -m form run hallway-phone-dock
           "$PY" -m form state hallway-phone-dock > "$RUNNER_TEMP/state.json"
-          "$PY" -c "import sys,json; s=json.load(open(sys.argv[1],encoding='utf-8')).get('slice_simulated') or {}; print('sliced:', {k:s.get(k) for k in ('time_s','filament_g','layers','slicer','slicer_version')}); sys.exit(0 if s.get('layers') and s.get('time_s') and s.get('filament_g') and s.get('slicer_version') not in (None, '', 'unknown', 'unavailable') else 1)" "$RUNNER_TEMP/state.json"
+          "$PY" -c "import sys,json; s=json.load(open(sys.argv[1],encoding='utf-8')).get('slice_simulated') or {}; print('sliced:', {k:s.get(k) for k in ('time_min','filament_g','layers','slicer','presets')}); sys.exit(0 if s.get('layers') and s.get('time_min') and s.get('filament_g') and s.get('slicer') == sys.argv[2] else 1)" "$RUNNER_TEMP/state.json" "$REPORTS"
           "$PY" -m form simulate hallway-phone-dock --png "$RUNNER_TEMP/out/toolpaths.png"
           test -s "$RUNNER_TEMP/out/toolpaths.png"
           "$PY" -m form cost hallway-phone-dock

@@ -169,7 +169,7 @@ EXIT_REASONS = {
     -102: "Found G-code in unprintable area after slicing.",
 }
 
-FAMILY = _bbl.Family(kind="orca", label=LABEL, conf_name="OrcaSlicer.conf", version_re=r"OrcaSlicer-([\d.]+)",
+FAMILY = _bbl.Family(kind="orca", label=LABEL, conf_name="OrcaSlicer.conf", version_re=r"OrcaSlicer-([\d.]+)", program="OrcaSlicer",
                      table="orca", deep_search=True, parse_header=parse_gcode_header,
                      cache_dirs=cache_dirs, shipped=profile_dirs, selection=selection, exit_reasons=EXIT_REASONS, bed_type=bed_type)
 

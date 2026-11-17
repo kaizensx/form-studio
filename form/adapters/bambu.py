@@ -56,7 +56,7 @@ def profile_dirs(app: Path) -> list[Path]:
     return _shipped_dirs(app, "BambuStudio")
 
 
-FAMILY = _bbl.Family(kind="bambu", label=LABEL, conf_name="BambuStudio.conf", version_re=r"BambuStudio-([\d.]+)",
+FAMILY = _bbl.Family(kind="bambu", label=LABEL, conf_name="BambuStudio.conf", version_re=r"BambuStudio-([\d.]+)", program="BambuStudio",
                      parse_header=parse_gcode_header, shipped=profile_dirs)
 
 # Where else the program is, when [slicer].app was left at its default and nothing is there.
