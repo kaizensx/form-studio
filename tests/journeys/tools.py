@@ -81,8 +81,15 @@ def journey_measure(ui):
     ui.expect(m["label"])
     ui.click_text("Face")
     ui.wait_until(lambda: ui.store.get("measureKind") == "face", 2, "face mode")
-    ui.click("viewport", 0.45, 0.50)
-    ui.wait_until(lambda: len(ui.store.get("measures")) == 2, 10, "a face measurement")
+    # the enclosure is two parts laid out for printing; a single point can land in the gap between them
+    for fx, fy in ((0.42, 0.60), (0.45, 0.50), (0.36, 0.45)):
+        ui.click("viewport", fx, fy)
+        try:
+            ui.wait_until(lambda: len(ui.store.get("measures")) == 2, 5, "a face measurement")
+            break
+        except Exception:
+            continue
+    ui.wait_until(lambda: len(ui.store.get("measures")) == 2, 5, "a face measurement")
     f = ui.store.get("measures")[1]
     ui.check(f["kind"] == "face" and f["face"]["area_mm2"] > 0, f"a face with an area: {f['label']}")
     ui.settle(300)
