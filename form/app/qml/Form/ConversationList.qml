@@ -78,7 +78,7 @@ Item {
                     Txt { text: row.c.title; width: parent.width - (row.c.pinned ? 17 : 0); elide: Text.ElideRight; wrapMode: Text.NoWrap; font.weight: row.current ? 600 : 500 } }
                 Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
                     text: row.c.match ? row.c.match
-                        : (!cl.compact && Store.pid && row.c.project === Store.pid ? "" : cl.projectName(row.c.project) + " · ") + F.ago(row.c.updated) + " · " + F.plural(row.c.messages, "message") } }
+                        : (!cl.compact && Store.pid && row.c.project === Store.pid ? "" : (row.c.project ? cl.projectName(row.c.project) : row.c.project_was ? row.c.project_was.name + " (in the trash)" : "General") + " · ") + F.ago(row.c.updated) + " · " + F.plural(row.c.messages, "message") } }
             Rectangle { id: dot; visible: row.c.state === "running" && !acts.visible; width: 7; height: 7; radius: 3.5; color: Theme.datum
                 anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter
                 SequentialAnimation on opacity { running: dot.visible; loops: Animation.Infinite

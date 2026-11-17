@@ -81,6 +81,8 @@ Item {
                         required property var modelData
                         required property int index
                         readonly property var p: modelData
+                        objectName: "projectCard"
+                        readonly property string title: p.name
                         readonly property bool hot: cm.containsMouse || more.hovered || (pm.opened && home.menuFor === p)
                         readonly property bool editing: home.renaming === p.id
                         readonly property bool asking: home.confirming === p.id
@@ -130,7 +132,7 @@ Item {
                                 onClicked: function (e) {
                                     if (e.button === Qt.RightButton) home.openMenu(card.p, card, e.x, e.y)
                                     else Store.open(card.p.id) } }
-                            Btn { id: more; kind: "quiet"; icon: "ellipsis"; tip: "Rename, duplicate, export, delete"; x: parent.width - width - 8; y: 8; z: 3
+                            Btn { id: more; objectName: "cardMore"; kind: "quiet"; icon: "ellipsis"; tip: "Rename, duplicate, export, delete"; x: parent.width - width - 8; y: 8; z: 3
                                 opacity: card.hot && !card.asking && !card.editing ? 1 : 0; visible: opacity > 0
                                 Behavior on opacity { NumberAnimation { duration: Theme.fast } }
                                 onClicked: home.openMenu(card.p, card, more.x, more.y + more.height + 4) }

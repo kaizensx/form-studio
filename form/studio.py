@@ -1334,6 +1334,10 @@ class Studio:
             raise StudioError("Unknown project.", status=404)
         if any(j.get("project") == pid and j.get("state") == "running" for j in list(self.jobs.values())):
             raise StudioError("This project is still building.", "Wait for the pipeline to finish, then delete it.", status=409)
+        try:
+            name = self.load(pid).get("name") or pid
+        except Exception:
+            name = pid
         trash = self.root / ".trash"
         stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         dest, i = trash / f"{pid}-{stamp}", 2
@@ -1348,4 +1352,14 @@ class Studio:
                                   "Close any program that has the project's files open and try again.", status=500)
         self._locks.pop(pid, None)
         self._layers_cache.clear()
-        return {"ok": True, "id": pid, "trash": str(dest)}
+        # conversations about this design stay, but no longer point at a project that is gone
+        detached = 0
+        try:
+            from .conversations import Conversations
+            store = Conversations(self.root)
+            for m in store.list(project=pid, limit=100000):
+                store.update(m["id"], project=None, project_was={"id": pid, "name": name})
+                detached += 1
+        except Exception:
+            pass                                     # the project is in the trash either way
+        return {"ok": True, "id": pid, "trash": str(dest), "conversations_detached": detached}
