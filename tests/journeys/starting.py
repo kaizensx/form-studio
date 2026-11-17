@@ -117,7 +117,7 @@ def journey_new_design_flow(ui):
 
     # install a recipe from a file: the code and its hash are shown first; nothing is installed before Install
     src = Path(os.environ["FORM_UITEST_TMP"]) / "shelf_block.py"
-    src.write_text(BLOCK, encoding="utf-8")
+    src.write_bytes(BLOCK.encode("utf-8"))           # byte for byte: write_text would add CRLF on Windows
     ui.click_text("New design")
     open_sheet_wait(ui, "new")
     ui.pick_file(src)
