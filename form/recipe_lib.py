@@ -26,6 +26,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import os
 import re
 import time
 import urllib.request
@@ -45,14 +46,14 @@ SECTIONS = ("builtin", "mine", "community")
 # Built-in recipes: a category and tags, so a long library can be searched and filtered.
 BUILTIN_TAGS = {
     "dock": ("Holders", ["desk", "phone", "holder", "fit"]),
-    "gridfinity": ("Storage", ["storage", "organizer", "gridfinity", "modular"]),
+    "gridfinity": ("Storage", ["organizer", "gridfinity", "modular"]),
     "hook": ("Mounts", ["wall", "mount", "load", "screws"]),
-    "planter": ("Home", ["home", "garden", "decor"]),
-    "coupon": ("Calibration", ["calibration", "fit", "test"]),
+    "planter": ("Home", ["garden", "decor"]),
+    "coupon": ("Calibration", ["fit", "test"]),
     "enclosure": ("Enclosures", ["electronics", "box", "lid", "inserts"]),
-    "gear_pair": ("Mechanisms", ["mechanism", "gears", "motion"]),
-    "knob": ("Mechanisms", ["mechanism", "replacement", "shaft"]),
-    "hinged_box": ("Storage", ["box", "hinge", "storage", "motion"]),
+    "gear_pair": ("Mechanisms", ["gears", "motion"]),
+    "knob": ("Mechanisms", ["replacement", "shaft"]),
+    "hinged_box": ("Storage", ["box", "hinge", "motion"]),
 }
 
 
@@ -236,7 +237,32 @@ def uninstall(root, rid: str) -> dict:
 
 # ---- community ---------------------------------------------------------------------------------------------------
 
+def _local(url: str, limit: int) -> bytes | None:
+    """Development and the interface tests: FORM_RECIPES_INDEX names a local index.json; "file:" urls in it are
+    files next to it. Never used unless that variable is set."""
+    idx = os.environ.get("FORM_RECIPES_INDEX", "").strip()
+    if not idx:
+        return None
+    base = Path(idx).resolve().parent
+    if url == INDEX_URL:
+        f = Path(idx)
+    elif str(url).startswith("file:"):
+        f = (base / str(url)[5:].lstrip("/")).resolve()
+        if not f.is_relative_to(base):
+            raise LibraryError("A local recipe file must be next to the local index.")
+    else:
+        return None
+    data = f.read_bytes()
+    if len(data) > limit:
+        raise LibraryError("The file is larger than a recipe can be, so it was not read.")
+    return data
+
+
 def _download(url: str, limit: int, opener=None) -> bytes:
+    if opener is None:
+        data = _local(url, limit)
+        if data is not None:
+            return data
     if not str(url).startswith("https://"):
         raise LibraryError("Community files are only read over https.")
     if opener is not None:
@@ -258,7 +284,8 @@ def _norm(e) -> dict | None:
         return None
     kind = e.get("kind") if e.get("kind") in KINDS else "python"
     sha = str(e.get("sha256") or "").lower()
-    url = e.get("url") if isinstance(e.get("url"), str) and e["url"].startswith("https://") else None
+    local = os.environ.get("FORM_RECIPES_INDEX") and isinstance(e.get("url"), str) and e["url"].startswith("file:")
+    url = e.get("url") if isinstance(e.get("url"), str) and (e["url"].startswith("https://") or local) else None
     prev = e.get("preview") if isinstance(e.get("preview"), str) and e["preview"].startswith("https://") else None
     return {"id": e["id"], "title": str(e["title"])[:80], "summary": str(e.get("summary") or "")[:300],
             "author": str(e.get("author") or "")[:80], "tags": [str(t)[:24] for t in (e.get("tags") or []) if isinstance(t, str)][:8],
@@ -362,8 +389,19 @@ def builtins(recipes: dict) -> list[dict]:
     return out
 
 
-def everything(root, recipes: dict, opener=None, refresh: bool = False) -> dict:
-    com = community(root, force=refresh, opener=opener)
+def cached_community(root) -> dict:
+    """What the last fetch of the index found, without going to the network."""
+    try:
+        c = json.loads((Path(root) / CACHE).read_text(encoding="utf-8"))
+        return {"recipes": c.get("recipes") or [], "fetched": c.get("fetched"), "error": None}
+    except (OSError, ValueError, AttributeError):
+        return {"recipes": [], "fetched": None, "error": None}
+
+
+def everything(root, recipes: dict, opener=None, refresh: bool = False, online: bool = True) -> dict:
+    """online=False lists the community recipes from the cache only: browsing built-in and your own recipes never
+    waits for the network."""
+    com = community(root, force=refresh, opener=opener) if online or refresh else cached_community(root)
     mine_ = mine(root)
     have = {m.get("community_id") for m in mine_ if m.get("community_id")}
     cs = []

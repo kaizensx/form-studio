@@ -24,6 +24,8 @@ Rectangle {
                     { icon: "plus", text: "New design…", keys: "Ctrl+N", run: function () { Store.openSheet("new") } },
                     { icon: "file_text", text: "New design from a brief…", run: function () { Store.openSheet("new", { tab: "brief" }) } },
                     { icon: "message_square_plus", text: "New conversation", keys: "Ctrl+Shift+O", run: function () { Store.newChat(); Store.talkOpen = true } },
+                    { icon: "import", text: "Import…", run: function () { Store.askImport() } },
+                    { icon: "archive", text: "Export this design…", enabled: !!Store.project, run: function () { Store.exportProject(Store.pid) } },
                     { sep: true },
                     { icon: "home", text: "All designs", keys: "Ctrl+Shift+H", run: function () { Store.home() } },
                     { icon: "folder_open", text: "Open the projects folder", run: function () { Bridge.openDataFolder() } },
@@ -33,6 +35,7 @@ Rectangle {
                     { icon: "wrench", text: "Software: install or check…", run: function () { Store.openSetup() } },
                     { icon: "settings", text: "Settings…", keys: "Ctrl+,", run: function () { Store.openSettings("general") } },
                     { sep: true },
+                    { icon: "sparkle", text: "What’s new", run: function () { Store.showWhatsNew() } },
                     { icon: "info", text: "About Form Studio", run: function () { Store.openSheet("about") } }
                 ] } }
         Btn { visible: bar.work; kind: "quiet"; icon: Store.talkOpen ? "panel_left_close" : "panel_left_open"; keys: "Ctrl+J"

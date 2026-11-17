@@ -1,0 +1,5 @@
+{"version": 1, "generated": "2026-11-17T00:00:00Z", "recipes": [
+ {"id": "cable-clip", "title": "Cable clip", "summary": "A clip for cables (test fixture).", "author": "test", "tags": ["desk", "cables"],
+  "kind": "python", "builtin": false, "url": "file:cable_clip.py", "sha256": "2cabfb10aa9078d2f1b20d8623c29ad5e17aa2a0512af6fff725e5a50e88730c", "preview": null},
+ {"id": "dock", "title": "Device dock", "summary": "Built into Form Studio.", "author": "Form Studio", "tags": ["desk"],
+  "kind": "python", "builtin": true, "url": null, "sha256": null, "preview": null}]}

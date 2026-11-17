@@ -35,7 +35,8 @@ def route_get(st, path: str, q: dict):
     if path == "/api/starters":
         return starters.for_studio(st, limit=int(q.get("limit") or 8))
     if path == "/api/recipes/library":
-        lib = recipe_lib.everything(st.root, st.recipes.builtins(), refresh=q.get("refresh") == "1")
+        lib = recipe_lib.everything(st.root, st.recipes.builtins(), refresh=q.get("refresh") == "1",
+                                    online=q.get("section") == "community")
         items = recipe_lib.search(lib["items"], q.get("q", ""), q.get("section", ""), q.get("tag", ""), q.get("sort", "name"))
         counts = {s: sum(1 for i in lib["items"] if i["section"] == s) for s in recipe_lib.SECTIONS}
         return {"items": items, "tags": recipe_lib.tags(lib["items"])[:24], "counts": counts,

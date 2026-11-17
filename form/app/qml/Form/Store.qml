@@ -1045,4 +1045,66 @@ QtObject {
             if (id === s.pid) home(); else reloadStudio()
             toast("Moved to the trash", "It is in .trash inside your projects folder until you remove it."); return r }, fail)
     }
+
+    // ── Home and new design (home workstream): learned starters, archives, What's New ──────────────────────
+    // form/starters.py ranks the starters from this person's own designs; form/bundle.py writes and reads .formstudio files.
+    property var starters: null        // GET /starters: { prompts: [{ id, text, source, pinned, why }], briefs: [...], history }
+    property var whatsNew: null        // GET /whatsnew: { version, show, markdown, highlights } while the modal is up
+    property var _startersReload: Connections { target: s
+        function onStudioChanged() { if (s.screen !== "work") s.loadStarters() }
+        function onScreenChanged() { if (s.screen === "home") s.loadStarters() } }
+    function loadStarters() { return get("/starters").then(function (r) { starters = r; return r }, function () { return null }) }
+    function _starterCall(verb, body, msg) {
+        return post("/starters/" + verb, body || ({})).then(function (r) { loadStarters(); if (msg) toast(msg); return r }, function (e) { fail(e); return null })
+    }
+    // a prompt goes into the composer, so it can be adjusted before it is sent
+    function useStarter(st) {
+        post("/starters/used", { id: st.id }).then(function () {}, function () {})
+        talkOpen = true
+        recallChat(st.text)
+    }
+    function useBrief(b) {
+        post("/starters/used", { id: b.id }).then(function () {}, function () {})
+        openSheet("new", { tab: "brief", preset: b.preset, answers: b.answers || ({}), measured: !!b.measured })
+    }
+    function pinStarter(id, on) { return _starterCall("pin", { id: id, on: on }, on ? "Pinned to Home" : "Unpinned") }
+    function removeStarter(id) { return _starterCall("remove", { id: id }) }
+    function addStarter(text) { return _starterCall("add", { text: text }, "Starter added") }
+    function editStarter(id, text) { return _starterCall("edit", { id: id, text: text }) }
+    function restoreStarters() { return _starterCall("restore", {}, "Suggestions restored") }
+    function saveBriefTemplate(preset, answers, title, measured) {
+        return _starterCall("template", { preset: preset, answers: answers, title: title || "", measured: !!measured }, "Saved as your template")
+    }
+    // .formstudio (or an older .formproj) archive, or a conversation exported as JSON
+    function importFile(fileUrl) {
+        var name = decodeURIComponent(String(fileUrl).replace(/^.*[\/\\]/, ""))
+        return upload("/archive/import?name=" + encodeURIComponent(name), fileUrl).then(function (r) {
+            sheet = null
+            if (r.conversation) {
+                loadConvs(); openConv(r.conversation.id); talkOpen = true
+                toast("Conversation imported", r.conversation.title); return r
+            }
+            var n = r.conversations ? r.conversations.length : 0
+            toast("Imported “" + r.name + "”", (r.renamed_from ? "A design with the id “" + r.renamed_from + "” exists, so this one is “" + r.id + "”. " : "")
+                  + (n ? F.plural(n, "conversation") + " came with it." : "Outputs are rebuilt on this computer."))
+            return reloadStudio().then(function () { loadConvs(); return open(r.id) })
+        }, fail)
+    }
+    signal exportRequested(string kind, string id, string fmt)          // Exports.qml opens the save dialog
+    function exportProject(id) { if (id) exportRequested("project", id, "") }
+    function exportConversation(id, fmt) { if (id) exportRequested("conversation", id, fmt || "md") }
+    function askImport() { exportRequested("import", "", "") }
+    function checkWhatsNew(headless) {
+        if (headless) return
+        // shown once: it counts as seen the moment it opens, however it is closed
+        get("/whatsnew").then(function (r) {
+            if (!r.show || welcome) return
+            whatsNew = r; openSheet("whatsnew")
+            post("/whatsnew/seen", { version: r.version }).then(function () {}, function () {})
+        }, function () {})
+    }
+    function showWhatsNew(version) {
+        get("/whatsnew?version=" + encodeURIComponent(version || Bridge.version)).then(function (r) { whatsNew = r; openSheet("whatsnew") }, fail)
+    }
+    function closeWhatsNew() { openSheet(null) }
 }

@@ -12,6 +12,10 @@ P.MenuBar {
     P.Menu { title: "File"
         P.MenuItem { text: "New Design…"; shortcut: StandardKey.New; onTriggered: Store.openSheet("new") }
         P.MenuItem { text: "New Design from a Brief…"; onTriggered: Store.openSheet("new", { tab: "brief" }) }
+        P.MenuItem { text: "Import…"; onTriggered: Store.askImport() }
+        P.MenuItem { text: "Export Design…"; enabled: mb.work; onTriggered: Store.exportProject(Store.pid) }
+        P.MenuItem { text: "Export Conversation as Markdown…"; enabled: !!Store.convId; onTriggered: Store.exportConversation(Store.convId, "md") }
+        P.MenuItem { text: "Export Conversation as JSON…"; enabled: !!Store.convId; onTriggered: Store.exportConversation(Store.convId, "json") }
         P.MenuItem { text: "New Conversation"; shortcut: "Ctrl+Shift+O"; onTriggered: { Store.newChat(); Store.talkOpen = true } }
         P.MenuSeparator {}
         P.MenuItem { text: "All Designs"; shortcut: "Ctrl+Shift+H"; onTriggered: Store.home() }
@@ -71,6 +75,7 @@ P.MenuBar {
         P.MenuItem { text: "Run the First-time Setup Again"; onTriggered: { Store.setOnboardStep(0); Store.checkSoftware(); Store.welcome = true } }
     }
     P.Menu { title: "Help"
+        P.MenuItem { text: "What’s New"; onTriggered: Store.showWhatsNew() }
         P.MenuItem { text: "Keyboard Shortcuts"; onTriggered: Store.openSheet("shortcuts") }
         P.MenuItem { text: "Form Studio on GitHub"; onTriggered: Bridge.openLink("https://github.com/kaizensx/form-studio") }
         P.MenuItem { text: "Report a Problem"; onTriggered: Bridge.openLink("https://github.com/kaizensx/form-studio/issues") }

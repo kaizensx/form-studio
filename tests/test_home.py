@@ -80,6 +80,8 @@ class Starters(Tmp):
         self.assertLess(ids.index(next(i for i in ids if i.startswith("l-kind-"))), ids.index("d-gridfinity"))
         self.assertEqual(out["briefs"][0]["preset"], "organizer")  # the template they used ranks first
         self.assertEqual(out["briefs"][0]["source"], "learned")
+        rel = {b["preset"]: b["source"] for b in out["briefs"]}
+        self.assertEqual(rel["remote-holder"], "related")         # a template close to what they make, not used yet
 
     def test_newer_designs_weigh_more(self):
         h = self.hist(("Old hook", "hook", "", "", 400), ("New knob", "knob", "", "", 0))
@@ -237,6 +239,25 @@ class Library(Tmp):
             com = recipe_lib.community(self.tmp, opener=self.opener(files))
             self.assertEqual(com["recipes"], [])
         self.assertTrue(com["error"])
+
+    def test_browsing_never_waits_for_the_network(self):
+        def boom(url, timeout):
+            raise AssertionError("the network was used")
+        lib = recipe_lib.everything(self.tmp, {}, opener=boom, online=False)
+        self.assertEqual(lib["items"], [])
+
+    def test_a_local_index_for_development(self):
+        fx = Path(__file__).resolve().parent / "fixtures" / "community" / "index.json"
+        os.environ["FORM_RECIPES_INDEX"] = str(fx)
+        try:
+            com = recipe_lib.community(self.tmp)
+            self.assertEqual([r["id"] for r in com["recipes"]], ["cable-clip", "dock"])
+            pv = recipe_lib.community_preview(self.tmp, "cable-clip")
+            self.assertTrue(pv["verified"])
+            self.assertEqual(recipe_lib.install_community(self.tmp, "cable-clip", pv["sha256"])["title"], "Cable clip")
+        finally:
+            del os.environ["FORM_RECIPES_INDEX"]
+        self.assertIsNone(recipe_lib._norm({"id": "x", "title": "X", "url": "file:x.py"})["url"])   # only with the variable
 
     def test_http_urls_are_never_read(self):
         with self.assertRaises(recipe_lib.LibraryError):

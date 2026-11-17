@@ -291,7 +291,7 @@ def rank_briefs(state: dict, presets: list[dict], hist: list[dict], ctx: dict | 
             sc += 1
         sc += 10 * min(int((uses.get("p-" + p["id"]) or {}).get("n", 0)), 10)
         items.append({"id": "p-" + p["id"], "kind": "preset", "preset": p["id"], "title": p["title"], "summary": p.get("summary", ""),
-                      "source": "learned" if pw.get(p["id"]) or kinds.get(p.get("closest_recipe") or "") else "suggested",
+                      "source": "learned" if pw.get(p["id"]) else "related" if kinds.get(p.get("closest_recipe") or "") else "suggested",
                       "score": sc})
     items = [i for i in items if i["id"] not in hidden]
     for i in items:

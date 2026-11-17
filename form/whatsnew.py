@@ -56,7 +56,9 @@ def highlights(md: str, limit: int = 6) -> list[dict]:
         m = re.match(r"^\s*-\s+\*\*(.+?)\*\*\s*(.*)$", line)
         if m:
             title = m.group(1).strip().rstrip(":")
-            out.append({"title": title.rstrip("."), "text": m.group(2).strip(), "group": group})
+            text = m.group(2).strip()
+            text = text[:1].upper() + text[1:] if text[:1].islower() else text
+            out.append({"title": title.rstrip("."), "text": text, "group": group})
     return out[:limit]
 
 

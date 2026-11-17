@@ -106,7 +106,7 @@ Column {
                                 Toggle { checked: !!row.v; anchors.verticalCenter: parent.verticalCenter; onToggled: function (on) { st.setEdit(row.r, on) } } }
                             // one of
                             Pick { visible: row.r.type === "choice"; width: 200; value: row.v
-                                model: (row.r.choices || []).map(function (c) { return { value: c, text: ({ auto: "Automatic", bambu: "Bambu Studio", orca: "OrcaSlicer", prusa: "PrusaSlicer", superslicer: "SuperSlicer", qidi: "QIDISlicer" })[c] || c } })
+                                model: (row.r.choices || []).map(function (c) { return { value: c, text: ({ auto: "Automatic", bambu: "Bambu Studio", orca: "OrcaSlicer", prusa: "PrusaSlicer", superslicer: "SuperSlicer", qidi: "QIDISlicer", stable: "Stable", preview: "Preview" })[c] || c } })
                                 onPicked: function (val) { st.setEdit(row.r, val) } }
                             // text and paths
                             Field { visible: row.r.type === "str" || row.r.type === "path"; width: row.r.type === "path" ? 270 : 300

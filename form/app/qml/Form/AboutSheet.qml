@@ -11,7 +11,7 @@ Column {
     spacing: 18
     property Component footerLeft: Row { spacing: 4
         Btn { kind: "quiet"; icon: "external_link"; text: "Source"; onClicked: Bridge.openLink("https://github.com/kaizensx/form-studio") }
-        Btn { kind: "quiet"; icon: "scroll_text"; text: "Changelog"; onClicked: Bridge.openLink("https://github.com/kaizensx/form-studio/blob/main/CHANGELOG.md") }
+        Btn { kind: "quiet"; icon: "sparkle"; text: "What’s new"; onClicked: Store.showWhatsNew() }
         Btn { kind: "quiet"; icon: "circle_alert"; text: "Report a problem"; onClicked: Bridge.openLink("https://github.com/kaizensx/form-studio/issues") } }
     property Component footer: Row { spacing: 8
         Btn { text: "Check for updates"; icon: "refresh_cw"; onClicked: { Store.openSheet(null); Store.checkUpdates(true).then(function (u) {

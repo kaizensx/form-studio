@@ -75,6 +75,13 @@ Item {
         add("Settings", "shortcuts", "keyboard", "Keyboard shortcuts", "", function () { Store.openSheet("shortcuts") }, "?")
         add("Settings", "folder", "folder_open", "Open the projects folder", Bridge.dataDirShort, function () { Bridge.openDataFolder() })
         add("Settings", "about", "info", "About Form Studio", "Version and licences", function () { Store.openSheet("about") })
+        // home workstream: what's new, import and export
+        add("Settings", "whatsnew", "sparkle", "What’s new", "Form Studio " + Bridge.version, function () { Store.showWhatsNew() })
+        add("Settings", "import", "import", "Import a project or conversation", ".formstudio, .formproj or .json", function () { Store.askImport() })
+        if (Store.project) add("Settings", "export.project", "archive", "Export this design", "One .formstudio file with its conversations", function () { Store.exportProject(Store.pid) })
+        if (Store.convId) add("Conversations", "export.conv.md", "file_text", "Export this conversation as Markdown", "", function () { Store.exportConversation(Store.convId, "md") })
+        if (Store.convId) add("Conversations", "export.conv.json", "file_code", "Export this conversation as JSON", "Import brings it back", function () { Store.exportConversation(Store.convId, "json") })
+        add("Settings", "recipes", "library", "Recipe library", "Built-in, yours and community", function () { Store.openSheet("new", { tab: "recipe" }) })
         return c
     }
     // loose match: every letter of the query, in order. Returns { score, at: [indices] } or null.
