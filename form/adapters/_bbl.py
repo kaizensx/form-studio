@@ -8,6 +8,10 @@ and <config_dir>/user/<id>/<kind>/, chain them with "inherits", remember the cur
           --arrange 1 --slice 0 --export-3mf plate.3mf --outputdir DIR model.stl
 
 writing DIR/plate_1.gcode and DIR/plate.3mf (with Metadata/slice_info.config).
+
+OrcaSlicer 2.5+ packs its system presets into one <vendor>.opc per vendor instead of JSON files.
+A family that sets cache_dirs gets those read (orca_cache.py) wherever a JSON file is missing;
+Bambu Studio does not set it and is resolved from JSON files only, as before.
 """
 from __future__ import annotations
 
@@ -35,6 +39,8 @@ class Family:
     table: str = ""                 # studio.toml table holding app/config_dir/presets ("" = [slicer] itself)
     deep_search: bool = False       # also look in nested folders / by "name" field (OrcaSlicer's libraries)
     parse_header: object = None     # G-code statistics reader
+    cache_dirs: object = None       # (app, config_dir) -> folders holding packed <vendor>.opc presets (OrcaSlicer 2.5+)
+    selection: object = None        # conf dict -> {"machine", "process", "filament"} chosen in the program
     version_cache: dict = field(default_factory=dict)
 
     def where(self, kind: str) -> str:
@@ -79,14 +85,59 @@ def find(fam: Family, config_dir: Path, kind: str, name: str) -> Path:
                         f"Open {fam.label} once with this preset selected, or set {fam.where(kind)} in studio.toml.")
 
 
-def flatten(fam: Family, config_dir: Path, kind: str, name: str, _depth=0) -> dict:
+@dataclass
+class Packed:
+    """Packed vendor presets (OrcaSlicer 2.5+ <vendor>.opc) to fall back on when there is no JSON file."""
+    dirs: list                      # folders to search, in order
+    vendor: Path | None = None      # the cache the printer came from: looked in first for the other presets
+
+
+def load(fam: Family, config_dir: Path, kind: str, name: str, packed: Packed | None = None, within=None):
+    """(preset, includes, cache): one preset as stated (its own keys and "inherits"), the presets it
+    includes, and the vendor cache it came from (None for a JSON file).
+
+    A JSON file wins. When there is none and the family packs its system presets into vendor
+    caches, the preset is read from those. `within` is the cache of the preset that names this
+    one as its parent: a parent is only ever taken from the same vendor or the filament library."""
+    try:
+        return json.loads(find(fam, config_dir, kind, name).read_text(encoding="utf-8")), [], None
+    except SlicerBlocked as missing:
+        if packed is None or not packed.dirs:
+            raise
+        from . import orca_cache
+        preset, path, problems = orca_cache.find(packed.dirs, kind, name, within=within, prefer=packed.vendor)
+        if preset is None:
+            if within:
+                msg = (f"{kind.capitalize()} preset “{name}” was not found. It is a parent of a preset in "
+                       f"{within}, and is neither in that file nor in the {orca_cache.LIBRARY} beside it.")
+            else:
+                where = ", ".join(str(c) for c in packed.dirs)
+                msg = (f"{kind.capitalize()} preset “{name}” was not found: not as a JSON file under {config_dir}, "
+                       f"and not in the packed vendor presets (*.opc) in {where}. "
+                       f"Check the spelling of {fam.where(kind)} in studio.toml.")
+            if problems:
+                msg += " Could not read: " + " ".join(problems[:2])
+            raise SlicerBlocked(msg) from missing
+        if packed.vendor is None and path.stem != orca_cache.LIBRARY:
+            packed.vendor = path
+        d = preset.to_json()
+        return d, d.pop("include", []), path
+
+
+def flatten(fam: Family, config_dir: Path, kind: str, name: str, _depth=0, packed: Packed | None = None,
+            within=None) -> dict:
     """Resolve the inheritance chain into one self-contained preset."""
     if _depth > 12:
         raise SlicerBlocked(f"Preset “{name}” has a circular inheritance chain.")
-    d = json.loads(find(fam, config_dir, kind, name).read_text(encoding="utf-8"))
+    d, includes, cache = load(fam, config_dir, kind, name, packed, within)
     parent = d.get("inherits")
-    if parent:
-        base = flatten(fam, config_dir, kind, parent, _depth + 1)
+    if parent or includes:
+        base = flatten(fam, config_dir, kind, parent, _depth + 1, packed, cache) if parent else {}
+        for inc in includes:            # OrcaSlicer layers these over the parent, under the preset's own keys
+            layer = flatten(fam, config_dir, kind, inc, _depth + 1, packed, cache)
+            for meta in ("type", "name", "from", "setting_id", "filament_id", "instantiation", "description"):
+                layer.pop(meta, None)
+            base.update(layer)
         base.update(d)
         d = base
     d.pop("inherits", None)
@@ -102,18 +153,21 @@ def resolve(fam: Family, s: dict, app: Path, config_dir: Path, wanted: dict) -> 
     if not app.exists():
         out["reason"] = f"{fam.label} was not found at {app}. Install it or set {fam.where('app')} in studio.toml."
         return out
-    selected = read_conf(config_dir, fam.conf_name).get("presets", {})
-    names = {
-        "machine": wanted["machine"] if wanted["machine"] != "auto" else selected.get("machine", ""),
-        "process": wanted["process"] if wanted["process"] != "auto" else selected.get("process", ""),
-        "filament": wanted["filament"] if wanted["filament"] != "auto" else (selected.get("filaments") or [""])[0],
-    }
+    conf = read_conf(config_dir, fam.conf_name)
+    if fam.selection:
+        chosen = fam.selection(conf)
+    else:
+        selected = conf.get("presets") or {}
+        chosen = {"machine": selected.get("machine", ""), "process": selected.get("process", ""),
+                  "filament": (selected.get("filaments") or [""])[0]}
+    names = {k: wanted[k] if wanted[k] != "auto" else (chosen.get(k) or "") for k in ("machine", "process", "filament")}
+    packed = Packed(list(fam.cache_dirs(app, config_dir))) if fam.cache_dirs else None
     out["source"] = {k: ("studio.toml" if wanted[k] != "auto" else f"{fam.label} current selection") for k in names}
     try:
         for kind, name in names.items():
             if not name:
-                raise SlicerBlocked(f"No {kind} preset is selected in {fam.label} and none is set in studio.toml.")
-            flat = flatten(fam, config_dir, kind, name)
+                raise SlicerBlocked(no_selection(fam, config_dir, kind, names, bool(conf)))
+            flat = flatten(fam, config_dir, kind, name, packed=packed)
             flat["name"] = name
             flat["from"] = "system"
             idkey = {"machine": "printer_settings_id", "process": "print_settings_id", "filament": "filament_settings_id"}[kind]
@@ -143,6 +197,18 @@ def resolve(fam: Family, s: dict, app: Path, config_dir: Path, wanted: dict) -> 
     except (ValueError, OSError) as e:
         out["reason"] = f"Could not read {fam.label} presets: {e}"
     return out
+
+
+def no_selection(fam: Family, config_dir: Path, kind: str, names: dict, has_conf: bool) -> str:
+    """Why there is no preset of this kind to slice with, in words that match what is on disk."""
+    fix = f"Choose one in {fam.label}, or set {fam.where(kind)} in studio.toml."
+    if not has_conf:
+        return (f"{fam.label} has no saved selection yet ({config_dir / fam.conf_name} is missing or unreadable), "
+                f"so there is no {kind} preset to follow. Open {fam.label} once, or set {fam.where(kind)} in studio.toml.")
+    if kind != "machine" and names.get("machine"):
+        return (f"{fam.label} has the printer “{names['machine']}” selected but no {kind} preset saved for it "
+                f"in {fam.conf_name}. {fix}")
+    return f"No {kind} preset is selected in {fam.label} ({fam.conf_name}) and none is set in studio.toml. {fix}"
 
 
 def version(fam: Family, app: str) -> str:

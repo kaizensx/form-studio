@@ -9,7 +9,15 @@ Bambu Lab printer OrcaSlicer writes Bambu's "; CHANGE_LAYER" / "; FEATURE:" mark
 "; total filament used [g] = …" after the last layer (src/libslic3r/GCode.cpp,
 src/libslic3r/GCode/GCodeProcessor.cpp). Both are read here.
 
-Not run against a real OrcaSlicer on the machine this was written on; tested with fixtures.
+Presets. Up to OrcaSlicer 2.4 the system presets are JSON files under <config>/system/<vendor>/.
+From 2.5 each vendor is one packed cache, <vendor>.opc, in <config>/system and in the program's
+own profiles folder; orca_cache.py reads those. A preset is looked for as JSON first (user presets
+still are JSON), then in <config>/system/*.opc, then in the shipped profiles, so presets pinned in
+studio.toml work on an install that was never opened. The current selection is "presets".machine
+in OrcaSlicer.conf plus that printer's entry in "orca_presets" (process, filament), as
+PresetBundle::load_selections reads it.
+
+Verified by slicing with OrcaSlicer 2.5.1 on macOS (Bambu Lab A1 mini presets from BBL.opc).
 
 Settings, all optional, in studio.toml:
     [slicer.orca]
@@ -21,6 +29,7 @@ Settings, all optional, in studio.toml:
 """
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -53,8 +62,54 @@ def parse_gcode_header(path: Path) -> dict:
     return gcode_stats(path)
 
 
+def profile_dirs(app: Path) -> list[Path]:
+    """Where the program keeps the vendor presets it ships (resources/profiles), for each layout."""
+    app = Path(app)
+    try:
+        real = app.resolve()
+    except OSError:
+        real = app
+    out = []
+    for exe in dict.fromkeys((app, real)):
+        here = exe.parent
+        out += [here.parent / "Resources" / "profiles",                 # macOS bundle: Contents/MacOS/OrcaSlicer
+                here / "resources" / "profiles",                        # Windows, Linux tarball
+                here.parent / "resources" / "profiles",                 # Linux: bin/orca-slicer beside resources/
+                here.parent / "share" / "OrcaSlicer" / "profiles"]      # Linux packages
+    found = []
+    for d in out:
+        try:                            # one folder under two spellings (case, symlink) counts once
+            if d.is_dir() and not any(os.path.samefile(d, f) for f in found):
+                found.append(d)
+        except OSError:
+            continue
+    return found
+
+
+def cache_dirs(app: Path, config_dir: Path) -> list[Path]:
+    """Folders with packed vendor presets: the person's installed vendors first, then the shipped ones."""
+    return [d for d in [Path(config_dir) / "system", *profile_dirs(app)] if d.is_dir()]
+
+
+def selection(conf: dict) -> dict:
+    """The presets chosen in OrcaSlicer. The printer is under "presets"; its process and filament
+    are in that printer's "orca_presets" entry (older versions kept them under "presets" too)."""
+    presets = conf.get("presets") if isinstance(conf.get("presets"), dict) else {}
+    machine = presets.get("machine") or ""
+    mine = {}
+    for entry in conf.get("orca_presets") or []:
+        if isinstance(entry, dict) and entry.get("machine") == machine:
+            mine = entry
+            break
+    filaments = presets.get("filaments") if isinstance(presets.get("filaments"), list) else []
+    return {"machine": machine,
+            "process": mine.get("process") or presets.get("process") or "",
+            "filament": mine.get("filament") or (filaments[0] if filaments else "") or ""}
+
+
 FAMILY = _bbl.Family(kind="orca", label=LABEL, conf_name="OrcaSlicer.conf", version_re=r"OrcaSlicer-([\d.]+)",
-                     table="orca", deep_search=True, parse_header=parse_gcode_header)
+                     table="orca", deep_search=True, parse_header=parse_gcode_header,
+                     cache_dirs=cache_dirs, selection=selection)
 
 
 def _settings(cfg: dict) -> dict:
