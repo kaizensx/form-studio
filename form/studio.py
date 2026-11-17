@@ -1353,13 +1353,19 @@ class Studio:
         self._locks.pop(pid, None)
         self._layers_cache.clear()
         # conversations about this design stay, but no longer point at a project that is gone
-        detached = 0
+        detached, missed = 0, []
+        from .conversations import Conversations
+        store = Conversations(self.root)              # shares the chat service's lock on the same folder
         try:
-            from .conversations import Conversations
-            store = Conversations(self.root)
-            for m in store.list(project=pid, limit=100000):
+            metas = store.list(project=pid, limit=100000)
+        except Exception as e:                        # the project is in the trash either way; say what was not done
+            metas, missed = [], [f"list: {type(e).__name__}: {e}"]
+        for m in metas:
+            try:
                 store.update(m["id"], project=None, project_was={"id": pid, "name": name})
                 detached += 1
-        except Exception:
-            pass                                     # the project is in the trash either way
-        return {"ok": True, "id": pid, "trash": str(dest), "conversations_detached": detached}
+            except Exception as e:
+                missed.append(f"{m['id']}: {type(e).__name__}: {e}")
+        if missed:
+            self.activity(None, "warning", f"{len(missed)} conversation(s) still name the deleted design {name}.", by="FORM")
+        return {"ok": True, "id": pid, "trash": str(dest), "conversations_detached": detached, "conversations_missed": missed}

@@ -61,3 +61,29 @@ class Replace(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConversationReadsOnWindows(unittest.TestCase):
+    """Found on a Windows runner: deleting a design left its conversation pointing at it."""
+
+    def test_one_lock_per_folder_across_objects(self):
+        from form.conversations import Conversations
+        root = Path(tempfile.mkdtemp(prefix="form-conv-lock-"))
+        self.assertIs(Conversations(root)._lock, Conversations(root)._lock)
+        self.assertIsNot(Conversations(root)._lock, Conversations(Path(tempfile.mkdtemp()))._lock)
+
+    def test_a_busy_read_is_retried(self):
+        from form.conversations import Conversations
+        store = Conversations(Path(tempfile.mkdtemp(prefix="form-conv-read-")))
+        m = store.create(project="p")
+        real, calls = Path.read_text, []
+
+        def busy(self, *a, **k):
+            if self.name == "meta.json":
+                calls.append(1)
+                if len(calls) < 3:
+                    raise PermissionError(13, "busy")
+            return real(self, *a, **k)
+        with mock.patch.object(Path, "read_text", busy):
+            self.assertEqual(store.meta(m["id"])["project"], "p")
+        self.assertEqual(len(calls), 3)

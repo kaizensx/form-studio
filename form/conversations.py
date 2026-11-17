@@ -58,10 +58,23 @@ def kind_of(name: str) -> str:
     return "image" if ext in IMAGE_EXT else "pdf" if ext in PDF_EXT else "cad" if ext in CAD_EXT else "file"
 
 
+_LOCKS: dict[str, threading.RLock] = {}
+_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_for(root: Path) -> threading.RLock:
+    """One lock per conversations folder, shared by every Conversations object in the process. The chat service and
+    the engine (deleting a design detaches its conversations) each make their own object; with separate locks a read
+    could meet a half-done write, which on Windows fails instead of waiting."""
+    key = str(Path(root).resolve())
+    with _LOCKS_GUARD:
+        return _LOCKS.setdefault(key, threading.RLock())
+
+
 class Conversations:
     def __init__(self, root: Path):
         self.root = Path(root) / ".conversations"
-        self._lock = threading.RLock()
+        self._lock = _lock_for(self.root)
 
     # -- paths ---------------------------------------------------------------
     def dir(self, cid: str) -> Path:
@@ -77,10 +90,14 @@ class Conversations:
     # -- meta ----------------------------------------------------------------
     def _read(self, cid: str) -> dict:
         f = self.dir(cid) / "meta.json"
-        try:
-            return json.loads(f.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            raise ConversationError("Unknown conversation.")
+        for attempt in range(20):                 # Windows: a file being replaced can refuse a read for a moment
+            try:
+                return json.loads(f.read_text(encoding="utf-8"))
+            except PermissionError:
+                time.sleep(0.02 * (attempt + 1))
+            except (OSError, ValueError):
+                break
+        raise ConversationError("Unknown conversation.")
 
     def _write(self, meta: dict) -> dict:
         d = self.dir(meta["id"])
