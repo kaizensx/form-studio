@@ -411,6 +411,21 @@ def make_handler(st: Studio):
             if not m:
                 raise StudioError("Not found.", status=404)
             pid, action = m.groups()
+            # -- project housekeeping: rename, duplicate, delete (app shell). Before the load below, so a project
+            #    whose state file is unreadable can still be moved to the trash. --
+            if action in ("rename", "duplicate", "delete"):
+                body = body if isinstance(body, dict) else {}
+                if action == "rename":
+                    row = st.rename_project(pid, body.get("name"))
+                    st.activity(pid, "project", f"Renamed to “{row['name']}”.", by="you")
+                    return self._json(row)
+                if action == "duplicate":
+                    row = st.duplicate_project(pid, body.get("name"))
+                    st.activity(row["id"], "project", f"Copied from {pid} as “{row['name']}”.", by="you")
+                    return self._json(row)
+                res = st.delete_project(pid)
+                st.activity(None, "project", f"Moved {pid} to the trash folder.", by="you")
+                return self._json(res)
             p = st.load(pid)
             recipe = st.recipe(p)
             auto = lambda proj: st.run(pid) if proj.get("auto_run", True) else None

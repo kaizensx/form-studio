@@ -34,6 +34,9 @@
   form share <project> [--out card.png] [--photo]      1600 x 900 share card of the head revision
   form history <project> [--gif out.gif]               revisions (who, when, stamp); --gif animates them (.gif or .webp)
   form mark <project> --text "LABEL"                    label text for designs with a Label parameter
+  form rename <project> <name>                          change the display name (the id stays)
+  form duplicate <project> [--name N]                   copy a project under a new id; the copy is not approved
+  form delete <project> --yes                           move a project to .trash inside the projects folder
 """
 from __future__ import annotations
 
@@ -208,6 +211,15 @@ def main(argv=None):
     mk = sub.add_parser("mark", help="label text for designs with marks")
     mk.add_argument("project")
     mk.add_argument("--text", required=True)
+    rn = sub.add_parser("rename", help="change a project's display name (the id stays)")
+    rn.add_argument("project")
+    rn.add_argument("name")
+    du = sub.add_parser("duplicate", help="copy a project under a new id; the copy is not approved")
+    du.add_argument("project")
+    du.add_argument("--name")
+    de = sub.add_parser("delete", help="move a project to .trash inside the projects folder (needs --yes)")
+    de.add_argument("project")
+    de.add_argument("--yes", action="store_true", help="really move it to the trash")
     a = ap.parse_args(argv)
 
     if a.cmd in (None, "serve"):
@@ -394,6 +406,16 @@ def main(argv=None):
             p = st.settings(st.load(a.project), {"mark_text": a.text})
             _print({"project": p["id"], "label_text": p.get("mark_text") or p["name"],
                     "note": "Used by designs with a Label parameter. Outputs for such a revision are stale until you run the pipeline."})
+        elif a.cmd == "rename":
+            _print(st.rename_project(a.project, a.name))
+        elif a.cmd == "duplicate":
+            _print(st.duplicate_project(a.project, a.name))
+        elif a.cmd == "delete":
+            if not a.yes:
+                st.load(a.project)                              # an unknown project is reported as such
+                raise StudioError(f"Nothing was deleted. “{a.project}” would be moved to {st.root / '.trash'}.",
+                                  f"Run it again with --yes: form delete {a.project} --yes")
+            _print(st.delete_project(a.project))
     except StudioError as e:
         _print({"error": e.public()})
         return 2

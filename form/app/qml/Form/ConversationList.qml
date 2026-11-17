@@ -41,11 +41,10 @@ Item {
             onAccepted: function () { var l = cl.here.concat(cl.rest); if (l.length) { Store.openConv(l[0].id); cl.chosen() } } }
         Item { visible: !cl.compact; width: 1; height: 4 }
         // new conversation
-        Rectangle { visible: !cl.compact; width: parent.width; height: 34; radius: Theme.rSm; color: nm.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
+        Rectangle { visible: !cl.compact; width: parent.width; height: 34; radius: Theme.rSm; color: nm.pressed ? Theme.washPress : nm.containsMouse ? Theme.washHover : "transparent"
             Icon { x: 8; name: "plus"; size: 14; anchors.verticalCenter: parent.verticalCenter; color: Theme.datum }
-            Txt { x: 30; text: "New conversation"; anchors.verticalCenter: parent.verticalCenter; font.weight: 550 }
-            Txt { anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 11; tone: 4
-                text: Qt.platform.os === "osx" ? "⇧⌘O" : "Ctrl Shift O" }
+            Txt { x: 30; text: "New conversation"; anchors.verticalCenter: parent.verticalCenter; font.weight: Theme.wMedium }
+            Kbd { keys: "Ctrl+Shift+O"; quiet: true; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter }
             MouseArea { id: nm; anchors.fill: parent; hoverEnabled: true; onClicked: { Store.newChat(); cl.chosen() } } }
 
         Item { visible: cl.here.length > 0; width: parent.width; height: 28; Txt { kind: "cap"; x: 8; y: 12; text: "This design" } }
@@ -67,7 +66,7 @@ Item {
             readonly property bool asking: cl.confirming === c.id
             readonly property bool editing: cl.renaming === c.id
             width: col.width; height: 44; radius: Theme.rSm
-            color: asking ? Theme.alpha(Theme.signal, 0.09) : current ? Theme.plate4 : rm.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : "transparent"
+            color: asking ? Theme.alpha(Theme.signal, 0.09) : current ? Theme.washOn : rm.pressed ? Theme.washPress : rm.containsMouse ? Theme.washHover : "transparent"
             MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true
                 onClicked: { if (!row.asking && !row.editing) { Store.openConv(row.c.id); cl.chosen() } } }
             // normal

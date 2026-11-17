@@ -26,7 +26,40 @@ FORM_DATA=... .venv/bin/python -m form.app --shot out.png --project ID --eval 'S
 - Panels are a `Column { width: parent ? parent.width : 0 }` of `Sec` groups; the inspector is 360 px wide inside its padding.
 - Numbers use `Txt { mono: true }`. Text wraps by default; add `wrapMode: Text.NoWrap; elide: Text.ElideRight` for single lines.
 - Inside `Repeater` delegates declare `required property var modelData` (and `required property int index` if used).
-- Animate only `opacity`, `scale`, `x`/`y`, colour. 120–320 ms, `Easing.OutCubic`. Nothing that is used all day animates.
+- Animate only `opacity`, `scale`, `x`/`y`, colour, and only with the motion tokens below. Nothing that is used all day
+  animates (the palette, keyboard actions, tab switches made from the keyboard).
+- Every interactive element has hover, pressed, keyboard-focus (`FocusRing`) and disabled states. Use the shared controls
+  and you get them; a hand-made `Rectangle` + `MouseArea` owes all four (`Theme.washHover / washPress / washOn`).
+- New components must be added to `qmldir` if `Main.qml` uses them (files inside `Form/` see each other without it).
+
+## Design tokens (`Theme.qml`)
+
+| Group | Tokens |
+|---|---|
+| Surfaces, low to high | `well` (inputs) `plate` (the bench) `plate1` (panels) `plate2` (cards, sheets) `plate3` (menus, buttons) `plate4` |
+| Ink | `ink` `ink2` `ink3` `ink4` (primary … muted) |
+| Edges | `rule` 7 % · `rule2` 12 % · `rule3` 20 % (hovered or raised) · `focus` (keyboard ring). Low-opacity white, never a solid grey |
+| Washes over any plate | `washHover` `washPress` `washOn` (selected) · `scrim` behind sheets |
+| Meaning | `datum` (+ `datumHi`, `datumInk`) `blueprint` `amber` `signal` `pass` `clay`; `Theme.evidence(kind)` |
+| Type | `tCap 10` `tFine 11` `tBody 13` `tLead 15` `tH3 18` `tH2 22` `tH1 30` `tHero 44` · weights `wBody 420` `wMedium 520` `wSemi 620` `wBold 700` |
+| Radii | `rXs 4` `rSm 6` `rMd 9` `rLg 14` `rXl 18`. Nested radii are concentric: inner = outer − padding |
+| Control heights | `hSm 24` `hMd 28` `hLg 34` |
+| Sheet widths | `sheetS 480` `sheetM 640` `sheetL 840` `sheetXl 1080` |
+| Motion | `press 110` (a control answering) · `fast 120` (hover, colour) · `pop 150` (menus, tooltips) · `base 180` (sheets, toasts) · `exit 110` (anything leaving) · `slow 320` (entrances) · `stagger 45` |
+| Easing (bezier points) | `easeOut` entering and answering · `easeMove` moving on screen · `easeDrawer` sliding panels |
+
+`Theme.reduced` is read once at start from the OS "reduce motion" setting (or `FORM_REDUCED_MOTION=1`). Write movement so
+it disappears when it is set: `Theme.move(ms)` → 0, `Theme.shift(px)` → 0, `Theme.from(scale)` → 1. Opacity and colour
+still animate. Use the presets instead of spelling the curve out:
+
+```qml
+Behavior on scale { Glide { duration: Theme.press } }          // Glide = NumberAnimation with easeOut
+Behavior on color { Tint {} }                                   // Tint  = ColorAnimation, Theme.fast
+scale: pressed ? Theme.from(0.97) : 1                           // never from 0; never ease-in
+```
+
+Shortcuts are written the Qt way everywhere (`"Ctrl+Shift+O"`) and shown the platform's way by `Kbd` and
+`Theme.keyText(seq)` (⇧⌘O on macOS).
 
 ## Components (all in the `Form` module; files in the same folder see each other without imports)
 
@@ -34,21 +67,27 @@ FORM_DATA=... .venv/bin/python -m form.app --shot out.png --project ID --eval 'S
 |---|---|
 | `Txt { kind; mono; tone }` | all text. kind: `body fine cap lead h3 h2 h1 hero`. tone 1–4 = primary…muted |
 | `Icon { name; size; color }` | Lucide glyph; names are in `Icons.qml` (underscores: `"arrow_left"`) |
-| `Btn { text; icon; kind; small; active; tip; onClicked }` | kind: `default primary quiet danger` |
+| `Btn { text; icon; kind; small; large; active; busy; tip; keys; onClicked }` | kind: `default primary quiet danger`. `busy` shows a spinner and ignores presses; `keys: "Ctrl+K"` adds the shortcut to the tooltip. Tab reaches it, Space/Enter press it |
 | `Tag { text; kind }` | evidence / status chip; colour from `Theme.evidence(kind)` |
 | `Sec { title; note; tag }` | titled group; children stack in a column, spacing 8 |
 | `Cap { text; note; tag }` | caption line |
 | `KV { k; sub; value; tag; first }` | key/value row; children go on the right instead of `value` |
 | `Delta { label; from; to; unit; tint }` | a change, from → to |
 | `Note { kind; title; text }` | kind: `plain amber red green blue`; children allowed |
-| `Field { text; placeholder; numeric; unit; onAccepted(text); onEdited(text) }` | one-line input |
+| `Field { text; placeholder; numeric; unit; error; busy; bare; onAccepted(text); onEdited(text) }` | one-line input. `error: "Why it is wrong"` turns the edge red and shows the sentence under it; `bare` drops the well (palette) |
 | `Area { text; placeholder; minLines; submitOnEnter; onSubmit(text); onBlurred(text) }` | multi-line input |
 | `Beam { from; to; step; value; base; tint; onMoved(value) }` | slider |
-| `Pick { model:[{value,text}]; value; onPicked(value) }` | dropdown |
-| `Seg { model; value; onPicked(value) }` | segmented control |
-| `Check { checked; onToggled(checked) }` | checkbox |
+| `Pick { model:[{value,text}]; value; onPicked(value) }` | dropdown (keyboard: Space/Down opens, arrows, Enter) |
+| `Seg { model; value; onPicked(value) }` | segmented control: a choice among a few options inside a panel |
+| `Tabs { model:[{value,text,badge?}]; value; onPicked(value) }` | sections of a sheet or panel; the marker slides. Do not use `Seg` as tabs |
+| `Check { checked; onToggled(checked) }` | checkbox: a choice confirmed later by a button |
+| `Toggle { checked; onToggled(checked) }` | on/off switch: a setting that applies at once |
+| `Pop { origin; … }` | a popover (`QtQuick.Controls.Popup`): grows from `origin` (`Popup.TopLeft`, `Popup.BottomLeft` …), shadow, Esc closes |
+| `PopMenu { model:[{text,icon?,keys?,danger?,enabled?,checked?,run()} \| {sep:true}] }` | a menu; `open()` or `openAt(item, x, y)` for a right-click. Arrows, Enter, Esc |
+| `Kbd { keys: "Ctrl+K"; quiet }` | shortcut hint as key caps |
+| `Spinner { size; color }` · `Shadow { radius }` · `FocusRing { on; radius }` | indeterminate progress · drop shadow for a floating surface · keyboard focus ring |
 | `ParamRow { p; prov }` | a recipe parameter bound to the draft; `prov: true` adds source and ±σ |
-| `Tip { text; show }` | tooltip, put inside the hovered item |
+| `Tip { text; keys; show }` | tooltip, put inside the hovered item. After one has shown, its neighbours open without delay |
 | `Viewport`, `MiniView { projectId; turning }` | 3D |
 
 `import "F.js" as F` gives `F.fmt(v, d)`, `F.trim(v, d)`, `F.pad(rev)` → `r04`, `F.dur(seconds)`, `F.ago(ts)`, `F.keys(o)`, `F.vals(o)`, `F.plural(n, word)`.
@@ -73,5 +112,40 @@ Actions: `refresh(withView)`, `setParam(key, value, immediate)`, `setProv(key, {
 `setStage(id)`, `setView(name)`, `setSection(axis, t)`, `setAck(id, on)`, `compareWith(n)`, `marker(check)`, `showLayers(on)`, `setLayer(n)`,
 `openSheet(kind, props)` / `openSheet(null)`, `toast(msg, hint, bad)`, `spec(key)`, `featureById(id)`, `revision(n)`, `reloadStudio()`.
 
-A sheet is a `Column` with `property string title` and `property int sheetWidth`; register its file name in `SheetHost.qml`'s `files` map.
+More shell state: `Store.talkWidth`, `Store.showImage(url, caption, note)` (the lightbox), `Store.renameProject(id, name)`,
+`Store.duplicateProject(id)`, `Store.deleteProject(id)` (moves it to `.trash` in the projects folder).
+
+## Sheets
+
+A sheet is a `Column` in its own file, registered in `SheetHost.qml`'s `files` map and opened with `Store.openSheet(kind, props)`.
+The host draws the header, the padding, the scrolling body with soft edges, and the action bar, so a sheet declares only:
+
+```qml
+Column {
+    id: sh
+    property string title: "Share card"
+    property string note: "1600 × 900 PNG of r04"            // optional line under the title
+    property int sheetWidth: Theme.sheetL                    // sheetS | sheetM | sheetL | sheetXl, nothing else
+    readonly property var tabs: [{ value: "a", text: "First" }, { value: "b", text: "Second" }]   // optional; the host renders them
+    property string tab: "a"
+    property int sheetHeight: 520                            // optional: fixed body height so tabs do not make the card jump
+    property Item firstFocus: name.input                     // optional: what has the keyboard when it opens
+    function accept() { save() }                             // optional: Enter, when no field took it
+    property Component footerLeft: Row { Btn { kind: "quiet"; text: "Open the folder" } }       // secondary, or one status line
+    property Component footer: Row { spacing: 8              // primary LAST: it sits at the right edge
+        Btn { kind: "quiet"; text: "Cancel"; onClicked: Store.openSheet(null) }
+        Btn { kind: "primary"; text: "Save"; busy: sh.saving; onClicked: sh.accept() } }
+    spacing: 14                                              // no bottomPadding: the host pads
+    …
+}
+```
+
+Esc closes; Tab and Shift+Tab stay inside the sheet; it enters at scale 0.97 → 1 with a fade in 180 ms and leaves in 110 ms.
+
+## The window
+
+`Main.qml` remembers the window's place and size, the agent column's width (drag its edge; double-click resets) and the
+recent palette commands, in the platform's settings store (`QtCore.Settings`). On macOS `MacMenu.qml` is the native menu
+bar; elsewhere the same actions are in the top bar's menu button. A new command should be added in three places: its
+button, `Palette.qml` (`add(group, id, icon, text, hint, run, keys)`), and `MacMenu.qml`.
 `Shape.qml`, `DraftCard.qml` and `ParamRow.qml` are the reference for style and density.

@@ -88,7 +88,7 @@ Rectangle {
         function onConvIdChanged() { talk.openGroups = ({}); feed.stick = true }
         function onChatFocusChanged() { ta.forceActiveFocus() }
         function onChatRecallChanged() { if (Store.chatRecall) { ta.text = Store.chatRecall; ta.cursorPosition = ta.text.length } } }
-    Shortcut { sequence: "Ctrl+Shift+O"; onActivated: Store.newChat() }
+
     FileDialog { id: pick; title: "Attach files"; fileMode: FileDialog.OpenFiles
         nameFilters: ["Images, PDFs, STEP and STL (*.png *.jpg *.jpeg *.webp *.gif *.bmp *.pdf *.step *.stp *.stl)"]
         onAccepted: Store.attachFiles(selectedFiles) }
@@ -98,25 +98,23 @@ Rectangle {
     Item {
         id: head; width: parent.width; height: 40; z: 3
         Item { id: sw; x: 8; width: parent.width - 16 - tools.width; height: 28; anchors.verticalCenter: parent.verticalCenter
-            Rectangle { anchors.fill: parent; radius: Theme.rSm; color: swm.containsMouse || list.opened ? Qt.rgba(1, 1, 1, 0.06) : "transparent" }
+            Rectangle { anchors.fill: parent; radius: Theme.rSm; color: swm.pressed ? Theme.washPress : swm.containsMouse || list.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
             Rectangle { id: sdot; x: 8; width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter
                 color: Store.chatBusy ? Theme.datum : Store.chatReady ? Theme.pass : Theme.ink4
                 SequentialAnimation on opacity { running: Store.chatBusy; loops: Animation.Infinite; alwaysRunToEnd: true
                     NumberAnimation { to: 0.3; duration: 600 } NumberAnimation { to: 1; duration: 600 } } }
-            Txt { id: ttl; x: 23; anchors.verticalCenter: parent.verticalCenter; font.weight: 600; wrapMode: Text.NoWrap; elide: Text.ElideRight
+            Txt { id: ttl; x: 23; anchors.verticalCenter: parent.verticalCenter; font.weight: Theme.wSemi; wrapMode: Text.NoWrap; elide: Text.ElideRight
                 width: Math.min(implicitWidth, parent.width - 23 - 22); text: Store.convTitle() }
             Icon { anchors.left: ttl.right; anchors.leftMargin: 4; name: "chevron_down"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
             MouseArea { id: swm; anchors.fill: parent; hoverEnabled: true; onClicked: list.opened ? list.close() : list.open() }
             Tip { show: swm.containsMouse && !list.opened; text: "Conversations" } }
         Row { id: tools; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 0
-            Btn { kind: "quiet"; small: true; icon: "message_square_plus"; tip: "New conversation (" + (Bridge.platform === "darwin" ? "⇧⌘O" : "Ctrl+Shift+O") + ")"
+            Btn { kind: "quiet"; icon: "message_square_plus"; tip: "New conversation"; keys: "Ctrl+Shift+O"
                 visible: !talk.empty || Store.convId !== ""; onClicked: Store.newChat() } }
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule }
-        Popup {
-            id: list; x: 8; y: head.height + 2; width: talk.width - 17; padding: 6; margins: 8
+        Pop {
+            id: list; x: 8; y: head.height + 2; width: Math.max(talk.width - 17, 320); padding: 6; origin: Popup.TopLeft
             height: Math.min(cl.implicitHeight + 12, talk.height - 90)
-            background: Rectangle { color: Theme.plate3; radius: Theme.rMd; border.color: Theme.rule2 }
-            enter: Transition { ParallelAnimation { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 140 } NumberAnimation { property: "scale"; from: 0.98; to: 1; duration: 140; easing.type: Easing.OutCubic } } }
             onOpened: { Store.loadConvs(); cl.reset() }
             Flickable { anchors.fill: parent; clip: true; contentHeight: cl.implicitHeight; boundsBehavior: Flickable.StopAtBounds
                 ScrollBar.vertical: ScrollBar { width: 6 }
@@ -128,10 +126,12 @@ Rectangle {
     Column {
         id: intro
         visible: talk.empty
-        x: 16; width: parent.width - 32; spacing: 10
-        anchors.top: head.bottom; anchors.topMargin: talk.hero ? 44 : 24
-        Txt { kind: talk.hero ? "h1" : "h3"; width: parent.width; text: talk.hero ? "What do you need\nto print?" : Store.project ? "Ask about this design,\nor describe a change." : "Describe a change,\nor a new part." }
-        Txt { tone: 2; width: parent.width; lineHeight: 1.35
+        x: talk.hero ? 28 : 16; width: parent.width - 2 * x; spacing: talk.hero ? 14 : 10
+        anchors.top: head.bottom; anchors.topMargin: talk.hero ? Math.max(36, Math.min(84, talk.height * 0.09)) : 24
+        Txt { kind: talk.hero ? "h1" : "h3"; width: parent.width; lineHeight: 1.08; font.weight: Theme.wSemi
+            font.pixelSize: talk.hero ? (talk.width >= 420 ? 34 : 30) : Theme.tH3
+            text: talk.hero ? "What do you need\nto print?" : Store.project ? "Ask about this design,\nor describe a change." : "Describe a change,\nor a new part." }
+        Txt { tone: 2; width: parent.width; lineHeight: 1.4
             text: talk.hero ? "Describe it. The agent designs it in a real CAD kernel while you watch, with checks, a fit model and a real slice. Nothing prints or uploads."
                             : "The agent works on the design with FORM's tools. Changes arrive as a draft or a new revision you can compare and undo." }
         Note { visible: !Store.chat.available && !!Store.studio; kind: "amber"; title: "No agent is connected"
@@ -147,7 +147,7 @@ Rectangle {
         contentHeight: sc.implicitHeight + 20; clip: true; boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { width: 6 }
         Column {
-            id: sc; x: 16; width: parent.width - 32; spacing: 6
+            id: sc; x: talk.hero ? 28 : 16; width: parent.width - 2 * x; spacing: 6
             Repeater {
                 model: !Store.chat.available ? [] : Store.project ? talk.forProject : talk.ideas.map(function (t) { return { label: t, prompt: t } })
                 Rectangle {
@@ -155,10 +155,18 @@ Rectangle {
                     required property var modelData
                     required property int index
                     width: sc.width; height: 34; radius: Theme.rMd
-                    color: im.containsMouse ? Theme.plate3 : Theme.plate2; border.color: Theme.rule
-                    Behavior on color { ColorAnimation { duration: Theme.fast } }
+                    color: im.pressed ? Theme.plate1 : im.containsMouse ? Theme.plate3 : Theme.plate2; border.color: im.containsMouse ? Theme.rule2 : Theme.rule
+                    scale: im.pressed ? Theme.from(0.985) : 1
+                    Behavior on scale { Glide { duration: Theme.press } }
+                    Behavior on color { Tint {} }
+                    // each suggestion arrives a beat after the one above
+                    opacity: 0; Component.onCompleted: arrive.start()
+                    SequentialAnimation { id: arrive; PauseAnimation { duration: 80 + idea.index * Theme.stagger }
+                        ParallelAnimation { Glide { target: idea; property: "opacity"; to: 1; duration: Theme.slow } Glide { target: slide; property: "y"; from: Theme.shift(6); to: 0; duration: Theme.slow } } }
+                    transform: Translate { id: slide }
                     Txt { x: 12; width: parent.width - 40; text: idea.modelData.label; anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: im.containsMouse ? 1 : 2 }
-                    Icon { name: "arrow_right"; size: 13; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; color: im.containsMouse ? Theme.datum : Theme.ink4 }
+                    Icon { name: "arrow_right"; size: 13; anchors.right: parent.right; anchors.rightMargin: im.containsMouse ? 8 : 10; anchors.verticalCenter: parent.verticalCenter; color: im.containsMouse ? Theme.datum : Theme.ink4
+                        Behavior on anchors.rightMargin { Glide { duration: Theme.fast } } }
                     MouseArea { id: im; anchors.fill: parent; hoverEnabled: true
                         onClicked: idea.modelData.review ? Store.askReview() : Store.send(idea.modelData.prompt) }
                 }
@@ -169,7 +177,8 @@ Rectangle {
             Flow { visible: !Store.project && talk.presets.length > 0; width: sc.width; spacing: 6
                 Repeater { model: Store.project ? [] : talk.presets
                     Rectangle { id: pc; required property var modelData
-                        width: pt.implicitWidth + 20; height: 26; radius: 13; color: pm.containsMouse ? Theme.plate3 : "transparent"; border.color: Theme.rule2
+                        width: pt.implicitWidth + 20; height: 26; radius: 13; color: pm.pressed ? Theme.plate1 : pm.containsMouse ? Theme.plate3 : "transparent"; border.color: pm.containsMouse ? Theme.rule3 : Theme.rule2
+                        Behavior on color { Tint {} }
                         Txt { id: pt; anchors.centerIn: parent; font.pixelSize: 12; tone: pm.containsMouse ? 1 : 2; text: pc.modelData.title }
                         MouseArea { id: pm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSheet("new", { tab: "brief", preset: pc.modelData.id }) }
                         Tip { show: pm.containsMouse; text: pc.modelData.summary } } } }
@@ -191,7 +200,7 @@ Rectangle {
         property bool auto: false
         visible: !talk.empty
         anchors.top: head.bottom; anchors.bottom: foot.top; anchors.left: parent.left; anchors.right: parent.right
-        topMargin: 14; bottomMargin: 10; clip: true; spacing: 10
+        topMargin: 16; bottomMargin: 12; clip: true; spacing: 14
         boundsBehavior: Flickable.StopAtBounds
         model: blocks
         function toEnd() { if (!stick) return; auto = true; positionViewAtEnd(); auto = false }
@@ -209,31 +218,33 @@ Rectangle {
             Loader { id: body; x: 16; width: parent.width - 32
                 sourceComponent: it.m.t === "user" ? cUser : it.m.t === "text" ? cText : it.m.t === "steps" ? cSteps : it.m.t === "act" ? cAct : it.m.t === "end" ? cEnd : cErr }
             // actions on hover: copy, and for your own message, edit and send again
-            Rectangle { visible: (hh.hovered || cb.hovered || eb.hovered) && (it.m.t === "user" || it.m.t === "text") && !it.m.local
-                z: 2; anchors.right: parent.right; anchors.rightMargin: 14; y: it.m.t === "user" ? it.height - 6 : -8
-                width: ar.implicitWidth + 4; height: 26; radius: Theme.rSm; color: Theme.plate3; border.color: Theme.rule2
+            Rectangle { readonly property bool want: (hh.hovered || cb.hovered || eb.hovered) && (it.m.t === "user" || it.m.t === "text") && !it.m.local
+                opacity: want ? 1 : 0; visible: opacity > 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } }
+                z: 2; anchors.right: parent.right; anchors.rightMargin: 14; y: it.m.t === "user" ? it.height - 6 : -10
+                width: ar.implicitWidth + 4; height: 26; radius: Theme.rSm + 1; color: Theme.plate3; border.color: Theme.rule2
                 Row { id: ar; anchors.centerIn: parent
                     Btn { id: cb; small: true; kind: "quiet"; icon: "copy"; tip: "Copy"; onClicked: { Bridge.copy(it.m.text); Store.toast("Copied") } }
                     Btn { id: eb; small: true; kind: "quiet"; icon: "pencil"; tip: "Edit and send again"; visible: it.m.t === "user"; onClicked: Store.recallChat(it.m.text) } } }
 
             Component { id: cUser; Item { implicitHeight: ub.height
-                Rectangle { id: ub; anchors.right: parent.right; radius: Theme.rLg; color: Theme.plate3; opacity: it.m.local ? 0.7 : 1
-                    width: Math.min(parent.width - 28, Math.max(ut.implicitWidth, af.visible ? af.implicitWidth : 0) + 22)
-                    height: uc.implicitHeight + 16
-                    Column { id: uc; x: 11; y: 8; width: parent.width - 22; spacing: 8
+                Rectangle { id: ub; anchors.right: parent.right; radius: Theme.rLg; color: Theme.plate3; border.color: Theme.rule; opacity: it.m.local ? 0.7 : 1
+                    width: Math.min(parent.width - 28, Math.max(ut.implicitWidth, af.visible ? af.implicitWidth : 0) + 26)
+                    height: uc.implicitHeight + 18
+                    Column { id: uc; x: 13; y: 9; width: parent.width - 26; spacing: 8
                         Flow { id: af; visible: it.m.attachments.length > 0; width: body.width - 50; spacing: 6
                             Repeater { model: it.m.attachments
                                 Rectangle { id: ach; required property var modelData
                                     readonly property bool pic: modelData.kind === "image"
-                                    width: pic ? 64 : acl.implicitWidth + 34; height: pic ? 64 : 26; radius: Theme.rSm; color: Theme.plate1; border.color: Theme.rule; clip: true
+                                    width: pic ? 64 : acl.implicitWidth + 34; height: pic ? 64 : 26; radius: Theme.rSm; color: Theme.plate1; border.color: ah.hovered && pic ? Theme.rule3 : Theme.rule; clip: true
+                                    TapHandler { enabled: ach.pic; onTapped: Store.showImage(Store.attachmentUrl(ach.modelData.file), ach.modelData.name, "Attached to this message") }
                                     Image { visible: ach.pic; anchors.fill: parent; anchors.margins: 1; fillMode: Image.PreserveAspectCrop; asynchronous: true; sourceSize.width: 160
                                         source: ach.pic && Store.convId ? Store.attachmentUrl(ach.modelData.file) : "" }
                                     Icon { visible: !ach.pic; x: 8; size: 13; anchors.verticalCenter: parent.verticalCenter; name: ach.modelData.kind === "cad" ? "box" : "file_text" }
                                     Txt { id: acl; visible: !ach.pic; x: 26; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; wrapMode: Text.NoWrap; text: ach.modelData.name }
                                     HoverHandler { id: ah }
                                     Tip { show: ah.hovered; text: ach.modelData.name } } } }
-                        Txt { id: ut; width: Math.min(implicitWidth, body.width - 50); text: it.m.text; lineHeight: 1.3 } } } } }
-            Component { id: cText; Txt { text: it.m.text; textFormat: Text.MarkdownText; width: body.width; lineHeight: 1.35; color: Theme.ink
+                        Txt { id: ut; width: Math.min(implicitWidth, body.width - 54); text: it.m.text; lineHeight: 1.4 } } } } }
+            Component { id: cText; Txt { text: it.m.text; textFormat: Text.MarkdownText; width: body.width; lineHeight: 1.45; color: Theme.ink
                 linkColor: Theme.datum; onLinkActivated: function (l) { Bridge.openLink(l) } } }
             Component { id: cSteps; TalkSteps { width: body.width; steps: it.m.steps; running: !!it.m.running
                 expanded: !!talk.openGroups[it.k]
@@ -253,10 +264,13 @@ Rectangle {
                 Btn { visible: !!it.m.last; small: true; icon: "rotate_cw"; text: "Retry"; onClicked: Store.retryChat() } } }
         }
         // what is being written right now
-        footer: Item { width: feed.width; visible: Store.chatBusy; height: Store.chatBusy ? lc.implicitHeight + 16 : 0
-            Column { id: lc; x: 16; y: 8; width: parent.width - 32; spacing: 8
-                Txt { visible: !!Store.chatLive && Store.chatLive.kind === "text" && Store.chatLive.text !== ""
-                    text: Store.chatLive ? Store.chatLive.text : ""; textFormat: Text.MarkdownText; width: parent.width; lineHeight: 1.35; color: Theme.ink }
+        footer: Item { width: feed.width; visible: Store.chatBusy; height: Store.chatBusy ? lc.implicitHeight + 18 : 0
+            Column { id: lc; x: 16; y: 10; width: parent.width - 32; spacing: 10
+                // the reply as it is written: the block grows smoothly instead of jumping a line at a time
+                Item { visible: !!Store.chatLive && Store.chatLive.kind === "text" && Store.chatLive.text !== ""; width: parent.width; clip: true
+                    height: visible ? lt.implicitHeight : 0
+                    Behavior on height { enabled: Store.chatBusy; NumberAnimation { duration: Theme.move(140); easing.type: Easing.OutQuad } }
+                    Txt { id: lt; text: Store.chatLive && Store.chatLive.text ? Store.chatLive.text : ""; textFormat: Text.MarkdownText; width: parent.width; lineHeight: 1.45; color: Theme.ink } }
                 Row { spacing: 8
                     Row { spacing: 3; anchors.verticalCenter: parent.verticalCenter
                         Repeater { model: 3
@@ -272,9 +286,12 @@ Rectangle {
         id: foot; width: parent.width; height: comp.height + 36; z: 2
         y: talk.landing ? intro.y + intro.height + 8 : talk.height - height
         Rectangle {
-            id: comp; x: 12; y: 8; width: parent.width - 24; height: inner.implicitHeight; radius: Theme.rLg
-            color: Theme.well; border.width: 1; border.color: ta.activeFocus ? Theme.datum : Theme.rule2
-            Behavior on border.color { ColorAnimation { duration: Theme.fast } }
+            id: comp; x: talk.hero ? 22 : 12; y: 8; width: parent.width - 2 * x; height: inner.implicitHeight; radius: Theme.rLg
+            color: Theme.well; border.width: 1; border.color: ta.activeFocus ? Theme.alpha(Theme.datum, 0.7) : ch.hovered ? Theme.rule3 : Theme.rule2
+            Behavior on border.color { Tint {} }
+            HoverHandler { id: ch }
+            Rectangle { anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3; border.color: Theme.alpha(Theme.datum, 0.13)
+                opacity: ta.activeFocus ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
             Column {
                 id: inner; width: parent.width
                 // files that go with the next message
@@ -294,7 +311,8 @@ Rectangle {
                                     onClicked: Store.dropAttachment(chip.modelData.id) } } } } }
                 ScrollView {
                     width: parent.width; clip: true
-                    height: Math.min(200, Math.max((talk.hero ? 3 : 2) * 19 + 18, ta.implicitHeight))
+                    height: Math.min(220, Math.max((talk.hero ? 3 : 2) * 19 + 18, ta.implicitHeight))
+                    Behavior on height { NumberAnimation { duration: Theme.move(Theme.fast); easing.type: Easing.OutQuad } }
                     TextArea {
                         id: ta
                         // "Ask about this feature…" from the viewport's context menu lands here
@@ -320,34 +338,43 @@ Rectangle {
                             enabled: Store.chat.available; onClicked: pick.open() }
                         // agent and model for this conversation
                         Item { id: mchip; width: ml.width + 31; height: 24
-                            Rectangle { anchors.fill: parent; radius: Theme.rSm; color: mcm.containsMouse || mpop.opened ? Qt.rgba(1, 1, 1, 0.07) : "transparent" }
+                            Rectangle { anchors.fill: parent; radius: Theme.rSm; color: mcm.pressed ? Theme.washPress : mcm.containsMouse || mpop.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
                             Txt { id: ml; x: 7; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
                                 width: Math.min(implicitWidth, comp.width - 170); elide: Text.ElideRight
                                 text: Store.chatAgentLabel + " · " + Store.modelLabel(Store.chatAgent, Store.chatModel) + (Store.chatEffort ? " · " + Store.chatEffort : "") }
                             Icon { x: ml.width + 12; name: "chevron_down"; size: 12; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
                             MouseArea { id: mcm; anchors.fill: parent; hoverEnabled: true; onClicked: mpop.opened ? mpop.close() : mpop.open() }
                             Tip { show: mcm.containsMouse && !mpop.opened; text: "Agent and model for this conversation" }
-                            Popup {
-                                id: mpop; x: -34; width: Math.min(320, talk.width - 24); padding: 6; margins: 8
+                            Pop {
+                                id: mpop; x: -34; width: Math.min(320, talk.width - 24); padding: 6
                                 height: Math.min(mp.implicitHeight + 12, talk.height - 70)
                                 y: talk.landing ? mchip.height + 6 : -height - 6
-                                background: Rectangle { color: Theme.plate3; radius: Theme.rMd; border.color: Theme.rule2 }
-                                enter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 140 } }
+                                origin: talk.landing ? Popup.TopLeft : Popup.BottomLeft
                                 Flickable { anchors.fill: parent; clip: true; contentHeight: mp.implicitHeight; boundsBehavior: Flickable.StopAtBounds
                                     ScrollBar.vertical: ScrollBar { width: 6 }
                                     TalkModelPicker { id: mp; width: parent.width; onDone: mpop.close() } }
                             }
                         }
                     }
-                    Btn { visible: !Store.chatBusy; kind: "primary"; small: true; icon: "arrow_up"; tip: "Send (Enter)"
-                        anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; width: 30
-                        enabled: Store.chatReady && ta.text.trim() !== ""; onClicked: ta.submit() }
-                    Btn { visible: Store.chatBusy; small: true; icon: "square"; text: "Stop"; tip: "Stop this reply. What was already committed stays."
-                        anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.stopChat() }
+                    // send, or stop while a reply is being written: one round button in one place
+                    Rectangle { id: sendBtn
+                        readonly property bool can: Store.chatBusy || (Store.chatReady && ta.text.trim() !== "")
+                        anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
+                        width: 28; height: 28; radius: 14
+                        color: Store.chatBusy ? (sbm.containsMouse ? Theme.plate4 : Theme.plate3) : can ? (sbm.containsMouse ? Theme.datumHi : Theme.datum) : Theme.plate3
+                        border.width: Store.chatBusy ? 1 : 0; border.color: Theme.rule2
+                        scale: sbm.pressed && can ? Theme.from(0.92) : 1
+                        Behavior on scale { Glide { duration: Theme.press } }
+                        Behavior on color { Tint {} }
+                        Icon { anchors.centerIn: parent; size: Store.chatBusy ? 11 : 15; name: Store.chatBusy ? "square" : "arrow_up"
+                            color: Store.chatBusy ? Theme.ink : sendBtn.can ? Theme.datumInk : Theme.ink4 }
+                        MouseArea { id: sbm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.chatBusy ? Store.stopChat() : ta.submit() }
+                        Tip { show: sbm.containsMouse; keys: Store.chatBusy ? "" : "Return"
+                            text: Store.chatBusy ? "Stop this reply. What was already committed stays." : sendBtn.can ? "Send" : !Store.chatReady ? "No agent is connected" : "Write a message first" } }
                 }
             }
         }
-        Txt { kind: "fine"; x: 16; anchors.top: comp.bottom; anchors.topMargin: 7; width: parent.width - 32; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 4
+        Txt { kind: "fine"; x: talk.hero ? 28 : 16; anchors.top: comp.bottom; anchors.topMargin: 7; width: parent.width - 2 * x; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 4
             text: Store.chatBusy ? "Working. Other conversations can run meanwhile."
                 : Store.conv && Store.conv.messages ? "Enter sends · ↑ brings back your last message"
                 : "Enter sends · Shift+Enter for a new line · drop files to attach" }

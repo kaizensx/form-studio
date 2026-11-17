@@ -1264,3 +1264,88 @@ class Studio:
             self._layers_cache.clear()
             self._layers_cache[key] = slicer.parse_layers(self.apath(p, "slice", key) / meta["gcode"], meta.get("slicer_kind"))
         return self._layers_cache[key]
+
+    # ── project housekeeping: rename, duplicate, delete (app shell) ──────────────────────────────────────────
+    def _summary(self, pid: str) -> dict:
+        """One project as Studio.list() reports it."""
+        for row in self.list():
+            if row["id"] == pid:
+                return row
+        raise StudioError("Unknown project.", status=404)
+
+    @staticmethod
+    def _pid(p_or_id) -> str:
+        return p_or_id["id"] if isinstance(p_or_id, dict) else str(p_or_id or "")
+
+    @staticmethod
+    def _clean_name(name) -> str:
+        name = " ".join(str(name or "").split())
+        if not name:
+            raise StudioError("A project needs a name.", "Type a name of up to 80 characters.")
+        if len(name) > 80:
+            raise StudioError("That name is too long.", "Use 80 characters or fewer.")
+        return name
+
+    def rename_project(self, p_or_id, name) -> dict:
+        """Change the display name only. The id (and so the folder, links and releases) stays what it was."""
+        pid, name = self._pid(p_or_id), self._clean_name(name)
+        with self.lock(pid):
+            p = self.load(pid)
+            p["name"] = name
+            self.save(p)
+        return self._summary(pid)
+
+    def duplicate_project(self, p_or_id, name=None) -> dict:
+        """Copy a project (revisions, variants, built artifacts) under a new id derived from the new name.
+        The copy is not approved: approvals and release folders describe the original and are left out."""
+        src_id = self._pid(p_or_id)
+        with self.lock(src_id):
+            src = self.load(src_id)
+            if name is None or not str(name).strip():
+                name = str(src["name"])[:75] + " copy"
+            name = self._clean_name(name)
+            base = slugify(name)
+            pid, i = base, 2
+            while (self.root / pid).exists():
+                pid, i = f"{base}-{i}", i + 1
+            dest = self.root / pid
+            try:
+                shutil.copytree(self.dir(src_id), dest, ignore=shutil.ignore_patterns("*.tmp", "*.bak", "releases"))
+                p = json.loads((dest / "project.json").read_text(encoding="utf-8"))
+                had = len(p.get("approvals") or [])
+                p.update({"id": pid, "name": name, "created": time.time(), "approvals": []})
+                p.setdefault("decisions", []).append({
+                    "ts": time.time(), "rev": p["head"], "kind": "note",
+                    "text": f"Copied from “{src['name']}” ({src_id})."
+                            + (" Its approval and releases stay with the original; this copy is not approved." if had else "")})
+                self.save(p)
+            except (OSError, ValueError) as e:
+                shutil.rmtree(dest, ignore_errors=True)
+                raise StudioError(f"Could not copy the project: {e}",
+                                  "Check that the projects folder is writable and has free space.", status=500)
+        return self._summary(pid)
+
+    def delete_project(self, p_or_id) -> dict:
+        """Move the project folder to <data dir>/.trash/<id>-<UTC timestamp>. Nothing is erased: moving the folder
+        back restores the project."""
+        pid = self._pid(p_or_id)
+        d = self.dir(pid)
+        if not (d / "project.json").exists() and not (d / "project.json.bak").exists():
+            raise StudioError("Unknown project.", status=404)
+        if any(j.get("project") == pid and j.get("state") == "running" for j in list(self.jobs.values())):
+            raise StudioError("This project is still building.", "Wait for the pipeline to finish, then delete it.", status=409)
+        trash = self.root / ".trash"
+        stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        dest, i = trash / f"{pid}-{stamp}", 2
+        with self.lock(pid):
+            try:
+                trash.mkdir(parents=True, exist_ok=True)
+                while dest.exists():
+                    dest, i = trash / f"{pid}-{stamp}-{i}", i + 1
+                shutil.move(str(d), str(dest))
+            except OSError as e:
+                raise StudioError(f"Could not move the project to the trash: {e}",
+                                  "Close any program that has the project's files open and try again.", status=500)
+        self._locks.pop(pid, None)
+        self._layers_cache.clear()
+        return {"ok": True, "id": pid, "trash": str(dest)}

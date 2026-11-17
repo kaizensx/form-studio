@@ -7,16 +7,20 @@ import "F.js" as F
 Column {
     id: vs
     property string title: "Variants"
-    property int sheetWidth: 1180
-    spacing: 14; bottomPadding: 22
+    property string note: "The head and every named variant, each built by the kernel"
+    property int sheetWidth: Theme.sheetXl
+    property Item firstFocus: nameField.input
+    spacing: 16
 
     property var board: null             // engine reply: { head, cards, differs, note }
     property var error: null
     property bool busy: false
+    property bool nameMissing: false
     readonly property var cards: board ? board.cards : []
     readonly property var differs: board ? board.differs : []
-    readonly property int cols: Math.max(2, Math.min(4, cards.length))
-    readonly property real cardW: Math.floor((width - (cols - 1) * 12) / cols)
+    readonly property int cols: Math.max(2, Math.min(3, cards.length))
+    readonly property int gap: 12
+    readonly property real cardW: Math.floor((width - (cols - 1) * gap) / cols)
     // one camera distance for every card, so sizes compare honestly
     readonly property real frame: Math.max.apply(null, cards.map(function (c) {
         var b = c.metrics ? c.metrics.bbox_mm : null
@@ -31,45 +35,69 @@ Column {
     }
     function save() {
         var n = nameField.text.trim()
-        if (!n) { Store.toast("Give the variant a name", "For example “Travel version” or “Thick walls”.", true); return }
+        if (!n) { nameMissing = true; nameField.input.forceActiveFocus(); Store.toast("Give the variant a name", "For example “Travel version” or “Thick walls”.", true); return }
         var p = Store.saveVariant(n, fromDraft ? draftChanges : null, fromDraft ? "draft" : "revision", noteField.text.trim())
         if (p) p.then(function () { nameField.text = ""; noteField.text = ""; vs.load() })
     }
     function hi(key) { return differs.indexOf(key) >= 0 }
+    function accept() { save() }
     Component.onCompleted: load()
     Connections { target: Store; function onDataChanged() { if (!vs.busy) vs.load() } }
 
-    // ── save the design on screen ──
-    Row { width: parent.width; spacing: 8
-        Field { id: nameField; width: 240; placeholder: "Name, e.g. Thick walls"; onAccepted: vs.save() }
-        Field { id: noteField; width: Math.max(160, parent.width - 240 - saveBtn.width - 16); placeholder: "Note (optional)"; onAccepted: vs.save() }
-        Btn { id: saveBtn; kind: "primary"; icon: "plus"
+    property Component footerLeft: Row { spacing: 4
+        Btn { kind: "quiet"; icon: "boxes"; text: "Compare alternatives"; enabled: !Store.hasDraft
+            tip: Store.hasDraft ? "Commit or discard the draft first" : ""; onClicked: Store.openSheet("alternatives") } }
+    property Component footer: Row { spacing: 8
+        Btn { kind: "quiet"; text: "Close"; onClicked: Store.openSheet(null) }
+        Btn { kind: "primary"; icon: "plus"; keys: "Return"
             text: vs.fromDraft ? "Save the draft as a variant" : "Save " + (Store.project ? F.pad(Store.project.head) : "the head") + " as a variant"
             onClicked: vs.save() } }
-    Txt { kind: "fine"; width: parent.width
-        text: vs.fromDraft ? "Your open draft (" + F.plural(F.keys(vs.draftChanges).length, "change") + ") is saved as it is. It stays a draft: nothing is committed."
-                           : "Saves the current head under a name. To save something different, change parameters first (a draft), or use Compare alternatives." }
 
-    Note { visible: !!vs.error; kind: "red"; title: vs.error ? vs.error.message || "Could not load the variants" : ""; text: vs.error && vs.error.hint ? vs.error.hint : "" }
-    Rectangle { width: parent.width; height: 1; color: Theme.rule }
+    // ── save the design on screen ──
+    Rectangle { width: parent.width; height: form.implicitHeight + 32; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+        Column { id: form; x: 16; y: 16; width: parent.width - 32; spacing: 10
+            Row { width: parent.width; spacing: 12
+                Column { width: 280; spacing: 6
+                    Txt { kind: "cap"; text: "Name this design" }
+                    Field { id: nameField; width: parent.width; placeholder: "e.g. Thick walls"; error: vs.nameMissing ? " " : ""
+                        onEdited: function (t) { if (t.trim()) vs.nameMissing = false }
+                        onAccepted: vs.save() } }
+                Column { width: parent.width - 292; spacing: 6
+                    Txt { kind: "cap"; text: "Note" }
+                    Field { id: noteField; width: parent.width; placeholder: "Optional"; onAccepted: vs.save() } } }
+            Txt { kind: "fine"; width: parent.width
+                text: vs.fromDraft ? "Your open draft (" + F.plural(F.keys(vs.draftChanges).length, "change") + ") is saved as it is. It stays a draft: nothing is committed."
+                                   : "Saves the current head under a name. To save something different, change parameters first (a draft), or use Compare alternatives." } } }
 
-    Grid { width: parent.width; columns: vs.cols; spacing: 12
+    Note { visible: !!vs.error; kind: "red"; title: vs.error ? vs.error.message || "Could not load the variants" : ""; text: vs.error && vs.error.hint ? vs.error.hint : ""
+        Btn { small: true; icon: "refresh_cw"; text: "Try again"; onClicked: vs.load() } }
+
+    // ── the first load ──
+    Rectangle { visible: !vs.board && !vs.error; width: parent.width; height: 180; radius: Theme.rMd; color: "transparent"; border.color: Theme.rule
+        Column { anchors.centerIn: parent; spacing: 8
+            Spinner { size: 18; anchors.horizontalCenter: parent.horizontalCenter }
+            Txt { tone: 2; text: "Building each variant…"; anchors.horizontalCenter: parent.horizontalCenter } } }
+
+    Grid { width: parent.width; columns: vs.cols; spacing: vs.gap; visible: vs.cards.length > 0
         Repeater { model: vs.cards
             Rectangle { id: card; required property var modelData
                 readonly property var c: modelData
                 readonly property var m: c.metrics || null
                 readonly property bool head: c.id === "@head"
-                width: vs.cardW; height: inner.implicitHeight + 24; radius: Theme.rMd
-                color: Theme.plate1; border.color: card.head ? Theme.alpha(Theme.datum, 0.55) : Theme.rule
-                Column { id: inner; x: 12; y: 12; width: parent.width - 24; spacing: 0
-                    Row { height: 18; spacing: 5
+                width: vs.cardW; height: inner.implicitHeight + 28; radius: Theme.rMd
+                color: ch.hovered ? Theme.plate3 : Theme.plate1
+                border.color: card.head ? Theme.alpha(Theme.datum, 0.55) : ch.hovered ? Theme.rule2 : Theme.rule
+                Behavior on color { Tint {} }
+                HoverHandler { id: ch }
+                Column { id: inner; x: 14; y: 14; width: parent.width - 28; spacing: 0
+                    Row { height: 18; spacing: 4
                         Tag { visible: card.head; text: "head"; kind: "interface" }
                         Tag { visible: !card.head && card.c.rev !== null && card.c.rev !== undefined; text: card.c.rev ? F.pad(card.c.rev) : ""; kind: "computed" }
                         Tag { visible: !card.head && !card.c.rev; text: "saved draft"; kind: "draft" }
                         Tag { visible: !card.head && !!card.c.is_head; text: "same as head" } }
-                    Item { width: 1; height: 6 }
-                    Rectangle { width: parent.width; height: 150; radius: Theme.rSm; color: Theme.plate; clip: true
-                        Viewport { id: mini; anchors.fill: parent; lite: true; interactive: false; showDims: false; showCompanions: false; selected: "-"; spin: cm.containsMouse
+                    Item { width: 1; height: 8 }
+                    Rectangle { width: parent.width; height: 150; radius: Theme.rXs; color: Theme.plate; clip: true
+                        Viewport { id: mini; anchors.fill: parent; lite: true; interactive: false; showDims: false; showCompanions: false; selected: "-"; spin: ch.hovered
                             property bool ready: false
                             opacity: ready ? 1 : 0
                             Behavior on opacity { NumberAnimation { duration: Theme.slow } }
@@ -78,11 +106,12 @@ Column {
                                 mini.setModel(v); mini.setView("iso", false)
                                 mini.dist = Qt.binding(function () { return vs.frame / Math.sin(13 * Math.PI / 180) * 0.8 })
                                 mini.ready = true }, function () {}) }
+                        Spinner { visible: !mini.ready && !card.c.error; anchors.centerIn: parent; color: Theme.ink4 }
                         Txt { visible: !!card.c.error; anchors.centerIn: parent; width: parent.width - 20; horizontalAlignment: Text.AlignHCenter; kind: "fine"; color: Theme.signal
-                            text: card.c.error ? card.c.error.message : "" }
-                        MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true } }
-                    Item { width: 1; height: 10 }
-                    Txt { text: card.c.name; font.weight: 600; font.pixelSize: 15; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                            text: card.c.error ? card.c.error.message : "" } }
+                    Item { width: 1; height: 12 }
+                    Txt { text: card.c.name; kind: "lead"; font.weight: Theme.wSemi; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                    Item { width: 1; height: 2 }
                     Txt { kind: "fine"; width: parent.width; height: 16; elide: Text.ElideRight; wrapMode: Text.NoWrap
                         text: card.c.note || (card.head ? "The current design" : card.c.by ? "Saved by " + card.c.by : "") }
                     Item { width: 1; height: 8 }
@@ -96,14 +125,15 @@ Column {
                             { k: "Fit yield", v: card.m.fit ? Math.round(card.m.fit.yield * 100) + " %" : "no fit interface", tag: card.m.fit ? "modelled" : "", d: "fit" },
                             { k: "Checks", v: card.m.checks ? card.m.checks.PASS + " pass · " + card.m.checks.WARN + " review · " + card.m.checks.FAIL + " fail" : "not run", tag: "", d: "" }] : []
                         Item { id: mr; required property var modelData; required property int index
-                            width: inner.width; height: 26
-                            Rectangle { visible: mr.index > 0; width: parent.width; height: 1; color: Theme.rule }
-                            Txt { text: mr.modelData.k; tone: 2; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+                            width: inner.width; height: 28
+                            Rectangle { width: parent.width; height: 1; color: Theme.rule }
+                            Txt { id: mk; text: mr.modelData.k; tone: 2; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
                             Row { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 6
                                 Txt { text: mr.modelData.v; mono: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter
+                                    width: Math.min(implicitWidth, mr.width - mk.width - 12 - (mtag.visible ? mtag.width + 6 : 0)); elide: Text.ElideRight; wrapMode: Text.NoWrap
                                     color: mr.modelData.tag === "" ? Theme.ink3 : vs.hi(mr.modelData.d) && !card.head ? Theme.blueprint : Theme.ink }
-                                Tag { visible: mr.modelData.tag !== ""; text: mr.modelData.tag; anchors.verticalCenter: parent.verticalCenter } } } }
-                    Item { width: 1; height: 10 }
+                                Tag { id: mtag; visible: mr.modelData.tag !== ""; text: mr.modelData.tag; anchors.verticalCenter: parent.verticalCenter } } } }
+                    Item { width: 1; height: 12 }
                     Cap { text: card.head ? "Baseline" : card.c.differences.length ? "Differs from the head" : "No differences"; width: parent.width
                         note: card.head ? "" : card.c.differences.length ? F.plural(card.c.differences.length, "parameter") : "" }
                     Item { width: 1; height: 4 }
@@ -112,8 +142,8 @@ Column {
                             label: modelData.label; from: F.trim(modelData.from); to: F.trim(modelData.to); unit: modelData.unit; tint: Theme.blueprint } }
                     Txt { visible: !card.head && card.c.differences.length > 6; kind: "fine"; text: "and " + (card.c.differences.length - 6) + " more" }
                     Txt { visible: card.head; kind: "fine"; width: parent.width; text: "Every variant is compared with this." }
-                    Item { width: 1; height: 12 }
-                    Row { spacing: 4; x: -4; visible: !card.head
+                    Item { visible: !card.head; width: 1; height: 12 }
+                    Row { spacing: 4; visible: !card.head
                         Btn { small: true; icon: "arrow_up"; text: "Promote to head"; enabled: !card.c.is_head && !card.c.error && !Store.hasDraft
                             tip: Store.hasDraft ? "Commit or discard the draft first" : card.c.rev ? "Checks out " + F.pad(card.c.rev) : "Commits these values as a new revision"
                             onClicked: { var p = Store.promoteVariant(card.c.id); if (p) p.then(function () { Store.openSheet(null) }) } }
@@ -123,9 +153,7 @@ Column {
                             onClicked: { var p = Store.deleteVariant(card.c.id); if (p) p.then(function () { vs.load() }) } } }
                 }
             } } }
-    Txt { visible: !!vs.board && vs.cards.length < 2; tone: 2; width: parent.width
-        text: "No variants yet. Name the current design above, or save a candidate from Compare alternatives." }
-    Row { spacing: 8
-        Btn { kind: "quiet"; icon: "boxes"; text: "Compare alternatives"; enabled: !Store.hasDraft; onClicked: Store.openSheet("alternatives") }
-        Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; text: vs.board ? vs.board.note : "Building each variant…"; width: vs.width - 190 } }
+    Note { visible: !!vs.board && vs.cards.length < 2; kind: "plain"; title: "No variants yet"
+        text: "Name the current design above, or save a candidate from Compare alternatives." }
+    Txt { kind: "fine"; width: parent.width; visible: !!vs.board; text: vs.board ? vs.board.note : "" }
 }
