@@ -1,0 +1,19 @@
+name: Documentation
+description: Something in the docs, the README or the website is wrong, missing or unclear.
+title: "[Docs] "
+labels: ["type:docs", "area:site"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: A link to the page or the file in the repository.
+      placeholder: "https://kaizensx.github.io/form-studio/docs/mcp.html"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What should change
+    validations:
+      required: true

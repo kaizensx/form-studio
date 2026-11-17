@@ -1,0 +1,43 @@
+name: Agent support
+description: An AI agent or MCP client that should work with Form Studio, or one that misbehaves.
+title: "[Agent] "
+labels: ["area:agent", "status:triage"]
+body:
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent or client
+      options:
+        - Claude Code
+        - Codex
+        - Gemini CLI
+        - Cursor CLI
+        - OpenCode
+        - Qwen Code
+        - GitHub Copilot CLI
+        - Claude Desktop
+        - Another MCP client
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Chat inside the Form Studio app
+        - Over MCP, from the agent's own window or terminal
+        - Both
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Agent version and model
+      placeholder: "Codex 0.164.0 · gpt-5.5"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: The request, the tool calls the agent made, and where it went wrong. A transcript is the most useful thing you can attach.
+    validations:
+      required: true

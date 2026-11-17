@@ -1,0 +1,54 @@
+name: Slicer or printer support
+description: A slicer, a slicer version or a printer profile that Form Studio should support or handles incorrectly.
+title: "[Slicer] "
+labels: ["area:slicer", "status:triage"]
+body:
+  - type: dropdown
+    id: slicer
+    attributes:
+      label: Slicer
+      options:
+        - Bambu Studio
+        - OrcaSlicer
+        - PrusaSlicer
+        - SuperSlicer
+        - QIDISlicer
+        - Creality Print
+        - Elegoo Slicer
+        - Anycubic Slicer Next
+        - Another OrcaSlicer fork
+        - Cura
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Slicer version and how it was installed
+      placeholder: "OrcaSlicer 2.5.1, AppImage"
+    validations:
+      required: true
+  - type: input
+    id: printer
+    attributes:
+      label: Printer, nozzle, process and filament presets
+      placeholder: "Prusa CORE One, 0.4 nozzle, 0.20mm SPEED, Prusament PLA"
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [macOS, Windows, Linux]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: Is the slicer not found, are presets missing, does the slice fail or differ from the slicer's own window? Include the message Form Studio shows.
+    validations:
+      required: true
+  - type: textarea
+    id: compare
+    attributes:
+      label: The same part sliced in the slicer's own window
+      description: Optional. Time, filament and layer count from the slicer itself make a mismatch easy to find.

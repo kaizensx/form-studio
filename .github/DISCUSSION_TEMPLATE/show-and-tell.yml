@@ -1,0 +1,26 @@
+body:
+  - type: markdown
+    attributes:
+      value: Show what you made. Photos of the printed part next to the render are the best kind of post.
+  - type: textarea
+    id: what
+    attributes:
+      label: What you made
+      description: The part, what it is for, and how the conversation with the agent went.
+    validations:
+      required: true
+  - type: textarea
+    id: media
+    attributes:
+      label: Pictures
+      description: Drop the share card, renders and photos of the print here.
+  - type: input
+    id: print
+    attributes:
+      label: Printer, slicer and filament
+      placeholder: "Prusa MK4S · PrusaSlicer 2.9.7 · PETG"
+  - type: textarea
+    id: result
+    attributes:
+      label: How it printed
+      description: Did it fit? Measured numbers (gap, wall, warp) help everyone calibrate the fit model.

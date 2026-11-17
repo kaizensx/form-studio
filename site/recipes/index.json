@@ -1,0 +1,182 @@
+{
+ "version": 1,
+ "generated": "2026-11-17T19:25:30+00:00",
+ "recipes": [
+  {
+   "id": "dock",
+   "title": "Device dock",
+   "summary": "A leaning desk cradle with a cable pass-through, sized to a measured device.",
+   "author": "Form Studio",
+   "tags": [
+    "phone",
+    "desk",
+    "fit",
+    "cable"
+   ],
+   "kind": "python",
+   "builtin": true,
+   "url": null,
+   "sha256": null,
+   "params_count": 23,
+   "preview": "https://kaizensx.github.io/form-studio/recipes/previews/dock.webp"
+  },
+  {
+   "id": "gridfinity",
+   "title": "Gridfinity-style bin",
+   "summary": "A storage bin on the 42 mm Gridfinity grid: stepped feet, stacking lip, optional dividers, scoop, label shelf and magnet pockets.",
+   "author": "Form Studio",
+   "tags": [
+    "storage",
+    "gridfinity",
+    "organiser",
+    "magnets"
+   ],
+   "kind": "python",
+   "builtin": true,
+   "url": null,
+   "sha256": null,
+   "params_count": 15,
+   "preview": "https://kaizensx.github.io/form-studio/recipes/previews/gridfinity.webp"
+  },
+  {
+   "id": "hook",
+   "title": "Wall hook",
+   "summary": "A two-screw wall hook sized to a load, with a bending-stress estimate and countersunk screw holes fitted to your screws.",
+   "author": "Form Studio",
+   "tags": [
+    "wall",
+    "load",
+    "screws",
+    "strength model"
+   ],
+   "kind": "python",
+   "builtin": true,
+   "url": null,
+   "sha256": null,
+   "params_count": 15,
+   "preview": "https://kaizensx.github.io/form-studio/recipes/previews/hook.webp"
+  },
+  {
+   "id": "planter",
+   "title": "Twisted planter",
+   "summary": "A polygon planter that twists as it rises, with a drainage hole that fits a standard cork or mesh plug.",
+   "author": "Form Studio",
+   "tags": [
+    "home",
+    "vase",
+    "twist"
+   ],
+   "kind": "python",
+   "builtin": true,
+   "url": null,
+   "sha256": null,
+   "params_count": 10,
+   "preview": "https://kaizensx.github.io/form-studio/recipes/previews/planter.webp"
+  },
+  {
+   "id": "coupon",
+   "title": "Fit coupon",
+   "summary": "A slot comb for calibrating internal-feature accuracy on your printer and material.",
+   "author": "Form Studio",
+   "tags": [
+    "calibration",
+    "fit",
+    "tolerance"
+   ],
+   "kind": "python",
+   "builtin": true,
+   "url": null,
+   "sha256": null,
+   "params_count": 7,
+   "preview": "https://kaizensx.github.io/form-studio/recipes/previews/coupon.webp"
+  },
+  {
+   "id": "enclosure",
+   "title": "Electronics enclosure",
+   "summary": "A box and screw-down lid for a circuit board: corner bosses for heat-set inserts or self-tapping screws, PCB standoffs on the board's hole pattern, USB-C and round wall cut-outs, and lid vents.",
+   "author": "Form Studio",
+   "tags": [
+    "electronics",
+    "pcb",
+    "heat-set inserts",
+    "lid"
+   ],
+   "kind": "python",
+   "builtin": true,
+   "url": null,
+   "sha256": null,
+   "params_count": 38,
+   "preview": "https://kaizensx.github.io/form-studio/recipes/previews/enclosure.webp"
+  },
+  {
+   "id": "gear_pair",
+   "title": "Spur gear pair",
+   "summary": "Two printable involute spur gears and a plate with axle pegs at the right centre distance, with a mesh check (centre distance, backlash, contact ratio) and a tooth-strength estimate.",
+   "author": "Form Studio",
+   "tags": [
+    "mechanism",
+    "gears",
+    "involute"
+   ],
+   "kind": "python",
+   "builtin": true,
+   "url": null,
+   "sha256": null,
+   "params_count": 13,
+   "preview": "https://kaizensx.github.io/form-studio/recipes/previews/gear_pair.webp"
+  },
+  {
+   "id": "knob",
+   "title": "Control knob",
+   "summary": "A knurled knob for a D-flat or round shaft: press fit or an M3 set screw in a captive nut, a pointer line and an optional skirt. Printed face down, no supports.",
+   "author": "Form Studio",
+   "tags": [
+    "control",
+    "shaft",
+    "set screw"
+   ],
+   "kind": "python",
+   "builtin": true,
+   "url": null,
+   "sha256": null,
+   "params_count": 14,
+   "preview": "https://kaizensx.github.io/form-studio/recipes/previews/knob.webp"
+  },
+  {
+   "id": "hinged_box",
+   "title": "Hinged box",
+   "summary": "A box and a lid joined by a pin hinge, printed side by side; the lid's lip is checked through its swing.",
+   "author": "Form Studio",
+   "tags": [
+    "box",
+    "hinge",
+    "assembly",
+    "lid"
+   ],
+   "kind": "python",
+   "builtin": true,
+   "url": null,
+   "sha256": null,
+   "params_count": 18,
+   "preview": "https://kaizensx.github.io/form-studio/recipes/previews/hinged_box.webp"
+  },
+  {
+   "id": "cable-clip",
+   "title": "Cable clip",
+   "summary": "A screw-down clip that snaps over a cable of measured diameter, with a fit model for the bore.",
+   "author": "kaizensx",
+   "tags": [
+    "cable management",
+    "desk",
+    "snap fit",
+    "screw mount"
+   ],
+   "kind": "python",
+   "builtin": false,
+   "url": "https://raw.githubusercontent.com/kaizensx/form-studio/main/community/recipes/cable-clip/recipe.py",
+   "sha256": "762aef35c5f59c98e71f04c519b72b4fad7e8b9994d1bc3adbc5069d2629cd58",
+   "params_count": 8,
+   "preview": "https://kaizensx.github.io/form-studio/recipes/previews/community-cable-clip.png"
+  }
+ ]
+}

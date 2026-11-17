@@ -1,0 +1,9 @@
+{
+  "id": "cable-clip",
+  "title": "Cable clip",
+  "summary": "A screw-down clip that snaps over a cable of measured diameter, with a fit model for the bore.",
+  "author": "kaizensx",
+  "tags": ["cable management", "desk", "snap fit", "screw mount"],
+  "kind": "python",
+  "params_count": 8
+}

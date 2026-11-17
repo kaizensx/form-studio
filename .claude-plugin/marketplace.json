@@ -1,12 +1,12 @@
 {
   "name": "form-studio",
-  "description": "FORM: design 3D-printable parts with an AI agent.",
-  "owner": { "name": "FORM contributors" },
+  "description": "Form Studio: design 3D-printable parts with an AI agent.",
+  "owner": { "name": "Form Studio contributors" },
   "plugins": [
     {
       "name": "form",
       "source": "./plugins/form",
-      "description": "FORM skills for designing printable parts, and the form-mcp server."
+      "description": "Form Studio skills for designing printable parts, and the form-mcp server."
     }
   ]
 }

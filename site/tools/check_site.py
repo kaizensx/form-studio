@@ -8,6 +8,7 @@ Fails (exit 1) when:
 - the exported data (site.json, toolpath.bin) does not match its own layout
 - a page asks another host for a script, a stylesheet, a font or an image
 - the first view is heavier than the budget
+- recipes/index.json is missing, or names a preview that is not published
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ from urllib.parse import unquote, urlparse
 SITE = Path(__file__).resolve().parents[1]
 BUDGET_FIRST_VIEW = 2_500_000        # bytes, uncompressed: page, CSS, fonts, scripts, three.js, the dock and its toolpath
 FIRST_VIEW = ["index.html", "css/site.css", "fonts/InstrumentSans.woff2", "fonts/GeistMono.woff2", "fonts/lucide-form.woff2",
-              "assets/lockup.svg", "js/main.js", "js/data.js", "js/app.js", "js/scene.js", "js/demos.js",
+              "assets/lockup.svg", "js/main.js", "js/theme.js", "js/recipes.js", "js/data.js", "js/app.js", "js/scene.js", "js/demos.js",
               "vendor/three.module.js", "vendor/OrbitControls.js",
               "assets/data/site.json", "assets/data/dock.glb", "assets/data/toolpath.bin"]
 
@@ -50,7 +51,7 @@ class Page(HTMLParser):
 
 def main() -> int:
     errors: list[str] = []
-    pages = sorted(SITE.glob("*.html")) + sorted((SITE / "docs").glob("*.html"))
+    pages = sorted(SITE.glob("*.html")) + sorted((SITE / "docs").glob("*.html")) + sorted((SITE / "recipes").glob("*.html"))
     if not (SITE / "docs" / "index.html").exists():
         errors.append("site/docs is missing: run python site/build.py first")
     parsed = {}
@@ -96,6 +97,19 @@ def main() -> int:
         head = (data / glb).read_bytes()[:12]
         if head[:4] != b"glTF":
             errors.append(f"{glb}: not a binary glTF file")
+
+    idx = SITE / "recipes" / "index.json"
+    if not idx.is_file():
+        errors.append("recipes/index.json is missing: run python site/tools/build_recipe_index.py")
+    else:
+        d = json.loads(idx.read_text(encoding="utf-8"))
+        if d.get("version") != 1 or not d.get("recipes"):
+            errors.append("recipes/index.json: expected version 1 and at least one recipe")
+        for r in d.get("recipes", []):
+            if r.get("preview"):
+                local = SITE / "recipes" / "previews" / r["preview"].rsplit("/", 1)[-1]
+                if not local.is_file():
+                    errors.append(f"recipes/index.json: {r['id']} preview is not in site/recipes/previews")
 
     weight = sum((SITE / f).stat().st_size for f in FIRST_VIEW)
     if weight > BUDGET_FIRST_VIEW:

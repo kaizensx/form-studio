@@ -1,0 +1,17 @@
+labels: ["type:feature"]
+body:
+  - type: markdown
+    attributes:
+      value: Share an idea for Form Studio. Rough is fine; the discussion is where it takes shape.
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What would you make or do with it?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Your printer, slicer, agent, or a part you were designing when the idea came up.
