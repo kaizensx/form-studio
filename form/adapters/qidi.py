@@ -1,7 +1,8 @@
 """Slicer adapter for QIDISlicer: a PrusaSlicer fork with the same INI presets, CLI and G-code comments.
 
 Everything is in prusa.py; only the program name, folder and version string differ.
-Not run against a real QIDISlicer on the machine this was written on. Settings: [slicer.qidi] (see prusa.py).
+Run for real in CI: QIDISlicer 1.2.5 on Windows and Linux (.github/workflows/slicers.yml). On Windows the program is
+QIDISlicer.exe (that release has no console program). Settings: [slicer.qidi] (see prusa.py).
 """
 from .common import SlicerBlocked, SlicerFailed  # noqa: F401
 from .prusa import QIDI, Adapter, parse_layers_prusa

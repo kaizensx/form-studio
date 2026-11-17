@@ -4,6 +4,8 @@ A slice is a simulation by the slicer. It says the model can be toolpathed with
 these presets and estimates time and material. It is not a print.
 
 The CLI, preset layout and 3MF reading are shared with OrcaSlicer in _bbl.py.
+Run for real on macOS, and on Windows and Linux in CI (.github/workflows/slicers.yml, Bambu Studio 02.09.01.70,
+never opened: presets then come from resources/profiles inside the program).
 Settings: [slicer].app, [slicer].config_dir, [slicer].machine/process/filament.
 """
 from __future__ import annotations

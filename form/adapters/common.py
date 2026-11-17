@@ -95,7 +95,10 @@ def shipped_dirs(app, share: str, sub: str = "profiles") -> list[Path]:
 
 
 def windows_file_version(path) -> str:
-    """The version a Windows program states in its own file properties ("" when it states none, or elsewhere)."""
+    """The version text in a Windows program's file properties ("" when it has none, or elsewhere).
+
+    Only the text fields. The numeric field is not the program's version in every build: OrcaSlicer 2.5.1's
+    orca-slicer.exe has no text and the number 2.0.0.0."""
     if os.name != "nt":
         return ""
     try:
@@ -124,9 +127,6 @@ def windows_file_version(path) -> str:
                     text = ctypes.wstring_at(at.value, n.value).strip("\0 ")
                     if re.search(r"\d", text):
                         return text
-        if api.VerQueryValueW(buf, "\\", ctypes.byref(at), ctypes.byref(n)) and n.value >= 16:
-            _, _, ms, ls = struct.unpack("IIII", ctypes.string_at(at.value, 16))
-            return f"{ms >> 16}.{ms & 0xFFFF}.{ls >> 16}.{ls & 0xFFFF}"
     except (OSError, AttributeError, ValueError, struct.error):
         pass
     return ""
@@ -142,8 +142,9 @@ def program_version(app: str, pattern: str, libraries: tuple = ()) -> str:
 
     On Windows the programs with a window (orca-slicer.exe, bambu-studio.exe, QIDISlicer.exe) print nothing
     to a pipe, so there the version comes from the file properties of the program, or of the library beside
-    it that holds the program (`libraries`, e.g. "OrcaSlicer.dll"). "unknown" when neither says;
-    "unavailable" when it could not be started at all."""
+    it that holds the program (`libraries`, e.g. "OrcaSlicer.dll"): bambu-studio.exe states it there,
+    orca-slicer.exe does not. "unknown" when neither says (a slice then takes it from its G-code, see
+    gcode_version); "unavailable" when the program could not be started at all."""
     try:
         with tempfile.TemporaryDirectory() as scratch:     # the CLI drops result.json into its cwd
             r = subprocess.run([app, "--help"], capture_output=True, text=True, timeout=30,

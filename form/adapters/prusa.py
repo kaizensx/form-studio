@@ -20,7 +20,8 @@ after the last layer (src/libslic3r/GCode.cpp, GCode/GCodeProcessor.cpp, Print.c
 SuperSlicer and QIDISlicer are PrusaSlicer forks with the same INI layout, CLI and G-code
 comments; they are registered as their own kinds with their own program and folder names.
 
-None of these was run on the machine this was written on; parsing is tested with fixtures.
+PrusaSlicer is run for real on macOS, Windows and Linux (.github/workflows/ui.yml); SuperSlicer 2.5.59.13 and
+QIDISlicer 1.2.5 on Windows and Linux (.github/workflows/slicers.yml), from their official builds, never opened.
 
 Settings, all optional, in studio.toml (table [slicer.prusa], [slicer.superslicer], [slicer.qidi]):
     app = "/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer"
@@ -95,10 +96,10 @@ PRUSA = Variant(
 )
 SUPERSLICER = Variant(
     kind="superslicer", label="SuperSlicer", ini="SuperSlicer.ini", version_re=r"SuperSlicer[-_ ]v?(\d[\d.]*\d)",
-    url="https://github.com/supermerill/SuperSlicer/releases", flatpak="com.superslicer.SuperSlicer",
+    url="https://github.com/supermerill/SuperSlicer/releases",      # not on Flathub: no flatpak to offer
     apps={"darwin": ["/Applications/SuperSlicer.app/Contents/MacOS/SuperSlicer"],
           "win": [r"%ProgramFiles%\SuperSlicer\superslicer_console.exe", "superslicer_console.exe"],
-          "linux": ["superslicer", "SuperSlicer", "/opt/SuperSlicer/AppRun", "~/Applications/SuperSlicer*.AppImage"] + _flatpak("com.superslicer.SuperSlicer")},
+          "linux": ["superslicer", "SuperSlicer", "/opt/SuperSlicer/AppRun", "~/Applications/SuperSlicer*.AppImage"]},
     dirs={"darwin": ["~/Library/Application Support/SuperSlicer"], "win": [r"%APPDATA%\SuperSlicer"],
           "linux": ["~/.config/SuperSlicer", "~/.SuperSlicer"]},
 )

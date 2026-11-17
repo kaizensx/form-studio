@@ -27,7 +27,8 @@ jobs:
         include:
           # reports: the version the program states, which the slice must carry.
           # url: the asset of the official release. sha256: the digest GitHub publishes for that asset
-          # (SuperSlicer 2.5.59.13 predates asset digests, so upstream publishes none).
+          # SuperSlicer 2.5.59.13 predates asset digests and upstream publishes no checksum, so its two are the
+          # digests of the files as first downloaded here on 2026-11-17: they pin the file, they are not upstream's word.
           - slicer: OrcaSlicer
             kind: orca
             version: 2.5.1
@@ -72,7 +73,7 @@ jobs:
             os: ubuntu-22.04
             dir: SuperSlicer
             url: https://github.com/supermerill/SuperSlicer/releases/download/2.5.59.13/SuperSlicer-ubuntu_20.04-2.5.59.13.AppImage
-            sha256: ""
+            sha256: 332dfbb7046fc12c1936900be2a85ce0f13031b381edf266f8c6d08d94730da4
           - slicer: SuperSlicer
             kind: superslicer
             version: 2.5.59.13
@@ -81,7 +82,7 @@ jobs:
             os: windows-latest
             dir: SuperSlicer
             url: https://github.com/supermerill/SuperSlicer/releases/download/2.5.59.13/SuperSlicer_2.5.59.13_win64_240701.zip
-            sha256: ""
+            sha256: aefc6d051b3b3e6e1d1a571d66cb267a09d7cfbe2d8f889a433cd8ac5f787a69
           - slicer: QIDISlicer
             kind: qidi
             version: 1.2.5
@@ -126,7 +127,7 @@ jobs:
           cd "$RUNNER_TEMP"
           curl -fL --retry 5 --retry-all-errors -o slicer.pkg "$URL"
           sha256sum slicer.pkg
-          if [ -n "$SHA256" ]; then echo "$SHA256  slicer.pkg" | sha256sum -c -; fi
+          echo "$SHA256  slicer.pkg" | sha256sum -c -
           if [ "$RUNNER_OS" = "Linux" ]; then
             # Unpacked, not mounted: runners have no FUSE. FORM starts the AppRun inside.
             chmod +x slicer.pkg

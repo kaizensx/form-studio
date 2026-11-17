@@ -23,6 +23,10 @@ vendor caches it ships (496 printers), each with the process and filament its wi
 its checks reject, a skirt that leaves the bed). The 8-tool Prusa CORE One INDX crashes the CLI about
 one run in three, with those JSON presets too.
 
+Also run for real on Windows and Linux in CI (.github/workflows/slicers.yml): the official portable zip and the
+unpacked AppImage, never opened, presets read from the caches inside the program. On Windows orca-slicer.exe prints
+nothing to FORM, so the version comes from the G-code it writes.
+
 Three things the CLI leaves to its caller, found that way and handled in _bbl.py and below:
 the build plate (bed_type), why it refused (EXIT_REASONS, and its log in 00000.log), and on macOS
 a "reopen windows?" question after any earlier crash (cli_env).
