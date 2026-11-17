@@ -84,7 +84,7 @@ class Journeys(unittest.TestCase):
     def test_sheets_palette_shortcuts(self):
         # installs and the upgrade are simulated, one item is reported missing so there is something to install,
         # and a newer release is pretended so the update sheet has something to offer
-        self.journey("shell.py", env_extra={"FORM_INSTALL_FAKE": "0.6", "FORM_SETUP_PRETEND_MISSING": "openscad",
+        self.journey("shell.py", env_extra={"FORM_INSTALL_FAKE": "0.6", "FORM_SETUP_PRETEND_MISSING": "openscad,parts",
                                             "FORM_FAKE_LATEST": "99.0.0"})
 
     def test_smallest_window(self):

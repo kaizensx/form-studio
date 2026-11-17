@@ -152,16 +152,22 @@ def journey_software_install_runs(ui):
     open_sheet_wait(ui, "settings")
     card = ui.item("sheetCard")
     ui.wait_until(lambda: ui.store.get("software") is not None and ui.store.get("softwareChecking") is False, 60, "the software check")
-    row = ui.js("Store.softwareItem('openscad')")
-    ui.check(row and row["status"] == "missing" and row["installable"], f"OpenSCAD is reported missing and installable (FORM_SETUP_PRETEND_MISSING): {row and row['status']}")
+    # OpenSCAD where FORM may install apps itself (Homebrew, winget, Flathub); on a Linux without Flatpak FORM never
+    # runs sudo, so the app is offered as instructions only and the journey installs the parts libraries instead.
+    rows = [ui.js("Store.softwareItem('%s')" % i) for i in ("openscad", "parts")]
+    ui.check(all(r and r["status"] == "missing" for r in rows), f"both are reported missing (FORM_SETUP_PRETEND_MISSING): {[r and r['status'] for r in rows]}")
+    row = next((r for r in rows if r["installable"]), None)
+    ui.check(row, "one of them can be installed by FORM here")
+    sid, label = row["id"], row["label"]
+    print("  installing:", sid)
     ui.run_js("Store.installPick = ({})")
     ui.settle(150)
-    name = ui.item(text="OpenSCAD", within=card)
+    name = ui.item(text=label, within=card)
     ui.scroll_to(name)
-    checks = [c for c in ui.find_all(name="softwareCheck", within=card) if c.property("sid") == "openscad"]
-    ui.check(checks, "OpenSCAD has a tick box")
+    checks = [c for c in ui.find_all(name="softwareCheck", within=card) if c.property("sid") == sid]
+    ui.check(checks, label + " has a tick box")
     ui.click(checks[0])
-    ui.wait_until(lambda: ui.store.get("installChosen") == ["openscad"], 2, "OpenSCAD to be ticked")
+    ui.wait_until(lambda: ui.store.get("installChosen") == [sid], 2, label + " to be ticked")
     btn = ui.wait_until(lambda: ui.find(text="Install 1 selected", within=card) or ui.find(text="Install", within=card), 3, "the Install button")
     ui.shot("sheet-software-picked")
     ui.click(btn)
@@ -169,7 +175,7 @@ def journey_software_install_runs(ui):
     ui.check(ui.store.get("installJob")["fake"] is True, "the job is a simulation (FORM_INSTALL_FAKE)")
     ui.wait_until(lambda: ui.store.get("installJob")["state"] != "running", 60, "the install job to finish")
     job = ui.store.get("installJob")
-    ui.eq((job["state"], job["steps"][0]["id"], job["steps"][0]["state"]), ("done", "openscad", "done"))
+    ui.eq((job["state"], job["steps"][0]["id"], job["steps"][0]["state"]), ("done", sid, "done"))
     ui.check(len(ui.store.get("installLog")) >= 2, "the log was streamed")
     ui.settle(400)
     ui.shot("sheet-software-finished")

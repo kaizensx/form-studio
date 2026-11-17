@@ -85,7 +85,10 @@ PRUSA = Variant(
     apps={"darwin": ["/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer",
                      "~/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer"],
           "win": [r"%ProgramFiles%\Prusa3D\PrusaSlicer\prusa-slicer-console.exe",
-                  r"C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer-console.exe", "prusa-slicer-console.exe"],
+                  r"C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer-console.exe", "prusa-slicer-console.exe",
+                  # Chocolatey unpacks the portable build here (found on a CI runner)
+                  r"%ProgramData%\chocolatey\lib\prusaslicer\tools\*\prusa-slicer-console.exe",
+                  r"%ProgramData%\chocolatey\lib\prusaslicer\tools\prusa-slicer-console.exe"],
           "linux": ["prusa-slicer", "PrusaSlicer", "~/Applications/PrusaSlicer*.AppImage"] + _flatpak("com.prusa3d.PrusaSlicer")},
     dirs={"darwin": ["~/Library/Application Support/PrusaSlicer"],
           "win": [r"%APPDATA%\PrusaSlicer"],

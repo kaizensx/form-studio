@@ -2,6 +2,8 @@ name: Interface tests
 
 # Uses the app the way a person does, on every platform: each journey in tests/journeys/ runs in the real window with
 # synthetic mouse and key events and asserts outcomes in the engine. Runners have no GPU; Qt renders in software.
+# Windows and Linux only: a macOS runner has no foreground window session, so pop-up menus never open there; the
+# same journeys run on a real Mac before each release.
 on:
   push:
     branches: [main, app, ui-ci]
@@ -16,7 +18,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: macOS arm64, os: macos-latest }
           - { name: Windows x64, os: windows-latest }
           - { name: Linux x64, os: ubuntu-22.04 }
     steps:
@@ -37,8 +38,7 @@ jobs:
         # A real slicer on every platform, so the journeys slice, simulate and release for real.
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = "macOS" ]; then brew install --cask prusaslicer
-          elif [ "$RUNNER_OS" = "Windows" ]; then choco install prusaslicer -y --no-progress
+          if [ "$RUNNER_OS" = "Windows" ]; then choco install prusaslicer -y --no-progress
           else sudo apt-get install -y prusa-slicer; fi
       - name: FORM finds the slicer and slices
         shell: bash
