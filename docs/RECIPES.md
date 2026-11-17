@@ -1,6 +1,6 @@
 # Writing a recipe
 
-A recipe is a family of objects: typed parameters in, one valid solid out, built in named stages so that every face knows which feature it belongs to. Everything else in FORM depends on recipes: checks, fit, the optimizer, renders, animations and releases. It all works on a new recipe automatically.
+A recipe is a family of objects: typed parameters in, one valid solid out, built in named stages so that every face knows which feature it belongs to. Everything else in Form Studio depends on recipes: checks, fit, the optimizer, renders, animations and releases. It all works on a new recipe automatically.
 
 Start from [`form/recipes/hook.py`](../form/recipes/hook.py). It is short and uses every hook.
 
@@ -38,13 +38,13 @@ def build(self, v):
     return stages
 ```
 
-Each `Stage` is the whole solid after that feature has been applied. After the build, FORM attributes every face of the final solid to the last stage that created its surface. That attribution drives several things:
+Each `Stage` is the whole solid after that feature has been applied. After the build, Form Studio attributes every face of the final solid to the last stage that created its surface. That attribution drives several things:
 
-- click-to-select on the bench,
+- click-to-select in the viewport,
 - the colours in renders,
 - "features touched" in change impact.
 
-> **Tip:** if two stages leave coplanar faces that OpenCascade fuses into one face, give them slightly different heights. Otherwise they share a colour. The Gridfinity dividers stop 1.5 mm below the label shelf for this reason.
+> **Tip:** when two stages leave coplanar faces, OpenCascade fuses them into one face, which then belongs to one feature. Give them slightly different heights; the Gridfinity dividers stop 1.5 mm below the label shelf for this reason.
 
 ## 3. Constraints that explain themselves
 
@@ -73,23 +73,25 @@ fit = {"cavity": "screw_hole", "mating": "screw_d", "clearance": "screw_clearanc
 | method | what it adds |
 |---|---|
 | `statics(v, volume, com)` | Numbers such as `safety_factor` (optimizer metrics `statics.<key>`), plus `"checks": [...]` that appear on the checks list labelled `model`. |
-| `companions(v)` | Ghost objects on the bench, such as the phone in the dock. |
+| `companions(v)` | Objects drawn with the part but not printed, such as the phone in the dock. |
 | `test_piece(v, shape)` | A small piece cut from the real geometry around the interface. Printing it is the cheapest physical test. |
 
 ## 6. Register and test
+
+Built-in recipes live in `form/recipes/`. Community recipes live in [`community/recipes/`](../community/recipes/README.md) and need no registration.
 
 1. Add the recipe to `registry()` in [`form/recipes/__init__.py`](../form/recipes/__init__.py).
 2. Run these checks:
 
 ```bash
-.venv/bin/form new "Try it" myrecipe
-.venv/bin/form render try-it --view sheet --out /tmp/try.png
-.venv/bin/form optimize try-it --vary wall:1:4 --minimize solid_mass_g
-.venv/bin/python -m unittest discover -s tests
+form new "Try it" myrecipe
+form render try-it --view sheet --out try.png
+form optimize try-it --vary wall:1:4 --minimize solid_mass_g
+python -m unittest discover -s tests
 ```
 
-Look at the render. Most recipe bugs are visible there before any check catches them: in this repository, a screwdriver that couldn't reach a screw, and a knife-edge label shelf.
+Look at the render. Most recipe mistakes are visible there before any check catches them, such as a screw a screwdriver cannot reach, or a knife-edge shelf.
 
-## Be honest in the recipe too
+## Evidence in recipes
 
 Models in `statics()` must state their assumptions in the check detail, and use `evidence: "model"`. A beam formula is not a load rating, and the text has to say so.

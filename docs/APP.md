@@ -1,69 +1,127 @@
-# The FORM desktop app
+# The desktop app
 
-FORM's app is a native program for macOS, Windows and Linux. It is written in Qt Quick (PySide6) and shares one
-process with the CAD engine. There is no browser and no web view: the interface and the 3D viewport are drawn on the GPU by Qt.
+Form Studio is a native desktop app for macOS, Windows and Linux, written in Qt Quick on PySide6. The interface and
+the 3D viewport are drawn on the GPU by Qt; the CAD engine runs in the same process, with the geometry kernel in an
+isolated worker. There is no browser and no web view.
 
-## Run it
+## Install
 
-**From a download.** Each push builds the app for every platform in the *Desktop app* workflow. Download the bundle for your
-system from the workflow run (or from a release), unpack it and open FORM.
+Download the bundle for your system from the [latest release](https://github.com/kaizensx/form-studio/releases/latest):
 
 | System | File | First launch |
 |---|---|---|
-| macOS, Apple Silicon | `FORM-macos-arm64.zip` | Right-click FORM → Open (the build is not notarized) |
-| macOS, Intel | `FORM-macos-x64.zip` | Same |
-| Windows 10/11 | `FORM-windows-x64.zip` | "More info" → "Run anyway" (the build is not signed) |
-| Linux x64 | `FORM-linux-x64.tar.gz` | Run `FORM/FORM` |
+| macOS, Apple Silicon | `FORM-macos-arm64.zip` | Unzip, then right-click **FORM.app** › **Open** |
+| macOS, Intel | `FORM-macos-x64.zip` | The same |
+| Windows 10 and 11 | `FORM-windows-x64.zip` | Unzip and run `FORM.exe`; in SmartScreen choose **More info** › **Run anyway** |
+| Linux x64 | `FORM-linux-x64.tar.gz` | Unpack and run `FORM/FORM` |
 
-**From Python.** If you already use FORM's CLI:
+On first start Form Studio checks what it needs and installs the rest from inside the app: the standard-parts
+libraries, a slicer, an agent and its sign-in. Every command is shown before it runs.
+
+### From Python
 
 ```bash
-uv tool install --force --python 3.12 "form-studio[all] @ git+https://github.com/kaizensx/form-studio"
-```
-
-```bash
+curl -LsSf https://raw.githubusercontent.com/kaizensx/form-studio/main/install.sh | sh    # macOS and Linux
 form app
 ```
 
-The app, `form serve`, the MCP server and the CLI all work on the same project folder (`~/FORM` by default), at the same time.
+The script installs [uv](https://docs.astral.sh/uv/) if it is missing (after asking), then Form Studio with its own
+Python 3.12, then runs `form setup`. On Windows, or to manage the install yourself:
 
-## What you see
+```bash
+uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizensx/form-studio"
+```
 
-- **Claude, on the left.** Describe a part or a change. Each message runs Claude Code on your own account with FORM's tools.
-  The same column shows what any other agent (Claude Code, Codex, the CLI) is doing to your designs, live.
-- **The part, in the middle.** The kernel's real geometry, one mesh per feature. Click a feature to select it. Overall
-  dimensions are drawn on the plate as dimension lines. Cut X/Y/Z shows a section with solid cut faces.
-- **The question, on the right.** Five stages: Brief, Shape, Fit, Prove, Release. Each tab says where it stands.
-- **The pipeline, along the bottom.** Parameters → Solid → Exports → Checks → Slice → Release. A node is only shown as
-  current when it describes the revision on screen.
-- **Home.** Every design as a live 3D card.
+## The window
+
+![The workspace: conversation, viewport and stages](images/app-prove.webp)
+
+| Area | What it holds |
+|---|---|
+| **Top bar** | The design and its revision, release state, the printer, search (Ctrl/⌘ K) and Settings |
+| **Conversation** (left) | The agent conversation for this design: messages, the agent's steps, the views it looked at, attachments. Resizable; Ctrl/⌘ J hides it |
+| **Viewport** (centre) | The kernel's geometry, one mesh per feature, with dimensions on the plate. The tool rail on its left edge holds Select, Measure, Section, Analyze, History, Assembly, Print simulation and Render |
+| **Stages** (right) | Brief, Shape, Fit, Prove and Release. Each tab shows where it stands: measured values, features, fit yield, checks to review, release readiness |
+| **Pipeline** (bottom) | Parameters › Solid › Exports › Checks › Slice › Release. A node is current only when it describes the revision on screen |
+
+### The five stages
+
+| Stage | What you do there |
+|---|---|
+| **Brief** | What the part is for, the dimensions you measured with their provenance, reference photos and imported parts |
+| **Shape** | Features in build order and their parameters. Select a feature on the model or in the list and change it; the draft shows its computed impact before you commit |
+| **Fit** | The fit model for each interface: a section, the clearance, the chance of fitting and how to raise it |
+| **Prove** | Every check with its evidence, print orientation, and the slice: time, filament, layers, Watch it print |
+| **Release** | The release gate, approval, the released files with their hashes, and the revision history |
+
+### Home
+
+Every design as a live 3D card, filtered by released and in progress and sorted by name or date. Right-click a card to
+rename, duplicate, export or move it to the trash.
+
+![Home](images/app-home.webp)
 
 ## Keys
 
 | Key | Does |
 |---|---|
-| Ctrl/⌘ K | Command palette: every action and every design |
-| Ctrl/⌘ 1–5 | Brief, Shape, Fit, Prove, Release |
-| Ctrl/⌘ Enter | Commit the draft |
-| Ctrl/⌘ J | Show or hide Claude |
-| Ctrl/⌘ N | New design from a recipe |
-| Esc | Close the sheet, leave the layer view, or deselect |
+| Ctrl/⌘ K | Search and commands: every action and every design |
+| Ctrl/⌘ N | New design |
+| Ctrl/⌘ Shift O | New conversation |
+| Ctrl/⌘ J | Show or hide the conversation |
+| Ctrl/⌘ Shift H | All designs (Home) |
+| Ctrl/⌘ , | Settings |
+| Ctrl/⌘ 1 to 5 | Brief, Shape, Fit, Prove, Release |
+| Ctrl/⌘ Return | Commit the draft |
+| ? | All keys |
 
-In the viewport: drag to orbit, right-drag or Shift-drag to pan, scroll or pinch to zoom, click to select a feature.
+In the viewport:
 
-## What it will not do
+| Key | Does |
+|---|---|
+| V | Select: click a feature, drag to orbit |
+| M | Measure distances, faces and diameters |
+| X | Section cut on or off |
+| A | Analyze: thickness, overhang and other maps |
+| E | Assembly views and joints |
+| T | History: the revision timeline |
+| F | Frame the selected feature, or the whole part |
+| 1 to 5 | Iso, front, side, top and underside views |
+| . | Reset the view |
+| H / Shift H | Hide the selected feature / show all |
+| Esc | Leave the tool or clear the selection |
 
-The app keeps every rule of the engine. It does not start a print or upload a design. A slice is labelled *simulated*,
-a fit yield *modelled*, and only you can approve a release, with a deliberate button in the Release stage.
+Drag to orbit, right-drag or Shift-drag to pan, scroll or pinch to zoom. Right-click a feature for quick actions.
 
-## Build it yourself
+In the conversation: Return sends, Shift Return adds a line, Up brings back your last message.
+
+## Settings
+
+Settings (Ctrl/⌘ ,) edits `studio.toml` for you, with a backup of the file.
+
+| Tab | Holds |
+|---|---|
+| General | Project folder, daily update check, opening Form Studio when an agent starts working |
+| Printer and slicer | The slicer; its printer, process and filament presets; bed size, edge margin and slice time limit |
+| Chat | The default agent, model and effort; web lookups; a spending limit per message; API keys, stored privately and never shown again |
+| Other apps | Where Blender, OpenSCAD and FreeCAD are; which programs files open in |
+| Software | Everything Form Studio uses, what is installed, and an Install button for the rest |
+
+## Rules the app keeps
+
+- It never starts a print and never uploads a design.
+- A slice is labelled **simulated**, a fit yield **modelled**, a strength figure a **model** with its assumptions.
+- Only a person approves a release, with a deliberate action in the Release stage.
+- The app, the CLI and the MCP server can work on the same project folder at the same time.
+
+## Build from source
 
 ```bash
 uv venv --python 3.12 .venv
 uv pip install --python .venv -e ".[all]" pyinstaller
-.venv/bin/python -m form.app            # run from source
-.venv/bin/pyinstaller packaging/form.spec --noconfirm
+.venv/bin/python -m form.app                          # run from source
+.venv/bin/pyinstaller packaging/form.spec --noconfirm # build the bundle into dist/
 ```
 
-The bundle lands in `dist/`. It is large (about 800 MB unpacked) because it carries the OpenCascade CAD kernel and Qt.
-Notes for working on the interface are in [form/app/qml/CONTRIBUTING-UI.md](../form/app/qml/CONTRIBUTING-UI.md).
+The bundle is about 800 MB unpacked, because it carries the OpenCascade kernel and Qt. Notes for working on the
+interface: [form/app/qml/CONTRIBUTING-UI.md](../form/app/qml/CONTRIBUTING-UI.md).

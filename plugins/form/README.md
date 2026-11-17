@@ -1,10 +1,10 @@
-# FORM plugin for Claude Code
+# Form Studio plugin for Claude Code
 
-Skills that carry FORM's design and print-engineering practice, and the `form-mcp` server they use.
+Skills that carry Form Studio's design and print-engineering practice, and the `form-mcp` server they use.
 
 ## Install
 
-FORM itself must be installed first, so that `form-mcp` is on your PATH (see the repository README).
+Form Studio itself must be installed first, so that `form-mcp` is on your PATH (see the repository README).
 
 ```
 claude plugin marketplace add kaizensx/form-studio
@@ -13,7 +13,7 @@ claude plugin install form@form-studio
 
 From a local checkout: `claude plugin marketplace add ./form-studio`, then the same install command.
 
-If you already registered FORM with `form setup` (`claude mcp add form ...`), you have the server twice.
+If you already registered Form Studio with `form setup` (`claude mcp add form ...`), you have the server twice.
 Keep one: remove the old registration with `claude mcp remove --scope user form`, or keep it and ignore the plugin's.
 
 ## Skills
