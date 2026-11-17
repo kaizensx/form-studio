@@ -231,7 +231,9 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
   standard-parts libraries, a slicer, an agent and its sign-in) install from inside the app, hands-free once you
   confirm. Every command is shown before it runs.
 - **Settings** (Ctrl/⌘ ,): general, printer and slicer, chat (agents, models, API keys), other apps, and software.
-- **What's New** after each update, and updates installed from inside the app.
+- **What's New** after each update, and updates installed from inside the app. Choose the Stable channel (releases) or Preview (pre-releases from the `dev` branch).
+
+![What's New after an update](images/app-whats-new.webp)
 - **Command palette** (Ctrl/⌘ K) for every action and every design.
 
 ![Command palette](images/app-palette.webp)
