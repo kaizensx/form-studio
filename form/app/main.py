@@ -36,7 +36,8 @@ def _engine(cfg):
 
 
 def _reduced_motion() -> bool:
-    """The system's "reduce motion" setting, or FORM_REDUCED_MOTION=1/0. Read once at start (Motion.qml)."""
+    """The system's "reduce motion" setting, or FORM_REDUCED_MOTION=1/0. The interface reads it once at start through
+    Bridge.reducedMotion (Theme.reduced); this copy is for callers that have no Bridge."""
     env = os.environ.get("FORM_REDUCED_MOTION", "").strip().lower()
     if env:
         return env not in ("0", "false", "no", "off")
@@ -94,6 +95,9 @@ def main(argv=None) -> int:
     os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
     app = QGuiApplication(sys.argv[:1])
     app.setWindowIcon(QIcon(str(HERE / "assets" / "icon.png")))
+    # Tab reaches every control, not only text fields (macOS limits it to text fields unless "Keyboard navigation"
+    # is on in System Settings). Sheets rely on this to keep the keyboard inside them.
+    app.styleHints().setTabFocusBehavior(Qt.TabFocusBehavior.TabFocusAllControls)
     for f in ("InstrumentSans.ttf", "GeistMono.ttf", "lucide.ttf"):
         QFontDatabase.addApplicationFont(str(HERE / "assets" / "fonts" / f))
 
@@ -106,7 +110,6 @@ def main(argv=None) -> int:
     errors: list[str] = []
     engine.warnings.connect(lambda ws: errors.extend(w.toString() for w in ws))
     engine.addImportPath(str(HERE / "qml"))
-    engine.rootContext().setContextProperty("formReducedMotion", _reduced_motion())      # Motion.qml
     w, h = (int(x) for x in args.size.lower().split("x"))
     engine.setInitialProperties({"startProject": args.project or "", "startStage": args.stage or "",
                                  "headless": bool(args.shot or args.check), "width": w, "height": h})

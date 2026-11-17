@@ -33,6 +33,7 @@ Item {
 
     FocusScope {
         id: card
+        objectName: "sheetCard"
         readonly property int pad: 24
         readonly property int headH: 58
         readonly property int tabsH: tabs.visible ? 34 : 0
@@ -47,6 +48,17 @@ Item {
         Behavior on opacity { NumberAnimation { duration: host.open ? Theme.base : Theme.exit; easing.type: Easing.OutCubic } }
         Behavior on scale { Glide { duration: host.open ? Theme.base : Theme.exit } }
 
+        // A focused control moves Tab along the window's whole chain by itself, so the card never sees the key.
+        // Two guards, first and last in the card, catch the keyboard on its way out and send it round.
+        Item { id: guardStart; width: 1; height: 1; activeFocusOnTab: true
+            onActiveFocusChanged: if (activeFocus) card.wrap(false) }
+        function wrap(forward) {
+            var n = (forward ? guardStart : guardEnd).nextItemInFocusChain(forward), guard = 0
+            while (n && (n === guardStart || n === guardEnd) && guard++ < 4) n = n.nextItemInFocusChain(forward)
+            if (n && inside(n) && n !== guardStart && n !== guardEnd) n.forceActiveFocus(forward ? Qt.TabFocusReason : Qt.BacktabFocusReason)
+            else sink.forceActiveFocus()          // a sheet with nothing to tab to: the keyboard rests on the card
+        }
+        Item { id: sink }
         function inside(it) { while (it) { if (it === card) return true; it = it.parent } return false }
         function grab() { if (!host.open) return; card.forceActiveFocus(); if (host.sheet && host.sheet.firstFocus) host.sheet.firstFocus.forceActiveFocus() }
         // keep Tab inside the sheet
@@ -54,7 +66,7 @@ Item {
             var w = card.Window.window, cur = w ? w.activeFocusItem : null
             var start = cur && inside(cur) ? cur : card
             var n = start.nextItemInFocusChain(forward), guard = 0
-            while (n && !inside(n) && guard++ < 400) n = n.nextItemInFocusChain(forward)
+            while (n && (!inside(n) || n === guardStart || n === guardEnd) && guard++ < 400) n = n.nextItemInFocusChain(forward)
             if (n && inside(n) && n !== card) n.forceActiveFocus(forward ? Qt.TabFocusReason : Qt.BacktabFocusReason)
         }
         Keys.onTabPressed: step(true)
@@ -111,5 +123,7 @@ Item {
             Loader { id: fr; anchors.right: parent.right; anchors.rightMargin: card.pad; anchors.verticalCenter: parent.verticalCenter
                 sourceComponent: host.sheet && host.sheet.footer ? host.sheet.footer : null }
         }
+        Item { id: guardEnd; width: 1; height: 1; activeFocusOnTab: true
+            onActiveFocusChanged: if (activeFocus) card.wrap(true) }
     }
 }

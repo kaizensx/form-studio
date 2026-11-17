@@ -123,6 +123,7 @@ Window {
     function esc() {
         if (Store.lightbox) Store.lightbox = null
         else if (Store.paletteOpen) Store.paletteOpen = false
+        else if (Store.ctxMenu) Store.ctxMenu = null
         else if (Store.sheet) Store.openSheet(null)
         else if (Store.measuring) Store.setMeasuring(false)
         else if (Store.layers) Store.showLayers(false)

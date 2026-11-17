@@ -39,11 +39,13 @@ class WorkspaceUi(unittest.TestCase):
         self.assertEqual(vp.count('fragmentShader: "shaders/clay.frag"'), vp.count("property color uRim"))
 
     def test_motion_stays_within_the_budget(self):
-        motion = read("Motion.qml")
-        for name, limit in (("quick", 320), ("ui", 320), ("slow", 320), ("part", 320), ("camera", 450)):
-            m = re.search(rf"readonly property int {name}: (?:reduced \? 0 : )?(\d+)", motion)
+        theme, motion = read("Theme.qml"), read("Motion.qml")           # one token set: Theme; Motion only renames it
+        for name, limit in (("press", 320), ("ui", 320), ("cross", 320), ("part", 320), ("camera", 450)):
+            m = re.search(rf"readonly property int {name}: (\d+)", theme)
             self.assertIsNotNone(m, name)
             self.assertLessEqual(int(m.group(1)), limit, name)
+        self.assertNotRegex(motion, r"readonly property int \w+: \d", "Motion.qml must not define durations of its own")
+        self.assertIn("readonly property bool reduced: Theme.reduced", motion)
 
     def test_reduced_motion_reads_the_environment(self):
         from form.app import main

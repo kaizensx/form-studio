@@ -21,7 +21,7 @@ Item {
     implicitWidth: row.implicitWidth + (text ? (small ? 16 : large ? 28 : 22) : (small ? 8 : 12))
     opacity: enabled ? 1 : 0.4
     scale: down ? Theme.from(0.97) : 1
-    activeFocusOnTab: enabled && visible
+    activeFocusOnTab: true          // Qt skips hidden and disabled items by itself
     Behavior on scale { Glide { duration: Theme.press } }
     Keys.onPressed: function (e) { if (e.key === Qt.Key_Space || e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { e.accepted = true; if (!e.isAutoRepeat) kdown = true } }
     Keys.onReleased: function (e) { if (kdown && (e.key === Qt.Key_Space || e.key === Qt.Key_Return || e.key === Qt.Key_Enter)) { e.accepted = true; kdown = false; if (enabled && !busy) clicked() } }

@@ -33,6 +33,8 @@ QtObject {
         "ruler": "\ue14b",
         "scan_line": "\ue258",
         "rotate_3d": "\ue2ea",
+        "mouse_pointer_2": "\ue1c3",
+        "power": "\ue140",
         "move_3d": "\ue2e5",
         "eye": "\ue0ba",
         "eye_off": "\ue0bb",

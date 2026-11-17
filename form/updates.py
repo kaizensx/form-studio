@@ -180,14 +180,45 @@ def _finish(out: dict, latest: dict | None, checked) -> dict:
     return out
 
 
+def install_now(cfg: dict, info: dict | None = None, echo=print) -> int:
+    """Run the upgrade command and print its output. 0 when it finished; the new code runs after a restart."""
+    import time as _t
+
+    from . import installer
+    info = info or check(cfg)
+    if info["kind"] == "packaged":
+        echo("This copy of FORM is updated by downloading the new app: " + (info.get("download") or {}).get("url", RELEASES))
+        return 2
+    try:
+        job = installer.Installer(cfg).update(info["command"])
+    except installer.InstallError as e:
+        echo(e.public()["message"])
+        return 2
+    seen = 0
+    while True:
+        p = job.public(seen)
+        for line in p["log"]:
+            echo(("$ " if line["kind"] == "cmd" else "  ") + line["text"])
+        seen = p["next"]
+        if p["state"] != "running":
+            break
+        _t.sleep(0.3)
+    echo("Upgraded. Restart FORM to use the new version." if p["state"] == "done" else "The upgrade did not finish: " + p["steps"][0]["message"])
+    return 0 if p["state"] == "done" else 1
+
+
 def main(argv=None) -> int:
     import argparse
-    ap = argparse.ArgumentParser(prog="form update", description="Is there a newer FORM? (checks only; never installs)")
+    ap = argparse.ArgumentParser(prog="form update", description="Is there a newer FORM? (checks only, unless --install)")
     ap.add_argument("--check", action="store_true", help="ask GitHub now and print JSON")
+    ap.add_argument("--install", action="store_true", help="run the upgrade command now (pip / uv / source installs), "
+                    "the same job the app's Update now button runs")
     a = ap.parse_args(argv)
     from . import config
     cfg = config.load()
     info = check(cfg, force=True)
+    if a.install:
+        return install_now(cfg, info)
     if a.check:
         print(json.dumps(info, indent=1, ensure_ascii=False))
         return 0

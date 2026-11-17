@@ -543,7 +543,8 @@ Item {
             var sp = r.scenePosition, d = Qt.vector3d(sp.x, -sp.z, sp.y).minus(vp.shift)
             vp.probed([d.x, d.y, d.z], vp.mmPerPx * 10)
         }
-        onPressed: function (e) { last = Qt.point(e.x, e.y); down = last; moved = false; vp.tween = false }
+        // a press on the part takes the keyboard from whatever text box had it, so V, M, F and the rest work again
+        onPressed: function (e) { vp.forceActiveFocus(); last = Qt.point(e.x, e.y); down = last; moved = false; vp.tween = false }
         onPositionChanged: function (e) {
             if (!pressed) {
                 if (vp.mapShown) { hoverAt = Qt.point(e.x, e.y); valueAt.restart(); return }

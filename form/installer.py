@@ -865,6 +865,31 @@ class Installer:
             job.start()
         return job
 
+    # -- upgrading FORM itself (pip / uv / a source checkout; the packaged app is replaced by a download) --
+    def update(self, shown: str | None = None, start: bool = True, timeout_s: float | None = None) -> Job:
+        """Run FORM's own upgrade command as an install job with a streamed log. `shown` is the command the user
+        was shown; a different command is refused. The running app keeps the old code until it is restarted."""
+        from . import updates
+        kind = updates.install_kind()
+        cmd = updates.upgrade_command(kind)
+        if not cmd:
+            raise InstallError("This copy of FORM is updated by downloading the new app.",
+                               "Use the download button; your projects stay where they are.")
+        if shown is not None and shown != cmd:
+            raise InstallError("The upgrade command changed since it was shown.", "Open the update sheet again and review it.", status=409)
+        sw = Software("form.update", "FORM", "Upgrades FORM itself.", "optional", "form",
+                      lambda cfg, ctx: Found("ok", "The new version is installed. Restart FORM to use it."),
+                      lambda platform, ctx: [])
+        m = Method("upgrade", "Upgrade a source checkout" if kind == "source" else "Upgrade with uv or pip", commands=[cmd])
+        with self._lock:
+            if any(j.state == "running" for j in self.jobs.values()):
+                raise InstallError("An install is already running.", "Wait for it, or cancel it.", status=409)
+            job = Job(self.cfg, [(sw, m)], timeout_s or DEFAULT_TIMEOUT_S, None)
+            self.jobs[job.id] = job
+        if start:
+            job.start()
+        return job
+
     def job(self, jid: str) -> Job:
         j = self.jobs.get(jid)
         if j is None:

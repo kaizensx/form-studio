@@ -10,6 +10,8 @@ Item {
     anchors.fill: parent; visible: Store.paletteOpen; z: 50
     onVisibleChanged: if (visible) { q.text = ""; sel = 0; Store.loadConvs(); q.input.forceActiveFocus() }
     property int sel: 0
+    objectName: "palette"
+    readonly property string selText: rows[picks[sel]] ? rows[picks[sel]].text : ""     // the highlighted command
     property alias query: q.text
     readonly property var groups: ["Recent", "Go to", "Tools", "Designs", "Conversations", "Settings"]
     function updates() { Store.checkUpdates(true).then(function (u) {

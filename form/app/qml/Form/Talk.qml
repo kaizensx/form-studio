@@ -324,6 +324,8 @@ Rectangle {
                         selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
                         leftPadding: 12; rightPadding: 12; topPadding: 10; bottomPadding: 6; background: null; renderType: Text.NativeRendering
                         function submit() { if (text.trim() && !Store.chatBusy && Store.chatReady) { Store.send(text); text = "" } }
+                        Keys.onTabPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
+                        Keys.onBacktabPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.BacktabFocusReason)
                         Keys.onPressed: function (e) {
                             if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && !(e.modifiers & Qt.ShiftModifier)) { e.accepted = true; submit() }
                             else if (e.key === Qt.Key_Up && text === "") {            // edit the last message: bring it back

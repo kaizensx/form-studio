@@ -114,7 +114,8 @@ QtObject {
     // ── toasts ───────────────────────────────────────────────
     property int _toastId: 0
     function toast(msg, hint, bad) {
-        var t = toasts.slice(); t.push({ id: ++_toastId, msg: msg, hint: hint || "", bad: !!bad }); toasts = t
+        var t = toasts.slice(); t.push({ id: ++_toastId, msg: msg, hint: hint || "", bad: !!bad, ts: Date.now() }); toasts = t
+        if (toasts.length > 4) toasts = toasts.slice(-4)          // a burst must not cover the screen
     }
     function dropToast(id) { toasts = toasts.filter(function (t) { return t.id !== id }) }
     function fail(e) { toast(e.message || "Something went wrong", e.hint, true) }
@@ -765,6 +766,26 @@ QtObject {
     function openSettings(tab) { openSheet("settings", { tab: tab || "general" }); loadConfig(); checkSoftware() }
     function addExample(id) {
         return post("/examples", { ids: [id] }).then(function () { sheet = null; return reloadStudio().then(function () { return open(id) }) }, fail)
+    }
+    // "Update now" (pip / uv / source installs): the upgrade command runs as an install job with a streamed log.
+    // The running app keeps its code until it is restarted; the sheet says so.
+    property var updateJob: null       // { id, state, steps, log, seconds, fake }
+    property var updateLog: []
+    readonly property bool updating: !!updateJob && updateJob.state === "running"
+    property var _updatePoll: Timer { interval: 400; onTriggered: s._updateTick() }
+    function installUpdate() {
+        if (!update || updating || installing) return
+        updateLog = []
+        post("/updates/install", { shown: update.command }).then(function (j) { updateLog = j.log; updateJob = j; _updatePoll.restart() }, fail)
+    }
+    function cancelUpdate() { if (updateJob) post("/install/job/" + updateJob.id + "/cancel", {}).then(function () {}, fail) }
+    function _updateTick() {
+        if (!updateJob) return
+        get("/install/job/" + updateJob.id + "?from=" + (updateLog.length ? updateLog[updateLog.length - 1].n + 1 : 0)).then(function (j) {
+            if (j.log.length) updateLog = updateLog.concat(j.log).slice(-400)
+            updateJob = j
+            if (j.state === "running") _updatePoll.restart()
+        }, function () { _updatePoll.restart() })
     }
     function checkUpdates(force) {
         return get("/updates" + (force ? "?force=1" : "")).then(function (u) { update = u; return u }, function () {})

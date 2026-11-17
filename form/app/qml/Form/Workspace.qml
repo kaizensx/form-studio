@@ -93,7 +93,8 @@ Item {
         function onPidChanged() { Ws.tool = "select" }
         function onFadeTo(apply) { vp.swap(apply) }                 // the timeline and anything else that swaps the geometry
     }
-    Component.onCompleted: Ws.tool = Store.measuring ? "measure" : Store.timelineOpen ? "history" : "select"
+    // a design that has just opened has the keyboard on the part, not in the conversation box Home left it in
+    Component.onCompleted: { Ws.tool = Store.measuring ? "measure" : Store.timelineOpen ? "history" : "select"; vp.forceActiveFocus() }
 
     readonly property Item focusItem: Window.activeFocusItem
     readonly property bool keys: Store.screen === "work" && !Store.sheet && !Store.paletteOpen && !(focusItem && focusItem.cursorPosition !== undefined)
@@ -160,7 +161,7 @@ Item {
             visible: !!Store.view
             Column {
                 id: railCol; x: 4; y: 4; spacing: 1
-                RailBtn { icon: "rotate_3d"; label: "Select"; keys: "V"; hint: "Click a feature to edit it. Drag to orbit, shift-drag to pan."
+                RailBtn { icon: "mouse_pointer_2"; label: "Select"; keys: "V"; hint: "Click a feature to edit it. Drag to orbit, shift-drag to pan."
                     active: ws.tool === "select" && !ws.sim; onClicked: ws.setTool("select") }
                 RailBtn { icon: "pencil_ruler"; label: "Measure"; keys: "M"; hint: "Distances, faces and hole diameters, computed from the part’s surface."
                     active: ws.tool === "measure" && !ws.sim; marked: Store.measures.length > 0; onClicked: ws.setTool("measure") }

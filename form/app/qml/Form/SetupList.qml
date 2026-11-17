@@ -46,7 +46,7 @@ Rectangle {
                 Rectangle { visible: row.index > 0; width: parent.width; height: 1; color: Theme.rule }
                 // status: a tick box when it can be installed, else a dot or a check
                 Item { x: 16; y: 14; width: 16; height: 16
-                    Check { visible: sl.selectable && row.r.installable; checked: row.picked; enabled: !Store.installing
+                    Check { objectName: "softwareCheck"; readonly property string sid: row.r.id; visible: sl.selectable && row.r.installable; checked: row.picked; enabled: !Store.installing
                         onToggled: function (on) { Store.setInstallPick(row.r.id, on) } }
                     Icon { visible: row.r.status === "ok"; name: "circle_check"; size: 15; color: Theme.pass; anchors.centerIn: parent }
                     Rectangle { visible: row.r.status !== "ok" && !(sl.selectable && row.r.installable); width: 8; height: 8; radius: 4

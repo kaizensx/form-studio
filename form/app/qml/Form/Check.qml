@@ -7,7 +7,7 @@ Item {
     signal toggled(bool checked)
     implicitWidth: 16; implicitHeight: 16
     opacity: enabled ? 1 : 0.4
-    activeFocusOnTab: enabled && visible
+    activeFocusOnTab: true          // Qt skips hidden and disabled items by itself
     Keys.onSpacePressed: toggled(!checked)
     Rectangle { anchors.fill: parent; radius: Theme.rXs
         color: c.checked ? (ma.containsMouse ? Theme.datumHi : Theme.datum) : ma.pressed ? Theme.plate2 : Theme.well

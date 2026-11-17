@@ -333,6 +333,10 @@ def route_post(st, path: str, body):
                                                  body.get("methods") if isinstance(body.get("methods"), dict) else None))
         st.activity(None, "setup", "Installing: " + ", ".join(s["label"] for s in job.steps), by="you")
         return job.public()
+    if path == "/api/updates/install":            # upgrade FORM itself: the command that was shown, as an install job
+        job = _wrap(lambda: sa.installer.update(body.get("shown") if isinstance(body.get("shown"), str) else None))
+        st.activity(None, "setup", "Upgrading FORM", by="you")
+        return job.public()
     m = re.fullmatch(r"/api/install/job/([0-9a-f]{10})/cancel", path)
     if m:
         j = _wrap(lambda: sa.installer.job(m.group(1)))

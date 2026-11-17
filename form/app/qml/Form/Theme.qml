@@ -88,6 +88,11 @@ QtObject {
     readonly property int fast: 120
     readonly property int base: 180
     readonly property int slow: 320
+    // the workspace: tool options and inspector sections, cross-fades of the part, the camera, assembly parts travelling
+    readonly property int ui: 170
+    readonly property int cross: 240
+    readonly property int camera: 420
+    readonly property int part: 300
     readonly property var easeOut: [0.23, 1, 0.32, 1, 1, 1]
     readonly property var easeMove: [0.77, 0, 0.175, 1, 1, 1]
     readonly property var easeDrawer: [0.32, 0.72, 0, 1, 1, 1]    // panels that slide (the agent column)
