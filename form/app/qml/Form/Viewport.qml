@@ -22,6 +22,7 @@ Item {
     property var bounds: ({ lo: Qt.vector3d(-40, -40, 0), hi: Qt.vector3d(40, 40, 40) })   // on the plate
     property vector3d shift: Qt.vector3d(0, 0, 0)
     property var marker: null                // { at:[x,y,z], to:[x,y,z] } in design coordinates
+    property real labelRight: width          // labels of markers and measurements stay left of this x (the dock sits right of it)
     property string sectionAxis: ""
     property real sectionT: 0.5
     signal picked(string feature)
@@ -506,7 +507,8 @@ Item {
             id: pl
             required property var modelData
             property point at: Qt.point(-999, -999)
-            x: Math.round(at.x + 9); y: Math.round(at.y - height - 5)
+            // to the right of its point, or to the left when that would run under the dock or off the view
+            x: Math.round(at.x + 9 + width > vp.labelRight - 6 ? Math.max(4, at.x - 9 - width) : at.x + 9); y: Math.round(Math.max(4, at.y - height - 5))
             width: pt.implicitWidth + 12; height: 19; radius: 3; color: Theme.alpha(Theme.plate, 0.88); border.color: Theme.alpha(modelData.tint, 0.45)
             visible: at.x > 0 && at.y > 0
             Text { id: pt; anchors.centerIn: parent; text: pl.modelData.text; color: pl.modelData.tint; font.family: Theme.mono; font.pixelSize: 11; renderType: Text.NativeRendering }

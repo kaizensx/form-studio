@@ -111,6 +111,7 @@ Item {
         Viewport {
             id: vp
             objectName: "viewport"
+            labelRight: dock.open ? dock.x : width
             anchors.fill: parent
             visible: !Store.layers
             asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
@@ -340,7 +341,7 @@ Item {
         readonly property int at: { for (var i = 0; i < Store.stages.length; i++) if (Store.stages[i].id === Store.stage) return i; return 0 }
         Rectangle { width: 1; height: parent.height; color: Theme.rule }
         // stage tabs: the lit tab slides to the stage you pick
-        Item { id: tabs; x: 8; y: 6; width: parent.width - 16; height: 52
+        Item { id: tabs; objectName: "stageTabs"; x: 8; y: 6; width: parent.width - 16; height: 52
             Rectangle { y: 2; width: tabs.width / 5 - 4; height: tabs.height - 4; radius: Theme.rMd; color: Theme.plate3
                 x: insp.at * tabs.width / 5 + 2
                 Behavior on x { NumberAnimation { duration: Motion.move(200); easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }

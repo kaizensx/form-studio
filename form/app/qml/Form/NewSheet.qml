@@ -79,7 +79,7 @@ Column {
                     MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true; onClicked: ns.pickId = rc.modelData.id; onDoubleClicked: { ns.pickId = rc.modelData.id; ns.make() } } } } }
         Column { width: parent.width; spacing: 6
             Txt { kind: "cap"; text: "Name" }
-            Field { id: name; objectName: "newName"; width: parent.width; placeholder: ns.chosen() ? ns.chosen().title : "e.g. Hallway phone dock"; onAccepted: ns.make() } }
+            Field { id: name; objectName: "newName"; width: parent.width; placeholder: ns.chosen() ? ns.chosen().title : "e.g. Hallway phone dock" } }       // Enter: the sheet's accept()
         Column { width: parent.width; spacing: 6
             Txt { kind: "cap"; text: "What it is for" }
             Area { id: brief; width: parent.width; minLines: 2; placeholder: "Optional. You can write this later." } }

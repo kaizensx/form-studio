@@ -25,7 +25,7 @@ import math
 
 import numpy as np
 
-ANALYSIS_VERSION = 5
+ANALYSIS_VERSION = 6
 MAPS = ("thickness", "overhang", "section", "features")
 MAP_LABEL = {"thickness": "Wall thickness", "overhang": "Overhangs", "section": "Layer cross-section", "features": "Small features"}
 TOL = 0.05                       # tessellation tolerance (mm) every map and mesh measurement is computed on
@@ -381,14 +381,17 @@ def _hex(c) -> str:
 
 def thickness_bands(nozzle: float) -> dict:
     """The thresholds the Thinnest-wall check uses: under two perimeters fails, under three is marginal."""
-    return {"fail_below": 2 * nozzle, "fine_from": 3 * nozzle, "deep_at": max(12 * nozzle, 3 * nozzle + 2.0)}
+    return {"fail_below": 2 * nozzle, "fine_from": 3 * nozzle}
 
 
 def thickness_colours(t, nozzle: float) -> np.ndarray:
+    """Three classes, the ones a nozzle cares about. Everything from three perimeters up is one plain colour: how
+    much thicker than "fine" a wall is says nothing about printing it, and shading it (a 30 mm block next to a 3 mm
+    rib, or the distance to whichever face a ray happens to meet) only painted patches that meant nothing."""
     b = thickness_bands(nozzle)
     t = np.asarray(t, dtype=np.float64)
     tt = np.where(np.isfinite(t), t, 1e9)
-    fine = _lerp(CLAY, CLAY_DEEP, (tt - b["fine_from"]) / (b["deep_at"] - b["fine_from"]))
+    fine = np.broadcast_to(np.asarray(CLAY, dtype=np.float64), (len(tt), 3))
     rgb = np.where((tt < b["fine_from"])[:, None], np.asarray(AMBER, dtype=np.float64), fine)
     rgb = np.where((tt < b["fail_below"])[:, None], np.asarray(SIGNAL, dtype=np.float64), rgb)
     rgb = np.where(np.isfinite(t)[:, None], rgb, np.asarray(CLAY, dtype=np.float64))
@@ -670,7 +673,7 @@ def op_analysis(key, recipe_id, values, map="thickness", nozzle=0.4, orientation
             "Wall thickness", "mm",
             [{"color": _hex(SIGNAL), "label": f"under {b['fail_below']:.1f} mm", "note": "cannot hold two perimeters"},
              {"color": _hex(AMBER), "label": f"{b['fail_below']:.1f} to {b['fine_from']:.1f} mm", "note": "marginal"},
-             {"color": _hex(CLAY), "to": _hex(CLAY_DEEP), "label": f"{b['fine_from']:.1f} to {b['deep_at']:.1f} mm and over", "note": "fine"}],
+             {"color": _hex(CLAY), "label": f"{b['fine_from']:.1f} mm and over", "note": "fine: three perimeters or more"}],
             f"Distance through the material to the opposing face, from {len(f['rep']):,} surface samples at most {f['h']:.1f} mm apart"
             + (" on the mesh" if mesh_design else "") + f". Thresholds are for a {nozzle:g} mm nozzle.",
             "Not a strength analysis. It does not see infill, layer adhesion or load, and a feature narrower than the "

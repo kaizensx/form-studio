@@ -7,6 +7,7 @@ import "F.js" as F
 // window narrows: the slicer chip drops the filament, then the name; search becomes its icon; notices become dots.
 Rectangle {
     id: bar
+    objectName: "topBar"
     property real inset: 0                    // room for the macOS window buttons
     height: 44; color: Theme.plate1
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule }

@@ -60,11 +60,10 @@ Column {
                 Column { width: 280; spacing: 6
                     Txt { kind: "cap"; text: "Name this design" }
                     Field { id: nameField; width: parent.width; placeholder: "e.g. Thick walls"; error: vs.nameMissing ? " " : ""
-                        onEdited: function (t) { if (t.trim()) vs.nameMissing = false }
-                        onAccepted: vs.save() } }
+                        onEdited: function (t) { if (t.trim()) vs.nameMissing = false } } }     // Enter: the sheet's accept()
                 Column { width: parent.width - 292; spacing: 6
                     Txt { kind: "cap"; text: "Note" }
-                    Field { id: noteField; width: parent.width; placeholder: "Optional"; onAccepted: vs.save() } } }
+                    Field { id: noteField; width: parent.width; placeholder: "Optional" } } }
             Txt { kind: "fine"; width: parent.width
                 text: vs.fromDraft ? "Your open draft (" + F.plural(F.keys(vs.draftChanges).length, "change") + ") is saved as it is. It stays a draft: nothing is committed."
                                    : "Saves the current head under a name. To save something different, change parameters first (a draft), or use Compare alternatives." } } }

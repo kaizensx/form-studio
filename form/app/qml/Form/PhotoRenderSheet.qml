@@ -7,6 +7,7 @@ import "F.js" as F
 // An illustration, never evidence. Cached per geometry and settings; a new revision makes old renders stale.
 Column {
     id: rs
+    objectName: "renderSheet"
     property string title: "Render"
     property string note: "An illustration of the current revision, never evidence"
     property int sheetWidth: Theme.sheetXl

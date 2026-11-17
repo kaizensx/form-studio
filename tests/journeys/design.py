@@ -16,8 +16,9 @@ def run(ui):
     ui.click(name)
     ui.type("Sensor case")
     ui.shot("design-new-sheet")
-    ui.click_text("Create design")
+    ui.key("Return")                                   # Enter in the name field creates it, once
     ui.wait_until(lambda: ui.store.get("screen") == "work", 120, "the new project to open")
+    ui.eq(len(ui.api("/studio")["projects"]), 1, "one Enter makes one project")
     pid = ui.store.get("pid")
     ui.eq(ui.api("/projects/" + pid)["project"]["name"], "Sensor case", "the typed name reached the engine")
     ui.eq(ui.api("/projects/" + pid)["project"]["recipe"], "enclosure")

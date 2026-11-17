@@ -13,6 +13,7 @@ Rectangle {
     property string pending: ""          // label of the map being computed
     property var check: null             // the matching pipeline check, when there is one (e.g. Thinnest wall)
     property bool collapsed: false
+    property bool detail: false          // the method and the full caveat are unfolded
     property real maxHeight: 520
     signal toggled()
     readonly property var legend: map ? map.legend : null
@@ -77,14 +78,14 @@ Rectangle {
                     model: lg.legend ? lg.legend.stops : []
                     Item { id: sw
                         required property var modelData
-                        width: parent.width; height: Math.max(18, sn.implicitHeight + 15)
+                        width: parent.width; height: sn.text !== "" ? 20 + sn.implicitHeight : 18
                         Rectangle { y: 2; width: 30; height: 12; radius: 2; border.color: Theme.rule2
                             gradient: Gradient { orientation: Gradient.Horizontal
                                 GradientStop { position: 0; color: sw.modelData.color }
                                 GradientStop { position: 1; color: sw.modelData.to || sw.modelData.color } } }
                         Txt { x: 40; mono: true; font.pixelSize: 12; text: sw.modelData.label
                             width: parent.width - 40; wrapMode: Text.NoWrap; elide: Text.ElideRight }
-                        Txt { id: sn; x: 40; y: 15; kind: "fine"; width: parent.width - 40; text: sw.modelData.note || "" } } } }
+                        Txt { id: sn; x: 40; y: 20; kind: "fine"; visible: text !== ""; width: parent.width - 40; text: sw.modelData.note || "" } } } }
             Txt { kind: "fine"; tone: 2; width: parent.width; visible: !!lg.map && (lg.map.map === "overhang" || lg.map.map === "section")
                 text: lg.map ? "Printed “" + lg.map.orientation_label + "”" + (lg.map.map === "overhang" ? ", angles in degrees past vertical" : "") : "" }
 
@@ -100,10 +101,17 @@ Rectangle {
 
             SectionChart { visible: !!lg.map && !!lg.map.chart; chart: lg.map ? lg.map.chart || null : null }
 
-            Txt { kind: "fine"; tone: 2; width: parent.width; visible: !!lg.legend
-                text: lg.legend ? lg.legend.what + " Revision " + F.pad(lg.map.rev) + ", tessellated at " + lg.map.tessellation_mm + " mm." : "" }
-            Rectangle { width: parent.width; height: nt.implicitHeight + 14; radius: Theme.rSm; color: Theme.alpha(Theme.amber, 0.07); visible: !!lg.legend
-                Txt { id: nt; x: 9; y: 7; width: parent.width - 18; kind: "fine"; color: Qt.lighter(Theme.amber, 1.3); text: lg.legend ? lg.legend.not : "" } }
+            // what it is not: always in sight, one or two lines
+            Txt { kind: "fine"; width: parent.width; visible: !!lg.legend; color: Qt.lighter(Theme.amber, 1.3)
+                text: lg.legend ? String(lg.legend.not).split(". ")[0].replace(/\.$/, "") + "." : "" }
+            // how it was computed, and the rest of the caveat: one click away, so the dock stays short
+            Item { width: parent.width; height: 20; visible: !!lg.legend
+                Row { spacing: 4; anchors.verticalCenter: parent.verticalCenter
+                    Icon { name: "chevron_right"; size: 11; color: Theme.ink3; rotation: lg.detail ? 90 : 0; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { kind: "fine"; text: "How this is computed"; color: dm.containsMouse ? Theme.ink : Theme.ink2 } }
+                MouseArea { id: dm; objectName: "legendDetail"; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: lg.detail = !lg.detail } }
+            Txt { kind: "fine"; tone: 2; width: parent.width; visible: !!lg.legend && lg.detail
+                text: lg.legend ? lg.legend.what + " Revision " + F.pad(lg.map.rev) + ", tessellated at " + lg.map.tessellation_mm + " mm. " + lg.legend.not : "" }
         }
     }
 }

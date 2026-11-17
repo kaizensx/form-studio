@@ -13,6 +13,37 @@ FORM_DATA=... .venv/bin/python -m form.app --shot out.png --project ID --eval 'S
 `--shot` prints every QML warning. A screen is done when it prints `ok: 0 warning(s)` and the screenshot looks right.
 `--size 1440x1200` gives a taller window so a long panel is visible.
 
+## Interaction tests: press the buttons
+
+A screenshot does not show that a button works. `tests/journeys/*.py` drive the real window with synthetic mouse and
+key events (`form/app/uitest.py`) and assert outcomes in the engine. Each journey runs in its own process with its own
+data folder, window settings and a stand-in agent CLI; no model, no network, no native dialog, nothing opened outside.
+
+```bash
+.venv/bin/python -m unittest tests.test_ui_journeys                            # all journeys (about three minutes)
+FORM_UI_SHOTS=.dev/uitest .venv/bin/python -m unittest tests.test_ui_journeys.Journeys.test_design   # one, keep its screenshots
+FORM_DATA=/tmp/x FORM_CONFIG=/nonexistent .venv/bin/python -m form.app --uitest tests/journeys/tools.py::journey_measure
+```
+
+```python
+def run(ui):                                   # or several functions named journey_…, run in file order
+    ui.click("stage-fit")                      # by objectName; ui.click_text("Commit as r02") by what it reads
+    ui.fill("fitHi", "0.5", enter=True)        # click a field, replace its text, press Return
+    ui.key("Ctrl+K"); ui.type("measure"); ui.key("Return")
+    ui.drag(beam, (40, 0)); ui.wheel("viewport", 240); ui.right_click("viewport")
+    ui.wait_until(lambda: ui.store.get("measuring") is True, 3, "measuring")      # conditions, never sleeps
+    ui.eq(ui.api("/projects/" + pid)["project"]["head"], 2)                       # the engine, not the screen
+    ui.shot("fit-window")
+```
+
+- A control a journey presses needs an `objectName` (or a text that is unique where it is looked for with `within=`).
+  `tests/test_qa.py` fails when a journey names one the QML no longer has.
+- Open native dialogs with `Store.ask(dlg)`, never `dlg.open()`: under test the dialog is answered with a path in the
+  test's folder (`ui.saved("name.step")`, `ui.pick_file(path)`), and its own `onAccepted` runs as usual.
+- `Bridge.reveal / openLink / openDataFolder` are recorded under test (`ui.outside`) instead of opening Finder or a browser.
+- A journey fails on any QML warning. `FORM_UITEST_WATCHDOG=120` prints every thread's stack if the event loop blocks.
+- A new shortcut goes in `ShortcutsSheet.qml`; `tests/journeys/shell.py` presses every key the sheet lists.
+
 ## Rules
 
 - **QML's JavaScript is ES2016.** No `async/await`, no object spread (`{...a}`; use `Object.assign`). Promises, arrow functions,
@@ -46,6 +77,7 @@ FORM_DATA=... .venv/bin/python -m form.app --shot out.png --project ID --eval 'S
 | Control heights | `hSm 24` `hMd 28` `hLg 34` |
 | Sheet widths | `sheetS 480` `sheetM 640` `sheetL 840` `sheetXl 1080` |
 | Motion | `press 110` (a control answering) · `fast 120` (hover, colour) · `pop 150` (menus, tooltips) · `base 180` (sheets, toasts) · `exit 110` (anything leaving) · `slow 320` (entrances) · `stagger 45` |
+| Motion, workspace | `ui 170` (tool options, inspector sections) · `cross 240` (cross-fades of the part) · `camera 420` · `part 300` (assembly parts travelling). `Motion.qml` only renames these for older code; use `Theme` |
 | Easing (bezier points) | `easeOut` entering and answering · `easeMove` moving on screen · `easeDrawer` sliding panels |
 
 `Theme.reduced` is read once at start from the OS "reduce motion" setting (or `FORM_REDUCED_MOTION=1`). Write movement so

@@ -67,6 +67,30 @@ class Journeys(unittest.TestCase):
     def test_design(self):
         self.journey("design.py")
 
+    def test_viewport_tools(self):
+        self.journey("tools.py")
+
+    def test_fit_prove_release(self):
+        self.journey("prove_release.py")
+
+    def test_conversations(self):
+        self.journey("chat.py")
+
+    def test_home(self):
+        self.journey("home.py")
+
+    def test_sheets_palette_shortcuts(self):
+        # installs and the upgrade are simulated, one item is reported missing so there is something to install,
+        # and a newer release is pretended so the update sheet has something to offer
+        self.journey("shell.py", env_extra={"FORM_INSTALL_FAKE": "0.6", "FORM_SETUP_PRETEND_MISSING": "openscad",
+                                            "FORM_FAKE_LATEST": "99.0.0"})
+
+    def test_smallest_window(self):
+        self.journey("sizes.py", size="1120x700")
+
+    def test_large_window(self):
+        self.journey("sizes.py", size="1728x1117")
+
 
 if __name__ == "__main__":
     unittest.main()

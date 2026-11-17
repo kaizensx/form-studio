@@ -254,6 +254,8 @@ def journey_variants_save_and_promote(ui):
     ui.type("Thick walls")
     ui.key("Return")
     ui.wait_until(lambda: saved_variants(ui, pid) == ["Thick walls"], 20, "the variant in the engine")
+    ui.settle(400)
+    ui.eq(len([t for t in ui.store.get("toasts") if t["msg"].startswith("Saved variant")]), 1, "one Enter saves the variant once")
     ui.wait_until(lambda: ui.exists(text="Promote to head", within=card), 20, "the variant's card")
     ui.settle(600)
     ui.shot("sheet-variants")

@@ -9,6 +9,7 @@ import "F.js" as F
 // cross-fades through the viewport's own swap (Store.fadeTo); the "viewing only" notice is drawn by the workspace.
 Item {
     id: tl
+    objectName: "timeline"
     property bool narrow: width < 620
     readonly property var revs: Store.revList
     readonly property int headRev: Store.project ? Store.project.head : 0
@@ -98,7 +99,7 @@ Item {
     Rectangle {
         id: card
         readonly property var r: tl.rev(tl.hover)
-        visible: tl.visible && !!r
+        visible: tl.visible && !!r && r.n !== tl.current       // the revision on screen needs no preview (and the card would cover its notice)
         width: 204; height: 196; radius: Theme.rMd; color: Theme.plate2; border.color: Theme.rule2; z: 3
         x: Math.max(0, Math.min(tl.width - width, track.x + track.tickX(Math.max(0, tl.hover)) - width / 2))
         y: -height - 14

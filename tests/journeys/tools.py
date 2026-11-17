@@ -1,5 +1,7 @@
 """The viewport's tools, from the rail and from their keys: select, measure, section, analyze, assembly, history,
 print simulation, photo render."""
+import os
+
 from _lib import has_slicer, make, open_project, open_sheet_wait, close_sheet_esc
 
 DATA = "fresh"
@@ -211,7 +213,31 @@ def _hidden(sim):
 def journey_photo_render_sheet(ui):
     ui.click_text("Photo render")
     open_sheet_wait(ui, "render")
+    rs = ui.item("renderSheet")
+    ui.wait_until(lambda: rs.property("st") is not None, 30, "the render sheet to load what Blender it has")
+    card = ui.item("sheetCard")
+    btn = ui.item(text="Render", within=card, exact=False)
     ui.shot("tools-render-sheet")
+    if not rs.property("ready"):
+        print("  (Blender is not installed: the Render button is off, as it should be)")
+        ui.check(btn.property("enabled") is False, "Render is off without Blender")
+        return close_sheet_esc(ui)
+    ui.check(btn.property("enabled") is True, "Render is on when Blender is installed")
+    if os.environ.get("FORM_UI_RENDER") != "1":
+        print("  (set FORM_UI_RENDER=1 to make one real Blender render)")
+        return close_sheet_esc(ui)
+    # one real render, with Fast preview ticked
+    ui.click_text("Fast preview", within=card)
+    ui.wait_until(lambda: rs.property("fast") is True, 2, "Fast preview")
+    ui.click(btn)
+    ui.wait_until(lambda: rs.property("busy") is True or rs.property("shown") is not None, 10, "the render to be asked for")
+    ui.wait_until(lambda: rs.property("busy") is False, 600, "Blender to finish")
+    err = rs.property("error")
+    ui.check(not (err.toVariant() if hasattr(err, "toVariant") else err), f"the render finished without an error: {err}")
+    latest = ui.api("/projects/" + ui.store.get("pid") + "/photo")["latest"]
+    ui.check(latest and latest["samples"] > 0, f"the engine has a render: {latest}")
+    ui.settle(800)
+    ui.shot("tools-render-done")
     close_sheet_esc(ui)
 
 

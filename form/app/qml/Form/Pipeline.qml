@@ -6,6 +6,7 @@ import "F.js" as F
 // It is the "now" row of the workspace's bottom strip; `flat` drops its own card when the strip draws one.
 Rectangle {
     id: pl
+    objectName: "pipeline"
     property bool flat: false
     readonly property bool narrow: width < 620          // labels only; the detail moves into the tooltip
     readonly property bool tiny: width < 470            // dots only, and one sentence for whatever is not current

@@ -486,7 +486,10 @@ QtObject {
     function openConv(id) {
         if (!id) return newChat()
         _chatPoll.stop()
-        convId = id; chatItems = []; chatTools = ({}); chatLive = null; chatNext = 0; chatBusy = false; chatAttach = []
+        // the feed is emptied first: a message of the old conversation must never be drawn under the new id
+        // (its attachment thumbnails would be asked for from the wrong conversation)
+        chatItems = []; chatTools = ({}); chatLive = null; chatNext = 0; chatBusy = false; chatAttach = []
+        convId = id
         talkOpen = true
         return get("/conversations/" + id).then(function (r) {
             if (convId !== id) return
