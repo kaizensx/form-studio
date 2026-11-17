@@ -7,13 +7,14 @@ import FormNative
 Txt {
     id: md
     property string source: ""
-    readonly property var look: ({ mono: Theme.mono, code_bg: String(Theme.well), rule: String(Theme.plate4), muted: String(Theme.ink3), link: String(Theme.datum),
+    property bool revs: false            // "r04" in a reply links to that revision (agent replies only)
+    readonly property var look: ({ revs: revs, mono: Theme.mono, code_bg: String(Theme.well), rule: String(Theme.plate4), muted: String(Theme.ink3), link: String(Theme.datum),
                                    code_px: Theme.tBody - 1, head_px: Theme.tLead })
     textFormat: Text.RichText
     text: source === "" ? "" : Bridge.markdown(source, look)
     lineHeight: 1.45
     color: Theme.ink
     linkColor: Theme.datum
-    onLinkActivated: function (l) { Bridge.openLink(l) }
+    onLinkActivated: function (l) { if (l.indexOf("form:rev/") === 0) Store.openRevRef(parseInt(l.slice(9))); else Bridge.openLink(l) }
     HoverHandler { enabled: md.hoveredLink !== ""; cursorShape: Qt.PointingHandCursor }
 }

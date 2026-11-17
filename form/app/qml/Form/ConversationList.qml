@@ -78,9 +78,11 @@ Item {
                     Icon { visible: row.c.pinned; name: "pin"; size: 11; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
                     Txt { text: row.c.title; width: parent.width - (row.c.pinned ? 17 : 0); elide: Text.ElideRight; wrapMode: Text.NoWrap; font.weight: row.current ? 600 : 500 } }
                 Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
-                    text: row.c.match ? row.c.match
+                    color: row.c.state === "asking" ? Theme.amber : Theme.ink3
+                    text: row.c.state === "asking" ? "Waiting for your answer · " + cl.projectName(row.c.project) : row.c.match ? row.c.match
                         : (!cl.compact && Store.pid && row.c.project === Store.pid ? "" : (row.c.project ? cl.projectName(row.c.project) : row.c.project_was ? row.c.project_was.name + " (in the trash)" : "General") + " · ") + F.ago(row.c.updated) + " · " + F.plural(row.c.messages, "message") } }
-            Rectangle { id: dot; visible: row.c.state === "running" && !acts.visible; width: 7; height: 7; radius: 3.5; color: Theme.datum
+            Rectangle { id: dot; visible: (row.c.state === "running" || row.c.state === "asking") && !acts.visible; width: 7; height: 7; radius: 3.5
+                color: row.c.state === "asking" ? Theme.amber : Theme.datum
                 anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter
                 SequentialAnimation on opacity { running: dot.visible; loops: Animation.Infinite
                     NumberAnimation { to: 0.3; duration: 600 } NumberAnimation { to: 1; duration: 600 } } }

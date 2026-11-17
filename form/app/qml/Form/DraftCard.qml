@@ -20,7 +20,10 @@ Rectangle {
                 Txt { kind: "cap"; text: Store.draftAgent ? "Draft by " + Store.draftAgent : "Draft change"; color: Theme.blueprint } }
             Txt { kind: "fine"; mono: true; anchors.right: parent.right; text: Store.preview ? "rebuilt in " + Math.round(Store.preview.timing.total_s * 1000) + " ms" : "" } }
         Note { visible: !!Store.draftError; kind: "red"; title: Store.draftError ? Store.draftError.message : ""
-            text: (Store.draftError && Store.draftError.hint ? Store.draftError.hint + " " : "") + "The view still shows the last version that built. Nothing has been saved." }
+            text: (Store.draftError && Store.draftError.hint ? Store.draftError.hint + " " : "") + "The view still shows the last version that built. Nothing has been saved."
+            FixBtn { subject: "this draft does not build"
+                details: Store.draftError ? "Error: " + Store.draftError.message + (Store.draftError.hint ? "\nHint: " + Store.draftError.hint : "")
+                    + "\nDraft values: " + JSON.stringify(Store.draftValues) : "" } }
         Column { width: parent.width; visible: !!d.im
             Repeater { model: d.im ? d.im.params : []
                 Delta { required property var modelData; label: modelData.label; from: F.trim(modelData.from); to: F.trim(modelData.to); unit: modelData.unit; tint: Theme.blueprint } } }

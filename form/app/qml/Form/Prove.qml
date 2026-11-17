@@ -27,7 +27,11 @@ Column {
                 : root.cn.state === "failed" ? (root.cn.error ? root.cn.error.message : "The checks failed.")
                 : root.cn.state === "stale" ? "The last checks were made for " + F.pad(root.cn.last_rev) + " and do not describe " + root.head + "."
                 : "Checks have not been produced for this revision." }
-        Btn { kind: "primary"; icon: "play"; text: root.busy ? "Working…" : "Run pipeline"; enabled: !root.busy; onClicked: Store.run() }
+        Row { spacing: 8
+            Btn { kind: "primary"; icon: "play"; text: root.busy ? "Working…" : "Run pipeline"; enabled: !root.busy; onClicked: Store.run() }
+            FixBtn { visible: !!root.cn && root.cn.state === "failed" && Store.chatReady && !!Store.chat.available; small: false
+                subject: "the checks could not be produced for " + root.head
+                details: root.cn && root.cn.error ? "Error: " + root.cn.error.message + (root.cn.error.hint ? "\nHint: " + root.cn.error.hint : "") : "" } }
     }
 
     // ── checks: the score first ──────────────────────────────
@@ -64,8 +68,17 @@ Column {
     }
 
     // ── what needs a look: failures and reviews, in full ─────
+    function checkText(c) {
+        return "- " + c.status + " · " + c.label + (c.value !== undefined && c.value !== null && c.value !== "" ? " = " + c.value : "")
+            + (c.evidence ? " (" + c.evidence + ")" : "") + (c.detail ? ": " + c.detail : "") + (c.id ? " [check " + c.id + "]" : "")
+            + (c.feature ? " [feature " + c.feature + "]" : "")
+    }
+    readonly property var failing: all.filter(function (c) { return c.status === "FAIL" })
     Sec { visible: root.open.length > 0
         title: root.roll.FAIL ? "Failed and to review" : "To review"
+        FixBtn { visible: root.failing.length > 0 && Store.chatReady && !!Store.chat.available
+            subject: root.failing.length === 1 ? "a check fails on " + root.head + ": " + root.failing[0].label : F.plural(root.failing.length, "check") + " fail on " + root.head
+            details: "Failing checks:\n" + root.failing.map(root.checkText).join("\n") }
         Column { x: -8; width: parent.width + 16
             Repeater {
                 model: root.open
@@ -91,6 +104,11 @@ Column {
                     }
                     MouseArea { id: cm; objectName: "openCheckArea"; anchors.fill: parent; enabled: cr.link; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                         onClicked: Store.marker(cr.modelData) }
+                    HoverHandler { id: crh }
+                    // one failing check: fix just this one (shown on hover, so the list stays quiet)
+                    FixBtn { objectName: "fixCheck"; compact: true; anchors.right: parent.right; anchors.rightMargin: 8; anchors.bottom: parent.bottom; anchors.bottomMargin: 8
+                        visible: cr.modelData.status === "FAIL" && Store.chatReady && !!Store.chat.available && (crh.hovered || hovered)
+                        subject: "the check “" + cr.modelData.label + "” fails on " + root.head; details: root.checkText(cr.modelData) }
                 }
             }
         }
@@ -235,9 +253,14 @@ Column {
                 : root.sliceFailed ? (root.sn.error && root.sn.error.hint || "")
                 : root.sn.state === "stale" ? "The last slice was of " + F.pad(root.sn.last_rev) + "; it does not describe " + root.head + "."
                 : "Not sliced yet." }
-        Btn { icon: "layers"; text: root.busy ? "Working…" : root.sliceFailed ? "Try again" : "Slice now"
-            enabled: !root.busy && !(root.sn && root.sn.unavailable)
-            onClicked: Store.run(["geometry", "exports", "checks", "slice"], root.sliceFailed) }
+        Row { spacing: 8
+            Btn { icon: "layers"; text: root.busy ? "Working…" : root.sliceFailed ? "Try again" : "Slice now"
+                enabled: !root.busy && !(root.sn && root.sn.unavailable)
+                onClicked: Store.run(["geometry", "exports", "checks", "slice"], root.sliceFailed) }
+            FixBtn { visible: root.sliceFailed && Store.chatReady && !!Store.chat.available; small: false
+                subject: "the slice failed for " + root.head
+                details: root.sn && root.sn.error ? "Slicer: " + (Store.slicer.label || "the configured slicer") + "\nError: " + root.sn.error.message
+                    + (root.sn.error.hint ? "\nHint: " + root.sn.error.hint : "") : "" } }
     }
 
     FileDialog {

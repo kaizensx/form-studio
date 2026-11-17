@@ -40,6 +40,7 @@ class Run:
     budget_usd: float = 3.0
     images: list = field(default_factory=list)    # absolute paths of attached images
     files: list = field(default_factory=list)     # absolute paths of every attachment the agent may read
+    tool_timeout_s: float = 1200.0                # how long one MCP tool call may take (ask_user waits for a person)
 
 
 class Parser:
@@ -47,6 +48,10 @@ class Parser:
 
     def feed(self, line: str) -> list[dict]:
         raise NotImplementedError
+
+    def finish(self) -> list[dict]:
+        """Called once the CLI's output has ended: events still owed (for CLIs without a final event)."""
+        return []
 
 
 class Adapter:
@@ -80,6 +85,10 @@ class Adapter:
             out["models"], out["efforts"] = [], []
             return out
         try:
+            out["signin"] = self.signin(cfg, exe)
+        except Exception:                                         # never let a sign-in probe break the list
+            out["signin"] = None
+        try:
             out["models"], out["efforts"] = self.models(cfg, exe), self.efforts(cfg, exe)
         except Exception as e:                                    # a broken CLI must not break the app
             out["models"], out["efforts"] = Adapter.models(self, cfg, exe), []
@@ -95,6 +104,22 @@ class Adapter:
 
     def explain(self, error: str) -> dict | None:
         """A known failure of this CLI, in plain words with what to do in FORM: {"message", "hint"}. None: show it as is."""
+        return None
+
+    def run_env(self, run: Run) -> dict:
+        """Extra environment variables for this run's process (on top of the user's own)."""
+        return {}
+
+    def resolve_model(self, session: str | None) -> str | None:
+        """The model id a finished run used, for CLIs whose stream does not say it (read from the CLI's own files)."""
+        return None
+
+    def model_label(self, model_id: str | None) -> str:
+        from .models import pretty
+        return pretty(model_id)
+
+    def signin(self, cfg: dict, exe: str) -> dict | None:
+        """{"signed_in": True | False | None, "how": "..."} without a prompt or a network call; None: not checked."""
         return None
 
     def resume_failed(self, stderr: str, events: list[dict]) -> bool:

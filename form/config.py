@@ -53,7 +53,7 @@ DEFAULTS = {
     # Chat in the bench runs Claude Code headless on your account, with FORM's tools (and web lookups if web = true).
     # agent / model / effort are what a new conversation starts with (the app's model picker writes them here);
     # agent: claude | codex | gemini. model: an alias or id that agent's CLI accepts, or "default". effort: "" = the CLI's own.
-    "chat": {"enabled": True, "cli": "claude", "model": "opus", "web": True, "budget_usd_per_message": 3.0,
+    "chat": {"enabled": True, "cli": "claude", "model": "opus", "web": True, "budget_usd_per_message": 3.0, "ask_timeout_s": 900,
              "agent": "claude", "effort": ""},
     # Optional: Blender, run headless for illustrative renders (render_photo). Empty app = look in the usual places.
     "blender": {"app": "", "timeout_s": 180, "samples": 128},

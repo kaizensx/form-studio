@@ -56,6 +56,7 @@ QtObject {
     property var chatAttach: []        // files attached to the next message: { id, name, kind, file, size }
     property int chatFocus: 0          // bumps when the composer should take the keyboard
     property string chatRecall: ""     // text to put back into the composer (edit the last message)
+    property var chatAsking: null      // the agent's open question (ask_user), while it waits for your answer
     property real actTs: Date.now() / 1000
 
     // ── derived ──────────────────────────────────────────────
@@ -467,13 +468,19 @@ QtObject {
         for (var i = 0; i < ms.length; i++) if (ms[i].id === model) return ms[i].label
         return model || "Default"
     }
+    // the composer's chip: the version the alias resolved to ("Opus 5.5"), else the picker's label
+    function modelShort(agent, model) {
+        var a = agentInfo(agent), ms = a ? a.models : []
+        for (var i = 0; i < ms.length; i++) if (ms[i].id === model) return ms[i].resolved_label || ms[i].label
+        return model || "Default"
+    }
     property var _chatInit: Connections { target: s; function onStudioChanged() { if (s.studio && !s.chatAgent) s._useDefaults() } }
     function _useDefaults() { chatAgent = chatDefault.agent; chatModel = chatDefault.model; chatEffort = chatDefault.effort }
 
     property var _chatPoll: Timer { interval: 250; onTriggered: s._chatTick() }
     property var _convPoll: Timer {
         interval: 3000; repeat: true
-        running: s.screen !== "boot" && (s.chatBusy || s.convs.some(function (c) { return c.state === "running" }))
+        running: s.screen !== "boot" && (s.chatBusy || s.convs.some(function (c) { return c.state === "running" || c.state === "asking" }))
         onTriggered: s.loadConvs()
     }
     function loadConvs() { return get("/conversations").then(function (r) { convs = r.conversations }, function () {}) }
@@ -482,6 +489,7 @@ QtObject {
     function newChat() {
         _chatPoll.stop()
         convId = ""; conv = null; chatItems = []; chatTools = ({}); chatLive = null; chatNext = 0; chatBusy = false; chatAttach = []
+        chatAsking = null
         if (studio) _useDefaults()
         talkOpen = true; chatFocus++
     }
@@ -490,7 +498,7 @@ QtObject {
         _chatPoll.stop()
         // the feed is emptied first: a message of the old conversation must never be drawn under the new id
         // (its attachment thumbnails would be asked for from the wrong conversation)
-        chatItems = []; chatTools = ({}); chatLive = null; chatNext = 0; chatBusy = false; chatAttach = []
+        chatItems = []; chatTools = ({}); chatLive = null; chatNext = 0; chatBusy = false; chatAttach = []; chatAsking = null
         convId = id
         talkOpen = true
         return get("/conversations/" + id).then(function (r) {
@@ -499,6 +507,8 @@ QtObject {
             chatAgent = r.agent; chatModel = r.model; chatEffort = r.effort || ""
             if (r.state === "running") _chatPoll.restart()
             chatFocus++
+            // a conversation about a design opens that design: viewport, checks and all (not when it was deleted)
+            if (r.project && r.project !== pid && projectExists(r.project)) return open(r.project)
         }, function (e) { fail(e); newChat(); loadConvs() })
     }
     // merge a reply from GET /conversations/<id>?from=chatNext into the feed
@@ -512,6 +522,7 @@ QtObject {
         if (r.items.length || items.length !== chatItems.length) { chatItems = items; chatTools = tools }
         chatNext = r.next; chatLive = r.live; chatSeconds = r.seconds || 0
         chatBusy = r.state === "running"
+        chatAsking = r.asking || null
         var m = Object.assign({}, r); delete m.items; delete m.live
         conv = m
     }
@@ -544,12 +555,65 @@ QtObject {
             chatItems = chatItems.concat([{ t: "error", text: e.message, local: true }])
         })
     }
+    // ── the agent asks, you answer (ask_user); its follow-ups; Fix with the agent (chat workstream) ──
+    function projectExists(id) {
+        var ps = studio ? studio.projects : []
+        for (var i = 0; i < ps.length; i++) if (ps[i].id === id && !ps[i].error) return true
+        return false
+    }
+    function answerAsk(qid, text, choices) {
+        var id = convId
+        if (!id) return Promise.resolve()
+        chatAsking = null                                   // the card shows the answer at once; the engine confirms it
+        return post("/conversations/" + id + "/answer", { id: qid, text: text || "", choices: choices || [] }).then(function () {
+            if (convId === id) _chatTick()
+        }, function (e) { fail(e); if (convId === id) _chatTick() })
+    }
+    // a revision named in a reply ("r04"): show it, read-only, from the timeline
+    function openRevRef(n) {
+        var want = conv && conv.project ? conv.project : pid
+        if (!want) return
+        var go = function () { if (project && n <= project.head) { timelineOpen = true; showRev(n, true) } else toast(F.pad(n) + " is not in this design") }
+        if (want !== pid && projectExists(want)) open(want).then(go); else go()
+    }
+    // a change the agent made, from its reply card: compare with the revision before, or go back to it
+    function compareChange(c) {
+        var go = function () { setStage("shape"); compareWith(c.from) }
+        if (c.project !== pid) open(c.project).then(go); else go()
+    }
+    function undoChange(c) {
+        var go = function () { checkout(c.from) }
+        if (c.project !== pid) open(c.project).then(go); else go()
+    }
+    function fixPrompt(subject, details) {
+        var where = project ? "“" + project.name + "” (project " + pid + "), " + F.pad(project.head) : "this design"
+        return "Fix this in " + where + ": " + subject + "\n\n" + (details ? details + "\n\n" : "")
+            + "Read the current state with Form Studio's tools first and explain the cause in one or two lines. Then preview "
+            + "the smallest change that fixes it and render it. Commit it (with expect_head) only if it builds and no check "
+            + "fails; if the fix changes how the part fits or looks, ask me first with ask_user. Say what is still unverified."
+    }
+    // "Fix with <agent>": open this design's conversation (or a new one) and send the failure, word for word
+    function fixWith(subject, details) {
+        if (!chat.available || !chatReady) return toast("No agent is connected", "Install one under Settings, Software.", true)
+        if (chatBusy) return toast("The conversation is still answering", "Wait for it, or stop it, then press Fix again.", true)
+        var text = fixPrompt(subject, details), here = pid
+        talkOpen = true
+        if (conv && conv.project === here) return send(text)
+        get("/conversations?project=" + here).then(function (r) {
+            var best = null
+            r.conversations.forEach(function (c) { if (c.messages && (!best || c.updated > best.updated)) best = c })
+            if (best && best.state !== "running") openConv(best.id).then(function () { if (s.pid === here && !s.chatBusy) s.send(text) })
+            else { newChat(); send(text) }
+        }, function () { newChat(); send(text) })
+    }
     function stopChat() { if (convId) post("/conversations/" + convId + "/stop", {}).then(function () { s._chatTick() }, function () {}) }
     function lastUserText() {
         for (var i = chatItems.length - 1; i >= 0; i--) if (chatItems[i].t === "user") return chatItems[i].text
         return ""
     }
     function retryChat() { var t = lastUserText(); if (t && !chatBusy) send(t) }
+    // a label for a model id on a message footer, when the engine did not name it
+    function modelName(ev) { return ev ? (ev.label || ev.model || "") : "" }
     function recallChat(text) { chatRecall = ""; chatRecall = text || lastUserText(); chatFocus++ }
 
     // what another agent did while you watch: a quiet line in the open conversation

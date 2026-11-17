@@ -178,7 +178,11 @@ Column {
             }
             Note { visible: !!rs.error; kind: "red"; width: ctl.width; title: rs.error ? rs.error.message : ""; text: rs.error ? (rs.error.hint || "") : ""
                 Txt { visible: !!(rs.error && rs.error.log); width: parent.width; mono: true; font.pixelSize: 10; tone: 3; maximumLineCount: 8; elide: Text.ElideLeft
-                    text: rs.error && rs.error.log ? rs.error.log.split("\n").slice(-8).join("\n") : "" } }
+                    text: rs.error && rs.error.log ? rs.error.log.split("\n").slice(-8).join("\n") : "" }
+                FixBtn { subject: "the Blender illustration render failed"
+                    details: rs.error ? "Error: " + rs.error.message + (rs.error.hint ? "\nHint: " + rs.error.hint : "")
+                        + (rs.error.log ? "\nLast lines of the log:\n" + rs.error.log.split("\n").slice(-12).join("\n") : "") : ""
+                    onClicked: Store.openSheet("") } }
         }
 
         // ── right: the picture ────────────────────────────

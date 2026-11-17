@@ -5,7 +5,7 @@ import FormNative
 // (new design, code rewrite, commit, a render with its picture) are always visible; the rest unfold on click.
 Column {
     id: sg
-    property var steps: []                 // [{ id, tool, input }]
+    property var steps: []                 // [{ id, tool, input, ts }]
     property bool running: false           // this group is still being added to
     property bool expanded: false
     signal toggle()
@@ -26,6 +26,8 @@ Column {
         case "read_document": return ["file_text", "Read a document"]
         case "Read": return ["paperclip", "Looked at an attached file"]
         case "WebSearch": case "web_search": return ["search", "Searched the web"]
+        case "ask_user": return ["message_square", "Asked you a question"]
+        case "run_pipeline": return ["play", "Ran the pipeline"]
         }
         return null
     }
@@ -65,7 +67,12 @@ Column {
                 Txt { id: lbl; x: 38; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
                     mono: !st.how; font.pixelSize: st.how ? 12 : 11; tone: st.how ? 2 : 3
                     text: st.how ? st.how[1] : st.modelData.tool }
-                Txt { anchors.left: lbl.right; anchors.leftMargin: 8; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                // a step still running says for how long (pipelines, renders and questions can take a while)
+                Txt { id: el; objectName: "stepElapsed"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    visible: !st.r && sg.running && !!st.modelData.ts && text !== ""; mono: true; font.pixelSize: 11; tone: 3
+                    text: { var t = (Store.chatSeconds, Date.now() / 1000 - (st.modelData.ts || 0))
+                            return t < 3 ? "" : t < 90 ? Math.round(t) + " s" : Math.floor(t / 60) + " min " + Math.round(t % 60) + " s" } }
+                Txt { anchors.left: lbl.right; anchors.leftMargin: 8; anchors.right: el.visible ? el.left : parent.right; anchors.rightMargin: el.visible ? 8 : 0; anchors.verticalCenter: parent.verticalCenter
                     visible: !st.how || sg.expanded; mono: true; font.pixelSize: 11; tone: 4; elide: Text.ElideRight; wrapMode: Text.NoWrap
                     text: st.how ? st.modelData.tool : (st.modelData.input || "") }
             }

@@ -22,7 +22,7 @@ PDF_EXT = {".pdf"}
 CAD_EXT = {".step", ".stp", ".stl"}
 MAX_ATTACHMENT = 60_000_000
 ID_RE = re.compile(r"[0-9a-f]{12}")
-EVENT_KINDS = ("user", "start", "text", "tool", "result", "act", "end", "error")
+EVENT_KINDS = ("user", "start", "text", "tool", "result", "act", "end", "error", "ask", "answer", "suggest")
 
 
 _last = [0.0]
@@ -184,6 +184,8 @@ class Conversations:
                 meta["preview"] = re.sub(r"\s+", " ", ev.get("text", ""))[:140]
             elif t == "text":
                 meta["preview"] = re.sub(r"\s+", " ", ev.get("text", ""))[:140]
+            elif t == "ask":
+                meta["preview"] = "Question: " + re.sub(r"\s+", " ", ev.get("question", ""))[:128]
             elif t == "start" and ev.get("model"):
                 meta["resolved_model"] = ev["model"]
             elif t == "end":
