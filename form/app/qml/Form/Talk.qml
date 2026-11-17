@@ -251,8 +251,7 @@ Rectangle {
                                     HoverHandler { id: ah }
                                     Tip { show: ah.hovered; text: ach.modelData.name } } } }
                         Txt { id: ut; width: Math.min(implicitWidth, body.width - 54); text: it.m.text; lineHeight: 1.4 } } } } }
-            Component { id: cText; Txt { text: it.m.text; textFormat: Text.MarkdownText; width: body.width; lineHeight: 1.45; color: Theme.ink
-                linkColor: Theme.datum; onLinkActivated: function (l) { Bridge.openLink(l) } } }
+            Component { id: cText; Md { objectName: "replyText"; source: it.m.text; width: body.width } }
             Component { id: cSteps; TalkSteps { objectName: "stepGroup"; width: body.width; steps: it.m.steps; running: !!it.m.running
                 expanded: !!talk.openGroups[it.k]
                 onToggle: { var o = Object.assign({}, talk.openGroups); o[it.k] = !o[it.k]; talk.openGroups = o } } }
@@ -277,7 +276,7 @@ Rectangle {
                 Item { visible: !!Store.chatLive && Store.chatLive.kind === "text" && Store.chatLive.text !== ""; width: parent.width; clip: true
                     height: visible ? lt.implicitHeight : 0
                     Behavior on height { enabled: Store.chatBusy; NumberAnimation { duration: Theme.move(140); easing.type: Easing.OutQuad } }
-                    Txt { id: lt; text: Store.chatLive && Store.chatLive.text ? Store.chatLive.text : ""; textFormat: Text.MarkdownText; width: parent.width; lineHeight: 1.45; color: Theme.ink } }
+                    Md { id: lt; source: Store.chatLive && Store.chatLive.text ? Store.chatLive.text : ""; width: parent.width } }
                 Row { spacing: 8
                     Row { spacing: 3; anchors.verticalCenter: parent.verticalCenter
                         Repeater { model: 3

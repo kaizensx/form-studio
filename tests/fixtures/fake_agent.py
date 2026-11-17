@@ -3,7 +3,7 @@
     fake_agent.py <data_dir> <session-or-"-"> <model> <message>
 
 Behaviour is chosen by words in the message: "slow" waits until terminated; "make" creates a project folder and
-reports it from a create_project tool; "render" reports a render PNG; "boom" exits 1. A session id that starts with
+reports it from a create_project tool; "render" reports a render PNG; "outline" answers in Markdown (lists, code, a table); "boom" exits 1. A session id that starts with
 "gone" is refused the way a CLI refuses a session it no longer has.
 """
 import json
@@ -53,7 +53,12 @@ def main():
     out({"type": "stream_event", "event": {"type": "content_block_start", "content_block": {"type": "text"}}})
     out({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "You said: "}}})
     out({"type": "stream_event", "event": {"type": "content_block_stop"}})
-    out({"type": "assistant", "message": {"content": [{"type": "text", "text": "You said: " + message.splitlines()[0]}]}})
+    reply = "You said: " + message.splitlines()[0]
+    if "outline" in message:
+        reply += ("\n\n1. First step, written long enough that it has to wrap onto a second line in the conversation column\n"
+                  "2. Second step\n   - a nested point\n     - and one below it\n\n- a **bold** bullet with `code`\n\n"
+                  "```python\nform.run()\n```\n\n| Option | Yield |\n|---|--:|\n| Head | 66 % |\n")
+    out({"type": "assistant", "message": {"content": [{"type": "text", "text": reply}]}})
     out({"type": "result", "total_cost_usd": 0.25, "num_turns": 2, "session_id": sid})
     return 0
 

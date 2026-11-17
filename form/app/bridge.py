@@ -228,6 +228,14 @@ class Bridge(QObject):
         if url.startswith(("https://", "http://")):
             QDesktopServices.openUrl(QUrl(url))
 
+    @Slot(str, "QVariant", result=str)
+    def markdown(self, text: str, style) -> str:
+        """Markdown → the rich text the interface draws (see markdown.py): lists on the app's own grid."""
+        from .markdown import to_html
+        if hasattr(style, "toVariant"):
+            style = style.toVariant()
+        return to_html(text, style if isinstance(style, dict) else None)
+
     @Slot(str)
     def copy(self, text: str):
         QGuiApplication.clipboard().setText(text)

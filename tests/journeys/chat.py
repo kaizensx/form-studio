@@ -43,6 +43,7 @@ def run(ui):
     ui.settle(300)
     ui.shot("chat-reply")
 
+
     # ── tool steps are grouped; the project the agent made is followed ──
     send(ui, "make a part and render it")
     ui.wait_until(lambda: ui.store.get("chatBusy") is False and ui.sees("You said: make a part and render it"), 30, "the second reply")
@@ -81,6 +82,20 @@ def run(ui):
     second_id = ui.store.get("convId")
     second = [x for x in convs(ui) if x["id"] == second_id][0]
     ui.eq((second["model"], second["resolved_model"]), ("small", "fake-small-1"), "the chosen model was used")
+    # ── a reply in Markdown: lists sit on the text column, not 40 px in (in the conversation that is deleted later,
+    # so the long reply does not push the first one out of the feed) ──
+    send(ui, "outline the plan")
+    ui.wait_until(lambda: ui.store.get("chatBusy") is False and ui.sees("You said: outline the plan"), 30, "the Markdown reply")
+    md = [m for m in ui.find_all(name="replyText") if "outline the plan" in m.property("text")][-1]
+    rich = md.property("text")
+    ui.check("<ul" not in rich and "<ol" not in rich and "<li" not in rich, "lists are not left to Qt's list layout")
+    ui.check(rich.count("<table") >= 6, "list items, the code block and the table are laid out as tables")
+    ui.check(ui.sees("a nested point", md) and ui.sees("form.run()", md) and ui.sees("<b>bold</b>", md), "the words of the reply are all there")
+    raw = [i for i in ui.store.get("chatItems") if i["t"] == "text"][-1]["text"]
+    ui.check("1. First step" in raw and "<table" not in raw, "the saved reply (what Copy copies) is still the Markdown")
+    ui.check(md.property("contentWidth") <= md.width() + 1, "the reply stays inside the column")
+    ui.settle(300)
+    ui.shot("chat-markdown")
 
     # ── attach a file: the chip shows, the agent gets it ──
     pic = png(ui.files / "sketch.png")

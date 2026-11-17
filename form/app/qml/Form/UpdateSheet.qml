@@ -38,8 +38,7 @@ Column {
         text: "This release comes from FORM_FAKE_LATEST. Nothing was fetched from GitHub." }
     Rectangle { visible: !!us.rel && us.rel.notes !== "" && us.phase === "idle"
         width: parent.width; height: Math.min(notes.implicitHeight, 320) + 24; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule; clip: true
-        Txt { id: notes; x: 14; y: 12; width: parent.width - 28; tone: 2; textFormat: Text.MarkdownText; text: us.rel ? us.rel.notes : ""
-            linkColor: Theme.datum; onLinkActivated: function (link) { Bridge.openLink(link) } } }
+        Md { id: notes; x: 14; y: 12; width: parent.width - 28; color: Theme.ink2; lineHeight: 1.25; source: us.rel ? us.rel.notes : "" } }
 
     // packaged app: open the download in the browser
     Txt { visible: us.packaged; width: parent.width; tone: 2
