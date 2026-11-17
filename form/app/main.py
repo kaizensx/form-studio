@@ -66,6 +66,8 @@ def main(argv=None) -> int:
     ap.add_argument("--wait", type=int, default=2600, help="ms to wait before --shot")
     ap.add_argument("--eval", dest="js", help="QML/JS expression run in Main.qml before --shot (development)")
     ap.add_argument("--after", type=int, default=900, help="ms between --eval and the screenshot")
+    ap.add_argument("--uitest", metavar="SCRIPT", help="drive the window with real input events from a journey "
+                    "script (file.py or file.py::function), then quit; see form/app/uitest.py")
     args = ap.parse_args(argv)
 
     try:
@@ -85,6 +87,9 @@ def main(argv=None) -> int:
     cfg = config.load()
     QCoreApplication.setOrganizationName("FORM")
     QCoreApplication.setApplicationName("FORM")
+    if args.uitest:
+        from . import uitest
+        uitest.prepare(cfg)          # its own window settings; a stand-in agent when $FORM_UITEST_AGENT is set
     QCoreApplication.setApplicationVersion(__version__)
     os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
     app = QGuiApplication(sys.argv[:1])
@@ -136,6 +141,9 @@ def main(argv=None) -> int:
                 finish(1 if (args.check and bad) else 0)
             QTimer.singleShot(args.after if args.js else 0, snap)
         QTimer.singleShot(args.wait, done)
+
+    if args.uitest:
+        QTimer.singleShot(200, lambda: uitest.run_script(app, engine, win, st, bridge.baseUrl, args.uitest, errors, finish))
 
     signal.signal(signal.SIGINT, lambda *_: app.quit())
     tick = QTimer(); tick.start(250); tick.timeout.connect(lambda: None)     # let Python see Ctrl+C

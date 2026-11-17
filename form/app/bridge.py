@@ -46,9 +46,14 @@ class _Call(QRunnable):
                 self.b.reply.emit(self.rid, False, {**(err or {"message": res.reason}), "status": res.status})
             else:
                 self.b.reply.emit(self.rid, True, obj)
+        except RuntimeError:        # the app is quitting and the bridge is gone; nobody is waiting for this reply
+            return
         except Exception as e:      # the engine thread died or the socket closed
-            self.b.reply.emit(self.rid, False, {"message": "The FORM engine is not answering.",
-                                                 "hint": f"Restart FORM. Your projects are saved on disk. ({e})", "status": 0})
+            try:
+                self.b.reply.emit(self.rid, False, {"message": "The FORM engine is not answering.",
+                                                     "hint": f"Restart FORM. Your projects are saved on disk. ({e})", "status": 0})
+            except RuntimeError:
+                pass
 
 
 def _reduced_motion() -> bool:

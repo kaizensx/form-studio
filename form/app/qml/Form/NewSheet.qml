@@ -90,7 +90,7 @@ Column {
                 Rectangle { id: ex; required property var modelData
                     width: ns.width; height: 40; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
                     Txt { x: 12; text: ex.modelData.name; font.weight: 600; anchors.verticalCenter: parent.verticalCenter }
-                    Btn { small: true; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
+                    Btn { objectName: "exampleAdd"; small: true; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
                         text: ex.modelData.present ? "Open" : "Add and open"
                         onClicked: { if (ex.modelData.present) { Store.openSheet(null); Store.open(ex.modelData.id) } else Store.addExample(ex.modelData.id) } } } } }
         Txt { kind: "fine"; width: parent.width; text: "FORM works from a written brief, dimensions you measure, and reference photos with a marked scale. It does not reconstruct geometry from photos or scans." }

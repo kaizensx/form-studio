@@ -743,7 +743,13 @@ QtObject {
             return r
         }, function (e) { fail(e); return null })
     }
-    function setOnboardStep(n) { onboardStep = Math.max(0, Math.min(2, n)); post("/setup/step", { step: onboardStep }).then(function () {}, function () {}) }
+    // saves run one after another, so two quick presses cannot land on the engine out of order
+    property var _stepSave: null
+    function setOnboardStep(n) {
+        onboardStep = Math.max(0, Math.min(2, n))
+        var v = onboardStep, send = function () { return post("/setup/step", { step: v }).then(function () {}, function () {}) }
+        _stepSave = _stepSave ? _stepSave.then(send) : send()
+    }
     function openSettings(tab) { openSheet("settings", { tab: tab || "general" }); loadConfig(); checkSoftware() }
     function addExample(id) {
         return post("/examples", { ids: [id] }).then(function () { sheet = null; return reloadStudio().then(function () { return open(id) }) }, fail)
