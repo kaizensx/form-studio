@@ -59,7 +59,7 @@ DEFAULTS = {
     "bench": {"auto_open": True},
     # Look for a newer FORM release on GitHub at most once a day (public release metadata only; nothing is
     # downloaded or installed). Off: check = false, or set FORM_NO_UPDATE_CHECK=1.
-    "updates": {"check": True},
+    "updates": {"check": True, "channel": "stable"},
     # Optional in-app model consultation through a local `claude` CLI. Off by
     # default: when FORM is used over MCP, the calling agent is the intelligence.
     "models": {

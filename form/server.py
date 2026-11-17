@@ -116,6 +116,13 @@ def make_handler(st: Studio):
             owned = setup_app.route_get(st, path, q)
             if owned is not None:
                 return self._json(owned)
+            # -- Home and new design: starters, recipe library, archives, What's New (home workstream; form/home_api.py) --
+            from . import home_api
+            got = home_api.route_get(st, path, q)
+            if isinstance(got, tuple):
+                return self._send(200, got[0], got[1], {"Content-Disposition": f'attachment; filename="{got[2]}"'})
+            if got is not None:
+                return self._json(got)
             # -- brief templates (presets) --
             if path == "/api/presets":
                 from . import presets
@@ -384,6 +391,11 @@ def make_handler(st: Studio):
             owned = setup_app.route_post(st, path, body)
             if owned is not None:
                 return self._json(owned)
+            # -- Home and new design (home workstream; form/home_api.py) --
+            from . import home_api
+            got = home_api.route_post(st, path, body, {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()})
+            if got is not None:
+                return self._json(got)
             # -- brief templates: save a filled-in brief, get the chat prompt that carries it --
             if path == "/api/briefs":
                 from . import presets

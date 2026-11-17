@@ -29,6 +29,8 @@ SCHEMA: dict[str, dict] = {
                          "existing projects are not moved."},
     "updates.check": {"type": "bool", "tab": "general", "label": "Check for a newer Form Studio once a day",
                       "help": "Reads public release information from GitHub. Nothing is downloaded or installed."},
+    "updates.channel": {"type": "choice", "tab": "general", "label": "Update channel", "choices": ["stable", "preview"],
+                        "help": "Stable: releases only. Preview: also pre-releases from the dev branch, where new features are tested first."},
     "bench.auto_open": {"type": "bool", "tab": "general", "label": "Open Form Studio's page when an agent starts working",
                         "help": "Applies to agents that use Form Studio over MCP outside this app."},
     "slicer.kind": {"type": "choice", "tab": "printer", "label": "Slicer",

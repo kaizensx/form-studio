@@ -37,6 +37,11 @@
   form rename <project> <name>                          change the display name (the id stays)
   form duplicate <project> [--name N]                   copy a project under a new id; the copy is not approved
   form delete <project> --yes                           move a project to .trash inside the projects folder
+  form export <project> [--out f.formstudio] [--no-conversations]   project + conversations + design code, one file
+  form import <file.formstudio | file.formproj | conversation.json>   import; a clashing id gets a new one
+  form export-conversation <id> [--format md|json] [--out file]       one conversation as Markdown or JSON
+  form starters [add "text" | edit ID "text" | remove ID | pin ID | unpin ID | restore]   Home's learned starters
+  form recipes [list|inspect|install|uninstall|community|source] ...  the recipe library (installs need --sha256)
 """
 from __future__ import annotations
 
@@ -91,6 +96,17 @@ def main(argv=None):
     if argv[:1] == ["conversations"]:             # saved conversations: list | show | delete | rename | pin
         from .chat import main_conversations
         return main_conversations(argv[1:])
+    # -- home workstream: archives, conversation export, learned starters, recipe library (each prints JSON) --
+    if argv[:1] in (["export"], ["import"], ["export-conversation"]):
+        from . import bundle
+        return {"export": bundle.main_export, "import": bundle.main_import,
+                "export-conversation": bundle.main_export_conversation}[argv[0]](argv[1:])
+    if argv[:1] == ["starters"]:
+        from .starters import main as starters_main
+        return starters_main(argv[1:])
+    if argv[:1] == ["recipes"]:
+        from .recipe_lib import main as recipes_main
+        return recipes_main(argv[1:])
     # -- setup workstream: installer, settings, examples (each prints JSON; none starts the kernel) --
     if argv[:1] == ["install"]:
         from .installer import main as install_main
