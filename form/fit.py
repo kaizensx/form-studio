@@ -179,6 +179,10 @@ def next_actions(fit: dict | None, costs: dict) -> list[dict]:
 def _cost(c: dict | None) -> str:
     if not c:
         return "not sliced yet"
-    m = int(round(c["time_s"] / 60))
-    t = f"{m // 60} h {m % 60:02d} min" if m >= 60 else f"{m} min"
-    return f"{t} · {c['filament_g']:.1f} g (slicer estimate)"
+    parts = []
+    if c.get("time_s") is not None:             # some slicers write no time estimate into the G-code
+        m = int(round(c["time_s"] / 60))
+        parts.append(f"{m // 60} h {m % 60:02d} min" if m >= 60 else f"{m} min")
+    if c.get("filament_g") is not None:
+        parts.append(f"{c['filament_g']:.1f} g")
+    return " · ".join(parts) + " (slicer estimate)" if parts else "sliced, no estimate from the slicer"

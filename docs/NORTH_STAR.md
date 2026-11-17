@@ -1,6 +1,6 @@
 # North star
 
-The owner's goal, rewritten as the brief every contributor (human or agent) works from.
+The project's goals: the brief every contributor works from.
 
 ## The product
 

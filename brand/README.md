@@ -4,8 +4,8 @@ The mark is the letter F drawn as a coordinate frame. The top arm is X, the stem
 meet is the origin, in the datum colour. Every part Form Studio builds is measured from that origin. The mark sits
 next to the wordmark "Form Studio": "Form" is set heavier and "Studio" lighter.
 
-The owner chose this direction (option 1, "Frame") from six. The other five, with their sheets, are kept in
-[`options/`](options/) as the record of that choice ([`options/overview.png`](options/overview.png)).
+This direction (option 1, "Frame") was chosen from six. The other five, with their sheets, are kept in
+[`options/`](options/) for reference ([`options/overview.png`](options/overview.png)).
 
 ## Files
 

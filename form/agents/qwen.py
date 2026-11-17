@@ -1,7 +1,7 @@
 """Qwen Code, headless: `qwen -p … -o stream-json --include-partial-messages` (Claude Code's stream shape:
 system/init with the model id, assistant, user tool_result, stream_event deltas, result).
 
-NOT RUN: written from `qwen --help` (Qwen Code 0.28.0) and its stream-json output adapter in the source; the
+Not yet verified with a live run. It follows `qwen --help` (Qwen Code 0.28.0) and its stream-json output adapter; the
 stream parser is tested with samples in that shape. FORM's MCP server is passed with `--mcp-config` (inline JSON;
 nothing is written to the user's settings). Shell commands and file edits need an approval nobody can give in a
 headless run, so they are refused; FORM's server is marked trusted so its tools run.
@@ -37,7 +37,7 @@ class QwenParser(ClaudeParser):
 class Qwen(Adapter):
     id, label, cli = "qwen", "Qwen Code", "qwen"
     install_hint = "Install Qwen Code (qwen) and give it an API key to use it here."
-    verified = "not run: written from `qwen --help` 0.28.0 and the Qwen Code source; the first real run is a test"
+    verified = "not run: not yet verified with a live reply"
     images, cost = False, False
 
     def signin(self, cfg, exe):

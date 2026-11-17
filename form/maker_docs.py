@@ -230,7 +230,7 @@ def print_report(d, release=None) -> str:
                                                                                      + " (slicer presets)" if s else "not sliced"),
               f"Orientation, seams, brim, supports and removal: {p['orientation']}; supports "
               + ("used" if s.get("support_used") else "not used" if s else "unknown (not sliced)") + "; seams and brim: see the slicer project",
-              "Slicer-estimated time and material: " + (f"{s['time_s'] / 60:.0f} min, {s['filament_g']:.1f} g (simulated)" if s.get("time_s") else "not sliced"),
+              "Slicer-estimated time and material: " + (f"{s['time_s'] / 60:.0f} min, {s['filament_g']:.1f} g (simulated)" if s.get("time_s") and s.get("filament_g") is not None else ("sliced; the slicer gave no estimate" if s else "not sliced")),
               ""]
     lines += ["## Measured results (fill in after printing)", "",
               "Actual physical measurements and test conditions:", "", "| Feature | Intended (mm) | Measured (mm) | Tool | By / date |",

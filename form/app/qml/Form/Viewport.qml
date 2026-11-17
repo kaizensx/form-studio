@@ -145,7 +145,7 @@ Item {
     Behavior on target { enabled: vp.tween; Vector3dAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
 
     // ── the free area: pixels the HUD covers on each side. The camera keeps the part in what is left, so a legend
-    // or an options bar never sits on it. The owner sets the targets; the camera glides there.
+    // or an options bar never sits on it. The parent sets the targets; the camera glides there.
     property real insetLeft: 0
     property real insetRight: 0
     property real insetTop: 0

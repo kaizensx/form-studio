@@ -1,8 +1,7 @@
 """Cursor CLI, headless: `cursor-agent -p … --output-format stream-json --stream-partial-output` (JSON Lines:
 system/init, assistant, tool_call started/completed, result).
 
-NOT RUN: Cursor's CLI is installed only by its own script, which was not run on the machine this adapter was written
-on. It follows Cursor's CLI reference (parameters, output format, MCP, permissions) and its parser is tested with
+Not yet verified with a live run. It follows Cursor's CLI reference (parameters, output format, MCP, permissions) and its parser is tested with
 samples in that documented shape. FORM's MCP server goes into `.cursor/mcp.json` inside the conversation's own
 folder, with `.cursor/cli.json` allowing only Form Studio's tools (shell and file writes denied); the user's own
 Cursor settings are not touched.
@@ -91,7 +90,7 @@ class CursorParser(Parser):
 class Cursor(Adapter):
     id, label, cli = "cursor", "Cursor CLI", "cursor-agent"
     install_hint = "Install Cursor's CLI (cursor-agent) and sign in to use it here."
-    verified = "not run: written from Cursor's CLI documentation; the first real run is a test"
+    verified = "not run: not yet verified with a live reply"
     images, cost = False, False
 
     def executable(self, cfg):

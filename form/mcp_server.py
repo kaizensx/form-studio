@@ -522,7 +522,7 @@ def build() -> MCPServer:
             info = st.side_slice(p, "test_piece")
             d = st.dir(p["id"]) / "artifacts" / "side" / info["key"]
             return {"piece": info["piece"]["label"], "stl": str(d / info["stl"]), "gcode": str(d / info["gcode"]),
-                    "time_min": round(info["time_s"] / 60), "filament_g": info["filament_g"], "evidence": "simulated slice"}
+                    "time_min": round(info["time_s"] / 60) if info.get("time_s") is not None else None, "filament_g": info["filament_g"], "evidence": "simulated slice"}
         return await _run(go)
 
     @mcp.tool(annotations=RW)

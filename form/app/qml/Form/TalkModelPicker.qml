@@ -41,7 +41,7 @@ Column {
         }
     }
     Note { visible: !!mp.agent && String(mp.agent.verified).indexOf("not run") === 0; kind: "amber"; width: mp.width
-        text: "This adapter was written from the CLI's documentation and has not been run. Treat the first message as a test." }
+        text: "Not yet verified with a live reply from this agent. If the first reply goes wrong, report it on GitHub." }
 
     Rectangle { width: mp.width; height: 1; color: Theme.rule }
     Txt { kind: "cap"; text: "Model"; x: 8; topPadding: 6; bottomPadding: 2 }

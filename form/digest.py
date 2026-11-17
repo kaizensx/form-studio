@@ -60,7 +60,7 @@ def digest(st, pid: str, bench: str | None = None) -> dict:
                                     for a in s["actions"][:4]]
     if s["slice"]:
         sl = s["slice"]
-        out["slice_simulated"] = {"time_min": round(sl["time_s"] / 60), "filament_g": sl["filament_g"], "layers": sl["layers"],
+        out["slice_simulated"] = {"time_min": round(sl["time_s"] / 60) if sl.get("time_s") is not None else None, "filament_g": sl["filament_g"], "layers": sl["layers"],
                                   "supports": sl.get("support_used"), "slicer": f"{sl.get('slicer_version')}",
                                   "presets": " / ".join(v["name"] for v in sl["presets"].values())}
     files = {}

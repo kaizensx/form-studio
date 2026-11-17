@@ -1157,7 +1157,7 @@ class Studio:
             lines += ["", "**Released with failed checks:** " + ", ".join(f"{f['label']} ({f['value']})" for f in m["released_with_failed_checks"])
                       + f". Reason given at approval: {m.get('note') or '—'}"]
         if s.get("time_s"):
-            lines += ["", "## Slice (simulated)", "", f"- {s.get('slicer_name') or 'Bambu Studio'} {s['slicer_version']}: {s['time_s']/60:.0f} min, {s['filament_g']:.1f} g, {s['layers']} layers, supports: {'yes' if s.get('support_used') else 'no'}",
+            lines += ["", "## Slice (simulated)", "", f"- {s.get('slicer_name') or 'Bambu Studio'} {s['slicer_version']}: {(f"{s['time_s']/60:.0f} min" if s.get('time_s') is not None else 'no time estimate')}, {(f"{s['filament_g']:.1f} g" if s.get('filament_g') is not None else 'no filament estimate')}, {s['layers']} layers, supports: {'yes' if s.get('support_used') else 'no'}",
                       "- Presets: " + " · ".join(v["name"] for v in s["presets"].values())]
         lines += ["", "## Limits", ""] + [f"- {x}" for x in m["limits"]] + [""]
         return "\n".join(lines)

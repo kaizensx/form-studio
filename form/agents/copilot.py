@@ -2,8 +2,8 @@
 session.start, assistant.message_delta, assistant.message, tool.execution_start, tool.execution_complete,
 assistant.usage, session.error, result).
 
-NOT RUN: written from `copilot --help` and `copilot help permissions` (Copilot CLI 1.0.113) and the session event
-schema in GitHub's Copilot SDK; the parser is tested with samples in that shape. FORM's MCP server is added for this
+Not yet verified with a live run. It follows `copilot --help` and `copilot help permissions` (Copilot CLI 1.0.113)
+and the session event schema in GitHub's Copilot SDK; the parser is tested with samples in that shape. FORM's MCP server is added for this
 run only with `--additional-mcp-config`; Form Studio's tools are allowed, shell and file writes are denied, and
 Copilot's own question form is off (Form Studio's ask_user is used instead).
 """
@@ -96,7 +96,7 @@ class CopilotParser(Parser):
 class Copilot(Adapter):
     id, label, cli = "copilot", "GitHub Copilot CLI", "copilot"
     install_hint = "Install GitHub Copilot CLI (copilot) and sign in to use it here."
-    verified = "not run: written from `copilot --help` 1.0.113 and GitHub's Copilot SDK event schema; the first real run is a test"
+    verified = "not run: not yet verified with a live reply"
     images, cost = True, False
 
     def signin(self, cfg, exe):

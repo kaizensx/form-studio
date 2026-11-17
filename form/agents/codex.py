@@ -112,7 +112,7 @@ class CodexParser(Parser):
 class Codex(Adapter):
     id, label, cli = "codex", "Codex", "codex"
     install_hint = "Install the Codex CLI (codex) and sign in to use it here."
-    verified = "written from `codex exec --help` and the Codex non-interactive documentation; stream parsing is tested with recorded samples"
+    verified = "follows `codex exec --help` and the Codex non-interactive documentation; stream parsing is tested with recorded samples"
     images, cost = True, False
 
     def _config(self) -> dict:

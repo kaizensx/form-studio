@@ -1,7 +1,7 @@
 """OpenCode, headless: `opencode run --format json …` (JSON Lines: text, tool_use, step_start, step_finish,
 error; every line carries sessionID).
 
-NOT RUN: written from `opencode run --help` (OpenCode 1.19.6) and its run command's source; the stream parser is
+Not yet verified with a live run. It follows `opencode run --help` (OpenCode 1.19.6) and its run command's source; the stream parser is
 tested with samples in that shape. OpenCode prints a text part only when it is finished (no live typing) and a tool
 only when it has returned; the stream never names the model, so it is read afterwards with `opencode export`.
 FORM's MCP server and the permissions (Form Studio's tools allowed, everything else refused) are passed in
@@ -89,7 +89,7 @@ class OpenCodeParser(Parser):
 class OpenCode(Adapter):
     id, label, cli = "opencode", "OpenCode", "opencode"
     install_hint = "Install OpenCode (opencode) and connect a model provider to use it here."
-    verified = "not run: written from `opencode run --help` 1.19.6 and the OpenCode source; the first real run is a test"
+    verified = "not run: not yet verified with a live reply"
     images, cost = True, True
 
     def _providers(self) -> list[str]:

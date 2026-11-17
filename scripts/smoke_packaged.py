@@ -5,7 +5,7 @@
     python scripts/smoke_packaged.py dist/FORM/FORM       # Linux
 
 The unit and interface tests run the source. Everything here runs the packaged program, because that is where
-the bugs that reached the owner lived: no certificates for https, the Blender script missing from the bundle,
+earlier packaging bugs lived: no certificates for https, the Blender script missing from the bundle,
 and chat handing agents an old form-mcp from PATH instead of the app itself. Each step uses a real outside
 program when it is installed (slicer, Blender) and says SKIP when it is not. Nothing is uploaded or printed.
 Exit code 0 only when every step that ran passed.

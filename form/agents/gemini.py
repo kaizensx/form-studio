@@ -1,9 +1,9 @@
 """Gemini CLI, headless: `gemini -p … --output-format stream-json` (JSON Lines: init, message, tool_use,
 tool_result, error, result).
 
-NOT RUN: Gemini CLI is not installed on the machine this adapter was written on. It follows the Gemini CLI
+Not yet verified with a live reply (that needs a Gemini sign-in or API key). It follows the Gemini CLI
 headless-mode reference and MCP settings documentation, and its stream parser is tested with samples in that
-documented shape. Treat the first real run as a test. FORM's MCP server goes into `.gemini/settings.json` inside
+documented shape. FORM's MCP server goes into `.gemini/settings.json` inside
 the conversation's own folder (project-level settings), never into the user's settings.
 """
 from __future__ import annotations
@@ -76,7 +76,7 @@ class GeminiParser(Parser):
 class Gemini(Adapter):
     id, label, cli = "gemini", "Gemini CLI", "gemini"
     install_hint = "Install the Gemini CLI (gemini) and sign in to use it here."
-    verified = "not run: written from the Gemini CLI documentation; the first real run is a test"
+    verified = "not run: not yet verified with a live reply"
     images, cost = False, False
 
     def signin(self, cfg, exe):

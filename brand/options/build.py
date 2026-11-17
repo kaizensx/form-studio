@@ -1,4 +1,4 @@
-"""Six logo directions for Form Studio, for the owner to choose from. Writes only into brand/options/.
+"""Six logo directions for Form Studio. Writes only into brand/options/.
 
     .venv/bin/python brand/options/build.py
 
