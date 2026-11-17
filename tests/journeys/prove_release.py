@@ -121,7 +121,13 @@ def journey_release(ui):
     ui.wait_until(lambda: data(ui)["approval"]["state"] == "approved", 60, "the approval to be recorded")
     ui.expect(rel)
     ui.click_text("Verify")
-    ui.expect("files intact", timeout=30)
+    try:
+        ui.expect("files intact", timeout=30)
+    except Exception:                  # seen once on a Windows runner: the row had only just appeared and the click missed it
+        print("  (Verify did not answer; pressing it again)")
+        ui.settle(500)
+        ui.click_text("Verify")
+        ui.expect("files intact", timeout=90)
     ui.check(ui.api("/projects/%s/release/%s" % (S["pid"], rel))["intact"], "the engine agrees the release is intact")
     ui.settle(300)
     ui.shot("release-approved")

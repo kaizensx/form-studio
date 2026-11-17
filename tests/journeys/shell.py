@@ -131,7 +131,10 @@ def journey_settings_saves_to_the_file(ui):
     ui.eq(t[sec][key], (not row["value"]), f"{row['key']} was flipped in the file")
     if before is not None:
         ui.check(any(p.name.startswith(cfg.name) and p != cfg for p in cfg.parent.iterdir()), "the previous file was kept as a backup")
-    # change it back, so a backup of the first save exists either way
+    # change it back, so a backup of the first save exists either way. The sheet reloads the settings after a save:
+    # wait for that, or the click lands on a switch that is about to be rebuilt.
+    ui.wait_until(lambda: [r for r in ui.js("Store.config.settings") if r["key"] == row["key"]][0]["value"] == (not row["value"]), 15, "the sheet to show the saved value")
+    ui.settle(600)
     toggles = [t for t in ui.find_all(within=card) if t.metaObject().className().startswith("Toggle")]
     ui.click(toggles[0])
     ui.wait_until(lambda: save.property("enabled") is True, 15, "Save to turn on again")

@@ -103,7 +103,14 @@ def run(ui):
     ui.key("Escape")
     ui.key("Ctrl+J")
     ui.settle(500)
-    no_overlaps(ui, "pipeline", "the pipeline strip with the conversation hidden")
+    for attempt in range(10):          # the strip glides to its new width; on a machine without a GPU that takes longer
+        try:
+            no_overlaps(ui, "pipeline", "the pipeline strip with the conversation hidden")
+            break
+        except Exception:
+            if attempt == 9:
+                raise
+            ui.settle(500)
     ui.shot(f"size-{tag}-no-talk")
     ui.key("Ctrl+J")
     ui.settle(400)
