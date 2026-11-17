@@ -355,5 +355,31 @@ class StandInSlices(unittest.TestCase):
         self.assertIn("could not fit", str(cm.exception))
 
 
+
+class ShippedBundles(unittest.TestCase):
+    """Found with a real PrusaSlicer 2.9.7 that had never been opened: no vendor folder yet, so no preset resolved."""
+
+    def test_presets_resolve_from_the_bundles_inside_the_program(self):
+        import tempfile
+        from pathlib import Path
+        from form.adapters.prusa import Bundle, shipped_profiles
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            exe = root / "PrusaSlicer.app" / "Contents" / "MacOS" / "PrusaSlicer"
+            exe.parent.mkdir(parents=True); exe.write_text("", encoding="utf-8")
+            prof = root / "PrusaSlicer.app" / "Contents" / "Resources" / "profiles"
+            prof.mkdir(parents=True)
+            (prof / "Acme.ini").write_text("[printer:Acme One]\nnozzle_diameter = 0.4\n", encoding="utf-8")
+            self.assertEqual(shipped_profiles(str(exe)), prof)
+            cfg = root / "config"                      # never opened: no vendor folder
+            cfg.mkdir()
+            self.assertIn("Acme One", Bundle(cfg, shipped_profiles(str(exe))).system["printer"])
+            self.assertNotIn("Acme One", Bundle(cfg).system["printer"])
+            (cfg / "vendor").mkdir()                   # an installed bundle of the same name wins
+            (cfg / "vendor" / "Acme.ini").write_text("[printer:Acme One]\nnozzle_diameter = 0.6\n", encoding="utf-8")
+            got = Bundle(cfg, prof).system["printer"]["Acme One"]
+            self.assertEqual(len(got), 1)
+            self.assertEqual(got[0][1]["nozzle_diameter"], "0.6")
+
 if __name__ == "__main__":
     unittest.main()

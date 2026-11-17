@@ -142,13 +142,31 @@ def split_list(value: str) -> list[str]:
     return out
 
 
+def shipped_profiles(app: str | None) -> Path | None:
+    """The vendor bundles inside the program itself (PrusaSlicer.app/Contents/Resources/profiles, <dir>/resources/profiles)."""
+    if not app:
+        return None
+    exe = Path(app)
+    for cand in (exe.parent.parent / "Resources" / "profiles", exe.parent / "resources" / "profiles",
+                 exe.parent.parent / "resources" / "profiles", exe.parent.parent / "share" / "PrusaSlicer" / "profiles"):
+        if cand.is_dir():
+            return cand
+    return None
+
+
 class Bundle:
     """Every preset PrusaSlicer would know about in one config folder."""
 
-    def __init__(self, config_dir: Path):
+    def __init__(self, config_dir: Path, shipped: Path | None = None):
         self.dir = config_dir
         self.system: dict = {s: {} for s in SECTION.values()}     # name -> [(bundle file, section dict), ...]
-        for vf in sorted((config_dir / "vendor").glob("*.ini")):
+        files = sorted((config_dir / "vendor").glob("*.ini"))
+        # A slicer that has never been opened has no vendor folder yet. The bundles it ships inside the program
+        # are the same files, so a preset pinned in studio.toml works on a fresh install. Installed ones win.
+        have = {f.name for f in files}
+        if shipped and shipped.is_dir():
+            files += [f for f in sorted(shipped.glob("*.ini")) if f.name not in have]
+        for vf in files:
             try:
                 data = read_ini(vf)
             except OSError:
@@ -227,7 +245,7 @@ class Adapter:
             selected = read_ini(cdir / v.ini).get("presets", {}) if (cdir / v.ini).exists() else {}
             names = {k: st[k] if st[k] != "auto" else selected.get(SECTION[k], "") for k in SECTION}
             out["source"] = {k: ("studio.toml" if st[k] != "auto" else f"{v.label} current selection") for k in SECTION}
-            bundle = Bundle(cdir)
+            bundle = Bundle(cdir, shipped_profiles(app))
             for kind, name in names.items():
                 if not name:
                     raise SlicerBlocked(f"No {SECTION[kind]} preset is selected in {v.label} and none is set in studio.toml.")
