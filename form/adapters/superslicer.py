@@ -1,7 +1,7 @@
 """Slicer adapter for SuperSlicer: a PrusaSlicer fork with the same INI presets, CLI and G-code comments.
 
 Everything is in prusa.py; only the program name, folder and version string differ.
-Not run against a real SuperSlicer on the machine this was written on. Settings: [slicer.superslicer] (see prusa.py).
+Run for real in CI: SuperSlicer 2.5.59.13 on Windows and Linux (.github/workflows/slicers.yml). Settings: [slicer.superslicer] (see prusa.py).
 """
 from .common import SlicerBlocked, SlicerFailed  # noqa: F401
 from .prusa import SUPERSLICER, Adapter, parse_layers_prusa

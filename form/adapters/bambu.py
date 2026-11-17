@@ -4,6 +4,8 @@ A slice is a simulation by the slicer. It says the model can be toolpathed with
 these presets and estimates time and material. It is not a print.
 
 The CLI, preset layout and 3MF reading are shared with OrcaSlicer in _bbl.py.
+Run for real on macOS, and on Windows and Linux in CI (.github/workflows/slicers.yml, Bambu Studio 02.09.01.70,
+never opened: presets then come from resources/profiles inside the program).
 Settings: [slicer].app, [slicer].config_dir, [slicer].machine/process/filament.
 """
 from __future__ import annotations
@@ -16,6 +18,7 @@ from pathlib import Path
 from . import _bbl
 from .common import SlicerBlocked, SlicerFailed, dur as _dur, parse_layers as _parse_layers  # noqa: F401
 from .common import private as _private  # noqa: F401
+from .common import expand as _expand, find_app as _find, platform as _platform, shipped_dirs as _shipped_dirs
 
 LABEL = "Bambu Studio"
 URL = "https://bambulab.com/en/download/studio"
@@ -49,8 +52,22 @@ def parse_gcode_header(path: Path) -> dict:
     return out
 
 
-FAMILY = _bbl.Family(kind="bambu", label=LABEL, conf_name="BambuStudio.conf", version_re=r"BambuStudio-([\d.]+)",
-                     parse_header=parse_gcode_header)
+def profile_dirs(app: Path) -> list[Path]:
+    """The vendor presets inside the program (resources/profiles/<vendor>/<kind>/*.json). Bambu Studio copies
+    them to <config_dir>/system when it is first opened; until then they are the only ones there are."""
+    return _shipped_dirs(app, "BambuStudio")
+
+
+FAMILY = _bbl.Family(kind="bambu", label=LABEL, conf_name="BambuStudio.conf", version_re=r"BambuStudio-([\d.]+)", program="BambuStudio",
+                     parse_header=parse_gcode_header, shipped=profile_dirs)
+
+# Where else the program is, when [slicer].app was left at its default and nothing is there.
+APPS = {
+    "darwin": ["~/Applications/BambuStudio.app/Contents/MacOS/BambuStudio"],
+    "win": [r"%ProgramFiles%\Bambu Studio\bambu-studio.exe", r"%LOCALAPPDATA%\Programs\Bambu Studio\bambu-studio.exe",
+            "bambu-studio.exe"],
+    "linux": ["BambuStudio", "/opt/BambuStudio/AppRun", "~/Applications/Bambu*Studio*.AppImage"],
+}
 
 
 def _conf(config_dir: Path) -> dict:
@@ -63,8 +80,14 @@ def flatten(config_dir: Path, kind: str, name: str, _depth=0) -> dict:
 
 
 def _app(cfg: dict) -> Path:
+    from ..config import DEFAULTS
     s = cfg["slicer"]
-    return Path(shutil.which(s["app"]) or s["app"]).expanduser()
+    app = Path(shutil.which(s["app"]) or _expand(s["app"]))
+    if not app.exists() and s["app"] == DEFAULTS["slicer"]["app"]:
+        other = _find(APPS[_platform()])
+        if other:
+            return Path(other)
+    return app
 
 
 def find_app(cfg: dict) -> str | None:

@@ -1,0 +1,11 @@
+# Real slicers in CI (.github/workflows/slicers.yml): SuperSlicer is installed on the runner but never opened, so the
+# presets are pinned here and FORM reads them from the profiles shipped inside the program.
+[printer]
+name = "Original Prusa MINI"
+envelope_mm = [180, 180, 180]
+
+[slicer]
+kind = "superslicer"
+machine = "Original Prusa MINI & MINI+"
+process = "0.20mm QUALITY @MINI"
+filament = "Prusament PLA"

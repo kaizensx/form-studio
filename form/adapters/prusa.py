@@ -20,7 +20,8 @@ after the last layer (src/libslic3r/GCode.cpp, GCode/GCodeProcessor.cpp, Print.c
 SuperSlicer and QIDISlicer are PrusaSlicer forks with the same INI layout, CLI and G-code
 comments; they are registered as their own kinds with their own program and folder names.
 
-None of these was run on the machine this was written on; parsing is tested with fixtures.
+PrusaSlicer is run for real on macOS, Windows and Linux (.github/workflows/ui.yml); SuperSlicer 2.5.59.13 and
+QIDISlicer 1.2.5 on Windows and Linux (.github/workflows/slicers.yml), from their official builds, never opened.
 
 Settings, all optional, in studio.toml (table [slicer.prusa], [slicer.superslicer], [slicer.qidi]):
     app = "/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer"
@@ -35,12 +36,11 @@ import hashlib
 import re
 import shutil
 import subprocess
-import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .common import SlicerBlocked, SlicerFailed, first_dir, find_app as _find, gcode_stats, platform, private
+from .common import SlicerBlocked, SlicerFailed, first_dir, find_app as _find, gcode_stats, gcode_version, platform, private, program_version, shipped_dirs
 from .common import parse_layers as _parse_layers
 
 SECTION = {"machine": "printer", "process": "print", "filament": "filament"}
@@ -79,7 +79,7 @@ def _flatpak(fid: str) -> list[str]:
 
 
 PRUSA = Variant(
-    kind="prusa", label="PrusaSlicer", ini="PrusaSlicer.ini", version_re=r"PrusaSlicer-([\d.]+)",
+    kind="prusa", label="PrusaSlicer", ini="PrusaSlicer.ini", version_re=r"PrusaSlicer[-_ ]v?(\d[\d.]*\d)",
     url="https://www.prusa3d.com/page/prusaslicer_424/", brew="prusaslicer", flatpak="com.prusa3d.PrusaSlicer",
     binary_gcode=True,
     apps={"darwin": ["/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer",
@@ -95,20 +95,23 @@ PRUSA = Variant(
           "linux": ["~/.config/PrusaSlicer", "~/.PrusaSlicer", "~/.var/app/com.prusa3d.PrusaSlicer/config/PrusaSlicer"]},
 )
 SUPERSLICER = Variant(
-    kind="superslicer", label="SuperSlicer", ini="SuperSlicer.ini", version_re=r"SuperSlicer-([\d.]+)",
-    url="https://github.com/supermerill/SuperSlicer/releases", flatpak="com.superslicer.SuperSlicer",
+    kind="superslicer", label="SuperSlicer", ini="SuperSlicer.ini", version_re=r"SuperSlicer[-_ ]v?(\d[\d.]*\d)",
+    url="https://github.com/supermerill/SuperSlicer/releases",      # not on Flathub: no flatpak to offer
     apps={"darwin": ["/Applications/SuperSlicer.app/Contents/MacOS/SuperSlicer"],
           "win": [r"%ProgramFiles%\SuperSlicer\superslicer_console.exe", "superslicer_console.exe"],
-          "linux": ["superslicer", "SuperSlicer", "~/Applications/SuperSlicer*.AppImage"] + _flatpak("com.superslicer.SuperSlicer")},
+          "linux": ["superslicer", "SuperSlicer", "/opt/SuperSlicer/AppRun", "~/Applications/SuperSlicer*.AppImage"]},
     dirs={"darwin": ["~/Library/Application Support/SuperSlicer"], "win": [r"%APPDATA%\SuperSlicer"],
           "linux": ["~/.config/SuperSlicer", "~/.SuperSlicer"]},
 )
 QIDI = Variant(
-    kind="qidi", label="QIDISlicer", ini="QIDISlicer.ini", version_re=r"QIDISlicer-([\d.]+)",
+    kind="qidi", label="QIDISlicer", ini="QIDISlicer.ini", version_re=r"QIDISlicer[-_ ]v?(\d[\d.]*\d)",
     url="https://github.com/QIDITECH/QIDISlicer/releases", binary_gcode=True,
     apps={"darwin": ["/Applications/QIDISlicer.app/Contents/MacOS/QIDISlicer"],
-          "win": [r"%ProgramFiles%\QIDISlicer\qidi-slicer-console.exe", "qidi-slicer-console.exe"],
-          "linux": ["qidi-slicer", "QIDISlicer", "~/Applications/QIDISlicer*.AppImage"]},
+          "win": [r"%ProgramFiles%\QIDISlicer\qidi-slicer-console.exe", "qidi-slicer-console.exe",
+                  # the official zip and installer of 1.2.5 have no console program, only this one
+                  r"%ProgramFiles%\QIDISlicer\QIDISlicer.exe", r"%LOCALAPPDATA%\Programs\QIDISlicer\QIDISlicer.exe",
+                  "QIDISlicer.exe"],
+          "linux": ["qidi-slicer", "QIDISlicer", "/opt/QIDISlicer/AppRun", "~/Applications/QIDISlicer*.AppImage"]},
     dirs={"darwin": ["~/Library/Application Support/QIDISlicer"], "win": [r"%APPDATA%\QIDISlicer"],
           "linux": ["~/.config/QIDISlicer"]},
 )
@@ -145,16 +148,12 @@ def split_list(value: str) -> list[str]:
     return out
 
 
-def shipped_profiles(app: str | None) -> Path | None:
-    """The vendor bundles inside the program itself (PrusaSlicer.app/Contents/Resources/profiles, <dir>/resources/profiles)."""
+def shipped_profiles(app: str | None, share: str = "PrusaSlicer") -> Path | None:
+    """The vendor bundles inside the program itself (PrusaSlicer.app/Contents/Resources/profiles,
+    <dir>/resources/profiles, share/<Program>/profiles, an unpacked AppImage: see common.shipped_dirs)."""
     if not app:
         return None
-    exe = Path(app)
-    for cand in (exe.parent.parent / "Resources" / "profiles", exe.parent / "resources" / "profiles",
-                 exe.parent.parent / "resources" / "profiles", exe.parent.parent / "share" / "PrusaSlicer" / "profiles"):
-        if cand.is_dir():
-            return cand
-    return None
+    return next(iter(shipped_dirs(app, share)), None)
 
 
 class Bundle:
@@ -248,7 +247,7 @@ class Adapter:
             selected = read_ini(cdir / v.ini).get("presets", {}) if (cdir / v.ini).exists() else {}
             names = {k: st[k] if st[k] != "auto" else selected.get(SECTION[k], "") for k in SECTION}
             out["source"] = {k: ("studio.toml" if st[k] != "auto" else f"{v.label} current selection") for k in SECTION}
-            bundle = Bundle(cdir, shipped_profiles(app))
+            bundle = Bundle(cdir, shipped_profiles(app, v.label))
             for kind, name in names.items():
                 if not name:
                     raise SlicerBlocked(f"No {SECTION[kind]} preset is selected in {v.label} and none is set in studio.toml.")
@@ -286,15 +285,17 @@ class Adapter:
     def version(self, app: str) -> str:
         c = self.v.version_cache
         if app not in c:
-            try:
-                with tempfile.TemporaryDirectory() as scratch:
-                    r = subprocess.run([app, "--help"], capture_output=True, text=True, timeout=30,
-                                       stdin=subprocess.DEVNULL, cwd=scratch)
-                m = re.search(self.v.version_re, r.stdout + r.stderr)
-                c[app] = m.group(1) if m else "unknown"
-            except (OSError, subprocess.SubprocessError):
-                c[app] = "unavailable"
+            c[app] = program_version(app, self.v.version_re, (self.v.label + ".dll",))
         return c[app]
+
+    def sliced_version(self, app: str, gcode: Path) -> str:
+        """The program's version for a slice: as the program reports it, else as that G-code states it."""
+        v = self.version(app)
+        if v in ("unknown", "unavailable"):
+            said = gcode_version(gcode, self.v.label)
+            if said:
+                v = self.v.version_cache[app] = said
+        return v
 
     def public(self, resolved: dict) -> dict:
         out = {k: v for k, v in resolved.items() if k != "presets"}
@@ -356,7 +357,7 @@ class Adapter:
         except (OSError, subprocess.SubprocessError):
             pass
         info.update({
-            "seconds": round(time.time() - t0, 2), "slicer_version": self.version(resolved["app"]),
+            "seconds": round(time.time() - t0, 2), "slicer_version": self.sliced_version(resolved["app"], gcode),
             "gcode": gcode.name, "threemf": None, "project_3mf": project,
             "gcode_sha256": hashlib.sha256(gcode.read_bytes()).hexdigest(),
             "presets": {k: {"name": p["name"], "sha": p["sha"]} for k, p in resolved["presets"].items()},

@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from xml.etree import ElementTree
 
-from .common import SlicerBlocked, SlicerFailed, private
+from .common import SlicerBlocked, SlicerFailed, gcode_version, private, program_version
 
 
 @dataclass
@@ -39,9 +39,11 @@ class Family:
     label: str                      # "Bambu Studio"
     conf_name: str                  # "BambuStudio.conf"
     version_re: str                 # r"BambuStudio-([\d.]+)"
+    program: str = ""               # the name in its G-code header and of its library on Windows ("BambuStudio")
     table: str = ""                 # studio.toml table holding app/config_dir/presets ("" = [slicer] itself)
     deep_search: bool = False       # also look in nested folders / by "name" field (OrcaSlicer's libraries)
     parse_header: object = None     # G-code statistics reader
+    shipped: object = None          # app -> the profiles folders inside the program (<vendor>/<kind>/*.json), for an install never opened
     cache_dirs: object = None       # (app, config_dir) -> folders holding packed <vendor>.opc presets (OrcaSlicer 2.5+)
     selection: object = None        # conf dict -> {"machine", "process", "filament"} chosen in the program
     exit_reasons: dict = field(default_factory=dict)    # CLI return code -> the program's own sentence for it
@@ -63,14 +65,18 @@ def read_conf(config_dir: Path, conf_name: str) -> dict:
         return {}
 
 
-def search_dirs(config_dir: Path, kind: str) -> list[Path]:
+def search_dirs(config_dir: Path, kind: str, shipped=()) -> list[Path]:
+    """Folders holding JSON presets of one kind: the person's own, the installed vendors, then the
+    vendors inside the program (the same files; all there is before the program is first opened)."""
     dirs = [d / kind for d in sorted((config_dir / "user").glob("*")) if (d / kind).is_dir()]
     dirs += [d / kind for d in sorted((config_dir / "system").glob("*")) if (d / kind).is_dir()]
+    for root in shipped:
+        dirs += [d / kind for d in sorted(Path(root).glob("*")) if (d / kind).is_dir()]
     return dirs
 
 
-def find(fam: Family, config_dir: Path, kind: str, name: str) -> Path:
-    dirs = search_dirs(config_dir, kind)
+def find(fam: Family, config_dir: Path, kind: str, name: str, shipped=()) -> Path:
+    dirs = search_dirs(config_dir, kind, shipped)
     for d in dirs:
         for cand in (d / f"{name}.json", d / "base" / f"{name}.json"):
             if cand.exists():
@@ -95,6 +101,7 @@ class Packed:
     """Packed vendor presets (OrcaSlicer 2.5+ <vendor>.opc) to fall back on when there is no JSON file."""
     dirs: list                      # folders to search, in order
     vendor: Path | None = None      # the cache the printer came from: looked in first for the other presets
+    json_roots: list = field(default_factory=list)      # shipped profiles folders with JSON presets (Family.shipped)
 
 
 def load(fam: Family, config_dir: Path, kind: str, name: str, packed: Packed | None = None, within=None):
@@ -105,7 +112,8 @@ def load(fam: Family, config_dir: Path, kind: str, name: str, packed: Packed | N
     caches, the preset is read from those. `within` is the cache of the preset that names this
     one as its parent: a parent is only ever taken from the same vendor or the filament library."""
     try:
-        return json.loads(find(fam, config_dir, kind, name).read_text(encoding="utf-8")), [], None
+        roots = packed.json_roots if packed else ()
+        return json.loads(find(fam, config_dir, kind, name, roots).read_text(encoding="utf-8")), [], None
     except SlicerBlocked as missing:
         if packed is None or not packed.dirs:
             raise
@@ -166,7 +174,10 @@ def resolve(fam: Family, s: dict, app: Path, config_dir: Path, wanted: dict) -> 
         chosen = {"machine": selected.get("machine", ""), "process": selected.get("process", ""),
                   "filament": (selected.get("filaments") or [""])[0]}
     names = {k: wanted[k] if wanted[k] != "auto" else (chosen.get(k) or "") for k in ("machine", "process", "filament")}
-    packed = Packed(list(fam.cache_dirs(app, config_dir))) if fam.cache_dirs else None
+    packed = None
+    if fam.cache_dirs or fam.shipped:
+        packed = Packed(list(fam.cache_dirs(app, config_dir)) if fam.cache_dirs else [],
+                        json_roots=list(fam.shipped(app)) if fam.shipped else [])
     out["source"] = {k: ("studio.toml" if wanted[k] != "auto" else f"{fam.label} current selection") for k in names}
     try:
         for kind, name in names.items():
@@ -227,15 +238,18 @@ def no_selection(fam: Family, config_dir: Path, kind: str, names: dict, has_conf
 
 def version(fam: Family, app: str) -> str:
     if app not in fam.version_cache:
-        try:
-            with tempfile.TemporaryDirectory() as scratch:     # the CLI drops result.json into its cwd
-                r = subprocess.run([app, "--help"], capture_output=True, text=True, timeout=30,
-                                   stdin=subprocess.DEVNULL, cwd=scratch)
-            m = re.search(fam.version_re, r.stdout + r.stderr)
-            fam.version_cache[app] = m.group(1) if m else "unknown"
-        except (OSError, subprocess.SubprocessError):
-            fam.version_cache[app] = "unavailable"
+        fam.version_cache[app] = program_version(app, fam.version_re, (fam.program + ".dll",))
     return fam.version_cache[app]
+
+
+def sliced_version(fam: Family, app: str, gcode: Path) -> str:
+    """The program's version for a slice: as the program reports it, else as that G-code states it."""
+    v = version(fam, app)
+    if v in ("unknown", "unavailable"):
+        said = gcode_version(gcode, fam.program)
+        if said:
+            v = fam.version_cache[app] = said
+    return v
 
 
 def public(fam: Family, resolved: dict) -> dict:
@@ -359,7 +373,7 @@ def slice_stl(fam: Family, resolved: dict, stl: Path, out_dir: Path, timeout: fl
     if threemf.exists():
         info.update(read_3mf(threemf, out_dir))
     info.update({
-        "seconds": round(time.time() - t0, 2), "slicer_version": version(fam, resolved["app"]),
+        "seconds": round(time.time() - t0, 2), "slicer_version": sliced_version(fam, resolved["app"], gcode),
         "gcode": gcode.name, "threemf": threemf.name if threemf.exists() else None,
         "gcode_sha256": hashlib.sha256(gcode.read_bytes()).hexdigest(),
         "presets": {k: {"name": v["name"], "sha": v["sha"]} for k, v in resolved["presets"].items()},

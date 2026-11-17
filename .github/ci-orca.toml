@@ -1,0 +1,11 @@
+# Real slicers in CI (.github/workflows/slicers.yml): OrcaSlicer is installed on the runner but never opened, so the
+# presets are pinned here and FORM reads them from the profiles shipped inside the program.
+[printer]
+name = "Bambu Lab A1 mini"
+envelope_mm = [180, 180, 180]
+
+[slicer]
+kind = "orca"
+machine = "Bambu Lab A1 mini 0.4 nozzle"
+process = "0.20mm Standard @BBL A1M"
+filament = "Bambu PLA Basic @BBL A1M"

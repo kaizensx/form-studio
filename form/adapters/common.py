@@ -9,7 +9,10 @@ import math
 import os
 import re
 import shutil
+import struct
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -58,6 +61,120 @@ def first_dir(candidates: list[str]) -> str:
         if Path(expand(c)).is_dir():
             return expand(c)
     return expand(candidates[0])
+
+
+def shipped_dirs(app, share: str, sub: str = "profiles") -> list[Path]:
+    """Folders named `sub` among the resources a slicer ships, for every way it is installed.
+
+    app is the program FORM starts: the executable, a link to it, or the AppRun of an unpacked
+    AppImage. share is the folder name the program uses under share/ ("OrcaSlicer")."""
+    app = Path(app)
+    try:
+        real = app.resolve()
+    except OSError:
+        real = app
+    out = []
+    for exe in dict.fromkeys((app, real)):
+        here = exe.parent
+        out += [here.parent / "Resources" / sub,                # macOS bundle: Contents/MacOS/<Program>
+                here / "resources" / sub,                       # Windows; Linux tarball; AppImage with resources beside AppRun
+                here.parent / "resources" / sub,                # Linux: bin/<program> beside resources/
+                here.parent / "share" / share / sub,            # Linux packages
+                here / "usr" / "bin" / "resources" / sub,       # unpacked AppImage (PrusaSlicer family): AppRun, usr/bin/resources
+                here / "usr" / "resources" / sub,
+                here / "usr" / "share" / share / sub,
+                here / "bin" / "resources" / sub]
+    found = []
+    for d in out:
+        try:                            # one folder under two spellings (case, symlink) counts once
+            if d.is_dir() and not any(os.path.samefile(d, f) for f in found):
+                found.append(d)
+        except OSError:
+            continue
+    return found
+
+
+def windows_file_version(path) -> str:
+    """The version text in a Windows program's file properties ("" when it has none, or elsewhere).
+
+    Only the text fields. The numeric field is not the program's version in every build: OrcaSlicer 2.5.1's
+    orca-slicer.exe has no text and the number 2.0.0.0."""
+    if os.name != "nt":
+        return ""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        api = ctypes.WinDLL("version")
+        api.GetFileVersionInfoSizeW.argtypes = [wintypes.LPCWSTR, ctypes.c_void_p]
+        api.GetFileVersionInfoSizeW.restype = wintypes.DWORD
+        api.GetFileVersionInfoW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p]
+        api.GetFileVersionInfoW.restype = wintypes.BOOL
+        api.VerQueryValueW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_void_p),
+                                       ctypes.POINTER(wintypes.UINT)]
+        api.VerQueryValueW.restype = wintypes.BOOL
+        size = api.GetFileVersionInfoSizeW(str(path), None)
+        if not size:
+            return ""
+        buf = ctypes.create_string_buffer(size)
+        if not api.GetFileVersionInfoW(str(path), 0, size, buf):
+            return ""
+        at, n = ctypes.c_void_p(), wintypes.UINT()
+        if api.VerQueryValueW(buf, "\\VarFileInfo\\Translation", ctypes.byref(at), ctypes.byref(n)) and n.value >= 4:
+            lang, page = struct.unpack("HH", ctypes.string_at(at.value, 4))
+            for key in ("ProductVersion", "FileVersion"):
+                where = f"\\StringFileInfo\\{lang:04x}{page:04x}\\{key}"
+                if api.VerQueryValueW(buf, where, ctypes.byref(at), ctypes.byref(n)) and n.value:
+                    text = ctypes.wstring_at(at.value, n.value).strip("\0 ")
+                    if re.search(r"\d", text):
+                        return text
+    except (OSError, AttributeError, ValueError, struct.error):
+        pass
+    return ""
+
+
+def version_in(text: str, pattern: str) -> str:
+    m = re.search(pattern, text or "")
+    return m.group(1) if m else ""
+
+
+def program_version(app: str, pattern: str, libraries: tuple = ()) -> str:
+    """The version of a slicer: what `--help` prints, matched by `pattern`.
+
+    On Windows the programs with a window (orca-slicer.exe, bambu-studio.exe, QIDISlicer.exe) print nothing
+    to a pipe, so there the version comes from the file properties of the program, or of the library beside
+    it that holds the program (`libraries`, e.g. "OrcaSlicer.dll"): bambu-studio.exe states it there,
+    orca-slicer.exe does not. "unknown" when neither says (a slice then takes it from its G-code, see
+    gcode_version); "unavailable" when the program could not be started at all."""
+    try:
+        with tempfile.TemporaryDirectory() as scratch:     # the CLI drops result.json into its cwd
+            r = subprocess.run([app, "--help"], capture_output=True, text=True, timeout=30,
+                               stdin=subprocess.DEVNULL, cwd=scratch, errors="replace")
+        found = version_in(r.stdout + r.stderr, pattern)
+    except (OSError, subprocess.SubprocessError):
+        return "unavailable"
+    if not found and os.name == "nt":
+        for f in (Path(app), *(Path(app).parent / lib for lib in libraries)):
+            found = version_in(windows_file_version(f), r"(\d+(?:\.\d+)+)") if f.exists() else ""
+            if found:
+                break
+    return found or "unknown"
+
+
+def gcode_version(path: Path, program: str) -> str:
+    """The version the slicer wrote at the top of its G-code: "; generated by OrcaSlicer 2.5.1 on …",
+    "; BambuStudio 02.09.01.70". "" when the first lines do not name `program`."""
+    pat = re.compile(r"^;\s*(?:generated by\s+)?" + re.escape(program).replace(r"\ ", r"\s*") + r"[ _-]+v?(\d+(?:\.\d+)+)")
+    try:
+        with open(path, errors="ignore", encoding="utf-8") as f:
+            for i, line in enumerate(f):
+                if i > 60:
+                    break
+                m = pat.match(line)
+                if m:
+                    return m.group(1)
+    except OSError:
+        pass
+    return ""
 
 
 def private(text: str) -> str:
