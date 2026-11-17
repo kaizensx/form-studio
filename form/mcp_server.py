@@ -37,7 +37,7 @@ Form Studio designs 3D-printable parts from parametric recipes and keeps an hone
 
 Workflow: form_overview -> describe_recipe -> create_project (or get_project) -> preview_change ->
 render (look at it) -> commit_change -> run_pipeline -> get_project (gate, checks, next actions) ->
-request_release (a person approves on the bench).
+request_release (a person approves in Form Studio).
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
@@ -45,7 +45,7 @@ Rules:
 - Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number.
   Never invent physical results; record_physical_result is only for what the user reports.
 - A slice is a simulation, not a print. Fit yield is a model. Say so when you report them.
-- You cannot approve a release. request_release returns a bench link for the user.
+- You cannot approve a release. request_release returns a link that opens the release in Form Studio for the user.
 - Nothing here starts a print or sends files anywhere.
 - Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time,
   at most three per task. Outside Form Studio's chat it tells you to ask in your own interface.
@@ -553,7 +553,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RO)
     async def request_release(project: str, open_browser: bool = False) -> dict:
         """Check whether the head revision can be released and hand the decision to the user.
-        Agents cannot approve: approval happens on the bench, where the user reviews checks and acknowledges warnings."""
+        Agents cannot approve: approval happens in Form Studio, where the user reviews checks and acknowledges warnings."""
         st = studio()
         def go():
             p = st.load(project)
@@ -813,7 +813,7 @@ def build() -> MCPServer:
         """Save a named variant of the design ("Travel version", "Thick walls"): a complete set of parameter values kept
         in the project next to the revisions. values are changes on top of the head (or of rev); leave them out to save
         the head (or rev) as it is. The candidate is built before it is saved; saving a name again replaces it. Nothing
-        is committed: promote a variant on the bench or with `form variants promote`."""
+        is committed: promote a variant in Form Studio or with `form variants promote`."""
         st = studio()
         from . import variants
         v = await _run(lambda: variants.save(st, st.load(project), name, values, rev, note, _origin(ctx).replace("agent:", "") or "agent"))

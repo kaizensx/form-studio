@@ -32,7 +32,7 @@ Form Studio designs 3D-printable parts from parametric recipes and keeps an hone
 
 Workflow: form_overview -> describe_recipe -> create_project (or get_project) -> preview_change ->
 render (look at it) -> commit_change -> run_pipeline -> get_project (gate, checks, next actions) ->
-request_release (a person approves on the bench).
+request_release (a person approves in Form Studio).
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
@@ -40,13 +40,15 @@ Rules:
 - Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number.
   Never invent physical results; record_physical_result is only for what the user reports.
 - A slice is a simulation, not a print. Fit yield is a model. Say so when you report them.
-- You cannot approve a release. request_release returns a bench link for the user.
+- You cannot approve a release. request_release returns a link that opens the release in Form Studio for the user.
 - Nothing here starts a print or sends files anywhere.
+- Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time,
+  at most three per task. Outside Form Studio's chat it tells you to ask in your own interface.
 ```
 
 ## Tools at a glance
 
-44 tools. Read-only tools never change a project.
+53 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -94,6 +96,15 @@ Rules:
 | [`rename_project`](#rename_project) | changes | Change a project's display name (up to 80 characters). |
 | [`duplicate_project`](#duplicate_project) | changes | Copy a project with its revisions, variants and built outputs under a new id (from the new name; default "<old name> copy"). |
 | [`delete_project`](#delete_project) | changes | Delete a project by moving its whole folder to the trash folder inside the projects folder (<projects folder>/.trash/<id>-<UTC time>). |
+| [`list_printers`](#list_printers) | read-only | Every printer set up in every installed slicer (the user's own presets and the system printers they enabled), with slicer, bed size and nozzle, plus the default printer. |
+| [`choose_printer`](#choose_printer) | changes | Use a printer for one design (`project`) or as the default for designs without their own choice (`default=True`, written to studio.toml after a backup). |
+| [`ask_user`](#ask_user) | read-only | Ask the person one question and wait for the answer. |
+| [`suggest_replies`](#suggest_replies) | read-only | Offer up to 3 short follow-up messages the person might send next (each under 80 characters, written as the person would say it, e.g. "Make the walls 2 mm"). |
+| [`list_starters`](#list_starters) | read-only | The starting points Home offers, ranked from what this person designs (their projects' recipes and briefs, their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}. |
+| [`recipe_library`](#recipe_library) | read-only | Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index on the project website. |
+| [`export_project`](#export_project) | changes | Write the project, its conversations and the code its revisions were built from to one .formstudio file (default: <projects folder>/<project>.formstudio). |
+| [`import_project`](#import_project) | changes | Import a .formstudio or .formproj archive (or a conversation .json) from an absolute path. |
+| [`export_conversation`](#export_conversation) | read-only | A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again). |
 
 ## Tools
 
@@ -409,7 +420,7 @@ kind="widths": measured pairs [{"nominal": mm, "measured": mm}] from a coupon (s
 *Read-only.*
 
 Check whether the head revision can be released and hand the decision to the user.
-Agents cannot approve: approval happens on the bench, where the user reviews checks and acknowledges warnings.
+Agents cannot approve: approval happens in Form Studio, where the user reviews checks and acknowledges warnings.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -604,7 +615,7 @@ invented light and material, not a photo of a print: never present it as evidenc
 Save a named variant of the design ("Travel version", "Thick walls"): a complete set of parameter values kept
 in the project next to the revisions. values are changes on top of the head (or of rev); leave them out to save
 the head (or rev) as it is. The candidate is built before it is saved; saving a name again replaces it. Nothing
-is committed: promote a variant on the bench or with `form variants promote`.
+is committed: promote a variant in Form Studio or with `form variants promote`.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -671,6 +682,124 @@ project. Returns {ok, id, trash}: tell the user the trash path.
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
+
+### `list_printers`
+
+*Read-only.*
+
+Every printer set up in every installed slicer (the user's own presets and the system printers they enabled),
+with slicer, bed size and nozzle, plus the default printer. With `project`: which printer that design uses and
+why (its own choice, the default, or the slicer's selection). With `printer` ("<kind>:<printer name>", the id from
+this list): the filaments and processes that printer can use.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string \| null |  |
+| `printer` | string \| null |  |
+
+### `choose_printer`
+
+Use a printer for one design (`project`) or as the default for designs without their own choice
+(`default=True`, written to studio.toml after a backup). `printer` is an id from list_printers ("bambu:Bambu Lab
+A1 mini 0.4 nozzle"); "" with a project clears its choice. Filament and process default to what the slicer would
+pick for that printer. Slicing and the bed-size and nozzle checks follow the choice; the slice goes stale.
+Ask the user which printer before calling this.
+
+| Argument | Type | Required |
+|---|---|---|
+| `printer` | string | yes |
+| `project` | string \| null |  |
+| `filament` | string |  |
+| `process` | string |  |
+| `default` | boolean |  |
+
+### `ask_user`
+
+*Read-only.*
+
+Ask the person one question and wait for the answer. Use it only when the answer changes the design
+and you cannot find it yourself: a measurement that sets a fit or a load, or an intent you cannot tell
+apart (which device, which side opens). At most a few questions per task; ask them one at a time.
+choices: up to 8 short options shown as buttons (multi_select lets the person pick several);
+allow_text lets them type their own answer; why: one line on what the answer changes.
+kind="confirm" shows an approval card (choices default to Yes / No) before an action the person
+should agree to. Returns {answered, answer, choices, text} or, when nobody answered, {answered: false,
+reason, note}: then continue with safe assumptions marked assumed. Outside Form Studio's chat nobody
+can answer here and the result tells you to ask in your own interface.
+
+| Argument | Type | Required |
+|---|---|---|
+| `question` | string | yes |
+| `choices` | array \| null |  |
+| `multi_select` | boolean |  |
+| `allow_text` | boolean |  |
+| `why` | string |  |
+| `kind` | string |  |
+
+### `suggest_replies`
+
+*Read-only.*
+
+Offer up to 3 short follow-up messages the person might send next (each under 80 characters, written
+as the person would say it, e.g. "Make the walls 2 mm"). Form Studio's chat shows them as buttons under
+your reply. Call it at most once, at the end of a reply, and only with useful next steps.
+
+| Argument | Type | Required |
+|---|---|---|
+| `options` | array | yes |
+
+### `list_starters`
+
+*Read-only.*
+
+The starting points Home offers, ranked from what this person designs (their projects' recipes and briefs,
+their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}.
+Use them to suggest what to design next; the person edits them in the app or with `form starters`.
+
+### `recipe_library`
+
+*Read-only.*
+
+Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index
+on the project website. section: builtin | mine | community. Installing code is the person's decision and
+happens only in the app or with `form recipes install` after they review the source and its SHA-256.
+
+| Argument | Type | Required |
+|---|---|---|
+| `q` | string |  |
+| `section` | string |  |
+| `tag` | string |  |
+
+### `export_project`
+
+Write the project, its conversations and the code its revisions were built from to one .formstudio file
+(default: <projects folder>/<project>.formstudio). Returns {file, bytes}. Nothing is uploaded.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `path` | string \| null |  |
+| `conversations` | boolean |  |
+
+### `import_project`
+
+Import a .formstudio or .formproj archive (or a conversation .json) from an absolute path. The archive is
+checked first; a project or conversation id that already exists gets a new one. Returns the new ids.
+
+| Argument | Type | Required |
+|---|---|---|
+| `path` | string | yes |
+
+### `export_conversation`
+
+*Read-only.*
+
+A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again).
+
+| Argument | Type | Required |
+|---|---|---|
+| `conversation` | string | yes |
+| `format` | string |  |
 
 ## Prompts
 

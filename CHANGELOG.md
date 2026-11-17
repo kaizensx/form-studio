@@ -1,5 +1,27 @@
 # Changelog
 
+## 12.0.0
+
+- **A new Home.** A new install shows every way to start, starters and the built-in recipes drawn live in 3D. With designs, starters sit above the live design grid.
+- **Starters learn from you.** They are ranked by what you design, your briefs, your printer and your material. Pin, edit, remove or add your own, and save a filled-in brief as your own template.
+- **Every way to start a design:** describe it (with a reference STEP or STL), pick from a searchable recipe library (built-in, yours, community), fill in a brief, or import.
+- **Community recipes.** Install a `.py` or `.scad` recipe from a file or from the gallery on the website, after reading its source and SHA-256. Downloads are verified against the index, nothing runs until you create a design, and uninstall is one click.
+- **Move designs anywhere.** Export a design with its conversations and code as one `.formstudio` file and import it again; clashing ids get new ones and nothing is overwritten. Conversations export as Markdown or JSON. `form export`, `form import`, `form export-conversation`.
+- **The agent asks when it needs to.** Questions arrive in the conversation as cards with choices, several choices, your own words or an approval, and the agent waits for your answer. `form chat` asks in the terminal.
+- **Suggested replies, change cards and revision links.** Replies can end with suggested next messages. A reply that changed the design shows r01 → r02 with Compare and Go back. A revision name like r04 opens it.
+- **Fix with your agent.** Failed checks, pipeline steps, slices, drafts that don't build and Blender renders have a Fix button that sends the failure to the design's conversation.
+- **Opening a conversation opens its design.**
+- **Model names with their version** ("Opus 5.5"), taken from what the agent reports, in the picker and on every reply.
+- **More agents:** Cursor CLI, OpenCode, Qwen Code and GitHub Copilot CLI, with install entries, sign-in checks and an Agents list in Settings › Chat.
+- **Every printer you have.** Form Studio finds every printer set up in every installed slicer and lets you choose printer, filament and process per design or as the default. Slicing and the bed-size and nozzle checks follow the choice. `form printers`, MCP `list_printers` and `choose_printer`.
+- **Your own Bambu Studio printers slice.** The slicer used to refuse them as incompatible with the process.
+- **More slicers:** ElegooSlicer and Snapmaker Orca.
+- **Setup by itself.** First start installs what Form Studio needs and pauses only when you have to sign in or download something, then carries on once it is done. `form setup --auto` does the same headless.
+- **Exploded views for every multi-part design.** The enclosure and the gear pair declare how their parts go together, with interference and clearance checks; any design with several bodies gets As modelled and Exploded views.
+- **What's New** after every update, once, and any time from About and Help.
+- **Update channel:** Stable (releases) or Preview (pre-releases from the `dev` branch), in Settings.
+- **A new website and README,** with every feature, a recipe gallery, documentation pages and a guide to contributing. Issue forms, discussions and labels on GitHub.
+
 ## 11.1.1
 
 - **Agents can read datasheets and drawings from the web in the installed app.** Every https read failed with a certificate error, because the app did not use the certificates it ships. Links that start with http:// are tried over https first. A site that only serves browsers is named as such, with the way around it: attach the file to the conversation.

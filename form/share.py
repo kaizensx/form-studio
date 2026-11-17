@@ -363,7 +363,7 @@ def _compose(st, p: dict, f: dict, photo_file: Path | None) -> Image.Image:
         d.text((40, Hh - 54), "Kernel geometry (build123d / OpenCascade). Dimensions in mm, computed from the solid.",
                fill=INK3, font=_font("sans", 19))
     # wordmark
-    d.text((40, 36), "F O R M", fill=INK, font=_font("bold", 24))
+    d.text((40, 36), "Form Studio", fill=INK, font=_font("bold", 24))
     # right column
     d.rectangle([split, 0, W, Hh], fill=PLATE1)
     d.line([split, 0, split, Hh], fill=PLATE2, width=2)
