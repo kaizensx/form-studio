@@ -15,7 +15,9 @@ def wait_job(ui, pid, timeout=300):
         st = {k: {x: v.get(x) for x in ("state", "blocked", "unavailable", "error") if v.get(x)} for k, v in (d.get("status") or {}).items()} if isinstance(d, dict) else d
         jobs = getattr(ui.studio, "jobs", {})
         last = [{"state": j.get("state"), "steps": [(s.get("node"), s.get("state"), str(s.get("error"))[:300]) for s in j.get("steps", [])]} for j in list(jobs.values())[-2:]]
-        raise type(e)(f"{e}; job={d.get('job') if isinstance(d, dict) else None} status={st} last jobs={last}") from None
+        err = {k: d.get(k) for k in ("error", "hint", "detail") if k in d} if isinstance(d, dict) else {}
+        raise type(e)(f"{e}; job={d.get('job') if isinstance(d, dict) else None} status={st} answer={err or str(d)[:300]} "
+                      f"last jobs={last}") from None
 
 
 def make(ui, recipe, name, values=None, open=True):
