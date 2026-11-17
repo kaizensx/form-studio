@@ -1,5 +1,12 @@
 # Changelog
 
+## 11.0.2
+
+- **OrcaSlicer 2.5 slices through FORM.** OrcaSlicer 2.5 stopped shipping its printer, process and filament presets as JSON files; each vendor is now one packed file (`.opc`). FORM reads that format (written from OrcaSlicer's own source, format version 2; any other version is refused by name, not guessed) and hands the slicer the presets it needs. Run for real with OrcaSlicer 2.5.1: the phone dock on a Bambu Lab A1 mini 0.4 nozzle, 0.20mm Standard, Generic PLA: 1 h 45 min, 59.04 g, 177 layers; layers, print simulation and cost all read its G-code.
+- **Presets pinned in `studio.toml` work on an OrcaSlicer that was never opened**: FORM falls back to the profiles inside the program.
+- **"Current selection"** follows OrcaSlicer's per-printer process and filament, and the Slicer sheet says exactly what is missing when the selection is incomplete.
+- Not verified: OrcaSlicer on Windows and Linux (profile paths are fixture-tested only; AppImage and Flatpak locations are not covered), vendors other than Bambu Lab (their packed files decode, none was sliced), and a real user-made preset.
+
 ## 11.0.1
 
 Run against the real programs for the first time, and fixed what that showed.
