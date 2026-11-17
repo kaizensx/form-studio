@@ -67,6 +67,8 @@ QtObject {
     readonly property var shown: (scrub && scrub.view) || preview || view         // geometry currently on screen
     readonly property var chat: studio && studio.chat ? studio.chat : ({ available: false, note: "" })
     readonly property var slicer: studio ? studio.env.slicer : ({ available: false })
+    // engine workstream: what the open design slices with (its own printer, the default, or the slicer's selection)
+    readonly property var printing: pid && data && data.printer ? data.printer.slicer : slicer
     readonly property var stages: [
         { id: "brief", title: "Brief", hint: "What it is for, what is known" },
         { id: "shape", title: "Shape", hint: "Select a feature, change it" },
@@ -640,7 +642,7 @@ QtObject {
         get("/setup/state").then(function (r) {
             var empty = r.fresh
             if (r.onboarding) onboardStep = r.onboarding.step
-            if (r.first_run && (!headless || empty)) { welcome = true; checkSoftware() }
+            if (r.first_run && (!headless || empty)) { welcome = true; checkSoftware(); if (!headless) autoSetup(false) }
             checkSetup().then(function (st) { if (st && !st.required_ok && (!headless || empty)) welcome = true })
         }, function () {})
         if (!headless) checkUpdates(false)
@@ -720,6 +722,18 @@ QtObject {
         post("/install", { ids: ids, shown: shown }).then(function (j) { installLog = j.log; installJob = j; _installPoll.restart() },
                                                            function (e) { fail(e); checkSoftware() })
     }
+    // ── hands-free setup (engine workstream): first start installs what Form Studio needs by itself, every command in
+    // the log, and pauses only where the person must act (sign in, a download page); the engine notices and goes on.
+    property bool autoTried: false
+    function autoSetup(force) {
+        if (installing || (autoTried && !force)) return
+        autoTried = true
+        get("/install/auto").then(function (r) {
+            if ((!force && !r.enabled) || !r.ids.length) return
+            post("/install/auto", {}).then(function (j) { installLog = j.log; installJob = j; installPick = ({}); _installPoll.restart() }, fail)
+        }, function () {})
+    }
+    function skipInstall(id) { if (installJob) post("/install/job/" + installJob.id + "/skip", { id: id }).then(function (j) { installJob = j }, fail) }
     function cancelInstall() { if (installJob) post("/install/job/" + installJob.id + "/cancel", {}).then(function () {}, fail) }
     property var _installPoll: Timer { interval: 400; onTriggered: s._installTick() }
     function _installTick() {

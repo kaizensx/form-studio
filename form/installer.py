@@ -1076,3 +1076,237 @@ def main(argv=None) -> int:
                       "after": {k: {"status": v["status"], "detail": v["detail"]} for k, v in job.after.items()}},
                      indent=1, ensure_ascii=False))
     return 0 if job.state == "done" else 1
+
+
+# ---- hands-free setup (engine workstream) -------------------------------------------------------------------------
+# First start installs what Form Studio needs without questions, in the app, with every command in the log. It only
+# stops for what a person must do: sign in, download an app Form Studio cannot install itself, or answer a system
+# prompt. Then it waits, checks again every few seconds, and goes on by itself once that thing is there. Nothing runs
+# with administrator rights; Gatekeeper and system prompts are left to the system. Cancel stops it; Skip leaves one item.
+#
+#     Installer.auto(start=True)          the app (POST /api/install/auto)
+#     run_auto(cfg, echo, wait=True)      `form setup --auto`
+
+AUTO_POLL_S = 3.0           # how often a waiting item is checked again
+AUTO_WAIT_S = 1800          # how long one item may wait for the person before it is left as not done
+AUTO_GROUPS = ("engine", "slicer", "ai")
+
+
+def auto_ids(rows: list[dict]) -> list[str]:
+    """What a hands-free setup takes care of: every required or recommended item Form Studio itself needs (the engine,
+    a slicer, Claude Code for chat and its sign-in) that is missing, in registry order. One slicer is enough (survey
+    makes the rest optional). Other agents' settings are never edited without a click: they stay in the list."""
+    out = []
+    for r in rows:
+        if r["level"] not in ("required", "recommended") or r["status"] not in ("missing", "warn") or r.get("absent"):
+            continue
+        if r["group"] not in AUTO_GROUPS:
+            continue
+        if r["id"].startswith("slicer.") and any(x["one_of"] == "slicer" and x["status"] == "ok" for x in rows):
+            continue
+        out.append(r["id"])
+    return out
+
+
+def _fake_s() -> float:
+    try:
+        return float(os.environ.get("FORM_INSTALL_FAKE") or 0)
+    except ValueError:
+        return 6.0
+
+
+class AutoJob(Job):
+    """Installs, signs in and waits for downloads, one item after another. Step states: waiting | running |
+    needs_user (the person has to do something; `action` says what) | done | failed | skipped | cancelled."""
+
+    def __init__(self, cfg: dict, ids: list[str], installer: "Installer | None" = None, poll_s: float = AUTO_POLL_S,
+                 wait_s: float = AUTO_WAIT_S, timeout_s: float = DEFAULT_TIMEOUT_S, on_done=None):
+        known = {s.id: s for s in REGISTRY}
+        super().__init__(cfg, [(known[i], Method("auto", "Automatic")) for i in ids if i in known], timeout_s, on_done)
+        self.kind = "auto"
+        self.installer, self.poll_s, self.wait_s = installer, poll_s, wait_s
+        self._skip: set = set()
+        for s in self.steps:
+            s.update(action=None, commands=[])
+
+    def skip(self, sid: str) -> None:
+        self._skip.add(sid)
+
+    def public(self, start: int = 0) -> dict:
+        out = super().public(start)
+        out["kind"] = "auto"
+        out["waiting_for_you"] = next((s for s in out["steps"] if s["state"] == "needs_user"), None)
+        return out
+
+    def run(self) -> None:
+        try:
+            ensure_user_bin_on_path()
+            for step, (sw, _m) in zip(self.steps, self.pairs):
+                if self._cancel.is_set():
+                    step.update(state="cancelled", message="not started")
+                    continue
+                if sw.id in self._skip:
+                    step.update(state="skipped", message="skipped")
+                    continue
+                step["state"] = "running"
+                ok, msg = self._auto_one(sw, step)
+                if self._cancel.is_set() and not ok:
+                    step.update(state="cancelled", message="cancelled", action=None)
+                    continue
+                if step["state"] != "skipped":
+                    step.update(state="done" if ok else "failed", message=msg, action=None)
+                    self.say(sw.id, ("Done: " if ok else "Not done: ") + msg, "note" if ok else "err")
+            self.after = {r["id"]: r for r in survey(self.cfg, only=[s["id"] for s in self.steps])}
+            states = {s["state"] for s in self.steps}
+            self.state = "cancelled" if "cancelled" in states else "failed" if "failed" in states else "done"
+        except Exception as e:
+            self.state = "failed"
+            self.say("_", f"{type(e).__name__}: {e}", "err")
+        finally:
+            self.ended = time.time()
+            if self.on_done:
+                try:
+                    self.on_done(self)
+                except Exception:
+                    pass
+
+    def _found(self, sw: Software) -> Found:
+        if _pretend_missing(sw.id):
+            return Found("missing", "reported missing by FORM_SETUP_PRETEND_MISSING (development)")
+        try:
+            return sw.detect(self.cfg, {})
+        except Exception as e:
+            return Found("warn", f"Could not check: {e}")
+
+    def _auto_one(self, sw: Software, step: dict) -> tuple[bool, str]:
+        ctx: dict = {}
+        if self._found(sw).status == "ok":
+            return True, "already there"
+        blocked = [n for n in sw.needs if get(n).detect(self.cfg, {}).status != "ok"] if not os.environ.get("FORM_INSTALL_FAKE") else []
+        if blocked:
+            return False, f"needs {get(blocked[0]).label} first"
+        m = plan(sw, ctx=ctx)
+        if m is not None and m.kind == "login":
+            return self._signin(sw, step)
+        if m is not None:
+            step.update(method=m.id, method_label=m.label, commands=list(m.commands), edits_file=m.kind == "action")
+            ok, msg = self._one(sw, m)
+            if ok:
+                ok, msg = self._verify(sw, msg)
+            if ok or self._cancel.is_set():
+                return ok, msg
+            self.say(sw.id, f"{m.label} did not finish: {msg}", "note")
+        page = manual(sw, ctx=ctx)
+        if not page:
+            return False, (m and "could not be installed here") or "Form Studio cannot install this by itself here"
+        why = "Form Studio cannot install it by itself on this computer" if m is None else "the automatic install did not work"
+        return self._wait_for(sw, step, {"kind": "download", "url": page,
+                                         "text": f"Download {sw.label} from its official page and install it ({why}). "
+                                                 "Form Studio notices when it is there and continues."})
+
+    def _signin(self, sw: Software, step: dict) -> tuple[bool, str]:
+        if os.environ.get("FORM_INSTALL_FAKE"):
+            self.say(sw.id, "FORM_INSTALL_FAKE is set: the sign-in is simulated and ends by itself.", "note")
+            return self._wait_for(sw, step, {"kind": "signin", "url": "", "login": "",
+                                             "text": "Sign in to your Claude account in the browser page that opens. "
+                                                     "Form Studio continues when you are signed in."})
+        lj = None
+        if self.installer is not None:
+            try:
+                lj = self.installer.login(start=True)
+            except InstallError as e:
+                return False, e.message
+        t0 = time.time()
+        while lj is not None and not lj.url and lj.state == "running" and time.time() - t0 < 20 and not self._cancel.is_set():
+            time.sleep(0.2)
+        action = {"kind": "signin", "url": lj.url if lj else "", "login": lj.id if lj else "",
+                  "text": "Sign in to your Claude account in the browser page that opens. Form Studio continues when you are signed in."}
+        ok, msg = self._wait_for(sw, step, action, login=lj)
+        if not ok and lj is not None and lj.state == "running":
+            lj.cancel()
+        return ok, msg
+
+    def _wait_for(self, sw: Software, step: dict, action: dict, login=None) -> tuple[bool, str]:
+        step.update(state="needs_user", action=action)
+        self.say(sw.id, "Waiting for you: " + action["text"] + (f" ({action['url']})" if action.get("url") else ""), "note")
+        t0 = time.time()
+        while not self._cancel.is_set():
+            if sw.id in self._skip:
+                step.update(state="skipped", message="skipped", action=None)
+                self.say(sw.id, "Skipped.", "note")
+                return False, "skipped"
+            if login is not None and login.url and not action.get("url"):
+                action["url"] = login.url
+            if login is not None and login.state in ("failed", "cancelled"):
+                return False, login.message or "sign-in did not finish"
+            f = Found("ok", "simulated") if os.environ.get("FORM_INSTALL_FAKE") and time.time() - t0 > _fake_s() else self._found(sw)
+            if f.status == "ok":
+                step["state"] = "running"
+                return True, f.detail or "found"
+            if time.time() - t0 > self.wait_s:
+                return False, f"not there after {self.wait_s / 60:.0f} minutes"
+            self._cancel.wait(self.poll_s)
+        return False, "cancelled"
+
+
+def _installer_auto(self: "Installer", ids: list[str] | None = None, start: bool = True, poll_s: float = AUTO_POLL_S) -> AutoJob:
+    with self._lock:
+        if any(j.state == "running" for j in self.jobs.values()):
+            raise InstallError("An install is already running.", "Wait for it, or cancel it.", status=409)
+        rows = survey(self.cfg)
+        ids = auto_ids(rows) if ids is None else ids
+        job = AutoJob(self.cfg, ids, self, poll_s=poll_s, on_done=self.on_done)
+        self.jobs[job.id] = job
+    if start:
+        job.start()
+    return job
+
+
+Installer.auto = _installer_auto
+
+
+def run_auto(cfg: dict, echo: Callable[[str], None] | None = None, wait: bool = True, poll_s: float = AUTO_POLL_S) -> AutoJob:
+    """`form setup --auto`: the same hands-free setup in a terminal. With wait=False an item that needs the person is
+    skipped instead of waited for."""
+    inst = Installer(cfg)
+    job = inst.auto(start=True, poll_s=poll_s)
+    seen, told = 0, set()
+    try:
+        while True:
+            p = job.public(seen)
+            for l in p["log"]:
+                if echo:
+                    echo(("$ " if l["kind"] == "cmd" else "  ") + l["text"])
+            seen = p["next"]
+            w = p["waiting_for_you"]
+            if w and w["id"] not in told:
+                told.add(w["id"])
+                if not wait:
+                    job.skip(w["id"])
+            if p["state"] != "running":
+                return job
+            time.sleep(0.2)
+    except KeyboardInterrupt:
+        job.cancel()
+        while job.state == "running":
+            time.sleep(0.1)
+        return job
+
+
+# ---- OrcaSlicer forks (engine workstream; adapters in form/adapters/orca_forks.py) ---------------------------------
+def _add_slicers() -> None:
+    at = next(i for i, s in enumerate(REGISTRY) if s.id == "slicer.qidi") + 1
+    for sw in (
+        _slicer("elegoo", "ElegooSlicer", "Slices for Elegoo printers (Centauri Carbon, Neptune). OrcaSlicer's CLI and presets.",
+                "elegoo-slicer", "Elegoo.ElegooSlicer", "", "https://github.com/ELEGOO-3D/ElegooSlicer/releases",
+                "about 200 MB", "optional"),
+        _slicer("snapmaker", "Snapmaker Orca", "Slices for Snapmaker printers (U1, J1, Artisan, A-series). OrcaSlicer's CLI and presets.",
+                "snapmaker-orca", "Snapmaker.OrcaSlicer", "", "https://github.com/Snapmaker/OrcaSlicer/releases",
+                "about 260 MB", "optional"),
+    ):
+        if not any(s.id == sw.id for s in REGISTRY):
+            REGISTRY.insert(at, sw)
+            at += 1
+
+
+_add_slicers()

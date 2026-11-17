@@ -95,6 +95,9 @@ def main(argv=None):
     if argv[:1] == ["install"]:
         from .installer import main as install_main
         return install_main(argv[1:])
+    if argv[:1] == ["printers"]:                  # engine workstream: printers in every slicer, per-design choice
+        from .printers import main as printers_main
+        return printers_main(argv[1:])
     if argv[:1] == ["config"]:
         from .config_edit import main as config_main
         return config_main(argv[1:])
@@ -127,6 +130,7 @@ def main(argv=None):
     sub.add_parser("conversations", help="saved conversations: list | show ID | delete ID | rename ID TITLE | pin ID")
     sub.add_parser("install", help="install what Form Studio uses (--list, <id>, --yes, --dry-run)")
     sub.add_parser("config", help="get [key] | set <key> <value>: read or change studio.toml")
+    sub.add_parser("printers", help="every printer in your slicers | options KIND NAME | use KIND NAME (--project ID | --default)")
     sub.add_parser("secrets", help="status | set NAME (value from stdin or a hidden prompt) | clear NAME: agent keys such as gemini_api_key")
     sub.add_parser("examples", help="list the shipped examples; `add` copies them into your projects")
     sub.add_parser("doctor")

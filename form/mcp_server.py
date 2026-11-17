@@ -871,6 +871,57 @@ def build() -> MCPServer:
         act(None, "project", f"Moved {project} to the trash folder", ctx)
         return res
 
+    # ---- printers: every printer the user set up in any installed slicer (engine workstream, form/printers.py) ----
+    @mcp.tool(annotations=RO)
+    async def list_printers(project: str | None = None, printer: str | None = None) -> dict:
+        """Every printer set up in every installed slicer (the user's own presets and the system printers they enabled),
+        with slicer, bed size and nozzle, plus the default printer. With `project`: which printer that design uses and
+        why (its own choice, the default, or the slicer's selection). With `printer` ("<kind>:<printer name>", the id from
+        this list): the filaments and processes that printer can use."""
+        def go():
+            from . import printers
+            st = studio()
+            if printer:
+                kind, _, name = printer.partition(":")
+                try:
+                    return printers.options(st.cfg, kind, name)
+                except printers.PrinterError as e:
+                    raise StudioError(e.message, e.hint)
+            out = printers.inventory(st.cfg)
+            if project:
+                out["project"] = {"id": project, **st.printer_state(st.load(project))}
+            return out
+        return await _run(go)
+
+    @mcp.tool()
+    async def choose_printer(printer: str, project: str | None = None, filament: str = "", process: str = "",
+                             default: bool = False, ctx: Context = None) -> dict:
+        """Use a printer for one design (`project`) or as the default for designs without their own choice
+        (`default=True`, written to studio.toml after a backup). `printer` is an id from list_printers ("bambu:Bambu Lab
+        A1 mini 0.4 nozzle"); "" with a project clears its choice. Filament and process default to what the slicer would
+        pick for that printer. Slicing and the bed-size and nozzle checks follow the choice; the slice goes stale.
+        Ask the user which printer before calling this."""
+        def go():
+            from . import printers
+            st = studio()
+            choice = None
+            if printer:
+                kind, _, name = printer.partition(":")
+                choice = {"kind": kind, "machine": name, "filament": filament, "process": process}
+            if default:
+                try:
+                    done = printers.set_default(st.cfg, choice)
+                except Exception as e:
+                    raise StudioError(str(getattr(e, "message", e)), getattr(e, "hint", ""))
+                st.slicer_info(refresh=True)
+                return {"default": done["default"], "path": done["path"], "backup": done["backup"]}
+            if not project:
+                raise StudioError("Give a project, or default=True.")
+            return st.set_printer(project, choice, by=_origin(ctx).replace("agent:", "") or "agent")
+        res = await _run(go)
+        act(project, "printer", f"Printer: {printer or 'default'}", ctx)
+        return res
+
     return mcp
 
 

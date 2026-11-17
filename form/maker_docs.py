@@ -326,7 +326,7 @@ def write(st, p, out_dir: Path, release: str | None = None, d: dict | None = Non
     out_dir.mkdir(parents=True, exist_ok=True)
     texts = {"BOM.csv": bom(d), "PRINT_REPORT.md": print_report(d, release), "MEASUREMENT_PLAN.md": measurement_plan(d, release)}
     images = []
-    if d["asm"] and not d["asm"].get("error"):
+    if d["asm"] and not d["asm"].get("error") and not d["asm"].get("derived"):
         texts["ASSEMBLY.md"], images = assembly_md(d, out_dir, release)
         if d["asm"]["joints"]:
             texts["MOTION_CHECKS.csv"] = motion_csv(d)

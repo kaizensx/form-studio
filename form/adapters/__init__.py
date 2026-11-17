@@ -24,5 +24,7 @@ SLICERS = {
     "prusa": "form.adapters.prusa",
     "superslicer": "form.adapters.superslicer",
     "qidi": "form.adapters.qidi",
+    "elegoo": "form.adapters.elegoo",
+    "snapmaker": "form.adapters.snapmaker",
 }
-AUTO_ORDER = ["bambu", "orca", "prusa", "superslicer", "qidi"]
+AUTO_ORDER = ["bambu", "orca", "prusa", "superslicer", "qidi", "elegoo", "snapmaker"]

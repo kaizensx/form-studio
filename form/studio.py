@@ -22,6 +22,7 @@ from . import cad_bridges
 from .recipes import RecipeBook, RecipeError, SCAD_PREFIX, SOURCE_PREFIX, is_source, source_path, store_source
 from .worker import Kernel, KernelFailure
 from . import fsutil
+from . import printers as printers_mod
 
 NODES = ["geometry", "exports", "checks", "slice"]
 STATICS_LABELS = {"tip_force_n": ("Tip-over force", "N"), "safety_factor": ("Bending safety factor", "x"),
@@ -179,6 +180,7 @@ class Studio:
         self._locks: dict = {}
         self._slicer = None
         self._slicer_at = 0.0
+        self._choice_cache: dict = {}                 # printer choice -> (time, resolved), see printer_choice
         self._kernel_id = None
         self._recipe_sha: dict = {}
         self._layers_cache: dict = {}
@@ -189,11 +191,73 @@ class Studio:
         return add_examples(self.root, ids)
 
     # ---- environment -----------------------------------------------------
-    def slicer_info(self, refresh=False) -> dict:
+    def slicer_info(self, refresh=False, p: dict | None = None) -> dict:
+        """What a slice would use. With a project: its own printer choice, else the default printer, else the
+        slicer's selection (form/printers.py)."""
+        choice, source = self.printer_choice(p)
+        if choice is not None:
+            ck = json.dumps(choice, sort_keys=True)
+            hit = self._choice_cache.get(ck)
+            if refresh or hit is None or time.time() - hit[0] > 20:
+                r = printers_mod.resolve(self.cfg, choice)
+                hit = (time.time(), r)
+                self._choice_cache[ck] = hit
+            said = "this design's printer in Form Studio" if source == "project" else "the default printer in Form Studio"
+            return {**hit[1], "choice_source": source, "source": {k: said for k in ("machine", "process", "filament")}}
+        if refresh:
+            self._choice_cache.clear()
         if refresh or self._slicer is None or time.time() - self._slicer_at > 20:
             self._slicer = slicer.resolve(self.cfg)
             self._slicer_at = time.time()
         return self._slicer
+
+    # ---- the printer a design uses (form/printers.py) ----------------------
+    def printer_choice(self, p: dict | None = None) -> tuple:
+        """(choice, "project" | "default") or (None, "") when the slicer's own selection applies."""
+        c = printers_mod.normalise(p.get("printer")) if isinstance(p, dict) else None
+        if c is not None:
+            return c, "project"
+        c = printers_mod.default_choice(self.cfg)
+        return (c, "default") if c is not None else (None, "")
+
+    def printer_env(self, p: dict | None = None) -> dict:
+        """Bed size, margin and printer name the checks use: the chosen printer's when there is a choice and its
+        slicer states a bed, else [printer] in studio.toml (as before)."""
+        pr = self.cfg["printer"]
+        out = {"envelope": list(pr["envelope_mm"]), "margin": pr["plate_margin_mm"], "name": pr["name"], "source": "studio.toml"}
+        choice, source = self.printer_choice(p)
+        if choice is not None:
+            s = self.slicer_info(p=p)
+            if s.get("available") and s.get("envelope_mm"):
+                out.update(envelope=[round(float(x), 3) for x in s["envelope_mm"]], name=choice["machine"], source=source)
+        return out
+
+    def printer_state(self, p: dict) -> dict:
+        """The printer this design uses and where that choice comes from (project, default, slicer)."""
+        choice, source = self.printer_choice(p)
+        s = self.slicer_info(p=p)
+        return {"choice": choice, "source": source or "slicer", "slicer": slicer.public(s), "env": self.printer_env(p)}
+
+    def set_printer(self, pid: str, choice, by: str = "you") -> dict:
+        """Use this printer (with its filament and process) for one design; None goes back to the default."""
+        with self.lock(pid):
+            p = self.load(pid)
+            if choice is None:
+                p.pop("printer", None)
+                text = "Printer: back to the default."
+            else:
+                try:
+                    c = printers_mod.validate(self.cfg, choice)
+                except printers_mod.PrinterError as e:
+                    raise StudioError(e.message, e.hint)
+                p["printer"] = c
+                text = "Printer: " + printers_mod.describe(c)
+            self.decide(p, "printer", text)
+            self.save(p)
+        self.activity(pid, "printer", text, by=by)
+        s = self.slicer_info(p=p)
+        return {"project": pid, "printer": p.get("printer"), "source": self.printer_choice(p)[1] or "slicer",
+                "slicer": slicer.public(s), "env": self.printer_env(p)}
 
     def kernel_id(self) -> str:
         if self._kernel_id is None:
@@ -211,8 +275,8 @@ class Studio:
             self._recipe_sha[rid] = h.hexdigest()[:16]
         return self._recipe_sha[rid]
 
-    def profile(self) -> str:
-        s = self.slicer_info()
+    def profile(self, p: dict | None = None) -> str:
+        s = self.slicer_info(p=p)
         if not s.get("available"):
             return "unknown printer profile"
         p = s["presets"]
@@ -469,7 +533,7 @@ class Studio:
     # ---- keys and status -------------------------------------------------
     def keys(self, p: dict, n: int | None = None) -> dict:
         r = self.rev(p, n)
-        s = self.slicer_info()
+        s = self.slicer_info(p=p)
         rid = self.rid(p, r["n"])
         recipe = self.recipes[rid]
         gk = H("geometry", rid, self.recipe_sha(rid), self.kernel_id(), r["values"])
@@ -481,8 +545,9 @@ class Studio:
         ek = H("exports", gk, p["orientation"], STL_TOL)
         fit_in = None
         if recipe.fit:
-            fit_in = [p["fit"], self.calibration.fingerprint(self.profile()), r["provenance"].get(recipe.fit["mating"])]
-        ck = H("checks", ek, self.cfg["printer"]["envelope_mm"], self.cfg["printer"]["plate_margin_mm"],
+            fit_in = [p["fit"], self.calibration.fingerprint(self.profile(p)), r["provenance"].get(recipe.fit["mating"])]
+        pe = self.printer_env(p)
+        ck = H("checks", ek, pe["envelope"], pe["margin"],
                s.get("nozzle_mm", 0.4), checks_mod.CHECKS_VERSION, fit_in)
         fc = self._freecad()
         if fc and not getattr(recipe, "mesh", False):  # an installed FreeCAD adds a re-import check
@@ -536,8 +601,8 @@ class Studio:
                 entry["made"] = made["ts"] if made else None
             out[node] = entry
             upstream_ok = upstream_ok and st == "current"
-        if not self.slicer_info().get("available"):
-            out["slice"]["unavailable"] = self.slicer_info().get("reason")
+        if not self.slicer_info(p=p).get("available"):
+            out["slice"]["unavailable"] = self.slicer_info(p=p).get("reason")
         return out
 
     def approval_state(self, p: dict, status: dict | None = None) -> dict:
@@ -568,7 +633,7 @@ class Studio:
             mc = self.mark_context(p, kw["recipe_id"], vals, rev) if isinstance(vals, dict) else None
             if mc and "key" in kw:
                 kw["key"] = f"{kw['key']}-{H(mc)}"
-            nz = self.slicer_info().get("nozzle_mm")
+            nz = self.slicer_info(p=p).get("nozzle_mm")
             ctx = {**(mc or {}), **({"nozzle": nz} if nz else {})}
             if ctx:
                 kw["_mark"] = ctx
@@ -603,7 +668,7 @@ class Studio:
     def fit(self, p: dict, values: dict | None = None, provenance: dict | None = None) -> dict | None:
         r = self.rev(p)
         recipe = self.recipe(p)
-        corr = self.calibration.correction(self.profile())
+        corr = self.calibration.correction(self.profile(p))
         return fit_mod.analyse(recipe, values or r["values"], provenance or r["provenance"], p["fit"], corr)
 
     def preview(self, p: dict, values: dict) -> dict:
@@ -862,14 +927,15 @@ class Studio:
     def _make_checks(self, p, rev, keys, name):
         ex = self.read(p, "exports", keys["exports"])
         stl = self.apath(p, "exports", keys["exports"]) / ex["files"]["stl"]["name"]
-        s = self.slicer_info()
+        s = self.slicer_info(p=p)
+        pe = self.printer_env(p)
         a = self._k("analyse", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], stl_path=str(stl),
-                    nozzle=s.get("nozzle_mm", 0.4), envelope=self.cfg["printer"]["envelope_mm"], orientation=p["orientation"], p=p)
+                    nozzle=s.get("nozzle_mm", 0.4), envelope=pe["envelope"], orientation=p["orientation"], p=p)
         if a.get("mesh", {}).get("sha256") and a["mesh"]["sha256"] != ex["files"]["stl"]["sha256"]:
             raise StudioError("The STL on disk is not the one that was exported.", "Run the pipeline again to regenerate exports.")
         summary = self.read(p, "geometry", keys["geometry"])
-        ctx = {"orientation": p["orientation"], "envelope": self.cfg["printer"]["envelope_mm"],
-               "margin": self.cfg["printer"]["plate_margin_mm"], "printer": self.cfg["printer"]["name"],
+        ctx = {"orientation": p["orientation"], "envelope": pe["envelope"],
+               "margin": pe["margin"], "printer": pe["name"],
                "nozzle": s.get("nozzle_mm", 0.4), "nozzle_assumed": not s.get("available")}
         fit = self.fit(p)
         items = checks_mod.build(self.recipe(p), summary, a, ctx, fit)
@@ -888,7 +954,7 @@ class Studio:
         ex = self.read(p, "exports", keys["exports"])
         stl = self.apath(p, "exports", keys["exports"]) / ex["files"]["stl"]["name"]
         out = self.apath(p, "slice", keys["slice"])
-        s = self.slicer_info(refresh=True)
+        s = self.slicer_info(refresh=True, p=p)
         if self.keys(p)["slice"] != keys["slice"]:
             raise StudioError("Slicer presets changed while the pipeline was running.", "Run again to slice with the presets now selected.")
         info = slicer.slice_stl(s, stl, out, timeout=self.cfg["slicer"]["timeout_s"])
@@ -900,7 +966,7 @@ class Studio:
     def side_slice(self, p: dict, kind: str) -> dict:
         """Slice the pocket ring (cut from this revision) so its real cost is known."""
         rev, keys = self.rev(p), self.keys(p)
-        s = self.slicer_info()
+        s = self.slicer_info(p=p)
         presets = {k: v["sha"] for k, v in s.get("presets", {}).items()}
         key = H(kind, keys["geometry"], presets, *_slicer_tag(s))
         out = self.dir(p["id"]) / "artifacts" / "side" / key
@@ -930,7 +996,7 @@ class Studio:
             m = self.read(p, "slice", keys["slice"])
             if m:
                 out["part"] = {"time_s": m.get("time_s"), "filament_g": m.get("filament_g")}
-            s = self.slicer_info()
+            s = self.slicer_info(p=p)
             presets = {k: v["sha"] for k, v in s.get("presets", {}).items()}
             side = self.dir(p["id"]) / "artifacts" / "side" / H("test_piece", keys["geometry"], presets, *_slicer_tag(s)) / "meta.json"
             if side.exists():
@@ -956,9 +1022,9 @@ class Studio:
             p = self.load(p["id"])
             kind = body.get("kind")
             rec = {"id": uuid.uuid4().hex[:8], "ts": time.time(), "rev": p["head"], "kind": kind, "class": "physical",
-                   "profile": self.profile(), "note": str(body.get("note", ""))[:1000]}
+                   "profile": self.profile(p), "note": str(body.get("note", ""))[:1000]}
             if kind == "widths":
-                cal = self.calibration.add(self.profile(), body.get("pairs", []), body.get("source", "part"), rec["note"],
+                cal = self.calibration.add(self.profile(p), body.get("pairs", []), body.get("source", "part"), rec["note"],
                                            {"project": p["id"], "rev": p["head"]})
                 rec.update({"pairs": cal["pairs"], "calibration_id": cal["id"], "source": cal["source"]})
             elif kind == "fit":
@@ -1243,8 +1309,9 @@ class Studio:
             "project": {k: v for k, v in p.items() if k != "produced"},
             "recipe": recipe.public(), "status": status, "approval": self.approval_state(p, status),
             "gate": self.gate(p, status), "fit": fit, "actions": fit_mod.next_actions(fit, costs), "costs": costs,
-            "calibration": {"profile": self.profile(), "correction": self.calibration.correction(self.profile()),
-                            "records": [r for r in self.calibration.records() if r["profile"] == self.profile()][-20:]},
+            "calibration": {"profile": self.profile(p), "correction": self.calibration.correction(self.profile(p)),
+                            "records": [r for r in self.calibration.records() if r["profile"] == self.profile(p)][-20:]},
+            "printer": self.printer_state(p),
             "checks": self.read(p, "checks", keys["checks"]) if status["checks"]["state"] == "current" else None,
             "slice": self.read(p, "slice", keys["slice"]) if status["slice"]["state"] == "current" else None,
             "exports": self.read(p, "exports", keys["exports"]) if status["exports"]["state"] == "current" else None,

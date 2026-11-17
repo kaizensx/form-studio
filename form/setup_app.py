@@ -11,6 +11,9 @@ The installer registry (form/installer.py), sign-in, settings and examples, all 
     POST /api/install               {ids, shown: {id: [commands]}, methods?} → job (runs only what was shown)
     GET  /api/install/job/<id>?from=N   state, steps, new log lines
     POST /api/install/job/<id>/cancel
+    POST /api/install/auto {ids?}   hands-free: install what is needed, pause only where the person must act (sign in,
+                                    a download page), detect that and continue; same job API, steps may be "needs_user"
+    POST /api/install/job/<id>/skip {id}    leave one item of a hands-free setup
     GET  /api/claude/auth           is Claude Code installed and signed in (no account details)
     POST /api/claude/login          start `claude auth login` in the background → job with the sign-in link
     GET  /api/claude/login/<id>     POST …/code {code}     POST …/cancel
@@ -312,6 +315,10 @@ def route_get(st, path: str, q: dict):
     m = re.fullmatch(r"/api/install/job/([0-9a-f]{10})", path)
     if m:
         return _wrap(lambda: sa.installer.job(m.group(1)).public(int(q.get("from") or 0)))
+    if path == "/api/install/auto":               # hands-free setup: would it start, and for what (engine workstream)
+        import os
+        return {"enabled": os.environ.get("FORM_NO_AUTO_SETUP", "") != "1",
+                "ids": installer.auto_ids(installer.survey(st.cfg))}
     if path == "/api/claude/auth":
         return installer.claude_auth(st.cfg)
     m = re.fullmatch(r"/api/claude/login/([0-9a-f]{10})", path)
@@ -342,6 +349,20 @@ def route_post(st, path: str, body):
         job = _wrap(lambda: sa.installer.update(body.get("shown") if isinstance(body.get("shown"), str) else None))
         st.activity(None, "setup", "Upgrading Form Studio", by="you")
         return job.public()
+    # -- hands-free setup (engine workstream): install everything needed, pause only for the person --
+    if path == "/api/install/auto":
+        ids = body.get("ids") if isinstance(body.get("ids"), list) else None
+        job = _wrap(lambda: sa.installer.auto(ids))
+        if job.steps:
+            st.activity(None, "setup", "Setting up: " + ", ".join(s["label"] for s in job.steps), by="you")
+        return job.public()
+    m = re.fullmatch(r"/api/install/job/([0-9a-f]{10})/skip", path)
+    if m:
+        j = _wrap(lambda: sa.installer.job(m.group(1)))
+        if not hasattr(j, "skip"):
+            raise StudioError("Only a hands-free setup can skip an item.")
+        j.skip(str(body.get("id") or ""))
+        return j.public()
     m = re.fullmatch(r"/api/install/job/([0-9a-f]{10})/cancel", path)
     if m:
         j = _wrap(lambda: sa.installer.job(m.group(1)))

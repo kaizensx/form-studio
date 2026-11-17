@@ -365,7 +365,12 @@ def main(argv=None) -> int:
     ap.add_argument("--check", action="store_true", help="report as JSON, change nothing")
     ap.add_argument("--yes", action="store_true", help="apply recommended fixes and install recommended software without asking")
     ap.add_argument("--dry-run", action="store_true", help="show what would run")
+    ap.add_argument("--auto", action="store_true", help="hands-free: install everything needed, wait where you must act "
+                                                       "(sign in, a download page) and continue by itself")
+    ap.add_argument("--no-wait", action="store_true", help="with --auto: skip what needs you instead of waiting")
     a = ap.parse_args(argv)
+    if a.auto:
+        return _auto(not a.no_wait, a.dry_run)
     items = check()
     if a.check:
         print(json.dumps({"items": [i.public() for i in items], "mcp_command": mcp_command(),
@@ -423,6 +428,31 @@ def main(argv=None) -> int:
     if a.yes:
         failed += _install_recommended(a.dry_run)
     print("\nRestart your agent so it loads Form Studio. Then ask it: “design me a Gridfinity bin for my screwdrivers”.\n")
+    return 1 if failed else 0
+
+
+def _auto(wait: bool, dry: bool) -> int:
+    """`form setup --auto`: the app's hands-free first start, in a terminal (form/installer.py AutoJob)."""
+    from . import config, installer
+    cfg = config.load()
+    ids = installer.auto_ids(installer.survey(cfg))
+    print(_c("1", "\nForm Studio setup") + _c("2", "   (hands-free; every command is printed before it runs)\n"))
+    if not ids:
+        print(_c("32", "Everything Form Studio needs is already here.\n"))
+        return 0
+    if dry:
+        for i in ids:
+            print(f"  would set up: {installer.get(i).label}")
+        return 0
+    def echo(line):
+        print("   " + line)
+    job = installer.run_auto(cfg, echo=echo, wait=wait)
+    failed = 0
+    for st in job.steps:
+        ok = st["state"] == "done"
+        mark = MARK["ok"] if ok else MARK["info"] if st["state"] == "skipped" else MARK["missing"]
+        print(f" {mark} {st['label']:<28} {st['message']}")
+        failed += st["state"] in ("failed", "cancelled")
     return 1 if failed else 0
 
 

@@ -11,6 +11,7 @@ import math
 from build123d import Align, Box, Cone, Cylinder, Pos
 
 from .. import parts
+from .assembly import Assembly, Part
 from .base import Feature, Param, Recipe, RecipeError, Stage
 from ..parts import checked
 
@@ -143,6 +144,19 @@ class GearPair(Recipe):
         s = s - bores
         stages.append(Stage("bores", s))
         return checked(stages)
+
+    def assembly(self, v):
+        """The gears, printed in a row in front of the plate, slid onto the axles: each sits on its collar, in mesh
+        (the large gear was only moved along X to print apart). Solids by X: small gear, plate, large gear."""
+        g = self.g(v)
+        z0 = v["plate_t"] + (g["collar_h"] if v["pegs"] else 0.0)
+        up = v["thickness"] + g["peg_h"] + 8
+        axle = "Push it onto its peg." if v["pegs"] else "Press a metal pin through it into the plate."
+        return Assembly(
+            parts=[Part("plate", "Plate", 1, note="Lay the plate flat, pegs up." if v["pegs"] else "Lay the plate flat."),
+                   Part("gear_a", "Small gear", 0, move=(0, -g["y_gears"], z0), explode=(0, 0, up), note="Fit the small gear. " + axle),
+                   Part("gear_b", "Large gear", 2, move=(g["C"] - g["xb_print"], -g["y_gears"], z0), explode=(0, 0, up),
+                        note="Fit the large gear so its teeth mesh with the small gear. " + axle)])
 
     def derived(self, v):
         g = self.g(v)

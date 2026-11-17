@@ -32,7 +32,7 @@ SCHEMA: dict[str, dict] = {
     "bench.auto_open": {"type": "bool", "tab": "general", "label": "Open Form Studio's page when an agent starts working",
                         "help": "Applies to agents that use Form Studio over MCP outside this app."},
     "slicer.kind": {"type": "choice", "tab": "printer", "label": "Slicer",
-                    "choices": ["auto", "bambu", "orca", "prusa", "superslicer", "qidi"],
+                    "choices": ["auto", "bambu", "orca", "prusa", "superslicer", "qidi", "elegoo", "snapmaker"],
                     "help": "“auto” uses the first one installed: Bambu Studio, OrcaSlicer, PrusaSlicer."},
     "slicer.machine": {"type": "str", "tab": "printer", "label": "Printer preset",
                        "help": "“auto” follows what is selected in the slicer. A preset name pins it."},
@@ -42,6 +42,13 @@ SCHEMA: dict[str, dict] = {
     "printer.name": {"type": "str", "tab": "printer", "label": "Printer name",
                      "help": "Used when no slicer is available. With a slicer, its selected printer wins."},
     "printer.envelope_mm": {"type": "vec3", "tab": "printer", "label": "Bed size (X, Y, Z)", "unit": "mm", "min": 20, "max": 2000},
+    # The default printer (form/printers.py): written by the printer picker and `form printers use --default`.
+    # Empty = follow [slicer].kind and the selection in that slicer. Not shown as text fields in Settings.
+    "printer.slicer": {"type": "str", "tab": "printer", "hidden": True, "label": "Default printer: slicer",
+                       "help": "A slicer kind (bambu, orca, prusa, …), or empty."},
+    "printer.machine": {"type": "str", "tab": "printer", "hidden": True, "label": "Default printer: printer preset"},
+    "printer.process": {"type": "str", "tab": "printer", "hidden": True, "label": "Default printer: process preset"},
+    "printer.filament": {"type": "str", "tab": "printer", "hidden": True, "label": "Default printer: filament preset"},
     "printer.plate_margin_mm": {"type": "float", "tab": "printer", "label": "Keep-out margin at the bed edge", "unit": "mm",
                                 "min": 0, "max": 50},
     "chat.enabled": {"type": "bool", "tab": "chat", "label": "Chat with Claude in Form Studio"},

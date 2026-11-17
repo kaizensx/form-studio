@@ -64,6 +64,7 @@ P.MenuBar {
         P.MenuItem { text: "Simulate the Print"; enabled: mb.work; onTriggered: Store.simulate() }
         P.MenuSeparator {}
         P.MenuItem { text: "Ask for a Design Review"; enabled: mb.work && Store.canAskReview; onTriggered: Store.askReview() }
+        P.MenuItem { text: "Choose Printer…"; onTriggered: Store.openSheet("printer") }
         P.MenuItem { text: "Choose Slicer…"; onTriggered: Store.openSheet("slicer") }
     }
     P.Menu { title: "Window"

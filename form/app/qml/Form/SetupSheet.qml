@@ -15,6 +15,9 @@ Column {
     property Component footerLeft: Txt { kind: "fine"; elide: Text.ElideRight; wrapMode: Text.NoWrap; verticalAlignment: Text.AlignVCenter
         text: Store.installing ? "Installing. Each command is in the log." : Store.softwareChecking ? "Looking at what is installed…" : "Nothing is installed until you press Install." }
     property Component footer: Row { spacing: 8
+        Btn { objectName: "autoSetup"; visible: !Store.installing; icon: "sparkles"; text: "Set up automatically"
+            tip: "Install what Form Studio needs by itself; it pauses only when you have to sign in or download something"
+            onClicked: Store.autoSetup(true) }
         Btn { visible: Store.installing; icon: "x"; text: "Cancel"; onClicked: Store.cancelInstall() }
         Btn { icon: "refresh_cw"; text: "Check again"; busy: Store.softwareChecking; enabled: !Store.installing
             onClicked: { Store.checkSoftware(); Store.checkSetup() } }

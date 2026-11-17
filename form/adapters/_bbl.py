@@ -195,13 +195,23 @@ def resolve(fam: Family, s: dict, app: Path, config_dir: Path, wanted: dict) -> 
                     flat["curr_bed_type"] = fam.bed_type(machine, conf, names["machine"])
             flat["name"] = name
             flat["from"] = "system"
+            if kind == "machine":
+                chain = machine_chain(fam, config_dir, name, packed)
+                if len(chain) > 1 and is_user(fam, config_dir, "machine", name):
+                    # a person's own printer: the CLI checks process compatibility against the system printer it
+                    # inherits from. For a preset "from" "system" it takes the preset's own name as that printer;
+                    # only "from": "User" makes it read "inherits" (BambuStudio.cpp run(): "new printer …, inherited
+                    # from …, compatible 0" and exit -17 for a user printer passed as a system one)
+                    flat["from"] = "User"
+                    flat["inherits"] = next((n for n in chain[1:] if not n.startswith("fdm_")), chain[1])
             idkey = {"machine": "printer_settings_id", "process": "print_settings_id", "filament": "filament_settings_id"}[kind]
             flat[idkey] = [name] if kind == "filament" else name
             blob = json.dumps(flat, sort_keys=True).encode()
             out["presets"][kind] = {"name": name, "sha": hashlib.sha256(blob).hexdigest()[:16], "data": flat}
         m, p = out["presets"]["machine"]["data"], out["presets"]["process"]["data"]
         compat = p.get("compatible_printers") or []
-        if compat and names["machine"] not in compat:
+        # a user printer is compatible with what its system printer is (the program checks the preset it inherits from)
+        if compat and not set(machine_chain(fam, config_dir, names["machine"], packed)) & set(compat):
             raise SlicerBlocked(f"Process “{names['process']}” is not compatible with “{names['machine']}”.")
         out["nozzle_mm"] = float((m.get("nozzle_diameter") or ["0.4"])[0])
         out["layer_height_mm"] = float(p.get("layer_height", 0.2))
@@ -221,6 +231,32 @@ def resolve(fam: Family, s: dict, app: Path, config_dir: Path, wanted: dict) -> 
         out["reason"] = str(e)
     except (ValueError, OSError) as e:
         out["reason"] = f"Could not read {fam.label} presets: {e}"
+    return out
+
+
+def is_user(fam: Family, config_dir: Path, kind: str, name: str) -> bool:
+    """Whether a preset is one of the person's own (a JSON file under <config>/user/)."""
+    try:
+        path = find(fam, config_dir, kind, name)
+    except SlicerBlocked:
+        return False
+    try:
+        path.resolve().relative_to((config_dir / "user").resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def machine_chain(fam: Family, config_dir: Path, name: str, packed: Packed | None = None) -> list:
+    """The printer preset and the presets it inherits from, nearest first."""
+    out = []
+    while name and len(out) < 12:
+        out.append(name)
+        try:
+            d, _inc, _cache = load(fam, config_dir, "machine", name, packed)
+        except SlicerBlocked:
+            break
+        name = d.get("inherits") or ""
     return out
 
 

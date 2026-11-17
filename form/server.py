@@ -129,6 +129,12 @@ def make_handler(st: Studio):
                 from . import slicer as slicer_mod
                 return self._json({"chosen": st.cfg["slicer"].get("kind", "auto"), "config": str(slicer_mod.config_target(st.cfg)).replace(str(Path.home()), "~"),
                                    "slicers": slicer_mod.detect_all(st.cfg)})
+            # -- printers: every printer in every installed slicer, per-design choice (form/printers.py) --
+            if path.startswith("/api/printers"):
+                from . import printers as printers_mod
+                owned = printers_mod.route_get(st, path, q)
+                if owned is not None:
+                    return self._json(owned)
             if path == "/api/photos":                      # Blender renders: newest current one per project
                 from . import photo
                 return self._json({"latest": photo.latest_all(st)})
@@ -401,12 +407,20 @@ def make_handler(st: Studio):
                 try:
                     done = slicer_mod.set_kind(st.cfg, str(body.get("kind", "")))
                 except slicer_mod.SlicerBlocked as e:
-                    raise StudioError(str(e), "Known kinds: auto, bambu, orca, prusa, superslicer, qidi.")
+                    raise StudioError(str(e), "Known kinds: auto, " + ", ".join(slicer_mod.SLICERS) + ".")
                 except OSError as e:
                     raise StudioError(f"Could not write studio.toml: {e}", "Check that the file and its folder are writable.")
                 st.slicer_info(refresh=True)
+                from . import printers as printers_mod
+                printers_mod.clear_cache()
                 st.activity(None, "slicer", f"Slicer set to {done['kind']} in {Path(done['path']).name}.", by="you")
                 return self._json({**done, "env": st.environment()})
+            # -- printers: choose the printer of a design, or the default (form/printers.py) --
+            if path.startswith("/api/printers"):
+                from . import printers as printers_mod
+                owned = printers_mod.route_post(st, path, body)
+                if owned is not None:
+                    return self._json(owned)
             m = re.fullmatch(r"/api/projects/([a-z0-9-]+)/([a-z_]+)", path)
             if not m:
                 raise StudioError("Not found.", status=404)

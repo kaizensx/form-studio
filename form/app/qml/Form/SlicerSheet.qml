@@ -44,6 +44,7 @@ Column {
     property Component footerLeft: Txt { kind: "fine"; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; verticalAlignment: Text.AlignVCenter
         text: ss.info ? "Choosing writes only [slicer].kind to " + ss.info.config + ", after a backup." : ss.loading ? "Looking for slicers…" : "" }
     property Component footer: Row { spacing: 8
+        Btn { icon: "printer"; text: "Printers…"; tip: "Every printer in your slicers"; onClicked: Store.openSheet("printer") }
         Btn { icon: "refresh_cw"; text: "Look again"; busy: ss.loading; enabled: ss.busy === ""; onClicked: ss.load() } }
 
     Txt { tone: 2; width: parent.width
@@ -108,8 +109,8 @@ Column {
     }
 
     Txt { kind: "fine"; width: parent.width; visible: ss.rest.length > 0
-        text: "Also supported, not installed: " + ss.rest.map(function (s) { return s.label }).join(", ") + " (same formats as PrusaSlicer)." }
+        text: "Also supported, not installed: " + ss.rest.map(function (s) { return s.label }).join(", ") + "." }
 
     Txt { kind: "fine"; width: parent.width; visible: !!ss.info
-        text: "Presets are chosen in the slicer itself, or pinned in studio.toml." }
+        text: "Pick a printer, filament and process for a design under Printers; otherwise the selection in the slicer is used." }
 }
