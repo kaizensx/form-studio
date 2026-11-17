@@ -1,5 +1,27 @@
 # Changelog
 
+## 11.0.3
+
+### Used on Windows and Linux, by the test suite
+- **The interface journeys now run on Windows and Linux in CI** (`.github/workflows/ui.yml`): the real window, real mouse and key events, and a real PrusaSlicer installed on the runner, so designs are built, sliced, simulated and released there. Until now only a Mac had done that. No person has used those builds by hand yet.
+- **Windows: `form run` failed on any design whose checks contain "Δ"**, because the console is not UTF-8. The CLI now writes UTF-8 everywhere. Found by the first real slice on a Windows runner.
+- **Windows: a PrusaSlicer installed with Chocolatey is found.**
+- **Linux: PrusaSlicer 2.4.0** (Ubuntu's package) slices through FORM; presets come from the bundles it ships.
+
+### OrcaSlicer, every vendor
+- **Sliced a 20 mm cube for 496 printers from all 71 vendors OrcaSlicer 2.5.1 ships: 471 slice.** The other 25 fail the same way with OrcaSlicer's own preset files (for example a start G-code outside the printable area), so they are OrcaSlicer's to fix.
+- **The build plate is the one OrcaSlicer's window would use.** Its command line defaulted to the Cool Plate: a Prusa CORE One came out with a 35 °C bed instead of 60 °C.
+- **A refused slice says why**, in OrcaSlicer's own words, instead of "exit code 154".
+- **macOS: no hang after a slicer crash** (the "reopen windows?" dialog used to block every later run).
+- **A preset you made in OrcaSlicer works**: layer height, infill and wall overrides were confirmed in the G-code on three printers.
+
+### Design and motion pass
+- All 62 screens were re-shot and reviewed at two window sizes. The pipeline strip and stage tabs no longer cut their text; sheets with a subtitle have a proper header; recipe descriptions, model notes and scene notes wrap instead of ending in "…"; reply cost and time are readable.
+- Motion: new messages fade in; tabs, rail buttons, pipeline nodes, rows and folds answer hover and press; every duration is a theme token; reduced motion is honoured in three places that ignored it.
+- **Renaming a design on Home is instant**, keeps what you typed if the list refreshes, and is not cancelled when you switch to another app.
+
+Left as they are, and known: the Variants sheet's empty state, phone companion lines that can leave the viewport, and Markdown list indent in replies.
+
 ## 11.0.2
 
 - **OrcaSlicer 2.5 slices through FORM.** OrcaSlicer 2.5 stopped shipping its printer, process and filament presets as JSON files; each vendor is now one packed file (`.opc`). FORM reads that format (written from OrcaSlicer's own source, format version 2; any other version is refused by name, not guessed) and hands the slicer the presets it needs. Run for real with OrcaSlicer 2.5.1: the phone dock on a Bambu Lab A1 mini 0.4 nozzle, 0.20mm Standard, Generic PLA: 1 h 45 min, 59.04 g, 177 layers; layers, print simulation and cost all read its G-code.

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "form-studio"
-version = "11.0.2"
+version = "11.0.3"
 description = "Desktop app, engine and MCP server for designing 3D-printable parts with an AI agent: real CAD, real slicing and an honest evidence record."
 readme = "README.md"
 license = "MIT"
