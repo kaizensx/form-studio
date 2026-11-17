@@ -283,7 +283,10 @@ class Chat:
 
     def _mcp(self) -> dict:
         # the launcher path may contain spaces ("Application Support"): never split it
-        cmd0, args0 = (self.mcp, []) if Path(self.mcp).exists() else (sys.executable, ["-m", "form.mcp_server"])
+        if getattr(sys, "frozen", False):           # the packaged app is its own MCP server; never a form-mcp on PATH
+            cmd0, args0 = sys.executable, ["-m", "form.mcp_server"]
+        else:
+            cmd0, args0 = (self.mcp, []) if Path(self.mcp).exists() else (sys.executable, ["-m", "form.mcp_server"])
         env = {"FORM_DATA": str(self.data)}
         if Path(str(self.cfg.get("_path", ""))).exists():
             env["FORM_CONFIG"] = self.cfg["_path"]

@@ -2,14 +2,9 @@ name: Website
 
 # Publishes site/ to GitHub Pages: https://kaizensx.github.io/form-studio/
 # The home page is hand-written. The /docs pages are generated from the repository's markdown by site/build.py.
+# Runs only when started by hand (Actions tab, or `gh workflow run`): the repository is private, so every run
+# is billed against the owner's Actions minutes. Builds and tests also run locally before a release.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "site/**"
-      - "docs/**"
-      - "CHANGELOG.md"
-      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:

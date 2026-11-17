@@ -13,7 +13,9 @@ Window {
     readonly property bool mac: Bridge.platform === "darwin"
     readonly property bool full: visibility === Window.FullScreen
     visible: true; color: Theme.plate
-    title: Store.project ? Store.project.name + (Store.hasDraft ? " (draft)" : "") + " — Form Studio" : "Form Studio"
+    // macOS draws the window title over our own top bar (the title bar is see-through), so it stays empty there;
+    // the Dock, the app menu and Mission Control still say Form Studio. Windows and Linux show it in their frame.
+    title: mac ? "" : Store.project ? Store.project.name + (Store.hasDraft ? " (draft)" : "") + " — Form Studio" : "Form Studio"
     minimumWidth: 1120; minimumHeight: 700
     // on macOS the content runs under a transparent title bar, so the window buttons sit in our own bar
     flags: mac ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window

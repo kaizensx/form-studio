@@ -47,8 +47,18 @@ class Item:
         return out
 
 
+def mcp_args() -> list[str]:
+    """Arguments after mcp_command(). The packaged app is one program that is also the MCP server."""
+    return ["-m", "form.mcp_server"] if getattr(sys, "frozen", False) else []
+
+
 def mcp_command() -> str:
-    """Absolute path of the form-mcp launcher for this installation."""
+    """Absolute path of the form-mcp launcher for this installation.
+
+    The packaged app has no form-mcp next to it. It used to fall back to whatever form-mcp was on PATH, which is a
+    separate (often older) command-line install: chats in the app then ran an old copy of Form Studio's tools."""
+    if getattr(sys, "frozen", False):
+        return sys.executable
     exe = Path(sys.executable).parent
     names = ("form-mcp.exe", "form-mcp") if sys.platform.startswith("win") else ("form-mcp",)
     for d in (exe, exe / "Scripts"):            # Windows venvs keep launchers in Scripts\
@@ -81,7 +91,7 @@ def _json_register(path: Path, key: str = "mcpServers") -> Callable[[], str]:
             backup = path.with_name(path.name + f".bak-form-{int(time.time())}")
             shutil.copyfile(path, backup)
         path.parent.mkdir(parents=True, exist_ok=True)
-        data.setdefault(key, {})["form"] = {"command": mcp_command()}
+        data.setdefault(key, {})["form"] = {"command": mcp_command(), **({"args": mcp_args()} if mcp_args() else {})}
         path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
         return f"added “form” to {path}" + (f" (backup: {backup.name})" if backup else "")
     return act
@@ -136,13 +146,14 @@ def agent_items(mcp: str | None = None) -> list[Item]:
     """One item per MCP-capable agent found on this computer: is FORM registered, and the fix if not.
     Shared by `form setup` and the installer registry (form/installer.py)."""
     mcp = mcp or mcp_command()
+    tail = "".join(" " + shlex.quote(a) for a in mcp_args())
     items: list[Item] = []
     if shutil.which("claude"):
-        add = f"claude mcp add --scope user form -- {shlex.quote(mcp)}"
+        add = f"claude mcp add --scope user form -- {shlex.quote(mcp)}{tail}"
         items.append(_agent_item("agent.claude", "Claude Code", _claude_command(), mcp, "Register Form Studio with Claude Code (user scope)",
                                  [add], ["claude mcp remove --scope user form", add]))
     if shutil.which("codex"):
-        add = f"codex mcp add form -- {shlex.quote(mcp)}"
+        add = f"codex mcp add form -- {shlex.quote(mcp)}{tail}"
         items.append(_agent_item("agent.codex", "Codex", _codex_command(), mcp, "Register Form Studio with Codex", [add],
                                  ["codex mcp remove form", add]))
     gem = HOME / ".gemini" / "settings.json"

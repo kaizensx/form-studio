@@ -53,3 +53,22 @@ class PresetNames(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PackagedMcp(unittest.TestCase):
+    """Found in the installed app: its chats used a form-mcp from PATH (an old command-line install)."""
+
+    def test_the_packaged_app_hands_agents_itself(self):
+        import sys
+        from pathlib import Path
+        from form import setup
+        from form.chat import Chat
+        with mock.patch.object(sys, "frozen", True, create=True), \
+             mock.patch.object(sys, "executable", "/Applications/FORM.app/Contents/MacOS/FORM"), \
+             mock.patch("shutil.which", return_value="/Users/x/.local/bin/form-mcp"):
+            self.assertEqual(setup.mcp_command(), "/Applications/FORM.app/Contents/MacOS/FORM")
+            self.assertEqual(setup.mcp_args(), ["-m", "form.mcp_server"])
+            c = Chat({"chat": {}, "_path": "(none)"}, Path("/tmp/x"), "/Users/x/.local/bin/form-mcp", adapters={})
+            m = c._mcp()
+        self.assertEqual(m["command"], "/Applications/FORM.app/Contents/MacOS/FORM")
+        self.assertEqual(m["args"][:2], ["-m", "form.mcp_server"])

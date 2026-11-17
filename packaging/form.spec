@@ -11,7 +11,9 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "form" / "recipes"), "form/recipes"),      # recipe sources are hashed into artifact keys
          (str(ROOT / "form" / "examples"), "form/examples"),
          (str(ROOT / "form" / "fonts"), "form/fonts"),          # the font used for text on parts
-         (str(ROOT / "form" / "presets"), "form/presets")]
+         (str(ROOT / "form" / "presets"), "form/presets"),
+         # run by Blender itself as a file (blender -b --python <path>), so it must exist on disk inside the app
+         (str(ROOT / "form" / "adapters" / "blender_scene.py"), "form/adapters")]
 binaries, hidden = [], []
 for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfium2", "pypdfium2_raw",
             "bd_warehouse", "py_gearworks"):     # parts libraries ship inside the app

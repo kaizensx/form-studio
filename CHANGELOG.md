@@ -3,6 +3,11 @@
 ## 11.1.1
 
 - **Agents can read datasheets and drawings from the web in the installed app.** Every https read failed with a certificate error, because the app did not use the certificates it ships. Links that start with http:// are tried over https first. A site that only serves browsers is named as such, with the way around it: attach the file to the conversation.
+- **Chat in the installed app now gives the agent this app's own tools.** It used to start whatever `form-mcp` was on the computer's PATH, often an older command-line install, so the agent worked with an old copy of Form Studio.
+- **Blender renders work in the installed app:** the script Blender runs was missing from the app.
+- **macOS:** the window title is no longer drawn over the top bar.
+- **Release check on the built app** (`scripts/smoke_packaged.py`): opens the window, builds and slices a design, draws the print, starts the app's own MCP server, reads a datasheet over https and renders in Blender, all with the packaged program instead of the source.
+- GitHub workflows run only when started by hand, so a private repository does not spend Actions minutes on every push.
 - **Brief presets** are found however the agent writes the name ("bathroom mount", "Bathroom Mount", "bathroom-mount").
 - **Timeline:** dragging through revisions and pressing "Back to head" always returns to the head; a late answer for an older revision could put it back on screen.
 - **Chat:** when an agent run fails or is stopped, its error or end is saved before the conversation shows it as finished.

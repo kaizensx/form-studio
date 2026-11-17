@@ -4,17 +4,10 @@ name: Real slicers
 # on the runner and never opened; FORM finds it, resolves the pinned presets from the profiles inside the program,
 # slices the example dock, and reads time, grams and layers back from that G-code. A job fails unless a real slice
 # exists. (PrusaSlicer runs in ui.yml; Bambu Studio and OrcaSlicer on macOS are run on a real Mac.)
+# Runs only when started by hand (Actions tab, or `gh workflow run`): the repository is private, so every run
+# is billed against the owner's Actions minutes. Builds and tests also run locally before a release.
 on:
-  push:
-    branches: [main, app, slicer-ci]
-    paths:
-      - form/adapters/**
-      - form/slicer.py
-      - .github/workflows/slicers.yml
-      - .github/ci-*.toml
   workflow_dispatch:
-  schedule:
-    - cron: "17 5 * * 1"
 
 jobs:
   slice:

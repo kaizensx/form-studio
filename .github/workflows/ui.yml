@@ -4,9 +4,9 @@ name: Interface tests
 # synthetic mouse and key events and asserts outcomes in the engine. Runners have no GPU; Qt renders in software.
 # Windows and Linux only: a macOS runner has no foreground window session, so pop-up menus never open there; the
 # same journeys run on a real Mac before each release.
+# Runs only when started by hand (Actions tab, or `gh workflow run`): the repository is private, so every run
+# is billed against the owner's Actions minutes. Builds and tests also run locally before a release.
 on:
-  push:
-    branches: [main, app, ui-ci]
   workflow_dispatch:
 
 jobs:

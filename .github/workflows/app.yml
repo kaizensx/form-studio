@@ -3,11 +3,9 @@ name: Desktop app
 # Builds the FORM desktop app for macOS (Apple Silicon and Intel), Windows and Linux.
 # Every push to main or app builds and uploads the bundles as workflow artifacts.
 # A tag like v9.0.0 also attaches them to a draft GitHub release.
+# Runs only when started by hand (Actions tab, or `gh workflow run`): the repository is private, so every run
+# is billed against the owner's Actions minutes. Builds and tests also run locally before a release.
 on:
-  push:
-    branches: [main, app]
-    tags: ["v*"]
-  pull_request:
   workflow_dispatch:
 
 permissions:
