@@ -68,6 +68,7 @@ def run(ui):
              "studio.toml was backed up first")
 
     # 3. back to the default for this design
+    ui.wait_until(lambda: ui.item("printerSheet").property("busy") == "", 20, "the default to finish saving")
     ui.click_text("Use the default")
     ui.wait_until(lambda: "printer" not in ui.api("/projects/" + pid)["project"], 10, "the design to forget its own printer")
     st = ui.api("/printers?project=" + pid)["project"]

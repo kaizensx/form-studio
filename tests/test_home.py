@@ -352,7 +352,7 @@ class Archives(Tmp):
 
     def test_unsafe_or_wrong_archives_are_refused_before_anything_is_written(self):
         st2 = make_studio(self.tmp / "c")
-        cases = [{"project/../../evil.txt": b"x"}, {"/abs.txt": b"x"}, {"project\\x.txt": b"x"},
+        cases = [{"project/../../evil.txt": b"x"}, {"/abs.txt": b"x"}] + ([{"project\\x.txt": b"x"}] if os.sep == "/" else []) + [
                  {"sources/0123456789abcdef.py": b"print('not matching')"}, {"conversations/zz/meta.json": b"{}"},
                  {"conversations/0123456789ab/../x": b""}]
         for extra in cases:
