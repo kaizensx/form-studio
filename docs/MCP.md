@@ -512,6 +512,38 @@ illustration). The card states only what FORM knows; it is not evidence of a pri
 | `project` | string | yes |
 | `picture` | string |  |
 
+## `rename_project`
+
+Change a project's display name (up to 80 characters). The project id stays the same, so links, files and
+releases keep working. Returns the project's summary: id, name, recipe, head, revisions, updated, approved_rev.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `name` | string | yes |
+
+## `duplicate_project`
+
+Copy a project with its revisions, variants and built outputs under a new id (from the new name; default
+"<old name> copy"). The copy is not approved: approvals and release folders belong to the original and are not
+copied. Returns the new project's summary; use its id from then on.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `name` | string | null |  |
+
+## `delete_project`
+
+Delete a project by moving its whole folder to the trash folder inside the projects folder
+(<projects folder>/.trash/<id>-<UTC time>). Nothing is erased, and moving the folder back restores it, but the
+project disappears from FORM. Ask the user first and only call this after they said yes to deleting this
+project. Returns {ok, id, trash}: tell the user the trash path.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+
 ## Prompt `design_part(goal)`
 
 A guided session: measure first, look at renders, preview before commit, hand release to the user.

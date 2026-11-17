@@ -40,13 +40,15 @@ CROPS = {
     "release": ("app-release.jpg", (1300, 136, 1800, 1160), 500),
     "release-wide": ("app-release.jpg", (424, 56, 1800, 1160), 1376),
     "welcome": ("app-welcome.jpg", (380, 56, 1420, 1160), 1040),
-    "slicers": ("app-slicers.jpg", (300, 500, 1100, 1100), 800),
+    "slicers": ("app-slicers.jpg", (424, 56, 1800, 1160), 1376),
     "home": ("app-home.jpg", (500, 56, 1800, 940), 1300),
     "reference": ("app-reference-part.jpg", (424, 56, 1300, 1160), 876),
     "enclosure": ("app-enclosure.jpg", (424, 56, 1300, 1160), 876),
     "render": ("app-render-sheet.jpg", (200, 96, 1600, 1060), 1400),
     "app": ("app-chat.jpg", None, 1800),
     "app-m": ("app-chat.jpg", (424, 56, 1300, 1160), 876),
+    "analysis": ("app-thickness.jpg", (424, 56, 1300, 1160), 876),
+    "measure": ("app-measure.jpg", (424, 56, 1300, 1160), 876),
 }
 
 

@@ -27,9 +27,18 @@
 - **Copies on a plate:** does N fit?
 - **Share card,** right-click quick actions, viewport keys (`?`).
 
+### Redesign
+- **Workspace:** one tool rail and options bar for the viewport, docked legends that never cover the part, one strip for the pipeline and the history, cross-faded rebuilds, a camera that keeps the part clear of panels, focal stage panels (Prove opens with a pass / review / fail scoreboard).
+- **Shell:** a design system with motion tokens, one sheet system for all 13 sheets, a one-line top bar, a resizable conversation column, a new Home with filters, sort and right-click actions, a grouped fuzzy command palette, a native menu bar, About with licences, remembered window size. Reduced motion is respected (`FORM_REDUCED_MOTION`).
+- **Housekeeping:** rename, duplicate, export and trash designs from Home (`form rename|duplicate|delete`).
+
+### Tested by clicking
+- **Nine UI journeys** drive the real window with synthetic mouse and keyboard events (`python -m form.app --uitest`, `tests/journeys`). They found and fixed, among others: Enter creating a project twice, Tab leaving a sheet, viewport keys typing into the chat box, toasts restarting each other, Esc not closing the context menu.
+- **Update now:** the update sheet installs the upgrade from the app (`form update --install`); the terminal instruction is gone.
+
 ### Headless
-- New commands: `form chat`, `conversations`, `install`, `config`, `examples`, `simulate`, `cost`, `pack`, `analyze`, `measure`, `orient`, `variants`, `share`, `history`, `mark`.
-- 41 MCP tools.
+- New commands: `form chat`, `conversations`, `install`, `config`, `examples`, `simulate`, `cost`, `pack`, `analyze`, `measure`, `orient`, `variants`, `share`, `history`, `mark`, `rename`, `duplicate`, `delete`, `update --install`.
+- 44 MCP tools.
 
 ### Website
 - https://kaizensx.github.io/form-studio/ (source in `site/`; the docs pages are generated from `docs/*.md`).

@@ -251,14 +251,14 @@ features = [<span class="f">Feature</span>(<span class="st">"plate"</span>, <spa
     </div>
     <div class="prove">
       <figure class="shot reveal">
-        <div class="frame" style="--ar: 876 / 760"><img src="assets/shots/layers.webp" data-slot="print-simulation" width="876" height="1104" loading="lazy" decoding="async" alt="Layer 4 of 127: outer walls, sparse infill and bottom surface drawn from the sliced toolpaths, with a layer slider."></div>
-        <h3>The slice, layer by layer</h3>
-        <p>Step through the real toolpaths: walls, infill, bridges, overhang walls. Print time and filament come from the slicer and are labelled simulated.</p>
+        <div class="frame" style="--ar: 876 / 760"><img src="assets/shots/layers.webp" data-slot="print-simulation" width="876" height="1104" loading="lazy" decoding="async" alt="The print simulation paused at layer 74 of 125: toolpaths coloured by line type, the nozzle position, a per-layer chart and the slicer\'s time estimate."></div>
+        <h3>Watch it print</h3>
+        <p>The slicer's own G-code played back in 3D: play, scrub, filter by line type, jump to the next bridge. Time is the slicer's estimate. Simulated, not a print.</p>
       </figure>
       <figure class="shot reveal" style="--d:100ms">
-        <div class="frame" style="--ar: 500 / 660"><img src="assets/shots/checks.webp" data-slot="analysis-map" width="500" height="1024" loading="lazy" decoding="async" alt="Checks for revision 4: one valid solid, interfaces as modelled, export mesh is closed, fits the build volume, thinnest wall 1.93 mm."></div>
-        <h3>Checks on the real solid</h3>
-        <p>The thinnest wall is found from 1,354 samples of the surface. Overhangs are measured on the mesh in the print orientation.</p>
+        <div class="frame" style="--ar: 876 / 760"><img src="assets/shots/analysis.webp" data-slot="analysis-map" width="876" height="1104" loading="lazy" decoding="async" alt="A wall-thickness map drawn on an enclosure, with its legend: under 0.8 mm, 0.8 to 1.2 mm, 1.2 mm and over, thinnest sample 1.37 mm."></div>
+        <h3>Analysis on the model</h3>
+        <p>Wall thickness, overhang, layer cross-section and small features, computed from the real geometry and drawn on the part. Each legend says what the map does not tell you. None of them is a strength analysis.</p>
       </figure>
     </div>
   </div>
@@ -268,7 +268,7 @@ features = [<span class="f">Feature</span>(<span class="st">"plate"</span>, <spa
 <section class="sec" id="assemblies">
   <div class="wrap split wide-left">
     <figure class="shot reveal">
-      <div class="frame"><img src="assets/shots/assembly.webp" width="876" height="1104" loading="lazy" decoding="async" alt="A hinged box shown assembled, with a slider for the lid hinge angle and the features of both parts."></div>
+      <div class="frame"><img src="assets/shots/assembly.webp" width="876" height="1104" loading="lazy" decoding="async" alt="A hinged box in the exploded view: the lid lifted off the box, with sliders for the spread and the lid hinge angle."></div>
     </figure>
     <div class="copy reveal" style="--d:100ms">
       <h2>Parts that go together are checked together</h2>

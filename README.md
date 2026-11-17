@@ -6,7 +6,7 @@
   <a href="https://github.com/kaizensx/form-studio/actions"><img alt="CI" src="https://github.com/kaizensx/form-studio/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-1c1b19">
   <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-1c1b19">
-  <img alt="MCP" src="https://img.shields.io/badge/MCP-41%20tools-e24d26">
+  <img alt="MCP" src="https://img.shields.io/badge/MCP-44%20tools-e24d26">
   <img alt="CAD" src="https://img.shields.io/badge/CAD-build123d%20%2F%20OpenCascade-1c1b19">
 </p>
 
@@ -30,7 +30,7 @@ FORM is a native app for macOS, Windows and Linux. Claude is on the left and you
 > *Design a case for a Raspberry Pi 5 with a snap-on lid*
 
 <p align="center"><img src="docs/screenshots/app-chat.jpg" width="900" alt="FORM app: Claude on the left, a phone dock in the 3D viewport with a blue draft, the change and its consequences on the right"><br>
-<sub>A real run in the app: Claude previewed a change, the kernel rebuilt it in 175 ms, and the app shows what it would cause before anything is saved. 4 steps, $0.11 on the user's account.</sub></p>
+<sub>A real run in the app: Claude previewed a 4° lean change, the kernel rebuilt it in 160 ms, and the app shows what it would cause before anything is saved. 3 steps, 16 s, $0.20 on the user's account.</sub></p>
 
 Claude then works through the request:
 
@@ -65,7 +65,7 @@ Get it from the [Desktop app workflow](https://github.com/kaizensx/form-studio/a
 <td width="50%"><img src="docs/screenshots/app-thickness.jpg" alt="Wall-thickness map on the part with its legend"></td>
 </tr><tr>
 <td><img src="docs/screenshots/app-measure.jpg" alt="Measure tool: distances, a face area and a hole diameter on the model"></td>
-<td><img src="docs/screenshots/app-conversation.jpg" alt="A saved conversation: steps, a failed preview explained, the views the agent looked at, the model picker"></td>
+<td><img src="docs/screenshots/app-conversation.jpg" alt="A conversation: the agent's steps folded, the view it looked at, its answer with what is assumed, the model picker"></td>
 </tr></table>
 
 - **Watch it print:** play, scrub, filter by line type, jump to the next bridge. Time is the slicer's estimate.
@@ -73,7 +73,8 @@ Get it from the [Desktop app workflow](https://github.com/kaizensx/form-studio/a
 - **Measure** distances, faces and holes; **find the best orientation** with the numbers behind the ranking.
 - **Conversations** are saved per design. Pick the agent and model per conversation, attach photos, drawings and STEP files.
 - **Design tools:** a revision timeline you can scrub, variants, text and revision stamps, vent patterns, cost from your prices, copies on a plate, a share card.
-- **First start installs what FORM needs from inside the app.** No terminal, no example projects.
+- **First start installs what FORM needs from inside the app.** No terminal, no example projects. Updates install from the app too.
+- **Tested by clicking:** nine scripted journeys drive the real window with mouse and keyboard events on every change (`tests/journeys`).
 
 Website: **https://kaizensx.github.io/form-studio/**
 
@@ -95,7 +96,7 @@ FORM drives existing software instead of replacing it. On first launch it shows 
 | **Blender** | Illustrative renders; its 3D-Print Toolbox checks when installed | renders yes |
 | **FreeCAD** | Open the STEP, an optional re-import check, a macro with every parameter | fixtures only |
 | **STEP / STL from makers** | Imported as reference parts to design around | yes |
-| **Claude Code, Codex, Gemini CLI, Cursor** | Use FORM's 41 MCP tools; the app follows along live | Claude Code, Codex |
+| **Claude Code, Codex, Gemini CLI, Cursor** | Use FORM's 44 MCP tools; the app follows along live | Claude Code, Codex |
 
 <table><tr>
 <td width="50%"><img src="docs/screenshots/app-reference-part.jpg" alt="A board imported as a STEP file, drawn in blueprint inside the case being designed"></td>
