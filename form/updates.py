@@ -110,7 +110,8 @@ def enabled(cfg: dict | None) -> bool:
 def _fetch() -> dict | None:
     req = urllib.request.Request(API, headers={"Accept": "application/vnd.github+json",
                                                "User-Agent": f"FORM/{__version__} update-check"})
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+    from . import net
+    with net.urlopen(req, timeout=TIMEOUT) as r:
         data = json.loads(r.read().decode("utf-8"))
     if not isinstance(data, dict) or not data.get("tag_name"):
         return None

@@ -9,6 +9,12 @@ import sys
 
 def main() -> int:
     multiprocessing.freeze_support()          # the CAD kernel runs in a spawned worker process
+    import os
+    try:                                      # https from inside the bundle, and for programs started from it
+        import certifi
+        os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+    except Exception:
+        pass
     argv = sys.argv[1:]
     if argv[:2] == ["-m", "form.mcp_server"]:
         from form.mcp_server import main as mcp

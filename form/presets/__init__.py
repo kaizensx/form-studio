@@ -29,10 +29,23 @@ def all_presets() -> list[dict]:
     return [found[k] for k in ORDER if k in found] + [v for k, v in found.items() if k not in ORDER]
 
 
+def _key(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", str(s or "").lower()).strip("-")
+
+
 def get(preset_id: str) -> dict:
+    """By id, title or the words an agent uses: "bathroom mount", "Bathroom Mount" and "bathroom_mount" all find
+    "bathroom-mount" (an agent read the tool's description, which lists the names with spaces)."""
+    want = _key(preset_id)
     for p in all_presets():
-        if p["id"] == preset_id:
+        if want in (_key(p["id"]), _key(p.get("title", ""))):
             return p
+    for p in all_presets():                 # "car accessory" → "automotive-accessory", "organiser" → "organizer"
+        words = set(_key(p["id"]).split("-")) | set(_key(p.get("title", "")).split("-"))
+        if want and set(want.split("-")) & words - {"a", "for", "the"}:
+            hits = [q for q in all_presets() if set(want.split("-")) & (set(_key(q["id"]).split("-")) | set(_key(q.get("title", "")).split("-")))]
+            if len(hits) == 1:
+                return hits[0]
     raise KeyError(preset_id)
 
 

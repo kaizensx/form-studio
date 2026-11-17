@@ -2,6 +2,8 @@
 
 ## 11.1.1
 
+- **Agents can read datasheets and drawings from the web in the installed app.** Every https read failed with a certificate error, because the app did not use the certificates it ships. Links that start with http:// are tried over https first. A site that only serves browsers is named as such, with the way around it: attach the file to the conversation.
+- **Brief presets** are found however the agent writes the name ("bathroom mount", "Bathroom Mount", "bathroom-mount").
 - **Timeline:** dragging through revisions and pressing "Back to head" always returns to the head; a late answer for an older revision could put it back on screen.
 - **Chat:** when an agent run fails or is stopped, its error or end is saved before the conversation shows it as finished.
 - The MCP reference uses the Form Studio name.
