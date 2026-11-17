@@ -98,6 +98,7 @@ Shortcuts are written the Qt way everywhere (`"Ctrl+Shift+O"`) and shown the pla
 | Component | Use |
 |---|---|
 | `Txt { kind; mono; tone }` | all text. kind: `body fine cap lead h3 h2 h1 hero`. tone 1–4 = primary…muted |
+| `Md { source }` | Markdown from an agent or a release note. Never `Text.MarkdownText`: Qt indents every list 40 px. `form/app/markdown.py` turns it into rich text with lists on the 8 px grid |
 | `Icon { name; size; color }` | Lucide glyph; names are in `Icons.qml` (underscores: `"arrow_left"`) |
 | `Btn { text; icon; kind; small; large; active; busy; tip; keys; onClicked }` | kind: `default primary quiet danger`. `busy` shows a spinner and ignores presses; `keys: "Ctrl+K"` adds the shortcut to the tooltip. Tab reaches it, Space/Enter press it |
 | `Tag { text; kind }` | evidence / status chip; colour from `Theme.evidence(kind)` |
@@ -121,6 +122,7 @@ Shortcuts are written the Qt way everywhere (`"Ctrl+Shift+O"`) and shown the pla
 | `ParamRow { p; prov }` | a recipe parameter bound to the draft; `prov: true` adds source and ±σ |
 | `Tip { text; keys; show }` | tooltip, put inside the hovered item. After one has shown, its neighbours open without delay |
 | `Viewport`, `MiniView { projectId; turning }` | 3D |
+| `Fold { title; note; tag; key; openByDefault }` | a section that folds. Its content fades and settles 6 px into place; its height is never animated |
 
 `import "F.js" as F` gives `F.fmt(v, d)`, `F.trim(v, d)`, `F.pad(rev)` → `r04`, `F.dur(seconds)`, `F.ago(ts)`, `F.keys(o)`, `F.vals(o)`, `F.plural(n, word)`.
 `import FormNative` gives `Bridge`: `Bridge.baseUrl`, `Bridge.save(apiPath, fileUrl) → bool`, `Bridge.downloads() → url`, `Bridge.reveal(fileUrl)`,

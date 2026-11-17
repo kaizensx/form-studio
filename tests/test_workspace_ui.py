@@ -38,6 +38,41 @@ class WorkspaceUi(unittest.TestCase):
         vp = read("Viewport.qml")
         self.assertEqual(vp.count('fragmentShader: "shaders/clay.frag"'), vp.count("property color uRim"))
 
+    def test_folds_move_without_animating_layout(self):
+        fold = read("Fold.qml")
+        self.assertNotRegex(fold, r"Behavior on (height|implicitHeight|width)", "the UI contract: height is never animated")
+        self.assertIn("Behavior on opacity", fold)
+        self.assertRegex(fold, r"y: f\.open \? 0 : -Theme\.shift\(\d+\)", "the content slides in, and not at all with reduced motion")
+        self.assertRegex(fold, r"Behavior on y \{ Glide \{ duration: Theme\.move\(", "the slide is off with reduced motion")
+        self.assertRegex(fold, r"Behavior on rotation \{ Glide \{ duration: Theme\.move\(", "so is the chevron's turn")
+        self.assertIn("clip: true", fold)
+        self.assertNotRegex(fold, r"duration: \d", "durations come from Theme")
+
+    def test_what_the_part_holds_is_cut_short_and_labelled(self):
+        vp = read("Viewport.qml")
+        self.assertTrue((FORM / "shaders" / "companion.frag").exists())
+        frag = (FORM / "shaders" / "companion.frag").read_text(encoding="utf-8")
+        self.assertIn("smoothstep(uFade0, uFade1, wpos.y)", frag)
+        self.assertEqual(vp.count('fragmentShader: "shaders/companion.frag"'), 4, "fill and outline, for a box and for an imported part")
+        self.assertEqual(vp.count("property real uFade0: comp.f0; property real uFade1: comp.f1"), 4)
+        self.assertIn("not printed", vp)                       # the honesty label on the reference outline
+        self.assertIn('objectName: "companionNote"', vp)
+
+    def test_viewport_labels_are_seated_together(self):
+        vp = read("Viewport.qml")
+        self.assertIn('import "Labels.js" as Labels', vp)
+        self.assertEqual(vp.count("Labels.place("), 1)
+        self.assertEqual(vp.count("FrameAnimation {"), 2, "the turntable and one label pass; no label projects itself")
+
+    def test_replies_are_drawn_by_the_markdown_converter(self):
+        talk, md = read("Talk.qml"), read("Md.qml")
+        self.assertNotIn("Text.MarkdownText", talk)
+        self.assertEqual(talk.count("Md {"), 2, "saved replies and the one being written")
+        self.assertIn("Bridge.markdown(source, look)", md)
+        self.assertIn("textFormat: Text.RichText", md)
+        for f in FORM.glob("*.qml"):
+            self.assertNotIn("Text.MarkdownText", f.read_text(encoding="utf-8"), f.name)
+
     def test_motion_stays_within_the_budget(self):
         theme, motion = read("Theme.qml"), read("Motion.qml")           # one token set: Theme; Motion only renames it
         for name, limit in (("press", 320), ("ui", 320), ("cross", 320), ("part", 320), ("camera", 450)):
