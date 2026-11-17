@@ -24,6 +24,7 @@ import io
 import math
 
 import numpy as np
+from . import fsutil
 
 ANALYSIS_VERSION = 6
 MAPS = ("thickness", "overhang", "section", "features")
@@ -1095,7 +1096,7 @@ def _cached(st, p, name: str, key: str, make):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(out), encoding="utf-8")
-    tmp.replace(path)
+    fsutil.replace(tmp, path)
     return out
 
 

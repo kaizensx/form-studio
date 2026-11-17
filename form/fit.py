@@ -10,6 +10,7 @@ import math
 import time
 import uuid
 from pathlib import Path
+from . import fsutil
 
 PRIOR_SIGMA = 0.15       # mm, assumed spread of an uncalibrated FDM internal width
 SIGMA_BY_SOURCE = {"measured": 0.03, "specified": 0.10, "photo": 0.60, "assumed": 0.30, "calibrated": 0.05}
@@ -57,7 +58,7 @@ class Calibration:
         data["records"].append(rec)
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
-        tmp.replace(self.path)
+        fsutil.replace(tmp, self.path)
         return rec
 
     def remove(self, rec_id: str) -> None:

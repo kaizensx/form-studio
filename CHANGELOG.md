@@ -5,6 +5,7 @@
 ### Used on Windows and Linux, by the test suite
 - **The interface journeys now run on Windows and Linux in CI** (`.github/workflows/ui.yml`): the real window, real mouse and key events, and a real PrusaSlicer installed on the runner, so designs are built, sliced, simulated and released there. Until now only a Mac had done that. No person has used those builds by hand yet.
 - **Windows: `form run` failed on any design whose checks contain "Δ"**, because the console is not UTF-8. The CLI now writes UTF-8 everywhere. Found by the first real slice on a Windows runner.
+- **Windows: a pipeline could fail right after the solid was built.** Windows refuses to replace a file that anything else has open (the window reading `project.json`, an antivirus scan). Every file FORM replaces is now retried for a moment. Found by the Windows interface run.
 - **Windows: a PrusaSlicer installed with Chocolatey is found.**
 - **Linux: PrusaSlicer 2.4.0** (Ubuntu's package) slices through FORM; presets come from the bundles it ships.
 

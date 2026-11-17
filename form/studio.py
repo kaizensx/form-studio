@@ -21,6 +21,7 @@ from . import __version__, checks as checks_mod, fit as fit_mod, slicer
 from . import cad_bridges
 from .recipes import RecipeBook, RecipeError, SCAD_PREFIX, SOURCE_PREFIX, is_source, source_path, store_source
 from .worker import Kernel, KernelFailure
+from . import fsutil
 
 NODES = ["geometry", "exports", "checks", "slice"]
 STATICS_LABELS = {"tip_force_n": ("Tip-over force", "N"), "safety_factor": ("Bending safety factor", "x"),
@@ -314,7 +315,7 @@ class Studio:
                 shutil.copyfile(path, path.with_suffix(".json.bak"))
             except ValueError:
                 pass
-        tmp.replace(path)
+        fsutil.replace(tmp, path)
 
     def rid(self, p: dict, n: int | None = None) -> str:
         """Recipe id a revision was built with (designs written as code change it per revision)."""
@@ -856,8 +857,7 @@ class Studio:
         if r.get("unavailable"):
             meta["unavailable"] = r["unavailable"]
         (tmp / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
-        shutil.rmtree(out, ignore_errors=True)
-        tmp.replace(out)
+        fsutil.replace_dir(tmp, out)
 
     def _make_checks(self, p, rev, keys, name):
         ex = self.read(p, "exports", keys["exports"])
@@ -1184,7 +1184,7 @@ class Studio:
         except StudioError as e:
             tmp.unlink(missing_ok=True)
             raise StudioError(f"Could not read {name}: {e}", e.hint or "Check that the file is a valid STEP or a closed STL.")
-        tmp.replace(target)
+        fsutil.replace(tmp, target)
         rec = {"file": name, "kind": "part", "format": "step" if name.endswith((".step", ".stp")) else "stl",
                "ts": time.time(), "sha256": sha_file(target), "bytes": target.stat().st_size,
                "bbox": info["bbox"], "volume_mm3": info["volume_mm3"], "solids": info.get("solids"),

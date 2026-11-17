@@ -15,6 +15,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
+from . import fsutil
 
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 PDF_EXT = {".pdf"}
@@ -86,7 +87,7 @@ class Conversations:
         d.mkdir(parents=True, exist_ok=True)
         tmp = d / "meta.json.tmp"
         tmp.write_text(json.dumps(meta, indent=1, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(d / "meta.json")
+        fsutil.replace(tmp, d / "meta.json")
         return meta
 
     def create(self, project: str | None = None, agent: str = "claude", model: str = "default", effort: str = "",

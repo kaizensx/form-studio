@@ -20,6 +20,7 @@ import tomllib
 from pathlib import Path
 
 from . import config
+from . import fsutil
 
 # key → what the Settings sheet and the CLI need to know. type: str | path | bool | float | int | choice | vec3
 SCHEMA: dict[str, dict] = {
@@ -251,7 +252,7 @@ def set_values(cfg: dict, values: dict, path: Path | None = None) -> dict:
         tmp = path.with_name(path.name + ".tmp-form")
         with open(tmp, "w", encoding="utf-8", newline="") as f:
             f.write(text)
-        os.replace(tmp, path)
+        fsutil.replace(tmp, path)
     except OSError as e:
         raise ConfigError(f"Could not write {path}: {e}", "Check that the file and its folder are writable.")
     _apply(cfg, clean)

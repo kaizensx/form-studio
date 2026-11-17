@@ -17,6 +17,7 @@ import zipfile
 from pathlib import Path
 
 import numpy as np
+from . import fsutil
 
 DOCS_VERSION = 1
 NAMES = ("BOM.csv", "ASSEMBLY.md", "PRINT_REPORT.md", "MEASUREMENT_PLAN.md", "MOTION_CHECKS.csv")
@@ -343,9 +344,7 @@ def working(st, p, name: str) -> Path:
         tmp = base.with_name(base.name + ".tmp")
         files = write(st, p, tmp, None, d)
         (tmp / "index.json").write_text(json.dumps(files, indent=1), encoding="utf-8")
-        import shutil
-        shutil.rmtree(base, ignore_errors=True)
-        tmp.replace(base)
+        fsutil.replace_dir(tmp, base)
     files = json.loads((base / "index.json").read_text(encoding="utf-8"))
     if name == "docs.zip":
         z = base / f"{p['id']}_r{d['rev']['n']:02d}_docs.zip"

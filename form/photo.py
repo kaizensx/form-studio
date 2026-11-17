@@ -17,6 +17,7 @@ from pathlib import Path
 
 from .adapters import blender as bl
 from .studio import H, StudioError
+from . import fsutil
 
 _info: dict = {"at": 0.0, "v": None, "key": None}
 _busy: set = set()
@@ -162,7 +163,7 @@ def render(st, p, preset="studio", finish="matte", color=None, fast=False, layer
             raise StudioError(str(e), e.hint, status=422, log=e.log)
         finally:
             (d / f"{key}.job.json").unlink(missing_ok=True)
-        tmp.replace(png)
+        fsutil.replace(tmp, png)
         rev = st.rev(p)
         m = {"key": key, "file": png.name, "project": p["id"], "rev": rev["n"], "ts": time.time(),
              "exports_key": keys["exports"], "geometry_key": keys["geometry"], "stl_sha256": ex["files"]["stl"]["sha256"],

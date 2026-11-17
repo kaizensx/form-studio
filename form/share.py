@@ -23,6 +23,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from . import __version__, render
 from .studio import H, StudioError
+from . import fsutil
 
 VERSION = 3                      # part of every cached card's name: change the drawing, change this
 SIZE = (1600, 900)
@@ -320,7 +321,7 @@ def card(st, p: dict, out: str | Path | None = None, picture: str = "model", for
         img = _compose(st, p, f, photo_file)
         tmp = target.with_suffix(".tmp.png")
         img.save(tmp, "PNG", optimize=True)
-        tmp.replace(target)
+        fsutil.replace(tmp, target)
         for old in d.glob(f"{p['id']}_r*_card_*.png"):          # keep the folder small: one card per picture kind
             if old != target and old.stat().st_mtime < target.stat().st_mtime - 3600:
                 old.unlink(missing_ok=True)
