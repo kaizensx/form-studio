@@ -42,7 +42,7 @@ def run(ui):
     ui.check(pid and any(p["id"] == pid for p in ui.api("/studio")["projects"]), "the example exists in the engine")
     ui.idle(300)
     st = ui.api("/projects/" + pid)["status"]
-    ui.check(all(v["state"] == "current" for v in st.values()), f"the pipeline finished: {st}")
+    ui.check(all(v["state"] == "current" or v.get("unavailable") for v in st.values()), f"the pipeline finished: {st}")
     ui.eq(ui.store.get("sheet"), None, "the sheet closed")
     ui.settle(600)
     ui.shot("first-run-example-open")

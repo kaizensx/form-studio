@@ -1,0 +1,11 @@
+# Interface tests in CI: PrusaSlicer is installed on the runner but never opened, so the presets are pinned here
+# and FORM reads them from the bundles inside the program.
+[printer]
+name = "Original Prusa MINI"
+envelope_mm = [180, 180, 180]
+
+[slicer]
+kind = "prusa"
+machine = "Original Prusa MINI & MINI+"
+process = "0.20mm QUALITY @MINI"
+filament = "Prusament PLA"

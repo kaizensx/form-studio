@@ -1,0 +1,65 @@
+name: Interface tests
+
+# Uses the app the way a person does, on every platform: each journey in tests/journeys/ runs in the real window with
+# synthetic mouse and key events and asserts outcomes in the engine. Runners have no GPU; Qt renders in software.
+# Windows and Linux only: a macOS runner has no foreground window session, so pop-up menus never open there; the
+# same journeys run on a real Mac before each release.
+on:
+  push:
+    branches: [main, app, ui-ci]
+  workflow_dispatch:
+
+jobs:
+  journeys:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows x64, os: windows-latest }
+          - { name: Linux x64, os: ubuntu-22.04 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Linux libraries for Qt
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 libfontconfig1 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-xfixes0 libgl1-mesa-dri xvfb
+      - name: Install
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv -e ".[all]"
+      - name: Install PrusaSlicer
+        # A real slicer on every platform, so the journeys slice, simulate and release for real.
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then choco install prusaslicer -y --no-progress
+          else sudo apt-get install -y prusa-slicer; fi
+      - name: FORM finds the slicer and slices
+        shell: bash
+        run: |
+          PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
+          export FORM_CONFIG=.github/ci-prusa.toml FORM_DATA="$RUNNER_TEMP/form-slice"
+          "$PY" -m form examples add
+          "$PY" -m form run hallway-phone-dock
+          "$PY" -m form state hallway-phone-dock > "$RUNNER_TEMP/state.json"
+          "$PY" -c "import sys,json; s=json.load(open(sys.argv[1],encoding='utf-8')).get('slice_simulated') or {}; print('sliced:', {k:s.get(k) for k in ('time_s','filament_g','layers','slicer','slicer_version')}); sys.exit(0 if s.get('layers') else 1)" "$RUNNER_TEMP/state.json"
+          "$PY" -m form cost hallway-phone-dock
+      - name: Use the app
+        shell: bash
+        run: |
+          PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
+          RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a -s '-screen 0 1920x1200x24'"
+          export FORM_UI_TESTS=1 FORM_UI_SHOTS="$RUNNER_TEMP/ui-shots" FORM_UI_STUDIO_TOML="$PWD/.github/ci-prusa.toml" FORM_NO_UPDATE_CHECK=1
+          eval $RUN "$PY" -m unittest -v tests.test_ui_journeys
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-shots-${{ matrix.name }}
+          path: ${{ runner.temp }}/ui-shots
+          if-no-files-found: ignore
