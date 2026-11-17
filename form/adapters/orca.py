@@ -37,12 +37,11 @@ Settings, all optional, in studio.toml:
 """
 from __future__ import annotations
 
-import os
 import shutil
 from pathlib import Path
 
 from . import _bbl
-from .common import SlicerBlocked, SlicerFailed, first_dir, find_app as _find, gcode_stats, platform  # noqa: F401
+from .common import SlicerBlocked, SlicerFailed, first_dir, find_app as _find, gcode_stats, platform, shipped_dirs  # noqa: F401
 from .common import parse_layers as _parse_layers
 
 LABEL = "OrcaSlicer"
@@ -72,26 +71,7 @@ def parse_gcode_header(path: Path) -> dict:
 
 def profile_dirs(app: Path) -> list[Path]:
     """Where the program keeps the vendor presets it ships (resources/profiles), for each layout."""
-    app = Path(app)
-    try:
-        real = app.resolve()
-    except OSError:
-        real = app
-    out = []
-    for exe in dict.fromkeys((app, real)):
-        here = exe.parent
-        out += [here.parent / "Resources" / "profiles",                 # macOS bundle: Contents/MacOS/OrcaSlicer
-                here / "resources" / "profiles",                        # Windows, Linux tarball
-                here.parent / "resources" / "profiles",                 # Linux: bin/orca-slicer beside resources/
-                here.parent / "share" / "OrcaSlicer" / "profiles"]      # Linux packages
-    found = []
-    for d in out:
-        try:                            # one folder under two spellings (case, symlink) counts once
-            if d.is_dir() and not any(os.path.samefile(d, f) for f in found):
-                found.append(d)
-        except OSError:
-            continue
-    return found
+    return shipped_dirs(app, "OrcaSlicer")
 
 
 def cache_dirs(app: Path, config_dir: Path) -> list[Path]:
@@ -191,7 +171,7 @@ EXIT_REASONS = {
 
 FAMILY = _bbl.Family(kind="orca", label=LABEL, conf_name="OrcaSlicer.conf", version_re=r"OrcaSlicer-([\d.]+)",
                      table="orca", deep_search=True, parse_header=parse_gcode_header,
-                     cache_dirs=cache_dirs, selection=selection, exit_reasons=EXIT_REASONS, bed_type=bed_type)
+                     cache_dirs=cache_dirs, shipped=profile_dirs, selection=selection, exit_reasons=EXIT_REASONS, bed_type=bed_type)
 
 
 def _settings(cfg: dict) -> dict:

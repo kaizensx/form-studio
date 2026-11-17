@@ -40,7 +40,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .common import SlicerBlocked, SlicerFailed, first_dir, find_app as _find, gcode_stats, platform, private
+from .common import SlicerBlocked, SlicerFailed, first_dir, find_app as _find, gcode_stats, platform, private, shipped_dirs
 from .common import parse_layers as _parse_layers
 
 SECTION = {"machine": "printer", "process": "print", "filament": "filament"}
@@ -99,7 +99,7 @@ SUPERSLICER = Variant(
     url="https://github.com/supermerill/SuperSlicer/releases", flatpak="com.superslicer.SuperSlicer",
     apps={"darwin": ["/Applications/SuperSlicer.app/Contents/MacOS/SuperSlicer"],
           "win": [r"%ProgramFiles%\SuperSlicer\superslicer_console.exe", "superslicer_console.exe"],
-          "linux": ["superslicer", "SuperSlicer", "~/Applications/SuperSlicer*.AppImage"] + _flatpak("com.superslicer.SuperSlicer")},
+          "linux": ["superslicer", "SuperSlicer", "/opt/SuperSlicer/AppRun", "~/Applications/SuperSlicer*.AppImage"] + _flatpak("com.superslicer.SuperSlicer")},
     dirs={"darwin": ["~/Library/Application Support/SuperSlicer"], "win": [r"%APPDATA%\SuperSlicer"],
           "linux": ["~/.config/SuperSlicer", "~/.SuperSlicer"]},
 )
@@ -108,7 +108,7 @@ QIDI = Variant(
     url="https://github.com/QIDITECH/QIDISlicer/releases", binary_gcode=True,
     apps={"darwin": ["/Applications/QIDISlicer.app/Contents/MacOS/QIDISlicer"],
           "win": [r"%ProgramFiles%\QIDISlicer\qidi-slicer-console.exe", "qidi-slicer-console.exe"],
-          "linux": ["qidi-slicer", "QIDISlicer", "~/Applications/QIDISlicer*.AppImage"]},
+          "linux": ["qidi-slicer", "QIDISlicer", "/opt/QIDISlicer/AppRun", "~/Applications/QIDISlicer*.AppImage"]},
     dirs={"darwin": ["~/Library/Application Support/QIDISlicer"], "win": [r"%APPDATA%\QIDISlicer"],
           "linux": ["~/.config/QIDISlicer"]},
 )
@@ -145,16 +145,12 @@ def split_list(value: str) -> list[str]:
     return out
 
 
-def shipped_profiles(app: str | None) -> Path | None:
-    """The vendor bundles inside the program itself (PrusaSlicer.app/Contents/Resources/profiles, <dir>/resources/profiles)."""
+def shipped_profiles(app: str | None, share: str = "PrusaSlicer") -> Path | None:
+    """The vendor bundles inside the program itself (PrusaSlicer.app/Contents/Resources/profiles,
+    <dir>/resources/profiles, share/<Program>/profiles, an unpacked AppImage: see common.shipped_dirs)."""
     if not app:
         return None
-    exe = Path(app)
-    for cand in (exe.parent.parent / "Resources" / "profiles", exe.parent / "resources" / "profiles",
-                 exe.parent.parent / "resources" / "profiles", exe.parent.parent / "share" / "PrusaSlicer" / "profiles"):
-        if cand.is_dir():
-            return cand
-    return None
+    return next(iter(shipped_dirs(app, share)), None)
 
 
 class Bundle:
@@ -248,7 +244,7 @@ class Adapter:
             selected = read_ini(cdir / v.ini).get("presets", {}) if (cdir / v.ini).exists() else {}
             names = {k: st[k] if st[k] != "auto" else selected.get(SECTION[k], "") for k in SECTION}
             out["source"] = {k: ("studio.toml" if st[k] != "auto" else f"{v.label} current selection") for k in SECTION}
-            bundle = Bundle(cdir, shipped_profiles(app))
+            bundle = Bundle(cdir, shipped_profiles(app, v.label))
             for kind, name in names.items():
                 if not name:
                     raise SlicerBlocked(f"No {SECTION[kind]} preset is selected in {v.label} and none is set in studio.toml.")

@@ -60,6 +60,37 @@ def first_dir(candidates: list[str]) -> str:
     return expand(candidates[0])
 
 
+def shipped_dirs(app, share: str, sub: str = "profiles") -> list[Path]:
+    """Folders named `sub` among the resources a slicer ships, for every way it is installed.
+
+    app is the program FORM starts: the executable, a link to it, or the AppRun of an unpacked
+    AppImage. share is the folder name the program uses under share/ ("OrcaSlicer")."""
+    app = Path(app)
+    try:
+        real = app.resolve()
+    except OSError:
+        real = app
+    out = []
+    for exe in dict.fromkeys((app, real)):
+        here = exe.parent
+        out += [here.parent / "Resources" / sub,                # macOS bundle: Contents/MacOS/<Program>
+                here / "resources" / sub,                       # Windows; Linux tarball; AppImage with resources beside AppRun
+                here.parent / "resources" / sub,                # Linux: bin/<program> beside resources/
+                here.parent / "share" / share / sub,            # Linux packages
+                here / "usr" / "bin" / "resources" / sub,       # unpacked AppImage (PrusaSlicer family): AppRun, usr/bin/resources
+                here / "usr" / "resources" / sub,
+                here / "usr" / "share" / share / sub,
+                here / "bin" / "resources" / sub]
+    found = []
+    for d in out:
+        try:                            # one folder under two spellings (case, symlink) counts once
+            if d.is_dir() and not any(os.path.samefile(d, f) for f in found):
+                found.append(d)
+        except OSError:
+            continue
+    return found
+
+
 def private(text: str) -> str:
     """Logs are shipped with projects; never let them carry the user's home path."""
     return text.replace(str(Path.home()), "~")
