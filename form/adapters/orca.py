@@ -17,7 +17,15 @@ studio.toml work on an install that was never opened. The current selection is "
 in OrcaSlicer.conf plus that printer's entry in "orca_presets" (process, filament), as
 PresetBundle::load_selections reads it.
 
-Verified by slicing with OrcaSlicer 2.5.1 on macOS (Bambu Lab A1 mini presets from BBL.opc).
+Verified by slicing with OrcaSlicer 2.5.1 on macOS: a 20 mm cube for every 0.4 mm printer in the 71
+vendor caches it ships (496 printers), each with the process and filament its window would select.
+471 slice; the other 25 fail the same way when the CLI is handed OrcaSlicer's own JSON presets (values
+its checks reject, a skirt that leaves the bed). The 8-tool Prusa CORE One INDX crashes the CLI about
+one run in three, with those JSON presets too.
+
+Three things the CLI leaves to its caller, found that way and handled in _bbl.py and below:
+the build plate (bed_type), why it refused (EXIT_REASONS, and its log in 00000.log), and on macOS
+a "reopen windows?" question after any earlier crash (cli_env).
 
 Settings, all optional, in studio.toml:
     [slicer.orca]
@@ -107,9 +115,83 @@ def selection(conf: dict) -> dict:
             "filament": mine.get("filament") or (filaments[0] if filaments else "") or ""}
 
 
+# BedType in src/libslic3r/PrintConfig.hpp, by its number (0 is "Default Plate", not a plate).
+BED_TYPES = ("", "Cool Plate", "Engineering Plate", "High Temp Plate", "Textured PEI Plate", "Textured Cool Plate",
+             "Supertack Plate")
+COOL_PLATE_MODELS = ("Bambu Lab X1 Carbon", "Bambu Lab X1", "Bambu Lab X1E")       # model ids BL-P001, BL-P002, C13
+
+
+def bed_type(machine: dict, conf: dict, name: str) -> str:
+    """The build plate OrcaSlicer's window slices with for this printer.
+
+    The plate decides which of a filament's bed temperatures goes into the G-code
+    (cool_plate_temp, hot_plate_temp, …). The window always sets it: the plate last chosen for the
+    printer if the printer offers a choice (OrcaSlicer.conf "orca_presets"[].curr_bed_type), else
+    the printer's default_bed_type, else Cool Plate for the X1 series and High Temp Plate for every
+    other printer (Preset::get_default_bed_type, Sidebar::update_presets, tag v2.5.1). The CLI sets
+    nothing and falls back to Cool Plate, which printed a Prusa CORE One's PLA bed at 35 °C where
+    the window gives 60 °C. So FORM states the plate itself."""
+    def by_number(text) -> str:
+        try:
+            n = int(str(text).strip())
+        except ValueError:
+            return ""
+        return BED_TYPES[n] if 0 < n < len(BED_TYPES) else ""
+
+    model = str(machine.get("printer_model") or "")
+    default = str(machine.get("default_bed_type") or "").strip()
+    if default:
+        fallback = default if default in BED_TYPES else by_number(default) or "High Temp Plate"
+    else:
+        fallback = "Cool Plate" if model in COOL_PLATE_MODELS else "High Temp Plate"
+    if model.startswith("Bambu Lab") or str(machine.get("support_multi_bed_types") or "0") == "1":
+        for entry in conf.get("orca_presets") or []:
+            if isinstance(entry, dict) and entry.get("machine") == name:
+                return by_number(entry.get("curr_bed_type") or "") or fallback
+    return fallback
+
+
+# What the CLI's return codes mean, in its own words (src/libslic3r/Utils.hpp CLI_* and cli_errors in
+# src/OrcaSlicer.cpp, tag v2.5.1). It writes result.json with the sentence on Linux only, so on
+# macOS and Windows the code is all there is. Codes about 3MF input and slicing caches are left out:
+# FORM hands it an STL.
+EXIT_REASONS = {
+    -1: "Failed setting up server environment.",
+    -2: "Invalid parameters to the slicer.",
+    -3: "The input files to the slicer are not found.",
+    -5: "The input preset file is invalid and can not be parsed.",
+    -6: "The input model file to the slicer can not be parsed.",
+    -7: "Unsupported printer technology (not FDM).",
+    -8: "Unsupported CLI instruction.",
+    -13: "Failed exporting 3mf files.",
+    -14: "Out of memory during slicing.",
+    -17: "The selected printer is not compatible with the process preset.",
+    -18: "Invalid parameter value(s) in the presets.",
+    -20: "The selected printer's bed size is smaller than the bed size used in the print profile.",
+    -21: "An error occurred when auto-arranging object(s).",
+    -22: "An error occurred when auto-orienting object(s).",
+    -25: "Failed exporting the G-code statistics.",
+    -50: "The plate has nothing to slice: it is empty, or no object on it is both printable and fully inside the print volume.",
+    -51: "There are some incorrect slicing parameters.",
+    -52: "Some objects are located over the boundary of the heated bed.",
+    -58: "Slicing time of a certain plate exceeds the limit.",
+    -59: "Triangle count of single plate exceeds the limit.",
+    -61: "Filaments are not compatible with the plate type.",
+    -62: "The temperature difference of the filaments used is too large.",
+    -63: "Object conflicts were detected when using print-by-object mode.",
+    -64: "Object conflicts were detected.",
+    -65: "Some slicing parameters cannot work with Spiral Vase mode.",
+    -66: "Some filaments cannot be mapped to correct extruders for multi-extruder Printer.",
+    -67: "Not support printing 2 or more TPU filaments.",
+    -68: "Some filaments cannot be printed on the extruder mapped to.",
+    -100: "Failed slicing the model.",
+    -101: "G-code conflicts detected after slicing.",
+    -102: "Found G-code in unprintable area after slicing.",
+}
+
 FAMILY = _bbl.Family(kind="orca", label=LABEL, conf_name="OrcaSlicer.conf", version_re=r"OrcaSlicer-([\d.]+)",
                      table="orca", deep_search=True, parse_header=parse_gcode_header,
-                     cache_dirs=cache_dirs, selection=selection)
+                     cache_dirs=cache_dirs, selection=selection, exit_reasons=EXIT_REASONS, bed_type=bed_type)
 
 
 def _settings(cfg: dict) -> dict:

@@ -425,6 +425,82 @@ class AdapterUsesCache(unittest.TestCase):
         self.assertEqual(len(orca.cache_dirs(app, self.dir / "never-opened")), 1)
 
 
+class WhatTheSweepFound(unittest.TestCase):
+    """Found by slicing a cube for every 0.4 mm printer OrcaSlicer 2.5.1 ships (.dev/orca_sweep.py)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        (self.dir / "system").mkdir()
+
+    def cache(self, machine=None, filament=None, extra_types=None):
+        types = {**TYPES, "default_filament_colour": oc.STRING + V, "default_bed_type": oc.STRING,
+                 "printer_model": oc.STRING, "support_multi_bed_types": oc.BOOL, **(extra_types or {})}
+        presets = {k: [dict(p, config=dict(p["config"])) for p in v] for k, v in PRESETS.items()}
+        presets["machine"][-1]["config"].update(machine or {})
+        presets["filament"][-1]["config"].update(filament or {})
+        (self.dir / "system" / "Test.opc").write_bytes(frame(build_body(types=types, presets=presets)))
+
+    def resolve(self, conf=None):
+        if conf is not None:
+            (self.dir / "OrcaSlicer.conf").write_text(json.dumps(conf) + "\n# MD5 checksum 0\n", encoding="utf-8")
+        r = orca.resolve(base_cfg(orca={"app": sys.executable, "config_dir": str(self.dir),
+                                        "machine": "Cube One 0.4 nozzle", "process": "0.16mm Fine @Cube",
+                                        "filament": "Test PLA"}))
+        self.assertTrue(r["available"], r["reason"])
+        return r
+
+    def test_an_empty_filament_list_is_not_handed_to_the_cli(self):
+        # Cubicon: "default_filament_colour": "" packs as an empty list, and the CLI aborts on one
+        # ("ConfigOptionVector::set_at(): Assigning from an empty vector").
+        self.cache(filament={"default_filament_colour": []})
+        f = self.resolve()["presets"]["filament"]["data"]
+        self.assertNotIn("default_filament_colour", f)
+        self.assertEqual(f["filament_type"], ["PLA"])
+        self.assertEqual(f["filament_settings_id"], ["Test PLA"])
+
+    def test_an_empty_machine_list_stays(self):
+        self.cache(machine={"compatible_printers": []})         # empty is a real value there
+        self.assertEqual(self.resolve()["presets"]["machine"]["data"]["compatible_printers"], [])
+
+    def test_the_plate_is_stated_as_the_window_would_set_it(self):
+        # The CLI alone slices every printer as "Cool Plate": a Prusa CORE One bed at 35 °C instead of 60 °C.
+        self.cache()
+        r = self.resolve()
+        self.assertEqual(r["presets"]["process"]["data"]["curr_bed_type"], "High Temp Plate")
+        self.assertEqual(r["summary"]["plate"], "High Temp Plate")
+        self.cache(machine={"default_bed_type": "Textured PEI Plate"})
+        self.assertEqual(self.resolve()["presets"]["process"]["data"]["curr_bed_type"], "Textured PEI Plate")
+
+    def test_the_plate_rules(self):
+        bed = orca.bed_type
+        self.assertEqual(bed({}, {}, "P"), "High Temp Plate")
+        self.assertEqual(bed({"default_bed_type": ""}, {}, "P"), "High Temp Plate")
+        self.assertEqual(bed({"default_bed_type": "4"}, {}, "P"), "Textured PEI Plate")           # the old numeric form
+        self.assertEqual(bed({"default_bed_type": "Supertack Plate"}, {}, "P"), "Supertack Plate")
+        self.assertEqual(bed({"default_bed_type": "nonsense"}, {}, "P"), "High Temp Plate")
+        self.assertEqual(bed({"default_bed_type": "0"}, {}, "P"), "High Temp Plate")
+        self.assertEqual(bed({"printer_model": "Bambu Lab X1 Carbon"}, {}, "P"), "Cool Plate")
+        self.assertEqual(bed({"printer_model": "Bambu Lab A1 mini"}, {}, "P"), "High Temp Plate")
+        chosen = {"orca_presets": [{"machine": "Other", "curr_bed_type": "1"}, {"machine": "P", "curr_bed_type": "2"}]}
+        self.assertEqual(bed({"printer_model": "Bambu Lab A1 mini"}, chosen, "P"), "Engineering Plate")
+        self.assertEqual(bed({"support_multi_bed_types": "1"}, chosen, "P"), "Engineering Plate")
+        self.assertEqual(bed({"support_multi_bed_types": "0"}, chosen, "P"), "High Temp Plate")   # no choice offered
+        self.assertEqual(bed({"support_multi_bed_types": "1", "default_bed_type": "Cool Plate"},
+                             {"orca_presets": [{"machine": "P", "curr_bed_type": "99"}]}, "P"), "Cool Plate")
+
+    def test_a_plate_already_in_the_presets_is_kept(self):
+        self.cache()
+        user = self.dir / "user" / "default" / "process"
+        user.mkdir(parents=True)
+        (user / "0.16mm Fine @Cube.json").write_text(json.dumps({
+            "name": "0.16mm Fine @Cube", "from": "User", "layer_height": "0.16",
+            "curr_bed_type": "Engineering Plate"}), encoding="utf-8")
+        self.assertEqual(self.resolve()["presets"]["process"]["data"]["curr_bed_type"], "Engineering Plate")
+
+
+
 REAL_DIRS = [Path("~/Library/Application Support/OrcaSlicer/system").expanduser(),
              Path("/Applications/OrcaSlicer.app/Contents/Resources/profiles"),
              Path("~/.config/OrcaSlicer/system").expanduser(),

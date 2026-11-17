@@ -15,11 +15,14 @@ Bambu Studio does not set it and is resolved from JSON files only, as before.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import zipfile
@@ -41,6 +44,8 @@ class Family:
     parse_header: object = None     # G-code statistics reader
     cache_dirs: object = None       # (app, config_dir) -> folders holding packed <vendor>.opc presets (OrcaSlicer 2.5+)
     selection: object = None        # conf dict -> {"machine", "process", "filament"} chosen in the program
+    exit_reasons: dict = field(default_factory=dict)    # CLI return code -> the program's own sentence for it
+    bed_type: object = None         # (machine preset, conf dict, machine name) -> the plate the program's window would use
     version_cache: dict = field(default_factory=dict)
 
     def where(self, kind: str) -> str:
@@ -168,6 +173,15 @@ def resolve(fam: Family, s: dict, app: Path, config_dir: Path, wanted: dict) -> 
             if not name:
                 raise SlicerBlocked(no_selection(fam, config_dir, kind, names, bool(conf)))
             flat = flatten(fam, config_dir, kind, name, packed=packed)
+            if kind == "filament":
+                # A per-filament list a vendor left empty ("default_filament_colour": "" in Cubicon's
+                # presets) aborts the CLI: "ConfigOptionVector::set_at(): Assigning from an empty vector".
+                # Left out, the program's own default applies, which is what its window does with it.
+                flat = {k: v for k, v in flat.items() if v != []}
+            if kind == "process" and fam.bed_type:
+                machine = out["presets"]["machine"]["data"]
+                if "curr_bed_type" not in flat and "curr_bed_type" not in machine:
+                    flat["curr_bed_type"] = fam.bed_type(machine, conf, names["machine"])
             flat["name"] = name
             flat["from"] = "system"
             idkey = {"machine": "printer_settings_id", "process": "print_settings_id", "filament": "filament_settings_id"}[kind]
@@ -232,6 +246,67 @@ def public(fam: Family, resolved: dict) -> dict:
     return out
 
 
+@contextlib.contextmanager
+def cli_env():
+    """The environment the CLI runs in: the person's own, except on macOS, where it gets an empty
+    throwaway home (CFFIXED_USER_HOME) for the length of the run.
+
+    Why: the CLI starts AppKit to draw the plate thumbnail. After any earlier crash of the program
+    (its CLI included) macOS then asks "…quit unexpectedly while reopening windows. Reopen?" in a
+    modal window on the person's screen, and the slice sits behind it until the timeout; a slice
+    killed there counts as one more crash. Seen with OrcaSlicer 2.5.1 on macOS 27. The crash history
+    and saved window state are per home folder, so a fresh one never asks. Presets are passed as
+    files and results are written to the output folder, so nothing is read from the real home."""
+    if sys.platform != "darwin":
+        yield None
+        return
+    home = tempfile.mkdtemp(prefix="form-slicer-home-")
+    try:
+        yield {**os.environ, "CFFIXED_USER_HOME": home}
+    finally:
+        shutil.rmtree(home, ignore_errors=True)
+
+
+def exit_code(returncode: int) -> int:
+    """The CLI returns small negative numbers; the system hands them back wrapped (POSIX: 256 + n,
+    Windows: 2**32 + n)."""
+    if returncode > 0x7FFFFFFF:
+        return returncode - (1 << 32)
+    if 128 <= returncode <= 255:
+        return returncode - 256
+    return returncode
+
+
+def own_logs(out_dir: Path) -> str:
+    """OrcaSlicer 2.5 writes its log to numbered files in the working folder (00000.log), not to
+    stdout. They are read into slicer.log and removed: they carry full paths."""
+    text = []
+    for p in sorted(out_dir.glob("*.log")):
+        if p.name == "slicer.log":
+            continue
+        try:
+            text.append(p.read_text(encoding="utf-8", errors="ignore"))
+            p.unlink()
+        except OSError:
+            continue
+    return "\n".join(text)
+
+
+def refusal(fam: Family, returncode: int, said: str, errors: list, result: dict) -> str:
+    """Why the CLI did not slice, in its own words where it gave any."""
+    if result.get("error_string"):
+        return result["error_string"]
+    if errors:
+        return errors[-1]
+    lines = [ln.strip() for ln in said.splitlines() if ln.strip() and ln.strip() != "run found error, exit"]
+    own = " ".join(lines[-6:])[:600] if len(lines) <= 12 else ""       # a few lines: its message. Many: usage text.
+    if os.name == "posix" and returncode < 0:
+        return f"it crashed (signal {-returncode})" + (f": {own}" if own else "")
+    code = exit_code(returncode)
+    reason = (fam.exit_reasons or {}).get(code, "")
+    return " ".join(x for x in (reason, own, f"(exit code {code})") if x)
+
+
 def slice_stl(fam: Family, resolved: dict, stl: Path, out_dir: Path, timeout: float = 600) -> dict:
     if not resolved.get("available"):
         raise SlicerBlocked(resolved.get("reason") or "Slicer unavailable.")
@@ -252,13 +327,18 @@ def slice_stl(fam: Family, resolved: dict, stl: Path, out_dir: Path, timeout: fl
            "--export-3mf", "plate.3mf", "--outputdir", str(out_dir), str(local)]
     t0 = time.time()
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=out_dir, stdin=subprocess.DEVNULL)
+        with cli_env() as env:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=out_dir,
+                               stdin=subprocess.DEVNULL, env=env)
     except subprocess.TimeoutExpired:
+        (out_dir / "slicer.log").write_text(private(own_logs(out_dir))[-200_000:], encoding="utf-8")
         raise SlicerFailed(f"{fam.label} did not finish within {timeout:g} s.",
                            "Raise [slicer].timeout_s in studio.toml, or simplify the model.")
     except OSError as e:
         raise SlicerBlocked(f"{fam.label} could not be started: {e}")
-    log = private(r.stdout + "\n" + r.stderr)
+    said = private(r.stdout + "\n" + r.stderr)
+    own = private(own_logs(out_dir))
+    log = said + ("\n" + own if own else "")
     (out_dir / "slicer.log").write_text(log[-200_000:], encoding="utf-8")
     result = {}
     if (out_dir / "result.json").exists():
@@ -270,10 +350,11 @@ def slice_stl(fam: Family, resolved: dict, stl: Path, out_dir: Path, timeout: fl
     threemf = out_dir / "plate.3mf"
     if r.returncode != 0 or not gcode.exists():
         errors = [ln.split("] ", 2)[-1] for ln in log.splitlines() if "[error]" in ln]
-        msg = result.get("error_string") or (errors[-1] if errors else f"exit code {r.returncode}")
+        msg = refusal(fam, r.returncode, said, errors, result)
+        tail = errors[-8:] or [ln for ln in (own or said).splitlines() if ln.strip()][-12:]
         raise SlicerFailed(f"{fam.label} refused to slice: {msg}",
                            "The full log is kept beside the failed slice. Check that the presets match the printer.",
-                           "\n".join(errors[-8:]))
+                           "\n".join(tail))
     info = fam.parse_header(gcode)
     if threemf.exists():
         info.update(read_3mf(threemf, out_dir))
@@ -283,7 +364,9 @@ def slice_stl(fam: Family, resolved: dict, stl: Path, out_dir: Path, timeout: fl
         "gcode_sha256": hashlib.sha256(gcode.read_bytes()).hexdigest(),
         "presets": {k: {"name": v["name"], "sha": v["sha"]} for k, v in resolved["presets"].items()},
         "warnings": sorted({ln.split("] ", 2)[-1][:200] for ln in log.splitlines()
-                            if "[warning]" in ln and "cli mode" not in ln})[:12],
+                            if "[warning]" in ln and "cli mode" not in ln}
+                           | {ln[len("got warnings: "):][:200] for ln in log.splitlines()
+                              if ln.startswith("got warnings: ")})[:12],
     })
     return info
 

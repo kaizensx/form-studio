@@ -326,6 +326,92 @@ class StandInSlices(unittest.TestCase):
             self.assertIn(flag, args)
         self.assertEqual(len(slicer.parse_layers(self.d / "out" / "plate_1.gcode", "orca")), 3)
 
+    def orca_run(self, body):
+        app = self.script('if args == ["--help"]:\n    print("OrcaSlicer-2.5.1:"); sys.exit(0)\n' + textwrap.dedent(body))
+        cfg = orca_cfg(app)
+        cfg["slicer"]["kind"] = "orca"
+        return slicer.slice_stl(slicer.resolve(cfg), self.stl, self.d / "out", timeout=60)
+
+    def test_orca_refusal_is_explained_from_its_exit_code_and_its_own_log_file(self):
+        # OrcaSlicer 2.5 logs to 00000.log in the working folder, and says why only through the exit code
+        # (result.json is written on Linux alone). 154 is -102 wrapped.
+        home = str(Path.home())
+        with self.assertRaises(common.SlicerFailed) as cm:
+            self.orca_run(f"""\
+                open("00000.log", "w").write("load {home}/x.json\\nplate 1: found gcode in unprintable area\\n")
+                print("run found error, exit"); sys.exit(154)
+                """)
+        self.assertEqual(str(cm.exception), "OrcaSlicer refused to slice: Found G-code in unprintable area after slicing. (exit code -102)")
+        self.assertIn("found gcode in unprintable area", cm.exception.log)
+        out = self.d / "out"
+        self.assertEqual([p.name for p in out.glob("*.log")], ["slicer.log"])       # its own file is folded in and gone
+        log = (out / "slicer.log").read_text(encoding="utf-8")
+        self.assertIn("load ~/x.json", log)
+        self.assertNotIn(home, log)
+
+    def test_orca_refusal_carries_what_it_printed(self):
+        with self.assertRaises(common.SlicerFailed) as cm:
+            self.orca_run("""\
+                print("run found error, exit")
+                print("Param values in 3mf/config error: ")
+                print("during_print_exhaust_fan_speed: 255 not in range [0, 100]"); sys.exit(238)
+                """)
+        self.assertIn("Invalid parameter value(s) in the presets. Param values in 3mf/config error: "
+                      "during_print_exhaust_fan_speed: 255 not in range [0, 100] (exit code -18)", str(cm.exception))
+        with self.assertRaises(common.SlicerFailed) as cm:
+            self.orca_run("sys.exit(77)\n")
+        self.assertEqual(str(cm.exception), "OrcaSlicer refused to slice: (exit code 77)")
+
+    def test_orca_crash_is_called_a_crash(self):
+        with self.assertRaises(common.SlicerFailed) as cm:
+            self.orca_run("""\
+                import signal
+                print("libc++abi: terminating due to uncaught exception", file=sys.stderr); sys.stderr.flush()
+                os.kill(os.getpid(), signal.SIGKILL)
+                """)
+        self.assertIn("it crashed (signal 9): libc++abi: terminating", str(cm.exception))
+
+    def test_orca_timeout_keeps_its_log_without_the_home_path(self):
+        app = self.script('if args == ["--help"]:\n    print("OrcaSlicer-2.5.1:"); sys.exit(0)\n'
+                          f'import time\nopen("00000.log", "w").write("read {Path.home()}/m.stl\\n")\ntime.sleep(30)\n')
+        cfg = orca_cfg(app)
+        cfg["slicer"]["kind"] = "orca"
+        with self.assertRaises(common.SlicerFailed) as cm:
+            slicer.slice_stl(slicer.resolve(cfg), self.stl, self.d / "out", timeout=3)
+        self.assertIn("did not finish within 3 s", str(cm.exception))
+        self.assertEqual([p.name for p in (self.d / "out").glob("*.log")], ["slicer.log"])
+        self.assertEqual((self.d / "out" / "slicer.log").read_text(encoding="utf-8"), "read ~/m.stl\n")
+
+    def test_exit_codes_unwrap(self):
+        from form.adapters import _bbl
+        self.assertEqual([_bbl.exit_code(c) for c in (0, 1, 154, 238, 205, 0xFFFFFF9A, -11)], [0, 1, -102, -18, -51, -102, -11])
+
+    def test_orca_warnings_come_from_its_log_file(self):
+        info = self.orca_run(f"""\
+            out = args[args.index("--outputdir") + 1]
+            open("00000.log", "w").write("got warnings: The precise wall option will be ignored.\\n")
+            shutil.copyfile({str(FIX / "orca" / "generic_printer.gcode")!r}, os.path.join(out, "plate_1.gcode"))
+            """)
+        self.assertEqual(info["warnings"], ["The precise wall option will be ignored."])
+
+    def test_the_cli_runs_in_a_throwaway_home_on_macos(self):
+        # After any crash of the program, macOS asks "reopen windows?" in a modal window when the CLI starts
+        # AppKit for the thumbnail, and the slice hangs behind it. The question is per home folder.
+        self.orca_run(f"""\
+            out = args[args.index("--outputdir") + 1]
+            home = os.environ.get("CFFIXED_USER_HOME", "")
+            json.dump([home, os.path.isdir(home)], open(os.path.join(out, "home.json"), "w"))
+            shutil.copyfile({str(FIX / "orca" / "generic_printer.gcode")!r}, os.path.join(out, "plate_1.gcode"))
+            """)
+        import json
+        home, existed = json.loads((self.d / "out" / "home.json").read_text(encoding="utf-8"))
+        if sys.platform == "darwin":
+            self.assertTrue(existed)
+            self.assertNotEqual(Path(home), Path.home())
+            self.assertFalse(Path(home).exists())                       # removed after the run
+        else:
+            self.assertEqual(home, os.environ.get("CFFIXED_USER_HOME", ""))
+
     def test_prusa_command_line_and_refusal(self):
         app = self.script(textwrap.dedent(f"""\
             if args == ["--help"]:
