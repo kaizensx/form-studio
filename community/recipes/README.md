@@ -66,7 +66,7 @@ class Design(Recipe):
 
 ### `preview.png`
 
-About 960 × 620 px, the part at its default values. The simplest way to make one:
+About 960 × 560 px, the part at its default values. The simplest way to make one:
 
 ```bash
 form render <project> --view iso --out preview.png

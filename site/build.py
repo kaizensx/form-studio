@@ -2,9 +2,9 @@
 
     python site/build.py            (needs the `markdown` package: pip install markdown)
 
-Reads docs/APP.md, docs/MCP.md, docs/RECIPES.md, docs/NORTH_STAR.md, docs/VERIFICATION.md and CHANGELOG.md,
-and writes site/docs/*.html and site/sitemap.xml. The home page (site/index.html) is hand-written and is
-not touched. The GitHub Pages workflow runs this before it uploads site/.
+Reads the markdown listed in PAGES and writes site/docs/*.html, site/sitemap.xml and site/robots.txt. The home
+page and the recipe gallery are hand-written and are not touched. The GitHub Pages workflow runs this before it
+uploads site/.
 """
 from __future__ import annotations
 
@@ -29,11 +29,13 @@ REPO = "https://github.com/kaizensx/form-studio"
 
 # slug, source, nav title, one line for the index
 PAGES = [
-    ("app", "docs/APP.md", "The desktop app", "Run it, what you see, the keys, what it will not do."),
+    ("features", "docs/FEATURES.md", "Features", "Everything Form Studio does, from the first message to the release."),
+    ("app", "docs/APP.md", "The desktop app", "Install, the window, the five stages, keys and settings."),
+    ("cli", "docs/CLI.md", "Command line", "Every form command, with its arguments."),
     ("mcp", "docs/MCP.md", "MCP tools", "Every tool an agent can call, generated from the server itself."),
     ("recipes", "docs/RECIPES.md", "Writing a recipe", "Parameters, features, constraints, fit and tests."),
-    ("verification", "docs/VERIFICATION.md", "What is verified", "Which tools and platforms were run for real, and the record of every test run."),
-    ("north-star", "docs/NORTH_STAR.md", "North star", "The brief every contributor works from."),
+    ("architecture", "docs/ARCHITECTURE.md", "Architecture", "The engine, the kernel worker, adapters, staleness and the fit model."),
+    ("verification", "docs/VERIFICATION.md", "Compatibility", "Platforms, slicers, agents and programs, and what CI exercises."),
     ("changelog", "CHANGELOG.md", "Changelog", "What changed in each version."),
 ]
 BY_SOURCE = {src: slug for slug, src, _, _ in PAGES}
@@ -45,7 +47,8 @@ PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title} · Form Studio docs</title>
 <meta name="description" content="{desc}">
-<meta name="theme-color" content="#0e1113">
+<meta name="theme-color" content="#0e1113" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
 <link rel="canonical" href="{base}docs/{file}">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Form Studio">
@@ -62,22 +65,29 @@ PAGE = """<!doctype html>
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="preload" href="../fonts/InstrumentSans.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../css/site.css">
+<script>document.documentElement.classList.add("js");try{{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}}catch(e){{}}</script>
+<script type="module">import {{ initTheme }} from "../js/theme.js"; initTheme(document.getElementById("theme"));</script>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></symbol>
+<symbol id="ic-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 019.5 4.5a8 8 0 1010 10z"/></symbol>
+<symbol id="ic-gh" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-6-2.5m12 4.5v-3.4a3 3 0 00-.8-2.3c2.7-.3 5.5-1.3 5.5-6a4.6 4.6 0 00-1.3-3.2 4.3 4.3 0 00-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 00-6 0C6.5 2.6 5.5 2.9 5.5 2.9a4.3 4.3 0 00-.1 3.2A4.6 4.6 0 004 9.3c0 4.6 2.8 5.6 5.5 6a3 3 0 00-.8 2.3V21"/></symbol>
+</defs></svg>
 <a class="skip" href="#main">Skip to content</a>
 <header class="nav scrolled">
   <div class="wrap">
-    <a class="brand" href="../"><img src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"></a>
+    <a class="brand" href="../"><img class="lk-d" src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="../assets/lockup-light.svg" alt="" width="143" height="22"></a>
     <ul class="nav-links">
-      <li><a href="../#fit">Fit</a></li>
-      <li><a href="../#checks">Checks</a></li>
-      <li><a href="../#print">Print</a></li>
-      <li><a href="../#assemblies">Assemblies</a></li>
+      <li><a href="../#features">Features</a></li>
       <li><a href="../#agents">Agents</a></li>
+      <li><a href="../recipes/">Recipes</a></li>
       <li><a href="./" aria-current="page">Docs</a></li>
+      <li><a href="../#community">Community</a></li>
     </ul>
     <div class="end">
-      <a class="gh" href="{repo}">GitHub</a>
+      <button class="theme" type="button" id="theme" aria-label="Switch between light and dark"><svg class="ic sun" aria-hidden="true"><use href="#ic-sun"/></svg><svg class="ic moon" aria-hidden="true"><use href="#ic-moon"/></svg></button>
+      <a class="gh" href="{repo}"><svg class="ic" aria-hidden="true"><use href="#ic-gh"/></svg><span>GitHub</span></a>
       <a class="btn primary small" href="../#download">Download</a>
     </div>
   </div>
@@ -96,52 +106,20 @@ PAGE = """<!doctype html>
 </div>
 <footer class="foot">
   <div class="wrap">
-    <a class="brand" href="../"><img src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"></a>
-    <nav aria-label="Footer">
-      <a href="./">Docs</a>
-      <a href="changelog.html">Changelog</a>
-      <a href="{repo}">GitHub</a>
-      <a href="{repo}/issues">Issues</a>
-      <a href="{repo}/blob/main/LICENSE">MIT licence</a>
-    </nav>
-    <p>No cookies, trackers or third-party requests. Generated from the repository’s markdown.</p>
+    <div class="foot-top">
+      <div class="foot-brand">
+        <a class="brand" href="../"><img class="lk-d" src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="../assets/lockup-light.svg" alt="" width="143" height="22"></a>
+        <p>Describe a part. Get a file you can print. Open source, MIT licence.</p>
+      </div>
+      <nav aria-label="Product"><span class="cap">Product</span><a href="../#features">Features</a><a href="../#tour">Tour</a><a href="../#agents">Agents and slicers</a><a href="../recipes/">Recipes</a><a href="../#download">Download</a></nav>
+      <nav aria-label="Docs"><span class="cap">Docs</span><a href="features.html">Features</a><a href="app.html">The app</a><a href="cli.html">Command line</a><a href="mcp.html">MCP tools</a><a href="changelog.html">Changelog</a></nav>
+      <nav aria-label="Community"><span class="cap">Community</span><a href="{repo}/discussions">Discussions</a><a href="{repo}/issues/new/choose">Report an issue</a><a href="{repo}/blob/main/CONTRIBUTING.md">Contributing</a><a href="{repo}">GitHub</a></nav>
+    </div>
+    <p class="foot-note">No cookies, trackers or third-party requests. These pages are generated from the repository’s markdown.</p>
   </div>
 </footer>
 </body>
 </html>
-"""
-
-
-# The top of the verification page: which external tools and platforms Form Studio has been run with, as stated
-# in the README's works-with table and status section. Keep it in step with the README when a tool is run again.
-VERIFIED_INTRO = """<h1>What is verified, and how</h1>
-<p class="lede">Each tool Form Studio drives, and how it was run. Below that is the record of every test run, by version,
-with what passed and what was not run.</p>
-<h2 id="tools">Tools Form Studio drives</h2>
-<div class="tablewrap"><table>
-<thead><tr><th>Tool</th><th>What Form Studio does with it</th><th>Run for real</th></tr></thead>
-<tbody>
-<tr><td>build123d / OpenCascade</td><td>The CAD kernel: every solid, STEP export and B-rep check</td><td class="r-run">Yes</td></tr>
-<tr><td>Bambu Studio</td><td>Slices with your printer, filament and process presets</td><td class="r-run">Yes: macOS by hand; 2.9.1 on Windows and Linux in CI</td></tr>
-<tr><td>PrusaSlicer</td><td>The same, picked automatically or in the Slicer sheet</td><td class="r-run">Yes: 2.9.7 on macOS and Windows, 2.4.0 on Linux (a full slice, layers, simulation, cost)</td></tr>
-<tr><td>OrcaSlicer</td><td>The same; reads OrcaSlicer 2.5’s packed presets (<code>.opc</code>)</td><td class="r-run">Yes: 2.5.1 on macOS, where 471 of the 496 printers it ships slice and the rest fail in OrcaSlicer itself; Windows and Linux in CI</td></tr>
-<tr><td>SuperSlicer, QIDISlicer</td><td>The same</td><td class="r-run">Yes: SuperSlicer 2.5.59 and QIDISlicer 1.2.5 on Windows and Linux in CI; QIDISlicer on macOS too</td></tr>
-<tr><td>OpenSCAD</td><td>Designs written in <code>.scad</code>; Customizer ranges become parameters</td><td class="r-run">Yes</td></tr>
-<tr><td>Blender</td><td>Illustrative renders; its 3D-Print Toolbox checks when installed</td><td class="r-run">Renders</td></tr>
-<tr><td>FreeCAD</td><td>Opens the STEP, an optional re-import check, a macro with every parameter</td><td class="r-run">Yes: 1.1.4, re-check and macro</td></tr>
-<tr><td>STEP and STL from makers</td><td>Imported as reference parts to design around</td><td class="r-run">Yes</td></tr>
-<tr><td>Claude Code, Codex, Gemini CLI, Cursor</td><td>Use Form Studio’s 44 MCP tools; the app follows along live. Claude Code, Codex and Gemini CLI also chat inside the app</td><td class="r-no">Claude Code and Codex. Gemini CLI 0.68.0 was run up to sign-in: a live reply needs a Gemini API key (Settings, Chat). Cursor was not run.</td></tr>
-</tbody></table></div>
-<h2 id="platforms">Platforms</h2>
-<p>The engine’s tests run on macOS, Windows and Linux in CI, and the Real slicers workflow slices with OrcaSlicer,
-Bambu Studio, SuperSlicer and QIDISlicer on Windows and Linux. Every build launches the packaged app on each platform
-and requires its interface to load and its CAD kernel to start. On Windows and Linux the interface journeys also run in
-CI: the real window is driven with mouse and key events, with a real PrusaSlicer, through design, slice, simulation and
-release. The macOS Apple Silicon app was also used by hand; the Windows, Linux and Intel macOS apps have not been used
-by hand yet.</p>
-<p>The app bundles are not signed or notarized. Nothing in the repository has been physically printed by the authors as
-part of verification: a slice is reported as simulated, fit as modelled, and strength as a model with stated
-assumptions.</p>
 """
 
 
@@ -153,6 +131,25 @@ def nav(current: str) -> str:
         cur = ' aria-current="page"' if slug == current else ""
         out.append(f'      <li><a href="{href}"{cur}>{html.escape(title)}</a></li>')
     return "\n".join(out)
+
+
+def image_size(f: Path) -> tuple[int, int] | None:
+    """Width and height of a PNG, GIF or WebP file, from its header (standard library only)."""
+    b = f.read_bytes()[:40]
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        return int.from_bytes(b[16:20], "big"), int.from_bytes(b[20:24], "big")
+    if b[:6] in (b"GIF87a", b"GIF89a"):
+        return int.from_bytes(b[6:8], "little"), int.from_bytes(b[8:10], "little")
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        kind = b[12:16]
+        if kind == b"VP8X":
+            return 1 + int.from_bytes(b[24:27], "little"), 1 + int.from_bytes(b[27:30], "little")
+        if kind == b"VP8 ":
+            return int.from_bytes(b[26:28], "little") & 0x3FFF, int.from_bytes(b[28:30], "little") & 0x3FFF
+        if kind == b"VP8L":
+            v = int.from_bytes(b[21:25], "little")
+            return (v & 0x3FFF) + 1, ((v >> 14) & 0x3FFF) + 1
+    return None
 
 
 def rewrite(body: str, source: str) -> str:
@@ -171,7 +168,9 @@ def rewrite(body: str, source: str) -> str:
             if f.is_file():
                 (OUT / "media").mkdir(parents=True, exist_ok=True)
                 shutil.copy(f, OUT / "media" / f.name)
-                return f'src="media/{f.name}"'
+                wh = image_size(f)
+                size = f' width="{wh[0]}" height="{wh[1]}"' if wh else ""
+                return f'src="media/{f.name}"{size} loading="lazy" decoding="async"'
             return f'src="{REPO}/raw/main/{target}"'
         if target in BY_SOURCE:
             return f'href="{BY_SOURCE[target]}.html{frag}"'
@@ -195,12 +194,10 @@ def main() -> int:
     if OUT.exists():
         shutil.rmtree(OUT)
     OUT.mkdir(parents=True)
-    urls = ["", "docs/"]
+    urls = ["", "docs/", "recipes/"]
     for slug, source, title, desc in PAGES:
         text = (ROOT / source).read_text(encoding="utf-8")
         body = rewrite(render(text), source)
-        if slug == "verification":
-            body = VERIFIED_INTRO + body.replace("<h1>Verification</h1>", '<h2 id="record">The test record</h2>', 1)
         src = f'<p class="src">Source: <a href="{REPO}/blob/main/{source}">{source}</a></p>'
         page = PAGE.format(title=html.escape(title), desc=html.escape(desc), file=f"{slug}.html", base=BASE, repo=REPO,
                            nav=nav(slug), src=src, body=body)
@@ -210,9 +207,10 @@ def main() -> int:
 
     items = "\n".join(f'<li><a href="{slug}.html"><b>{html.escape(title)}</b><span>{html.escape(desc)}</span></a></li>'
                       for slug, _, title, desc in PAGES)
-    index = (f"<h1>Docs</h1>\n<p>These pages are built from the markdown in the repository. "
-             f'If a page and the code disagree, <a href="{REPO}/issues">open an issue</a>.</p>\n<ul class="docs-index">\n{items}\n</ul>')
-    (OUT / "index.html").write_text(PAGE.format(title="Docs", desc="Form Studio documentation: the app, MCP tools, recipes, verification.",
+    index = (f"<h1>Documentation</h1>\n<p class=\"lede\">How to use Form Studio, from the desktop app to the command line and the "
+             f'MCP server, and how to extend it with recipes. Spotted something wrong? <a href="{REPO}/issues/new?template=6-docs.yml">Tell us</a>.</p>\n'
+             f'<ul class="docs-index">\n{items}\n</ul>')
+    (OUT / "index.html").write_text(PAGE.format(title="Docs", desc="Form Studio documentation: features, the desktop app, the command line, MCP tools, recipes, architecture and compatibility.",
                                                 file="", base=BASE, repo=REPO, nav=nav("index"), src="", body=index), encoding="utf-8")
 
     today = _dt.date.today().isoformat()

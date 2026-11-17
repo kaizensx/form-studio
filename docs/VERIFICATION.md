@@ -12,12 +12,12 @@ every change.
 
 ## Platforms
 
-| Platform | App bundle | Engine tests | Packaged app starts | Interface journeys | Real slices |
-|---|---|---|---|---|---|
-| macOS, Apple Silicon | `FORM-macos-arm64.zip` | CI | CI | Supported | Supported |
-| macOS, Intel | `FORM-macos-x64.zip` | CI | CI | Supported | Supported |
-| Windows 10 and 11, x64 | `FORM-windows-x64.zip` | CI | CI | CI | CI |
-| Linux x64 (glibc 2.35+) | `FORM-linux-x64.tar.gz` | CI | CI | CI | CI |
+| Platform | Engine tests | Packaged app starts | Interface journeys | Real slices |
+|---|---|---|---|---|
+| macOS, Apple Silicon | CI | CI | Supported | Supported |
+| macOS, Intel | CI | CI | Supported | Supported |
+| Windows 10 and 11, x64 | CI | CI | CI | CI |
+| Linux x64 (glibc 2.35+) | CI | CI | CI | CI |
 
 - **Engine tests:** the full test suite on the real CAD kernel.
 - **Packaged app starts:** the built bundle is launched; its window must load, the engine must answer and the CAD kernel
