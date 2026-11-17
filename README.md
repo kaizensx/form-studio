@@ -91,12 +91,13 @@ FORM drives existing software instead of replacing it. On first launch it shows 
 |---|---|---|
 | **build123d / OpenCascade** | The CAD kernel: every solid, STEP, B-rep checks | yes |
 | **Bambu Studio** | Slices with your printer, filament and process presets | yes |
-| **OrcaSlicer, PrusaSlicer** (SuperSlicer, QIDISlicer) | Same, picked automatically or in the Slicer sheet | fixtures only |
+| **PrusaSlicer** | Same, picked automatically or in the Slicer sheet | yes (2.9.7: a full slice, layers, simulation, cost) |
+| **OrcaSlicer** (SuperSlicer, QIDISlicer) | Same | OrcaSlicer 2.5.1 is detected; a slice waits on its first-run printer setup. The others: fixtures only |
 | **OpenSCAD** | Designs written in `.scad`; Customizer ranges become parameters | yes |
 | **Blender** | Illustrative renders; its 3D-Print Toolbox checks when installed | renders yes |
-| **FreeCAD** | Open the STEP, an optional re-import check, a macro with every parameter | fixtures only |
+| **FreeCAD** | Open the STEP, an optional re-import check, a macro with every parameter | yes (1.1.4: re-check and macro) |
 | **STEP / STL from makers** | Imported as reference parts to design around | yes |
-| **Claude Code, Codex, Gemini CLI, Cursor** | Use FORM's 44 MCP tools; the app follows along live | Claude Code, Codex |
+| **Claude Code, Codex, Gemini CLI, Cursor** | Use FORM's 44 MCP tools; the app follows along live. Claude Code and Codex also chat inside the app | Claude Code, Codex |
 
 <table><tr>
 <td width="50%"><img src="docs/screenshots/app-reference-part.jpg" alt="A board imported as a STEP file, drawn in blueprint inside the case being designed"></td>
@@ -311,11 +312,11 @@ While it's open, it follows what agents change, and labels each revision with th
 
 ## Status and roadmap
 
-The engine is tested on macOS (Apple Silicon, full pipeline with slicing) and Linux (Ubuntu in CI: all tests, no slicer). The desktop app was built, packaged and run on macOS (Apple Silicon). The Windows, Linux and Intel macOS app bundles are built by CI and have not been run by a person yet; please report what you find.
+The engine's tests run on macOS, Windows and Linux in CI (no slicer there; slicing is tested on a Mac with Bambu Studio and PrusaSlicer). Every build also launches the packaged app on each platform and requires its interface to load and its CAD kernel to start. The macOS Apple Silicon app was also used by hand. Nobody has used the Windows, Linux or Intel macOS app by hand yet; please report what you find.
 
 Not verified yet, and wanted next:
 
-- OrcaSlicer, PrusaSlicer and FreeCAD runs on real installations (the adapters are tested against fixtures)
+- a real OrcaSlicer slice (it is detected; its first-run setup has to be done once), SuperSlicer, QIDISlicer and Gemini CLI
 - signed and notarized app bundles, and in-app updates beyond a notice
 - printer monitoring (left off on purpose until it can be read-only and local)
 - scan-to-CAD and photo-to-dimensions

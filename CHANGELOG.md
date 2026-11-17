@@ -1,5 +1,17 @@
 # Changelog
 
+## 11.0.1
+
+Run against the real programs for the first time, and fixed what that showed.
+
+- **Codex works in the app.** FORM passed Claude's default model name to Codex, which refused it. The default model and effort now belong to the default agent only. In a live run Codex called FORM's `get_project` tool and answered correctly. Codex notices are shown quietly instead of as errors.
+- **PrusaSlicer 2.9.7:** a real slice of the phone dock ran through FORM, and the layers, print simulation and cost all read its G-code. Presets pinned in `studio.toml` now resolve from the bundles PrusaSlicer ships, so it does not have to be opened first.
+- **FreeCAD 1.1.4:** the re-import check and the generated macro both ran. The check now uses FreeCAD's exact bounding box; the default one is padded on curved faces and made the check warn.
+- **OrcaSlicer 2.5.1** is found and reported. It keeps its printer profiles packed until its own first-run setup is done, so FORM says so and waits.
+- **Installer:** the parts libraries, OrcaSlicer, PrusaSlicer and FreeCAD were installed for real through `form install`.
+- **Every build launches the packaged app** on macOS, Windows and Linux and requires the interface to load and the CAD kernel to start (`--check` now reports the kernel).
+- **Windows:** conversation times always move forward, so "most recent" is right on a coarse clock.
+
 ## 11.0.0
 
 ### One app, zero terminal

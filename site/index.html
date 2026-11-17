@@ -291,10 +291,11 @@ features = [<span class="f">Feature</span>(<span class="st">"plate"</span>, <spa
       <tbody>
         <tr><td>build123d / OpenCascade</td><td>The CAD kernel: every solid, STEP export and B-rep check.</td><td><span class="tag pass">run for real</span></td></tr>
         <tr><td>Bambu Studio</td><td>Slices with your printer, filament and process presets.</td><td><span class="tag pass">run for real</span></td></tr>
-        <tr><td>OrcaSlicer, PrusaSlicer <small>also SuperSlicer, QIDISlicer</small></td><td>The same, picked automatically or in the Slicer sheet.</td><td><span class="tag amber">fixtures only</span></td></tr>
+        <tr><td>PrusaSlicer</td><td>The same, picked automatically or in the Slicer sheet.</td><td><span class="tag pass">run for real</span></td></tr>
+        <tr><td>OrcaSlicer <small>also SuperSlicer, QIDISlicer</small></td><td>The same. OrcaSlicer is detected; a slice waits on its own first-run printer setup.</td><td><span class="tag amber">fixtures only</span></td></tr>
         <tr><td>OpenSCAD</td><td>Designs written in <code>.scad</code>. Customizer ranges become parameters.</td><td><span class="tag pass">run for real</span></td></tr>
         <tr><td>Blender</td><td>Illustrative renders of the current revision, and its 3D-Print Toolbox checks when the add-on is installed.</td><td><span class="tag pass">renders run</span></td></tr>
-        <tr><td>FreeCAD</td><td>Opens the STEP, an optional re-import check, and a macro with every parameter.</td><td><span class="tag amber">fixtures only</span></td></tr>
+        <tr><td>FreeCAD</td><td>Opens the STEP, an optional re-import check, and a macro with every parameter.</td><td><span class="tag pass">run for real</span></td></tr>
         <tr><td>STEP and STL from makers</td><td>Imported as reference parts to design around.</td><td><span class="tag pass">run for real</span></td></tr>
         <tr><td>Claude Code, Codex <small>also Gemini CLI, Cursor, Claude Desktop</small></td><td>Use FORM's 31 MCP tools. The open app follows along live.</td><td><span class="tag pass">Claude Code, Codex</span></td></tr>
       </tbody>
@@ -447,7 +448,7 @@ I can't approve it. Review it on the bench.</span>
       <span id="rel-text">Downloads are on the GitHub releases page.</span>
       <a href="https://github.com/kaizensx/form-studio/actions/workflows/app.yml">Builds of every push</a>
     </p>
-    <p class="compat-note">The app was built, packaged and run on an Apple Silicon Mac. The Windows, Linux and Intel macOS bundles are built by CI and have not been run by a person yet. Please report what you find.</p>
+    <p class="compat-note">The app was built, packaged and used by hand on an Apple Silicon Mac. Every build also launches the Windows, Linux and macOS bundles and requires the interface to load and the CAD kernel to start. Nobody has used the Windows, Linux or Intel macOS app by hand yet. Please report what you find.</p>
 
     <div class="cmds">
       <div class="reveal">
