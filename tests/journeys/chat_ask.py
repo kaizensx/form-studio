@@ -113,8 +113,17 @@ def run(ui):
     ui.click(ui.find("changeCompare", within=card))
     ui.wait_until(lambda: ui.js("!!Store.compare && Store.compare.rev === 1"), 20, "the comparison with r01")
     ui.click(ui.find("changeUndo", within=card))
-    ui.click(ui.wait_until(lambda: ui.find("changeUndoYes", within=card), 5, "the confirmation"))
-    ui.wait_until(lambda: ui.api("/projects/" + pid)["project"]["head"] == 1, 20, "the head to go back to r01")
+    for attempt in range(3):              # the confirmation slides in: click once it has settled, again if it missed
+        yes = ui.wait_until(lambda: ui.find("changeUndoYes", within=card), 5, "the confirmation")
+        ui.settle(350)
+        if yes.property("visible"):
+            ui.click(yes)
+        try:
+            ui.wait_until(lambda: ui.api("/projects/" + pid)["project"]["head"] == 1, 8 if attempt < 2 else 20, "the head to go back to r01")
+            break
+        except Exception:
+            if attempt == 2:
+                raise
     ui.settle(300)
 
     # ── opening a conversation opens its design ──
