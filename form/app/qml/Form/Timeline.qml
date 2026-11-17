@@ -5,11 +5,11 @@ import "F.js" as F
 
 // Revision timeline: one tick per revision, hover for a live thumbnail, drag to scrub, play to morph through them.
 // Scrubbing only looks (the engine's /view?rev=); "Branch from here" checks that revision out.
-// Fills the viewport area: a strip above the pipeline, a cross-fade layer over the 3D view, a read-only banner.
+// It is the history row of the workspace's bottom strip, above the pipeline (which is "now"). The picture
+// cross-fades through the viewport's own swap (Store.fadeTo); the "viewing only" notice is drawn by the workspace.
 Item {
     id: tl
-    property Item viewport: null
-    property real bottomInset: 82
+    property bool narrow: width < 620
     readonly property var revs: Store.revList
     readonly property int headRev: Store.project ? Store.project.head : 0
     readonly property int current: Store.scrub ? Store.scrub.rev : headRev
@@ -18,124 +18,89 @@ Item {
     property bool exporting: false
     function rev(i) { return i >= 0 && i < revs.length ? revs[i] : null }
     function indexOf(n) { for (var i = 0; i < revs.length; i++) if (revs[i].n === n) return i; return -1 }
+    implicitHeight: 40
 
-    // ── cross-fade: keep the old picture on top while the geometry underneath is swapped, then let it go ──
-    property var grab: null
-    Connections {
-        target: Store
-        function onFadeTo(apply) {
-            if (!tl.viewport || !tl.visible) { apply(); return }
-            var ok = tl.viewport.grabToImage(function (res) {
-                tl.grab = res; shot.source = res.url; shot.opacity = 1
-                apply(); fade.restart()
-            })
-            if (!ok) apply()
+    Btn { id: play; x: 8; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "quiet"
+        icon: Store.morphing ? "pause" : "play"; enabled: tl.revs.length > 1
+        tip: tl.revs.length > 1 ? "Play through every revision" : "There is only one revision"
+        onClicked: Store.playMorph() }
+
+    Item {
+        id: track
+        anchors.left: play.right; anchors.leftMargin: 10; anchors.right: side.left; anchors.rightMargin: 14     // the ticks get what the text leaves
+        height: parent.height
+        readonly property real gap: tl.revs.length > 1 ? Math.min(46, Math.max(3, (width - 28) / (tl.revs.length - 1))) : 0
+        function tickX(i) { return 14 + i * gap }
+        function at(mx) { return gap > 0 ? Math.max(0, Math.min(tl.revs.length - 1, Math.round((mx - 14) / gap))) : 0 }
+        Rectangle { x: 14; y: Math.round(parent.height / 2); width: Math.max(0, track.tickX(tl.revs.length - 1) - 14); height: 1; color: Theme.rule2 }
+        // where the view is now
+        Rectangle {
+            readonly property int i: tl.indexOf(tl.current)
+            visible: i >= 0; x: track.tickX(i) - 9; y: 7; width: 18; height: parent.height - 14; radius: Theme.rXs
+            color: Theme.alpha(Store.scrub ? Theme.blueprint : Theme.datum, 0.14); border.color: Theme.alpha(Store.scrub ? Theme.blueprint : Theme.datum, 0.45)
+            Behavior on x { enabled: !tm.pressed; NumberAnimation { duration: Motion.move(Motion.ui); easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+        }
+        Repeater {
+            model: tl.revs
+            Item {
+                id: tick
+                required property var modelData
+                required property int index
+                readonly property bool isHead: modelData.n === tl.headRev
+                readonly property bool agent: (modelData.origin || "").indexOf("agent") === 0
+                x: track.tickX(index) - 1; width: 2; height: track.height
+                Rectangle { anchors.horizontalCenter: parent.horizontalCenter; anchors.verticalCenter: parent.verticalCenter
+                    width: 2; height: tick.isHead ? 18 : tl.hover === tick.index ? 16 : 12; radius: 1
+                    color: tick.isHead ? Theme.datum : tl.hover === tick.index ? Theme.ink : Theme.ink3 }
+                // made by an agent: a ring above the tick (shape, not colour)
+                Rectangle { visible: tick.agent; anchors.horizontalCenter: parent.horizontalCenter; y: 5; width: 5; height: 5; radius: 2.5
+                    color: "transparent"; border.color: Theme.ink2 }
+                // released: settled evidence
+                Rectangle { visible: tl.released.indexOf(tick.modelData.n) >= 0; anchors.horizontalCenter: parent.horizontalCenter; y: parent.height - 9
+                    width: 4; height: 4; radius: 2; color: Theme.pass }
+            }
+        }
+        MouseArea {
+            id: tm
+            anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+            onPositionChanged: function (e) {
+                var i = track.at(e.x); Store.tlHover = i
+                if (pressed && tl.rev(i) && tl.rev(i).n !== tl.current) { Store.stopMorph(); Store.showRev(tl.rev(i).n, false) }
+            }
+            onPressed: function (e) { var i = track.at(e.x); Store.tlHover = i; Store.stopMorph(); if (tl.rev(i) && tl.rev(i).n !== tl.current) Store.showRev(tl.rev(i).n, true) }
+            onExited: Store.tlHover = -1
         }
     }
-    Image { id: shot; anchors.fill: parent; opacity: 0; visible: opacity > 0; cache: false; smooth: true }
-    NumberAnimation { id: fade; target: shot; property: "opacity"; from: 1; to: 0; duration: Theme.slow; easing.type: Easing.OutCubic }
 
-    // ── read-only banner while another revision is on screen ──
-    Rectangle {
-        visible: !!Store.scrub; x: 16; y: Store.hasDraft || Store.compare ? 46 : 14
-        width: bn.implicitWidth + 24; height: 30; radius: Theme.rSm
-        color: Theme.alpha(Theme.plate1, 0.92); border.color: Theme.alpha(Theme.blueprint, 0.4)
-        Row { id: bn; anchors.centerIn: parent; spacing: 10
-            Txt { mono: true; font.pixelSize: 12; color: Theme.blueprint; text: Store.scrub ? F.pad(Store.scrub.rev) : ""; anchors.verticalCenter: parent.verticalCenter }
-            Txt { font.pixelSize: 12; tone: 2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
-                text: Store.morphing ? "Playing the history · head is " + F.pad(tl.headRev) : "Viewing only · head is still " + F.pad(tl.headRev) }
-            Btn { small: true; kind: "quiet"; text: "Back to head"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.endScrub() } }
-    }
-
-    // ── the strip ──
-    Rectangle {
-        id: strip
-        visible: Store.timelineOpen && !!Store.project
-        x: 12; width: parent.width - 24; height: 42; y: parent.height - tl.bottomInset - height + 4
-        radius: Theme.rLg; color: Theme.alpha(Theme.plate1, 0.9); border.color: Theme.rule
-
-        Btn { id: play; x: 8; anchors.verticalCenter: parent.verticalCenter; small: true; kind: "quiet"
-            icon: Store.morphing ? "pause" : "play"; enabled: tl.revs.length > 1
-            tip: tl.revs.length > 1 ? "Play through every revision" : "There is only one revision"
-            onClicked: Store.playMorph() }
-
-        Item {
-            id: track
-            anchors.left: play.right; anchors.leftMargin: 10; anchors.right: side.left; anchors.rightMargin: 14     // the ticks get what the text leaves
-            height: parent.height
-            readonly property real gap: tl.revs.length > 1 ? Math.min(46, Math.max(3, (width - 28) / (tl.revs.length - 1))) : 0
-            function tickX(i) { return 14 + i * gap }
-            function at(mx) { return gap > 0 ? Math.max(0, Math.min(tl.revs.length - 1, Math.round((mx - 14) / gap))) : 0 }
-            Rectangle { x: 14; y: parent.height / 2; width: Math.max(0, track.tickX(tl.revs.length - 1) - 14); height: 1; color: Theme.rule2 }
-            // where the view is now
-            Rectangle {
-                readonly property int i: tl.indexOf(tl.current)
-                visible: i >= 0; x: track.tickX(i) - 9; y: 7; width: 18; height: parent.height - 14; radius: Theme.rXs
-                color: Theme.alpha(Store.scrub ? Theme.blueprint : Theme.datum, 0.14); border.color: Theme.alpha(Store.scrub ? Theme.blueprint : Theme.datum, 0.45)
-                Behavior on x { enabled: !tm.pressed; NumberAnimation { duration: Theme.base; easing.type: Easing.OutCubic } }
-            }
-            Repeater {
-                model: tl.revs
-                Item {
-                    id: tick
-                    required property var modelData
-                    required property int index
-                    readonly property bool isHead: modelData.n === tl.headRev
-                    readonly property bool agent: (modelData.origin || "").indexOf("agent") === 0
-                    x: track.tickX(index) - 1; width: 2; height: track.height
-                    Rectangle { anchors.horizontalCenter: parent.horizontalCenter; anchors.verticalCenter: parent.verticalCenter
-                        width: 2; height: tick.isHead ? 18 : 12; radius: 1
-                        color: tick.isHead ? Theme.datum : tl.hover === tick.index ? Theme.ink : Theme.ink3 }
-                    // made by an agent: a ring above the tick (shape, not colour)
-                    Rectangle { visible: tick.agent; anchors.horizontalCenter: parent.horizontalCenter; y: 6; width: 5; height: 5; radius: 2.5
-                        color: "transparent"; border.color: Theme.ink2 }
-                    // released: settled evidence
-                    Rectangle { visible: tl.released.indexOf(tick.modelData.n) >= 0; anchors.horizontalCenter: parent.horizontalCenter; y: parent.height - 10
-                        width: 4; height: 4; radius: 2; color: Theme.pass }
-                }
-            }
-            MouseArea {
-                id: tm
-                anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                onPositionChanged: function (e) {
-                    var i = track.at(e.x); Store.tlHover = i
-                    if (pressed && tl.rev(i) && tl.rev(i).n !== tl.current) { Store.stopMorph(); Store.showRev(tl.rev(i).n, false) }
-                }
-                onPressed: function (e) { var i = track.at(e.x); Store.tlHover = i; Store.stopMorph(); if (tl.rev(i) && tl.rev(i).n !== tl.current) Store.showRev(tl.rev(i).n, true) }
-                onExited: Store.tlHover = -1
-            }
-        }
-
-        Row {
-            id: side; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 4
-            readonly property var r: tl.rev(tl.hover >= 0 ? tl.hover : tl.indexOf(tl.current))
-            Txt { mono: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter; text: side.r ? F.pad(side.r.n) : ""
-                color: side.r && side.r.n === tl.headRev ? Theme.datum : Theme.ink }
-            Txt { font.pixelSize: 12; tone: 2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
-                text: side.r ? "by " + Store.who(side.r.origin) + " · " + F.ago(side.r.ts) : "" }
-            Txt { font.pixelSize: 12; tone: 3; anchors.verticalCenter: parent.verticalCenter; width: Math.min(implicitWidth, Math.max(60, strip.width * 0.14)); elide: Text.ElideRight; wrapMode: Text.NoWrap
-                text: side.r ? (side.r.summary || side.r.note || "") : "" }
-            Item { width: 6; height: 1 }
-            Btn { small: true; kind: Store.scrub ? "default" : "quiet"; icon: "git_branch"; text: "Branch from here"; anchors.verticalCenter: parent.verticalCenter
-                enabled: !!Store.scrub && !Store.hasDraft && !Store.morphing
-                tip: Store.hasDraft ? "Commit or discard the draft first" : "Make this revision the head. Nothing is deleted; later revisions stay."
-                onClicked: Store.branchFrom(Store.scrub.rev) }
-            Btn { small: true; kind: "quiet"; icon: tl.exporting ? "loader_circle" : "film"; anchors.verticalCenter: parent.verticalCenter
-                enabled: !tl.exporting && tl.revs.length > 1; tip: tl.exporting ? "Rendering every revision…" : "Export the history as a GIF or animated WebP"
-                onClicked: { dlg.currentFolder = Bridge.downloads(); dlg.currentFile = Bridge.downloads() + "/" + Store.pid + "_history.gif"; dlg.open() } }
-            Btn { small: true; kind: "quiet"; icon: "x"; anchors.verticalCenter: parent.verticalCenter; tip: "Close the timeline"
-                onClicked: { Store.timelineOpen = false; Store.endScrub() } }
-        }
+    Row {
+        id: side; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 4
+        readonly property var r: tl.rev(tl.hover >= 0 ? tl.hover : tl.indexOf(tl.current))
+        Txt { mono: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter; text: side.r ? F.pad(side.r.n) : ""
+            color: side.r && side.r.n === tl.headRev ? Theme.datum : Theme.ink }
+        Txt { font.pixelSize: 12; tone: 2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; visible: !tl.narrow
+            text: side.r ? "by " + Store.who(side.r.origin) + " · " + F.ago(side.r.ts) : "" }
+        Txt { font.pixelSize: 12; tone: 3; anchors.verticalCenter: parent.verticalCenter; width: Math.min(implicitWidth, Math.max(60, tl.width * 0.14)); elide: Text.ElideRight; wrapMode: Text.NoWrap
+            visible: !tl.narrow; text: side.r ? (side.r.summary || side.r.note || "") : "" }
+        Item { width: 6; height: 1 }
+        Btn { small: true; kind: Store.scrub ? "default" : "quiet"; icon: "git_branch"; text: tl.narrow ? "" : "Branch from here"; anchors.verticalCenter: parent.verticalCenter
+            enabled: !!Store.scrub && !Store.hasDraft && !Store.morphing
+            tip: Store.hasDraft ? "Commit or discard the draft first" : "Branch from here: make this revision the head. Nothing is deleted; later revisions stay."
+            onClicked: Store.branchFrom(Store.scrub.rev) }
+        Btn { small: true; kind: "quiet"; icon: tl.exporting ? "loader_circle" : "film"; anchors.verticalCenter: parent.verticalCenter
+            enabled: !tl.exporting && tl.revs.length > 1; tip: tl.exporting ? "Rendering every revision…" : "Export the history as a GIF or animated WebP"
+            onClicked: { dlg.currentFolder = Bridge.downloads(); dlg.currentFile = Bridge.downloads() + "/" + Store.pid + "_history.gif"; dlg.open() } }
+        Btn { small: true; kind: "quiet"; icon: "x"; anchors.verticalCenter: parent.verticalCenter; tip: "Close the timeline"
+            onClicked: { Store.timelineOpen = false; Store.endScrub() } }
     }
 
     // ── hover card: that revision's real geometry, turning ──
     Rectangle {
         id: card
         readonly property var r: tl.rev(tl.hover)
-        visible: strip.visible && !!r
+        visible: tl.visible && !!r
         width: 204; height: 196; radius: Theme.rMd; color: Theme.plate2; border.color: Theme.rule2; z: 3
-        x: Math.max(12, Math.min(tl.width - width - 12, strip.x + track.x + track.tickX(Math.max(0, tl.hover)) - width / 2))
-        y: strip.y - height - 46          // above the viewport's own status row
+        x: Math.max(0, Math.min(tl.width - width, track.x + track.tickX(Math.max(0, tl.hover)) - width / 2))
+        y: -height - 14
         onRChanged: mini.show(r ? r.n : 0)
         Rectangle { x: 6; y: 6; width: parent.width - 12; height: 118; radius: Theme.rSm; color: Theme.plate; clip: true
             Viewport {
@@ -143,7 +108,7 @@ Item {
                 property int want: 0
                 property bool ready: false
                 opacity: ready ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: Theme.base } }
+                Behavior on opacity { NumberAnimation { duration: Motion.ui } }
                 function show(n) {
                     want = n
                     if (!n) return

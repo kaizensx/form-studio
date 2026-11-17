@@ -30,7 +30,11 @@ Item {
     readonly property var types: info ? info.types : []
     readonly property var special: ["Bridge", "Overhang wall", "Floating vertical shell"]
     readonly property bool onlySpecial: types.length > 0 && types.every(function (t) { return (special.indexOf(t) >= 0) !== !!hidden[t] })
-    readonly property int foot: bar.height + 84 + 10   // kept clear at the bottom: transport and the pipeline strip
+    property real leftInset: 12                // the workspace's tool rail stays on screen at the left
+    readonly property bool narrow: width < 640 // a narrow viewport: controls stack, the line types fold away
+    property bool typesFold: narrow
+    property real stripHeight: 60              // the workspace's bottom strip (pipeline), with its margin
+    readonly property int foot: bar.height + stripHeight + 12 + 10   // kept clear at the bottom: transport and the pipeline strip
 
     readonly property var inks: ({
         "Outer wall": Theme.ink, "Inner wall": Theme.ink3, "Sparse infill": Theme.amber,
@@ -143,20 +147,24 @@ Item {
             GradientStop { position: 0.8; color: "transparent" } GradientStop { position: 1; color: Theme.alpha(Theme.plate, 0.7) } } }
 
     // ── top left: way back, and what this is ─────────────────
-    Column { x: 16; y: 14; spacing: 10
+    Column { x: sim.leftInset + 4; y: 14; spacing: 10
         Row { spacing: 10
-            Btn { icon: "arrow_left"; text: "Back to the design"; onClicked: Store.showLayers(false) }
+            Btn { icon: "arrow_left"; text: sim.narrow ? "Back" : "Back to the design"; onClicked: Store.showLayers(false) }
             Tag { text: "simulated"; anchors.verticalCenter: parent.verticalCenter } }
-        Txt { kind: "fine"; tone: 2; text: "Simulated from the slicer's G-code. Not a print."; wrapMode: Text.NoWrap }
+        Item { width: 1; height: 24; visible: sim.narrow }       // the view controls take this row when it is narrow
+        Txt { kind: "fine"; tone: 2; text: "Simulated from the slicer's G-code. Not a print."; width: Math.min(implicitWidth, sim.width - sim.leftInset - 20) }
 
         // line types: click to hide or show
         Rectangle { visible: sim.types.length > 0 && sim.mode !== "plate"
             width: 214; height: lg.implicitHeight + 16; radius: Theme.rMd; color: Theme.alpha(Theme.plate1, 0.9); border.color: Theme.rule
             Column { id: lg; x: 6; y: 8; width: parent.width - 12; spacing: 0
                 Item { width: parent.width; height: 22
-                    Txt { kind: "cap"; x: 6; text: "Line types"; anchors.verticalCenter: parent.verticalCenter }
-                    Txt { kind: "fine"; anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter; text: "m of path" } }
-                Repeater { model: sim.types
+                    Icon { x: 4; name: "chevron_down"; size: 12; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter; rotation: sim.typesFold ? -90 : 0 }
+                    Txt { kind: "cap"; x: 22; text: "Line types"; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { kind: "fine"; anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
+                        text: sim.typesFold ? (F.keys(sim.hidden).length ? F.keys(sim.hidden).length + " hidden" : "all shown") : "m of path" }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: sim.typesFold = !sim.typesFold } }
+                Repeater { model: sim.typesFold ? [] : sim.types
                     Rectangle { id: tr; required property string modelData
                         readonly property bool on: !sim.hidden[modelData]
                         width: parent.width; height: 22; radius: Theme.rXs; color: tma.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : "transparent"
@@ -167,8 +175,8 @@ Item {
                         Txt { mono: true; font.pixelSize: 11; tone: tr.on ? 3 : 4; anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter
                             text: sim.info ? F.fmt(sim.info.type_length_mm[tr.modelData] / 1000, 1) : "" }
                         MouseArea { id: tma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: sim.toggleType(tr.modelData) } } }
-                Item { width: parent.width; height: 6 }
-                Row { x: 6; spacing: 6
+                Item { width: parent.width; height: 6; visible: !sim.typesFold }
+                Row { x: 6; spacing: 6; visible: !sim.typesFold
                     Btn { small: true; text: "All"; enabled: F.keys(sim.hidden).length > 0; onClicked: sim.showOnly(null) }
                     Btn { small: true; text: "Bridges and overhangs"; active: sim.onlySpecial
                         enabled: sim.types.some(function (t) { return sim.special.indexOf(t) >= 0 })
@@ -179,16 +187,16 @@ Item {
     }
 
     // ── top right: how to look at it ─────────────────────────
-    Column { anchors.right: parent.right; anchors.rightMargin: 16; y: 14; spacing: 8
+    Column { anchors.right: parent.right; anchors.rightMargin: 12; y: sim.narrow ? 50 : 14; spacing: 8
         Row { anchors.right: parent.right; spacing: 8
-            Btn { kind: "quiet"; icon: "ghost"; text: "Ghost"; active: sim.ghost; visible: sim.mode === "3d"
-                tip: "Show the toolpaths still to come, faintly"; onClicked: sim.ghost = !sim.ghost }
+            Btn { kind: "quiet"; icon: "ghost"; text: sim.narrow ? "" : "Ghost"; active: sim.ghost; visible: sim.mode === "3d"
+                tip: "Ghost: show the toolpaths still to come, faintly"; onClicked: sim.ghost = !sim.ghost }
             Btn { kind: "quiet"; icon: "maximize_2"; tip: "Frame the print"; onClicked: view.frame(true) }
             Seg { model: [{ value: "3d", text: "3D" }, { value: "2d", text: "Layer" }, { value: "plate", text: "Copies" }]
                 value: sim.mode; onPicked: function (m) { sim.pause(); sim.mode = m } } }
         // copies on the plate
         Rectangle { visible: sim.mode === "plate"; anchors.right: parent.right
-            width: 300; height: pk.implicitHeight + 24; radius: Theme.rMd; color: Theme.alpha(Theme.plate1, 0.94); border.color: Theme.rule
+            width: Math.min(300, sim.width - sim.leftInset - 20); height: pk.implicitHeight + 24; radius: Theme.rMd; color: Theme.alpha(Theme.plate1, 0.94); border.color: Theme.rule
             Column { id: pk; x: 14; y: 12; width: parent.width - 28; spacing: 8
                 Item { width: parent.width; height: 28
                     Txt { text: "Copies on one plate"; font.weight: 600; anchors.verticalCenter: parent.verticalCenter }
@@ -216,7 +224,7 @@ Item {
         id: bar
         sim: sim
         visible: sim.mode !== "plate"
-        anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 84
-        width: Math.min(parent.width - 32, 780)
+        anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: sim.stripHeight + 12
+        width: Math.min(parent.width - 24, 780)
     }
 }

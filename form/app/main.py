@@ -35,6 +35,27 @@ def _engine(cfg):
     return st, httpd
 
 
+def _reduced_motion() -> bool:
+    """The system's "reduce motion" setting, or FORM_REDUCED_MOTION=1/0. Read once at start (Motion.qml)."""
+    env = os.environ.get("FORM_REDUCED_MOTION", "").strip().lower()
+    if env:
+        return env not in ("0", "false", "no", "off")
+    try:
+        if sys.platform == "darwin":
+            import subprocess
+            r = subprocess.run(["defaults", "read", "com.apple.universalaccess", "reduceMotion"],
+                               capture_output=True, text=True, timeout=2)
+            return r.stdout.strip() == "1"
+        if sys.platform == "win32":
+            import ctypes
+            on = ctypes.c_int(1)
+            ctypes.windll.user32.SystemParametersInfoW(0x1042, 0, ctypes.byref(on), 0)   # SPI_GETCLIENTAREAANIMATION
+            return on.value == 0
+    except Exception:
+        pass
+    return False
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="form app", description="FORM desktop app")
     ap.add_argument("--check", action="store_true", help="load the interface, report QML errors, quit")
@@ -79,6 +100,7 @@ def main(argv=None) -> int:
     errors: list[str] = []
     engine.warnings.connect(lambda ws: errors.extend(w.toString() for w in ws))
     engine.addImportPath(str(HERE / "qml"))
+    engine.rootContext().setContextProperty("formReducedMotion", _reduced_motion())      # Motion.qml
     w, h = (int(x) for x in args.size.lower().split("x"))
     engine.setInitialProperties({"startProject": args.project or "", "startStage": args.stage or "",
                                  "headless": bool(args.shot or args.check), "width": w, "height": h})

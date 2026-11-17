@@ -35,8 +35,30 @@ Column {
         }, function (e) { root.busy = false; Store.fail(e) })
     }
 
-    Txt { tone: 2; width: parent.width; topPadding: 12
-        text: "Intent and what is actually known. Anything not measured is carried as an assumption all the way to release." }
+    // how the object's dimensions are known: one segment per dimension, coloured by its source
+    readonly property var sources: known.map(function (p) {
+        var pv = Object.assign({ source: "assumed" }, Store.head && Store.head.provenance[p.key] || {}, Store.draftProv[p.key] || {})
+        return { label: p.label, source: pv.source } })
+    readonly property int measured: sources.filter(function (x) { return x.source === "measured" }).length
+    function mix() {
+        var n = ({}), order = ["measured", "specified", "assumed", "photo"]
+        sources.forEach(function (x) { n[x.source] = (n[x.source] || 0) + 1 })
+        return order.filter(function (k) { return n[k] }).map(function (k) { return n[k] + " " + (k === "photo" ? "from photo" : k) }).join(" · ")
+    }
+    Column { visible: root.known.length > 0; width: parent.width; topPadding: 14; spacing: 10
+        Row { spacing: 10
+            Txt { id: big; kind: "hero"; mono: true; wrapMode: Text.NoWrap; text: root.measured + "/" + root.known.length
+                color: root.measured === root.known.length ? Theme.pass : Theme.ink }
+            Column { anchors.verticalCenter: big.verticalCenter; spacing: 4
+                Txt { tone: 2; text: "dimensions of the object measured" }
+                Txt { kind: "fine"; text: root.mix() } } }
+        Row { width: parent.width; height: 6; spacing: 3
+            Repeater { model: root.sources
+                Rectangle { required property var modelData
+                    width: (parent.width - 3 * (root.sources.length - 1)) / root.sources.length; height: 6; radius: 3
+                    color: Theme.alpha(Theme.evidence(modelData.source), modelData.source === "measured" ? 1 : 0.55)
+                    Behavior on color { ColorAnimation { duration: Motion.ui } } } } }
+    }
 
     Sec { title: "Intent"
         Area { id: intent; width: parent.width; minLines: 4
@@ -46,7 +68,8 @@ Column {
             Connections { target: root
                 function onBriefChanged() { if (!intent.area.activeFocus && intent.text !== (root.brief.text || "")) intent.text = root.brief.text || "" } } } }
 
-    Sec { title: "Answers from the brief"; note: root.brief.preset_title || ""
+    Item { width: 1; height: 10 }
+    Fold { title: "Answers from the brief"; note: root.brief.preset_title || ""; key: "brief.answers"
         visible: !!root.brief.answers && root.brief.answers.length > 0
         Column { width: parent.width
             Repeater { model: root.brief.answers || []
@@ -65,7 +88,7 @@ Column {
             Repeater { model: root.known
                 ParamRow { required property var modelData; p: modelData; prov: true } } } }
 
-    Sec { title: "Reference photos"; note: root.refs.length ? root.refs.length + " attached" : ""
+    Fold { title: "Reference photos"; note: root.refs.length ? root.refs.length + " attached" : "none"; key: "brief.photos"; openByDefault: root.refs.length > 0
         Txt { kind: "fine"; width: parent.width
             text: "A photo can give a rough dimension once you mark a known length in it. FORM treats photo values as ±0.6 mm or worse and never as a fit-critical measurement." }
         Column { width: parent.width; visible: root.refs.length > 0
@@ -76,7 +99,7 @@ Column {
                     Btn { kind: "quiet"; small: true; icon: "ruler"; text: "Measure"; onClicked: Store.openSheet("photo", { ref: rr.modelData }) } } } }
         Btn { text: "Attach photo"; icon: "image"; onClicked: dlg.open() } }
 
-    Sec { title: "Reference parts"; note: root.parts.length ? root.parts.length + " imported" : ""
+    Fold { title: "Reference parts"; note: root.parts.length ? root.parts.length + " imported" : "none"; key: "brief.parts"; openByDefault: root.parts.length > 0
         Txt { kind: "fine"; width: parent.width
             text: "A STEP or STL of something the design must fit around, such as a board from its maker. It is drawn in blueprint where its file places it. Designs written as code can cut around it with self.reference(\"name\")." }
         Column { width: parent.width; visible: root.parts.length > 0
@@ -88,7 +111,9 @@ Column {
                     Tag { text: pr.modelData.evidence || "computed"; anchors.verticalCenter: parent.verticalCenter } } } }
         Btn { text: "Import part…"; icon: "box"; onClicked: partDlg.open() } }
 
-    Sec { title: "Printer context"; tag: root.sl.available ? "specified" : ""
+    Fold { title: "Printer context"; key: "brief.printer"; openByDefault: !root.sl.available
+        note: root.sl.available ? root.sl.presets.machine.name : "slicer unavailable"; noteColor: root.sl.available ? Theme.ink3 : Theme.signal
+        Tag { visible: !!root.sl.available; text: "specified" }
         Column { width: parent.width; visible: !!root.sl.available
             KV { first: true; k: "Printer"; value: root.sl.available ? root.sl.presets.machine.name : "" }
             KV { k: "Material"; value: root.sl.available ? root.sl.presets.filament.name : "" }
@@ -110,5 +135,5 @@ Column {
         onAccepted: root.attach(selectedFile) }
     FileDialog { id: partDlg; title: "Import a reference part"; nameFilters: ["STEP or STL (*.step *.stp *.stl)"]
         onAccepted: Store.importPart(selectedFile) }
-    Connections { target: Store; function onImportPartRequested() { partDlg.open() } }
+    Connections { target: Store; function onImportPartRequested() { Ws.setOpen("brief.parts", true); partDlg.open() } }
 }

@@ -36,7 +36,7 @@ Item {
     property var _map: null                  // what is drawn (kept while fading out)
     property real mapMix: 0
     readonly property bool mapShown: !!_map
-    Behavior on mapMix { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+    Behavior on mapMix { NumberAnimation { duration: Motion.slow; easing.type: Easing.OutCubic } }
     onAnalysisChanged: { if (analysis) { mapOff.stop(); _map = analysis; mapMix = 1 } else { mapMix = 0; mapOff.restart() } }
     Timer { id: mapOff; interval: 300; onTriggered: if (!vp.analysis) vp._map = null }
     signal hoveredValue(real value, real x, real y, bool on)
@@ -63,7 +63,7 @@ Item {
     readonly property bool asmOn: !!asm && asmMode !== "print"
     onAsmModeChanged: { asmTween = true; _frame(); asmTweenOff.restart(); if (interactive && model && model.assembly) setView(Store.viewName, true) }
     onExplodeChanged: _frame()
-    Timer { id: asmTweenOff; interval: 360; onTriggered: vp.asmTween = false }
+    Timer { id: asmTweenOff; interval: Motion.part + 60 + Motion.stagger * (vp.asm ? Math.min(6, vp.asm.parts.length) : 0); onTriggered: vp.asmTween = false }
     function jointOf(id) {
         var js = asm ? asm.joints : []
         for (var i = 0; i < js.length; i++) if (js[i].part === id) return js[i]
@@ -102,7 +102,7 @@ Item {
         }
         bounds = { lo: lo.plus(sh), hi: hi.plus(sh) }
     }
-    Behavior on shift { enabled: vp.asmTween; Vector3dAnimation { duration: 320; easing.type: Easing.OutCubic } }
+    Behavior on shift { enabled: vp.asmTween; Vector3dAnimation { duration: Motion.part; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
 
     // ── camera (orbit around target; angles in degrees) ─────
     property vector3d target: Qt.vector3d(0, 0, 20)
@@ -110,11 +110,31 @@ Item {
     property real el: 28.4
     property real dist: 420
     property bool tween: false
-    Behavior on az { enabled: vp.tween; NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
-    Behavior on el { enabled: vp.tween; NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
-    Behavior on dist { enabled: vp.tween; NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
-    Behavior on target { enabled: vp.tween; Vector3dAnimation { duration: 420; easing.type: Easing.OutCubic } }
+    Behavior on az { enabled: vp.tween; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    Behavior on el { enabled: vp.tween; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    Behavior on dist { enabled: vp.tween; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    Behavior on target { enabled: vp.tween; Vector3dAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
 
+    // ── the free area: pixels the HUD covers on each side. The camera keeps the part in what is left, so a legend
+    // or an options bar never sits on it. The owner sets the targets; the camera glides there.
+    property real insetLeft: 0
+    property real insetRight: 0
+    property real insetTop: 0
+    property real insetBottom: 0
+    property bool insetGlide: false          // off until the first frame, so the view does not slide in on load
+    Behavior on insetLeft { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    Behavior on insetRight { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    Behavior on insetTop { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    Behavior on insetBottom { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    readonly property real freeW: Math.max(120, width - insetLeft - insetRight)
+    readonly property real freeH: Math.max(120, height - insetTop - insetBottom)
+    // pull back when the free area is much smaller than the view, so the framing keeps its margin
+    readonly property real fitK: Math.max(1, 0.78 * height / freeH, Math.min(1.5, 0.6 * height / freeW))
+    readonly property real mmPerPx: dist * fitK * 2 * Math.tan(13 * Math.PI / 180) / Math.max(1, height)
+
+    // which sides of the part face the camera (the dimension lines stand on those)
+    readonly property bool camRight: Math.sin(az * Math.PI / 180) > 0.02
+    readonly property bool camFront: Math.cos(az * Math.PI / 180) >= -0.02
     readonly property var views: ({ iso: [-34, 28.4], front: [0, 3.4], side: [90, 3.4], back: [153.4, 26], top: [0, 89], under: [-35.5, -41] })
     function scene(p) { return Qt.vector3d(p.x, p.z, -p.y) }           // Z-up millimetres → Qt Quick 3D's Y-up
     function center(b) { return Qt.vector3d((b.lo.x + b.hi.x) / 2, (b.lo.y + b.hi.y) / 2, (b.lo.z + b.hi.z) / 2) }
@@ -153,9 +173,22 @@ Item {
         tween = true; target = center(b); dist = Math.max(14, radius(b)) / Math.sin(13 * Math.PI / 180) * 1.9
     }
     function setModel(v) {
-        model = v
-        if (!v) return
-        _frame()
+        // a rebuilt part is shown, not popped: the last frame stays on top and fades while the new mesh is underneath.
+        // Rapid rebuilds (dragging a slider) skip it, so direct manipulation stays direct.
+        var now = Date.now(), calm = now - _lastModel > 420
+        _lastModel = now
+        if (model && v && calm && !_swapping && crossfade) swap(function () { vp.model = v; vp._frame() })
+        else { model = v; if (v) _frame() }
+    }
+    // ── cross-fade: the one mechanism for "the geometry changed" (drafts, commits, the timeline, Store.fadeTo) ──
+    property bool crossfade: interactive && !lite
+    property real _lastModel: 0
+    property bool _swapping: false
+    function swap(apply) {
+        if (!crossfade || !visible || width < 2) { apply(); return }
+        thaw.stop(); still.live = false; still.opacity = 1; still.z = 1
+        _swapping = true; apply(); _swapping = false
+        thaw.restart()
     }
     function setGhost(v) { ghost = v }
     function setSection(axis, t) { sectionAxis = axis || ""; sectionT = t === undefined ? 0.5 : t }
@@ -179,6 +212,9 @@ Item {
     readonly property vector3d clipN: sectionAxis === "x" ? Qt.vector3d(1, 0, 0) : sectionAxis === "y" ? Qt.vector3d(0, 0, 1) : Qt.vector3d(0, 1, 0)
     readonly property real clipD: sectionAxis === "y" ? -clipAt : clipAt
 
+    // selection reads as an outline: a mint rim where the feature turns away from the eye, on top of a light tint.
+    // Hover is the same idea, fainter, and immediate.
+    function rimColor(id) { return id === selected ? Qt.rgba(0.42, 0.85, 0.7, 1) : id === hovered ? Qt.rgba(0.30, 0.30, 0.28, 1) : Qt.rgba(0, 0, 0, 1) }
     function partColor(id) {
         return id === selected ? "#b9e8d7" : flagged.indexOf(id) >= 0 ? "#a9bff5" : id === hovered ? "#f1eee6" : "#d8d3c8"
     }
@@ -200,25 +236,38 @@ Item {
             fieldOfView: 26; clipNear: 2; clipFar: 6000
             readonly property real ra: vp.az * Math.PI / 180
             readonly property real re: Math.max(-89, Math.min(89, vp.el)) * Math.PI / 180
-            readonly property vector3d zpos: Qt.vector3d(vp.target.x + vp.dist * Math.sin(ra) * Math.cos(re),
-                                                         vp.target.y - vp.dist * Math.cos(ra) * Math.cos(re),
-                                                         vp.target.z + vp.dist * Math.sin(re))
+            // the look-at point, moved so the orbit centre lands in the middle of the free area
+            readonly property real ox: (vp.insetLeft - vp.insetRight) / 2 * vp.mmPerPx
+            readonly property real oy: (vp.insetTop - vp.insetBottom) / 2 * vp.mmPerPx
+            readonly property vector3d aim: Qt.vector3d(vp.target.x - Math.cos(ra) * ox - Math.sin(ra) * Math.sin(re) * oy,
+                                                        vp.target.y - Math.sin(ra) * ox + Math.cos(ra) * Math.sin(re) * oy,
+                                                        vp.target.z + Math.cos(re) * oy)
+            readonly property real far: vp.dist * vp.fitK
+            readonly property vector3d zpos: Qt.vector3d(aim.x + far * Math.sin(ra) * Math.cos(re),
+                                                         aim.y - far * Math.cos(ra) * Math.cos(re),
+                                                         aim.z + far * Math.sin(re))
             position: vp.scene(zpos)
-            rotation: Quaternion.lookAt(vp.scene(zpos), vp.scene(vp.target))
+            rotation: Quaternion.lookAt(vp.scene(zpos), vp.scene(aim))
         }
-        DirectionalLight { eulerRotation: Qt.vector3d(-52, -32, 0); brightness: 2.1; color: "#ffffff"
-            castsShadow: !vp.lite; shadowFactor: 85; shadowMapQuality: Light.ShadowMapQualityVeryHigh; softShadowQuality: Light.PCF32; pcfFactor: 5; shadowMapFar: 1400; csmNumSplits: 1 }
-        DirectionalLight { eulerRotation: Qt.vector3d(-18, 118, 0); brightness: 0.7; color: "#fff1e0" }
-        DirectionalLight { eulerRotation: Qt.vector3d(40, -150, 0); brightness: 0.35; color: "#cfe0ff" }
-        DirectionalLight { eulerRotation: Qt.vector3d(-90, 0, 0); brightness: 0.25 }
+        // key from the upper left front (casts the shadow), a warm fill, a cool rim from behind that draws the
+        // far silhouette, and a little light from straight above so top faces separate from walls
+        DirectionalLight { eulerRotation: Qt.vector3d(-50, -34, 0); brightness: 2.0; color: "#fffaf2"
+            castsShadow: !vp.lite; shadowFactor: 86; shadowMapQuality: Light.ShadowMapQualityVeryHigh; softShadowQuality: Light.PCF32; pcfFactor: 9; shadowMapFar: 1400; csmNumSplits: 1 }
+        DirectionalLight { eulerRotation: Qt.vector3d(-16, 112, 0); brightness: 0.62; color: "#ffeedd" }
+        DirectionalLight { eulerRotation: Qt.vector3d(-24, 164, 0); brightness: 0.9; color: "#c4dcff" }
+        DirectionalLight { eulerRotation: Qt.vector3d(-90, 0, 0); brightness: 0.22 }
 
         Node {
             id: zup
             eulerRotation.x: -90                       // everything below is in Z-up millimetres
 
             // build plate: ground that catches the shadow, a 10 mm grid, a firm outline
-            Model { source: "#Rectangle"; scale: Qt.vector3d(14, 14, 1); z: -0.06; receivesShadows: true; castsShadows: false; pickable: false
-                materials: PrincipledMaterial { baseColor: "#232a2f"; roughness: 1; specularAmount: 0 } }
+            // the bench runs to the horizon and fades into the background; the plate is a slightly lighter slab on it
+            Model { source: "#Rectangle"; scale: Qt.vector3d(60, 60, 1); z: -0.09; receivesShadows: true; castsShadows: false; pickable: false
+                materials: CustomMaterial { shadingMode: CustomMaterial.Shaded; fragmentShader: "shaders/ground.frag"
+                    property color uColor: "#1d2327"; property color uFar: Theme.plate; property real uFade: Math.max(vp.plateSize * 1.6, vp.dist * 0.9) } }
+            Model { source: "#Rectangle"; scale: Qt.vector3d(vp.plateSize / 100, vp.plateSize / 100, 1); z: -0.05; receivesShadows: true; castsShadows: false; pickable: false
+                materials: PrincipledMaterial { baseColor: "#262d32"; roughness: 1; specularAmount: 0 } }
             Model { pickable: false; castsShadows: false
                 geometry: LineGeometry { points: {
                     var p = [], h = vp.plateSize / 2
@@ -247,10 +296,11 @@ Item {
                             property real uMap: 0
                             property color uColor: vp.partColor(feature)
                             property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
+                            property color uRim: vp.rimColor(feature)
                             property vector3d uClipN: vp.clipN
                             property real uClipD: vp.clipD
                             property real uClip: vp.clipOn ? 1 : 0
-                            Behavior on uColor { ColorAnimation { duration: 140 } }
+                            Behavior on uColor { ColorAnimation { duration: 70 } }
                         }
                     }
                 }
@@ -261,12 +311,17 @@ Item {
                     Node {
                         id: pn
                         required property var modelData
+                        required property int index
                         readonly property var xf: vp.partXf(modelData)
                         readonly property alias meshes: pm
                         position: xf.pos
                         rotation: xf.rot
-                        Behavior on position { enabled: vp.asmTween; Vector3dAnimation { duration: 320; easing.type: Easing.OutCubic } }
-                        Behavior on rotation { enabled: vp.asmTween; QuaternionAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                        Behavior on position { enabled: vp.asmTween; SequentialAnimation {
+                            PauseAnimation { duration: Motion.stagger * Math.min(6, pn.index) }
+                            Vector3dAnimation { duration: Motion.part; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }
+                        Behavior on rotation { enabled: vp.asmTween; SequentialAnimation {
+                            PauseAnimation { duration: Motion.stagger * Math.min(6, pn.index) }
+                            QuaternionAnimation { duration: Motion.part; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }
                         Repeater3D {
                             id: pm
                             model: vp.model ? vp.model.mesh.filter(function (m) { return m.part === pn.modelData.id }) : []
@@ -280,10 +335,11 @@ Item {
                                     property real uMap: 0
                                     property color uColor: vp.partColor(feature)
                                     property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
+                                    property color uRim: vp.rimColor(feature)
                                     property vector3d uClipN: vp.clipN
                                     property real uClipD: vp.clipD
                                     property real uClip: vp.clipOn ? 1 : 0
-                                    Behavior on uColor { ColorAnimation { duration: 140 } }
+                                    Behavior on uColor { ColorAnimation { duration: 70 } }
                                 }
                             }
                         }
@@ -345,6 +401,7 @@ Item {
                         property real uMap: vp.mapMix
                         property color uColor: Theme.clay
                         property color uGlow: "#000000"
+                        property color uRim: "#000000"
                         property vector3d uClipN: vp.clipN
                         property real uClipD: vp.clipD
                         property real uClip: vp.clipOn ? 1 : 0
@@ -397,15 +454,22 @@ Item {
                 geometry: LineGeometry { points: {
                     var b = vp.bounds, o = 7, t = 2.2, p = []
                     var x0 = b.lo.x, x1 = b.hi.x, y0 = b.lo.y, y1 = b.hi.y, z1 = b.hi.z
-                    var g = 0.12
-                    p.push(x0, y0 - o, g, x1, y0 - o, g, x0, y0 - o - t, g, x0, y0 - 1, g, x1, y0 - o - t, g, x1, y0 - 1, g)
-                    p.push(x1 + o, y0, g, x1 + o, y1, g, x1 + 1, y0, g, x1 + o + t, y0, g, x1 + 1, y1, g, x1 + o + t, y1, g)
-                    p.push(x1 + o, y1, 0, x1 + o, y1, z1, x1 + 1, y1, z1, x1 + o + t, y1, z1)
+                    var g = 0.12, sx = vp.camRight ? 1 : -1, sy = vp.camFront ? -1 : 1
+                    var xe = vp.camRight ? x1 : x0, ye = vp.camFront ? y0 : y1, yf = vp.camFront ? y1 : y0
+                    p.push(x0, ye + sy * o, g, x1, ye + sy * o, g, x0, ye + sy * (o + t), g, x0, ye + sy, g, x1, ye + sy * (o + t), g, x1, ye + sy, g)
+                    p.push(xe + sx * o, y0, g, xe + sx * o, y1, g, xe + sx, y0, g, xe + sx * (o + t), y0, g, xe + sx, y1, g, xe + sx * (o + t), y1, g)
+                    p.push(xe + sx * o, yf, 0, xe + sx * o, yf, z1, xe + sx, yf, z1, xe + sx * (o + t), yf, z1)
                     return p } }
                 materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
-                    property color uColor: "#8fb5a7"; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                    property color uColor: Theme.alpha(Theme.datum, 0.72); property vector3d uClipN; property real uClipD; property real uClip: 0 } }
         }
     }
+    // the frame before a geometry change, held on top and let go (see swap)
+    // It is kept current by sitting, fully covered, behind the 3D view; a swap lifts it in front and fades it.
+    ShaderEffectSource { id: still; anchors.fill: view; sourceItem: view; live: true; z: -1; visible: vp.crossfade }
+    SequentialAnimation { id: thaw
+        NumberAnimation { target: still; property: "opacity"; from: 1; to: 0; duration: Motion.slow; easing.type: Easing.InOutQuad }
+        ScriptAction { script: { still.z = -1; still.opacity = 1; still.live = true } } }
 
     // dimension numbers, placed where the 3D dimension lines are
     Repeater {
@@ -416,19 +480,20 @@ Item {
             property point at: Qt.point(-999, -999)
             readonly property var b: vp.bounds
             readonly property real mm: index === 0 ? b.hi.x - b.lo.x : index === 1 ? b.hi.y - b.lo.y : b.hi.z
-            x: at.x - width / 2; y: at.y - height / 2
-            width: t.implicitWidth + 12; height: 18; radius: 3; color: Theme.alpha(Theme.plate, 0.82); border.color: Theme.alpha(Theme.datum, 0.35)
+            x: Math.round(at.x - width / 2); y: Math.round(at.y - height / 2)
+            width: t.implicitWidth + 10; height: 17; radius: Theme.rXs; color: Theme.plate; border.color: Theme.alpha(Theme.datum, 0.28)
             visible: at.x > 0 && at.y > 0
-            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.datum; font.family: Theme.mono; font.pixelSize: 11; renderType: Text.NativeRendering }
+            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.datum; font.family: Theme.mono; font.pixelSize: 11; font.weight: 500; renderType: Text.NativeRendering }
             FrameAnimation {
                 running: dl.visible || vp.visible
                 onTriggered: {
                     var o = 7, b = dl.b
-                    var p = dl.index === 0 ? Qt.vector3d((b.lo.x + b.hi.x) / 2, b.lo.y - o, 0)
-                          : dl.index === 1 ? Qt.vector3d(b.hi.x + o, (b.lo.y + b.hi.y) / 2, 0)
-                          : Qt.vector3d(b.hi.x + o, b.hi.y, b.hi.z / 2)
+                    var xs = vp.camRight ? b.hi.x + o : b.lo.x - o
+                    var p = dl.index === 0 ? Qt.vector3d((b.lo.x + b.hi.x) / 2, vp.camFront ? b.lo.y - o : b.hi.y + o, 0)
+                          : dl.index === 1 ? Qt.vector3d(xs, (b.lo.y + b.hi.y) / 2, 0)
+                          : Qt.vector3d(xs, vp.camFront ? b.hi.y : b.lo.y, b.hi.z / 2)
                     var s = view.mapFrom3DScene(vp.scene(p))
-                    dl.at = s.z > 0 ? Qt.point(s.x, s.y) : Qt.point(-999, -999)
+                    dl.at = s.z > 0 ? Qt.point(Math.round(s.x), Math.round(s.y)) : Qt.point(-999, -999)
                 }
             }
         }
@@ -476,7 +541,7 @@ Item {
             var r = view.pick(x, y)
             if (!r.objectHit) return
             var sp = r.scenePosition, d = Qt.vector3d(sp.x, -sp.z, sp.y).minus(vp.shift)
-            vp.probed([d.x, d.y, d.z], vp.dist * 2 * Math.tan(13 * Math.PI / 180) / Math.max(1, height) * 10)
+            vp.probed([d.x, d.y, d.z], vp.mmPerPx * 10)
         }
         onPressed: function (e) { last = Qt.point(e.x, e.y); down = last; moved = false; vp.tween = false }
         onPositionChanged: function (e) {
@@ -493,7 +558,7 @@ Item {
             if ((e.buttons & Qt.LeftButton) && !(e.modifiers & Qt.ShiftModifier)) {
                 vp.az -= dx * 0.4; vp.el = Math.max(-89, Math.min(89, vp.el + dy * 0.4))
             } else {
-                var k = vp.dist * 2 * Math.tan(13 * Math.PI / 180) / height
+                var k = vp.mmPerPx
                 var ra = vp.az * Math.PI / 180, re = vp.el * Math.PI / 180
                 var right = Qt.vector3d(Math.cos(ra), Math.sin(ra), 0)
                 var up = Qt.vector3d(-Math.sin(ra) * Math.sin(re), Math.cos(ra) * Math.sin(re), Math.cos(re))
