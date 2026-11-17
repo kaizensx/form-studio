@@ -65,8 +65,22 @@ Column {
     }
 
     // ── gate ────────────────────────────────────────────────
-    Sec { title: root.p ? "Gate for " + F.pad(root.p.head) : "Gate"
+    readonly property bool superseded: !!ap && ap.state === "superseded"
+    readonly property bool ready: !!g && g.ready
+    readonly property color gateInk: approved ? Theme.pass : ready ? Theme.datum : superseded ? Theme.amber : Theme.signal
+    property bool allRevs: false
+    Column { width: parent.width; topPadding: 16; spacing: 12
+        Row { width: parent.width; spacing: 14
+            Rectangle { id: seal; width: 48; height: 48; radius: 24; color: Theme.alpha(root.gateInk, 0.12); border.color: Theme.alpha(root.gateInk, 0.35)
+                Icon { anchors.centerIn: parent; size: 22; color: root.gateInk; name: root.approved ? "badge_check" : root.ready ? "shield_check" : "lock" } }
+            Column { width: parent.width - 62; anchors.verticalCenter: seal.verticalCenter; spacing: 3
+                Txt { kind: "h2"; width: parent.width
+                    text: root.approved ? "Released" : root.ready ? (root.allAcked ? "Ready to approve" : "Ready, with warnings") : "Not ready" }
+                Txt { kind: "fine"; tone: 2; width: parent.width
+                    text: root.p ? "Gate for " + F.pad(root.p.head) + (root.g ? " · " + root.g.evidence_level : "") : "" } } }
         Txt { kind: "fine"; width: parent.width; text: "A release is a frozen copy of files whose hashes match the revision they claim to be." }
+    }
+    Sec { topPadding: 4
         Note { visible: root.approved; kind: "green"
             title: root.approved ? F.pad(root.ap.rev) + " is released." : ""
             text: root.approved ? "Approved " + F.ago(root.ap.ts) + " as " + root.ap.release + ". " + root.g.evidence_level + "." : "" }
@@ -97,7 +111,8 @@ Column {
     }
 
     // ── design review (in the chat) ─────────────────────────
-    Sec { title: "Design review"; note: "subjective"
+    Item { width: 1; height: 10 }
+    Fold { title: "Design review"; note: "subjective"; key: "release.review"
         Txt { kind: "fine"; width: parent.width
             text: "Claude looks at " + (root.p ? F.pad(root.p.head) : "the head revision") + " at three scales (silhouette, relationships, details) as designer, engineer and print technician, scores six criteria and lists concrete fixes. It changes nothing." }
         Btn { kind: "default"; icon: "eye"; text: Store.chatBusy ? "Claude is answering…" : "Ask Claude for a design review"
@@ -106,7 +121,7 @@ Column {
     }
 
     // ── share (design tools) ────────────────────────────────
-    Sec { title: "Share"
+    Fold { title: "Share"; key: "release.share"; note: "card, variants, timeline"
         Txt { kind: "fine"; width: parent.width
             text: "A 1600 × 900 image of " + (root.p ? F.pad(root.p.head) : "the head revision") + ": the part with its dimensions, what is computed and what is simulated, and the revision. It states only what FORM knows." }
         Row { spacing: 6
@@ -116,7 +131,8 @@ Column {
     }
 
     // ── releases ────────────────────────────────────────────
-    Sec { title: "Releases"; visible: !!root.d && root.d.releases.length > 0
+    Fold { title: "Releases"; key: "release.releases"; openByDefault: true; visible: !!root.d && root.d.releases.length > 0
+        note: root.d ? String(root.d.releases.length) : ""
         Column { width: parent.width
             Repeater { model: root.d ? root.d.releases.slice().reverse() : []
                 Item { id: rr; required property var modelData; required property int index
@@ -136,7 +152,7 @@ Column {
     }
 
     // ── working files ───────────────────────────────────────
-    Sec { title: root.d && root.d.exports ? "Working files for " + F.pad(root.d.exports.rev) : "Working files"; note: "not a release"
+    Fold { title: root.d && root.d.exports ? "Working files for " + F.pad(root.d.exports.rev) : "Working files"; note: "not a release"; key: "release.files"
         visible: !!root.d && !!root.d.exports
         Column { width: parent.width
             Repeater { model: root.d && root.d.exports ? F.vals(root.d.exports.files) : []
@@ -172,7 +188,7 @@ Column {
         "PRINT_REPORT.md": "Checks with evidence classes, presets, blanks for measured results",
         "MEASUREMENT_PLAN.md": "Which brief dimensions are assumed, and how to measure each",
         "MOTION_CHECKS.csv": "Every joint position checked, with overlap and clearance" })
-    Sec { title: root.p ? "Maker documents for " + F.pad(root.p.head) : "Maker documents"; note: "not a release"
+    Fold { title: root.p ? "Maker documents for " + F.pad(root.p.head) : "Maker documents"; note: "not a release"; key: "release.docs"
         visible: !!root.d && !!root.d.documents && root.d.documents.length > 0
         Txt { kind: "fine"; width: parent.width
             text: "Made from this revision's solids, checks and slice when you save them. A value FORM does not have stays blank or NOT RUN. A release keeps its own copy." }
@@ -192,9 +208,9 @@ Column {
     }
 
     // ── revisions ───────────────────────────────────────────
-    Sec { title: "Revisions"; note: root.p ? root.revs.length + " · head " + F.pad(root.p.head) : ""
+    Fold { title: "Revisions"; note: root.p ? root.revs.length + " · head " + F.pad(root.p.head) : ""; key: "release.revs"; openByDefault: true
         Column { width: parent.width
-            Repeater { model: root.revs
+            Repeater { model: root.allRevs || root.revs.length <= 5 ? root.revs : root.revs.slice(0, 4)
                 Item { id: rv; required property var modelData; required property int index
                     readonly property bool head: modelData.n === root.p.head
                     readonly property bool compared: !!Store.compare && Store.compare.rev === modelData.n
@@ -214,6 +230,9 @@ Column {
                                 text: rv.compared ? "Hide comparison" : "Compare with head"; onClicked: Store.compareWith(rv.modelData.n) }
                             Btn { kind: "quiet"; small: true; text: "Make head"; tip: "Check this revision out as a new head"; onClicked: Store.checkout(rv.modelData.n) } }
                         Loader { width: parent.width; active: rv.compared; visible: active; sourceComponent: diffCard } } } } }
+        Btn { kind: "quiet"; small: true; x: -8; visible: root.revs.length > 5
+            icon: root.allRevs ? "chevron_up" : "chevron_down"; text: root.allRevs ? "Show the latest four" : "Show all " + root.revs.length + " revisions"
+            onClicked: root.allRevs = !root.allRevs }
     }
 
     Component {
@@ -242,7 +261,7 @@ Column {
     }
 
     // ── decision log ────────────────────────────────────────
-    Sec { title: "Decision log"
+    Fold { title: "Decision log"; key: "release.log"; note: root.p ? String(root.p.decisions.length) : ""
         Txt { kind: "fine"; width: parent.width; visible: !!root.p && root.p.decisions.length === 0
             text: "Approvals, model consultations, orientation changes and physical results are logged here." }
         Column { width: parent.width
@@ -257,7 +276,7 @@ Column {
     }
 
     // ── project file ────────────────────────────────────────
-    Sec { title: "Project file"
+    Fold { title: "Project file"; key: "release.archive"; note: ".formproj"
         Txt { tone: 2; width: parent.width; text: "Everything in one archive: revisions, provenance, artifacts, releases." }
         Btn { text: "Save .formproj…"; icon: "download"
             onClicked: root.saveAs(Store.pid + ".formproj", "/projects/" + Store.pid + "/archive", "FORM projects (*.formproj)", true) }

@@ -36,3 +36,6 @@ StatusChips 1.0 StatusChips.qml
 PhotoRenderSheet 1.0 PhotoRenderSheet.qml
 Timeline 1.0 Timeline.qml
 ContextMenu 1.0 ContextMenu.qml
+# workspace motion (redesign workstream)
+singleton Motion 1.0 Motion.qml
+singleton Ws 1.0 Ws.qml

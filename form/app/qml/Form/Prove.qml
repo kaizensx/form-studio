@@ -30,13 +30,45 @@ Column {
         Btn { kind: "primary"; icon: "play"; text: root.busy ? "Working…" : "Run pipeline"; enabled: !root.busy; onClicked: Store.run() }
     }
 
-    // ── checks ───────────────────────────────────────────────
-    Sec { visible: !!root.ch
-        title: root.ch ? "Checks for " + F.pad(root.ch.rev) : ""
-        note: root.ch ? root.ch.rollup.PASS + " pass · " + root.ch.rollup.WARN + " review · " + root.ch.rollup.FAIL + " fail" : ""
+    // ── checks: the score first ──────────────────────────────
+    readonly property var all: ch ? ch.checks : []
+    readonly property var open: all.filter(function (c) { return c.status !== "PASS" })
+    readonly property var passed: all.filter(function (c) { return c.status === "PASS" })
+    readonly property var roll: ch ? ch.rollup : ({ PASS: 0, WARN: 0, FAIL: 0 })
+    readonly property int total: Math.max(1, roll.PASS + roll.WARN + roll.FAIL)
+    property int shown: -1                                   // index of the passed check whose detail is open
+    function evidenceMix(list) {                             // "8 computed · 1 heuristic"
+        var n = ({}), order = []
+        list.forEach(function (c) { var e = c.evidence || "unlabelled"; if (!n[e]) { n[e] = 0; order.push(e) } n[e]++ })
+        return order.map(function (e) { return n[e] + " " + e }).join(" · ")
+    }
+    Column { visible: !!root.ch; width: parent.width; topPadding: 14; spacing: 12
+        Row { width: parent.width
+            Repeater {
+                model: [{ n: root.roll.PASS, l: "pass", c: Theme.pass }, { n: root.roll.WARN, l: "to review", c: Theme.amber }, { n: root.roll.FAIL, l: "failed", c: Theme.signal }]
+                Column { required property var modelData; required property int index
+                    width: parent.width / 3; spacing: 0
+                    Tick { decimals: 0; value: modelData.n; font.pixelSize: Theme.tH1; font.weight: 600; font.letterSpacing: -0.6
+                        color: modelData.n > 0 ? modelData.c : Theme.ink4 }
+                    Txt { kind: "cap"; text: modelData.l; color: modelData.n > 0 ? Theme.ink2 : Theme.ink4 } }
+            }
+        }
+        // the same three numbers as one bar: how much of the evidence is settled
+        Row { width: parent.width; height: 4; spacing: 2
+            Repeater { model: [[root.roll.PASS, Theme.pass], [root.roll.WARN, Theme.amber], [root.roll.FAIL, Theme.signal]]
+                Rectangle { required property var modelData
+                    visible: modelData[0] > 0; height: 4; radius: 2; color: modelData[1]
+                    width: Math.max(4, (parent.width - 4) * modelData[0] / root.total) } } }
+        Txt { kind: "fine"; width: parent.width
+            text: root.ch ? "Checks for " + F.pad(root.ch.rev) + " · " + root.evidenceMix(root.all) + ". Each says how it is known." : "" }
+    }
+
+    // ── what needs a look: failures and reviews, in full ─────
+    Sec { visible: root.open.length > 0
+        title: root.roll.FAIL ? "Failed and to review" : "To review"
         Column { x: -8; width: parent.width + 16
             Repeater {
-                model: root.ch ? root.ch.checks : []
+                model: root.open
                 Rectangle {
                     id: cr
                     required property var modelData
@@ -53,6 +85,9 @@ Column {
                                 wrapMode: Text.NoWrap; elide: Text.ElideRight; width: Math.min(implicitWidth, 170); horizontalAlignment: Text.AlignRight } }
                         Tag { x: 50; text: cr.modelData.evidence || ""; visible: text !== "" }
                         Txt { kind: "fine"; x: 50; width: parent.width - 50; text: cr.modelData.detail || ""; visible: text !== "" }
+                        Row { x: 50; spacing: 5; visible: cr.link
+                            Icon { name: "crosshair"; size: 11; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
+                            Txt { kind: "fine"; text: "Click to see where on the part" } }
                     }
                     MouseArea { id: cm; anchors.fill: parent; enabled: cr.link; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                         onClicked: Store.marker(cr.modelData) }
@@ -60,9 +95,43 @@ Column {
             }
         }
     }
+    Item { width: 1; height: 6; visible: !!root.ch }
+
+    // ── passes: one line each, the evidence class first; a click opens the detail ──
+    Fold { visible: root.passed.length > 0; key: "prove.passed"; openByDefault: root.open.length === 0 && root.passed.length <= 6
+        title: "Passed"; note: root.passed.length + " · " + root.evidenceMix(root.passed)
+        Column { x: -8; width: parent.width + 16
+            Repeater {
+                model: root.passed
+                Rectangle {
+                    id: pr
+                    required property var modelData
+                    required property int index
+                    readonly property bool link: !!(modelData.at || modelData.feature)
+                    readonly property bool on: root.shown === index
+                    width: parent.width; height: on ? 30 + pd.implicitHeight + 8 : 30; radius: Theme.rSm
+                    color: pm.containsMouse || on ? Qt.rgba(1, 1, 1, 0.04) : "transparent"
+                    Tag { x: 8; y: 7; text: pr.modelData.evidence || "pass"; kind: pr.modelData.evidence ? pr.modelData.evidence : "PASS" }
+                    Txt { x: 92; y: 6; width: parent.width - 92 - pv.width - 16; text: pr.modelData.label; wrapMode: Text.NoWrap; elide: Text.ElideRight }
+                    Txt { id: pv; mono: true; font.pixelSize: 12; tone: 2; anchors.right: parent.right; anchors.rightMargin: 8; y: 7
+                        text: String(pr.modelData.value === undefined || pr.modelData.value === null ? "" : pr.modelData.value)
+                        wrapMode: Text.NoWrap; elide: Text.ElideRight; width: Math.min(implicitWidth, 128); horizontalAlignment: Text.AlignRight }
+                    Txt { id: pd; visible: pr.on; kind: "fine"; x: 92; y: 30; width: parent.width - 100
+                        text: (pr.modelData.label.length > 22 ? pr.modelData.label + ". " : "") + (pr.modelData.detail || "") + (pr.link ? " Shown on the part." : "") }
+                    MouseArea { id: pm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                        onClicked: { root.shown = pr.on ? -1 : pr.index; if (!pr.on && pr.link) Store.marker(pr.modelData) } }
+                }
+            }
+        }
+    }
 
     // ── orientation ──────────────────────────────────────────
-    Sec { title: "Print orientation"; tag: "computed"; visible: !!root.ch
+    Fold { title: "Print orientation"; key: "prove.orient"; visible: !!root.ch
+        note: { var t = root.ch ? root.ch.orientation_table : []
+                for (var i = 0; i < t.length; i++) if (root.d && t[i].id === root.d.project.orientation) return t[i].label
+                return "" }
+        Row { spacing: 6
+            Tag { text: "computed" } Txt { kind: "fine"; text: "from the solid, for each way it can lie"; anchors.verticalCenter: parent.verticalCenter } }
         Column { x: -8; width: parent.width + 16
             Item { width: parent.width; height: 22
                 Txt { kind: "cap"; x: 8; text: "Lay it"; anchors.verticalCenter: parent.verticalCenter }
@@ -105,35 +174,10 @@ Column {
                     { big: F.fmt(root.sl.filament_g, 1) + " g", small: F.fmt(root.sl.filament_mm / 1000, 1) + " m filament" },
                     { big: String(root.sl.layers), small: "layers to " + F.fmt(root.sl.max_z_mm, 1) + " mm" }] : []
                 Column { required property var modelData; width: parent.width / 3; spacing: 3
-                    Txt { mono: true; font.pixelSize: 16; font.weight: 600; text: modelData.big; width: parent.width - 8; wrapMode: Text.NoWrap; elide: Text.ElideRight }
+                    Txt { mono: true; font.pixelSize: Theme.tH3; font.weight: 600; font.letterSpacing: -0.3; text: modelData.big; width: parent.width - 8; wrapMode: Text.NoWrap; elide: Text.ElideRight }
                     Txt { kind: "fine"; text: modelData.small; width: parent.width - 8 } }
             }
         }
-        Column { width: parent.width
-            KV { k: "Supports generated"; value: root.sl ? (root.sl.support_used ? "yes" : "none") : "" }
-            KV { k: "Presets"
-                Column { spacing: 2; anchors.verticalCenter: parent.verticalCenter
-                    Repeater { model: root.sl ? F.vals(root.sl.presets) : []
-                        Txt { required property var modelData; kind: "fine"; tone: 2; text: modelData.name; width: 250; horizontalAlignment: Text.AlignRight
-                            wrapMode: Text.NoWrap; elide: Text.ElideLeft } } } }
-            KV { k: "Slicer"; value: root.sl ? (root.sl.slicer_name || "Bambu Studio") + " " + root.sl.slicer_version + " · " + root.sl.seconds + "s" : "" }
-        }
-        Txt { kind: "fine"; width: parent.width
-            visible: !!root.sl && (root.sl.plate_warnings || []).length > 0
-            text: root.sl ? "Slicer notes: " + root.uniq(root.sl.plate_warnings || []).join(", ") : "" }
-        Item { id: plate
-            visible: !!root.sl && (root.sl.images || []).indexOf("plate_1.png") >= 0
-            width: parent.width
-            height: visible ? (img.status === Image.Ready ? Math.round(width * img.sourceSize.height / img.sourceSize.width) : Math.round(width * 0.75)) : 0
-            Rectangle { id: mask; anchors.fill: parent; radius: Theme.rMd; visible: false; layer.enabled: true }
-            Rectangle { anchors.fill: parent; radius: Theme.rMd; color: Theme.well }
-            Image { id: img; anchors.fill: parent; asynchronous: true; fillMode: Image.PreserveAspectFit; mipmap: true
-                source: plate.visible && root.sn ? Store.file("slice/current/plate_1.png") + "?k=" + root.sn.key : ""
-                layer.enabled: true
-                layer.effect: MultiEffect { maskEnabled: true; maskSource: mask } }
-            Rectangle { anchors.fill: parent; radius: Theme.rMd; color: "transparent"; border.width: 1; border.color: Theme.rule2 }
-        }
-        Txt { kind: "fine"; visible: plate.visible; text: "Plate preview rendered by " + ((root.sl && root.sl.slicer_name) || "Bambu Studio") + "." }
         Flow { spacing: 8; topPadding: 2; width: parent.width
             Btn { visible: !Store.layers; icon: "play"; text: "Watch it print"; tip: "Play the slicer's toolpaths in 3D (a simulation, not a print)"
                 onClicked: Store.simulate({ at: 0, play: true }) }
@@ -143,10 +187,39 @@ Column {
                 onClicked: { save.selectedFile = Bridge.downloads() + "/" + root.sl.threemf; save.open() } } }
         Txt { kind: "fine"; width: parent.width
             text: "A slice shows the toolpaths " + ((root.sl && root.sl.slicer_name) || "Bambu Studio") + " would send with these presets. It is not a print: adhesion, warping and fit are only known after printing." }
+        Fold { title: "Slice details"; key: "prove.slice"
+            note: root.sl ? "supports " + (root.sl.support_used ? "generated" : "none") + " · " + (root.sl.slicer_name || "Bambu Studio") + " " + root.sl.slicer_version : ""
+            Column { width: parent.width
+                KV { first: true; k: "Supports generated"; value: root.sl ? (root.sl.support_used ? "yes" : "none") : "" }
+                KV { k: "Presets"
+                    Column { spacing: 2; anchors.verticalCenter: parent.verticalCenter
+                        Repeater { model: root.sl ? F.vals(root.sl.presets) : []
+                            Txt { required property var modelData; kind: "fine"; tone: 2; text: modelData.name; width: 250; horizontalAlignment: Text.AlignRight
+                                wrapMode: Text.NoWrap; elide: Text.ElideLeft } } } }
+                KV { k: "Slicer"; value: root.sl ? (root.sl.slicer_name || "Bambu Studio") + " " + root.sl.slicer_version + " · " + root.sl.seconds + "s" : "" }
+            }
+            Txt { kind: "fine"; width: parent.width
+                visible: !!root.sl && (root.sl.plate_warnings || []).length > 0
+                text: root.sl ? "Slicer notes: " + root.uniq(root.sl.plate_warnings || []).join(", ") : "" }
+            Item { id: plate
+                visible: !!root.sl && (root.sl.images || []).indexOf("plate_1.png") >= 0
+                width: parent.width
+                height: visible ? (img.status === Image.Ready ? Math.round(width * img.sourceSize.height / img.sourceSize.width) : Math.round(width * 0.75)) : 0
+                Rectangle { id: mask; anchors.fill: parent; radius: Theme.rMd; visible: false; layer.enabled: true }
+                Rectangle { anchors.fill: parent; radius: Theme.rMd; color: Theme.well }
+                Image { id: img; anchors.fill: parent; asynchronous: true; fillMode: Image.PreserveAspectFit; mipmap: true
+                    source: plate.visible && root.sn ? Store.file("slice/current/plate_1.png") + "?k=" + root.sn.key : ""
+                    layer.enabled: true
+                    layer.effect: MultiEffect { maskEnabled: true; maskSource: mask } }
+                Rectangle { anchors.fill: parent; radius: Theme.rMd; color: "transparent"; border.width: 1; border.color: Theme.rule2 }
+            }
+            Txt { kind: "fine"; visible: plate.visible; text: "Plate preview rendered by " + ((root.sl && root.sl.slicer_name) || "Bambu Studio") + "." }
+        }
     }
 
     // ── cost, copies, other materials (CostSection.qml) ──────
     CostSection { sl: root.sl }
+    Item { width: 1; height: 16 }
 
     // ── slice: not current ───────────────────────────────────
     Sec { title: "Slice"; visible: !root.sl

@@ -1,7 +1,8 @@
 import QtQuick
 import "F.js" as F
 
-// The uncommitted change and everything it would cause, computed by the kernel. Sits at the foot of every stage.
+// The uncommitted change and everything it would cause, computed by the kernel. Pinned to the foot of the inspector
+// on every stage: what changed and the decision first, so Commit is always in reach; the consequences scroll below.
 Rectangle {
     id: d
     readonly property var im: Store.preview ? Store.preview.impact : null
@@ -22,6 +23,12 @@ Rectangle {
         Column { width: parent.width; visible: !!d.im
             Repeater { model: d.im ? d.im.params : []
                 Delta { required property var modelData; label: modelData.label; from: F.trim(modelData.from); to: F.trim(modelData.to); unit: modelData.unit; tint: Theme.blueprint } } }
+        Field { width: parent.width; placeholder: "Why this change? (optional, kept in history)"; text: Store.draftNote; onEdited: function (t) { Store.draftNote = t } }
+        Row { spacing: 8
+            Btn { kind: "primary"; text: "Commit as " + d.next; icon: "git_commit_horizontal"
+                enabled: !Store.draftError && (!!Store.preview || F.keys(Store.draftProv).length > 0); onClicked: Store.commit() }
+            Btn { kind: "quiet"; text: "Discard"; onClicked: Store.discard() } }
+        Rectangle { width: parent.width; height: 1; color: Theme.rule; visible: !!d.im }
         Flow { width: parent.width; spacing: 5; visible: !!(d.im && d.im.features.length)
             Repeater { model: d.im ? d.im.features : []
                 Tag { required property var modelData; text: modelData.label + " · " + modelData.change; kind: modelData.change } } }
@@ -48,10 +55,5 @@ Rectangle {
             Delta { required property string modelData
                 label: (Store.spec(modelData) ? Store.spec(modelData).label : modelData) + " source"
                 to: Store.draftProv[modelData].source + " ±" + F.trim(Store.draftProv[modelData].sigma) } }
-        Field { width: parent.width; placeholder: "Why this change? (optional, kept in history)"; text: Store.draftNote; onEdited: function (t) { Store.draftNote = t } }
-        Row { spacing: 8
-            Btn { kind: "primary"; text: "Commit as " + d.next; icon: "git_commit_horizontal"
-                enabled: !Store.draftError && (!!Store.preview || F.keys(Store.draftProv).length > 0); onClicked: Store.commit() }
-            Btn { kind: "quiet"; text: "Discard"; onClicked: Store.discard() } }
     }
 }
