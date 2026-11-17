@@ -12,7 +12,9 @@ Column {
     readonly property var parts: (brief.references || []).filter(function (r) { return r.kind === "part" })
     function size(b) { return [0, 1, 2].map(function (i) { return F.fmt(b[1][i] - b[0][i], 1) }).join(" × ") }
     readonly property var known: Store.recipe ? Store.recipe.params.filter(function (p) { return p.group === "brief" }) : []
-    readonly property var sl: Store.slicer || ({ available: false })
+    // the printer this design uses (its own choice, the default, or the slicer's selection: form/printers.py)
+    readonly property var pr: Store.data && Store.data.printer ? Store.data.printer : null
+    readonly property var sl: pr ? pr.slicer : (Store.slicer || ({ available: false }))
     property bool busy: false
 
     function attach(fileUrl) {
@@ -121,13 +123,17 @@ Column {
             KV { k: "Walls · infill · supports"
                 value: root.sl.available ? root.sl.summary.walls + " · " + root.sl.summary.infill + " · " + (String(root.sl.summary.supports) === "1" ? "on" : "off") : "" } }
         Txt { kind: "fine"; width: parent.width; visible: !!root.sl.available
-            text: root.sl.available ? "Read from " + (root.sl.label || "Bambu Studio") + " " + root.sl.version + " (" + root.sl.source.machine + "). Change the selection there, or pin presets in studio.toml; the slice goes stale when they change." : "" }
+            text: !root.sl.available ? "" : root.pr && root.pr.source !== "slicer"
+                ? "Presets from " + (root.sl.label || "the slicer") + " " + (root.sl.version || "") + ", chosen as " + (root.pr.source === "project" ? "this design's printer" : "the default printer") + " in Form Studio. Bed " + root.pr.env.envelope.map(function (x) { return F.fmt(x, 0) }).join(" × ") + " mm. The slice goes stale when they change."
+                : "Read from " + (root.sl.label || "Bambu Studio") + " " + root.sl.version + " (" + root.sl.source.machine + "). Choose another printer below, or change the selection there; the slice goes stale when it changes." }
         Note { visible: !root.sl.available; kind: "red"; title: "Slicer unavailable"; text: root.sl.reason || "" }
         Row { spacing: 4; x: -8
             Btn { visible: !!root.sl.available; kind: "quiet"; icon: "refresh_cw"; text: root.busy ? "Re-reading…" : "Re-read presets"; enabled: !root.busy
                 onClicked: root.reread() }
             // slicer picker (slicer workstream)
-            Btn { kind: "quiet"; icon: "printer"; text: "Slicer: " + (root.sl.label || "none") + "…"; onClicked: Store.openSheet("slicer") } } }
+            Btn { objectName: "briefPrinter"; kind: "quiet"; icon: "printer"; text: "Printer…"; tip: "Every printer in your slicers; pick one for this design"
+                onClicked: Store.openSheet("printer") }
+            Btn { kind: "quiet"; icon: "settings"; text: "Slicer: " + (root.sl.label || "none") + "…"; onClicked: Store.openSheet("slicer") } } }
 
     Item { width: 1; height: 20 }
 

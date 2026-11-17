@@ -1,0 +1,13 @@
+# Real slicers in CI (.github/workflows/slicers.yml): ElegooSlicer is installed on the runner but never opened, so the
+# presets are pinned here and FORM reads them from the profiles shipped inside the program.
+[printer]
+name = "Elegoo Centauri Carbon"
+envelope_mm = [256, 256, 256]
+
+[slicer]
+kind = "elegoo"
+
+[slicer.elegoo]
+machine = "Elegoo Centauri Carbon 0.4 nozzle"
+process = "0.20mm Standard @Elegoo CC 0.4 nozzle"
+filament = "Elegoo PLA @ECC"

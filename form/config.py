@@ -31,7 +31,9 @@ else:
 DEFAULTS = {
     "server": {"host": "127.0.0.1", "port": 4173},
     "data": {"dir": "~/FORM"},
-    "printer": {"name": "Bambu Lab A1 mini", "envelope_mm": [180, 180, 180], "plate_margin_mm": 2.0},
+    # slicer/machine/process/filament: the default printer (form/printers.py); empty = the slicer's own selection.
+    "printer": {"name": "Bambu Lab A1 mini", "envelope_mm": [180, 180, 180], "plate_margin_mm": 2.0,
+                "slicer": "", "machine": "", "process": "", "filament": ""},
     "slicer": {
         # "auto" uses the first installed of Bambu Studio, OrcaSlicer, PrusaSlicer (form/adapters AUTO_ORDER).
         # app/config_dir/machine/process/filament here are Bambu Studio's; other slicers read [slicer.orca],

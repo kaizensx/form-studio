@@ -36,6 +36,12 @@ class MCPEndToEnd(unittest.TestCase):
                 tools = {t.name for t in (await c.list_tools()).tools}
                 self.assertIn("render", tools)
                 self.assertNotIn("approve", " ".join(tools))          # approval is not an agent tool
+                self.assertTrue({"list_printers", "choose_printer"} <= tools)   # printers in every installed slicer
+                inv = data(await c.call_tool("list_printers", {}))
+                self.assertIn("printers", inv)
+                self.assertTrue(all(":" in p["id"] for p in inv["printers"]))
+                bad = await c.call_tool("choose_printer", {"printer": "nope:x", "project": "missing-project"})
+                self.assertTrue(bad.is_error)
 
                 ov = data(await c.call_tool("form_overview", {}))
                 self.assertIn("dock", [r["id"] for r in ov["recipes"]])

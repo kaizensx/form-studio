@@ -66,6 +66,13 @@ Item {
     readonly property string tool: Ws.tool
     readonly property bool compact: centre.width < 640              // a narrow viewport: controls shorten, docks fold
     readonly property bool sim: !!Store.layers
+    // a design that declares how its parts go together: assembled / exploded / as printed. Separate bodies
+    // with no declaration (form/recipes/assembly.py from_solids): as modelled / pulled apart.
+    readonly property var asmModes: Store.assembly && Store.assembly.derived
+        ? [{ value: "print", text: "As modelled" }, { value: "exploded", text: "Exploded" }]
+        : [{ value: "assembled", text: "Assembled" }, { value: "exploded", text: "Exploded" }, { value: "print", text: "Print layout" }]
+    // the bed of the printer this design uses (form/printers.py), for the plate caption
+    readonly property string bed: d && d.printer ? d.printer.env.envelope.slice(0, 2).map(function (x) { return F.fmt(x, 0) }).join(" × ") : "180 × 180"
     readonly property bool mapBlocked: !!Store.analysisMap && (Store.hasDraft || !!Store.compare)
     function setTool(t) {
         if (ws.sim) Store.showLayers(false)
@@ -115,6 +122,7 @@ Item {
             anchors.fill: parent
             visible: !Store.layers
             asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
+            plateSize: ws.d && ws.d.printer ? Math.max(60, Math.max(ws.d.printer.env.envelope[0], ws.d.printer.env.envelope[1])) : 180
             hiddenFeatures: Store.hidden                                             // design tools: quick actions
             // what the HUD covers: the rail and options, the dock when it is open, the strip and the readout
             insetLeft: ws.compact ? 76 : 60; insetTop: 46
@@ -229,10 +237,10 @@ Item {
                 Btn { small: true; height: 26; text: "Clear map"; visible: !!Store.analysisMap && !ws.compact; onClicked: Store.setAnalysis("") }
             }
             HudBar { id: asmBar; objectName: "asmBar"; shown: ws.tool === "assembly" && !!Store.assembly; maxWidth: opts.room
-                Seg { visible: !ws.compact; model: [{ value: "assembled", text: "Assembled" }, { value: "exploded", text: "Exploded" }, { value: "print", text: "Print layout" }]
+                Seg { visible: !ws.compact; model: ws.asmModes
                     value: Store.asmMode; onPicked: function (v) { Store.setAsmMode(v) } }
                 Pick { visible: ws.compact; width: 150; height: 26; value: Store.asmMode; onPicked: function (v) { Store.setAsmMode(v) }
-                    model: [{ value: "assembled", text: "Assembled" }, { value: "exploded", text: "Exploded" }, { value: "print", text: "Print layout" }] }
+                    model: ws.asmModes }
                 HudSlider { visible: Store.asmMode === "exploded"; label: "Spread"; from: 0; to: 1.6; step: 0.05; base: 1; percent: true
                     value: Store.explode; onMoved: function (v) { Store.setExplode(v) } }
                 Repeater { model: Store.assembly && Store.asmMode !== "print" ? Store.assembly.joints : []
@@ -313,7 +321,8 @@ Item {
                 Tick { font.pixelSize: 12; tone: 2; value: Store.shown ? Store.shown.volume_mm3 / 1000 : 0; unit: " cm³"; anchors.verticalCenter: parent.verticalCenter }
                 Txt { text: "·"; tone: 4; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact }
                 Txt { font.pixelSize: 12; tone: 3; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact; wrapMode: Text.NoWrap
-                    text: !Store.assembly ? "plate 180 × 180" : Store.asmMode === "assembled" ? "assembled" : Store.asmMode === "exploded" ? "assembled size, shown exploded" : "as printed, " + F.plural(Store.assembly.parts.length, "part") } }
+                    text: !Store.assembly ? "plate " + ws.bed : Store.asmMode === "assembled" ? "assembled" : Store.asmMode === "exploded" ? (Store.assembly.derived ? "as modelled, shown pulled apart" : "assembled size, shown exploded")
+                        : (Store.assembly.derived ? "as modelled, " : "as printed, ") + F.plural(Store.assembly.parts.length, "part") } }
         }
 
         // ── bottom: history above now ────────────────────────

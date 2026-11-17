@@ -3,8 +3,8 @@ import QtQuick.Controls
 import FormNative
 
 // First run: three short steps instead of one long list. 1 FORM itself, 2 your printer and slicer, 3 your AI.
-// Recommended items start ticked, but nothing runs until the step's button is pressed, and each command is shown
-// first. The step you reached is remembered in the data folder. Afterwards you land on Home.
+// A hands-free setup starts by itself (Store.autoSetup, form/installer.py AutoJob): what Form Studio needs is installed
+// with every command in the log, and it pauses only where the person must act. Optional items stay ticks. The step you reached is remembered in the data folder. Afterwards you land on Home.
 Rectangle {
     id: wl
     color: Theme.plate
@@ -89,7 +89,7 @@ Rectangle {
         Column { x: 32; anchors.bottom: parent.bottom; anchors.bottomMargin: 28; width: parent.width - 64; spacing: 6
             Icon { name: "shield_check"; size: 16; color: Theme.ink3 }
             Txt { kind: "fine"; width: parent.width
-                text: "Nothing is installed until you press the button on a step. Each command is shown first. Form Studio never asks for a password." } }
+                text: "Form Studio installs what it needs by itself and pauses only when you have to sign in or download something. Every command is in the log; Cancel stops it. It never asks for a password." } }
     }
 
     // ── the step ────────────────────────────────────────────
@@ -226,10 +226,10 @@ Rectangle {
             Row { spacing: 10; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                 Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; visible: !Store.installing && wl.chosen.length > 0
                     text: "Untick everything to continue without installing" }
-                Btn { visible: Store.installing; large: true; icon: "x"; text: "Cancel install"; onClicked: Store.cancelInstall() }
+                Btn { visible: Store.installing; large: true; icon: "x"; text: Store.installJob && Store.installJob.kind === "auto" ? "Cancel setup" : "Cancel install"; onClicked: Store.cancelInstall() }
                 Btn { kind: "primary"; large: true; busy: Store.installing || !wl.sw
                     icon: wl.chosen.length ? "download" : wl.step < 2 ? "arrow_right" : "check"
-                    text: Store.installing ? "Installing…" : !wl.sw ? "Checking…" : wl.chosen.length ? "Install " + wl.chosen.length + " selected"
+                    text: Store.installing ? (Store.installJob && Store.installJob.kind === "auto" ? "Setting up…" : "Installing…") : !wl.sw ? "Checking…" : wl.chosen.length ? "Install " + wl.chosen.length + " selected"
                         : wl.step < 2 ? "Continue" : "Open Form Studio"
                     onClicked: wl.primary() } }
         }

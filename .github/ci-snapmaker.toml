@@ -1,0 +1,13 @@
+# Real slicers in CI (.github/workflows/slicers.yml): Snapmaker Orca is installed on the runner but never opened, so the
+# presets are pinned here and FORM reads them from the profiles shipped inside the program.
+[printer]
+name = "Snapmaker A350"
+envelope_mm = [320, 350, 325]
+
+[slicer]
+kind = "snapmaker"
+
+[slicer.snapmaker]
+machine = "Snapmaker A350 (0.4 nozzle)"
+process = "0.16 Optimal @Snapmaker (0.4 nozzle)"
+filament = "Snapmaker PLA"

@@ -165,9 +165,10 @@ def max_copies(w: float, h: float, bed: tuple, spacing: float = DEFAULT_SPACING_
 
 
 # ---- a project ----------------------------------------------------------------------------------
-def bed_for(st, tp=None) -> tuple[list, str]:
-    """Bed width and depth: the selected printer preset, else what the G-code states, else studio.toml."""
-    s = st.slicer_info()
+def bed_for(st, tp=None, p=None) -> tuple[list, str]:
+    """Bed width and depth: the design's printer (form/printers.py) or the selected printer preset, else what the
+    G-code states, else studio.toml."""
+    s = st.slicer_info(p=p)
     if s.get("envelope_mm"):
         return [float(s["envelope_mm"][0]), float(s["envelope_mm"][1])], f"printer preset in {s.get('label') or 'the slicer'}"
     if tp is not None:
@@ -211,7 +212,7 @@ def project(st, p: dict, n: int = 1, spacing: float | None = None, rotate: bool 
         tp = toolpath.for_project(st, p)
     except StudioError:
         tp = None
-    bed, bed_source = bed_for(st, tp)
+    bed, bed_source = bed_for(st, tp, p)
     margin = float(st.cfg["printer"].get("plate_margin_mm", 0) or 0)
     if len(parts) == 1:
         out = copies(parts[0]["w"], parts[0]["h"], n, bed, spacing, margin, rotate)

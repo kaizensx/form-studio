@@ -17,6 +17,9 @@ Column {
             Btn { kind: "primary"; icon: "download"; enabled: sp.chosen > 0; busy: Store.installing
                 text: Store.installing ? "Installing…" : sp.chosen ? "Install " + sp.chosen + " selected" : "Install selected"
                 onClicked: Store.installSoftware() }
+            Btn { objectName: "autoSetup"; visible: !Store.installing; icon: "sparkles"; text: "Set up automatically"
+                tip: "Install what Form Studio needs by itself; it pauses only when you have to sign in or download something"
+                onClicked: Store.autoSetup(true) }
             Btn { visible: Store.installing; icon: "x"; text: "Cancel"; onClicked: Store.cancelInstall() }
             Btn { icon: "refresh_cw"; text: "Check again"; busy: Store.softwareChecking; enabled: !Store.installing
                 onClicked: { Store.checkSoftware(); Store.checkSetup() } } }

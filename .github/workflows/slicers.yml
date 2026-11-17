@@ -3,7 +3,8 @@ name: Real slicers
 # Every slicer FORM drives, run for real on Windows and Linux: the official build of a pinned version is installed
 # on the runner and never opened; FORM finds it, resolves the pinned presets from the profiles inside the program,
 # slices the example dock, and reads time, grams and layers back from that G-code. A job fails unless a real slice
-# exists. (PrusaSlicer runs in ui.yml; Bambu Studio and OrcaSlicer on macOS are run on a real Mac.)
+# exists. (PrusaSlicer runs in ui.yml; Bambu Studio, OrcaSlicer, ElegooSlicer and Snapmaker Orca on macOS are run on a
+# real Mac.)
 # The repository is public: GitHub's standard runners are free. Runs on pushes to main and on version tags.
 on:
   push:
@@ -100,6 +101,43 @@ jobs:
             dir: QIDISlicer
             url: https://github.com/QIDITECH/QIDISlicer/releases/download/V1.2.5/QIDISlicer_1.2.5_Win64.zip
             sha256: b95bd1a2811418d1baef886f919edf891043edd62077944eb5d89538973d76d5
+          # OrcaSlicer forks with OrcaSlicer's CLI (form/adapters/orca_forks.py). sha256: the digest GitHub publishes.
+          - slicer: ElegooSlicer
+            kind: elegoo
+            version: 1.5.3.5
+            reports: "1.5.3.5"
+            on: Linux
+            os: ubuntu-24.04
+            dir: ElegooSlicer
+            url: https://github.com/elegooofficial/ElegooSlicer/releases/download/v1.5.3.5/ElegooSlicer_Linux_V1.5.3.5.AppImage
+            sha256: 7b3b3f08e0d0d51bb472c85865d1be9b0c28385423daba1cb0c3b225d0101afc
+          - slicer: ElegooSlicer
+            kind: elegoo
+            version: 1.5.3.5
+            reports: "1.5.3.5"
+            on: Windows
+            os: windows-latest
+            dir: ElegooSlicer
+            url: https://github.com/elegooofficial/ElegooSlicer/releases/download/v1.5.3.5/ElegooSlicer_Windows_V1.5.3.5_portable.zip
+            sha256: 0215cd958d6a52ae1bd33a5ad7509ecd1b156baf63fbe04333e04cf0305793e5
+          - slicer: Snapmaker Orca
+            kind: snapmaker
+            version: 2.4.1
+            reports: "2.4.1"
+            on: Linux
+            os: ubuntu-24.04
+            dir: Snapmaker_Orca
+            url: https://github.com/Snapmaker/OrcaSlicer/releases/download/v2.4.1/Snapmaker_Orca_Linux_AppImage_Ubuntu2404_V2.4.1.AppImage
+            sha256: 2b5117e22d04a3a27bcdfc5a873c55d28ff3b7ce9721946de1f134fa97d2cc06
+          - slicer: Snapmaker Orca
+            kind: snapmaker
+            version: 2.4.1
+            reports: "2.4.1"
+            on: Windows
+            os: windows-latest
+            dir: Snapmaker_Orca
+            url: https://github.com/Snapmaker/OrcaSlicer/releases/download/v2.4.1/Snapmaker_Orca_Windows_V2.4.1_portable.zip
+            sha256: 1f002e2168c576f800bcfd0509b5e164b5ad65a0963abc2bef8317d929d48c9d
     env:
       FORM_CONFIG: .github/ci-${{ matrix.kind }}.toml
       FORM_NO_UPDATE_CHECK: 1

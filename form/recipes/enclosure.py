@@ -10,6 +10,7 @@ from __future__ import annotations
 from build123d import Align, Axis, Box, Circle, Cylinder, Plane, Pos, Rot, SlotOverall, extrude, fillet
 
 from .. import marks, parts, patterns
+from .assembly import Assembly, Hardware, Part
 from .base import Feature, Param, Recipe, RecipeError, Stage
 from ..parts import checked
 
@@ -351,6 +352,19 @@ class Enclosure(Recipe):
                 s = marks.revision_stamp(s, at=(0, 0), height=6, depth=min(0.4, v["floor"] / 3))
             stages.append(Stage("mark", s))
         return checked(stages)
+
+    def assembly(self, v):
+        """The lid, printed beside the box with its outer face down, turned over onto the box: the lip goes inside the
+        walls and the lid holes line up with the corner bosses (both are symmetric about the box centre)."""
+        g = self.g(v)
+        screws = [Hardware("Lid screw", f"{g['size']}", 4, "ISO 7380 / 14583, or a self-tapping screw of that size",
+                           "Screw the lid down at the four corners" + (" into the heat-set inserts." if v["fasten"] else "."),
+                           after="lid")]
+        return Assembly(
+            parts=[Part("box", "Box", 1, note="Fit the board on its standoffs and set the box on the bench, open side up."),
+                   Part("lid", "Lid", 0, move=(0, -g["lid_y"], g["H"] + v["lid_t"]), rotate=(0, 180, 0),
+                        explode=(0, 0, v["lip_h"] + 25), note="Turn the lid over and press it on: the lip goes inside the walls.")],
+            hardware=screws)
 
     def derived(self, v):
         g = self.g(v)

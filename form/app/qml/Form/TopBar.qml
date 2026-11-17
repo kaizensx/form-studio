@@ -63,20 +63,20 @@ Rectangle {
     }
     Row { id: right; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 6
         StatusChips { anchors.verticalCenter: parent.verticalCenter; compact: bar.work ? !bar.roomy : bar.tight }      // setup / update notices
-        // what it will print on; opens the slicer picker
+        // what it will print on; opens the printer picker
         Item { width: chip.implicitWidth + 16; height: 26; anchors.verticalCenter: parent.verticalCenter; visible: !!Store.studio
             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: cm.pressed ? Theme.washPress : cm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
             Row { id: chip; x: 8; spacing: 7; anchors.verticalCenter: parent.verticalCenter
-                Icon { name: "printer"; size: 13; anchors.verticalCenter: parent.verticalCenter; color: Store.slicer.available ? Theme.ink3 : Theme.amber }
+                Icon { name: "printer"; size: 13; anchors.verticalCenter: parent.verticalCenter; color: Store.printing.available ? Theme.ink3 : Theme.amber }
                 Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; color: Theme.ink2; visible: !bar.tight || !bar.work
                     width: Math.min(implicitWidth, 190); elide: Text.ElideRight; wrapMode: Text.NoWrap
-                    text: Store.slicer.available ? Store.slicer.presets.machine.name : "No slicer" }
-                Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; visible: Store.slicer.available && bar.roomy
+                    text: Store.printing.available ? Store.printing.presets.machine.name : "No slicer" }
+                Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; visible: Store.printing.available && bar.roomy
                     width: Math.min(implicitWidth, 150); elide: Text.ElideRight; wrapMode: Text.NoWrap
-                    text: Store.slicer.available ? Store.slicer.presets.filament.name : "" } }
-            MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSheet("slicer") }
+                    text: Store.printing.available ? Store.printing.presets.filament.name : "" } }
+            MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSheet("printer") }
             Tip { show: cm.containsMouse
-                text: Store.slicer.available ? (Store.slicer.label || "Slicer") + (Store.slicer.version ? " " + Store.slicer.version : "") + " · " + Store.slicer.presets.machine.name + " · " + Store.slicer.presets.filament.name + " · " + Store.slicer.presets.process.name + ". Click to choose the slicer."
+                text: Store.printing.available ? (Store.printing.label || "Slicer") + (Store.printing.version ? " " + Store.printing.version : "") + " · " + Store.printing.presets.machine.name + " · " + Store.printing.presets.filament.name + " · " + Store.printing.presets.process.name + ". Click to choose the printer."
                     : "No slicer was found. Click to see which Form Studio can use." } }
         Rectangle { visible: !bar.tight; width: bar.roomy ? 220 : 170; height: 26; radius: Theme.rSm; anchors.verticalCenter: parent.verticalCenter
             color: sm.pressed ? Theme.plate : sm.containsMouse ? Theme.plate2 : Theme.well; border.color: sm.containsMouse ? Theme.rule2 : Theme.rule

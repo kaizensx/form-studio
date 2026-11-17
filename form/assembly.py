@@ -61,10 +61,13 @@ def get(model):
         return model["_asm"]
     recipe, v = model["recipe"], model["values"]
     spec = recipe.assembly(v) if hasattr(recipe, "assembly") else None
+    solids = _ordered_solids(model["shape"])
+    if spec is None and len(solids) > 1:               # several bodies, no declaration: still give them a view
+        from .recipes.assembly import from_solids
+        spec = from_solids([_bbox(s) for s in solids])
     if spec is None:
         model["_asm"] = None
         return None
-    solids = _ordered_solids(model["shape"])
     problems = spec.validate(len(solids))
     if problems:
         model["_asm"] = {"spec": spec, "error": " ".join(problems)}
@@ -154,7 +157,7 @@ def _check(id, label, status, value, detail, **kw):
 def analyse(model) -> list:
     """Assembly checks as check rows (form/checks.py format). Empty when the design has no assembly."""
     a = get(model)
-    if a is None:
+    if a is None or a["spec"].derived:                 # a derived view says nothing about how the parts meet
         return []
     if a["error"]:
         return [_check("asm_valid", "Assembly can be checked", "FAIL", "invalid", a["error"] +

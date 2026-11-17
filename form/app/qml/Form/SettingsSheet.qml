@@ -38,7 +38,7 @@ Column {
     property int rev: 0                        // bumped on Revert and Save so the fields show the stored values again
     readonly property var cfg: Store.config
     readonly property int dirty: F.keys(edits).length
-    readonly property var rows: cfg ? cfg.settings.filter(function (r) { return r.tab === st.tab }) : []
+    readonly property var rows: cfg ? cfg.settings.filter(function (r) { return r.tab === st.tab && !r.hidden }) : []
     spacing: 14
     Component.onCompleted: { if (!Store.config) Store.loadConfig(); if (!Store.software) Store.checkSoftware(); st.loadKeys() }
 

@@ -67,6 +67,7 @@ Item {
         add("Settings", "settings", "settings", "Settings", "", function () { Store.openSettings("general") }, "Ctrl+,")
         add("Settings", "settings.printer", "printer", "Settings: printer and slicer", "", function () { Store.openSettings("printer") })
         add("Settings", "settings.chat", "message_square", "Settings: chat", "", function () { Store.openSettings("chat") })
+        add("Settings", "printer", "printer", "Choose printer", "Printer, filament and process for this design", function () { Store.openSheet("printer") })
         add("Settings", "slicer", "printer", "Choose slicer", Store.slicer.label || "", function () { Store.openSheet("slicer") })
         add("Settings", "software", "wrench", "Software: install or check", "Slicer, Claude Code, CAD apps, agents", function () { Store.openSettings("software") })
         add("Settings", "setup", "list_checks", "Setup checklist", "What Form Studio found on this computer", function () { Store.openSetup() })

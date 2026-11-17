@@ -1079,8 +1079,8 @@ KERNEL_OPS = {"analysis": op_analysis, "probe": op_probe, "orient": op_orient}
 
 # ── engine side (server, CLI and MCP call these with a Studio) ────────────────
 
-def _nozzle(st) -> tuple:
-    s = st.slicer_info()
+def _nozzle(st, p=None) -> tuple:
+    s = st.slicer_info(p=p)            # the design's own printer (form/printers.py), else the slicer's selection
     return float(s.get("nozzle_mm", 0.4)), not s.get("available")
 
 
@@ -1107,7 +1107,7 @@ def run_map(st, p: dict, map: str = "thickness", rev: int | None = None) -> dict
         raise StudioError(f"Unknown map “{map}”.", "Maps: " + ", ".join(MAPS) + ".")
     r = st.rev(p, rev)
     gk = st.keys(p, r["n"])["geometry"]
-    nozzle, assumed = _nozzle(st)
+    nozzle, assumed = _nozzle(st, p)
     orientation = p["orientation"]
     key = H("analysis", ANALYSIS_VERSION, gk, map, nozzle, orientation if map in ("overhang", "section") else None)
     out = _cached(st, p, map, key, lambda: st._k("analysis", timeout=300, key=gk, recipe_id=st.rid(p, r["n"]), values=r["values"],
@@ -1153,7 +1153,8 @@ def orientations(st, p: dict) -> dict:
     from .studio import H
     r = st.rev(p)
     gk = st.keys(p)["geometry"]
-    env, margin = list(st.cfg["printer"]["envelope_mm"]), st.cfg["printer"]["plate_margin_mm"]
+    pe = st.printer_env(p)                                       # the design's printer bed (form/printers.py)
+    env, margin = list(pe["envelope"]), pe["margin"]
     cur = p["orientation"]
     key = H("orient", ANALYSIS_VERSION, gk, env, margin, cur if cur not in NAMED else None)
     out = _cached(st, p, "orient", key, lambda: st._k("orient", timeout=300, key=gk, recipe_id=st.rid(p), values=r["values"],
@@ -1162,7 +1163,7 @@ def orientations(st, p: dict) -> dict:
     for c in out["candidates"]:
         c["current"] = c["id"] == cur or float(np.asarray(c["down"]) @ dn) > 0.9995
     out.update({"current": cur, "current_label": orientation_label(cur), "rev": r["n"], "project": p["id"],
-                "printer": st.cfg["printer"]["name"], "envelope_mm": env})
+                "printer": pe["name"], "envelope_mm": env})
     return out
 
 

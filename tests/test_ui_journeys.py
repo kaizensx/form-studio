@@ -49,6 +49,7 @@ def run_journey(script: str, size: str = "1440x900", env_extra: dict | None = No
         env = dict(os.environ, FORM_DATA=str(data), FORM_CONFIG=str(Path(tmp) / "studio.toml"), FORM_NO_UPDATE_CHECK="1",
                    FORM_UITEST_AGENT=str(HERE / "fixtures" / "fake_agent.py"), FORM_UITEST_TMP=tmp,
                    FORM_SECRETS=str(Path(tmp) / "secrets.json"),          # never the user's own agent keys
+                   FORM_NO_AUTO_SETUP="1",                                 # first start never installs for real in a test
                    FORM_UITEST_OUT=os.environ.get("FORM_UI_SHOTS") or str(Path(tmp) / "shots"), FORM_REDUCED_MOTION="0")
         if os.environ.get("FORM_UI_STUDIO_TOML"):      # CI: a studio.toml that pins a slicer and presets for every journey
             (Path(tmp) / "studio.toml").write_text(Path(os.environ["FORM_UI_STUDIO_TOML"]).read_text(encoding="utf-8"), encoding="utf-8")
@@ -87,6 +88,25 @@ class Journeys(unittest.TestCase):
         # and a newer release is pretended so the update sheet has something to offer
         self.journey("shell.py", env_extra={"FORM_INSTALL_FAKE": "0.6", "FORM_SETUP_PRETEND_MISSING": "openscad,parts",
                                             "FORM_FAKE_LATEST": "99.0.0"})
+
+    def test_printers(self):
+        # Bambu Studio is a fixture folder; every other slicer points at a program that does not exist
+        sys.path.insert(0, str(HERE))
+        from test_printers import bambu_dir
+        from test_slicers import NOWHERE
+        from form.adapters import SLICERS
+        tmp = Path(tempfile.mkdtemp(prefix="form-ui-printers-"))
+        d = bambu_dir(tmp)
+        toml = tmp / "studio.toml"
+        toml.write_text(f'[slicer]\nkind = "bambu"\napp = {json.dumps(sys.executable)}\nconfig_dir = {json.dumps(str(d))}\n'
+                        + "".join(f"[slicer.{k}]\napp = {json.dumps(NOWHERE)}\n" for k in SLICERS if k != "bambu"), encoding="utf-8")
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(toml)}):     # run_journey copies it into the run's folder
+            self.journey("printers.py")
+
+    def test_install_flow(self):
+        self.journey("install.py", env_extra={"FORM_INSTALL_FAKE": "3", "FORM_SETUP_PRETEND_MISSING": "parts,claude.signin",
+                                              "FORM_NO_AUTO_SETUP": ""})
 
     def test_smallest_window(self):
         self.journey("sizes.py", size="1120x700")
