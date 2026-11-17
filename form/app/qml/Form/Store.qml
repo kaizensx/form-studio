@@ -936,10 +936,15 @@ QtObject {
         if (n === project.head) { scrub = null; if (preview) { viewer.setModel(preview); viewer.setGhost(view) } else showHead() }
         else { scrub = { rev: n, view: v }; viewer.flagged = []; viewer.setModel(v); viewer.setGhost(null) }
     }
+    // Dragging along the timeline asks for several revisions in a row and the answers can arrive out of order.
+    // Only the latest request is shown: a late answer must not put an old revision back after "Back to head".
+    property int _revAsk: 0
     function showRev(n, fade) {
         if (!project) return Promise.resolve()
+        var ask = ++_revAsk
         return loadRev(n).then(function (v) {
-            if (fade) fadeTo(function () { s._showScrub(n, v) }); else s._showScrub(n, v)
+            if (ask !== s._revAsk) return
+            if (fade) fadeTo(function () { if (ask === s._revAsk) s._showScrub(n, v) }); else s._showScrub(n, v)
         }, fail)
     }
     function endScrub() { stopMorph(); if (scrub) showRev(project.head, true) }
@@ -959,7 +964,7 @@ QtObject {
         _morphTimer.restart()
     }
     function stopMorph() { morphing = false; _morphTimer.stop() }
-    function branchFrom(n) { stopMorph(); scrub = null; checkout(n) }
+    function branchFrom(n) { stopMorph(); _revAsk++; scrub = null; checkout(n) }
     property var _scrubReset: Connections { target: s
         function onPidChanged() { s.scrub = null; s.morphing = false; s.hidden = []; s.ctxMenu = null; s.revViews = ({}) } }
 

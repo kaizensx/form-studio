@@ -360,15 +360,16 @@ class Chat:
                     continue
                 break
             ended = any(e["t"] == "end" for e in job.events[n0:])
+            # Save the last events first and only then say the job is over: a reader that sees "failed" or
+            # "stopped" must also find its error or end event (found on a slow Windows runner).
             if job.stop_asked:
-                job.state = "stopped"
                 if not ended:
                     self._add(job, {"t": "end", "stopped": True, "cost_usd": None, "steps": job.steps,
                                     "seconds": round(time.time() - job.started, 1), "agent": job.agent})
+                job.state = "stopped"
             elif rc == 0 and not job.error:
                 job.state = "done"
             else:
-                job.state = "failed"
                 if not job.error:
                     job.error = err_text.strip()[-800:] or f"{adapter.label} exited with code {rc}"
                     known = adapter.explain(job.error)
@@ -377,9 +378,11 @@ class Chat:
                         self._add(job, {"t": "error", "text": known["message"], "hint": known.get("hint", "")})
                     else:
                         self._add(job, {"t": "error", "text": job.error})
+                job.state = "failed"
         except (OSError, ConversationError) as e:
-            job.state, job.error = "failed", str(e)
+            job.error = str(e)
             self._add(job, {"t": "error", "text": job.error})
+            job.state = "failed"
         finally:
             job.live = None
 
