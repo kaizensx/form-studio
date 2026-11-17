@@ -236,9 +236,14 @@ Rectangle {
                                 Rectangle { id: ach; required property var modelData
                                     readonly property bool pic: modelData.kind === "image"
                                     width: pic ? 64 : acl.implicitWidth + 34; height: pic ? 64 : 26; radius: Theme.rSm; color: Theme.plate1; border.color: ah.hovered && pic ? Theme.rule3 : Theme.rule; clip: true
-                                    TapHandler { enabled: ach.pic; onTapped: Store.showImage(Store.attachmentUrl(ach.modelData.file), ach.modelData.name, "Attached to this message") }
-                                    Image { visible: ach.pic; anchors.fill: parent; anchors.margins: 1; fillMode: Image.PreserveAspectCrop; asynchronous: true; sourceSize.width: 160
-                                        source: ach.pic && Store.convId ? Store.attachmentUrl(ach.modelData.file) : "" }
+                                    TapHandler { enabled: ach.pic; onTapped: Store.showImage(Store.attachmentUrl(ach.modelData.file, aimg.cid), ach.modelData.name, "Attached to this message") }
+                                    // The address is fixed when the thumbnail is made. Bound to Store.convId it would be asked for
+                                    // again under the next conversation's id while this message is being removed.
+                                    Image { id: aimg; visible: ach.pic; anchors.fill: parent; anchors.margins: 1; fillMode: Image.PreserveAspectCrop; asynchronous: true; sourceSize.width: 160
+                                        property string cid: ""
+                                        function arm() { if (!cid && ach.pic && Store.convId) { cid = Store.convId; source = Store.attachmentUrl(ach.modelData.file, cid) } }
+                                        Component.onCompleted: arm()
+                                        Connections { target: Store; function onConvIdChanged() { aimg.arm() } } }
                                     Icon { visible: !ach.pic; x: 8; size: 13; anchors.verticalCenter: parent.verticalCenter; name: ach.modelData.kind === "cad" ? "box" : "file_text" }
                                     Txt { id: acl; visible: !ach.pic; x: 26; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; wrapMode: Text.NoWrap; text: ach.modelData.name }
                                     HoverHandler { id: ah }

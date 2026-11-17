@@ -601,7 +601,8 @@ QtObject {
     }
     function pinConv(id, on) { return post("/conversations/" + id + "/pin", { on: on }).then(function () { return loadConvs() }, fail) }
     function deleteConv(id) {
-        return post("/conversations/" + id + "/delete", {}).then(function () { if (convId === id) newChat(); return loadConvs() }, fail)
+        if (convId === id) newChat()
+        return post("/conversations/" + id + "/delete", {}).then(function () { return loadConvs() }, fail)
     }
     // opening a design shows its most recent conversation; going home shows a fresh prompt
     property var _convFollow: Connections {
