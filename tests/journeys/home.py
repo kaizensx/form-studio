@@ -63,10 +63,18 @@ def run(ui):
 
     # ── rename from the card's menu ──
     menu(ui, "Alpha knob", "Rename")
+    ui.wait_until(lambda: ui.win.activeFocusItem() is not None and "TextInput" in ui.win.activeFocusItem().metaObject().className(),
+                  3, "the name field to take the keyboard")
+    ui.settle(200)                # past the moment the closing menu hands focus back
     ui.clear()
     ui.type("Volume knob")
     ui.key("Return")
-    ui.wait_until(lambda: any(p["name"] == "Volume knob" for p in projects(ui)), 5, "the new name in the engine")
+    ui.wait_until(lambda: "Volume knob" in shown_names(ui), 2, "the card to show the new name at once")
+    ui.wait_until(lambda: any(p["name"] == "Volume knob" for p in projects(ui)), 30, "the new name in the engine")
+    # the renamed design is now the last one changed: wait for the grid to finish moving it to the front, or the
+    # next right-click lands on whichever card slides under the pointer
+    ui.wait_until(lambda: shown_names(ui)[0] == "Volume knob", 10, "the renamed design to move to the front")
+    ui.settle(500)
     card(ui, "Volume knob")
 
     # ── duplicate ──

@@ -62,8 +62,20 @@ def _print(obj) -> None:
     print(json.dumps(obj, indent=1, default=str, ensure_ascii=False))
 
 
+def _utf8_streams() -> None:
+    """Output is JSON with real characters (Δ, ·, °, names in any language). A Windows console or pipe defaults to a
+    legacy code page that cannot encode them, and `form run` then fails with 'charmap codec can't encode'."""
+    for s in (sys.stdout, sys.stderr):
+        try:
+            if (getattr(s, "encoding", "") or "").lower().replace("-", "") != "utf8":
+                s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass                                   # replaced streams (tests, embedders) keep their own encoding
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else list(argv)
+    _utf8_streams()
     if argv[:1] == ["app"]:                       # the desktop app has its own flags
         from .app.main import main as app_main
         return app_main(argv[1:])

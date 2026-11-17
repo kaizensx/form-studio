@@ -1022,6 +1022,13 @@ QtObject {
     property var paletteRecent: []               // ids of the commands run last, newest first (remembered by Main.qml)
     function notePaletteRun(id) { if (!id) return; var r = paletteRecent.filter(function (x) { return x !== id }); r.unshift(id); paletteRecent = r.slice(0, 8) }
     function renameProject(id, name) {
+        // show the new name at once: the engine may be busy building thumbnails and answer seconds later
+        if (studio && studio.projects) {
+            var before = studio
+            studio = Object.assign({}, studio, { projects: studio.projects.map(function (p) { return p.id === id ? Object.assign({}, p, { name: name }) : p }) })
+            return post("/projects/" + id + "/rename", { name: name }).then(function (r) { reloadStudio(); if (id === s.pid) refresh(false); return r },
+                                                                             function (e) { studio = before; reloadStudio(); fail(e) })
+        }
         return post("/projects/" + id + "/rename", { name: name }).then(function (r) { reloadStudio(); if (id === s.pid) refresh(false); return r }, fail)
     }
     function duplicateProject(id) {

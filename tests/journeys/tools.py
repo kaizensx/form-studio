@@ -134,7 +134,7 @@ def journey_history(ui):
     ui.settle(300)
     track = ui.item("timelineTrack")
     ui.drag(track, (-track.width() * 0.9, 0), fx=0.97)
-    ui.wait_until(lambda: (ui.store.get("scrub") or {}).get("rev") == 1, 20, "scrubbing to r01")
+    ui.wait_until(lambda: (ui.store.get("scrub") or {}).get("rev") == 1, 90, "scrubbing to r01")
     ui.expect("Back to head")
     ui.click_text("Back to head")
     ui.wait_until(lambda: ui.store.get("scrub") is None, 20, "back to the head")

@@ -150,3 +150,15 @@ class JourneyHooks(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WindowsConsole(unittest.TestCase):
+    """Found on a Windows runner: `form run` printed JSON containing "Δ" to a cp1252 pipe and failed."""
+
+    def test_cli_output_survives_a_legacy_code_page(self):
+        import subprocess, sys, os
+        env = dict(os.environ, PYTHONIOENCODING="cp1252", PYTHONUTF8="0")
+        r = subprocess.run([sys.executable, "-c", "from form.__main__ import _utf8_streams, _print; _utf8_streams(); _print({'v': 'Δ 0.1 mm · 45°'})"],
+                           capture_output=True, env=env, cwd=str(ROOT))
+        self.assertEqual(r.returncode, 0, r.stderr.decode("utf-8", "replace"))
+        self.assertIn("Δ 0.1 mm · 45°", r.stdout.decode("utf-8"))

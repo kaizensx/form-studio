@@ -8,9 +8,11 @@ import "F.js" as F
 // A card opens on click; right-click (or the ⋯ button) renames, duplicates, exports or moves it to the trash.
 Item {
     id: home
+    objectName: "homeView"
     property string filter: "all"             // all | released | open
     property string order: "recent"           // recent | name
     property string renaming: ""
+    property string renameDraft: ""      // what has been typed so far: kept here so a list refresh that rebuilds the card does not wipe it
     property string confirming: ""
     property var menuFor: null
     readonly property var everything: Store.studio ? Store.studio.projects.filter(function (p) { return !p.error }) : []
@@ -39,7 +41,7 @@ Item {
         return [
             { icon: "arrow_up_right", text: "Open", run: function () { Store.open(p.id) } },
             { sep: true },
-            { icon: "pencil", text: "Rename", run: function () { home.confirming = ""; home.renaming = p.id } },
+            { icon: "pencil", text: "Rename", run: function () { home.confirming = ""; home.renameDraft = p.name; home.renaming = p.id } },
             { icon: "copy_plus", text: "Duplicate", run: function () { Store.duplicateProject(p.id) } },
             { icon: "package", text: "Export .formproj…", run: function () { saveDlg.pid = p.id; saveDlg.currentFile = Bridge.downloads() + "/" + p.id + ".formproj"; Store.ask(saveDlg) } },
             { sep: true },
@@ -142,10 +144,24 @@ Item {
                                 onClicked: home.openMenu(card.p, card, more.x, more.y + more.height + 4) }
                             // rename in place
                             Field { id: rf; visible: card.editing; x: 12; y: parent.height - card.foot + 18; width: parent.width - 24
-                                onVisibleChanged: if (visible) { text = card.p.name; input.forceActiveFocus(); input.selectAll() }
+                                // The card menu gives focus back to whatever had it when it closes, a moment after this
+                                // field appears. Taking focus at once lost that race on a slow machine and the rename
+                                // was cancelled as "clicked elsewhere". Take it, take it again once the menu is gone,
+                                // and only then treat losing it as a cancel.
+                                property bool armed: false
+                                function grab() { input.forceActiveFocus(); if (text === card.p.name) input.selectAll(); else input.cursorPosition = text.length }
+                                function begin() { text = home.renameDraft; grab(); arm.restart() }
+                                Component.onCompleted: if (visible) begin()      // the card was rebuilt in the middle of a rename
+                                onEdited: function (t) { home.renameDraft = t }
+                                Timer { id: arm; interval: 140; onTriggered: { if (!rf.input.activeFocus) rf.grab(); rf.armed = true } }
+                                onVisibleChanged: { armed = false; if (visible) begin(); else arm.stop() }
                                 onAccepted: function (t) { if (!card.editing) return; home.renaming = ""; if (t.trim() && t.trim() !== card.p.name) Store.renameProject(card.p.id, t.trim()) }
                                 Keys.onEscapePressed: home.renaming = ""
-                                Connections { target: rf.input; function onActiveFocusChanged() { if (!rf.input.activeFocus && card.editing) home.renaming = "" } } }
+                                Connections { target: rf.input; function onActiveFocusChanged() {
+                                    // switching to another app is not "clicked elsewhere": the name stays open
+                                    if (rf.armed && !rf.input.activeFocus && card.editing && rf.Window.window && rf.Window.window.active) home.renaming = "" } }
+                                Connections { target: rf.Window.window; enabled: card.editing
+                                    function onActiveChanged() { if (rf.Window.window.active && card.editing && !rf.input.activeFocus) rf.input.forceActiveFocus() } } }
                             // move to trash?
                             Rectangle { visible: card.asking; x: 1; y: 1; width: parent.width - 2; height: parent.height - card.foot - 1; radius: Theme.rLg - 1; color: Theme.alpha(Theme.plate, 0.72) }
                             Item { visible: card.asking; x: 16; y: parent.height - card.foot; width: parent.width - 32; height: card.foot

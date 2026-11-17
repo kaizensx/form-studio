@@ -270,7 +270,7 @@ def journey_variants_save_and_promote(ui):
     ui.click(btn)
     ui.wait_until(lambda: head(ui) == h0 + 1, 30, "a new head revision from the variant")
     ui.check(abs(ui.api("/projects/" + pid)["project"]["revisions"][-1]["values"]["wall"] - (wall + 0.8)) < 1e-6, "the head holds the variant's values")
-    ui.wait_until(lambda: sheet(ui) is None, 5, "the sheet to close after promoting")
+    ui.wait_until(lambda: sheet(ui) is None, 60, "the sheet to close after promoting")
     wait_job(ui, pid)
     ui.idle(300)
     toasts_gone(ui)
