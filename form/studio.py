@@ -419,7 +419,9 @@ class Studio:
                     p = self.load(d.name)
                     out.append({"id": p["id"], "name": p["name"], "recipe": p["recipe"], "head": p["head"],
                                 "revisions": len(p["revisions"]), "updated": p.get("updated", p["created"]),
-                                "approved_rev": (p["approvals"][-1]["rev"] if p["approvals"] else None)})
+                                "approved_rev": (p["approvals"][-1]["rev"] if p["approvals"] else None),
+                                # concepts first (form/concepts.py) and what the design is for (form/start.py)
+                                "concept": p.get("concept"), "purpose": p.get("purpose")})
                 except StudioError as e:
                     out.append({"id": d.name, "name": d.name, "error": str(e)})
         return out

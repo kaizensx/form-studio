@@ -41,20 +41,33 @@ RECAP_CHARS = 6000
 PROMPT = """\
 You are working inside Form Studio, a design studio for 3D-printed parts. The user is looking at Form Studio's page: every Form Studio
 tool you call shows up there live (3D model, drafts, checks, slice), so you do not need to describe geometry at length.
-- Use Form Studio tools for all design work. Built-in recipes (dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob): create_project.
-  Anything else: call design_guide, then write the design as code with create_design; iterate with update_design.
+- Use Form Studio tools for all design work: call design_guide, then write the design as code with create_design; iterate
+  with update_design. Built-in recipes (form_overview lists them) are allowed as building blocks with create_project,
+  but do not offer recipes to the person.
+- A NEW idea that is not already a precise specification: first make 3-4 genuinely different concepts as real CAD with
+  propose_concepts (different structural approaches, not size variants), each with a one-line rationale. Then stop and
+  let the person pick in Form Studio's concepts view (or pick_concept when they pick in words; a mix such as "base of A,
+  hook of C" is one more concept with propose_concepts(group=...)). Refine the picked one with update_design.
 - After creating or changing a design, render(view="sheet") and look at it; fix what is wrong before replying.
 - Look up exact dimensions of commercial parts: find the official datasheet or mechanical drawing with web search,
   then open it with Form Studio's read_document (it shows PDF pages as images; web fetch loses a drawing's dimensions).
   Name the source. Put such numbers in params with group "brief" and the source in doc.
 - Ask the user only for measurements that change the fit or safety, or to settle an intent you cannot tell apart,
-  and only when you cannot find the answer yourself: use Form Studio's ask_user (one question at a time, with
-  choices when there are obvious options, at most three questions per task). Before an action the user should
-  agree to (deleting, replacing their design), ask_user with kind="confirm".
+  and only when you cannot find the answer yourself (one question at a time, at most three per task). A measurement:
+  ask_measurement(project, param, question, where=..., tolerance_mm=..., diagram=...), which updates the design with how
+  it was measured. Anything else: ask_user, with choices when there are obvious options. Before an action the user
+  should agree to (deleting, replacing their design), ask_user with kind="confirm".
 - When the reply is done, call suggest_replies once with up to three short next steps the user might want.
-- Files the user attaches are listed at the end of their message with full paths. Look at images and PDFs before
-  answering. A dimension read off a photo or sketch is an estimate: say so and record it as assumed, not measured.
-  STEP/STL parts: import_reference(project, path), never read them as text.
+- Files the user attaches are listed at the end of their message with full paths. Look at images and PDFs before answering.
+  Photos: find the scale from a reference object if there is one (bank card 85.60 x 53.98 mm, a coin by its official
+  diameter, a ruler); give dimensions as "estimated from the photo (scale from <reference>)", record them as assumed, then
+  ask for the few that matter with ask_measurement, one at a time.
+  Sketches drawn in Form Studio come with their geometry as JSON: the JSON is authoritative over the picture; a stated
+  dimension overrides the drawn length; extrude or revolve the profile faithfully.
+  STEP/STL parts: a reference to design around, import_reference(project, path), never read as text. PDF drawings:
+  read_document. Links: open a model's page with web fetch when you have it; download only files the user gave.
+- A "Purpose:" line says what the design is for. Respect it. Just a 3D model: Design only is already set (no slicing);
+  do not talk about printing.
 - Reply briefly: what you made, the key numbers, what is assumed or unverified, and what the user should check.
   Slices are simulations and fit yields are models; say so. You cannot approve releases; point to the Release tab.
 Current project on the page: {project}.
@@ -183,6 +196,7 @@ class ChatJob:
         self.unread = 0                        # output lines that were not the CLI's event format
         self.model_id: str | None = None       # the model the CLI reported for this run
         self.head0: int | None = None          # the project's head revision when the message was sent
+        self.purpose: str | None = None        # "print" | "model": what the design is for (form/start.py)
 
     def public(self, start: int = 0) -> dict:
         return {"id": self.id, "state": self.state, "session": self.session, "cost_usd": self.cost,
@@ -200,6 +214,7 @@ class Chat:
         self.recent = Recent(self.data)
         self.jobs: dict[str, ChatJob] = {}
         self._lock = threading.Lock()
+        self.studio = None                     # the app's engine, when there is one: names the printer for "Purpose:"
 
     # ---- state -------------------------------------------------------------------------------------------------
     def status(self) -> dict:
@@ -250,11 +265,15 @@ class Chat:
     # ---- sending -----------------------------------------------------------------------------------------------
     def send(self, message: str, conversation: str | None = None, project: str | None = None, agent: str | None = None,
              model: str | None = None, effort: str | None = None, attachments: list[str] | None = None,
-             ask: bool = True) -> ChatJob:
-        """ask: a person can answer the agent's questions (the app; `form chat` in a terminal)."""
+             ask: bool = True, purpose: str | None = None) -> ChatJob:
+        """ask: a person can answer the agent's questions (the app; `form chat` in a terminal).
+        purpose: "print" or "model" (form/start.py); kept in the conversation, so later messages keep it."""
         message = (message or "").strip()
         if not message:
             raise RuntimeError("Write a message first.")
+        from .start import PURPOSES
+        if purpose is not None and purpose not in PURPOSES:
+            raise RuntimeError(f"Unknown purpose “{purpose}”: use print or model.")
         st = self.status()
         if not self.cfg.get("chat", {}).get("enabled", True):
             raise RuntimeError(st["note"])
@@ -284,6 +303,8 @@ class Chat:
             fields = {"agent": agent, "model": model, "effort": effort or ""}
             if project and not meta.get("project"):
                 fields["project"] = project
+            if purpose:
+                fields["purpose"] = purpose
             meta = self.store.update(meta["id"], **fields)
             cid = meta["id"]
             session = meta.get("session") if meta.get("session_agent") == agent else None
@@ -292,6 +313,7 @@ class Chat:
             job.before = self._project_ids()
             job.ask = bool(ask)
             job.head0 = self._head(job.project)
+            job.purpose = meta.get("purpose") if meta.get("purpose") in PURPOSES else None
             user = {"t": "user", "text": message}
             if job.attachments:
                 user["attachments"] = job.attachments
@@ -333,14 +355,25 @@ class Chat:
     def ask_dir(self, cid: str) -> Path:
         return self.store.dir(cid) / "ask"
 
-    def answer(self, cid: str, qid: str, text: str = "", choices: list | None = None) -> dict:
-        """The person's answer to the agent's question: handed to the waiting tool and kept in the conversation."""
+    def ask_image(self, cid: str, qid: str) -> Path:
+        """The picture a measurement question points at (copied into the ask folder by ask_measurement)."""
+        folder = self.ask_dir(cid)
+        q = ask_mod.read_question(folder, qid)
+        name = (q or {}).get("image")
+        f = folder / name if name and re.fullmatch(r"[0-9a-f]{10}\.(png|jpg|jpeg)", name) else None
+        if f is None or not f.is_file():
+            raise ConversationError("That question has no picture.")
+        return f
+
+    def answer(self, cid: str, qid: str, text: str = "", choices: list | None = None, extra: dict | None = None) -> dict:
+        """The person's answer to the agent's question: handed to the waiting tool and kept in the conversation.
+        extra: what answering did besides words (a measurement: value, method, source, rev; form/start.answer)."""
         try:
-            a = ask_mod.answer(self.ask_dir(cid), qid, text, choices)
+            a = ask_mod.answer(self.ask_dir(cid), qid, text, choices, extra)
         except ask_mod.AskError as e:
             raise ConversationError(str(e))
         j = self.job_for(cid)
-        ev = {"t": "answer", "id": qid, "text": a["text"], "choices": a["choices"]}
+        ev = {"t": "answer", "id": qid, "text": a["text"], "choices": a["choices"], **(extra or {})}
         if j and j.state == "running":
             if j.waiting and j.waiting.get("id") == qid:
                 j.waiting = None
@@ -356,10 +389,15 @@ class Chat:
                 for q in ask_mod.questions(folder):
                     if q["id"] not in job.asked and q["state"] == "open":
                         job.asked.add(q["id"])
-                        self._add(job, {"t": "ask", "id": q["id"], "question": q["question"], "choices": q["choices"],
-                                        "multi": q["multi"], "free": q["free"], "why": q["why"], "kind": q["kind"],
-                                        "timeout": q.get("timeout")})
-                        job.waiting = {k: q[k] for k in ("id", "question", "choices", "multi", "free", "why", "kind")}
+                        ev = {"t": "ask", "id": q["id"], "question": q["question"], "choices": q["choices"],
+                              "multi": q["multi"], "free": q["free"], "why": q["why"], "kind": q["kind"],
+                              "timeout": q.get("timeout")}
+                        if q["kind"] == "measure":              # a guided measurement card (ask_measurement)
+                            ev.update({k: q.get(k) for k in ask_mod.MEASURE_FIELDS})
+                            if q.get("image"):
+                                ev["image_url"] = f"/api/conversations/{job.conversation}/ask/{q['id']}/image"
+                        self._add(job, ev)
+                        job.waiting = {k: v for k, v in ev.items() if k not in ("t", "timeout")}
                     elif q["id"] in job.asked and q["state"] == "closed" and job.waiting and job.waiting["id"] == q["id"]:
                         job.waiting = None
                         self._add(job, {"t": "answer", "id": q["id"], "closed": q.get("reason") or "timeout"})
@@ -403,6 +441,9 @@ class Chat:
         if job is not None and job.ask and job.conversation:          # ask_user reaches this conversation
             env[ask_mod.ENV_DIR] = str(self.ask_dir(job.conversation))
             env[ask_mod.ENV_TIMEOUT] = str(int(self._ask_timeout()))
+        if job is not None and job.purpose:                           # designs created in this run get this purpose
+            from .start import ENV_PURPOSE
+            env[ENV_PURPOSE] = job.purpose
         return {"command": cmd0, "args": args0 + ["--no-bench"], "env": env}
 
     def _ask_timeout(self) -> float:
@@ -425,12 +466,61 @@ class Chat:
                 parts.append("Earlier in this conversation (the earlier agent session is not available, so this is a "
                              "transcript; check the project with Form Studio's tools rather than trusting it):\n" + recap + "\n\nNow:")
         parts.append(job.message)
+        line = self._purpose_line(job.purpose)
+        if line:
+            parts.append(line)
         if job.attachments:
             d = self.store.files_dir(job.conversation)
             what = {"image": "image", "pdf": "PDF; read_document(path) also opens it page by page",
-                    "cad": "CAD part; use import_reference(project, path)"}
-            parts.append("Attached files:\n" + "\n".join(f"- {d / a['file']} ({what.get(a['kind'], a['kind'])})" for a in job.attachments))
+                    "cad": "CAD part; use import_reference(project, path)",
+                    "sketch": "sketch drawn in Form Studio; its geometry is below"}
+
+            def hint(a):
+                if a["file"].lower().endswith(".3mf"):          # import_reference reads STEP and STL only
+                    return ("3MF file; Form Studio cannot import 3MF as a reference part, so ask the person for a STEP or "
+                            "STL export of it, and do not guess its geometry")
+                return what.get(a["kind"], a["kind"])
+            parts.append("Attached files:\n" + "\n".join(f"- {d / a['file']} ({hint(a)})" for a in job.attachments))
+            for a in job.attachments:
+                if a["kind"] == "sketch":
+                    parts.append(self._sketch_block(d / a["file"]))
         return "\n\n".join(parts)
+
+    SKETCH_HEADING = "Sketch drawn in Form Studio (structured geometry, mm, y up):"
+    SKETCH_CHARS = 12000
+
+    def _sketch_block(self, f: Path) -> str:
+        """A sketch's JSON inline, compact, so the agent reads exact numbers; cut by whole primitives when long."""
+        from . import sketch as sketch_mod
+        try:
+            s = sketch_mod.validate(json.loads(f.read_text(encoding="utf-8")))
+        except (OSError, ValueError) as e:
+            return f"{self.SKETCH_HEADING} {f.name}\n(could not be read: {e})"
+        try:
+            summary = sketch_mod.summarize(s)["text"]
+        except ValueError:
+            summary = ""
+        dump = lambda o: json.dumps(o, separators=(",", ":"), ensure_ascii=False)  # noqa: E731
+        text = dump(s)
+        if len(text) > self.SKETCH_CHARS:
+            n, total = len(s["primitives"]), len(s["primitives"])
+            while n > 0 and len(text) > self.SKETCH_CHARS:
+                n = n * 3 // 4
+                text = dump(dict(s, primitives=s["primitives"][:n], truncated=True, primitives_total=total))
+        return f"{self.SKETCH_HEADING} {f.name}\n{text}" + (f"\nSummary: {summary}" if summary else "")
+
+    def _purpose_line(self, purpose: str | None) -> str:
+        if not purpose:
+            return ""
+        from . import start
+        printer = None
+        if purpose == "print":
+            st = getattr(self, "studio", None)
+            try:
+                printer = start.state(st)["printer"]["name"] if st is not None else start.printer_name_cfg(self.cfg)
+            except Exception:
+                printer = None
+        return start.purpose_line(purpose, printer)
 
     def _run(self, job: ChatJob, adapter, exe: str) -> None:
         if getattr(adapter, "inline", False):
@@ -694,6 +784,10 @@ class Chat:
                     ev["img"] = {"project": rel.parts[0], "file": rel.parts[3]}
             except (OSError, ValueError):
                 pass
+        if name == "propose_concepts" and ev.get("ok"):         # the app opens the concepts view for this group
+            m = re.search(r'"id"\s*:\s*"([0-9a-f]{10})"', full)
+            if m:
+                ev["concepts"] = {"group": m.group(1)}
         if name.startswith("create_") and ev.get("ok") and job.before is not None:
             new = self._project_ids() - job.before
             hit = [p for p in new if f'"{p}"' in full] or (list(new) if len(new) == 1 else [])
@@ -750,8 +844,14 @@ def main_chat(argv: list[str]) -> int:
         job = chat.send(a.message, cid, a.project, a.agent, a.model, a.effort, ids, ask=interactive)
     except (RuntimeError, ConversationError) as e:
         return fail(str(e))
+    return stream(chat, job, a.json, interactive)
+
+
+def stream(chat: "Chat", job: ChatJob, as_json: bool, interactive: bool) -> int:
+    """Print a running message until it ends: text as it streams, steps and questions on stderr; or JSON events.
+    Shared by `form chat` and `form start`."""
     seen, shown_live = 1, 0
-    if a.json:
+    if as_json:
         print(json.dumps({"t": "conversation", "id": job.conversation, "job": job.id, "agent": job.agent, "model": job.model}), flush=True)
     try:
         while True:
@@ -759,7 +859,7 @@ def main_chat(argv: list[str]) -> int:
             evs = job.events[seen:]
             seen += len(evs)
             for ev in evs:
-                if a.json:
+                if as_json:
                     print(json.dumps(ev, ensure_ascii=False, default=str), flush=True)
                     continue
                 t = ev["t"]
@@ -782,7 +882,7 @@ def main_chat(argv: list[str]) -> int:
                     print(f"[{ev.get('steps', 0)} steps · {cost} · {ev.get('seconds')} s"
                           + (" · stopped" if ev.get("stopped") else "") + f" · conversation {job.conversation}]", file=sys.stderr, flush=True)
             L = job.live
-            if not a.json and L and L.get("kind") == "text" and len(L.get("text", "")) > shown_live and len(L["text"]) < 20000:
+            if not as_json and L and L.get("kind") == "text" and len(L.get("text", "")) > shown_live and len(L["text"]) < 20000:
                 sys.stdout.write(L["text"][shown_live:])
                 sys.stdout.flush()
                 shown_live = len(L["text"])
@@ -792,7 +892,7 @@ def main_chat(argv: list[str]) -> int:
     except KeyboardInterrupt:
         chat.stop(job.id)
         time.sleep(0.5)
-    if a.json:
+    if as_json:
         print(json.dumps({"t": "done", "state": job.state, "conversation": job.conversation, "session": job.session,
                           "cost_usd": job.cost, "error": job.error}, ensure_ascii=False), flush=True)
     return 0 if job.state == "done" else 1
@@ -811,6 +911,8 @@ def ask_parse(reply: str, q: dict) -> tuple[list[str], str]:
 
 
 def _ask_terminal(chat: "Chat", job: ChatJob, q: dict) -> None:
+    if q.get("kind") == "measure":
+        return _measure_terminal(chat, job, q)
     print("\n? " + q.get("question", ""), file=sys.stderr, flush=True)
     if q.get("why"):
         print("  (" + q["why"] + ")", file=sys.stderr, flush=True)
@@ -833,6 +935,33 @@ def _ask_terminal(chat: "Chat", job: ChatJob, q: dict) -> None:
             print(f"  {e}", file=sys.stderr, flush=True)
             if "Pick" not in str(e):
                 return
+
+
+def _measure_terminal(chat: "Chat", job: ChatJob, q: dict) -> None:
+    """A measurement question in a terminal: the number, then how it was measured. The MCP tool commits it."""
+    unit = q.get("unit") or "mm"
+    print("\n? " + q.get("question", ""), file=sys.stderr, flush=True)
+    for line in (q.get("where"), q.get("why")):
+        if line:
+            print("  (" + line + ")", file=sys.stderr, flush=True)
+    if q.get("tolerance_mm"):
+        print(f"  to within ±{q['tolerance_mm']:g} mm", file=sys.stderr, flush=True)
+    while True:
+        try:
+            value = ask_mod.parse_number(input(f"  value ({unit}): "))
+            if value is None:
+                continue
+            m = input("  measured with (calipers, ruler, tape, estimate): ").strip().lower()
+        except EOFError:
+            return
+        if m not in ask_mod.METHODS:
+            continue
+        try:
+            chat.answer(job.conversation, q["id"], f"{value:g}", [m], extra={"value": value, "method": m})
+            return
+        except ConversationError as e:
+            print(f"  {e}", file=sys.stderr, flush=True)
+            return
 
 
 def main_conversations(argv: list[str]) -> int:

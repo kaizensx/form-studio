@@ -24,6 +24,8 @@ def make_handler(st: Studio):
     from .setup import mcp_command
     if not hasattr(st, "chat"):
         st.chat = chat_mod.Chat(st.cfg, st.root, mcp_command())
+    if getattr(st.chat, "studio", None) is None:      # names the printer in the agent's "Purpose:" line
+        st.chat.studio = st
     from . import setup_app, updates           # first-run setup and update notices (desktop app)
     if not hasattr(st, "setup_app"):
         st.setup_app = setup_app.Setup(st.cfg, st)
@@ -311,6 +313,10 @@ def make_handler(st: Studio):
             if mf:
                 f = self._conv(lambda: st.chat.store.attachment(mf.group(1), mf.group(2)))
                 return self._send(200, f.read_bytes(), mimetypes.guess_type(f.name)[0] or "application/octet-stream")
+            mi = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/ask/([0-9a-f]{10})/image", path)
+            if mi:                                          # the picture of a measurement question (ask_measurement)
+                f = self._conv(lambda: st.chat.ask_image(mi.group(1), mi.group(2)))
+                return self._send(200, f.read_bytes(), mimetypes.guess_type(f.name)[0] or "image/png")
             m = re.fullmatch(r"/api/conversations/([0-9a-f]{12})", path)
             if m:
                 return self._json(self._conv(lambda: st.chat.conversation(m.group(1), int(q.get("from") or 0))))
@@ -334,7 +340,7 @@ def make_handler(st: Studio):
             if path == "/api/conversations/send":           # first message of a new conversation
                 cid = None
             else:
-                m = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/(send|stop|rename|pin|delete|attach|settings|note|answer)", path)
+                m = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/(send|stop|rename|pin|delete|attach|settings|note|answer|fetch|sketch)", path)
                 if not m:
                     raise StudioError("Not found.", status=404)
                 cid, verb = m.group(1), m.group(2)
@@ -347,9 +353,25 @@ def make_handler(st: Studio):
                 if verb == "delete":
                     self._conv(lambda: st.chat.delete(cid))
                     return self._json({"deleted": cid})
-                if verb == "answer":                        # the person's answer to the agent's ask_user question
-                    return self._json(self._conv(lambda: st.chat.answer(cid, str(body.get("id", "")), str(body.get("text") or ""),
-                                                                        [str(c) for c in (body.get("choices") or [])])))
+                if verb == "answer":                        # the person's answer to ask_user / ask_measurement
+                    from . import start as start_mod      # a measurement is committed first (form/start.py)
+                    return self._json(self._conv(lambda: start_mod.answer(
+                        st, cid, str(body.get("id", "")), str(body.get("text") or ""),
+                        [str(c) for c in (body.get("choices") or [])], body.get("measure"))))
+                if verb == "fetch":                         # a link pasted on Home: a file is attached, a page passed on
+                    from . import start as start_mod
+                    return self._json(start_mod.fetch(st, cid, str(body.get("url") or "")))
+                if verb == "sketch":                        # a sketch drawn in Form Studio, as structured geometry
+                    from . import sketch as sketch_mod
+                    try:
+                        sk = sketch_mod.validate(body.get("sketch"))
+                        summary = sketch_mod.summarize(sk)
+                    except ValueError as e:
+                        raise StudioError(f"The sketch could not be read: {e}", "Draw it again, or send the picture instead.")
+                    name = re.sub(r"\.sketch\.json$|\.json$", "", str(body.get("name") or "sketch"), flags=re.I) or "sketch"
+                    data = json.dumps(sk, ensure_ascii=False).encode("utf-8")
+                    rec = self._conv(lambda: st.chat.store.attach(cid, name=name + ".sketch.json", data=data))
+                    return self._json({"attachments": [rec], "summary": summary})
                 if verb == "note":
                     return self._json(self._conv(lambda: st.chat.note(cid, body.get("by", "agent"), body.get("text", ""))))
                 if verb == "settings":
@@ -366,8 +388,12 @@ def make_handler(st: Studio):
             msg = str(body.get("message", "")).strip()[:16000]
             if not msg:
                 raise StudioError("Write a message first.")
+            purpose = body.get("purpose") or None          # "print" | "model" (form/start.py), kept on the conversation
+            if purpose is not None and purpose not in ("print", "model"):
+                raise StudioError(f"Unknown purpose “{purpose}”.", "Use \"print\" or \"model\".")
             job = self._conv(lambda: st.chat.send(msg, cid, body.get("project") or None, body.get("agent") or None,
-                                                  body.get("model") or None, body.get("effort"), body.get("attachments") or []))
+                                                  body.get("model") or None, body.get("effort"), body.get("attachments") or [],
+                                                  purpose=purpose))
             st.activity(job.project, "chat", msg[:200], by="you")
             return self._json({"id": job.id, "conversation": job.conversation, "meta": st.chat.store.meta(job.conversation)})
 
