@@ -207,7 +207,17 @@ def journey_colours_and_materials(ui):
     ui.click_text("PETG")
     ui.wait_until(lambda: ui.js("Store.appearance.material") == "PETG", 10, "the material")
     ui.eq(ui.api("/projects/" + pid)["project"]["material"], "PETG", "kept where the slicer reads it")
-    ui.click(ui.item("look-lid"), 0.5, 0.1)
+    # the material re-runs the checks and the panel redraws: open the lid's row only once it holds still, and make
+    # sure it is the one open before picking its colour
+    ui.wait_until(lambda: ui.js("Store.activity.length") == 0, 120, "the checks to finish")
+    for _ in range(3):
+        ui.settle(300)
+        ui.click(ui.item("look-lid"), 0.5, 0.1)
+        try:
+            ui.wait_until(lambda: ui.item("appearance").property("open") == "lid", 4, "the lid's row to open")
+            break
+        except Exception:
+            continue
     ui.settle(300)
     ui.click(ui.item("swatch-#e08a2c"))
     ui.wait_until(lambda: ((ui.js("Store.appearance.parts") or {}).get("lid") or {}).get("color") == "#e08a2c", 10, "the lid's colour")

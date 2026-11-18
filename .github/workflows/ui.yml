@@ -52,7 +52,7 @@ jobs:
         # A real slicer on every platform, so the journeys slice, simulate and release for real.
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then choco install prusaslicer -y --no-progress
+          if [ "$RUNNER_OS" = "Windows" ]; then for i in 1 2 3 4; do choco install prusaslicer -y --no-progress && break; echo "Chocolatey failed (attempt $i), retrying"; sleep $((i * 20)); done
           else sudo apt-get install -y prusa-slicer; fi
       - name: FORM finds the slicer and slices
         shell: bash

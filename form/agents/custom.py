@@ -230,8 +230,10 @@ def candidates(u: str) -> list[str]:
 
 
 def _headers(key: str | None, wire: str | None = None) -> dict:
-    h = {"accept": "application/json", "content-type": "application/json", "user-agent": "FormStudio",
-         "anthropic-version": prov.ANTHROPIC_VERSION}
+    h = {"accept": "application/json", "content-type": "application/json", "user-agent": "FormStudio"}
+    if wire == "anthropic":
+        # only when talking Anthropic: a gateway that sees this header answers in Anthropic's format and lists less
+        h["anthropic-version"] = prov.ANTHROPIC_VERSION
     if key:
         # the key goes only to the server the person typed; which header it reads is what detection finds out
         if wire in (None, "openai"):
@@ -312,6 +314,8 @@ def detect(url: str, key: str | None = None, timeout: float = 6.0) -> dict:
     for c in candidates(u):
         tried.append(c + "/models")
         status, d, err = _request(c + "/models", key, timeout=timeout)
+        if status == 400 and "anthropic-version" in json.dumps(d or {}).lower():
+            status, d, err = _request(c + "/models", key, wire="anthropic", timeout=timeout)   # Anthropic asks for it
         if err and err.startswith("connect:") or err == "timeout":
             last_err = err
             if len(tried) == 1:
@@ -331,9 +335,16 @@ def detect(url: str, key: str | None = None, timeout: float = 6.0) -> dict:
                 return {"ok": False, "error": "format", "tried": tried,
                         "message": "This is Gemini's own API. Form Studio talks to Gemini through its OpenAI-compatible endpoint, which did not answer here.",
                         "hint": "Use https://generativelanguage.googleapis.com/v1beta/openai, or add the key under Gemini API."}
-            if kind in ("openai", "anthropic"):
+            if kind == "openai":
                 found = (kind, c, d, kind)
                 break
+            if kind == "anthropic" and not found:
+                # gateways (OpenRouter and others) answer Anthropic-style on one path and OpenAI-style on another:
+                # the OpenAI one lists every model and calls tools the same way for all of them, so keep looking for
+                # it and use the Anthropic answer only when nothing else answers (Anthropic itself, or a proxy of it)
+                found = (kind, c, d, kind)
+                if "anthropic.com" in _host(c):
+                    break
     if not found and not auth and not (last_err and len(tried) == 1):
         root = re.sub(r"/(v\d+|api(/v\d+)?|openai(/v\d+)?)$", "", u)          # Ollama's own list, then its /v1
         tried.append(root + "/api/tags")
