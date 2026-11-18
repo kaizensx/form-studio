@@ -48,7 +48,7 @@ Rules:
 
 ## Tools at a glance
 
-53 tools. Read-only tools never change a project.
+62 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -85,9 +85,15 @@ Rules:
 | [`freecad_macro`](#freecad_macro) | read-only | Write a FreeCAD macro (.FCMacro) next to the current STEP export. |
 | [`analyze`](#analyze) | read-only | An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics. |
 | [`measure`](#measure) | read-only | Measure the part. Points are [x, y, z] in millimetres in the design frame. |
+| [`analyze_selection`](#analyze_selection) | read-only | Analyse a selection on the CAD solid without saving it. |
+| [`list_annotations`](#list_annotations) | read-only | The selections the person named and kept on this design (annotations): name, note, the revision they were made on, the picked items and their computed analysis, and `text` describing each. |
+| [`annotate`](#annotate) | changes | Keep a selection on the head revision with a name and a note (for example a place you want the person to look at, or one you changed). |
+| [`set_appearance`](#set_appearance) | changes | Colour (#rrggbb) and material of the whole design (part="") or of one part (an assembly part id from get_project / render). |
 | [`suggest_orientation`](#suggest_orientation) | read-only | Rank the ways the part can lie on the plate: the six axis orientations plus every flat face on its convex hull. |
 | [`print_simulation`](#print_simulation) | read-only | Look at the sliced print as it would stand at the end of `layer` (1-based; default: finished). |
 | [`estimate_cost`](#estimate_cost) | read-only | Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same volume in the other materials the slicer has presets for. |
+| [`plate_plan`](#plate_plan) | read-only | How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material), the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts too big for the plate, and per plate the slicer's time and filament when it has been sliced. |
+| [`set_part_print`](#set_part_print) | changes | Print settings for one printed part of a multi-part design (part ids from plate_plan): orientation (a named one, a "down:x,y,z" id, or "auto" for the best-ranked way for that part alone), material (PLA, PETG, TPU, ...; parts in different materials go on different plates, each sliced with its own filament), color ("#rrggbb"). |
 | [`pack_plate`](#pack_plate) | read-only | Do `copies` of this design fit on one plate? |
 | [`render_photo`](#render_photo) | changes | A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed). |
 | [`save_variant`](#save_variant) | changes | Save a named variant of the design ("Travel version", "Thick walls"): a complete set of parameter values kept in the project next to the revisions. |
@@ -102,6 +108,9 @@ Rules:
 | [`suggest_replies`](#suggest_replies) | read-only | Offer up to 3 short follow-up messages the person might send next (each under 80 characters, written as the person would say it, e.g. "Make the walls 2 mm"). |
 | [`list_starters`](#list_starters) | read-only | The starting points Home offers, ranked from what this person designs (their projects' recipes and briefs, their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}. |
 | [`recipe_library`](#recipe_library) | read-only | Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index on the project website. |
+| [`export_recipe`](#export_recipe) | changes | Write an installed ("mine") recipe as one .formrecipe file: its code, meta.json (parameters, author, tags, the code's SHA-256) and preview.png drawn from a real build at its defaults. |
+| [`prepare_recipe_submission`](#prepare_recipe_submission) | changes | Prepare an installed recipe for the community gallery: the community/recipes/<id>/ folder (written into `folder` when given), what the gallery's checks would refuse, and the link to GitHub's recipe issue form with the fields filled in. |
+| [`design_as_recipe`](#design_as_recipe) | changes | Turn a design's current code into a recipe whose defaults are the design's values; ranges narrow a parameter's range ({key: [min, max]}, never wider than the code's own). |
 | [`export_project`](#export_project) | changes | Write the project, its conversations and the code its revisions were built from to one .formstudio file (default: <projects folder>/<project>.formstudio). |
 | [`import_project`](#import_project) | changes | Import a .formstudio or .formproj archive (or a conversation .json) from an absolute path. |
 | [`export_conversation`](#export_conversation) | read-only | A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again). |
@@ -348,6 +357,9 @@ Make an earlier revision the head again (nothing is deleted). Outputs for it are
 Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from
 suggest_orientation), the acceptable total fit gap
 window, and whether the pipeline slices automatically. The checks include an orientation comparison table.
+design_only=True: the design is not sliced (checks, exports and release still work; the release says it was
+not sliced). material: PLA, PETG, ABS, ASA, TPU, PA, PC, ... for the whole design ("" clears): the slice uses the
+printer's filament preset for it and the checks add notes for that material. Ask the user before changing either.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -356,6 +368,8 @@ window, and whether the pipeline slices automatically. The checks include an ori
 | `fit_gap_min_mm` | number \| null |  |
 | `fit_gap_max_mm` | number \| null |  |
 | `auto_slice` | boolean \| null |  |
+| `design_only` | boolean \| null |  |
+| `material` | string \| null |  |
 
 ### `explore_alternatives`
 
@@ -530,6 +544,64 @@ round boss the diameter: exact from the CAD solid, or "fitted" to mesh edges for
 | `at` | array \| null |  |
 | `rev` | integer \| null |  |
 
+### `analyze_selection`
+
+*Read-only.*
+
+Analyse a selection on the CAD solid without saving it. items: up to 24 of
+{"kind": "point" | "edge" | "face", "at": [x, y, z]} or {"kind": "region", "points": [[x, y, z], ...], "radius": mm}
+in design millimetres with each part as printed (the frame measure uses). Per item: feature, face type, area,
+normal and tilt to the bed, overhang, local wall thickness along the inward normal, gap in front, curvature radii,
+height above the bed; an edge's length, radius and the angle its faces meet at; a region's painted area, overhang
+share, features touched and thinnest sampled wall. Returns the numbers and `text`, the same in sentences.
+Evidence class: computed.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `items` | array | yes |
+| `rev` | integer \| null |  |
+
+### `list_annotations`
+
+*Read-only.*
+
+The selections the person named and kept on this design (annotations): name, note, the revision they were
+made on, the picked items and their computed analysis, and `text` describing each. An annotation from an older
+revision describes that revision; reanalyse it with analyze_selection(items=...) to see the head.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+
+### `annotate`
+
+Keep a selection on the head revision with a name and a note (for example a place you want the person to look
+at, or one you changed). items as in analyze_selection. Shown as a pin in Form Studio's viewport and listed in
+its Annotations panel.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `items` | array | yes |
+| `name` | string |  |
+| `note` | string |  |
+
+### `set_appearance`
+
+Colour (#rrggbb) and material of the whole design (part="") or of one part (an assembly part id from
+get_project / render). Materials: PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF. Form Studio draws the
+colour, writes it into its 3MF and adds material notes to the checks (heat, sunlight, warping, flexible, fibre-filled);
+stored in the same fields set_part_print uses (project material, parts.<id>.material), so the slicer picks the matching filament. Leave an argument out to keep it; clear=True removes both.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `part` | string |  |
+| `color` | string \| null |  |
+| `material` | string \| null |  |
+| `clear` | boolean |  |
+
 ### `suggest_orientation`
 
 *Read-only.*
@@ -552,13 +624,15 @@ Look at the sliced print as it would stand at the end of `layer` (1-based; defau
 picture drawn from the slicer's G-code toolpaths, coloured by line type, plus statistics: z, line types in
 that layer, whether it has bridges or overhang walls, slicer time elapsed and remaining, and the list of
 bridge and overhang layers. only: draw just these line types (e.g. ["Bridge", "Overhang wall"]).
-Needs a current slice (run_pipeline). This is a simulation of the slice, not a print: say so.
+plate: which plate (1-based) when the design was sliced on several (plate_plan). Needs a current slice
+(run_pipeline). This is a simulation of the slice, not a print: say so.
 
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
 | `layer` | integer \| null |  |
 | `only` | array \| null |  |
+| `plate` | integer \| null |  |
 
 ### `estimate_cost`
 
@@ -577,6 +651,34 @@ says which number to ask the user for. No currency is assumed.
 | `watts` | number \| null |  |
 | `machine_rate_per_h` | number \| null |  |
 | `copies` | integer |  |
+
+### `plate_plan`
+
+*Read-only.*
+
+How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material),
+the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts
+too big for the plate, and per plate the slicer's time and filament when it has been sliced. Computed by FORM from
+bounding boxes; each plate is sliced on its own. Needs current checks (run_pipeline).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+
+### `set_part_print`
+
+Print settings for one printed part of a multi-part design (part ids from plate_plan): orientation (a named
+one, a "down:x,y,z" id, or "auto" for the best-ranked way for that part alone), material (PLA, PETG, TPU, ...;
+parts in different materials go on different plates, each sliced with its own filament), color ("#rrggbb").
+"" clears a setting. Checks and slice go stale; the pipeline runs again.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `part` | string | yes |
+| `orientation` | string \| null |  |
+| `material` | string \| null |  |
+| `color` | string \| null |  |
 
 ### `pack_plate`
 
@@ -769,6 +871,42 @@ happens only in the app or with `form recipes install` after they review the sou
 | `q` | string |  |
 | `section` | string |  |
 | `tag` | string |  |
+
+### `export_recipe`
+
+Write an installed ("mine") recipe as one .formrecipe file: its code, meta.json (parameters, author, tags,
+the code's SHA-256) and preview.png drawn from a real build at its defaults. Returns {file, bytes, sha256}.
+Nothing is uploaded; the person shares the file however they like.
+
+| Argument | Type | Required |
+|---|---|---|
+| `recipe` | string | yes |
+| `path` | string \| null |  |
+
+### `prepare_recipe_submission`
+
+Prepare an installed recipe for the community gallery: the community/recipes/<id>/ folder (written into
+`folder` when given), what the gallery's checks would refuse, and the link to GitHub's recipe issue form with
+the fields filled in. Never open or post it: give the link to the person, who submits it themselves.
+
+| Argument | Type | Required |
+|---|---|---|
+| `recipe` | string | yes |
+| `folder` | string \| null |  |
+
+### `design_as_recipe`
+
+Turn a design's current code into a recipe whose defaults are the design's values; ranges narrow a
+parameter's range ({key: [min, max]}, never wider than the code's own). It is built once and compared with the
+design (check.same_volume). Returns the code and its SHA-256 for the person to review; installing it is their
+decision, in the app or with `form recipes derive <project> --install --sha256 <hex>`.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `title` | string |  |
+| `summary` | string |  |
+| `ranges` | object \| null |  |
 
 ### `export_project`
 

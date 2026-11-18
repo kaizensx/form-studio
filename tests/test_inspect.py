@@ -184,8 +184,9 @@ class OnTheSolid(unittest.TestCase):
         materials.set_appearance(self.st, pid, "", material="PETG")
         p = self.st.load(pid)
         k1 = self.st.keys(p)
-        self.assertEqual((k1["geometry"], k1["exports"], k1["slice"]), (k0["geometry"], k0["exports"], k0["slice"]))
-        self.assertNotEqual(k1["checks"], k0["checks"])                  # a material re-runs the checks only
+        self.assertEqual((k1["geometry"], k1["exports"]), (k0["geometry"], k0["exports"]))
+        self.assertNotEqual(k1["checks"], k0["checks"])                  # a material re-runs the checks
+        self.assertNotEqual(k1["slice"], k0["slice"])                    # and the slice: it picks the filament per plate
         self.assertEqual(p["parts"]["lid"], {"color": "#e08a2c", "material": "TPU"})     # where the slicer reads it
         self.assertEqual((p["material"], p["color"]), ("PETG", "#3f7fbf"))
         self.assertEqual(self.st.run_sync(pid, ["geometry", "exports", "checks"])["state"], "done")
