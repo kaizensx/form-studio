@@ -1,18 +1,32 @@
 from .base import Feature, Param, Recipe, RecipeError, Stage  # noqa: F401
 
+# The built-in library, in the order it is shown. Each module is named after its recipe's id (Studio.recipe_sha
+# hashes form/recipes/<id>.py) and defines one Recipe subclass with that id.
+LIBRARY = ("gridfinity_bin", "gridfinity_baseplate", "storage_box", "pegboard", "device_stand", "cable_organizer",
+           "desk_hanger", "shelf_bracket", "hose_adapter", "plant_pot", "vase", "battery_holder",
+           "enclosure", "coupon")
+# Retired recipes: never listed, but every design that names one still opens, builds and releases as before.
+LEGACY = ("dock", "gridfinity", "hook", "planter", "gear_pair", "knob", "hinged_box")
+
+
+def _load(name: str) -> Recipe:
+    import importlib
+    mod = importlib.import_module(f"{__name__}.{name}")
+    for v in vars(mod).values():
+        if isinstance(v, type) and issubclass(v, Recipe) and v.__module__ == mod.__name__ and v.id == name:
+            return v()
+    raise ImportError(f"form/recipes/{name}.py defines no Recipe with id {name!r}")
+
 
 def registry() -> dict:
-    from .coupon import Coupon
-    from .dock import Dock
-    from .enclosure import Enclosure
-    from .gear_pair import GearPair
-    from .gridfinity import GridfinityBin
-    from .hook import WallHook
-    from .knob import Knob
-    from .planter import TwistPlanter
-    from .hinged_box import HingedBox
-    return {r.id: r for r in (Dock(), GridfinityBin(), WallHook(), TwistPlanter(), Coupon(),
-                              Enclosure(), GearPair(), Knob(), HingedBox())}
+    """Every built-in recipe, listed and legacy, by id."""
+    return {r.id: r for r in (_load(n) for n in LIBRARY + LEGACY)}
+
+
+def listed(recipes: dict | None = None) -> dict:
+    """The recipes the library shows: built-in, not legacy."""
+    recipes = registry() if recipes is None else recipes
+    return {k: r for k, r in recipes.items() if not getattr(r, "legacy", False)}
 
 
 # ---- designs written as code (by an agent or a person) ---------------------------------------
@@ -110,6 +124,11 @@ class RecipeBook(dict):
         return False
 
     def builtins(self):
+        """The built-in recipes the library lists (legacy ones are left out; they still build by id)."""
+        return {k: v for k, v in self.items() if not is_source(k) and not getattr(v, "legacy", False)}
+
+    def all_builtins(self):
+        """Every built-in recipe, legacy ones included: for naming what an existing design was made from."""
         return {k: v for k, v in self.items() if not is_source(k)}
 
 

@@ -17,6 +17,7 @@ PLA_DENSITY = 1.24e-3     # g/mm³
 
 class WallHook(Recipe):
     id = "hook"
+    legacy = True          # retired from the library: still opens and builds for designs that use it
     title = "Wall hook"
     summary = "A two-screw wall hook sized to a load, with a bending-stress estimate and countersunk screw holes fitted to your screws."
     fit = {"cavity": "screw_hole", "mating": "screw_d", "clearance": "screw_clearance",

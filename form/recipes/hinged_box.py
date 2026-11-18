@@ -20,6 +20,7 @@ GAP = 8.0          # mm between box and lid on the plate
 
 class HingedBox(Recipe):
     id = "hinged_box"
+    legacy = True          # retired from the library: still opens and builds for designs that use it
     title = "Hinged box"
     summary = "A box and a lid joined by a pin hinge, printed side by side; the lid's lip is checked through its swing."
     solids = 2

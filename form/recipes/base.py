@@ -67,6 +67,11 @@ class Recipe:
     fit: dict | None = None
     #: number of separate printed bodies the final stage contains (e.g. 2 for a case base + lid on one plate)
     solids: int = 1
+    #: where the library files it ("Storage", "Wall & pegboard", ...) and words people search for
+    category: str = ""
+    tags: tuple = ()
+    #: retired from the library: left out of every listing, but designs that use it still open and build
+    legacy: bool = False
 
     def defaults(self) -> dict:
         return {p.key: p.default for p in self.params}
@@ -143,5 +148,5 @@ class Recipe:
             "id": self.id, "title": self.title, "summary": self.summary,
             "params": [p.public() for p in self.params],
             "features": [asdict(f) for f in self.features],
-            "fit": self.fit,
+            "fit": self.fit, "category": self.category, "tags": list(self.tags), "legacy": self.legacy,
         }
