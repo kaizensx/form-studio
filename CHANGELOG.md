@@ -1,14 +1,11 @@
 # Changelog
 
-## Unreleased
+## 12.0.0
 
 - **Assemblies that move like the real thing.** Joints form chains: a part can be fixed to another (`Part(attach="arm")`) or move on a joint mounted on another part (`hinge(..., parent="arm")`), so turning an arm swings the cup on it and the bolt in the cup, in the viewport sliders, the Assembled and Exploded views and the checks. Exploded offsets are relative to the parent. Ratchet joints (`step=15`) are checked at the positions they click to. Existing declarations work unchanged.
 - **Joined parts are fits, not collisions.** `Mate(a, b, "pin" | "thread" | ...)` declares a pin in its hole or a thread in its thread; the pair is measured against its clearance instead of booleaned, and a thread's arbitrary phase is searched.
 - **Assembly checks in seconds, within a budget.** Parts are compared on their meshes and booleaned only where they meet; joint sweeps refine near contact, give the first contact angle and prove motion free between positions where the clearance allows. They run in their own time budget (`[assembly].budget_s`, 45 s) with progress, and a partial result says which range was checked instead of timing out. A five-part shower holder with fine threads went from not finishing in 15 minutes to 20 s.
 - **Wrong assembly declarations are refused with the reason** (unknown part, a loop, a part with two parents) when a design is created or updated.
-
-## 12.0.0
-
 - **Design without a 3D printer.** The first run and Settings › General ask once: "I have a 3D printer" or "I just design". Someone who only designs gets no printer chip, no slicer install, no slicer in setup or the hands-free first start, and no Printing tab; the top bar reads "No printer · Just designing".
 - **Every design has a purpose:** For 3D printing, or Just a 3D model (rendering, CAD exchange, CNC, laser cutting, moulding, visualisation). New designs start from your answer; change it any time in the Brief or from the top bar. `form new … --purpose model --process cnc`, `form purpose <project> model`, MCP `create_project` / `create_design` / `set_print_setup` take `purpose` and `process`, and `get_project` reports it.
 - **A 3D model is checked as a model.** Overhangs, bridges, plate contact, the build volume, nozzle walls, the printer-accuracy fit model and the slice are not run and Prove says so; size, a valid solid, a closed mesh, the STEP round trip, loads and assembly checks still run, and the thinnest feature is compared with the process you name. The pipeline has no Slice step and the Fit stage is hidden.
