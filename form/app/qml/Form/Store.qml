@@ -98,6 +98,14 @@ QtObject {
         return settings(b)
     }
     // one call for every way to start a design: { name, recipe, brief, purpose, process } (purpose/process optional)
+    // New design (Ctrl+N, the menus, the palette): Home with an empty composer. A conversation under way is kept in
+    // the list and a fresh one starts, as a new chat does in Claude.
+    function startNew() {
+        openSheet(null)
+        if (chatItems.length || chatBusy) newChat()         // files already attached to an unsent message stay
+        if (screen !== "home") home()
+        startFocus++
+    }
     function newDesign(o) { o = o || {}; return create(o.name || "", o.recipe, o.brief || "", o.purpose, o.process) }
     readonly property var stages: [
         { id: "brief", title: "Brief", hint: "What it is for, what is known" },

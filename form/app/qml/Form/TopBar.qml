@@ -29,7 +29,7 @@ Rectangle {
         Btn { id: menuBtn; visible: !Theme.mac; kind: "quiet"; icon: "menu"; tip: "Menu"; active: appMenu.opened; onClicked: appMenu.opened ? appMenu.close() : appMenu.open()
             PopMenu { id: appMenu; y: parent.height + 6; width: 264
                 model: [
-                    { icon: "plus", text: "New design", keys: "Ctrl+N", run: function () { if (Store.screen !== "home") Store.home(); Store.startFocus++ } },
+                    { icon: "plus", text: "New design", keys: "Ctrl+N", run: function () { Store.startNew() } },
                     { icon: "message_square_plus", text: "New conversation", keys: "Ctrl+Shift+O", run: function () { Store.newChat(); Store.talkOpen = true } },
                     { icon: "import", text: "Import…", run: function () { Store.askImport() } },
                     { icon: "archive", text: "Export this design…", enabled: !!Store.project, run: function () { Store.exportProject(Store.pid) } },

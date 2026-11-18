@@ -155,7 +155,7 @@ Window {
     Shortcut { sequence: "Ctrl+4"; onActivated: win.stageKey("prove"); onActivatedAmbiguously: win.stageKey("prove") }
     Shortcut { sequence: "Ctrl+5"; onActivated: win.stageKey("release"); onActivatedAmbiguously: win.stageKey("release") }
     Shortcut { sequence: "Ctrl+Return"; onActivated: win.commitKey(); onActivatedAmbiguously: win.commitKey() }
-    function newDesign() { Store.openSheet(null); if (Store.screen !== "home") Store.home(); Store.startFocus++ }
+    function newDesign() { Store.startNew() }
     Shortcut { sequences: [StandardKey.New]; onActivated: win.newDesign(); onActivatedAmbiguously: win.newDesign() }
     Shortcut { sequence: "Ctrl+J"; onActivated: Store.talkOpen = !Store.talkOpen; onActivatedAmbiguously: Store.talkOpen = !Store.talkOpen }
     Shortcut { sequences: ["Ctrl+,"]; onActivated: Store.openSettings("general"); onActivatedAmbiguously: Store.openSettings("general") }      // Settings (⌘, on macOS)
