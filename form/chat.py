@@ -1,9 +1,10 @@
-"""Chat: each message runs an agent CLI headless on the user's own account, with FORM's tools.
+"""Chat: each message runs an agent with Form Studio's tools: an agent CLI headless on the user's own account, or an
+API agent that talks to a model provider directly (form/agents/api.py).
 
-The agent (Claude Code, Codex, … see form/agents) talks to FORM through its own `form-mcp --no-bench` process over
-the same data folder, so everything it does appears in the app through the activity log, exactly as when you use
-that agent from a terminal. Allowed: FORM's MCP tools, web search/fetch for datasheets when enabled, and reading
-the files attached to the conversation. No shell, no file edits.
+The agent (Claude Code, Codex, an API provider, … see form/agents) talks to Form Studio through its own
+`form-mcp --no-bench` process over the same data folder, so everything it does appears in the app through the activity
+log, exactly as when you use that agent from a terminal. Allowed: Form Studio's MCP tools, web search/fetch for
+datasheets when enabled (CLI agents), and reading the files attached to the conversation. No shell, no file edits.
 
 Every message belongs to a conversation (form/conversations.py) that is saved as it streams. One message runs at
 a time per conversation; up to MAX_RUNNING conversations run at once.
@@ -25,8 +26,11 @@ import tomllib
 import uuid
 from pathlib import Path
 
+from . import __version__
 from . import agents as agents_mod
 from . import ask as ask_mod
+from .agents import compat
+from .agents import providers as providers_mod
 from .agents.models import Learned
 from .agents.base import Run, short as _short  # noqa: F401  (_short: kept for callers of the old name)
 from .conversations import ConversationError, Conversations
@@ -64,7 +68,7 @@ def _adapters(cfg: dict) -> dict:
 def defaults(cfg: dict, agent_status: list[dict] | None = None) -> dict:
     """The agent, model and effort a new conversation starts with ([chat] in studio.toml)."""
     c = cfg.get("chat", {})
-    agent = c.get("agent") or "claude"
+    agent = c.get("agent") or ""
     st = agent_status if agent_status is not None else [a.status(cfg) for a in _adapters(cfg).values()]
     ok = [a["id"] for a in st if a["available"]]
     if agent not in ok and ok:
@@ -75,7 +79,12 @@ def defaults(cfg: dict, agent_status: list[dict] | None = None) -> dict:
 def status(cfg: dict) -> dict:
     c = cfg.get("chat", {})
     on = c.get("enabled", True)
-    ags = [a.status(cfg) for a in _adapters(cfg).values()] if on else []
+    ads = list(_adapters(cfg).values()) if on else []
+    if any(getattr(a, "inline", False) for a in ads) and c.get("api_agents", True):
+        providers_mod.warm(cfg, {a.id for a in ads if getattr(a, "inline", False)})     # all at once, not one by one
+    if not c.get("api_agents", True):
+        ads = [a for a in ads if not getattr(a, "inline", False)]
+    ags = [a.status(cfg) for a in ads]
     if cfg.get("data", {}).get("dir"):                    # the versions each alias resolved to on its last run
         learned = Learned(Path(cfg["data"]["dir"]))
         learned.seed()
@@ -86,11 +95,11 @@ def status(cfg: dict) -> dict:
     if not on:
         note = "Chat is off in studio.toml."
     elif not cur:
-        note = ("Install an agent CLI (Claude Code, Codex, Gemini CLI, Cursor, OpenCode, Qwen Code or GitHub Copilot) "
-                "to chat here. Everything else works without it.")
+        note = ("Connect an agent to chat here: an agent CLI such as Claude Code, Codex or Gemini CLI, an API key from a "
+                "model provider, or a local model server such as Ollama. Everything else works without one.")
     return {"available": bool(cur), "cli": cur["cli"] if cur else None, "model": d["model"], "web": bool(c.get("web", True)),
             "note": note, "agents": ags, "default": d, "max_running": MAX_RUNNING,
-            "label": cur["label"] if cur else "Claude Code"}
+            "label": cur["label"] if cur else "your agent"}
 
 
 def set_defaults_text(text: str, values: dict) -> str:
@@ -166,6 +175,7 @@ class ChatJob:
         self.ask = False                       # someone can answer ask_user (the app, or a terminal)
         self.asked: set = set()                # question ids already shown in the conversation
         self.waiting: dict | None = None       # the open question, while the agent waits for an answer
+        self.unread = 0                        # output lines that were not the CLI's event format
         self.model_id: str | None = None       # the model the CLI reported for this run
         self.head0: int | None = None          # the project's head revision when the message was sent
 
@@ -209,6 +219,11 @@ class Chat:
         for ev in out.get("items", []):                  # conversations saved before model names were shown
             if ev.get("t") == "start" and ev.get("model") and not ev.get("label"):
                 ev["label"] = ad.model_label(ev["model"]) if ad else ev["model"]
+        if out.get("resolved_model") and not out.get("resolved_agent"):     # saved before the agent was recorded with it
+            out["resolved_agent"] = next((e.get("agent") for e in reversed(self.store.events(cid))
+                                          if e.get("t") in ("start", "end") and e.get("model")), None)
+        if out.get("resolved_model") and (out.get("resolved_agent") or out.get("agent")) != out.get("agent"):
+            out["resolved_model"] = None              # saved under the agent used before; not this one's model
         if out.get("resolved_model"):
             out["resolved_label"] = ad.model_label(out["resolved_model"]) if ad else out["resolved_model"]
         return out
@@ -408,6 +423,8 @@ class Chat:
         return "\n\n".join(parts)
 
     def _run(self, job: ChatJob, adapter, exe: str) -> None:
+        if getattr(adapter, "inline", False):
+            return self._run_inline(job, adapter)
         c = self.cfg.get("chat", {})
         cwd = self.store.dir(job.conversation) if job.conversation else self.data
         had_history = bool(job.conversation) and self.store.meta(job.conversation).get("messages", 0) > 1
@@ -437,6 +454,8 @@ class Chat:
                     drain = threading.Thread(target=lambda p=job.proc: err_buf.extend(p.stderr), daemon=True)
                     drain.start()
                     for line in job.proc.stdout:
+                        if line.strip() and not line.lstrip().startswith(("{", "[")):
+                            job.unread += 1
                         self._event(job, line)
                     job.proc.wait()
                     self._event(job, None)                      # what the parser still owes (CLIs without an end event)
@@ -475,7 +494,9 @@ class Chat:
             else:
                 if not job.error:
                     job.error = err_text.strip()[-800:] or f"{adapter.label} exited with code {rc}"
-                    known = adapter.explain(job.error)
+                    known = adapter.explain(job.error) or compat.diagnose(
+                        adapter.id, adapter.label, exe, rc, err_text, job.unread,
+                        sum(1 for e in job.events[n0:] if e["t"] in ("start", "text", "tool", "end")), __version__)
                     if known:                                   # a known failure, said plainly with the fix inside FORM
                         job.error = known["message"]
                         self._add(job, {"t": "error", "text": known["message"], "hint": known.get("hint", "")})
@@ -484,6 +505,57 @@ class Chat:
                 job.state = "failed"
         except (OSError, ConversationError) as e:
             job.error = str(e)
+            self._add(job, {"t": "error", "text": job.error})
+            job.state = "failed"
+        finally:
+            job.live = None
+            self._close_asks(job)
+
+    def _run_inline(self, job: ChatJob, adapter) -> None:
+        """An API agent: the loop runs in this thread (form/agents/api.py); its events take the same path as a CLI's."""
+        from .agents.api import Control, SessionGone
+        c = self.cfg.get("chat", {})
+        cwd = self.store.dir(job.conversation) if job.conversation else self.data
+        had_history = bool(job.conversation) and self.store.meta(job.conversation).get("messages", 0) > 1
+        if job.conversation:
+            threading.Thread(target=self._watch_asks, args=(job,), daemon=True, name=f"form-ask-{job.id}").start()
+        failure = None
+        try:
+            for attempt in (1, 2):
+                fdir = self.store.files_dir(job.conversation) if job.conversation else cwd
+                files = [fdir / a["file"] for a in job.attachments]
+                run = Run(message=self._prompt(job, with_recap=had_history and not job.session),
+                          system=PROMPT.format(project=job.project or "none (start a new one if asked)"),
+                          model=job.model, effort=job.effort, session=job.session, cwd=cwd, scratch=cwd, mcp=self._mcp(job),
+                          tool_timeout_s=self._ask_timeout() + 300, web=False,
+                          budget_usd=float(c.get("budget_usd_per_message", 3.0)),
+                          images=[f for f, a in zip(files, job.attachments) if a["kind"] == "image"], files=files)
+                job.parser = None
+                job.proc = Control()
+                try:
+                    failure = adapter.execute(run, self.cfg, lambda evs: self._events(job, evs), job.proc)
+                except SessionGone:
+                    if attempt == 1 and job.session:      # the saved history is gone: send again with a transcript
+                        job.session = None
+                        if job.conversation:
+                            self.store.update(job.conversation, session=None, session_agent=None)
+                        continue
+                    raise
+                break
+            self._close_asks(job)
+            if job.stop_asked:
+                if not any(e["t"] == "end" for e in job.events[1:]):
+                    self._add(job, {"t": "end", "stopped": True, "cost_usd": None, "steps": job.steps,
+                                    "seconds": round(time.time() - job.started, 1), "agent": job.agent})
+                job.state = "stopped"
+            elif failure:
+                job.error = failure["message"]
+                self._add(job, {"t": "error", "text": failure["message"], "hint": failure.get("hint", "")})
+                job.state = "failed"
+            else:
+                job.state = "done"
+        except (OSError, ConversationError, RuntimeError, ValueError) as e:
+            job.error = str(e) or type(e).__name__
             self._add(job, {"t": "error", "text": job.error})
             job.state = "failed"
         finally:
@@ -504,8 +576,12 @@ class Chat:
         """One line of the CLI's output: update what is live, save what is finished."""
         if job.parser is None:
             job.parser = self.adapters[job.agent].parser()
+        self._events(job, job.parser.finish() if line is None else job.parser.feed(line))
+
+    def _events(self, job: ChatJob, evs: list[dict]) -> None:
+        """FORM events from an agent (a CLI's parsed output, or an API agent directly): update what is live, save the rest."""
         adapter = self.adapters[job.agent]
-        for ev in (job.parser.finish() if line is None else job.parser.feed(line)):
+        for ev in evs:
             t = ev["t"]
             if t == "live":
                 job.live = ev["live"]
@@ -566,7 +642,7 @@ class Chat:
                 model = None
             if model and job.conversation:
                 try:
-                    self.store.update(job.conversation, resolved_model=model)
+                    self.store.update(job.conversation, resolved_model=model, resolved_agent=job.agent)
                 except ConversationError:
                     pass
         if model:
@@ -620,7 +696,7 @@ class Chat:
 # ---- command line: `form chat …`, `form conversations …` ----------------------------------------------------------
 
 def main_chat(argv: list[str]) -> int:
-    """form chat "message" [--project ID] [--conversation ID] [--model X] [--agent claude|codex] [--effort L]
+    """form chat "message" [--project ID] [--conversation ID] [--model X] [--agent ID] [--effort L]
     [--attach FILE ...] [--json]: send one message, stream the reply, save the conversation."""
     import argparse
     from . import config
@@ -628,8 +704,10 @@ def main_chat(argv: list[str]) -> int:
     ap.add_argument("message")
     ap.add_argument("--project")
     ap.add_argument("--conversation", help="continue this conversation (id from `form conversations list`)")
-    ap.add_argument("--agent", help="claude, codex, gemini, cursor, opencode, qwen or copilot (default: [chat] agent)")
-    ap.add_argument("--model", help="a model alias or id the agent's CLI accepts (default: [chat] model)")
+    ap.add_argument("--agent", help="an agent CLI (claude, codex, gemini, cursor, opencode, qwen, copilot) or an API provider "
+                                    "(anthropic, openai, google, openrouter, mistral, xai, deepseek, groq, ollama, lmstudio, "
+                                    "llamacpp); default: [chat] agent")
+    ap.add_argument("--model", help="a model alias or id the agent accepts (default: [chat] model)")
     ap.add_argument("--effort")
     ap.add_argument("--attach", action="append", default=[], metavar="FILE", help="image, PDF, STEP or STL (repeat)")
     ap.add_argument("--json", action="store_true", help="print one JSON event per line instead of text")

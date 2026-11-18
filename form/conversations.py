@@ -112,7 +112,7 @@ class Conversations:
         now = _now()
         meta = {"id": uuid.uuid4().hex[:12], "title": title.strip()[:120] or "New conversation", "title_auto": not title.strip(),
                 "project": project or None, "agent": agent, "model": model or "default", "effort": effort or "",
-                "session": None, "session_agent": None, "resolved_model": None,
+                "session": None, "session_agent": None, "resolved_model": None, "resolved_agent": None,
                 "created": now, "updated": now, "pinned": False, "cost_usd": 0.0, "cost_known": True,
                 "messages": 0, "events": 0, "preview": ""}
         with self._lock:
@@ -127,6 +127,10 @@ class Conversations:
     def update(self, cid: str, touch: bool = False, **fields) -> dict:
         with self._lock:
             meta = self._read(cid)
+            if fields.get("agent") and fields["agent"] != meta.get("agent") and "resolved_model" not in fields \
+                    and (meta.get("resolved_agent") or meta.get("agent")) != fields["agent"]:
+                # the model the last reply came from belongs to the agent that sent it, not to the new one
+                fields = dict(fields, resolved_model=None, resolved_agent=None)
             meta.update(fields)
             if touch:
                 meta["updated"] = _now()
@@ -186,13 +190,14 @@ class Conversations:
                 meta["preview"] = re.sub(r"\s+", " ", ev.get("text", ""))[:140]
             elif t == "ask":
                 meta["preview"] = "Question: " + re.sub(r"\s+", " ", ev.get("question", ""))[:128]
-            elif t == "start" and ev.get("model"):
-                meta["resolved_model"] = ev["model"]
             elif t == "end":
                 if ev.get("cost_usd") is not None:
                     meta["cost_usd"] = round(meta.get("cost_usd", 0.0) + float(ev["cost_usd"]), 6)
                 elif not ev.get("stopped"):
                     meta["cost_known"] = False            # this agent does not report money
+            if t in ("start", "end") and ev.get("model"):
+                meta["resolved_model"] = ev["model"]
+                meta["resolved_agent"] = ev.get("agent") or meta.get("agent")
             if t != "act":
                 meta["updated"] = ev["ts"]
             self._write(meta)

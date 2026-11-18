@@ -72,42 +72,93 @@ class Learned:
         return self.all().get(agent, {}).get(alias or "default")
 
     def learn(self, agent: str, alias: str, model_id: str, label: str = "") -> None:
-        if not model_id:
+        """Remember what `alias` resolved to on a run of `agent` that just reported it."""
+        if not model_id or not agent:
             return
         with _LOCK:
             d = self.all()
             d.setdefault(agent, {})[alias or "default"] = {"id": model_id, "label": label or pretty(model_id),
-                                                         "ts": time.time()}
+                                                         "ts": time.time(), "src": "run"}
+            self._save(d)
+
+    def _save(self, d: dict) -> None:
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(d, indent=1, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp, self.path)
+        except OSError:
+            pass
+
+    def _reported(self) -> dict:
+        """{(agent, alias): (model id, ts)} from what each agent itself reported, in every saved conversation.
+
+        Only a "start" or "end" event names the agent that ran and the alias it was asked for, so this is the one
+        source that cannot mix agents up: a conversation's meta keeps the last model it saw even after its agent is
+        switched (that is how a Claude model once ended up listed as Codex's default)."""
+        found: dict = {}
+        for evf in sorted(self.path.parent.glob("*/events.jsonl")):
+            asked: dict = {}
             try:
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                tmp = self.path.with_suffix(".tmp")
-                tmp.write_text(json.dumps(d, indent=1, ensure_ascii=False), encoding="utf-8")
-                os.replace(tmp, self.path)
+                with open(evf, encoding="utf-8") as fh:
+                    for line in fh:
+                        if '"start"' not in line and '"end"' not in line:
+                            continue
+                        try:
+                            e = json.loads(line)
+                        except ValueError:
+                            continue
+                        if e.get("t") == "start" and e.get("agent"):
+                            asked[e["agent"]] = e.get("asked")
+                        if e.get("t") not in ("start", "end") or not e.get("agent") or not e.get("model"):
+                            continue
+                        alias = e.get("asked") if e.get("t") == "start" else asked.get(e["agent"])
+                        if alias is None:
+                            continue                      # saved before runs recorded what they were asked for
+                        key = (e["agent"], alias or "default")
+                        if key not in found or e.get("ts", 0) >= found[key][1]:
+                            found[key] = (e["model"], e.get("ts", 0))
             except OSError:
-                pass
+                continue
+        return found
 
     def seed(self) -> None:
-        """Once, for a data folder that has conversations from before this file existed: learn from their last reply."""
-        if self.path.exists():
-            return
-        found: dict = {}
-        for meta in sorted(self.path.parent.glob("*/meta.json")):
-            try:
-                m = json.loads(meta.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue
-            if m.get("resolved_model") and m.get("agent"):
-                key = (m["agent"], m.get("model") or "default")
-                if key not in found or m.get("updated", 0) > found[key][1]:
-                    found[key] = (m["resolved_model"], m.get("updated", 0))
-        if not found:
-            return
-        for (agent, alias), (mid, _) in found.items():
-            self.learn(agent, alias, mid)
+        """Make the file trustworthy before it is shown. Called with every status read; does work at most once.
+
+        - No file yet (conversations from before it existed): learn from what each agent reported in them.
+        - Entries written by an earlier Form Studio (no "src"): keep only those an agent's own report confirms, so a
+          model learned under the wrong agent is dropped and the picker shows that agent's real default again."""
+        with _LOCK:
+            exists = self.path.exists()
+            d = self.all()
+            legacy = [(a, k) for a, ms in d.items() if isinstance(ms, dict)
+                      for k, v in ms.items() if isinstance(v, dict) and v.get("src") != "run"]
+            if exists and not legacy:
+                return
+            reported = self._reported()
+            if not exists:
+                if not reported:
+                    return
+                for (agent, alias), (mid, ts) in reported.items():
+                    d.setdefault(agent, {})[alias] = {"id": mid, "label": pretty(mid), "ts": ts or time.time(), "src": "run"}
+                self._save(d)
+                return
+            for agent, alias in legacy:
+                got = reported.get((agent, alias))
+                if got and got[0] == d[agent][alias].get("id"):
+                    d[agent][alias]["src"] = "run"
+                else:
+                    del d[agent][alias]
+            for agent in [a for a, ms in d.items() if isinstance(ms, dict) and not ms]:
+                del d[agent]
+            self._save(d)
 
     def decorate(self, status: dict) -> dict:
         """Put what was learned into an agent's model list (labels with versions, the resolved id in the note)."""
+        if status.get("kind") == "api":
+            return status                 # an API agent names its models itself, from the provider's list, every time
         mine = self.all().get(status.get("id"), {})
+        mine = mine if isinstance(mine, dict) else {}
         out = []
         for m in status.get("models") or []:
             m = dict(m)

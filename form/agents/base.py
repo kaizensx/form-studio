@@ -62,6 +62,8 @@ class Adapter:
     verified = ""                 # how this adapter was checked; shown as it is
     images = False                # the CLI takes images as input
     cost = False                  # the CLI reports cost in money
+    inline = False                # True: runs inside Form Studio (an API agent), no CLI process
+    kind = "cli"
 
     # -- discovery -----------------------------------------------------------
     def executable(self, cfg: dict) -> str | None:
@@ -79,7 +81,7 @@ class Adapter:
     def status(self, cfg: dict) -> dict:
         exe = self.executable(cfg)
         out = {"id": self.id, "label": self.label, "available": bool(exe), "cli": exe, "why": None,
-               "images": self.images, "reports_cost": self.cost, "verified": self.verified}
+               "images": self.images, "reports_cost": self.cost, "verified": self.verified, "kind": "cli"}
         if not exe:
             out["why"] = self.install_hint
             out["models"], out["efforts"] = [], []

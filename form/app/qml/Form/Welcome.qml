@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Controls
 import FormNative
 
-// First run: three short steps instead of one long list. 1 FORM itself, 2 your printer and slicer, 3 your AI.
+// First run: three short steps instead of one long list. 1 Form Studio itself, 2 your printer and slicer, 3 your agent:
+// a choice between the agent apps found here, model provider APIs (keys found or added) and local models.
 // A hands-free setup starts by itself (Store.autoSetup, form/installer.py AutoJob): what Form Studio needs is installed
 // with every command in the log, and it pauses only where the person must act. Optional items stay ticks. The step you reached is remembered in the data folder. Afterwards you land on Home.
 Rectangle {
@@ -13,7 +14,7 @@ Rectangle {
     readonly property var steps: [
         { title: "Form Studio itself", sub: "The CAD kernel and where your designs live", ids: ["kernel", "data", "parts"] },
         { title: "Your printer and slicer", sub: "So a design can be sliced for your machine", ids: ["slicer.bambu", "slicer.orca", "slicer.prusa"] },
-        { title: "Your AI", sub: "Claude designs with you in chat", ids: ["claude", "claude.signin", "agent.claude", "agent.codex", "agent.gemini", "agent.cursor", "agent.desktop"] }
+        { title: "Your agent", sub: "Who designs with you in chat", ids: ["claude", "claude.signin", "agent.claude", "agent.codex", "agent.gemini", "agent.cursor", "agent.desktop"] }
     ]
     readonly property var here: steps[step]
     // ticked rows of this step only
@@ -25,16 +26,40 @@ Rectangle {
         var need = steps[i].ids.map(function (id) { return Store.softwareItem(id) }).filter(function (r) {
             return r && !r.absent && r.level !== "optional" && r.status !== "ok" && r.status !== "info" })
         if (i === 1) return wl.anySlicer ? "done" : "todo"
+        if (i === 2) return Store.chat.available ? "done" : "todo"
         return need.length ? "todo" : "done"
     }
     function stepNote(i) {
         if (!sw) return "Checking…"
         if (i === 1) return wl.anySlicer ? "A slicer is ready" : "No slicer yet"
+        if (i === 2) { var n = Store.chatAgents.filter(function (a) { return a.available }).length
+                       return n ? n + (n === 1 ? " agent ready" : " agents ready") : "Choose one" }
         var rows = steps[i].ids.map(function (id) { return Store.softwareItem(id) }).filter(function (r) { return r && !r.absent && r.status !== "info" })
         var ok = rows.filter(function (r) { return r.status === "ok" }).length
         return ok + " of " + rows.length + " ready"
     }
     function go(n) { Store.setOnboardStep(n) }
+    // step 3: which way to reach a model is shown; it starts on the first one that has something ready
+    function agentsOf(way) {
+        return Store.chatAgents.filter(function (a) {
+            return way === "cli" ? a.kind !== "api" : way === "local" ? a.kind === "api" && a.local : a.kind === "api" && !a.local })
+    }
+    property string way: ""
+    readonly property var missingApps: sw ? ["claude", "codex", "gemini"].filter(function (id) { var r = Store.softwareItem(id); return r && r.status !== "ok" }) : []
+    readonly property string firstWay: ["cli", "api", "local"].filter(function (w) { return wl.agentsOf(w).some(function (a) { return a.available }) })[0] || "cli"
+    onFirstWayChanged: if (!wl.picked) wl.way = wl.firstWay
+    property bool picked: false
+    onWayChanged: if (wl.way !== wl.firstWay) wl.picked = true
+    Component.onCompleted: { wl.way = wl.firstWay; wl.loadKeys() }
+    property var keys: []
+    function loadKeys() { Store.get("/secrets").then(function (r) { wl.keys = r.keys }, function () {}) }
+    function keyFor(name) { for (var i = 0; i < wl.keys.length; i++) if (wl.keys[i].name === name) return wl.keys[i]; return null }
+    function saveKey(name, value) {
+        return Store.post("/secrets", { name: name, value: value }).then(function (r) {
+            wl.keys = r.keys; Store.toast(r.key.label + " saved", "Kept in a private file on this computer and sent only to its provider.")
+            Store.refreshAgents() }, Store.fail) }
+    function clearKey(name) {
+        return Store.post("/secrets", { name: name, clear: true }).then(function (r) { wl.keys = r.keys; Store.refreshAgents() }, Store.fail) }
     // each step arrives the same way: the page fades in and settles upward
     onStepChanged: { fl.contentY = 0; arrive.restart() }
     ParallelAnimation { id: arrive
@@ -109,7 +134,7 @@ Rectangle {
                 Txt { kind: "lead"; tone: 2; width: parent.width; lineHeight: 1.35
                     text: wl.step === 0 ? "Form Studio builds real geometry with a CAD kernel and keeps every design in a folder you own. This is checked for you."
                         : wl.step === 1 ? "A slicer turns a design into a print plan. Form Studio drives one that is installed here and reads the printer, filament and process selected in it."
-                        : "Chat in Form Studio runs Claude Code on your own Claude account. Form Studio also offers its tools to other coding agents on this computer." } }
+                        : "Chat works with the agent you choose. Each one designs with Form Studio's tools and runs on your own account or computer. You can change it per conversation." } }
 
             // step 1: a checklist that fills in as each part answers
             Column { visible: wl.step === 0; width: parent.width; spacing: 16
@@ -191,16 +216,80 @@ Rectangle {
                                 onClicked: Store.saveConfig({ "printer.name": pn.text, "printer.envelope_mm": [Number(px.text), Number(py.text), Number(pz.text)] }) } } } }
             }
 
-            // step 3: Claude and other agents
+            // step 3: the agent: three ways to reach a model, with what was found for each
             Column { visible: wl.step === 2; width: parent.width; spacing: 16
-                SetupList { width: parent.width; ids: ["claude"] }
-                ClaudeSignIn { width: parent.width }
-                SetupList { width: parent.width; ids: ["agent.claude"] }
-                Column { width: parent.width; spacing: 6; visible: others.rows.length > 0
-                    Txt { kind: "cap"; text: "Other agents on this computer" }
-                    SetupList { id: others; width: parent.width; ids: ["agent.codex", "agent.gemini", "agent.cursor", "agent.desktop"] } }
-                Txt { kind: "fine"; width: parent.width; visible: wl.absentAgents.length > 0
-                    text: "Not found here: " + wl.absentAgents.join(", ") + ". If you install one later, add Form Studio to it under Settings, Software." }
+                Row { id: ways; width: parent.width; spacing: 10
+                    Repeater {
+                        model: [{ id: "cli", icon: "monitor", title: "An agent app", sub: "Claude Code, Codex, Gemini CLI and others, on their own accounts" },
+                                { id: "api", icon: "globe", title: "A model API", sub: "Anthropic, OpenAI, Gemini, OpenRouter, Mistral, xAI, DeepSeek or Groq, with your key" },
+                                { id: "local", icon: "cuboid", title: "A local model", sub: "Ollama, LM Studio or llama.cpp on this computer" }]
+                        Rectangle {
+                            id: way
+                            required property var modelData
+                            readonly property bool on: wl.way === modelData.id
+                            readonly property var found: wl.agentsOf(modelData.id).filter(function (a) { return a.available })
+                            objectName: "agentWay_" + modelData.id
+                            width: (ways.width - 20) / 3; height: wc.implicitHeight + 26; radius: Theme.rMd
+                            color: on ? Theme.alpha(Theme.datum, 0.07) : wm.containsMouse ? Theme.washHover : Theme.plate1
+                            border.color: on ? Theme.datum : Theme.rule; border.width: on ? 1.5 : 1
+                            Behavior on color { Tint {} }
+                            Column { id: wc; x: 14; y: 13; width: parent.width - 28; spacing: 4
+                                Row { spacing: 8
+                                    Icon { name: way.modelData.icon; size: 15; color: way.on ? Theme.datum : Theme.ink2; anchors.verticalCenter: parent.verticalCenter }
+                                    Txt { text: way.modelData.title; font.weight: Theme.wSemi; anchors.verticalCenter: parent.verticalCenter } }
+                                Txt { kind: "fine"; tone: 2; width: parent.width; text: way.modelData.sub }
+                                Txt { kind: "fine"; width: parent.width; color: way.found.length ? Theme.pass : Theme.ink3
+                                    text: way.found.length ? "Found: " + way.found.map(function (a) { return a.label }).join(", ") : "None found yet" } }
+                            MouseArea { id: wm; anchors.fill: parent; hoverEnabled: true; onClicked: wl.way = way.modelData.id }
+                        }
+                    }
+                }
+                // an agent app: what is installed, and the installs and sign-ins for the ones Form Studio can set up
+                Column { visible: wl.way === "cli"; width: parent.width; spacing: 16
+                    Rectangle { visible: wcli.children.length > 1; width: parent.width; height: wcli.implicitHeight; radius: Theme.rMd
+                        color: Theme.plate1; border.color: Theme.rule
+                        Column { id: wcli; width: parent.width
+                            Repeater {
+                                model: wl.step === 2 && wl.way === "cli" ? wl.agentsOf("cli").filter(function (a) { return a.available }) : []
+                                AgentRow { width: wcli.width; a: modelData; first: index === 0
+                                    required property var modelData
+                                    required property int index } } } }
+                    Txt { visible: wl.sw && wl.missingApps.length > 0; kind: "cap"; text: "Agent apps Form Studio can install" }
+                    SetupList { width: parent.width; visible: wl.missingApps.length > 0; ids: wl.missingApps }
+                    ClaudeSignIn { width: parent.width; visible: !!Store.softwareItem("claude") && Store.softwareItem("claude").status === "ok" }
+                    Column { width: parent.width; spacing: 6; visible: others.rows.length > 0
+                        Txt { kind: "cap"; text: "Form Studio's tools in your agents" }
+                        Txt { kind: "fine"; width: parent.width; text: "So the agent can also use Form Studio from its own window or a terminal." }
+                        SetupList { id: others; width: parent.width; ids: ["agent.claude", "agent.codex", "agent.gemini", "agent.cursor", "agent.desktop"] } }
+                    Txt { kind: "fine"; width: parent.width; visible: wl.absentAgents.length > 0
+                        text: "Not found here: " + wl.absentAgents.join(", ") + ". If you install one later, add Form Studio to it under Settings, Software." } }
+                // a model API: keys found in the environment, or added here
+                Column { visible: wl.way === "api"; width: parent.width; spacing: 10
+                    Txt { kind: "fine"; tone: 2; width: parent.width
+                        text: "Form Studio talks to the provider directly, with its own tools. Usage is billed to your account with that provider. A key you add is kept in a private file on this computer and sent only to its provider." }
+                    Rectangle { width: parent.width; height: wapi.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+                        Column { id: wapi; width: parent.width
+                            Repeater {
+                                model: wl.step === 2 && wl.way === "api" ? wl.agentsOf("api") : []
+                                AgentRow { width: wapi.width; a: modelData; first: index === 0; k: wl.keyFor(modelData.key || "")
+                                    required property var modelData
+                                    required property int index
+                                    onSaveKey: function (v) { wl.saveKey(modelData.key, v) }
+                                    onClearKey: wl.clearKey(modelData.key) } } } } }
+                // a local model: servers found on their usual ports
+                Column { visible: wl.way === "local"; width: parent.width; spacing: 10
+                    Item { width: parent.width; height: 28
+                        Txt { kind: "fine"; tone: 2; width: parent.width - 130; anchors.verticalCenter: parent.verticalCenter
+                            text: "Nothing leaves this computer. Start the server with a model that supports tool calls, then look again." }
+                        Btn { small: true; kind: "quiet"; icon: "refresh_cw"; text: "Look again"; busy: Store.agentsChecking; anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter; onClicked: Store.refreshAgents() } }
+                    Rectangle { width: parent.width; height: wloc.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+                        Column { id: wloc; width: parent.width
+                            Repeater {
+                                model: wl.step === 2 && wl.way === "local" ? wl.agentsOf("local") : []
+                                AgentRow { width: wloc.width; a: modelData; first: index === 0
+                                    required property var modelData
+                                    required property int index } } } } }
             }
         }
     }

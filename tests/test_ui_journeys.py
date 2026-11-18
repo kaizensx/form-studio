@@ -50,6 +50,7 @@ def run_journey(script: str, size: str = "1440x900", env_extra: dict | None = No
                    FORM_UITEST_AGENT=str(HERE / "fixtures" / "fake_agent.py"), FORM_UITEST_TMP=tmp,
                    FORM_SECRETS=str(Path(tmp) / "secrets.json"),          # never the user's own agent keys
                    FORM_NO_AUTO_SETUP="1",                                 # first start never installs for real in a test
+                   FORM_PROVIDERS_OFFLINE="1",                             # a test key is never sent to a real model provider
                    FORM_UITEST_OUT=os.environ.get("FORM_UI_SHOTS") or str(Path(tmp) / "shots"), FORM_REDUCED_MOTION="0")
         if os.environ.get("FORM_UI_STUDIO_TOML"):      # CI: a studio.toml that pins a slicer and presets for every journey
             (Path(tmp) / "studio.toml").write_text(Path(os.environ["FORM_UI_STUDIO_TOML"]).read_text(encoding="utf-8"), encoding="utf-8")
@@ -95,7 +96,8 @@ class Journeys(unittest.TestCase):
         # installs and the upgrade are simulated, one item is reported missing so there is something to install,
         # and a newer release is pretended so the update sheet has something to offer
         self.journey("shell.py", env_extra={"FORM_INSTALL_FAKE": "0.6", "FORM_SETUP_PRETEND_MISSING": "openscad,parts",
-                                            "FORM_FAKE_LATEST": "99.0.0"})
+                                            "FORM_FAKE_LATEST": "99.0.0",
+                                            "FORM_UITEST_API_AGENTS": "1"})     # the provider rows on Settings › Agents
 
     def test_printers(self):
         # Bambu Studio is a fixture folder; every other slicer points at a program that does not exist
@@ -111,6 +113,9 @@ class Journeys(unittest.TestCase):
         from unittest import mock
         with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(toml)}):     # run_journey copies it into the run's folder
             self.journey("printers.py")
+
+    def test_api_agents(self):
+        self.journey("agents.py", env_extra={"FORM_UITEST_API_AGENTS": "1"})
 
     def test_install_flow(self):
         self.journey("install.py", env_extra={"FORM_INSTALL_FAKE": "3", "FORM_SETUP_PRETEND_MISSING": "parts,claude.signin",

@@ -6,13 +6,13 @@ import "F.js" as F
 // Settings: everything you would otherwise edit in studio.toml, plus the Software tab (the installer registry).
 // Edits collect in `edits` and are written by "Save changes": only the changed keys are rewritten, comments and
 // other keys stay, and the previous file is kept as a backup next to it (form/config_edit.py).
-// Open with Store.openSettings("general" | "printer" | "chat" | "apps" | "software").
+// Open with Store.openSettings("general" | "printer" | "chat" (the Agents tab) | "apps" | "software").
 Column {
     id: st
     property string title: "Settings"
     property int sheetWidth: Theme.sheetL
     property int sheetHeight: 520
-    readonly property var tabs: [{ value: "general", text: "General" }, { value: "printer", text: "Printer and slicer" }, { value: "chat", text: "Chat" },
+    readonly property var tabs: [{ value: "general", text: "General" }, { value: "printer", text: "Printer and slicer" }, { value: "chat", text: "Agents" },
                                  { value: "apps", text: "Other apps" }, { value: "software", text: "Software", badge: Store.setupAttention && Store.setupAttention.length ? Store.setupAttention.length : 0 }]
     function accept() { if (tab !== "software" && dirty > 0) save() }
     // the action bar: what is saved where on the left, the actions on the right
@@ -42,16 +42,20 @@ Column {
     spacing: 14
     Component.onCompleted: { if (!Store.config) Store.loadConfig(); if (!Store.software) Store.checkSoftware(); st.loadKeys() }
 
-    // agent keys (Gemini): kept by FORM in a private file, never shown back; only "set" or "not set" comes from the engine
+    // API keys: kept by Form Studio in a private file, never shown back; only "set" or "not set" comes from the engine
     property var keys: []
     function loadKeys() { Store.get("/secrets").then(function (r) { st.keys = r.keys }, function () {}) }
+    function keyFor(name) { for (var i = 0; i < st.keys.length; i++) if (st.keys[i].name === name) return st.keys[i]; return null }
     function saveKey(name, value) {
         return Store.post("/secrets", { name: name, value: value }).then(function (r) {
-            st.keys = r.keys; Store.toast(r.key.label + " saved", "Kept in a private file on this computer and given only to its agent.")
-            Store.checkSoftware() }, Store.fail) }
+            st.keys = r.keys; Store.toast(r.key.label + " saved", "Kept in a private file on this computer and sent only to its provider.")
+            Store.checkSoftware(); Store.refreshAgents() }, Store.fail) }
     function clearKey(name) {
         return Store.post("/secrets", { name: name, clear: true }).then(function (r) {
-            st.keys = r.keys; Store.toast(r.key.label + " removed", ""); Store.checkSoftware() }, Store.fail) }
+            st.keys = r.keys; Store.toast(r.key.label + " removed", ""); Store.checkSoftware(); Store.refreshAgents() }, Store.fail) }
+    readonly property var cliAgents: Store.chatAgents.filter(function (a) { return a.kind !== "api" })
+    readonly property var apiAgents: Store.chatAgents.filter(function (a) { return a.kind === "api" && !a.local })
+    readonly property var localAgents: Store.chatAgents.filter(function (a) { return a.kind === "api" && a.local })
 
     function same(a, b) { return JSON.stringify(a) === JSON.stringify(b) }
     function current(r) { return st.edits[r.key] !== undefined ? st.edits[r.key] : r.value }
@@ -78,42 +82,53 @@ Column {
             title: "The slicer decides the printer"
             text: "Form Studio follows the printer, filament and process selected in " + (Store.slicer.label || "the slicer") + " (now: " +
                   (Store.slicer.available ? Store.slicer.presets.machine.name : "") + "). The name and bed size below are used only when no slicer is available." }
-        Note { visible: st.tab === "chat" && !Store.chat.available; kind: "amber"; title: "Chat is not available yet"
-            text: (Store.chat.note || "") + " Install Claude Code and sign in under Software."
-            Btn { small: true; text: "Open Software"; onClicked: st.tab = "software" } }
-        // ── agents: every CLI chat can drive, installed or not (chat workstream) ──
-        Txt { visible: st.tab === "chat"; kind: "cap"; text: "Agents" }
-        Rectangle { visible: st.tab === "chat" && Store.chatAgents.length > 0; width: parent.width; height: agList.implicitHeight; radius: Theme.rMd
+        Note { visible: st.tab === "chat" && !Store.chat.available; kind: "amber"; title: "No agent is connected yet"
+            text: "Chat works with the agent you choose: an agent app installed here, a model provider's API key, or a model running on this computer." }
+        // ── agents: every way chat can reach a model, set up or not (agents workstream) ──
+        Txt { visible: st.tab === "chat"; kind: "cap"; text: "Agent apps on this computer" }
+        Txt { visible: st.tab === "chat"; kind: "fine"; width: parent.width
+            text: "Each runs on its own account with Form Studio's tools. Install more under Software." }
+        Rectangle { visible: st.tab === "chat" && st.cliAgents.length > 0; width: parent.width; height: agList.implicitHeight; radius: Theme.rMd
             color: Theme.plate1; border.color: Theme.rule
             Column { id: agList; width: parent.width
                 Repeater {
-                    model: st.tab === "chat" ? Store.chatAgents : []
-                    Item {
-                        id: ag
+                    model: st.tab === "chat" ? st.cliAgents : []
+                    AgentRow { width: agList.width; a: modelData; first: index === 0; objectName: "agentRow"
                         required property var modelData
                         required property int index
-                        readonly property var a: modelData
-                        readonly property var si: a.signin || null
-                        readonly property string dflt: { var ms = a.models || []; return ms.length ? ms[0].label : "" }
-                        objectName: "agentRow"
-                        width: agList.width; height: Math.max(agl.implicitHeight, 28) + 22
-                        Rectangle { visible: ag.index > 0; x: 16; width: parent.width - 32; height: 1; color: Theme.rule }
-                        Rectangle { x: 16; y: 17; width: 7; height: 7; radius: 3.5
-                            color: !ag.a.available ? Theme.ink4 : ag.si && ag.si.signed_in === false ? Theme.amber : Theme.pass }
-                        Column { id: agl; x: 32; width: parent.width - 32 - agr.width - 28; anchors.verticalCenter: parent.verticalCenter; spacing: 2
-                            Row { spacing: 8
-                                Txt { text: ag.a.label; font.weight: Theme.wMedium }
-                                Tag { visible: ag.a.available && String(ag.a.verified).indexOf("not run") === 0; text: "untested"; kind: "assumed"; anchors.verticalCenter: parent.verticalCenter }
-                                Txt { visible: Store.chatDefault.agent === ag.a.id; kind: "fine"; text: "default for new conversations"; anchors.verticalCenter: parent.verticalCenter } }
-                            Txt { kind: "fine"; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
-                                text: !ag.a.available ? (ag.a.why || "Not installed.") : (ag.si ? ag.si.how : "Installed") }
-                            Txt { kind: "fine"; tone: 4; mono: true; font.pixelSize: 10; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; visible: ag.a.available
-                                text: (ag.a.cli || "") + (ag.dflt ? "  ·  " + ag.dflt : "") + ((ag.a.models || []).length > 1 ? "  ·  " + ((ag.a.models || []).length - 1) + " listed models" : "") } }
-                        Row { id: agr; anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 6
-                            Btn { visible: !ag.a.available; small: true; icon: "download"; text: "Install…"; onClicked: st.tab = "software" }
-                            Btn { visible: ag.a.available && Store.chatDefault.agent !== ag.a.id; small: true; kind: "quiet"; text: "Make default"
-                                onClicked: Store.post("/chat/defaults", { agent: ag.a.id, model: "default", effort: "" }).then(function () { Store.reloadStudio() }, Store.fail) } }
-                    }
+                        onInstall: st.tab = "software" }
+                }
+            } }
+        Txt { visible: st.tab === "chat"; kind: "cap"; text: "Model provider APIs"; topPadding: 6 }
+        Txt { visible: st.tab === "chat"; kind: "fine"; width: parent.width
+            text: "Form Studio talks to the provider directly, with its own tools; no other app is needed. A key set in your environment is found by itself. Keys you add are kept in a private file on this computer and sent only to their provider." }
+        Rectangle { visible: st.tab === "chat" && st.apiAgents.length > 0; width: parent.width; height: apList.implicitHeight; radius: Theme.rMd
+            color: Theme.plate1; border.color: Theme.rule
+            Column { id: apList; width: parent.width
+                Repeater {
+                    model: st.tab === "chat" ? st.apiAgents : []
+                    AgentRow { width: apList.width; a: modelData; first: index === 0; k: st.keyFor(modelData.key || "")
+                        objectName: "secretRow"                 // every provider API row takes a key
+                        required property var modelData
+                        required property int index
+                        onSaveKey: function (v) { return st.saveKey(modelData.key, v) }
+                        onClearKey: st.clearKey(modelData.key) }
+                }
+            } }
+        Item { visible: st.tab === "chat"; width: parent.width; height: 30
+            Txt { kind: "cap"; text: "Local models"; anchors.bottom: parent.bottom; anchors.bottomMargin: 2 }
+            Btn { small: true; kind: "quiet"; icon: "refresh_cw"; text: "Look again"; busy: Store.agentsChecking; anchors.right: parent.right
+                anchors.bottom: parent.bottom; onClicked: Store.refreshAgents() } }
+        Txt { visible: st.tab === "chat"; kind: "fine"; width: parent.width
+            text: "Servers on this computer, found on their usual ports. Nothing leaves this computer. The model must support tool calls." }
+        Rectangle { visible: st.tab === "chat" && st.localAgents.length > 0; width: parent.width; height: loList.implicitHeight; radius: Theme.rMd
+            color: Theme.plate1; border.color: Theme.rule
+            Column { id: loList; width: parent.width
+                Repeater {
+                    model: st.tab === "chat" ? st.localAgents : []
+                    AgentRow { width: loList.width; a: modelData; first: index === 0; objectName: "localRow"
+                        required property var modelData
+                        required property int index }
                 }
             } }
         Txt { visible: st.tab === "chat" && st.rows.length > 0; kind: "cap"; text: "Defaults" }
@@ -162,42 +177,6 @@ Column {
                                     onEdited: function (t) { if (t !== "" && !isNaN(Number(t))) { var a = row.v.slice(); a[index] = Number(t); st.setEdit(row.r, a) } } } }
                             Txt { visible: row.r.type === "vec3"; kind: "fine"; text: "mm"; anchors.verticalCenter: parent.verticalCenter }
                         }
-                    }
-                }
-            } }
-        // ── keys: one row per agent key ─────────────────────────
-        Rectangle { visible: st.tab === "chat" && st.keys.length > 0; width: parent.width; height: keyList.implicitHeight; radius: Theme.rMd
-            color: Theme.plate1; border.color: Theme.rule
-            Column { id: keyList; width: parent.width
-                Repeater {
-                    model: st.tab === "chat" ? st.keys : []
-                    Item {
-                        id: krow
-                        required property var modelData
-                        required property int index
-                        readonly property var k: modelData
-                        objectName: "secretRow"
-                        width: keyList.width; height: Math.max(kleft.implicitHeight, 28) + 26
-                        Rectangle { visible: krow.index > 0; x: 16; width: parent.width - 32; height: 1; color: Theme.rule }
-                        Column { id: kleft; x: 16; width: parent.width * 0.5 - 24; anchors.verticalCenter: parent.verticalCenter; spacing: 2
-                            Row { spacing: 6
-                                Icon { name: "lock"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
-                                Txt { text: krow.k.label; font.weight: Theme.wMedium } }
-                            Txt { kind: "fine"; text: krow.k.help; width: parent.width }
-                            Txt { kind: "fine"; width: parent.width; color: krow.k.set || krow.k.from_env ? Theme.pass : Theme.ink3
-                                text: krow.k.from_env ? "Set in the environment for this run. That one is used."
-                                    : krow.k.set ? "Stored privately on this computer. It is not shown again." : "Not set." } }
-                        Row { anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 8
-                            Field { id: kf; objectName: "secretField"; visible: !krow.k.set; width: 220; placeholder: "Paste the key"; mono: true
-                                input.echoMode: TextInput.Password
-                                onAccepted: function (t) { if (t.trim()) st.saveKey(krow.k.name, t).then(function () { kf.text = "" }) } }
-                            Btn { visible: !krow.k.set; small: true; kind: "quiet"; icon: "external_link"; text: "Get a key"
-                                anchors.verticalCenter: parent.verticalCenter; onClicked: Bridge.openLink(krow.k.url) }
-                            Btn { visible: !krow.k.set; small: true; kind: "primary"; text: "Save key"; enabled: kf.text.trim().length > 0
-                                anchors.verticalCenter: parent.verticalCenter
-                                onClicked: st.saveKey(krow.k.name, kf.text).then(function () { kf.text = "" }) }
-                            Btn { visible: krow.k.set; small: true; kind: "quiet"; icon: "trash_2"; text: "Remove"
-                                anchors.verticalCenter: parent.verticalCenter; onClicked: st.clearKey(krow.k.name) } }
                     }
                 }
             } }

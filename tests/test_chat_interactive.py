@@ -60,6 +60,62 @@ class ModelNames(unittest.TestCase):
             self.assertIn("claude-opus-5-5", ms[1]["note"])
             self.assertEqual(ms[1]["resolved"], "claude-opus-5-5")
 
+    @staticmethod
+    def _switched_conversation(data: Path) -> str:
+        """A conversation answered by Claude Code (Opus) and then switched to Codex before its next message: the
+        state that once put a Claude model under Codex in models.json."""
+        from form.conversations import Conversations
+        s = Conversations(data)
+        m = s.create(None, "claude", "opus")
+        s.append(m["id"], {"t": "user", "text": "hi"})
+        s.append(m["id"], {"t": "start", "model": "claude-opus-5-5", "agent": "claude", "asked": "opus"})
+        s.append(m["id"], {"t": "end", "cost_usd": 0.1, "agent": "claude", "model": "claude-opus-5-5"})
+        meta = s.meta(m["id"])
+        meta.update(agent="codex", model="default", resolved_agent=None)    # as an earlier version left it
+        (s.dir(m["id"]) / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+        return m["id"]
+
+    def test_a_bad_learned_entry_from_an_earlier_version_is_dropped(self):
+        """The owner's models.json had Codex's default as claude-opus-5-5. Codex never runs Claude models."""
+        with tempfile.TemporaryDirectory() as d:
+            data = Path(d)
+            self._switched_conversation(data)
+            f = data / ".conversations" / "models.json"
+            f.write_text(json.dumps({"claude": {"opus": {"id": "claude-opus-5-5", "label": "Opus 5.5", "ts": 1}},
+                                     "codex": {"default": {"id": "claude-opus-5-5", "label": "Opus 5.5", "ts": 1}}}))
+            L = Learned(data)
+            L.seed()
+            self.assertIsNone(L.get("codex", "default"))
+            self.assertEqual(L.get("claude", "opus")["id"], "claude-opus-5-5", "a confirmed entry is kept")
+            codex = {"id": "codex", "label": "Codex", "models": [{"id": "default", "label": "Default", "note": "From your Codex config: gpt-6.1-sol"}]}
+            self.assertEqual(L.decorate(codex)["models"][0]["label"], "Default")
+            self.assertNotIn("claude", json.dumps(L.decorate(codex)))
+            before = f.read_text()
+            L.seed()                                               # repaired once; nothing more to do
+            self.assertEqual(f.read_text(), before)
+
+    def test_first_seed_learns_only_what_each_agent_reported(self):
+        with tempfile.TemporaryDirectory() as d:
+            data = Path(d)
+            self._switched_conversation(data)
+            L = Learned(data)
+            L.seed()
+            self.assertEqual(L.all().keys(), {"claude"})
+            self.assertEqual(L.get("claude", "opus")["id"], "claude-opus-5-5")
+
+    def test_switching_agent_forgets_the_other_agents_model(self):
+        with tempfile.TemporaryDirectory() as d:
+            data = Path(d)
+            cid = self._switched_conversation(data)
+            c = chat.Chat({"chat": {}}, data, "/nonexistent", adapters={})
+            self.assertIsNone(c.conversation(cid)["resolved_model"], "a legacy meta: the model belongs to Claude Code")
+            from form.conversations import Conversations
+            s = Conversations(data)
+            m = s.create(None, "claude", "opus")
+            s.append(m["id"], {"t": "start", "model": "claude-opus-5-5", "agent": "claude", "asked": "opus"})
+            self.assertEqual(s.meta(m["id"])["resolved_agent"], "claude")
+            self.assertIsNone(s.update(m["id"], agent="codex")["resolved_model"])
+
     def test_chat_learns_the_model_from_the_stream_and_names_it_on_the_reply(self):
         with tempfile.TemporaryDirectory() as t:
             data = Path(t)
