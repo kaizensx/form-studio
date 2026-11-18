@@ -134,7 +134,7 @@ def assembly_md(d, out_dir: Path, release=None) -> tuple[str, list]:
              "They are diagrams; Form Studio has not seen the parts go together.", ""]
     ov = f"assembly-00.png"
     feats = [{"id": "placed", "label": "Assembled"}, {"id": "new", "label": "This step"}]
-    png = render_png(_scene(d, {x["id"]: x["explode"] for x in asm["parts"]}, ""), feats[:1], "iso", None, size=(880, 600),
+    png = render_png(_scene(d, {x["id"]: x.get("explode_total", x["explode"]) for x in asm["parts"]}, ""), feats[:1], "iso", None, size=(880, 600),
                      title="Exploded view", caption="Each part offset along its separation direction")
     (out_dir / ov).write_bytes(png)
     images.append(ov)
@@ -146,9 +146,9 @@ def assembly_md(d, out_dir: Path, release=None) -> tuple[str, list]:
         placed = {ids[i]: [0, 0, 0] for i in range(s["upto"] + 1)}
         if s["kind"] == "part":
             x = s["part"]
-            placed[x["id"]] = x["explode"]
+            placed[x["id"]] = x.get("explode_total", x["explode"])
             title, text = f"Step {k}: {x['label']}", x["note"] or f"Place the {x['label'].lower()}."
-            how = "Separation direction: " + _dir_text(x["explode"]) + "."
+            how = "Separation direction: " + _dir_text(x.get("explode_total", x["explode"])) + "."
             hl = x["id"]
         else:
             h = s["hw"]
@@ -162,10 +162,17 @@ def assembly_md(d, out_dir: Path, release=None) -> tuple[str, list]:
         lines += [f"### {k}. {title.split(': ', 1)[1]}", "", text, "", how, "", f"![{title}]({img})", ""]
     if asm["joints"]:
         lines += ["## Moving parts", ""]
+        labels = {x["id"]: x["label"] for x in asm["parts"]}
         for j in asm["joints"]:
+            if j["kind"] == "fixed":
+                continue
             u = "°" if j["kind"] == "hinge" else " mm"
-            lines.append(f"- {j['label']}: {j['part']} {j['kind']}, {j['range'][0]:g}–{j['range'][1]:g}{u}, "
-                         f"checked at {j['samples']} positions (see MOTION_CHECKS.csv). Sampled positions only.")
+            moves = [labels.get(m, m) for m in j.get("moves") or [j["part"]]]
+            on = f" on the {labels.get(j['parent'], j['parent']).lower()}" if j.get("parent") else ""
+            how = (f"clicks every {j['step']:g}{u}, checked at each click" if j.get("step") else
+                   f"swept from {j['samples']} positions, refined near contact")
+            lines.append(f"- {j['label']}: {j['kind']}{on}, {j['range'][0]:g}–{j['range'][1]:g}{u}, moves "
+                         f"{', '.join(moves)}; {how} (see MOTION_CHECKS.csv and the motion checks for what was proven).")
         lines.append("")
     lines += ["## Limits", "", "- Placements come from the design's assembly declaration; the checks test that geometry, not the printed parts.",
               "- Printed parts differ from the model by the printer's accuracy; see the fit and clearance checks.", ""]
@@ -225,8 +232,8 @@ def print_report(d, release=None) -> str:
     motion = [c for c in checks or [] if c["id"].startswith("asm_motion")]
     if motion:
         lines += ["## Motion checks (sampled)", "", "| Joint | Result | Worst | Samples | Method |", "|---|---|---|---|---|"]
-        lines += [f"| {c['label']} | {c['status']} | {c['value']} | {len(c.get('samples', []))} | boolean overlap + B-rep distance (computed); "
-                  "does not prove continuous freedom |" for c in motion]
+        lines += [f"| {c['label']} | {c['status']} | {c['value']} | {len(c.get('samples', []))} | "
+                  f"{c.get('method') or 'boolean overlap + B-rep distance'} (computed); " + _motion_claim(c) + " |" for c in motion]
         lines += ["", "Per-position results: MOTION_CHECKS.csv.", ""]
     s = sl or {}
     lines += ["## Process", "",
@@ -306,6 +313,15 @@ def measurement_plan(d, release=None) -> str:
     return "\n".join(lines)
 
 
+def _motion_claim(c) -> str:
+    if c.get("partial"):
+        cov = c.get("checked")
+        return f"partial: checked {cov[0]:g} to {cov[1]:g} only" if cov else "partial: not reached"
+    if c.get("proven") and not c.get("unproven") and c["status"] != "FAIL":
+        return "free between positions proven by the clearance bound"
+    return "does not prove continuous freedom between sampled positions"
+
+
 def motion_csv(d) -> str:
     out = io.StringIO()
     w = csv.writer(out, lineterminator="\n")
@@ -315,10 +331,20 @@ def motion_csv(d) -> str:
         if not c["id"].startswith("asm_motion"):
             continue
         for s in c.get("samples", []):
-            w.writerow([f"r{d['rev']['n']:02d}", c["label"], s["value"], "B-rep boolean intersection and distance (computed)",
-                        "" if s["clearance_mm"] is None else s["clearance_mm"],
-                        f"{s['overlap_mm3']} mm3 with {s['with']}" if s["overlap_mm3"] > 0.01 else "none",
-                        f"checks/{d['keys']['checks'][:12]}", "computed from the model, not measured; sampled positions only"])
+            state = s.get("state")
+            if s.get("overlap_mm3", 0) > 0.01:
+                hit = f"{s['overlap_mm3']} mm3 with {s['with']}"
+            elif state == "overlap":
+                hit = (f"at least {s['depth_mm']} mm deep into {s['with']}" if s.get("depth_mm") is not None else f"inside {s['with']}")
+            elif state == "contact":
+                hit = f"touching {s['with']} (within mesh tolerance)"
+            else:
+                hit = "none"
+            clear = s["clearance_mm"] if s.get("clearance_mm") is not None else (
+                f">= {s['clearance_at_least_mm']}" if s.get("clearance_at_least_mm") is not None else "")
+            w.writerow([f"r{d['rev']['n']:02d}", c["label"], s["value"], (c.get("method") or "B-rep boolean intersection and distance") + " (computed)",
+                        clear, hit, f"checks/{d['keys']['checks'][:12]}",
+                        "computed from the model, not measured; " + ("refined position" if s.get("refined") else "declared position")])
     return out.getvalue()
 
 

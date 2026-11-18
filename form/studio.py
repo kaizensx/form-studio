@@ -178,6 +178,7 @@ class Studio:
         if (cfg.get("cad") or {}).get("openscad"):
             os.environ["FORM_OPENSCAD"] = str(cfg["cad"]["openscad"])   # OpenSCAD designs build in the worker
         self.kernel = Kernel()
+        self._tl = threading.local()                        # the pipeline step running on this thread (progress)
         self.recipes = RecipeBook(self.sources)
         self.calibration = fit_mod.Calibration(self.root / "calibration.json")
         self.jobs: dict = {}
@@ -515,6 +516,26 @@ class Studio:
             raise StudioError(str(e), e.hint, kind="source")
         return rid
 
+    def _check_assembly(self, rid: str, values: dict) -> None:
+        """Refuse a design whose assembly() declaration cannot be used (unknown parts, loops, two parents, ...),
+        before it becomes a revision. Plain data: no kernel needed."""
+        recipe = self.recipes[rid]
+        if not self._declares_assembly(recipe):
+            return
+        try:
+            spec = recipe.assembly(recipe.validate(values))
+        except RecipeError:
+            return                                     # the build reports parameter problems with their own hints
+        except Exception as e:
+            raise StudioError(f"assembly() raised {type(e).__name__}: {e}", "Fix assembly() in the design source.", kind="source")
+        if spec is None:
+            return
+        probs = spec.validate(getattr(recipe, "solids", 1)) if hasattr(spec, "validate") else ["assembly() must return an Assembly."]
+        if probs:
+            raise StudioError("The assembly declaration cannot be used: " + " ".join(probs),
+                              "Fix assembly() in the design source; design_guide (ASSEMBLIES) shows parts, attach, joints with "
+                              "parent, and mates.", kind="source", problems=probs)
+
     def create_design(self, name: str, source: str, brief: str = "", values: dict | None = None,
                       language: str = "python", references: list | None = None) -> dict:
         """A new project whose geometry is defined by source: Python (one Recipe subclass) or OpenSCAD.
@@ -528,8 +549,9 @@ class Studio:
             if not src.is_file() or src.suffix.lower() not in REF_FORMATS:
                 raise StudioError(f"Not a STEP or STL file: {src}", "Give the absolute path of a .step, .stp or .stl file.")
             refs[self._ref_name(src.name)] = str(src.resolve())
+        self._check_assembly(rid, {**self.recipes[rid].defaults(), **(values or {})})
         self._k("summary", key="pv-" + H(rid, values or {}), recipe_id=rid, refs=refs,
-                values={**self.recipes[rid].defaults(), **(values or {})}, tol=0.1)        # must build before it is saved
+                values={**self.recipes[rid].defaults(), **(values or {})}, tol=0.1, timeout=180)   # must build before it is saved
         p = self.create(name, rid, brief, values)
         for path in refs.values():
             self.import_reference(p, Path(path))
@@ -551,7 +573,8 @@ class Studio:
             keep = {k: v for k, v in head["values"].items() if k in {q.key for q in new.params}}
             vals = {**new.defaults(), **keep, **{k: float(v) for k, v in (values or {}).items()}}
             vals = self._validate(rid, vals)
-            self._k("summary", key="pv-" + H(rid, vals), recipe_id=rid, values=vals, tol=0.1, p=p)
+            self._check_assembly(rid, vals)
+            self._k("summary", key="pv-" + H(rid, vals), recipe_id=rid, values=vals, tol=0.1, p=p, timeout=180)
             prov = {q.key: (head["provenance"][q.key] if q.key in head["provenance"] and q.key in keep
                             and head["provenance"][q.key].get("source") != "assumed" else _initial_provenance(q)) for q in new.params}
             n = max(r["n"] for r in p["revisions"]) + 1
@@ -659,6 +682,9 @@ class Studio:
         pe = self.printer_env(p)
         ck = H("checks", ek, pe["envelope"], pe["margin"],
                s.get("nozzle_mm", 0.4), checks_mod.CHECKS_VERSION, fit_in)
+        if self._declares_assembly(recipe):            # the assembly checks' method and time budget shape their results
+            from .assembly import ASSEMBLY_VERSION
+            ck = H(ck, "assembly", ASSEMBLY_VERSION, self.assembly_budget())
         fc = self._freecad()
         if fc and not getattr(recipe, "mesh", False):  # an installed FreeCAD adds a re-import check
             ck = H(ck, "freecad", fc)
@@ -675,6 +701,50 @@ class Studio:
         if extra:
             sk = H(sk, "plates", plates_mod.PLATES_VERSION, {k: v for k, v in extra.items() if k != "brief"})
         return {"geometry": gk, "exports": ek, "checks": ck, "slice": sk}
+
+    @staticmethod
+    def _declares_assembly(recipe) -> bool:
+        from .recipes.base import Recipe
+        f = getattr(type(recipe), "assembly", None)
+        return f is not None and f is not Recipe.assembly
+
+    def assembly_budget(self) -> float:
+        """Seconds the assembly checks may take ([assembly].budget_s; a design's Assembly(budget_s=...) wins)."""
+        try:
+            return float((self.cfg.get("assembly") or {}).get("budget_s", 45))
+        except (TypeError, ValueError):
+            return 45.0
+
+    def _assembly_checks(self, p, rev, keys, step=None) -> list:
+        """The assembly checks in their own kernel call, with their own budget. Never fails the checks step: a kernel
+        timeout or crash becomes a WARN row saying what was not checked."""
+        budget = self.assembly_budget()
+        try:
+            recipe = self.recipe(p)
+            spec = recipe.assembly(rev["values"]) if self._declares_assembly(recipe) else None
+            if spec is not None and getattr(spec, "budget_s", None):
+                budget = float(spec.budget_s)
+        except Exception:
+            spec = None
+        if spec is None:
+            return []
+
+        def prog(d):
+            if step is not None:
+                step["progress"] = {k: d.get(k) for k in ("phase", "label", "done", "total", "value", "joint")}
+                step["progress"]["seconds"] = round(time.perf_counter() - t0, 1)
+        t0 = time.perf_counter()
+        try:
+            r = self._k("assembly", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], budget_s=budget,
+                        p=p, timeout=budget + 180, on_progress=prog)
+        except StudioError as e:
+            return [{"id": "asm_budget", "label": "Assembly checks finished in their time budget", "status": "WARN",
+                     "value": "not finished", "evidence": "computed", "frame": None, "partial": True,
+                     "detail": f"The assembly checks did not finish: {e} Nothing about how the parts meet or move "
+                               "was verified in this run; the other checks are unaffected."}]
+        if step is not None:
+            step.pop("progress", None)
+        return r.get("checks") or []
 
     def apath(self, p: dict, node: str, key: str) -> Path:
         base = self.dir(p["id"]) / "artifacts" / node
@@ -1010,6 +1080,7 @@ class Studio:
                         step["state"] = "cached"
                         continue
                     step["state"] = "running"
+                    self._tl.step = step                         # long steps report progress on it
                     t0 = time.perf_counter()
                     try:
                         getattr(self, f"_make_{node}")(p, rev, keys, name)
@@ -1075,6 +1146,9 @@ class Studio:
                     orient=plates_mod.part_orientations(p), margin=pe["margin"])
         if a.get("mesh", {}).get("sha256") and a["mesh"]["sha256"] != ex["files"]["stl"]["sha256"]:
             raise StudioError("The STL on disk is not the one that was exported.", "Run the pipeline again to regenerate exports.")
+        asm_rows = self._assembly_checks(p, rev, keys, getattr(self._tl, "step", None))
+        if asm_rows:
+            a["assembly"] = asm_rows
         summary = self.read(p, "geometry", keys["geometry"])
         ctx = {"orientation": p["orientation"], "envelope": pe["envelope"],
                "margin": pe["margin"], "printer": pe["name"],

@@ -178,6 +178,10 @@ pages: "1", "1-3", "2,5" (at most 4). Use this for official dimensions of boards
 Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
 built with build123d. FORM builds it, and with run=True exports, checks and slices it. Load or build errors come
 back with the line and a hint; fix and call again. Then render(view="sheet") and look at it.
+Several parts: declare assembly() (design_guide, ASSEMBLIES): parts with attach=, joints with parent= (chains: a
+joint moves everything attached below it), Mate() for pins and threads. A declaration that cannot be used
+(unknown part, a loop, two parents) is refused with the reason; the assembly checks then run in their own time
+budget and say which joint ranges they reached.
 language="openscad": source is an OpenSCAD file; parameters come from Customizer comments (`w = 40; // [20:1:120]`).
 OpenSCAD output is a mesh: no STEP, no B-rep checks (reported as not available, never faked).
 references: absolute paths of STEP/STL parts to import first, so a Python design can use self.reference("name.step").
@@ -197,7 +201,8 @@ references: absolute paths of STEP/STL parts to import first, so a Python design
 Replace a design's code as a new revision (history keeps every version). Existing parameter values carry over;
 changing a default does not change a saved value, so pass values={...} to change them. New parameters start at
 their defaults. Use preview_change/commit_change instead when only values change. language defaults to the
-project's current one ("python" or "openscad").
+project's current one ("python" or "openscad"). An unusable assembly() declaration is refused with the reason,
+and no revision is made.
 
 | Argument | Type | Required |
 |---|---|---|

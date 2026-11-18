@@ -390,7 +390,7 @@ def _thickness(model, max_rays=1500):
 
 
 def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180, 180, 180), orientation="as_modelled",
-               orient=None, margin=2.0):
+               orient=None, margin=2.0, assembly=False):
     """Computed checks on the solid and on the exported mesh. No heuristics dressed as facts."""
     from . import mesh_audit
     model = _get(key, recipe_id, values, 0.05)
@@ -408,10 +408,11 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
         out["parts"] = [{"id": pid, "label": label, "material": material, "orientation": o,
                          "size": [round(b.size.X, 3), round(b.size.Y, 3), round(b.size.Z, 3)]}
                         for pid, label, material, solid, o in parts for b in [solid.bounding_box()]]
-    from . import assembly as asm
-    assembly_checks = asm.analyse(model)               # [] for a single part
-    if assembly_checks:
-        out["assembly"] = assembly_checks
+    if assembly:                                       # normally its own op (op_assembly), with its own time budget
+        from . import assembly as asm
+        assembly_checks = asm.analyse(model)           # [] for a single part
+        if assembly_checks:
+            out["assembly"] = assembly_checks
     if stl_path:
         tris, stl_format, stl_sha = mesh_audit.read_stl(Path(stl_path))
         row = next(r for r in table if r["id"] == orientation)
@@ -557,6 +558,21 @@ def op_reference(path, fmt, out):
     view = {"positions": _b64(P.astype(np.float32)), "indices": _b64(T.astype(np.uint32)), "edges": _b64(E)}
     Path(out).write_text(json.dumps(view), encoding="utf-8")
     return info
+
+
+PROGRESS = None        # set by the worker: sends ("progress", {...}) to the caller while an op runs
+
+
+def op_assembly(key, recipe_id, values, budget_s=45.0):
+    """Assembly checks (interference, fits, joint sweeps, tool access) within budget_s seconds of work.
+
+    Separate from op_analyse so a long sweep has its own time limit and never holds up the other checks.
+    Reports progress through PROGRESS while it runs."""
+    from . import assembly as asm
+    model = _get(key, recipe_id, values, 0.05)
+    t0 = time.perf_counter()
+    rows = asm.analyse(model, budget_s=budget_s, progress=PROGRESS)
+    return {"checks": rows, "seconds": round(time.perf_counter() - t0, 2)}
 
 
 def op_ping():

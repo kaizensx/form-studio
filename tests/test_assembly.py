@@ -5,6 +5,7 @@ run the worker and the pipeline end to end.
 """
 import csv
 import io
+import math
 import json
 import os
 import tempfile
@@ -87,10 +88,16 @@ class GeometryChecks(unittest.TestCase):
                         joints=[hinge("cube", (0, 1, 0), (10, 0, 20), (0, 90), samples=10, label="Swing")])
         r = next(x for x in asm.analyse(model(spec)) if x["id"].startswith("asm_motion"))
         self.assertEqual(r["status"], "FAIL")
-        self.assertIn("sampled at 10 positions; does not prove continuous freedom", r["detail"])
+        self.assertIn("(10 declared, ", r["detail"])
+        self.assertIn("does not prove continuous freedom", r["detail"])
         self.assertEqual(r["pose"]["joint"], "cube_hinge")
-        self.assertEqual(len(r["samples"]), 10)
-        self.assertEqual(r["samples"][0]["overlap_mm3"], 0.0)                       # assembled position is clear
+        self.assertGreaterEqual(len(r["samples"]), 10)
+        self.assertEqual(r["samples"][0]["state"], "clear")                         # assembled position is clear
+        self.assertGreater(r["samples"][0]["clearance_mm"], 0.9)                     # 1 mm gap at rest
+        # the cube's inner face (1 mm out from the pivot line, 10..20 mm below it) first reaches the block where
+        # cos θ = 20 sin θ - sin² θ ... i.e. sin θ = 1/20: 2.87°
+        self.assertAlmostEqual(r["first_contact"], math.degrees(math.asin(1 / 20)), delta=0.6)
+        self.assertGreater(float(r["value"].split()[0]), 1)                          # overlap volume on the B-rep, mm³
         free = Assembly(parts=spec.parts, joints=[slide("cube", (1, 0, 0), (0, 30), samples=4, label="Pull")])
         r2 = next(x for x in asm.analyse(model(free)) if x["id"].startswith("asm_motion"))
         self.assertEqual(r2["status"], "PASS")
@@ -104,6 +111,79 @@ class GeometryChecks(unittest.TestCase):
         early = Hardware("Screw", "M3", 1, after="block", access=screw.access)
         clear = [x for x in asm.analyse(model(Assembly(parts=parts, hardware=[early]))) if x["id"].startswith("asm_access")]
         self.assertEqual(clear[0]["status"], "PASS")
+
+
+def three(spec):
+    """A 20 mm block, a 10 mm cube and a 4 mm tip printed in a row."""
+    shape = Box(20, 20, 20, align=A) + Pos(40, 0, 0) * Box(10, 10, 10, align=A) + Pos(70, 0, 0) * Box(4, 4, 4, align=A)
+    return {"recipe": Two(spec), "values": {"sink": 0}, "shape": shape, "faces": []}
+
+
+class Chains(unittest.TestCase):
+    """The cube slides toward the block; the tip, attached to the cube's front face, gets there first."""
+
+    def spec(self, attach="arm", hi=17.0, budget=None):
+        return Assembly(parts=[Part("block", "Block", 0), Part("arm", "Arm", 1, move=(-5, 0, 0)),      # x 30..40
+                               Part("tip", "Tip", 2, move=(-42, 0, 0), attach=attach)],               # x 26..30, on its front
+                        joints=[slide("arm", (-1, 0, 0), (0, hi), samples=5, label="Push")], budget_s=budget)
+
+    def motion(self, rows):
+        return next(x for x in rows if x["id"].startswith("asm_motion"))
+
+    def test_a_part_attached_to_a_moving_part_moves_and_collides_with_it(self):
+        r = self.motion(asm.analyse(three(self.spec())))
+        self.assertEqual(r["status"], "FAIL", r["detail"])
+        self.assertIn("Tip hits Block", r["detail"])
+        self.assertIn("carrying Tip", r["detail"])
+        self.assertEqual(r["moves"], ["arm", "tip"])
+        self.assertAlmostEqual(r["first_contact"], 16.0, delta=0.2)                   # tip front 26 -> block face 10
+        self.assertGreater(r["pose"]["value"], 16.0)
+        # not attached, the tip stays put and the arm drives into it at once: the false collision a chain avoids
+        loose = self.motion(asm.analyse(three(self.spec(attach=""))))
+        self.assertEqual(loose["status"], "FAIL")
+        self.assertIn("Arm hits Tip", loose["detail"])
+        self.assertNotIn("carrying", loose["detail"])
+        self.assertLess(loose["first_contact"], 0.5)
+
+    def test_a_proven_free_slide_says_so(self):
+        r = self.motion(asm.analyse(three(self.spec(hi=12.0))))
+        self.assertEqual(r["status"], "PASS", r["detail"])
+        self.assertIn("free over the whole range", r["detail"])
+        self.assertEqual(r["unproven"], [])
+
+    def test_a_tiny_budget_reports_partial_not_clear(self):
+        rows = asm.analyse(three(self.spec(budget=1)), progress=None)
+        b = {x["id"]: x for x in rows}["asm_budget"]
+        self.assertIn(b["status"], ("PASS", "WARN"))
+        rows = asm.analyse(three(self.spec()), budget_s=1e-6)            # the studio's budget, no design override
+        by = {x["id"]: x for x in rows}
+        self.assertEqual(by["asm_budget"]["status"], "WARN")
+        self.assertTrue(by["asm_budget"]["partial"])
+        self.assertEqual(by["asm_interference"]["status"], "WARN")
+        self.assertIn("Not checked in the time budget", by["asm_interference"]["detail"])
+        self.assertNotEqual(self.motion(rows)["status"], "PASS")
+
+    def test_progress_is_reported(self):
+        seen = []
+        asm.analyse(three(self.spec()), progress=seen.append)
+        phases = [x["phase"] for x in seen]
+        self.assertIn("rest", phases)
+        self.assertIn("joint", phases)
+        self.assertEqual(phases[-1], "done")
+
+    def test_joined_pairs_are_measured_not_booleaned(self):
+        from form.recipes.base import Mate
+        # the tip sunk 1 mm into the arm's front face, declared a press fit: no interference failure, a fit row instead
+        spec = Assembly(parts=[Part("block", "Block", 0), Part("arm", "Arm", 1, move=(-5, 0, 0)),
+                               Part("tip", "Tip", 2, move=(-41, 0, 0), attach="arm")],
+                        mates=[Mate("tip", "arm", "press", label="Tip in the arm")])
+        by = {x["id"]: x for x in asm.analyse(three(spec))}
+        self.assertEqual(by["asm_interference"]["status"], "PASS")
+        self.assertIn("joined by design", by["asm_interference"]["detail"])
+        self.assertEqual(by["asm_fit_tip_arm"]["status"], "PASS")
+        undeclared = {x["id"]: x for x in asm.analyse(three(Assembly(parts=spec.parts)))}
+        self.assertEqual(undeclared["asm_interference"]["status"], "FAIL")
+        self.assertAlmostEqual(float(undeclared["asm_interference"]["value"].split()[0]), 16.0, delta=0.1)   # 4 x 4 x 1
 
 
 class StudioAssembly(unittest.TestCase):
@@ -130,6 +210,14 @@ class StudioAssembly(unittest.TestCase):
         self.assertTrue(all(m["part"] in ("box", "lid") for m in v["mesh"]))
         self.assertAlmostEqual(abs(a["parts"][1]["placement"]["q"][1]), 1.0, places=6)     # flipped about X
         self.assertLess(a["bbox"][1][0] - a["bbox"][0][0], v["bbox"][1][0] - v["bbox"][0][0])  # assembled is narrower
+
+    def test_unusable_declarations_are_refused_with_the_reason(self):
+        from form.studio import StudioError
+        bad = EXAMPLE.replace('note="Press the lid on, plug first."', 'attach="nope", note="Press the lid on, plug first."')
+        with self.assertRaises(StudioError) as e:
+            self.st.create_design("Bad asm", bad)
+        self.assertIn("attached to unknown part “nope”", str(e.exception))
+        self.assertIn("assembly()", e.exception.hint)
 
     def test_single_part_designs_are_unchanged(self):
         p = self.st.create("Hook", "hook")
@@ -180,7 +268,8 @@ class StudioAssembly(unittest.TestCase):
         self.st.run_sync(p["id"], ["geometry", "exports", "checks"])
         m = self.checks(self.st.load(p["id"]))["asm_motion_lid_hinge"]
         self.assertEqual(m["status"], "FAIL")
-        self.assertEqual(m["pose"]["value"], 5.0)
+        self.assertIn(m["pose"]["value"], [x["value"] for x in m["samples"]])        # the worst position checked
+        self.assertLessEqual(m["first_contact"], 5.0)                                  # the old 5° sample already hit
         self.assertTrue(m["at"] and m["to"])
         self.assertIn("Check failed: Lid hinge moves freely", " ".join(self.st.gate(self.st.load(p["id"]))["reasons"]))
 

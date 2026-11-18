@@ -60,6 +60,8 @@ DEFAULTS = {
              "agent": "", "effort": ""},
     # Optional: Blender, run headless for illustrative renders (render_photo). Empty app = look in the usual places.
     "blender": {"app": "", "timeout_s": 180, "samples": 128},
+    # Assembly checks (interference, fits, joint sweeps): seconds of work before they stop and report what they reached.
+    "assembly": {"budget_s": 45},
     # Open the bench in your browser when an agent starts working (MCP server).
     "bench": {"auto_open": True},
     # Look for a newer FORM release on GitHub at most once a day (public release metadata only; nothing is

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Assemblies that move like the real thing.** Joints form chains: a part can be fixed to another (`Part(attach="arm")`) or move on a joint mounted on another part (`hinge(..., parent="arm")`), so turning an arm swings the cup on it and the bolt in the cup, in the viewport sliders, the Assembled and Exploded views and the checks. Exploded offsets are relative to the parent. Ratchet joints (`step=15`) are checked at the positions they click to. Existing declarations work unchanged.
+- **Joined parts are fits, not collisions.** `Mate(a, b, "pin" | "thread" | ...)` declares a pin in its hole or a thread in its thread; the pair is measured against its clearance instead of booleaned, and a thread's arbitrary phase is searched.
+- **Assembly checks in seconds, within a budget.** Parts are compared on their meshes and booleaned only where they meet; joint sweeps refine near contact, give the first contact angle and prove motion free between positions where the clearance allows. They run in their own time budget (`[assembly].budget_s`, 45 s) with progress, and a partial result says which range was checked instead of timing out. A five-part shower holder with fine threads went from not finishing to 28 s.
+- **Wrong assembly declarations are refused with the reason** (unknown part, a loop, a part with two parents) when a design is created or updated.
+
 ## 12.0.0
 
 - **A new recipe library, made of the things people print most:** Gridfinity bin and baseplate, a box with a sliding, press-on or hinged lid, SKÅDIS pegboard accessories, a phone and tablet stand, a cable organizer, an under-desk hanger, a shelf bracket, a hose and pipe adapter, a self-watering planter, a faceted vase and lamp shade, and a battery and card holder. Each passes its checks at its defaults and prints without supports; multi-part recipes show Assembled and Exploded views. Recipes have categories and tags for search, in the app and the website gallery. The older dock, wall hook, twisted planter, gear pair, knob, hinged box and Gridfinity bin leave the library; designs that use them still open and build.

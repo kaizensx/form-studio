@@ -96,18 +96,32 @@ Item {
         for (var i = 0; i < js.length; i++) if (js[i].part === id) return js[i]
         return null
     }
+    function jointById(id) {
+        var js = asm ? asm.joints : []
+        for (var i = 0; i < js.length; i++) if (js[i].id === id) return js[i]
+        return null
+    }
+    // The joints that move a part, outermost first (the engine sends them as `chain`): arm tilt, then cup tilt for the
+    // cup bolt. Each joint's axis is given with every joint at 0, so they apply innermost first, then outward.
+    function chainOf(x) {
+        if (x.chain) return x.chain
+        var j = jointOf(x.id)
+        return j ? [j.id] : []
+    }
     function partXf(x) {                     // part as printed → where it is drawn: { pos, rot }
         if (!asmOn) return { pos: Qt.vector3d(0, 0, 0), rot: Qt.quaternion(1, 0, 0, 0) }
         var pl = x.placement, t = Qt.vector3d(pl.t[0], pl.t[1], pl.t[2]), q = Qt.quaternion(pl.q[0], pl.q[1], pl.q[2], pl.q[3])
-        var j = jointOf(x.id), v = j ? (pose[j.id] || 0) : 0
-        if (j && v) {
+        var ch = chainOf(x)
+        for (var i = ch.length - 1; i >= 0; i--) {
+            var j = jointById(ch[i]), v = j ? (pose[j.id] || 0) : 0
+            if (!j || !v || j.kind === "fixed") continue
             var ax = Qt.vector3d(j.axis[0], j.axis[1], j.axis[2]).normalized()
             if (j.kind === "hinge") {
                 var r = Quaternion.fromAxisAndAngle(ax, v), o = Qt.vector3d(j.origin[0], j.origin[1], j.origin[2])
                 t = r.times(t.minus(o)).plus(o); q = r.times(q)
             } else t = t.plus(ax.times(v))
         }
-        if (asmMode === "exploded") t = t.plus(Qt.vector3d(x.explode[0], x.explode[1], x.explode[2]).times(explode))
+        if (asmMode === "exploded") { var e = x.explode_total || x.explode; t = t.plus(Qt.vector3d(e[0], e[1], e[2]).times(explode)) }
         return { pos: t, rot: q }
     }
     // ── points on parts, from the print frame (where the engine computes) to where the part is drawn now ──
@@ -166,7 +180,7 @@ Item {
         if (on && asmMode === "exploded") {
             var asm = a
             for (var i = 0; i < asm.parts.length; i++) {
-                var x = asm.parts[i], e = Qt.vector3d(x.explode[0], x.explode[1], x.explode[2]).times(explode)
+                var x = asm.parts[i], xe = x.explode_total || x.explode, e = Qt.vector3d(xe[0], xe[1], xe[2]).times(explode)
                 lo = Qt.vector3d(Math.min(lo.x, x.bbox[0][0] + e.x), Math.min(lo.y, x.bbox[0][1] + e.y), Math.min(lo.z, x.bbox[0][2] + e.z))
                 hi = Qt.vector3d(Math.max(hi.x, x.bbox[1][0] + e.x), Math.max(hi.y, x.bbox[1][1] + e.y), Math.max(hi.z, x.bbox[1][2] + e.z))
             }

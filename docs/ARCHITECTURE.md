@@ -28,6 +28,7 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Kernel worker | `form/worker.py`, `form/kernel.py` | build123d on OpenCascade in a separate process; a crash or timeout restarts it without touching project state |
 | Recipes | `form/recipes/` | Parametric families and designs written as code (Python or OpenSCAD) |
 | Checks and analysis | `form/checks.py`, `form/analysis.py`, `form/fit.py` | Checks on the solid, analysis maps, the fit model, statics |
+| Assemblies | `form/recipes/assembly.py`, `form/assembly.py`, `form/collide.py` | Parts, kinematic chains and fits as data; interference, fit and joint-sweep checks on meshes with B-rep refinement, in their own time budget |
 | Slicer adapters | `form/adapters/` | Find the slicer, resolve presets, slice, parse the G-code |
 | Print simulation | `form/toolpath.py`, `form/simulate.py` | Per-layer toolpaths by line type, timed by the slicer's estimate |
 | Agents | `form/agents/`, `form/chat.py` | Run an agent CLI with Form Studio's tools for in-app conversations |

@@ -100,7 +100,10 @@ def impact_digest(imp: dict) -> dict:
 def job_digest(job: dict) -> dict:
     out = {"job": job.get("id"), "state": job["state"],
            "steps": [f"{s['label']}: {s['state']}" + (f" ({s['seconds']} s)" if s.get("seconds") is not None else "")
-                     + (f" - {s['error']['message']}" if s.get("error") else "") for s in job.get("steps", [])]}
+                     + (f" - {s['error']['message']}" if s.get("error") else "")
+                     + (f" [{s['progress'].get('label')}" + (f" at {s['progress']['value']}" if s['progress'].get('value') is not None else "")
+                        + f", {s['progress'].get('seconds')} s]" if s.get("progress") and s["state"] == "running" else "")
+                     for s in job.get("steps", [])]}
     if job.get("error"):
         out["error"] = job["error"]
     return out

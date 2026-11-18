@@ -211,13 +211,18 @@ QtObject {
             var n = jobSteps.length, fin = jobSteps.filter(function (x) { return x.state !== "queued" && x.state !== "running" }).length
             var cur = jobSteps.filter(function (x) { return x.state === "running" })[0]
             list.push({ id: "job", label: "Running the pipeline", t0: _jobT0, progress: n ? fin / n : -1, done: false, ok: true,
-                        detail: (cur ? cur.label : "") + " · " + fin + " of " + n })
+                        detail: (cur ? cur.label + _stepProgress(cur) : "") + " · " + fin + " of " + n })
             left = true
         }
         if (JSON.stringify(list) !== JSON.stringify(activity)) activity = list
         if (!left) _actTimer.stop()
     }
-    property var jobSteps: []          // the running pipeline job's steps: [{ node, label, state }]
+    property var jobSteps: []          // the running pipeline job's steps: [{ node, label, state, progress? }]
+    function _stepProgress(st) {       // a long step's own progress: the assembly checks say which joint and position
+        var p = st && st.progress
+        if (!p || !p.label) return ""
+        return " · " + p.label + (p.value !== undefined && p.value !== null ? " at " + p.value : "")
+    }
     property real _jobT0: 0
 
     // ── viewport coupling ────────────────────────────────────

@@ -179,9 +179,15 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
 
 ![A hinged box, assembled](images/app-assembly.webp)
 
-- **Assembled, exploded and print layouts** in the viewport, with hinge and slide joints you can move.
-- **Checks from the solids:** overlap when assembled, the smallest gap, each joint swept through its range, and whether
-  a screwdriver reaches every screw.
+- **Assembled, exploded and print layouts** in the viewport, with hinge and slide joints you can move. Joints form
+  chains: moving an arm swings the cup mounted on it and the bolt in the cup, and exploded views separate each part
+  from its parent.
+- **Checks from the solids:** overlap when assembled, the smallest gap, every declared fit (a pin in its hole, a thread
+  in its thread) against its clearance, each joint swept through its range with everything it carries, and whether a
+  screwdriver reaches every screw.
+- **Fast and bounded:** parts are compared on their meshes first and booleaned only where they meet; sweeps refine near
+  contact, locate the first contact angle and prove motion free between positions where the clearance allows. The
+  checks run in their own time budget and say exactly which range they reached.
 - **A bill of materials** for the bought hardware; a release adds `BOM.csv` and `ASSEMBLY.md`.
 
 ## Optimisation and alternatives

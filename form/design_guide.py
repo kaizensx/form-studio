@@ -83,19 +83,40 @@ HARDWARE: form.parts  (use it; do not guess screw, nut, insert, bearing or gear 
 
 ASSEMBLIES (for solids >= 2; without one the app can show the parts only as modelled and pulled apart, never
   assembled, and checks nothing about how they meet)
-  from form.recipes.base import Access, Assembly, Hardware, Part, hinge, slide
-  Part(id, label, solid, move, rotate, explode, note)   solid = index of the printed body, numbered left to right on the
-       plate (bounding-box centre X, then Y). Assembled placement = Pos(*move) * Rot(*rotate) applied to the part as printed.
-       explode = offset in mm along the separation direction for the exploded view. List parts in assembly order;
-       note is the assembly step ("Press the lid on.").
-  hinge(part, axis, origin, (lo_deg, hi_deg), samples) / slide(part, axis, (lo_mm, hi_mm), samples): the part moves,
-       every other part stays put; 0 is the assembled position. Use about one sample per 5 degrees.
+  from form.recipes.base import Access, Assembly, Hardware, Mate, Part, fixed, hinge, slide
+  Part(id, label, solid, move, rotate, explode, note, attach="")   solid = index of the printed body, numbered left to
+       right on the plate (bounding-box centre X, then Y). Assembled placement = Pos(*move) * Rot(*rotate) applied to the
+       part as printed. explode = offset in mm for the exploded view, RELATIVE TO ITS PARENT (a child separates with its
+       parent and then by its own offset). List parts in assembly order; note is the assembly step ("Press the lid on.").
+       attach="arm": the part is rigidly fixed to the arm and moves with it (a bolt in its hole, a cap on a tube).
+  hinge(part, axis, origin, (lo_deg, hi_deg), samples, parent="", step=0, id=, label=) / slide(part, axis, (lo, hi), samples,
+       parent="") / fixed(part, parent): the joint moves `part` AND everything attached below it, relative to `parent`
+       ("" = the world). Axis and origin are in the assembled frame with every joint at 0; a child joint's axis rides
+       with its parent's motion. 0 is the assembled position. step > 0 = a ratchet or detent: only multiples of step are
+       checked (the positions it can rest at). samples = the coarse sweep; Form Studio adds positions near contact.
+  KINEMATIC CHAINS: the parts form a tree. Each part has at most ONE link to a parent: attach=..., or one joint that
+       moves it. Example, a wall arm with a tilting cup:
+         Part("base", ...),                                   # fixed to the world
+         Part("pin", ..., attach="base"),                    # rides with the base
+         Part("arm", ...), Part("cup", ...), Part("cup_bolt", ..., attach="cup"),
+         joints=[hinge("arm", (1, 0, 0), pivot1, (-60, 60), parent="base", id="arm_tilt", label="Arm tilt"),
+                 hinge("cup", (1, 0, 0), pivot2, (-90, 90), parent="arm", id="cup_tilt", label="Cup tilt")]
+       Moving Arm tilt swings the arm, the cup and the cup bolt together; Cup tilt swings the cup and its bolt about an
+       axis that is wherever the arm put it. Never give a part both attach= and a joint, or two joints; no loops.
+  Mate(a, b, kind, clearance, label): two parts that touch or interlock BY DESIGN, kind = pin | thread | slip | snap |
+       press | contact. Declare one for every pin in its hole and every thread in its thread: they are then not booleaned
+       (fine threads are slow and always "collide"); their gap is measured once and compared with clearance (designed
+       gap per side, mm). Everything not mated is checked for overlap at rest and through every joint's motion.
   Hardware(name, size, qty, source, note, after=part_id, access=(Access(at, axis, tool_d, length),))
        bought parts for the BOM; access = a straight tool path ending at the screw head, pointing the way it is driven,
        checked against the parts in place after `after`.
-  Form Studio then checks, from the solids: overlap when assembled, the smallest gap, each joint swept at its samples (worst
-  overlap and the angle), and tool access. Sampled motion never proves the motion is free between samples.
-  The app shows Assembled / Exploded / Print layout, and a release adds BOM.csv and ASSEMBLY.md.
+  Assembly(parts, joints, hardware, mates, clearance_warn=0.1, budget_s=None)   budget_s: seconds for the assembly checks
+       (default [assembly].budget_s = 45); when it runs out the checks say which ranges they reached, never "clear".
+  Form Studio then checks, from the solids: overlap when assembled, the smallest gap, each mated fit, each joint swept
+  through its range with its whole chain (first contact angle, worst overlap; free between samples is proven where the
+  clearance exceeds the travel, otherwise reported as sampled only), and tool access. A wrong declaration (unknown part,
+  loop, two parents) is refused by create_design/update_design with the reason.
+  The app shows Assembled / Exploded / Print layout with a slider per joint, and a release adds BOM.csv and ASSEMBLY.md.
 
 TEXT AND MARKS: form.marks   PATTERNS: form.patterns
   from form import marks, patterns

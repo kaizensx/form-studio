@@ -36,6 +36,7 @@ def _serve(conn):
             meshsolid.set_paths(kwargs.pop("_refs", None))
             from . import marks                            # label text, revision and nozzle for designs with marks
             marks.set_context(kwargs.pop("_mark", None))
+            kernel.PROGRESS = (lambda d: conn.send(("progress", d))) if kwargs.pop("_progress", False) else None
             conn.send(("ok", kernel.OPS[op](**kwargs)))
         except RecipeError as e:
             conn.send(("recipe_error", e.public()))
@@ -69,17 +70,29 @@ class Kernel:
         finally:
             self._proc = self._conn = None
 
-    def call(self, op: str, timeout: float = 60, **kwargs):
+    def call(self, op: str, timeout: float = 60, on_progress=None, **kwargs):
+        """Run one kernel op. timeout covers the whole call; on_progress(dict) receives the op's progress reports."""
         with self._lock:
             if self._proc is None or not self._proc.is_alive():
                 self._start()
             try:
+                if on_progress is not None:
+                    kwargs["_progress"] = True
                 self._conn.send((op, kwargs))
-                if not self._conn.poll(timeout):
-                    self._kill(f"{op} exceeded {timeout:g} s")
-                    raise KernelFailure({"kind": "timeout", "message": f"The geometry kernel did not answer within {timeout:g} s and was restarted.",
-                                         "hint": "Nothing was saved from that attempt. Your last committed revision is intact."})
-                status, payload = self._conn.recv()
+                end = time.monotonic() + timeout
+                while True:
+                    if not self._conn.poll(max(0.0, end - time.monotonic())):
+                        self._kill(f"{op} exceeded {timeout:g} s")
+                        raise KernelFailure({"kind": "timeout", "message": f"The geometry kernel did not answer within {timeout:g} s and was restarted.",
+                                             "hint": "Nothing was saved from that attempt. Your last committed revision is intact."})
+                    status, payload = self._conn.recv()
+                    if status != "progress":
+                        break
+                    if on_progress is not None:
+                        try:
+                            on_progress(payload)
+                        except Exception:
+                            pass
             except (EOFError, BrokenPipeError, ConnectionResetError, OSError):
                 self._kill(f"{op} crashed the kernel process")
                 raise KernelFailure({"kind": "crash", "message": "The geometry kernel stopped unexpectedly and was restarted.",

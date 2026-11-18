@@ -316,10 +316,11 @@ Item {
                     onClicked: ws.askAssembly() }
                 HudSlider { visible: Store.asmMode === "exploded"; label: "Spread"; from: 0; to: 1.6; step: 0.05; base: 1; percent: true
                     value: Store.explode; onMoved: function (v) { Store.setExplode(v) } }
-                Repeater { model: Store.assembly && Store.asmMode !== "print" ? Store.assembly.joints : []
+                Repeater { model: Store.assembly && Store.asmMode !== "print" ? Store.assembly.joints.filter(function (j) { return j.kind !== "fixed" }) : []
                     HudSlider { required property var modelData
                         label: modelData.label; unit: modelData.kind === "hinge" ? "°" : " mm"
-                        from: modelData.range[0]; to: modelData.range[1]; step: 1; base: 0
+                        objectName: "jointSlider_" + modelData.id
+                        from: modelData.range[0]; to: modelData.range[1]; step: modelData.step > 0 ? modelData.step : 1; base: 0
                         value: Store.pose[modelData.id] || 0
                         onMoved: function (v) { Store.setPose(modelData.id, v) } } }
             }
