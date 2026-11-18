@@ -11,7 +11,18 @@ def run(ui):
     # ── create from the recipe sheet ──
     ui.click_text("Start from a recipe")
     open_sheet_wait(ui, "new")
-    ui.click_text("Electronics enclosure")
+    def chosen():
+        c = ui.item("newSheet").property("chosen")
+        c = c.toVariant() if hasattr(c, "toVariant") else c
+        return (c or {}).get("id")
+    for _ in range(3):                                 # the grid can still shift while recipe previews load
+        ui.click_text("Electronics enclosure")
+        try:
+            ui.wait_until(lambda: chosen() == "enclosure", 3, "the enclosure to be picked")
+            break
+        except Exception:
+            ui.settle(500)
+    ui.eq(chosen(), "enclosure", "the clicked recipe is the one picked")
     name = ui.item("newName")
     ui.click(name)
     ui.type("Sensor case")
