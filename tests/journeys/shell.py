@@ -93,7 +93,9 @@ def journey_new_sheet_tabs(ui):
     ui.key("Ctrl+N")
     open_sheet_wait(ui, "new")
     card = ui.item("sheetCard")
-    ui.click_text("Self-watering planter", within=card, exact=False)
+    ui.click("recipeSearch")                           # the library is long: search rather than rely on what fits on screen
+    ui.type("planter")
+    ui.click(ui.item(text="Self-watering planter", within=card, exact=False, timeout=20))
     ui.wait_until(lambda: ui.item(text="Create design").property("enabled") is True, 2, "a recipe to be picked")
     # the brief tab: templates, questions
     ui.click_text("From a brief", within=card, exact=False)
