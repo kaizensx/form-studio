@@ -69,6 +69,7 @@ message, with what the design is for.
 
 | Command | Does |
 |---|---|
+| `form replace --photo FILE [--name NAME] [--what TEXT] [--broke TEXT] [--reference card\|coin\|ruler\|none]` | Start the replacement of a broken part from a photo with a scale reference |
 | `form list` | Every project |
 | `form recipe <recipe>` | A recipe's parameters, features and checks |
 | `form new <name> <recipe> [key=value ...] [--purpose print\|model] [--process P] [--brief TEXT]` | A new design from a recipe; `--process` (for a model) is `cnc`, `laser`, `injection`, `casting`, `sheet_metal`, `render`, `cad` or `other` |
@@ -120,6 +121,7 @@ message, with what the design is for.
 | `form pack <project> [--copies N] [--spacing MM] [--no-rotate]` | Do N copies fit on one plate |
 | `form optimize <project> --vary key:min:max ... --minimize\|--maximize METRIC [--require EXPR] [--budget N]` | Goal seek over parameters |
 | `form compare-printers <project> [--printer ID] [--limit N]` | Slice the design for real on every printer in your slicers: time, filament and cost side by side |
+| `form lighter <project> [--builds N] [--apply ID]` | Lighter versions that keep every passing check passing: thinner walls, bigger pockets, less infill, each with its mass and the slicer's grams; `--apply` commits one |
 | `form verify <project> <release>` | Re-hash a release against its manifest |
 | `form release-files <project> [release] [--out FILE.zip]` | Every file of a release in one .zip: models, G-code, sliced 3MF, report, documents and manifest (the newest release by default) |
 | `form instructions <project> [--rev N] [--out FILE.pdf]` | Assembly instructions as a PDF: a parts page, then one page per part in the order the assembly attaches them |

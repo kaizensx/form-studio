@@ -60,6 +60,10 @@ each one named as it arrives.
 
 ![A design being built, feature by feature](images/building.webp)
 
+- **Replace a broken part.** On Home, **Replace a broken part** takes a photo of the part with a card, coin or ruler
+  beside it, what it is and where it broke; the agent estimates sizes from the photo, asks for the ones that decide the
+  fit and designs the replacement. `form replace`; MCP `replace_part_guide`.
+
 ## Concepts and measurements
 
 ![Concepts side by side, each a real CAD model with its size and volume](images/concepts.webp)
@@ -334,6 +338,11 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
 
 ## Optimisation and alternatives
 
+- **Make it lighter.** Tools › Make it lighter tries thinner walls and floors, larger lightening pockets and lighter
+  slicer settings, and shows only candidates that keep every passing check passing, each with its computed mass and the
+  slicer's grams before and after. **Apply** commits the one you choose. `form lighter`; MCP `make_lighter`,
+  `apply_lighter`.
+
 - **Goal seek** (`optimize`): search parameter ranges for the lightest, smallest or strongest design that still passes
   its constraints, for example the lightest bracket with a safety factor of at least 3. Every candidate is a real
   kernel build.
@@ -399,7 +408,7 @@ Writing one: [Writing a recipe](RECIPES.md) and [community recipes](../community
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 74 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 77 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
