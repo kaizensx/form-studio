@@ -190,7 +190,8 @@ QtObject {
             if (s._toastAt >= a.done - 5) return
             if (!ok) s.toast((e && e.message) || (a.label + " did not finish"), e && e.hint, true)
             // success is said only where nothing else shows it: the button that asked is still on screen
-            else if (a.done - a.t0 > 900 && (a.explicit || s._alive(a.owner))) s.toast(a.label + " · done", "Took " + ((a.done - a.t0) / 1000).toFixed(1) + " s.")
+            // only long, named work: a step that moved the screen on, or anything quick, needs no word of its own
+            else if (a.done - a.t0 > 3000 && a.explicit) s.toast(a.label + " · done", "Took " + ((a.done - a.t0) / 1000).toFixed(1) + " s.")
         })
         _actTick()
     }
