@@ -1,10 +1,8 @@
 <p align="center">
-  <a href="https://kaizensx.github.io/form-studio/">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/header-dark.svg">
-      <img src="docs/readme/header-light.svg" alt="Form Studio. What are we making? Describe it. An agent designs it in a real CAD kernel. Form Studio proves it and slices it." width="820">
-    </picture>
-  </a>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/header-dark.svg">
+    <img src="docs/readme/header-light.svg" alt="Form Studio. What are we making? Describe it. An agent designs it in a real CAD kernel. Form Studio proves it and slices it." width="820">
+  </picture>
 </p>
 
 <p align="center">
@@ -18,12 +16,10 @@
 </p>
 
 <p align="center">
-  <a href="https://kaizensx.github.io/form-studio/#try">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.svg">
-      <img src="docs/readme/hero-light.svg" width="100%" alt="Form Studio, drawn from the app. On Home, a request is typed into the composer: a stand for my phone on the desk, leaning back 20 degrees, with a slot for the charging cable. The workspace opens; the Desk phone stand is built by the CAD kernel, 70.0 by 115.6 by 88.9 mm; all 11 checks pass and the slicer estimates 1 h 56 min and 72.4 g.">
-    </picture>
-  </a>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.svg">
+    <img src="docs/readme/hero-light.svg" width="100%" alt="Form Studio, drawn from the app. On Home, a request is typed into the composer: a stand for my phone on the desk, leaning back 20 degrees, with a slot for the charging cable. The workspace opens; the Desk phone stand is built by the CAD kernel, 70.0 by 115.6 by 88.9 mm; all 11 checks pass and the slicer estimates 1 h 56 min and 72.4 g.">
+  </picture>
 </p>
 
 <p align="center">
@@ -76,7 +72,7 @@ are frozen with their hashes.
 <td width="50%" valign="top">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/prove-dark.svg">
-  <img src="docs/readme/prove-light.svg" width="100%" alt="Prove for the Desk phone stand r01: 11 pass, 0 to review, 0 failed. One valid solid; interfaces as modelled; export mesh closed, 22,052 triangles; STL matches the CAD solid; fits the build volume; thinnest wall 4.86 mm; unsupported overhangs 0 mm²; plate contact 7735 mm²; tip-over resistance 1.12 N; fit within tolerance window 100% modelled; re-imported in FreeCAD.">
+  <img src="docs/readme/prove-light.svg" width="440" alt="Prove for the Desk phone stand r01: 11 pass, 0 to review, 0 failed. One valid solid; interfaces as modelled; export mesh closed, 22,052 triangles; STL matches the CAD solid; fits the build volume; thinnest wall 4.86 mm; unsupported overhangs 0 mm²; plate contact 7735 mm²; tip-over resistance 1.12 N; fit within tolerance window 100% modelled; re-imported in FreeCAD.">
 </picture>
 <h4>Proved on the solid</h4>
 Every revision is checked on the B-rep and the exported mesh. Each result says how it is known:
@@ -85,7 +81,7 @@ Every revision is checked on the B-rep and the exported mesh. Each result says h
 <td width="50%" valign="top">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hinge-dark.svg">
-  <img src="docs/readme/hinge-light.svg" width="100%" alt="The Hinged box assembled, its lid swung on the Lid hinge from 0 to 110 degrees. The sweep check: Lid hinge moves freely, 0 mm³ at 107 positions.">
+  <img src="docs/readme/hinge-light.svg" width="440" alt="The Hinged box assembled, its lid swung on the Lid hinge from 0 to 110 degrees. The sweep check: Lid hinge moves freely, 0 mm³ at 107 positions.">
 </picture>
 <h4>Parts that move together</h4>
 Joints declared by the design, swept through their range and checked for collisions, with Assembled, Exploded and
@@ -96,7 +92,7 @@ Print layout views.
 <td width="50%" valign="top">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/print-dark.svg">
-  <img src="docs/readme/print-light.svg" width="100%" alt="The Desk phone stand's print played back from Bambu Studio's G-code: 318 layers built up one after another, the current layer in its line types, with the slicer's clock and the time of every layer.">
+  <img src="docs/readme/print-light.svg" width="440" alt="The Desk phone stand's print played back from Bambu Studio's G-code: 318 layers built up one after another, the current layer in its line types, with the slicer's clock and the time of every layer.">
 </picture>
 <h4>Watch it print before you print it</h4>
 Your slicer's G-code, every layer and line type, timed by the slicer's own estimate. A simulation, labelled as one.
