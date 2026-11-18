@@ -26,7 +26,7 @@ on:
       task:
         description: What to do
         type: choice
-        options: [setup, digest]
+        options: [setup, snapshot, digest]
         default: setup
 
 permissions:
@@ -60,7 +60,16 @@ jobs:
         run: |
           if [ -z "$DISCORD_BOT_TOKEN" ]; then echo "DISCORD_BOT_TOKEN is not set; nothing to post"; exit 0; fi
           case "$TASK" in
-            setup) python scripts/discord/setup_server.py ;;
+            setup) python scripts/discord/snapshot.py discord-before.json && python scripts/discord/setup_server.py && python scripts/discord/snapshot.py discord-after.json ;;
+            snapshot) python scripts/discord/snapshot.py discord-snapshot.json ;;
             digest) python scripts/discord/post.py digest ;;
             *) python scripts/discord/post.py event ;;
           esac
+      # the server before and after a setup (or a plain snapshot), kept 90 days: compare or roll back from it
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && (github.event.inputs.task == 'setup' || github.event.inputs.task == 'snapshot') }}
+        with:
+          name: discord-snapshot-${{ github.run_number }}
+          path: discord-*.json
+          if-no-files-found: ignore
+          retention-days: 90
