@@ -19,7 +19,8 @@ from . import fsutil
 
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 PDF_EXT = {".pdf"}
-CAD_EXT = {".step", ".stp", ".stl"}
+CAD_EXT = {".step", ".stp", ".stl", ".3mf"}
+SKETCH_SUFFIX = ".sketch.json"        # a sketch drawn in Form Studio (form/sketch.py): structured geometry, read as JSON
 MAX_ATTACHMENT = 60_000_000
 ID_RE = re.compile(r"[0-9a-f]{12}")
 EVENT_KINDS = ("user", "start", "text", "tool", "result", "act", "end", "error", "ask", "answer", "suggest")
@@ -54,6 +55,8 @@ def title_from(message: str, limit: int = 52) -> str:
 
 
 def kind_of(name: str) -> str:
+    if str(name).lower().endswith(SKETCH_SUFFIX):
+        return "sketch"
     ext = Path(name).suffix.lower()
     return "image" if ext in IMAGE_EXT else "pdf" if ext in PDF_EXT else "cad" if ext in CAD_EXT else "file"
 
@@ -273,11 +276,14 @@ class Conversations:
         elif len(data) > MAX_ATTACHMENT:
             raise ConversationError(f"That file is larger than {MAX_ATTACHMENT // 1_000_000} MB.")
         raw = Path(name or (src.name if src else "file")).name
-        stem = re.sub(r"[^A-Za-z0-9_\-]+", "-", Path(raw).stem).strip("-")[:60] or "file"
-        ext = re.sub(r"[^a-z0-9.]", "", Path(raw).suffix.lower())[:8]
+        if raw.lower().endswith(SKETCH_SUFFIX):           # a double suffix: keep it whole so the kind survives
+            base, ext = raw[:-len(SKETCH_SUFFIX)], SKETCH_SUFFIX
+        else:
+            base, ext = Path(raw).stem, re.sub(r"[^a-z0-9.]", "", Path(raw).suffix.lower())[:8]
+        stem = re.sub(r"[^A-Za-z0-9_\-]+", "-", base).strip("-")[:60] or "file"
         kind = kind_of(stem + ext)
         if kind == "file":
-            raise ConversationError(f"{raw}: attach images, PDFs, or STEP/STL parts.",)
+            raise ConversationError(f"{raw}: attach images, PDFs, STEP/STL/3MF parts or a sketch.",)
         d = self.files_dir(cid)
         aid = uuid.uuid4().hex[:6]
         target = d / f"{aid}-{stem}{ext}"
