@@ -273,7 +273,10 @@ def make_handler(st: Studio):
                 rel = q.get("release")
                 if rel and not re.fullmatch(r"r\d+-[0-9a-f]+", rel):
                     raise StudioError("Unknown release.", status=404)
-                f = maker_docs.release_zip(st, p, rel) if rel else maker_docs.working(st, p, md.group(1))
+                if rel and md.group(1) == "files.zip":
+                    f = maker_docs.release_files_zip(st, p, rel)
+                else:
+                    f = maker_docs.release_zip(st, p, rel) if rel else maker_docs.working(st, p, md.group(1))
                 ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
                 extra = {} if ctype.startswith("image/") else {"Content-Disposition": f'attachment; filename="{f.name}"'}
                 return self._send(200, f.read_bytes(), ctype, extra)

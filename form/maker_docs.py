@@ -409,6 +409,20 @@ def release_zip(st, p, release: str) -> Path:
     return z
 
 
+def release_files_zip(st, p, release: str) -> Path:
+    """Every file of a release (models, G-code, sliced 3MF, report, documents, manifest) in one .zip."""
+    from .studio import StudioError
+    rel = st.dir(p["id"]) / "releases" / release
+    if not (rel / "MANIFEST.json").is_file():
+        raise StudioError("Unknown release.", status=404)
+    z = st.root / f".{p['id']}-{release}.zip"
+    with zipfile.ZipFile(z, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in sorted(rel.rglob("*")):
+            if f.is_file():
+                zf.write(f, f"{p['id']}-{release}/{f.relative_to(rel).as_posix()}")
+    return z
+
+
 def available(st, p) -> list:
     """Names of the working documents this design gets (cheap: no generation)."""
     try:

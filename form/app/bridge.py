@@ -227,6 +227,15 @@ class Bridge(QObject):
         else:
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(p).parent)))
 
+    @Slot(str)
+    def openProjectFolder(self, rel: str):
+        """A folder inside the projects folder (a design, a release), opened in Finder / Explorer."""
+        base = Path(self._data).resolve()
+        p = (base / rel).resolve()
+        if base not in p.parents or not p.is_dir() or self._outside("folder", str(p)):
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(p)))
+
     @Slot()
     def openDataFolder(self):
         if self._outside("folder", self._data):

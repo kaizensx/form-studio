@@ -263,6 +263,9 @@ class StudioAssembly(unittest.TestCase):
             self.assertIn("ASSEMBLY.md", r["manifest"]["documents"])
             self.assertTrue(self.st.verify_release(self.st.load(p["id"]), r["release"])["intact"])
             self.assertIn("ASSEMBLY.md", zipfile.ZipFile(maker_docs.release_zip(self.st, p, r["release"])).namelist())
+            every = zipfile.ZipFile(maker_docs.release_files_zip(self.st, p, r["release"])).namelist()
+            for ext in (".step", ".stl", "MANIFEST.json", "REPORT.md", "ASSEMBLY.md"):            # the whole release, models too
+                self.assertTrue(any(n.endswith(ext) for n in every), ext)
 
         self.st.commit(self.st.load(p["id"]), {"front_relief": 0.15}, "less relief")
         self.st.run_sync(p["id"], ["geometry", "exports", "checks"])

@@ -170,10 +170,15 @@ Column {
                         Txt { text: rr.modelData; mono: true; font.pixelSize: 12; width: parent.width; wrapMode: Text.WrapAnywhere }
                         Txt { kind: "fine"; width: parent.width; text: rr.state
                             color: rr.state.indexOf("FILES ALTERED") === 0 ? Theme.signal : rr.state.indexOf("files intact") === 0 ? Theme.pass : Theme.ink3 }
-                        Row { spacing: 4; x: -8
+                        Flow { spacing: 4; x: -8; width: parent.width + 8
                             Btn { kind: "quiet"; small: true; icon: "badge_check"; text: "Verify"; tip: "Re-hash every file against the manifest"; onClicked: root.verify(rr.modelData) }
                             Btn { kind: "quiet"; small: true; icon: "download"; text: "Save report…"
                                 onClicked: root.saveAs(rr.modelData + "-REPORT.md", "/projects/" + Store.pid + "/file/releases/" + rr.modelData + "/REPORT.md", "Markdown (*.md)", false) }
+                            Btn { objectName: "releaseFiles"; kind: "quiet"; small: true; icon: "download"; text: "Save files…"
+                                tip: "Everything in this release in one .zip: STEP, STL, the sliced 3MF, G-code, report and documents"
+                                onClicked: root.saveAs(Store.pid + "-" + rr.modelData + ".zip", "/projects/" + Store.pid + "/docs/files.zip?release=" + rr.modelData, "Zip archives (*.zip)", true) }
+                            Btn { kind: "quiet"; small: true; icon: "folder_open"; text: Theme.mac ? "Show in Finder" : "Show folder"
+                                tip: "Open this release's folder"; onClicked: Bridge.openProjectFolder(Store.pid + "/releases/" + rr.modelData) }
                             Btn { kind: "quiet"; small: true; icon: "download"; text: "Documents…"; tip: "BOM, assembly, print report and measurement plan of this release (.zip)"
                                 onClicked: root.saveAs(rr.modelData + "-docs.zip", "/projects/" + Store.pid + "/docs/docs.zip?release=" + rr.modelData, "Zip archives (*.zip)", true) } } } } } }
     }
