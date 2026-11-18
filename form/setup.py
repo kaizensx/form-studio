@@ -299,14 +299,16 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
     if not installer.find_claude(cfg):
         m = installer.plan(installer.get("claude"))
         items.append(Item("chat.claude", "Claude Code (chat)", "missing",
-                          "Not found. Chat in the app runs Claude Code on your account; everything else works without it.",
+                          "Not found. Chat in the app can run Claude Code on your account, or any other agent you choose "
+                          "(Settings, Agents); everything else works without one.",
                           Fix("Install Claude Code", list(m.commands) if m else [], recommended=False,
                               note="Then sign in: the app does it under Settings, Software; in a terminal run `claude auth login`. "
                                    f"Other ways to install: {installer.CLAUDE_DOCS}")))
     if not any(i.id.startswith("agent.") for i in items):
         items.append(Item("agent.none", "Coding agent", "info",
-                          "No MCP-capable agent found. Install Claude Code, Codex, Gemini CLI or Cursor, then re-run `form setup`. "
-                          "Without one, the `form` CLI still works."))
+                          "No MCP-capable agent found. Install one (Claude Code, Codex, Gemini CLI, Cursor, …), then re-run "
+                          "`form setup`. Chat in the app can also use a model provider's API or a local model. Without any, the "
+                          "`form` CLI still works."))
     return items
 
 

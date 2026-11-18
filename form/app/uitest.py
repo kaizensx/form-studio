@@ -48,6 +48,9 @@ def prepare(cfg: dict) -> None:
     fake = os.environ.get("FORM_UITEST_AGENT", "")
     if fake:
         cfg["_adapters"] = {"fake": _fake_adapter(Path(fake), Path(cfg["data"]["dir"]))}
+        if os.environ.get("FORM_UITEST_API_AGENTS") == "1":     # the API agents too (tests/journeys/agents.py)
+            from ..agents.api import all_api_adapters
+            cfg["_adapters"].update({a.id: a for a in all_api_adapters()})
         cfg["chat"] = dict(cfg.get("chat") or {}, enabled=True, agent="fake", model="default", effort="")
 
 

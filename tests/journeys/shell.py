@@ -144,7 +144,7 @@ def journey_settings_saves_to_the_file(ui):
     ui.wait_until(lambda: tomllib.loads(cfg.read_text(encoding="utf-8"))[sec][key] == row["value"], 10, "the setting to be restored by Enter")
     ui.check(any(p.name.startswith(cfg.name) and p != cfg for p in cfg.parent.iterdir()), "a backup was made next to studio.toml")
     # the other tabs render
-    for tab in ("Printer and slicer", "Chat", "Software"):
+    for tab in ("Printer and slicer", "Agents", "Software"):
         ui.click_text(tab, within=card)
         ui.settle(300)
     ui.shot("sheet-settings-software")
@@ -153,9 +153,9 @@ def journey_settings_saves_to_the_file(ui):
 
 
 def journey_agent_key_saved_and_removed(ui):
-    """The Gemini API key: pasted in Settings, Chat; stored privately; never shown again; removable."""
+    """An API key: pasted in Settings, Agents; stored privately; never shown again; removable."""
     ui.run_js('Store.openSettings("chat")')
-    ui.wait_until(lambda: ui.find(name="secretRow") is not None, 10, "the key row on the Chat tab")
+    ui.wait_until(lambda: ui.find(name="secretRow") is not None, 10, "the key row on the Agents tab")
     f = ui.item("sheetScroll")
     f.setProperty("contentY", max(0, f.property("contentHeight") - f.property("height")))
     ui.settle(300)

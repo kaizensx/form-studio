@@ -22,12 +22,12 @@ Rectangle {
         Item { width: parent.width; height: 18
             Row { spacing: 8; anchors.verticalCenter: parent.verticalCenter
                 Txt { text: "Claude sign-in"; font.weight: 600; wrapMode: Text.NoWrap }
-                Tag { visible: !si.signedIn && si.hasClaude; text: "recommended"; kind: "specified"; anchors.verticalCenter: parent.verticalCenter } }
+                Item { width: 1; height: 1 } }
             Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; kind: "fine"; wrapMode: Text.NoWrap
                 text: si.signedIn ? "ready" : si.running ? "waiting for the browser" : "not signed in"; color: si.signedIn ? Theme.pass : Theme.ink3 } }
         Txt { kind: "fine"; tone: 2; width: parent.width
             text: si.signedIn ? si.item.detail : !si.hasClaude ? "Install Claude Code first. Then sign in here."
-                : "Chat runs on your own Claude account. Sign in once; your password goes to Anthropic's page in your browser, never to Form Studio." }
+                : "Claude Code runs on your own Claude account. Sign in once; your password goes to Anthropic's page in your browser, never to Form Studio." }
         // waiting for the browser
         Column { visible: si.running; width: parent.width; spacing: 6; topPadding: 2
             Txt { width: parent.width; text: si.job && si.job.url ? "Finish signing in on the page that opened in your browser. If no page opened, use the link." : "Starting Claude Code's sign-in…" }

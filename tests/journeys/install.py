@@ -11,6 +11,10 @@ def run(ui):
     job = ui.wait_until(lambda: ui.js("Store.installJob && Store.installJob.kind === 'auto' ? Store.installJob : null"), 60,
                         "the hands-free setup to start by itself")
     ids = [s["id"] for s in job["steps"]]
+    ui.check("claude" not in ids, f"no agent is installed by itself; choosing one is the last step: {ids}")
+    if (ui.js("Store.softwareItem('claude')") or {}).get("status") != "ok":
+        ui.check("parts" in ids and "claude.signin" not in ids, f"what it sets up without Claude Code here: {ids}")
+        return                                       # the sign-in pause below needs an installed Claude Code
     ui.check("parts" in ids and "claude.signin" in ids, f"what it sets up: {ids}")
     ui.check(not any(i.startswith("agent.") and i != "agent.claude" for i in ids), "other agents are never edited by itself")
     ui.expect("Setting up", timeout=20)

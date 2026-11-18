@@ -52,11 +52,12 @@ DEFAULTS = {
     # Other CAD tools (optional). Empty = look in the usual places. OpenSCAD builds `language="openscad"` designs;
     # FreeCADCmd, when found, re-imports each exported STEP as an extra check.
     "cad": {"openscad": "", "freecad": "", "timeout_s": 120},
-    # Chat in the bench runs Claude Code headless on your account, with FORM's tools (and web lookups if web = true).
-    # agent / model / effort are what a new conversation starts with (the app's model picker writes them here);
-    # agent: claude | codex | gemini. model: an alias or id that agent's CLI accepts, or "default". effort: "" = the CLI's own.
-    "chat": {"enabled": True, "cli": "claude", "model": "opus", "web": True, "budget_usd_per_message": 3.0, "ask_timeout_s": 900,
-             "agent": "claude", "effort": ""},
+    # Chat runs the agent you choose with Form Studio's tools: an agent CLI headless on your account, or a model
+    # provider's API (key in Settings › Agents), or a local model server. agent / model / effort are what a new
+    # conversation starts with (the app's model picker writes them here); agent "" = the first one available.
+    # model: an alias or id that agent accepts, or "default". effort: "" = the agent's own. cli: Claude Code's command.
+    "chat": {"enabled": True, "cli": "claude", "model": "default", "web": True, "budget_usd_per_message": 3.0, "ask_timeout_s": 900,
+             "agent": "", "effort": ""},
     # Optional: Blender, run headless for illustrative renders (render_photo). Empty app = look in the usual places.
     "blender": {"app": "", "timeout_s": 180, "samples": 128},
     # Open the bench in your browser when an agent starts working (MCP server).

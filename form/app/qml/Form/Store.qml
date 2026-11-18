@@ -478,7 +478,7 @@ QtObject {
     function agentInfo(id) { for (var i = 0; i < chatAgents.length; i++) if (chatAgents[i].id === id) return chatAgents[i]; return null }
     readonly property var chatAgentInfo: agentInfo(chatAgent)
     readonly property bool chatReady: !!chatAgentInfo && chatAgentInfo.available
-    readonly property string chatAgentLabel: chatAgentInfo ? chatAgentInfo.label : "Claude Code"
+    readonly property string chatAgentLabel: chatAgentInfo ? chatAgentInfo.label : "your agent"
     function modelLabel(agent, model) {
         var a = agentInfo(agent), ms = a ? a.models : []
         for (var i = 0; i < ms.length; i++) if (ms[i].id === model) return ms[i].label
@@ -610,7 +610,7 @@ QtObject {
     }
     // "Fix with <agent>": open this design's conversation (or a new one) and send the failure, word for word
     function fixWith(subject, details) {
-        if (!chat.available || !chatReady) return toast("No agent is connected", "Install one under Settings, Software.", true)
+        if (!chat.available || !chatReady) return toast("No agent is connected", "Choose one under Settings, Agents.", true)
         if (chatBusy) return toast("The conversation is still answering", "Wait for it, or stop it, then press Fix again.", true)
         var text = fixPrompt(subject, details), here = pid
         talkOpen = true
@@ -628,6 +628,16 @@ QtObject {
         return ""
     }
     function retryChat() { var t = lastUserText(); if (t && !chatBusy) send(t) }
+    // ── agents workstream: retry with another model, look for agents again ──
+    property bool retryAfterPick: false     // the model picker was opened from "Try another model": picking one resends
+    property bool agentsChecking: false
+    function refreshAgents() {
+        agentsChecking = true
+        return get("/chat?refresh=1").then(function (r) {
+            agentsChecking = false
+            if (studio) studio = Object.assign({}, studio, { chat: r })
+        }, function (e) { agentsChecking = false; fail(e) })
+    }
     // a label for a model id on a message footer, when the engine did not name it
     function modelName(ev) { return ev ? (ev.label || ev.model || "") : "" }
     function recallChat(text) { chatRecall = ""; chatRecall = text || lastUserText(); chatFocus++ }
@@ -654,6 +664,7 @@ QtObject {
             if (studio) studio = Object.assign({}, studio, { chat: Object.assign({}, studio.chat, { "default": r["default"] }) })
         }, function () {})
         if (convId) post("/conversations/" + convId + "/settings", body).then(function (m) { if (convId === m.id) conv = Object.assign({}, conv, m) }, function () {})
+        if (retryAfterPick && model !== undefined) { retryAfterPick = false; retryChat() }
     }
 
     // attachments: images, PDFs, STEP/STL. Copied into the conversation's folder; sent with the next message.

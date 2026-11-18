@@ -1,13 +1,15 @@
-"""Keys an agent CLI needs, kept by FORM so nobody has to open a terminal to set an environment variable.
+"""API keys Form Studio keeps, so nobody has to open a terminal to set an environment variable.
 
-Today that is one key: Gemini CLI runs headless only when it is signed in, and its only way to sign in without its
-own interactive screen is an API key in GEMINI_API_KEY. The Settings sheet (Chat tab) and `form secrets` store it here.
+Two kinds of use: Gemini CLI runs headless only with GEMINI_API_KEY, and the API agents (form/agents/api.py) talk to
+a model provider directly with that provider's key. The Settings sheet (Agents tab) and `form secrets` store them.
 
 Rules:
-- One JSON file, `secrets.json` in FORM's user folder (`~/.config/form-studio`, or $FORM_SECRETS for tests), readable
-  by this user only. Never studio.toml: that file is meant to be shared and backed up.
+- One JSON file, `secrets.json` in Form Studio's user folder (`~/.config/form-studio`, or $FORM_SECRETS for tests),
+  readable by this user only. Never studio.toml: that file is meant to be shared and backed up.
 - A value is never returned by the API, the CLI or MCP: only whether it is set. MCP has no way to read or write it.
-- A key is handed to its own agent only, as an environment variable, and only when that variable is not already set.
+- A key is handed only to the agents it belongs to: as an environment variable to a CLI (and only when that variable
+  is not already set), or read in-process by an API agent for its own provider's requests.
+- A key set in the environment wins over a stored one.
 """
 from __future__ import annotations
 
@@ -18,14 +20,30 @@ from pathlib import Path
 
 from . import fsutil
 
+
+def _key(label, agents, env, help, url, alt=()):
+    return {"label": label, "agents": list(agents), "agent": agents[0], "env": env, "alt": list(alt), "help": help, "url": url}
+
+
 KNOWN = {
-    "gemini_api_key": {
-        "label": "Gemini API key",
-        "agent": "gemini",
-        "env": "GEMINI_API_KEY",
-        "help": "Lets Gemini CLI run inside Form Studio. Create one at Google AI Studio; usage is billed to that Google account.",
-        "url": "https://aistudio.google.com/apikey",
-    },
+    "anthropic_api_key": _key("Anthropic API key", ["anthropic"], "ANTHROPIC_API_KEY",
+                              "Claude models through the Anthropic API, billed to that Anthropic account.",
+                              "https://console.anthropic.com/settings/keys"),
+    "openai_api_key": _key("OpenAI API key", ["openai"], "OPENAI_API_KEY",
+                           "OpenAI models through the OpenAI API, billed to that OpenAI account.",
+                           "https://platform.openai.com/api-keys"),
+    "gemini_api_key": _key("Gemini API key", ["gemini", "google"], "GEMINI_API_KEY",
+                           "Gemini models through the Gemini API, and Gemini CLI inside Form Studio. Usage is billed to that Google account.",
+                           "https://aistudio.google.com/apikey", alt=["GOOGLE_API_KEY"]),
+    "openrouter_api_key": _key("OpenRouter API key", ["openrouter"], "OPENROUTER_API_KEY",
+                               "Models from many providers through OpenRouter, billed to that OpenRouter account.",
+                               "https://openrouter.ai/keys"),
+    "mistral_api_key": _key("Mistral API key", ["mistral"], "MISTRAL_API_KEY",
+                            "Mistral models through the Mistral API.", "https://console.mistral.ai/api-keys"),
+    "xai_api_key": _key("xAI API key", ["xai"], "XAI_API_KEY", "Grok models through the xAI API.", "https://console.x.ai"),
+    "deepseek_api_key": _key("DeepSeek API key", ["deepseek"], "DEEPSEEK_API_KEY", "DeepSeek models through the DeepSeek API.",
+                             "https://platform.deepseek.com/api_keys"),
+    "groq_api_key": _key("Groq API key", ["groq"], "GROQ_API_KEY", "Open models served by Groq.", "https://console.groq.com/keys"),
 }
 
 
@@ -96,21 +114,43 @@ def clear(name: str) -> dict:
     return status()[name]
 
 
+def _env_name(spec: dict) -> str | None:
+    """The environment variable that holds this key for this process, if any."""
+    return next((v for v in [spec["env"], *spec["alt"]] if os.environ.get(v)), None)
+
+
 def status() -> dict:
-    """{name: {label, help, url, agent, set, from_env}}. Never the value."""
+    """{name: {label, help, url, agent, agents, env, set, from_env, env_name}}. Never the value."""
     d = _read()
     out = {}
     for name, spec in KNOWN.items():
+        env = _env_name(spec)
         out[name] = {"name": name, "label": spec["label"], "help": spec["help"], "url": spec["url"], "agent": spec["agent"],
-                     "set": bool(d.get(name)), "from_env": bool(os.environ.get(spec["env"]))}
+                     "agents": spec["agents"], "env": spec["env"], "set": bool(d.get(name)), "from_env": bool(env),
+                     "env_name": env}
     return out
 
 
+def for_agent(agent: str) -> str | None:
+    """The secret name that belongs to an agent (an API provider), or None."""
+    return next((n for n, spec in KNOWN.items() if agent in spec["agents"]), None)
+
+
+def value(name: str) -> tuple[str | None, str]:
+    """(key, where) for in-process use by an API agent: the environment first, then the stored file. Never logged."""
+    spec = _check(name)
+    env = _env_name(spec)
+    if env:
+        return os.environ[env], "env:" + env
+    v = _read().get(name)
+    return (v, "stored") if v else (None, "")
+
+
 def agent_env(agent: str) -> dict:
-    """Environment variables to add when FORM starts this agent's CLI."""
+    """Environment variables to add when Form Studio starts this agent's CLI."""
     d = _read()
     return {spec["env"]: d[name] for name, spec in KNOWN.items()
-            if spec["agent"] == agent and d.get(name) and not os.environ.get(spec["env"])}
+            if agent in spec["agents"] and d.get(name) and not os.environ.get(spec["env"])}
 
 
 def main(argv=None) -> int:

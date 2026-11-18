@@ -4,8 +4,9 @@ import QtQuick.Dialogs
 import FormNative
 import "F.js" as F
 
-// The agent column. Conversations are saved and switchable; each message runs an agent CLI (Claude Code, Codex)
-// headless on your own account with FORM's tools. The same column shows what any other agent does to your designs.
+// The agent column. Conversations are saved and switchable; each message runs the agent you chose (an agent app such
+// as Claude Code or Codex, a model provider's API, or a local model) with Form Studio's tools. The same column shows
+// what any other agent does to your designs.
 Rectangle {
     id: talk
     property bool hero: false                 // home screen: larger intro, wider column
@@ -44,6 +45,19 @@ Rectangle {
     function showList() { list.open() }
     function showModels() { mpop.open() }
     function money(v) { return v === null || v === undefined ? "" : v < 0.01 ? "under $0.01" : "$" + v.toFixed(2) }
+    function tokens(u) {
+        if (!u) return ""
+        var n = (u.input_tokens || 0) + (u.output_tokens || 0)
+        if (!n) return ""
+        return (n >= 1000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : String(n)) + " tokens"
+    }
+    function costText(m) {
+        if (m.cost !== null && m.cost !== undefined) return " · " + talk.money(m.cost)
+        if (m.stopped) return ""
+        var t = talk.tokens(m.usage)
+        return t ? " · " + t : " · cost not reported"
+    }
+    function tryAnother() { Store.retryAfterPick = true; Qt.callLater(function () { mpop.open() }) }   // after the click ends: the menu may open under the pointer
     function secs(s) { return s === null || s === undefined ? "" : s < 90 ? Math.round(s) + " s" : Math.floor(s / 60) + " min " + Math.round(s % 60) + " s" }
 
     // ── the feed as blocks: messages, folded step groups, footers ──
@@ -73,8 +87,9 @@ Rectangle {
             else if (ev.t === "text") out.push({ t: "text", k: "t" + i, text: ev.text })
             else if (ev.t === "act") out.push({ t: "act", k: "a" + i, by: ev.by, text: ev.text })
             else if (ev.t === "end") out.push({ t: "end", k: "e" + i, cost: ev.cost_usd, steps: ev.steps, seconds: ev.seconds, stopped: !!ev.stopped,
-                                                model: Store.modelName(ev) || model, agent: ev.agent || agent, change: ev.change || null })
-            else if (ev.t === "error") out.push({ t: "error", k: "x" + i, text: ev.text })
+                                                model: Store.modelName(ev) || model, agent: ev.agent || agent, change: ev.change || null,
+                                                usage: ev.usage || null })
+            else if (ev.t === "error") out.push({ t: "error", k: "x" + i, text: ev.text, hint: ev.hint || "" })
         }
         // follow-ups: only the newest, only until you write again, and shown under the reply's footer
         var sg = -1
@@ -299,15 +314,17 @@ Rectangle {
               Item { width: body.width; height: 22
                 Txt { id: ft; kind: "fine"; mono: true; tone: 3; anchors.verticalCenter: parent.verticalCenter; width: Math.min(implicitWidth, parent.width - (rb.visible ? rb.width + 6 : 0)); elide: Text.ElideRight; wrapMode: Text.NoWrap
                     text: (it.m.stopped ? "stopped · " : "") + F.plural(it.m.steps || 0, "step") + " · " + talk.secs(it.m.seconds)
-                        + (it.m.cost !== null && it.m.cost !== undefined ? " · " + talk.money(it.m.cost) : it.m.stopped ? "" : " · cost not reported")
-                        + (it.m.model ? " · " + it.m.model : "") }
-                Btn { id: rb; visible: !!it.m.last; small: true; kind: "quiet"; icon: "rotate_cw"; tip: "Send your last message again"
-                    anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.retryChat() } }
+                        + talk.costText(it.m) + (it.m.model ? " · " + it.m.model : "") }
+                Row { id: rb; visible: !!it.m.last; spacing: 2; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    Btn { small: true; kind: "quiet"; icon: "repeat"; tip: "Send it again with another model"; onClicked: talk.tryAnother() }
+                    Btn { small: true; kind: "quiet"; icon: "rotate_cw"; tip: "Send your last message again"; onClicked: Store.retryChat() } } }
               // what this reply changed in the design: compare it, or go back
               TalkChange { visible: !!it.m.change; width: body.width; change: it.m.change } } }
             Component { id: cErr; Column { spacing: 6
-                Note { kind: "red"; text: it.m.text; width: body.width }
-                Btn { visible: !!it.m.last; small: true; icon: "rotate_cw"; text: "Retry"; onClicked: Store.retryChat() } } }
+                Note { kind: "red"; text: it.m.text + (it.m.hint ? "\n" + it.m.hint : ""); width: body.width }
+                Row { visible: !!it.m.last; spacing: 6
+                    Btn { small: true; icon: "rotate_cw"; text: "Retry"; onClicked: Store.retryChat() }
+                    Btn { small: true; kind: "quiet"; icon: "repeat"; text: "Try another model…"; onClicked: talk.tryAnother() } } } }
         }
         // what is being written right now
         footer: Item { width: feed.width; visible: Store.chatBusy; height: Store.chatBusy ? lc.implicitHeight + 18 : 0
@@ -398,7 +415,8 @@ Rectangle {
                             MouseArea { id: mcm; anchors.fill: parent; hoverEnabled: true; onClicked: mpop.opened ? mpop.close() : mpop.open() }
                             Tip { show: mcm.containsMouse && !mpop.opened; text: "Agent and model for this conversation" }
                             Pop {
-                                id: mpop; x: -34; width: Math.min(320, talk.width - 24); padding: 6
+                                id: mpop; x: -34; width: Math.min(340, talk.width - 24); padding: 6
+                                onClosed: Store.retryAfterPick = false
                                 height: Math.min(mp.implicitHeight + 12, talk.height - 70)
                                 y: talk.landing ? mchip.height + 6 : -height - 6
                                 origin: talk.landing ? Popup.TopLeft : Popup.BottomLeft

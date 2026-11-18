@@ -48,7 +48,7 @@ GROUPS = [
     ("engine", "Form Studio itself", ("kernel", "data", "python")),
     ("slicer", "Slicer and printer", ("slicer", "printer")),
     ("cad", "CAD and 3D apps", ("cad", "freecad", "blender", "openscad", "fusion", "onshape")),
-    ("chat", "Claude Code for chat", ("chat.", "agent.claude")),
+    ("chat", "Agents for chat", ("chat.", "agent.claude")),
     ("agents", "Other agents", ("agent.",)),
     ("other", "Other", ()),
 ]
@@ -395,6 +395,8 @@ def route_post(st, path: str, body):
         else:
             row = _wrap(lambda: agent_keys.set_value(name, str(body.get("value") or "")))
             st.activity(None, "settings", f"{row['label']} saved.", by="you")
+        from .agents import providers as _prov            # the model lists that key gave (or did not) are stale
+        _prov.forget()
         return {"key": row, "keys": list(agent_keys.status().values())}
     if path == "/api/examples":
         ids = body.get("ids")

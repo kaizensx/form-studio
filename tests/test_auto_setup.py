@@ -46,9 +46,13 @@ class Auto(unittest.TestCase):
                 {"id": "claude", "level": "recommended", "status": "missing", "group": "ai", "one_of": ""},
                 {"id": "agent.codex", "level": "recommended", "status": "missing", "group": "agents", "one_of": ""},
                 {"id": "openscad", "level": "optional", "status": "missing", "group": "cad", "one_of": ""}]
-        self.assertEqual(installer.auto_ids(rows), ["kernel", "slicer.bambu", "claude"])
+        self.assertEqual(installer.auto_ids(rows), ["kernel", "slicer.bambu"], "which agent to install is the person's choice")
         rows.append({"id": "slicer.orca", "level": "optional", "status": "ok", "group": "slicer", "one_of": "slicer"})
-        self.assertEqual(installer.auto_ids(rows), ["kernel", "claude"])             # one slicer is enough
+        self.assertEqual(installer.auto_ids(rows), ["kernel"])                       # one slicer is enough
+        rows.append({"id": "claude.signin", "level": "recommended", "status": "missing", "group": "ai", "one_of": "", "needs": ["claude"]})
+        self.assertEqual(installer.auto_ids(rows), ["kernel"], "no sign-in for an agent that is not installed")
+        rows[3]["status"] = "ok"
+        self.assertEqual(installer.auto_ids(rows), ["kernel", "claude.signin"], "an installed agent's sign-in is finished")
 
     def test_installs_without_asking_and_skips_what_is_there(self):
         marker = Path(self.tmp) / "a.txt"

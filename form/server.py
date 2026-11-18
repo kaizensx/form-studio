@@ -92,6 +92,9 @@ def make_handler(st: Studio):
             if path == "/api/activity":
                 return self._json({"events": st.activity_since(float(q.get("since") or 0)), "now": time.time()})
             if path == "/api/chat":
+                if q.get("refresh"):                        # agents workstream: look for providers and local servers again
+                    from .agents import providers as _prov
+                    _prov.forget()
                 return self._json(st.chat.status())
             if path.startswith("/api/conversations"):       # saved conversations (chat workstream)
                 return self._conv_get(path, q)

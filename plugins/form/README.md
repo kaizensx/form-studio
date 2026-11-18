@@ -34,4 +34,4 @@ Keep one: remove the old registration with `claude mcp remove --scope user form`
 | `print-feedback` | a real print came back: failed, tight, loose |
 | `release` | handing a revision to the user for approval |
 
-Other agents (Codex, Gemini CLI, Cursor) can read the same files: `AGENTS.md` at the repository root points here.
+Any other agent (Codex, Gemini CLI, Cursor, OpenCode, …) can read the same files: `AGENTS.md` at the repository root points here.

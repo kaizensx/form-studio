@@ -44,8 +44,8 @@ PARTS_PINS = ("bd_warehouse==0.4.0", "py_gearworks==0.0.24")  # the same pins as
 KERNEL_PIN = "build123d==0.13.0"
 DEFAULT_TIMEOUT_S = 1800
 LEVELS = ("required", "recommended", "optional")
-GROUPS = [("engine", "Form Studio itself"), ("slicer", "Printer and slicer"), ("ai", "Your AI"),
-          ("agents", "Other agents"), ("cad", "CAD and 3D apps")]
+GROUPS = [("engine", "Form Studio itself"), ("slicer", "Printer and slicer"), ("ai", "Claude Code"),
+          ("agents", "Other agent apps"), ("cad", "CAD and 3D apps")]
 
 
 # ---- model --------------------------------------------------------------------------------------------------------
@@ -169,7 +169,7 @@ def claude_auth(cfg: dict | None = None, exe: str | None = None) -> dict:
     plan_name = str(d.get("subscriptionType") or "")
     return {"installed": True, "signed_in": on, "method": how, "plan": plan_name,
             "detail": ("Signed in" + (f" · {how}" if how else "") + (f" ({plan_name})" if plan_name else "")) if on
-                      else "Not signed in. Chat needs your Claude account."}
+                      else "Not signed in. Claude Code needs your Claude account to answer in chat."}
 
 
 def _d_kernel(cfg, ctx) -> Found:
@@ -205,7 +205,7 @@ def _d_parts(cfg, ctx) -> Found:
 def _d_claude(cfg, ctx) -> Found:
     exe = find_claude(cfg)
     if not exe:
-        return Found("missing", "Not found. Chat in the app runs Claude Code on your own account.")
+        return Found("missing", "Not found. Chat can run Claude Code on your own account, or any other agent you choose.")
     code, out = _run([exe, "--version"], timeout=20)
     v = out.splitlines()[0].strip() if code == 0 and out else ""
     return Found("ok", (v or "installed") + f" · {exe}", version=v, path=exe)
@@ -415,7 +415,7 @@ def gemini_signed_in(cfg: dict | None = None) -> tuple[bool, str]:
             return True, f"Gemini CLI is set to sign in with {kind}."
     except (OSError, ValueError, AttributeError):
         pass
-    return False, "Not signed in. Add a Gemini API key in Settings, Chat tab, or sign in once with Google in Gemini CLI."
+    return False, "Not signed in. Add a Gemini API key in Settings, Agents tab, or sign in once with Google in Gemini CLI."
 
 
 def _d_gemini_signin(cfg, ctx) -> Found:
@@ -427,7 +427,7 @@ def _d_gemini_signin(cfg, ctx) -> Found:
 
 def _m_gemini_signin(platform, ctx) -> list[Method]:
     return [Method("key", "Create an API key", kind="open", url="https://aistudio.google.com/apikey",
-                   note="Create a key on Google's page, then paste it in Settings, Chat tab. Form Studio keeps it in a private "
+                   note="Create a key on Google's page, then paste it in Settings, Agents tab. Form Studio keeps it in a private "
                         "file on this computer and gives it only to Gemini CLI.")]
 
 
@@ -527,9 +527,9 @@ REGISTRY: list[Software] = [
             "", "", "", "https://github.com/supermerill/SuperSlicer/releases", "about 120 MB", "optional"),
     _slicer("qidi", "QIDISlicer", "Slices for QIDI printers (Q1 Pro, Q2, X-Plus 4 and more).",
             "", "", "", "https://github.com/QIDITECH/QIDISlicer/releases", "about 170 MB", "optional"),
-    Software("claude", "Claude Code", "Chat in Form Studio runs Claude Code on your own Claude account. Everything else works without it.",
+    Software("claude", "Claude Code", "Anthropic's agent. Chat can run it on your own Claude account. Everything else works without it.",
              "recommended", "ai", _d_claude, _m_claude, size="about 280 MB", homepage=CLAUDE_DOCS),
-    Software("claude.signin", "Claude sign-in", "Chat needs Claude Code signed in to your account.",
+    Software("claude.signin", "Claude sign-in", "Claude Code answers in chat only when it is signed in to your account.",
              "recommended", "ai", _d_signin, _m_signin, needs=("claude",)),
     Software("agent.claude", "Form Studio tools in Claude Code", "Lets Claude Code call Form Studio (design, check, slice) from chat and from a terminal.",
              "recommended", "ai", _d_agent("agent.claude", "Claude Code"), _m_agent("agent.claude"), needs=("claude",)),
@@ -1165,14 +1165,19 @@ AUTO_GROUPS = ("engine", "slicer", "ai")
 
 def auto_ids(rows: list[dict], cfg: dict | None = None) -> list[str]:
     """What a hands-free setup takes care of: every required or recommended item Form Studio itself needs (the engine,
-    a slicer, Claude Code for chat and its sign-in) that is missing, in registry order. One slicer is enough (survey
-    makes the rest optional). Other agents' settings are never edited without a click: they stay in the list."""
+    a slicer) that is missing, in registry order. One slicer is enough (survey makes the rest optional). Which agent
+    to chat with is the person's choice (the setup's last step), so no agent is installed by itself; for an agent
+    that is already installed, its sign-in and Form Studio's tools in it are finished. Other agents' settings are
+    never edited without a click: they stay in the list."""
     out = []
+    by = {r["id"]: r for r in rows}
     for r in rows:
         if r["level"] not in ("required", "recommended") or r["status"] not in ("missing", "warn") or r.get("absent"):
             continue
         if r["group"] not in AUTO_GROUPS:
             continue
+        if r["group"] == "ai" and not (r.get("needs") and all(by.get(n, {}).get("status") == "ok" for n in r["needs"])):
+            continue                     # installing an agent is a choice; finishing one that is here is not
         if r["id"].startswith("slicer.") and any(x["one_of"] == "slicer" and x["status"] == "ok" for x in rows):
             continue
         if r["id"].startswith("slicer.") and cfg is not None and not (cfg.get("slicer") or {}).get("enabled", True):

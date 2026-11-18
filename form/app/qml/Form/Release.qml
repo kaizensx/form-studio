@@ -139,10 +139,10 @@ Column {
     Item { width: 1; height: 10 }
     Fold { title: "Design review"; note: "subjective"; key: "release.review"
         Txt { kind: "fine"; width: parent.width
-            text: "Claude looks at " + (root.p ? F.pad(root.p.head) : "the head revision") + " at three scales (silhouette, relationships, details) as designer, engineer and print technician, scores six criteria and lists concrete fixes. It changes nothing." }
-        Btn { kind: "default"; icon: "eye"; text: Store.chatBusy ? "Claude is answering…" : "Ask Claude for a design review"
+            text: "The agent looks at " + (root.p ? F.pad(root.p.head) : "the head revision") + " at three scales (silhouette, relationships, details) as designer, engineer and print technician, scores six criteria and lists concrete fixes. It changes nothing." }
+        Btn { kind: "default"; icon: "eye"; text: Store.chatBusy ? Store.chatAgentLabel + " is answering…" : "Ask " + Store.chatAgentLabel + " for a design review"
             enabled: Store.canAskReview; onClicked: Store.askReview() }
-        Txt { kind: "fine"; width: parent.width; visible: !Store.chat.available; color: Theme.amber; text: Store.chat.note || "Claude is not connected." }
+        Txt { kind: "fine"; width: parent.width; visible: !Store.chat.available; color: Theme.amber; text: Store.chat.note || "No agent is connected." }
     }
 
     // ── share (design tools) ────────────────────────────────

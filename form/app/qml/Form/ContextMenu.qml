@@ -14,7 +14,7 @@ Item {
         var f = m.feature, out = []
         if (feat) {
             out.push({ icon: "sliders_horizontal", text: "Edit parameters", key: "", run: function () { Store.pick(f) } })
-            out.push({ icon: "message_square", text: "Ask Claude about this feature…", key: "", off: !Store.chat.available, run: function () { Store.askAbout(f) } })
+            out.push({ icon: "message_square", text: "Ask the agent about this feature…", key: "", off: !Store.chat.available, run: function () { Store.askAbout(f) } })
             out.push({ icon: "focus", text: "Frame this feature", key: "F", run: function () { Store.select(f) } })
             out.push({ icon: "eye_off", text: "Hide feature", key: "H", run: function () { Store.toggleHidden(f) } })
             out.push({ icon: "copy", text: "Copy dimensions", key: "", run: function () { Store.copyDims(f) } })
