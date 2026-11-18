@@ -9,6 +9,7 @@
 - **Motion that follows where you go.** Screens hand over by depth (going into a design the workspace grows in and its inspector slides after it; going back, Home settles), Prove counts its results up and the checks rise in one after another, chat messages rise into place with a caret while a reply is written, step groups unfold in a cascade, and focus rings close in on the control. Reduced motion keeps only the fades.
 - **The mark is the loader.** The opening screen builds the Form Studio mark while the CAD kernel starts, and every loading state in the app is the same mark building itself.
 - **Save a whole release.** Release › Releases › **Save files…** saves every file of a release in one .zip (STEP, STL, sliced 3MF, G-code, report, documents); **Show in Finder** opens its folder.
+- **Opening a design from Home:** an outline grows from where you typed into the 3D view.
 
 ## 12.1.0
 
