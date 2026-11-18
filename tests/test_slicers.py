@@ -387,6 +387,27 @@ class StandInSlices(unittest.TestCase):
         from form.adapters import _bbl
         self.assertEqual([_bbl.exit_code(c) for c in (0, 1, 154, 238, 205, 0xFFFFFF9A, -11)], [0, 1, -102, -18, -51, -102, -11])
 
+    def test_a_crash_after_the_gcode_is_written_keeps_the_gcode(self):
+        # Snapmaker Orca on Windows (software OpenGL) writes the whole G-code, says so, then crashes drawing the thumbnail
+        info = self.orca_run(f"""\
+            out = args[args.index("--outputdir") + 1]
+            shutil.copyfile({str(FIX / "orca" / "generic_printer.gcode")!r}, os.path.join(out, "plate_1.gcode"))
+            open(os.path.join(out, "plate.3mf"), "wb").write(b"half")
+            print("Slicing result exported to " + out + "/plate_1.gcode")
+            print("[error] Slic3r::GUI::PartPlate::calc_exclude_triangles:Unable to create exclude triangles")
+            sys.exit(3221225477)
+            """)
+        self.assertEqual((info["time_s"], info["filament_g"], info["layers"]), (847, 1.83, 3))
+        self.assertIsNone(info["threemf"])                                        # nothing kept from a crashed 3MF write
+        self.assertIn("after writing the G-code", info["warnings"][0])
+        # without the slicer saying the G-code was exported, a non-zero exit is still a failed slice
+        with self.assertRaises(common.SlicerFailed):
+            self.orca_run(f"""\
+                out = args[args.index("--outputdir") + 1]
+                shutil.copyfile({str(FIX / "orca" / "generic_printer.gcode")!r}, os.path.join(out, "plate_1.gcode"))
+                sys.exit(1)
+                """)
+
     def test_orca_warnings_come_from_its_log_file(self):
         info = self.orca_run(f"""\
             out = args[args.index("--outputdir") + 1]

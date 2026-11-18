@@ -435,7 +435,14 @@ def slice_stl(fam: Family, resolved: dict, stl: Path, out_dir: Path, timeout: fl
             pass
     gcode = out_dir / "plate_1.gcode"
     threemf = out_dir / "plate.3mf"
-    if r.returncode != 0 or not gcode.exists():
+    # Some builds (Snapmaker Orca on Windows with software OpenGL) write the whole G-code, say so, and then crash
+    # drawing the project's thumbnail. The G-code is complete (it was renamed from .tmp only once fully written), so it
+    # is used and the exit is reported as a warning; the project 3MF from that run is not.
+    after_gcode = (r.returncode != 0 and gcode.exists()
+                   and "Slicing result exported to" in log and not (out_dir / "plate_1.gcode.tmp").exists())
+    if after_gcode and threemf.exists():
+        threemf.unlink()
+    if (r.returncode != 0 and not after_gcode) or not gcode.exists():
         errors = [ln.split("] ", 2)[-1] for ln in log.splitlines() if "[error]" in ln]
         msg = refusal(fam, r.returncode, said, errors, result)
         tail = errors[-8:] or [ln for ln in (own or said).splitlines() if ln.strip()][-12:]
@@ -455,6 +462,9 @@ def slice_stl(fam: Family, resolved: dict, stl: Path, out_dir: Path, timeout: fl
                            | {ln[len("got warnings: "):][:200] for ln in log.splitlines()
                               if ln.startswith("got warnings: ")})[:12],
     })
+    if after_gcode:
+        info["warnings"] = [f"{fam.label} exited with code {r.returncode} after writing the G-code, while drawing the "
+                            "project thumbnail. The G-code is complete; no project 3MF was kept from this run."] + info["warnings"]
     return info
 
 
