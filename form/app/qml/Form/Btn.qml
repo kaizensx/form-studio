@@ -69,9 +69,6 @@ Item {
     opacity: enabled ? 1 : 0.4
     scale: down ? Theme.from(0.97) : 1
     activeFocusOnTab: true          // Qt skips hidden and disabled items by itself
-    Accessible.role: Accessible.Button
-    Accessible.name: shownText || tip
-    Accessible.description: _shown ? "Working" : ""
     Behavior on scale { Glide { duration: Theme.press } }
     Keys.onPressed: function (e) { if (e.key === Qt.Key_Space || e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { e.accepted = true; if (!e.isAutoRepeat) kdown = true } }
     Keys.onReleased: function (e) { if (kdown && (e.key === Qt.Key_Space || e.key === Qt.Key_Return || e.key === Qt.Key_Enter)) { e.accepted = true; kdown = false; b._press() } }
