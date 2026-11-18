@@ -95,6 +95,8 @@ Column {
         Note { visible: !!root.ap && root.ap.state === "superseded"; kind: "amber"
             title: visible ? F.pad(root.ap.rev) + " was released; " + F.pad(root.p.head) + " has not been." : ""
             text: visible ? "Changed since: " + (root.ap.changed || []).join(", ") + ". The earlier release folder is intact but is a different design." : "" }
+        Note { objectName: "releaseDesignOnly"; visible: !root.approved && !!root.g && !!root.g.design_only; kind: "plain"; title: "Design only: not sliced"
+            text: root.g && root.g.not_covered ? "This release will not cover:\n" + root.g.not_covered.map(function (x) { return "· " + x }).join("\n") : "" }
         Note { visible: !root.approved && !!root.g && root.g.reasons.length > 0 && !root.overriding; kind: "red"; title: "Not ready"
             text: root.g ? root.g.reasons.join("\n") : "" }
         Column { width: parent.width; spacing: 6; visible: !root.approved && root.overriding

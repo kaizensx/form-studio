@@ -391,7 +391,7 @@ class Studio:
 
     def environment(self) -> dict:
         s = self.slicer_info()
-        return {"version": __version__, "kernel": self.kernel_id(), "slicer": slicer.public(s),
+        return {"version": __version__, "kernel": self.kernel_id(), "slicer": slicer.public(s), "slicing": self.slice_mode(),
                 "printer": self.cfg["printer"], "profile": self.profile(),
                 "models": {k: v for k, v in self.cfg["models"].items()},
                 "config_path": self.cfg["_path"], "data_dir": str(self.root),
@@ -1121,6 +1121,8 @@ class Studio:
                      "evidence": "simulated"})
         if s.get("material"):
             info["material"] = s["material"]
+        if s.get("plate_note"):
+            info["plate_note"] = s["plate_note"]
         (out / "meta.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
 
     # ---- several plates (form/plates.py) ---------------------------------
@@ -1187,6 +1189,7 @@ class Studio:
                            "images": imgs, "thumbnail": imgs[0] if imgs else None, "stl": f"plate_{n}.stl",
                            "material": plate["material"], "filament": (info.get("presets") or {}).get("filament", {}).get("name"),
                            "filament_note": mat.get("text") if mat.get("changed") or not mat.get("matched", True) else "",
+                           "plate_note": res.get("plate_note") or "",
                            "parts": plate["parts"], "used_mm": plate["used_mm"], "triangles": geo["triangles"]})
         def total(k):
             vals = [r.get(k) for r in rows]

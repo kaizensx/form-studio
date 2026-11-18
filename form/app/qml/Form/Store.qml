@@ -324,13 +324,29 @@ QtObject {
     }
     function showLayers(on) {
         if (!on) { layers = null; return }
-        pget("/layers").then(function (m) { m.n = Math.min(m.count - 1, 3); layers = m }, fail)
+        pget("/layers" + plateQuery).then(function (m) { m.n = Math.min(m.count - 1, 3); layers = m }, fail)
     }
     function setLayer(n) { if (layers) layers = Object.assign({}, layers, { n: n }) }
     // ── print simulation (LayerView.qml): open it in a given state from anywhere ──
     // o: { at: 0..1 of the slicer's time, layer: 1-based, fraction, ghost, only: [line types] | null, mode: "3d" | "2d" | "plate",
     //      copies: N (plate preview), play: true, speed }
     property var simAsk: null
+    // ── engine workstream: several plates (form/plates.py) and Design only (slicing turned off) ──
+    property int plate: 1                // the plate Prove and the print simulation show, when a design has several
+    readonly property var plates: data && data.slice && data.slice.plates ? data.slice.plates : []
+    readonly property int plateShown: plates.length ? Math.max(1, Math.min(plates.length, plate)) : 1
+    readonly property string plateQuery: plates.length ? "?plate=" + plateShown : ""
+    function setPlate(n) {                // the open simulation stays open and loads the other plate's toolpaths
+        if (n === plate) return
+        plate = n
+        if (layers) pget("/layers" + plateQuery).then(function (m) { if (layers) { m.n = Math.min(m.count - 1, layers.n); layers = m } }, fail)
+    }
+    function designOnlyEverywhere(on) {   // Settings or first run: no slicing for any design; a waiting slicer install is skipped
+        if (on && installJob && installJob.state === "running")
+            installJob.steps.forEach(function (st) { if (st.id.indexOf("slicer.") === 0 && st.state !== "done") skipInstall(st.id) })
+        if (on) { var pk = Object.assign({}, installPick); F.keys(pk).forEach(function (k) { if (k.indexOf("slicer.") === 0) pk[k] = false }); installPick = pk }
+        return saveConfig({ "slicer.enabled": !on }).then(function (r) { if (pid) refresh(); return r })
+    }
     signal revealInspector(real y)     // scroll the stage inspector (y in its content; a large value = the end)
     function simulate(o) { simAsk = o || ({}); if (!layers) showLayers(true) }
     // Open a native file or folder dialog. Under the interaction tests (form/app/uitest.py) no native window opens:

@@ -17,6 +17,10 @@ Column {
     readonly property string head: d ? F.pad(d.project.head) : ""
     readonly property bool busy: Store.job !== ""
     readonly property bool sliceFailed: !!sn && sn.state === "failed"
+    readonly property bool sliceOff: !!sn && sn.state === "off"                       // Design only
+    readonly property var plates: Store.plates                                          // several plates (form/plates.py)
+    readonly property var pl: plates.length ? plates[Store.plateShown - 1] : null        // the plate on screen
+    readonly property var shownSlice: pl ? Object.assign({}, sl, pl) : sl                // that plate, or the one slice
     readonly property var colw: [54, 70, 78, 70]            // orientation table: numeric column widths
     function uniq(a) { return a.filter(function (x, i) { return a.indexOf(x) === i }) }
 
@@ -189,25 +193,49 @@ Column {
 
     // ── slice ────────────────────────────────────────────────
     Sec { visible: !!root.sl
-        title: root.sl ? "Slice of " + F.pad(root.sl.rev) : ""; tag: "simulated"
+        title: root.sl ? "Slice of " + F.pad(root.sl.rev) + (root.plates.length > 1 ? " · " + root.plates.length + " plates" : "") : ""; tag: "simulated"
         Row { width: parent.width; topPadding: 4; bottomPadding: 2
             Repeater {
                 model: root.sl ? [
-                    { big: F.dur(root.sl.time_s), small: "estimated print time" },
-                    { big: F.fmt(root.sl.filament_g, 1) + " g", small: F.fmt(root.sl.filament_mm / 1000, 1) + " m filament" },
-                    { big: String(root.sl.layers), small: "layers to " + F.fmt(root.sl.max_z_mm, 1) + " mm" }] : []
+                    { big: F.dur(root.sl.time_s), small: root.plates.length > 1 ? "print time, all plates" : "estimated print time" },
+                    { big: F.fmt(root.sl.filament_g, 1) + " g", small: root.plates.length > 1 ? "filament, all plates" : F.fmt(root.sl.filament_mm / 1000, 1) + " m filament" },
+                    root.plates.length > 1 ? { big: String(root.plates.length), small: "plates, one after another" }
+                        : { big: String(root.sl.layers), small: "layers to " + F.fmt(root.sl.max_z_mm, 1) + " mm" }] : []
                 Column { required property var modelData; width: parent.width / 3; spacing: 3
                     Txt { mono: true; font.pixelSize: Theme.tH3; font.weight: 600; font.letterSpacing: -0.3; text: modelData.big; width: parent.width - 8; wrapMode: Text.NoWrap; elide: Text.ElideRight }
                     Txt { kind: "fine"; text: modelData.small; width: parent.width - 8 } }
             }
         }
+        // several plates: the design did not fit one plate (or its parts differ in material); each plate sliced on its own
+        Column { visible: root.plates.length > 1; width: parent.width; spacing: 8
+            Seg { objectName: "provePlates"; value: Store.plateShown
+                model: root.plates.map(function (x) { return { value: x.n, text: "Plate " + x.n } })
+                onPicked: function (n) { Store.setPlate(n) } }
+            Rectangle { width: parent.width; height: pc.implicitHeight + 20; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+                Column { id: pc; x: 12; y: 10; width: parent.width - 24; spacing: 4
+                    Item { width: parent.width; height: 20
+                        Txt { text: root.pl ? root.pl.parts.map(function (q) { return q.label }).join(", ") : ""; font.weight: 600
+                            width: parent.width - pst.width - 10; wrapMode: Text.NoWrap; elide: Text.ElideRight; anchors.verticalCenter: parent.verticalCenter }
+                        Txt { id: pst; mono: true; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
+                            text: root.pl ? F.dur(root.pl.time_s) + " · " + F.fmt(root.pl.filament_g, 1) + " g · " + root.pl.layers + " layers" : "" } }
+                    Txt { kind: "fine"; width: parent.width; wrapMode: Text.NoWrap; elide: Text.ElideRight
+                        text: root.pl ? (root.pl.filament || "") + (root.pl.material ? " · " + root.pl.material : "") : "" }
+                    Txt { kind: "fine"; tone: 2; width: parent.width; visible: text !== ""
+                        text: root.pl ? [root.pl.filament_note || "", root.pl.plate_note || ""].filter(function (x) { return x }).join(" ") : "" } } }
+            Txt { kind: "fine"; width: parent.width
+                text: "Form Studio laid the parts out from their bounding boxes (computed), " + (root.sl && root.sl.plan ? F.trim(root.sl.plan.spacing_mm) : 6)
+                    + " mm apart, one material per plate. Times and grams are the slicer's, per plate and added up." }
+        }
+        Txt { kind: "fine"; tone: 2; width: parent.width; visible: !!root.sl && !root.plates.length && !!root.sl.material && !!root.sl.material.text
+            text: root.sl && root.sl.material ? "Filament: " + root.sl.material.text : "" }
         Flow { spacing: 8; topPadding: 2; width: parent.width
             Btn { visible: !Store.layers; icon: "play"; text: "Watch it print"; tip: "Play the slicer's toolpaths in 3D (a simulation, not a print)"
                 onClicked: Store.simulate({ at: 0, play: true }) }
             Btn { icon: Store.layers ? "arrow_left" : "layers"; text: Store.layers ? "Back to the design" : "Inspect layers"
                 onClicked: { if (Store.layers) Store.showLayers(false); else Store.simulate({ mode: "2d", layer: 4 }) } }
-            Btn { kind: "quiet"; icon: "download"; text: "Save sliced 3MF…"; visible: !!root.sl && !!root.sl.threemf
-                onClicked: { save.selectedFile = Bridge.downloads() + "/" + root.sl.threemf; Store.ask(save) } } }
+            Btn { kind: "quiet"; icon: "download"; text: root.plates.length > 1 ? "Save plate " + Store.plateShown + " 3MF…" : "Save sliced 3MF…"
+                visible: !!root.shownSlice && !!root.shownSlice.threemf
+                onClicked: { save.selectedFile = Bridge.downloads() + "/" + (root.plates.length > 1 ? Store.pid + "_plate" + Store.plateShown + ".3mf" : root.sl.threemf); Store.ask(save) } } }
         Txt { kind: "fine"; width: parent.width
             text: "A slice shows the toolpaths " + ((root.sl && root.sl.slicer_name) || "Bambu Studio") + " would send with these presets. It is not a print: adhesion, warping and fit are only known after printing." }
         Fold { title: "Slice details"; key: "prove.slice"
@@ -225,13 +253,14 @@ Column {
                 visible: !!root.sl && (root.sl.plate_warnings || []).length > 0
                 text: root.sl ? "Slicer notes: " + root.uniq(root.sl.plate_warnings || []).join(", ") : "" }
             Item { id: plate
-                visible: !!root.sl && (root.sl.images || []).indexOf("plate_1.png") >= 0
+                readonly property string pic: root.pl ? (root.pl.thumbnail || "") : (root.sl && (root.sl.images || []).indexOf("plate_1.png") >= 0 ? "plate_1.png" : "")
+                visible: !!root.sl && pic !== ""
                 width: parent.width
                 height: visible ? (img.status === Image.Ready ? Math.round(width * img.sourceSize.height / img.sourceSize.width) : Math.round(width * 0.75)) : 0
                 Rectangle { id: mask; anchors.fill: parent; radius: Theme.rMd; visible: false; layer.enabled: true }
                 Rectangle { anchors.fill: parent; radius: Theme.rMd; color: Theme.well }
                 Image { id: img; anchors.fill: parent; asynchronous: true; fillMode: Image.PreserveAspectFit; mipmap: true
-                    source: plate.visible && root.sn ? Store.file("slice/current/plate_1.png") + "?k=" + root.sn.key : ""
+                    source: plate.visible && root.sn ? Store.file("slice/current/" + plate.pic) + "?k=" + root.sn.key : ""
                     layer.enabled: true
                     layer.effect: MultiEffect { maskEnabled: true; maskSource: mask } }
                 Rectangle { anchors.fill: parent; radius: Theme.rMd; color: "transparent"; border.width: 1; border.color: Theme.rule2 }
@@ -245,7 +274,20 @@ Column {
     Item { width: 1; height: 16 }
 
     // ── slice: not current ───────────────────────────────────
-    Sec { title: "Slice"; visible: !root.sl
+    // ── Design only: slicing is off for this design, for every design, or no slicer is installed ──
+    Sec { title: "Slice"; visible: root.sliceOff
+        Note { objectName: "designOnlyNote"; kind: "plain"; title: "Design only"
+            text: root.sliceOff ? root.sn.off.text + " Checks, exports, renders and releases work as usual; a release says that it was not sliced." : "" }
+        Txt { kind: "fine"; width: parent.width; visible: root.sliceOff && root.sn.off.why !== "project"; text: root.sliceOff ? root.sn.off.how : "" }
+        Row { spacing: 8
+            Btn { objectName: "sliceOn"; visible: root.sliceOff && root.sn.off.why === "project"; icon: "layers"; text: "Slice this design"
+                enabled: !root.busy; onClicked: Store.settings({ design_only: false }) }
+            Btn { visible: root.sliceOff && root.sn.off.why === "settings"; icon: "settings"; text: "Turn slicing on"
+                enabled: !root.busy; onClicked: Store.designOnlyEverywhere(false) }
+            Btn { visible: root.sliceOff && root.sn.off.why === "no_slicer"; icon: "download"; text: "Set up a slicer…"
+                onClicked: Store.openSheet("setup") } }
+    }
+    Sec { title: "Slice"; visible: !root.sl && !root.sliceOff
         Note { kind: "red"; visible: !!root.sn && !!root.sn.unavailable; title: "Blocked"; text: root.sn && root.sn.unavailable ? String(root.sn.unavailable) : "" }
         Note { kind: "amber"; visible: !(root.sn && root.sn.unavailable)
             title: root.sliceFailed && root.sn.error ? root.sn.error.message : ""
@@ -257,6 +299,9 @@ Column {
             Btn { icon: "layers"; text: root.busy ? "Working…" : root.sliceFailed ? "Try again" : "Slice now"
                 enabled: !root.busy && !(root.sn && root.sn.unavailable)
                 onClicked: Store.run(["geometry", "exports", "checks", "slice"], root.sliceFailed) }
+            Btn { objectName: "designOnly"; kind: "quiet"; text: "Design only"; enabled: !root.busy
+                tip: "Do not slice this design. Checks, exports and release still work; the release says it was not sliced."
+                onClicked: Store.settings({ design_only: true }) }
             FixBtn { visible: root.sliceFailed && Store.chatReady && !!Store.chat.available; small: false
                 subject: "the slice failed for " + root.head
                 details: root.sn && root.sn.error ? "Slicer: " + (Store.slicer.label || "the configured slicer") + "\nError: " + root.sn.error.message
@@ -268,7 +313,7 @@ Column {
         title: "Save sliced 3MF"; fileMode: FileDialog.SaveFile; nameFilters: ["3MF (*.3mf)"]; defaultSuffix: "3mf"
         currentFolder: Bridge.downloads()
         onAccepted: {
-            if (Bridge.save("/projects/" + Store.pid + "/file/slice/current/" + root.sl.threemf, selectedFile)) Bridge.reveal(selectedFile)
+            if (Bridge.save("/projects/" + Store.pid + "/file/slice/current/" + root.shownSlice.threemf, selectedFile)) Bridge.reveal(selectedFile)
             else Store.toast("The sliced 3MF could not be saved.", "Check that the folder is writable and try again.", true)
         }
     }

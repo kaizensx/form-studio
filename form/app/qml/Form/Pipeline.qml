@@ -28,7 +28,7 @@ Rectangle {
     property real least0: 0
     readonly property string summary: {
         var order = ["geometry", "exports", "checks", "slice"], names = ({ geometry: "Solid", exports: "Exports", checks: "Checks", slice: "Slice" })
-        for (var i = 0; i < order.length; i++) { var s = stateOf(order[i]); if (s !== "current") return names[order[i]] + ": " + (meta(order[i]) || s) }
+        for (var i = 0; i < order.length; i++) { var s = stateOf(order[i]); if (s !== "current" && s !== "off") return names[order[i]] + ": " + (meta(order[i]) || s) }
         return rev + " · all current"
     }
     color: flat ? "transparent" : Theme.alpha(Theme.plate1, 0.9); radius: Theme.rLg; border.color: Theme.rule; border.width: flat ? 0 : 1
@@ -36,7 +36,7 @@ Rectangle {
     readonly property var d: Store.data
     readonly property var st: d ? d.status : ({})
     readonly property string rev: d ? F.pad(d.project.head) : ""
-    readonly property bool dirty: F.vals(st).some(function (n) { return n.state !== "current" })
+    readonly property bool dirty: F.vals(st).some(function (n) { return n.state !== "current" && n.state !== "off" })   // off: Design only
     function stateOf(id) {
         var n = st[id]; if (!n) return "missing"
         var run = Store.running[id]
@@ -47,13 +47,15 @@ Rectangle {
     function meta(id) {
         var n = st[id], s = stateOf(id); if (!n) return ""
         if (s === "running") return Store.running[id] === "queued" ? "queued" : "working…"
+        if (s === "off") return pl.roomy ? "design only, not sliced" : "design only"
         if (s !== "current") return n.error ? n.error.message : (id === "slice" && n.unavailable) ? "slicer unavailable" : s === "stale" ? "made for " + F.pad(n.last_rev || 0) : s === "blocked" ? "waiting" : "not made"
         if (id === "geometry") return Store.view ? Store.view.faces + " faces" : ""
         if (id === "exports") return d.exports ? (d.exports.files.step ? ".step .stl .3mf" : ".stl only (mesh)") : ""
         if (id === "checks") { var r = d.checks ? d.checks.rollup : null; if (!r) return ""
             if (roomy) return r.PASS + " pass · " + r.WARN + " review · " + r.FAIL + " fail"
             return r.FAIL ? r.FAIL + " fail · " + r.WARN + " review" : r.WARN ? r.PASS + " pass · " + r.WARN + " review" : r.PASS + " pass" }
-        if (id === "slice") return d.slice ? F.dur(d.slice.time_s) + (roomy ? " · " + F.fmt(d.slice.filament_g, 1) + " g" : "") : ""
+        if (id === "slice") return d.slice ? F.dur(d.slice.time_s) + (roomy ? " · " + F.fmt(d.slice.filament_g, 1) + " g" : "")
+            + (d.slice.plates && d.slice.plates.length > 1 ? " · " + d.slice.plates.length + " plates" : "") : ""
         return ""
     }
     function tint(s) { return s === "current" ? Theme.pass : s === "running" ? Theme.datum : s === "failed" ? Theme.signal : s === "stale" ? Theme.amber : Theme.ink4 }

@@ -125,7 +125,7 @@ Item {
     PrintSimView {
         id: view
         anchors.fill: parent
-        url: Store.pid ? Bridge.baseUrl + "/api/projects/" + Store.pid + "/toolpath" : ""
+        url: Store.pid ? Bridge.baseUrl + "/api/projects/" + Store.pid + "/toolpath" + Store.plateQuery : ""
         colors: sim.inks
         now: sim.now; total: Math.max(1, sim.count); mode: sim.mode; ghost: sim.ghost
         nozzle: sim.here; footer: sim.foot
@@ -154,6 +154,13 @@ Item {
             Tag { text: "simulated"; anchors.verticalCenter: parent.verticalCenter } }
         Item { width: 1; height: 24; visible: sim.narrow }       // the view controls take this row when it is narrow
         Txt { kind: "fine"; tone: 2; text: "Simulated from the slicer's G-code. Not a print."; width: Math.min(implicitWidth, sim.width - sim.leftInset - 20) }
+        // several plates: which one is on screen (each was sliced on its own)
+        Row { visible: Store.plates.length > 1; spacing: 8
+            Seg { objectName: "simPlates"; value: Store.plateShown
+                model: Store.plates.map(function (x) { return { value: x.n, text: "Plate " + x.n } })
+                onPicked: function (n) { sim.pause(); Store.setPlate(n) } }
+            Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
+                text: { var x = Store.plates[Store.plateShown - 1]; return x ? x.parts.map(function (q) { return q.label }).join(", ") : "" } } }
 
         // line types: click to hide or show
         Rectangle { visible: sim.types.length > 0 && sim.mode !== "plate"
@@ -214,7 +221,7 @@ Item {
                 Txt { kind: "fine"; width: parent.width; visible: !!sim.packed && sim.packed.parts_per_copy > 1
                     text: "This design prints as " + (sim.packed ? sim.packed.parts_per_copy : 0) + " parts; the outlines are their bounding boxes. Toolpaths are shown once, as sliced." }
                 Txt { kind: "fine"; width: parent.width
-                    text: "Bounding boxes with " + (sim.packed ? F.trim(sim.packed.spacing_mm) : 6) + " mm between parts, 90° turns allowed. A preview only: Form Studio still exports one part per plate, and your slicer arranges copies itself." }
+                    text: "Bounding boxes with " + (sim.packed ? F.trim(sim.packed.spacing_mm) : 6) + " mm between parts, 90° turns allowed. A preview only: your slicer arranges copies itself." }
             }
         }
     }

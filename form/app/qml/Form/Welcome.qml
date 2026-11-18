@@ -19,17 +19,18 @@ Rectangle {
     // ticked rows of this step only
     readonly property var chosen: Store.installChosen.filter(function (id) { return wl.here.ids.indexOf(id) >= 0 })
     readonly property bool anySlicer: !!sw && ["slicer.bambu", "slicer.orca", "slicer.prusa"].some(function (id) { var it = Store.softwareItem(id); return it && it.status === "ok" })
+    readonly property bool designOnly: !!Store.studio && !!Store.studio.env.slicing && Store.studio.env.slicing.why === "settings"
     readonly property var absentAgents: sw ? sw.software.filter(function (r) { return r.absent }).map(function (r) { return r.label.replace("Form Studio tools in ", "") }) : []
     function stepState(i) {          // done | todo | open — for the rail
         if (!sw) return "open"
         var need = steps[i].ids.map(function (id) { return Store.softwareItem(id) }).filter(function (r) {
             return r && !r.absent && r.level !== "optional" && r.status !== "ok" && r.status !== "info" })
-        if (i === 1) return wl.anySlicer ? "done" : "todo"
+        if (i === 1) return wl.anySlicer || wl.designOnly ? "done" : "todo"
         return need.length ? "todo" : "done"
     }
     function stepNote(i) {
         if (!sw) return "Checking…"
-        if (i === 1) return wl.anySlicer ? "A slicer is ready" : "No slicer yet"
+        if (i === 1) return wl.anySlicer ? "A slicer is ready" : wl.designOnly ? "Design only" : "No slicer yet"
         var rows = steps[i].ids.map(function (id) { return Store.softwareItem(id) }).filter(function (r) { return r && !r.absent && r.status !== "info" })
         var ok = rows.filter(function (r) { return r.status === "ok" }).length
         return ok + " of " + rows.length + " ready"
@@ -174,6 +175,16 @@ Rectangle {
                         Txt { kind: "fine"; width: parent.width; text: "Read from what is selected in the slicer. Change the printer or filament there and Form Studio follows." } } }
                 Txt { visible: !!wl.sw && !wl.anySlicer; width: parent.width; tone: 2
                     text: "No slicer was found. Pick the one that matches your printer; Bambu Studio is ticked because it is Form Studio's default. Everything except slicing also works without one." }
+                // Design only: design, check, export and release without any slicer (it can be turned on later in Settings)
+                Rectangle { visible: !!wl.sw && !wl.anySlicer; width: parent.width; height: dc.implicitHeight + 28; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+                    readonly property bool off: wl.designOnly
+                    Column { id: dc; x: 16; y: 14; width: parent.width - 32; spacing: 8
+                        Txt { font.weight: 600; text: parent.parent.off ? "Design only is on" : "Only designing for now?" }
+                        Txt { kind: "fine"; tone: 2; width: parent.width
+                            text: "Design only: no slicer is installed or used. Designs, checks, STEP, STL and 3MF exports, renders and releases all work; a release says it was not sliced. Turn slicing on any time in Settings." }
+                        Btn { objectName: "welcomeDesignOnly"; text: parent.parent.off ? "Slice designs after all" : "Design only, no slicer"
+                            icon: parent.parent.off ? "layers" : "pencil"; enabled: !Store.installing || !parent.parent.off
+                            onClicked: Store.designOnlyEverywhere(!parent.parent.off) } } }
                 SetupList { width: parent.width; ids: ["slicer.bambu", "slicer.orca", "slicer.prusa"] }
                 // no slicer: the bed size is the one thing FORM still needs to know
                 Rectangle { visible: !!wl.sw && !wl.anySlicer; width: parent.width; height: bc.implicitHeight + 28; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule

@@ -112,6 +112,54 @@ class Journeys(unittest.TestCase):
         with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(toml)}):     # run_journey copies it into the run's folder
             self.journey("printers.py")
 
+    # -- engine workstream: several plates, Design only (tests/journeys/plates.py, design_only.py) --
+    def _no_slicers_toml(self, extra: str = "") -> Path:
+        sys.path.insert(0, str(HERE))
+        from test_slicers import NOWHERE
+        from form.adapters import SLICERS
+        tmp = Path(tempfile.mkdtemp(prefix="form-ui-engine-"))
+        toml = tmp / "studio.toml"
+        toml.write_text(extra + f'[slicer]\napp = {json.dumps(NOWHERE)}\n'
+                        + "".join(f"[slicer.{k}]\napp = {json.dumps(NOWHERE)}\n" for k in SLICERS if k != "bambu"), encoding="utf-8")
+        return toml
+
+    def test_design_only(self):
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(self._no_slicers_toml())}):
+            self.journey("design_only.py")
+
+    def test_plates(self):
+        # a stand-in OrcaSlicer that copies a fixture G-code: the same on every machine
+        import stat
+        sys.path.insert(0, str(HERE))
+        from test_slicers import FIX, NOWHERE
+        from form.adapters import SLICERS
+        tmp = Path(tempfile.mkdtemp(prefix="form-ui-plates-"))
+        py = tmp / "stand_in.py"
+        py.write_text("import sys, shutil, os\nargs = sys.argv[1:]\nif args == ['--help']:\n    print('OrcaSlicer-2.5.1:'); sys.exit(0)\n"
+                      f"out = args[args.index('--outputdir') + 1]\nshutil.copyfile({str(FIX / 'orca' / 'generic_printer.gcode')!r}, "
+                      "os.path.join(out, 'plate_1.gcode'))\n", encoding="utf-8")
+        app = tmp / "orca"
+        app.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{py}" "$@"\n', encoding="utf-8")
+        app.chmod(app.stat().st_mode | stat.S_IEXEC)
+        toml = tmp / "studio.toml"
+        toml.write_text(f'[printer]\nenvelope_mm = [180, 180, 180]\n[slicer]\nkind = "orca"\napp = {json.dumps(NOWHERE)}\n'
+                        f'[slicer.orca]\napp = {json.dumps(str(app))}\nconfig_dir = {json.dumps(str(FIX / "orca" / "config"))}\n'
+                        + "".join(f"[slicer.{k}]\napp = {json.dumps(NOWHERE)}\n" for k in SLICERS if k not in ("bambu", "orca")),
+                        encoding="utf-8")
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(toml)}):
+            self.journey("plates.py")
+
+    @unittest.skipUnless(sys.platform == "darwin" or os.environ.get("FORM_UI_REAL_SLICER") == "1",
+                         "the real slicer journey runs where a slicer is installed (macOS here, or FORM_UI_REAL_SLICER=1)")
+    def test_plates_real_slicer(self):
+        sys.path.insert(0, str(HERE))
+        from test_plates import REAL
+        if not REAL:
+            self.skipTest("no Bambu Studio or OrcaSlicer with a printer selected")
+        self.journey("plates.py")
+
     def test_install_flow(self):
         self.journey("install.py", env_extra={"FORM_INSTALL_FAKE": "3", "FORM_SETUP_PRETEND_MISSING": "parts,claude.signin",
                                               "FORM_NO_AUTO_SETUP": ""})

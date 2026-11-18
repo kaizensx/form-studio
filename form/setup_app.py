@@ -318,7 +318,7 @@ def route_get(st, path: str, q: dict):
     if path == "/api/install/auto":               # hands-free setup: would it start, and for what (engine workstream)
         import os
         return {"enabled": os.environ.get("FORM_NO_AUTO_SETUP", "") != "1",
-                "ids": installer.auto_ids(installer.survey(st.cfg))}
+                "ids": installer.auto_ids(installer.survey(st.cfg), st.cfg)}
     if path == "/api/claude/auth":
         return installer.claude_auth(st.cfg)
     m = re.fullmatch(r"/api/claude/login/([0-9a-f]{10})", path)

@@ -346,19 +346,23 @@ class Pipeline(unittest.TestCase):
 
 
 class SlicerBlockedIsHonest(unittest.TestCase):
-    def test_missing_slicer_blocks_only_the_slice(self):
+    def test_missing_slicer_means_design_only(self):
+        # No slicer installed: the design is not sliced, and the gate says what that leaves out instead of blocking
         tmp = Path(tempfile.mkdtemp(prefix="form-test-"))
-        st = make_studio(tmp, slicer={"app": "/nonexistent/BambuStudio"})
+        st = make_studio(tmp, slicer={"app": "/nonexistent/BambuStudio", "kind": "bambu"})
         try:
             p = st.create("No slicer", "coupon")
             job = st.run_sync(p["id"])
             by = {s["node"]: s for s in job["steps"]}
             self.assertEqual([by[n]["state"] for n in ("geometry", "exports", "checks")], ["done"] * 3)
-            self.assertEqual(by["slice"]["state"], "blocked")
-            self.assertIn("not found", by["slice"]["error"]["message"])
+            self.assertNotIn("slice", by)
+            status = st.status(st.load(p["id"]))
+            self.assertEqual(status["slice"]["state"], "off")
+            self.assertEqual(status["slice"]["off"]["why"], "no_slicer")
             g = st.gate(st.load(p["id"]))
-            self.assertFalse(g["ready"])
-            self.assertTrue(any("blocked" in r for r in g["reasons"]))
+            self.assertFalse(any("Slice" in r for r in g["reasons"]), g["reasons"])
+            self.assertTrue(g["not_covered"])
+            self.assertIn("Design only", g["evidence_level"])
         finally:
             st.kernel.stop()
             shutil.rmtree(tmp, ignore_errors=True)

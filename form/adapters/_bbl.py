@@ -208,6 +208,7 @@ def resolve(fam: Family, s: dict, app: Path, config_dir: Path, wanted: dict) -> 
             flat[idkey] = [name] if kind == "filament" else name
             blob = json.dumps(flat, sort_keys=True).encode()
             out["presets"][kind] = {"name": name, "sha": hashlib.sha256(blob).hexdigest()[:16], "data": flat}
+        plate_for_filament(out)
         m, p = out["presets"]["machine"]["data"], out["presets"]["process"]["data"]
         compat = p.get("compatible_printers") or []
         # a user printer is compatible with what its system printer is (the program checks the preset it inherits from)
@@ -232,6 +233,42 @@ def resolve(fam: Family, s: dict, app: Path, config_dir: Path, wanted: dict) -> 
     except (ValueError, OSError) as e:
         out["reason"] = f"Could not read {fam.label} presets: {e}"
     return out
+
+
+# the build plate -> the filament key holding its bed temperature; 0 there means the filament cannot be printed on it
+PLATE_TEMP = {"Cool Plate": "cool_plate_temp", "Engineering Plate": "eng_plate_temp", "High Temp Plate": "hot_plate_temp",
+              "Textured PEI Plate": "textured_plate_temp", "Textured Cool Plate": "textured_cool_plate_temp",
+              "Supertack Plate": "supertack_plate_temp"}
+PLATE_ORDER = ("Textured PEI Plate", "High Temp Plate", "Engineering Plate", "Cool Plate", "Textured Cool Plate", "Supertack Plate")
+
+
+def plate_for_filament(out: dict) -> None:
+    """When the build plate the slice would use (stated in the process or printer, else the CLI's Cool Plate) has
+    no bed temperature for this filament, use the first plate that has one, and say so in out["plate_note"].
+
+    The CLI refuses such a slice outright ("Filaments are not compatible with the plate type"); the slicer's window
+    would make you pick another plate. Nothing changes for a filament the plate supports."""
+    pr = out["presets"]
+    m, p, f = pr["machine"]["data"], pr["process"]["data"], pr["filament"]["data"]
+    plate = p.get("curr_bed_type") or m.get("curr_bed_type") or "Cool Plate"
+
+    def temp(name):
+        v = f.get(PLATE_TEMP.get(name, ""))
+        v = v[0] if isinstance(v, list) and v else v
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+    if plate not in PLATE_TEMP or temp(plate) is None or temp(plate) > 0:
+        return
+    for other in PLATE_ORDER:
+        t = temp(other)
+        if t and t > 0:
+            p = dict(p, curr_bed_type=other)
+            blob = json.dumps(p, sort_keys=True).encode()
+            pr["process"] = dict(pr["process"], data=p, sha=hashlib.sha256(blob).hexdigest()[:16])
+            out["plate_note"] = f"{pr['filament']['name']} cannot be printed on the {plate}; the slice uses the {other}."
+            return
 
 
 def is_user(fam: Family, config_dir: Path, kind: str, name: str) -> bool:

@@ -3,11 +3,11 @@ test goes through the window."""
 
 
 def wait_job(ui, pid, timeout=300):
-    """Until the project's pipeline is current (solid, exports, checks; slice when a slicer is installed)."""
+    """Until the project's pipeline is current (solid, exports, checks; slice when a slicer is installed and slicing is on)."""
     def done():
         d = ui.api("/projects/" + pid)
         return isinstance(d, dict) and d.get("status") and not d.get("job") and all(
-            v["state"] in ("current", "blocked", "failed") or v.get("unavailable") for v in d["status"].values())
+            v["state"] in ("current", "blocked", "failed", "off") or v.get("unavailable") for v in d["status"].values())
     try:
         ui.wait_until(done, timeout, f"the pipeline of {pid}")
     except Exception as e:                 # say where it stopped: a timeout alone explains nothing on a remote runner

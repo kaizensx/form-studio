@@ -1163,7 +1163,7 @@ AUTO_WAIT_S = 1800          # how long one item may wait for the person before i
 AUTO_GROUPS = ("engine", "slicer", "ai")
 
 
-def auto_ids(rows: list[dict]) -> list[str]:
+def auto_ids(rows: list[dict], cfg: dict | None = None) -> list[str]:
     """What a hands-free setup takes care of: every required or recommended item Form Studio itself needs (the engine,
     a slicer, Claude Code for chat and its sign-in) that is missing, in registry order. One slicer is enough (survey
     makes the rest optional). Other agents' settings are never edited without a click: they stay in the list."""
@@ -1175,6 +1175,8 @@ def auto_ids(rows: list[dict]) -> list[str]:
             continue
         if r["id"].startswith("slicer.") and any(x["one_of"] == "slicer" and x["status"] == "ok" for x in rows):
             continue
+        if r["id"].startswith("slicer.") and cfg is not None and not (cfg.get("slicer") or {}).get("enabled", True):
+            continue                                     # Design only: the person chose to work without a slicer
         out.append(r["id"])
     return out
 
@@ -1325,7 +1327,7 @@ def _installer_auto(self: "Installer", ids: list[str] | None = None, start: bool
         if any(j.state == "running" for j in self.jobs.values()):
             raise InstallError("An install is already running.", "Wait for it, or cancel it.", status=409)
         rows = survey(self.cfg)
-        ids = auto_ids(rows) if ids is None else ids
+        ids = auto_ids(rows, self.cfg) if ids is None else ids
         job = AutoJob(self.cfg, ids, self, poll_s=poll_s, on_done=self.on_done)
         self.jobs[job.id] = job
     if start:
