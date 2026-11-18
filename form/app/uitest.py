@@ -335,9 +335,27 @@ class UI:
                 self._pump(30)
                 return
 
+    def _steady(self, target, fx: float, fy: float, limit: float = 3.0) -> None:
+        """Wait until the item stops moving: a panel sliding in, a popover growing, a strip changing height. A hand
+        aims at where a control rests; on a slow software-rendered runner a click aimed mid-animation lands on
+        whatever is there once the event arrives."""
+        it = self.item(target) if isinstance(target, str) else target
+        t0, last = time.time(), None
+        while time.time() - t0 < limit:
+            try:
+                p = self._pt(it, fx, fy)
+                now = (p.x(), p.y(), round(it.width()), round(it.height()))
+            except RuntimeError:                       # the item went away; let the caller find out
+                return
+            if now == last:
+                return
+            last = now
+            self._pump(40)
+
     def hover(self, target, fx: float = 0.5, fy: float = 0.5):
         if not isinstance(target, (tuple, list)):
             self.scroll_to(target, fy)
+            self._steady(target, fx, fy)
         p = self._pt(target, fx, fy)
         self.T.mouseMove(self.win, p)
         self._pump(15)

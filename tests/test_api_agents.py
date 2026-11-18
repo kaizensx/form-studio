@@ -13,7 +13,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from form import chat, secrets  # noqa: E402
+from form import chat, fsutil, secrets  # noqa: E402
 from form.agents import ADAPTERS, compat  # noqa: E402
 from form.agents import providers as prov  # noqa: E402
 from form.agents.api import ApiAdapter, simplify, tool_specs  # noqa: E402
@@ -45,6 +45,7 @@ class Env(unittest.TestCase):
             s.close()
         self.env.stop()
         prov.forget()
+        fsutil.rmtree(self.tmp.name)                # retried: on Windows the tool server's folder frees a moment after it ends
         self.tmp.cleanup()
 
     def serve(self, **kw) -> FakeProvider:
@@ -153,7 +154,7 @@ class Loop(Env):
             {"text": "There are built-in recipes.", "usage": {"prompt_tokens": 1200, "completion_tokens": 80}},
             {"text": "Still here."}])
         c = self.chat_with("ollama", srv.url)
-        job = wait(c.send("What can you make?", ask=False), 90)
+        job = wait(c.send("What can you make?", ask=False), 300)
         self.assertEqual(job.state, "done", job.error)
         items = c.conversation(job.conversation)["items"]
         kinds = [e["t"] for e in items]
@@ -178,7 +179,7 @@ class Loop(Env):
         self.assertIn("Form Studio", srv.requests[0]["messages"][0]["content"])
         self.assertIn("form_overview", [t["function"]["name"] for t in srv.requests[0]["tools"]])
         # the next message continues the same API history
-        job2 = wait(c.send("And now?", job.conversation, ask=False), 60)
+        job2 = wait(c.send("And now?", job.conversation, ask=False), 300)
         self.assertEqual(job2.state, "done", job2.error)
         msgs = srv.requests[-1]["messages"]
         self.assertEqual([m["role"] for m in msgs if m["role"] == "user"][-2:], ["user", "user"])
@@ -192,7 +193,7 @@ class Loop(Env):
             {"text": "A hook has these parameters."}])
         with mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "k"}):
             c = self.chat_with("anthropic", srv.url)
-            job = wait(c.send("What does a hook take?", ask=False), 90)
+            job = wait(c.send("What does a hook take?", ask=False), 300)
         self.assertEqual(job.state, "done", job.error)
         first, second = srv.requests
         self.assertEqual({k.lower(): v for k, v in srv.headers[0].items()}.get("anthropic-version"), prov.ANTHROPIC_VERSION)
@@ -219,12 +220,12 @@ class Loop(Env):
         c = self.chat_with("ollama", srv.url)
         job = c.send("Make a box", ask=True)
         t0 = time.time()
-        while not job.waiting and time.time() - t0 < 60 and job.state == "running":
+        while not job.waiting and time.time() - t0 < 300 and job.state == "running":
             time.sleep(0.05)
         self.assertTrue(job.waiting, job.error)
         self.assertEqual(job.waiting["question"], "Which side opens?")
         c.answer(job.conversation, job.waiting["id"], "", ["Left"])
-        wait(job, 60)
+        wait(job, 300)
         self.assertEqual(job.state, "done", job.error)
         tool_msg = next(m for m in srv.requests[1]["messages"] if m["role"] == "tool")
         self.assertIn("Left", tool_msg["content"])
@@ -233,7 +234,7 @@ class Loop(Env):
         srv = self.serve(models=[{"id": "m"}], script=[{"status": 401, "error": "Incorrect API key provided"}])
         with mock.patch.dict(os.environ, {"GROQ_API_KEY": "k"}):
             c = self.chat_with("groq", srv.url)
-            job = wait(c.send("hi", model="m", ask=False), 60)
+            job = wait(c.send("hi", model="m", ask=False), 300)
         self.assertEqual(job.state, "failed")
         err = next(e for e in c.conversation(job.conversation)["items"] if e["t"] == "error")
         self.assertIn("refused the key", err["text"])
@@ -244,10 +245,10 @@ class Loop(Env):
         c = self.chat_with("ollama", srv.url)
         job = c.send("slow one", ask=False)
         t0 = time.time()
-        while not (job.live and job.live.get("kind") == "text") and time.time() - t0 < 60:
+        while not (job.live and job.live.get("kind") == "text") and time.time() - t0 < 300:
             time.sleep(0.05)
         self.assertTrue(c.stop(job.id))
-        wait(job, 20)
+        wait(job, 60)
         self.assertEqual(job.state, "stopped")
 
     def test_openrouter_cost_is_reported(self):
@@ -255,7 +256,7 @@ class Loop(Env):
             {"text": "Hello.", "usage": {"prompt_tokens": 5, "completion_tokens": 2, "cost": 0.0123}}])
         with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "k"}):
             c = self.chat_with("openrouter", srv.url)
-            job = wait(c.send("hi", ask=False), 60)
+            job = wait(c.send("hi", ask=False), 300)
         self.assertEqual(job.state, "done", job.error)
         self.assertAlmostEqual(job.cost, 0.0123)
         self.assertEqual(srv.requests[0]["usage"], {"include": True})

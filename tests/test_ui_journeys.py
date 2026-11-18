@@ -149,9 +149,13 @@ class Journeys(unittest.TestCase):
         py.write_text("import sys, shutil, os\nargs = sys.argv[1:]\nif args == ['--help']:\n    print('OrcaSlicer-2.5.1:'); sys.exit(0)\n"
                       f"out = args[args.index('--outputdir') + 1]\nshutil.copyfile({str(FIX / 'orca' / 'generic_printer.gcode')!r}, "
                       "os.path.join(out, 'plate_1.gcode'))\n", encoding="utf-8")
-        app = tmp / "orca"
-        app.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{py}" "$@"\n', encoding="utf-8")
-        app.chmod(app.stat().st_mode | stat.S_IEXEC)
+        if os.name == "nt":                  # Windows starts a .cmd file, not a shell script
+            app = tmp / "orca.cmd"
+            app.write_text(f'@"{sys.executable}" "{py}" %*\r\n', encoding="utf-8")
+        else:
+            app = tmp / "orca"
+            app.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{py}" "$@"\n', encoding="utf-8")
+            app.chmod(app.stat().st_mode | stat.S_IEXEC)
         toml = tmp / "studio.toml"
         toml.write_text(f'[printer]\nenvelope_mm = [180, 180, 180]\n[slicer]\nkind = "orca"\napp = {json.dumps(NOWHERE)}\n'
                         f'[slicer.orca]\napp = {json.dumps(str(app))}\nconfig_dir = {json.dumps(str(FIX / "orca" / "config"))}\n'

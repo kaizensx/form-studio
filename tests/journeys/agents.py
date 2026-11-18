@@ -44,6 +44,7 @@ def run(ui):
         ui.shot("agents-picker")
         ui.click_text("other-model:3b")                 # picking a model closes the menu
         ui.wait_until(lambda: ui.store.get("chatModel") == "other-model:3b", 5, "the model to change")
+        ui.wait_until(lambda: ui.find(name="pickAgent_ollama") is None, 5, "the menu to close")
         ui.click("modelChip")
         ui.click_text("Default · tool-model:8b")
         ui.wait_until(lambda: ui.store.get("chatModel") == "default", 5, "back to the default model")
