@@ -67,7 +67,11 @@ Item {
         if (ai) (ai.models || []).forEach(function (m) { add("Conversations", "model." + ai.id + "." + m.id, "bot", "Model: " + m.label, Store.chatModel === m.id || (m.id === "default" && !Store.chatModel) ? "In use · " + ai.label : ai.label, function () { Store.setChatChoice(undefined, m.id) }) })
         ;(Store.chatAgents || []).forEach(function (a) { if (a.available && a.id !== Store.chatAgent) add("Conversations", "agent." + a.id, "bot", "Agent: " + a.label, "Switch the agent that answers", function () { Store.setChatChoice(a.id) }) })
         add("Settings", "settings", "settings", "Settings", "", function () { Store.openSettings("general") }, "Ctrl+,")
-        add("Settings", "settings.printer", "printer", "Settings: printer and slicer", "", function () { Store.openSettings("printer") })
+        if (Store.prints) add("Settings", "settings.printer", "printer", "Settings: printing", "Default printer, slicer, bed", function () { Store.openSettings("printer") })
+        add("Settings", "settings.use", Store.prints ? "pencil" : "printer", Store.prints ? "I just design (no printer)" : "I have a 3D printer",
+            "How you use Form Studio; change it any time", function () { Store.setPrinting(!Store.prints) })
+        if (Store.project) add("Settings", "purpose", Store.modelDesign ? "printer" : "box", Store.modelDesign ? "Make this design for 3D printing" : "Make this design just a 3D model",
+            "What this design is for", function () { Store.setPurpose(Store.modelDesign ? "print" : "model") })
         add("Settings", "settings.chat", "message_square", "Settings: agents", "Agent apps, API keys, local models", function () { Store.openSettings("chat") })
         add("Settings", "printer", "printer", "Choose printer", "Printer, filament and process for this design", function () { Store.openSheet("printer") })
         add("Settings", "slicer", "printer", "Choose slicer", Store.slicer.label || "", function () { Store.openSheet("slicer") })

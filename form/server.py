@@ -386,7 +386,8 @@ def make_handler(st: Studio):
             path = urlparse(self.path).path
             body = self._body()
             if path == "/api/projects":
-                p = st.create(body.get("name", ""), body.get("recipe", ""), body.get("brief", ""), body.get("values"))
+                p = st.create(body.get("name", ""), body.get("recipe", ""), body.get("brief", ""), body.get("values"),
+                              purpose=body.get("purpose"), process=body.get("process"))
                 job = st.run(p["id"])
                 return self._json({"id": p["id"], "job": job})
             if path == "/api/import":

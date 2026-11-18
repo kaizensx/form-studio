@@ -141,6 +141,26 @@ class Journeys(unittest.TestCase):
         with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(self._no_slicers_toml())}):
             self.journey("design_only.py")
 
+    # -- designing without a printer, and settings that apply at once (tests/journeys/no_printer.py, settings_live.py) --
+    def test_no_printer(self):
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(self._no_slicers_toml())}):
+            self.journey("no_printer.py")
+
+    def test_settings_live(self):
+        sys.path.insert(0, str(HERE))
+        from test_printers import bambu_dir
+        from test_slicers import NOWHERE
+        from form.adapters import SLICERS
+        tmp = Path(tempfile.mkdtemp(prefix="form-ui-settings-"))
+        d = bambu_dir(tmp)
+        toml = tmp / "studio.toml"
+        toml.write_text(f'[slicer]\nkind = "bambu"\napp = {json.dumps(sys.executable)}\nconfig_dir = {json.dumps(str(d))}\n'
+                        + "".join(f"[slicer.{k}]\napp = {json.dumps(NOWHERE)}\n" for k in SLICERS if k != "bambu"), encoding="utf-8")
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(toml)}):
+            self.journey("settings_live.py")
+
     def test_plates(self):
         # a stand-in OrcaSlicer that copies a fixture G-code: the same on every machine
         import stat

@@ -216,56 +216,61 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
                           Fix("Choose another folder", note="Set FORM_DATA=/some/folder or [data].dir in studio.toml.")))
 
     # --- slicer -----------------------------------------------------------
-    s = slicer.resolve(cfg)
-    name = s.get("label") or "Bambu Studio"
-    if s.get("available"):
-        m = s["presets"]["machine"]["name"]
-        env = s.get("envelope_mm")
-        items.append(Item("slicer", f"Slicer ({name})", "ok",
-                          f"{slicer.version(s['app'], s.get('kind', 'bambu'))} · {m} · " + " / ".join(v["name"] for k, v in s["presets"].items() if k != "machine")))
-        if env and [round(x) for x in env] != [round(x) for x in cfg["printer"]["envelope_mm"]]:
-            items.append(Item("printer", "Printer size", "warn",
-                              f"studio.toml says {cfg['printer']['envelope_mm']} mm but the selected printer is {env} mm",
-                              Fix(f"Use the slicer's printer ({m}, {env[0]:.0f}×{env[1]:.0f}×{env[2]:.0f} mm)",
-                                  action=_write_printer(cfg, m, env))))
-        else:
-            items.append(Item("printer", "Printer size", "ok", f"{cfg['printer']['name']} {cfg['printer']['envelope_mm']} mm"))
+    from . import purpose as purpose_mod
+    if not purpose_mod.printing(cfg):                              # "I just design": nothing to set up
+        items.append(Item("slicer", "Slicer", "info", "Not needed: you just design. Turn on “I have a 3D printer” in Settings › General to slice designs."))
     else:
-        installed = Path(s.get("app") or "/nonexistent").exists()
-        if installed:
-            items.append(Item("slicer", f"Slicer ({name})", "warn", s.get("reason", ""),
-                              Fix(f"Open {name} once and select your printer, filament and process",
-                                  [f"open -a {name.replace(' ', '')}"] if sys.platform == "darwin" else [],
-                                  recommended=False,
-                                  note="Form Studio follows whatever is selected there. Re-run `form setup` afterwards.")))
-        elif s.get("kind", "bambu") == "bambu":
-            cmds, note = [], f"Download from {BAMBU_URL}"
-            if sys.platform == "darwin" and shutil.which("brew"):
-                cmds = ["brew install --cask bambu-studio"]
-            elif shutil.which("flatpak"):
-                cmds = ["flatpak install -y flathub com.bambulab.BambuStudio"]
-                note = "Then set [slicer].app to the AppImage or a wrapper script; flatpak apps need `flatpak run`."
-            if s.get("chosen") == "auto":
-                note += " OrcaSlicer or PrusaSlicer work too; Form Studio uses the first one it finds."
-            items.append(Item("slicer", "Slicer (Bambu Studio)", "missing",
-                              "Not found. Everything except slicing works without it; slices show as BLOCKED.",
-                              Fix("Install Bambu Studio (about 200 MB)", cmds, recommended=False, note=note)))
+        s = slicer.resolve(cfg)
+        name = s.get("label") or "Bambu Studio"
+        if s.get("available"):
+            m = s["presets"]["machine"]["name"]
+            env = s.get("envelope_mm")
+            items.append(Item("slicer", f"Slicer ({name})", "ok",
+                              f"{slicer.version(s['app'], s.get('kind', 'bambu'))} · {m} · " + " / ".join(v["name"] for k, v in s["presets"].items() if k != "machine")))
+            if env and [round(x) for x in env] != [round(x) for x in cfg["printer"]["envelope_mm"]] \
+                    and not (cfg["printer"].get("machine") or "").strip():
+                items.append(Item("printer", "Printer size", "warn",
+                                  f"The checks use {cfg['printer']['envelope_mm']} mm but {name} slices on {m} ({env[0]:.0f} × {env[1]:.0f} × {env[2]:.0f} mm)",
+                                  Fix(f"Use the slicer's printer ({m}, {env[0]:.0f}×{env[1]:.0f}×{env[2]:.0f} mm)",
+                                      action=_write_printer(cfg, m, env))))
+            else:
+                items.append(Item("printer", "Printer size", "ok", f"{cfg['printer']['name']} {cfg['printer']['envelope_mm']} mm"))
         else:
-            hint = slicer.adapter(s["kind"]).install_hint()
-            items.append(Item("slicer", f"Slicer ({name})", "missing",
-                              f"{s.get('reason') or 'Not found.'} Everything except slicing works without it; slices show as BLOCKED.",
-                              Fix(f"Install {name}", hint["cmds"], recommended=False, note=hint["note"])))
-    # Other slicers on this machine (slicer workstream): listed so you can switch with [slicer].kind.
-    try:
-        for d in slicer.detect_all(cfg):
-            if d["active"] or not d["installed"]:
-                continue
-            what = (f"{d['version']} · would use " + " / ".join(d["presets"].values())) if d["available"] else d["reason"]
-            items.append(Item(f"slicer.{d['kind']}", d["label"], "info",
-                              f"Installed, not in use. {what}. To use it, set [slicer].kind = \"{d['kind']}\" in studio.toml "
-                              "or pick it in the app (Brief, Printer context, Slicer)."))
-    except Exception as e:                                         # detection must never break setup
-        items.append(Item("slicer.detect", "Other slicers", "info", f"Could not check for other slicers: {e}"))
+            installed = Path(s.get("app") or "/nonexistent").exists()
+            if installed:
+                items.append(Item("slicer", f"Slicer ({name})", "warn", s.get("reason", ""),
+                                  Fix(f"Open {name} once and select your printer, filament and process",
+                                      [f"open -a {name.replace(' ', '')}"] if sys.platform == "darwin" else [],
+                                      recommended=False,
+                                      note="Form Studio follows whatever is selected there. Re-run `form setup` afterwards.")))
+            elif s.get("kind", "bambu") == "bambu":
+                cmds, note = [], f"Download from {BAMBU_URL}"
+                if sys.platform == "darwin" and shutil.which("brew"):
+                    cmds = ["brew install --cask bambu-studio"]
+                elif shutil.which("flatpak"):
+                    cmds = ["flatpak install -y flathub com.bambulab.BambuStudio"]
+                    note = "Then set [slicer].app to the AppImage or a wrapper script; flatpak apps need `flatpak run`."
+                if s.get("chosen") == "auto":
+                    note += " OrcaSlicer or PrusaSlicer work too; Form Studio uses the first one it finds."
+                items.append(Item("slicer", "Slicer (Bambu Studio)", "missing",
+                                  "Not found. Everything except slicing works without it; slices show as BLOCKED.",
+                                  Fix("Install Bambu Studio (about 200 MB)", cmds, recommended=False, note=note)))
+            else:
+                hint = slicer.adapter(s["kind"]).install_hint()
+                items.append(Item("slicer", f"Slicer ({name})", "missing",
+                                  f"{s.get('reason') or 'Not found.'} Everything except slicing works without it; slices show as BLOCKED.",
+                                  Fix(f"Install {name}", hint["cmds"], recommended=False, note=hint["note"])))
+        # Other slicers on this machine (slicer workstream): listed so you can switch with [slicer].kind.
+        try:
+            for d in slicer.detect_all(cfg):
+                if d["active"] or not d["installed"]:
+                    continue
+                what = (f"{d['version']} · would use " + " / ".join(d["presets"].values())) if d["available"] else d["reason"]
+                items.append(Item(f"slicer.{d['kind']}", d["label"], "info",
+                                  f"Installed, not in use. {what}. To use it, set [slicer].kind = \"{d['kind']}\" in studio.toml "
+                                  "or pick it in the app (Brief, Printer context, Slicer)."))
+        except Exception as e:                                         # detection must never break setup
+            items.append(Item("slicer.detect", "Other slicers", "info", f"Could not check for other slicers: {e}"))
 
     # --- other CAD tools (optional bridges) ---------------------------------
     from . import cad_bridges

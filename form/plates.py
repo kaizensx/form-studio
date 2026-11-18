@@ -180,7 +180,8 @@ def for_project(st, p: dict) -> dict:
 def main_cli(argv: list) -> int:
     """form plates <project> [--orient PART=O] [--material PART=M] [--color PART=#hex]
        form design-only <project> on|off
-       form material <project> <material | "">          Each prints JSON."""
+       form material <project> <material | "">
+       form purpose <project> [print | model] [--process cnc]    Each prints JSON."""
     import json
     import sys
     from . import config
@@ -201,6 +202,16 @@ def main_cli(argv: list) -> int:
             p = st.settings(st.load(pid), {"design_only": args[1] == "on"})
             out({"project": pid, "design_only": bool(p.get("design_only")), "slicing": st.slice_mode(p),
                  "gate": st.gate(p)})
+            return 0
+        if cmd == "purpose":                      # form/purpose.py: print or model, and for a model how it is made
+            body, rest = {}, args[1:]
+            if rest and not rest[0].startswith("--"):
+                body["purpose"] = rest.pop(0)
+            if rest[:1] == ["--process"]:
+                body["process"] = rest[1] if len(rest) > 1 else ""
+            from . import purpose as purpose_mod
+            p = st.settings(st.load(pid), body) if body else st.load(pid)
+            out({"project": pid, **purpose_mod.describe(p), "slicing": st.slice_mode(p)})
             return 0
         if cmd == "material":
             p = st.settings(st.load(pid), {"material": args[1] if len(args) > 1 else ""})
