@@ -260,7 +260,7 @@ Column {
                             Txt { kind: "fine"; visible: !!row.r.help; text: row.r.help || ""; width: parent.width }
                             Txt { kind: "fine"; visible: row.hasPath; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
                                 color: row.found ? Theme.pass : Theme.ink3; text: row.found ? "Found: " + row.found : "Not found on this computer" }
-                            Txt { kind: "fine"; tone: 4; mono: true; font.pixelSize: 10; text: row.r.key + (row.r.in_file ? "" : "  ·  default") } }
+                            Txt { visible: row.r.tab === "advanced"; kind: "fine"; tone: 4; mono: true; font.pixelSize: 10; text: row.r.key } }   // the file key only where people edit the file itself
                         Row { anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                             // true / false
                             Row { visible: row.r.type === "bool"; spacing: 8; anchors.verticalCenter: parent.verticalCenter

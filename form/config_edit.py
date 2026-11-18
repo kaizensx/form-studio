@@ -51,10 +51,10 @@ SCHEMA: dict[str, dict] = {
     "slicer.filament": {"type": "str", "tab": "advanced", "hidden": True, "label": "Pinned filament preset", "help": "“auto”, or a preset name."},
     "slicer.timeout_s": {"type": "int", "tab": "advanced", "label": "Slice time limit", "unit": "s", "min": 30, "max": 7200,
                          "help": "A slice that takes longer is stopped and reported. Large or detailed parts may need more."},
-    "printer.name": {"type": "str", "tab": "printer", "label": "Printer name when none is chosen",
-                     "help": "Named in the checks while no default printer is chosen above. A chosen printer brings its own name and bed."},
-    "printer.envelope_mm": {"type": "vec3", "tab": "printer", "label": "Bed size when no printer is chosen (X, Y, Z)", "unit": "mm", "min": 20, "max": 2000,
-                            "help": "The build volume the checks use until a default printer is chosen above."},
+    "printer.name": {"type": "str", "tab": "advanced", "label": "Printer name when none is chosen",
+                     "help": "Named in the checks while no default printer is chosen in Printing. A chosen printer brings its own name and bed."},
+    "printer.envelope_mm": {"type": "vec3", "tab": "advanced", "label": "Bed size when no printer is chosen (X, Y, Z)", "unit": "mm", "min": 20, "max": 2000,
+                            "help": "The build volume the checks use until a default printer is chosen in Printing."},
     # The default printer (form/printers.py): written by the printer picker and `form printers use --default`.
     # Empty = follow [slicer].kind and the selection in that slicer. Not shown as text fields in Settings.
     "printer.slicer": {"type": "str", "tab": "printer", "hidden": True, "label": "Default printer: slicer",
