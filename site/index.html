@@ -93,18 +93,23 @@
     <p class="lead">Describe it, drop a photo, sketch it or paste a link. An agent designs it in a real CAD kernel; Form Studio checks it, slices it with your slicer and plays the print back. With a printer, or without one.</p>
     <div class="cta">
       <a class="btn primary" id="cta-dl" href="#download"><span class="i" aria-hidden="true">&#xe0b2;</span><span>Download</span></a>
+      <a class="btn" href="#try"><span class="i" aria-hidden="true">&#xe13c;</span><span>Try it here</span></a>
       <a class="btn" href="https://github.com/kaizensx/form-studio">Source on GitHub</a>
     </div>
     <p class="fine">macOS, Windows and Linux. Open source, MIT licence.</p>
   </div>
 
-  <div class="wrap stage-wrap">
+  <div class="wrap stage-wrap" id="try">
+    <div class="try-bar">
+      <div class="scr-seg" role="group" aria-label="Screen"><button type="button" data-scr="home" aria-pressed="false"><span class="i" aria-hidden="true">&#xe412;</span>Home</button><button type="button" data-scr="work" aria-pressed="true"><span class="i" aria-hidden="true">&#xe524;</span>Workspace</button></div>
+      <p class="try-hint"><b>Try it.</b> Type on Home, drag the part, switch stages, open the model menu, play the print.</p>
+    </div>
     <div class="app-frame island" id="app-frame">
-      <div class="app" id="app" role="region" aria-roledescription="interactive recreation" aria-label="Form Studio, recreated in the page with a sample project. It plays a short story; drag the 3D view to orbit, and use the stage tabs, view buttons and layer slider.">
+      <div class="app" id="app" role="region" aria-roledescription="interactive recreation" aria-label="Form Studio, recreated in the page with a sample project. It plays a short story from Home to the workspace; type on Home, drag the 3D view to orbit, and use the stage tabs, view buttons, model menu and layer slider.">
         <header class="tb">
           <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
           <button class="ib side" type="button" tabindex="-1" aria-hidden="true"><span class="i">&#xe21c;</span></button>
-          <span class="wm"><img src="assets/lockup.svg" alt="Form Studio" width="98" height="15"></span>
+          <button class="wm" type="button" id="tb-home" title="Home"><img src="assets/lockup.svg" alt="Form Studio: Home" width="98" height="15"></button>
           <span class="slash" aria-hidden="true">/</span>
           <span class="pname">Hallway phone dock</span>
           <span class="rev" id="tb-rev">r04</span>
@@ -122,7 +127,7 @@
             <div>
               <div class="composer">
                 <div class="field ph" id="composer-field">Ask about Hallway phone dock, or describe a change…</div>
-                <div class="row"><span class="i" aria-hidden="true">&#xe12d;</span><span class="model-pick">Claude Code · Opus 5.5 <span class="i" aria-hidden="true">&#xe06d;</span></span><span class="send" id="send"><span class="i" aria-hidden="true">&#xe04a;</span></span></div>
+                <div class="row"><span class="i" aria-hidden="true">&#xe12d;</span><button type="button" class="model-pick mpick" id="talk-model" aria-haspopup="dialog" aria-expanded="false"><span class="ml">Claude Code · Default</span> <span class="i" aria-hidden="true">&#xe06d;</span></button><span class="send" id="send"><span class="i" aria-hidden="true">&#xe04a;</span></span></div>
               </div>
               <div class="talk-hint">Enter sends · Shift+Enter for a new line · drop files to attach</div>
             </div>
@@ -162,11 +167,45 @@
             <div class="panel-wrap" id="panel-wrap"></div>
           </aside>
         </div>
+        <section class="home-scr" id="home-scr" aria-label="Home">
+          <div class="bench" aria-hidden="true"><i></i></div>
+          <div class="home-in">
+            <span class="greet" id="home-greet">Good afternoon</span>
+            <h3 class="home-title">What are we making?</h3>
+            <p class="home-lead" id="home-lead">Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD, checked and sliced for your printer.</p>
+            <div class="hcomp" id="hcomp">
+              <textarea id="home-field" rows="2" spellcheck="false" aria-label="What are we making?" placeholder="A knob like the one in my photo, with a 6 mm D-shaft"></textarea>
+              <div class="hrow">
+                <button type="button" class="hq"><span class="i" aria-hidden="true">&#xe12d;</span>Photo or file</button>
+                <button type="button" class="hq"><span class="i" aria-hidden="true">&#xe131;</span>Sketch</button>
+                <button type="button" class="hq"><span class="i" aria-hidden="true">&#xe102;</span>Link</button>
+                <button type="button" class="hq" aria-label="Dictate"><span class="i" aria-hidden="true">&#xe118;</span></button>
+                <button type="button" class="hgo" id="home-go"><span>Design it</span><span class="i" aria-hidden="true">&#xe049;</span></button>
+              </div>
+            </div>
+            <div class="hopts">
+              <div class="hseg" role="group" aria-label="What the next design is for"><button type="button" data-p="print" aria-pressed="true">For my printer</button><button type="button" data-p="model" aria-pressed="false">Just a 3D model</button></div>
+              <button type="button" class="hchip" id="home-printer"><span class="i" aria-hidden="true">&#xe141;</span>Bambu Lab A1 mini 0.4 nozzle</button>
+              <button type="button" class="hchip mpick" id="home-model" aria-haspopup="dialog" aria-expanded="false"><span class="i" aria-hidden="true">&#xe412;</span><span class="ml">Claude Code · Default</span></button>
+              <span class="hdiv" aria-hidden="true"></span>
+              <button type="button" class="hchip" id="home-blank"><span class="i" aria-hidden="true">&#xe4c0;</span>Start blank</button>
+            </div>
+            <button type="button" class="hcont" id="home-cont">Continue “Hallway phone dock” · r04 · just now <span aria-hidden="true">→</span></button>
+          </div>
+          <div class="hdes">
+            <div class="hdes-h"><b>Designs</b><span class="mono">2</span><span class="sp"></span><span class="hq"><span class="i" aria-hidden="true">&#xe22f;</span>Import…</span><span class="hq" aria-hidden="true"><span class="i">&#xe247;</span></span></div>
+            <div class="hcards">
+              <button type="button" class="hcard" data-open="dock"><img src="assets/shots/card-dock.webp" width="560" height="415" alt="" loading="lazy"><span class="hf"><b>Hallway phone dock</b><span>Device dock · just now</span><em>r04</em></span></button>
+              <button type="button" class="hcard" data-open="box"><img src="assets/shots/card-box.webp" width="560" height="415" alt="" loading="lazy"><span class="hf"><b>Hinged box</b><span>Hinged box · just now</span><em>r01</em></span></button>
+            </div>
+          </div>
+        </section>
+        <div class="mmenu" id="mmenu" role="dialog" aria-label="Agent and model" hidden></div>
         <div class="ptr" id="ptr" aria-hidden="true"><svg width="18" height="22" viewBox="0 0 18 22"><path d="M2 1.5v16.2l4.1-3.9 2.6 6.2 2.9-1.2-2.6-6.1h5.8z" fill="#fff" stroke="#000" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
       </div>
     </div>
     <div class="stage-note">
-      <p>Form Studio, drawn live in this page with a sample project. The geometry comes from the CAD kernel, the checks and fit model from Form Studio’s engine, and the toolpath from the G-code Bambu Studio 2.9.1 wrote for a Bambu Lab A1 mini. The conversation re-enacts how the project was made.</p>
+      <p>Form Studio, drawn live in this page with a sample project: Home, the workspace and the model menu are laid out as in the app. The geometry comes from the CAD kernel, the checks and fit model from Form Studio’s engine, and the toolpath from the G-code Bambu Studio 2.9.1 wrote for a Bambu Lab A1 mini. The conversation re-enacts how the project was made.</p>
       <button class="story-ctl" type="button" id="story-ctl" aria-pressed="false"><span class="i" aria-hidden="true">&#xe12e;</span><span class="lbl">Pause</span><span class="bar" aria-hidden="true"><i id="story-bar"></i></span></button>
     </div>
   </div>
