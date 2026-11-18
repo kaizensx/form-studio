@@ -96,3 +96,85 @@ def morph(studio, p: dict, a: dict, b: dict, out, frames: int = 24, size=(640, 4
     imgs = [imgs[0]] * hold + imgs + [imgs[-1]] * hold + imgs[::-1]       # pause, go, pause, come back
     info = _save(imgs, out, ms)
     return info | {"kind": "morph", "built_frames": len(views), "skipped": skipped, "changed": changed}
+
+
+# ---- turntable export: GIF, animated WebP, a PNG sequence, or MP4 (with ffmpeg) -------------------------------------
+FORMATS = ("gif", "webp", "png", "mp4")
+
+
+def ffmpeg() -> str | None:
+    """The ffmpeg program, if one is installed (PATH, or the imageio-ffmpeg wheel). MP4 needs it; nothing else does."""
+    import shutil
+    exe = shutil.which("ffmpeg")
+    if exe:
+        return exe
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return None
+
+
+def export(studio, p: dict, fmt: str = "webp", frames: int = 36, elevation: float = 24, size=(960, 720), fps: int = 24) -> dict:
+    """A turntable of the head revision rendered from the real mesh. gif / webp: one animated file; png: a folder of
+    numbered frames and a .zip of them; mp4: H.264 through ffmpeg (refused with the reason when it is not installed).
+    Cached per geometry key, format, frame count and elevation."""
+    import json
+    import shutil
+    import subprocess
+    import zipfile
+    from .studio import StudioError
+    fmt = (fmt or "webp").lower().lstrip(".")
+    if fmt not in FORMATS:
+        raise StudioError(f"Unknown format “{fmt}”.", "Use " + ", ".join(FORMATS) + ".")
+    exe = ffmpeg() if fmt == "mp4" else None
+    if fmt == "mp4" and not exe:
+        raise StudioError("MP4 needs ffmpeg, which is not installed.", "Install ffmpeg (brew install ffmpeg), or export a PNG sequence or WebP.")
+    frames = max(12, min(int(frames), 180))
+    elevation = max(-60.0, min(float(elevation), 80.0))
+    key = H("turntable", studio.keys(p)["geometry"], fmt, frames, elevation, list(size), fps)[:12]
+    d = studio.dir(p["id"]) / "artifacts" / "motion"
+    stem = f"r{p['head']:02d}-turntable-{key}"
+    meta_f = d / (stem + ".json")
+    if meta_f.is_file():
+        info = json.loads(meta_f.read_text(encoding="utf-8"))
+        if Path(info["file"]).exists():
+            return info | {"cached": True}
+    recipe = studio.recipe(p)
+    v = studio.view(p)
+    lo, hi = _bbox(v)
+    imgs = [render.render_png(v, _feats(recipe), camera=(-90 + 360 * i / frames, elevation), frame_box=(lo, hi), size=size,
+                              overlay=False, title=f"{p['name']}  r{p['head']:02d}", caption=recipe.title, as_image=True)
+            for i in range(frames)]
+    d.mkdir(parents=True, exist_ok=True)
+    still = d / (stem + "-still.png")
+    imgs[frames // 8].convert("RGB").save(still)
+    ms = round(1000 / fps)
+    if fmt in ("gif", "webp"):
+        info = _save(imgs, d / f"{stem}.{fmt}", ms) | {"fps": fps}
+    else:
+        folder = d / (stem + "-frames")
+        shutil.rmtree(folder, ignore_errors=True)
+        folder.mkdir(parents=True)
+        for i, im in enumerate(imgs):
+            im.convert("RGB").save(folder / f"frame_{i:04d}.png")
+        if fmt == "png":
+            out = d / f"{stem}-png.zip"
+            with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+                for f in sorted(folder.iterdir()):
+                    z.write(f, f"{stem}/{f.name}")
+        else:
+            out = d / f"{stem}.mp4"
+            r = subprocess.run([exe, "-y", "-loglevel", "error", "-framerate", str(fps), "-i", str(folder / "frame_%04d.png"),
+                                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out)],
+                               capture_output=True, text=True, timeout=300)
+            if r.returncode != 0 or not out.is_file():
+                raise StudioError("ffmpeg could not write the MP4.", (r.stderr or "").strip()[-300:])
+            shutil.rmtree(folder, ignore_errors=True)
+        info = {"file": str(out), "frames": frames, "bytes": out.stat().st_size, "fps": fps}
+        if fmt == "png":
+            info["folder"] = str(folder)
+    info |= {"kind": "turntable", "fmt": fmt, "rev": p["head"], "elevation": elevation, "size": list(size),
+             "still": str(still), "seconds": round(frames / fps, 2), "renderer": "Form Studio's headless renderer, from the kernel's mesh"}
+    meta_f.write_text(json.dumps(info, indent=1), encoding="utf-8")
+    return info | {"cached": False}

@@ -515,6 +515,67 @@ def build() -> MCPServer:
         return await _run(go)
 
     @mcp.tool(annotations=RW)
+    async def add_feature(project: str, kind: str, at: list[float], normal: list[float], size: str = "M3",
+                          hole: str = "tapped", height: float | None = None, outer_d: float | None = None,
+                          hole_d: float | None = None, hole_depth: float | None = None, length: float | None = None,
+                          thickness: float | None = None, width: float | None = None, lip: float | None = None,
+                          lip_height: float | None = None, up: list[float] | None = None, allow_strain: float | None = None,
+                          expect_head: int | None = None) -> dict:
+        """Add a standard feature on a flat face of a Python design, written into its source as a feature block and built
+        in the kernel as a new revision. kind="boss": a screw boss (size M2..M5; hole tapped = ISO tap drill, clearance =
+        ISO 273, insert = a typical heat-set insert hole; height, outer_d, hole_d, hole_depth in mm). kind="snap_hook":
+        a cantilever snap-fit hook (length, thickness, width, lip = undercut, lip_height; up = the lip's direction).
+        at / normal: a point on the face and its outward normal (analyze_selection gives them). Returns the new head, the
+        features and check rows: boss wall vs the nozzle; hook strain 1.5·t·y/L² vs allow_strain (a rule of thumb when
+        not given). Remove one with remove_feature."""
+        st = studio()
+        o = {k: v for k, v in dict(size=size, hole=hole, height=height, outer_d=outer_d, hole_d=hole_d, hole_depth=hole_depth,
+                                   length=length, thickness=thickness, width=width, lip=lip, lip_height=lip_height, up=up).items()
+             if v is not None}
+        def go():
+            from . import feature_helpers as fh
+            p = st.load(project)
+            out = fh.add(st, p, kind, at, normal, expect_head, "agent", **o)
+            out["checks"] = fh.checks(out["features"][-1], st.slicer_info(p=p).get("nozzle_mm"), allow_strain)
+            return out
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def remove_feature(project: str, feature_id: str, expect_head: int | None = None) -> dict:
+        """Remove a feature added with add_feature (feature_id like "boss_1" or "hook_1"). A new revision."""
+        st = studio()
+        def go():
+            from . import feature_helpers as fh
+            return fh.remove(st, st.load(project), feature_id, expect_head, origin="agent")
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def compare_printers(project: str, limit: int = 8, printers: list[str] | None = None) -> dict:
+        """Slice the head revision's exported model for real on every printer set up in every installed slicer (the
+        selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's
+        simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and
+        cheapest. A printer whose bed is too small is reported without slicing; a failed slice says why. Each slice is a
+        simulation, not a print. Slices are cached per model and presets."""
+        st = studio()
+        def go():
+            from . import slicecompare
+            return slicecompare.compare(st, st.load(project), limit, printers)
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def turntable(project: str, fmt: str = "webp", frames: int = 36, elevation: float = 24) -> list:
+        """Render a turntable of the head revision from the kernel's mesh. fmt: webp or gif (one animated file), png (a
+        numbered PNG sequence, zipped), mp4 (H.264; needs ffmpeg installed, refused with the reason otherwise). Returns a
+        still and the file path."""
+        st = studio()
+        def go():
+            from . import animate as anim
+            return anim.export(st, st.load(project), fmt, frames, elevation)
+        info = await _run(go)
+        return [Image(path=info["still"]), f"turntable ({info['fmt']}): {info['file']} ({info['frames']} frames, "
+                f"{info['seconds']} s at {info['fps']} fps, {info['bytes'] // 1024} kB)"]
+
+    @mcp.tool(annotations=RW)
     async def remove_text(project: str, mark_id: str, expect_head: int | None = None) -> dict:
         """Remove lettering added with add_text (mark_id like "text_1"; get_design_source shows the block). A new revision."""
         st = studio()

@@ -171,6 +171,12 @@ class Bridge(QObject):
         return self._rm
 
     reducedMotion = Property(bool, _reduced, constant=True)
+
+    def _ffmpeg(self) -> bool:                  # MP4 turntables need it (form/animate.py)
+        from ..animate import ffmpeg
+        return ffmpeg() is not None
+
+    hasFfmpeg = Property(bool, _ffmpeg, constant=True)
     underTest = Property(bool, lambda self: bool(getattr(self, "under_test", False)), constant=True)   # interaction tests: no splash
 
     def _qt(self) -> str:

@@ -119,6 +119,9 @@ Rectangle {
                 Btn { objectName: "textHere"; small: true; icon: "type"; text: "Text here…"; visible: !!sp.flat
                     tip: "Raise or sink lettering on this flat face, as a feature of the design"
                     onClicked: Store.openSheet("text", { item: sp.flat }) }
+                Btn { objectName: "featureHere"; small: true; icon: "wrench"; text: "Feature here…"; visible: !!sp.flat
+                    tip: "A screw boss or a snap-fit hook on this flat face, as a feature of the design"
+                    onClicked: Store.openSheet("feature", { item: sp.flat }) }
                 Btn { small: true; kind: "quiet"; text: "Clear"; onClicked: Store.selClear() }
             }
             Column {

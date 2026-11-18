@@ -63,7 +63,7 @@ Rules:
 
 ## Tools at a glance
 
-70 tools. Read-only tools never change a project.
+74 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -87,6 +87,10 @@ Rules:
 | [`compare_revisions`](#compare_revisions) | read-only | What changed between two revisions: parameters, features, interfaces, stability, fit. |
 | [`geometry_diff`](#geometry_diff) | changes | What changed in the solid between revision a and b (default the head): material added (b minus a) and removed (a minus b), each with its volume in mm³, number of separate regions and bounding box, computed with booleans on the B-rep. |
 | [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
+| [`add_feature`](#add_feature) | changes | Add a standard feature on a flat face of a Python design, written into its source as a feature block and built in the kernel as a new revision. |
+| [`remove_feature`](#remove_feature) | changes | Remove a feature added with add_feature (feature_id like "boss_1" or "hook_1"). |
+| [`compare_printers`](#compare_printers) | read-only | Slice the head revision's exported model for real on every printer set up in every installed slicer (the selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and cheapest. |
+| [`turntable`](#turntable) | read-only | Render a turntable of the head revision from the kernel's mesh. |
 | [`remove_text`](#remove_text) | changes | Remove lettering added with add_text (mark_id like "text_1"; get_design_source shows the block). |
 | [`assembly_instructions`](#assembly_instructions) | changes | Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then one page per part going on (in the declaration's parent order, at its explode offset, with arrows). |
 | [`checkout_revision`](#checkout_revision) | changes | Make an earlier revision the head again (nothing is deleted). |
@@ -409,6 +413,78 @@ cap height, depth how far the letters stand out or sink in. Returns the new head
 | `sunk` | boolean |  |
 | `up` | array \| null |  |
 | `expect_head` | integer \| null |  |
+
+### `add_feature`
+
+Add a standard feature on a flat face of a Python design, written into its source as a feature block and built
+in the kernel as a new revision. kind="boss": a screw boss (size M2..M5; hole tapped = ISO tap drill, clearance =
+ISO 273, insert = a typical heat-set insert hole; height, outer_d, hole_d, hole_depth in mm). kind="snap_hook":
+a cantilever snap-fit hook (length, thickness, width, lip = undercut, lip_height; up = the lip's direction).
+at / normal: a point on the face and its outward normal (analyze_selection gives them). Returns the new head, the
+features and check rows: boss wall vs the nozzle; hook strain 1.5·t·y/L² vs allow_strain (a rule of thumb when
+not given). Remove one with remove_feature.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `kind` | string | yes |
+| `at` | array | yes |
+| `normal` | array | yes |
+| `size` | string |  |
+| `hole` | string |  |
+| `height` | number \| null |  |
+| `outer_d` | number \| null |  |
+| `hole_d` | number \| null |  |
+| `hole_depth` | number \| null |  |
+| `length` | number \| null |  |
+| `thickness` | number \| null |  |
+| `width` | number \| null |  |
+| `lip` | number \| null |  |
+| `lip_height` | number \| null |  |
+| `up` | array \| null |  |
+| `allow_strain` | number \| null |  |
+| `expect_head` | integer \| null |  |
+
+### `remove_feature`
+
+Remove a feature added with add_feature (feature_id like "boss_1" or "hook_1"). A new revision.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `feature_id` | string | yes |
+| `expect_head` | integer \| null |  |
+
+### `compare_printers`
+
+*Read-only.*
+
+Slice the head revision's exported model for real on every printer set up in every installed slicer (the
+selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's
+simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and
+cheapest. A printer whose bed is too small is reported without slicing; a failed slice says why. Each slice is a
+simulation, not a print. Slices are cached per model and presets.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `limit` | integer |  |
+| `printers` | array \| null |  |
+
+### `turntable`
+
+*Read-only.*
+
+Render a turntable of the head revision from the kernel's mesh. fmt: webp or gif (one animated file), png (a
+numbered PNG sequence, zipped), mp4 (H.264; needs ffmpeg installed, refused with the reason otherwise). Returns a
+still and the file path.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `fmt` | string |  |
+| `frames` | integer |  |
+| `elevation` | number |  |
 
 ### `remove_text`
 

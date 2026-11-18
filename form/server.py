@@ -229,6 +229,19 @@ def make_handler(st: Studio):
             if rest == "/text":
                 from . import engrave
                 return self._json({"marks": engrave.list_marks(st, p)})
+            # -- standard features at a face, comparing slicers, turntables (form/feature_helpers.py, slicecompare.py, animate.py) --
+            if rest == "/features":
+                from . import feature_helpers
+                return self._json({"features": feature_helpers.list_features(st, p)})
+            if rest == "/features/check":
+                from . import feature_helpers
+                o = {k: q[k] for k in ("size", "hole", "height", "outer_d", "hole_d", "hole_depth", "length", "thickness",
+                                       "width", "lip", "lip_height") if q.get(k) not in (None, "")}
+                return self._json(feature_helpers.preview(q.get("kind") or "boss", nozzle=st.slicer_info(p=p).get("nozzle_mm"),
+                                                          allow_strain=float(q["allow_strain"]) if q.get("allow_strain") else None, **o))
+            if rest == "/slicecompare":
+                from . import slicecompare
+                return self._json(slicecompare.cached(st, p) or {"rows": [], "cached": False})
             if rest == "/text/check":
                 from . import engrave
                 return self._json(engrave.printability(q.get("text") or "", float(q.get("height") or 6), float(q.get("depth") or 0.6),
@@ -259,7 +272,7 @@ def make_handler(st: Studio):
                 if rest == "/share":
                     return self._json(c)
                 return self._send(200, Path(c["file"]).read_bytes(), "image/png")
-            m2 = re.fullmatch(r"/file/(exports|slice|side|releases|references|share)/([A-Za-z0-9_.\-]+)(?:/([A-Za-z0-9_.\-]+))?", rest)
+            m2 = re.fullmatch(r"/file/(exports|slice|side|motion|releases|references|share)/([A-Za-z0-9_.\-]+)(?:/([A-Za-z0-9_.\-]+))?", rest)
             if m2:
                 node, a, b = m2.groups()
                 base = st.dir(pid) / (node if node in ("releases", "references", "share") else f"artifacts/{node}")
@@ -561,6 +574,25 @@ def make_handler(st: Studio):
                 st.activity(pid, "design", f"Text on a face: r{out['head']:02d}.", by="you")
                 out["job"] = auto(st.load(pid))
                 return self._json(out)
+            if action in ("feature", "feature_remove"):
+                from . import feature_helpers
+                eh = int(body["expect_head"]) if body.get("expect_head") is not None else None
+                if action == "feature_remove":
+                    out = feature_helpers.remove(st, p, str(body.get("id", "")), eh)
+                else:
+                    o = {k: v for k, v in (body.get("options") or {}).items()}
+                    out = feature_helpers.add(st, p, body.get("kind", ""), body.get("at"), body.get("normal"), eh, "you", **o)
+                st.activity(pid, "design", f"Standard feature: r{out['head']:02d}.", by="you")
+                out["job"] = auto(st.load(pid))
+                return self._json(out)
+            if action == "slicecompare":
+                from . import slicecompare
+                return self._json(slicecompare.compare(st, p, limit=int(body.get("limit") or slicecompare.LIMIT),
+                                                       ids=body.get("printers") or None))
+            if action == "turntable":
+                from . import animate
+                return self._json(animate.export(st, p, body.get("fmt") or "webp", int(body.get("frames") or 36),
+                                                 float(body.get("elevation") if body.get("elevation") is not None else 24)))
             if action == "instructions":
                 from . import instructions
                 return self._json(instructions.build(st, p, int(body["rev"]) if body.get("rev") is not None else None))

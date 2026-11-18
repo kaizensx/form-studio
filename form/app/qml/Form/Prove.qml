@@ -313,6 +313,8 @@ Column {
 
     // ── cost, copies, other materials (CostSection.qml) ──────
     CostSection { sl: root.sl; visible: !root.model }
+    // ── every printer you have, sliced for real (PrinterCompare.qml) ──
+    PrinterCompare { visible: !root.model && !root.sliceOff }
     Item { width: 1; height: 16 }
 
     // ── slice: not current ───────────────────────────────────

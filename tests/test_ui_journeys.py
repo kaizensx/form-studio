@@ -81,6 +81,36 @@ class Journeys(unittest.TestCase):
     def test_maker_tools(self):
         self.journey("maker_tools.py")
 
+    def test_new_tools(self):              # 12.3: a boss at a face, every printer compared, a turntable
+        # real slicers where they are installed (macOS here); elsewhere a stand-in OrcaSlicer that copies a fixture G-code
+        sys.path.insert(0, str(HERE))
+        from test_plates import REAL
+        if REAL:
+            return self.journey("new_tools.py")
+        import stat
+        from test_slicers import FIX, NOWHERE
+        from form.adapters import SLICERS
+        tmp = Path(tempfile.mkdtemp(prefix="form-ui-tools-"))
+        py = tmp / "stand_in.py"
+        py.write_text("import sys, shutil, os\nargs = sys.argv[1:]\nif args == ['--help']:\n    print('OrcaSlicer-2.5.1:'); sys.exit(0)\n"
+                      f"out = args[args.index('--outputdir') + 1]\nshutil.copyfile({str(FIX / 'orca' / 'generic_printer.gcode')!r}, "
+                      "os.path.join(out, 'plate_1.gcode'))\n", encoding="utf-8")
+        if os.name == "nt":
+            app = tmp / "orca.cmd"
+            app.write_text(f'@"{sys.executable}" "{py}" %*\r\n', encoding="utf-8")
+        else:
+            app = tmp / "orca"
+            app.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{py}" "$@"\n', encoding="utf-8")
+            app.chmod(app.stat().st_mode | stat.S_IEXEC)
+        toml = tmp / "studio.toml"
+        toml.write_text(f'[slicer]\nkind = "orca"\napp = {json.dumps(NOWHERE)}\n'
+                        f'[slicer.orca]\napp = {json.dumps(str(app))}\nconfig_dir = {json.dumps(str(FIX / "orca" / "config"))}\n'
+                        + "".join(f"[slicer.{k}]\napp = {json.dumps(NOWHERE)}\n" for k in SLICERS if k not in ("bambu", "orca")),
+                        encoding="utf-8")
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(toml)}):
+            self.journey("new_tools.py")
+
     def test_assembly_chain(self):          # a joint slider moves the whole chain; exploded follows the tree
         self.journey("assembly_chain.py")
 

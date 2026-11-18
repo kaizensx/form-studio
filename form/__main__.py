@@ -19,6 +19,9 @@
   form render <project> [--view iso|front|...|sheet] [--highlight feature] [--out file.png]
   form optimize <project> --vary arm_t:4:20 --minimize solid_mass_g --require "statics.safety_factor>=3"
   form animate <project> [--morph 1:4] [--out x.gif]   turntable or revision morph
+  form turntable <project> --fmt mp4|png|webp|gif      a turntable video or PNG sequence
+  form compare-printers <project>                      slice on every printer: time, filament, cost
+  form feature <project> boss --at x,y,z --normal ...  a screw boss or snap-fit hook in the code
   form verify <project> <release>    re-hash a release against its manifest
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
                                      one message to an agent with FORM's tools; streams the reply, saves the conversation
@@ -261,6 +264,31 @@ def main(argv=None):
     an.add_argument("--morph", help="from:to revision numbers, e.g. 1:4")
     an.add_argument("--frames", type=int, default=36)
     an.add_argument("--out")
+    tt = sub.add_parser("turntable", help="a turntable of the part: --fmt webp|gif|png (a PNG sequence)|mp4 (needs ffmpeg)")
+    tt.add_argument("project")
+    tt.add_argument("--fmt", default="webp", choices=["webp", "gif", "png", "mp4"])
+    tt.add_argument("--frames", type=int, default=36)
+    tt.add_argument("--elevation", type=float, default=24, help="camera height, degrees above the horizon")
+    tt.add_argument("--out", help="copy the file here")
+    cp = sub.add_parser("compare-printers", help="slice the design on every printer in your slicers: time, filament, cost")
+    cp.add_argument("project")
+    cp.add_argument("--limit", type=int, default=8, help="how many printers (the selected ones first)")
+    cp.add_argument("--printer", action="append", metavar="ID", help="only these printer ids (form printers lists them)")
+    fe = sub.add_parser("feature", help="a screw boss or snap-fit hook on a flat face, written into the design's code: "
+                                        "feature <project> boss|snap_hook --at x,y,z --normal x,y,z [options] | --list | --remove ID")
+    fe.add_argument("project")
+    fe.add_argument("kind", nargs="?", choices=["boss", "snap_hook"])
+    fe.add_argument("--at", metavar="x,y,z")
+    fe.add_argument("--normal", metavar="x,y,z")
+    fe.add_argument("--up", metavar="x,y,z", help="which way the snap hook's lip faces (its plane's up)")
+    fe.add_argument("--size", default="M3", help="boss screw size, M2 to M5")
+    fe.add_argument("--hole", default="tapped", choices=["tapped", "clearance", "insert"])
+    for k in ("height", "outer_d", "hole_d", "hole_depth", "length", "thickness", "width", "lip", "lip_height"):
+        fe.add_argument("--" + k.replace("_", "-"), dest=k, type=float)
+    fe.add_argument("--allow-strain", type=float, help="the hook material's allowable strain, e.g. 0.03")
+    fe.add_argument("--list", action="store_true")
+    fe.add_argument("--remove", metavar="ID")
+    fe.add_argument("--expect-head", type=int)
     # -- analysis on the model (form/analysis.py) --
     az = sub.add_parser("analyze", help="an analysis map: wall thickness, overhangs, layer cross-section, small features")
     az.add_argument("project")
@@ -458,6 +486,35 @@ def main(argv=None):
                 out = a.out or f"{a.project}_r{p['head']:02d}_turntable.gif"
                 info = animate.turntable(st, p, out, frames=a.frames)
             _print(info)
+        elif a.cmd == "turntable":
+            from . import animate
+            info = animate.export(st, st.load(a.project), a.fmt, a.frames, a.elevation)
+            if a.out:
+                import shutil as _sh
+                _sh.copyfile(info["file"], a.out)
+                info["copied_to"] = a.out
+            _print(info)
+        elif a.cmd == "compare-printers":
+            from . import slicecompare
+            _print(slicecompare.compare(st, st.load(a.project), a.limit, a.printer))
+        elif a.cmd == "feature":
+            from . import feature_helpers as fh
+            xyz = lambda t: [float(x) for x in t.split(",")]
+            p = st.load(a.project)
+            if a.list:
+                _print({"features": fh.list_features(st, p)})
+            elif a.remove:
+                _print(fh.remove(st, p, a.remove, a.expect_head, origin="cli"))
+            else:
+                if not (a.kind and a.at and a.normal):
+                    raise StudioError("Give boss or snap_hook, --at x,y,z and --normal x,y,z.", "`form select <project> --face x,y,z` reports a face's point and normal.")
+                o = {k: getattr(a, k) for k in ("size", "hole", "height", "outer_d", "hole_d", "hole_depth", "length", "thickness",
+                                                "width", "lip", "lip_height") if getattr(a, k) is not None}
+                if a.up:
+                    o["up"] = xyz(a.up)
+                out = fh.add(st, p, a.kind, xyz(a.at), xyz(a.normal), a.expect_head, "cli", **o)
+                out["checks"] = fh.checks(out["features"][-1], st.slicer_info(p=p).get("nozzle_mm"), a.allow_strain)
+                _print(out)
         elif a.cmd == "analyze":
             from . import analysis
             p = st.load(a.project)

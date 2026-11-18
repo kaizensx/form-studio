@@ -153,6 +153,7 @@ Column {
             text: "A 1600 × 900 image of " + (root.p ? F.pad(root.p.head) : "the head revision") + ": the part with its dimensions, what is computed and what is simulated, and the revision. It states only what Form Studio knows." }
         Row { spacing: 6
             Btn { icon: "share_2"; text: "Share card…"; enabled: !Store.hasDraft; onClicked: Store.openSheet("share") }
+            Btn { objectName: "openTurntable"; kind: "quiet"; icon: "film"; text: "Turntable…"; enabled: !Store.hasDraft; onClicked: Store.openSheet("turntable") }
             Btn { kind: "quiet"; icon: "layout_grid"; text: "Variants"; onClicked: Store.openSheet("variants") }
             Btn { kind: "quiet"; icon: "history"; text: "Timeline"; active: Store.timelineOpen; onClicked: Store.timelineOpen = !Store.timelineOpen } }
     }

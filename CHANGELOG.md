@@ -1,5 +1,11 @@
 # Changelog
 
+## 12.3.0
+
+- **Every printer you have, compared.** Prove › Every printer slices the design for real on each printer set up in each installed slicer, with that printer's own process and filament, and shows the slicer's time and filament and the cost from your prices side by side, with a bar per printer and the fastest, least filament and cheapest marked. A printer whose bed is too small says so; a failed slice says why. Slices are kept per model and presets, so asking again is instant. `form compare-printers <project> [--limit N] [--printer ID]`; MCP `compare_printers`.
+- **Screw bosses and snap-fit hooks where you click.** In Annotate, pick a point on a flat face and choose **Feature here…**: a screw boss (M2 to M5; the hole for a screw cutting its thread is the ISO tap drill, for a heat-set insert a typical insert hole, for a screw passing through the ISO 273 clearance) or a cantilever snap-fit hook. The boss wall is checked against your nozzle and the hook's strain (1.5·t·y/L²) against an allowable strain as you type. **Add to design** writes the feature into the design's code and builds a new revision in the kernel; one that does not sit on the part is refused with the reason. `form feature <project> boss|snap_hook --at x,y,z --normal x,y,z`, `--list`, `--remove`; MCP `add_feature`, `remove_feature`.
+- **Turntable videos.** Release › Share › **Turntable…** (also in the palette and the Tools menu) renders the part turning once from the kernel's mesh, at the frames and camera height you choose, as MP4 (when ffmpeg is installed), a PNG sequence, an animated WebP or a GIF, plays it in the sheet and saves it. `form turntable <project> --fmt mp4|png|webp|gif`; MCP `turntable`.
+
 ## 12.2.0
 
 - **One place to type.** With a conversation open on Home, the middle of Home steps aside instead of showing a second box; **New design** (Ctrl+N, the menus, the palette) starts a fresh conversation, as a new chat does in Claude, and the one you were in stays in the list. Files attached to an unsent message are kept.

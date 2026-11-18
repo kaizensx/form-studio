@@ -482,6 +482,37 @@ QtObject {
             return refresh(true).then(function () { return true })
         }, function (e) { fail(e); return false })
     }
+    // standard features at a face (form/feature_helpers.py): a screw boss or a snap-fit hook, written into the code
+    function addFeature(body) {
+        body.expect_head = project ? project.head : null
+        return ppost("/feature", body).then(function (r) {
+            var f = r.features[r.features.length - 1]
+            toast("Feature added as " + F.pad(r.head), (f.kind === "boss" ? f.size + " screw boss" : "Snap-fit hook") + " is a feature in the design's code now.")
+            selItems = []; selection = null
+            if (r.job) track(r.job)
+            return refresh(true).then(function () { return true })
+        }, function (e) { fail(e); return false })
+    }
+    // print time and cost on every printer (form/slicecompare.py): real slices, cached per model and presets
+    property var printerCompare: null
+    property bool printerCompareBusy: false
+    function comparePrinters(limit) {
+        if (printerCompareBusy) return Promise.resolve(null)
+        printerCompareBusy = true
+        var at = pid
+        return ppost("/slicecompare", { limit: limit || 8 }).then(function (r) {
+            printerCompareBusy = false
+            if (pid === at) printerCompare = r
+            var ok = r.rows.filter(function (x) { return x.status === "ok" }).length
+            toast("Compared on " + F.plural(ok, "printer"), "Each one sliced for real; times and grams are the slicers' simulations.")
+            return r
+        }, function (e) { printerCompareBusy = false; fail(e); return null })
+    }
+    function loadPrinterCompare() {
+        var at = pid
+        printerCompare = null
+        pget("/slicecompare").then(function (r) { if (pid === at && r.rows.length) printerCompare = r }, function () {})
+    }
     function removeText(id) {
         return ppost("/text_remove", { id: id, expect_head: project ? project.head : null }).then(function (r) {
             toast("Text removed", "New revision " + F.pad(r.head) + ".")
