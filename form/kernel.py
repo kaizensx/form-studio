@@ -590,3 +590,7 @@ from .selection import KERNEL_OPS as _SELECTION_OPS  # noqa: E402
 OPS.update(_SELECTION_OPS)
 from .materials import KERNEL_OPS as _MATERIAL_OPS  # noqa: E402  (3MF with colours)
 OPS.update(_MATERIAL_OPS)
+from .geomdiff import KERNEL_OPS as _DIFF_OPS  # noqa: E402  (what changed between revisions)
+OPS.update(_DIFF_OPS)
+from .instructions import KERNEL_OPS as _INSTR_OPS  # noqa: E402  (assembly instructions)
+OPS.update(_INSTR_OPS)

@@ -306,7 +306,7 @@ QtObject {
     function open(id) {
         pid = id
         draftValues = ({}); draftProv = ({}); draftNote = ""; draftOrigin = ""; draftAgent = ""
-        preview = null; draftError = null; feature = ""; compare = null; layers = null; section = null; ack = []
+        preview = null; draftError = null; feature = ""; compare = null; instructions = null; layers = null; section = null; ack = []
         _stamp = ""
         return refresh(true).then(function () {
             screen = "work"; viewName = "iso"; blankCanvas = false
@@ -450,12 +450,47 @@ QtObject {
     function compareWith(n) {
         if (compare && compare.rev === n) { compare = null; if (viewer) { viewer.setGhost(null); viewer.flagged = [] } return }
         Promise.all([pget("/view?rev=" + n), pget("/diff?a=" + n + "&b=" + project.head)]).then(function (r) {
-            compare = { rev: n, view: r[0], diff: r[1] }
+            compare = { rev: n, view: r[0], diff: r[1], geo: null, geoBusy: true, geoError: "" }
             if (viewer) {
                 viewer.setGhost(r[0])
                 viewer.flagged = r[1].impact.features.filter(function (f) { return f.change !== "trimmed" }).map(function (f) { return f.id })
             }
+            // the geometric diff: booleans on both solids in the kernel, slower than the parameter diff, so it follows
+            pget("/geomdiff?a=" + n + "&b=" + project.head).then(function (g) {
+                if (compare && compare.rev === n) compare = Object.assign({}, compare, { geo: g, geoBusy: false })
+            }, function (e) {
+                if (compare && compare.rev === n) compare = Object.assign({}, compare, { geoBusy: false, geoError: e.message || "The kernel could not compare the solids." })
+            })
         }, fail)
+    }
+
+    // ── maker tools: text on a face (form/engrave.py), assembly instructions (form/instructions.py) ──
+    function addText(body) {
+        body.expect_head = project ? project.head : null
+        return ppost("/text", body).then(function (r) {
+            toast("Text added as " + F.pad(r.head), "“" + body.text + "” is a feature in the design's code now.")
+            selItems = []; selection = null
+            if (r.job) track(r.job)
+            return refresh(true).then(function () { return true })
+        }, function (e) { fail(e); return false })
+    }
+    function removeText(id) {
+        return ppost("/text_remove", { id: id, expect_head: project ? project.head : null }).then(function (r) {
+            toast("Text removed", "New revision " + F.pad(r.head) + ".")
+            if (r.job) track(r.job)
+            return refresh(true)
+        }, fail)
+    }
+    property var instructions: null            // { rev, key, pdf, pages, steps } for the open design
+    property bool instructionsBusy: false
+    function makeInstructions() {
+        if (instructionsBusy) return Promise.resolve(null)
+        instructionsBusy = true
+        return ppost("/instructions", {}).then(function (r) {
+            instructionsBusy = false; instructions = r
+            toast("Assembly instructions ready", r.steps.length + " steps, " + r.pages.length + " pages")
+            return r
+        }, function (e) { instructionsBusy = false; fail(e); return null })
     }
     function marker(c) {
         if (!viewer) return

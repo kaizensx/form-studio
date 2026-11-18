@@ -78,6 +78,9 @@ class Journeys(unittest.TestCase):
     def test_viewport_tools(self):
         self.journey("tools.py")
 
+    def test_maker_tools(self):
+        self.journey("maker_tools.py")
+
     def test_assembly_chain(self):          # a joint slider moves the whole chain; exploded follows the tree
         self.journey("assembly_chain.py")
 

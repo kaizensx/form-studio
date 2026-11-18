@@ -19,7 +19,7 @@ Item {
     id: host
     anchors.fill: parent; z: 40
     readonly property var files: ({ "import": "ImportSheet.qml", alternatives: "Alternatives.qml", photo: "PhotoSheet.qml", ring: "RingSheet.qml", setup: "SetupSheet.qml", settings: "SettingsSheet.qml", update: "UpdateSheet.qml", slicer: "SlicerSheet.qml", render: "PhotoRenderSheet.qml", variants: "VariantsSheet.qml", share: "ShareSheet.qml", shortcuts: "ShortcutsSheet.qml", about: "AboutSheet.qml", whatsnew: "WhatsNew.qml", printer: "PrinterSheet.qml",
-                                    sketch: "SketchSheet.qml", concepts: "ConceptsSheet.qml" })
+                                    sketch: "SketchSheet.qml", concepts: "ConceptsSheet.qml", text: "TextSheet.qml" })
     readonly property bool open: !!Store.sheet
     readonly property Item sheet: ld.item
     property string file: ""                 // stays set while the sheet fades out

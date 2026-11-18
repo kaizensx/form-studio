@@ -222,6 +222,17 @@ def make_handler(st: Studio):
                 cand = st.head_summary(p, b)
                 return self._json({"a": a, "b": b, "impact": st.impact(p, st.rev(p, b)["values"], cand, base_rev=a),
                                    "note_a": st.rev(p, a)["note"], "note_b": st.rev(p, b)["note"]})
+            # -- maker tools: geometric diff, text on faces, assembly instructions (form/geomdiff.py, engrave.py, instructions.py) --
+            if rest == "/geomdiff":
+                from . import geomdiff
+                return self._json(geomdiff.compute(st, p, int(q["a"]), int(q["b"]) if q.get("b") else None))
+            if rest == "/text":
+                from . import engrave
+                return self._json({"marks": engrave.list_marks(st, p)})
+            if rest == "/text/check":
+                from . import engrave
+                return self._json(engrave.printability(q.get("text") or "", float(q.get("height") or 6), float(q.get("depth") or 0.6),
+                                                       q.get("sunk") == "1", st.slicer_info(p=p).get("nozzle_mm")))
             if rest.startswith("/job/"):
                 job = st.jobs.get(rest[5:])
                 if not job:
@@ -539,6 +550,20 @@ def make_handler(st: Studio):
                 if action == "annotation_delete":
                     return self._json(selection.delete(st, pid, str(body.get("id", ""))))
                 return self._json(selection.reanalyze(st, pid, str(body.get("id", "")), rv))
+            if action in ("text", "text_remove"):
+                from . import engrave
+                eh = int(body["expect_head"]) if body.get("expect_head") is not None else None
+                if action == "text_remove":
+                    out = engrave.remove(st, p, str(body.get("id", "")), eh)
+                else:
+                    out = engrave.add(st, p, body.get("text", ""), body.get("at"), body.get("normal"), float(body.get("height") or 6),
+                                      float(body.get("depth") or 0.6), bool(body.get("sunk")), body.get("up"), eh)
+                st.activity(pid, "design", f"Text on a face: r{out['head']:02d}.", by="you")
+                out["job"] = auto(st.load(pid))
+                return self._json(out)
+            if action == "instructions":
+                from . import instructions
+                return self._json(instructions.build(st, p, int(body["rev"]) if body.get("rev") is not None else None))
             if action == "preview":
                 return self._json(st.preview(p, body.get("values", {})))
             if action == "commit":

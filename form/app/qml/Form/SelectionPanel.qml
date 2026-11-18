@@ -16,6 +16,12 @@ Rectangle {
     readonly property var items: sel ? sel.items : []
     readonly property var anns: Store.annotations
     readonly property int head: Store.project ? Store.project.head : 0
+    // a flat face or a point on one, picked on the solid: where text can go (TextSheet.qml)
+    readonly property var flat: {
+        for (var i = 0; i < items.length; i++) { var x = items[i]
+            if ((x.kind === "face" || x.kind === "point") && x.on && x.normal && x.curvature && x.curvature.kind === "flat") return x }
+        return null
+    }
     width: 300; radius: Theme.rMd
     height: collapsed ? 36 : Math.min(maxHeight, 36 + col.implicitHeight + 12)
     color: Theme.alpha(Theme.plate1, 0.96); border.color: Theme.rule
@@ -110,6 +116,9 @@ Rectangle {
                     onClicked: Store.askAboutSelection(sp.sel.text, "") }
                 Btn { objectName: "keepSelection"; small: true; icon: "map_pin_plus"; text: "Keep…"; tip: "Name it and keep it with " + F.pad(sp.head)
                     onClicked: { sp.keeping = true; Qt.callLater(function () { nameField.input.forceActiveFocus() }) } }
+                Btn { objectName: "textHere"; small: true; icon: "type"; text: "Text here…"; visible: !!sp.flat
+                    tip: "Raise or sink lettering on this flat face, as a feature of the design"
+                    onClicked: Store.openSheet("text", { item: sp.flat }) }
                 Btn { small: true; kind: "quiet"; text: "Clear"; onClicked: Store.selClear() }
             }
             Column {

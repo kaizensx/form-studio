@@ -55,6 +55,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
 
 def _kv(pairs: list[str]) -> dict:
@@ -286,6 +287,29 @@ def main(argv=None):
     de = sub.add_parser("delete", help="move a project to .trash inside the projects folder (needs --yes)")
     de.add_argument("project")
     de.add_argument("--yes", action="store_true", help="really move it to the trash")
+    # -- maker tools (form/engrave.py, form/geomdiff.py, form/instructions.py) --
+    eg = sub.add_parser("engrave", help="text on a flat face as a real feature: engrave <project> TEXT --at x,y,z --normal x,y,z "
+                                        "[--height 6 --depth 0.6 --sunk] | --list | --remove text_N")
+    eg.add_argument("project")
+    eg.add_argument("text", nargs="?", default="")
+    eg.add_argument("--at", metavar="x,y,z", help="a point on the face, mm (form select --face gives one)")
+    eg.add_argument("--normal", metavar="x,y,z", help="the face's outward normal")
+    eg.add_argument("--up", metavar="x,y,z", help="which way the capitals point (default: up on a wall, +Y on a floor)")
+    eg.add_argument("--height", type=float, default=6.0, help="cap height, mm")
+    eg.add_argument("--depth", type=float, default=0.6, help="how far the letters stand out or sink in, mm")
+    eg.add_argument("--sunk", action="store_true", help="cut the text into the face instead of raising it")
+    eg.add_argument("--list", action="store_true")
+    eg.add_argument("--remove", metavar="ID")
+    eg.add_argument("--expect-head", type=int)
+    gd = sub.add_parser("diff", help="what changed between two revisions, computed on the solids: diff <project> A [B] [--png FILE]")
+    gd.add_argument("project")
+    gd.add_argument("a", type=int)
+    gd.add_argument("b", type=int, nargs="?")
+    gd.add_argument("--png", help="also write the picture (added green, removed red) here")
+    ins = sub.add_parser("instructions", help="assembly instructions as a PDF from the assembly declaration: instructions <project> [--rev N] [--out FILE]")
+    ins.add_argument("project")
+    ins.add_argument("--rev", type=int)
+    ins.add_argument("--out", help="copy the PDF here")
     # -- selections, annotations, colours and materials (form/selection.py, form/materials.py) --
     se = sub.add_parser("select", help="analyse points, edges, faces or a painted region on the solid; --keep saves it as an annotation")
     se.add_argument("project")
@@ -406,6 +430,39 @@ def main(argv=None):
                 _print(analysis.measure(st, p, xyz(a.a), xyz(a.b)))
             else:
                 raise StudioError("Give --from x,y,z and --to x,y,z, or --at x,y,z.", "Points are in millimetres in the design frame.")
+        elif a.cmd == "engrave":
+            from . import engrave
+            xyz = lambda t: [float(x) for x in t.split(",")]
+            p = st.load(a.project)
+            if a.list:
+                _print({"marks": engrave.list_marks(st, p)})
+            elif a.remove:
+                _print(engrave.remove(st, p, a.remove, a.expect_head, origin="cli"))
+            else:
+                if not (a.text and a.at and a.normal):
+                    raise StudioError("Give the text, --at x,y,z and --normal x,y,z.", "`form select <project> --face x,y,z` reports a face's point and normal.")
+                nz = st.slicer_info(p=p).get("nozzle_mm")
+                out = engrave.add(st, p, a.text, xyz(a.at), xyz(a.normal), a.height, a.depth, a.sunk, xyz(a.up) if a.up else None,
+                                  a.expect_head, origin="cli")
+                out["printability"] = engrave.printability(a.text, a.height, a.depth, a.sunk, nz)
+                _print(out)
+        elif a.cmd == "diff":
+            from . import geomdiff
+            import shutil as _sh
+            p = st.load(a.project)
+            d = geomdiff.compute(st, p, a.a, a.b)
+            if a.png:
+                _sh.copyfile(geomdiff.png_path(st, p, d), a.png)
+                d["png"] = str(Path(a.png).resolve())
+            _print(d)
+        elif a.cmd == "instructions":
+            from . import instructions
+            import shutil as _sh
+            out = instructions.build(st, st.load(a.project), a.rev)
+            if a.out:
+                _sh.copyfile(out["pdf_path"], a.out)
+                out["pdf_path"] = str(Path(a.out).resolve())
+            _print(out)
         elif a.cmd == "select":
             from . import selection
             xyz = lambda t: [float(x) for x in t.split(",")]

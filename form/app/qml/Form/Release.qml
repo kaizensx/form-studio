@@ -239,6 +239,23 @@ Column {
                                                "Same type (*." + String(mr.modelData).split(".").pop() + ")", true) } } } }
         Btn { text: "Save all with images (.zip)…"; icon: "download"
             onClicked: root.saveAs(Store.pid + "_" + F.pad(root.p.head) + "_docs.zip", "/projects/" + Store.pid + "/docs/docs.zip", "Zip archives (*.zip)", true) }
+        // assembly instructions as a PDF, drawn from the assembly declaration (form/instructions.py)
+        Column { objectName: "instructions"; width: parent.width; spacing: 8; visible: !!Store.assembly && !Store.assembly.derived
+            readonly property var r: Store.instructions && root.p && Store.instructions.rev === root.p.head ? Store.instructions : null
+            Rectangle { width: parent.width; height: 1; color: Theme.rule }
+            Txt { kind: "fine"; width: parent.width
+                text: "Step-by-step assembly instructions: one page per part going on, in the order the parts attach, at their exploded offset." }
+            Btn { objectName: "makeInstructions"; icon: "book_open"; text: parent.r ? "Make them again" : "Make assembly instructions"
+                busy: Store.instructionsBusy; busyText: "Drawing the steps…"; onClicked: Store.makeInstructions() }
+            Flow { width: parent.width; spacing: 6; visible: !!parent.r
+                Repeater { model: parent.parent.r ? parent.parent.r.pages : []
+                    Rectangle { required property var modelData; required property int index
+                        width: 62; height: 88; radius: 3; color: Theme.plate1; border.color: index === 0 ? Theme.rule2 : Theme.rule; clip: true
+                        Image { anchors.fill: parent; anchors.margins: 1; asynchronous: true; fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
+                            source: Store.instructions ? Store.file("side/" + Store.instructions.key + "/" + parent.modelData) : "" } } } }
+            Btn { kind: "primary"; icon: "download"; text: "Save PDF…"; visible: !!parent.r
+                onClicked: root.saveAs(parent.r.pdf, "/projects/" + Store.pid + "/file/side/" + parent.r.key + "/" + parent.r.pdf, "PDF (*.pdf)", true) }
+        }
     }
 
     // ── revisions ───────────────────────────────────────────
@@ -277,6 +294,29 @@ Column {
                 .concat(im.metrics.map(function (m) { var k = m.unit === "%" ? 0 : 2; return { label: m.label, from: F.fmt(m.from, k), to: F.fmt(m.to, k), unit: m.unit } })) : []
             kind: "blue"
             Txt { kind: "cap"; color: Theme.blueprint; text: Store.compare && root.p ? F.pad(Store.compare.rev) + " → " + F.pad(root.p.head) : "" }
+            // the solids compared in the kernel (form/geomdiff.py): material added green, removed red
+            Column { objectName: "geoDiff"; width: parent.width; spacing: 6
+                readonly property var g: Store.compare ? Store.compare.geo : null
+                Row { spacing: 6; visible: !!Store.compare && Store.compare.geoBusy
+                    Spinner { size: 12; anchors.verticalCenter: parent.verticalCenter; color: Theme.blueprint }
+                    Txt { kind: "fine"; text: "Comparing the solids…" } }
+                Txt { kind: "fine"; width: parent.width; color: Theme.amber; visible: !!Store.compare && Store.compare.geoError !== ""
+                    text: Store.compare ? Store.compare.geoError : "" }
+                Rectangle { width: parent.width; height: width * 590 / 1440; radius: Theme.rSm; color: Theme.plate1; border.color: Theme.rule; clip: true
+                    visible: !!parent.g && !parent.g.same
+                    Image { id: gimg; anchors.fill: parent; anchors.margins: 1; asynchronous: true; cache: false; fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
+                        source: parent.parent.g ? Store.file("side/" + parent.parent.g.key + "/" + parent.parent.g.image) : ""
+                        opacity: status === Image.Ready ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.reduced ? 0 : Theme.base } } }
+                    Spinner { anchors.centerIn: parent; size: 16; visible: gimg.status === Image.Loading } }
+                Flow { width: parent.width; spacing: 12; visible: !!parent.g && !parent.g.same
+                    Repeater { model: parent.parent.g ? [["Added", parent.parent.g.added, Theme.pass], ["Removed", parent.parent.g.removed, Theme.signal]] : []
+                        Row { required property var modelData; spacing: 5
+                            Rectangle { width: 9; height: 9; radius: 2; color: modelData[2]; anchors.verticalCenter: parent.verticalCenter }
+                            Txt { kind: "fine"; tone: 2; mono: true
+                                text: modelData[0] + " " + F.fmt(modelData[1].volume_mm3, 1) + " mm³" + (modelData[1].regions > 1 ? " · " + modelData[1].regions + " regions" : "") } } }
+                    Tag { text: "computed" } }
+                Txt { kind: "fine"; width: parent.width; visible: !!parent.g; text: parent.g ? parent.g.text : "" }
+            }
             Column { width: parent.width
                 Repeater { model: dc.im ? dc.im.params : []
                     Delta { required property var modelData; label: modelData.label; from: F.trim(modelData.from); to: F.trim(modelData.to); unit: modelData.unit; tint: Theme.blueprint } } }
