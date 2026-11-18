@@ -131,6 +131,7 @@ QtObject {
     property var _clickOwner: null     // the Btn whose click is running right now (Btn.qml sets it)
     property var activity: []          // on screen: [{ id, label, t0, progress (0..1 or -1), detail, done, ok }]
     property var _acts: ({})
+    property var activityLog: []       // the last 30 named pieces of work: { label, ms, shown, ok } (diagnostics, tests)
     property int _actId: 0
     property real _toastAt: 0
     property var _actTimer: Timer { interval: 100; repeat: true; onTriggered: s._actTick() }
@@ -181,6 +182,7 @@ QtObject {
         var a = _acts[id]
         if (!a) return
         a.done = Date.now(); a.ok = ok
+        activityLog = activityLog.concat([{ label: a.label, ms: a.done - a.t0, shown: !!a.shown, ok: ok }]).slice(-30)
         if (!a.shown) { delete _acts[id]; _actTick(); return }
         // a click whose work took a while gets a word when it ends, unless its own code already said something
         if (a.click && !a.quiet) _afterAct.later(function () {

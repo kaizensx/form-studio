@@ -12,6 +12,7 @@ from pathlib import Path
 from _lib import open_sheet_wait, sheet, wait_job
 
 DATA = "fresh"
+SLOW, QUICK = "fakeSlow", "fakeQuick"         # buttons the first journey makes at run time (not in the QML files)
 CLIP = (Path(__file__).resolve().parents[2] / "community" / "recipes" / "cable-clip" / "recipe.py").read_text(encoding="utf-8")
 
 
@@ -35,7 +36,7 @@ def journey_busy_feedback(ui):
                 var t = Qt.createQmlObject('import QtQuick; Timer { interval: 1600; running: true }', b)
                 t.triggered.connect(function () { res(true); t.destroy() }) })) })
         })""")
-    btn = ui.item("fakeSlow")
+    btn = ui.item(SLOW)
     t0 = time.time()
     ui.click(btn)
     ui.wait_until(lambda: btn.property("showsBusy"), 1.0, "the spinner on the button")
@@ -55,7 +56,7 @@ def journey_busy_feedback(ui):
     # a quick answer never flashes: the spinner waits a moment before it shows
     ui.run_js("""var q = Qt.createQmlObject('import QtQuick; import Form; Btn { objectName: "fakeQuick"; x: 520; y: 300; text: "Quick" }', win.contentItem); q.z = 999
         q.clicked.connect(function () { q.run(function () { return Promise.resolve(1) }) })""")
-    quick = ui.item("fakeQuick")
+    quick = ui.item(QUICK)
     ui.click(quick)
     ui.settle(250)
     ui.check(not quick.property("showsBusy"), "an instant answer shows no spinner")
@@ -79,10 +80,18 @@ def journey_export_and_import_a_recipe(ui):
     ui.click_text("Mine", within=card, exact=False)
     ui.item(text="Cable clip", within=card, timeout=10)
     ui.click_text("Cable clip", within=card)
+    t0 = time.time()
     ui.click("recipeShareBtn")
-    open_sheet_wait(ui, "shareRecipe")
-    # the preview is drawn from a real build: busy feedback while the kernel works, then the picture
+    # the preview is drawn from a real build: a skeleton and the activity bar while the kernel works, then the picture
+    # (the window's loop is driven from Python here and can be slow to sample while the engine renders, so the
+    # app's own record of what the bar showed is what is checked)
+    ui.wait_until(lambda: sheet(ui) == "shareRecipe", 5, "the share sheet")
+    opened = time.time() - t0
     ui.wait_until(lambda: ui.item("sharePreview").property("ready"), 180, "the preview from the build")
+    rec = [a for a in ui.js("Store.activityLog") if a["label"] == "Preparing the recipe to share"][-1]
+    print(f"MEASURE share preview: sheet {opened:.2f} s, build and picture {rec['ms'] / 1000:.2f} s, named in the bar: {rec['shown']}", flush=True)
+    ui.check(rec["shown"] or rec["ms"] < 300, "work over 300 ms is named in the bar")
+    ui.check(opened < 1.0, "the sheet opens at once, before the build")
     ui.fill("shareAuthor", "maker-1")
     ui.click_text("Apply changes")
     ui.wait_until(lambda: json.loads((Path(ui.studio.root) / ".recipes" / f"{m['id']}.json").read_text())["author"] == "maker-1", 30, "the author kept")
@@ -134,8 +143,7 @@ def journey_share_to_the_community(ui):
     ui.expect("What the GitHub form will show, filled in")
     ui.settle(300)
     ui.shot("share-community")
-    ui.wait_until(lambda: ui.store.get("toasts") == [], 15, "the toasts over the button to leave")
-    ui.click("shareIssue")
+    ui.click("shareIssue")                             # a toast may sit over it: clicks go through to the sheet
     ui.wait_until(lambda: any(k == "link" for k, _ in ui.outside), 3, "the browser asked to open the issue")
     url = [a for k, a in ui.outside if k == "link"][-1]
     u = urllib.parse.urlparse(url)
@@ -171,10 +179,25 @@ def journey_design_to_recipe(ui):
     ui.settle(300)
     ui.shot("design-to-recipe")
     btn = ui.item("deriveBuild")
+    t0 = time.time()
     ui.click(btn)
-    # a real slow action: the kernel builds the rewritten recipe and the design
-    ui.wait_until(lambda: sheet(ui) == "recipe" or btn.property("showsBusy"), 10, "busy feedback or the result")
-    ui.wait_until(lambda: sheet(ui) == "recipe", 180, "the review")
+    # a real slow action: the kernel builds the rewritten recipe and the design. Measured: the time to the first
+    # visible feedback (the button's spinner, or the result itself when it is quicker than the spinner's delay)
+    seen = {}
+    def watch():
+        if sheet(ui) == "recipe":                      # the result replaced the sheet (and its button)
+            return True
+        if btn.property("showsBusy") and "busy" not in seen:
+            seen["busy"] = time.time() - t0
+        if ui.js("Store.activity.length") > 0 and "bar" not in seen:
+            seen["bar"] = time.time() - t0
+        return sheet(ui) == "recipe"
+    ui.wait_until(watch, 180, "the review")
+    done = time.time() - t0
+    print(f"MEASURE derive: feedback {seen.get('busy', done):.2f} s, bar {seen.get('bar', float('nan')):.2f} s, done {done:.2f} s", flush=True)
+    ui.check(seen.get("busy", done) < 0.5, "feedback within half a second")
+    if done > 0.8:
+        ui.check("bar" in seen, "work over 300 ms is named in the bar")
     ui.settle(300)
     ui.expect("Builds the same solid as the design")
     ui.shot("derived-review")
