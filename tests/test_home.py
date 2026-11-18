@@ -434,6 +434,15 @@ class WhatsNew(Tmp):
         self.assertEqual(hl[0], {"title": "Learned starters", "text": "Home suggests what you make.", "group": "Home"})
         self.assertEqual(len(hl), 2)
 
+    def test_a_dev_build_shows_what_is_unreleased(self):
+        cl = self.tmp / "CHANGELOG-dev.md"
+        cl.write_text("# Changelog\n\n## Unreleased\n\n- **Lighter.** Thinner walls.\n\n" + CHANGELOG.split("\n", 1)[1], encoding="utf-8")
+        self.assertEqual(list(whatsnew.sections(cl.read_text(encoding="utf-8")))[0], "Unreleased")
+        n = whatsnew.notes("1.1.0-dev", cl)
+        self.assertTrue(n["found"])
+        self.assertEqual(n["highlights"][0]["title"], "Lighter")
+        self.assertFalse(whatsnew.notes("1.1.0", cl)["found"])       # a release never shows the Unreleased notes
+
     def test_shown_once_per_version(self):
         root = self.tmp / "data"
         self.assertFalse(whatsnew.due(root, "12.0.0", first_run=True, path=self.cl)["show"])       # a new folder: silent

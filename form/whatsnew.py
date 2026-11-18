@@ -31,7 +31,7 @@ def sections(text: str) -> dict[str, str]:
     out: dict[str, str] = {}
     cur, buf = None, []
     for line in text.splitlines():
-        m = re.match(r"^##\s+v?([0-9][0-9A-Za-z.\-+]*)\s*(?:[-—(].*)?$", line)
+        m = re.match(r"^##\s+v?([0-9][0-9A-Za-z.\-+]*|Unreleased)\s*(?:[-—(].*)?$", line)
         if m or (line.startswith("## ") and cur is not None):
             if cur is not None:
                 out[cur] = "\n".join(buf).strip()
@@ -70,6 +70,8 @@ def notes(version: str, path: Path | None = None) -> dict:
         return {"version": version, "found": False, "markdown": "", "highlights": []}
     sec = sections(p.read_text(encoding="utf-8"))
     md = sec.get(version) or sec.get(version.lstrip("vV")) or ""
+    if not md and version.endswith("-dev"):          # a build of dev: what it has that the last release does not
+        md = sec.get("Unreleased", "")
     return {"version": version, "found": bool(md), "markdown": md, "highlights": highlights(md),
             "versions": list(sec)[:12]}
 

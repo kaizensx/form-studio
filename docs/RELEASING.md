@@ -23,6 +23,13 @@ who watch the repository or the Discord server are told about something worth th
 
 A patch carries fixes only, never features. The fix lands on `main` and is merged back into `dev` the same day.
 
+## The version on dev
+
+`dev` always carries the number of the release it is building towards, with `-dev`: after 1.0.0 it says `1.1.0-dev`
+(`form/__init__.py`; `1.1.0.dev0` in `pyproject.toml`). A copy built from `dev` shows that number in About and in
+What's New (which then shows the `## Unreleased` notes), so it is always clear which version is being worked on. It
+is never offered as an update to anyone: `1.1.0-dev` sorts before `1.1.0-preview.1` and `1.1.0`.
+
 ## Version numbers
 
 `MAJOR.MINOR.PATCH`:
@@ -44,10 +51,12 @@ notes (`scripts/ci/release_notes.py`). When a stable release is cut, `## Unrelea
    sessions work on the repository, agree who tags: only one does.
 2. Run the unit tests (`FORM_SKIP_UI=1 python -m unittest discover -s tests`) and the interface journeys that touch
    what changed.
-3. **Preview:** tag `vX.Y.0-preview.N` on `dev` and push the tag. `app.yml` builds the four downloads and publishes a
+3. **Preview:** set the version to `X.Y.0-preview.N` in one commit on `dev`, tag it `vX.Y.0-preview.N` and push the tag,
+   then set it back to `X.Y.0-dev` in the next commit. `app.yml` builds the four downloads and publishes a
    pre-release.
-4. **Stable:** rename `## Unreleased` to `## X.Y.0`, set the version in `form/__init__.py` and `pyproject.toml`,
-   commit on `dev`, fast-forward `main` to `dev`, tag `vX.Y.0` and push. `app.yml` builds a draft release; publish it
+4. **Stable:** rename `## Unreleased` to `## X.Y.0`, set the version in `form/__init__.py` and `pyproject.toml`
+   to `X.Y.0` (dropping `-dev`), commit on `dev`, fast-forward `main` to `dev`, tag `vX.Y.0` and push. Then set `dev`
+   to the next one, `X.(Y+1).0-dev`, with a new empty `## Unreleased`. `app.yml` builds a draft release; publish it
    once all four downloads and `SHA256SUMS` are attached.
 5. **Patch:** fix on `main`, set the version, tag `vX.Y.Z`, publish, then merge `main` into `dev`.
 
