@@ -994,6 +994,50 @@ def build() -> MCPServer:
             return {"recipes": recipe_lib.search(lib["items"], q, section, tag), "community_error": lib["community_error"]}
         return await _run(go)
 
+    # ---- recipe sharing (form/recipe_share.py): packages and submissions are written locally; nothing is posted ----
+    @mcp.tool(annotations=RW)
+    async def export_recipe(recipe: str, path: str | None = None, ctx: Context = None) -> dict:
+        """Write an installed ("mine") recipe as one .formrecipe file: its code, meta.json (parameters, author, tags,
+        the code's SHA-256) and preview.png drawn from a real build at its defaults. Returns {file, bytes, sha256}.
+        Nothing is uploaded; the person shares the file however they like."""
+        from pathlib import Path as _P
+
+        from . import recipe_share
+        st = studio()
+        out = _P(path).expanduser() if path else st.root / "shared-recipes"
+        if not path:
+            out.mkdir(parents=True, exist_ok=True)
+        return await _run(_home, recipe_share.export, st, recipe, out)
+
+    @mcp.tool(annotations=RW)
+    async def prepare_recipe_submission(recipe: str, folder: str | None = None) -> dict:
+        """Prepare an installed recipe for the community gallery: the community/recipes/<id>/ folder (written into
+        `folder` when given), what the gallery's checks would refuse, and the link to GitHub's recipe issue form with
+        the fields filled in. Never open or post it: give the link to the person, who submits it themselves."""
+        from . import recipe_share
+        st = studio()
+        def go():
+            r = recipe_share.prepare(st, recipe)
+            out = {k: r["submission"][k] for k in ("folder", "meta", "problems", "notes")}
+            out["issue_url"], out["omitted_from_link"] = r["submission"]["issue"]["url"], r["submission"]["issue"]["omitted"]
+            if folder:
+                out["saved"] = recipe_share.save_submission(st, recipe, folder)
+            return out
+        return await _run(_home, go)
+
+    @mcp.tool(annotations=RW)
+    async def design_as_recipe(project: str, title: str = "", summary: str = "",
+                               ranges: dict[str, list[float]] | None = None) -> dict:
+        """Turn a design's current code into a recipe whose defaults are the design's values; ranges narrow a
+        parameter's range ({key: [min, max]}, never wider than the code's own). It is built once and compared with the
+        design (check.same_volume). Returns the code and its SHA-256 for the person to review; installing it is their
+        decision, in the app or with `form recipes derive <project> --install --sha256 <hex>`."""
+        from . import recipe_share
+        st = studio()
+        rg = {k: (v[0], v[1]) for k, v in (ranges or {}).items() if len(v) == 2}
+        d = await _run(_home, recipe_share.derive, st, project, title, summary, rg)
+        return {k: d[k] for k in ("title", "summary", "kind", "sha256", "source", "check", "param_list", "problems")}
+
     @mcp.tool(annotations=RW)
     async def export_project(project: str, path: str | None = None, conversations: bool = True, ctx: Context = None) -> dict:
         """Write the project, its conversations and the code its revisions were built from to one .formstudio file

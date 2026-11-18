@@ -91,6 +91,11 @@ class Journeys(unittest.TestCase):
         # is a local copy (tests/fixtures/community), so nothing is fetched
         self.journey("starting.py", env_extra={"FORM_RECIPES_INDEX": str(HERE / "fixtures" / "community" / "index.json")})
 
+    def test_sharing_and_busy_feedback(self):
+        # a slow action's busy button and activity bar; a recipe exported and imported again; the community
+        # submission (its GitHub link is recorded, not opened); a design turned into a recipe
+        self.journey("sharing.py")
+
     def test_sheets_palette_shortcuts(self):
         # installs and the upgrade are simulated, one item is reported missing so there is something to install,
         # and a newer release is pretended so the update sheet has something to offer

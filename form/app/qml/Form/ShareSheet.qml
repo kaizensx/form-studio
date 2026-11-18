@@ -35,6 +35,8 @@ Column {
         Btn { small: true; kind: "quiet"; icon: "copy"; tip: "Copy the command"; anchors.verticalCenter: parent.verticalCenter
             onClicked: { Bridge.copy("form share " + Store.pid + " --out card.png"); Store.toast("Copied the command") } } }
     property Component footer: Row { spacing: 8
+        Btn { kind: "quiet"; icon: "wand"; text: "Share as a recipe…"; tip: "Turn this design into a recipe others can make their own version of"
+            onClicked: Store.openSheet("designRecipe", { project: Store.pid }) }
         Btn { icon: "download"; text: "Save PNG…"; enabled: sh.ready; onClicked: sh.savePng() }
         Btn { kind: "primary"; icon: "copy"; text: "Copy image"; enabled: sh.ready; keys: "Return"; onClicked: sh.copy() } }
 

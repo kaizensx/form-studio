@@ -39,13 +39,20 @@ Column {
     property Component footerLeft: tab === "recipe" ? leftRecipe : tab === "brief" && preset ? leftBrief : tab === "blank" ? leftBlank : null
     property Component footer: tab === "recipe" ? rightRecipe : tab === "brief" && preset ? rightBrief : tab === "blank" ? rightBlank : null
     Component { id: leftRecipe; Row { spacing: 4
-        Btn { objectName: "installRecipeFile"; kind: "quiet"; icon: "file_code"; text: "Install from a file…"; tip: "A .py (build123d) or .scad (OpenSCAD) recipe. You see its code before anything is installed."
+        Btn { objectName: "installRecipeFile"; kind: "quiet"; icon: "file_code"; text: "Install from a file…"; tip: "A .formrecipe someone shared, or a .py (build123d) or .scad (OpenSCAD) recipe. You see its code before anything is installed."
             onClicked: Store.ask(recipeDlg) }
-        Btn { kind: "quiet"; icon: "refresh_cw"; text: "Refresh"; visible: ns.section === "community"; onClicked: ns.loadLib(true) } } }
+        Btn { kind: "quiet"; icon: "refresh_cw"; text: "Refresh"; visible: ns.section === "community"; onClicked: ns.loadLib(true) }
+        // ratings would need a server; each community recipe's conversation is on GitHub
+        Btn { objectName: "recipeDiscuss"; kind: "quiet"; icon: "message_square"; text: "Discuss"; visible: !!ns.chosen && ns.chosen.section === "community" && !!ns.chosen.discussion
+            tip: "Opens this recipe's discussion on GitHub in your browser"; onClicked: Bridge.openLink(ns.chosen.discussion) }
+        Btn { kind: "quiet"; icon: "external_link"; text: "Source"; visible: !!ns.chosen && ns.chosen.section === "community" && !!ns.chosen.page
+            tip: "Opens its folder on GitHub in your browser"; onClicked: Bridge.openLink(ns.chosen.page) } } }
     Component { id: rightRecipe; Row { spacing: 8
         Btn { kind: "quiet"; text: "Cancel"; onClicked: Store.openSheet(null) }
         Btn { visible: !!ns.chosen && ns.chosen.section === "mine"; kind: "quiet"; icon: "code"; text: "View code"; onClicked: ns.viewSource(ns.chosen.id) }
-        Btn { objectName: "recipePrimary"; kind: "primary"; keys: "Return"; busy: ns.creating
+        Btn { visible: !!ns.chosen && ns.chosen.section === "mine"; objectName: "recipeShareBtn"; icon: "share_2"; text: "Share…"
+            tip: "As a .formrecipe file, or with the community gallery"; onClicked: Store.openSheet("shareRecipe", { id: ns.chosen.id }) }
+        Btn { objectName: "recipePrimary"; kind: "primary"; keys: "Return"; busy: ns.creating; busyText: ns.needsInstall ? "Checking…" : "Creating…"
             icon: ns.needsInstall ? "download" : "plus"
             text: ns.needsInstall ? "Review and install…" : "Create design"
             enabled: !!ns.chosen && !(ns.chosen.section === "community" && ns.chosen.installed && !ns.mineFor(ns.chosen))
@@ -206,7 +213,8 @@ Column {
             Seg { x: search.width + 12; anchors.verticalCenter: parent.verticalCenter; value: ns.section; model: ns.sectionModel
                 onPicked: function (v) { ns.section = v } }
             Pick { anchors.right: parent.right; width: 168; anchors.verticalCenter: parent.verticalCenter; value: ns.sort
-                model: [{ value: "name", text: "Sort: by name" }, { value: "recent", text: "Sort: newest installed" }]
+                model: [{ value: "name", text: "Sort: by name" }, { value: "recent", text: "Sort: newest installed" }, { value: "added", text: "Sort: newest in the gallery" },
+                        { value: "author", text: "Sort: by author" }, { value: "params", text: "Sort: most parameters" }]
                 onPicked: function (v) { ns.sort = v } } }
         // tags and categories
         Flow { width: parent.width; height: 24; spacing: 6; clip: true
@@ -252,7 +260,8 @@ Column {
                             RecipeView { anchors.fill: parent; visible: cell.it.section === "builtin"; recipeId: cell.it.section === "builtin" ? cell.it.id : ""
                                 turning: rm.containsMouse || cell.on }
                             Image { id: img; anchors.fill: parent; visible: cell.it.section !== "builtin" && !!cell.it.preview && status === Image.Ready
-                                fillMode: Image.PreserveAspectCrop; asynchronous: true; source: cell.it.section !== "builtin" && cell.it.preview ? cell.it.preview : "" }
+                                fillMode: Image.PreserveAspectCrop; asynchronous: true
+                                source: cell.it.section !== "builtin" && cell.it.preview ? (String(cell.it.preview).indexOf("/api/") === 0 ? Bridge.baseUrl + cell.it.preview : cell.it.preview) : "" }
                             Column { visible: cell.it.section !== "builtin" && img.status !== Image.Ready; anchors.centerIn: parent; spacing: 6
                                 Icon { anchors.horizontalCenter: parent.horizontalCenter; name: cell.it.section === "community" ? "globe" : "file_code"; size: 26; color: Theme.ink4 }
                                 Txt { anchors.horizontalCenter: parent.horizontalCenter; kind: "fine"; tone: 4; text: cell.it.kind === "scad" ? "OpenSCAD" : "build123d" } } }
@@ -263,8 +272,9 @@ Column {
                             Row { spacing: 6
                                 Tag { text: cell.it.section === "builtin" ? "built-in" : cell.it.section === "mine" ? "mine" : cell.it.builtin ? "included" : cell.it.installed ? "installed" : "community"
                                       kind: "x"; tint: cell.it.section === "builtin" ? Theme.ink3 : cell.it.section === "mine" ? Theme.datum : Theme.blueprint }
-                                Txt { kind: "fine"; tone: 3; text: cell.it.author && cell.it.section !== "builtin" ? "by " + cell.it.author : cell.it.category || ""
-                                      anchors.verticalCenter: parent.verticalCenter } } }
+                                Txt { kind: "fine"; tone: 3; text: (cell.it.author && cell.it.section !== "builtin" ? "by " + cell.it.author : cell.it.category || "")
+                                                                   + (cell.it.params ? " · " + cell.it.params + " params" : "")
+                                      anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideRight; wrapMode: Text.NoWrap; width: Math.min(implicitWidth, card.width - 110) } } }
                         Icon { visible: cell.on; name: "circle_check"; size: 16; color: Theme.datum; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 10 }
                         MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true
                             onClicked: ns.pickKey = cell.it.id + "|" + cell.it.section
@@ -272,6 +282,17 @@ Column {
                     }
                 }
             }
+            // a skeleton while the library loads: the grid's shape, not a blank
+            Grid { visible: !ns.libLoaded; columns: grid.cols; anchors.fill: parent; clip: true
+                Repeater { model: grid.cols * 2
+                    Item { width: grid.cellWidth; height: grid.cellHeight
+                        Rectangle { x: 5; y: 5; width: parent.width - 10; height: parent.height - 10; radius: Theme.rLg; color: Theme.plate1; border.color: Theme.rule
+                            Rectangle { x: 1; y: 1; width: parent.width - 2; height: 112; radius: Theme.rLg - 1; color: Theme.plate2 }
+                            Rectangle { x: 14; y: 124; width: parent.width * 0.5; height: 10; radius: 5; color: Theme.plate3 }
+                            Rectangle { x: 14; y: 144; width: parent.width * 0.75; height: 8; radius: 4; color: Theme.plate2 }
+                            Rectangle { x: 14; y: 158; width: parent.width * 0.6; height: 8; radius: 4; color: Theme.plate2 }
+                            SequentialAnimation on opacity { running: !ns.libLoaded; loops: Animation.Infinite
+                                NumberAnimation { to: 0.55; duration: 650 } NumberAnimation { to: 1; duration: 650 } } } } } }
             // empty and offline states
             Column { anchors.centerIn: parent; width: Math.min(420, parent.width - 40); spacing: 8; visible: ns.libLoaded && ns.lib.items.length === 0
                 Icon { anchors.horizontalCenter: parent.horizontalCenter; name: ns.section === "community" ? "globe" : ns.section === "mine" ? "file_code" : "search"; size: 26; color: Theme.ink4 }
@@ -446,9 +467,10 @@ Column {
     FileDialog { id: refDlg; title: "Attach a reference part"; nameFilters: ["STEP or STL (*.step *.stp *.stl)"]; fileMode: FileDialog.OpenFiles
         onAccepted: { var r = ns.refs.slice(), f = selectedFiles && selectedFiles.length ? selectedFiles : [selectedFile]
                       for (var i = 0; i < f.length; i++) if (String(f[i])) r.push(f[i]); ns.refs = r } }
-    FileDialog { id: recipeDlg; title: "Install a recipe from a file"; nameFilters: ["Recipes (*.py *.scad)"]
+    FileDialog { id: recipeDlg; title: "Install a recipe from a file"; nameFilters: ["Recipes (*.formrecipe *.py *.scad)"]
         onAccepted: {
-            var nm = decodeURIComponent(String(selectedFile).replace(/^.*[\/\\]/, ""))
-            Store.upload("/recipes/inspect?name=" + encodeURIComponent(nm), selectedFile).then(function (r) { Store.openSheet("recipe", { mode: "file", info: r }) }, Store.fail)
+            var nm = decodeURIComponent(String(selectedFile).replace(/^.*[\/\\]/, "")), pkg = /\.formrecipe$/i.test(nm)
+            Store.upload((pkg ? "/recipes/package/inspect?name=" : "/recipes/inspect?name=") + encodeURIComponent(nm), selectedFile)
+                 .then(function (r) { Store.openSheet("recipe", { mode: pkg ? "package" : "file", info: r }) }, Store.fail)
         } }
 }

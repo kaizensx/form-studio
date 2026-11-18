@@ -438,8 +438,8 @@ def save_submission(st, rid: str, dest) -> dict:
     """Write community/recipes/<id>/ (recipe file, meta.json, preview.png) inside dest, for a pull request."""
     r = prepare(st, rid)
     sub = r["submission"]
-    base = Path(dest).expanduser()
-    if not base.is_dir():
+    base = Path(str(dest or "")).expanduser()
+    if not str(dest or "").strip() or not base.is_absolute() or not base.is_dir():
         raise ShareError("Choose a folder that exists.")
     out = base / sub["meta"]["id"]
     out.mkdir(exist_ok=True)

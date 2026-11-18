@@ -28,7 +28,7 @@ Column {
                 : root.cn.state === "stale" ? "The last checks were made for " + F.pad(root.cn.last_rev) + " and do not describe " + root.head + "."
                 : "Checks have not been produced for this revision." }
         Row { spacing: 8
-            Btn { kind: "primary"; icon: "play"; text: root.busy ? "Working…" : "Run pipeline"; enabled: !root.busy; onClicked: Store.run() }
+            Btn { kind: "primary"; icon: "play"; text: "Run pipeline"; busyText: "Running…"; busy: root.busy; onClicked: Store.run() }
             FixBtn { visible: !!root.cn && root.cn.state === "failed" && Store.chatReady && !!Store.chat.available; small: false
                 subject: "the checks could not be produced for " + root.head
                 details: root.cn && root.cn.error ? "Error: " + root.cn.error.message + (root.cn.error.hint ? "\nHint: " + root.cn.error.hint : "") : "" } }
@@ -254,8 +254,8 @@ Column {
                 : root.sn.state === "stale" ? "The last slice was of " + F.pad(root.sn.last_rev) + "; it does not describe " + root.head + "."
                 : "Not sliced yet." }
         Row { spacing: 8
-            Btn { icon: "layers"; text: root.busy ? "Working…" : root.sliceFailed ? "Try again" : "Slice now"
-                enabled: !root.busy && !(root.sn && root.sn.unavailable)
+            Btn { icon: "layers"; text: root.sliceFailed ? "Try again" : "Slice now"; busyText: "Slicing…"; busy: root.busy
+                enabled: !(root.sn && root.sn.unavailable)
                 onClicked: Store.run(["geometry", "exports", "checks", "slice"], root.sliceFailed) }
             FixBtn { visible: root.sliceFailed && Store.chatReady && !!Store.chat.available; small: false
                 subject: "the slice failed for " + root.head

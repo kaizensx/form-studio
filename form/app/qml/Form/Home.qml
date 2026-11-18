@@ -59,6 +59,7 @@ Item {
             { icon: "pencil", text: "Rename", run: function () { home.confirming = ""; home.renameDraft = p.name; home.renaming = p.id } },
             { icon: "copy_plus", text: "Duplicate", run: function () { Store.duplicateProject(p.id) } },
             { icon: "archive", text: "Export…", run: function () { home.exportProject(p) } },
+            { icon: "wand", text: "Turn into a recipe…", run: function () { Store.openSheet("designRecipe", { project: p.id }) } },
             { sep: true },
             { icon: "trash_2", text: "Move to trash…", danger: true, run: function () { home.renaming = ""; home.confirming = p.id } }
         ]

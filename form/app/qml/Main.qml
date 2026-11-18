@@ -117,6 +117,7 @@ Window {
     }
     Loader { anchors.top: top.bottom; anchors.bottom: parent.bottom; width: parent.width; z: 30; active: Store.welcome; sourceComponent: Welcome {} }
     Toasts { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 18; z: 80 }
+    ActivityBar { anchors.top: top.bottom; width: parent.width; z: 70 }          // named engine work over 300 ms, with progress
     SheetHost {}
     Exports {}
     Palette { id: palette }
