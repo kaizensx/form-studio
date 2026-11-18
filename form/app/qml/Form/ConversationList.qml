@@ -22,7 +22,7 @@ Item {
         if (!id) return "General"
         var ps = Store.studio ? Store.studio.projects : []
         for (var i = 0; i < ps.length; i++) if (ps[i].id === id) return ps[i].name
-        return id
+        return "a design no longer here"
     }
     function search(text) { query = text; debounce.restart() }
     Timer { id: debounce; interval: 160
