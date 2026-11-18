@@ -1,0 +1,39 @@
+# Area labels from the paths a pull request changes (actions/labeler, used by workflows/triage.yml).
+"area:app":
+  - changed-files:
+      - any-glob-to-any-file: ["form/app/**", "packaging/**"]
+"area:engine":
+  - changed-files:
+      - any-glob-to-any-file:
+          - form/studio.py
+          - form/kernel.py
+          - form/worker.py
+          - form/checks.py
+          - form/analysis.py
+          - form/fit.py
+          - form/render.py
+          - form/simulate.py
+          - form/toolpath.py
+          - form/digest.py
+          - form/bundle.py
+"area:slicer":
+  - changed-files:
+      - any-glob-to-any-file: ["form/adapters/**", "form/slicer.py", "form/printers.py", ".github/ci-*.toml"]
+"area:agent":
+  - changed-files:
+      - any-glob-to-any-file: ["form/agents/**", "form/chat.py", "form/mcp_server.py", "form/ask.py", "plugins/**", "AGENTS.md"]
+"area:recipes":
+  - changed-files:
+      - any-glob-to-any-file: ["form/recipes/**", "community/recipes/**", "docs/RECIPES.md"]
+"area:site":
+  - changed-files:
+      - any-glob-to-any-file: ["site/**"]
+"area:cli":
+  - changed-files:
+      - any-glob-to-any-file: ["form/__main__.py", "docs/CLI.md"]
+"area:installer":
+  - changed-files:
+      - any-glob-to-any-file: ["form/installer.py", "form/setup.py", "form/setup_app.py", "install.sh"]
+"type:docs":
+  - changed-files:
+      - all-globs-to-all-files: ["**/*.md"]

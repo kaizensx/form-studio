@@ -1,0 +1,30 @@
+name: CI assets prune
+
+# Keeps the ci-assets branch small: pictures for comments older than 120 days are removed and the branch history is
+# squashed into one commit. Recipe bundles, the slicer matrix, benchmarks and interface baselines are kept.
+on:
+  schedule:
+    - cron: "5 12 1 * *"     # midday, away from the nightly jobs that write to the branch
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-assets-write
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/ci
+      - name: Prune
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/assets.py prune --keep-days 120

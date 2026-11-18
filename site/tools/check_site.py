@@ -52,6 +52,7 @@ class Page(HTMLParser):
 def main() -> int:
     errors: list[str] = []
     pages = sorted(SITE.glob("*.html")) + sorted((SITE / "docs").glob("*.html")) + sorted((SITE / "recipes").glob("*.html"))
+    pages += sorted((SITE / "compat").glob("*.html")) + sorted((SITE / "bench").glob("*.html"))
     if not (SITE / "docs" / "index.html").exists():
         errors.append("site/docs is missing: run python site/build.py first")
     parsed = {}

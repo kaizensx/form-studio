@@ -1,0 +1,429 @@
+{
+ "schema": 1,
+ "ok": true,
+ "verdict": "valid",
+ "problems": [],
+ "sets": [
+  {
+   "name": "defaults",
+   "values": {},
+   "seconds": {
+    "geometry": 0.033,
+    "exports": 0.019,
+    "checks": 0.28,
+    "slice": 0.441,
+    "load": 0.058
+   },
+   "steps": {
+    "geometry": "done",
+    "exports": "done",
+    "checks": "done",
+    "slice": "done"
+   },
+   "volume_mm3": 849.42,
+   "bbox_mm": [
+    28.6,
+    10.0,
+    7.87
+   ],
+   "solid_mass_g": 1.05,
+   "checks": [
+    {
+     "id": "solid",
+     "label": "One valid solid",
+     "status": "PASS",
+     "value": "1 solid",
+     "evidence": "computed"
+    },
+    {
+     "id": "mesh",
+     "label": "Export mesh is closed",
+     "status": "PASS",
+     "value": "1,580 triangles",
+     "evidence": "computed"
+    },
+    {
+     "id": "conversion",
+     "label": "STL matches the CAD solid",
+     "status": "PASS",
+     "value": "0.001% volume",
+     "evidence": "computed"
+    },
+    {
+     "id": "envelope",
+     "label": "Fits the build volume",
+     "status": "PASS",
+     "value": "28.6 \u00d7 10.0 \u00d7 7.9 mm",
+     "evidence": "computed"
+    },
+    {
+     "id": "wall",
+     "label": "Thinnest wall",
+     "status": "PASS",
+     "value": "1.60 mm",
+     "evidence": "computed"
+    },
+    {
+     "id": "overhang",
+     "label": "Unsupported overhangs",
+     "status": "PASS",
+     "value": "0 mm\u00b2",
+     "evidence": "computed"
+    },
+    {
+     "id": "adhesion",
+     "label": "Plate contact",
+     "status": "PASS",
+     "value": "268 mm\u00b2",
+     "evidence": "heuristic"
+    },
+    {
+     "id": "fit",
+     "label": "Fit within tolerance window",
+     "status": "WARN",
+     "value": "85% modelled",
+     "evidence": "model"
+    },
+    {
+     "id": "freecad",
+     "label": "Re-imported in FreeCAD",
+     "status": "PASS",
+     "value": "valid \u00b7 \u0394 0.000% volume",
+     "evidence": "computed"
+    }
+   ],
+   "rollup": {
+    "PASS": 8,
+    "WARN": 1,
+    "FAIL": 0
+   },
+   "slice": {
+    "ok": true,
+    "time_s": 600.0,
+    "filament_g": 1.12,
+    "layers": 39,
+    "supports": false,
+    "slicer": "OrcaSlicer",
+    "slicer_kind": "orca",
+    "slicer_version": "2.5.1",
+    "seconds": 0.42,
+    "presets": {
+     "machine": "Anycubic Kobra Neo 0.4 nozzle",
+     "process": "0.20mm Standard @Anycubic Kobra Neo 0.4 nozzle",
+     "filament": "Generic PLA @System"
+    }
+   },
+   "state": "built",
+   "image": "preview.png"
+  },
+  {
+   "name": "smaller",
+   "values": {
+    "cable_d": 4.0,
+    "screw_d": 2.7
+   },
+   "seconds": {
+    "geometry": 0.047,
+    "exports": 0.016,
+    "checks": 0.362,
+    "load": 0.045
+   },
+   "steps": {
+    "geometry": "done",
+    "exports": "done",
+    "checks": "done"
+   },
+   "volume_mm3": 740.21,
+   "bbox_mm": [
+    26.6,
+    10.0,
+    5.97
+   ],
+   "solid_mass_g": 0.92,
+   "checks": [
+    {
+     "id": "solid",
+     "label": "One valid solid",
+     "status": "PASS",
+     "value": "1 solid",
+     "evidence": "computed"
+    },
+    {
+     "id": "mesh",
+     "label": "Export mesh is closed",
+     "status": "PASS",
+     "value": "1,548 triangles",
+     "evidence": "computed"
+    },
+    {
+     "id": "conversion",
+     "label": "STL matches the CAD solid",
+     "status": "PASS",
+     "value": "0.000% volume",
+     "evidence": "computed"
+    },
+    {
+     "id": "envelope",
+     "label": "Fits the build volume",
+     "status": "PASS",
+     "value": "26.6 \u00d7 10.0 \u00d7 6.0 mm",
+     "evidence": "computed"
+    },
+    {
+     "id": "wall",
+     "label": "Thinnest wall",
+     "status": "PASS",
+     "value": "1.60 mm",
+     "evidence": "computed"
+    },
+    {
+     "id": "overhang",
+     "label": "Unsupported overhangs",
+     "status": "PASS",
+     "value": "0 mm\u00b2",
+     "evidence": "computed"
+    },
+    {
+     "id": "adhesion",
+     "label": "Plate contact",
+     "status": "PASS",
+     "value": "255 mm\u00b2",
+     "evidence": "heuristic"
+    },
+    {
+     "id": "fit",
+     "label": "Fit within tolerance window",
+     "status": "WARN",
+     "value": "85% modelled",
+     "evidence": "model"
+    },
+    {
+     "id": "freecad",
+     "label": "Re-imported in FreeCAD",
+     "status": "PASS",
+     "value": "valid \u00b7 \u0394 0.000% volume",
+     "evidence": "computed"
+    }
+   ],
+   "rollup": {
+    "PASS": 8,
+    "WARN": 1,
+    "FAIL": 0
+   },
+   "state": "built",
+   "image": "smaller.png"
+  },
+  {
+   "name": "larger",
+   "values": {
+    "cable_d": 13.0,
+    "screw_d": 4.7
+   },
+   "seconds": {
+    "geometry": 0.035,
+    "exports": 0.013,
+    "checks": 0.292,
+    "load": 0.036
+   },
+   "steps": {
+    "geometry": "done",
+    "exports": "done",
+    "checks": "done"
+   },
+   "volume_mm3": 1253.11,
+   "bbox_mm": [
+    35.6,
+    10.0,
+    14.52
+   ],
+   "solid_mass_g": 1.55,
+   "checks": [
+    {
+     "id": "solid",
+     "label": "One valid solid",
+     "status": "PASS",
+     "value": "1 solid",
+     "evidence": "computed"
+    },
+    {
+     "id": "mesh",
+     "label": "Export mesh is closed",
+     "status": "PASS",
+     "value": "1,652 triangles",
+     "evidence": "computed"
+    },
+    {
+     "id": "conversion",
+     "label": "STL matches the CAD solid",
+     "status": "PASS",
+     "value": "0.001% volume",
+     "evidence": "computed"
+    },
+    {
+     "id": "envelope",
+     "label": "Fits the build volume",
+     "status": "PASS",
+     "value": "35.6 \u00d7 10.0 \u00d7 14.5 mm",
+     "evidence": "computed"
+    },
+    {
+     "id": "wall",
+     "label": "Thinnest wall",
+     "status": "PASS",
+     "value": "1.60 mm",
+     "evidence": "computed"
+    },
+    {
+     "id": "overhang",
+     "label": "Unsupported overhangs",
+     "status": "PASS",
+     "value": "0 mm\u00b2",
+     "evidence": "computed"
+    },
+    {
+     "id": "adhesion",
+     "label": "Plate contact",
+     "status": "PASS",
+     "value": "321 mm\u00b2",
+     "evidence": "heuristic"
+    },
+    {
+     "id": "fit",
+     "label": "Fit within tolerance window",
+     "status": "WARN",
+     "value": "85% modelled",
+     "evidence": "model"
+    },
+    {
+     "id": "freecad",
+     "label": "Re-imported in FreeCAD",
+     "status": "PASS",
+     "value": "valid \u00b7 \u0394 0.000% volume",
+     "evidence": "computed"
+    }
+   ],
+   "rollup": {
+    "PASS": 8,
+    "WARN": 1,
+    "FAIL": 0
+   },
+   "state": "built",
+   "image": "larger.png"
+  }
+ ],
+ "images": {
+  "preview": "preview.png",
+  "sheet": "preview-sheet.png"
+ },
+ "environment": {
+  "form": "12.0.0",
+  "kernel": "build123d 0.13.0 / OCP 8.0.1.1",
+  "slicer": {
+   "available": true,
+   "reason": "",
+   "kind": "orca",
+   "version": "2.5.1"
+  }
+ },
+ "source_sha256": "762aef35c5f59c98e71f04c519b72b4fad7e8b9994d1bc3adbc5069d2629cd58",
+ "recipe": {
+  "title": "Cable clip",
+  "summary": "A screw-down clip that snaps over a cable of measured diameter, with a fit model for the bore.",
+  "kind": "python",
+  "builtin": false,
+  "id": null,
+  "params": [
+   {
+    "key": "cable_d",
+    "label": "Cable diameter",
+    "default": 6.0,
+    "min": 2,
+    "max": 20,
+    "unit": "mm",
+    "group": "brief"
+   },
+   {
+    "key": "clearance",
+    "label": "Clearance / side",
+    "default": 0.3,
+    "min": 0.0,
+    "max": 1.0,
+    "unit": "mm",
+    "group": "interface"
+   },
+   {
+    "key": "wall",
+    "label": "Ring wall",
+    "default": 2.0,
+    "min": 1.2,
+    "max": 5,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "width",
+    "label": "Clip width",
+    "default": 10,
+    "min": 6,
+    "max": 30,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "plate_t",
+    "label": "Plate thickness",
+    "default": 2.4,
+    "min": 1.6,
+    "max": 6,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "tab",
+    "label": "Screw tab length",
+    "default": 9,
+    "min": 6,
+    "max": 20,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "screw_d",
+    "label": "Screw hole diameter",
+    "default": 3.4,
+    "min": 2,
+    "max": 6,
+    "unit": "mm",
+    "group": "brief"
+   },
+   {
+    "key": "opening",
+    "label": "Snap opening",
+    "default": 0.8,
+    "min": 0.5,
+    "max": 0.95,
+    "unit": "",
+    "group": "form"
+   }
+  ],
+  "features": [
+   {
+    "id": "plate",
+    "label": "Base plate"
+   },
+   {
+    "id": "ring",
+    "label": "Ring"
+   },
+   {
+    "id": "opening",
+    "label": "Snap opening"
+   },
+   {
+    "id": "screws",
+    "label": "Screw holes"
+   }
+  ]
+ },
+ "seconds": 6.39
+}

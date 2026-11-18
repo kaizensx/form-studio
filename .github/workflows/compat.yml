@@ -1,0 +1,163 @@
+name: Compatibility matrix
+
+# Every recipe (built-in and community) sliced by every slicer CI can install, every night: PrusaSlicer, OrcaSlicer,
+# Bambu Studio, SuperSlicer, QIDISlicer, ElegooSlicer and Snapmaker Orca, the official Linux builds pinned in
+# slicers.yml (keep the two lists in step). Each cell records whether the recipe built, sliced and passed its checks,
+# with print time, filament and layers.
+#
+# The merged matrix goes to the ci-assets branch (compat/latest.json, badge.json, history.json). The website build
+# (pages.yml) copies it to /compat/, a page with the matrix and its date, and to /compat/badge.json, a shields.io
+# endpoint for the README:
+#   https://img.shields.io/endpoint?url=https://kaizensx.github.io/form-studio/compat/badge.json
+#
+# Runs on a schedule and by hand only; it is not part of pull requests.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compat
+  cancel-in-progress: false
+
+env:
+  FORM_NO_UPDATE_CHECK: 1
+
+jobs:
+  slice:
+    name: ${{ matrix.slicer }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { slicer: PrusaSlicer, kind: prusa, os: ubuntu-22.04, apt: prusa-slicer }
+          - slicer: OrcaSlicer
+            kind: orca
+            version: 2.5.1
+            os: ubuntu-24.04
+            dir: OrcaSlicer
+            url: https://github.com/OrcaSlicer/OrcaSlicer/releases/download/v2.5.1/OrcaSlicer_Linux_AppImage_Ubuntu2404_V2.5.1.AppImage
+            sha256: 073b8105c928356141db0ddbce88b81d52c7a9e2442f9baae0a9089c89ff04eb
+          - slicer: Bambu Studio
+            kind: bambu
+            version: 2.9.1.70
+            os: ubuntu-24.04
+            dir: BambuStudio
+            url: https://github.com/bambulab/BambuStudio/releases/download/v02.09.01.70/BambuStudio_ubu24-v02.09.01.70-20261103183404.AppImage
+            sha256: 668dabb1be53c758189ed6bc89935285dea5e0af46216546b1bafd6882e9aff0
+          - slicer: SuperSlicer
+            kind: superslicer
+            version: 2.5.59.13
+            os: ubuntu-22.04
+            dir: SuperSlicer
+            url: https://github.com/supermerill/SuperSlicer/releases/download/2.5.59.13/SuperSlicer-ubuntu_20.04-2.5.59.13.AppImage
+            sha256: 332dfbb7046fc12c1936900be2a85ce0f13031b381edf266f8c6d08d94730da4
+          - slicer: QIDISlicer
+            kind: qidi
+            version: 1.2.5
+            os: ubuntu-24.04
+            dir: QIDISlicer
+            url: https://github.com/QIDITECH/QIDISlicer/releases/download/V1.2.5/QIDISlicer_1.2.5_Ubuntu24.AppImage
+            sha256: 4c78c03f4711ac6d7356753c9e7f2cf2e884b2c98e5326231368f8ba839b320f
+          - slicer: ElegooSlicer
+            kind: elegoo
+            version: 1.5.3.5
+            os: ubuntu-24.04
+            dir: ElegooSlicer
+            url: https://github.com/elegooofficial/ElegooSlicer/releases/download/v1.5.3.5/ElegooSlicer_Linux_V1.5.3.5.AppImage
+            sha256: 7b3b3f08e0d0d51bb472c85865d1be9b0c28385423daba1cb0c3b225d0101afc
+          - slicer: Snapmaker Orca
+            kind: snapmaker
+            version: 2.4.1
+            os: ubuntu-24.04
+            dir: Snapmaker_Orca
+            url: https://github.com/Snapmaker/OrcaSlicer/releases/download/v2.4.1/Snapmaker_Orca_Linux_AppImage_Ubuntu2404_V2.4.1.AppImage
+            sha256: 2b5117e22d04a3a27bcdfc5a873c55d28ff3b7ce9721946de1f134fa97d2cc06
+    env:
+      FORM_CONFIG: .github/ci-${{ matrix.kind }}.toml
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-form
+        id: form
+        with:
+          extras: parts
+      - name: Linux libraries (GTK/GL and a virtual screen for the slicer)
+        env:
+          APT: ${{ matrix.apt }}
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libegl1 libgl1 libglu1-mesa libgl1-mesa-dri libxkbcommon0 libdbus-1-3 libfontconfig1 \
+            libgtk-3-0 libwebkit2gtk-4.1-0 libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 xvfb ${APT:+"$APT"}
+      - name: Cached slicer download
+        if: matrix.url
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/slicer-dl
+          key: slicer-${{ matrix.kind }}-${{ matrix.sha256 }}
+      - name: Install ${{ matrix.slicer }} ${{ matrix.version }} (official release, never opened)
+        if: matrix.url
+        env:
+          URL: ${{ matrix.url }}
+          SHA256: ${{ matrix.sha256 }}
+          DIR: ${{ matrix.dir }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/slicer-dl"
+          cd "$RUNNER_TEMP/slicer-dl"
+          if ! echo "$SHA256  slicer.pkg" | sha256sum -c - >/dev/null 2>&1; then
+            curl -fL --retry 5 --retry-all-errors -o slicer.pkg "$URL"
+          fi
+          echo "$SHA256  slicer.pkg" | sha256sum -c -
+          cp slicer.pkg "$RUNNER_TEMP/slicer.AppImage"
+          cd "$RUNNER_TEMP"
+          chmod +x slicer.AppImage
+          ./slicer.AppImage --appimage-extract > /dev/null
+          sudo mv squashfs-root "/opt/$DIR"
+      - name: Every recipe through the slicer
+        env:
+          PY: ${{ steps.form.outputs.python }}
+          KIND: ${{ matrix.kind }}
+          NAME: ${{ matrix.slicer }}
+          VERSION: ${{ matrix.version }}
+          RUNNER_IMAGE: ${{ matrix.os }}
+        run: |
+          xvfb-run -a python3 scripts/ci/compat.py run --kind "$KIND" --name "$NAME" --version "$VERSION" \
+            --runner "$RUNNER_IMAGE" --python "$PY" --out "$RUNNER_TEMP/compat"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: compat-${{ matrix.kind }}
+          path: ${{ runner.temp }}/compat/compat-${{ matrix.kind }}.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+  publish:
+    needs: slice
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write          # the ci-assets branch
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: compat-*
+          path: ${{ runner.temp }}/in
+      - name: Merge and publish
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/ci/assets.py get --path compat/history.json --out "$RUNNER_TEMP/history.json" || echo "[]" > "$RUNNER_TEMP/history.json"
+          python3 scripts/ci/compat.py merge --in "$RUNNER_TEMP/in" --out "$RUNNER_TEMP/compat" --history "$RUNNER_TEMP/history.json"
+          python3 scripts/ci/assets.py put --src "$RUNNER_TEMP/compat" --dest compat --message "Compatibility matrix ${GITHUB_SHA::10}"
+          python3 -c "import json,sys; t=json.load(open(sys.argv[1]))['totals']; print(f\"### Slicer matrix\n\n{t['sliced']} of {t['cells']} cells sliced; {t['ok']} with every check passing.\")" \
+            "$RUNNER_TEMP/compat/latest.json" >> "$GITHUB_STEP_SUMMARY"

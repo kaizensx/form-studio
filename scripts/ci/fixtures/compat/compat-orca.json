@@ -1,0 +1,220 @@
+{
+ "kind": "orca",
+ "slicer": {
+  "name": "OrcaSlicer",
+  "version": "2.5.1"
+ },
+ "runner": "local",
+ "results": {
+  "coupon": {
+   "title": "Fit coupon",
+   "builtin": true,
+   "state": "ok",
+   "seconds": {
+    "geometry": 0.062,
+    "exports": 0.019,
+    "checks": 0.256,
+    "slice": 0.404,
+    "load": 0.004
+   },
+   "rollup": {
+    "PASS": 9,
+    "WARN": 0,
+    "FAIL": 0
+   },
+   "time_s": 1249.0,
+   "filament_g": 4.31,
+   "layers": 50,
+   "supports": false
+  },
+  "dock": {
+   "title": "Device dock",
+   "builtin": true,
+   "state": "ok",
+   "seconds": {
+    "geometry": 0.243,
+    "exports": 0.047,
+    "checks": 0.524,
+    "slice": 0.722,
+    "load": 0.002
+   },
+   "rollup": {
+    "PASS": 10,
+    "WARN": 2,
+    "FAIL": 0
+   },
+   "time_s": 9317.0,
+   "filament_g": 52.1,
+   "layers": 177,
+   "supports": false
+  },
+  "enclosure": {
+   "title": "Electronics enclosure",
+   "builtin": true,
+   "state": "ok",
+   "seconds": {
+    "geometry": 0.656,
+    "exports": 0.083,
+    "checks": 0.784,
+    "slice": 0.864,
+    "load": 0.021
+   },
+   "rollup": {
+    "PASS": 14,
+    "WARN": 2,
+    "FAIL": 0
+   },
+   "time_s": 10985.0,
+   "filament_g": 64.9,
+   "layers": 160,
+   "supports": false
+  },
+  "gear_pair": {
+   "title": "Spur gear pair",
+   "builtin": true,
+   "state": "ok",
+   "seconds": {
+    "geometry": 1.958,
+    "exports": 0.41,
+    "checks": 7.274,
+    "slice": 1.285,
+    "load": 0.206
+   },
+   "rollup": {
+    "PASS": 16,
+    "WARN": 1,
+    "FAIL": 0
+   },
+   "time_s": 3791.0,
+   "filament_g": 16.93,
+   "layers": 58,
+   "supports": false
+  },
+  "gridfinity": {
+   "title": "Gridfinity-style bin",
+   "builtin": true,
+   "state": "check-failed",
+   "seconds": {
+    "geometry": 0.719,
+    "exports": 0.087,
+    "checks": 0.725,
+    "slice": 0.714,
+    "load": 0.004
+   },
+   "rollup": {
+    "PASS": 7,
+    "WARN": 3,
+    "FAIL": 1
+   },
+   "time_s": 5690.0,
+   "filament_g": 30.39,
+   "layers": 230,
+   "supports": false
+  },
+  "hinged_box": {
+   "title": "Hinged box",
+   "builtin": true,
+   "state": "ok",
+   "seconds": {
+    "geometry": 0.141,
+    "exports": 0.031,
+    "checks": 1.076,
+    "slice": 0.603,
+    "load": 0.003
+   },
+   "rollup": {
+    "PASS": 13,
+    "WARN": 2,
+    "FAIL": 0
+   },
+   "time_s": 5966.0,
+   "filament_g": 32.89,
+   "layers": 172,
+   "supports": false
+  },
+  "hook": {
+   "title": "Wall hook",
+   "builtin": true,
+   "state": "ok",
+   "seconds": {
+    "geometry": 0.064,
+    "exports": 0.02,
+    "checks": 0.297,
+    "slice": 0.431,
+    "load": 0.002
+   },
+   "rollup": {
+    "PASS": 10,
+    "WARN": 3,
+    "FAIL": 0
+   },
+   "time_s": 3301.0,
+   "filament_g": 14.12,
+   "layers": 400,
+   "supports": false
+  },
+  "knob": {
+   "title": "Control knob",
+   "builtin": true,
+   "state": "ok",
+   "seconds": {
+    "geometry": 1.228,
+    "exports": 0.113,
+    "checks": 0.878,
+    "slice": 0.691,
+    "load": 0.008
+   },
+   "rollup": {
+    "PASS": 10,
+    "WARN": 3,
+    "FAIL": 0
+   },
+   "time_s": 1428.0,
+   "filament_g": 4.66,
+   "layers": 80,
+   "supports": false
+  },
+  "planter": {
+   "title": "Twisted planter",
+   "builtin": true,
+   "state": "check-failed",
+   "seconds": {
+    "geometry": 0.105,
+    "exports": 0.019,
+    "checks": 0.619,
+    "slice": 1.095,
+    "load": 0.003
+   },
+   "rollup": {
+    "PASS": 9,
+    "WARN": 0,
+    "FAIL": 1
+   },
+   "time_s": 15120.0,
+   "filament_g": 84.56,
+   "layers": 500,
+   "supports": false
+  },
+  "cable-clip": {
+   "title": "Cable clip",
+   "builtin": false,
+   "state": "ok",
+   "seconds": {
+    "geometry": 0.029,
+    "exports": 0.02,
+    "checks": 0.253,
+    "slice": 0.407,
+    "load": 0.053
+   },
+   "rollup": {
+    "PASS": 8,
+    "WARN": 1,
+    "FAIL": 0
+   },
+   "time_s": 600.0,
+   "filament_g": 1.12,
+   "layers": 39,
+   "supports": false
+  }
+ }
+}

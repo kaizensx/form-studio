@@ -1,0 +1,107 @@
+name: Show and tell
+
+# A post in the "Show and tell" discussion category with a design attached (a .formstudio or .formproj archive renamed
+# to .zip, or a recipe file) gets a reply with a turntable GIF of the design, its four views, its checks and a slice.
+# Posts without an attachment are left alone.
+#
+#   build  (no write access): finds and downloads the attachment, rebuilds the design in the CAD kernel inside
+#          scripts/ci/sandbox.sh (another user, no network), renders it and slices it with PrusaSlicer.
+#   reply  (discussions and contents write, runs no submitted code): checks the files as data, puts the pictures on
+#          the ci-assets branch and keeps one reply on the post up to date.
+on:
+  discussion:
+    types: [created, edited]
+
+permissions: {}
+
+concurrency:
+  group: show-and-tell-${{ github.event.discussion.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: >-
+      github.event.discussion.category.name == 'Show and tell' &&
+      (github.event.action != 'edited' || github.event.changes.body != null)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      found: ${{ steps.find.outputs.found }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Find a design in the post
+        id: find
+        run: python3 scripts/ci/issue_recipe.py extract --event "$GITHUB_EVENT_PATH" --out "$RUNNER_TEMP/result/submission"
+      - name: A folder outside the runner's home for the sandbox's Python
+        if: steps.find.outputs.found == 'true'
+        run: sudo install -d -o "$(id -u)" -g "$(id -g)" -m 0755 /opt/fsci
+      - name: Install Form Studio outside the runner's home
+        if: steps.find.outputs.found == 'true'
+        uses: ./.github/actions/setup-form
+        with:
+          venv: /opt/fsci/venv
+          python-install-dir: /opt/fsci/python
+          extras: parts
+          editable: "false"
+          save-cache: "false"
+      - name: Install PrusaSlicer
+        if: steps.find.outputs.found == 'true'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends prusa-slicer
+      - name: Rebuild, render and slice in the sandbox
+        if: steps.find.outputs.found == 'true'
+        env:
+          MODE: ${{ steps.find.outputs.mode }}
+        run: |
+          bash scripts/ci/sandbox.sh setup
+          SUB="$RUNNER_TEMP/result/submission"
+          FILE=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['file'])" "$SUB/submission.json")
+          sudo cp scripts/ci/build_recipe.py .github/ci-prusa.toml "$SUB/$FILE" /srv/fsbuild/in/
+          sudo chmod -R a+rX /srv/fsbuild/in /opt/fsci
+          if [ "$MODE" = "archive" ]; then ARGS=(--archive "/srv/fsbuild/in/$FILE"); else ARGS=(--source "/srv/fsbuild/in/$FILE"); fi
+          set +e
+          timeout 1200 bash scripts/ci/sandbox.sh run \
+            --env FORM_CONFIG=/srv/fsbuild/in/ci-prusa.toml --env FORM_DATA=/srv/fsbuild/home/data -- \
+            /opt/fsci/venv/bin/python /srv/fsbuild/in/build_recipe.py "${ARGS[@]}" --turntable --slice --sheet --out /srv/fsbuild/out
+          echo "build exit code: $?"
+          set -e
+          mkdir -p "$RUNNER_TEMP/result/out"
+          sudo find /srv/fsbuild/out -maxdepth 1 -type f \( -name '*.png' -o -name '*.gif' -o -name result.json \) \
+            -size -8M -exec cp {} "$RUNNER_TEMP/result/out/" \;
+          sudo chown -R "$(id -u)" "$RUNNER_TEMP/result"
+      - uses: actions/upload-artifact@v7
+        if: always() && steps.find.outputs.found == 'true'
+        with:
+          name: showcase
+          path: ${{ runner.temp }}/result
+          retention-days: 7
+          if-no-files-found: ignore
+
+  reply:
+    needs: build
+    if: ${{ !cancelled() && needs.build.outputs.found == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write          # pictures on the ci-assets branch
+      discussions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: showcase
+          path: ${{ runner.temp }}/result
+      - name: Reply
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NODE_ID: ${{ github.event.discussion.node_id }}
+          NUMBER: ${{ github.event.discussion.number }}
+        run: python3 scripts/ci/showcase.py --discussion-id "$NODE_ID" --number "$NUMBER" --result "$RUNNER_TEMP/result"

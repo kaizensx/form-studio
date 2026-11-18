@@ -1,0 +1,52 @@
+{
+ "schema": 1,
+ "date": "2026-11-18T01:43:50+00:00",
+ "commit": "475392f02a9d75f969aefeb13434937443214361",
+ "subject": "Built-in recipe previews are kept on disk, so the library shows them at once after the first time",
+ "runner": "local",
+ "form": "12.0.0",
+ "slicer": {
+  "available": true,
+  "kind": "orca",
+  "version": "2.5.1"
+ },
+ "recipes": {
+  "dock": {
+   "load_s": 0.006,
+   "pipeline_s": 1.681,
+   "state": "done",
+   "geometry_s": 0.236,
+   "exports_s": 0.05,
+   "checks_s": 0.594,
+   "slice_s": 0.796
+  },
+  "hook": {
+   "load_s": 0.0,
+   "pipeline_s": 0.924,
+   "state": "done",
+   "geometry_s": 0.053,
+   "exports_s": 0.016,
+   "checks_s": 0.345,
+   "slice_s": 0.506
+  },
+  "knob": {
+   "load_s": 0.008,
+   "pipeline_s": 3.318,
+   "state": "done",
+   "geometry_s": 1.503,
+   "exports_s": 0.104,
+   "checks_s": 0.878,
+   "slice_s": 0.828
+  }
+ },
+ "totals": {
+  "pipeline_s": 5.923,
+  "geometry_s": 1.792,
+  "checks_s": 1.817,
+  "slice_s": 2.13
+ },
+ "app": {
+  "cold_s": 6.692,
+  "warm_s": 6.469
+ }
+}

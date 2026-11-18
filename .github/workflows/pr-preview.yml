@@ -1,0 +1,159 @@
+name: PR preview
+
+# Pictures of what a pull request changes, posted as one comment by pr-preview-comment.yml.
+#
+#   plan     which built-in and community recipes the change can affect (a recipe file, or code every recipe goes
+#            through: the kernel, checks, renderer, recipe base), and whether the interface changed (form/app/).
+#   recipes  builds each affected recipe at its defaults twice, with the base branch's code and with the pull request's,
+#            and records pictures, volume, mass and every check.
+#   ui       runs the interface journeys on Linux with a real PrusaSlicer and compares the screenshots with the
+#            baselines ui.yml keeps from dev (ci-assets branch, ui/baseline/).
+#
+# This workflow runs the pull request's code, so it has a read-only token and no secrets, also for forks. It only
+# uploads artifacts; the comment is written by pr-preview-comment.yml, which runs none of this code.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - form/recipes/**
+      - community/recipes/**
+      - form/kernel.py
+      - form/worker.py
+      - form/checks.py
+      - form/render.py
+      - form/parts.py
+      - form/patterns.py
+      - form/marks.py
+      - form/fit.py
+      - form/app/**
+      - scripts/ci/pr_preview.py
+      - scripts/ci/build_recipe.py
+      - .github/workflows/pr-preview.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  FORM_NO_UPDATE_CHECK: 1
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      recipes: ${{ steps.affected.outputs.recipes }}
+      ui: ${{ steps.affected.outputs.ui }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: What the change affects
+        id: affected
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/pr"
+          python3 scripts/ci/pr_preview.py affected --base "$BASE" --head "$HEAD" --out "$RUNNER_TEMP/pr/affected.json"
+          python3 -c "import json,os,sys; json.dump({'number': int(os.environ['NUMBER']), 'head_sha': os.environ['HEAD'], 'base_sha': os.environ['BASE']}, open(sys.argv[1], 'w'))" "$RUNNER_TEMP/pr/pr.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pr
+          path: ${{ runner.temp }}/pr
+          retention-days: 7
+
+  recipes:
+    needs: plan
+    if: needs.plan.outputs.recipes == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-form
+        id: form
+        with:
+          extras: parts
+          save-cache: "false"
+      - name: The base branch's code, next to this one
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
+      - uses: actions/download-artifact@v8
+        with:
+          name: pr
+          path: ${{ runner.temp }}/pr
+      - name: Build before and after
+        env:
+          FORM_CONFIG: ${{ github.workspace }}/.github/ci-studio.toml
+          PY: ${{ steps.form.outputs.python }}
+        run: |
+          python3 scripts/ci/pr_preview.py recipes --affected "$RUNNER_TEMP/pr/affected.json" \
+            --base-root "$RUNNER_TEMP/base" --head-root . --python "$PY" --out "$RUNNER_TEMP/recipes"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: recipes
+          path: ${{ runner.temp }}/recipes
+          retention-days: 7
+
+  ui:
+    needs: plan
+    if: needs.plan.outputs.ui == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Linux libraries for Qt, and PrusaSlicer
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 libfontconfig1 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-xfixes0 libgl1-mesa-dri xvfb prusa-slicer
+      - uses: ./.github/actions/setup-form
+        id: form
+        with:
+          save-cache: "false"
+      - name: Screenshot baselines from dev
+        run: |
+          mkdir -p "$RUNNER_TEMP/baseline"
+          if git fetch -q --depth=1 origin ci-assets 2>/dev/null; then
+            git archive FETCH_HEAD ui/baseline 2>/dev/null | tar -x -C "$RUNNER_TEMP/baseline" --strip-components=2 || true
+          fi
+          find "$RUNNER_TEMP/baseline" -name '*.png' | wc -l
+      - name: Use the app
+        id: journeys
+        continue-on-error: true
+        env:
+          PY: ${{ steps.form.outputs.python }}
+        run: |
+          export FORM_UI_TESTS=1 FORM_UI_SHOTS="$RUNNER_TEMP/ui-shots" FORM_UI_STUDIO_TOML="$PWD/.github/ci-prusa.toml"
+          xvfb-run -a -s '-screen 0 1920x1200x24' "$PY" -m unittest -v tests.test_ui_journeys
+      - name: Compare with the baselines
+        env:
+          PY: ${{ steps.form.outputs.python }}
+          OUTCOME: ${{ steps.journeys.outcome }}
+        run: |
+          J=failed; [ "$OUTCOME" = "success" ] && J=passed
+          mkdir -p "$RUNNER_TEMP/ui-shots"
+          "$PY" scripts/ci/pr_preview.py ui --shots "$RUNNER_TEMP/ui-shots" --baseline "$RUNNER_TEMP/baseline" \
+            --out "$RUNNER_TEMP/ui" --journeys "$J"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ui
+          path: ${{ runner.temp }}/ui
+          retention-days: 7
+      - name: The journeys' result
+        if: steps.journeys.outcome != 'success'
+        run: |
+          echo "::error::The interface journeys failed; see the step 'Use the app'."
+          exit 1

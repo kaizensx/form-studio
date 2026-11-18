@@ -1,0 +1,56 @@
+/* Pages drawn from CI data: /compat/ (slicer matrix) and /bench/ (benchmarks). Uses the tokens in site.css. */
+
+.ci-page .gallery-head { margin-bottom: 24px; }
+.ci-stamp { font-family: var(--mono); font-size: 13px; color: var(--ink3); }
+.ci-stamp a { color: var(--ink2); }
+
+.ci-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
+.ci-tile { padding: 16px 18px; border-radius: var(--r-lg); background: var(--plate1); border: 1px solid var(--rule); display: grid; gap: 4px; }
+.ci-tile .v { font-size: 1.9rem; font-weight: 620; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ci-tile .v small { font-size: .95rem; font-weight: 500; color: var(--ink3); letter-spacing: 0; margin-left: 2px; }
+.ci-tile .k { font-size: 13px; color: var(--ink3); }
+.ci-tile .d { font-family: var(--mono); font-size: 12px; color: var(--ink3); }
+.ci-tile .d.up { color: var(--signal); }
+.ci-tile .d.down { color: var(--pass); }
+
+.ci-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--ink2); margin-bottom: 12px; }
+.ci-legend span { display: inline-flex; align-items: center; gap: 8px; }
+.ci-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--ink4); }
+.ci-dot.ok, .ci-cell.ok { --c: var(--pass); }
+.ci-dot.warn, .ci-cell.warn { --c: var(--amber); }
+.ci-dot.bad, .ci-cell.bad { --c: var(--signal); }
+.ci-dot.err, .ci-cell.err { --c: var(--ink4); }
+.ci-dot { background: var(--c, var(--ink4)); }
+
+.ci-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--r-lg); background: var(--plate1); }
+.ci-scroll:focus-visible { outline-offset: 4px; }
+.ci-matrix { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 14px; }
+.ci-matrix th, .ci-matrix td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+.ci-matrix tr:last-child th, .ci-matrix tr:last-child td { border-bottom: 0; }
+.ci-matrix thead th { position: sticky; top: 0; background: var(--plate2); font-weight: 560; font-size: 13px; color: var(--ink2); white-space: nowrap; }
+.ci-matrix thead th .ver { display: block; font-family: var(--mono); font-weight: 400; font-size: 11px; color: var(--ink3); }
+.ci-matrix tbody th { font-weight: 560; white-space: nowrap; position: sticky; left: 0; background: var(--plate1); z-index: 1; }
+.ci-matrix tbody th .tag { margin-left: 8px; font-size: 11px; font-weight: 500; color: var(--ink3); border: 1px solid var(--rule2); border-radius: 999px; padding: 1px 7px; }
+.ci-cell { display: grid; gap: 1px; padding: 7px 10px 7px 12px; border-radius: var(--r-sm); min-width: 108px;
+  background: color-mix(in srgb, var(--c) 12%, transparent); border-left: 3px solid var(--c); }
+.ci-cell b { font-weight: 560; font-size: 13px; font-variant-numeric: tabular-nums; }
+.ci-cell span { font-family: var(--mono); font-size: 11.5px; color: var(--ink3); white-space: nowrap; }
+.ci-cell.err b, .ci-cell.bad b { color: var(--ink2); }
+.ci-times td { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.ci-trend { margin-top: 40px; }
+.ci-trend h2 { font-size: 1.35rem; letter-spacing: -.02em; margin-bottom: 4px; }
+.ci-trend .fine { margin-bottom: 12px; }
+.ci-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.ci-chart, .ci-card { border: 1px solid var(--rule); border-radius: var(--r-lg); background: var(--plate1); padding: 14px 16px 10px; }
+.ci-card h3 { font-size: 14px; font-weight: 560; display: flex; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.ci-card h3 span { font-family: var(--mono); font-weight: 400; color: var(--ink3); font-size: 12px; }
+.ci-svg { width: 100%; height: auto; overflow: visible; }
+.ci-svg .grid line { stroke: var(--rule); }
+.ci-svg .grid text, .ci-svg .axis text { fill: var(--ink3); font-family: var(--mono); font-size: 10px; }
+.ci-svg .line { fill: none; stroke: var(--blueprint); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
+.ci-svg .area { fill: var(--blueprint); opacity: .09; }
+.ci-svg .pt { fill: var(--plate1); stroke: var(--blueprint); stroke-width: 1.5; }
+.ci-svg a:hover .pt, .ci-svg a:focus .pt { fill: var(--blueprint); }
+.ci-empty { padding: 40px; text-align: center; color: var(--ink2); border: 1px dashed var(--rule2); border-radius: var(--r-lg); }
+@media (max-width: 640px) { .ci-tile .v { font-size: 1.6rem; } }

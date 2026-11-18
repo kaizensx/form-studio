@@ -1,0 +1,45 @@
+name: PR preview comment
+
+# Posts the pictures PR preview made as one comment on the pull request, edited in place on every push.
+#
+# Two workflows, so that the pull request's code never runs with a write token: PR preview runs that code read-only
+# and uploads artifacts; this workflow runs afterwards from the default branch, runs only scripts/ci/pr_preview.py from
+# the default branch, reads the artifacts as data (JSON with size limits, PNGs checked byte by byte, every string
+# escaped), and checks that the pull request named in them really has the commit the run was for.
+# Pictures go to the ci-assets branch, because a comment cannot show images from an artifact.
+on:
+  workflow_run:
+    workflows: ["PR preview"]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: pr-preview-comment-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  comment:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read            # the other run's artifacts
+      contents: write          # pictures on the ci-assets branch
+      pull-requests: write     # the comment
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/preview
+      - name: Comment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ ! -f "$RUNNER_TEMP/preview/pr/pr.json" ]; then echo "No preview to post."; exit 0; fi
+          python3 scripts/ci/pr_preview.py comment --dir "$RUNNER_TEMP/preview" --head-sha "$HEAD_SHA"

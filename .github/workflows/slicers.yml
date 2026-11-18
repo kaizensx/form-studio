@@ -16,6 +16,9 @@ on:
       - .github/ci-*.toml
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   slice:
     name: ${{ matrix.slicer }} ${{ matrix.version }} on ${{ matrix.on }}

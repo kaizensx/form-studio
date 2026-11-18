@@ -1,0 +1,33 @@
+# Weekly dependency updates, as grouped pull requests against dev (where all work lands first).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "CI:"
+  - package-ecosystem: pip
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      python:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      # The CAD kernel and its bindings are pinned on purpose; they move with a tested release.
+      - dependency-name: build123d
+      - dependency-name: cadquery-ocp*
+      - dependency-name: bd_warehouse
+      - dependency-name: py_gearworks
+    commit-message:
+      prefix: "Dependencies:"

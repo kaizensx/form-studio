@@ -4,10 +4,19 @@ name: Interface tests
 # synthetic mouse and key events and asserts outcomes in the engine. Runners have no GPU; Qt renders in software.
 # Windows and Linux only: a macOS runner has no foreground window session, so pop-up menus never open there; the
 # same journeys run on a real Mac before each release.
+# On dev, the Linux screenshots also become the baselines that PR preview compares pull requests with
+# (ci-assets branch, ui/baseline/).
 on:
   push:
     branches: [main, dev]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   journeys:
@@ -61,10 +70,37 @@ jobs:
           PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
           RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a -s '-screen 0 1920x1200x24'"
           export FORM_UI_TESTS=1 FORM_UI_SHOTS="$RUNNER_TEMP/ui-shots" FORM_UI_STUDIO_TOML="$PWD/.github/ci-prusa.toml" FORM_NO_UPDATE_CHECK=1
-          eval $RUN "$PY" -m unittest -v tests.test_ui_journeys
+          eval "$RUN" '"$PY" -m unittest -v tests.test_ui_journeys'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ui-shots-${{ matrix.name }}
           path: ${{ runner.temp }}/ui-shots
           if-no-files-found: ignore
+
+  baseline:
+    name: Screenshot baselines
+    needs: journeys
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write          # the ci-assets branch
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: ui-shots-Linux x64
+          path: ${{ runner.temp }}/shots
+      - name: Keep the Linux screenshots as baselines
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          N=$(find "$RUNNER_TEMP/shots" -maxdepth 1 -name '*.png' ! -name 'fail-*' 2>/dev/null | wc -l)
+          echo "$N screenshots"
+          if [ "$N" -lt 3 ]; then echo "Too few screenshots to replace the baselines."; exit 0; fi
+          python3 scripts/ci/assets.py put --src "$RUNNER_TEMP/shots" --dest ui/baseline --replace --exclude fail- \
+            --message "Interface baselines from dev ${GITHUB_SHA::10}"
