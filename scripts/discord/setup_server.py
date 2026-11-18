@@ -147,10 +147,18 @@ class Setup:
 
     def ensure_onboarding(self):
         prompts = []
-        for title, names, emoji in S.ONBOARDING:
-            opts = [{"title": n, "emoji": {"name": e}, "role_ids": [self.roles[n]["id"]], "channel_ids": []}
-                    for n, e in zip(names, emoji) if n in self.roles]
-            prompts.append({"type": 0, "title": title, "options": opts, "single_select": False,
+        try:
+            have = {p["title"]: p for p in d.call("GET", f"/guilds/{self.g}/onboarding").get("prompts", [])}
+        except d.DiscordError:
+            have = {}
+        base = int(self.g) + 1                                    # new prompts and options need snowflake-shaped ids
+        for i, (title, names, emoji) in enumerate(S.ONBOARDING):
+            old = {o["title"]: o["id"] for o in have.get(title, {}).get("options", [])}
+            opts = [{"id": old.get(n, str(base + 100 * (i + 1) + j)), "title": n, "emoji": {"name": e},
+                     "role_ids": [self.roles[n]["id"]], "channel_ids": []}
+                    for j, (n, e) in enumerate(zip(names, emoji)) if n in self.roles]
+            prompts.append({"id": have.get(title, {}).get("id", str(base + i)), "type": 0, "title": title,
+                            "options": opts, "single_select": False,
                             "required": False, "in_onboarding": True})
         defaults = [c["id"] for c in self.channels if c["type"] in (S.TEXT, S.NEWS, S.FORUM)]
         try:
