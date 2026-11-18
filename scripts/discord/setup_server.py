@@ -449,6 +449,8 @@ class Setup:
 
     # ---- forum posts, edited in place ---------------------------------------------------------------
     def forum_threads(self, forum_id):
+        if forum_id == "0":                                       # a forum this dry run would create
+            return {}
         active = [t for t in d.call("GET", f"/guilds/{self.g}/threads/active").get("threads", [])
                   if t.get("parent_id") == forum_id]
         archived = d.call("GET", f"/channels/{forum_id}/threads/archived/public?limit=100").get("threads", [])
