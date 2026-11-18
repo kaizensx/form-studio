@@ -86,6 +86,48 @@ def _utf8_streams() -> None:
             pass                                   # replaced streams (tests, embedders) keep their own encoding
 
 
+def _tool(args) -> int:
+    """form tool                      list every MCP tool
+       form tool NAME [JSON | -]      call one, arguments as a JSON object (or JSON on stdin with -)"""
+    import asyncio
+    from . import mcp_server
+    srv = mcp_server.build()
+    if not args or args[0] in ("-h", "--help", "list"):
+        tools = asyncio.run(srv.list_tools())
+        _print({"tools": [{"name": t.name, "summary": (t.description or "").strip().splitlines()[0][:160]} for t in tools],
+                "call_with": "form tool NAME '{\"key\": value}'"})
+        return 0
+    name, raw = args[0], (args[1] if len(args) > 1 else "{}")
+    if raw == "-":
+        raw = sys.stdin.read() or "{}"
+    try:
+        kw = json.loads(raw)
+        if not isinstance(kw, dict):
+            raise ValueError("not an object")
+    except ValueError as e:
+        _print({"error": {"message": f"The arguments must be one JSON object: {e}", "hint": "form tool NAME '{\"project\": \"my-part\"}'"}})
+        return 2
+    try:
+        out = asyncio.run(srv.call_tool(name, kw))
+    except Exception as e:                          # unknown tool, bad arguments, or the tool's own refusal
+        _print({"error": {"message": str(e), "hint": "form tool lists every tool; docs/MCP.md has their arguments."}})
+        return 1
+    if getattr(out, "is_error", getattr(out, "isError", False)):
+        texts = [getattr(b, "text", "") for b in getattr(out, "content", [])]
+        _print({"error": {"message": " ".join(texts).strip() or "The tool refused.", "hint": ""}})
+        return 1
+    structured = getattr(out, "structured_content", None) or getattr(out, "structuredContent", None)
+    if structured is not None:
+        _print(structured["result"] if isinstance(structured, dict) and set(structured) == {"result"} else structured)
+        return 0
+    res = [b.text for b in getattr(out, "content", []) if getattr(b, "text", None) is not None]
+    try:
+        _print(json.loads(res[0]) if len(res) == 1 else {"content": res})
+    except ValueError:
+        _print({"content": res})
+    return 0
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else list(argv)
     _utf8_streams()
@@ -140,6 +182,8 @@ def main(argv=None):
     if argv[:1] == ["secrets"]:                    # agent keys (Gemini); values never on the command line
         from .secrets import main as secrets_main
         return secrets_main(argv[1:])
+    if argv[:1] == ["tool"]:                       # any MCP tool, headless, with the same arguments and rules
+        return _tool(argv[1:])
     if argv[:1] == ["examples"]:
         from . import config
         from .studio import StudioError, add_examples, list_examples

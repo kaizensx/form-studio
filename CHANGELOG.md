@@ -1,5 +1,12 @@
 # Changelog
 
+## 12.2.0
+
+- **One place to type.** With a conversation open on Home, the middle of Home steps aside instead of showing a second box; **New design** (Ctrl+N, the menus, the palette) starts a fresh conversation, as a new chat does in Claude, and the one you were in stays in the list. Files attached to an unsent message are kept.
+- **Every MCP tool from the terminal.** `form tool` lists them; `form tool NAME '{json}'` calls any of them headless with the same arguments, checks and refusals as over MCP, so everything an agent can do is also a command.
+- **Every file of a release from the terminal.** `form release-files <project> [release] [--out FILE.zip]` writes the same .zip as **Save files…**: models, G-code, the sliced 3MF, report, documents and manifest.
+- **A Discord community server** with the Form Studio bot: releases, discussions, issues, pull requests and a weekly digest are posted there from GitHub Actions.
+
 ## 12.1.0
 
 - **Text on any flat face.** In Annotate, pick a point on a flat face and choose **Text here…**: type the words, raised or sunk, cap height and depth, with the stroke width and cap height checked against your nozzle as you type (computed on the glyphs). **Add to design** writes the lettering into the design's own code as a feature (one stage per text, in Form Studio's bundled font) and builds a new revision in the kernel; text off the part or on a curved face is refused with the reason. `form engrave <project> TEXT --at x,y,z --normal x,y,z [--sunk]`, `--list`, `--remove text_N`; MCP `add_text`, `remove_text`.

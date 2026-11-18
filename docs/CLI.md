@@ -121,6 +121,13 @@ message, with what the design is for.
 | `form release-files <project> [release] [--out FILE.zip]` | Every file of a release in one .zip: models, G-code, sliced 3MF, report, documents and manifest (the newest release by default) |
 | `form instructions <project> [--rev N] [--out FILE.pdf]` | Assembly instructions as a PDF: a parts page, then one page per part in the order the assembly attaches them |
 
+## Any MCP tool
+
+| Command | Does |
+|---|---|
+| `form tool` | Every MCP tool with a one-line summary |
+| `form tool NAME '{"key": value}'` | Call any MCP tool headless, with the same arguments, checks and refusals as over MCP ([MCP reference](MCP.md)); `-` reads the JSON from stdin |
+
 ## Agents
 
 | Command | Does |

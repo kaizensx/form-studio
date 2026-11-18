@@ -54,7 +54,7 @@ Item {
             add("Tools", "freecad", "external_link", "Open the STEP in FreeCAD", "Release · working files", function () { Store.openIn("step", "freecad") })
             if (Store.canAskReview) add("Tools", "review", "eye", "Ask for a design review", "Silhouette, relationships, details", function () { Store.askReview() })
         }
-        add("Tools", "new", "plus", "New design", "Describe it, or drop a photo, a sketch, a part or a link", function () { if (Store.screen !== "home") Store.home(); Store.startFocus++ }, "Ctrl+N")
+        add("Tools", "new", "plus", "New design", "Describe it, or drop a photo, a sketch, a part or a link", function () { Store.startNew() }, "Ctrl+N")
         add("Tools", "sketch", "pen_tool", "Sketch a new design", "Lines, circles, arcs and dimensions in mm", function () { if (Store.screen !== "home") Store.home(); Store.openSheet("sketch") })
         add("Tools", "blank", "square_dashed", "Start blank", "An empty build plate: describe, sketch or import what goes on it", function () { Store.startBlank() })
         add("Tools", "block", "cuboid", "Start from a block", "A rounded block shaped with sliders, no agent", function () { Store.startBlock("") })

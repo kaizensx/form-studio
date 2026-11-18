@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def home(ui):
-    if ui.store.get("screen") != "home":
-        ui.run_js("Store.home()")
+    if ui.store.get("screen") != "home" or ui.js("Store.chatItems.length") > 0:
+        ui.run_js("Store.startNew()")             # a new design: Home with an empty composer and a fresh conversation
     ui.wait_until(lambda: ui.store.get("screen") == "home" and ui.exists("startComposer"), 30, "Home and its composer")
     ui.wait_until(lambda: ui.js("Store.chatReady"), 20, "the stand-in agent")
     ui.settle(500)

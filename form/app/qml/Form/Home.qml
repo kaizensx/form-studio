@@ -34,6 +34,8 @@ Item {
     readonly property var talks: Store.convs.filter(function (c) { return c.messages > 0 }).slice(0, home.width > 1500 ? 4 : 3)
     readonly property real cw: Math.min(width - (width < 1000 ? 48 : 96), 1200)          // content width
     readonly property real heroH: fresh ? height : Math.max(500, Math.min(620, height * 0.7))
+    // a conversation is open in the column on the left: that is where you type, so the middle does not offer a second box
+    readonly property bool chatting: Store.talkOpen && (Store.chatItems.length > 0 || Store.chatBusy)
     // the composer always sits in the middle; the bench behind it stays empty (the part you made last is in the list below)
     readonly property bool split: false
     readonly property real side: Math.round((width - cw) / 2)
@@ -184,13 +186,17 @@ Item {
                     Item { width: 1; height: 14 }
                     Txt { width: Math.min(parent.width, 600); x: home.split ? 0 : (parent.width - width) / 2; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
                         tone: 2; font.pixelSize: Theme.tLead; lineHeight: 1.4
-                        text: Store.newPurposeEffective === "model" ? "Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD you can check and export."
+                        text: home.chatting ? "You are talking with " + Store.chatAgentLabel + " in the column on the left. Open one of your designs to work on it together, or start a new design."
+                            : Store.newPurposeEffective === "model" ? "Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD you can check and export."
                                                          : "Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD, checked and sliced for your printer." }
                     Item { width: 1; height: 30 }
-                    StartComposer { id: composer; width: parent.width; dragging: home.dropping; onSketchWanted: Store.openSheet("sketch") }
-                    Item { width: 1; height: 16 }
+                    Row { objectName: "homeChatting"; visible: home.chatting; spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
+                        Btn { objectName: "homeNewDesign"; kind: "primary"; icon: "plus"; text: "New design"; keys: "Ctrl+N"; onClicked: Store.startNew() }
+                        Btn { kind: "quiet"; icon: "panel_left_close"; text: "Hide the conversation"; onClicked: Store.talkOpen = false } }
+                    StartComposer { id: composer; visible: !home.chatting; width: parent.width; dragging: home.dropping; onSketchWanted: Store.openSheet("sketch") }
+                    Item { visible: !home.chatting; width: 1; height: 16 }
                     // ── under the composer: what it is for, which printer, which agent and model, or a blank canvas ──
-                    Row { id: opts; objectName: "startOptions"; anchors.horizontalCenter: parent.horizontalCenter; spacing: 6; height: 30
+                    Row { id: opts; objectName: "startOptions"; visible: !home.chatting; anchors.horizontalCenter: parent.horizontalCenter; spacing: 6; height: 30
                         Seg { id: purposeSeg; objectName: "startPurpose"; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 30
                             value: Store.newPurposeEffective; onPicked: function (v) { Store.setNewPurpose(v) }
                             model: [{ value: "print", text: "For my printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" },
@@ -219,12 +225,12 @@ Item {
                             tip: "An empty build plate and the workspace. Describe, sketch or import what goes on it."
                             onClicked: Store.startBlank() } }
                     // the design you were on, one click away
-                    Item { visible: !home.fresh && !!home.latest; width: 1; height: 14 }
-                    Txt { objectName: "homeContinue"; visible: !home.fresh && !!home.latest; anchors.horizontalCenter: parent.horizontalCenter; kind: "fine"; tone: cm.containsMouse ? 1 : 3
+                    Item { visible: !home.chatting && !home.fresh && !!home.latest; width: 1; height: 14 }
+                    Txt { objectName: "homeContinue"; visible: !home.chatting && !home.fresh && !!home.latest; anchors.horizontalCenter: parent.horizontalCenter; kind: "fine"; tone: cm.containsMouse ? 1 : 3
                         text: home.latest ? "Continue “" + home.latest.name + "” · " + F.pad(home.latest.head) + " · " + F.ago(home.latest.updated) + "  →" : ""
                         MouseArea { id: cm; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.open(home.latest.id) } }
-                    Item { visible: home.fresh; width: 1; height: 40 }
-                    Grid { id: ways; visible: home.fresh; width: parent.width; columns: 4; spacing: 10
+                    Item { visible: home.fresh && !home.chatting; width: 1; height: 40 }
+                    Grid { id: ways; visible: home.fresh && !home.chatting; width: parent.width; columns: 4; spacing: 10
                         readonly property real tw: Math.floor((width - 3 * spacing) / 4)
                         Repeater {
                             model: [{ icon: "camera", t: "A photo", d: "With a card, coin or ruler in it, the agent can estimate sizes", run: function () { composer.pickFiles() } },
