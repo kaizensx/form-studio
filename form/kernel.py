@@ -42,6 +42,22 @@ def _skin(shape):
     return Compound(shape.faces())
 
 
+def _where(e: BaseException, recipe) -> str:
+    """The exception and, for a design written as code, the line of that code it came from: an agent fixes the
+    source from this, so the type alone ("TypeError") is not enough."""
+    import os
+    import traceback
+    msg = f"{type(e).__name__}: {e}".strip().rstrip(":")
+    srcs = {os.path.realpath(f.__code__.co_filename) for c in type(recipe).__mro__ if c.__module__ not in ("builtins",)
+            and not c.__module__.startswith("form.") for f in vars(c).values() if hasattr(f, "__code__")}
+    if srcs:                                          # a design written as code: point at its line
+        frames = [f for f in traceback.extract_tb(e.__traceback__) if os.path.realpath(f.filename) in srcs]
+        if frames:
+            f = frames[-1]
+            msg += f" (line {f.lineno}" + (f": {f.line.strip()[:120]}" if f.line else "") + ")"
+    return msg[:600]
+
+
 def _build(recipe_id: str, values: dict, tol: float):
     """Build, attribute every face to a feature, and tessellate."""
     from build123d import CenterOf, Vertex
@@ -53,7 +69,7 @@ def _build(recipe_id: str, values: dict, tol: float):
     except RecipeError:
         raise
     except Exception as e:
-        raise RecipeError(f"The kernel could not build this shape ({type(e).__name__})", "",
+        raise RecipeError(f"The kernel could not build this shape: {_where(e, recipe)}", "",
                           "Step back toward the last value that built, then change one parameter at a time.") from e
     final = stages[-1].shape
     t_build = time.perf_counter() - t0
@@ -261,9 +277,54 @@ def _oriented(shape, orientation):
     return Pos(-(bb.min.X + bb.max.X) / 2, -(bb.min.Y + bb.max.Y) / 2, -bb.min.Z) * s
 
 
+def _open_edges(path) -> int:
+    """Edges of a binary STL used by one triangle only (vertices welded at 1e-6 mm): 0 for a closed mesh."""
+    raw = np.fromfile(str(path), dtype=np.uint8)
+    n = int(raw[80:84].view(np.uint32)[0]) if raw.size >= 84 else 0
+    if n == 0:
+        return 0
+    rec = raw[84:84 + 50 * n].reshape(n, 50)
+    V = np.ascontiguousarray(rec[:, 12:48]).view(np.float32).reshape(n, 3, 3).astype(np.float64)
+    _, ids = np.unique(np.round(V.reshape(-1, 3) / 1e-6).astype(np.int64), axis=0, return_inverse=True)
+    ids = ids.reshape(n, 3)
+    E = np.sort(np.concatenate([ids[:, [0, 1]], ids[:, [1, 2]], ids[:, [2, 0]]]), axis=1)
+    _, counts = np.unique(E, axis=0, return_counts=True)
+    return int((counts == 1).sum())
+
+
+def write_stl(shape, path, tol: float = 0.01, ang: float = 0.1) -> dict:
+    """An STL of a valid solid with no holes. OCCT's mesher can fail on a face at one setting (a small face between
+    tangent surfaces) and still return: that face gets no triangles, or its edges get a different polygon from its
+    neighbour's, and the STL has an open boundary although the CAD solid is fine. The written mesh is checked
+    edge by edge; when it is open the solid is meshed again with nearby settings and the first closed mesh is kept.
+    A mesh that no setting closes is written with the asked-for settings, and the mesh check reports it."""
+    from OCP.BRepMesh import BRepMesh_IncrementalMesh
+    from OCP.BRepTools import BRepTools
+    from OCP.StlAPI import StlAPI_Writer
+
+    def write(t, a):
+        BRepTools.Clean_s(shape.wrapped)
+        BRepMesh_IncrementalMesh(shape.wrapped, t, True, a, True).Perform()
+        w = StlAPI_Writer()
+        w.ASCIIMode = False                                    # binary, as build123d's export_stl writes
+        w.Write(shape.wrapped, str(path))
+        return _open_edges(path)
+
+    tries = [(tol, ang), (tol, ang * 2), (tol / 2, ang * 2), (tol * 2, ang * 2), (tol / 10, ang), (tol * 5, max(ang * 2, 0.25))]
+    first = None
+    for t, a in tries:
+        open_ = write(t, a)
+        first = open_ if first is None else first
+        if not open_:
+            return {"tolerance": t, "angular_tolerance": a, "remeshed": (t, a) != (tol, ang), "open_edges": 0,
+                    "open_edges_first": first}
+    open_ = write(tol, ang)
+    return {"tolerance": tol, "angular_tolerance": ang, "remeshed": False, "open_edges": open_, "open_edges_first": first}
+
+
 def op_export(key, recipe_id, values, out_dir, name, orientation="as_modelled", tol=0.01, ang=0.1):
     """Write STEP (design frame) and STL (print frame). Returns paths and sizes."""
-    from build123d import export_step, export_stl
+    from build123d import export_step
     model = _get(key, recipe_id, values, 0.05)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -273,10 +334,10 @@ def op_export(key, recipe_id, values, out_dir, name, orientation="as_modelled", 
     if not mesh:
         export_step(model["shape"], str(step))
     oriented = _oriented(model["shape"], orientation)
-    export_stl(oriented, str(stl), tolerance=tol, angular_tolerance=ang)
+    used = write_stl(oriented, stl, tol, ang)
     bb = oriented.bounding_box()
     out = {"step": None if mesh else str(step), "stl": str(stl), "orientation": orientation,
-           "stl_tolerance_mm": tol, "print_bbox": [bb.size.X, bb.size.Y, bb.size.Z],
+           "stl_tolerance_mm": used["tolerance"], "print_bbox": [bb.size.X, bb.size.Y, bb.size.Z],
            "brep_volume_mm3": model["volume"], "seconds": round(time.perf_counter() - t, 3)}
     if mesh:
         out["unavailable"] = {"step": "Not available for mesh designs: OpenSCAD produces triangles, not a CAD solid."}
@@ -306,14 +367,13 @@ def _printed_parts(model, orientation="as_modelled", orient=None, envelope=(180,
 def op_plate_parts(key, recipe_id, values, out_dir, name, orientation="as_modelled", orient=None, envelope=(180, 180, 180),
                    margin=2.0, tol=0.01, ang=0.1):
     """Each printed part as its own STL, centred and standing on z = 0, for the plate plan (form/plates.py)."""
-    from build123d import export_stl
     model = _get(key, recipe_id, values, 0.05)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     parts = []
     for pid, label, material, solid, o in _printed_parts(model, orientation, orient, envelope, margin):
         stl = out / f"{name}_{pid}.stl"
-        export_stl(solid, str(stl), tolerance=tol, angular_tolerance=ang)
+        write_stl(solid, stl, tol, ang)
         bb = solid.bounding_box()
         parts.append({"id": pid, "label": label, "material": material, "orientation": o, "stl": str(stl),
                       "size": [bb.size.X, bb.size.Y, bb.size.Z], "volume_mm3": float(solid.volume)})
@@ -321,7 +381,6 @@ def op_plate_parts(key, recipe_id, values, out_dir, name, orientation="as_modell
 
 
 def op_test_piece(key, recipe_id, values, out_dir, name, tol=0.01):
-    from build123d import export_stl
     model = _get(key, recipe_id, values, 0.05)
     res = model["recipe"].test_piece(model["values"], model["shape"])
     if res is None:
@@ -333,7 +392,7 @@ def op_test_piece(key, recipe_id, values, out_dir, name, tol=0.01):
     out.mkdir(parents=True, exist_ok=True)
     path = out / f"{name}.stl"
     bb = piece.bounding_box()
-    export_stl(Pos0(piece, bb), str(path), tolerance=tol, angular_tolerance=0.1)
+    write_stl(Pos0(piece, bb), path, tol, 0.1)
     return {"stl": str(path), "bbox": [bb.size.X, bb.size.Y, bb.size.Z], "volume_mm3": float(piece.volume), **info}
 
 

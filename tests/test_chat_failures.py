@@ -1,0 +1,139 @@
+"""Failures seen in real conversations, fixed at their cause: a build error that hid its message, an STL rejected for
+its label, a valid solid exported with holes, an assembly the render tool could not show, a model the account cannot
+use that kept coming back, and a no-op draft shown as a build failure.
+
+Real kernel, temp data folder."""
+import json
+import os
+import struct
+import tempfile
+import unittest
+from pathlib import Path
+
+TMP = tempfile.mkdtemp(prefix="form-chatfail-")
+
+from form import config, kernel  # noqa: E402
+from form import render as rendering  # noqa: E402
+from form.agents.models import Learned, Recent  # noqa: E402
+from form.chat import _model_unavailable  # noqa: E402
+from form.design_guide import EXAMPLE  # noqa: E402
+from form.studio import Studio, StudioError  # noqa: E402
+
+BUILD = "    def build(self, v):\n"
+BROKEN = EXAMPLE.replace(BUILD, BUILD + "        width = len(v['inner_w'])\n", 1)        # TypeError on a float
+
+
+def _stl(path: Path, tris) -> None:
+    with open(path, "wb") as f:
+        f.write(b"\0" * 80 + struct.pack("<I", len(tris)))
+        for t in tris:
+            f.write(struct.pack("<3f", 0, 0, 0) + b"".join(struct.pack("<3f", *v) for v in t) + b"\0\0")
+
+
+TETRA = [((0, 0, 0), (0, 10, 0), (10, 0, 0)), ((0, 0, 0), (10, 0, 0), (0, 0, 10)),
+         ((0, 0, 0), (0, 0, 10), (0, 10, 0)), ((10, 0, 0), (0, 10, 0), (0, 0, 10))]
+
+
+class Kernel(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        os.environ["FORM_DATA"] = TMP
+        cls.st = Studio(config.load())
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.st.kernel.stop()
+
+    def test_build_error_says_what_and_where(self):
+        with self.assertRaises(StudioError) as cm:
+            self.st.create_design("Broken box", BROKEN)
+        msg = str(cm.exception)
+        self.assertIn("TypeError", msg)
+        self.assertIn("float", msg)                                  # the exception's own text
+        self.assertIn("len(v['inner_w'])", msg)                       # and the line of the design it came from
+
+    def test_stl_with_a_label_for_a_name_imports(self):
+        p = self.st.create_design("Label import", EXAMPLE)
+        src = Path(TMP) / "64e6bd-Sliding-wallet-V1_Slider.stl"
+        _stl(src, TETRA)
+        rec = self.st.import_reference(p, src, "Original slider")
+        self.assertEqual(rec["file"], "Original_slider.stl")
+        with self.assertRaises(StudioError):                           # a file that is not a part is still refused
+            self.st.import_reference(p, Path(TMP) / "notes.txt", "Notes")
+
+    def test_assembled_and_exploded_render(self):
+        p = self.st.create_design("Posed box", EXAMPLE)
+        v = self.st.view(p)
+        feats = [{"id": f.id, "label": f.label} for f in self.st.recipe(p).features]
+        for pose in rendering.POSES:
+            posed = rendering.posed(v, pose)
+            self.assertIsNone(posed["edges"])
+            self.assertTrue(rendering.render_png(posed, feats, "iso").startswith(b"\x89PNG"))
+        lid = next(m for m in v["mesh"] if m.get("part") and m["feature"] == "lid")
+        moved = next(m for m in rendering.posed(v, "assembled")["mesh"] if m["part"] == lid["part"] and m["feature"] == "lid")
+        self.assertNotEqual(lid["positions"], moved["positions"])     # the lid goes from the plate onto the box
+
+    def test_single_part_has_no_assembled_view(self):
+        with self.assertRaises(ValueError):
+            rendering.posed({"mesh": [], "assembly": None}, "assembled")
+
+
+class Stl(unittest.TestCase):
+    def test_open_edges_counts_holes(self):
+        closed, holed = Path(TMP) / "closed.stl", Path(TMP) / "holed.stl"
+        _stl(closed, TETRA)
+        _stl(holed, TETRA[:3])
+        self.assertEqual(kernel._open_edges(closed), 0)
+        self.assertEqual(kernel._open_edges(holed), 3)
+
+    def test_write_stl_remeshes_until_closed(self):
+        from build123d import Box, Cylinder, Pos
+        shape = Box(30, 20, 10) - Pos(0, 0, 2) * Cylinder(6, 10)
+        out = Path(TMP) / "part.stl"
+        calls = []
+        real = kernel._open_edges
+
+        def flaky(path):                      # the mesher's failure, on the first setting only
+            calls.append(1)
+            return 105 if len(calls) == 1 else real(path)
+        kernel._open_edges = flaky
+        try:
+            res = kernel.write_stl(shape, out, 0.01, 0.1)
+        finally:
+            kernel._open_edges = real
+        self.assertTrue(res["remeshed"])
+        self.assertEqual(res["open_edges"], 0)
+        self.assertEqual(res["open_edges_first"], 105)
+        self.assertEqual(kernel._open_edges(out), 0)
+
+
+class Models(unittest.TestCase):
+    def test_unavailable_model_errors_are_recognised(self):
+        self.assertTrue(_model_unavailable("The 'gpt-6.2-sol' model is not supported when using Codex with a ChatGPT account."))
+        self.assertTrue(_model_unavailable('{"code":"model_not_found"}'))
+        self.assertFalse(_model_unavailable("Rate limit reached. Try again in 20 s."))
+        self.assertFalse(_model_unavailable("Network is unreachable"))
+
+    def test_forget_and_drop(self):
+        d = Path(tempfile.mkdtemp(prefix="form-models-"))
+        learned, recent = Learned(d), Recent(d)
+        learned.learn("codex", "gpt-6.2-sol", "gpt-6.2-sol")
+        learned.learn("codex", "default", "gpt-6.1-sol")
+        recent.use("codex", "gpt-6.1-sol", 1)
+        recent.use("codex", "gpt-6.2-sol", 2)
+        learned.forget("codex", "gpt-6.2-sol")
+        recent.drop("codex", "gpt-6.2-sol")
+        self.assertIsNone(learned.get("codex", "gpt-6.2-sol"))
+        self.assertEqual(learned.get("codex", "default")["id"], "gpt-6.1-sol")
+        self.assertEqual(recent.last("codex"), "gpt-6.1-sol")
+
+
+class DraftCard(unittest.TestCase):
+    def test_no_op_commit_is_not_a_build_failure(self):
+        qml = (Path(__file__).resolve().parent.parent / "form" / "app" / "qml" / "Form" / "Store.qml").read_text(encoding="utf-8")
+        i = qml.index("function commit()")
+        self.assertIn('e.message === "Nothing changed."', qml[i:i + 900])
+
+
+if __name__ == "__main__":
+    unittest.main()

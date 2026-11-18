@@ -82,6 +82,15 @@ class Learned:
                                                          "ts": time.time(), "src": "run"}
             self._save(d)
 
+    def forget(self, agent: str, alias: str) -> None:
+        """Drop what `alias` resolved to: the agent refused that model, so it is not shown as anyone's version."""
+        with _LOCK:
+            d = self.all()
+            if isinstance(d.get(agent), dict) and d[agent].pop(alias or "default", None) is not None:
+                if not d[agent]:
+                    del d[agent]
+                self._save(d)
+
     def _save(self, d: dict) -> None:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -230,6 +239,16 @@ class Recent:
             if known is None or mid in known or mid == "default":
                 return mid
         return None
+
+    def drop(self, agent: str, model: str) -> None:
+        """Forget a model the agent refused, so picking the agent no longer selects it."""
+        with _LOCK:
+            d = self.all()
+            rows = d.get(agent) or []
+            keep = [r for r in rows if isinstance(r, dict) and r.get("id") != model]
+            if len(keep) != len(rows):
+                d[agent] = keep
+                self._save(d)
 
     def use(self, agent: str, model: str, ts: float | None = None) -> None:
         if not agent or not model:

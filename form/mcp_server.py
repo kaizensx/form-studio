@@ -398,7 +398,8 @@ def build() -> MCPServer:
     async def render(project: str, view: str = "iso", highlight: str | None = None, rev: int | None = None,
                      values: dict[str, float] | None = None, ctx: Context = None) -> list:
         """Look at the part. Returns a PNG rendered from the real kernel geometry, coloured by feature.
-        view: iso, iso_back, front, back, left, right, top, bottom, or "sheet" (four views at once).
+        view: iso, iso_back, front, back, left, right, top, bottom, "sheet" (four views at once), or for a design with
+        several parts "assembled" (put together) and "exploded" (pulled apart along its explode offsets).
         highlight: a feature id to pick out. values: render an uncommitted candidate (same as preview_change)."""
         st = studio()
         def go():
@@ -414,7 +415,12 @@ def build() -> MCPServer:
                 n = rev or p["head"]
                 v = st.view(p, n)
                 title, key = f"{p['name']} - r{n:02d}", st.keys(p, n)["geometry"]
-            views = ["iso", "front", "top", "right"] if view == "sheet" else [view]
+            if view in rendering.POSES:
+                try:
+                    v = rendering.posed(v, view)
+                except ValueError as e:
+                    raise StudioError(str(e))
+            views = ["iso", "front", "top", "right"] if view == "sheet" else ["iso"] if view in rendering.POSES else [view]
             cache = st.dir(p["id"]) / "artifacts" / "renders"
             cache.mkdir(parents=True, exist_ok=True)
             f = cache / f"{key}-{view}-{highlight or 'all'}-v{rendering.VERSION}.png"

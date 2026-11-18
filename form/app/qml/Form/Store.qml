@@ -394,7 +394,11 @@ QtObject {
             toast("Committed as " + F.pad(r.head), r.job ? "Regenerating solid, exports, checks and slice." : "Auto-regenerate is off: outputs are now stale.")
             if (r.job) track(r.job)
             refresh(true)
-        }, function (e) { draftError = e })
+        }, function (e) {
+            // the draft is the head revision again (a value moved and moved back): nothing to commit, not a failure
+            if (e && e.message === "Nothing changed.") { discard(); return toast("Nothing to commit", "The draft is the same as the head revision.") }
+            draftError = e
+        })
     }
     function checkout(n) {
         if (hasDraft) return toast("Commit or discard the draft first.", "", true)

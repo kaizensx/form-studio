@@ -1829,6 +1829,8 @@ class Studio:
         The part is drawn as a blueprint companion in its own coordinates (the design's frame), and a design can
         read it with self.reference(name). Re-importing the same name replaces the file.
         """
+        if name and src and Path(name).suffix.lower() not in REF_FORMATS and src.suffix.lower() in REF_FORMATS:
+            name += src.suffix.lower()          # a label ("Original base") for a .stl: keep the file's format
         name = self._ref_name(name or src.name)
         if Path(name).suffix not in REF_FORMATS:
             raise StudioError("Only STEP (.step, .stp) and STL (.stl) parts can be imported.",

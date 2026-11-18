@@ -186,6 +186,15 @@ def set_defaults(cfg: dict, agent: str | None = None, model: str | None = None, 
     return {"default": defaults(cfg), "saved": saved, "path": str(path), "note": why}
 
 
+
+_UNAVAILABLE = re.compile(r"model_not_found|model[^.]{0,80}\b(is not supported|does not exist|not available|not found|"
+                          r"no access|not have access)|unknown model|invalid model", re.I)
+
+
+def _model_unavailable(err: str) -> bool:
+    """The agent refused the model itself (not the account, the network or the request): a different model works."""
+    return bool(_UNAVAILABLE.search(err or ""))
+
 class ChatJob:
     def __init__(self, message: str, project: str | None, session: str | None, conversation: str | None = None,
                  agent: str = "claude", model: str = "default", effort: str = ""):
@@ -730,10 +739,9 @@ class Chat:
             if t == "start":
                 ev["agent"] = job.agent
                 ev["asked"] = job.model
-                if ev.get("model"):
+                if ev.get("model"):               # learned once the reply finishes: a model that fails is not kept
                     job.model_id = ev["model"]
                     ev["label"] = adapter.model_label(ev["model"])
-                    self.learned.learn(job.agent, job.model, ev["model"], ev["label"])
             elif t == "tool":
                 job.steps += 1
                 job.tools[ev.get("id")] = ev.get("name", "")
@@ -756,16 +764,37 @@ class Chat:
                 if pid and h1 is not None and h1 != job.head0:
                     ev["change"] = {"project": pid, "from": job.head0, "to": h1}
                 self._add(job, ev)
-                if err:
+                if err and _model_unavailable(str(err)):
+                    job.error = self._drop_model(job, str(err))
+                    self._add(job, {"t": "error", "text": job.error})
+                elif err:
                     job.error = str(err)
                     self._add(job, {"t": "error", "text": job.error})
-                else:                          # a reply came: this model goes first in the menu and is the agent's last
+                else:
+                    if job.model_id and job.model_id != job.model:
+                        self.learned.learn(job.agent, job.model, job.model_id, adapter.model_label(job.model_id))                          # a reply came: this model goes first in the menu and is the agent's last
                     used = job.model or "default"
                     if used == "default" and getattr(adapter, "inline", False) and job.model_id:
                         used = job.model_id           # an API provider's Default is its last-used model: name it
                     self.recent.use(job.agent, used)
                 continue
             self._add(job, ev)
+
+    def _drop_model(self, job: ChatJob, err: str) -> str:
+        """The account cannot use the model this conversation asked for. Forget it (so it is no one's default) and
+        switch the conversation to Default, so the next message is answered instead of failing the same way."""
+        bad = job.model if job.model and job.model != "default" else job.model_id
+        self.learned.forget(job.agent, job.model or "default")
+        if bad:
+            self.recent.drop(job.agent, bad)
+        if job.conversation and job.model and job.model != "default":
+            try:
+                self.store.update(job.conversation, model="default")
+            except ConversationError:
+                pass
+        who = getattr(self.adapters.get(job.agent), "label", None) or job.agent
+        return (f"{who} cannot use the model “{bad}” with this account, so nothing was sent to it. "
+                "This conversation now uses Default; send the message again, or pick another model in the menu.")
 
     def _end_model(self, job: ChatJob, adapter, ev: dict) -> None:
         """Name the model on the reply's footer: from the stream, or from the CLI's own files when it did not say."""
@@ -781,8 +810,6 @@ class Chat:
                 except ConversationError:
                     pass
         if model:
-            if model != job.model_id:
-                self.learned.learn(job.agent, job.model, model, adapter.model_label(model))
             job.model_id = model
             ev["model"], ev["label"] = model, adapter.model_label(model)
 

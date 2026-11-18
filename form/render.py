@@ -39,6 +39,32 @@ def _arr(b64: str, dtype, cols: int) -> np.ndarray:
     return np.frombuffer(base64.b64decode(b64), dtype=dtype).reshape(-1, cols)
 
 
+POSES = ("assembled", "exploded")       # a multi-part design put together (or pulled apart), seen from iso
+
+
+def posed(view_data: dict, pose: str) -> dict:
+    """The view with every part moved from where it prints to where it sits in the assembly (plus its explode
+    offset for "exploded"). Raises ValueError when the design has no usable assembly."""
+    a = view_data.get("assembly") or {}
+    if not a.get("parts"):
+        raise ValueError("This design is one part, so it has no assembled view. Use iso, front, top and the others.")
+    if a.get("error"):
+        raise ValueError(f"The assembly cannot be shown: {a['error']}")
+    move = {}
+    for part in a["parts"]:
+        M = np.array(part["placement"]["m"], dtype=np.float64)
+        off = np.array(part["explode_total"] if pose == "exploded" else (0.0, 0.0, 0.0), dtype=np.float64)
+        move[part["id"]] = (M[:, :3], M[:, 3] + off)
+    mesh = []
+    for m in view_data["mesh"]:
+        if m.get("part") in move:
+            R, tr = move[m["part"]]
+            P = _arr(m["positions"], np.float32, 3).astype(np.float64) @ R.T + tr
+            m = {**m, "positions": base64.b64encode(np.ascontiguousarray(P.astype(np.float32)).tobytes()).decode()}
+        mesh.append(m)
+    return {**view_data, "mesh": mesh, "edges": None}     # edges are drawn in the print frame: leave them out
+
+
 def _camera(view: str):
     if view not in VIEWS:
         raise ValueError(f"Unknown view “{view}”. Choose one of: {', '.join(VIEWS)}.")
