@@ -230,7 +230,7 @@ class StudioAssembly(unittest.TestCase):
         p = self.st.create("Hinged", "hinged_box")
         job = self.st.run_sync(p["id"])                                 # the slice step is blocked where no slicer is installed
         self.assertIn(job["state"], ("done", "blocked"), job)
-        sliced = job["state"] == "done"
+        sliced = any(s["node"] == "slice" and s["state"] == "done" for s in job["steps"])   # Design only drops the step
         p = self.st.load(p["id"])
         c = self.checks(p)
         for k in ("asm_interference", "asm_motion_lid_hinge", "asm_access_1", "asm_access_3"):

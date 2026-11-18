@@ -17,7 +17,8 @@ Column {
     readonly property string head: d ? F.pad(d.project.head) : ""
     readonly property bool busy: Store.job !== ""
     readonly property bool sliceFailed: !!sn && sn.state === "failed"
-    readonly property bool sliceOff: !!sn && sn.state === "off"                       // Design only
+    readonly property bool sliceOff: !!sn && sn.state === "off" && !Store.modelDesign  // Design only
+    readonly property bool model: Store.modelDesign                                     // a 3D model: no print checks, no slice
     readonly property var plates: Store.plates                                          // several plates (form/plates.py)
     readonly property var pl: plates.length ? plates[Store.plateShown - 1] : null        // the plate on screen
     readonly property var shownSlice: pl ? Object.assign({}, sl, pl) : sl                // that plate, or the one slice
@@ -40,7 +41,8 @@ Column {
 
     // ── checks: the score first ──────────────────────────────
     readonly property var all: ch ? ch.checks : []
-    readonly property var open: all.filter(function (c) { return c.status !== "PASS" })
+    readonly property var open: all.filter(function (c) { return c.status === "FAIL" || c.status === "WARN" })
+    readonly property var unknown: all.filter(function (c) { return c.status !== "PASS" && c.status !== "FAIL" && c.status !== "WARN" })
     readonly property var passed: all.filter(function (c) { return c.status === "PASS" })
     readonly property var roll: ch ? ch.rollup : ({ PASS: 0, WARN: 0, FAIL: 0 })
     readonly property int total: Math.max(1, roll.PASS + roll.WARN + roll.FAIL)
@@ -119,6 +121,25 @@ Column {
     }
     Item { width: 1; height: 6; visible: !!root.ch }
 
+    // ── a 3D model: which print checks do not apply, and the way back to printing ──
+    Note { objectName: "modelChecksNote"; visible: root.model && !!root.ch; kind: "plain"; title: "3D model: print checks do not apply"
+        text: root.ch && root.ch.not_applicable ? "Not run, because this design is not for 3D printing: " + root.ch.not_applicable.join(", ") + "." : "" }
+    Row { visible: root.model && !!root.ch; spacing: 8; topPadding: 6
+        Btn { objectName: "makePrintable"; small: true; icon: "printer"; text: "Make it for 3D printing"; enabled: !root.busy
+            tip: "Run the print checks and slice it (when a slicer is installed)"; onClicked: Store.setPurpose("print") } }
+
+    // ── what could not be checked (mesh designs, a model with no stated process): never counted as a pass ──
+    Fold { visible: root.unknown.length > 0; key: "prove.unknown"; openByDefault: true
+        title: "Not checked"; note: root.unknown.length + " · not counted as passed"
+        Column { width: parent.width; spacing: 6
+            Repeater { model: root.unknown
+                Column { required property var modelData; width: parent.width; spacing: 2
+                    Item { width: parent.width; height: 18
+                        Tag { text: "N/A"; y: 1 }
+                        Txt { x: 50; width: parent.width - 50 - nv.width - 10; text: parent.parent.modelData.label; font.weight: 550; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                        Txt { id: nv; mono: true; anchors.right: parent.right; text: String(parent.parent.modelData.value || ""); wrapMode: Text.NoWrap } }
+                    Txt { kind: "fine"; x: 50; width: parent.width - 50; text: parent.modelData.detail || "" } } } } }
+
     // ── passes: one line each, the evidence class first; a click opens the detail ──
     Fold { visible: root.passed.length > 0; key: "prove.passed"; openByDefault: root.open.length === 0 && root.passed.length <= 6
         title: "Passed"; note: root.passed.length + " · " + root.evidenceMix(root.passed)
@@ -153,7 +174,7 @@ Column {
     }
 
     // ── orientation ──────────────────────────────────────────
-    Fold { title: "Print orientation"; key: "prove.orient"; visible: !!root.ch
+    Fold { title: "Print orientation"; key: "prove.orient"; visible: !!root.ch && !root.model
         note: { var t = root.ch ? root.ch.orientation_table : []
                 for (var i = 0; i < t.length; i++) if (root.d && t[i].id === root.d.project.orientation) return t[i].label
                 return "" }
@@ -270,7 +291,7 @@ Column {
     }
 
     // ── cost, copies, other materials (CostSection.qml) ──────
-    CostSection { sl: root.sl }
+    CostSection { sl: root.sl; visible: !root.model }
     Item { width: 1; height: 16 }
 
     // ── slice: not current ───────────────────────────────────
@@ -287,7 +308,7 @@ Column {
             Btn { visible: root.sliceOff && root.sn.off.why === "no_slicer"; icon: "download"; text: "Set up a slicer…"
                 onClicked: Store.openSheet("setup") } }
     }
-    Sec { title: "Slice"; visible: !root.sl && !root.sliceOff
+    Sec { title: "Slice"; visible: !root.sl && !root.sliceOff && !root.model
         Note { kind: "red"; visible: !!root.sn && !!root.sn.unavailable; title: "Blocked"; text: root.sn && root.sn.unavailable ? String(root.sn.unavailable) : "" }
         Note { kind: "amber"; visible: !(root.sn && root.sn.unavailable)
             title: root.sliceFailed && root.sn.error ? root.sn.error.message : ""

@@ -24,10 +24,12 @@ Rectangle {
         if (!d || !Store.project) return out
         var roll = d.checks ? d.checks.rollup : null, rev = F.pad(Store.project.head)
         if (roll && roll.FAIL) out.push({ label: "Fix what fails in " + rev, prompt: "The checks on " + rev + " of this design report " + roll.FAIL + " failure(s). Read them with Form Studio's tools, explain each in one line, and preview the smallest change that fixes them. Do not commit until I say so." })
-        else if (roll && roll.WARN) out.push({ label: "Explain the " + F.plural(roll.WARN, "warning") + " on " + rev, prompt: "Explain the warnings on " + rev + " of this design: what each one means for the print or the fit, and which I can safely acknowledge." })
-        out.push({ label: "Review " + rev + ": design, engineering, print", review: true })
+        else if (roll && roll.WARN) out.push({ label: "Explain the " + F.plural(roll.WARN, "warning") + " on " + rev, prompt: "Explain the warnings on " + rev + " of this design: what each one means for " + (Store.modelDesign ? "the part" : "the print or the fit") + ", and which I can safely acknowledge." })
+        var model = Store.modelDesign
+        out.push({ label: "Review " + rev + (model ? ": design and engineering" : ": design, engineering, print"), review: true })
         out.push({ label: "Make it lighter without failing a check", prompt: "Make this design lighter without failing any check. Show me the candidate as a preview first, with the mass before and after." })
-        out.push({ label: "What should I measure before printing?", prompt: "Which numbers in this design are assumed rather than measured, and which of them matter for the fit? Tell me exactly what to measure and with what." })
+        if (model) out.push({ label: "Which dimensions are still assumed?", prompt: "Which numbers in this design are assumed rather than measured or specified? Tell me which matter most and how to confirm each." })
+        else out.push({ label: "What should I measure before printing?", prompt: "Which numbers in this design are assumed rather than measured, and which of them matter for the fit? Tell me exactly what to measure and with what." })
         if (d.fit && d.fit.yield < 0.95) out.push({ label: "Improve the modelled fit yield", prompt: "The modelled fit yield is " + Math.round(d.fit.yield * 100) + "%. What drives it, and what change would raise it? It is a model, so say what a test print should confirm." })
         return out.slice(0, 4)
     }
@@ -419,8 +421,9 @@ Rectangle {
                                 id: mpop; x: -34; width: Math.min(380, talk.width - 24); padding: 6
                                 onAboutToShow: mp.reset()
                                 onOpened: mp.opened()
-                                onClosed: { Store.retryAfterPick = false
-                                    if (Store.pendingSend) { Store.chatPrefill(Store.pendingSend); Store.pendingSend = "" } }
+                                onClosed: Qt.callLater(function () {     // after a pick in the same moment has had its turn: it sends the message
+                                    Store.retryAfterPick = false
+                                    if (Store.pendingSend) { Store.chatPrefill(Store.pendingSend); Store.pendingSend = "" } })
                                 height: Math.min(mp.implicitHeight + 12, talk.height - 70)
                                 y: talk.landing ? mchip.height + 6 : -height - 6
                                 origin: talk.landing ? Popup.TopLeft : Popup.BottomLeft

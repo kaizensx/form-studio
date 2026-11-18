@@ -13,12 +13,15 @@ Rectangle {
     readonly property int step: Store.onboardStep
     readonly property var steps: [
         { title: "Form Studio itself", sub: "The CAD kernel and where your designs live", ids: ["kernel", "data", "parts"] },
-        { title: "Your printer and slicer", sub: "So a design can be sliced for your machine", ids: ["slicer.bambu", "slicer.orca", "slicer.prusa"] },
+        { title: "Printer, or just designing", sub: "Only what your use needs is set up", ids: ["slicer.bambu", "slicer.orca", "slicer.prusa"] },
         { title: "Your agent", sub: "Who designs with you in chat", ids: ["claude", "claude.signin", "agent.claude", "agent.codex", "agent.gemini", "agent.cursor", "agent.desktop"] }
     ]
     readonly property var here: steps[step]
+    // "I have a 3D printer" / "I just design" (form/purpose.py); slicers are offered only after the first
+    readonly property bool justDesign: Store.printingDecided && !Store.prints
+    readonly property bool withPrinter: Store.printingDecided && Store.prints
     // ticked rows of this step only
-    readonly property var chosen: Store.installChosen.filter(function (id) { return wl.here.ids.indexOf(id) >= 0 })
+    readonly property var chosen: Store.installChosen.filter(function (id) { return wl.here.ids.indexOf(id) >= 0 && (wl.step !== 1 || wl.withPrinter) })
     readonly property bool anySlicer: !!sw && ["slicer.bambu", "slicer.orca", "slicer.prusa"].some(function (id) { var it = Store.softwareItem(id); return it && it.status === "ok" })
     readonly property bool designOnly: !!Store.studio && !!Store.studio.env.slicing && Store.studio.env.slicing.why === "settings"
     readonly property var absentAgents: sw ? sw.software.filter(function (r) { return r.absent }).map(function (r) { return r.label.replace("Form Studio tools in ", "") }) : []
@@ -26,13 +29,13 @@ Rectangle {
         if (!sw) return "open"
         var need = steps[i].ids.map(function (id) { return Store.softwareItem(id) }).filter(function (r) {
             return r && !r.absent && r.level !== "optional" && r.status !== "ok" && r.status !== "info" })
-        if (i === 1) return wl.anySlicer || wl.designOnly ? "done" : "todo"
+        if (i === 1) return wl.anySlicer || wl.designOnly || wl.justDesign ? "done" : "todo"
         if (i === 2) return Store.chat.available ? "done" : "todo"
         return need.length ? "todo" : "done"
     }
     function stepNote(i) {
         if (!sw) return "Checking…"
-        if (i === 1) return wl.anySlicer ? "A slicer is ready" : wl.designOnly ? "Design only" : "No slicer yet"
+        if (i === 1) return wl.justDesign ? "Just designing" : wl.anySlicer ? "A slicer is ready" : wl.designOnly ? "Design only" : wl.withPrinter ? "No slicer yet" : "Choose one"
         if (i === 2) { var n = Store.chatAgents.filter(function (a) { return a.available }).length
                        return n ? n + (n === 1 ? " agent ready" : " agents ready") : "Choose one" }
         var rows = steps[i].ids.map(function (id) { return Store.softwareItem(id) }).filter(function (r) { return r && !r.absent && r.status !== "info" })
@@ -134,7 +137,7 @@ Rectangle {
                 Txt { kind: "h1"; text: wl.here.title; width: parent.width; font.weight: Theme.wSemi }
                 Txt { kind: "lead"; tone: 2; width: parent.width; lineHeight: 1.35
                     text: wl.step === 0 ? "Form Studio builds real geometry with a CAD kernel and keeps every design in a folder you own. This is checked for you."
-                        : wl.step === 1 ? "A slicer turns a design into a print plan. Form Studio drives one that is installed here and reads the printer, filament and process selected in it."
+                        : wl.step === 1 ? "Form Studio designs with or without a 3D printer. Say which, and only what that needs is set up. You can change it any time in Settings."
                         : "Chat works with the agent you choose. Each one designs with Form Studio's tools and runs on your own account or computer. You can change it per conversation." } }
 
             // step 1: a checklist that fills in as each part answers
@@ -187,8 +190,35 @@ Rectangle {
                         text: "Designs are kept in " + Bridge.dataDirShort + "  ·  change it later in Settings" } }
             }
 
-            // step 2: slicer and printer
+            // step 2: a printer, or just designing (form/purpose.py); slicers only for someone who prints
             Column { visible: wl.step === 1; width: parent.width; spacing: 16
+                Row { id: uses; width: parent.width; spacing: 10
+                    Repeater {
+                        model: [{ id: "print", icon: "printer", title: "I have a 3D printer", sub: "Designs are checked against your printer and sliced with your slicer." },
+                                { id: "design", icon: "pencil", title: "I just design", sub: "No printer or slicer. Export STEP, STL, 3MF, OBJ, GLB and renders for anything: CNC, laser, moulding, rendering." }]
+                        Rectangle {
+                            id: use
+                            required property var modelData
+                            readonly property bool on: modelData.id === "print" ? wl.withPrinter : wl.justDesign
+                            objectName: modelData.id === "print" ? "welcomePrinter" : "welcomeJustDesign"   // objectName: "welcomePrinter" / objectName: "welcomeJustDesign"
+                            width: (uses.width - 10) / 2; height: uc2.implicitHeight + 28; radius: Theme.rMd
+                            color: on ? Theme.alpha(Theme.datum, 0.07) : um.containsMouse ? Theme.washHover : Theme.plate1
+                            border.color: on ? Theme.datum : Theme.rule; border.width: on ? 1.5 : 1
+                            Behavior on color { Tint {} }
+                            Column { id: uc2; x: 16; y: 14; width: parent.width - 32; spacing: 5
+                                Row { spacing: 8
+                                    Icon { name: use.modelData.icon; size: 16; color: use.on ? Theme.datum : Theme.ink2; anchors.verticalCenter: parent.verticalCenter }
+                                    Txt { text: use.modelData.title; font.weight: Theme.wSemi; anchors.verticalCenter: parent.verticalCenter } }
+                                Txt { kind: "fine"; tone: 2; width: parent.width; text: use.modelData.sub } }
+                            Icon { visible: use.on; name: "circle_check"; size: 16; color: Theme.datum; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 10 }
+                            MouseArea { id: um; anchors.fill: parent; hoverEnabled: true; enabled: !use.on
+                                onClicked: Store.setPrinting(use.modelData.id === "print") }
+                        }
+                    }
+                }
+                Txt { visible: wl.justDesign; width: parent.width; tone: 2
+                    text: "Nothing printing-related is installed. New designs start as 3D models; any one of them can still be made for printing later, and a slicer is offered then." }
+                Column { visible: wl.withPrinter; width: parent.width; spacing: 16
                 Rectangle { visible: wl.anySlicer && Store.slicer.available; width: parent.width; height: uc.implicitHeight + 28; radius: Theme.rMd
                     color: Theme.alpha(Theme.pass, 0.06); border.color: Theme.alpha(Theme.pass, 0.25)
                     Column { id: uc; x: 16; y: 14; width: parent.width - 32; spacing: 4
@@ -197,19 +227,9 @@ Rectangle {
                             Txt { font.weight: 600; text: "Form Studio will slice with " + (Store.slicer.label || "your slicer"); anchors.verticalCenter: parent.verticalCenter } }
                         Txt { kind: "fine"; tone: 2; width: parent.width
                             text: Store.slicer.available ? Store.slicer.presets.machine.name + "  ·  " + Store.slicer.presets.filament.name + "  ·  " + Store.slicer.presets.process.name : "" }
-                        Txt { kind: "fine"; width: parent.width; text: "Read from what is selected in the slicer. Change the printer or filament there and Form Studio follows." } } }
+                        Txt { kind: "fine"; width: parent.width; text: "Read from what is selected in the slicer. Change the printer or filament there and Form Studio follows, or pick another one in Settings › Printing." } } }
                 Txt { visible: !!wl.sw && !wl.anySlicer; width: parent.width; tone: 2
-                    text: "No slicer was found. Pick the one that matches your printer; Bambu Studio is ticked because it is Form Studio's default. Everything except slicing also works without one." }
-                // Design only: design, check, export and release without any slicer (it can be turned on later in Settings)
-                Rectangle { visible: !!wl.sw && !wl.anySlicer; width: parent.width; height: dc.implicitHeight + 28; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
-                    readonly property bool off: wl.designOnly
-                    Column { id: dc; x: 16; y: 14; width: parent.width - 32; spacing: 8
-                        Txt { font.weight: 600; text: parent.parent.off ? "Design only is on" : "Only designing for now?" }
-                        Txt { kind: "fine"; tone: 2; width: parent.width
-                            text: "Design only: no slicer is installed or used. Designs, checks, STEP, STL and 3MF exports, renders and releases all work; a release says it was not sliced. Turn slicing on any time in Settings." }
-                        Btn { objectName: "welcomeDesignOnly"; text: parent.parent.off ? "Slice designs after all" : "Design only, no slicer"
-                            icon: parent.parent.off ? "layers" : "pencil"; enabled: !Store.installing || !parent.parent.off
-                            onClicked: Store.designOnlyEverywhere(!parent.parent.off) } } }
+                    text: "No slicer was found. Pick the one that matches your printer; Bambu Studio is ticked because it is Form Studio's default. Untick it to install one later: designs, checks and exports work without it." }
                 SetupList { width: parent.width; ids: ["slicer.bambu", "slicer.orca", "slicer.prusa"] }
                 // no slicer: the bed size is the one thing FORM still needs to know
                 Rectangle { visible: !!wl.sw && !wl.anySlicer; width: parent.width; height: bc.implicitHeight + 28; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
@@ -225,6 +245,7 @@ Rectangle {
                             Txt { kind: "fine"; text: "mm"; anchors.verticalCenter: parent.verticalCenter }
                             Btn { text: "Save size"; anchors.verticalCenter: parent.verticalCenter
                                 onClicked: Store.saveConfig({ "printer.name": pn.text, "printer.envelope_mm": [Number(px.text), Number(py.text), Number(pz.text)] }) } } } }
+                }
             }
 
             // step 3: the agent: three ways to reach a model, with what was found for each
@@ -328,6 +349,7 @@ Rectangle {
                     text: "Untick everything to continue without installing" }
                 Btn { visible: Store.installing; large: true; icon: "x"; text: Store.installJob && Store.installJob.kind === "auto" ? "Cancel setup" : "Cancel install"; onClicked: Store.cancelInstall() }
                 Btn { kind: "primary"; large: true; busy: Store.installing || !wl.sw
+                    autoBusy: false              // moving between steps saves the step in the background: never wait for it
                     icon: wl.chosen.length ? "download" : wl.step < 2 ? "arrow_right" : "check"
                     text: Store.installing ? (Store.installJob && Store.installJob.kind === "auto" ? "Setting up…" : "Installing…") : !wl.sw ? "Checking…" : wl.chosen.length ? "Install " + wl.chosen.length + " selected"
                         : wl.step < 2 ? "Continue" : "Open Form Studio"

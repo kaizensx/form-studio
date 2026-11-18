@@ -11,7 +11,7 @@ Column {
     readonly property int chosen: Store.installChosen.length
     property bool actions: true              // false when the host (Settings) puts Install / Check again in its action bar
     Txt { tone: 2; width: parent.width
-        text: "What Form Studio uses on this computer. Tick what you want, then press Install: each command is shown before it runs, and Form Studio never asks for a password." }
+        text: "What Form Studio uses on this computer. Only the CAD kernel is required; everything else is optional and unlocks one feature, and is offered again where that feature is used. Tick what you want, then press Install: each command is shown before it runs, and Form Studio never asks for a password." }
     Item { width: parent.width; height: 28; visible: sp.actions || (!!sp.sw && sp.sw.packaged)
         Row { spacing: 8; visible: sp.actions
             Btn { kind: "primary"; icon: "download"; enabled: sp.chosen > 0; busy: Store.installing
@@ -32,7 +32,7 @@ Column {
             id: grp
             required property var modelData
             width: sp.width; spacing: 6; visible: list.rows.length > 0
-            Txt { kind: "cap"; text: grp.modelData.title }
+            Txt { kind: "cap"; text: grp.modelData.title + (grp.modelData.id === "slicer" && !Store.prints ? "  ·  not needed: you just design" : "") }
             SetupList { id: list; width: parent.width; ids: grp.modelData.items }
             ClaudeSignIn { width: parent.width; visible: grp.modelData.id === "ai" }
         }

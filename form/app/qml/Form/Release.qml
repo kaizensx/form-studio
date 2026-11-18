@@ -97,6 +97,8 @@ Column {
             text: visible ? "Changed since: " + (root.ap.changed || []).join(", ") + ". The earlier release folder is intact but is a different design." : "" }
         Note { objectName: "releaseDesignOnly"; visible: !root.approved && !!root.g && !!root.g.design_only; kind: "plain"; title: "Design only: not sliced"
             text: root.g && root.g.not_covered ? "This release will not cover:\n" + root.g.not_covered.map(function (x) { return "· " + x }).join("\n") : "" }
+        Note { objectName: "releaseModel"; visible: !root.approved && Store.modelDesign; kind: "plain"; title: "A 3D model, not for printing"
+            text: "This release will hold STEP, STL, 3MF, OBJ and GLB files, a four-view sheet and an iso render, the checks and a report. No slice or G-code: it is not made for 3D printing." }
         Note { visible: !root.approved && !!root.g && root.g.reasons.length > 0 && !root.overriding; kind: "red"; title: "Not ready"
             text: root.g ? root.g.reasons.join("\n") : "" }
         Column { width: parent.width; spacing: 6; visible: !root.approved && root.overriding
@@ -139,7 +141,7 @@ Column {
     Item { width: 1; height: 10 }
     Fold { title: "Design review"; note: "subjective"; key: "release.review"
         Txt { kind: "fine"; width: parent.width
-            text: "The agent looks at " + (root.p ? F.pad(root.p.head) : "the head revision") + " at three scales (silhouette, relationships, details) as designer, engineer and print technician, scores six criteria and lists concrete fixes. It changes nothing." }
+            text: "The agent looks at " + (root.p ? F.pad(root.p.head) : "the head revision") + " at three scales (silhouette, relationships, details) as designer, engineer" + (Store.modelDesign ? "" : " and print technician") + ", scores six criteria and lists concrete fixes. It changes nothing." }
         Btn { kind: "default"; icon: "eye"; text: Store.chatBusy ? Store.chatAgentLabel + " is answering…" : "Ask " + Store.chatAgentLabel + " for a design review"
             enabled: Store.canAskReview; onClicked: Store.askReview() }
         Txt { kind: "fine"; width: parent.width; visible: !Store.chat.available; color: Theme.amber; text: Store.chat.note || "No agent is connected." }
@@ -180,7 +182,9 @@ Column {
     Fold { title: root.d && root.d.exports ? "Working files for " + F.pad(root.d.exports.rev) : "Working files"; note: "not a release"; key: "release.files"
         visible: !!root.d && !!root.d.exports
         Column { width: parent.width
-            Repeater { model: root.d && root.d.exports ? F.vals(root.d.exports.files) : []
+            // exchange formats first (STEP, STL), then the viewer formats (OBJ, GLB)
+            Repeater { model: root.d && root.d.exports ? ["step", "stl", "3mf", "obj", "glb"].filter(function (k) { return !!root.d.exports.files[k] })
+                                                         .map(function (k) { return root.d.exports.files[k] }) : []
                 Item { id: xr; required property var modelData; required property int index
                     readonly property bool step: /\.(step|stp)$/i.test(String(modelData.name))
                     width: parent.width; implicitHeight: xc.implicitHeight + 14

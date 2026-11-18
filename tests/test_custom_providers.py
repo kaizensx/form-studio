@@ -17,7 +17,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from form import agents, chat, secrets  # noqa: E402
+from form import agents, chat, fsutil, secrets  # noqa: E402
 from form.agents import custom  # noqa: E402
 from form.agents import providers as prov  # noqa: E402
 from form.agents.api import ApiAdapter  # noqa: E402
@@ -48,6 +48,7 @@ class Env(unittest.TestCase):
             s.close()
         self.env.stop()
         prov.forget()
+        fsutil.rmtree(self.tmp.name)                # retried: on Windows the tool server's folder frees a moment after it ends
         self.tmp.cleanup()
 
     def serve(self, **kw) -> FakeProvider:
@@ -173,7 +174,7 @@ class SaveAndUse(Env):
         self.assertEqual((st["label"], st["custom"], st["models"][0]["id"]), ("Team proxy", True, "default"))
         self.assertIn("the only model", st["models"][0]["note"])
         self.assertNotIn('"k"', json.dumps(st))
-        job = wait(c.send("What can you make?", ask=False), 90)
+        job = wait(c.send("What can you make?", ask=False), 300)    # the tool server loads the CAD kernel: slow on Windows runners
         self.assertEqual(job.state, "done", job.error)
         self.assertEqual(srv.headers[0].get("authorization") or srv.headers[0].get("Authorization"), "Bearer k")
         self.assertTrue(any(m["role"] == "tool" for m in srv.requests[1]["messages"]))

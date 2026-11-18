@@ -355,6 +355,9 @@ def write(st, p, out_dir: Path, release: str | None = None, d: dict | None = Non
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     texts = {"BOM.csv": bom(d), "PRINT_REPORT.md": print_report(d, release), "MEASUREMENT_PLAN.md": measurement_plan(d, release)}
+    from . import purpose
+    if purpose.is_model(p):                      # a 3D model is not printed: no print report
+        texts.pop("PRINT_REPORT.md")
     images = []
     if d["asm"] and not d["asm"].get("error") and not d["asm"].get("derived"):
         texts["ASSEMBLY.md"], images = assembly_md(d, out_dir, release)
@@ -413,7 +416,8 @@ def available(st, p) -> list:
         spec = recipe.assembly(v)
     except Exception:
         spec = None
-    out = ["BOM.csv", "PRINT_REPORT.md", "MEASUREMENT_PLAN.md"]
+    from . import purpose
+    out = ["BOM.csv", "MEASUREMENT_PLAN.md"] if purpose.is_model(p) else ["BOM.csv", "PRINT_REPORT.md", "MEASUREMENT_PLAN.md"]
     if spec is not None:
         out.insert(1, "ASSEMBLY.md")
         if spec.joints:

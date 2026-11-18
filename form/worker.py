@@ -103,7 +103,15 @@ class Kernel:
         raise KernelFailure(payload)
 
     def stop(self):
-        with self._lock:
-            if self._proc and self._proc.is_alive():
-                self._proc.kill()
-            self._proc = self._conn = None
+        """End the worker now, also while a call is waiting on it (that call then fails as a crash). Never waits for
+        the lock: at exit the warm-up ping can hold it for as long as the CAD kernel takes to import."""
+        proc = self._proc
+        if proc is not None and proc.is_alive():
+            proc.kill()
+            proc.join(5)
+        if self._lock.acquire(timeout=1):
+            try:
+                if self._proc is proc:
+                    self._proc = self._conn = None
+            finally:
+                self._lock.release()

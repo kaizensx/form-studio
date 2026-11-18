@@ -189,9 +189,9 @@ Column {
             }
         }
         var nm = name.text.trim() || c.title, br = brief.text.trim()
-        if (c.section === "builtin") { Store.create(nm, c.id, br); return }
+        if (c.section === "builtin") { Store.create(nm, c.id, br, Store.newPurposeEffective); return }
         creating = true
-        Store.post("/recipes/create", { id: c.id, name: nm, brief: br }).then(function (r) {
+        Store.post("/recipes/create", { id: c.id, name: nm, brief: br, purpose: Store.newPurposeEffective }).then(function (r) {
             ns.creating = false; Store.openSheet(null); Store.stage = "shape"
             Store.reloadStudio().then(function () { Store.open(r.id).then(function () { Store.track(r.job) }) })
         }, function (e) { ns.creating = false; Store.fail(e) })
@@ -306,7 +306,13 @@ Column {
             Column { width: 320; spacing: 4
                 Txt { kind: "cap"; text: "Name" }
                 Field { id: name; objectName: "newName"; width: parent.width; placeholder: ns.chosen ? ns.chosen.title : "e.g. Hallway phone dock" } }
-            Column { width: parent.width - 332; spacing: 4
+            // what the design is for (form/purpose.py); starts from Settings › General, changeable later in the Brief
+            Column { width: 190; spacing: 4
+                Txt { kind: "cap"; text: "Made for" }
+                Pick { objectName: "newPurpose"; width: parent.width; value: Store.newPurposeEffective
+                    model: [{ value: "print", text: "3D printing" }, { value: "model", text: "Just a 3D model" }]
+                    onPicked: function (v) { Store.newPurpose = v } } }
+            Column { width: parent.width - 332 - 202; spacing: 4
                 Txt { kind: "cap"; text: "What it is for" }
                 Field { id: brief; width: parent.width; placeholder: ns.chosen && ns.chosen.section !== "builtin" && !ns.needsInstall ? "Optional. Creating it runs this recipe’s code on this computer." : "Optional. You can write this later." } } }
     }

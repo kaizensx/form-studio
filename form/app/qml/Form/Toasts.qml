@@ -17,9 +17,9 @@ Column {
             readonly property int life: modelData.bad ? 7000 : 3400
             readonly property int age: Date.now() - (modelData.ts || Date.now())
             width: tc.width; height: card.height
-            // over an open sheet a toast can sit on its buttons: there it lets clicks through and turns see-through
-            // under the pointer, so the button below is never blocked
-            readonly property bool overSheet: !!Store.sheet
+            // a toast can sit on a button anywhere (a sheet's, a setup step's Continue): it always lets clicks through
+            // and turns see-through under the pointer, so the button below is never blocked
+            readonly property bool overSheet: true
             opacity: overSheet && hov.hovered ? 0.18 : 1
             Behavior on opacity { NumberAnimation { duration: Theme.fast } }
             function leave() { if (leaving) return; leaving = true; out.start() }

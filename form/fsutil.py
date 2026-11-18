@@ -44,3 +44,21 @@ def replace_dir(src, dst, seconds: float = 3.0) -> None:
                 raise
             time.sleep(wait)
             wait = min(wait * 2, 0.2)
+
+
+def rmtree(path, seconds: float = 10.0) -> None:
+    """shutil.rmtree(path), retried while Windows reports a file or folder inside as busy (a process that just
+    ended can hold its working folder for a moment). A missing `path` is fine."""
+    end = time.monotonic() + seconds
+    wait = 0.05
+    while True:
+        try:
+            shutil.rmtree(path)
+            return
+        except FileNotFoundError:
+            return
+        except OSError:
+            if time.monotonic() >= end:
+                raise
+            time.sleep(wait)
+            wait = min(wait * 2, 0.5)

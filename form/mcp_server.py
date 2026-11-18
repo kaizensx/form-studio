@@ -33,7 +33,8 @@ from .digest import digest as _digest
 from .studio import H, Studio, StudioError
 
 INSTRUCTIONS = """\
-Form Studio designs 3D-printable parts from parametric recipes and keeps an honest record of what is known.
+Form Studio designs parts with a real CAD kernel, for 3D printing or as plain 3D models, and keeps an honest record of
+what is known.
 
 Workflow: form_overview -> describe_recipe -> create_project (or get_project) -> preview_change ->
 render (look at it) -> commit_change -> run_pipeline -> get_project (gate, checks, next actions) ->
@@ -47,6 +48,10 @@ Rules:
 - A slice is a simulation, not a print. Fit yield is a model. Say so when you report them.
 - You cannot approve a release. request_release returns a link that opens the release in Form Studio for the user.
 - Nothing here starts a print or sends files anywhere.
+- Every design has a purpose: "print" (for 3D printing) or "model" (just a 3D model: rendering, CAD exchange, CNC,
+  laser cutting, moulding). get_project reports it. For a model never ask about a printer, slicer, filament or
+  orientation; print checks and slicing do not apply. Pass purpose to create_project/create_design when the person
+  says what it is for; otherwise Form Studio uses their default (form_overview: purpose_default).
 - Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time,
   at most three per task. Outside Form Studio's chat it tells you to ask in your own interface.
 """
@@ -131,15 +136,20 @@ def build() -> MCPServer:
         st = studio()
         def go():
             env = st.environment()
-            return {
+            out = {
                 "version": env["version"], "kernel": env["kernel"], "printer": env["printer"],
                 "slicer": {k: env["slicer"].get(k) for k in ("kind", "available", "reason", "version")} |
                           {"presets": {k: v["name"] for k, v in env["slicer"].get("presets", {}).items()}},
                 "calibration_profile": env["profile"],
                 "recipes": [{"id": r.id, "title": r.title, "summary": r.summary} for r in st.recipes.builtins().values()],
-                "projects": [{k: q.get(k) for k in ("id", "name", "recipe", "head", "approved_rev")} for q in st.list()],
+                "projects": [{k: q.get(k) for k in ("id", "name", "recipe", "head", "approved_rev", "purpose")} for q in st.list()],
                 "data_dir": env["data_dir"], "bench": _bench(),
+                "has_printer": env["purpose"]["printing"], "purpose_default": env["purpose"]["default"],
             }
+            if not env["purpose"]["printing"]:      # someone who only designs: no printer talk at all
+                out.pop("printer"); out.pop("calibration_profile")
+                out["slicer"] = {"needed": False, "note": "This person does not 3D print. Do not suggest a printer or a slicer."}
+            return out
         return await _run(go)
 
     @mcp.tool(annotations=RO)
@@ -234,7 +244,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def create_design(name: str, source: str, brief: str = "", values: dict[str, float] | None = None,
                             run: bool = True, language: str = "python", references: list[str] | None = None,
-                            ctx: Context = None) -> dict:
+                            purpose: str | None = None, process: str | None = None, ctx: Context = None) -> dict:
         """Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
         built with build123d. FORM builds it, and with run=True exports, checks and slices it. Load or build errors come
         back with the line and a hint; fix and call again. Then render(view="sheet") and look at it.
@@ -244,10 +254,12 @@ def build() -> MCPServer:
         budget and say which joint ranges they reached.
         language="openscad": source is an OpenSCAD file; parameters come from Customizer comments (`w = 40; // [20:1:120]`).
         OpenSCAD output is a mesh: no STEP, no B-rep checks (reported as not available, never faked).
-        references: absolute paths of STEP/STL parts to import first, so a Python design can use self.reference("name.step")."""
+        references: absolute paths of STEP/STL parts to import first, so a Python design can use self.reference("name.step").
+        purpose: "print" (for 3D printing) or "model" (just a 3D model; not sliced, no print checks). Omitted: the
+        person's default. process (models only): cnc, laser, injection, casting, sheet_metal, render, cad, other."""
         st = studio()
         act(None, "design", f"Writing a new design: {name}", ctx)
-        p = await _run(st.create_design, name, source, brief, values, language, references)
+        p = await _run(st.create_design, name, source, brief, values, language, references, purpose, process)
         act(p["id"], "commit", f"Created {name} (r01)", ctx)
         if run:
             jid = st.run(p["id"])
@@ -284,12 +296,14 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def create_project(name: str, recipe: str, brief: str = "", values: dict[str, float] | None = None,
-                             run: bool = True, ctx: Context = None) -> dict:
+                             run: bool = True, purpose: str | None = None, process: str | None = None,
+                             ctx: Context = None) -> dict:
         """Create a project from a built-in recipe (form_overview lists them: gridfinity_bin, storage_box, pegboard, device_stand, ...).
         For anything else, write a design: design_guide, then create_design. values override recipe defaults (all start as 'assumed').
-        With run=True the solid, exports and checks are built (and sliced if a slicer is available)."""
+        With run=True the solid, exports and checks are built (and sliced if a slicer is available and it is for printing).
+        purpose: "print" or "model" (just a 3D model); omitted: the person's default. process: see create_design."""
         st = studio()
-        p = await _run(st.create, name, recipe, brief, values)
+        p = await _run(lambda: st.create(name, recipe, brief, values, purpose=purpose, process=process))
         act(p["id"], "commit", f"Created {name} from the {recipe} recipe", ctx)
         if run:
             jid = st.run(p["id"])
@@ -462,13 +476,15 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def set_print_setup(project: str, orientation: str | None = None, fit_gap_min_mm: float | None = None,
                               fit_gap_max_mm: float | None = None, auto_slice: bool | None = None,
-                              design_only: bool | None = None, material: str | None = None) -> dict:
+                              design_only: bool | None = None, material: str | None = None,
+                              purpose: str | None = None, process: str | None = None) -> dict:
         """Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from
         suggest_orientation), the acceptable total fit gap
         window, and whether the pipeline slices automatically. The checks include an orientation comparison table.
         design_only=True: the design is not sliced (checks, exports and release still work; the release says it was
         not sliced). material: PLA, PETG, ABS, ASA, TPU, PA, PC, ... for the whole design ("" clears): the slice uses the
-        printer's filament preset for it and the checks add notes for that material. Ask the user before changing either."""
+        printer's filament preset for it and the checks add notes for that material. Ask the user before changing either.
+        purpose: "print" or "model" (just a 3D model, never sliced); process: for a model, how it will be made."""
         st = studio()
         body: dict[str, Any] = {}
         if orientation is not None:
@@ -483,6 +499,10 @@ def build() -> MCPServer:
             body["design_only"] = design_only
         if material is not None:
             body["material"] = material
+        if purpose is not None:
+            body["purpose"] = purpose
+        if process is not None:
+            body["process"] = process
         await _run(lambda: st.settings(st.load(project), body))
         jid = st.run(project)
         await _wait_job(st, jid, 45)

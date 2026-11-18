@@ -33,7 +33,12 @@ def digest(st, pid: str, bench: str | None = None) -> dict:
                          "evidence": s["gate"]["evidence_level"].replace(" · ", "; ")},
         "approval": s["approval"],
         "orientation": p["orientation"],
+        "purpose": s["purpose"],
     }
+    if s["purpose"]["purpose"] == "model":           # not for printing: say so, so an agent never asks for a printer
+        del out["orientation"]
+        out["purpose"]["note"] = ("A 3D model, not for 3D printing: no printer, slicer, orientation or filament applies. "
+                                  "Do not ask the person about a printer. Print checks are not run.")
     if getattr(recipe, "mesh", False):
         out["mesh_design"] = recipe.public().get("notes", [])
     parts = [r for r in p["brief"].get("references", []) if r.get("kind") == "part"]

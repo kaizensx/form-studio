@@ -40,9 +40,14 @@ jobs:
             libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
             libxcb-shape0 libxcb-xinerama0 libxcb-xfixes0 libgl1-mesa-dri xvfb
       - name: Install
+        shell: bash
+        env:
+          UV_HTTP_TIMEOUT: "120"
         run: |
           uv venv --python 3.12 .venv
-          uv pip install --python .venv -e ".[all]"
+          # retried: a large wheel (cadquery-ocp) sometimes times out on the runner's network
+          for i in 1 2 3; do uv pip install --python .venv -e ".[all]" && break
+            [ "$i" = 3 ] && exit 1; echo "Install failed; retrying in 20 s."; sleep 20; done
       - name: Install PrusaSlicer
         # A real slicer on every platform, so the journeys slice, simulate and release for real.
         shell: bash

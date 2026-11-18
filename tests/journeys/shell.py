@@ -93,7 +93,7 @@ def journey_new_sheet_tabs(ui):
     ui.key("Ctrl+N")
     open_sheet_wait(ui, "new")
     card = ui.item("sheetCard")
-    ui.click_text("Planter", within=card, exact=False)
+    ui.click_text("Self-watering planter", within=card, exact=False)
     ui.wait_until(lambda: ui.item(text="Create design").property("enabled") is True, 2, "a recipe to be picked")
     # the brief tab: templates, questions
     ui.click_text("From a brief", within=card, exact=False)
@@ -119,9 +119,11 @@ def journey_settings_saves_to_the_file(ui):
     ui.settle(200)
     save = ui.item(text="Save", within=card, exact=False)
     ui.check(save.property("enabled") is False, "Save is off until something changes")
-    row = [r for r in ui.js("Store.config.settings") if r["type"] == "bool" and r["tab"] == "general"][0]
+    ui.click_text("Updates", within=card)            # General has the printer choice (applied at once); Updates has switches
+    ui.settle(300)
+    row = [r for r in ui.js("Store.config.settings") if r["type"] == "bool" and r["tab"] == "updates"][0]
     toggles = [t for t in ui.find_all(within=card) if t.metaObject().className().startswith("Toggle")]
-    ui.check(toggles, "the General tab has a switch")
+    ui.check(toggles, "the Updates tab has a switch")
     ui.click(toggles[0])
     ui.wait_until(lambda: save.property("enabled") is True, 2, "Save to turn on after a change")
     ui.shot("sheet-settings-dirty")
@@ -144,7 +146,7 @@ def journey_settings_saves_to_the_file(ui):
     ui.wait_until(lambda: tomllib.loads(cfg.read_text(encoding="utf-8"))[sec][key] == row["value"], 10, "the setting to be restored by Enter")
     ui.check(any(p.name.startswith(cfg.name) and p != cfg for p in cfg.parent.iterdir()), "a backup was made next to studio.toml")
     # the other tabs render
-    for tab in ("Printer and slicer", "Agents", "Software"):
+    for tab in ("Printing", "Agents", "Other apps", "Advanced", "Software"):
         ui.click_text(tab, within=card)
         ui.settle(300)
     ui.shot("sheet-settings-software")

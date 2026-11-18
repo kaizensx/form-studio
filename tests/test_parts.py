@@ -246,7 +246,10 @@ class Pipeline(unittest.TestCase):
                 steps = {s["node"]: s["state"] for s in job["steps"]}
                 for n in ("geometry", "exports", "checks"):
                     self.assertEqual(steps[n], "done", job)
-                self.assertIn(steps["slice"], ("done", "blocked"), job)
+                if st.slice_mode(st.load(p["id"]))["on"]:
+                    self.assertIn(steps["slice"], ("done", "blocked"), job)
+                else:                                           # Design only (no slicer here): the slice is not a step
+                    self.assertNotIn("slice", steps, job)
                 checks = st.read(st.load(p["id"]), "checks", st.keys(st.load(p["id"]))["checks"])["checks"]
                 self.assertFalse([c for c in checks if c["status"] == "FAIL"], checks)
             finally:

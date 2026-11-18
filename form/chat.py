@@ -39,7 +39,8 @@ MAX_RUNNING = 3
 RECAP_CHARS = 6000
 
 PROMPT = """\
-You are working inside Form Studio, a design studio for 3D-printed parts. The user is looking at Form Studio's page: every Form Studio
+You are working inside Form Studio, a design studio for parts made with a real CAD kernel: for 3D printing, or as
+plain 3D models (rendering, CAD exchange, CNC, laser cutting, moulding). The user is looking at Form Studio's page: every Form Studio
 tool you call shows up there live (3D model, drafts, checks, slice), so you do not need to describe geometry at length.
 - Use Form Studio tools for all design work. Built-in recipes (dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob): create_project.
   Anything else: call design_guide, then write the design as code with create_design; iterate with update_design.
@@ -57,8 +58,19 @@ tool you call shows up there live (3D model, drafts, checks, slice), so you do n
   STEP/STL parts: import_reference(project, path), never read them as text.
 - Reply briefly: what you made, the key numbers, what is assumed or unverified, and what the user should check.
   Slices are simulations and fit yields are models; say so. You cannot approve releases; point to the Release tab.
+- Every design has a purpose (get_project reports it). For a "model" (not for 3D printing) never ask about a
+  printer, slicer, filament or print orientation, and do not talk about printing; pass purpose="model" to
+  create_project/create_design when the person says it is not for printing. {printing}
 Current project on the page: {project}.
 """
+
+
+def system_prompt(cfg: dict, project: str | None) -> str:
+    """The instructions every in-app agent gets: the project on the page, and whether this person prints at all."""
+    from . import purpose
+    note = ("This person has a 3D printer; new designs are for printing unless they say otherwise." if purpose.printing(cfg) else
+            "This person does not 3D print: new designs are 3D models (pass purpose=\"model\"), and never suggest a printer or a slicer.")
+    return PROMPT.format(project=project or "none (start a new one if asked)", printing=note)
 
 
 def _adapters(cfg: dict) -> dict:
@@ -177,6 +189,7 @@ class ChatJob:
         self.before: set | None = None         # project ids that existed when the message was sent
         self.attachments: list[dict] = []
         self.stop_asked = False
+        self.thread: threading.Thread | None = None
         self.ask = False                       # someone can answer ask_user (the app, or a terminal)
         self.asked: set = set()                # question ids already shown in the conversation
         self.waiting: dict | None = None       # the open question, while the agent waits for an answer
@@ -297,8 +310,22 @@ class Chat:
                 user["attachments"] = job.attachments
             job.events[0] = self.store.append(cid, user)
             self.jobs[job.id] = job
-        threading.Thread(target=self._run, args=(job, adapter, exe), daemon=True, name=f"form-chat-{job.id}").start()
+        job.thread = threading.Thread(target=self._run, args=(job, adapter, exe), daemon=True, name=f"form-chat-{job.id}")
+        job.thread.start()
         return job
+
+    def shutdown(self, seconds: float = 15.0) -> None:
+        """The app is quitting: stop every running message and wait (up to `seconds`) until each has ended with the
+        agent and its tool server, so nothing keeps running in a conversation's folder after Form Studio is gone."""
+        jobs = list(self.jobs.values())
+        for j in jobs:
+            if j.state == "running":
+                self.stop(j.id)
+        end = time.time() + seconds
+        for j in jobs:
+            t = getattr(j, "thread", None)
+            if t is not None and t.is_alive():
+                t.join(max(0.0, end - time.time()))
 
     def start(self, message: str, project: str | None = None, session: str | None = None) -> ChatJob:
         """The older entry point (web bench): continue the conversation that owns `session`, or start a new one."""
@@ -411,6 +438,9 @@ class Chat:
         except (TypeError, ValueError):
             return ask_mod.DEFAULT_TIMEOUT
 
+    def _system(self, job: ChatJob) -> str:
+        return system_prompt(self.cfg, job.project)
+
     def _prompt(self, job: ChatJob, with_recap: bool) -> str:
         parts = []
         if with_recap and job.conversation:
@@ -446,7 +476,7 @@ class Chat:
                 fdir = self.store.files_dir(job.conversation) if job.conversation else cwd
                 files = [fdir / a["file"] for a in job.attachments]
                 run = Run(message=self._prompt(job, with_recap=had_history and not job.session),
-                          system=PROMPT.format(project=job.project or "none (start a new one if asked)"),
+                          system=self._system(job),
                           model=job.model, effort=job.effort, session=job.session, cwd=cwd, scratch=tmp, mcp=self._mcp(job),
                           tool_timeout_s=self._ask_timeout() + 300,
                           web=bool(c.get("web", True)), budget_usd=float(c.get("budget_usd_per_message", 3.0)),
@@ -535,7 +565,7 @@ class Chat:
                 fdir = self.store.files_dir(job.conversation) if job.conversation else cwd
                 files = [fdir / a["file"] for a in job.attachments]
                 run = Run(message=self._prompt(job, with_recap=had_history and not job.session),
-                          system=PROMPT.format(project=job.project or "none (start a new one if asked)"),
+                          system=self._system(job),
                           model=job.model, effort=job.effort, session=job.session, cwd=cwd, scratch=cwd, mcp=self._mcp(job),
                           tool_timeout_s=self._ask_timeout() + 300, web=False,
                           budget_usd=float(c.get("budget_usd_per_message", 3.0)),
