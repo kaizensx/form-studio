@@ -67,6 +67,14 @@ def journey_design_only_everywhere(ui):
     ui.click("stage-prove")
     ui.wait_until(lambda: ui.store.get("stage") == "prove", 3, "the Prove stage")
     ui.expect("Slicing is turned off for every design.")
-    ui.click_text("Turn slicing on")
-    ui.wait_until(lambda: data(ui)["status"]["slice"].get("off", {}).get("why") == "no_slicer", 10, "slicing on again (still no slicer)")
+    on = lambda: data(ui)["status"]["slice"].get("off", {}).get("why") == "no_slicer"
+    for attempt in range(2):                           # the Prove panel can still be laying out: click once it holds still
+        ui.settle(400)
+        ui.click_text("Turn slicing on")
+        try:
+            ui.wait_until(on, 30, "slicing on again (still no slicer)")
+            break
+        except Exception:
+            if attempt or on():
+                raise
     print("  " + json.dumps(data(ui)["status"]["slice"]["off"]))
