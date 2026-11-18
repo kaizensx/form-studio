@@ -1,0 +1,41 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions and notes about printers, slicers, presets and filaments. Mark the reply that solved it as the answer, so the next person finds it.
+        A slicer or printer that does not work at all is a bug: [open a slicer or printer issue](https://github.com/kaizensx/form-studio/issues/new?template=4-slicer-printer.yml).
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What you are trying to print or slice, and what happens.
+    validations:
+      required: true
+  - type: input
+    id: printer
+    attributes:
+      label: Printer and nozzle
+      placeholder: "Bambu Lab A1 mini · 0.4 mm"
+    validations:
+      required: true
+  - type: input
+    id: slicer
+    attributes:
+      label: Slicer, version and preset
+      placeholder: "Bambu Studio 02.09.01.70 · 0.20mm Standard @BBL A1M · Generic PLA"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+  - type: textarea
+    id: output
+    attributes:
+      label: What Form Studio reported
+      description: The slice line under Prove, or the output of `form doctor` and `form printers`. Paste text, not screenshots, where you can.
+      render: text
