@@ -12,10 +12,10 @@
 - **Every MCP tool from the terminal.** `form tool` lists them; `form tool NAME '{json}'` calls any of them headless with the same arguments, checks and refusals as over MCP, so everything an agent can do is also a command.
 - **Every file of a release from the terminal.** `form release-files <project> [release] [--out FILE.zip]` writes the same .zip as **Save files…**: models, G-code, the sliced 3MF, report, documents and manifest.
 - **A Discord community server** with the Form Studio bot: releases, discussions, issues, pull requests and a weekly digest are posted there from GitHub Actions.
-
 - **Motion that follows where you go.** Screens hand over by depth (going into a design the workspace grows in and its inspector slides after it; going back, Home settles), Prove counts its results up and the checks rise in one after another, chat messages rise into place with a caret while a reply is written, step groups unfold in a cascade, and focus rings close in on the control. Reduced motion keeps only the fades.
 - **The mark is the loader.** The opening screen builds the Form Studio mark while the CAD kernel starts, and every loading state in the app is the same mark building itself.
 - **Save a whole release.** Release › Releases › **Save files…** saves every file of a release in one .zip (STEP, STL, sliced 3MF, G-code, report, documents); **Show in Finder** opens its folder.
+- **Opening a design from Home:** an outline grows from where you typed into the 3D view.
 
 ## 12.1.0
 
