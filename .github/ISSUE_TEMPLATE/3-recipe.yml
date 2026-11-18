@@ -9,6 +9,9 @@ body:
         A recipe is a family of objects: typed parameters in, one valid solid out. See
         [Writing a recipe](https://kaizensx.github.io/form-studio/docs/recipes.html) and the
         [community gallery format](https://github.com/kaizensx/form-studio/tree/main/community/recipes).
+
+        Submitting from Form Studio (**Share › Share to the community**) fills in the fields below. Drag `preview.png`
+        from the submission folder it saved into the Preview box, choose **This is**, then submit.
   - type: dropdown
     id: kind
     attributes:
@@ -16,6 +19,7 @@ body:
       options:
         - A request for a recipe
         - A recipe I wrote and will submit as a pull request
+        - A recipe I am submitting for the community gallery
     validations:
       required: true
   - type: textarea
@@ -47,3 +51,24 @@ body:
         - Python (build123d)
         - OpenSCAD
         - Either
+  - type: input
+    id: recipe_id
+    attributes:
+      label: Recipe id
+      description: The folder name under community/recipes/. Lowercase letters, digits and hyphens.
+      placeholder: cable-clip
+  - type: textarea
+    id: recipe_meta
+    attributes:
+      label: meta.json
+      description: What the gallery shows. Form Studio fills this in from the recipe.
+  - type: textarea
+    id: recipe_code
+    attributes:
+      label: Recipe code
+      description: The whole recipe.py or recipe.scad. If it is too long for the link, drag the file here.
+  - type: textarea
+    id: preview
+    attributes:
+      label: Preview
+      description: Drag preview.png from the saved submission folder here (about 960 × 560, the part at its default values).

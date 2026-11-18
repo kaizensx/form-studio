@@ -31,7 +31,11 @@ def _call(fn, *a, **kw):
 
 
 def route_get(st, path: str, q: dict):
-    from . import bundle, recipe_lib, starters, whatsnew
+    from . import bundle, recipe_lib, recipe_share, starters, whatsnew
+    if path.startswith("/api/recipes/"):          # sharing: packages, submissions, a design as a recipe (form/recipe_share.py)
+        got = _call(recipe_share.route_get, st, path, q)
+        if got is not None:
+            return got
     if path == "/api/starters":
         return starters.for_studio(st, limit=int(q.get("limit") or 8))
     if path == "/api/recipes/library":
@@ -69,8 +73,12 @@ def route_get(st, path: str, q: dict):
 
 
 def route_post(st, path: str, body, q: dict):
-    from . import bundle, recipe_lib, starters, whatsnew
+    from . import bundle, recipe_lib, recipe_share, starters, whatsnew
     b = body if isinstance(body, dict) else {}
+    if path.startswith("/api/recipes/"):          # sharing (form/recipe_share.py)
+        got = _call(recipe_share.route_post, st, path, body, q)
+        if got is not None:
+            return got
     if path.startswith("/api/starters/"):
         verb = path.rsplit("/", 1)[1]
         root = st.root

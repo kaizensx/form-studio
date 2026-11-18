@@ -20,6 +20,7 @@ they press Install. An unreachable or empty index is not an error: the Community
     form recipes install FILE --sha256 HEX
     form recipes community [--refresh]
     form recipes uninstall ID
+    form recipes export|import|submit|derive ...   sharing; see form/recipe_share.py
 """
 from __future__ import annotations
 
@@ -29,12 +30,15 @@ import json
 import os
 import re
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 DIR = ".recipes"
 PENDING = ".pending"
 INDEX_URL = "https://kaizensx.github.io/form-studio/recipes/index.json"
+REPO = "https://github.com/kaizensx/form-studio"
+DISCUSSIONS = REPO + "/discussions"
 CACHE = ".form-community.json"
 TTL = 3600
 MAX_SOURCE = 200_000
@@ -287,10 +291,17 @@ def _norm(e) -> dict | None:
     local = os.environ.get("FORM_RECIPES_INDEX") and isinstance(e.get("url"), str) and e["url"].startswith("file:")
     url = e.get("url") if isinstance(e.get("url"), str) and (e["url"].startswith("https://") or local) else None
     prev = e.get("preview") if isinstance(e.get("preview"), str) and e["preview"].startswith("https://") else None
-    return {"id": e["id"], "title": str(e["title"])[:80], "summary": str(e.get("summary") or "")[:300],
+    disc = e.get("discussion") if isinstance(e.get("discussion"), str) and e["discussion"].startswith(DISCUSSIONS) else None
+    added = e.get("added") if isinstance(e.get("added"), str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", e["added"]) else None
+    n = e.get("params_count") if isinstance(e.get("params_count"), int) and 0 <= e["params_count"] < 1000 else None
+    title = str(e["title"])[:80]
+    return {"id": e["id"], "title": title, "summary": str(e.get("summary") or "")[:300],
             "author": str(e.get("author") or "")[:80], "tags": [str(t)[:24] for t in (e.get("tags") or []) if isinstance(t, str)][:8],
             "kind": kind, "builtin": bool(e.get("builtin")), "url": url,
-            "sha256": sha if re.fullmatch(r"[0-9a-f]{64}", sha) else None, "preview": prev}
+            "sha256": sha if re.fullmatch(r"[0-9a-f]{64}", sha) else None, "preview": prev, "params": n, "added": added,
+            # ratings need a server; the conversation about a recipe lives in the repository's Discussions
+            "discussion": disc or DISCUSSIONS + "?discussions_q=" + urllib.parse.quote(f'"{title}"'),
+            "page": None if e.get("builtin") else f"{REPO}/tree/main/community/recipes/{e['id']}"}
 
 
 def parse_index(data: bytes) -> list[dict]:
@@ -428,6 +439,12 @@ def search(items: list[dict], q: str = "", section: str = "", tag: str = "", sor
     order = {s: i for i, s in enumerate(SECTIONS)}
     if sort == "recent":
         out.sort(key=lambda i: (-(i.get("installed_at") or 0), i.get("title", "").lower()))
+    elif sort == "added":                    # newest in the gallery first (the date its folder was added), then installed
+        out.sort(key=lambda i: (i.get("added") or "", i.get("installed_at") or 0), reverse=True)
+    elif sort == "author":
+        out.sort(key=lambda i: (str(i.get("author") or "~").lower(), i.get("title", "").lower()))
+    elif sort == "params":
+        out.sort(key=lambda i: (-(i.get("params") or 0), i.get("title", "").lower()))
     else:
         out.sort(key=lambda i: (order.get(i.get("section"), 9), i.get("title", "").lower()))
     return out
@@ -458,12 +475,15 @@ def main(argv=None) -> int:
 
     from . import config
     ap = argparse.ArgumentParser(prog="form recipes", description="The recipe library: built-in, installed, community.")
+    if argv and argv[0] in ("export", "import", "submit", "derive"):          # sharing: form/recipe_share.py
+        from .recipe_share import main as share_main
+        return share_main(argv[0], argv[1:])
     ap.add_argument("verb", nargs="?", default="list", choices=["list", "inspect", "install", "uninstall", "community", "source"])
     ap.add_argument("arg", nargs="?")
     ap.add_argument("--q", default="")
     ap.add_argument("--section", default="", choices=["", *SECTIONS])
     ap.add_argument("--tag", default="")
-    ap.add_argument("--sort", default="name", choices=["name", "recent"])
+    ap.add_argument("--sort", default="name", choices=["name", "recent", "added", "author", "params"])
     ap.add_argument("--sha256", default="", help="the hash `inspect` printed; install refuses anything else")
     ap.add_argument("--refresh", action="store_true")
     a = ap.parse_args(argv)
