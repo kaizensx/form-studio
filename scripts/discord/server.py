@@ -160,9 +160,6 @@ ONBOARDING = [
         ("Getting help", "Guides and the help forum", [], ["help", "guides"]),
         ("Building Form Studio", "The code, CI and GitHub channels", [], ["contributing", "github", "ci"]),
     ]),
-    ("Which system do you use?", [
-        ("macOS", "", ["macOS"], []), ("Windows", "", ["Windows"], []), ("Linux", "", ["Linux"], []),
-    ]),
     ("What do you print with?", [
         ("Bambu Lab", "", ["Bambu Lab"], []), ("Prusa", "", ["Prusa"], []), ("Creality", "", ["Creality"], []),
         ("Another printer", "Elegoo, Anycubic, Voron, Snapmaker…", ["Other printer"], []),
@@ -176,7 +173,13 @@ ONBOARDING = [
     ("Get a mention for every stable release?", [
         ("Yes, mention me", "In #announcements, a few times a month at most", ["Release pings"], []),
     ]),
+    ("Which system do you use?", [
+        ("macOS", "", ["macOS"], []), ("Windows", "", ["Windows"], []), ("Linux", "", ["Linux"], []),
+    ]),
 ]
+
+# Discord shows a few questions while joining; the rest are in Channels & Roles (<id:customize>).
+ONBOARDING_SHOWN = 4
 
 # ---- the Server Guide (Server Settings › Onboarding › Server Guide) ---------------------------------------------------
 # Applied in the browser (the API has no endpoint a bot may use); kept here so it can be set again the same way.

@@ -237,6 +237,10 @@ class Setup:
             raise SystemExit(f"no #{name}")
         return c
 
+    def fresh(self, name):
+        c = self.channel(name)
+        return c if self.dry or c["id"] == "0" else d.call("GET", f"/channels/{c['id']}")
+
     def mention(self, name):
         return f"<#{self.channel(name)['id']}>"
 
@@ -282,7 +286,8 @@ class Setup:
                     opts.append({"id": old.get(label, str(base + 1000 + 100 * i + j)), "title": label,
                                  "description": desc, "role_ids": role_ids, "channel_ids": chan_ids})
             prompts.append({"id": have.get(title, {}).get("id", str(base + 10 + i)), "type": 0, "title": title,
-                            "options": opts, "single_select": False, "required": False, "in_onboarding": True})
+                            "options": opts, "single_select": False, "required": False,
+                            "in_onboarding": i < S.ONBOARDING_SHOWN})
         defaults = [self.channel(n)["id"] for _, chans in S.LAYOUT for n, t, _, o in chans
                     if o.get("default") and t in (S.TEXT, S.NEWS, S.FORUM) and self.find(n)]
         self._try("onboarding", lambda: self._do(
@@ -303,6 +308,8 @@ class Setup:
             # one rule per guild for spam (3), keyword presets (4) and mention spam (5): match those by type
             have = next((r for r in rules if (r["trigger_type"] == trigger and trigger in (3, 4, 5))
                          or r["name"] == name), None)
+            if have is not None and have.get("creator_id") != self.me["id"] and trigger == 5:
+                continue                     # Discord's own mention-spam rule cannot be edited by a bot; it is kept
             if have is None:
                 self._try(f"automod {name}", lambda: self._do("POST", f"/guilds/{self.g}/auto-moderation/rules",
                                                               body, f"AutoMod: {name}"))
@@ -478,7 +485,7 @@ class Setup:
             self._try("pin post", lambda: d.call("PATCH", f"/channels/{t['id']}", {"flags": PINNED}))
 
     def guides(self):
-        forum = self.channel("guides")
+        forum = self.fresh("guides")
         threads = self.forum_threads(forum["id"])
         # newest first in the forum: post the last guide first so Guide 01 ends up on top
         for i, (title, tag, _art, text, links) in reversed(list(enumerate(S.GUIDES, 1))):
@@ -494,7 +501,7 @@ class Setup:
         if not RECIPES.exists():
             log("no site/recipes/index.json: recipes skipped")
             return
-        forum = self.channel("recipes")
+        forum = self.fresh("recipes")
         threads = self.forum_threads(forum["id"])
         for r in reversed(json.loads(RECIPES.read_text(encoding="utf-8"))["recipes"]):
             src = (f"{S.REPO}/blob/main/form/recipes/{r['id']}.py" if r.get("builtin")
