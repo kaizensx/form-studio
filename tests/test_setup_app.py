@@ -208,6 +208,12 @@ class Versions(unittest.TestCase):
         self.assertFalse(updates.newer("10.0.0", "10.0.0"))
         self.assertFalse(updates.newer("9.9.9", "10.0.0"))
         self.assertTrue(updates.newer("10.0.10", "10.0.9"))         # numeric, not lexical
+        # the development builds (5.0.0 to 12.3.0) came before the public 1.0.0
+        self.assertTrue(updates.newer("1.0.0", "12.3.0"))
+        self.assertTrue(updates.newer("v1.1.0", "11.1.1"))
+        self.assertFalse(updates.newer("12.3.0", "1.0.0"))
+        self.assertTrue(updates.newer("1.0.1", "1.0.0"))
+        self.assertFalse(updates.newer("1.0.0", "1.1.0"))
 
     def test_prereleases(self):
         self.assertTrue(updates.newer("10.1.0", "10.1.0rc1"))       # final beats its pre-release
@@ -293,10 +299,10 @@ class UpdateCheck(unittest.TestCase):
         self.assertTrue(u["available"])
 
     def test_not_newer(self):
-        with mock.patch("urllib.request.urlopen", return_value=_release("v1.0.0")):
+        with mock.patch("urllib.request.urlopen", return_value=_release("v9.0.0")):
             u = updates.check(self.cfg)
         self.assertFalse(u["available"])
-        self.assertEqual(u["latest"], "1.0.0")
+        self.assertEqual(u["latest"], "9.0.0")
 
     def test_off_switches(self):
         with mock.patch("urllib.request.urlopen", side_effect=AssertionError("no network when off")):

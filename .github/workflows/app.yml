@@ -2,7 +2,7 @@ name: Desktop app
 
 # Builds the FORM desktop app for macOS (Apple Silicon and Intel), Windows and Linux.
 # Every push to main (stable) or dev (integration) builds and uploads the bundles as workflow artifacts.
-# A tag like v12.0.0 attaches them to a draft stable release; a tag like v12.0.0-preview.1 publishes a pre-release
+# A tag like v1.1.0 attaches them to a draft stable release; a tag like v1.1.0-preview.1 publishes a pre-release
 # for the Preview update channel. The release job (tags only) also writes the notes from the tag's CHANGELOG.md
 # section, attaches SHA256SUMS and an SPDX SBOM of the source tree, and signs build provenance attestations for the
 # four bundles (verify with `gh attestation verify <file> --repo kaizensx/form-studio`).
@@ -151,7 +151,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          # A plain tag (v12.0.0) makes a draft stable release; a tag with a suffix (v12.0.0-preview.1) a pre-release.
+          # A plain tag (v1.1.0) makes a draft stable release; a tag with a suffix (v1.1.0-preview.1) a pre-release.
           if [[ "$TAG" == *-* ]]; then KIND=(--prerelease); else KIND=(--draft); fi
           VERSION="${TAG#v}"
           if gh release view "$TAG" >/dev/null 2>&1; then
