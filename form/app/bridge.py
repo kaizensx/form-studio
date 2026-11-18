@@ -171,6 +171,7 @@ class Bridge(QObject):
         return self._rm
 
     reducedMotion = Property(bool, _reduced, constant=True)
+    underTest = Property(bool, lambda self: bool(getattr(self, "under_test", False)), constant=True)   # interaction tests: no splash
 
     def _qt(self) -> str:
         import PySide6

@@ -122,7 +122,7 @@ Window {
     }
     Loader { anchors.top: top.bottom; anchors.bottom: parent.bottom; width: parent.width; z: 30; active: Store.welcome; sourceComponent: Welcome {} }
     // the opening screen: the mark builds itself while the kernel starts; it stays at least until the mark is drawn
-    Splash { anchors.fill: parent; z: 90; done: Store.screen !== "boot" && splashMin.ran
+    Splash { anchors.fill: parent; z: 90; visible: !win.headless && !Bridge.underTest && opacity > 0; done: Store.screen !== "boot" && splashMin.ran
         Timer { id: splashMin; property bool ran: win.headless; interval: 2300; running: true; onTriggered: ran = true } }
     Toasts { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 18; z: 80 }
     ActivityBar { anchors.top: top.bottom; width: parent.width; z: 70 }          // named engine work over 300 ms, with progress
