@@ -3,7 +3,7 @@
     python scripts/ci/release_notes.py changelog --tag v1.1.0 [--changelog CHANGELOG.md] [--out notes.md]
     python scripts/ci/release_notes.py draft [--base dev] [--dry-run]
 
-`changelog` writes the notes for a version tag from its CHANGELOG.md section ("## 12.0.0"). A pre-release tag such as
+`changelog` writes the notes for a version tag from its CHANGELOG.md section ("## 1.0.0"). A pre-release tag such as
 v1.1.0-preview.2 uses the section of 1.1.0, or "## Unreleased" when that does not exist yet. The notes end with how to
 verify the download (SHA256SUMS and the build attestations).
 

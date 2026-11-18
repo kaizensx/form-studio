@@ -761,6 +761,12 @@ html { scroll-padding-top: calc(var(--nav-h) + 8px); }
 .hero-copy { text-align: center; display: grid; justify-items: center; gap: 26px; }
 .hero .eyebrow { display: inline-flex; align-items: center; gap: 10px; color: var(--ink2); font-weight: 520; padding: 6px 14px 6px 11px; border-radius: 999px; border: 1px solid var(--rule2); background: color-mix(in srgb, var(--plate1) 70%, transparent); }
 .hero .eyebrow .pip { width: 6px; height: 6px; border-radius: 50%; background: var(--datum); box-shadow: 0 0 0 4px color-mix(in srgb, var(--datum) 18%, transparent); }
+.hero .eyebrow .launch { display: inline-flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
+.hero .eyebrow .launch b { color: var(--ink); font-weight: 650; }
+.hero .eyebrow .launch span[aria-hidden] { transition: transform .25s cubic-bezier(.2,.7,.2,1); }
+.hero .eyebrow:hover { border-color: color-mix(in srgb, var(--datum) 55%, var(--rule2)); }
+.hero .eyebrow:hover .launch span[aria-hidden] { transform: translateX(3px); }
+@media (max-width: 520px) { .hero .eyebrow .launch { font-size: 12px; gap: 6px; } }
 .hero-title { font-size: clamp(3.4rem, 10.6vw, 9.8rem); line-height: .92; letter-spacing: -.052em; font-weight: 650; margin: 0; }
 .hero-title .ln { display: block; overflow: hidden; padding: 0 .04em .07em; margin-bottom: -.07em; }
 .hero-title .ln > span { display: inline-block; background: linear-gradient(180deg, var(--ink) 35%, color-mix(in srgb, var(--ink) 58%, var(--plate))); -webkit-background-clip: text; background-clip: text; color: transparent; }

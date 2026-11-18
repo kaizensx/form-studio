@@ -39,7 +39,7 @@ body:
     attributes:
       label: Form Studio version
       description: Shown in About, or as "current" in `form update --check`.
-      placeholder: "11.1.1"
+      placeholder: "1.0.0"
     validations:
       required: true
   - type: dropdown

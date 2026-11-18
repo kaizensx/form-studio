@@ -16,6 +16,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/kaizensx/form-studio/releases/tag/v1.0.0"><b>Form Studio 1.0.0 is out: the first public release.</b></a> &nbsp;<a href="CHANGELOG.md">What is in it →</a>
+</p>
+
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.svg">
     <img src="docs/readme/hero-light.svg" width="100%" alt="Form Studio, drawn from the app. On Home, a request is typed into the composer: a stand for my phone on the desk, leaning back 20 degrees, with a slot for the charging cable. The workspace opens; the Desk phone stand is built by the CAD kernel, 70.0 by 115.6 by 88.9 mm; all 11 checks pass and the slicer estimates 1 h 56 min and 72.4 g.">

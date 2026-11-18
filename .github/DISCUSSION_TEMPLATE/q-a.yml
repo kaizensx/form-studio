@@ -10,7 +10,7 @@ body:
     attributes:
       label: Your setup
       description: Form Studio version, operating system, agent and slicer.
-      placeholder: "11.1.1 · Windows 11 · Codex · OrcaSlicer 2.5.1"
+      placeholder: "1.0.0 · Windows 11 · Codex · OrcaSlicer 2.5.1"
   - type: textarea
     id: tried
     attributes:
