@@ -14,11 +14,12 @@ Projects live in `~/FORM` by default. Set `FORM_DATA` to use another folder, and
 ## Quick start
 
 ```bash
-form examples add                                  # copy the example designs into your projects
-form run hallway-phone-dock                        # solid, exports, checks and slice
-form simulate hallway-phone-dock --png sim.png     # the print, drawn from the G-code
-form share hallway-phone-dock --out card.png       # a share card
-form chat "Make the base 92 mm deep" --project hallway-phone-dock --agent codex
+form start --text "A stand for my phone, 9.5 mm thick" --photo phone.jpg   # start the way Home does
+form new "Desk stand" device_stand device_width=75.6                    # or from a recipe: solid, exports, checks, slice
+form commit desk-stand lean=18 --expect-head 1                          # a new revision, rebuilt and checked
+form simulate desk-stand --png sim.png --layer 40                       # the print, drawn from the G-code
+form share desk-stand --out card.png                                    # a share card
+form chat "Make the base 92 mm deep" --project desk-stand --agent codex
 ```
 
 ## Apps and servers
@@ -33,8 +34,8 @@ form chat "Make the base 92 mm deep" --project hallway-phone-dock --agent codex
 
 | Command | Does |
 |---|---|
-| `form setup` | Find what is missing and fix what you choose. `--check` prints the findings as JSON, `--yes` accepts every fix, `--dry-run` shows the commands only |
-| `form doctor` | The kernel, slicer, printer and agents Form Studio found |
+| `form setup` | Find what is missing and fix what you choose. `--check` prints the findings as JSON, `--yes` accepts every fix, `--dry-run` shows the commands only, `--auto` installs everything needed hands-free and waits where you must act (`--no-wait` skips those steps) |
+| `form doctor` | The kernel, slicer, printer, purpose and agents Form Studio found |
 | `form install --list` | Everything Form Studio can install: parts libraries, slicers, agents, OpenSCAD, Blender, FreeCAD |
 | `form install <id>` | Install one item, after showing its commands (`--yes`, `--dry-run`) |
 | `form config get [key]` / `form config set <key> <value>` | Read or change `studio.toml` |
@@ -70,17 +71,20 @@ message, with what the design is for.
 |---|---|
 | `form list` | Every project |
 | `form recipe <recipe>` | A recipe's parameters, features and checks |
-| `form new <name> <recipe> [key=value ...] [--brief TEXT]` | A new design from a recipe |
+| `form new <name> <recipe> [key=value ...] [--purpose print\|model] [--process P] [--brief TEXT]` | A new design from a recipe; `--process` (for a model) is `cnc`, `laser`, `injection`, `casting`, `sheet_metal`, `render`, `cad` or `other` |
+| `form purpose <project> [print\|model] [--process P]` | Read or change what a design is for |
 | `form state <project>` | The head revision: parameters with provenance, outputs, checks, fit, slice, release gate |
 | `form preview <project> key=value ...` | Build a change without saving it, and report its impact |
 | `form commit <project> key=value ... [--note] [--expect-head N] [--measured keys]` | Save a change as a new revision |
-| `form run <project> [--force]` | Regenerate whatever is stale: solid, STEP and STL, checks, slice |
+| `form run <project> [--force]` | Regenerate whatever is stale: solid, STEP, STL, OBJ and GLB, checks, slice |
 | `form history <project> [--gif FILE]` | The revision list; `--gif` writes a morph through every revision (`.gif` or `.webp`) |
 | `form variants list\|save\|promote\|delete <project> [name] [key=value ...]` | Named variants |
 | `form mark <project> --text TEXT` | The label text for designs with lettering |
 | `form rename <project> <name>` | Change the display name (the id stays) |
 | `form duplicate <project> [--name NAME]` | Copy a project under a new id |
 | `form delete <project> --yes` | Move a project to the trash inside the projects folder |
+| `form export <project> [--out FILE.formstudio] [--no-conversations]` | The design, its history, its conversations and the code it was built from, as one file |
+| `form import FILE.formstudio \| FILE.formproj \| CONVERSATION.json` | Import; a clashing id gets a new one and nothing is overwritten |
 
 ## Look and analyse
 
@@ -92,11 +96,21 @@ message, with what the design is for.
 | `form orient <project> [--apply [ID]] [--png FILE]` | Rank print orientations; `--apply` sets the best one |
 | `form animate <project> [--morph 1:4] [--frames N] [--out FILE]` | A turntable, or a morph between two revisions |
 | `form share <project> [--out PNG] [--photo]` | The share card; `--photo` uses the newest Blender render |
+| `form select <project> [--point\|--edge\|--face x,y,z]... [--region "x,y,z;..." --radius R] [--keep NAME --note TEXT] [--text]` | Analyse points, edges, faces or a painted region on the solid: area, tilt, overhang, wall thickness, curvature, height; `--keep` saves it as an annotation |
+| `form annotations <project> [list\|show\|delete] [ID]` | Kept selections |
+| `form appearance <project> [--part PART] [--color #hex] [--material M] [--clear] [--3mf FILE]` | Colour and material of the design or one part; `--3mf` writes a 3MF with colours |
 
 ## Print
 
 | Command | Does |
 |---|---|
+| `form printers` | Every printer set up in every installed slicer |
+| `form printers options KIND NAME` | A printer's filaments and processes |
+| `form printers use KIND NAME [--filament F] [--process P] (--project ID \| --default)` | Use a printer for one design or as the default |
+| `form printers clear (--project ID \| --default)` | Forget a design's printer, or the default |
+| `form plates <project> [--orient PART=O] [--material PART=M] [--color PART=#hex]` | How the design's parts go onto plates, and per-part print settings |
+| `form material <project> <PLA\|PETG\|ABS\|ASA\|TPU\|... \| "">` | The filament the slice uses |
+| `form design-only <project> on\|off` | Slice this design or not |
 | `form simulate <project> [--png PNG --layer N] [--gif GIF] [--frames DIR] [--layers a:b]` | Pictures of the toolpaths building up, from the slicer's G-code |
 | `form cost <project> [--price-per-kg] [--kwh-price] [--watts] [--machine-rate] [--copies] [--save]` | Filament, electricity and machine time |
 | `form pack <project> [--copies N] [--spacing MM] [--no-rotate]` | Do N copies fit on one plate |
@@ -109,5 +123,25 @@ message, with what the design is for.
 |---|---|
 | `form chat "message" [--project ID] [--conversation ID] [--agent ID] [--model X] [--effort L] [--json]` | Send one message to an agent, with Form Studio's tools |
 | `form conversations list \| show ID \| rename ID TITLE \| pin ID \| delete ID` | Saved conversations |
+| `form export-conversation <id> [--format md\|json] [--out FILE]` | One conversation as Markdown (to read) or JSON (to import again) |
+
+`form chat` asks the agent's questions in the terminal, and takes `--attach FILE` for files.
+
+## Recipes
+
+Recipes are building blocks for agents and the community gallery. Installing one never runs it: the code runs only
+when a design is created from it.
+
+| Command | Does |
+|---|---|
+| `form recipes [list] [--q WORDS] [--section builtin\|mine\|community] [--tag T] [--sort name\|recent]` | Built-in recipes, the ones you installed, and the community gallery |
+| `form recipes community [--refresh]` | The community index from the website |
+| `form recipes inspect FILE` | What installing a file would install: its SHA-256, title and any problems |
+| `form recipes install FILE --sha256 HEX` | Install exactly that file, by its hash |
+| `form recipes uninstall ID` | Remove an installed recipe |
+| `form recipes export ID [--out FILE] [--author NAME] [--tags a,b]` | One `.formrecipe` file: the code, `meta.json` with its SHA-256, and a preview from a real build |
+| `form recipes import FILE.formrecipe [--sha256 HEX]` | Shows the code's checksum; with `--sha256`, installs it |
+| `form recipes submit ID [--out DIR] [--author NAME] [--tags a,b]` | The community submission folder, and a link to a pre-filled GitHub issue; nothing is posted |
+| `form recipes derive PROJECT [--title T] [--summary S] [--range key=min:max ...] [--install --sha256 HEX]` | Turn a design into a recipe whose defaults are the design's values |
 
 Release approval has no command. It is a deliberate action in the app's Release stage.

@@ -15,8 +15,9 @@ Download the bundle for your system from the [latest release](https://github.com
 | Windows 10 and 11 | `FORM-windows-x64.zip` | Unzip and run `FORM.exe`; in SmartScreen choose **More info** › **Run anyway** |
 | Linux x64 | `FORM-linux-x64.tar.gz` | Unpack and run `FORM/FORM` |
 
-On first start Form Studio checks what it needs and installs the rest from inside the app: the standard-parts
-libraries, a slicer, an agent and its sign-in. Every command is shown before it runs.
+On first start Form Studio asks how you use it ("I have a 3D printer" or "I just design"), then installs what it
+needs by itself: the standard-parts libraries, a slicer if you print, an agent and its sign-in. It pauses only when you
+have to sign in or download something, and carries on once that is done. Every command is shown before it runs.
 
 ### From Python
 
@@ -34,25 +35,25 @@ uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizens
 
 ## The window
 
-![The workspace: conversation, viewport and stages](images/app-prove.webp)
+![The workspace: conversation, viewport and stages](images/prove.webp)
 
 | Area | What it holds |
 |---|---|
-| **Top bar** | The design and its revision, release state, the printer, search (Ctrl/⌘ K) and Settings |
+| **Top bar** | The design and its revision, release state, its purpose, the printer (or "No printer · Just designing"), search (Ctrl/⌘ K) and Settings. A bar under it names any work that takes longer than 300 ms, with progress |
 | **Conversation** (left) | The agent conversation for this design: messages, the agent's steps, the views it looked at, attachments. Resizable; Ctrl/⌘ J hides it |
-| **Viewport** (centre) | The kernel's geometry, one mesh per feature, with dimensions on the plate. The tool rail on its left edge holds Select, Measure, Section, Analyze, History, Assembly, Print simulation and Render |
+| **Viewport** (centre) | The kernel's geometry, one mesh per feature, with dimensions on the plate. The tool rail on its left edge holds Select, Measure, Annotate, Section, Analyze, Assembly, History, Simulate the print and Photo render |
 | **Stages** (right) | Brief, Shape, Fit, Prove and Release. Each tab shows where it stands: measured values, features, fit yield, checks to review, release readiness |
-| **Pipeline** (bottom) | Parameters › Solid › Exports › Checks › Slice › Release. A node is current only when it describes the revision on screen |
+| **Pipeline** (bottom) | Parameters › Solid › Exports › Checks › Slice › Release. A node is current only when it describes the revision on screen. A 3D model, or a design that is not sliced, has no Slice step |
 
 ### The five stages
 
 | Stage | What you do there |
 |---|---|
-| **Brief** | What the part is for, the dimensions you measured with their provenance, reference photos and imported parts |
+| **Brief** | What the part is for and its purpose (for 3D printing, or just a 3D model and how it will be made), the dimensions you measured with their provenance, reference photos and imported parts |
 | **Shape** | Features in build order and their parameters. Select a feature on the model or in the list and change it; the draft shows its computed impact before you commit |
-| **Fit** | The fit model for each interface: a section, the clearance, the chance of fitting and how to raise it |
-| **Prove** | Every check with its evidence, print orientation, and the slice: time, filament, layers, Watch it print |
-| **Release** | The release gate, approval, the released files with their hashes, and the revision history |
+| **Fit** | The fit model for each interface: a section, the clearance, the chance of fitting and how to raise it. Hidden for a 3D model |
+| **Prove** | Every check with its evidence, print orientation, the plates, and the slice: time, filament, layers, Watch it print. A 3D model shows the checks that apply to it and says which do not |
+| **Release** | The release gate, approval (over failed checks only with a reason for each, on the record), the released files with their hashes, and the revision history |
 
 ### Home
 
@@ -72,12 +73,20 @@ what the design assumes now; the number you type is committed with how you measu
 
 Below: concepts waiting for a pick, recent conversations, and every design as a live 3D card, filtered by released and
 in progress and sorted by name or date. Right-click a card to rename, duplicate, export or move it to the trash.
+**Import** (from Home or the command palette) opens a `.formstudio` or `.formproj` design, a conversation exported as
+JSON, or one of the shipped examples.
 
 **Sketch pad.** Lines, rectangles, circles, arcs (centre, start, end), freehand strokes and dimensions, snapped to a
 5 mm grid and to the points already drawn (Alt draws freely), with undo and redo. A typed dimension is "stated" and
 overrides the drawn length. The agent receives the shapes as structured geometry in millimetres and the picture.
 
-![Home](images/app-home.webp)
+![Home on the first day: one composer, and what you can start from](images/home-empty.webp)
+
+![Home with designs and recent conversations](images/home-designs.webp)
+
+![The sketch pad](images/sketch.webp)
+
+![Concepts side by side](images/concepts.webp)
 
 ## Keys
 
@@ -100,6 +109,7 @@ In the viewport:
 | V | Select: click a feature, drag to orbit |
 | M | Measure distances, faces and diameters |
 | X | Section cut on or off |
+| N | Annotate: pick, paint or lasso, keep, ask the agent |
 | A | Analyze: thickness, overhang and other maps |
 | E | Assembly views and joints |
 | T | History: the revision timeline |
@@ -111,19 +121,32 @@ In the viewport:
 
 Drag to orbit, right-drag or Shift-drag to pan, scroll or pinch to zoom. Right-click a feature for quick actions.
 
+While measuring or annotating: D distance, G face, O diameter, R edge, P point, B brush, L lasso, [ and ] brush size,
+Shift-click adds to the selection, Alt-drag orbits while painting.
+
 In the conversation: Return sends, Shift Return adds a line, Up brings back your last message.
 
 ## Settings
 
-Settings (Ctrl/⌘ ,) edits `studio.toml` for you, with a backup of the file.
+Settings (Ctrl/⌘ ,) edits `studio.toml` for you, with a backup of the file. A search box finds any setting, numbers
+are checked as you type, every value can be reset to its default, and changes apply at once: choosing the default
+printer updates the top bar, the plate and the open design's checks without a restart.
+
+![Settings › General](images/settings-general.webp)
 
 | Tab | Holds |
 |---|---|
-| General | Project folder, daily update check, opening Form Studio when an agent starts working |
-| Printer and slicer | The slicer; its printer, process and filament presets; bed size, edge margin and slice time limit |
-| Chat | The default agent, model and effort; web lookups; a spending limit per message; API keys, stored privately and never shown again |
-| Other apps | Where Blender, OpenSCAD and FreeCAD are; which programs files open in |
+| General | How you use Form Studio ("I have a 3D printer" or "I just design") and the project folder |
+| Printing | The default printer, filament and process, from every printer set up in your slicers; the slicer, and whether designs made for printing are sliced; the keep-out margin and the gap between parts on a plate; which program "Open in slicer" uses. Shown only when you print |
+| Agents | Agent apps, model API keys, local models and providers you added, in one list; Add a provider…; the agent, model and effort for new conversations; web lookups; a spending limit per message; opening Form Studio when an outside agent starts working. Keys are stored privately and never shown again |
+| Other apps | Blender, OpenSCAD and FreeCAD: whether and where each was found, Browse as a fallback, and what each one unlocks; which programs "Open in CAD" and "Open in viewer" use |
+| Updates | The daily check for a newer Form Studio, and the Stable or Preview channel |
+| Advanced | The slice time limit, how long the agent waits for your answers, the Claude Code command, and the printer name used when none is chosen |
 | Software | Everything Form Studio uses, what is installed, and an Install button for the rest |
+
+![Settings › Agents](images/settings-agents.webp)
+
+![Settings › Printing: the default printer from your slicers, and how designs are sliced](images/settings-printing.webp)
 
 ## Rules the app keeps
 

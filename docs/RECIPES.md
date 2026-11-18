@@ -6,7 +6,9 @@ Start from [`form/recipes/shelf_bracket.py`](../form/recipes/shelf_bracket.py). 
 
 ## The built-in library
 
-The library is the recipes people print most, each designed to be bought, not only to work:
+Recipes are building blocks: agents start from them and change anything, and people browse them in the
+[website gallery](https://kaizensx.github.io/form-studio/recipes/). The library is the recipes people print most, each
+designed to be bought, not only to work:
 
 | id | title | category |
 |---|---|---|
@@ -31,7 +33,7 @@ The order is `LIBRARY` in [`form/recipes/__init__.py`](../form/recipes/__init__.
 
 > **Tip:** an exact 45° chamfer or cone around a curved edge tessellates a little past 45° and trips the overhang check. Use a chamfer that rises more than it runs (0.3 mm in, 0.5 mm up), or 40° cones.
 
-**Legacy recipes.** `dock`, `gridfinity`, `hook`, `planter`, `gear_pair`, `knob` and `hinged_box` are retired (`legacy = True`). They are left out of every listing: the library, the New design sheet, Home, `form_overview` and the website gallery. Designs that name them still open, build and release exactly as before. To retire a recipe, set `legacy = True` and move its id from `LIBRARY` to `LEGACY`; never delete its file.
+**Legacy recipes.** `dock`, `gridfinity`, `hook`, `planter`, `gear_pair`, `knob` and `hinged_box` are retired (`legacy = True`). They are left out of every listing: `form recipes`, `form_overview`, `recipe_library` and the website gallery. Designs that name them still open, build and release exactly as before. To retire a recipe, set `legacy = True` and move its id from `LIBRARY` to `LEGACY`; never delete its file.
 
 ## 1. Parameters
 
@@ -102,7 +104,7 @@ fit = {"cavity": "screw_hole", "mating": "screw_d", "clearance": "screw_clearanc
 | method | what it adds |
 |---|---|
 | `statics(v, volume, com)` | Numbers such as `safety_factor` (optimizer metrics `statics.<key>`), plus `"checks": [...]` that appear on the checks list labelled `model`. |
-| `companions(v)` | Objects drawn with the part but not printed, such as the phone in the dock. |
+| `companions(v)` | Objects drawn with the part but not printed, such as the phone on the stand. |
 | `test_piece(v, shape)` | A small piece cut from the real geometry around the interface. Printing it is the cheapest physical test. |
 
 ## 6. Library metadata

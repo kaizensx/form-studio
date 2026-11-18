@@ -1,37 +1,45 @@
 # Community recipes
 
 Recipes contributed by the community. Each one appears in the
-[recipe gallery](https://kaizensx.github.io/form-studio/recipes/) and in the app's **New design › Community recipes**,
-where it can be opened as a new design in one click.
+[recipe gallery](https://kaizensx.github.io/form-studio/recipes/), with its category and tags, and agents can find it
+and build on it (`recipe_library` over MCP). Anyone can install one with `form recipes install`, after reading its
+source and its SHA-256; nothing runs until a design is created from it.
 
 A recipe is a family of objects: typed parameters in, one valid solid out, built in named stages so that every face
 knows which feature it belongs to. Form Studio builds it in the CAD kernel and runs the full pipeline on it: checks,
 fit model, slicing, print simulation, revisions, variants, optimisation and release.
 
-## Submitting from Form Studio
+## Submit it in an issue
 
-The quickest way: install your recipe (**New design › From a recipe › Install from a file…**, or **Turn this design into
-a recipe** from a design's menu), pick it under **Mine** and press **Share…**.
+The quickest way. Open a [New recipe](https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml)
+issue, choose **build and check it here**, and paste `recipe.py` (or link to it, or attach it as `recipe.py.txt` or in
+a `.zip`). The automation builds it in the CAD kernel at its defaults and at a smaller and a larger set of measured
+dimensions, runs the checks, slices it with PrusaSlicer and replies with pictures and results. Edit the issue to check
+again. Once it passes, a maintainer can accept it, and the automation opens the pull request with `recipe.py`,
+`meta.json` and `preview.png`, credited to you.
 
-- **As a file** saves one `.formrecipe`: the code, `meta.json` (title, summary, author, tags, every parameter with its
-  range, the code's SHA-256) and `preview.png`, drawn from a real build at the recipe's defaults. Anyone can open it
-  with **Install from a file…**; they see the code and the checksum before anything is installed.
-- **To the community** checks what the gallery would refuse (author, summary, tags, id), then offers two buttons.
-  **Open a pre-filled GitHub issue in your browser** opens the recipe form with the title, id, `meta.json` and code
-  filled in; drag `preview.png` into it, choose *This is*, and submit it yourself. **Save the submission folder…**
-  writes `<id>/` with exactly the three files below, for a pull request. Form Studio sends nothing on its own.
+## Prepare it with Form Studio
 
-The same from a terminal, each printing JSON:
+Install your recipe, or turn a design into one, then package or submit it. Each command prints JSON:
 
 ```bash
+form recipes inspect my_recipe.py                              # its SHA-256, title and any problems
+form recipes install my_recipe.py --sha256 <hex>               # install exactly that file
+form recipes derive <project> --range wall=1.6:3               # a design as a recipe; --install --sha256 <hex>
 form recipes export <id> --out my-recipe.formrecipe --author your-github-username --tags "desk, cables"
-form recipes import my-recipe.formrecipe                 # shows the code's SHA-256; add --sha256 <hex> to install
-form recipes submit <id> --out path/to/fork/community/recipes   # the folder, and the pre-filled issue link
-form recipes derive <project> --range wall=1.6:3              # a design as a recipe; --install --sha256 <hex>
+form recipes import my-recipe.formrecipe                       # shows the code's SHA-256; add --sha256 <hex> to install
+form recipes submit <id> --out path/to/fork/community/recipes  # the folder, and the pre-filled issue link
 ```
 
-Each recipe's page in the app links to its thread in the repository's
-[Discussions](https://github.com/kaizensx/form-studio/discussions), where people say how it printed.
+- **`export`** writes one `.formrecipe` file: the code, `meta.json` (title, summary, author, tags, every parameter
+  with its range, the code's SHA-256) and `preview.png`, drawn from a real build at the recipe's defaults. Anyone can
+  `import` it and sees the code and the checksum before anything is installed.
+- **`submit`** checks what the gallery would refuse (author, summary, tags, id), writes `<id>/` with exactly the three
+  files below for a pull request, and prints a link that opens the recipe issue form with the title, id, `meta.json`
+  and code filled in. Open it, drag `preview.png` into it and submit it yourself. Form Studio sends nothing on its own.
+
+Agents can do the same over MCP (`export_recipe`, `prepare_recipe_submission`, `design_as_recipe`). How it printed
+belongs in its thread in [Discussions](https://github.com/kaizensx/form-studio/discussions).
 
 ## Layout
 
@@ -99,19 +107,10 @@ About 960 × 560 px, the part at its default values. The simplest way to make on
 form render <project> --view iso --out preview.png
 ```
 
-## Or submit it in an issue
-
-Open a [New recipe](https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml) issue, choose
-**build and check it here**, and paste `recipe.py` (or link to it, or attach it as `recipe.py.txt` or in a `.zip`).
-Form Studio's automation builds it in the CAD kernel at its defaults and at a smaller and a larger set of measured
-dimensions, runs the checks, slices it with PrusaSlicer and replies with pictures and results. Edit the issue to check
-again. Once it passes, a maintainer can accept it, and the automation opens the pull request with `recipe.py`,
-`meta.json` and `preview.png`, credited to you.
-
 ## Before you open a pull request
 
-1. Create a design from your file and run the pipeline. In the app: **New design › Import project**, or ask the agent
-   to create a design from the file. From a script, `Studio.create_design(name, source)` then `form run <project>`.
+1. Create a design from your file and run the pipeline: ask an agent to create a design from the file
+   (`create_design`), or from a script `Studio.create_design(name, source)` then `form run <project>`.
 2. It builds with its default values, and `form state <project>` shows no failed check.
 3. Every parameter has a unit, a range and a group (`brief`, `interface`, `form`, `process`). Dimensions people should
    measure are `brief`.

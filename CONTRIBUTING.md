@@ -7,10 +7,10 @@ a slicer that behaves differently, a measured result, a sharper check.
 
 | Contribution | Where it goes | Start here |
 |---|---|---|
-| **Recipes** | `community/recipes/<id>/` (gallery) or `form/recipes/` (built-in) | [community/recipes](community/recipes/README.md), [Writing a recipe](docs/RECIPES.md); in the app, **Share… › To the community** prepares the folder and a pre-filled issue |
-| **Measured print results** | An issue or a Show and tell post | Printer, nozzle, filament, slicer preset and the measured numbers |
-| **Slicer and printer support** | `form/adapters/` | [`form/adapters/__init__.py`](form/adapters/__init__.py) defines the adapter interface |
-| **Agent support** | `form/agents/` | [`form/agents/base.py`](form/agents/base.py) defines the agent interface |
+| **Recipes** | `community/recipes/<id>/` (gallery) or `form/recipes/` (built-in) | Open a [New recipe](https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml) issue: it is built, checked and sliced for you and answered with pictures. Or `form recipes submit <id>` for the folder and a pre-filled issue. See [community/recipes](community/recipes/README.md) and [Writing a recipe](docs/RECIPES.md) |
+| **Measured print results** | An issue or a [Show and tell](https://github.com/kaizensx/form-studio/discussions/categories/show-and-tell) post | Printer, nozzle, filament, slicer preset and the measured numbers. Attach a `.formstudio` file (renamed to `.zip`) and the automation replies with a turntable, four views, its checks and a slice |
+| **Slicer and printer support** | `form/adapters/` | [`form/adapters/__init__.py`](form/adapters/__init__.py) defines the adapter interface; OrcaSlicer forks that kept its command line need only an entry in [`form/adapters/orca_forks.py`](form/adapters/orca_forks.py) |
+| **Agent and provider support** | `form/agents/` | [`form/agents/base.py`](form/agents/base.py) defines the agent interface; model APIs are entries in [`form/agents/providers.py`](form/agents/providers.py) |
 | **The desktop app** | `form/app/qml/` | [UI contributor notes](form/app/qml/CONTRIBUTING-UI.md) |
 | **Docs and website** | `docs/`, `site/` | [Website build](#the-website) |
 
@@ -46,6 +46,7 @@ The interface journeys (`tests/test_ui_journeys.py`) drive the real window with 
 
 ```bash
 .venv/bin/python -m form.app --shot out.png --project hallway-phone-dock --stage prove   # screenshot the app
+.venv/bin/python -m form.app --uitest tests/journeys/start.py   # drive the real window with one journey
 .venv/bin/python scripts/gen_mcp_docs.py           # regenerate docs/MCP.md after changing MCP tools
 .venv/bin/python scripts/make_media.py             # regenerate README media after changing recipes or the renderer
 .venv/bin/python scripts/acceptance.py             # the end-to-end acceptance run
@@ -77,7 +78,8 @@ python -m http.server -d site 8000
 1. Open or find an issue for anything larger than a small fix, so the approach can be agreed first.
 2. Keep each pull request to one change. Include tests, and screenshots for interface changes.
 3. Add a line to `CHANGELOG.md` under the next version.
-4. CI runs the test suite on Linux and macOS, checks that `docs/MCP.md` is current, and builds the website.
+4. CI runs the test suite on Linux and macOS, checks that `docs/MCP.md` is current, and builds the website. A pull
+   request that touches recipes or the interface gets before and after pictures in a comment.
 
 By contributing you agree that your work is released under the [MIT licence](LICENSE), and to follow the
 [Code of Conduct](CODE_OF_CONDUCT.md).
