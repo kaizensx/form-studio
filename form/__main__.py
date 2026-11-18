@@ -274,7 +274,7 @@ def main(argv=None):
     apx.add_argument("project")
     apx.add_argument("--part", default="")
     apx.add_argument("--color")
-    apx.add_argument("--material", help="pla, petg, abs, asa, tpu, pa, pc, resin, resin_tough")
+    apx.add_argument("--material", help="PLA, PETG, ABS, ASA, TPU, PA, PC, PLA-CF, PETG-CF, PA-CF")
     apx.add_argument("--clear", action="store_true", help="remove the colour and material of the design or that part")
     apx.add_argument("--3mf", dest="threemf", metavar="FILE", help="write a 3MF of the head with these colours")
     a = ap.parse_args(argv)

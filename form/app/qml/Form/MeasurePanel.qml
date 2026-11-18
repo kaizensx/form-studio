@@ -55,7 +55,7 @@ Rectangle {
                 }
             }
             Txt { kind: "fine"; width: parent.width
-                text: "Computed from the part’s surface, tessellated at 0.05 mm. Diameters marked exact come from the CAD solid; “fitted” means a circle fitted to mesh edges." }
+                text: "Computed on the part’s surface; faces and diameters marked exact come from the CAD solid, “fitted” means a circle fitted to mesh edges. A distance between two parts belongs to the view it was taken in." }
         }
     }
 }

@@ -727,6 +727,7 @@ Item {
             color: pl.modelData.on ? Theme.alpha(pl.modelData.tint, 0.22) : plm.containsMouse ? Theme.alpha(Theme.plate3, 0.95) : Theme.alpha(Theme.plate, 0.88)
             border.color: Theme.alpha(modelData.tint, pl.modelData.on ? 0.8 : 0.45)
             opacity: pl.modelData.old ? 0.7 : 1
+            z: pl.modelData.ann ? 3 : 0                 // an annotation's label is a button, above the orbit area
             visible: shown
             Text { id: pt; anchors.centerIn: parent; text: pl.modelData.text; color: pl.modelData.tint; font.family: pl.modelData.ann ? Theme.sans : Theme.mono
                 font.pixelSize: Theme.tFine; font.weight: pl.modelData.ann ? 550 : 400; renderType: Text.NativeRendering }

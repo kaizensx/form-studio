@@ -34,6 +34,7 @@ Item {
             add("Tools", "resetview", "rotate_ccw", "Reset the view", "Camera", function () { Store.resetView() }, ".")
             add("Tools", "dims", "ruler", (Store.dims ? "Hide" : "Show") + " overall dimensions", "Viewport", function () { Store.toggleDims() })
             add("Tools", "measure", "ruler", Store.measuring ? "Stop measuring" : "Measure", "Distance, angle, radius on the solid", function () { Store.setMeasuring(!Store.measuring) }, "M")
+            add("Tools", "annotate", "map_pin", Store.selecting ? "Stop annotating" : "Annotate", "Pick or paint on the part, keep a note, ask the agent", function () { Store.setSelecting(!Store.selecting) }, "N")
             Store.analysisMaps.forEach(function (m) { if (m.value) add("Tools", "map." + m.value, "layers", "Analysis map: " + m.text, Store.analysisMap === m.value ? "Showing now" : "Colour the part by " + m.text.toLowerCase(), function () { Store.setAnalysis(m.value) }) })
             if (Store.analysisMap) add("Tools", "map.off", "layers", "Hide the analysis map", Store.analysisLabel(Store.analysisMap), function () { Store.setAnalysis("") })
             add("Tools", "orient", "move_3d", "Find a print orientation", "Ranks the ways it can sit on the plate", function () { Store.setStage("prove"); Store.findOrientation() })

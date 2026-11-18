@@ -1,54 +1,58 @@
 """Colours and materials of a design: for the whole design, or per part.
 
-Kept in the project file as::
+Kept in the project file in the fields the slicer integration reads too (form/adapters picks the filament per plate
+from them)::
 
-    "appearance": {"color": "#d8d3c8" | null, "material": "petg" | null,
-                   "parts": {"<part id>": {"color": "#...", "material": "..."}}}
+    "color": "#d8d3c8" | null,  "material": "PETG" | null,
+    "parts": {"<part id>": {"color": "#...", "material": "PLA", ...other per-part print settings...}}
 
 A part's own colour or material wins over the design's. Part ids are the assembly's (``lid``, ``body``, or
-``part1``… for separate bodies with no declaration); a single-body design uses the design entry only.
+``part1``… for separate bodies with no declaration); a single-body design uses the design entry only. Material keys
+are PLA, PETG, ABS, ASA, TPU, PA, PC and the fibre-filled PLA-CF, PETG-CF, PA-CF; input is read case-insensitively
+("nylon" is PA).
 
-The material is a plain id from MATERIALS. Form Studio uses it for the material notes in the checks (heat, sunlight,
-warping, flexible filament, resin), the solid-mass estimate and the colours in the 3MF it writes. Choosing the
-slicer's filament profile from it is the slicer integration's job (form/adapters): it reads ``material`` per part from
-here and nothing else.
-
-Property values are typical figures from filament and resin datasheets; brands differ. They feed heuristics, never a
-computed result.
+Form Studio uses the material for the material notes in the checks (heat, sunlight, warping, flexible filament,
+fibre-filled), the solid-mass estimate and the names in the 3MF it writes. Property values are typical figures from
+filament datasheets; brands differ. They feed heuristics, never a computed result.
 """
 from __future__ import annotations
 
 import re
 
 MATERIALS = {
-    "pla": {"label": "PLA", "process": "fdm", "density_g_cm3": 1.24, "heat_c": 55, "nozzle_c": [190, 220], "bed_c": [50, 60],
+    "PLA": {"label": "PLA", "process": "fdm", "density_g_cm3": 1.24, "heat_c": 55, "nozzle_c": [190, 220], "bed_c": [50, 60],
             "color": "#e9e5dc", "warp": "low", "uv": "poor", "flex": "rigid",
             "note": "Easy to print and stiff. Softens from about 55 °C and creeps under a constant load when warm."},
-    "petg": {"label": "PETG", "process": "fdm", "density_g_cm3": 1.27, "heat_c": 70, "nozzle_c": [230, 250], "bed_c": [70, 85],
+    "PETG": {"label": "PETG", "process": "fdm", "density_g_cm3": 1.27, "heat_c": 70, "nozzle_c": [230, 250], "bed_c": [70, 85],
              "color": "#cfe3e8", "warp": "low", "uv": "fair", "flex": "tough",
              "note": "Tougher than PLA and fine in warm water. Strings; bridges sag a little more."},
-    "abs": {"label": "ABS", "process": "fdm", "density_g_cm3": 1.04, "heat_c": 95, "nozzle_c": [240, 260], "bed_c": [95, 110],
+    "ABS": {"label": "ABS", "process": "fdm", "density_g_cm3": 1.04, "heat_c": 95, "nozzle_c": [240, 260], "bed_c": [95, 110],
             "color": "#e4e1da", "warp": "high", "uv": "poor", "flex": "tough",
             "note": "Heat resistant and tough. Shrinks as it cools: large flat parts lift without an enclosure."},
-    "asa": {"label": "ASA", "process": "fdm", "density_g_cm3": 1.07, "heat_c": 95, "nozzle_c": [240, 260], "bed_c": [90, 110],
+    "ASA": {"label": "ASA", "process": "fdm", "density_g_cm3": 1.07, "heat_c": 95, "nozzle_c": [240, 260], "bed_c": [90, 110],
             "color": "#dcdad5", "warp": "high", "uv": "good", "flex": "tough",
             "note": "Like ABS with good resistance to sunlight. Needs an enclosure for large parts."},
-    "tpu": {"label": "TPU 95A", "process": "fdm", "density_g_cm3": 1.21, "heat_c": 60, "nozzle_c": [220, 240], "bed_c": [30, 60],
+    "TPU": {"label": "TPU", "process": "fdm", "density_g_cm3": 1.21, "heat_c": 60, "nozzle_c": [220, 240], "bed_c": [30, 60],
             "color": "#3b3f44", "warp": "low", "uv": "fair", "flex": "flexible",
-            "note": "Flexible and impact resistant. Print slowly; bridges and steep overhangs droop."},
-    "pa": {"label": "Nylon (PA)", "process": "fdm", "density_g_cm3": 1.14, "heat_c": 80, "nozzle_c": [250, 280], "bed_c": [70, 90],
+            "note": "Flexible and impact resistant (95A). Print slowly; bridges and steep overhangs droop."},
+    "PA": {"label": "Nylon (PA)", "process": "fdm", "density_g_cm3": 1.14, "heat_c": 80, "nozzle_c": [250, 280], "bed_c": [70, 90],
            "color": "#efeadc", "warp": "high", "uv": "fair", "flex": "tough",
            "note": "Tough and wear resistant. Absorbs moisture: dry it before printing. Warps on large flat parts."},
-    "pc": {"label": "Polycarbonate", "process": "fdm", "density_g_cm3": 1.20, "heat_c": 115, "nozzle_c": [260, 300], "bed_c": [100, 120],
+    "PC": {"label": "Polycarbonate (PC)", "process": "fdm", "density_g_cm3": 1.20, "heat_c": 115, "nozzle_c": [260, 300], "bed_c": [100, 120],
            "color": "#d6dde2", "warp": "high", "uv": "fair", "flex": "tough",
            "note": "Strongest and most heat resistant of the common filaments. Needs a hot, enclosed printer."},
-    "resin": {"label": "Resin (standard)", "process": "resin", "density_g_cm3": 1.12, "heat_c": 50, "nozzle_c": None, "bed_c": None,
-              "color": "#9aa3ab", "warp": "low", "uv": "poor", "flex": "brittle",
-              "note": "Fine detail on an MSLA printer. Brittle; yellows in sunlight."},
-    "resin_tough": {"label": "Resin (tough)", "process": "resin", "density_g_cm3": 1.15, "heat_c": 60, "nozzle_c": None, "bed_c": None,
-                    "color": "#8d969e", "warp": "low", "uv": "poor", "flex": "tough",
-                    "note": "ABS-like resin for parts that take knocks. Printed on an MSLA printer."},
+    "PLA-CF": {"label": "PLA-CF (carbon fibre)", "process": "fdm", "density_g_cm3": 1.29, "heat_c": 60, "nozzle_c": [210, 240], "bed_c": [50, 60],
+               "color": "#3a3c3f", "warp": "low", "uv": "poor", "flex": "rigid", "fibre": True,
+               "note": "Stiffer than PLA with a matte finish. Abrasive: needs a hardened nozzle."},
+    "PETG-CF": {"label": "PETG-CF (carbon fibre)", "process": "fdm", "density_g_cm3": 1.30, "heat_c": 75, "nozzle_c": [240, 260], "bed_c": [70, 80],
+                "color": "#35383b", "warp": "low", "uv": "fair", "flex": "tough", "fibre": True,
+                "note": "Stiff and dimensionally stable. Abrasive: needs a hardened nozzle."},
+    "PA-CF": {"label": "PA-CF (carbon fibre)", "process": "fdm", "density_g_cm3": 1.20, "heat_c": 150, "nozzle_c": [270, 300], "bed_c": [80, 100],
+              "color": "#2f3134", "warp": "high", "uv": "fair", "flex": "tough", "fibre": True,
+              "note": "Very stiff and heat resistant. Abrasive and hygroscopic: hardened nozzle, dry filament, enclosure."},
 }
+_ALIASES = {"NYLON": "PA", "PA/NYLON": "PA", "PA6": "PA", "PA12": "PA", "TPU95A": "TPU", "TPU 95A": "TPU",
+            "POLYCARBONATE": "PC", "PLA+CF": "PLA-CF", "PETG+CF": "PETG-CF", "PA+CF": "PA-CF", "PACF": "PA-CF"}
 
 # colours offered in the app; any #rrggbb is accepted
 SWATCHES = ["#e9e5dc", "#2b2d30", "#8a9097", "#c8483c", "#e08a2c", "#e6c34a", "#5e9e5a", "#3f7fbf", "#6d5bd0", "#d9708f", "#7a5a3c", "#d4e4ec"]
@@ -58,7 +62,7 @@ _HEX = re.compile(r"#[0-9a-fA-F]{6}")
 
 def catalogue() -> dict:
     return {"materials": [{"id": k, **v} for k, v in MATERIALS.items()], "swatches": SWATCHES,
-            "source": "Typical values from filament and resin datasheets; brands differ."}
+            "source": "Typical values from filament datasheets; brands differ."}
 
 
 def clean_color(c):
@@ -73,28 +77,42 @@ def clean_color(c):
 def clean_material(m):
     if m in (None, ""):
         return None
-    m = str(m).strip().lower()
-    if m not in MATERIALS:
+    k = str(m).strip().upper()
+    k = _ALIASES.get(k, k)
+    if k not in MATERIALS:
         raise ValueError("Unknown material. Known: " + ", ".join(MATERIALS) + ".")
-    return m
+    return k
+
+
+def _key(m):
+    """A stored material, normalised (another tool may have written "petg" or "Nylon"); None if unknown."""
+    try:
+        return clean_material(m)
+    except ValueError:
+        return None
 
 
 def appearance(p: dict) -> dict:
-    a = p.get("appearance") or {}
-    return {"color": a.get("color"), "material": a.get("material"), "parts": dict(a.get("parts") or {})}
+    """{color, material, parts: {id: {color, material}}} read from the project's own fields."""
+    parts = {}
+    for k, v in (p.get("parts") or {}).items():
+        if isinstance(v, dict) and (v.get("color") or v.get("material")):
+            parts[k] = {x: v.get(x) for x in ("color", "material") if v.get(x)}
+    return {"color": p.get("color"), "material": p.get("material"), "parts": parts}
 
 
 def resolved(p: dict, part: str = "") -> dict:
     """The colour and material a part is shown and printed in: its own, else the design's, else the material's colour."""
     a = appearance(p)
-    own = a["parts"].get(part) or {} if part else {}
-    mat = own.get("material") or a.get("material")
+    own = (a["parts"].get(part) or {}) if part else {}
+    mat = _key(own.get("material")) or _key(a.get("material"))
     col = own.get("color") or a.get("color") or (MATERIALS[mat]["color"] if mat in MATERIALS else None)
     return {"color": col, "material": mat}
 
 
 def set_appearance(st, pid: str, part: str = "", color="keep", material="keep", by: str = "you") -> dict:
-    """Set (or clear, with None) the colour and/or material of the design (part "") or of one part."""
+    """Set (or clear, with None) the colour and/or material of the design (part "") or of one part. Other per-part
+    settings in project["parts"] (written by the print setup) are kept."""
     from .studio import StudioError
     try:
         c = clean_color(color) if color != "keep" else "keep"
@@ -104,17 +122,24 @@ def set_appearance(st, pid: str, part: str = "", color="keep", material="keep", 
     part = re.sub(r"[^a-zA-Z0-9_-]", "", str(part or ""))[:40]
     with st.lock(pid):
         p = st.load(pid)
-        a = appearance(p)
-        slot = a if not part else a["parts"].setdefault(part, {})
-        if c != "keep":
-            slot["color"] = c
-        if m != "keep":
-            slot["material"] = m
         if part:
-            a["parts"][part] = {k: v for k, v in slot.items() if v}
-            if not a["parts"][part]:
-                del a["parts"][part]
-        p["appearance"] = {"color": a.get("color"), "material": a.get("material"), "parts": a["parts"]}
+            if not isinstance(p.get("parts"), dict):
+                p["parts"] = {}
+            slot = p["parts"].setdefault(part, {})
+        else:
+            slot = p
+        for k, v in (("color", c), ("material", m)):
+            if v == "keep":
+                continue
+            if v:
+                slot[k] = v
+            elif part:
+                slot.pop(k, None)
+            else:
+                slot[k] = None
+        if part and not p["parts"][part]:
+            del p["parts"][part]
+        p.pop("appearance", None)
         st.save(p)
     what = []
     if c != "keep":
@@ -123,16 +148,16 @@ def set_appearance(st, pid: str, part: str = "", color="keep", material="keep", 
         what.append(f"material {MATERIALS[m]['label']}" if m else "material cleared")
     if what:
         st.activity(pid, "appearance", (f"Part {part}: " if part else "Design: ") + ", ".join(what) + ".", by=by)
-    return p["appearance"]
+    return appearance(p)
 
 
 def fingerprint(p: dict):
     """What the material notes in the checks depend on, or None when no material is chosen (checks keys unchanged)."""
     a = appearance(p)
-    mats = sorted({x for x in [a.get("material")] + [v.get("material") for v in a["parts"].values()] if x})
+    mats = sorted({x for x in [_key(a.get("material"))] + [_key(v.get("material")) for v in a["parts"].values()] if x})
     if not mats:
         return None
-    return [mats, sorted((k, v.get("material")) for k, v in a["parts"].items() if v.get("material")), a.get("material"),
+    return [mats, sorted((k, _key(v.get("material"))) for k, v in a["parts"].items() if v.get("material")), _key(a.get("material")),
             (p.get("brief") or {}).get("text", ""), p.get("name", "")]
 
 
@@ -159,11 +184,10 @@ def check_items(p: dict, analysis: dict, ctx: dict) -> list:
         M = MATERIALS[m]
         names = [x for x in parts if x] + (["other parts"] if "" in parts and a["parts"] else [])
         who = f" ({', '.join(names)})" if len(groups) > 1 and names else ""
-        sid = f"material_{m}"
+        sid = f"material_{m.lower()}"
         notes, warn = [], False
-        if M["process"] == "resin":
-            warn = True
-            notes.append("Resin prints on an MSLA printer: the FDM slice, nozzle and bridge checks here do not describe how it will print.")
+        if M.get("fibre"):
+            notes.append("Fibre-filled filament wears a brass nozzle quickly: print it with a hardened one.")
         if _CAR.search(text) and M["heat_c"] < 80:
             warn = True
             notes.append(f"A car interior in the sun passes 70 °C; {M['label']} softens from about {M['heat_c']} °C. ASA or PC hold their shape.")
@@ -185,9 +209,9 @@ def check_items(p: dict, analysis: dict, ctx: dict) -> list:
             notes.append(f"Flexible filament droops: {row['steep_mm2']:.0f} mm² of steep overhang and {row['ceiling_mm2']:.0f} mm² of flat "
                          "ceiling in this orientation. Reorient or add support.")
         thin = analysis.get("thin")
-        if thin and M["flex"] == "brittle" and thin["t"] < 1.5:
+        if thin and M.get("fibre") and thin["t"] < 1.2:
             warn = True
-            notes.append(f"Standard resin is brittle; the thinnest wall is {thin['t']:.2f} mm. Thicken it or use a tough resin.")
+            notes.append(f"Fibre-filled filament needs walls of three lines or more; the thinnest wall is {thin['t']:.2f} mm.")
         if not notes:
             notes.append(M["note"])
         out.append({"id": sid, "label": f"{M['label']} suits the part{who}", "status": "WARN" if warn else "PASS",
@@ -199,9 +223,10 @@ def check_items(p: dict, analysis: dict, ctx: dict) -> list:
 
 def mass_g(volume_mm3: float, material: str | None):
     """Solid mass if printed 100% dense: an upper bound. None without a material."""
-    if material not in MATERIALS:
+    m = _key(material)
+    if m is None:
         return None
-    return round(volume_mm3 / 1000.0 * MATERIALS[material]["density_g_cm3"], 2)
+    return round(volume_mm3 / 1000.0 * MATERIALS[m]["density_g_cm3"], 2)
 
 
 # ── 3MF with colours ────────────────────────────────────────────────────────

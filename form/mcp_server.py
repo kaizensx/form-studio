@@ -737,9 +737,9 @@ def build() -> MCPServer:
     async def set_appearance(project: str, part: str = "", color: str | None = None, material: str | None = None,
                              clear: bool = False, ctx: Context = None) -> dict:
         """Colour (#rrggbb) and material of the whole design (part="") or of one part (an assembly part id from
-        get_project / render). Materials: pla, petg, abs, asa, tpu, pa, pc, resin, resin_tough. Form Studio draws the
-        colour, writes it into its 3MF and adds material notes to the checks (heat, sunlight, warping, flexible, resin);
-        a slicer integration reads `material` per part. Leave an argument out to keep it; clear=True removes both."""
+        get_project / render). Materials: PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF. Form Studio draws the
+        colour, writes it into its 3MF and adds material notes to the checks (heat, sunlight, warping, flexible, fibre-filled);
+        stored in the same fields set_part_print uses (project material, parts.<id>.material), so the slicer picks the matching filament. Leave an argument out to keep it; clear=True removes both."""
         st = studio()
         from . import materials
         def go():

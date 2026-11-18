@@ -939,6 +939,7 @@ QtObject {
     property var _measureSayOff: Timer { interval: 2600; onTriggered: s.measureSay = "" }
     function measureNote(t) { measureSay = t; _measureSayOff.restart() }
     function setMeasuring(on) {
+        if (on && selecting) setSelecting(false)
         measuring = !!on; measureFrom = null; measureSay = ""
         if (on) { measureOpen = true; if (viewer) viewer.setMarker(null) }
     }
@@ -1004,6 +1005,7 @@ QtObject {
     property var _selSayOff: Timer { interval: 2600; onTriggered: s.selSay = "" }
     function selNote(t) { selSay = t; _selSayOff.restart() }
     function setSelecting(on) {
+        if (on && measuring) setMeasuring(false)
         selecting = !!on; selSay = ""
         if (on && viewer) viewer.setMarker(null)
     }
@@ -1049,6 +1051,15 @@ QtObject {
         if (annFocus && annFocus.id === id) annFocus = null
         return ppost("/annotation_delete", { id: id }).then(function () { s.toast("Annotation deleted"); return s.refresh(false) }, fail)
     }
+    function cutThrough(x) {                   // a section through a selected point that contains its normal: the wall there, in section
+        if (!viewer || !x || !x.on) return
+        var part = x.part || "", p = viewer.shownPoint(part, x.on), n = viewer.shownDir(part, x.normal || [0, 0, 1])
+        var k = Math.abs(n[0]) >= Math.abs(n[1]) && Math.abs(n[0]) >= Math.abs(n[2]) ? 0 : Math.abs(n[1]) >= Math.abs(n[2]) ? 1 : 2
+        var i = k === 1 ? 0 : 1                 // facing X or Z: cut across Y; facing Y: cut across X
+        var ax = ["x", "y", "z"][i], b = viewer.bounds, sh = viewer.shiftTo
+        var v = p[i] + sh[ax], t = (v - b.lo[ax]) / Math.max(1e-6, b.hi[ax] - b.lo[ax])
+        setSection(ax, Math.min(0.98, Math.max(0.02, t)))
+    }
     function annotationById(id) { for (var i = 0; i < annotations.length; i++) if (annotations[i].id === id) return annotations[i]; return null }
     function askAboutSelection(text, what) {   // puts the selection, with its numbers, in the composer; you add the question
         talkOpen = true
@@ -1060,19 +1071,26 @@ QtObject {
         function onAnalysisKeyChanged() { if (s.selItems.length) { s.selItems = []; s.selection = null }; s.annFocus = null } }
 
     // ── colours and materials (form/materials.py) ──
-    // The project keeps { color, material, parts: { id: { color, material } } }; a part's own wins over the design's.
+    // The project keeps color and material, and parts: { id: { color, material, ... } } (the slicer reads the same
+    // fields to pick the filament per part); a part's own wins over the design's.
     property var materialCat: null             // GET /materials: [{ id, label, heat_c, density_g_cm3, color, note }], swatches
-    readonly property var appearance: project && project.appearance ? project.appearance : ({ color: null, material: null, parts: ({}) })
+    readonly property var appearance: {
+        if (!project) return { color: null, material: null, parts: ({}) }
+        var ps = project.parts || ({}), out = ({})
+        for (var k in ps) if (ps[k] && (ps[k].color || ps[k].material)) out[k] = { color: ps[k].color || null, material: ps[k].material || null }
+        return { color: project.color || null, material: project.material || null, parts: out }
+    }
     function loadMaterials() { if (!materialCat) get("/materials").then(function (r) { s.materialCat = r }, function () {}) }
     function material(id) {
-        var ms = materialCat ? materialCat.materials : []
-        for (var i = 0; i < ms.length; i++) if (ms[i].id === id) return ms[i]
+        var ms = materialCat ? materialCat.materials : [], k = id ? String(id).toUpperCase() : ""
+        if (k === "NYLON" || k === "PA/NYLON") k = "PA"
+        for (var i = 0; i < ms.length; i++) if (ms[i].id === k) return ms[i]
         return null
     }
     function look(part) {                      // { color, material, own } as drawn and printed
         var a = appearance, own = part && a.parts ? (a.parts[part] || {}) : {}
-        var m = own.material || a.material || null, mat = material(m)
-        return { color: own.color || a.color || (mat ? mat.color : null), material: m, own: !!(own.color || own.material) }
+        var mat = material(own.material) || material(a.material)
+        return { color: own.color || a.color || (mat ? mat.color : null), material: mat ? mat.id : null, own: !!(own.color || own.material) }
     }
     function setLook(part, color, material) {  // undefined keeps, null clears
         var body = { part: part || "" }

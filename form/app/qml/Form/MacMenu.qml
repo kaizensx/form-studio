@@ -58,6 +58,7 @@ P.MenuBar {
         P.MenuItem { text: "Variants Board…"; enabled: mb.work; onTriggered: Store.openSheet("variants") }
         P.MenuSeparator {}
         P.MenuItem { text: "Measure  (M)"; enabled: mb.work; checkable: true; checked: Store.measuring; onTriggered: Store.setMeasuring(!Store.measuring) }
+        P.MenuItem { text: "Annotate  (N)"; enabled: mb.work; checkable: true; checked: Store.selecting; onTriggered: Store.setSelecting(!Store.selecting) }
         P.Menu { title: "Analysis Map"
             P.MenuItem { text: "None"; enabled: mb.work; onTriggered: Store.setAnalysis("") }
             P.MenuItem { text: "Thickness"; enabled: mb.work; onTriggered: Store.setAnalysis("thickness") }

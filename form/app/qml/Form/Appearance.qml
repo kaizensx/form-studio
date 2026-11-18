@@ -94,7 +94,7 @@ Sec {
         }
     }
     Txt { kind: "fine"; width: parent.width
-        text: "The colour is drawn here and written into the 3MF. A material adds its notes to the checks (heat, sunlight, warping, flexible, resin); typical datasheet values, brands differ." }
+        text: "The colour is drawn here and written into the 3MF. A material adds its notes to the checks (heat, sunlight, warping, flexible, fibre-filled) and picks the slicer’s filament; typical datasheet values, brands differ." }
     Btn { objectName: "save3mf"; small: true; icon: "download"; text: "Save 3MF with colours…"; enabled: !Store.hasDraft
         tip: Store.hasDraft ? "Commit or discard the draft first." : "The current revision as printed, one object per part, each in its colour."
         onClicked: Store.exportRequested("colour3mf", Store.pid, "3mf") }

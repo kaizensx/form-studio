@@ -17,6 +17,7 @@ Column {
         [{ title: "Viewport tools", rows: [
             ["V", "Select: click a feature, drag to orbit"],
             ["M", "Measure distances, faces and diameters"],
+            ["N", "Annotate: pick, paint or lasso, keep, ask the agent"],
             ["X", "Section cut on or off"],
             ["A", "Analyze: thickness, overhang and other maps"],
             ["E", "Assembly views and joints"],
@@ -32,7 +33,12 @@ Column {
             [".", "Reset the view"],
             ["H", "Hide or show the selected feature"],
             ["Shift+H", "Show all features"],
-            ["Right-click", "Quick actions for a feature"]] }],
+            ["Right-click", "Quick actions for a feature"]] },
+         { title: "Inside Measure and Annotate", rows: [
+            ["D", "Measure: distance"], ["G", "Measure or Annotate: face"], ["O", "Measure: diameter"],
+            ["R", "Annotate: edge"], ["P", "Annotate: point"], ["B", "Annotate: brush"], ["L", "Annotate: lasso"],
+            ["[", "Brush smaller"], ["]", "Brush larger"],
+            ["Shift+Click", "Add to the selection"], ["Alt+Drag", "Orbit while painting"]] }],
         [{ title: "Everywhere", rows: [
             ["Ctrl+K", "Search and commands"],
             ["Ctrl+N", "New design"],

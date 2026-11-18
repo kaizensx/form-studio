@@ -91,6 +91,8 @@ Rectangle {
                             Txt { kind: "fine"; tone: 2; mono: true; width: parent.width; text: row.ln[1] }
                             Txt { kind: "fine"; tone: 3; width: parent.width; visible: !!row.ln[2]; elide: Text.ElideRight; wrapMode: Text.NoWrap; text: row.ln[2] } }
                         Btn { anchors.right: parent.right; anchors.rightMargin: -6; y: 4; small: true; kind: "quiet"; icon: "x"; tip: "Remove from the selection"; onClicked: Store.selRemove(row.index) }
+                        Btn { anchors.right: parent.right; anchors.rightMargin: -6; y: 30; small: true; kind: "quiet"; icon: "scissors"; visible: !!row.modelData.on && row.modelData.kind !== "region"
+                            tip: "Cut the part open through this point, to see the wall here in section"; onClicked: Store.cutThrough(row.modelData) }
                     }
                 }
             }
