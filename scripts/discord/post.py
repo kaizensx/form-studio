@@ -57,14 +57,23 @@ def short(text: str, n: int = 600) -> str:
 
 def notes_to_fields(body: str) -> tuple[str, list]:
     """A release's notes as Discord markdown: '- **Title.** text' bullets become fields."""
-    fields, rest = [], []
+    fields, rest, more = [], [], 0
     for ln in (body or "").splitlines():
         m = re.match(r"\s*[-*]\s+\*\*(.+?)\*\*\s*(.*)", ln)
-        if m and len(fields) < 9:
-            fields.append({"name": m.group(1).rstrip(".")[:250], "value": short(m.group(2), 300) or "—", "inline": False})
+        if m:
+            if len(fields) < 9:
+                value = re.sub(r"\*\*|`", "", m.group(2))          # a cut never leaves a bold or code mark open
+                fields.append({"name": m.group(1).rstrip(".")[:250], "value": short(value, 300) or "—", "inline": False})
+            else:
+                more += 1                                          # beyond nine: counted, never pushed into the intro
+        elif ln.startswith("### "):
+            break                                                  # "Verify the download" and the like stay on GitHub
         elif not ln.startswith("#"):
             rest.append(ln)
-    return short("\n".join(rest), 400), fields
+    if more:
+        fields.append({"name": f"And {more} more", "value": "Everything is in the release notes.", "inline": False})
+    intro = re.sub(r"\s*\n\s*(?=\S)", " ", "\n".join(rest).strip())    # notes wrap lines; Discord should not
+    return short(intro, 400), fields
 
 
 def release(ev):
