@@ -19,6 +19,24 @@ from .studio import NODES, Studio, StudioError
 WEB = Path(__file__).resolve().parent / "web"
 
 
+def _log_error(root, method: str, path: str, exc: BaseException) -> None:
+    """An unexpected error, with its traceback, appended to <data>/.logs/engine-errors.log (kept under ~1 MB). The
+    packaged app has no console, so this is where a report's details come from. Never raises."""
+    try:
+        import datetime
+        d = Path(root) / ".logs"
+        d.mkdir(parents=True, exist_ok=True)
+        f = d / "engine-errors.log"
+        if f.exists() and f.stat().st_size > 1_000_000:
+            f.replace(d / "engine-errors.old.log")
+        q = path.split("?", 1)[0]                     # the query can carry text the person typed; it is not needed
+        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        with f.open("a", encoding="utf-8") as out:
+            out.write(f"--- {datetime.datetime.now().isoformat(timespec='seconds')} {method} {q}\n{tb}\n")
+    except Exception:
+        pass
+
+
 def make_handler(st: Studio):
     from . import chat as chat_mod
     from .setup import mcp_command
@@ -78,6 +96,7 @@ def make_handler(st: Studio):
                 pass
             except Exception as e:
                 traceback.print_exc()
+                _log_error(st.root, self.command, self.path, e)
                 self._json({"error": {"message": f"Unexpected {type(e).__name__}: {e}",
                                       "hint": "Your project state is unchanged. If this repeats, export the project and report it."}}, 500)
 
