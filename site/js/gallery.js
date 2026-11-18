@@ -1,9 +1,8 @@
 // The recipe gallery page: search and filter over recipes/index.json.
-import { initTheme } from "./theme.js";
+import "./nav.js";
 import { card, loadIndex } from "./recipes.js";
 
 const $ = (s) => document.querySelector(s);
-initTheme($("#theme"));
 
 const grid = $("#grid"), q = $("#q"), count = $("#count"), filter = $("#filter");
 let all = [], mode = "all";

@@ -16,6 +16,9 @@ import shutil
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "tools"))
+import chrome  # noqa: E402  the shared nav and footer
+
 try:
     import markdown
 except ImportError:                                    # pragma: no cover
@@ -66,32 +69,10 @@ PAGE = """<!doctype html>
 <link rel="preload" href="../fonts/InstrumentSans.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../css/site.css">
 <script>document.documentElement.classList.add("js");try{{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}}catch(e){{}}</script>
-<script type="module">import {{ initTheme }} from "../js/theme.js"; initTheme(document.getElementById("theme"));</script>
+<script type="module" src="../js/nav.js"></script>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
-<symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></symbol>
-<symbol id="ic-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 019.5 4.5a8 8 0 1010 10z"/></symbol>
-<symbol id="ic-gh" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-6-2.5m12 4.5v-3.4a3 3 0 00-.8-2.3c2.7-.3 5.5-1.3 5.5-6a4.6 4.6 0 00-1.3-3.2 4.3 4.3 0 00-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 00-6 0C6.5 2.6 5.5 2.9 5.5 2.9a4.3 4.3 0 00-.1 3.2A4.6 4.6 0 004 9.3c0 4.6 2.8 5.6 5.5 6a3 3 0 00-.8 2.3V21"/></symbol>
-</defs></svg>
-<a class="skip" href="#main">Skip to content</a>
-<header class="nav scrolled">
-  <div class="wrap">
-    <a class="brand" href="../"><img class="lk-d" src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="../assets/lockup-light.svg" alt="" width="143" height="22"></a>
-    <ul class="nav-links">
-      <li><a href="../#features">Features</a></li>
-      <li><a href="../#agents">Agents</a></li>
-      <li><a href="../recipes/">Recipes</a></li>
-      <li><a href="./" aria-current="page">Docs</a></li>
-      <li><a href="../#community">Community</a></li>
-    </ul>
-    <div class="end">
-      <button class="theme" type="button" id="theme" aria-label="Switch between light and dark"><svg class="ic sun" aria-hidden="true"><use href="#ic-sun"/></svg><svg class="ic moon" aria-hidden="true"><use href="#ic-moon"/></svg></button>
-      <a class="gh" href="{repo}"><svg class="ic" aria-hidden="true"><use href="#ic-gh"/></svg><span>GitHub</span></a>
-      <a class="btn primary small" href="../#download">Download</a>
-    </div>
-  </div>
-</header>
+{navhtml}
 <div class="wrap docs">
   <nav class="docs-nav" aria-label="Docs">
     <span class="cap">Docs</span>
@@ -104,23 +85,14 @@ PAGE = """<!doctype html>
 {body}
   </main>
 </div>
-<footer class="foot">
-  <div class="wrap">
-    <div class="foot-top">
-      <div class="foot-brand">
-        <a class="brand" href="../"><img class="lk-d" src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="../assets/lockup-light.svg" alt="" width="143" height="22"></a>
-        <p>Describe a part. Get a file you can print. Open source, MIT licence.</p>
-      </div>
-      <nav aria-label="Product"><span class="cap">Product</span><a href="../#features">Features</a><a href="../#tour">Tour</a><a href="../#agents">Agents and slicers</a><a href="../recipes/">Recipes</a><a href="../#download">Download</a></nav>
-      <nav aria-label="Docs"><span class="cap">Docs</span><a href="features.html">Features</a><a href="app.html">The app</a><a href="cli.html">Command line</a><a href="mcp.html">MCP tools</a><a href="changelog.html">Changelog</a></nav>
-      <nav aria-label="Community"><span class="cap">Community</span><a href="{repo}/discussions">Discussions</a><a href="{repo}/issues/new/choose">Report an issue</a><a href="{repo}/blob/main/CONTRIBUTING.md">Contributing</a><a href="{repo}">GitHub</a></nav>
-    </div>
-    <p class="foot-note">No cookies, trackers or third-party requests. These pages are generated from the repository’s markdown.</p>
-  </div>
-</footer>
+{foothtml}
 </body>
 </html>
 """
+
+
+NAVHTML = chrome.nav("../", "docs")
+FOOTHTML = chrome.foot("../")
 
 
 def nav(current: str) -> str:
@@ -152,6 +124,11 @@ def image_size(f: Path) -> tuple[int, int] | None:
     return None
 
 
+def is_moving(f: Path) -> bool:
+    """A video, a GIF or an animated WebP: the website draws the app in code instead (see site/tools/check_site.py)."""
+    return chrome.is_moving(f.name, f.read_bytes())
+
+
 def rewrite(body: str, source: str) -> str:
     """Point relative links at the generated pages or at GitHub, and copy local images next to the pages."""
     here = posixpath.dirname(source)
@@ -165,6 +142,8 @@ def rewrite(body: str, source: str) -> str:
         frag = "#" + frag if frag else ""
         if attr == "src":
             f = ROOT / target
+            if f.is_file() and is_moving(f):
+                return 'src="" data-moving'           # removed below: the website shows no animated images or video
             if f.is_file():
                 (OUT / "media").mkdir(parents=True, exist_ok=True)
                 shutil.copy(f, OUT / "media" / f.name)
@@ -178,6 +157,8 @@ def rewrite(body: str, source: str) -> str:
         return f'href="{REPO}/{kind}/main/{target}{frag}"'
 
     body = re.sub(r'\b(href|src)="([^"]+)"', link, body)
+    body = re.sub(r"<(?:img|video|source)\b[^>]*\bdata-moving\b[^>]*>", "", body)
+    body = re.sub(r"<p>\s*</p>", "", body)
     body = re.sub(r"<table>", '<div class="tablewrap"><table>', body)
     body = body.replace("</table>", "</table></div>")
     body = re.sub(r'<pre><code class="language-[\w-]+">', '<pre tabindex="0"><code>', body)
@@ -200,7 +181,7 @@ def main() -> int:
         body = rewrite(render(text), source)
         src = f'<p class="src">Source: <a href="{REPO}/blob/main/{source}">{source}</a></p>'
         page = PAGE.format(title=html.escape(title), desc=html.escape(desc), file=f"{slug}.html", base=BASE, repo=REPO,
-                           nav=nav(slug), src=src, body=body)
+                           nav=nav(slug), src=src, body=body, navhtml=NAVHTML, foothtml=FOOTHTML)
         (OUT / f"{slug}.html").write_text(page, encoding="utf-8")
         urls.append(f"docs/{slug}.html")
         print("docs", slug, "<-", source)
@@ -211,7 +192,7 @@ def main() -> int:
              f'MCP server, and how to extend it with recipes. Spotted something wrong? <a href="{REPO}/issues/new?template=6-docs.yml">Tell us</a>.</p>\n'
              f'<ul class="docs-index">\n{items}\n</ul>')
     (OUT / "index.html").write_text(PAGE.format(title="Docs", desc="Form Studio documentation: features, the desktop app, the command line, MCP tools, recipes, architecture and compatibility.",
-                                                file="", base=BASE, repo=REPO, nav=nav("index"), src="", body=index), encoding="utf-8")
+                                                file="", base=BASE, repo=REPO, nav=nav("index"), src="", body=index, navhtml=NAVHTML, foothtml=FOOTHTML), encoding="utf-8")
 
     today = _dt.date.today().isoformat()
     sm = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
@@ -219,6 +200,8 @@ def main() -> int:
     sm.append("</urlset>")
     (SITE / "sitemap.xml").write_text("\n".join(sm) + "\n", encoding="utf-8")
     (SITE / "robots.txt").write_text(f"User-agent: *\nAllow: /\nSitemap: {BASE}sitemap.xml\n", encoding="utf-8")
+    for page in chrome.stamp(SITE):
+        print("nav and footer ->", page)
     print("wrote", OUT, "and sitemap.xml")
     return 0
 

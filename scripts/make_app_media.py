@@ -1,4 +1,4 @@
-"""Smooth animations of the real app for the README (animated WebP) and the website (WebP and MP4).
+"""Smooth animations of the real app for the README (animated WebP).
 
     .venv/bin/python scripts/make_app_media.py                 # capture every clip, then encode
     .venv/bin/python scripts/make_app_media.py --encode-only   # encode frames captured before
@@ -23,14 +23,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FRAMES = ROOT / ".dev" / "media-frames"
 README = ROOT / "docs" / "images"
-SITE = ROOT / "site" / "assets" / "media"
 FPS = 30
 
-# clip → README animated WebP (width, quality, keep every nth frame) and website MP4 (width, where its poster frame is)
+# clip → README animated WebP (width, quality, keep every nth frame). The website draws the app in code instead:
+# it has no video and no animated images.
 OUT = {
-    "orbit": {"readme": ("app-orbit.webp", 960, 70, 1), "site": ("orbit", 1600, 0.0)},
-    "hinge": {"readme": ("assembly-joint.webp", 760, 76, 1), "site": ("hinge", 1200, 0.3)},
-    "print": {"readme": ("print-sim-play.webp", 960, 70, 1), "site": ("print", 1600, 0.7)},
+    "orbit": {"readme": ("app-orbit.webp", 960, 70, 1)},
+    "hinge": {"readme": ("assembly-joint.webp", 760, 76, 1)},
+    "print": {"readme": ("print-sim-play.webp", 960, 70, 1)},
 }
 
 
@@ -68,14 +68,6 @@ def encode(clip: str) -> None:
     print(json.dumps({"file": str(dest.relative_to(ROOT)), "frames": len(imgs), "fps": round(FPS / nth, 1),
                       "seconds": round(len(imgs) * ms / 1000, 1), "size": f"{imgs[0].width}x{imgs[0].height}",
                       "kb": dest.stat().st_size // 1024}))
-    # the website: H.264 MP4 at every frame, and one frame as the poster (also what reduced motion shows)
-    stem, sw, at = OUT[clip]["site"]
-    SITE.mkdir(parents=True, exist_ok=True)
-    first = Image.open(files[min(len(files) - 1, int(at * len(files)))]).convert("RGB")
-    first.resize((sw, round(first.height * sw / first.width)), Image.LANCZOS).save(SITE / f"{stem}.webp", quality=84, method=6)
-    subprocess.run([sys.executable, str(ROOT / "scripts" / "media" / "encode_mp4.py"), str(FRAMES / clip),
-                    str(SITE / f"{stem}.mp4"), "--fps", str(FPS), "--width", str(sw), "--quality", "High"],
-                   check=True, stderr=subprocess.DEVNULL)
 
 
 def main() -> None:

@@ -4,25 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Form Studio: what are we making?</title>
-<meta name="description" content="Form Studio is an open-source desktop app for macOS, Windows and Linux. Start from words, a photo, a sketch, a part or a link; an AI agent designs it in a real CAD kernel, Form Studio checks every revision, slices it with your slicer and simulates the print. With a printer or without one.">
+<meta name="description" content="Form Studio is an open-source desktop app for macOS, Windows and Linux. Describe a part; an AI agent designs it in a real CAD kernel, Form Studio checks every revision, slices it with your slicer and plays the print back.">
 <meta name="theme-color" content="#0e1113" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
 <link rel="canonical" href="https://kaizensx.github.io/form-studio/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Form Studio">
 <meta property="og:title" content="Form Studio: what are we making?">
-<meta property="og:description" content="Start from words, a photo, a sketch, a part or a link. An AI agent designs it as real CAD; Form Studio checks it, slices it with your slicer and simulates the print. macOS, Windows and Linux. MIT licence.">
+<meta property="og:description" content="Describe a part. An agent designs it as real CAD; Form Studio checks it, slices it with your slicer and plays the print back. macOS, Windows and Linux. MIT licence.">
 <meta property="og:url" content="https://kaizensx.github.io/form-studio/">
 <meta property="og:image" content="https://kaizensx.github.io/form-studio/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Form Studio">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Form Studio">
 <link rel="preload" href="fonts/InstrumentSans.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/GeistMono.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/lucide-form.woff2" as="font" type="font/woff2" crossorigin>
@@ -34,76 +34,53 @@
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
 <script type="module" src="js/main.js"></script>
 </head>
-<body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-  <defs>
-    <symbol id="ic-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-5 4v-14z"/><path d="M8 9.5h8M8 12.5h5"/></symbol>
-    <symbol id="ic-cube" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
-    <symbol id="ic-check" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M8 12.2l2.8 2.8L16.5 9"/></symbol>
-    <symbol id="ic-layers" viewBox="0 0 24 24"><path d="M12 4l8.5 4.5L12 13 3.5 8.5 12 4z"/><path d="M3.5 12.5L12 17l8.5-4.5M3.5 16.5L12 21l8.5-4.5"/></symbol>
-    <symbol id="ic-seal" viewBox="0 0 24 24"><path d="M12 3l2.4 1.7 2.9-.1.9 2.8 2.3 1.8-1 2.8 1 2.8-2.3 1.8-.9 2.8-2.9-.1L12 21l-2.4-1.7-2.9.1-.9-2.8-2.3-1.8 1-2.8-1-2.8 2.3-1.8.9-2.8 2.9.1L12 3z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></symbol>
-    <symbol id="ic-branch" viewBox="0 0 24 24"><circle cx="6.5" cy="5.5" r="2"/><circle cx="6.5" cy="18.5" r="2"/><circle cx="17.5" cy="8" r="2"/><path d="M6.5 7.5v9M17.5 10c0 4-6 3.5-10 6.5"/></symbol>
-    <symbol id="ic-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
-    <symbol id="ic-map" viewBox="0 0 24 24"><path d="M4 18.5l5-3 6 3 5-3v-11l-5 3-6-3-5 3v11z"/><path d="M9 4.5v11M15 7.5v11"/></symbol>
-    <symbol id="ic-hinge" viewBox="0 0 24 24"><rect x="3.5" y="13" width="17" height="6.5" rx="1.5"/><path d="M5 13L16.5 5.5l2 3L7.5 13"/><circle cx="5.5" cy="13" r="1.4"/></symbol>
-    <symbol id="ic-spark" viewBox="0 0 24 24"><path d="M12 3.5l1.9 5.6 5.6 1.9-5.6 1.9-1.9 5.6-1.9-5.6-5.6-1.9 5.6-1.9L12 3.5z"/><path d="M19 17v4M17 19h4"/></symbol>
-    <symbol id="ic-camera" viewBox="0 0 24 24"><path d="M3.5 8.5a2 2 0 012-2h2.3l1.6-2h5.2l1.6 2h2.3a2 2 0 012 2v9a2 2 0 01-2 2h-13a2 2 0 01-2-2v-9z"/><circle cx="12" cy="13" r="3.6"/></symbol>
-    <symbol id="ic-plug" viewBox="0 0 24 24"><path d="M9 3.5v4M15 3.5v4M6.5 7.5h11v3a5.5 5.5 0 01-11 0v-3zM12 16v4.5"/></symbol>
-    <symbol id="ic-alert" viewBox="0 0 24 24"><path d="M12 3.5l9 16H3l9-16z"/><path d="M12 10v4.5M12 17.2v.3"/></symbol>
-    <symbol id="ic-dl" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M4.5 19.5h15"/></symbol>
-    <symbol id="ic-term" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M7 9.5l3 2.5-3 2.5M12.5 15h4.5"/></symbol>
-    <symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></symbol>
-    <symbol id="ic-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 019.5 4.5a8 8 0 1010 10z"/></symbol>
-    <symbol id="ic-pen" viewBox="0 0 24 24"><path d="M4 20l1.2-4.6L15.8 4.8a2 2 0 012.8 0l.6.6a2 2 0 010 2.8L8.6 18.8 4 20z"/><path d="M13.5 7l3.5 3.5"/></symbol>
-    <symbol id="ic-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></symbol>
-    <symbol id="ic-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></symbol>
-    <symbol id="ic-ruler" viewBox="0 0 24 24"><path d="M3 15.5L15.5 3 21 8.5 8.5 21 3 15.5z"/><path d="M7 11.5l2 2M10 8.5l1.5 1.5M13 5.5l2 2"/></symbol>
-    <symbol id="ic-chart" viewBox="0 0 24 24"><path d="M4 20V4M4 20h16"/><path d="M8 16l3.5-4 3 2.5L20 8"/></symbol>
-    <symbol id="ic-gh" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-6-2.5m12 4.5v-3.4a3 3 0 00-.8-2.3c2.7-.3 5.5-1.3 5.5-6a4.6 4.6 0 00-1.3-3.2 4.3 4.3 0 00-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 00-6 0C6.5 2.6 5.5 2.9 5.5 2.9a4.3 4.3 0 00-.1 3.2A4.6 4.6 0 004 9.3c0 4.6 2.8 5.6 5.5 6a3 3 0 00-.8 2.3V21"/></symbol>
-  </defs>
-</svg>
-
+<body class="home">
+<!--nav-->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></symbol>
+<symbol id="ic-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 019.5 4.5a8 8 0 1010 10z"/></symbol>
+<symbol id="ic-gh" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-6-2.5m12 4.5v-3.4a3 3 0 00-.8-2.3c2.7-.3 5.5-1.3 5.5-6a4.6 4.6 0 00-1.3-3.2 4.3 4.3 0 00-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 00-6 0C6.5 2.6 5.5 2.9 5.5 2.9a4.3 4.3 0 00-.1 3.2A4.6 4.6 0 004 9.3c0 4.6 2.8 5.6 5.5 6a3 3 0 00-.8 2.3V21"/></symbol>
+</defs></svg>
 <a class="skip" href="#main">Skip to content</a>
 <header class="nav" id="nav">
   <div class="wrap">
     <a class="brand" href="./"><img class="lk-d" src="assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="assets/lockup-light.svg" alt="" width="143" height="22"></a>
-    <ul class="nav-links">
-      <li><a href="#reel">Watch</a></li>
-      <li><a href="#start">Start</a></li>
-      <li><a href="#features">Features</a></li>
-      <li><a href="#agents">Agents</a></li>
-      <li><a href="recipes/">Recipes</a></li>
-      <li><a href="compat/">Compatibility</a></li>
-      <li><a href="docs/">Docs</a></li>
-      <li><a href="#community">Community</a></li>
-    </ul>
+    <nav class="nav-links" aria-label="Site"><ul><li><a href="./#how">How it works</a></li><li><a href="recipes/">Recipes</a></li><li><a href="compat/">Compatibility</a></li><li><a href="bench/">Benchmarks</a></li><li><a href="docs/">Docs</a></li></ul></nav>
     <div class="end">
       <button class="theme" type="button" id="theme" aria-label="Switch between light and dark"><svg class="ic sun" aria-hidden="true"><use href="#ic-sun"/></svg><svg class="ic moon" aria-hidden="true"><use href="#ic-moon"/></svg></button>
       <a class="gh" href="https://github.com/kaizensx/form-studio"><svg class="ic" aria-hidden="true"><use href="#ic-gh"/></svg><span>GitHub</span></a>
-      <a class="btn primary small" href="#download">Download</a>
+      <a class="btn primary small dl-btn" href="./#download">Download</a>
+      <button class="menu-btn" type="button" id="menu-btn" aria-expanded="false" aria-controls="menu" aria-label="Menu"><i></i><i></i></button>
     </div>
+  </div>
+  <div class="menu" id="menu" hidden>
+    <ul><li><a href="./#how">How it works</a></li><li><a href="recipes/">Recipes</a></li><li><a href="compat/">Compatibility</a></li><li><a href="bench/">Benchmarks</a></li><li><a href="docs/">Docs</a></li><li><a href="https://github.com/kaizensx/form-studio">GitHub</a></li></ul>
   </div>
   <span class="scrolled-bar" id="scroll-bar" aria-hidden="true"></span>
 </header>
+<!--/nav-->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="ic-cube" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
+<symbol id="ic-seal" viewBox="0 0 24 24"><path d="M12 3l2.4 1.7 2.9-.1.9 2.8 2.3 1.8-1 2.8 1 2.8-2.3 1.8-.9 2.8-2.9-.1L12 21l-2.4-1.7-2.9.1-.9-2.8-2.3-1.8 1-2.8-1-2.8 2.3-1.8.9-2.8 2.9.1L12 3z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></symbol>
+<symbol id="ic-plug" viewBox="0 0 24 24"><path d="M9 3.5v4M15 3.5v4M6.5 7.5h11v3a5.5 5.5 0 01-11 0v-3zM12 16v4.5"/></symbol>
+<symbol id="ic-term" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M7 9.5l3 2.5-3 2.5M12.5 15h4.5"/></symbol>
+</defs></svg>
 
 <main id="main">
-<section class="hero" aria-labelledby="hero-title">
-  <div class="wrap hero-copy">
-    <h1 id="hero-title">What are we making?</h1>
-    <p class="lead">Describe it, drop a photo, sketch it or paste a link. An agent designs it in a real CAD kernel; Form Studio checks it, slices it with your slicer and plays the print back. With a printer, or without one.</p>
-    <div class="cta">
-      <a class="btn primary" id="cta-dl" href="#download"><span class="i" aria-hidden="true">&#xe0b2;</span><span>Download</span></a>
-      <a class="btn" href="#try"><span class="i" aria-hidden="true">&#xe13c;</span><span>Try it here</span></a>
-      <a class="btn" href="https://github.com/kaizensx/form-studio">Source on GitHub</a>
+<section class="hero" id="top" aria-labelledby="hero-title">
+  <div class="hero-bg" aria-hidden="true"><div class="hero-grid" data-par="-0.12"></div><div class="hero-glow" data-par="0.18"></div></div>
+  <div class="wrap hero-copy" id="hero-copy">
+    <p class="eyebrow in-1"><span class="pip"></span>Open source · macOS, Windows and Linux</p>
+    <h1 id="hero-title" class="hero-title"><span class="ln"><span>What are we</span></span> <span class="ln"><span>making?</span></span></h1>
+    <p class="lead in-2">Describe a part. An agent designs it in a real CAD kernel; Form Studio checks it, slices it with your slicer and plays the print back before you start it.</p>
+    <div class="cta in-3">
+      <a class="btn primary big" id="cta-dl" href="#download"><span class="i" aria-hidden="true">&#xe0b2;</span><span>Download</span></a>
+      <a class="btn big ghost" href="#how"><span>See how it works</span><span class="i" aria-hidden="true">&#xe06d;</span></a>
     </div>
-    <p class="fine">macOS, Windows and Linux. Open source, MIT licence.</p>
   </div>
 
-  <div class="wrap stage-wrap" id="try">
-    <div class="try-bar">
-      <div class="scr-seg" role="group" aria-label="Screen"><button type="button" data-scr="home" aria-pressed="false"><span class="i" aria-hidden="true">&#xe412;</span>Home</button><button type="button" data-scr="work" aria-pressed="true"><span class="i" aria-hidden="true">&#xe524;</span>Workspace</button></div>
-      <p class="try-hint"><b>Try it.</b> Type on Home, drag the part, switch stages, open the model menu, play the print.</p>
-    </div>
+  <div class="stage" id="try">
+    <div class="stage-tilt" id="stage-tilt">
     <div class="app-frame island" id="app-frame">
       <div class="app" id="app" role="region" aria-roledescription="interactive recreation" aria-label="Form Studio, recreated in the page with a sample project. It plays a short story from Home to the workspace; type on Home, drag the 3D view to orbit, and use the stage tabs, view buttons, model menu and layer slider.">
         <header class="tb">
@@ -204,413 +181,118 @@
         <div class="ptr" id="ptr" aria-hidden="true"><svg width="18" height="22" viewBox="0 0 18 22"><path d="M2 1.5v16.2l4.1-3.9 2.6 6.2 2.9-1.2-2.6-6.1h5.8z" fill="#fff" stroke="#000" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
       </div>
     </div>
-    <div class="stage-note">
-      <p>Form Studio, drawn live in this page with a sample project: Home, the workspace and the model menu are laid out as in the app. The geometry comes from the CAD kernel, the checks and fit model from Form Studio’s engine, and the toolpath from the G-code Bambu Studio 2.9.1 wrote for a Bambu Lab A1 mini. The conversation re-enacts how the project was made.</p>
+    </div>
+    <div class="stage-cap">
+      <div class="scr-seg" role="group" aria-label="Screen"><button type="button" data-scr="home" aria-pressed="false">Home</button><button type="button" data-scr="work" aria-pressed="true">Workspace</button></div>
+      <p>The real app, drawn live in this page. The part comes from the CAD kernel, the toolpath from Bambu Studio’s G-code.</p>
       <button class="story-ctl" type="button" id="story-ctl" aria-pressed="false"><span class="i" aria-hidden="true">&#xe12e;</span><span class="lbl">Pause</span><span class="bar" aria-hidden="true"><i id="story-bar"></i></span></button>
     </div>
   </div>
 </section>
 
-<section class="block reel-sec" id="reel" aria-labelledby="reel-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="reel-title">See it move.</h2>
-      <div>
-        <p>Recorded from the Form Studio window at 30 frames a second. The hinged box is one of the building blocks, built as a solid by the CAD kernel; its lid turns on the joint the design declares, and the print is played back from the G-code the slicer wrote.</p>
-      </div>
-    </div>
-    <div class="reel rv" id="reel-box">
-      <div class="reel-view island">
-        <video id="reel-v" muted playsinline preload="none" poster="assets/media/orbit.webp" aria-label="Form Studio turning the hinged box on its plate while the lid opens"></video>
-        <button class="reel-pp" type="button" id="reel-pp" aria-label="Pause"><span class="i" aria-hidden="true">&#xe12e;</span></button>
-      </div>
-      <div class="reel-side">
-      <div class="reel-tabs" role="tablist" aria-label="Clips">
-        <button type="button" role="tab" aria-selected="true" data-clip="orbit" data-label="Form Studio turning the hinged box on its plate while the lid opens"><span class="n">01</span><b>Turn it around</b><span>The workspace with the solid on its plate, its dimensions, the stages and the pipeline.</span><i></i></button>
-        <button type="button" role="tab" aria-selected="false" tabindex="-1" data-clip="hinge" data-label="The lid swung through its range on the Lid hinge slider, then the parts pulled apart and put back"><span class="n">02</span><b>Move the joints</b><span>The lid swept through its range on its hinge, then exploded and put back together.</span><i></i></button>
-        <button type="button" role="tab" aria-selected="false" tabindex="-1" data-clip="print" data-label="The print played back layer by layer from the slicer's G-code, with line types and the time per layer"><span class="n">03</span><b>Watch it print</b><span>Every layer and line type from the slicer’s G-code, before the printer starts.</span><i></i></button>
-      </div>
-      <p class="reel-note"><i aria-hidden="true"></i>Live from the app window, 30 frames a second.</p>
-      </div>
-    </div>
-    <ul class="stats rv" aria-label="In numbers">
-      <li><b data-count="66">66</b><span>MCP tools for any agent</span></li>
-      <li><b data-count="7">7</b><span>slicers, sliced for real in CI</span></li>
-      <li><b data-count="13">13</b><span>design skills for agents</span></li>
-      <li><b data-count="5">5</b><span>export formats, STEP to GLB</span></li>
-      <li><b data-count="3">3</b><span>desktop platforms, one app</span></li>
-    </ul>
+<section class="how" id="how" aria-labelledby="how-title">
+  <div class="wrap how-head">
+    <p class="eyebrow rv">How it works</p>
+    <h2 id="how-title" class="rv">From a sentence to a print<br class="br"> you can trust.</h2>
   </div>
-</section>
-
-<section class="block flow-sec" id="how" aria-labelledby="how-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="how-title">From an idea to released files.</h2>
-      <div>
-        <p>Bring what you have. The agent proposes real designs, asks for the numbers that matter and builds the one you pick as a parametric model. Form Studio carries every revision through checks, fit, slicing and simulation, until you approve the files.</p>
-      </div>
-    </div>
-    <ol class="flow rv" aria-label="The steps of a design">
-      <li><span class="n">01</span><svg class="ic" aria-hidden="true"><use href="#ic-chat"/></svg><b>Start from anything</b><span>Words, a photo with a coin for scale, a sketch, a STEP or STL part, a PDF drawing or a link.</span></li>
-      <li><span class="n">02</span><svg class="ic" aria-hidden="true"><use href="#ic-grid"/></svg><b>Pick a concept</b><span>Three or four different designs, each real CAD with its size and volume. Pick one or ask for a mix.</span></li>
-      <li><span class="n">03</span><svg class="ic" aria-hidden="true"><use href="#ic-check"/></svg><b>Check</b><span>Checks on the solid, a fit model for every interface, assemblies swept through their motion.</span></li>
-      <li><span class="n">04</span><svg class="ic" aria-hidden="true"><use href="#ic-layers"/></svg><b>Slice and simulate</b><span>Your slicer, your printer, as many plates as it takes. Or just a 3D model: no slicing at all.</span></li>
-      <li><span class="n">05</span><svg class="ic" aria-hidden="true"><use href="#ic-seal"/></svg><b>Release</b><span>You approve. STEP, STL, 3MF, OBJ, GLB and G-code are frozen with hashes and a report.</span></li>
-    </ol>
-  </div>
-</section>
-
-<section class="block" id="start" aria-labelledby="start-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="start-title">Start from anything.</h2>
-      <div>
-        <p>Home is one composer for whatever you have. Type it or dictate it, drop or paste a photo or a part, draw on the sketch pad, or paste a link. Choose whether the next design is for your printer or just a 3D model, or start blank.</p>
-      </div>
-    </div>
-    <div class="agent-grid rv">
-      <figure class="agent-shot island"><img src="assets/shots/home.webp" width="1600" height="989" loading="lazy" decoding="async" alt="Form Studio's Home: What are we making?, one composer with Photo or file, Sketch and Link, For my printer or Just a 3D model, Start blank, recent conversations and designs"></figure>
-      <ul class="agent-list">
-        <li><b>A photo, with a scale</b><span>With a bank card, a coin or a ruler in the picture, the agent estimates sizes from it and keeps them marked as estimated until you measure.</span></li>
-        <li><b>A sketch with dimensions</b><span>Lines, rectangles, circles, arcs and freehand in millimetres, snapped to a grid. The agent receives structured geometry, not just a picture.</span></li>
-        <li><b>A part or a drawing</b><span>A STEP, STL or 3MF to design around or start from, or a PDF drawing read as images so its dimensions survive.</span></li>
-        <li><b>A link</b><span>A model page is passed to the agent; a direct file link is downloaded once and shown on the composer.</span></li>
-      </ul>
-    </div>
-    <div class="duo rv">
-      <figure class="island"><img src="assets/shots/photo.webp" width="1000" height="644" loading="lazy" decoding="async" alt="A photo of a box on the composer with the words: a box like this for my desk drawer, 120 mm wide, with a hinged lid"><figcaption><b>A photo and a sentence.</b> The agent sees both.</figcaption></figure>
-      <figure class="island"><img src="assets/shots/sketch.webp" width="1200" height="791" loading="lazy" decoding="async" alt="The sketch pad with a rectangle, a circle and a stated 80 mm dimension, and the list of shapes with their sizes"><figcaption><b>The sketch pad.</b> Shapes in millimetres, a stated dimension wins over the drawn one.</figcaption></figure>
-    </div>
-  </div>
-</section>
-
-<section class="block" id="concepts" aria-labelledby="concepts-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="concepts-title">Several real designs, not one guess.</h2>
-      <div>
-        <p>For a new idea the agent proposes three or four genuinely different concepts, each built as real CAD, side by side and turning, with a line on each and its computed size and volume. Continue with one, or ask for a mix in words.</p>
-        <p>The workspace opens the moment you send, and every build grows into the viewport feature by feature, each feature named as it arrives.</p>
-      </div>
-    </div>
-    <figure class="shot-wide island rv"><img src="assets/shots/concepts.webp" width="1600" height="989" loading="lazy" decoding="async" alt="Three concepts for a desk phone stand side by side: a cradle with a charging slot, a folded strip and a weighted puck, each with its size, volume and a Continue button"></figure>
-    <div class="duo rv">
-      <figure class="island"><img src="assets/shots/building.webp" width="1200" height="742" loading="lazy" decoding="async" alt="A headphone hook growing into the viewport feature by feature while the agent works: clamp, arm, saddle and grip ridges"><figcaption><b>Watch it being built.</b> The design attaches the moment it exists.</figcaption></figure>
-      <figure class="island"><img src="assets/shots/measure-this.webp" width="1600" height="989" loading="lazy" decoding="async" alt="A Measure this card: how thick is your phone with its case, a diagram of where to measure, the value assumed now and the tolerance that matters"><figcaption><b>Measure this.</b> Where to measure, the tolerance that matters, and how you measured it, on the record.</figcaption></figure>
-    </div>
-  </div>
-</section>
-
-<section class="block" id="features" aria-labelledby="features-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="features-title">A complete workshop, from idea to file.</h2>
-      <div>
-        <p>Ideas, concepts, engineering checks, slicing and release in one native app, and every capability also available from the command line and to any MCP agent.</p>
-        <p><a class="more" href="docs/features.html">Every feature, in the docs <span aria-hidden="true">→</span></a></p>
-      </div>
-    </div>
-    <ul class="fgrid rv">
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-pen"/></svg><b>Start from anything</b><p>Words, photos with a scale, sketches, STEP, STL and 3MF parts, PDF drawings and links, in one composer.</p><a href="#start">Start</a></li>
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-grid"/></svg><b>Concepts</b><p>Three or four different designs as real CAD, side by side with their size and volume. Pick one or mix them.</p><a href="#concepts">Concepts</a></li>
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-cube"/></svg><b>Real CAD</b><p>B-rep solids from build123d on OpenCascade, exported as STEP, STL, 3MF, OBJ and GLB. Python or OpenSCAD designs.</p><a href="docs/features.html#designing">Designing</a></li>
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-check"/></svg><b>Checks with evidence</b><p>Validity, walls, overhangs, bridges, plate contact, tip-over, fit. Each result says how it is known.</p><a href="#checks">Checks</a></li>
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-target"/></svg><b>Fit model</b><p>The chance a pocket fits what it holds, from your measurements and your printer's accuracy.</p><a href="#fit">Fit</a></li>
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-map"/></svg><b>Annotate and measure</b><p>Pick faces, edges or painted regions and read area, tilt, overhang and wall thickness computed on the solid.</p><a href="#tour">Analysis</a></li>
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-layers"/></svg><b>Plates and print simulation</b><p>Every printer in your slicers, as many plates as it takes, and the G-code played back in 3D.</p><a href="#print">Simulation</a></li>
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-hinge"/></svg><b>Assemblies</b><p>Chained hinges and slides, pins and threads as fits, joint sweeps for collisions, assembled and exploded.</p><a href="#assemblies">Assemblies</a></li>
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-ruler"/></svg><b>Just a 3D model</b><p>No printer needed: models for CAD, CNC, laser, moulding or rendering, checked as models.</p><a href="#model">3D models</a></li>
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-spark"/></svg><b>Any agent, any model</b><p>Agent apps, model APIs, local models and any provider by its address, with a model menu that searches hundreds.</p><a href="#agents">Agents</a></li>
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-seal"/></svg><b>Release</b><p>One approval by a person freezes the files with SHA-256 hashes and a report. Verify them at any time.</p><a href="docs/features.html#release">Release</a></li>
-      <li><svg class="ic" aria-hidden="true"><use href="#ic-term"/></svg><b>Headless</b><p>Every capability as a <code>form</code> command printing JSON and as one of 66 MCP tools for any agent.</p><a href="#cli">CLI and MCP</a></li>
-    </ul>
-  </div>
-</section>
-
-<section class="block" id="fit" aria-labelledby="fit-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="fit-title">Know how likely it is to fit before you print.</h2>
-      <div>
-        <p>A pocket 0.3 mm too tight is a failed print. Form Studio models the gap between the printed cavity and the real object from what is known about each: the dimensions you measured, the ones you assumed, and how accurate your printer is.</p>
-        <p>Then it tells you the cheapest way to raise the odds: measure the object, print a coupon, or print a thin ring cut from the real pocket.</p>
-      </div>
-    </div>
-    <div class="demo fit-demo island rv" id="fit-demo">
-      <div class="fit-chart"><svg id="fit-svg" viewBox="0 0 640 300" role="img" aria-label="Distribution of the expected gap between the pocket and the phone, with the acceptable window marked"></svg></div>
-      <div class="fit-side">
-        <div><div class="fit-big"><b id="fit-y">66%</b><span>modelled chance the gap lands in your window of 0.10 to 0.80 mm</span></div></div>
-        <div class="fit-three">
-          <div><b id="fit-t" style="color:var(--signal)">7%</b><span>too tight</span></div>
-          <div><b id="fit-g">0.60 mm</b><span>expected gap</span></div>
-          <div><b id="fit-l" style="color:var(--amber)">28%</b><span>too loose</span></div>
-        </div>
-        <div class="ctl">
-          <div class="ctl-row"><label for="fit-c">Clearance per side</label><output id="fit-co" for="fit-c">0.30 mm</output></div>
-          <input type="range" id="fit-c" min="0.10" max="0.50" step="0.01" value="0.30">
-          <small>Recommended for a centred gap: <span id="fit-rec" class="mono">0.23 mm</span></small>
-        </div>
-        <div class="ctl">
-          <div class="ctl-row"><span class="lbl" id="fit-src-l">Phone width, 71.50 mm</span></div>
-          <div class="seg" role="group" aria-labelledby="fit-src-l"><button type="button" id="fit-a" aria-pressed="true">Assumed ±0.30</button><button type="button" id="fit-m" aria-pressed="false">Measured ±0.03</button></div>
-          <small id="fit-why">The phone’s width is a guess, so it drives 80% of the uncertainty.</small>
+  <div class="how-track" id="how-track">
+    <div class="how-pin">
+      <div class="wrap how-grid">
+        <ol class="how-steps" id="how-steps">
+          <li class="on"><span class="n">01</span><h3>Describe it</h3><p>Words, a photo with a coin for scale, a sketch, a part or a link. Choose your printer, or just a 3D model.</p></li>
+          <li><span class="n">02</span><h3>It is built as real CAD</h3><p>An agent writes a parametric design; build123d on OpenCascade builds the solid, feature by feature.</p></li>
+          <li><span class="n">03</span><h3>Every revision is checked</h3><p>Validity, walls, overhangs, plate contact, tip-over and fit. Each result says how it is known.</p></li>
+          <li><span class="n">04</span><h3>Sliced, then played back</h3><p>Your slicer writes the G-code. Form Studio plays every layer back before the printer starts.</p></li>
+        </ol>
+        <div class="how-win island" id="how-win" aria-hidden="true">
+          <div class="mtb"><span class="lights"><i></i><i></i><i></i></span><img src="assets/lockup.svg" alt="" width="98" height="15"><span class="slash">/</span><span class="pn" id="hw-name">New design</span><span class="rv-chip mono" id="hw-rev"></span><span class="sp"></span><span class="tag t-ink" id="hw-stage">Home</span></div>
+          <div class="scenes">
+            <div class="scene s-home" data-s="0">
+              <span class="greet">Good afternoon</span>
+              <b class="ht">What are we making?</b>
+              <div class="hc"><p id="hw-type"><span class="ph">A knob like the one in my photo…</span></p><div class="hr"><span class="hq"><span class="i">&#xe12d;</span>Photo or file</span><span class="hq"><span class="i">&#xe131;</span>Sketch</span><span class="hq"><span class="i">&#xe102;</span>Link</span><span class="hgo" id="hw-go">Design it<span class="i">&#xe049;</span></span></div></div>
+              <div class="hchips"><span class="on">For my printer</span><span>Just a 3D model</span><span class="ch"><span class="i">&#xe141;</span><em id="hw-printer"></em></span></div>
+            </div>
+            <div class="scene s-cad" data-s="1">
+              <canvas id="hw-gl"></canvas>
+              <ul class="feats" id="hw-feats"></ul>
+              <p class="cad-hud mono" id="hw-cad"></p>
+            </div>
+            <div class="scene s-checks" data-s="2">
+              <div class="ck-sum"><div><b id="hw-pass">0</b><span>Pass</span></div><div class="w"><b id="hw-warn">0</b><span>To review</span></div><div class="f"><b>0</b><span>Failed</span></div></div>
+              <ul class="ck-list" id="hw-checks"></ul>
+            </div>
+            <div class="scene s-print" data-s="3">
+              <canvas id="hw-pc"></canvas>
+              <div class="pr-hud"><b id="hw-layer"></b><span class="mono" id="hw-z"></span><span class="tag t-amber">Simulated</span></div>
+              <div class="pr-bar"><i id="hw-pbar"></i></div>
+              <p class="pr-read mono" id="hw-read"></p>
+            </div>
+          </div>
+          <div class="win-prog"><i></i><i></i><i></i><i></i></div>
         </div>
       </div>
-      <div class="demo-foot" style="grid-column:1/-1"><span>Every value above was computed by Form Studio’s fit model for the phone dock, at each clearance from 0.10 to 0.50 mm.</span><span class="tag t-amber">Modelled</span></div>
     </div>
   </div>
 </section>
 
-<section class="block" id="checks" aria-labelledby="checks-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="checks-title">Every revision is rebuilt and checked on the solid.</h2>
-      <div>
-        <p>Each change rebuilds a boundary-representation solid in OpenCascade, then checks it: one valid solid, a closed export mesh, the thinnest wall, overhangs, bridges, plate contact and the force that tips it over.</p>
-        <p>Each result says how it is known. A measurement on the geometry is computed, a rule of thumb is a heuristic, and a formula with assumptions is a model.</p>
-      </div>
-    </div>
-    <div class="demo checks-demo island rv" id="checks-demo">
-      <div class="checks-sum">
-        <div class="tri"><div class="p"><b id="ck-p">10</b><span class="cap">Pass</span></div><div class="w"><b id="ck-w">2</b><span class="cap">To review</span></div><div class="f"><b>0</b><span class="cap">Failed</span></div></div>
-        <div class="ratio" id="ck-ratio"></div>
-        <p class="fine" id="ck-ev"></p>
-        <p class="fine">The phone dock at revision 4, as checked by Form Studio. Select a check to read what it measured.</p>
-      </div>
-      <div>
-        <div class="checks-head"><span class="cap" id="ck-count">12 checks</span>
-          <div class="seg" role="group" aria-label="Show checks by evidence" id="ck-filter"><button type="button" data-f="all" aria-pressed="true">All</button><button type="button" data-f="computed" aria-pressed="false">Computed</button><button type="button" data-f="heuristic" aria-pressed="false">Heuristic</button><button type="button" data-f="model" aria-pressed="false">Model</button></div>
+<section class="moves" id="moves" aria-labelledby="moves-title">
+  <div class="moves-track" id="moves-track">
+    <div class="moves-pin">
+      <div class="wrap moves-grid">
+        <div class="moves-copy">
+          <p class="eyebrow">Assemblies</p>
+          <h2 id="moves-title">Parts that move are checked moving.</h2>
+          <p>The hinged box is two printed parts on one joint. Form Studio swings the lid through its whole range, checks each position for collisions, then shows how the parts come apart.</p>
+          <dl class="readout">
+            <div><dt>Lid hinge</dt><dd class="mono" id="mv-angle">0°</dd></div>
+            <div><dt>Range</dt><dd class="mono" id="mv-range"></dd></div>
+            <div><dt>Positions checked</dt><dd class="mono" id="mv-samples"></dd></div>
+          </dl>
         </div>
-        <ul class="checks-list" id="ck-list"></ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="block" id="print" aria-labelledby="print-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="print-title">Watch the print before you start it.</h2>
-      <div>
-        <p>Form Studio reads the toolpaths your slicer wrote and plays them back: every layer and every line type, timed by the slicer’s own estimate. Jump straight to the layers with bridges, where prints tend to go wrong.</p>
-        <p>Choose any printer set up in any of your slicers, per design or as the default. Parts that do not fit one plate are laid out on as many as needed, each sliced, with time, filament and cost added up.</p>
-      </div>
-    </div>
-    <div class="demo print-demo island rv" id="print-demo">
-      <div class="print-canvas"><canvas id="pc" role="img" aria-label="Top view of one layer of the sliced phone dock"></canvas><div class="print-hud" aria-live="polite"><b id="pc-layer">Layer 51 of 127</b><span id="pc-z">z 14.28 mm</span><span id="pc-t"></span></div></div>
-      <div class="print-side">
-        <span class="cap">Line types</span>
-        <ul class="types" id="pc-types"></ul>
-      </div>
-      <div class="print-bar">
-        <div class="print-row">
-          <button type="button" class="btn small primary" id="pc-play"><span class="i" aria-hidden="true">&#xe13c;</span><span>Play</span></button>
-          <button type="button" class="btn small" id="pc-bridge"><span class="i" aria-hidden="true">&#xe160;</span>Next bridge</button>
-          <span class="readout" id="pc-read"></span>
-          <span class="tag t-amber" style="margin-left:auto">Slicer estimate</span>
+        <div class="moves-view island" aria-hidden="true">
+          <canvas id="mv-c"></canvas>
+          <div class="mv-hud"><span>Lid hinge</span><span class="track"><i id="mv-fill"></i><b id="mv-thumb"></b></span><span class="mono" id="mv-deg">0°</span></div>
+          <div class="mv-seg"><span class="on" id="mv-a">Assembled</span><span id="mv-e">Exploded</span></div>
         </div>
-        <div class="chart" id="pc-chart" role="slider" tabindex="0" aria-label="Layer" aria-valuemin="1" aria-valuemax="127" aria-valuenow="51"><canvas id="pc-chart-c"></canvas></div>
-      </div>
-      <div class="demo-foot" style="grid-column:1/-1"><span id="pc-credit">G-code from Bambu Studio 02.09.01.70: Bambu Lab A1 mini 0.4 nozzle, 0.28mm Extra Draft, Generic PLA.</span><span class="tag t-amber">Simulated, not a print</span></div>
-    </div>
-    <div class="duo rv">
-      <figure class="island"><img src="assets/shots/print-sim.webp" width="1600" height="989" loading="lazy" decoding="async" alt="The hinged box's print simulated in 3D from Bambu Studio's G-code at layer 98 of 157"><figcaption><b>In the app.</b> The print in 3D, any layer, any line type.</figcaption></figure>
-      <figure class="island"><img src="assets/shots/plates.webp" width="1600" height="989" loading="lazy" decoding="async" alt="A large box laid out on two plates, each sliced, with 3 h 17 min and 143.4 g added up"><figcaption><b>Several plates.</b> Each sliced on its own, totals added up.</figcaption></figure>
-    </div>
-  </div>
-</section>
-
-<section class="block" id="assemblies" aria-labelledby="asm-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="asm-title">Parts that go together are checked together.</h2>
-      <div>
-        <p>See a design assembled, exploded, or laid out as it prints, and move each hinge or slide through its range. Joints form chains: turning an arm swings everything mounted on it. Form Studio checks overlap, the smallest gap, pins and threads against their clearance, each joint through its motion, and whether a screwdriver reaches every screw, in seconds.</p>
-        <p>Hardware comes with its source: screw clearances to ISO 273, heat-set insert pockets, nut traps, magnet pockets and printable threads.</p>
-      </div>
-    </div>
-    <div class="demo asm-demo island rv" id="asm-demo">
-      <div class="asm-view" id="asm-view"><canvas id="asm-c" role="img" aria-label="The hinged box and its lid, built by the CAD kernel. Drag to turn it."></canvas></div>
-      <div class="asm-side">
-        <div class="seg" role="group" aria-label="Layout" id="asm-mode"><button type="button" data-m="assembled" aria-pressed="true">Assembled</button><button type="button" data-m="exploded" aria-pressed="false">Exploded</button><button type="button" data-m="print" aria-pressed="false">As printed</button></div>
-        <div class="ctl">
-          <div class="ctl-row"><label for="asm-hinge">Lid hinge</label><output id="asm-ho" for="asm-hinge">0°</output></div>
-          <input type="range" id="asm-hinge" min="0" max="110" step="1" value="0">
-          <small>Range 0 to 110°, checked for collisions at 23 positions.</small>
-        </div>
-        <div class="sec"><span class="cap">Hardware</span><ul class="hw" id="asm-hw"></ul></div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="block" id="model" aria-labelledby="model-title">
+<section class="why" id="why" aria-labelledby="why-title">
   <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="model-title">No printer? Design anyway.</h2>
-      <div>
-        <p>Tell Form Studio once that you just design, or choose <b>Just a 3D model</b> for one design. There is no printer chip, no slicer and no print checks in the way: size, a valid solid, a closed mesh and the STEP round trip are still checked, and the thinnest feature is compared with the process you name, whether CNC, laser cutting, moulding or rendering.</p>
-        <p>The release holds STEP, STL, 3MF, OBJ and GLB, a four-view sheet and an iso render.</p>
-      </div>
+    <p class="eyebrow rv">Why Form Studio</p>
+    <h2 id="why-title" class="rv">Real geometry. Honest numbers.<br class="br"> The tools you already use.</h2>
+    <div class="why-grid">
+      <article class="rv">
+        <svg class="ic" aria-hidden="true"><use href="#ic-cube"/></svg>
+        <p class="num"><b data-count="0" id="why-faces">0</b><span>faces</span></p>
+        <h3>A real CAD kernel</h3>
+        <p>Boundary-representation solids, not meshes: the sample dock is <span id="why-faces2">a solid</span> built in <span id="why-ms">milliseconds</span>. Out come STEP, STL, 3MF, OBJ and GLB.</p>
+      </article>
+      <article class="rv">
+        <svg class="ic" aria-hidden="true"><use href="#ic-seal"/></svg>
+        <p class="num"><b data-count="0" id="why-checks">0</b><span>checks</span></p>
+        <h3>Honest by design</h3>
+        <p>Every revision is checked, and every number says how it is known: computed, heuristic, modelled, simulated or measured. Only you approve a release.</p>
+      </article>
+      <article class="rv">
+        <svg class="ic" aria-hidden="true"><use href="#ic-plug"/></svg>
+        <p class="num"><b data-count="66">66</b><span>MCP tools</span></p>
+        <h3>Your agent, your slicer</h3>
+        <p>Claude Code, Codex, Gemini CLI and four more, or local models. Seven slicers, from Bambu Studio to PrusaSlicer. Every action is also a command.</p>
+      </article>
     </div>
-    <div class="duo rv">
-      <figure class="island"><img src="assets/shots/model-prove.webp" width="1600" height="989" loading="lazy" decoding="async" alt="A faceted lamp shade made as a 3D model: Prove lists the checks that ran and the print checks that do not apply"><figcaption><b>Checked as a model.</b> Prove says which print checks do not apply.</figcaption></figure>
-      <figure class="island"><img src="assets/shots/model-release.webp" width="1600" height="989" loading="lazy" decoding="async" alt="Releasing the lamp shade as a 3D model, ready to approve, with the files it will hold"><figcaption><b>Released as a model.</b> No G-code, no print report.</figcaption></figure>
-    </div>
-  </div>
-</section>
-
-<section class="block" id="tour" aria-labelledby="tour-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="tour-title">Look closer, from every side.</h2>
-      <div>
-        <p>Selections analysed on the solid, colours and materials, assemblies, maps computed on the real geometry, the revision timeline, variants, photoreal renders and a share card. Every picture here is a screenshot of Form Studio.</p>
-      </div>
-    </div>
-    <div class="tour rv" id="tour-box">
-      <div class="tour-tabs" role="tablist" aria-label="Tools">
-        <button type="button" role="tab" id="tt-0" aria-controls="tp-0" aria-selected="true"><b>Annotate</b><span>Faces, edges and painted regions, measured on the solid</span></button>
-        <button type="button" role="tab" id="tt-1" aria-controls="tp-1" aria-selected="false" tabindex="-1"><b>Colours and materials</b><span>Per part, in the viewport and the 3MF</span></button>
-        <button type="button" role="tab" id="tt-2" aria-controls="tp-2" aria-selected="false" tabindex="-1"><b>Assembled</b><span>Joint sliders that move the whole chain</span></button>
-        <button type="button" role="tab" id="tt-3" aria-controls="tp-3" aria-selected="false" tabindex="-1"><b>Wall thickness</b><span>Thinnest spot marked, under-two-perimeter area</span></button>
-        <button type="button" role="tab" id="tt-4" aria-controls="tp-4" aria-selected="false" tabindex="-1"><b>Overhangs</b><span>By angle, flat ceilings and bridges</span></button>
-        <button type="button" role="tab" id="tt-5" aria-controls="tp-5" aria-selected="false" tabindex="-1"><b>Measure</b><span>Snapped distances, faces, hole diameters</span></button>
-        <button type="button" role="tab" id="tt-6" aria-controls="tp-6" aria-selected="false" tabindex="-1"><b>Timeline</b><span>Scrub revisions, play them as a morph</span></button>
-        <button type="button" role="tab" id="tt-7" aria-controls="tp-7" aria-selected="false" tabindex="-1"><b>Variants</b><span>Named alternatives, compared and promoted</span></button>
-        <button type="button" role="tab" id="tt-8" aria-controls="tp-8" aria-selected="false" tabindex="-1"><b>Photoreal render</b><span>Blender, in your filament colour</span></button>
-        <button type="button" role="tab" id="tt-9" aria-controls="tp-9" aria-selected="false" tabindex="-1"><b>Share card</b><span>Every number with its evidence</span></button>
-        <button type="button" role="tab" id="tt-10" aria-controls="tp-10" aria-selected="false" tabindex="-1"><b>Command palette</b><span>Every action and design, one key away</span></button>
-      </div>
-      <div class="tour-view island">
-        <figure role="tabpanel" id="tp-0" aria-labelledby="tt-0" class="on"><img src="assets/shots/annotate.webp" width="1600" height="989" loading="lazy" decoding="async" alt="Annotate on the phone stand: a face and a painted region, with area, tilt, overhang and wall thickness computed on the solid"></figure>
-        <figure role="tabpanel" id="tp-1" aria-labelledby="tt-1"><img data-src="assets/shots/colours.webp" width="1600" height="989" alt="The hinged box in blue PETG with an orange lid, colours and material set per part"></figure>
-        <figure role="tabpanel" id="tp-2" aria-labelledby="tt-2"><img data-src="assets/shots/assembly.webp" width="1600" height="989" alt="The hinged box assembled with its lid open at 69 degrees on the Lid hinge slider"></figure>
-        <figure role="tabpanel" id="tp-3" aria-labelledby="tt-3"><img data-src="assets/shots/thickness.webp" width="1600" height="1062" alt="Wall-thickness map on the phone dock, with the legend and the thinnest sample"></figure>
-        <figure role="tabpanel" id="tp-4" aria-labelledby="tt-4"><img data-src="assets/shots/overhang.webp" width="1600" height="1062" alt="Overhang map: unsupported overhang, flat ceilings and plate contact"></figure>
-        <figure role="tabpanel" id="tp-5" aria-labelledby="tt-5"><img data-src="assets/shots/measure.webp" width="1600" height="1062" alt="Measuring 86.10 mm across the dock, snapped to its side faces"></figure>
-        <figure role="tabpanel" id="tp-6" aria-labelledby="tt-6"><img data-src="assets/shots/timeline.webp" width="1600" height="1062" alt="The revision timeline under the viewport"></figure>
-        <figure role="tabpanel" id="tp-7" aria-labelledby="tt-7"><img data-src="assets/shots/variants.webp" width="1600" height="1062" alt="The variants sheet with the head revision and its numbers"></figure>
-        <figure role="tabpanel" id="tp-8" aria-labelledby="tt-8"><img data-src="assets/shots/render.webp" width="1600" height="1062" alt="The render sheet with a Blender render of the dock in matte blue PLA on a wooden desk"></figure>
-        <figure role="tabpanel" id="tp-9" aria-labelledby="tt-9"><img data-src="assets/shots/share.webp" width="1600" height="1062" alt="The share card: the dock with its dimensions, print time, filament, checks and fit yield"></figure>
-        <figure role="tabpanel" id="tp-10" aria-labelledby="tt-10"><img data-src="assets/shots/palette.webp" width="1600" height="1062" alt="The command palette over the workspace"></figure>
-      </div>
-  </div>
-</section>
-
-<section class="block" id="agent" aria-labelledby="agent-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="agent-title">An agent that works the way an engineer does.</h2>
-      <div>
-        <p>It reads the datasheet, asks what it cannot know, looks at what it built, and fixes what the checks find. You stay in charge of every revision and of the release.</p>
-      </div>
-    </div>
-    <div class="agent-grid rv">
-      <figure class="agent-shot island"><img src="assets/shots/measure-this.webp" width="1600" height="989" loading="lazy" decoding="async" alt="A conversation in Form Studio: the agent asks how thick the phone is with its case, with a diagram, the tolerance that matters and calipers as the method, next to the stand it is designing"></figure>
-      <ul class="agent-list">
-        <li><b>Asks before it guesses</b><span>Questions arrive as cards with choices, your own words or an approval, and the agent waits for your answer.</span></li>
-        <li><b>Measure this</b><span>Where to measure, the unit and the tolerance that matters; your number is committed with how you measured it.</span></li>
-        <li><b>Fix with your agent</b><span>A failed check, step, slice or render hands its evidence to the conversation in one click.</span></li>
-        <li><b>Shows every change</b><span>A reply that changed the design shows r01 → r02 with Compare and Go back, and suggests what to do next.</span></li>
-        <li><b>Reads drawings</b><span>PDF datasheets and mechanical drawings are read as images, so their dimensions survive.</span></li>
-        <li><b>Design skills</b><span>Thirteen skills for intake, FDM engineering, fit calibration, hardware, assemblies and review.</span></li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<section class="block" id="agents" aria-labelledby="agents-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="agents-title">Any agent, any model, your slicer.</h2>
-      <div>
-        <p>Pick the agent and model for each conversation: Claude Code, Codex, Gemini CLI, Cursor CLI, OpenCode, Qwen Code or GitHub Copilot CLI; model APIs from your keys; local models from Ollama, LM Studio or llama.cpp; or any provider added by its address. From their own windows, agents and any other MCP client reach the engine through 66 tools, and the open app follows what they change.</p>
-        <p>Slicing runs in the slicer you have installed, with any printer you configured in it and your filament and process presets.</p>
-      </div>
-    </div>
-    <div class="demo works rv">
-      <div>
-        <span class="cap">Agents</span>
-        <ul class="picker" id="ag-list"></ul>
-        <div class="detail" id="ag-detail" aria-live="polite"></div>
-      </div>
-      <div>
-        <span class="cap">Slicers</span>
-        <ul class="picker" id="sl-list"></ul>
-        <div class="detail" id="sl-detail" aria-live="polite"></div>
-      </div>
-    </div>
-    <div class="duo rv">
-      <figure class="island"><img src="assets/shots/providers.webp" width="1200" height="907" loading="lazy" decoding="async" alt="Settings › Agents: model API keys, a provider added by its address with 374 models, and local model servers"><figcaption><b>Settings › Agents.</b> Agent apps, keys, local models and your providers in one place.</figcaption></figure>
-      <figure class="island"><img src="assets/shots/picker.webp" width="1000" height="845" loading="lazy" decoding="async" alt="The model menu searching a provider's 374 models for claude"><figcaption><b>A model menu for hundreds of models.</b> Search, vendor sections, Recent.</figcaption></figure>
-    </div>
-  </div>
-</section>
-
-<section class="block" id="cli" aria-labelledby="cli-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="cli-title">Everything works without the window.</h2>
-      <div>
-        <p>Every action is a <code>form</code> command that prints JSON, and an MCP tool an agent can call. No feature exists only in the interface. The output below was captured from Form Studio on the sample project.</p>
-      </div>
-    </div>
-    <div class="demo term island rv" id="term">
-      <div class="term-bar" role="tablist" aria-label="Commands" id="term-tabs"></div>
-      <pre id="term-out" tabindex="0" aria-live="off"></pre>
-      <div class="mcp-row">
-        <div><b>Claude Code</b><code>claude mcp add --scope user form -- form-mcp</code></div>
-        <div><b>Codex</b><code>codex mcp add form -- form-mcp</code></div>
-        <div><b>Gemini CLI</b><code>~/.gemini/settings.json</code></div>
-        <div><b>Cursor</b><code>~/.cursor/mcp.json</code></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="block" id="recipes" aria-labelledby="recipes-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="recipes-title">Building blocks, and a community gallery.</h2>
-      <div>
-        <p>Agents start from parametric building blocks made of the things people print most: Gridfinity bins, boxes with lids, SKÅDIS accessories, stands, planters, vases, brackets and enclosures. Each passes its checks at its defaults and prints without supports, and the agent changes anything.</p>
-        <p>Anyone can add one: open a recipe issue and it is built, checked and sliced automatically, and answered with pictures.</p>
-        <p><a class="more" href="recipes/">Browse the recipe gallery <span aria-hidden="true">→</span></a></p>
-      </div>
-    </div>
-    <ul class="rgrid rv" id="recipe-teaser" aria-live="polite"></ul>
-  </div>
-</section>
-
-<section class="block" id="community" aria-labelledby="community-title">
-  <div class="wrap">
-    <div class="sec-head rv">
-      <h2 id="community-title">Built in the open.</h2>
-      <div>
-        <p>Form Studio is MIT-licensed and developed on GitHub. Recipes, slicer profiles, agent integrations and measured print results all make it better for everyone, and the automation checks every contribution with real builds and real slicers.</p>
-      </div>
-    </div>
-    <ul class="cgrid rv">
-      <li><a href="https://github.com/kaizensx/form-studio/discussions/categories/show-and-tell"><svg class="ic" aria-hidden="true"><use href="#ic-camera"/></svg><b>Show and tell</b><span>Share what you designed and printed, with the share card and photos.</span></a></li>
-      <li><a href="https://github.com/kaizensx/form-studio/discussions/categories/q-a"><svg class="ic" aria-hidden="true"><use href="#ic-chat"/></svg><b>Questions</b><span>Setup help and how-tos in Discussions.</span></a></li>
-      <li><a href="https://github.com/kaizensx/form-studio/discussions/categories/ideas"><svg class="ic" aria-hidden="true"><use href="#ic-spark"/></svg><b>Ideas</b><span>Propose a feature and shape it with others.</span></a></li>
-      <li><a href="https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml"><svg class="ic" aria-hidden="true"><use href="#ic-cube"/></svg><b>Share a recipe</b><span>Paste it in an issue: it is built, checked and sliced, and answered with pictures.</span></a></li>
-      <li><a href="compat/"><svg class="ic" aria-hidden="true"><use href="#ic-grid"/></svg><b>Compatibility matrix</b><span>Every recipe sliced by every slicer, every night.</span></a></li>
-      <li><a href="bench/"><svg class="ic" aria-hidden="true"><use href="#ic-chart"/></svg><b>Benchmarks</b><span>Pipeline timings and start time, tracked on every change.</span></a></li>
-      <li><a href="https://github.com/kaizensx/form-studio/issues/new/choose"><svg class="ic" aria-hidden="true"><use href="#ic-alert"/></svg><b>Report a problem</b><span>Bugs, slicer and printer support, agent support.</span></a></li>
-      <li><a href="https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md"><svg class="ic" aria-hidden="true"><use href="#ic-branch"/></svg><b>Contribute code</b><span>Branch from dev and open a pull request; it gets before and after previews.</span></a></li>
-      <li><a href="docs/recipes.html"><svg class="ic" aria-hidden="true"><use href="#ic-pen"/></svg><b>Write a recipe</b><span>Typed parameters, features, constraints and checks.</span></a></li>
-    </ul>
+    <p class="why-more rv"><a class="more" href="docs/features.html">Every feature, in the docs <span aria-hidden="true">→</span></a></p>
   </div>
 </section>
 
 <section class="get" id="download" aria-labelledby="dl-title">
   <div class="wrap">
-    <div class="get-head rv">
-      <h2 id="dl-title">Download Form Studio</h2>
-      <p>One download per platform, with SHA256SUMS, build provenance and an SBOM. On first start Form Studio asks once whether you print or just design, then installs what is missing by itself: the parts libraries, a slicer if you print, an agent and its sign-in.</p>
+    <div class="get-head">
+      <h2 id="dl-title" class="rv">Make something.</h2>
+      <p class="rv">Free and open source under the MIT licence. On first start Form Studio sets itself up: the parts libraries, a slicer if you print, an agent and its sign-in.</p>
     </div>
     <ul class="dl rv" id="dl">
       <li><a href="https://github.com/kaizensx/form-studio/releases/latest/download/FORM-macos-arm64.zip" data-os="mac-arm"><b>macOS</b><span>Apple Silicon</span><code>FORM-macos-arm64.zip</code><span class="i" aria-hidden="true">&#xe0b2;</span></a></li>
@@ -625,13 +307,14 @@
     <div class="get-foot rv">
       <a href="https://github.com/kaizensx/form-studio/releases">All releases</a>
       <a href="docs/changelog.html">Changelog</a>
-      <a href="compat/">Compatibility matrix</a>
       <a href="docs/app.html">Install guide</a>
+      <a href="https://github.com/kaizensx/form-studio">Source on GitHub</a>
     </div>
   </div>
 </section>
 </main>
 
+<!--foot-->
 <footer class="foot">
   <div class="wrap">
     <div class="foot-top">
@@ -639,12 +322,13 @@
         <a class="brand" href="./"><img class="lk-d" src="assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="assets/lockup-light.svg" alt="" width="143" height="22"></a>
         <p>What are we making? Open source, MIT licence.</p>
       </div>
-      <nav aria-label="Product"><span class="cap">Product</span><a href="#start">Start from anything</a><a href="#features">Features</a><a href="#tour">Tour</a><a href="#agents">Agents and slicers</a><a href="recipes/">Recipes</a><a href="compat/">Compatibility matrix</a><a href="bench/">Benchmarks</a><a href="#download">Download</a></nav>
+      <nav aria-label="Product"><span class="cap">Product</span><a href="./#how">How it works</a><a href="recipes/">Recipes</a><a href="compat/">Compatibility</a><a href="bench/">Benchmarks</a><a href="./#download">Download</a></nav>
       <nav aria-label="Docs"><span class="cap">Docs</span><a href="docs/features.html">Features</a><a href="docs/app.html">The app</a><a href="docs/cli.html">Command line</a><a href="docs/mcp.html">MCP tools</a><a href="docs/changelog.html">Changelog</a></nav>
-      <nav aria-label="Community"><span class="cap">Community</span><a href="https://github.com/kaizensx/form-studio/discussions">Discussions</a><a href="https://github.com/kaizensx/form-studio/issues/new/choose">Report an issue</a><a href="https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md">Contributing</a><a href="https://github.com/kaizensx/form-studio">GitHub</a></nav>
+      <nav aria-label="Community"><span class="cap">Community</span><a href="https://github.com/kaizensx/form-studio/discussions">Discussions</a><a href="https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml">Share a recipe</a><a href="https://github.com/kaizensx/form-studio/issues/new/choose">Report an issue</a><a href="https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md">Contributing</a></nav>
     </div>
     <p class="foot-note">No cookies, trackers or third-party requests. Form Studio runs on your computer; it never uploads a design and never starts a print.</p>
   </div>
 </footer>
+<!--/foot-->
 </body>
 </html>

@@ -13,11 +13,11 @@ const I = { check: "e06c", spin: "e10a", cube: "e524", eye: "e0ba", commit: "e0e
 export async function initHero() {
   const app = $("#app"), frame = $("#app-frame");
   const d = (await siteData()).dock;
-  const compact = matchMedia("(max-width: 899px)");
+  const compact = { matches: false };   // the window is always drawn at its real 1440 x 880 layout, then scaled
 
-  // ---------- scale the 1440 x 880 window to the column ----------
+  // ---------- scale the 1440 x 880 window to the column, like a picture of the real window ----------
   const fit = () => {
-    const s = compact.matches ? 1 : Math.min(1, frame.clientWidth / 1440);
+    const s = Math.min(1, frame.clientWidth / 1440);
     frame.style.setProperty("--s", s.toFixed(4));
   };
   new ResizeObserver(fit).observe(frame); fit();

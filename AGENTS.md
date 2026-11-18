@@ -76,7 +76,7 @@ Commands:
 .venv/bin/python -m unittest discover -s tests      # includes an MCP stdio end-to-end test
 .venv/bin/python scripts/acceptance.py              # writes docs/ACCEPTANCE_RUN.md
 .venv/bin/python scripts/make_media.py              # regenerates docs/assets from real builds
-.venv/bin/python scripts/make_app_media.py          # README animations and website videos, recorded from the real app window
+.venv/bin/python scripts/make_app_media.py          # README animations, recorded from the real app window (the website draws the app in code)
 .venv/bin/python scripts/media/site_shot.py URL OUT  # a picture of the website's live replica (README hero docs/images/try-it*.webp)
 .venv/bin/python scripts/gen_mcp_docs.py            # regenerates docs/MCP.md
 ```

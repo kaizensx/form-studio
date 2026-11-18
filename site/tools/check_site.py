@@ -9,6 +9,8 @@ Fails (exit 1) when:
 - a page asks another host for a script, a stylesheet, a font or an image
 - the first view is heavier than the budget
 - recipes/index.json is missing, or names a preview that is not published
+- the site holds a video, a GIF or an animated image (the app is drawn in code instead)
+- a page's navigation bar or footer differs from the shared one in site/tools/chrome.py
 """
 from __future__ import annotations
 
@@ -20,9 +22,11 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 SITE = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import chrome  # noqa: E402  the shared nav and footer, and what counts as moving media
 BUDGET_FIRST_VIEW = 2_500_000        # bytes, uncompressed: page, CSS, fonts, scripts, three.js, the dock and its toolpath
 FIRST_VIEW = ["index.html", "css/site.css", "fonts/InstrumentSans.woff2", "fonts/GeistMono.woff2", "fonts/lucide-form.woff2",
-              "assets/lockup.svg", "js/main.js", "js/theme.js", "js/recipes.js", "js/data.js", "js/app.js", "js/scene.js", "js/demos.js",
+              "assets/lockup.svg", "js/main.js", "js/nav.js", "js/theme.js", "js/motion.js", "js/data.js", "js/app.js", "js/scene.js",
               "vendor/three.module.js", "vendor/OrbitControls.js",
               "assets/data/site.json", "assets/data/dock.glb", "assets/data/toolpath.bin"]
 
@@ -111,6 +115,28 @@ def main() -> int:
                 local = SITE / "recipes" / "previews" / r["preview"].rsplit("/", 1)[-1]
                 if not local.is_file():
                     errors.append(f"recipes/index.json: {r['id']} preview is not in site/recipes/previews")
+
+    # the app is drawn in code: no video, GIF or animated image anywhere on the site
+    for f in SITE.rglob("*"):
+        if f.is_file() and ".venv" not in f.parts and chrome.is_moving(f.name, f.read_bytes()[:4096]):
+            errors.append(f"{f.relative_to(SITE).as_posix()}: video or animated image; draw the app in code instead")
+    for f in pages:
+        if re.search(r"<video\b", f.read_text(encoding="utf-8")):
+            errors.append(f"{f.relative_to(SITE).as_posix()}: has a <video>; draw the app in code instead")
+
+    # one navigation bar and one footer, the same on every page (site/tools/chrome.py)
+    for f in pages:
+        rel = f.relative_to(SITE).as_posix()
+        text = f.read_text(encoding="utf-8")
+        want = chrome.expected(rel)
+        if rel.startswith("docs/"):
+            want = (chrome.nav("../", "docs"), chrome.foot("../"))
+        if want is None:
+            errors.append(f"{rel}: not in site/tools/chrome.py STAMPED, so it has no shared nav")
+            continue
+        for part, name in zip(want, ("nav", "footer")):
+            if part not in text:
+                errors.append(f"{rel}: the shared {name} is missing or out of date: run python site/build.py")
 
     weight = sum((SITE / f).stat().st_size for f in FIRST_VIEW)
     if weight > BUDGET_FIRST_VIEW:

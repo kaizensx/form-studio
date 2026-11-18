@@ -1,9 +1,8 @@
 // /bench/: build, check, slice and start-up times over time (data.json, copied from the ci-assets branch at deploy).
-import { initTheme } from "./theme.js";
+import "./nav.js";
 import { ago, esc, lineChart, loadJSON, tile, when } from "./cidata.js";
 
 const $ = (s) => document.querySelector(s);
-initTheme($("#theme"));
 
 const REPO = "https://github.com/kaizensx/form-studio/commit/";
 const sec = (v) => (Number.isFinite(v) ? (v < 10 ? v.toFixed(2) : v.toFixed(1)) : "—");

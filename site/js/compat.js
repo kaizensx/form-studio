@@ -1,9 +1,8 @@
 // /compat/: the nightly slicer matrix (data.json and history.json, copied from the ci-assets branch at deploy).
-import { initTheme } from "./theme.js";
+import "./nav.js";
 import { ago, esc, lineChart, loadJSON, tile, when } from "./cidata.js";
 
 const $ = (s) => document.querySelector(s);
-initTheme($("#theme"));
 
 const fmtTime = (s) => {
   if (!Number.isFinite(s)) return "";
