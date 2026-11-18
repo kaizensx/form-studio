@@ -286,7 +286,7 @@ class Bridges(unittest.TestCase):
         self.assertAlmostEqual(size[0], 54, places=3)              # width 50 + 2 x wall 2, from -D width=50
         self.assertAlmostEqual(size[2], 20, places=3)
         ex = self.st.read(p, "exports", self.st.keys(p)["exports"])
-        self.assertEqual(set(ex["files"]), {"stl"})
+        self.assertEqual(set(ex["files"]), {"stl", "obj", "glb"})          # no STEP; OBJ and GLB come from the mesh
         self.assertIn("mesh designs", ex["unavailable"]["step"])
         ch = {c["id"]: c for c in self.st.read(p, "checks", self.st.keys(p)["checks"])["checks"]}
         self.assertEqual(ch["solid"]["status"], "N/A")

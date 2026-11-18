@@ -25,6 +25,11 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Ask the person a blocking question | `ask_user` (a card in Form Studio's chat; elsewhere it tells you to ask yourself) | `form chat` prompts in the terminal |
 | Offer next steps | `suggest_replies` (up to three buttons under the reply) | — |
 
+Every design has a **purpose**: `print` (for 3D printing) or `model` (just a 3D model: rendering, CAD exchange, CNC,
+laser, moulding). `get_project` reports it and `form_overview` says whether the person prints at all (`has_printer`).
+For a model, never ask about a printer, slicer, filament or orientation: print checks and slicing do not apply. Pass
+`purpose` (and for a model `process`) to `create_project` / `create_design` when the person says what it is for.
+
 Rules that keep the record honest:
 
 1. **Units:** mm, degrees, grams. Only use parameter keys that `describe_recipe` lists.

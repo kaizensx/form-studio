@@ -59,6 +59,14 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
                 f"{dv*100:.3f}% volume", f"CAD {b['volume_mm3']/1000:.2f} cm³, mesh {m['volume_mm3']/1000:.2f} cm³. "
                 "Guards against unit or tessellation errors in conversion.", "computed")
 
+    if ctx.get("purpose") == "model":            # a 3D model: no printer, so no print checks (form/purpose.py)
+        _model_checks(add, summary, analysis, ctx, mesh)
+        s = summary.get("statics")
+        for c in (s or {}).get("checks", []):
+            add(c["id"], c["label"], c["status"], c["value"], c["detail"], c.get("evidence", "model"), feature=c.get("feature"))
+        out.extend(analysis.get("assembly") or [])
+        return out
+
     row = next(r for r in analysis["orientation_table"] if r["id"] == ctx["orientation"])
     env, margin = ctx["envelope"], ctx["margin"]
     size = [row["footprint_mm"][0], row["footprint_mm"][1], row["height_mm"]]
@@ -146,6 +154,31 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
     out.extend(analysis.get("assembly") or [])     # interference, clearance, motion, tool access (form/assembly.py)
     # material notes (heat, sunlight, warping, flexible and fibre-filled filament) come from form/materials.py
     return out
+
+
+def _model_checks(add, summary, analysis, ctx, mesh):
+    """The checks that matter for a model that is rendered, exchanged or made another way: its size, and its thinnest
+    feature against the process the person named (a rule of thumb, labelled heuristic)."""
+    from . import purpose
+    bb = summary.get("bbox")
+    if bb and len(bb) == 2:
+        dims = [hi - lo for lo, hi in zip(bb[0], bb[1])]
+        add("size", "Overall size", "PASS", " × ".join(f"{d:.1f}" for d in dims) + " mm",
+            "Bounding box of the solid as modelled (X × Y × Z), measured on the kernel's geometry.", "computed")
+    thin = analysis.get("thin")
+    pr = purpose.PROCESSES.get(ctx.get("process") or "", purpose.PROCESSES[""])
+    if thin:
+        t, lim = thin["t"], pr["min_feature_mm"]
+        where = f"Smallest opposing-wall distance over {analysis['thickness_samples']:,} surface samples" + (" of the mesh." if mesh else ".")
+        if lim:
+            add("feature", "Thinnest feature", "PASS" if t >= lim else ("WARN" if t >= lim / 2 else "FAIL"), f"{t:.2f} mm",
+                f"{where} {pr['label']} usually needs at least {lim:g} mm. {pr.get('why', '')}".strip(), "heuristic",
+                feature=thin.get("feature"), at=thin.get("at"), to=thin.get("to"))
+        else:
+            add("feature", "Thinnest feature", NA, f"{t:.2f} mm",
+                f"{where} No manufacturing process is stated for this model, so there is no minimum to compare it with. "
+                "Name one in the design's purpose to check it.", "computed",
+                feature=thin.get("feature"), at=thin.get("at"), to=thin.get("to"))
 
 
 def _fit_feature(recipe):

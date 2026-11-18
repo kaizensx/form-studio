@@ -70,6 +70,24 @@ Column {
             Connections { target: root
                 function onBriefChanged() { if (!intent.area.activeFocus && intent.text !== (root.brief.text || "")) intent.text = root.brief.text || "" } } } }
 
+    // what the design is for (form/purpose.py): a print is checked against a printer and sliced; a model is not
+    Sec { id: purposeSec; title: "Purpose"; objectName: "briefPurpose"
+        readonly property var pu: Store.data && Store.data.purpose ? Store.data.purpose : ({ purpose: "print" })
+        Seg { objectName: "purposeSeg"; value: purposeSec.pu.purpose; enabled: !Store.job
+            model: [{ value: "print", text: "For 3D printing" }, { value: "model", text: "Just a 3D model" }]
+            onPicked: function (v) { if (v !== Store.purpose) Store.setPurpose(v) } }
+        Txt { kind: "fine"; width: parent.width
+            text: purposeSec.pu.purpose === "model"
+                ? "For rendering, CAD exchange, CNC, laser cutting, moulding or visualisation. No printer or slicer is used; print checks such as overhangs, plate contact and the build volume do not apply. Releases carry STEP, STL, 3MF, OBJ, GLB and rendered views."
+                : "Checked against your printer (build volume, walls for the nozzle, overhangs, plate contact) and sliced when a slicer is installed." }
+        Row { visible: purposeSec.pu.purpose === "model"; spacing: 10
+            Txt { text: "Made by"; tone: 2; anchors.verticalCenter: parent.verticalCenter }
+            Pick { objectName: "processPick"; width: 260; value: purposeSec.pu.process || ""
+                model: Store.purposeInfo.processes.map(function (x) { return { value: x.id, text: x.label + (x.min_feature_mm ? "  · min " + x.min_feature_mm + " mm" : "") } })
+                onPicked: function (v) { Store.setPurpose("model", v) } } }
+        Txt { kind: "fine"; width: parent.width; visible: purposeSec.pu.purpose === "model"
+            text: "Naming the process lets the checks flag features thinner than it usually holds (a rule of thumb)." } }
+
     Item { width: 1; height: 10 }
     Fold { title: "Answers from the brief"; note: root.brief.preset_title || ""; key: "brief.answers"
         visible: !!root.brief.answers && root.brief.answers.length > 0
@@ -113,8 +131,9 @@ Column {
                     Tag { text: pr.modelData.evidence || "computed"; anchors.verticalCenter: parent.verticalCenter } } } }
         Btn { text: "Import part…"; icon: "box"; onClicked: Store.ask(partDlg) } }
 
-    Fold { title: "Printer context"; key: "brief.printer"; openByDefault: !root.sl.available
-        note: root.sl.available ? root.sl.presets.machine.name : "slicer unavailable"; noteColor: root.sl.available ? Theme.ink3 : Theme.signal
+    Fold { title: "Printer context"; key: "brief.printer"; openByDefault: !root.sl.available && Store.prints
+        visible: !Store.modelDesign                    // a 3D model has no printer
+        note: root.sl.available ? root.sl.presets.machine.name : Store.prints ? "no slicer" : "no printer"; noteColor: root.sl.available || !Store.prints ? Theme.ink3 : Theme.amber
         Tag { visible: !!root.sl.available; text: "specified" }
         Column { width: parent.width; visible: !!root.sl.available
             KV { first: true; k: "Printer"; value: root.sl.available ? root.sl.presets.machine.name : "" }
@@ -126,7 +145,9 @@ Column {
             text: !root.sl.available ? "" : root.pr && root.pr.source !== "slicer"
                 ? "Presets from " + (root.sl.label || "the slicer") + " " + (root.sl.version || "") + ", chosen as " + (root.pr.source === "project" ? "this design's printer" : "the default printer") + " in Form Studio. Bed " + root.pr.env.envelope.map(function (x) { return F.fmt(x, 0) }).join(" × ") + " mm. The slice goes stale when they change."
                 : "Read from " + (root.sl.label || "Bambu Studio") + " " + root.sl.version + " (" + root.sl.source.machine + "). Choose another printer below, or change the selection there; the slice goes stale when it changes." }
-        Note { visible: !root.sl.available; kind: "red"; title: "Slicer unavailable"; text: root.sl.reason || "" }
+        Note { visible: !root.sl.available; kind: Store.prints ? "amber" : "plain"; title: Store.prints ? "No slicer" : "No printer"
+            text: Store.prints ? (root.sl.reason || "") + " Checks use the bed size in Settings › Printing until one is set up."
+                : "You just design, so this design is checked against the bed size in Settings and not sliced. To make it a 3D model instead, choose “Just a 3D model” above." }
         Row { spacing: 4; x: -8
             Btn { visible: !!root.sl.available; kind: "quiet"; icon: "refresh_cw"; text: root.busy ? "Re-reading…" : "Re-read presets"; enabled: !root.busy
                 onClicked: root.reread() }

@@ -117,7 +117,7 @@ def main(argv=None):
     if argv[:1] == ["printers"]:                  # engine workstream: printers in every slicer, per-design choice
         from .printers import main as printers_main
         return printers_main(argv[1:])
-    if argv[:1] in (["plates"], ["design-only"], ["material"]):   # engine workstream: plates, Design only, materials
+    if argv[:1] in (["plates"], ["design-only"], ["material"], ["purpose"]):   # engine workstream: plates, Design only, materials
         from .plates import main_cli
         return main_cli(argv)
     if argv[:1] == ["config"]:
@@ -157,6 +157,7 @@ def main(argv=None):
     sub.add_parser("config", help="get [key] | set <key> <value>: read or change studio.toml")
     sub.add_parser("plates", help="how the design's parts go onto plates | --orient PART=O --material PART=M --color PART=#hex")
     sub.add_parser("design-only", help="design-only <project> on|off: slice this design or not (Design only)")
+    sub.add_parser("purpose", help="purpose <project> [print|model] [--process cnc|laser|...]: what the design is for")
     sub.add_parser("material", help="material <project> PLA|PETG|ABS|ASA|TPU|... ('' clears): the filament the slice uses")
     sub.add_parser("printers", help="every printer in your slicers | options KIND NAME | use KIND NAME (--project ID | --default)")
     sub.add_parser("secrets", help="status | set NAME (value from stdin or a hidden prompt) | clear NAME: agent keys such as gemini_api_key")
@@ -172,6 +173,8 @@ def main(argv=None):
     n.add_argument("recipe")
     n.add_argument("values", nargs="*")
     n.add_argument("--brief", default="")
+    n.add_argument("--purpose", default=None, help="print (for 3D printing) or model (just a 3D model); default from [general].printing")
+    n.add_argument("--process", default=None, help="for a model: cnc, laser, injection, casting, sheet_metal, render, cad, other")
     for name in ("state", "run", "preview", "commit", "render"):
         c = sub.add_parser(name)
         c.add_argument("project")
@@ -318,7 +321,7 @@ def main(argv=None):
             r = st.recipes[a.recipe]
             _print({**r.public(), "features": [{"id": f.id, "label": f.label, "role": f.role} for f in r.features]})
         elif a.cmd == "new":
-            p = st.create(a.name, a.recipe, a.brief, _kv(a.values))
+            p = st.create(a.name, a.recipe, a.brief, _kv(a.values), purpose=a.purpose, process=a.process)
             job = st.run_sync(p["id"])
             _print({"pipeline": job_digest(job), "project": digest(st, p["id"])})
         elif a.cmd == "state":
