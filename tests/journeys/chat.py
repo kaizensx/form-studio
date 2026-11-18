@@ -1,5 +1,6 @@
 """Conversations with a stand-in agent CLI (tests/fixtures/fake_agent.py): send, streamed text, grouped steps,
 stop, new conversation, rename, pin, delete, the model picker, an attachment. No model is called."""
+import sys
 import struct
 import zlib
 
@@ -41,6 +42,8 @@ def run(ui):
     ui.eq((c[0]["messages"], c[0]["agent"]), (1, "fake"))
     ui.eq(ui.item("composer").property("text"), "", "the composer is empty after sending")
     ui.settle(300)
+    if ui.store.get("screen") == "home":       # one place to type: the middle of Home steps aside for the conversation
+        ui.check(ui.exists("homeChatting") and not ui.exists("startComposer"), "Home shows no second composer while chatting")
     ui.shot("chat-reply")
 
 
@@ -68,8 +71,12 @@ def run(ui):
     first_id = ui.store.get("convId")
 
     # ── a new conversation, with another model ──
-    ui.key("Ctrl+Shift+O")
-    ui.wait_until(lambda: ui.store.get("convId") == "", 3, "a new conversation with the shortcut")
+    if sys.platform == "darwin":
+        # the native menu bar owns ⌘⇧O on macOS (MacMenu.qml), and a synthetic key never reaches it: use the button
+        ui.click("talkNewChat")
+    else:
+        ui.key("Ctrl+Shift+O")
+    ui.wait_until(lambda: ui.store.get("convId") == "", 3, "a new conversation")
     ui.click("modelChip")
     ui.settle(300)
     ui.click_text("Small")

@@ -143,7 +143,7 @@ Rectangle {
             MouseArea { id: swm; anchors.fill: parent; hoverEnabled: true; onClicked: list.opened ? list.close() : list.open() }
             Tip { show: swm.containsMouse && !list.opened; text: "Conversations" } }
         Row { id: tools; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 0
-            Btn { kind: "quiet"; icon: "message_square_plus"; tip: "New conversation"; keys: "Ctrl+Shift+O"
+            Btn { objectName: "talkNewChat"; kind: "quiet"; icon: "message_square_plus"; tip: "New conversation"; keys: "Ctrl+Shift+O"
                 visible: !talk.empty || Store.convId !== ""; onClicked: Store.newChat() } }
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule }
         Pop {
