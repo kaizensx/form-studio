@@ -504,7 +504,7 @@ export function openProjects(first) {
     h('div.plist', null, h('div.cap', { style: 'margin-bottom:4px' }, 'Open'),
       st.projects.length ? st.projects.map(p => p.error ? h('div.err', null, h('b', null, p.id), p.error) :
         h('button', { onclick: async () => { $('sheet').hidden = true; await A.open(p.id); } },
-          h('span', null, h('b', null, p.name), h('small', null, `${st.recipes.find(r => r.id === p.recipe)?.title} · ${p.revisions} revision${p.revisions > 1 ? 's' : ''} · ${ago(p.updated)}`)),
+          h('span', null, h('b', null, p.name), h('small', null, `${st.recipes.find(r => r.id === p.recipe)?.title ?? st.recipe_titles?.[p.recipe] ?? p.recipe} · ${p.revisions} revision${p.revisions > 1 ? 's' : ''} · ${ago(p.updated)}`)),
           h('span.rev', null, pad(p.head)))) : h('p.fine', null, 'No projects yet.'))), true);
 }
 

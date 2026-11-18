@@ -2,7 +2,7 @@
   "id": "enclosure",
   "title": "Enclosure",
   "summary": "A case with a lid for a circuit board, with connector openings and mounting posts.",
-  "closest_recipe": null,
+  "closest_recipe": "enclosure",
   "questions": [
     {"key": "board", "label": "Board name or model", "kind": "text", "required": true,
      "placeholder": "e.g. Raspberry Pi 5, or a custom board",

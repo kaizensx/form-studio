@@ -38,22 +38,25 @@ MIN_PROMPTS = 3
 # survives into a person's history only when it matches what they make.
 DEFAULT_PROMPTS = [
     {"id": "d-pi5-case", "text": "A case for a Raspberry Pi 5 with a snap-on lid",
-     "recipes": ["enclosure", "hinged_box"], "presets": ["enclosure"]},
+     "recipes": ["enclosure", "storage_box", "hinged_box"], "presets": ["enclosure"]},
     {"id": "d-gridfinity", "text": "A Gridfinity bin, 3 × 1, for screwdrivers",
-     "recipes": ["gridfinity"], "presets": ["organizer"]},
+     "recipes": ["gridfinity_bin", "gridfinity_baseplate", "gridfinity"], "presets": ["organizer"]},
     {"id": "d-hook", "text": "The lightest wall hook that safely holds 5 kg",
-     "recipes": ["hook"], "presets": ["bathroom-mount"]},
-    {"id": "d-dock", "text": "A desk dock for my phone, leaning back for video calls",
-     "recipes": ["dock"], "presets": ["desk-accessory"]},
-    {"id": "d-knob", "text": "A replacement knob for a 6 mm D-shaft",
-     "recipes": ["knob"], "presets": []},
+     "recipes": ["pegboard", "shelf_bracket", "hook"], "presets": ["bathroom-mount"]},
+    {"id": "d-dock", "text": "A phone stand for video calls, with a slot for the charging cable",
+     "recipes": ["device_stand", "dock"], "presets": ["desk-accessory"]},
+    {"id": "d-skadis", "text": "A SKÅDIS pegboard cup for pens and screwdrivers",
+     "recipes": ["pegboard"], "presets": []},
     {"id": "d-remote", "text": "A holder for the TV remote that screws under the coffee table",
-     "recipes": ["dock"], "presets": ["remote-holder"]},
-    {"id": "d-planter", "text": "A twisted planter for a 9 cm nursery pot, with a drainage hole",
-     "recipes": ["planter"], "presets": []},
+     "recipes": ["device_stand", "dock"], "presets": ["remote-holder"]},
+    {"id": "d-planter", "text": "A self-watering pot for a 9 cm nursery pot, for herbs on the windowsill",
+     "recipes": ["plant_pot", "planter"], "presets": []},
+    {"id": "d-hose", "text": "An adapter from my 35 mm vacuum hose to a 32 mm tool",
+     "recipes": ["hose_adapter"], "presets": []},
     {"id": "d-car", "text": "A cable clip for the car's air vent that survives a hot summer",
-     "recipes": [], "presets": ["automotive-accessory"]},
+     "recipes": ["cable_organizer"], "presets": ["automotive-accessory"]},
 ]
+
 
 _LOCK = threading.Lock()
 
@@ -313,7 +316,7 @@ def listing(root, hist: list[dict], presets: list[dict], titles: dict | None = N
 
 def for_studio(st, limit: int = 8) -> dict:
     from . import presets as presets_mod
-    titles = {k: r.title for k, r in st.recipes.builtins().items()}
+    titles = {k: r.title for k, r in st.recipes.all_builtins().items()}     # legacy too: older designs name them
     return listing(st.root, history(st), presets_mod.all_presets(), titles, context(st), limit)
 
 

@@ -308,7 +308,7 @@ def main(argv=None):
             _print(st.list())
         elif a.cmd == "recipe":
             if a.recipe not in st.recipes:
-                raise StudioError(f"Unknown recipe “{a.recipe}”.", "Known: " + ", ".join(st.recipes))
+                raise StudioError(f"Unknown recipe “{a.recipe}”.", "Known: " + ", ".join(st.recipes.builtins()))
             r = st.recipes[a.recipe]
             _print({**r.public(), "features": [{"id": f.id, "label": f.label, "role": f.role} for f in r.features]})
         elif a.cmd == "new":

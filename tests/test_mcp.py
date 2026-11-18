@@ -44,7 +44,8 @@ class MCPEndToEnd(unittest.TestCase):
                 self.assertTrue(bad.is_error)
 
                 ov = data(await c.call_tool("form_overview", {}))
-                self.assertIn("dock", [r["id"] for r in ov["recipes"]])
+                self.assertIn("gridfinity_bin", [r["id"] for r in ov["recipes"]])
+                self.assertNotIn("dock", [r["id"] for r in ov["recipes"]])      # legacy: still builds by id (below)
 
                 p = data(await c.call_tool("create_project", {"name": "Test dock", "recipe": "dock",
                                                               "values": {"device_width": 70}, "run": True}))

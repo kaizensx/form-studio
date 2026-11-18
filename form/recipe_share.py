@@ -382,7 +382,8 @@ def submission_problems(cm: dict) -> list[str]:
     out = []
     if not COMMUNITY_ID.match(cm["id"]):
         out.append("The id must be 2 to 49 lowercase letters, digits and hyphens.")
-    if cm["id"] in lib.BUILTIN_TAGS or cm["id"].replace("-", "_") in lib.BUILTIN_TAGS:
+    from .recipes import LEGACY, LIBRARY
+    if cm["id"] in LIBRARY + LEGACY or cm["id"].replace("-", "_") in LIBRARY + LEGACY:
         out.append(f"“{cm['id']}” is a built-in recipe's id. Change the title so the id differs.")
     if not cm["author"]:
         out.append("Add your GitHub username as the author.")

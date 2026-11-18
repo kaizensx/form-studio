@@ -47,18 +47,8 @@ TIMEOUT = 8.0
 KINDS = {"python": ".py", "scad": ".scad"}
 SECTIONS = ("builtin", "mine", "community")
 
-# Built-in recipes: a category and tags, so a long library can be searched and filtered.
-BUILTIN_TAGS = {
-    "dock": ("Holders", ["desk", "phone", "holder", "fit"]),
-    "gridfinity": ("Storage", ["organizer", "gridfinity", "modular"]),
-    "hook": ("Mounts", ["wall", "mount", "load", "screws"]),
-    "planter": ("Home", ["garden", "decor"]),
-    "coupon": ("Calibration", ["fit", "test"]),
-    "enclosure": ("Enclosures", ["electronics", "box", "lid", "inserts"]),
-    "gear_pair": ("Mechanisms", ["gears", "motion"]),
-    "knob": ("Mechanisms", ["replacement", "shaft"]),
-    "hinged_box": ("Storage", ["box", "hinge", "motion"]),
-}
+# Built-in recipes carry their category and tags (Recipe.category, Recipe.tags); this is the fallback for one that does not.
+BUILTIN_TAGS: dict = {}
 
 
 class LibraryError(ValueError):
@@ -394,7 +384,9 @@ def install_community(root, cid: str, sha: str, opener=None) -> dict:
 def builtins(recipes: dict) -> list[dict]:
     out = []
     for rid, r in recipes.items():
-        cat, tags = BUILTIN_TAGS.get(rid, ("Other", []))
+        if getattr(r, "legacy", False):
+            continue
+        cat, tags = (r.category, list(r.tags)) if getattr(r, "category", "") else BUILTIN_TAGS.get(rid, ("Other", []))
         out.append({"id": rid, "title": r.title, "summary": r.summary, "author": "Form Studio", "tags": tags, "category": cat,
                     "kind": "python", "section": "builtin", "installed": True, "params": len(r.params), "preview": None})
     return out
@@ -490,8 +482,8 @@ def main(argv=None) -> int:
     root = config.load()["data"]["dir"]
     try:
         if a.verb == "list":
-            from .recipes import registry
-            lib = everything(root, registry(), refresh=a.refresh)
+            from .recipes import listed
+            lib = everything(root, listed(), refresh=a.refresh)
             out = {"recipes": search(lib["items"], a.q, a.section, a.tag, a.sort), "community_error": lib["community_error"]}
         elif a.verb == "community":
             out = community(root, force=a.refresh)

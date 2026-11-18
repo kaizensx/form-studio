@@ -3,7 +3,8 @@
     python site/tools/build_recipe_index.py [--check]
 
 Sources:
-- the built-in recipes in form/recipes/*.py (read with `ast`, so the CAD kernel is not needed): builtin = true
+- the built-in recipes in form/recipes/*.py (read with `ast`, so the CAD kernel is not needed): builtin = true. Legacy
+  recipes (`legacy = True`: retired, kept only so older designs build) are left out.
 - community/recipes/<id>/ with recipe.py or recipe.scad, meta.json and preview.png: builtin = false
 
 The app fetches https://kaizensx.github.io/form-studio/recipes/index.json, so the path and this schema are an interface:
@@ -41,21 +42,18 @@ OPTIONAL = {"discussion": re.compile(r"^https://github\.com/kaizensx/form-studio
             "added": re.compile(r"^\d{4}-\d{2}-\d{2}$")}
 FIELDS = {"id": str, "title": str, "summary": str, "author": str, "tags": list, "kind": str, "params_count": int}
 
-# The order of the built-in recipes in the gallery (form/recipes/__init__.py registry order); others follow by id.
-ORDER = ["dock", "gridfinity", "hook", "planter", "coupon", "enclosure", "gear_pair", "knob", "hinged_box"]
 
-# Built-in recipes carry no tags in code; these are for search in the gallery.
-BUILTIN_TAGS = {
-    "dock": ["phone", "desk", "fit", "cable"],
-    "gridfinity": ["storage", "gridfinity", "organiser", "magnets"],
-    "hook": ["wall", "load", "screws", "strength model"],
-    "planter": ["home", "vase", "twist"],
-    "coupon": ["calibration", "fit", "tolerance"],
-    "enclosure": ["electronics", "pcb", "heat-set inserts", "lid"],
-    "gear_pair": ["mechanism", "gears", "involute"],
-    "knob": ["control", "shaft", "set screw"],
-    "hinged_box": ["box", "hinge", "assembly", "lid"],
-}
+
+def _library_order() -> list[str]:
+    """LIBRARY in form/recipes/__init__.py: the gallery shows the built-in recipes in that order (legacy ones never)."""
+    tree = ast.parse((ROOT / "form" / "recipes" / "__init__.py").read_text(encoding="utf-8"))
+    for st in tree.body:
+        if isinstance(st, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "LIBRARY" for t in st.targets):
+            return list(ast.literal_eval(st.value))
+    return []
+
+
+ORDER = _library_order()
 
 
 def _const(node):
@@ -75,15 +73,15 @@ def builtin() -> list[dict]:
             for st in cls.body:
                 if isinstance(st, ast.Assign) and len(st.targets) == 1 and isinstance(st.targets[0], ast.Name):
                     name = st.targets[0].id
-                    if name in ("id", "title", "summary"):
+                    if name in ("id", "title", "summary", "category", "tags", "legacy"):
                         attrs[name] = _const(st.value)
                     elif name == "params" and isinstance(st.value, (ast.List, ast.Tuple)):
                         params = sum(1 for e in st.value.elts if isinstance(e, ast.Call))
-            if attrs.get("id") and attrs.get("title") and attrs.get("summary"):
+            if attrs.get("id") and attrs.get("title") and attrs.get("summary") and not attrs.get("legacy"):
                 rid = attrs["id"]
                 preview = SITE / "recipes" / "previews" / f"{rid}.webp"
                 out.append({"id": rid, "title": attrs["title"], "summary": attrs["summary"], "author": "Form Studio",
-                            "tags": BUILTIN_TAGS.get(rid, []), "kind": "python", "builtin": True, "url": None,
+                            "tags": list(attrs.get("tags") or ()), "kind": "python", "builtin": True, "url": None,
                             "sha256": None, "params_count": params,
                             "preview": f"{BASE}recipes/previews/{rid}.webp" if preview.is_file() else None})
     return sorted(out, key=lambda r: (ORDER.index(r["id"]) if r["id"] in ORDER else len(ORDER), r["id"]))

@@ -45,7 +45,8 @@ Item {
         if (!Store.studio) return ""
         if (String(id).indexOf("src:") === 0 || String(id).indexOf("scad:") === 0) return "Designed as code"
         for (var i = 0; i < Store.studio.recipes.length; i++) if (Store.studio.recipes[i].id === id) return Store.studio.recipes[i].title
-        return id
+        var t = Store.studio.recipe_titles                 // retired recipes are not listed, but older designs name them
+        return t && t[id] ? t[id] : id
     }
     function greeting() {
         var h = new Date().getHours()
@@ -204,7 +205,7 @@ Item {
                 width: parent.width; columns: home.cw > 900 ? 4 : 3; spacing: 12
                 readonly property real tw: Math.floor((width - (columns - 1) * spacing) / columns)
                 Repeater {
-                    model: ["dock", "enclosure", "gridfinity", "hook"].slice(0, rgrid.columns)
+                    model: ["gridfinity_bin", "device_stand", "pegboard", "storage_box"].slice(0, rgrid.columns)
                     Rectangle {
                         id: rc
                         objectName: "recipeCard"

@@ -2,7 +2,7 @@
   "id": "desk-accessory",
   "title": "Desk accessory",
   "summary": "A stand, tray, cable guide or holder that sits on or clamps to a desk.",
-  "closest_recipe": "dock",
+  "closest_recipe": "device_stand",
   "questions": [
     {"key": "purpose", "label": "What it is for", "kind": "text", "required": true,
      "placeholder": "e.g. hold a phone upright while charging",

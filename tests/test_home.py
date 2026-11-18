@@ -266,14 +266,15 @@ class Library(Tmp):
     def test_search_sections_tags_and_sort(self):
         from form.recipes import registry
         items = recipe_lib.builtins(registry())
+        self.assertNotIn("dock", [i["id"] for i in items])         # legacy recipes build, but are not listed
         recipe_lib.install(self.tmp, BLOCK, "python", recipe_lib.sha256(BLOCK), {"tags": ["test"]})
         items += recipe_lib.mine(self.tmp)
-        self.assertEqual([i["id"] for i in recipe_lib.search(items, "gear")], ["gear_pair"])
+        self.assertEqual([i["id"] for i in recipe_lib.search(items, "skadis")], ["pegboard"])
         self.assertEqual([i["id"] for i in recipe_lib.search(items, section="mine")], ["test-block"])
-        self.assertEqual({i["id"] for i in recipe_lib.search(items, tag="Mechanisms")}, {"gear_pair", "knob"})
+        self.assertEqual({i["id"] for i in recipe_lib.search(items, tag="Wall & desk")}, {"pegboard", "cable_organizer", "desk_hanger", "shelf_bracket"})
         self.assertEqual(recipe_lib.search(items)[0]["section"], "builtin")
         self.assertEqual(recipe_lib.search(items, sort="recent")[0]["id"], "test-block")
-        self.assertIn({"tag": "storage", "count": 2}, recipe_lib.tags(items))
+        self.assertIn({"tag": "storage", "count": 4}, recipe_lib.tags(items))
 
     def test_a_design_from_an_installed_recipe(self):
         st = make_studio(self.tmp)
@@ -563,11 +564,13 @@ class RecipePreviews(Tmp):
             built.append(kw["recipe_id"])
             return {"positions": "AAAA", "recipe": kw["recipe_id"]}
         with mock.patch.object(self.st, "_k", side_effect=fake_k):
-            v = home_api.recipe_view(self.st, "hook")
-        self.assertEqual((built, v["companions"]), (["hook"], []))
+            v = home_api.recipe_view(self.st, "shelf_bracket")
+        self.assertEqual((built, v["companions"]), (["shelf_bracket"], []))
         self.assertEqual(len(list((self.st.root / ".cache" / "recipe-views").glob("*.json"))), 1)
         st2 = make_studio(self.tmp)                          # a new start of the app: nothing in memory
         with mock.patch.object(st2, "_k", side_effect=AssertionError("built again")):
-            self.assertEqual(home_api.recipe_view(st2, "hook")["recipe"], "hook")
+            self.assertEqual(home_api.recipe_view(st2, "shelf_bracket")["recipe"], "shelf_bracket")
         with self.assertRaises(StudioError):
             home_api.recipe_view(st2, "not-a-recipe")
+        with self.assertRaises(StudioError):                 # a legacy recipe builds for its designs, but has no library preview
+            home_api.recipe_view(st2, "hook")

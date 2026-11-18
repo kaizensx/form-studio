@@ -378,7 +378,8 @@ class Studio:
             base = Path(__file__).parent / "recipes"
             h = hashlib.sha256()
             src = source_path(self.sources, rid) if is_source(rid) else base / f"{rid}.py"
-            extra = (base / "scad.py", base / "meshsolid.py") if rid.startswith(SCAD_PREFIX) else ()
+            extra = (base / "scad.py", base / "meshsolid.py") if rid.startswith(SCAD_PREFIX) else \
+                (base / "style.py",) if not is_source(rid) else ()      # the library's shared design helpers
             for f in (base / "base.py", src, *extra):
                 h.update(f.read_bytes())
             self._recipe_sha[rid] = h.hexdigest()[:16]
