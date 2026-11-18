@@ -18,6 +18,20 @@ echo "Checking the built app"
 "$PY" scripts/smoke_packaged.py dist/FORM.app
 BACKUP_DIR=${BACKUP_DIR:-"$HOME/Library/Caches/form-studio/previous-apps"}
 mkdir -p "$BACKUP_DIR"
+# A running copy must not have its app replaced under it: it reads parts of its own code from the bundle when it first
+# needs them, and once the files are swapped it reads the new bundle at the old offsets ("Error -3 while decompressing
+# data"). Quit it first (it saves as it goes), and open the new one afterwards.
+WAS_RUNNING=0
+if pgrep -f "/Applications/FORM.app/Contents/MacOS/FORM" >/dev/null 2>&1; then
+  WAS_RUNNING=1
+  echo "Quitting the running Form Studio so it is not replaced while open"
+  osascript -e 'tell application id "net.form-studio.app" to quit' >/dev/null 2>&1 || true
+  i=0
+  while pgrep -f "/Applications/FORM.app/Contents/MacOS/FORM" >/dev/null 2>&1 && [ $i -lt 30 ]; do sleep 1; i=$((i + 1)); done
+  if pgrep -f "/Applications/FORM.app/Contents/MacOS/FORM" >/dev/null 2>&1; then
+    echo "Form Studio did not quit within 30 s; close it and run this again. Nothing was replaced."; exit 1
+  fi
+fi
 if [ -d /Applications/FORM.app ]; then
   OLD=$(defaults read /Applications/FORM.app/Contents/Info.plist CFBundleShortVersionString 2>/dev/null || echo old)
   DEST="$BACKUP_DIR/FORM-$OLD-$(date +%Y%m%d-%H%M%S).app"
@@ -26,4 +40,5 @@ if [ -d /Applications/FORM.app ]; then
 fi
 ditto dist/FORM.app /Applications/FORM.app
 echo "Installed Form Studio $VER in /Applications"
+[ "$WAS_RUNNING" = 1 ] && open -a /Applications/FORM.app && echo "Opened the new Form Studio"
 command -v uv >/dev/null && uv tool install --force --python 3.12 "form-studio[all] @ $PWD" >/dev/null 2>&1 && echo "form command updated" || true
