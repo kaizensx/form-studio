@@ -298,8 +298,18 @@ Item {
     // selection reads as an outline: a mint rim where the feature turns away from the eye, on top of a light tint.
     // Hover is the same idea, fainter, and immediate.
     function rimColor(id) { return id === selected ? Qt.rgba(0.42, 0.85, 0.7, 1) : id === hovered ? Qt.rgba(0.30, 0.30, 0.28, 1) : Qt.rgba(0, 0, 0, 1) }
-    function partColor(id) {
-        return id === selected ? "#b9e8d7" : flagged.indexOf(id) >= 0 ? "#a9bff5" : id === hovered ? "#f1eee6" : "#d8d3c8"
+    function partColor(id, part) {
+        var b = colorOf(part || "")
+        if (!b) return id === selected ? "#b9e8d7" : flagged.indexOf(id) >= 0 ? "#a9bff5" : id === hovered ? "#f1eee6" : "#d8d3c8"
+        return id === selected ? Qt.tint(b, "#9065d4b0") : flagged.indexOf(id) >= 0 ? Qt.tint(b, "#80a9bff5") : id === hovered ? Qt.lighter(b, 1.12) : b
+    }
+    // colours of the design and its parts (Store.look: the part's own, else the design's, else its material's); none = clay
+    property var colorOf: function (part) { return "" }
+    function edgeColor(part) {               // the kernel's edges stay readable on a dark part
+        var c = colorOf(part || "")
+        if (!c) return "#2b2925"
+        var k = Qt.color(c), l = 0.299 * k.r + 0.587 * k.g + 0.114 * k.b
+        return l < 0.32 ? Qt.lighter(c, 2.1) : Qt.darker(c, 2.6)
     }
 
     FrameAnimation { running: vp.spin && vp.visible; onTriggered: { vp.tween = false; vp.az += frameTime * 9 } }
@@ -378,7 +388,7 @@ Item {
                         materials: CustomMaterial {
                             shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
                             property real uMap: 0
-                            property color uColor: vp.partColor(feature)
+                            property color uColor: vp.partColor(feature, "")
                             property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
                             property color uRim: vp.rimColor(feature)
                             property vector3d uClipN: vp.clipN
@@ -418,7 +428,7 @@ Item {
                                 materials: CustomMaterial {
                                     shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
                                     property real uMap: 0
-                                    property color uColor: vp.partColor(feature)
+                                    property color uColor: vp.partColor(feature, pn.modelData.id)
                                     property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
                                     property color uRim: vp.rimColor(feature)
                                     property vector3d uClipN: vp.clipN
@@ -431,13 +441,13 @@ Item {
                         Model { pickable: false; castsShadows: false; depthBias: -2
                             geometry: LineGeometry { segments: pn.modelData.edges || "" }
                             materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
-                                property color uColor: "#2b2925"; property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
+                                property color uColor: vp.edgeColor(pn.modelData.id); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
                     }
                 }
                 Model { visible: !!(vp.model && vp.model.edges) && !vp.asm; pickable: false; castsShadows: false; depthBias: -2
                     geometry: LineGeometry { segments: vp.model && vp.model.edges ? vp.model.edges : "" }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
-                        property color uColor: "#2b2925"; property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
+                        property color uColor: vp.edgeColor(""); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
                 Model { visible: !!(vp.ghost && vp.ghost.edges) && !vp.asmOn; pickable: false; castsShadows: false
                     geometry: LineGeometry { segments: vp.ghost && vp.ghost.edges ? vp.ghost.edges : "" }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"; depthDrawMode: Material.NeverDepthDraw

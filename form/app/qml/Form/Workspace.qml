@@ -136,6 +136,8 @@ Item {
             asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
             plateSize: ws.d && ws.d.printer ? Math.max(60, Math.max(ws.d.printer.env.envelope[0], ws.d.printer.env.envelope[1])) : 180
             hiddenFeatures: Store.hidden                                             // design tools: quick actions
+            // colours and materials: re-made whenever the design's appearance or the catalogue changes
+            colorOf: { var a = Store.appearance, c = Store.materialCat; return function (part) { return Store.look(part).color || "" } }
             // what the HUD covers: the rail and options, the dock when it is open, the strip and the readout
             insetLeft: ws.compact ? 76 : 60; insetTop: 46
             insetRight: dock.open && !ws.compact ? dock.width + 20 : 0

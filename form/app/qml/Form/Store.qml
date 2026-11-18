@@ -987,6 +987,29 @@ QtObject {
         }, function (e) { done(); s.fail(e) })
     }
 
+    // ── colours and materials (form/materials.py) ──
+    // The project keeps { color, material, parts: { id: { color, material } } }; a part's own wins over the design's.
+    property var materialCat: null             // GET /materials: [{ id, label, heat_c, density_g_cm3, color, note }], swatches
+    readonly property var appearance: project && project.appearance ? project.appearance : ({ color: null, material: null, parts: ({}) })
+    function loadMaterials() { if (!materialCat) get("/materials").then(function (r) { s.materialCat = r }, function () {}) }
+    function material(id) {
+        var ms = materialCat ? materialCat.materials : []
+        for (var i = 0; i < ms.length; i++) if (ms[i].id === id) return ms[i]
+        return null
+    }
+    function look(part) {                      // { color, material, own } as drawn and printed
+        var a = appearance, own = part && a.parts ? (a.parts[part] || {}) : {}
+        var m = own.material || a.material || null, mat = material(m)
+        return { color: own.color || a.color || (mat ? mat.color : null), material: m, own: !!(own.color || own.material) }
+    }
+    function setLook(part, color, material) {  // undefined keeps, null clears
+        var body = { part: part || "" }
+        if (color !== undefined) body.color = color
+        if (material !== undefined) body.material = material
+        return ppost("/appearance", body).then(function () { return s.refresh(false) }, fail)
+    }
+    property var _matLoad: Connections { target: s; function onPidChanged() { if (s.pid) s.loadMaterials() } }
+
     // print orientation finder (GET /orient): candidates ranked by a score whose terms are shown
     property var orient: null
     property bool orientBusy: false

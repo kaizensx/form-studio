@@ -142,6 +142,9 @@ def make_handler(st: Studio):
                 owned = printers_mod.route_get(st, path, q)
                 if owned is not None:
                     return self._json(owned)
+            if path == "/api/materials":                   # colours and materials (form/materials.py)
+                from . import materials
+                return self._json(materials.catalogue())
             if path == "/api/photos":                      # Blender renders: newest current one per project
                 from . import photo
                 return self._json({"latest": photo.latest_all(st)})
@@ -156,6 +159,12 @@ def make_handler(st: Studio):
                 last = p["revisions"][-1]
                 return self._json({"head": p["head"], "updated": p.get("updated"),
                                    "last": {"n": last["n"], "origin": last.get("origin"), "note": last["note"]}})
+            # -- selections, annotations, colours and materials (form/selection.py, form/materials.py) --
+            if rest == "/annotations":
+                return self._json({"annotations": p.get("annotations") or []})
+            if rest == "/colour.3mf":
+                from . import materials
+                return self._send(200, materials.threemf(st, p), "model/3mf")
             # -- analysis on the model (form/analysis.py): maps, orientations --
             if rest == "/analysis":
                 from . import analysis
@@ -466,6 +475,28 @@ def make_handler(st: Studio):
                 from . import analysis
                 return self._json(analysis.measure(st, p, body.get("from"), body.get("to"), body.get("rev"),
                                                    body.get("from_on"), body.get("to_on")))
+            # -- colours and materials (form/materials.py): a material changes the checks' notes, so they re-run --
+            if action == "appearance":
+                from . import materials
+                had = materials.fingerprint(p)
+                out = materials.set_appearance(st, pid, str(body.get("part") or ""), body.get("color", "keep"),
+                                               body.get("material", "keep"), by="you")
+                if materials.fingerprint(st.load(pid)) != had:
+                    auto(st.load(pid))
+                return self._json(out)
+            # -- selections and annotations (form/selection.py) --
+            if action in ("select", "annotate", "annotation", "annotation_delete", "annotation_analyze"):
+                from . import selection
+                rv = int(body["rev"]) if body.get("rev") is not None else None
+                if action == "select":
+                    return self._json(selection.analyze(st, p, body.get("items"), rv))
+                if action == "annotate":
+                    return self._json(selection.add(st, pid, body.get("items"), body.get("name", ""), body.get("note", ""), rv, by="you"))
+                if action == "annotation":
+                    return self._json(selection.update(st, pid, str(body.get("id", "")), body.get("name"), body.get("note")))
+                if action == "annotation_delete":
+                    return self._json(selection.delete(st, pid, str(body.get("id", ""))))
+                return self._json(selection.reanalyze(st, pid, str(body.get("id", "")), rv))
             if action == "preview":
                 return self._json(st.preview(p, body.get("values", {})))
             if action == "commit":

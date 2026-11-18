@@ -48,6 +48,7 @@ Column {
                 Repeater { id: gen
                     model: root.params.filter(function (p) { return p.group !== "brief" && !Store.featureById(p.feature) })
                     ParamRow { required property var modelData; p: modelData } } } }
+        Appearance { }                                  // colours and materials (form/materials.py)
         Sec { title: "Explore"
             Txt { tone: 2; width: parent.width; text: "Build a grid of real candidates and rank them against objectives you weight." }
             Row { spacing: 6

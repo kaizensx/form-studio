@@ -525,3 +525,9 @@ OPS = {k[3:]: v for k, v in list(globals().items()) if k.startswith("op_")}
 # analysis maps, measuring and print orientations (form/analysis.py)
 from .analysis import KERNEL_OPS as _ANALYSIS_OPS  # noqa: E402
 OPS.update(_ANALYSIS_OPS)
+
+# selections and annotations (form/selection.py)
+from .selection import KERNEL_OPS as _SELECTION_OPS  # noqa: E402
+OPS.update(_SELECTION_OPS)
+from .materials import KERNEL_OPS as _MATERIAL_OPS  # noqa: E402  (3MF with colours)
+OPS.update(_MATERIAL_OPS)

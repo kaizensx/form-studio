@@ -552,6 +552,10 @@ class Studio:
         fc = self._freecad()
         if fc and not getattr(recipe, "mesh", False):  # an installed FreeCAD adds a re-import check
             ck = H(ck, "freecad", fc)
+        from . import materials as materials_mod       # a chosen material adds its notes (none chosen: key unchanged)
+        mfp = materials_mod.fingerprint(p)
+        if mfp:
+            ck = H(ck, "material", mfp)
         presets = {k: v["sha"] for k, v in s.get("presets", {}).items()} if s.get("available") else None
         sk = H("slice", ek, presets, slicer.version(s["app"], s.get("kind", "bambu")) if s.get("available") else None,
                *_slicer_tag(s))
@@ -939,6 +943,8 @@ class Studio:
                "nozzle": s.get("nozzle_mm", 0.4), "nozzle_assumed": not s.get("available")}
         fit = self.fit(p)
         items = checks_mod.build(self.recipe(p), summary, a, ctx, fit)
+        from . import materials as materials_mod       # material notes: heat, sunlight, warping, flexible, resin
+        items += materials_mod.check_items(p, a, ctx)
         fc = self._freecad()
         if fc and "step" in ex["files"]:                # optional: re-read the exported STEP in FreeCAD
             step = self.apath(p, "exports", keys["exports"]) / ex["files"]["step"]["name"]
