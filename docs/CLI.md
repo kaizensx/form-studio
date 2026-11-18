@@ -95,11 +95,13 @@ message, with what the design is for.
 | `form measure <project> --from x,y,z --to x,y,z` | A distance; `--at x,y,z` reports the face, edge or hole at a point |
 | `form orient <project> [--apply [ID]] [--png FILE]` | Rank print orientations; `--apply` sets the best one |
 | `form animate <project> [--morph 1:4] [--frames N] [--out FILE]` | A turntable, or a morph between two revisions |
+| `form turntable <project> [--fmt mp4\|png\|webp\|gif] [--frames N] [--elevation DEG] [--out FILE]` | The part turning once, rendered from the kernel's mesh; MP4 needs ffmpeg |
 | `form share <project> [--out PNG] [--photo]` | The share card; `--photo` uses the newest Blender render |
 | `form select <project> [--point\|--edge\|--face x,y,z]... [--region "x,y,z;..." --radius R] [--keep NAME --note TEXT] [--text]` | Analyse points, edges, faces or a painted region on the solid: area, tilt, overhang, wall thickness, curvature, height; `--keep` saves it as an annotation |
 | `form annotations <project> [list\|show\|delete] [ID]` | Kept selections |
 | `form appearance <project> [--part PART] [--color #hex] [--material M] [--clear] [--3mf FILE]` | Colour and material of the design or one part; `--3mf` writes a 3MF with colours |
 | `form engrave <project> TEXT --at x,y,z --normal x,y,z [--up x,y,z] [--height MM] [--depth MM] [--sunk]` | Raised or sunk text on a flat face, written into the design's code as a feature and built as a new revision; `--list` and `--remove text_N` |
+| `form feature <project> boss\|snap_hook --at x,y,z --normal x,y,z [--size M3] [--hole tapped\|clearance\|insert] ...` | A screw boss or a snap-fit hook on a flat face, written into the design's code and built as a new revision |
 | `form diff <project> A [B] [--png FILE]` | What changed between two revisions on the solids: material added and removed, with volumes and regions |
 
 ## Print
@@ -117,6 +119,7 @@ message, with what the design is for.
 | `form cost <project> [--price-per-kg] [--kwh-price] [--watts] [--machine-rate] [--copies] [--save]` | Filament, electricity and machine time |
 | `form pack <project> [--copies N] [--spacing MM] [--no-rotate]` | Do N copies fit on one plate |
 | `form optimize <project> --vary key:min:max ... --minimize\|--maximize METRIC [--require EXPR] [--budget N]` | Goal seek over parameters |
+| `form compare-printers <project> [--printer ID] [--limit N]` | Slice the design for real on every printer in your slicers: time, filament and cost side by side |
 | `form verify <project> <release>` | Re-hash a release against its manifest |
 | `form release-files <project> [release] [--out FILE.zip]` | Every file of a release in one .zip: models, G-code, sliced 3MF, report, documents and manifest (the newest release by default) |
 | `form instructions <project> [--rev N] [--out FILE.pdf]` | Assembly instructions as a PDF: a parts page, then one page per part in the order the assembly attaches them |

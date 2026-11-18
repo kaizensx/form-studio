@@ -254,6 +254,10 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
   cap height and depth, with stroke width and cap height checked against your nozzle as you type. **Add to design**
   writes the lettering into the design's own code as a feature and builds a new revision. `form engrave`; MCP
   `add_text`, `remove_text`.
+- **Screw bosses and snap-fit hooks where you click.** In Annotate, **Feature here…** on a flat face adds a screw
+  boss (M2 to M5, with the ISO tap drill, a heat-set insert hole or the ISO 273 clearance) or a cantilever snap-fit
+  hook, checked against your nozzle and written into the design's code. `form feature`; MCP `add_feature`,
+  `remove_feature`.
 - **Section (X):** a clipping plane through the solid with filled cut faces.
 - **Orientation finder:** ranks print orientations by overhang area, support, contact and height, with the numbers
   behind the ranking, and applies the one you choose.
@@ -293,6 +297,10 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
 - **Cost:** filament, electricity and machine time from the slice and your prices. Form Studio never guesses a price.
 
 ![Several plates in Prove, each sliced on its own](images/plates.webp)
+
+- **Every printer you have, compared.** Prove › Every printer slices the design for real on each printer set up in
+  each installed slicer, with its own process and filament, and shows time, filament and cost side by side with the
+  fastest, least filament and cheapest marked. `form compare-printers`; MCP `compare_printers`.
 
 ## Assemblies
 
@@ -340,6 +348,7 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
 | **Photoreal render** with Blender: studio, desk or dark scenes, matte, PETG or silk finishes, any colour, layer lines at the slicer's layer height. | **Share card**: the part with its dimensions, print time, filament, checks and fit, each labelled with its evidence. |
 
 - **Engine renders** in any view or as a four-view sheet, coloured by feature, for agents to look at their work.
+- **Turntable videos:** Release › Share › **Turntable…** renders the part turning once as MP4, PNG frames, WebP or GIF. `form turntable`; MCP `turntable`.
 - **Turntables and revision morphs** as GIF or WebP (`form animate`, `form history --gif`).
 - Renders are illustrations and are labelled as such; they are never evidence.
 
@@ -390,7 +399,7 @@ Writing one: [Writing a recipe](RECIPES.md) and [community recipes](../community
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 70 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 74 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
