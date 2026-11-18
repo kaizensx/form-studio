@@ -74,6 +74,7 @@ def journey_just_design_from_settings(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 10, "Home")
     ui.wait_until(lambda: ui.find(name="purposeChip") is not None, 5, "the “just designing” chip")
     ui.check(ui.js("Store.purposeInfo['default']") == "model", "new designs now start as 3D models")
+    ui.settle(800)                                     # Home sets its bench and the top bar settles before the click
     ui.click("purposeChip")
     open_sheet_wait(ui, "settings")
     ui.click("settingsPrinter")
