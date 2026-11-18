@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 12.0.0
 
 - **Design without a 3D printer.** The first run and Settings › General ask once: "I have a 3D printer" or "I just design". Someone who only designs gets no printer chip, no slicer install, no slicer in setup or the hands-free first start, and no Printing tab; the top bar reads "No printer · Just designing".
 - **Every design has a purpose:** For 3D printing, or Just a 3D model (rendering, CAD exchange, CNC, laser cutting, moulding, visualisation). New designs start from your answer; change it any time in the Brief or from the top bar. `form new … --purpose model --process cnc`, `form purpose <project> model`, MCP `create_project` / `create_design` / `set_print_setup` take `purpose` and `process`, and `get_project` reports it.
@@ -10,9 +10,6 @@
 - **Settings that apply at once.** Choosing the default printer (from Settings › Printing or the printer picker) updates Settings, the top bar, the plate and the open design's checks without a restart; "I just design" hides printing everywhere immediately. Checks use the printer your slicer slices on, not a separate bed size.
 - **Settings rebuilt:** General, Printing, Agents, Other apps, Updates, Advanced and Software, with search. Agent, model and effort are picked from what is set up; slicers and programs (Blender, OpenSCAD, FreeCAD, Claude Code) show whether and where they were found, with Browse as a fallback and what each one unlocks; numbers are checked as you type; every value can be reset to its default. Preset names are no longer typed by hand.
 - **Agents never ask a designer about a printer.** The in-app agent and MCP clients are told whether you print and what each design is for.
-
-## 12.0.0
-
 - **A new recipe library, made of the things people print most:** Gridfinity bin and baseplate, a box with a sliding, press-on or hinged lid, SKÅDIS pegboard accessories, a phone and tablet stand, a cable organizer, an under-desk hanger, a shelf bracket, a hose and pipe adapter, a self-watering planter, a faceted vase and lamp shade, and a battery and card holder. Each passes its checks at its defaults and prints without supports; multi-part recipes show Assembled and Exploded views. Recipes have categories and tags for search, in the app and the website gallery. The older dock, wall hook, twisted planter, gear pair, knob, hinged box and Gridfinity bin leave the library; designs that use them still open and build.
 - **A new Home.** A new install shows every way to start, starters and the built-in recipes drawn live in 3D. With designs, starters sit above the live design grid.
 - **Starters learn from you.** They are ranked by what you design, your briefs, your printer and your material. Pin, edit, remove or add your own, and save a filled-in brief as your own template.
