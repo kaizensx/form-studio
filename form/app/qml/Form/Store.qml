@@ -1499,6 +1499,7 @@ QtObject {
     // Recipes and briefs are not offered here any more; agents may still use recipes, and older designs open as before.
     property var whatsNew: null        // GET /whatsnew: { version, show, markdown, highlights } while the modal is up
     property var startInfo: null       // GET /start: { purpose, printer: { name, available } }
+    signal morphFrom(rect r)           // Home: the composer's place as it hands over to the workspace (MorphFrame)
     property var chatLinks: []         // page links pasted into the composer: { url, host }; passed on, never downloaded
     property var concepts: []          // open concept groups (form/concepts.py): boards with members and numbers
     property int startFocus: 0         // bumps when Home's composer should take the keyboard

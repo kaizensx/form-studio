@@ -140,6 +140,9 @@ Window {
     // the opening screen: the mark builds itself while the kernel starts; it stays at least until the mark is drawn
     Splash { anchors.fill: parent; z: 90; visible: !win.headless && !Bridge.underTest && opacity > 0; done: Store.screen !== "boot" && splashMin.ran
         Timer { id: splashMin; property bool ran: win.headless; interval: 2300; running: true; onTriggered: ran = true } }
+    MorphFrame { id: morph; anchors.fill: parent; z: 85
+        to: { var p = stage.mapToItem(null, 0, 0); return Qt.rect(p.x + 8, p.y + 8, stage.width - 16, stage.height - 16) } }
+    Connections { target: Store; function onMorphFrom(r) { morph.play(r) } }
     Toasts { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 18; z: 80 }
     ActivityBar { anchors.top: top.bottom; width: parent.width; z: 70 }          // named engine work over 300 ms, with progress
     SheetHost {}

@@ -193,7 +193,10 @@ Item {
                     Row { objectName: "homeChatting"; visible: home.chatting; spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
                         Btn { objectName: "homeNewDesign"; kind: "primary"; icon: "plus"; text: "New design"; keys: "Ctrl+N"; onClicked: Store.startNew() }
                         Btn { kind: "quiet"; icon: "panel_left_close"; text: "Hide the conversation"; onClicked: Store.talkOpen = false } }
-                    StartComposer { id: composer; visible: !home.chatting; width: parent.width; dragging: home.dropping; onSketchWanted: Store.openSheet("sketch") }
+                    StartComposer { id: composer; visible: !home.chatting
+                        Component.onDestruction: if (Store.screen === "designing" || Store.screen === "work") {
+                            var p = composer.mapToItem(null, 0, 0); Store.morphFrom(Qt.rect(p.x, p.y, composer.width, composer.height)) }
+                         width: parent.width; dragging: home.dropping; onSketchWanted: Store.openSheet("sketch") }
                     Item { visible: !home.chatting; width: 1; height: 16 }
                     // ── under the composer: what it is for, which printer, which agent and model, or a blank canvas ──
                     Row { id: opts; objectName: "startOptions"; visible: !home.chatting; anchors.horizontalCenter: parent.horizontalCenter; spacing: 6; height: 30
