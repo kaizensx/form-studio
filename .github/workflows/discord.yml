@@ -1,0 +1,66 @@
+# The Form Studio bot on Discord. It needs two settings on the repository:
+#   secret   DISCORD_BOT_TOKEN  the bot's token (Developer Portal › the application › Bot › Reset Token)
+#   variable DISCORD_GUILD_ID   the server's id
+# Without them every job here is skipped. "Set up the server" (Actions › Discord › Run workflow) builds the roles,
+# channels, onboarding and the welcome posts from scripts/discord/server.py; the other jobs post what happens.
+name: Discord
+
+on:
+  release:
+    types: [published]
+  discussion:
+    types: [created]
+  issues:
+    types: [opened, closed]
+  pull_request_target:
+    types: [opened, closed]
+  workflow_run:
+    workflows: [CI, Interface tests, Desktop app, Real slicers, Website]
+    types: [completed]
+  watch:
+    types: [started]
+  schedule:
+    - cron: "0 9 * * 1"              # Monday 09:00 UTC: the week in Form Studio
+  workflow_dispatch:
+    inputs:
+      task:
+        description: What to do
+        type: choice
+        options: [setup, digest]
+        default: setup
+
+permissions:
+  contents: read
+
+concurrency:
+  group: discord-${{ github.event_name }}-${{ github.event.inputs.task || 'event' }}
+  cancel-in-progress: false
+
+jobs:
+  post:
+    if: ${{ vars.DISCORD_GUILD_ID != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # pull_request_target: only the base branch's scripts run; nothing from the pull request is checked out
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/discord
+            form/app/assets
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Post
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_GUILD_ID: ${{ vars.DISCORD_GUILD_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+          TASK: ${{ github.event.inputs.task || (github.event_name == 'schedule' && 'digest') || 'event' }}
+        run: |
+          if [ -z "$DISCORD_BOT_TOKEN" ]; then echo "DISCORD_BOT_TOKEN is not set; nothing to post"; exit 0; fi
+          case "$TASK" in
+            setup) python scripts/discord/setup_server.py ;;
+            digest) python scripts/discord/post.py digest ;;
+            *) python scripts/discord/post.py event ;;
+          esac
