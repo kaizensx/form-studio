@@ -21,12 +21,13 @@ on:
     types: [started]
   schedule:
     - cron: "0 9 * * 1"              # Monday 09:00 UTC: the week in Form Studio
+    - cron: "17 */2 * * *"           # every two hours: the help desk (answers new #help posts, archives solved ones)
   workflow_dispatch:
     inputs:
       task:
         description: What to do
         type: choice
-        options: [setup, snapshot, digest]
+        options: [setup, plan, snapshot, helpdesk, digest]
         default: setup
 
 permissions:
@@ -48,6 +49,7 @@ jobs:
           sparse-checkout: |
             scripts/discord
             form/app/assets
+            site/recipes/index.json
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -56,13 +58,15 @@ jobs:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_GUILD_ID: ${{ vars.DISCORD_GUILD_ID }}
           GITHUB_TOKEN: ${{ github.token }}
-          TASK: ${{ github.event.inputs.task || (github.event_name == 'schedule' && 'digest') || 'event' }}
+          TASK: ${{ github.event.inputs.task || (github.event.schedule == '0 9 * * 1' && 'digest') || (github.event_name == 'schedule' && 'helpdesk') || 'event' }}
         run: |
           if [ -z "$DISCORD_BOT_TOKEN" ]; then echo "DISCORD_BOT_TOKEN is not set; nothing to post"; exit 0; fi
           case "$TASK" in
             setup) python scripts/discord/snapshot.py discord-before.json && python scripts/discord/setup_server.py && python scripts/discord/snapshot.py discord-after.json ;;
+            plan) python scripts/discord/setup_server.py --dry-run && python scripts/discord/helpdesk.py --dry-run ;;
             snapshot) python scripts/discord/snapshot.py discord-snapshot.json ;;
             digest) python scripts/discord/post.py digest ;;
+            helpdesk) python scripts/discord/helpdesk.py ;;
             *) python scripts/discord/post.py event ;;
           esac
       # the server before and after a setup (or a plain snapshot), kept 90 days: compare or roll back from it

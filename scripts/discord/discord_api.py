@@ -44,11 +44,16 @@ def call(method: str, path: str, body=None, *, files: dict | None = None, reason
         boundary = "formstudio" + os.urandom(8).hex()
         parts = []
         payload = dict(body or {})
-        payload["attachments"] = [{"id": i, "filename": n} for i, n in enumerate(files)]
+        att = [{"id": i, "filename": n} for i, n in enumerate(files)]
+        if "message" in payload:                       # a forum post: its first message carries the files
+            payload["message"] = {**payload["message"], "attachments": att}
+        else:
+            payload["attachments"] = att
         parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="payload_json"\r\n'
                      f'Content-Type: application/json\r\n\r\n{json.dumps(payload)}\r\n'.encode())
         for i, (name, data) in enumerate(files.items()):
-            ctype = "image/png" if name.endswith(".png") else "image/gif" if name.endswith(".gif") else "application/octet-stream"
+            ctype = {"png": "image/png", "gif": "image/gif", "webp": "image/webp", "jpg": "image/jpeg"}.get(
+                name.rsplit(".", 1)[-1], "application/octet-stream")
             parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="files[{i}]"; filename="{name}"\r\n'
                          f'Content-Type: {ctype}\r\n\r\n'.encode() + data + b"\r\n")
         parts.append(f"--{boundary}--\r\n".encode())
@@ -86,6 +91,13 @@ def send(channel_id: str, content: str = "", embeds: list | None = None, compone
     if components:
         body["components"] = components
     return call("POST", f"/channels/{channel_id}/messages", body, files=files)
+
+
+def footer(section: str, sig: str = "") -> dict:
+    """The footer every Form Studio embed carries: the mark and "Form Studio · Section".
+    sig (a hash of the post) rides on the icon's address, invisible, so setup can tell a post is current."""
+    from server import ICON
+    return {"text": f"Form Studio · {section}", "icon_url": ICON + (f"?v={sig}" if sig else "")}
 
 
 def link_button(label: str, url: str, emoji: str | None = None) -> dict:
