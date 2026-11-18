@@ -322,3 +322,37 @@ class ModelLists(Env):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GatewayFormats(unittest.TestCase):
+    """A gateway answers in Anthropic's format when it sees anthropic-version; Anthropic itself requires it."""
+
+    def _fake(self, gateway: bool):
+        from unittest import mock
+        oa = {"object": "list", "data": [{"id": "openai/gpt-x"}, {"id": "anthropic/claude-y"}, {"id": "meta/z"}]}
+        an = {"data": [{"id": "claude-y", "type": "model", "display_name": "Claude Y"}], "has_more": False, "first_id": "claude-y"}
+
+        def req(url, key, body=None, wire=None, timeout=6.0):
+            if body is not None:                                       # the chat probe: rejected as invalid, as real servers do
+                return 400, {"error": {"message": "invalid request"}}, None
+            if not url.endswith("/v1/models"):
+                return 404, None, None
+            if gateway:
+                return 200, (an if wire == "anthropic" else oa), None
+            if wire != "anthropic":
+                return 400, {"error": {"message": "anthropic-version: header is required"}}, None
+            return 200, an, None
+        return mock.patch.object(custom, "_request", side_effect=req)
+
+    def test_a_gateway_is_read_in_its_openai_format(self):
+        with self._fake(gateway=True):
+            r = custom.detect("https://gateway.example/api")
+        self.assertTrue(r["ok"], r)
+        self.assertEqual((r["format_id"], r["count"]), ("openai", 3))
+        self.assertIn("openai/gpt-x", [m["id"] for m in r["models"]])
+
+    def test_anthropic_still_gets_its_header(self):
+        with self._fake(gateway=False):
+            r = custom.detect("https://api.anthropic.com")
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(r["format_id"], "anthropic")
