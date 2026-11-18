@@ -11,7 +11,7 @@ who watch the repository or the Discord server are told about something worth th
 | `dev` | Every finished change, as soon as it passes its tests | Previews only |
 | `main` | Exactly what was last released as stable, plus patches | Stable releases and patches |
 
-`main` moves only when a stable release or a patch is cut. Day-to-day work never lands on `main` directly.
+`main` moves only when a stable release or a patch is cut. Day-to-day work never lands on `main` directly. One exception: changes to the README, the website or the docs that describe what the latest stable release already does may go to `main` directly, since they change no code and need no release.
 
 ## Three kinds of release
 

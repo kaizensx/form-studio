@@ -49,7 +49,8 @@ The interface journeys (`tests/test_ui_journeys.py`) drive the real window with 
 .venv/bin/python -m form.app --uitest tests/journeys/start.py   # drive the real window with one journey
 .venv/bin/python scripts/gen_mcp_docs.py           # regenerate docs/MCP.md after changing MCP tools
 .venv/bin/python scripts/make_media.py             # regenerate README media after changing recipes or the renderer
-.venv/bin/python scripts/make_app_media.py         # re-record the README animations and website videos from the app (30 fps)
+.venv/bin/python scripts/readme_art.py             # redraw the README's pictures (docs/readme) from a fresh engine and slicer run
+.venv/bin/python scripts/make_app_media.py         # re-record the app animations and website videos from the app (30 fps)
 .venv/bin/python scripts/acceptance.py             # the end-to-end acceptance run
 ```
 

@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
-"""The README's pictures: Form Studio drawn 1:1 as animated SVG, from real engine output.
+"""The README's pictures, drawn as animated SVG from a real run of the engine.
 
-Every part, number and check in these drawings comes from a real run of the engine on this machine:
+Every part, number and check in these drawings comes from a run on this machine:
 
   1. two designs are built from their recipes in a scratch projects folder (`form new`), so the CAD kernel builds
      the solids, the checks run on them and your slicer slices them;
-  2. the triangle meshes and B-rep edges the app's viewport draws are read from the engine (`Studio.view`) and
-     projected with the viewport's own camera (Viewport.qml: orbit angles, 26° field of view, framing);
-  3. the check results, slice estimate and assembly joint come from the same run; the print playback is the
-     slicer's G-code, read by form/toolpath.py.
+  2. the triangle meshes and B-rep edges are read from the engine (`Studio.view`) and projected with the
+     viewport's orbit camera (Viewport.qml: orbit angles, 26° field of view);
+  3. check names and results, the slice estimate, the assembly joint and its sweep come from the same run; layers
+     are the slicer's G-code, read by form/toolpath.py; the printer comparison is `form compare-printers`; the
+     file hashes are SHA-256 of the exported files; the terminal lines are what `form state` printed.
 
-The app's chrome is drawn from the QML Theme (colours are read from Theme.qml), its fonts (Instrument Sans, Geist
-Mono and the Lucide icons, subset and embedded) and the layout of Home.qml, Workspace.qml, Talk.qml and Prove.qml.
-GitHub shows an SVG in an <img> without scripts, so all motion is CSS keyframes and SMIL.
+Colours come from Theme.qml, the mark from LogoPaths.js, and the type is Instrument Sans and Geist Mono, subset
+and embedded in each file. GitHub shows an SVG in an <img> without scripts, so all motion is CSS keyframes and
+stroke dashes, and every drawing rests on its finished frame when the reader prefers reduced motion.
 
     .venv/bin/python scripts/readme_art.py              # writes docs/readme/*.svg (dark and light)
     .venv/bin/python scripts/readme_art.py --keep DIR   # reuse (or keep) the scratch projects folder
 
-Needs the engine's extras (build123d) and, for the slice and print playback, a slicer Form Studio can drive.
+Needs the engine's extras (build123d) and a slicer Form Studio can drive.
 """
 from __future__ import annotations
 
@@ -69,14 +70,6 @@ def mix(a: str, b: str, k: float) -> str:
     ca = [int(ha[i:i + 2], 16) for i in (0, 2, 4)]
     cb = [int(hb[i:i + 2], 16) for i in (0, 2, 4)]
     return "#%02x%02x%02x" % tuple(round(x + (y - x) * k) for x, y in zip(ca, cb))
-
-
-EVIDENCE = {"computed": T["datum"], "specified": T["datum"], "heuristic": T["ink2"], "model": T["amber"],
-            "modelled": T["amber"], "simulated": T["amber"], "assumed": T["amber"], "PASS": T["pass"]}
-
-ICON = {}
-for _n, _c in re.findall(r'"(\w+)": "\\u([0-9a-f]{4})"', (QML / "Icons.qml").read_text(encoding="utf-8")):
-    ICON[_n] = chr(int(_c, 16))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -157,39 +150,30 @@ class Svg:
         self.body.append(s)
 
     # ── motion ──
-    def anim(self, frames: list, ease: str = "cubic-bezier(.23,1,.32,1)", origin: str = "") -> str:
-        """frames: [(seconds, {css props})]. Returns a class name. Values hold between keys unless the next key
-        differs (then they ease). The loop restarts at 0."""
+    def anim(self, frames: list, ease: str = "cubic-bezier(.23,1,.32,1)", origin: str = "", rest: dict | None = None,
+             dur: float | None = None, delay: float = 0.0, once: bool = False) -> str:
+        """frames: [(seconds, {css props})] on a timeline of `dur` seconds (the drawing's loop by default). Returns
+        a class name. Values hold between keys unless the next key differs (then they ease). `rest` is the state
+        shown without motion (reduced motion); `once` plays the timeline a single time and holds its end."""
         name = self.id("k")
+        dur = dur or self.loop
         fr = sorted(frames, key=lambda f: f[0])
         if fr[0][0] > 0:
             fr.insert(0, (0.0, fr[0][1]))
-        if fr[-1][0] < self.loop:
-            fr.append((self.loop, fr[-1][1]))
+        if fr[-1][0] < dur:
+            fr.append((dur, fr[-1][1]))
         steps = []
         for t, props in fr:
-            pct = 100.0 * t / self.loop
+            pct = min(100.0, 100.0 * t / dur)
             body = ";".join("%s:%s" % kv for kv in props.items())
             steps.append("%.3f%%{%s;animation-timing-function:%s}" % (pct, body, ease))
         self.css.append("@keyframes %s{%s}" % (name, "".join(steps)))
         extra = ("transform-box:fill-box;transform-origin:%s;" % origin) if origin else ""
-        self.css.append(".%s{animation:%s %gs infinite;%s}" % (name, name, self.loop, extra))
+        if rest:
+            extra += "".join("%s:%s;" % kv for kv in rest.items())
+        timing = "%gs %gs %s both" % (dur, delay, "1" if once else "infinite")
+        self.css.append(".%s{%sanimation:%s %s}" % (name, extra, name, timing))
         return name
-
-    def show(self, t_in: float, t_out: float | None = None, fade: float = 0.24, rise: float = 0.0, scale: float = 0.0) -> str:
-        """Visible from t_in (fading and rising in) until t_out (fading out). Returns a class."""
-        hid = {"opacity": "0"}
-        vis = {"opacity": "1"}
-        if rise:
-            hid["transform"] = "translateY(%gpx)" % rise
-            vis["transform"] = "translateY(0px)"
-        if scale:
-            hid["transform"] = "scale(%g)" % scale
-            vis["transform"] = "scale(1)"
-        fr = [(0, hid), (max(0.0, t_in), hid), (t_in + fade, vis)]
-        if t_out is not None:
-            fr += [(t_out, vis), (min(self.loop, t_out + fade * 0.7), hid)]
-        return self.anim(fr, origin="center" if scale else "")
 
     # ── text ──
     def text(self, x, y, s, size=13, weight=420, fill=None, family="sans", anchor="start", ls=0.0, cls="", extra="",
@@ -210,10 +194,6 @@ class Svg:
             attrs += ' class="%s"' % cls
         self.add('<text %s%s>%s</text>' % (attrs, extra, esc(s)))
         return text_w(s, size, weight, family, ls)
-
-    def icon(self, x, y, name, size=14, fill=None, cls=""):
-        """Lucide glyph centred on (x, y)."""
-        self.text(x - size / 2, y + size / 2, ICON[name], size=size, family="icon", fill=fill or T["ink2"], cls=cls)
 
     def rect(self, x, y, w, h, r=0, fill="none", stroke=None, sw=1, cls="", extra=""):
         a = 'x="%s" y="%s" width="%s" height="%s"' % (f1(x), f1(y), f1(w), f1(h))
@@ -241,13 +221,17 @@ class Svg:
 
     def render(self, desc: str = "") -> str:
         faces = "".join(font_face(fam, ch) for fam, ch in self.chars.items() if ch)
-        style = "<style>%s%s@media (prefers-reduced-motion:reduce){*{animation:none!important}}</style>" % (faces, "".join(self.css))
-        head = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %s %s" width="%s" height="%s" role="img" fill="none">'
+        # .fr repaints the drawing for its first two seconds, so the embedded fonts are used even when nothing else
+        # moves (reduced motion): an image is otherwise painted once, possibly before its fonts are decoded
+        style = ("<style>%s%s@keyframes fr{0%%{opacity:0}100%%{opacity:.01}}.fr{animation:fr 2s 1}"
+                 "@media (prefers-reduced-motion:reduce){*:not(.fr){animation:none!important}}</style>" % (faces, "".join(self.css)))
+        style = style.replace("<style>", "<style>text{font-variant-numeric:tabular-nums;white-space:pre}", 1)
+        head = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %s %s" width="%s" height="%s" role="img" fill="none" xml:space="preserve">'
                 % (f1(self.w), f1(self.h), f1(self.w), f1(self.h)))
         t = "<title>%s</title>" % esc(self.title) if self.title else ""
         d = "<desc>%s</desc>" % esc(desc) if desc else ""
         defs = "<defs>%s</defs>" % "".join(self.defs) if self.defs else ""
-        return head + t + d + style + defs + "".join(self.body) + "</svg>\n"
+        return head + t + d + style + defs + "".join(self.body) + "<rect class=\"fr\" width=\"1\" height=\"1\" fill=\"#808080\" opacity=\"0\"/></svg>\n"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -298,16 +282,31 @@ def engine(data_dir: Path) -> dict:
             print("no toolpath for %s: %s" % (pid, e))
         out[pid] = {"state": state, "view": view, "meshes": meshes, "edges": edges, "asm": asm,
                     "part_edges": part_edges, "toolpath": tp}
+    env = {**os.environ, "FORM_DATA": str(data_dir)}
+
+    def cli(*args) -> str:
+        return subprocess.run([sys.executable, "-m", "form", *args], cwd=ROOT, check=True, capture_output=True,
+                              text=True, env=env).stdout
+
+    stand = out["desk-phone-stand"]
+    # what the terminal card shows: the CLI's own output, verbatim
+    stand["state_text"] = cli("state", "desk-phone-stand")
+    out["tools"] = json.loads(cli("tool"))["tools"]
+    # every printer set up in the installed slicers, sliced for real
+    print("comparing printers…", flush=True)
+    out["compare"] = json.loads(cli("compare-printers", "desk-phone-stand", "--limit", "8"))
+    # the exported files and their SHA-256
+    import hashlib
+    hashes = []
+    for kind, path in stand["state"]["files"].items():
+        p = Path(path)
+        if p.exists():
+            hashes.append((kind, p.name, hashlib.sha256(p.read_bytes()).hexdigest(), p.stat().st_size))
+    stand["hashes"] = hashes
+    import importlib
+    from form import adapters
+    out["slicers"] = [importlib.import_module(m).LABEL for m in adapters.SLICERS.values()]
     return out
-
-
-def mesh_edges(d):
-    """The B-rep edges in the frame the meshes are in (an assembly's parts carry their own)."""
-    if d["edges"] is not None:
-        return d["edges"]
-    if d["part_edges"]:
-        return np.concatenate(list(d["part_edges"].values()))
-    return None
 
 
 def parse_check(s: str) -> dict:
@@ -372,12 +371,28 @@ def shade(normals: np.ndarray, cam: Camera, base=CLAY) -> list:
     sky = np.array([0, 1.0, 0])
     k = np.clip(n @ key, 0, 1)
     s = np.clip(n @ sky, 0, 1)
-    lum = 0.50 + 0.34 * k + 0.12 * s
+    lum = 0.58 + 0.32 * k + 0.12 * s
+    lum = np.round(lum / 0.018) * 0.018          # tone bands: neighbouring facets of a fillet merge into one shape
     h = base.lstrip("#")
     rgb = np.array([int(h[i:i + 2], 16) for i in (0, 2, 4)], float)
     cols = np.clip(rgb[None, :] * lum[:, None] * 0.98, 0, 255)
-    q = np.round(cols / 3) * 3
-    return ["#%02x%02x%02x" % tuple(int(v) for v in c) for c in q]
+    return ["#%02x%02x%02x" % tuple(int(round(v)) for v in c) for c in cols]
+
+
+def rel_path(pts, close=True) -> str:
+    """A polyline as one move and relative lines (about a third shorter than absolute coordinates)."""
+    q = np.round(np.asarray(pts, float) * 10).astype(int)
+    out = ["M%s %s" % (f1(q[0][0] / 10), f1(q[0][1] / 10))]
+    prev = q[0]
+    segs = []
+    for cur in q[1:]:
+        dx, dy = cur - prev
+        if dx or dy:
+            segs.append("%s %s" % (f1(dx / 10), f1(dy / 10)))
+        prev = cur
+    if segs:
+        out.append("l" + " ".join(segs).replace(" -", "-"))
+    return "".join(out) + ("z" if close else "")
 
 
 def _raster(xy, z, W, H, scale=2.0):
@@ -410,8 +425,54 @@ def _raster(xy, z, W, H, scale=2.0):
     return zb, ib
 
 
+def merged_outline(tris3: np.ndarray, xy: np.ndarray) -> str:
+    """Triangles of one colour as their outline: edges two triangles share in opposite directions cancel, the rest
+    are chained into closed loops (filled nonzero, so the result covers exactly what the triangles cover)."""
+    key = lambda p: (round(p[0], 3), round(p[1], 3), round(p[2], 3))
+    pos = {}
+    directed = {}
+    for t3, t2 in zip(tris3, xy):
+        ks = [key(p) for p in t3]
+        for k, p in zip(ks, t2):
+            pos[k] = p
+        for a, b in ((ks[0], ks[1]), (ks[1], ks[2]), (ks[2], ks[0])):
+            if a == b:
+                continue
+            if (b, a) in directed:
+                directed[(b, a)] -= 1
+                if directed[(b, a)] == 0:
+                    del directed[(b, a)]
+            else:
+                directed[(a, b)] = directed.get((a, b), 0) + 1
+    nxt: dict = {}
+    for (a, b), n in directed.items():
+        for _ in range(n):
+            nxt.setdefault(a, []).append(b)
+    out = []
+    while nxt:
+        start = next(iter(nxt))
+        loop = [start]
+        cur = start
+        while True:
+            lst = nxt.get(cur)
+            if not lst:
+                break
+            b = lst.pop()
+            if not lst:
+                del nxt[cur]
+            if b == start:
+                break
+            loop.append(b)
+            cur = b
+        if len(loop) >= 3:
+            pts = np.array([pos[k] for k in loop])
+            pts = rdp(np.vstack([pts, pts[:1]]), 0.12)[:-1] if len(pts) > 4 else pts
+            out.append(rel_path(pts))
+    return "".join(out)
+
+
 def draw_solid(cam: Camera, tris: np.ndarray, W: float, H: float, edges: np.ndarray | None = None,
-               colors: list | None = None, edge_ink: str = "rgba(28,30,30,.55)") -> tuple[str, str]:
+               colors: list | None = None, edge_ink: str = "rgba(28,30,30,.55)", base: str | None = None) -> tuple[str, str]:
     """Visible triangles as merged flat-shaded paths (painter's order), and the visible B-rep edges as one path."""
     tris = np.asarray(tris, float)
     nrm = np.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0])
@@ -426,7 +487,7 @@ def draw_solid(cam: Camera, tris: np.ndarray, W: float, H: float, edges: np.ndar
     tris, nrm = tris[facing], nrm[facing]
     if colors is not None:
         colors = [c for c, o in zip(colors, facing) if o]
-    cols = shade(nrm, cam) if colors is None else colors
+    cols = shade(nrm, cam, base or CLAY) if colors is None else colors
     xy, z = cam.project(tris)
     sc = 2.0
     zb, ib = _raster(xy, z, W, H, sc)
@@ -496,8 +557,7 @@ def draw_solid(cam: Camera, tris: np.ndarray, W: float, H: float, edges: np.ndar
                 batches.append((cur, batch))
     paths = []
     for c, batch in batches:
-        d = "".join("M%s %sL%s %sL%s %sZ" % (f1(xy[i][0][0]), f1(xy[i][0][1]), f1(xy[i][1][0]), f1(xy[i][1][1]),
-                                              f1(xy[i][2][0]), f1(xy[i][2][1])) for i in batch)
+        d = merged_outline(tris[batch], xy[batch])
         paths.append('<path d="%s" fill="%s" stroke="%s" stroke-width=".6" stroke-linejoin="round"/>' % (d, c, c))
     epath = ""
     if edges is not None and len(edges):
@@ -524,31 +584,11 @@ def draw_solid(cam: Camera, tris: np.ndarray, W: float, H: float, edges: np.ndar
                 if (not vis[k] or k == n - 1) and run is not None:
                     e_ = k if vis[k] else k - 1
                     if e_ > run:
-                        out.append("M%s %sL%s %s" % (f1(pts[run][0]), f1(pts[run][1]), f1(pts[e_][0]), f1(pts[e_][1])))
+                        out.append(rel_path([pts[run], pts[e_]], close=False))
                     run = None
         if out:
             epath = '<path d="%s" stroke="%s" stroke-width=".8" stroke-linecap="round" fill="none"/>' % ("".join(out), edge_ink)
     return "".join(paths), epath
-
-
-def draw_plate(svg: Svg, cam: Camera, size=(180, 180), center=(0, 0), fade_id: str = "", grid=10,
-               plate_fill="#252b2f", grid_ink="#1a1f22"):
-    """The build plate: a graphite slab with a 10 mm grid, fading into the bench."""
-    w, h = size
-    cx, cy = center
-    corners = np.array([[cx - w / 2, cy - h / 2, 0], [cx + w / 2, cy - h / 2, 0], [cx + w / 2, cy + h / 2, 0], [cx - w / 2, cy + h / 2, 0]])
-    xy, _ = cam.project(corners)
-    d = "M" + "L".join("%s %s" % (f1(x), f1(y)) for x, y in xy) + "Z"
-    lines = []
-    for gx in np.arange(cx - w / 2, cx + w / 2 + 0.01, grid):
-        a, _ = cam.project(np.array([[gx, cy - h / 2, 0], [gx, cy + h / 2, 0]]))
-        lines.append("M%s %sL%s %s" % (f1(a[0][0]), f1(a[0][1]), f1(a[1][0]), f1(a[1][1])))
-    for gy in np.arange(cy - h / 2, cy + h / 2 + 0.01, grid):
-        a, _ = cam.project(np.array([[cx - w / 2, gy, 0], [cx + w / 2, gy, 0]]))
-        lines.append("M%s %sL%s %s" % (f1(a[0][0]), f1(a[0][1]), f1(a[1][0]), f1(a[1][1])))
-    mask = ' mask="url(#%s)"' % fade_id if fade_id else ""
-    svg.add('<g%s><path d="%s" fill="%s"/><path d="%s" stroke="%s" stroke-width="1"/>'
-            '<path d="%s" stroke="#2f363b" stroke-width="1"/></g>' % (mask, d, plate_fill, "".join(lines), grid_ink, d))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -561,7 +601,7 @@ LOGO_W = float(re.search(r"width = ([\d.]+)", _LP).group(1))
 LOGO_CAP = float(re.search(r"capHeight = ([\d.]+)", _LP).group(1))
 
 
-def logo(svg: Svg, x, cy, size=14, ink=None, ink2=None, cls="", part=None, word=True) -> float:
+def logo(svg: Svg, x, cy, size=14, ink=None, ink2=None, cls="", part=None, word=True, datum=None) -> float:
     """Logo.qml: the F as a coordinate frame (the origin in datum, the arms in clay) and the wordmark outlines,
     left edge at x, centred on cy. Returns the width."""
     u = size / 48
@@ -569,7 +609,7 @@ def logo(svg: Svg, x, cy, size=14, ink=None, ink2=None, cls="", part=None, word=
     cut = 2 * u if size >= 24 else 0
     clay = part or T["clay"]
     out = ['<g%s>' % (' class="%s"' % cls if cls else "")]
-    out.append('<rect x="%s" y="%s" width="%s" height="%s" fill="%s"/>' % (f1(x), f1(y), "%.2f" % (12 * u), "%.2f" % (12 * u), T["datum"]))
+    out.append('<rect x="%s" y="%s" width="%s" height="%s" fill="%s"/>' % (f1(x), f1(y), "%.2f" % (12 * u), "%.2f" % (12 * u), datum or T["datum"]))
     for rx, ry, rw, rh in ((12 * u + cut, 0, 28 * u - cut, 12 * u), (0, 12 * u + cut, 12 * u, 36 * u - cut), (12 * u, 20 * u, 20 * u, 12 * u)):
         out.append('<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" fill="%s"/>' % (x + rx, y + ry, rw, rh, clay))
     w = 40 * u
@@ -585,663 +625,6 @@ def logo(svg: Svg, x, cy, size=14, ink=None, ink2=None, cls="", part=None, word=
     return w
 
 
-def tag(svg: Svg, x, y, text, kind=None) -> float:
-    """Tag.qml: 17 px, the evidence colour at 11 % behind its own colour, caps."""
-    tint = EVIDENCE.get(kind or text, T["ink2"])
-    w = text_w(text.upper(), 10, 620, ls=0.6) + 12
-    svg.rect(x, y, w, 17, 4, fill=alpha(tint, 0.11) if tint.startswith("#") else tint)
-    svg.text(x + w / 2, y + 12.2, text, 10, 620, tint, anchor="middle", ls=0.6, upper=True)
-    return w
-
-
-def btn(svg: Svg, x, y, text, icon=None, h=28, quiet=True, fill=None, ink=None, size=13, weight=520, cls="", small=False) -> float:
-    """Btn.qml: icon then words, 13 px (12 when small), medium weight."""
-    if small:
-        size, h = 12, 24
-    gap = 5 if small else 6
-    isz = 13 if small else 14
-    w = (text_w(text, size, weight) if text else 0) + ((isz + gap) if icon and text else isz if icon else 0) + ((16 if small else 22) if text else (8 if small else 12))
-    if cls:
-        svg.g(cls)
-    if not quiet:
-        svg.rect(x, y, w, h, 6, fill=fill or T["plate3"], stroke=T["rule2"])
-    ix = x + ((8 if small else 11) if text else (4 if small else 6))
-    if icon:
-        svg.icon(ix + isz / 2, y + h / 2, icon, isz, ink or T["ink2"])
-        ix += isz + gap
-    if text:
-        svg.text(ix, y + h / 2 + size * 0.36, text, size, weight, ink or T["ink"])
-    if cls:
-        svg.end()
-    return w
-
-
-def window(svg: Svg, x, y, w, h, light: bool, r=12):
-    """The window: rounded, a hairline edge and a soft shadow that suits the page behind it."""
-    fid = svg.id("sh")
-    if light:
-        svg.defs.append('<filter id="%s" x="-10%%" y="-10%%" width="120%%" height="130%%"><feGaussianBlur in="SourceAlpha" stdDeviation="14"/>'
-                        '<feOffset dy="10"/><feComponentTransfer><feFuncA type="linear" slope=".22"/></feComponentTransfer>'
-                        '<feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>' % fid)
-    else:
-        svg.defs.append('<filter id="%s" x="-10%%" y="-10%%" width="120%%" height="130%%"><feGaussianBlur in="SourceAlpha" stdDeviation="16"/>'
-                        '<feOffset dy="12"/><feComponentTransfer><feFuncA type="linear" slope=".6"/></feComponentTransfer>'
-                        '<feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>' % fid)
-    svg.rect(x, y, w, h, r, fill=T["plate"], extra=' filter="url(#%s)"' % fid)
-    cid = svg.id("clip")
-    svg.defs.append('<clipPath id="%s"><rect x="%s" y="%s" width="%s" height="%s" rx="%s"/></clipPath>' % (cid, f1(x), f1(y), f1(w), f1(h), r))
-    return cid
-
-
-def window_edge(svg: Svg, x, y, w, h, light: bool, r=12):
-    svg.rect(x + 0.5, y + 0.5, w - 1, h - 1, r, stroke="rgba(0,0,0,.18)" if light else "rgba(255,255,255,.10)")
-
-
-def traffic(svg: Svg, x, y):
-    for i, c in enumerate(("#ff5f57", "#febc2e", "#28c840")):
-        svg.circle(x + i * 20, y, 6, c)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-# The hero: Home, a request typed into the composer, then the workspace building, checking and slicing it
-# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-REQUEST = "A stand for my phone on the desk, leaning back 20°, with a slot for the charging cable"
-
-
-def topbar_home(svg: Svg, W, printer: str):
-    svg.rect(0, 0, W, 44, fill=T["plate1"])
-    svg.rect(0, 43, W, 1, fill=T["rule"])
-    traffic(svg, 20, 22)
-    logo(svg, 90, 22)
-    # right: setup notice, printer, search, settings
-    x = W - 23
-    svg.icon(x, 22, "settings", 15, T["ink2"])
-    x -= 23 + 170
-    svg.rect(x, 9, 170, 26, 6, fill=T["well"], stroke=T["rule2"])
-    svg.icon(x + 15, 22, "search", 13, T["ink3"])
-    svg.text(x + 29, 26.5, "Search", 13, 420, T["ink3"])
-    svg.text(x + 158, 26.5, "⌘K", 11, 420, T["ink3"], anchor="end")
-    pw = text_w(printer, 12, 420)
-    x -= 14 + pw
-    svg.text(x, 26, printer, 12, 420, T["ink2"])
-    svg.icon(x - 13, 22, "printer", 13, T["ink3"])
-    return x - 13
-
-
-def composer(svg: Svg, x, y, w, typing: tuple | None):
-    """StartComposer.qml: a plate with the words, the four ways to add something, and Design it."""
-    h = 148
-    sid = svg.id("csh")
-    svg.defs.append('<filter id="%s" x="-20%%" y="-30%%" width="140%%" height="170%%"><feGaussianBlur in="SourceAlpha" stdDeviation="17"/>'
-                    '<feOffset dy="18"/><feComponentTransfer><feFuncA type="linear" slope=".55"/></feComponentTransfer>'
-                    '<feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>' % sid)
-    svg.rect(x, y, w, h, 22, fill=alpha(T["plate1"], 0.94), stroke=T["rule2"], extra=' filter="url(#%s)"' % sid)
-    if typing:
-        t0, t1, t_send = typing
-        focus = svg.anim([(0, {"opacity": "0"}), (t0 - 0.3, {"opacity": "0"}), (t0, {"opacity": "1"}), (t_send + 0.3, {"opacity": "1"}), (t_send + 0.5, {"opacity": "0"})])
-        svg.rect(x - 4, y - 4, w + 8, h + 8, 26, stroke=alpha(T["datum"], 0.1), sw=4, cls=focus)
-        svg.rect(x + 0.5, y + 0.5, w - 1, h - 1, 21.5, stroke=alpha(T["datum"], 0.5), cls=focus)
-    tx, ty = x + 22, y + 30
-    ph = "Describe it, or drop a photo, a sketch, a part or a link…"
-    if typing:
-        t0, t1, t_send = typing
-        hide = svg.anim([(0, {"opacity": "1"}), (t0 + 0.05, {"opacity": "1"}), (t0 + 0.06, {"opacity": "0"}), (svg.loop - 0.01, {"opacity": "0"})], ease="steps(1)")
-        svg.text(tx, ty + 5, ph, 16, 420, T["ink4"], cls=hide)
-        # the words, revealed character by character (SMIL: discrete widths at each character's advance)
-        n = len(REQUEST)
-        xs = [0.0]
-        for i in range(n):
-            xs.append(text_w(REQUEST[: i + 1], 16, 420))
-        times = [t0 + (t1 - t0) * i / n for i in range(n + 1)]
-        # a slightly human rhythm: pauses after commas
-        cid = svg.id("type")
-        T_ = svg.loop
-        kt = [0.0] + [t / T_ for t in times] + [(t_send + 0.6) / T_, (t_send + 0.6) / T_ + 1e-4, 1.0]
-        vals = [0.0] + xs + [xs[-1], 0.0, 0.0]
-        svg.defs.append('<clipPath id="%s"><rect x="%s" y="%s" width="0" height="30">'
-                        '<animate attributeName="width" dur="%gs" repeatCount="indefinite" calcMode="discrete" keyTimes="%s" values="%s"/>'
-                        '</rect></clipPath>' % (cid, f1(tx - 1), f1(ty - 14), T_, ";".join("%.5f" % k for k in kt),
-                                                ";".join(f1(v + 1) for v in vals)))
-        svg.add('<g clip-path="url(#%s)">' % cid)
-        svg.text(tx, ty + 5, REQUEST, 16, 420, T["ink"])
-        svg.add("</g>")
-        # caret
-        cvals = [0.0] + xs + [xs[-1], 0.0, 0.0]
-        caret_vis = svg.anim([(0, {"opacity": "0"}), (t0 - 0.01, {"opacity": "0"}), (t0, {"opacity": "1"}), (t_send, {"opacity": "1"}), (t_send + 0.01, {"opacity": "0"})], ease="steps(1)")
-        svg.add('<rect x="%s" y="%s" width="1.5" height="19" fill="%s" class="%s"><animate attributeName="x" dur="%gs" repeatCount="indefinite" '
-                'calcMode="discrete" keyTimes="%s" values="%s"/></rect>'
-                % (f1(tx), f1(ty - 10), T["datum"], caret_vis, T_, ";".join("%.5f" % k for k in kt), ";".join(f1(tx + v + 1) for v in cvals)))
-    else:
-        svg.text(tx, ty + 5, ph, 16, 420, T["ink4"])
-    # bottom row
-    by = y + h - 30
-    bx = x + 14
-    for ic, label in (("paperclip", "Photo or file"), ("pen_tool", "Sketch"), ("link", "Link")):
-        bx += btn(svg, bx, by - 14, label, ic) + 4
-    svg.icon(bx + 10, by, "mic", 14, T["ink2"])
-    # Design it: quiet while empty, datum once there are words
-    gw = text_w("Design it", 13, 620) + 44 + 24
-    gx, gy = x + w - 14 - gw, by - 19
-    svg.rect(gx, gy, gw, 38, 19, fill=T["plate2"])
-    svg.text(gx + 22, gy + 23.5, "Design it", 13, 620, T["ink4"])
-    svg.icon(gx + gw - 26, gy + 19, "arrow_right", 13, T["ink4"])
-    if typing:
-        t0, t1, t_send = typing
-        on = svg.anim([(0, {"opacity": "0", "transform": "scale(1)"}), (t0 + 0.08, {"opacity": "0", "transform": "scale(1)"}),
-                       (t0 + 0.26, {"opacity": "1", "transform": "scale(1)"}), (t_send - 0.12, {"opacity": "1", "transform": "scale(1)"}),
-                       (t_send, {"opacity": "1", "transform": "scale(.96)"}), (t_send + 0.14, {"opacity": "1", "transform": "scale(1)"}),
-                       (t_send + 0.5, {"opacity": "1", "transform": "scale(1)"}), (t_send + 0.7, {"opacity": "0", "transform": "scale(1)"})], origin="center")
-        svg.g(on)
-        svg.rect(gx, gy, gw, 38, 19, fill=T["datum"])
-        svg.text(gx + 22, gy + 23.5, "Design it", 13, 620, T["datumInk"])
-        svg.icon(gx + gw - 26, gy + 19, "arrow_right", 13, T["datumInk"])
-        svg.end()
-    return h
-
-
-def seg(svg: Svg, x, y, items, on=0, h=30, size=13) -> float:
-    """Seg.qml: a well with the chosen option raised."""
-    ws = [text_w(t, size, 520) + 20 for t in items]
-    W = sum(ws) + 6
-    svg.rect(x, y, W, h, 7, fill=T["well"], stroke=T["rule"])
-    cx = x + 3
-    for i, (t, w) in enumerate(zip(items, ws)):
-        if i == on:
-            svg.rect(cx, y + 3, w, h - 6, 5, fill=T["plate3"])
-        svg.text(cx + w / 2, y + h / 2 + 4.6, t, size, 520, T["ink"] if i == on else T["ink3"], anchor="middle")
-        cx += w
-    return W
-
-
-def home_scene(svg: Svg, W, H, data, typing):
-    stand, box = data["desk-phone-stand"], data["hinged-box"]
-    printer = stand["state"]["slice_simulated"]["presets"].split(" / ")[0]
-    svg.rect(0, 0, W, H, fill=T["plate"])
-    # the bench: a build plate in perspective behind the hero, darkened toward the edges (Home.qml)
-    cam = Camera(az=-34, el=28.4, target=(0, 0, 0), dist=300)
-    pts = np.array([[-130, -130, 0], [130, -130, 0], [130, 130, 0], [-130, 130, 0]], float)
-    cam.fit(pts, (-40, 230, W + 80, 700))
-    fid = svg.id("fade")
-    svg.defs.append('<radialGradient id="%sg" cx=".5" cy=".42" r=".62"><stop offset="0" stop-color="#fff" stop-opacity=".9"/>'
-                    '<stop offset=".7" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>'
-                    '<mask id="%s"><rect width="%s" height="%s" fill="url(#%sg)"/></mask>' % (fid, fid, W, H, fid))
-    draw_plate(svg, cam, (260, 260), fade_id=fid, grid=10, plate_fill="#22282b", grid_ink="#161a1c")
-    vg = svg.id("vg")
-    svg.defs.append('<linearGradient id="%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%s" stop-opacity=".85"/>'
-                    '<stop offset=".32" stop-color="%s" stop-opacity=".25"/><stop offset=".62" stop-color="%s" stop-opacity=".55"/>'
-                    '<stop offset="1" stop-color="%s"/></linearGradient>' % (vg, T["plate"], T["plate"], T["plate"], T["plate"]))
-    svg.rect(0, 44, W, 640, fill="url(#%s)" % vg)
-    # the scan line crossing the bench now and then
-    sg = svg.id("scan")
-    svg.defs.append('<linearGradient id="%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%s" stop-opacity="0"/>'
-                    '<stop offset=".5" stop-color="%s" stop-opacity=".05"/><stop offset="1" stop-color="%s" stop-opacity="0"/></linearGradient>'
-                    % (sg, T["datum"], T["datum"], T["datum"]))
-    sc = svg.anim([(0, {"transform": "translateY(160px)", "opacity": "0"}), (0.8, {"transform": "translateY(160px)", "opacity": "0"}),
-                   (2.0, {"opacity": "1"}), (4.6, {"opacity": "1"}), (6.0, {"transform": "translateY(560px)", "opacity": "0"})], ease="ease-in-out")
-    svg.rect(0, 0, W, 120, fill="url(#%s)" % sg, cls=sc)
-    topbar_home(svg, W, printer)
-    # setup notice (amber) sits left of the printer in the real bar; left out: it depends on the machine
-    cx = W / 2
-    svg.text(cx, 143, "GOOD AFTERNOON", 10, 620, T["datum"], anchor="middle", ls=1.6)
-    svg.text(cx, 217, "What are we making?", 52, 620, T["ink"], anchor="middle", ls=-2.0)
-    svg.text(cx, 258, "Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD,", 15, 420, T["ink2"], anchor="middle")
-    svg.text(cx, 284.5, "checked and sliced for your printer.", 15, 420, T["ink2"], anchor="middle")
-    cw = 820
-    composer(svg, cx - cw / 2, 328, cw, typing)
-    # under the composer
-    items_y = 491
-    parts = []
-    sw = text_w("For my printer", 12, 520) + text_w("Just a 3D model", 12, 520) + 44 + 6
-    pw = text_w(printer, 12, 520) + 34
-    agent = "Claude Code · Default"
-    aw = text_w(agent, 12, 520) + 34
-    bw = text_w("Start blank", 12, 520) + 34
-    total = sw + 6 + pw + 6 + aw + 6 + 9 + 6 + bw
-    x = cx - total / 2
-    seg(svg, x, items_y, ["For my printer", "Just a 3D model"], size=12)
-    x += sw + 6
-    x += btn(svg, x, items_y + 3, printer, "printer", small=True) + 6
-    x += btn(svg, x, items_y + 3, agent, "sparkles", small=True) + 6
-    svg.rect(x + 4, items_y + 7, 1, 16, fill=T["rule2"])
-    x += 15
-    btn(svg, x, items_y + 3, "Start blank", "square_dashed", small=True)
-    svg.text(cx, 546, "Continue “Hinged box” · r01 · just now  →", 11, 420, T["ink3"], anchor="middle")
-    # designs
-    svg.text(120, 692, "Designs", 18, 620, T["ink"], ls=-0.2)
-    svg.text(120 + text_w("Designs", 18, 620, ls=-0.2) + 12, 692, "2", 12, 420, T["ink3"], family="mono")
-    rx = W - 120
-    svg.icon(rx - 12, 687, "folder_open", 14, T["ink2"])
-    w = text_w("Import…", 13, 520)
-    svg.text(rx - 40 - w, 692, "Import…", 13, 520, T["ink"])
-    svg.icon(rx - 40 - w - 14, 687, "import", 14, T["ink2"])
-    cwid = (W - 240 - 3 * 16) / 4
-    for i, (pid, d) in enumerate((("hinged-box", box), ("desk-phone-stand", stand))):
-        x0 = 120 + i * (cwid + 16)
-        y0 = 718
-        ch = round(cwid * 0.74) + 62
-        clip = svg.id("cc")
-        svg.defs.append('<clipPath id="%s"><rect x="%s" y="%s" width="%s" height="%s" rx="16"/></clipPath>' % (clip, f1(x0), f1(y0), f1(cwid), ch))
-        svg.add('<g clip-path="url(#%s)">' % clip)
-        bg = svg.id("cg")
-        svg.defs.append('<linearGradient id="%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3034"/><stop offset="1" stop-color="#1b2023"/></linearGradient>' % bg)
-        svg.rect(x0, y0, cwid, ch, fill="url(#%s)" % bg)
-        mini(svg, d, (x0, y0, cwid, ch - 62))
-        svg.add("</g>")
-        svg.rect(x0 + 0.5, y0 + 0.5, cwid - 1, ch - 1, 16, stroke=T["rule"])
-    return cam
-
-
-def mini(svg: Svg, d, box):
-    """A design card's live part on its plate (MiniView)."""
-    x0, y0, w, h = box
-    tris = np.concatenate([m["tris"] for m in d["meshes"]])
-    lo, hi = tris.reshape(-1, 3).min(0), tris.reshape(-1, 3).max(0)
-    c = (lo + hi) / 2
-    cam = Camera(az=-34, el=28.4, target=c, dist=400)
-    plate = np.array([[c[0] - 90, c[1] - 90, 0], [c[0] + 90, c[1] + 90, 0], [c[0] - 90, c[1] + 90, 0], [c[0] + 90, c[1] - 90, 0]])
-    cam.fit(plate, (x0 + 0.16 * w, y0 + 0.36 * h, 0.70 * w, 0.51 * h))
-    fid = svg.id("mf")
-    svg.defs.append('<radialGradient id="%sg" cx=".5" cy=".55" r=".55"><stop offset="0" stop-color="#fff" stop-opacity=".9"/>'
-                    '<stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><mask id="%s"><rect x="%s" y="%s" width="%s" height="%s" fill="url(#%sg)"/></mask>'
-                    % (fid, fid, f1(x0), f1(y0), f1(w), f1(h), fid))
-    draw_plate(svg, cam, (180, 180), center=(c[0], c[1]), fade_id=fid, plate_fill="#30373b", grid_ink="#1d2225")
-    fills, edges = draw_solid(cam, tris, svg.w, svg.h, mesh_edges(d))
-    svg.add(fills + edges)
-
-
-def wrap(s: str, width: float, size=13, weight=420) -> list:
-    out, cur = [], ""
-    for word in s.split(" "):
-        t = (cur + " " + word).strip()
-        if text_w(t, size, weight) > width and cur:
-            out.append(cur)
-            cur = word
-        else:
-            cur = t
-    if cur:
-        out.append(cur)
-    return out
-
-
-def elide(s: str, width: float, size=13, weight=420, family="sans") -> str:
-    if text_w(s, size, weight, family) <= width:
-        return s
-    while s and text_w(s + "…", size, weight, family) > width:
-        s = s[:-1]
-    return s.rstrip() + "…"
-
-
-def fmt_min(m: float) -> str:
-    m = int(round(m))
-    return "%d h %d min" % (m // 60, m % 60) if m >= 60 else "%d min" % m
-
-
-def stand_facts(d) -> dict:
-    s = d["state"]
-    sl = s["slice_simulated"]
-    checks = [parse_check(c) for c in s["checks"]]
-    v = d["view"]
-    lo, hi = np.array(v["bbox"][0]), np.array(v["bbox"][1])
-    size = hi - lo
-    ev = {}
-    for c in checks:
-        ev[c["evidence"]] = ev.get(c["evidence"], 0) + 1
-    mix_ = " · ".join("%d %s" % (n, e) for e, n in ev.items())
-    return {"name": s["name"], "rev": "r%02d" % s["head"], "checks": checks, "mix": mix_,
-            "time": fmt_min(sl["time_min"]), "grams": "%.1f g" % sl["filament_g"], "layers": str(sl["layers"]),
-            "slicer": sl["slicer"], "presets": sl["presets"], "faces": v["faces"],
-            "size": " × ".join("%.1f" % x for x in size), "volume": "%.1f cm³" % (v["volume_mm3"] / 1000),
-            "dims": size, "printer": sl["presets"].split(" / ")[0],
-            "zmax": "%.1f" % hi[2], "recipe": s["recipe"], "next": s.get("next_best_actions", []),
-            "params": s["parameters"]}
-
-
-def workspace_scene(svg: Svg, W, H, d, t0: float, end: float):
-    """Workspace.qml with the conversation, the viewport and the Prove stage, filling in as the engine answers."""
-    F = stand_facts(d)
-    ok = [c for c in F["checks"] if c["status"] == "PASS"]
-    svg.rect(0, 0, W, H, fill=T["plate"])
-    # ── viewport: the bench and the part ──
-    vx0, vx1 = 340, 1040
-    bg = svg.id("vpg")
-    svg.defs.append('<radialGradient id="%s" cx=".5" cy=".3" r=".8"><stop offset="0" stop-color="#22272a"/><stop offset="1" stop-color="#141719"/></radialGradient>' % bg)
-    svg.rect(vx0, 44, vx1 - vx0, H - 44, fill="url(#%s)" % bg)
-    tris = np.concatenate([m["tris"] for m in d["meshes"]])
-    lo, hi = tris.reshape(-1, 3).min(0), tris.reshape(-1, 3).max(0)
-    c = (lo + hi) / 2
-    rad = max(np.linalg.norm(hi - lo) / 2, 12)
-    cam = Camera(az=-34, el=28.4, target=c, dist=rad / math.sin(math.radians(13)) * 1.5)
-    cam.fit(tris.reshape(-1, 3), (513, 322, 396, 414))
-    clipv = svg.id("vc")
-    svg.defs.append('<clipPath id="%s"><rect x="%s" y="44" width="%s" height="%s"/></clipPath>' % (clipv, vx0, vx1 - vx0, H - 44))
-    svg.add('<g clip-path="url(#%s)">' % clipv)
-    pf = svg.id("pf")
-    svg.defs.append('<radialGradient id="%sg" cx=".52" cy=".62" r=".6"><stop offset="0" stop-color="#fff" stop-opacity="1"/>'
-                    '<stop offset=".75" stop-color="#fff" stop-opacity=".6"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>'
-                    '<mask id="%s"><rect x="%s" y="44" width="%s" height="%s" fill="url(#%sg)"/></mask>' % (pf, pf, vx0, vx1 - vx0, H - 44, pf))
-    draw_plate(svg, cam, (180, 180), fade_id=pf, plate_fill="#2a3034", grid_ink="#1b2023")
-    fills, edges = draw_solid(cam, tris, W, H, d["edges"])
-    # the build grows up from the plate, feature by feature, in build order: a rising cut with the datum line on it
-    xy, _ = cam.project(tris.reshape(-1, 3))
-    top, bot = xy[:, 1].min() - 6, xy[:, 1].max() + 6
-    bid = svg.id("build")
-    T_ = svg.loop
-    g0, g1 = t0 + 0.5, t0 + 2.3
-    kt = [0, g0 / T_, g1 / T_, (end - 0.01) / T_, end / T_, 1]
-    hv = [0, 0, bot - top, bot - top, 0, 0]
-    yv = [bot, bot, top, top, bot, bot]
-    svg.defs.append('<clipPath id="%s"><rect x="%s" y="%s" width="%s" height="0">'
-                    '<animate attributeName="height" dur="%gs" repeatCount="indefinite" keyTimes="%s" values="%s" calcMode="spline" keySplines="%s"/>'
-                    '<animate attributeName="y" dur="%gs" repeatCount="indefinite" keyTimes="%s" values="%s" calcMode="spline" keySplines="%s"/>'
-                    '</rect></clipPath>'
-                    % (bid, vx0, f1(bot), vx1 - vx0, T_, ";".join("%.4f" % k for k in kt), ";".join(f1(v) for v in hv),
-                       ";".join(["0 0 1 1", ".3 .7 .2 1", "0 0 1 1", "0 0 1 1", "0 0 1 1"]),
-                       T_, ";".join("%.4f" % k for k in kt), ";".join(f1(v) for v in yv),
-                       ";".join(["0 0 1 1", ".3 .7 .2 1", "0 0 1 1", "0 0 1 1", "0 0 1 1"])))
-    svg.add('<g clip-path="url(#%s)">%s%s</g>' % (bid, fills, edges))
-    # the cut line, glowing while it rises
-    scan = svg.anim([(0, {"transform": "translateY(%gpx)" % (bot - top), "opacity": "0"}), (g0, {"transform": "translateY(%gpx)" % (bot - top), "opacity": "0"}),
-                     (g0 + 0.1, {"opacity": "1"}), (g1 - 0.1, {"transform": "translateY(0px)", "opacity": "1"}), (g1 + 0.3, {"transform": "translateY(0px)", "opacity": "0"})],
-                    ease="cubic-bezier(.3,.7,.2,1)")
-    sx0, sx1 = xy[:, 0].min() - 30, xy[:, 0].max() + 30
-    lg = svg.id("sl")
-    svg.defs.append('<linearGradient id="%s" x1="0" x2="1"><stop offset="0" stop-color="%s" stop-opacity="0"/><stop offset=".2" stop-color="%s"/>'
-                    '<stop offset=".8" stop-color="%s"/><stop offset="1" stop-color="%s" stop-opacity="0"/></linearGradient>' % (lg, T["datum"], T["datum"], T["datum"], T["datum"]))
-    svg.add('<g class="%s"><rect x="%s" y="%s" width="%s" height="1.5" fill="url(#%s)"/><rect x="%s" y="%s" width="%s" height="26" fill="url(#%s)" opacity=".07"/></g>'
-            % (scan, f1(sx0), f1(top), f1(sx1 - sx0), lg, f1(sx0), f1(top), f1(sx1 - sx0), lg))
-    # overall dimensions (Store.dims): three mint lines with their values, from the solid's box
-    dims = svg.show(g1 + 0.1, end - 0.3)
-    svg.g(dims)
-    L, Hh, D = F["dims"]
-    blo, bhi = np.array(d["view"]["bbox"][0]), np.array(d["view"]["bbox"][1])
-    off = 9
-    lines = [((blo[0] - off, blo[1], 0), (blo[0] - off, blo[1], bhi[2]), "%.1f" % bhi[2] if False else "%.1f" % (bhi[2] - blo[2])),
-             ((blo[0] - off, blo[1], 0), (blo[0] - off, bhi[1], 0), "%.1f" % (bhi[1] - blo[1])),
-             ((blo[0], blo[1] - off, 0), (bhi[0], blo[1] - off, 0), "%.1f" % (bhi[0] - blo[0]))]
-    # Viewport.qml stands the height on the corner nearest the camera's left; the depth runs along it, the width across the front
-    lines[0] = ((blo[0] - off, bhi[1] - 0, 0), (blo[0] - off, bhi[1], bhi[2]), "%.1f" % (bhi[2] - blo[2]))
-    lines[1] = ((blo[0] - off, blo[1], 0), (blo[0] - off, bhi[1], 0), "%.1f" % (bhi[1] - blo[1]))
-    lines[2] = ((blo[0], blo[1] - off, 0), (bhi[0], blo[1] - off, 0), "%.1f" % (bhi[0] - blo[0]))
-    for a, b, label in lines:
-        (p, q), _ = cam.project(np.array([a, b]))
-        svg.line(p[0], p[1], q[0], q[1], alpha(T["datum"], 0.55), 1)
-        mx, my = (p + q) / 2
-        w = text_w(label, 12, 520, "mono") + 10
-        svg.rect(mx - w / 2, my - 10, w, 20, 5, fill=alpha(T["plate"], 0.92), stroke=alpha(T["datum"], 0.45))
-        svg.text(mx, my + 4.3, label, 12, 520, T["ink"], family="mono", anchor="middle")
-    svg.end()
-    svg.add("</g>")
-    # rail
-    svg.rect(352, 58, 40, 365, 9, fill=alpha(T["plate1"], 0.92), stroke=T["rule"])
-    ys = [75, 106, 137, 168, 199, 230, 271, 302, 343, 374, 405]
-    icons = ["mouse_pointer_2", "pencil_ruler", "map_pin", "scissors", "scan_line", "history", "layers", "camera", "maximize_2", "ruler", "box"]
-    for yy, ic in zip(ys, icons):
-        if ic == "mouse_pointer_2":
-            svg.rect(356, yy - 14, 32, 28, 6, fill=T["washOn"])
-        svg.icon(372, yy, ic, 15, T["datum"] if ic == "mouse_pointer_2" else T["ink2"])
-    svg.rect(358, 250, 28, 1, fill=T["rule2"])
-    svg.rect(358, 322, 28, 1, fill=T["rule2"])
-    # view switch
-    vs = ["Iso", "Front", "Side", "Top", "Under"]
-    ws = [text_w(v, 12, 520) + 16 for v in vs]
-    x = 1027 - sum(ws) - 4
-    svg.rect(x, 58, sum(ws) + 4, 26, 6, fill=alpha(T["plate1"], 0.92), stroke=T["rule"])
-    x += 2
-    for i, (v, w) in enumerate(zip(vs, ws)):
-        if i == 0:
-            svg.rect(x, 60, w, 22, 5, fill=T["plate3"])
-        svg.text(x + w / 2, 75.2, v, 12, 520, T["ink"] if i == 0 else T["ink2"], anchor="middle")
-        x += w
-    # size line
-    sz = svg.show(g1 + 0.1, end - 0.3)
-    svg.g(sz)
-    x = svg.text(356, 851, "%s mm" % F["size"], 12, 420, T["ink2"], family="mono")
-    svg.text(356 + x + 8, 851, "· %s ·" % F["volume"], 12, 420, T["ink2"], family="mono")
-    x2 = text_w("· %s ·" % F["volume"], 12, 420, "mono")
-    svg.text(356 + x + 16 + x2, 851, "plate 180 × 180", 12, 420, T["ink3"])
-    svg.end()
-    # pipeline strip: each step lights as the engine finishes it
-    svg.rect(353, 866, 674, 48, 9, fill=alpha(T["plate1"], 0.92), stroke=T["rule"])
-    steps = [("Parameters", F["rev"], t0 + 0.4), ("Solid", "%d faces" % F["faces"], g1), ("Exports", ".step .stl .obj .glb", g1 + 0.5),
-             ("Checks", "%d pass" % len(ok), t0 + 3.2 + 0.16 * len(ok)), ("Slice", F["time"], t0 + 5.5), ("Release", "ready", t0 + 5.9)]
-    xs = [369, 471, 549, 704, 787, 876]
-    for (label, sub, tt), x in zip(steps, xs):
-        svg.circle(x, 880, 3, T["ink4"])
-        svg.circle(x, 880, 3, T["datum"] if label != "Release" else T["ink3"], cls=svg.show(tt, end - 0.2, 0.12))
-        svg.text(x + 9, 884.3, label, 12, 620, T["ink"])
-        svg.text(x - 1, 904, sub, 11, 420, T["ink2"], family="mono", cls=svg.show(tt, end - 0.2, 0.18))
-    for x in xs[1:]:
-        svg.rect(x - 16, 883, 6, 1, fill=T["ink4"])
-    svg.text(952, 892, "AUTO", 10, 620, T["ink3"], ls=0.9)
-    svg.rect(991, 881, 27, 16, 8, fill=T["datum"])
-    svg.circle(1010, 889, 6, T["datumInk"])
-
-    # ── top bar ──
-    svg.rect(0, 0, W, 44, fill=T["plate1"])
-    svg.rect(0, 43, W, 1, fill=T["rule"])
-    traffic(svg, 20, 22)
-    svg.icon(94, 22, "panel_left_close", 15, T["ink2"])
-    logo(svg, 124, 22, ink=T["ink2"], ink2=T["ink3"])
-    svg.text(228, 27, "/", 13, 420, T["ink4"])
-    w = svg.text(242, 27, F["name"], 13, 620, T["ink"])
-    w2 = svg.text(242 + w + 10, 27, F["rev"], 13, 420, T["ink2"], family="mono")
-    tag(svg, 242 + w + 20 + w2, 13.5, "UNRELEASED", "x")
-    x = W - 23
-    svg.icon(x, 22, "settings", 15, T["ink2"])
-    x -= 23 + 170
-    svg.rect(x, 9, 170, 26, 6, fill=T["well"], stroke=T["rule2"])
-    svg.icon(x + 15, 22, "search", 13, T["ink3"])
-    svg.text(x + 29, 26.5, "Search", 13, 420, T["ink3"])
-    svg.text(x + 158, 26.5, "⌘K", 11, 420, T["ink3"], anchor="end")
-    pw = text_w(F["printer"], 12, 420)
-    x -= 14 + pw
-    svg.text(x, 26, F["printer"], 12, 420, T["ink2"])
-    svg.icon(x - 13, 22, "printer", 13, T["ink3"])
-
-    # ── the conversation ──
-    svg.rect(0, 44, 340, H - 44, fill=T["plate1"])
-    svg.rect(340, 44, 1, H - 44, fill=T["rule"])
-    svg.circle(19, 62, 3, T["datum"])
-    nm = elide(REQUEST, 250, 13, 620)
-    w = svg.text(31, 66.6, nm, 13, 620, T["ink"])
-    svg.icon(31 + w + 10, 62, "chevron_down", 12, T["ink3"])
-    svg.icon(318, 62, "message_square_plus", 14, T["ink3"])
-    svg.rect(0, 84, 340, 1, fill=T["rule"])
-    # the request, as you sent it
-    bw = 340 - 16 - 56
-    lines_ = wrap(REQUEST, bw - 28, 13)
-    bh = 20 + len(lines_) * 19
-    u = svg.show(t0 + 0.05, end, rise=8)
-    svg.g(u)
-    svg.rect(340 - 16 - bw, 102, bw, bh, 14, fill=T["plate2"], stroke=T["rule"])
-    for i, ln in enumerate(lines_):
-        svg.text(340 - 16 - bw + 14, 102 + 24 + i * 19, ln, 13, 420, T["ink"])
-    svg.end()
-    y = 102 + bh + 22
-    # the agent's tool calls (TalkSteps.qml), then what it says
-    rows = [("cuboid", "Started a design from the %s recipe" % F["recipe"], "create_project", t0 + 0.6),
-            ("eye", "Looked at the iso view", "render", g1 + 0.2),
-            ("play", "Ran the pipeline", "run_pipeline", g1 + 0.6)]
-    hdr = svg.show(t0 + 0.4, end, rise=4)
-    svg.g(hdr)
-    svg.icon(23, y, "chevron_right", 13, T["ink3"])
-    svg.text(37, y + 4, "4 steps", 11, 550, T["ink2"])
-    svg.text(37 + text_w("4 steps", 11, 550) + 8, y + 4, "1 folded", 11, 420, T["ink4"])
-    svg.end()
-    y += 22
-    for ic, text, tool, tt in rows:
-        cl = svg.show(tt, end, rise=4)
-        svg.g(cl)
-        svg.rect(24, y - 11, 1, 22, fill=T["rule2"])
-        svg.icon(40, y, ic, 12, T["ink2"])
-        svg.text(54, y + 4.2, text, 12, 420, T["ink2"])
-        svg.end()
-        y += 24
-    y += 14
-    say = ("All %d checks pass on %s. The slice is %s and %s of filament, %s layers. Your phone's thickness is assumed "
-           "at %s: measure it with calipers before you print." % (len(ok), F["rev"], F["time"], F["grams"], F["layers"],
-                                                                 F["params"]["device_thickness"].split(" (")[0]))
-    reply = svg.show(t0 + 6.1, end, rise=6)
-    svg.g(reply)
-    for i, ln in enumerate(wrap(say, 300, 13)):
-        svg.text(16, y + i * 20, ln, 13, 420, T["ink"])
-    svg.end()
-    # composer at the bottom of the column
-    svg.rect(13, 806, 315, 93, 14, fill=T["plate2"], stroke=T["rule2"])
-    svg.text(29, 828, "Ask about %s, or describe a" % F["name"], 13, 420, T["ink3"])
-    svg.text(29, 846, "change…", 13, 420, T["ink3"])
-    svg.icon(29, 879, "paperclip", 13, T["ink3"])
-    w = svg.text(48, 883.5, "Claude Code · Default", 13, 420, T["ink"])
-    svg.icon(48 + w + 10, 879, "chevron_down", 11, T["ink3"])
-    svg.circle(305, 880, 13, T["plate3"])
-    svg.icon(305, 880, "arrow_up", 12, T["ink3"])
-    svg.text(16, 917, "Enter sends · Shift+Enter for a new line · drop files to attach", 11, 420, T["ink3"])
-
-    # ── the inspector: stages, then Prove ──
-    px = 1040
-    svg.rect(px, 44, 400, H - 44, fill=T["plate1"])
-    svg.rect(px, 44, 1, H - 44, fill=T["rule"])
-    tabs = [("01", "Brief", "0/6 measured"), ("02", "Shape", "%d features" % 3), ("03", "Fit", "100% modelled"),
-            ("04", "Prove", "All pass"), ("05", "Release", "Ready")]
-    tabs[1] = ("02", "Shape", "4 features")
-    cxs = [1087, 1162, 1241, 1318, 1392]
-    svg.rect(1287, 52, 64, 47, 8, fill=T["washOn"])
-    for (n, t, s), cx_ in zip(tabs, cxs):
-        on = t == "Prove"
-        wn = text_w(n, 9, 420, "mono")
-        wt = text_w(t, 13, 620)
-        x0 = cx_ - (wn + 4 + wt) / 2
-        svg.text(x0, 70, n, 9, 420, T["ink4"], family="mono")
-        svg.text(x0 + wn + 4, 70, t, 13, 620, T["ink"] if on else T["ink2"])
-        col = T["pass"] if t in ("Fit", "Prove") else T["ink3"]
-        svg.text(cx_, 88, s, 10, 420, col, anchor="middle")
-    svg.rect(px, 108, 400, 1, fill=T["rule"])
-    head = svg.show(t0 + 3.2 + 0.16 * len(ok), end)
-    svg.circle(1063, 126, 3, T["pass"], cls=head)
-    svg.text(1076, 130.5, "All %d checks pass for %s." % (len(ok), F["rev"]), 13, 420, T["ink2"], cls=head)
-    run = svg.anim([(0, {"opacity": "0"}), (t0 + 0.4, {"opacity": "0"}), (t0 + 0.6, {"opacity": "1"}),
-                    (t0 + 3.2 + 0.16 * len(ok), {"opacity": "1"}), (t0 + 3.4 + 0.16 * len(ok), {"opacity": "0"})])
-    svg.circle(1063, 126, 3, T["datum"], cls=run)
-    svg.text(1076, 130.5, "Building %s, checking it, slicing it…" % F["rev"], 13, 420, T["ink3"], cls=run)
-    svg.rect(px, 147, 400, 1, fill=T["rule"])
-    # the score
-    ck0 = t0 + 3.0
-    for j, (lab, colr, n) in enumerate((("pass", T["pass"], len(ok)), ("to review", T["amber"], 0), ("failed", T["signal"], 0))):
-        x = 1060 + j * 120
-        if j == 0:
-            for k in range(n + 1):
-                a = ck0 + 0.16 * k
-                b = ck0 + 0.16 * (k + 1) if k < n else end - 0.2
-                cls = svg.anim([(0, {"opacity": "1" if k == 0 else "0"}), (a - 0.001, {"opacity": "1" if k == 0 else "0"}), (a, {"opacity": "1"}),
-                                (b, {"opacity": "1"}), (b + 0.001, {"opacity": "1" if (k == 0 and b >= end - 0.2) else "0"})], ease="steps(1)")
-                svg.text(x, 198, str(k), 30, 600, colr if k else T["ink4"], family="mono", ls=-0.6, cls=cls)
-        else:
-            svg.text(x, 198, "0", 30, 600, T["ink4"], family="mono", ls=-0.6)
-        svg.text(x, 222, lab, 10, 620, T["ink2"] if (j == 0) else T["ink4"], ls=0.9, upper=True)
-    svg.rect(1060, 241, 356, 4, 2, fill=T["rule"])
-    bar = svg.anim([(0, {"transform": "scaleX(0)"}), (ck0, {"transform": "scaleX(0)"}), (ck0 + 0.16 * len(ok), {"transform": "scaleX(1)"}),
-                    (end - 0.2, {"transform": "scaleX(1)"}), (end, {"transform": "scaleX(0)"})], ease="linear", origin="left")
-    svg.rect(1060, 241, 356, 4, 2, fill=T["pass"], cls=bar)
-    for i, ln in enumerate(wrap("Checks for %s · %s. Each says how it is known." % (F["rev"], F["mix"]), 356, 11)):
-        svg.text(1060, 268 + i * 17, ln, 11, 420, T["ink3"])
-    svg.rect(1060, 300, 360, 1, fill=T["rule"])
-    # passed, one line each with its evidence class
-    svg.icon(1066, 318, "chevron_down", 11, T["ink3"])
-    svg.text(1080, 321.6, "PASSED", 10, 620, T["ink3"], ls=0.9)
-    svg.text(1420, 321.6, "%d · %s" % (len(ok), F["mix"]), 11, 420, T["ink3"], anchor="end")
-    y = 334
-    for i, c in enumerate(ok):
-        cl = svg.show(ck0 + 0.16 * (i + 1) - 0.1, end - 0.2, 0.16, rise=4)
-        svg.g(cl)
-        tag(svg, 1060, y + 7, c["evidence"], c["evidence"])
-        lab = c["label"]
-        val = c["value"]
-        val = elide(val, 128, 12, 420, "mono")
-        vw = text_w(val, 12, 420, "mono")
-        lab = elide(lab, 268 - vw, 13, 420)
-        svg.text(1144, y + 20, lab, 13, 420, T["ink"])
-        svg.text(1420, y + 19.5, val, 12, 420, T["ink2"], family="mono", anchor="end")
-        svg.end()
-        y += 30
-    y += 8
-    svg.rect(1060, y, 360, 1, fill=T["rule"])
-    # the slice
-    sl = svg.show(t0 + 5.5, end - 0.2, rise=6)
-    svg.g(sl)
-    y += 30
-    svg.text(1060, y, "SLICE OF %s" % F["rev"].upper(), 10, 620, T["ink3"], ls=0.9)
-    tag(svg, 1420 - text_w("SIMULATED", 10, 620, ls=0.6) - 12, y - 12, "simulated", "simulated")
-    y += 34
-    for j, (big, small) in enumerate(((F["time"], "estimated print time"), (F["grams"], "of filament"), (F["layers"], "layers to %s mm" % F["zmax"]))):
-        x = 1060 + j * 120
-        svg.text(x, y, big, 18, 600, T["ink"], family="mono", ls=-0.3)
-        svg.text(x, y + 22, small, 11, 420, T["ink3"])
-    y += 46
-    w = btn(svg, 1060, y, "Watch it print", "play", h=28, quiet=False)
-    btn(svg, 1060 + w + 8, y, "Inspect layers", "layers", h=28, quiet=False)
-    y += 52
-    for i, ln in enumerate(wrap("A slice shows the toolpaths %s would send with these presets. It is not a print: adhesion, "
-                                "warping and fit are only known after printing." % "Bambu Studio", 356, 11)):
-        svg.text(1060, y + i * 17, ln, 11, 420, T["ink3"])
-    svg.end()
-
-
-def hero(data, light: bool):
-    W, H, M = 1440, 928, 28
-    loop = 17.0
-    svg = Svg(W + 2 * M, H + 2 * M + 8, loop, "Form Studio")
-    cid = window(svg, M, M, W, H, light)
-    svg.add('<g clip-path="url(#%s)"><g transform="translate(%d %d)">' % (cid, M, M))
-    t_type0, t_type1, t_send = 0.9, 4.6, 5.2
-    home_g = svg.anim([(0, {"opacity": "1"}), (t_send + 0.25, {"opacity": "1"}), (t_send + 0.5, {"opacity": "0"}),
-                       (loop - 0.55, {"opacity": "0"}), (loop - 0.05, {"opacity": "1"})], ease="cubic-bezier(.23,1,.32,1)")
-    work_g = svg.anim([(0, {"opacity": "0"}), (t_send + 0.2, {"opacity": "0"}), (t_send + 0.5, {"opacity": "1"}),
-                       (loop - 0.55, {"opacity": "1"}), (loop - 0.05, {"opacity": "0"})])
-    svg.add('<g class="%s">' % work_g)
-    workspace_scene(svg, W, H, data["desk-phone-stand"], t_send + 0.3, loop - 0.4)
-    svg.add('</g><g class="%s">' % home_g)
-    home_scene(svg, W, H, data, (t_type0, t_type1, t_send))
-    svg.add("</g></g></g>")
-    window_edge(svg, M, M, W, H, light)
-    F = stand_facts(data["desk-phone-stand"])
-    desc = ("Form Studio, drawn from the app: on Home a request is typed into the composer and sent; the workspace opens, "
-            "the %s is built by the CAD kernel (%s mm), %d checks pass, and the slicer estimates %s and %s."
-            % (F["name"].lower(), F["size"], len(F["checks"]), F["time"], F["grams"]))
-    return svg.render(desc), desc
-
-
-# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-# Cards: one piece of the app each, at its real size
-# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-CW, CH, CM = 680, 420, 20          # card content, margin around the window
-
-
-def card(loop: float, title: str, light: bool):
-    svg = Svg(CW + 2 * CM, CH + 2 * CM + 6, loop, title)
-    cid = window(svg, CM, CM, CW, CH, light, r=12)
-    svg.add('<g clip-path="url(#%s)"><g transform="translate(%d %d)">' % (cid, CM, CM))
-    return svg
-
-
-def card_end(svg: Svg, light: bool):
-    svg.add("</g></g>")
-    window_edge(svg, CM, CM, CW, CH, light, r=12)
-
-
-def viewport_bg(svg: Svg, x, y, w, h):
-    bg = svg.id("vpg")
-    svg.defs.append('<radialGradient id="%s" cx=".5" cy=".3" r=".85"><stop offset="0" stop-color="#23282b"/><stop offset="1" stop-color="#131618"/></radialGradient>' % bg)
-    svg.rect(x, y, w, h, fill="url(#%s)" % bg)
-
-
-def plate_mask(svg: Svg, x, y, w, h, cx=".5", cy=".6") -> str:
-    pf = svg.id("pf")
-    svg.defs.append('<radialGradient id="%sg" cx="%s" cy="%s" r=".62"><stop offset="0" stop-color="#fff"/>'
-                    '<stop offset=".72" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>'
-                    '<mask id="%s"><rect x="%s" y="%s" width="%s" height="%s" fill="url(#%sg)"/></mask>' % (pf, cx, cy, pf, x, y, w, h, pf))
-    return pf
-
-
 def rot(axis, ang):
     a = np.asarray(axis, float)
     a /= np.linalg.norm(a)
@@ -1250,118 +633,6 @@ def rot(axis, ang):
     return np.array([[c + x * x * (1 - c), x * y * (1 - c) - z * s, x * z * (1 - c) + y * s],
                      [y * x * (1 - c) + z * s, c + y * y * (1 - c), y * z * (1 - c) - x * s],
                      [z * x * (1 - c) - y * s, z * y * (1 - c) + x * s, c + z * z * (1 - c)]])
-
-
-def hinge_card(data, light: bool):
-    """The hinged box assembled, its lid swept through the joint's range, with the joint slider and the sweep's check."""
-    d = data["hinged-box"]
-    asm = d["asm"]
-    joint = asm["joints"][0]
-    lid = next(p for p in asm["parts"] if p["id"] == joint["part"])
-    M = np.array(lid["placement"]["m"])
-    lo_deg, hi_deg = joint["range"]
-    check = next(parse_check(c) for c in d["state"]["checks"] if joint["label"] in c and "moves" in c)
-    body_t = np.concatenate([m["tris"] for m in d["meshes"] if m["part"] != lid["id"]])
-    lid_t = np.concatenate([m["tris"] for m in d["meshes"] if m["part"] == lid["id"]])
-    lid_a = lid_t @ M[:, :3].T + M[:, 3]
-    be = d["part_edges"].get("body")
-    le = d["part_edges"].get(lid["id"])
-    le_a = le @ M[:, :3].T + M[:, 3] if le is not None else None
-    o = np.array(joint["origin"])
-    N = 14
-    angles = [lo_deg + (hi_deg - lo_deg) * (1 - math.cos(math.pi * i / (N - 1))) / 2 for i in range(N)]
-    loop = 7.6
-    svg = card(loop, "Lid hinge", light)
-    viewport_bg(svg, 0, 0, CW, CH)
-    # frame the open and closed box together, the way the viewport frames an assembly
-    allp = [body_t.reshape(-1, 3)]
-    for a in (angles[0], angles[-1]):
-        R = rot(joint["axis"], math.radians(a))
-        allp.append((lid_a.reshape(-1, 3) - o) @ R.T + o)
-    allp = np.concatenate(allp)
-    lo, hi = allp.min(0), allp.max(0)
-    cam = Camera(az=-34, el=24, target=(lo + hi) / 2, dist=420)
-    cam.fit(allp, (170, 70, 360, 300))
-    c = (lo + hi) / 2
-    draw_plate(svg, cam, (180, 180), center=(0, 0), fade_id=plate_mask(svg, 0, 0, CW, CH), plate_fill="#2a3034", grid_ink="#1b2023")
-    # frames: closed, opening, open, closing, closed
-    hold0, move, hold1 = 0.7, 2.4, 0.9
-    step = move / (N - 1)
-    seq = [(0, 0.0, hold0)]
-    t = hold0
-    for i in range(1, N):
-        seq.append((i, t, t + step))
-        t += step
-    seq[-1] = (N - 1, seq[-1][1], t + hold1)
-    t += hold1
-    for i in range(N - 2, -1, -1):
-        seq.append((i, t, t + step))
-        t += step
-    seq[-1] = (0, seq[-1][1], loop)
-    classes = []
-    for i in range(N):
-        iv = [(s, e) for j, s, e in seq if j == i]
-        fr = [(0, {"opacity": "1" if iv[0][0] == 0 else "0"})]
-        for s, e in iv:
-            if s > 0:
-                fr += [(s - 1e-3, {"opacity": "0"}), (s, {"opacity": "1"})]
-            if e < loop:
-                fr += [(e, {"opacity": "1"}), (e + 1e-3, {"opacity": "0"})]
-            else:
-                fr += [(loop, {"opacity": "1"})]
-        classes.append(svg.anim(fr, ease="steps(1)"))
-    for i, a in enumerate(angles):
-        R = rot(joint["axis"], math.radians(a))
-        lt = (lid_a - o) @ R.T + o
-        tris = np.concatenate([body_t, lt])
-        ed = None
-        if be is not None and le_a is not None:
-            ed = np.concatenate([be, (le_a - o) @ R.T + o])
-        fills, edges = draw_solid(cam, tris, svg.w, svg.h, ed)
-        svg.add('<g class="%s">%s%s</g>' % (classes[i], fills, edges))
-    # the HUD: arrangement and the joint's slider (HudSlider.qml)
-    seg(svg, 14, 14, ["Assembled", "Exploded", "Print layout"], on=0, h=26, size=12)
-    sx = 14 + sum(text_w(t, 12, 520) + 20 for t in ["Assembled", "Exploded", "Print layout"]) + 6 + 8
-    lw = text_w(joint["label"], 12)
-    sw = lw + 118 + 30 + 30
-    svg.rect(sx, 14, sw, 26, 6, fill=alpha(T["plate1"], 0.9), stroke=T["rule"])
-    svg.text(sx + 10, 31.3, joint["label"], 12, 420, T["ink2"])
-    tx0 = sx + 10 + lw + 10
-    svg.rect(tx0, 26, 110, 2, 1, fill=T["rule2"])
-    for i, a in enumerate(angles):
-        f = (a - lo_deg) / (hi_deg - lo_deg)
-        g = svg.id("hs")
-        svg.add('<g class="%s">' % classes[i])
-        svg.rect(tx0, 26, 110 * f, 2, 1, fill=T["datum"])
-        svg.circle(tx0 + 110 * f, 27, 6, T["ink"])
-        svg.text(sx + sw - 10, 31, "%d°" % round(a), 11, 420, T["ink"], family="mono", anchor="end")
-        svg.add("</g>")
-    # views
-    vs = ["Iso", "Front", "Side", "Top"]
-    ws_ = [text_w(v, 12, 520) + 16 for v in vs]
-    x = CW - 14 - sum(ws_) - 4
-    svg.rect(x, 14, sum(ws_) + 4, 26, 6, fill=alpha(T["plate1"], 0.92), stroke=T["rule"])
-    x += 2
-    for k, (v, w) in enumerate(zip(vs, ws_)):
-        if k == 0:
-            svg.rect(x, 16, w, 22, 5, fill=T["plate3"])
-        svg.text(x + w / 2, 31.2, v, 12, 520, T["ink"] if k == 0 else T["ink2"], anchor="middle")
-        x += w
-    # the check the sweep produced
-    y = CH - 48
-    lab = check["label"]
-    val = check["value"]
-    w = text_w(lab, 13) + text_w(val, 12, 420, "mono") + 92 + 40
-    svg.rect(14, y, w, 34, 9, fill=alpha(T["plate1"], 0.92), stroke=T["rule"])
-    tag(svg, 24, y + 8.5, check["evidence"], check["evidence"])
-    svg.text(108, y + 21.5, lab, 13, 420, T["ink"])
-    svg.text(14 + w - 12, y + 21.3, val, 12, 420, T["ink2"], family="mono", anchor="end")
-    svg.circle(CW - 30, y + 17, 3, T["pass"])
-    svg.text(CW - 40, y + 21.3, "%s · %s" % (d["state"]["name"], "r%02d" % d["state"]["head"]), 12, 420, T["ink3"], anchor="end")
-    card_end(svg, light)
-    desc = ("The %s's lid swung through its %s range, %d to %d degrees, drawn from the CAD kernel's meshes; the sweep check: %s, %s."
-            % (d["state"]["name"].lower(), joint["label"].lower(), lo_deg, hi_deg, lab.lower(), val))
-    return svg.render(desc), desc
 
 
 def chain(segs: np.ndarray, tol=1e-3) -> list:
@@ -1400,272 +671,879 @@ TYPE_INK = {"Outer wall": T["ink"], "Inner wall": T["ink3"], "Sparse infill": T[
             "Overhang wall": T["signal"], "Floating vertical shell": "#ff9678", "Gap infill": T["ink4"]}
 
 
-def fmt_clock(s: float) -> str:
-    s = int(round(s))
-    return "%d:%02d:%02d" % (s // 3600, s % 3600 // 60, s % 60)
+def fmt_min(m: float) -> str:
+    m = int(round(m))
+    return "%d h %d min" % (m // 60, m % 60) if m >= 60 else "%d min" % m
 
 
-def print_card(data, light: bool):
-    """The print played back from the slicer's G-code: layers stack up, the current one in its line types."""
+def wrap(s: str, width: float, size=13, weight=420) -> list:
+    out, cur = [], ""
+    for word in s.split(" "):
+        t = (cur + " " + word).strip()
+        if text_w(t, size, weight) > width and cur:
+            out.append(cur)
+            cur = word
+        else:
+            cur = t
+    if cur:
+        out.append(cur)
+    return out
+
+
+def elide(s: str, width: float, size=13, weight=420, family="sans") -> str:
+    if text_w(s, size, weight, family) <= width:
+        return s
+    while s and text_w(s + "…", size, weight, family) > width:
+        s = s[:-1]
+    return s.rstrip() + "…"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+# The page's palette: Theme.qml for GitHub's dark theme, the same roles set dark-on-light for the light theme
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+def P(light: bool) -> dict:
+    if light:
+        return dict(panel="#f3f4f2", panel2="#e7eae7", well="#ffffff", ink="#0e1113", ink2="#4a5451", ink3="#6e7875",
+                    ink4="#b3bab7", datum="#1d7457", mint=T["datum"], mintInk=T["datumInk"], clay="#d6d0c3",
+                    edge="rgba(14,17,19,.62)", grid="rgba(14,17,19,.10)", amber="#9a6b12", pass_="#1f7a4d",
+                    signal="#c2452b", blueprint="#3557c4", shadow="rgba(14,17,19,.10)", logo_part="#0e1113")
+    return dict(panel="#13171a", panel2="#1b2024", well="#0a0c0e", ink=T["ink"], ink2=T["ink2"], ink3=T["ink3"],
+                ink4=T["ink4"], datum=T["datum"], mint=T["datum"], mintInk=T["datumInk"], clay=T["clay"],
+                edge="rgba(16,18,18,.62)", grid="rgba(232,237,235,.08)", amber=T["amber"], pass_=T["pass"],
+                signal=T["signal"], blueprint=T["blueprint"], shadow="rgba(0,0,0,.35)", logo_part=T["clay"])
+
+
+def ev_ink(p: dict, ev: str) -> str:
+    return {"computed": p["datum"], "specified": p["datum"], "heuristic": p["ink2"], "model": p["amber"],
+            "modelled": p["amber"], "simulated": p["amber"], "assumed": p["amber"]}.get(ev, p["ink2"])
+
+
+def stand_facts(d) -> dict:
+    s = d["state"]
+    sl = s["slice_simulated"]
+    checks = [parse_check(c) for c in s["checks"]]
+    v = d["view"]
+    lo, hi = np.array(v["bbox"][0]), np.array(v["bbox"][1])
+    ev = {}
+    for c in checks:
+        ev[c["evidence"]] = ev.get(c["evidence"], 0) + 1
+    return {"name": s["name"], "rev": "r%02d" % s["head"], "checks": checks, "evidence": ev,
+            "time": fmt_min(sl["time_min"]), "grams": "%.1f g" % sl["filament_g"], "layers": sl["layers"],
+            "presets": sl["presets"], "size": " × ".join("%.1f" % x for x in hi - lo)}
+
+
+def all_tris(d) -> np.ndarray:
+    return np.concatenate([m["tris"] for m in d["meshes"]])
+
+
+def wire(cam: Camera, edges: np.ndarray) -> str:
+    """Every B-rep edge, bottom to top, as one path: drawn with a dash it is plotted edge by edge."""
+    order = np.argsort(edges[:, :, 2].min(1) + 0.02 * edges[:, :, 0].min(1))
+    xy, _ = cam.project(edges[order])
+    return "".join("M%s %sL%s %s" % (f1(a[0]), f1(a[1]), f1(b[0]), f1(b[1])) for a, b in xy)
+
+
+def draw_dash(svg: Svg, d: str, stroke: str, sw: float, t0: float, t1: float, dur: float, hold: float | None = None,
+              once: bool = False, ease="cubic-bezier(.45,.05,.25,1)", extra="", cap="round") -> str:
+    """A path that draws itself from t0 to t1 (a stroke dash over its normalised length)."""
+    fr = [(0, {"stroke-dashoffset": "1"}), (t0, {"stroke-dashoffset": "1"}), (t1, {"stroke-dashoffset": "0"})]
+    if hold is not None:
+        fr += [(hold, {"stroke-dashoffset": "0"}), (hold + 1e-3, {"stroke-dashoffset": "1"})]
+    cls = svg.anim(fr, ease=ease, rest={"stroke-dashoffset": "0"}, dur=dur, once=once)
+    svg.add('<path d="%s" pathLength="1" stroke-dasharray="1 1" stroke="%s" stroke-width="%s" stroke-linecap="%s" '
+            'stroke-linejoin="round" fill="none" class="%s"%s/>' % (d, stroke, f1(sw), cap, cls, extra))
+    return cls
+
+
+def window_classes(svg: Svg, intervals_per_frame: list, dur: float, delay: float = 0.0, once=False) -> list:
+    """One class per frame: visible only inside its intervals (frame 0 is the one shown without motion)."""
+    out = []
+    for k, iv in enumerate(intervals_per_frame):
+        fr = [(0, {"opacity": "0"})]
+        for s, e in iv:
+            if s <= 0:
+                fr = [(0, {"opacity": "1"})]
+            else:
+                fr += [(s - 1e-3, {"opacity": "0"}), (s, {"opacity": "1"})]
+            if e < dur:
+                fr += [(e, {"opacity": "1"}), (e + 1e-3, {"opacity": "0"})]
+            else:
+                fr += [(dur, {"opacity": "1"})]
+        out.append(svg.anim(fr, ease="linear", rest={"opacity": "1" if k == 0 else "0"}, dur=dur, delay=delay, once=once))
+    return out
+
+
+def frame_intervals(index_at, n: int, dur: float, dt=1 / 120) -> list:
+    iv = [[] for _ in range(n)]
+    t, cur, start = 0.0, index_at(0.0), 0.0
+    while t < dur - 1e-9:
+        t = min(dur, t + dt)
+        k = index_at(t) if t < dur - 1e-9 else None
+        if k != cur:
+            iv[cur].append((start, t))
+            cur, start = k, t
+    return iv
+
+
+def rings(svg: Svg, cam: Camera, c, radii, ink: str, cls=""):
+    out = []
+    for r in radii:
+        a = np.linspace(0, 2 * math.pi, 97)
+        P3 = np.stack([c[0] + r * np.cos(a), c[1] + r * np.sin(a), np.zeros_like(a)], 1)
+        xy, _ = cam.project(P3)
+        out.append("M" + "L".join("%s %s" % (f1(x), f1(y)) for x, y in xy) + "Z")
+    svg.add('<path d="%s" stroke="%s" stroke-width="1" fill="none"%s/>' % ("".join(out), ink, ' class="%s"' % cls if cls else ""))
+
+
+def soft_shadow(svg: Svg, cam: Camera, c, rx, ry, ink):
+    g = svg.id("sg")
+    svg.defs.append('<radialGradient id="%s"><stop offset="0" stop-color="%s"/><stop offset="1" stop-color="%s" stop-opacity="0"/></radialGradient>'
+                    % (g, ink, ink))
+    xy, _ = cam.project(np.array([[c[0], c[1], 0.0]]))
+    svg.add('<ellipse cx="%s" cy="%s" rx="%s" ry="%s" fill="url(#%s)"/>' % (f1(xy[0][0]), f1(xy[0][1]), f1(rx), f1(ry), g))
+
+
+def spin_about(c):
+    return lambda pts, deg: (np.asarray(pts).reshape(-1, 3) - c) @ rot([0, 0, 1], math.radians(deg)).T + c
+
+
+def px_per_mm(cam: Camera, dist: float) -> float:
+    return cam.s * cam.k / dist
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+# The opening poster: the question, and a real part drawing itself as edges, filling, then turning
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+def hero(data, light: bool):
+    p = P(light)
     d = data["desk-phone-stand"]
-    tp = d["toolpath"]
     F = stand_facts(d)
-    loop = 9.0
-    svg = card(loop, "Print playback", light)
-    viewport_bg(svg, 0, 0, CW, CH)
-    L = tp.layers
+    W, H = 828, 660
+    period = 14.0
+    svg = Svg(W, H, period, "Form Studio")
+    svg.rect(0, 0, W, H, 28, fill=p["panel"])
+    logo(svg, 40, 52, size=22, ink=p["ink"], ink2=p["ink2"], part=p["logo_part"], datum=p["datum"])
+    svg.text(W - 40, 59, "Open source  ·  macOS, Windows, Linux", 14, 520, p["ink3"], anchor="end")
+    h1 = svg.anim([(0, {"opacity": "0", "transform": "translateY(14px)"}), (0.15, {"opacity": "0", "transform": "translateY(14px)"}),
+                   (0.95, {"opacity": "1", "transform": "translateY(0px)"})], dur=1.0, once=True)
+    svg.text(W / 2, 166, "What are we making?", 78, 640, p["ink"], anchor="middle", ls=-2.9, cls=h1)
+    h2 = svg.anim([(0, {"opacity": "0", "transform": "translateY(10px)"}), (0.35, {"opacity": "0", "transform": "translateY(10px)"}),
+                   (1.15, {"opacity": "1", "transform": "translateY(0px)"})], dur=1.2, once=True)
+    svg.text(W / 2, 212, "Describe a part. An agent designs it as real CAD while you watch.", 21, 450, p["ink2"], anchor="middle", cls=h2)
+    # the part, turned about its own vertical axis on a turntable of rings
+    tris = all_tris(d).reshape(-1, 3)
+    edges = d["edges"]
+    lo, hi = tris.min(0), tris.max(0)
+    c = (lo + hi) / 2
+    c[2] = 0.0
+    spin = spin_about(c)
+    a0, a1, step = 0.0, 60.0, 3.0
+    angles = list(np.arange(a0, a1 + 1e-6, step))
+    dist = 440
+    cam = Camera(az=-36, el=21, target=(c[0], c[1], hi[2] / 2), dist=dist)
+    cam.fit(np.concatenate([spin(tris, a) for a in (a0, (a0 + a1) / 2, a1)]), (189, 244, 450, 338))
+    t_draw0, t_draw1, t_fill0, t_fill1 = 0.5, 3.1, 2.7, 3.6
+    rad = float(np.linalg.norm((hi - lo)[:2])) / 2
+    k_ = px_per_mm(cam, dist)
+    soft_shadow(svg, cam, c, rad * k_ * 1.1, rad * k_ * 0.36, p["shadow"])
+    rc = svg.anim([(0, {"opacity": "0"}), (0.3, {"opacity": "0"}), (1.2, {"opacity": "1"})], dur=1.2, once=True)
+    rings(svg, cam, c, [rad * 1.2, rad * 1.6, rad * 2.05], p["grid"], cls=rc)
+
+    def angle_at(t):
+        u = t / period
+        if u < 0.14:
+            return a0
+        if u < 0.5:
+            v = (u - 0.14) / 0.36
+            return a0 + (a1 - a0) * (1 - math.cos(math.pi * v)) / 2
+        if u < 0.6:
+            return a1
+        v = (u - 0.6) / 0.4
+        return a1 - (a1 - a0) * (1 - math.cos(math.pi * v)) / 2
+
+    classes = window_classes(svg, frame_intervals(lambda t: int(round((angle_at(t) - a0) / step)), len(angles), period),
+                             period, delay=4.2)
+    fill_in = svg.anim([(0, {"opacity": "0"}), (t_fill0, {"opacity": "0"}), (t_fill1, {"opacity": "1"})], dur=t_fill1, once=True)
+    svg.add('<g class="%s">' % fill_in)
+    for k, a in enumerate(angles):
+        fills, ed = draw_solid(cam, spin(tris, a).reshape(-1, 3, 3), W, H, spin(edges, a).reshape(-1, 2, 3),
+                               edge_ink=p["edge"], base=p["clay"])
+        svg.add('<g class="%s">%s%s</g>' % (classes[k], fills, ed))
+    svg.add("</g>")
+    # the bounding dimensions, measured on the solid, while it rests facing you
+    dims_in = svg.anim([(0, {"opacity": "0"}), (t_fill1 + 0.1, {"opacity": "0"}), (t_fill1 + 0.6, {"opacity": "1"})], dur=t_fill1 + 0.6, once=True)
+    dims_rest = svg.anim([(0, {"opacity": "1"}), (0.11 * period, {"opacity": "1"}), (0.14 * period, {"opacity": "0"}),
+                          (0.975 * period, {"opacity": "0"}), (period, {"opacity": "1"})], dur=period, delay=4.2)
+    svg.add('<g class="%s"><g class="%s">' % (dims_in, dims_rest))
+    off = 9.0
+    size = hi - lo
+    for a3, b3, ext, val in (
+            ((lo[0], lo[1] - off, 0), (hi[0], lo[1] - off, 0), (0, off * 0.7, 0), size[0]),
+            ((lo[0] - off, lo[1], 0), (lo[0] - off, hi[1], 0), (off * 0.7, 0, 0), size[1]),
+            ((hi[0] + off, lo[1], lo[2]), (hi[0] + off, lo[1], hi[2]), (-off * 0.7, 0, 0), size[2])):
+        A, B, E = np.array(a3, float), np.array(b3, float), np.array(ext, float)
+        xy, _ = cam.project(np.array([A, B, A + E, B + E]))
+        (ax, ay), (bx, by), (aex, aey), (bex, bey) = xy
+        svg.add('<path d="M%s %sL%s %sM%s %sL%s %sM%s %sL%s %s" stroke="%s" stroke-width="1.1" stroke-linecap="round"/>'
+                % (f1(ax), f1(ay), f1(bx), f1(by), f1(ax), f1(ay), f1(aex), f1(aey), f1(bx), f1(by), f1(bex), f1(bey), p["datum"]))
+        mx, my = (ax + bx) / 2, (ay + by) / 2
+        lab = "%.1f" % val
+        tw = text_w(lab, 13, 500, "mono")
+        svg.rect(mx - tw / 2 - 6, my - 10, tw + 12, 20, 6, fill=p["panel"])
+        svg.text(mx, my + 4.6, lab, 13, 500, p["datum"], family="mono", anchor="middle")
+    svg.add("</g></g>")
+    wire_out = svg.anim([(0, {"opacity": "1"}), (t_fill0 + 0.2, {"opacity": "1"}), (t_fill1 + 0.3, {"opacity": "0"})],
+                        dur=t_fill1 + 0.3, once=True, rest={"opacity": "0"})
+    svg.add('<g class="%s">' % wire_out)
+    draw_dash(svg, wire(cam, edges), p["datum"], 1.3, t_draw0, t_draw1, t_draw1, once=True)
+    svg.add("</g>")
+    cap = svg.anim([(0, {"opacity": "0"}), (t_fill1 - 0.2, {"opacity": "0"}), (t_fill1 + 0.5, {"opacity": "1"})], dur=t_fill1 + 0.5, once=True)
+    svg.g(cap)
+    n_pass = sum(1 for c_ in F["checks"] if c_["status"] == "PASS")
+    line = "%s  ·  %s mm  ·  %d of %d checks pass  ·  %s, %s in the slicer" % (
+        F["name"], F["size"], n_pass, len(F["checks"]), F["time"], F["grams"])
+    svg.text(W / 2, H - 40, line, 15, 450, p["ink3"], anchor="middle")
+    svg.end()
+    desc = ("Form Studio. What are we making? The %s, built by the CAD kernel, draws itself as its B-rep edges, fills in "
+            "as shaded faces and turns: %s mm, %d of %d checks pass, %s and %s in the slicer."
+            % (F["name"].lower(), F["size"], n_pass, len(F["checks"]), F["time"], F["grams"]))
+    return [("hero", svg.render(desc))]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+# Small motion helpers shared by the strips and cards
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+def counter(svg: Svg, x, y, values: list, times: list, size, weight, fill, dur, once=True, anchor="start", ls=0.0):
+    """A number counting up: each value shown from its time until the next; the last one is the resting state."""
+    n = len(values)
+    for i, v in enumerate(values):
+        t0 = times[i]
+        t1 = times[i + 1] if i + 1 < n else None
+        fr = [(0, {"opacity": "1" if i == 0 else "0"})]
+        if i:
+            fr += [(t0 - 1e-3, {"opacity": "0"}), (t0, {"opacity": "1"})]
+        if t1 is not None:
+            fr += [(t1 - 1e-3, {"opacity": "1"}), (t1, {"opacity": "0"})]
+        cls = svg.anim(fr, ease="linear", rest={"opacity": "1" if i == n - 1 else "0"}, dur=dur, once=once)
+        svg.text(x, y, str(v), size, weight, fill, anchor=anchor, ls=ls, cls=cls)
+
+
+def cycle(svg: Svg, t_in: float, t_out: float, fade=0.4, rise=8.0, scale=0.0) -> str:
+    """In at t_in, out at t_out, on the drawing's loop; resting visible."""
+    hid = {"opacity": "0"}
+    vis = {"opacity": "1"}
+    if rise:
+        hid["transform"] = "translateY(%gpx)" % rise
+        vis["transform"] = "translateY(0px)"
+    if scale:
+        hid["transform"] = "scale(%g)" % scale
+        vis["transform"] = "scale(1)"
+    fr = [(0, hid), (t_in, hid), (t_in + fade, vis), (t_out, vis), (min(svg.loop, t_out + 0.3), {"opacity": "0"})]
+    return svg.anim(fr, origin="center" if scale else "")
+
+
+def typing(svg: Svg, x, y, s, size, weight, fill, t0, t1, t_out, bg, caret, family="sans"):
+    """Text typed in: a cover the colour of the field steps off it one character at a time, the caret riding its edge."""
+    w = svg.text(x, y, s, size, weight, fill, family=family)
+    n = max(1, len(s))
+    cls = svg.anim([(0, {"transform": "translateX(0px)"}), (t0, {"transform": "translateX(0px)"}),
+                    (t1, {"transform": "translateX(%spx)" % f1(w + 3)}), (t_out, {"transform": "translateX(%spx)" % f1(w + 3)}),
+                    (t_out + 1e-3, {"transform": "translateX(0px)"})], ease="steps(%d,end)" % n,
+                   rest={"transform": "translateX(%spx)" % f1(w + 3)})
+    car = svg.anim([(0, {"opacity": "0"}), (t0 - 0.2, {"opacity": "0"}), (t0 - 0.19, {"opacity": "1"}), (t1 + 0.25, {"opacity": "1"}),
+                    (t1 + 0.26, {"opacity": "0"})], ease="linear", rest={"opacity": "0"})
+    clip = svg.id("tc")
+    svg.defs.append('<clipPath id="%s"><rect x="%s" y="%s" width="%s" height="%s"/></clipPath>'
+                    % (clip, f1(x - 2), f1(y - size * 1.1), f1(w + 6), f1(size * 1.6)))
+    svg.add('<g clip-path="url(#%s)"><g class="%s"><rect x="%s" y="%s" width="%s" height="%s" fill="%s"/><rect class="%s" x="%s" y="%s" '
+            'width="1.6" height="%s" fill="%s"/></g></g>'
+            % (clip, cls, f1(x - 1), f1(y - size * 1.05), f1(w + 8), f1(size * 1.45), bg, car, f1(x - 1), f1(y - size * 0.92),
+               f1(size * 1.2), caret))
+    return w
+
+
+def check_mark(cx, cy, s=1.0) -> str:
+    return "M%s %sl%s %sl%s %s" % (f1(cx - 4.2 * s), f1(cy + 0.2 * s), f1(2.9 * s), f1(2.9 * s), f1(5.6 * s), f1(-6.2 * s))
+
+
+def layer_paths(cam: Camera, tp, l: int, types=None, cx=0.0, cy=0.0, eps=0.25) -> dict:
+    """One G-code layer projected: {type index: path} (consecutive moves chained into polylines)."""
+    s0, s1 = tp.start[l], tp.start[l + 1]
+    z = float(tp.z[l])
+    by_type = {}
+    for (x0, y0, x1, y1), ty in zip(tp.seg[s0:s1], tp.seg_type[s0:s1]):
+        if types is None or int(ty) in types:
+            by_type.setdefault(int(ty), []).append((x0, y0, x1, y1))
+    out = {}
+    for ty, sg in by_type.items():
+        dd = []
+        for pl in chain(np.array(sg)):
+            P3 = np.array([[a - cx, b - cy, z] for a, b in pl])
+            xy, _ = cam.project(P3)
+            xy = rdp(xy, eps)
+            if len(xy) >= 2:
+                dd.append(rel_path(xy, close=False))
+        out[ty] = "".join(dd)
+    return out
+
+
+def type_ink(p: dict, light: bool) -> dict:
+    if not light:
+        return TYPE_INK
+    return {"Outer wall": p["ink"], "Inner wall": p["ink3"], "Sparse infill": p["amber"], "Internal solid infill": p["blueprint"],
+            "Top surface": p["datum"], "Bottom surface": mix("#1d7457", "#ffffff", 0.35), "Bridge": p["signal"],
+            "Overhang wall": p["signal"], "Floating vertical shell": "#d0603f", "Gap infill": p["ink4"]}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+# How it works: four beats in two pictures (side by side on a wide page, stacked on a phone), one shared clock
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+BEAT_LOOP = 12.0
+BEATS = [("Describe", "Words, a photo, a sketch, a part or a link."),
+         ("Build", "Your agent writes real build123d CAD. It grows in front of you."),
+         ("Prove", "Every revision is checked on the solid itself."),
+         ("Slice", "Your slicer and your presets, played back layer by layer.")]
+
+
+def beat_window(j):
+    return 0.4 + 2.7 * j, 0.4 + 2.7 * (j + 1)
+
+
+def beat_describe(svg, p, x, y, w, h, t0, t1, t_out):
+    svg.rect(x, y + 12, w, 100, 14, fill=p["well"])
+    lines = ["A stand for my phone,", "leaning back 20°"]
+    mid = t0 + (t1 - t0) * 0.5
+    typing(svg, x + 13, y + 44, lines[0], 13.5, 450, p["ink"], t0 + 0.1, mid - 0.15, t_out, p["well"], p["datum"])
+    typing(svg, x + 13, y + 65, lines[1], 13.5, 450, p["ink"], mid, t1 - 0.6, t_out, p["well"], p["datum"])
+    send = svg.anim([(0, {"opacity": ".25"}), (t1 - 0.5, {"opacity": ".25"}), (t1 - 0.3, {"opacity": "1"}), (t_out, {"opacity": "1"}),
+                     (t_out + 0.3, {"opacity": ".25"})], rest={"opacity": "1"})
+    cx, cy = x + w - 24, y + 89
+    svg.add('<g class="%s"><circle cx="%s" cy="%s" r="12" fill="%s"/><path d="M%s %sv-10M%s %sl4.5-4.5 4.5 4.5" stroke="%s" stroke-width="1.8" '
+            'stroke-linecap="round" stroke-linejoin="round"/></g>' % (send, f1(cx), f1(cy), p["mint"], f1(cx), f1(cy + 5), f1(cx - 4.5),
+                                                                    f1(cy - 0.5), p["mintInk"]))
+
+
+def beat_build(svg, p, d, x, y, w, h, t0, t1, t_out):
+    tris = all_tris(d).reshape(-1, 3)
+    cam = Camera(az=-36, el=21, target=tris.mean(0), dist=440)
+    cam.fit(tris, (x + 6, y + 6, w - 12, h - 12))
+    fills, ed = draw_solid(cam, tris.reshape(-1, 3, 3), svg.w, svg.h, d["edges"], edge_ink=p["edge"], base=p["clay"])
+    f_in = svg.anim([(0, {"opacity": "0"}), (t1 - 0.9, {"opacity": "0"}), (t1 - 0.2, {"opacity": "1"}), (t_out, {"opacity": "1"}),
+                     (t_out + 0.3, {"opacity": "0"})], rest={"opacity": "1"})
+    svg.add('<g class="%s">%s%s</g>' % (f_in, fills, ed))
+    w_out = svg.anim([(0, {"opacity": "1"}), (t1 - 0.6, {"opacity": "1"}), (t1, {"opacity": "0"}), (BEAT_LOOP - 0.01, {"opacity": "0"}),
+                      (BEAT_LOOP, {"opacity": "1"})], rest={"opacity": "0"})
+    svg.add('<g class="%s">' % w_out)
+    draw_dash(svg, wire(cam, d["edges"]), p["datum"], 1.0, t0 + 0.05, t1 - 0.6, BEAT_LOOP)
+    svg.add("</g>")
+
+
+def beat_prove(svg, p, F, x, y, w, h, t0, t1, t_out):
+    fit = [c for c in F["checks"] if c["status"] == "PASS"]
+    first = ("One valid", "2 valid", "Export mesh", "Thinnest wall", "Unsupported overhangs", "Fits the build")
+    rank = lambda c: next((k for k, f in enumerate(first) if c["label"].startswith(f)), len(first))
+    rows = []
+    for c in sorted(fit, key=rank):
+        full = "%s: %s" % (c["label"], c["value"])
+        for s in ((c["label"],) if c["label"].startswith(("One valid", "Export mesh", "2 valid")) else (full, c["label"])):
+            if text_w(s, 12.5, 480) <= w - 24:
+                rows.append(s)
+                break
+        if len(rows) == 4:
+            break
+    for i, s in enumerate(rows):
+        ry = y + 16 + i * 26
+        ti = t0 + 0.25 + i * (t1 - t0 - 0.8) / len(rows)
+        g = cycle(svg, ti - 0.15, t_out, fade=0.25, rise=4)
+        svg.g(g)
+        svg.circle(x + 9, ry, 9, alpha(p["pass_"], 0.16))
+        svg.text(x + 26, ry + 4.4, s, 12.5, 480, p["ink"])
+        svg.end()
+        draw_dash(svg, check_mark(x + 9, ry, 0.95), p["pass_"], 1.8, ti, ti + 0.3, BEAT_LOOP, hold=t_out + 0.3)
+    n = len(fit)
+    g = cycle(svg, t1 - 0.5, t_out, fade=0.3, rise=4)
+    svg.text(x, y + h - 4, "%d of %d checks pass" % (n, len(F["checks"])), 12.5, 520, p["pass_"], cls=g)
+
+
+def beat_slice(svg, p, d, x, y, w, h, t0, t1, t_out):
+    tp = d["toolpath"]
     (bx0, by0, _), (bx1, by1, zt) = tp.bbox
     cx, cy = (bx0 + bx1) / 2, (by0 + by1) / 2
-    # plate frame: the G-code's coordinates are the bed's; centre the part like the viewport does
     pts = np.array([[bx0, by0, 0], [bx1, by1, zt], [bx0, by1, zt], [bx1, by0, 0], [bx0, by0, zt], [bx1, by1, 0]], float)
     pts[:, 0] -= cx
     pts[:, 1] -= cy
-    cam = Camera(az=-34, el=28.4, target=(0, 0, zt / 2), dist=420)
-    cam.fit(pts, (200, 62, 280, 238))
-    draw_plate(svg, cam, (180, 180), fade_id=plate_mask(svg, 0, 0, CW, CH, cy=".5"), plate_fill="#2a3034", grid_ink="#1b2023")
-    K = 36
-    t_build0, t_build1 = 0.4, 6.8
-    groups = np.array_split(np.arange(0, L, 2), K)
+    cam = Camera(az=-36, el=21, target=(0, 0, zt / 2), dist=440)
+    cam.fit(pts, (x + 6, y + 4, w - 12, h - 8))
     ow = tp.types.index("Outer wall")
-    px_per_mm = cam.s * cam.k / 420
-    sw = max(0.6, tp.width * px_per_mm * 1.6)
-    shade_side = mix(T["clay"], "#000000", 0.18)
+    L = tp.layers
+    pick = list(range(0, L, max(1, L // 28))) + [L - 1]
+    K = len(pick)
+    groups = [np.array([l]) for l in pick]
     for gi, ls in enumerate(groups):
-        t_in = t_build0 + (t_build1 - t_build0) * gi / K
-        cls = svg.anim([(0, {"opacity": "0"}), (t_in, {"opacity": "0"}), (t_in + 0.001, {"opacity": "1"}),
-                        (loop - 0.6, {"opacity": "1"}), (loop - 0.2, {"opacity": "0"})], ease="steps(1)")
-        parts = []
-        for l in ls:
-            s0, s1 = tp.start[l], tp.start[l + 1]
-            sg = tp.seg[s0:s1][tp.seg_type[s0:s1] == ow]
-            if not len(sg):
-                continue
-            z = float(tp.z[l])
-            dd = []
-            for pl in chain(sg):
-                P = np.array([[x - cx, y - cy, z] for x, y in pl])
-                xy, _ = cam.project(P)
-                xy = rdp(xy, 0.25)
-                if len(xy) < 2:
-                    continue
-                dd.append("M" + "L".join("%s %s" % (f1(a), f1(b)) for a, b in xy) + ("Z" if np.allclose(pl[0], pl[-1], atol=1e-2) else ""))
-            if dd:
-                parts.append('<path d="%s" fill="#3b4246" fill-rule="evenodd" stroke="%s" stroke-width="%s" stroke-linejoin="round"/>'
-                             % ("".join(dd), shade_side, f1(sw) if sw >= 1 else "%.2f" % sw))
-        svg.add('<g class="%s">%s</g>' % (cls, "".join(parts)))
-        # the layer being printed, in its line types, while it is the newest
-        l = int(ls[-1])
-        s0, s1 = tp.start[l], tp.start[l + 1]
-        by_type = {}
-        for (x0, y0, x1, y1), ty in zip(tp.seg[s0:s1], tp.seg_type[s0:s1]):
-            by_type.setdefault(int(ty), []).append((x0, y0, x1, y1))
-        z = float(tp.z[l])
-        cur = []
-        for ty, sgs in by_type.items():
-            dd = []
-            for pl in chain(np.array(sgs)):
-                P = np.array([[x - cx, y - cy, z] for x, y in pl])
-                xy, _ = cam.project(P)
-                xy = rdp(xy, 0.2)
-                dd.append("M" + "L".join("%s %s" % (f1(a), f1(b)) for a, b in xy))
-            cur.append('<path d="%s" stroke="%s" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>'
-                       % ("".join(dd), TYPE_INK.get(tp.types[ty], T["ink2"])))
-        t_out = t_build0 + (t_build1 - t_build0) * (gi + 1) / K if gi < K - 1 else loop - 0.6
-        ccls = svg.anim([(0, {"opacity": "0"}), (t_in, {"opacity": "0"}), (t_in + 0.001, {"opacity": "1"}),
-                         (t_out, {"opacity": "1"}), (t_out + 0.001, {"opacity": "0"})], ease="steps(1)")
-        svg.add('<g class="%s">%s</g>' % (ccls, "".join(cur)))
-    # header: back to the design and the SIMULATED tag, the sentence the app shows
-    btn(svg, 14, 14, "Back to the design", "arrow_left", h=28, quiet=False)
-    tag(svg, 14 + text_w("Back to the design", 13, 520) + 22 + 14 + 22 + 8, 19.5, "simulated", "simulated")
-    svg.text(16, 58, "Simulated from the slicer's G-code. Not a print.", 11, 420, T["ink3"])
-    # line types, as the legend lists them
-    lx, ly = CW - 196, 14
-    shown = [t for t in tp.types if t in TYPE_INK]
-    lengths = tp.type_lengths() if hasattr(tp, "type_lengths") else {}
-    svg.rect(lx, ly, 182, 30 + 17 * len(shown), 9, fill=alpha(T["plate1"], 0.92), stroke=T["rule"])
-    svg.text(lx + 12, ly + 19, "LINE TYPES", 10, 620, T["ink3"], ls=0.9)
-    svg.text(lx + 170, ly + 19, "m of path", 10, 420, T["ink4"], anchor="end")
-    for k, t in enumerate(shown):
-        yy = ly + 36 + k * 17
-        svg.rect(lx + 12, yy - 8, 8, 8, 2, fill=TYPE_INK[t])
-        svg.text(lx + 26, yy, t, 11, 420, T["ink2"])
-        ln = lengths.get(t)
-        if isinstance(ln, (int, float)):
-            svg.text(lx + 170, yy, "%.1f" % (ln / 1000), 10, 420, T["ink3"], family="mono", anchor="end")
-    # the transport bar: layer, height and the slicer's clock, then the time of every layer
-    bx, byy, bw, bh = 14, CH - 104, CW - 28, 90
-    svg.rect(bx, byy, bw, bh, 12, fill=alpha(T["plate1"], 0.94), stroke=T["rule"])
-    svg.rect(bx + 10, byy + 10, 64, 26, 6, fill=T["datum"])
-    svg.icon(bx + 24, byy + 23, "pause", 12, T["datumInk"])
-    svg.text(bx + 34, byy + 27.3, "Pause", 12, 620, T["datumInk"])
-    for gi, ls in enumerate(groups):
-        l = int(ls[-1])
-        t_in = t_build0 + (t_build1 - t_build0) * gi / K
-        t_out = t_build0 + (t_build1 - t_build0) * (gi + 1) / K if gi < K - 1 else loop - 0.2
-        c_ = svg.anim([(0, {"opacity": "1" if gi == 0 else "0"}), (t_in, {"opacity": "1" if gi == 0 else "0"}), (t_in + 0.001, {"opacity": "1"}),
-                       (t_out, {"opacity": "1"}), (t_out + 0.001, {"opacity": "0"})], ease="steps(1)")
-        svg.g(c_)
-        svg.text(bx + 88, byy + 27.3, "Layer %d / %d  ·  z %.2f mm" % (l + 1, L, tp.z[l]), 12, 420, T["ink"], family="mono")
-        el = float(tp.t0[l + 1])
-        svg.text(bx + bw - 120, byy + 27.3, "%s elapsed  ·  %s left" % (fmt_clock(el), fmt_clock(tp.total_time_s - el)), 11, 420, T["ink3"], family="mono", anchor="end")
-        svg.end()
-    tag(svg, bx + bw - 110, byy + 14.5, "slicer estimate", "simulated")
-    # time per layer, as the app charts it (real per-layer seconds from the slicer's markers)
-    cx0, cy0, cw_, ch_ = bx + 12, byy + 46, bw - 24, 34
-    tmax = float(np.percentile(tp.time, 98))
-    bars = []
-    step = cw_ / L
-    for l in range(L):
-        h = min(1.0, tp.time[l] / tmax) * ch_
-        bars.append("M%s %sV%s" % (f1(cx0 + l * step + step / 2), f1(cy0 + ch_), f1(cy0 + ch_ - max(1, h))))
-    svg.add('<path d="%s" stroke="%s" stroke-width="%s"/>' % ("".join(bars), T["ink4"], "%.2f" % max(0.6, step * 0.7)))
-    clip = svg.id("tc")
-    svg.defs.append('<clipPath id="%s"><rect x="%s" y="%s" width="%s" height="%s">'
-                    '<animate attributeName="width" dur="%gs" repeatCount="indefinite" keyTimes="0;%.4f;%.4f;%.4f;1" values="0;0;%s;%s;%s"/></rect></clipPath>'
-                    % (clip, f1(cx0), f1(cy0), f1(cw_), ch_, loop, t_build0 / loop, t_build1 / loop, (loop - 0.2) / loop, f1(cw_), f1(cw_), f1(cw_)))
-    svg.add('<path d="%s" stroke="%s" stroke-width="%s" clip-path="url(#%s)"/>' % ("".join(bars), T["ink2"], "%.2f" % max(0.6, step * 0.7), clip))
-    head = svg.anim([(0, {"transform": "translateX(0px)"}), (t_build0, {"transform": "translateX(0px)"}),
-                     (t_build1, {"transform": "translateX(%spx)" % f1(cw_)}), (loop - 0.2, {"transform": "translateX(%spx)" % f1(cw_)}),
-                     (loop, {"transform": "translateX(0px)"})], ease="linear")
-    svg.rect(cx0 - 0.5, cy0 - 3, 1.5, ch_ + 4, fill=T["datum"], cls=head)
-    card_end(svg, light)
-    desc = ("The %s's print played back from %s's G-code: %d layers, %s, built up layer by layer with the line types of the "
-            "current layer; a simulation, not a print." % (F["name"].lower(), "Bambu Studio", L, F["time"]))
-    return svg.render(desc), desc
+        ti = t0 + 0.1 + (t1 - t0 - 0.5) * gi / K
+        dd = "".join(layer_paths(cam, tp, int(l), {ow}, cx, cy).get(ow, "") for l in ls)
+        cls = svg.anim([(0, {"opacity": "0"}), (ti, {"opacity": "0"}), (ti + 1e-3, {"opacity": "1"}), (t_out, {"opacity": "1"}),
+                        (t_out + 0.3, {"opacity": "0"})], ease="linear")
+        svg.add('<path class="%s" d="%s" stroke="%s" stroke-width=".8" stroke-linejoin="round"/>' % (cls, dd, alpha(p["ink2"], 0.55)))
+        nxt = t0 + 0.1 + (t1 - t0 - 0.5) * (gi + 1) / K if gi < K - 1 else t_out
+        hot = svg.anim([(0, {"opacity": "0"}), (ti, {"opacity": "0"}), (ti + 1e-3, {"opacity": "1"}), (nxt, {"opacity": "1"}),
+                        (nxt + 1e-3, {"opacity": "0"})], ease="linear", rest={"opacity": "1" if gi == K - 1 else "0"})
+        top = layer_paths(cam, tp, int(ls[-1]), {ow}, cx, cy).get(ow, "")
+        svg.add('<path class="%s" d="%s" stroke="%s" stroke-width="1.5" stroke-linejoin="round"/>' % (hot, top, p["datum"]))
 
 
-def prove_card(data, light: bool):
-    """Prove: the score and every passed check with how it is known, ticking in as the checks finish."""
+def steps(data, light: bool):
+    p = P(light)
     d = data["desk-phone-stand"]
     F = stand_facts(d)
-    ok = [c for c in F["checks"] if c["status"] == "PASS"]
-    loop = 8.0
-    svg = card(loop, "Prove", light)
-    # the part, left
-    viewport_bg(svg, 0, 0, 280, CH)
-    tris = np.concatenate([m["tris"] for m in d["meshes"]])
-    lo, hi = tris.reshape(-1, 3).min(0), tris.reshape(-1, 3).max(0)
-    cam = Camera(az=-34, el=28.4, target=(lo + hi) / 2, dist=420)
-    cam.fit(tris.reshape(-1, 3), (40, 92, 200, 220))
-    clip = svg.id("pc")
-    svg.defs.append('<clipPath id="%s"><rect width="280" height="%s"/></clipPath>' % (clip, CH))
-    svg.add('<g clip-path="url(#%s)">' % clip)
-    draw_plate(svg, cam, (180, 180), fade_id=plate_mask(svg, 0, 0, 280, CH), plate_fill="#2a3034", grid_ink="#1b2023")
-    fills, edges = draw_solid(cam, tris, svg.w, svg.h, d["edges"])
-    svg.add(fills + edges + "</g>")
-    svg.text(16, CH - 18, "%s mm" % F["size"], 11, 420, T["ink2"], family="mono")
-    svg.text(16, 30, F["name"], 13, 620, T["ink"])
-    svg.text(16 + text_w(F["name"], 13, 620) + 8, 30, F["rev"], 12, 420, T["ink2"], family="mono")
-    # the panel
-    px = 280
-    svg.rect(px, 0, CW - px, CH, fill=T["plate1"])
-    svg.rect(px, 0, 1, CH, fill=T["rule"])
-    x0 = px + 20
-    right = CW - 20
-    ck0, dt = 0.5, 0.22
-    done = ck0 + dt * len(ok)
-    for j, (lab, colr, n) in enumerate((("pass", T["pass"], len(ok)), ("to review", T["amber"], 0), ("failed", T["signal"], 0))):
-        x = x0 + j * 110
-        if j == 0:
-            for k in range(n + 1):
-                a = ck0 + dt * k if k else 0.0
-                b = ck0 + dt * (k + 1) if k < n else loop - 0.3
-                fr = [(0, {"opacity": "1" if k == 0 else "0"})]
-                if k:
-                    fr += [(a - 1e-3, {"opacity": "0"}), (a, {"opacity": "1"})]
-                fr += [(b, {"opacity": "1"}), (b + 1e-3, {"opacity": "0"})]
-                if k == 0:
-                    fr += [(loop - 0.3, {"opacity": "0"}), (loop - 0.3 + 1e-3, {"opacity": "1"})]
-                cls = svg.anim(fr, ease="steps(1)")
-                svg.text(x, 50, str(k), 30, 600, colr if k else T["ink4"], family="mono", ls=-0.6, cls=cls)
-        else:
-            svg.text(x, 50, "0", 30, 600, T["ink4"], family="mono", ls=-0.6)
-        svg.text(x, 72, lab, 10, 620, T["ink2"] if j == 0 else T["ink4"], ls=0.9, upper=True)
-    svg.rect(x0, 86, right - x0, 4, 2, fill=T["rule"])
-    bar = svg.anim([(0, {"transform": "scaleX(0)"}), (ck0, {"transform": "scaleX(0)"}), (done, {"transform": "scaleX(1)"}),
-                    (loop - 0.3, {"transform": "scaleX(1)"}), (loop, {"transform": "scaleX(0)"})], ease="linear", origin="left")
-    svg.rect(x0, 86, right - x0, 4, 2, fill=T["pass"], cls=bar)
-    svg.text(x0, 111, "Checks for %s · %s." % (F["rev"], F["mix"]), 11, 420, T["ink3"])
-    y = 124
-    for i, c in enumerate(ok):
-        cl = svg.show(ck0 + dt * (i + 1) - 0.12, loop - 0.3, 0.14, rise=4)
-        svg.g(cl)
-        tag(svg, x0, y + 7, c["evidence"], c["evidence"])
-        val = elide(c["value"], 128, 12, 420, "mono")
-        vw = text_w(val, 12, 420, "mono")
-        svg.text(x0 + 84, y + 20, elide(c["label"], right - x0 - 84 - vw - 12, 13), 13, 420, T["ink"])
-        svg.text(right, y + 19.5, val, 12, 420, T["ink2"], family="mono", anchor="end")
+    out = []
+    for half in (0, 1):
+        svg = Svg(414, 368, BEAT_LOOP, "How it works")
+        for k in (0, 1):
+            j = half * 2 + k
+            x = 3 + k * 209
+            svg.rect(x, 0, 199, 368, 22, fill=p["panel"])
+            t0, t1 = beat_window(j)
+            t_out = BEAT_LOOP - 0.5
+            svg.text(x + 20, 58, str(j + 1), 40, 600, p["ink4"], ls=-1)
+            lit = svg.anim([(0, {"opacity": "0"}), (t0, {"opacity": "0"}), (t0 + 0.25, {"opacity": "1"}), (t_out, {"opacity": "1"}),
+                            (t_out + 0.3, {"opacity": "0"})], rest={"opacity": "1"})
+            svg.text(x + 20, 58, str(j + 1), 40, 600, p["datum"], ls=-1, cls=lit)
+            mx, my, mw, mh = x + 20, 82, 159, 136
+            if j == 0:
+                beat_describe(svg, p, mx, my, mw, mh, t0, t1, t_out)
+            elif j == 1:
+                beat_build(svg, p, d, mx, my, mw, mh, t0, t1, t_out)
+            elif j == 2:
+                beat_prove(svg, p, F, mx, my, mw, mh, t0, t1, t_out)
+            else:
+                beat_slice(svg, p, d, mx, my, mw, mh, t0, t1, t_out)
+            title, line = BEATS[j]
+            svg.text(x + 20, 266, title, 26, 640, p["ink"], ls=-0.6)
+            for i, ln in enumerate(wrap(line, 160, 15.5, 440)):
+                svg.text(x + 20, 294 + i * 21.5, ln, 15.5, 440, p["ink2"])
+        a, b = BEATS[half * 2][0], BEATS[half * 2 + 1][0]
+        desc = "%d %s, %d %s: %s %s" % (half * 2 + 1, a, half * 2 + 2, b, BEATS[half * 2][1], BEATS[half * 2 + 1][1])
+        out.append(("steps-%d" % (half + 1), svg.render(desc)))
+    return out
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+# The numbers, in two pictures
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+def numbers(data, light: bool):
+    p = P(light)
+    n_tools = len(data["tools"])
+    n_slicers = len(data["slicers"])
+    items = [(n_slicers, "slicers it drives for real"), (n_tools, "MCP tools for any agent"),
+             (3, "platforms: macOS, Windows and Linux"), (0, "uploads. Your designs stay on your computer")]
+    out = []
+    for half in (0, 1):
+        svg = Svg(414, 178, 4.0, "Form Studio in numbers")
+        for k in (0, 1):
+            n, label = items[half * 2 + k]
+            x = 3 + k * 207 + 20
+            svg.rect(x, 26, 10, 10, fill=p["datum"])
+            steps_ = 9 if n > 9 else max(1, n)
+            vals = sorted(set([round(n * i / steps_) for i in range(steps_ + 1)]))
+            times = [0.25 + 0.9 * i / max(1, len(vals) - 1) for i in range(len(vals))]
+            times[0] = 0.0
+            counter(svg, x - 3, 112, vals, times, 78, 600, p["ink"], 1.3, ls=-3)
+            for i, ln in enumerate(wrap(label, 170, 16, 450)):
+                svg.text(x, 142 + i * 22, ln, 16, 450, p["ink2"])
+        desc = "; ".join("%d %s" % it for it in items[half * 2: half * 2 + 2])
+        out.append(("numbers-%d" % (half + 1), svg.render(desc)))
+    return out
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+# Features: one idea per card, two to a row on a wide page
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+CARD_W, CARD_H = 414, 436
+
+
+def card(title: str, light: bool, loop: float):
+    p = P(light)
+    svg = Svg(CARD_W, CARD_H, loop, title)
+    svg.rect(3, 0, CARD_W - 6, CARD_H, 24, fill=p["panel"])
+    return svg, p
+
+
+def card_words(svg: Svg, p, title: str, sentence: str):
+    svg.text(27, 326, title, 27, 640, p["ink"], ls=-0.7)
+    for i, ln in enumerate(wrap(sentence, 358, 16, 440)):
+        svg.text(27, 358 + i * 23, ln, 16, 440, p["ink2"])
+
+
+def f_start(data, light):
+    title = "Start from anything"
+    svg, p = card(title, light, 10.0)
+    chips = ["“a hook for my desk”", "photo.jpg", "sketch, in mm", "bracket.step", "part.stl", "drawing.pdf", "a link"]
+    x, y = 27, 34
+    for i, c in enumerate(chips):
+        w = text_w(c, 14, 520) + 30
+        if x + w > 387:
+            x, y = 27, y + 44
+        g = cycle(svg, 0.1 + 0.12 * i, 9.6, fade=0.35, rise=10)
+        svg.g(g)
+        svg.rect(x, y, w, 34, 17, fill=p["panel2"])
+        svg.text(x + 15, y + 22, c, 14, 520, p["ink"])
         svg.end()
-        y += 26
-    card_end(svg, light)
-    desc = "Prove for the %s %s: %s; %s." % (F["name"].lower(), F["rev"], ", ".join("%s %s" % (c["label"].lower(), c["value"]) for c in ok), F["mix"])
-    return svg.render(desc), desc
+        x += w + 8
+    fy = 196
+    svg.rect(27, fy, 360, 62, 18, fill=p["well"])
+    ph = svg.anim([(0, {"opacity": "1"}), (2.0, {"opacity": "1"}), (2.3, {"opacity": "0"}), (9.4, {"opacity": "0"}), (9.7, {"opacity": "1"})],
+                  rest={"opacity": "0"})
+    svg.text(47, fy + 36, "What are we making?", 15, 450, p["ink3"], cls=ph)
+    typing(svg, 47, fy + 36, "A hook for my desk, sized from photo.jpg", 14, 450, p["ink"], 2.3, 4.4, 9.4, p["well"], p["datum"])
+    send = svg.anim([(0, {"opacity": ".3"}), (4.5, {"opacity": ".3"}), (4.7, {"opacity": "1"}), (9.4, {"opacity": "1"}), (9.7, {"opacity": ".3"})],
+                    rest={"opacity": "1"})
+    cx, cy = 387 - 31, fy + 31
+    svg.add('<g class="%s"><circle cx="%s" cy="%s" r="16" fill="%s"/><path d="M%s %sv-12M%s %sl5.5-5.5 5.5 5.5" stroke="%s" stroke-width="2" '
+            'stroke-linecap="round" stroke-linejoin="round"/></g>' % (send, f1(cx), f1(cy), p["mint"], f1(cx), f1(cy + 6), f1(cx - 5.5),
+                                                                    f1(cy - 0.5), p["mintInk"]))
+    card_words(svg, p, title, "Words, a photo with a coin for scale, a sketch with real dimensions, a STEP, STL or 3MF part, a PDF drawing or a link.")
+    return svg.render("%s: words, photos, sketches, STEP, STL and 3MF parts, PDF drawings and links in one composer." % title)
 
 
-def header(data, light: bool):
-    """The wordmark on the bench: the mark, the name, and a datum line crossing a build-plate grid."""
-    W, H = 1200, 300
-    svg = Svg(W, H, 9.0, "Form Studio")
-    ink = "#0e1113" if light else T["ink"]
-    ink2 = "#5b6562" if light else T["ink2"]
-    part = "#0e1113" if light else T["clay"]
-    datum = "#2f8a6c" if light else T["datum"]
-    # the bench grid in perspective, fading out
-    cam = Camera(az=0, el=24, target=(0, 0, 0), dist=300)
-    pts = np.array([[-200, -60, 0], [200, -60, 0], [200, 200, 0], [-200, 200, 0]], float)
-    cam.fit(pts, (-200, 120, W + 400, 360))
-    m = svg.id("hm")
-    svg.defs.append('<radialGradient id="%sg" cx=".5" cy=".55" r=".55"><stop offset="0" stop-color="#fff" stop-opacity=".9"/>'
-                    '<stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><mask id="%s"><rect width="%d" height="%d" fill="url(#%sg)"/></mask>'
-                    % (m, m, W, H, m))
-    lines = []
-    for gx in np.arange(-200, 201, 20):
-        a, _ = cam.project(np.array([[gx, -60, 0], [gx, 200, 0]]))
-        lines.append("M%s %sL%s %s" % (f1(a[0][0]), f1(a[0][1]), f1(a[1][0]), f1(a[1][1])))
-    for gy in np.arange(-60, 201, 20):
-        a, _ = cam.project(np.array([[-200, gy, 0], [200, gy, 0]]))
-        lines.append("M%s %sL%s %s" % (f1(a[0][0]), f1(a[0][1]), f1(a[1][0]), f1(a[1][1])))
-    gink = "rgba(14,17,19,.10)" if light else "rgba(232,237,235,.07)"
-    svg.add('<path d="%s" stroke="%s" stroke-width="1" mask="url(#%s)"/>' % ("".join(lines), gink, m))
-    # the scan line
-    sg = svg.id("scan")
-    svg.defs.append('<linearGradient id="%s" x1="0" x2="1"><stop offset="0" stop-color="%s" stop-opacity="0"/><stop offset=".5" stop-color="%s" stop-opacity=".9"/>'
-                    '<stop offset="1" stop-color="%s" stop-opacity="0"/></linearGradient>' % (sg, datum, datum, datum))
-    sc = svg.anim([(0, {"transform": "translateY(0px)", "opacity": "0"}), (0.6, {"transform": "translateY(0px)", "opacity": "0"}),
-                   (1.2, {"opacity": ".9"}), (3.4, {"opacity": ".9"}), (4.2, {"transform": "translateY(170px)", "opacity": "0"})], ease="ease-in-out")
-    svg.rect(150, 120, W - 300, 1.2, fill="url(#%s)" % sg, cls=sc)
-    # the mark: the origin first, then the arms, as the app's first start draws it
-    size = 96
-    u = size / 48
-    total = 40 * u + 0.42 * size + LOGO_W * (size / 1.5 / LOGO_CAP)
-    x = (W - total) / 2
-    y = 110 - size / 2
-    o = svg.show(0.2, None, 0.5, scale=0.6)
-    svg.rect(x, y, 12 * u, 12 * u, fill=datum, cls=o)
-    cut = 2 * u
-    for k, (rx, ry, rw, rh) in enumerate(((12 * u + cut, 0, 28 * u - cut, 12 * u), (0, 12 * u + cut, 12 * u, 36 * u - cut), (12 * u, 20 * u, 20 * u, 12 * u))):
-        cls = svg.anim([(0, {"opacity": "0", "transform": "translate(%spx,%spx)" % ("-10" if k != 1 else "0", "0" if k != 1 else "-10")}),
-                        (0.45 + 0.12 * k, {"opacity": "0", "transform": "translate(%spx,%spx)" % ("-10" if k != 1 else "0", "0" if k != 1 else "-10")}),
-                        (0.95 + 0.12 * k, {"opacity": "1", "transform": "translate(0px,0px)"})])
-        svg.rect(x + rx, y + ry, rw, rh, fill=part, cls=cls)
-    cap = size / 1.5
-    k_ = cap / LOGO_CAP
-    wx, wy = x + 40 * u + 0.42 * size, y + (size - cap) / 2
-    wc = svg.show(0.9, None, 0.6, rise=6)
-    svg.add('<g class="%s"><g transform="translate(%.2f %.2f) scale(%.5f)"><path d="%s" fill="%s"/><path d="%s" fill="%s"/></g></g>'
-            % (wc, wx, wy, k_, LOGO_FORM, ink, LOGO_STUDIO, ink2))
-    t1 = svg.show(1.5, None, 0.6, rise=6)
-    svg.text(W / 2, 222, "What are we making?", 30, 620, ink, anchor="middle", ls=-0.8, cls=t1)
-    t2 = svg.show(1.8, None, 0.6, rise=6)
-    svg.text(W / 2, 256, "Describe it. An agent designs it in a real CAD kernel. Form Studio proves it and slices it.", 16, 420,
-             "#5b6562" if light else T["ink3"], anchor="middle", cls=t2)
-    # header runs once (it does not loop forever: everything holds after the entrance)
-    svg.css = [c.replace(" infinite;", " 1 forwards;") for c in svg.css]
-    desc = "Form Studio. What are we making?"
-    return svg.render(desc), desc
+AGENT_APPS = ["Claude Code", "Codex", "Gemini CLI", "Cursor CLI", "OpenCode", "Qwen Code", "GitHub Copilot CLI"]
+MODEL_APIS = ["Anthropic", "OpenAI", "Gemini", "OpenRouter", "Mistral", "xAI", "DeepSeek", "Groq"]
+LOCAL = ["Ollama", "LM Studio", "llama.cpp"]
 
 
-SCENES = {"header": header, "hero": hero, "prove": prove_card, "hinge": hinge_card, "print": print_card}
+def f_talk(data, light):
+    title = "Talk to any model"
+    picks = [(0, 0), (1, 0), (2, 0), (0, 1), (1, 2), (2, 1), (0, 6), (1, 4)]
+    step = 1.15
+    svg, p = card(title, light, step * len(picks))
+    cols = [("Agent apps", AGENT_APPS), ("Model APIs", MODEL_APIS), ("Local", LOCAL)]
+    cx_, x0, y0, rh = [0, 144, 272], 27, 74, 23
+    hl = alpha(p["mint"], 0.16) if not light else alpha(p["datum"], 0.12)
+    fr = []
+    for i, (c, r) in enumerate(picks):
+        t = i * step
+        tr = {"transform": "translate(%spx,%spx)" % (f1(cx_[c]), f1(r * rh))}
+        fr += [(t + (0.32 if i else 0), tr), (t + step, tr)]
+    fr.append((svg.loop - 0.001, fr[-1][1]))
+    mv = svg.anim([(0, fr[0][1])] + fr, ease="cubic-bezier(.65,0,.35,1)")
+    svg.rect(x0 - 8, y0 - 16, 124, 23, 7, fill=hl, cls=mv)
+    for ci, (head, names) in enumerate(cols):
+        svg.text(x0 + cx_[ci], 44, head, 13, 620, p["ink"])
+        for ri, n in enumerate(names):
+            svg.text(x0 + cx_[ci], y0 + ri * rh, n, 13.5, 450, p["ink2"])
+    card_words(svg, p, title, "Agent apps, model APIs or local models. Every conversation keeps its own agent and model, and its design.")
+    return svg.render("%s: agent apps %s; model APIs %s; local models %s." % (title, ", ".join(AGENT_APPS), ", ".join(MODEL_APIS), ", ".join(LOCAL)))
+
+
+def arc_path(cx, cy, r, a0, a1) -> str:
+    x0, y0 = cx + r * math.sin(a0), cy - r * math.cos(a0)
+    x1, y1 = cx + r * math.sin(a1), cy - r * math.cos(a1)
+    return "M%s %sA%s %s 0 %d 1 %s %s" % (f1(x0), f1(y0), f1(r), f1(r), 1 if a1 - a0 > math.pi else 0, f1(x1), f1(y1))
+
+
+def f_proved(data, light):
+    title = "Proved on the solid"
+    d = data["desk-phone-stand"]
+    F = stand_facts(d)
+    loop = 10.0
+    svg, p = card(title, light, loop)
+    checks = F["checks"]
+    n = len(checks)
+    cx, cy, r = 118, 146, 78
+    svg.add('<circle cx="%s" cy="%s" r="%s" stroke="%s" stroke-width="16"/>' % (cx, cy, r, p["panel2"]))
+    gap = math.radians(3.2)
+    seg = 2 * math.pi / n
+    t0, dt = 0.4, 0.2
+    for i, c in enumerate(checks):
+        a0, a1 = i * seg + gap / 2, (i + 1) * seg - gap / 2
+        ink = ev_ink(p, c["evidence"]) if c["status"] == "PASS" else p["signal"]
+        draw_dash(svg, arc_path(cx, cy, r, a0, a1), ink, 16, t0 + i * dt, t0 + i * dt + 0.28, loop, hold=loop - 0.05,
+                  ease="cubic-bezier(.23,1,.32,1)", cap="butt")
+    passed = sum(1 for c in checks if c["status"] == "PASS")
+    counter(svg, cx, cy + 14, list(range(passed + 1)), [0.0] + [t0 + i * dt + 0.28 for i in range(passed)], 46, 620, p["ink"], loop,
+            once=False, anchor="middle", ls=-1.5)
+    svg.text(cx, cy + 38, "checks pass", 13, 500, p["ink3"], anchor="middle")
+    lx = 232
+    order = [e for e in ("computed", "heuristic", "model", "simulated", "measured") if e in F["evidence"]]
+    notes = {"computed": "from the solid or the mesh", "heuristic": "a rule of thumb, stated", "model": "a stated model, not a test"}
+    for k, e in enumerate(order):
+        yy = 92 + k * 54
+        g = cycle(svg, t0 + n * dt + 0.1 + 0.15 * k, 9.6, fade=0.35, rise=6)
+        svg.g(g)
+        svg.rect(lx, yy - 10, 10, 10, 3, fill=ev_ink(p, e))
+        svg.text(lx + 18, yy, "%d %s" % (F["evidence"][e], e), 15, 600, p["ink"])
+        svg.text(lx + 18, yy + 20, notes.get(e, ""), 12.5, 450, p["ink3"])
+        svg.end()
+    card_words(svg, p, title, "Every revision is checked on the B-rep and its mesh, and every number says how it is known.")
+    desc = "%s: %s; %s." % (title, ", ".join("%s %s" % (c["label"].lower(), c["value"]) for c in checks),
+                            ", ".join("%d %s" % (F["evidence"][e], e) for e in order))
+    return svg.render(desc)
+
+
+def f_move(data, light):
+    title = "Assemblies that move"
+    d = data["hinged-box"]
+    asm = d["asm"]
+    joint = asm["joints"][0]
+    lid = next(pp for pp in asm["parts"] if pp["id"] == joint["part"])
+    M = np.array(lid["placement"]["m"])
+    lo_deg, hi_deg = joint["range"]
+    check = next(parse_check(c) for c in d["state"]["checks"] if joint["label"] in c and "moves" in c)
+    body_t = np.concatenate([m["tris"] for m in d["meshes"] if m["part"] != lid["id"]])
+    lid_t = np.concatenate([m["tris"] for m in d["meshes"] if m["part"] == lid["id"]])
+    lid_a = lid_t @ M[:, :3].T + M[:, 3]
+    be = d["part_edges"].get("body")
+    le = d["part_edges"].get(lid["id"])
+    le_a = le @ M[:, :3].T + M[:, 3]
+    o = np.array(joint["origin"])
+    N = 12
+    angles = [lo_deg + (hi_deg - lo_deg) * (1 - math.cos(math.pi * i / (N - 1))) / 2 for i in range(N)]
+    loop = 8.0
+    svg, p = card(title, light, loop)
+    allp = [body_t.reshape(-1, 3)]
+    for a in (angles[0], angles[-1]):
+        R = rot(joint["axis"], math.radians(a))
+        allp.append((lid_a.reshape(-1, 3) - o) @ R.T + o)
+    allp = np.concatenate(allp)
+    lo, hi = allp.min(0), allp.max(0)
+    cam = Camera(az=-40, el=24, target=(lo + hi) / 2, dist=420)
+    cam.fit(allp, (57, 22, 310, 228))
+    c0 = (lo + hi) / 2
+    rad = float(np.linalg.norm((hi - lo)[:2])) / 2
+    k_ = px_per_mm(cam, 420)
+    soft_shadow(svg, cam, (c0[0], c0[1], 0), rad * k_ * 0.95, rad * k_ * 0.34, p["shadow"])
+    rings(svg, cam, (c0[0], c0[1], 0), [rad * 1.05, rad * 1.4], p["grid"])
+    hold0, move, hold1 = 0.8, 2.4, 0.8
+    st = move / (N - 1)
+    seq, t = [], hold0
+    seq.append((0, 0.0, hold0))
+    for i in range(1, N):
+        seq.append((i, t, t + st))
+        t += st
+    seq[-1] = (N - 1, seq[-1][1], t + hold1)
+    t += hold1
+    for i in range(N - 2, -1, -1):
+        seq.append((i, t, t + st))
+        t += st
+    seq[-1] = (0, seq[-1][1], loop)
+    iv = [[(s, e) for j, s, e in seq if j == i] for i in range(N)]
+    classes = window_classes(svg, iv, loop)
+    for i, a in enumerate(angles):
+        R = rot(joint["axis"], math.radians(a))
+        tris = np.concatenate([body_t, (lid_a - o) @ R.T + o])
+        ed = np.concatenate([be, (le_a - o) @ R.T + o])
+        fills, edges = draw_solid(cam, tris, svg.w, svg.h, ed, edge_ink=p["edge"], base=p["clay"])
+        svg.add('<g class="%s">%s%s' % (classes[i], fills, edges))
+        svg.text(27, 46, "%d°" % round(a), 22, 620, p["datum"])
+        svg.add("</g>")
+    svg.text(27, 66, joint["label"], 13, 500, p["ink3"])
+    svg.text(27, 268, "%s · %s" % (check["label"], check["value"]), 13, 500, p["ink2"])
+    card_words(svg, p, title, "Joints are swept through their whole range and checked for collisions, assembled, exploded or laid out to print.")
+    desc = ("%s: the %s's lid swings on the %s from %d to %d degrees; %s, %s." %
+            (title, d["state"]["name"].lower(), joint["label"].lower(), lo_deg, hi_deg, check["label"].lower(), check["value"]))
+    return svg.render(desc)
+
+
+def f_slicer(data, light):
+    title = "Your slicer, for real"
+    d = data["desk-phone-stand"]
+    tp = d["toolpath"]
+    loop = 10.0
+    svg, p = card(title, light, loop)
+    L = tp.layers
+    # the layer with the most infill to see: sparse infill, while solid fills (drawn as a block at this size) stay small
+    solid = {tp.types.index(t) for t in ("Bridge", "Top surface", "Bottom surface", "Internal solid infill") if t in tp.types}
+    sparse = tp.types.index("Sparse infill")
+    best, bl = -1.0, L // 3
+    for l in range(1, L - 1):
+        s0, s1 = tp.start[l], tp.start[l + 1]
+        sg, ty = tp.seg[s0:s1], tp.seg_type[s0:s1]
+        ln = np.hypot(sg[:, 2] - sg[:, 0], sg[:, 3] - sg[:, 1])
+        if sum(float(ln[ty == t].sum()) for t in solid) > 400:
+            continue
+        score = float(ln[ty == sparse].sum()) + 50 * len(set(ty.tolist()))
+        if score > best:
+            best, bl = score, l
+    s0, s1 = tp.start[bl], tp.start[bl + 1]
+    pts = tp.seg[s0:s1].reshape(-1, 2)
+    swap = np.ptp(pts[:, 1]) > np.ptp(pts[:, 0])         # the long side across the card
+    if swap:
+        pts = pts[:, ::-1]
+    (bx0, by0), (bx1, by1) = pts.min(0), pts.max(0)
+    # plan view from above
+    s = min(352 / (bx1 - bx0), 196 / (by1 - by0))
+    ox = 27 + (360 - (bx1 - bx0) * s) / 2 - bx0 * s
+    oy = 50 + (200 + (by1 - by0) * s) / 2 + by0 * s
+    ink = type_ink(p, light)
+    by_type = {}
+    for (x0, y0, x1, y1), ty in zip(tp.seg[s0:s1], tp.seg_type[s0:s1]):
+        by_type.setdefault(int(ty), []).append((x0, y0, x1, y1))
+    order = sorted(by_type, key=lambda t_: ["Outer wall", "Inner wall", "Gap infill", "Sparse infill", "Internal solid infill",
+                                            "Bridge", "Top surface", "Bottom surface", "Floating vertical shell"].index(tp.types[t_])
+                   if tp.types[t_] in TYPE_INK else 99)
+    t0 = 0.3
+    span = 6.2 / max(1, len(order))
+    for i, ty in enumerate(order):
+        dd = []
+        for pl in chain(np.array(by_type[ty])):
+            xy = np.array([[ox + b * s, oy - a * s] if swap else [ox + a * s, oy - b * s] for a, b in pl])
+            xy = rdp(xy, 0.2)
+            dd.append(rel_path(xy, close=False))
+        draw_dash(svg, "".join(dd), ink.get(tp.types[ty], p["ink2"]), 1.0, t0 + i * span, t0 + (i + 1) * span, loop, hold=9.4,
+                  ease="linear")
+    name = d["state"]["slice_simulated"]
+    svg.text(27, 34, "Layer %d of %d" % (bl + 1, L), 13, 600, p["ink"])
+    svg.text(27 + text_w("Layer %d of %d" % (bl + 1, L), 13, 600) + 8, 34, "z %.2f mm · from the G-code" % tp.z[bl], 13, 450, p["ink3"])
+    x = 27
+    for ty in order:
+        nm = tp.types[ty]
+        wd = 13 + text_w(nm, 11.5, 450)
+        if x + wd > 387:
+            break
+        svg.rect(x, 260, 8, 8, 2, fill=ink.get(nm, p["ink2"]))
+        svg.text(x + 13, 268, nm, 11.5, 450, p["ink3"])
+        x += wd + 14
+    sl = data["slicers"]
+    card_words(svg, p, title, "%s and %s slice every revision with your printer's own presets." % (", ".join(sl[:-1]), sl[-1]))
+    desc = ("%s: layer %d of %d of the %s, drawn line type by line type from the slicer's G-code; slicers: %s." %
+            (title, bl + 1, L, d["state"]["name"].lower(), ", ".join(sl)))
+    return svg.render(desc)
+
+
+def f_compare(data, light):
+    title = "Every printer compared"
+    cmp_ = data["compare"]
+    loop = 10.0
+    svg, p = card(title, light, loop)
+    rows, seen = [], set()
+    for r in sorted([r for r in cmp_["rows"] if r["status"] == "ok"], key=lambda r: r["time_s"]):
+        key = (r["model"], r["nozzle_mm"])
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(r)
+    rows = rows[:5]
+    tmax = max(r["time_s"] for r in rows)
+    best = cmp_.get("best", {})
+    for i, r in enumerate(rows):
+        y = 40 + i * 46
+        nm = r["model"]
+        svg.text(27, y, nm, 14, 580, p["ink"])
+        x = 27 + text_w(nm, 14, 580) + 6
+        svg.text(x, y, "%.1f mm" % r["nozzle_mm"], 13, 450, p["ink3"])
+        tags = [lab for key, lab in (("fastest", "fastest"), ("least_filament", "least filament")) if best.get(key) == r["id"]]
+        if tags:
+            x += text_w("%.1f mm" % r["nozzle_mm"], 13, 450) + 8
+            svg.text(x, y, " · ".join(tags), 13, 560, p["datum"])
+        svg.text(387, y, "%s · %.1f g" % (fmt_min(r["time_s"] / 60), r["filament_g"]), 13.5, 500, p["ink2"], anchor="end")
+        svg.rect(27, y + 10, 360, 6, 3, fill=p["panel2"])
+        g = svg.anim([(0, {"transform": "scaleX(0)"}), (0.4 + 0.14 * i, {"transform": "scaleX(0)"}), (1.4 + 0.14 * i, {"transform": "scaleX(1)"}),
+                      (9.3, {"transform": "scaleX(1)"}), (9.7, {"transform": "scaleX(0)"})], origin="left")
+        fast = best.get("fastest") == r["id"]
+        svg.rect(27, y + 10, max(6, 360 * r["time_s"] / tmax), 6, 3, fill=p["datum"] if fast else p["ink3"], cls=g)
+    svg.text(27, 268, "Each slicer's own estimate, with that printer's presets.", 12.5, 450, p["ink3"])
+    card_words(svg, p, title, "One design, sliced for real on every printer set up in your slicers, with time and filament side by side.")
+    desc = "%s: %s; simulated by each slicer." % (title, "; ".join("%s %.1f mm nozzle, %s, %.1f g" % (r["model"], r["nozzle_mm"], fmt_min(r["time_s"] / 60), r["filament_g"]) for r in rows))
+    return svg.render(desc)
+
+
+def f_release(data, light):
+    title = "Release what you approved"
+    d = data["desk-phone-stand"]
+    loop = 10.0
+    svg, p = card(title, light, loop)
+    lab = {"step": "STEP", "stl": "STL", "3mf": "3MF", "obj": "OBJ", "glb": "GLB", "gcode": "G-code"}
+    rows = sorted(d["hashes"], key=lambda h: list(lab).index(h[0]) if h[0] in lab else 99)
+    for i, (kind, name, hx, size) in enumerate(rows[:6]):
+        y = 42 + i * 35
+        g = cycle(svg, 0.3 + 0.18 * i, 9.3, fade=0.35, rise=6)
+        svg.g(g)
+        svg.text(27, y, lab.get(kind, kind.upper()), 14, 640, p["ink"])
+        svg.text(100, y, "%.0f kB" % (size / 1000) if size < 1e6 else "%.1f MB" % (size / 1e6), 12.5, 450, p["ink3"])
+        svg.text(387, y, hx[:8] + "…" + hx[-8:], 12.5, 450, p["ink2"], family="mono", anchor="end")
+        svg.end()
+        draw_dash(svg, check_mark(244, y - 4.5, 0.75), p["datum"], 1.6, 1.6 + 0.12 * i, 1.9 + 0.12 * i, loop, hold=9.3)
+    svg.text(27, 268, "SHA-256 of %s %s's files, as exported" % (d["state"]["name"], "r%02d" % d["state"]["head"]), 12.5, 450, p["ink3"])
+    card_words(svg, p, title, "Only a person approves a release. Its files are frozen with SHA-256 hashes and a report of every check.")
+    desc = "%s: %s." % (title, "; ".join("%s %s sha256 %s" % (lab.get(k, k), n, h) for k, n, h, _ in rows[:6]))
+    return svg.render(desc)
+
+
+def f_headless(data, light):
+    title = "Everything headless"
+    d = data["desk-phone-stand"]
+    loop = 10.0
+    svg, p = card(title, light, loop)
+    svg.rect(27, 20, 360, 258, 16, fill=p["well"])
+    cmd = "form state desk-phone-stand"
+    lines = d["state_text"].splitlines()
+    want = ['"name": ', '"lean": ', "Thinnest wall", '"time_min": ', '"filament_g": ']
+    shown, last = [], None
+    for i, ln in enumerate(lines):
+        if any(w_ in ln for w_ in want) and not (want[0] in ln and shown and '"name"' in shown[0][1]):
+            if last is not None and i != last + 1:
+                shown.append((None, "…"))
+            shown.append((i, ln.rstrip()))
+            last = i
+            if '"filament_g"' in ln:
+                break
+    shown = [(None, "{")] + shown + [(None, "…")]
+    fs = 11.5
+    x0, y0, lh = 43, 50, 19.5
+    svg.text(x0, y0, "$", fs, 500, p["datum"], family="mono")
+    typing(svg, x0 + text_w("$ ", fs, 500, "mono"), y0, cmd, fs, 450, p["ink"], 0.4, 1.6, 9.3, p["well"], p["datum"], family="mono")
+    for k, (_, ln) in enumerate(shown):
+        y = y0 + (k + 1) * lh
+        g = cycle(svg, 1.9 + 0.09 * k, 9.3, fade=0.15, rise=0)
+        ln = ln.replace("\t", " ")
+        ink = p["ink3"] if ln.strip() in ("{", "…") else p["ink2"]
+        svg.text(x0, y, elide(ln, 330, fs, 450, "mono"), fs, 450, ink, family="mono", cls=g)
+    y = y0 + (len(shown) + 1) * lh
+    if y < 268:
+        g = cycle(svg, 1.9 + 0.09 * len(shown) + 0.2, 9.3, fade=0.15, rise=0)
+        svg.text(x0, y, "$", fs, 500, p["datum"], family="mono", cls=g)
+    card_words(svg, p, title, "Every action is a form command that prints JSON, and every agent tool is one of %d MCP tools." % len(data["tools"]))
+    return svg.render("%s: $ %s prints the design as JSON: %s." % (title, cmd, " ".join(l.strip() for _, l in shown)))
+
+
+FEATURES = [("start", f_start), ("talk", f_talk), ("proved", f_proved), ("move", f_move), ("slicer", f_slicer),
+            ("compare", f_compare), ("release", f_release), ("headless", f_headless)]
+
+
+def features(data, light: bool):
+    return [("feature-%s" % n, fn(data, light)) for n, fn in FEATURES]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+# Download buttons: one picture each, the same on light and dark pages (a link around a <picture> loses its dark
+# source on GitHub), so each is a self-contained pill with its own edge
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+DOWNLOADS = [("macos-arm64", "macOS", "Apple silicon"), ("macos-x64", "macOS", "Intel"),
+             ("windows-x64", "Windows", "x64"), ("linux-x64", "Linux", "x64")]
+
+
+def downloads(data, light: bool):
+    out = []
+    for i, (slug, os_, sub) in enumerate(DOWNLOADS):
+        primary = i == 0
+        W, H = 168, 56
+        svg = Svg(W, H, 1.0, "Download for %s, %s" % (os_, sub))
+        fill = T["datum"] if primary else "#161b1f"
+        ink = T["datumInk"] if primary else T["ink"]
+        ink2 = "rgba(13,26,22,.66)" if primary else T["ink2"]
+        svg.rect(0.5, 0.5, W - 1, H - 1, 27.5, fill=fill, stroke="rgba(13,26,22,.14)" if primary else "rgba(255,255,255,.14)")
+        svg.text(24, 26, os_, 16, 640, ink, ls=-0.2)
+        svg.text(24, 42, sub, 12, 480, ink2)
+        cx, cy = W - 29, H / 2
+        svg.circle(cx, cy, 18, T["datumInk"] if primary else T["datum"])
+        svg.add('<path d="M%s %sv11M%s %sl5 5 5-5" stroke="%s" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+                % (f1(cx), f1(cy - 6.5), f1(cx - 5), f1(cy - 0.5), T["datum"] if primary else T["datumInk"]))
+        out.append(("download-%s" % slug, svg.render("Download Form Studio for %s, %s" % (os_, sub))))
+    return out
+
+
+downloads.neutral = True
+SCENES = {"hero": hero, "steps": steps, "numbers": numbers, "features": features, "downloads": downloads}
 
 
 def main():
@@ -1676,23 +1554,23 @@ def main():
     a = ap.parse_args()
     data_dir = a.keep or Path(tempfile.mkdtemp(prefix="form-readme-"))
     cache = data_dir / ".readme-art.pkl"
+    import pickle
     if a.keep and cache.exists() and not a.fresh:
-        import pickle
         data = pickle.loads(cache.read_bytes())
     else:
         data = engine(data_dir)
         if a.keep:
-            import pickle
             cache.write_bytes(pickle.dumps(data))
     OUT.mkdir(parents=True, exist_ok=True)
     for name, fn in SCENES.items():
         if a.only and name not in a.only.split(","):
             continue
-        for light in (False, True):
-            svg_text, desc = fn(data, light)
-            p = OUT / ("%s-%s.svg" % (name, "light" if light else "dark"))
-            p.write_text(svg_text, encoding="utf-8")
-            print("%-28s %7.1f kB" % (p.relative_to(ROOT), p.stat().st_size / 1024))
+        neutral = getattr(fn, "neutral", False)
+        for light in ((False,) if neutral else (False, True)):
+            for fname, svg_text in fn(data, light):
+                path = OUT / ("%s.svg" % fname if neutral else "%s-%s.svg" % (fname, "light" if light else "dark"))
+                path.write_text(svg_text, encoding="utf-8")
+                print("%-34s %7.1f kB" % (path.relative_to(ROOT), path.stat().st_size / 1024))
 
 
 if __name__ == "__main__":
