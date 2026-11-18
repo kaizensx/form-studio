@@ -229,8 +229,22 @@ class Setup:
         self.post_once("rules", "rules", [{"color": d.AMBER, "title": "Rules", "fields": fields,
                                            "description": "Short, so they get read. Moderators may remove what breaks them."}])
 
+    def ensure_profile(self):
+        """The bot's own picture and profile banner, once."""
+        body = {}
+        if not self.me.get("avatar") and (ART / "icon.png").exists():
+            body["avatar"] = "data:image/png;base64," + base64.b64encode((ART / "icon.png").read_bytes()).decode()
+        if not self.me.get("banner") and (ART / "profile-banner.png").exists():
+            body["banner"] = "data:image/png;base64," + base64.b64encode((ART / "profile-banner.png").read_bytes()).decode()
+        if body:
+            try:
+                self._do("PATCH", "/users/@me", body, "bot avatar and banner")
+            except d.DiscordError as e:
+                log(f"profile: {e}")
+
     def run(self):
         log(f"server: {self.guild['name']} · bot: {self.me['username']}")
+        self.ensure_profile()
         self.ensure_roles()
         self.ensure_channels()
         self.ensure_community()
