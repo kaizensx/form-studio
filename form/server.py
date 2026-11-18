@@ -242,6 +242,9 @@ def make_handler(st: Studio):
             if rest == "/slicecompare":
                 from . import slicecompare
                 return self._json(slicecompare.cached(st, p) or {"rows": [], "cached": False})
+            if rest == "/lighten":                       # the last "Make it lighter" search for this revision (form/lighten.py)
+                from . import lighten
+                return self._json(lighten.cached(st, p) or {"candidates": [], "cached": False, "none": True})
             if rest == "/text/check":
                 from . import engrave
                 return self._json(engrave.printability(q.get("text") or "", float(q.get("height") or 6), float(q.get("depth") or 0.6),
@@ -446,6 +449,12 @@ def make_handler(st: Studio):
                               purpose=body.get("purpose"), process=body.get("process"))
                 job = st.run(p["id"])
                 return self._json({"id": p["id"], "job": job})
+            if path == "/api/replace/brief":                # Home › Replace a broken part (form/replace.py): the message only
+                from . import replace
+                return self._json({"message": replace.brief(str(body.get("name") or ""), str(body.get("what") or ""),
+                                                            str(body.get("reference") or "card"), str(body.get("coin") or ""),
+                                                            str(body.get("broke") or ""), str(body.get("purpose") or "print")),
+                                   "steps": replace.STEPS})
             if path == "/api/import":
                 p = st.import_archive(body if isinstance(body, bytes) else b"")
                 return self._json({"id": p["id"]})
@@ -583,6 +592,16 @@ def make_handler(st: Studio):
                     o = {k: v for k, v in (body.get("options") or {}).items()}
                     out = feature_helpers.add(st, p, body.get("kind", ""), body.get("at"), body.get("normal"), eh, "you", **o)
                 st.activity(pid, "design", f"Standard feature: r{out['head']:02d}.", by="you")
+                out["job"] = auto(st.load(pid))
+                return self._json(out)
+            if action == "lighten":
+                from . import lighten
+                return self._json(lighten.search(st, p, builds=int(body.get("builds") or 4)))
+            if action == "lighten_apply":
+                from . import lighten
+                eh = int(body["expect_head"]) if body.get("expect_head") is not None else None
+                out = lighten.apply_values(st, p, body.get("changes"), body.get("settings"), eh, "you")
+                st.activity(pid, "design", "Lighter: " + (f"r{out['head']:02d}" if body.get("changes") else "print settings") + ".", by="you")
                 out["job"] = auto(st.load(pid))
                 return self._json(out)
             if action == "slicecompare":

@@ -21,7 +21,7 @@ Rectangle {
         else if (roll && roll.WARN) out.push({ label: "Explain the " + F.plural(roll.WARN, "warning") + " on " + rev, prompt: "Explain the warnings on " + rev + " of this design: what each one means for " + (Store.modelDesign ? "the part" : "the print or the fit") + ", and which I can safely acknowledge." })
         var model = Store.modelDesign
         out.push({ label: "Review " + rev + (model ? ": design and engineering" : ": design, engineering, print"), review: true })
-        out.push({ label: "Make it lighter without failing a check", prompt: "Make this design lighter without failing any check. Show me the candidate as a preview first, with the mass before and after." })
+        out.push({ label: "Make it lighter without failing a check", sheet: "lighter" })
         if (model) out.push({ label: "Which dimensions are still assumed?", prompt: "Which numbers in this design are assumed rather than measured or specified? Tell me which matter most and how to confirm each." })
         else out.push({ label: "What should I measure before printing?", prompt: "Which numbers in this design are assumed rather than measured, and which of them matter for the fit? Tell me exactly what to measure and with what." })
         if (d.fit && d.fit.yield < 0.95) out.push({ label: "Improve the modelled fit yield", prompt: "The modelled fit yield is " + Math.round(d.fit.yield * 100) + "%. What drives it, and what change would raise it? It is a model, so say what a test print should confirm." })
@@ -156,6 +156,12 @@ Rectangle {
         }
     }
 
+    // ── Replace a broken part: where the agent is in the four steps (Store.replaceProgress) ──
+    Rectangle { id: rsteps; visible: Store.replaceActive && !talk.empty; z: 2
+        anchors.top: head.bottom; width: parent.width - 1; height: visible ? 62 : 0; color: Theme.plate1
+        ReplaceSteps { x: 14; y: 9; width: parent.width - 28; done: Store.replaceProgress.done; active: Store.replaceProgress.active }
+        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule } }
+
     // ── nothing open yet: what you can ask ──
     Column {
         id: intro
@@ -200,7 +206,7 @@ Rectangle {
                     Icon { name: "arrow_right"; size: 13; anchors.right: parent.right; anchors.rightMargin: im.containsMouse ? 8 : 10; anchors.verticalCenter: parent.verticalCenter; color: im.containsMouse ? Theme.datum : Theme.ink4
                         Behavior on anchors.rightMargin { Glide { duration: Theme.fast } } }
                     MouseArea { id: im; anchors.fill: parent; hoverEnabled: true
-                        onClicked: idea.modelData.review ? Store.askReview() : Store.send(idea.modelData.prompt) }
+                        onClicked: idea.modelData.sheet ? Store.openSheet(idea.modelData.sheet) : idea.modelData.review ? Store.askReview() : Store.send(idea.modelData.prompt) }
                 }
             }
         }
@@ -212,7 +218,7 @@ Rectangle {
         property bool stick: true              // follow the newest message unless the reader scrolled up
         property bool auto: false
         visible: !talk.empty
-        anchors.top: head.bottom; anchors.bottom: foot.top; anchors.left: parent.left; anchors.right: parent.right
+        anchors.top: rsteps.visible ? rsteps.bottom : head.bottom; anchors.bottom: foot.top; anchors.left: parent.left; anchors.right: parent.right
         topMargin: 16; bottomMargin: 12; clip: true; spacing: 14
         boundsBehavior: Flickable.StopAtBounds
         model: blocks

@@ -205,8 +205,38 @@ class Studio:
         base = self._slicer_info(refresh, p)
         mat = materials_mod.normalise(material) if material else (materials_mod.stated(p) if isinstance(p, dict) else None)
         if not mat:
-            return base
-        return self._slicer_for_material(p, mat, refresh, base)
+            return self._with_print_overrides(base, p)
+        return self._with_print_overrides(self._slicer_for_material(p, mat, refresh, base), p)
+
+    # a design's own infill and wall count over the process preset ("Make it lighter", form/lighten.py)
+    OVERRIDE_KEYS = {"infill": ("sparse_infill_density", "fill_density"), "walls": ("wall_loops", "perimeters")}
+
+    def _with_print_overrides(self, s: dict, p) -> dict:
+        """The slicer info with p["print_overrides"] written into the process preset (a new preset sha, so the slice
+        key changes and the slice is redone with them). Overrides the preset does not have are ignored."""
+        ov = p.get("print_overrides") if isinstance(p, dict) else None
+        proc = (s.get("presets") or {}).get("process") if isinstance(s, dict) else None
+        if not ov or not s.get("available") or not proc or "data" not in proc:
+            return s
+        data, applied = dict(proc["data"]), {}
+        for k, v in ov.items():
+            key = next((x for x in self.OVERRIDE_KEYS.get(k, ()) if x in data), None)
+            if key is None or isinstance(data[key], list):
+                continue
+            was = data[key]
+            if k == "infill":
+                data[key] = f"{int(round(float(v)))}%" if isinstance(was, str) else float(v)
+            else:
+                data[key] = str(int(v)) if isinstance(was, str) else int(v)
+            applied[k] = float(v)
+        if not applied:
+            return s
+        sha = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:16]
+        label = ", ".join(f"infill {v:g}%" if k == "infill" else f"{v:g} walls" for k, v in applied.items())
+        summ = dict(s.get("summary") or {})
+        summ.update({k: data[next(x for x in self.OVERRIDE_KEYS[k] if x in data)] for k in applied})
+        return {**s, "presets": {**s["presets"], "process": {**proc, "data": data, "sha": sha, "name": f"{proc['name']} ({label})"}},
+                "summary": summ, "print_overrides": applied}
 
     def _slicer_for_material(self, p, mat: str, refresh: bool, base: dict) -> dict:
         choice, source = self.printer_choice(p)
@@ -1067,6 +1097,23 @@ class Studio:
                 p["auto_slice"] = bool(body["auto_slice"])
             if "auto_run" in body:
                 p["auto_run"] = bool(body["auto_run"])
+            if "print_overrides" in body:             # infill / wall count over the process preset; {} clears
+                ov = {}
+                for k, v in (body["print_overrides"] or {}).items():
+                    if k not in self.OVERRIDE_KEYS:
+                        raise StudioError(f"Unknown print setting “{k}”.", "Known: infill (percent), walls (count).")
+                    v = float(v)
+                    if not ((k == "infill" and 0 <= v <= 100) or (k == "walls" and 1 <= v <= 20)):
+                        raise StudioError(f"{k} {v:g} is out of range.", "Infill 0–100 %, walls 1–20.")
+                    ov[k] = v
+                if ov != (p.get("print_overrides") or {}):
+                    self.decide(p, "print_settings", ("Print settings over the slicer's process: "
+                                + ", ".join(f"infill {v:g}%" if k == "infill" else f"{v:g} walls" for k, v in ov.items()) + ".")
+                                if ov else "Print settings: the slicer's process as it is.")
+                if ov:
+                    p["print_overrides"] = ov
+                else:
+                    p.pop("print_overrides", None)
             if "design_only" in body:
                 on = bool(body["design_only"]) if not isinstance(body["design_only"], str) else \
                     body["design_only"].strip().lower() in ("1", "true", "yes", "on")

@@ -23,6 +23,7 @@ P.MenuBar {
         P.MenuSeparator {}
         P.MenuItem { text: "Import a Reference Part…"; enabled: mb.work; onTriggered: Store.askImportPart() }
         P.MenuItem { text: "Share Card…"; enabled: mb.work; onTriggered: Store.openSheet("share") }
+        P.MenuItem { text: "Make It Lighter…"; enabled: mb.work; onTriggered: Store.openSheet("lighter") }
         P.MenuItem { text: "Turntable Video…"; enabled: mb.work; onTriggered: Store.openSheet("turntable") }
         P.MenuItem { text: "Render in Blender…"; enabled: mb.work; onTriggered: Store.openSheet("render") }
         P.MenuSeparator {}

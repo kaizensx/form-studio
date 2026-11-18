@@ -226,7 +226,10 @@ Item {
                         Item { width: 9; height: 30; anchors.verticalCenter: parent.verticalCenter; Rectangle { width: 1; height: 16; color: Theme.rule2; anchors.centerIn: parent } }
                         Btn { id: blank; anchors.verticalCenter: parent.verticalCenter; objectName: "startBlank"; small: true; kind: "quiet"; icon: "square_dashed"; text: "Start blank"
                             tip: "An empty build plate and the workspace. Describe, sketch or import what goes on it."
-                            onClicked: Store.startBlank() } }
+                            onClicked: Store.startBlank() }
+                        Btn { anchors.verticalCenter: parent.verticalCenter; objectName: "startReplace"; small: true; kind: "quiet"; icon: "wrench"; text: "Replace a broken part"
+                            tip: "From a photo: the agent estimates sizes, asks you for the ones that matter, then designs the new part."
+                            onClicked: Store.openSheet("replace") } }
                     // the design you were on, one click away
                     Item { visible: !home.chatting && !home.fresh && !!home.latest; width: 1; height: 14 }
                     Txt { objectName: "homeContinue"; visible: !home.chatting && !home.fresh && !!home.latest; anchors.horizontalCenter: parent.horizontalCenter; kind: "fine"; tone: cm.containsMouse ? 1 : 3

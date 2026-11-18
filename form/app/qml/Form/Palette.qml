@@ -42,6 +42,7 @@ Item {
             add("Tools", "layers", "layers", Store.layers ? "Close the layer view" : "Show the sliced layers", "The toolpath of the current slice", function () { Store.showLayers(!Store.layers) })
             add("Tools", "run", "play", "Regenerate everything", "Solid, exports, checks, slice", function () { Store.run() })
             add("Tools", "alternatives", "boxes", "Compare alternatives", "Build a grid of candidates", function () { Store.openSheet("alternatives") })
+            add("Tools", "lighter", "weight", "Make it lighter", "Thinner walls, pockets, less infill: every passing check kept", function () { Store.openSheet("lighter") })
             add("Tools", "variants", "layout_grid", "Variants board", "Named variants side by side", function () { Store.openSheet("variants") })
             add("Tools", "share", "share_2", "Share card", "A 1600 × 900 image of this design", function () { Store.openSheet("share") })
             add("Tools", "turntable", "film", "Turntable video", "The part turning, as MP4, PNG frames, WebP or GIF", function () { Store.openSheet("turntable") })
@@ -57,6 +58,7 @@ Item {
         }
         add("Tools", "new", "plus", "New design", "Describe it, or drop a photo, a sketch, a part or a link", function () { Store.startNew() }, "Ctrl+N")
         add("Tools", "sketch", "pen_tool", "Sketch a new design", "Lines, circles, arcs and dimensions in mm", function () { if (Store.screen !== "home") Store.home(); Store.openSheet("sketch") })
+        add("Tools", "replace", "wrench", "Replace a broken part", "From a photo: estimated, measured, designed", function () { if (Store.screen !== "home") Store.home(); Store.openSheet("replace") })
         add("Tools", "blank", "square_dashed", "Start blank", "An empty build plate: describe, sketch or import what goes on it", function () { Store.startBlank() })
         add("Tools", "block", "cuboid", "Start from a block", "A rounded block shaped with sliders, no agent", function () { Store.startBlock("") })
         if (Store.concepts.length) add("Tools", "concepts", "boxes", "Concepts waiting for a pick", Store.concepts[0].name, function () { Store.openConcepts(Store.concepts[0].id) })
