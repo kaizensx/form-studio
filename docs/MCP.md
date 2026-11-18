@@ -95,7 +95,7 @@ Rules:
 | [`verify_release`](#verify_release) | read-only | Re-hash every file of a release against its manifest and say whether it still matches the head revision. |
 | [`open_in`](#open_in) | changes | Open a current output in the user's own software: what = step \| stl \| 3mf \| gcode \| folder. |
 | [`open_bench`](#open_bench) | changes | The bench is the local web page where the user inspects the 3D model, compares revisions and approves releases. |
-| [`brief_presets`](#brief_presets) | read-only | Brief templates for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure, car accessory): the questions worth asking, environment defaults (temperature, humidity, UV, load), a material to start from and the checks to plan for. |
+| [`brief_presets`](#brief_presets) | read-only | Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure, car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a material to start from and the checks to plan for. |
 | [`import_reference`](#import_reference) | changes | Import an existing part (STEP or STL, e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's references. |
 | [`freecad_macro`](#freecad_macro) | read-only | Write a FreeCAD macro (.FCMacro) next to the current STEP export. |
 | [`analyze`](#analyze) | read-only | An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics. |
@@ -125,8 +125,8 @@ Rules:
 | [`pick_concept`](#pick_concept) | changes | The person picked a concept (in words; in the app they pick on the board). |
 | [`list_concepts`](#list_concepts) | read-only | Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>. |
 | [`suggest_replies`](#suggest_replies) | read-only | Offer up to 3 short follow-up messages the person might send next (each under 80 characters, written as the person would say it, e.g. "Make the walls 2 mm"). |
-| [`list_starters`](#list_starters) | read-only | The starting points Home offers, ranked from what this person designs (their projects' recipes and briefs, their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}. |
-| [`recipe_library`](#recipe_library) | read-only | Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index on the project website. |
+| [`list_starters`](#list_starters) | read-only | Ideas for what this person might design next, ranked from what they already design (the building blocks and kinds of part in their projects, their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}. |
+| [`recipe_library`](#recipe_library) | read-only | Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index on the project website, to find a building block to start a design from. |
 | [`export_recipe`](#export_recipe) | changes | Write an installed ("mine") recipe as one .formrecipe file: its code, meta.json (parameters, author, tags, the code's SHA-256) and preview.png drawn from a real build at its defaults. |
 | [`prepare_recipe_submission`](#prepare_recipe_submission) | changes | Prepare an installed recipe for the community gallery: the community/recipes/<id>/ folder (written into `folder` when given), what the gallery's checks would refuse, and the link to GitHub's recipe issue form with the fields filled in. |
 | [`design_as_recipe`](#design_as_recipe) | changes | Turn a design's current code into a recipe whose defaults are the design's values; ranges narrow a parameter's range ({key: [min, max]}, never wider than the code's own). |
@@ -511,9 +511,10 @@ The bench is the local web page where the user inspects the 3D model, compares r
 
 *Read-only.*
 
-Brief templates for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure,
-car accessory): the questions worth asking, environment defaults (temperature, humidity, UV, load), a material to
-start from and the checks to plan for. Defaults are assumptions to confirm with the user, never measurements.
+Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure,
+car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a
+material to start from and the checks to plan for. Use it while gathering requirements; the defaults are
+assumptions to confirm with the person, never measurements.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -953,17 +954,19 @@ your reply. Call it at most once, at the end of a reply, and only with useful ne
 
 *Read-only.*
 
-The starting points Home offers, ranked from what this person designs (their projects' recipes and briefs,
-their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}.
-Use them to suggest what to design next; the person edits them in the app or with `form starters`.
+Ideas for what this person might design next, ranked from what they already design (the building blocks
+and kinds of part in their projects, their printer and material, what they pinned or used):
+{prompts: [{id, text, source, pinned}], briefs: [...]}. Offer them as suggestions when the person asks what to
+make; they edit the list with `form starters`.
 
 ### `recipe_library`
 
 *Read-only.*
 
 Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index
-on the project website. section: builtin | mine | community. Installing code is the person's decision and
-happens only in the app or with `form recipes install` after they review the source and its SHA-256.
+on the project website, to find a building block to start a design from. section: builtin | mine | community.
+Installing code is the person's decision and happens only with `form recipes install`, after they review the
+source and its SHA-256.
 
 | Argument | Type | Required |
 |---|---|---|

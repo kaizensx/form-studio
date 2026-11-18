@@ -113,8 +113,8 @@ each one named as it arrives.
 - **Local models:** Ollama, LM Studio and llama.cpp, found from their running servers.
 - **Add any provider by its address.** Settings › Agents › Add a provider… (or `form providers add URL`) takes a base
   URL and an optional key, finds the format (OpenAI-, Anthropic- or Gemini-compatible, with or without `/v1`, or
-  Ollama), reads the models and which of them call tools, and shows "Connected: OpenAI-compatible, 37 models, tools
-  supported" before you save. The key is kept in Form Studio's private secrets file and never shown again. Saved
+  Ollama), reads the models and which of them call tools, and shows what it found, for example "Connected:
+  OpenAI-compatible, 374 models, tools supported by 323 of 374", before you save. The key is kept in Form Studio's private secrets file and never shown again. Saved
   providers can be edited, tested on one model or removed.
 - **A model menu for hundreds of models.** Search, vendor sections, ↑ ↓ and Return, free models marked, the models you
   used pinned under Recent. Batch-only variants and models without tool calls are left out.

@@ -658,9 +658,10 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def brief_presets(preset: str = "") -> dict:
-        """Brief templates for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure,
-        car accessory): the questions worth asking, environment defaults (temperature, humidity, UV, load), a material to
-        start from and the checks to plan for. Defaults are assumptions to confirm with the user, never measurements."""
+        """Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure,
+        car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a
+        material to start from and the checks to plan for. Use it while gathering requirements; the defaults are
+        assumptions to confirm with the person, never measurements."""
         from . import presets as pr
         if not preset:
             return {"presets": [{k: p[k] for k in ("id", "title", "summary")} for p in pr.all_presets()]}
@@ -1227,9 +1228,10 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def list_starters() -> dict:
-        """The starting points Home offers, ranked from what this person designs (their projects' recipes and briefs,
-        their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}.
-        Use them to suggest what to design next; the person edits them in the app or with `form starters`."""
+        """Ideas for what this person might design next, ranked from what they already design (the building blocks
+        and kinds of part in their projects, their printer and material, what they pinned or used):
+        {prompts: [{id, text, source, pinned}], briefs: [...]}. Offer them as suggestions when the person asks what to
+        make; they edit the list with `form starters`."""
         from . import starters
         st = studio()
         return await _run(starters.for_studio, st)
@@ -1237,8 +1239,9 @@ def build() -> MCPServer:
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
     async def recipe_library(q: str = "", section: str = "", tag: str = "") -> dict:
         """Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index
-        on the project website. section: builtin | mine | community. Installing code is the person's decision and
-        happens only in the app or with `form recipes install` after they review the source and its SHA-256."""
+        on the project website, to find a building block to start a design from. section: builtin | mine | community.
+        Installing code is the person's decision and happens only with `form recipes install`, after they review the
+        source and its SHA-256."""
         from . import recipe_lib
         st = studio()
         def go():

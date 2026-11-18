@@ -186,8 +186,8 @@ still checked, and the release holds the formats you need.
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/settings-agents.webp" alt="Settings › Agents: model API keys, a provider added by its address with 373 models, and local model servers"></td>
-<td width="50%"><img src="docs/images/model-picker.webp" alt="The model menu: agent apps, a provider with 373 models, and a search for claude narrowing the list to 20"></td>
+<td width="50%"><img src="docs/images/settings-agents.webp" alt="Settings › Agents: model API keys, a provider added by its address with 374 models, and local model servers"></td>
+<td width="50%"><img src="docs/images/model-picker.webp" alt="The model menu: agent apps, a provider with 374 models, and a search for claude narrowing the list to 20"></td>
 </tr>
 </table>
 
