@@ -1,0 +1,11 @@
+{
+ "items": [
+  "builtin-hook",
+  "community-cable-clip"
+ ],
+ "reasons": {
+  "hook": [
+   "form/recipes/hook.py"
+  ]
+ }
+}

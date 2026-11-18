@@ -1,0 +1,12 @@
+{
+ "action": "opened",
+ "issue": {
+  "number": 102,
+  "title": "[Recipe] Shelf bracket",
+  "user": {
+   "login": "someone"
+  },
+  "body": "### This is\n\nA recipe I wrote: build and check it here\n\n### The object\n\nA bracket\n\n### Recipe source\n\n```python\nprint('hello')\n```\n\n### Link to the recipe file\n\nhttps://evil.example.com/recipe.py",
+  "labels": []
+ }
+}

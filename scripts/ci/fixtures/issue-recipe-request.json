@@ -1,0 +1,12 @@
+{
+ "action": "opened",
+ "issue": {
+  "number": 103,
+  "title": "[Recipe] A request",
+  "user": {
+   "login": "x"
+  },
+  "body": "### This is\n\nA request for a recipe\n\n### The object\n\nA vase",
+  "labels": []
+ }
+}

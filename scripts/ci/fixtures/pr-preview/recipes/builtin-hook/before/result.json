@@ -1,0 +1,318 @@
+{
+ "schema": 1,
+ "ok": true,
+ "verdict": "valid",
+ "problems": [],
+ "sets": [
+  {
+   "name": "defaults",
+   "values": {},
+   "seconds": {
+    "geometry": 0.07,
+    "exports": 0.022,
+    "checks": 0.296,
+    "load": 0.002
+   },
+   "steps": {
+    "geometry": "done",
+    "exports": "done",
+    "checks": "done"
+   },
+   "volume_mm3": 25957.12,
+   "bbox_mm": [
+    28.0,
+    46.0,
+    80.0
+   ],
+   "solid_mass_g": 32.19,
+   "checks": [
+    {
+     "id": "solid",
+     "label": "One valid solid",
+     "status": "PASS",
+     "value": "1 solid",
+     "evidence": "computed"
+    },
+    {
+     "id": "interfaces",
+     "label": "Interfaces as modelled",
+     "status": "PASS",
+     "value": "\u0394 0.0000 mm",
+     "evidence": "computed"
+    },
+    {
+     "id": "mesh",
+     "label": "Export mesh is closed",
+     "status": "PASS",
+     "value": "2,944 triangles",
+     "evidence": "computed"
+    },
+    {
+     "id": "conversion",
+     "label": "STL matches the CAD solid",
+     "status": "PASS",
+     "value": "0.003% volume",
+     "evidence": "computed"
+    },
+    {
+     "id": "envelope",
+     "label": "Fits the build volume",
+     "status": "PASS",
+     "value": "28.0 \u00d7 46.0 \u00d7 80.0 mm",
+     "evidence": "computed"
+    },
+    {
+     "id": "wall",
+     "label": "Thinnest wall",
+     "status": "PASS",
+     "value": "6.00 mm",
+     "evidence": "computed"
+    },
+    {
+     "id": "overhang",
+     "label": "Unsupported overhangs",
+     "status": "WARN",
+     "value": "31 mm\u00b2",
+     "evidence": "computed"
+    },
+    {
+     "id": "bridge",
+     "label": "Flat ceilings",
+     "status": "WARN",
+     "value": "2 mm\u00b2",
+     "evidence": "heuristic"
+    },
+    {
+     "id": "adhesion",
+     "label": "Plate contact",
+     "status": "PASS",
+     "value": "1288 mm\u00b2",
+     "evidence": "heuristic"
+    },
+    {
+     "id": "strength",
+     "label": "Arm bending safety factor",
+     "status": "PASS",
+     "value": "6.9\u00d7",
+     "evidence": "model"
+    },
+    {
+     "id": "screw_pull",
+     "label": "Upper screw pull-out load",
+     "status": "PASS",
+     "value": "17 N",
+     "evidence": "model"
+    },
+    {
+     "id": "fit",
+     "label": "Fit within tolerance window",
+     "status": "WARN",
+     "value": "75% modelled",
+     "evidence": "model"
+    },
+    {
+     "id": "freecad",
+     "label": "Re-imported in FreeCAD",
+     "status": "PASS",
+     "value": "valid \u00b7 \u0394 0.000% volume",
+     "evidence": "computed"
+    }
+   ],
+   "rollup": {
+    "PASS": 10,
+    "WARN": 3,
+    "FAIL": 0
+   },
+   "state": "built",
+   "image": "preview.png"
+  }
+ ],
+ "images": {
+  "preview": "preview.png"
+ },
+ "environment": {
+  "form": "12.0.0",
+  "kernel": "build123d 0.13.0 / OCP 8.0.1.1",
+  "slicer": {
+   "available": true,
+   "reason": "",
+   "kind": "orca",
+   "version": "2.5.1"
+  }
+ },
+ "recipe": {
+  "title": "Wall hook",
+  "summary": "A two-screw wall hook sized to a load, with a bending-stress estimate and countersunk screw holes fitted to your screws.",
+  "kind": "python",
+  "builtin": true,
+  "id": "hook",
+  "params": [
+   {
+    "key": "load_kg",
+    "label": "Load",
+    "default": 3.0,
+    "min": 0.1,
+    "max": 20,
+    "unit": "kg",
+    "group": "brief"
+   },
+   {
+    "key": "screw_d",
+    "label": "Screw shank diameter",
+    "default": 4.0,
+    "min": 2,
+    "max": 8,
+    "unit": "mm",
+    "group": "brief"
+   },
+   {
+    "key": "screw_head_d",
+    "label": "Screw head diameter",
+    "default": 8.0,
+    "min": 4,
+    "max": 16,
+    "unit": "mm",
+    "group": "brief"
+   },
+   {
+    "key": "screw_clearance",
+    "label": "Screw hole clearance / side",
+    "default": 0.25,
+    "min": 0,
+    "max": 1,
+    "unit": "mm",
+    "group": "interface"
+   },
+   {
+    "key": "plate_w",
+    "label": "Plate width",
+    "default": 28,
+    "min": 12,
+    "max": 80,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "plate_h",
+    "label": "Plate height",
+    "default": 80,
+    "min": 30,
+    "max": 160,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "plate_t",
+    "label": "Plate thickness",
+    "default": 6,
+    "min": 3,
+    "max": 15,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "arm_len",
+    "label": "Arm reach",
+    "default": 40,
+    "min": 10,
+    "max": 120,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "arm_t",
+    "label": "Arm thickness",
+    "default": 9,
+    "min": 3,
+    "max": 25,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "tip_h",
+    "label": "Tip height",
+    "default": 14,
+    "min": 4,
+    "max": 50,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "tip_t",
+    "label": "Tip thickness",
+    "default": 6,
+    "min": 3,
+    "max": 20,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "root_r",
+    "label": "Root fillet",
+    "default": 8,
+    "min": 0,
+    "max": 25,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "screw_spacing",
+    "label": "Screw spacing",
+    "default": 40,
+    "min": 15,
+    "max": 140,
+    "unit": "mm",
+    "group": "form"
+   },
+   {
+    "key": "strength_mpa",
+    "label": "Material strength",
+    "default": 40,
+    "min": 10,
+    "max": 120,
+    "unit": "MPa",
+    "group": "process"
+   },
+   {
+    "key": "layer_factor",
+    "label": "Layer-adhesion factor",
+    "default": 0.5,
+    "min": 0.1,
+    "max": 1.0,
+    "unit": "",
+    "group": "process"
+   }
+  ],
+  "features": [
+   {
+    "id": "plate",
+    "label": "Wall plate"
+   },
+   {
+    "id": "arm",
+    "label": "Arm"
+   },
+   {
+    "id": "tip",
+    "label": "Tip"
+   },
+   {
+    "id": "root",
+    "label": "Root fillet"
+   },
+   {
+    "id": "screws",
+    "label": "Screw holes"
+   },
+   {
+    "id": "countersinks",
+    "label": "Countersinks"
+   },
+   {
+    "id": "soften",
+    "label": "Edge softening"
+   }
+  ]
+ },
+ "seconds": 3.98
+}
