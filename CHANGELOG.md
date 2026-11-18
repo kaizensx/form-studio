@@ -7,6 +7,10 @@
 - **Every file of a release from the terminal.** `form release-files <project> [release] [--out FILE.zip]` writes the same .zip as **Save files…**: models, G-code, the sliced 3MF, report, documents and manifest.
 - **A Discord community server** with the Form Studio bot: releases, discussions, issues, pull requests and a weekly digest are posted there from GitHub Actions.
 
+- **Motion that follows where you go.** Screens hand over by depth (going into a design the workspace grows in and its inspector slides after it; going back, Home settles), Prove counts its results up and the checks rise in one after another, chat messages rise into place with a caret while a reply is written, step groups unfold in a cascade, and focus rings close in on the control. Reduced motion keeps only the fades.
+- **The mark is the loader.** The opening screen builds the Form Studio mark while the CAD kernel starts, and every loading state in the app is the same mark building itself.
+- **Save a whole release.** Release › Releases › **Save files…** saves every file of a release in one .zip (STEP, STL, sliced 3MF, G-code, report, documents); **Show in Finder** opens its folder.
+
 ## 12.1.0
 
 - **Text on any flat face.** In Annotate, pick a point on a flat face and choose **Text here…**: type the words, raised or sunk, cap height and depth, with the stroke width and cap height checked against your nozzle as you type (computed on the glyphs). **Add to design** writes the lettering into the design's own code as a feature (one stage per text, in Form Studio's bundled font) and builds a new revision in the kernel; text off the part or on a curved face is refused with the reason. `form engrave <project> TEXT --at x,y,z --normal x,y,z [--sunk]`, `--list`, `--remove text_N`; MCP `add_text`, `remove_text`.
