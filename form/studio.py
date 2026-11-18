@@ -418,6 +418,12 @@ class Studio:
         self.dir(pid)
         return self._locks.setdefault(pid, ProjectLock(self.root / ".locks" / f"{pid}.lock"))
 
+    def run_lock(self, pid: str) -> ProjectLock:
+        """One pipeline at a time per project. Separate from lock(): edits (a colour, a setting, a commit) never wait
+        for a running slice; the pipeline takes lock() only to read the project and to record each finished step."""
+        self.dir(pid)
+        return self._locks.setdefault(pid + "/run", ProjectLock(self.root / ".locks" / f"{pid}.run.lock"))
+
     def list(self) -> list:
         out = []
         for d in sorted(self.root.iterdir()):
@@ -1109,8 +1115,8 @@ class Studio:
             return p
 
     # ---- pipeline --------------------------------------------------------
-    def _record(self, p, node, key, ok, error=None):
-        p["produced"].setdefault(node, []).append({"key": key, "rev": p["head"], "ts": time.time(), "ok": ok})
+    def _record(self, p, node, key, ok, error=None, rev=None):
+        p["produced"].setdefault(node, []).append({"key": key, "rev": p["head"] if rev is None else rev, "ts": time.time(), "ok": ok})
         p["produced"][node] = p["produced"][node][-60:]
         fail = self._failed(p, node, key)
         fail.parent.mkdir(parents=True, exist_ok=True)
@@ -1135,9 +1141,10 @@ class Studio:
 
     def _run(self, job, nodes, force):
         pid = job["project"]
-        with self.lock(pid):
+        with self.run_lock(pid):
             try:
-                p = self.load(pid)
+                with self.lock(pid):
+                    p = self.load(pid)
                 want = [n for n in NODES if not nodes or n in nodes]
                 if "slice" in want and not nodes and not p.get("auto_slice", True):
                     want.remove("slice")
@@ -1165,25 +1172,28 @@ class Studio:
                     step["state"] = "running"
                     self._tl.step = step                         # long steps report progress on it
                     t0 = time.perf_counter()
+                    ok, err = True, None                         # p is the snapshot this run builds from, throughout
                     try:
-                        getattr(self, f"_make_{node}")(p, rev, keys, name)
-                        self._record(p, node, key, True)
+                        getattr(self, f"_make_{node}")(p, rev, keys, name)   # outputs are keyed: no project lock needed
                         step["state"] = "done"
                     except slicer.SlicerBlocked as e:
+                        ok = None
                         step["state"], step["error"] = "blocked", {"message": str(e), "hint": "Geometry and checks are unaffected."}
                         blocked = True
                     except (StudioError, slicer.SlicerFailed) as e:
-                        err = e.public() if isinstance(e, StudioError) else {"message": str(e), "hint": e.hint, "log": e.log}
-                        self._record(p, node, key, False, err)
+                        ok, err = False, (e.public() if isinstance(e, StudioError) else {"message": str(e), "hint": e.hint, "log": e.log})
                         step["state"], step["error"] = "failed", err
                         blocked = True
                     except Exception as e:  # unexpected: record it, never lose the project
-                        err = {"message": f"Unexpected {type(e).__name__}: {e}", "hint": "The project state is intact. Run again; if it repeats, export the project and report it."}
-                        self._record(p, node, key, False, err)
+                        ok, err = False, {"message": f"Unexpected {type(e).__name__}: {e}", "hint": "The project state is intact. Run again; if it repeats, export the project and report it."}
                         step["state"], step["error"] = "failed", err
                         blocked = True
                     step["seconds"] = round(time.perf_counter() - t0, 3)
-                    self.save(p)
+                    if ok is not None:
+                        with self.lock(pid):                     # what changed meanwhile (a colour, a note) is kept
+                            fresh = self.load(pid)
+                            self._record(fresh, node, key, ok, err, rev=rev["n"])
+                            self.save(fresh)
                 job["state"] = "failed" if any(s["state"] == "failed" for s in job["steps"]) else \
                     ("blocked" if any(s["state"] == "blocked" for s in job["steps"]) else "done")
             except StudioError as e:
@@ -1953,7 +1963,7 @@ class Studio:
         trash = self.root / ".trash"
         stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         dest, i = trash / f"{pid}-{stamp}", 2
-        with self.lock(pid):
+        with self.run_lock(pid), self.lock(pid):         # another process's pipeline finishes first
             try:
                 trash.mkdir(parents=True, exist_ok=True)
                 while dest.exists():

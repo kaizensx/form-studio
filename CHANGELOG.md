@@ -1,5 +1,10 @@
 # Changelog
 
+## 12.0.1
+
+- **Edits never wait for a slice.** Changing a colour or material, a setting, the printer or a note goes through at once while the pipeline builds, checks or slices; the run records its results without undoing what changed meanwhile. One pipeline runs per project at a time, and deleting a project waits for it.
+- **A slice whose G-code was written is kept.** Snapmaker Orca on Windows writes the whole G-code and then crashes drawing the project thumbnail with software OpenGL; Form Studio now keeps that G-code, says what happened, and keeps no half-written project 3MF. Every slicer in the real-slicer matrix (Bambu Studio, OrcaSlicer, ElegooSlicer, Snapmaker Orca, QIDISlicer and SuperSlicer on Windows and Linux) slices for real again.
+
 ## 12.0.0
 
 - **Start from anything.** Home is one composer for words, a photo, a sketch, a STEP, STL or 3MF part, a PDF drawing or a link; drop or paste them anywhere on Home. A model page link is passed to the agent; only a direct file link is downloaded, and the composer shows what was fetched. `form start --text … --photo … --sketch … --file … --link …`.

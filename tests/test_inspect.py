@@ -175,6 +175,37 @@ class OnTheSolid(unittest.TestCase):
         self.assertAlmostEqual(r["distance_mm"], 10.0)
         self.assertLess(r["from_on"]["off_surface_mm"], 0.01)          # looked up at a_on, not at [0, 0, 0]
 
+    def test_a_colour_does_not_wait_for_a_running_pipeline(self):
+        import threading
+        import time
+        pid = self.box["id"]
+        started, release = threading.Event(), threading.Event()
+        real = self.st._make_checks
+
+        def slow(p, rev, keys, name):                     # a long step, like a slice
+            started.set()
+            release.wait(30)
+            return real(p, rev, keys, name)
+        self.st._make_checks = slow
+        try:
+            job = self.st.run(pid, nodes=["geometry", "exports", "checks"], force=True)
+            self.assertTrue(started.wait(60), "the pipeline reached the slow step")
+            t0 = time.perf_counter()
+            materials.set_appearance(self.st, pid, "", color="#22aa66")
+            self.assertLess(time.perf_counter() - t0, 2.0)                 # the edit did not wait for the step
+            release.set()
+            for _ in range(600):
+                if self.st.jobs[job]["state"] != "running":
+                    break
+                time.sleep(0.1)
+        finally:
+            release.set()
+            self.st._make_checks = real
+        self.assertEqual(self.st.jobs[job]["state"], "done")
+        p = self.st.load(pid)
+        self.assertEqual(p["color"], "#22aa66")                            # the edit survived the run's save
+        self.assertTrue(p["produced"]["checks"][-1]["ok"])                 # and the run's result was recorded
+
     def test_colours_materials_checks_and_3mf(self):
         pid = self.box["id"]
         k0 = self.st.keys(self.st.load(pid))

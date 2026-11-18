@@ -1,10 +1,12 @@
 # PyInstaller spec for the FORM desktop app.   pyinstaller packaging/form.spec --noconfirm
+import re
 import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
 ROOT = Path(SPECPATH).parent
+VERSION = re.search(r'__version__ = "([^"]+)"', (ROOT / "form" / "__init__.py").read_text(encoding="utf-8")).group(1)
 datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "form" / "app" / "assets"), "form/app/assets"),
          (str(ROOT / "form" / "web"), "form/web"),
@@ -46,5 +48,5 @@ coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="FORM")
 if sys.platform == "darwin":
     app = BUNDLE(coll, name="FORM.app", icon=icon, bundle_identifier="net.form-studio.app",
                  info_plist={"CFBundleName": "Form Studio", "CFBundleDisplayName": "Form Studio",   # the bundle file stays FORM.app
-                             "CFBundleShortVersionString": "12.0.0", "NSHighResolutionCapable": True,
+                             "CFBundleShortVersionString": VERSION, "CFBundleVersion": VERSION, "NSHighResolutionCapable": True,
                              "LSMinimumSystemVersion": "12.0", "NSRequiresAquaSystemAppearance": False})
