@@ -328,6 +328,10 @@ def run_job(app: str, job: dict, job_path: Path, timeout: float = 180, progress=
             break
     if proc.returncode != 0 or not report or not Path(job["out"]).is_file():
         err = (report or {}).get("error") or f"Blender exited with code {proc.returncode}."
+        from .. import compat                       # a Blender outside the supported range that lost an API: say so
+        why = compat.wrap_message("blender", version(app), f"Blender could not render: {err}", tail(text, 60))
+        if why:
+            raise BlenderFailed(why[0], why[1], tail(text))
         raise BlenderFailed(f"Blender could not render: {err}", "The end of Blender's log is attached.", tail(text))
     report["seconds"] = round(time.time() - t0, 2)
     return report

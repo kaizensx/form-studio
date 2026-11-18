@@ -300,8 +300,19 @@ def project(st, p: dict, copies: int = 1, overrides: dict | None = None, with_ma
     settings = toolpath.gcode_settings(st.apath(p, "slice", key) / meta["gcode"])
     prefs = load_prefs(st.cfg)
     out = estimate(meta, settings, prefs, copies, overrides)
-    out |= {"project": p["id"], "rev": meta.get("rev", p["head"]), "slicer": meta.get("slicer_name") or "Bambu Studio",
+    out |= {"project": p["id"], "rev": meta.get("rev", p["head"]), "slicer": meta.get("slicer_name") or "the slicer",
             "prefs": prefs, "prefs_file": str(prefs_path(st.cfg))}
+    if meta.get("plates"):                            # several plates (form/plates.py): each costed with its own filament
+        rows = []
+        for pl in meta["plates"]:
+            e = estimate(pl, toolpath.gcode_settings(st.apath(p, "slice", key) / pl["gcode"]), prefs, 1, overrides)
+            rows.append({"n": pl["n"], "material": pl.get("material") or e["filament"]["filament_type"],
+                         "filament_g": pl.get("filament_g"), "time_s": pl.get("time_s"),
+                         "cost": e["per_plate_as_sliced"]["cost"], "not_counted": e["per_plate_as_sliced"]["not_counted"]})
+        out["plates"] = rows
+        costs = [r["cost"] for r in rows]
+        out["per_plate_as_sliced"]["cost"] = None if any(c is None for c in costs) else round(sum(costs), 4)
+        out["per_plate_as_sliced"]["plates"] = len(rows)
     if with_materials:
         dia = _first(settings.get("filament_diameter"), 1.75)
         vol = filament_volume_cm3(meta["filament_mm"], dia) if meta.get("filament_mm") else None

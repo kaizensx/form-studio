@@ -227,7 +227,9 @@ def run_openscad(exe: str, scad: Path, values: dict, out_stl: Path, timeout: flo
     log = (r.stderr or "") + (r.stdout or "")
     if r.returncode != 0 or not out_stl.exists() or out_stl.stat().st_size < 84:
         err = [ln for ln in log.splitlines() if re.search(r"ERROR|WARNING|error", ln)] or log.strip().splitlines()[-3:]
-        raise RuntimeError("OpenSCAD failed: " + " ".join(err)[:600])
+        from . import compat                        # an OpenSCAD outside the supported range that dropped an option
+        why = compat.wrap_message("openscad", version(exe), "OpenSCAD failed: " + " ".join(err)[:600], log)
+        raise RuntimeError(f"{why[0]} {why[1]}" if why else "OpenSCAD failed: " + " ".join(err)[:600])
     if "Current top level object is empty" in log or "top level object is not a 3D object" in log.lower():
         raise RuntimeError("OpenSCAD produced no 3D object.")
     return {"command": cmd, "log": log[-2000:]}
@@ -284,7 +286,13 @@ def freecad_recheck(exe: str, step_path: Path, timeout: float = 120) -> dict:
             return {"ok": False, "error": f"FreeCAD did not finish within {timeout:g} s."}
         except OSError as e:
             return {"ok": False, "error": f"FreeCAD could not start: {e}"}
-        return parse_freecad_output((r.stdout or "") + "\n" + (r.stderr or ""))
+        out = parse_freecad_output((r.stdout or "") + "\n" + (r.stderr or ""))
+    if not out.get("ok"):                           # a FreeCAD outside the supported range whose Python API changed
+        from . import compat
+        why = compat.wrap_message("freecad", version(exe), out.get("error", ""), (r.stdout or "") + (r.stderr or ""))
+        if why:
+            out["error"] = f"{why[0]} {why[1]}"
+    return out
 
 
 def recheck_item(result: dict, brep_volume: float, brep_bbox: list) -> dict:

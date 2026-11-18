@@ -271,6 +271,43 @@ def op_export(key, recipe_id, values, out_dir, name, orientation="as_modelled", 
     return out
 
 
+def _printed_parts(model, orientation="as_modelled", orient=None, envelope=(180, 180, 180), margin=2.0):
+    """The design's printed parts, each laid on the plate by itself: [(id, label, material, oriented solid, orientation)].
+    orient: {part id: orientation | "auto"}; a part without one lies as the design's `orientation` says.
+    [] for a design of one solid."""
+    from . import assembly as asm
+    a = asm.get(model)
+    if a is None or a.get("error") or len(a["printed"]) < 2:
+        return []
+    out = []
+    for p, solid in zip(a["spec"].parts, a["printed"]):
+        o = (orient or {}).get(p.id) or orientation
+        if o == "auto":                                # the best-ranked way for this part alone (form/analysis.py)
+            from . import analysis
+            P, T = _tessellate(solid, 0.1)
+            ranked = analysis.rank_orientations(P, T, [None] * len(T), set(), list(envelope), margin)
+            o = ranked["candidates"][0]["id"] if ranked["candidates"] else orientation
+        out.append((p.id, p.label, p.material, _oriented(solid, o), o))
+    return out
+
+
+def op_plate_parts(key, recipe_id, values, out_dir, name, orientation="as_modelled", orient=None, envelope=(180, 180, 180),
+                   margin=2.0, tol=0.01, ang=0.1):
+    """Each printed part as its own STL, centred and standing on z = 0, for the plate plan (form/plates.py)."""
+    from build123d import export_stl
+    model = _get(key, recipe_id, values, 0.05)
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    parts = []
+    for pid, label, material, solid, o in _printed_parts(model, orientation, orient, envelope, margin):
+        stl = out / f"{name}_{pid}.stl"
+        export_stl(solid, str(stl), tolerance=tol, angular_tolerance=ang)
+        bb = solid.bounding_box()
+        parts.append({"id": pid, "label": label, "material": material, "orientation": o, "stl": str(stl),
+                      "size": [bb.size.X, bb.size.Y, bb.size.Z], "volume_mm3": float(solid.volume)})
+    return {"parts": parts}
+
+
 def op_test_piece(key, recipe_id, values, out_dir, name, tol=0.01):
     from build123d import export_stl
     model = _get(key, recipe_id, values, 0.05)
@@ -340,7 +377,8 @@ def _thickness(model, max_rays=1500):
     return best, hist
 
 
-def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180, 180, 180), orientation="as_modelled"):
+def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180, 180, 180), orientation="as_modelled",
+               orient=None, margin=2.0):
     """Computed checks on the solid and on the exported mesh. No heuristics dressed as facts."""
     from . import mesh_audit
     model = _get(key, recipe_id, values, 0.05)
@@ -353,6 +391,11 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
                     "expected_solids": getattr(model["recipe"], "solids", 1),
                     "volume_mm3": model["volume"], "mesh_design": bool(getattr(model["recipe"], "mesh", False))},
            "interface_audit": model["recipe"].measure(model["values"], model["by_feature"])}
+    parts = _printed_parts(model, orientation, orient, envelope, margin)   # each part as it lies on a plate by itself
+    if parts:
+        out["parts"] = [{"id": pid, "label": label, "material": material, "orientation": o,
+                         "size": [round(b.size.X, 3), round(b.size.Y, 3), round(b.size.Z, 3)]}
+                        for pid, label, material, solid, o in parts for b in [solid.bounding_box()]]
     from . import assembly as asm
     assembly_checks = asm.analyse(model)               # [] for a single part
     if assembly_checks:

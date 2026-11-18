@@ -43,8 +43,9 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
 
     m = analysis.get("mesh")
     if m:
-        fails = m.get("failures", [])
-        add("mesh", "Export mesh is closed", "PASS" if m["status"] == "PASS_LIMITED_SCREEN" else "FAIL",
+        # the size against the bed is "Fits the build volume" below (which knows about several plates), not this one
+        fails = [f for f in m.get("failures", []) if f != "exceeds_axis_aligned_envelope"]
+        add("mesh", "Export mesh is closed", "PASS" if m["status"] == "PASS_LIMITED_SCREEN" or not fails else "FAIL",
             f"{m.get('triangles', 0):,} triangles",
             "No open, non-manifold, flipped, duplicate or degenerate faces in the exported STL."
             if not fails else "Problems: " + ", ".join(fails) + ".", "computed")
@@ -62,9 +63,35 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
     env, margin = ctx["envelope"], ctx["margin"]
     size = [row["footprint_mm"][0], row["footprint_mm"][1], row["height_mm"]]
     fits = size[0] <= env[0] - 2 * margin and size[1] <= env[1] - 2 * margin and size[2] <= env[2]
-    add("envelope", "Fits the build volume", "PASS" if fits else "FAIL",
-        f"{size[0]:.1f} × {size[1]:.1f} × {size[2]:.1f} mm",
-        f"{ctx['printer']} allows {env[0]-2*margin:.0f} × {env[1]-2*margin:.0f} × {env[2]:.0f} mm with a {margin:g} mm plate margin.", "computed")
+    allows = f"{ctx['printer']} allows {env[0]-2*margin:.0f} × {env[1]-2*margin:.0f} × {env[2]:.0f} mm with a {margin:g} mm plate margin."
+    plan = ctx.get("plates")
+    if plan and (plan.get("needed") or plan["too_big"]):  # several parts: each must fit; the design may take several plates
+        if plan["too_big"]:
+            big = plan["too_big"]
+            add("envelope", "Fits the build volume", "FAIL",
+                f"{big[0]['label']}: {' × '.join(f'{v:.1f}' for v in big[0]['size'])} mm",
+                ("These parts are" if len(big) > 1 else "This part is") + " larger than the plate however "
+                + ("they lie" if len(big) > 1 else "it lies") + " flat: " + "; ".join(
+                    f"{b['label']} {' × '.join(f'{v:.1f}' for v in b['size'])} mm" for b in big)
+                + f". {allows} Split the part, scale it, or choose a larger printer.", "computed")
+        else:
+            n = plan["count"]
+            mats = sorted({pl["material"] for pl in plan["plates"] if pl["material"]})
+            add("envelope", "Fits the build volume", "PASS", f"{n} plate" + ("" if n == 1 else "s"),
+                f"As modelled the design is {size[0]:.1f} × {size[1]:.1f} × {size[2]:.1f} mm"
+                + (", larger than one plate" if not fits else "") + f". Its {len(ctx.get('parts') or [])} parts are laid out "
+                f"one by one on {n} plate{'' if n == 1 else 's'}, {plan['spacing_mm']:g} mm apart"
+                + (f", one material per plate ({', '.join(mats)})" if len(mats) > 1 else "") + f". {allows}", "computed")
+    else:
+        detail = allows
+        if not fits:                                  # another way to lie that does fit: say which
+            alt = [r for r in analysis["orientation_table"] if r["id"] != row["id"]
+                   and r["footprint_mm"][0] <= env[0] - 2 * margin and r["footprint_mm"][1] <= env[1] - 2 * margin
+                   and r["height_mm"] <= env[2]]
+            if alt:
+                detail += f" It fits lying “{alt[0]['label']}”: change the print orientation in Prove."
+        add("envelope", "Fits the build volume", "PASS" if fits else "FAIL",
+            f"{size[0]:.1f} × {size[1]:.1f} × {size[2]:.1f} mm", detail, "computed")
 
     thin, nz = analysis.get("thin"), ctx["nozzle"]
     if thin:
@@ -117,6 +144,10 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
             f"printer accuracy is {p['source']}" + (f" from {p['n']} measurements" if p["n"] else "") + ".",
             "model", feature=_fit_feature(recipe))
     out.extend(analysis.get("assembly") or [])     # interference, clearance, motion, tool access (form/assembly.py)
+    if ctx.get("materials"):                       # stated materials: heat, sun, flexible filament (form/materials.py)
+        from . import materials
+        big = max((x["size"][:2] for x in ctx.get("parts") or []), key=lambda s: s[0] * s[1], default=size[:2])
+        out.extend(materials.checks(ctx["materials"], row, ctx.get("material_brief", ""), big, bool(ctx.get("parts"))))
     return out
 
 

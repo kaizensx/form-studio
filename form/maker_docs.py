@@ -59,7 +59,11 @@ def bom(d) -> str:
     parts = asm["parts"] if asm else [{"label": d["p"]["name"], "solid": 0, "volume_mm3": d["view"]["volume_mm3"],
                                        "print_bbox": d["view"]["bbox"], "material": ""}]
     vol = sum(x["volume_mm3"] for x in parts) or 1.0
+    from . import materials                           # materials stated for the design or a part (form/materials.py)
+    stated = materials.of_project(d["p"], [{"id": x.get("id") or "", "material": x.get("material") or ""} for x in parts])
     for x in parts:
+        x = dict(x, material=(stated["parts"].get(x.get("id") or "", {}).get("material") or materials.stated(d["p"])
+                              or x.get("material") or ""))
         size = np.subtract(x["print_bbox"][1], x["print_bbox"][0])
         g = f"{total_g * x['volume_mm3'] / vol:.1f}" if total_g else ""
         ev = ("simulated plate total, split by part volume (computed)" if len(parts) > 1 else "simulated (slicer)") if total_g \
@@ -186,7 +190,7 @@ def print_report(d, release=None) -> str:
              f"Release stage: {'released as ' + release if release else 'working files, not released'}",
              f"Source of truth: recipe `{d['rid']}` @ `{d['recipe_sha']}` (design source in the project)",
              f"Source / STEP / mesh hashes: {hashes}",
-             f"Tool and dependency versions: {d['kernel']}" + (f"; Bambu Studio {sl.get('slicer_version')}" if sl else "; slicer: not run"),
+             f"Tool and dependency versions: {d['kernel']}" + (f"; {sl.get('slicer_name') or 'slicer'} {sl.get('slicer_version')}" if sl else "; slicer: not run"),
              f"Generated: {time.strftime('%Y-%m-%d %H:%M')}", "",
              "| Check | PASS / FAIL / NOT RUN | Evidence / result |", "|---|---|---|"]
     geo = d["status"]["geometry"]["state"] == "current"

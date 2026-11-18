@@ -33,12 +33,14 @@ DEFAULTS = {
     "data": {"dir": "~/FORM"},
     # slicer/machine/process/filament: the default printer (form/printers.py); empty = the slicer's own selection.
     "printer": {"name": "Bambu Lab A1 mini", "envelope_mm": [180, 180, 180], "plate_margin_mm": 2.0,
-                "slicer": "", "machine": "", "process": "", "filament": ""},
+                "slicer": "", "machine": "", "process": "", "filament": "",
+                "plate_spacing_mm": 6.0},             # gap between parts when a design is laid out on plates (form/plates.py)
     "slicer": {
         # "auto" uses the first installed of Bambu Studio, OrcaSlicer, PrusaSlicer (form/adapters AUTO_ORDER).
         # app/config_dir/machine/process/filament here are Bambu Studio's; other slicers read [slicer.orca],
         # [slicer.prusa], … (see form/adapters/orca.py and prusa.py).
         "kind": "auto",
+        "enabled": True,                    # false: Design only for every design (no slicing; form/studio.py slice_mode)
         "app": _BAMBU_APP,
         "config_dir": _BAMBU_CONF,
         "machine": "auto", "process": "auto", "filament": "auto",

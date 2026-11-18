@@ -286,21 +286,22 @@ _cache: dict = {}
 _cache_lock = threading.Lock()
 
 
-def for_project(st, p: dict) -> Toolpath:
-    """The toolpath of the project's current slice (raises StudioError if it has none). Cached per slice."""
+def for_project(st, p: dict, plate: int | None = None) -> Toolpath:
+    """The toolpath of the project's current slice, or of one plate of it (raises StudioError if it has none).
+    Cached per slice and plate."""
     from .studio import StudioError
-    key = st.keys(p)["slice"]
+    key = f"{st.keys(p)['slice']}:{plate or 1}"
     with _cache_lock:
         hit = _cache.get(key)
     if hit is not None:
         return hit
-    meta = st.read(p, "slice", key)
-    if not meta:
+    if not st.read(p, "slice", st.keys(p)["slice"]):
         raise StudioError("There is no current slice to simulate.", "Run the pipeline first (form run <project>).", status=409)
-    layers = st.layers(p)
+    meta, folder, gcode = st.plate_meta(p, plate)
+    layers = st.layers(p, plate)
     if not layers:
         raise StudioError("The slicer's G-code has no extrusion moves Form Studio can read.", status=409)
-    settings = gcode_settings(st.apath(p, "slice", key) / meta["gcode"])
+    settings = gcode_settings(folder / gcode)
     w, src = drawing_width(settings)
     tp = build(layers, meta.get("time_s"), w, src, settings)
     with _cache_lock:

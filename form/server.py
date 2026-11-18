@@ -171,8 +171,12 @@ def make_handler(st: Studio):
             if rest == "/view":
                 n = int(q["rev"]) if q.get("rev") else None
                 return self._json(st.view(p, n))
+            plate = int(q["plate"]) if str(q.get("plate") or "").isdigit() else None      # several plates (form/plates.py)
+            if rest == "/plates":
+                from . import plates
+                return self._json(plates.for_project(st, p))
             if rest == "/layers":
-                layers = st.layers(p)
+                layers = st.layers(p, plate)
                 if "n" in q:
                     i = max(0, min(len(layers) - 1, int(q["n"])))
                     return self._json({"index": i, "count": len(layers), **layers[i]})
@@ -181,10 +185,10 @@ def make_handler(st: Studio):
             # -- print simulation, cost, plate packing (form/toolpath.py, simulate.py, cost.py, packing.py) --
             if rest == "/toolpath":
                 from . import toolpath
-                return self._json(toolpath.for_project(st, p).public())
+                return self._json(toolpath.for_project(st, p, plate).public())
             if rest == "/simulation.png":
                 from . import simulate, toolpath
-                tp = toolpath.for_project(st, p)
+                tp = toolpath.for_project(st, p, plate)
                 pr = float(q["progress"]) if q.get("progress") else float(int(q.get("layer") or tp.layers))
                 return self._send(200, simulate.png_at(tp, pr, title=f"{p['name']}  r{p['head']:02d}"), "image/png")
             if rest == "/cost":
@@ -483,6 +487,9 @@ def make_handler(st: Studio):
             if action == "settings":
                 p = st.settings(p, body)
                 return self._json({"job": auto(p)})
+            if action == "part":                           # per-part orientation, material, colour (form/plates.py, materials.py)
+                st.set_part(pid, str(body.get("part") or ""), **{k: body.get(k) for k in ("orientation", "material", "color")})
+                return self._json({"job": auto(st.load(pid))})
             if action == "run":
                 nodes = [n for n in body.get("nodes", []) if n in NODES] or None
                 return self._json({"job": st.run(pid, nodes, bool(body.get("force")))})

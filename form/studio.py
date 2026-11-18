@@ -23,11 +23,15 @@ from .recipes import RecipeBook, RecipeError, SCAD_PREFIX, SOURCE_PREFIX, is_sou
 from .worker import Kernel, KernelFailure
 from . import fsutil
 from . import printers as printers_mod
+from . import materials as materials_mod, plates as plates_mod
 
 NODES = ["geometry", "exports", "checks", "slice"]
 STATICS_LABELS = {"tip_force_n": ("Tip-over force", "N"), "safety_factor": ("Bending safety factor", "x"),
                   "root_stress_mpa": ("Arm root stress", "MPa"), "upper_screw_pull_n": ("Upper screw load", "N")}
 NODE_LABEL = {"geometry": "Solid", "exports": "STEP + STL", "checks": "Checks", "slice": "Slice"}
+# what a Design only release does not contain or say, in the gate, the manifest and the report
+NOT_COVERED = ["No slice: print time and filament are not estimated.", "No sliced 3MF or G-code in the release.",
+               "No print simulation: supports, bridges and the first layer are not previewed."]
 STL_TOL = 0.01
 REF_FORMATS = (".step", ".stp", ".stl")
 SCHEMA = "form-project/1"
@@ -191,9 +195,38 @@ class Studio:
         return add_examples(self.root, ids)
 
     # ---- environment -----------------------------------------------------
-    def slicer_info(self, refresh=False, p: dict | None = None) -> dict:
+    def slicer_info(self, refresh=False, p: dict | None = None, material: str | None = None) -> dict:
         """What a slice would use. With a project: its own printer choice, else the default printer, else the
-        slicer's selection (form/printers.py)."""
+        slicer's selection (form/printers.py); and when the design states a material (form/materials.py), that
+        printer's filament preset for it. `material` asks for one material explicitly (a plate of one material)."""
+        base = self._slicer_info(refresh, p)
+        mat = materials_mod.normalise(material) if material else (materials_mod.stated(p) if isinstance(p, dict) else None)
+        if not mat:
+            return base
+        return self._slicer_for_material(p, mat, refresh, base)
+
+    def _slicer_for_material(self, p, mat: str, refresh: bool, base: dict) -> dict:
+        choice, source = self.printer_choice(p)
+        b = materials_mod.base_choice(choice, base)
+        if b is None:                                   # nothing resolves: keep saying why
+            return base
+        c, note = materials_mod.choice_for(self.cfg, b, base, mat)
+        if not note["changed"]:
+            return {**base, "material": note}
+        ck = json.dumps(c, sort_keys=True)
+        hit = self._choice_cache.get(ck)
+        if refresh or hit is None or time.time() - hit[0] > 20:
+            hit = (time.time(), printers_mod.resolve(self.cfg, c))
+            self._choice_cache[ck] = hit
+        r = hit[1]
+        if not r.get("available"):                      # that filament does not work with this printer and process
+            return {**base, "material": dict(note, matched=False, changed=False, filament=b.get("filament") or "",
+                                             text=f"{note['filament']} cannot be used here: {r.get('reason')}")}
+        src = dict(base.get("source") or {})
+        src["filament"] = f"the {materials_mod.MATERIALS[mat]['label']} set for this design"
+        return {**r, "choice_source": base.get("choice_source", source or "slicer"), "source": src, "material": note}
+
+    def _slicer_info(self, refresh=False, p: dict | None = None) -> dict:
         choice, source = self.printer_choice(p)
         if choice is not None:
             ck = json.dumps(choice, sort_keys=True)
@@ -237,6 +270,80 @@ class Studio:
         choice, source = self.printer_choice(p)
         s = self.slicer_info(p=p)
         return {"choice": choice, "source": source or "slicer", "slicer": slicer.public(s), "env": self.printer_env(p)}
+
+    # ---- Design only: slicing is optional (per design, for every design, or because no slicer is installed) ----
+    def slice_mode(self, p: dict | None = None) -> dict:
+        """{"on": bool, "why": "" | "settings" | "project" | "no_slicer", "text", "how"}."""
+        if not self.cfg["slicer"].get("enabled", True):
+            return {"on": False, "why": "settings", "text": "Slicing is turned off for every design.",
+                    "how": "Turn on Settings › Printer and slicer › Slice designs, or set [slicer].enabled = true in studio.toml."}
+        if isinstance(p, dict) and p.get("design_only"):
+            return {"on": False, "why": "project", "text": "This design is set to Design only.",
+                    "how": "Turn slicing on for this design in Prove, or run `form design-only <project> off`."}
+        s = self.slicer_info(p=p)
+        app = s.get("app") or ""
+        if not s.get("available") and not (app and (Path(app).is_file() or shutil.which(app))):
+            return {"on": False, "why": "no_slicer", "text": "No slicer is installed, so designs are not sliced.",
+                    "how": "Install Bambu Studio, OrcaSlicer or PrusaSlicer (Settings › Set up); slicing starts on its own."}
+        return {"on": True, "why": "", "text": "", "how": ""}
+
+    def set_part(self, pid: str, part: str, by: str = "you", **fields) -> dict:
+        """Per-part print settings: orientation (named, "down:x,y,z" or "auto"), material, color. "" clears one."""
+        from . import analysis
+        part = str(part or "").strip()
+        if not re.fullmatch(r"[A-Za-z0-9_.\-]{1,60}", part):
+            raise StudioError("Name the part by its id.", "Part ids are listed in the checks (`form plates <project>`).")
+        with self.lock(pid):
+            p = self.load(pid)
+            parts = dict(p.get("parts") or {})
+            cur = dict(parts.get(part) or {})
+            said = []
+            for k, v in fields.items():
+                if k not in ("orientation", "material", "color") or v is None:
+                    continue
+                v = str(v).strip()
+                if k == "orientation" and v and v != "auto" and not analysis.valid_orientation(v):
+                    raise StudioError("Unknown orientation.", "Use auto, one of: " + ", ".join(analysis.NAMED) + ", or a “down:x,y,z” id.")
+                if k == "material" and v and not materials_mod.normalise(v):
+                    raise StudioError(f"Unknown material “{v}”.", "Known: " + ", ".join(materials_mod.MATERIALS) + ".")
+                if k == "material" and v:
+                    v = materials_mod.normalise(v)
+                if k == "color" and v and not re.fullmatch(r"#[0-9a-fA-F]{6}", v):
+                    raise StudioError("A colour is #rrggbb.")
+                if v:
+                    cur[k] = v
+                else:
+                    cur.pop(k, None)
+                said.append(f"{k} {v or 'cleared'}")
+            if cur:
+                parts[part] = cur
+            else:
+                parts.pop(part, None)
+            p["parts"] = parts
+            text = f"Part {part}: " + ", ".join(said) + "."
+            self.decide(p, "part", text)
+            self.save(p)
+        self.activity(pid, "part", text, by=by)
+        return {"project": pid, "part": part, "settings": parts.get(part, {})}
+
+    def _plate_inputs(self, p: dict, recipe) -> dict:
+        """Inputs of the plate plan and the material notes that are not at their defaults (they join the checks and
+        slice keys only when set, so designs that use none of this keep their keys)."""
+        from . import config as config_mod
+        out = {}
+        if p.get("material"):
+            out["material"] = materials_mod.normalise(p["material"])
+        own = {k: v for k, v in sorted((p.get("parts") or {}).items()) if isinstance(v, dict) and v}
+        if own:
+            out["parts"] = own
+        if getattr(recipe, "solids", 1) > 1:
+            if plates_mod.spacing(self.cfg) != plates_mod.DEFAULT_SPACING_MM:
+                out["spacing"] = plates_mod.spacing(self.cfg)
+            if float(self.cfg["printer"].get("plate_margin_mm", 2.0)) != float(config_mod.DEFAULTS["printer"]["plate_margin_mm"]):
+                out["margin"] = float(self.cfg["printer"]["plate_margin_mm"])
+        if out.get("material") or any("material" in v for v in own.values()):
+            out["brief"] = H(p["brief"].get("text", ""))           # the material notes read the brief
+        return out
 
     def set_printer(self, pid: str, choice, by: str = "you") -> dict:
         """Use this printer (with its filament and process) for one design; None goes back to the default."""
@@ -552,9 +659,14 @@ class Studio:
         fc = self._freecad()
         if fc and not getattr(recipe, "mesh", False):  # an installed FreeCAD adds a re-import check
             ck = H(ck, "freecad", fc)
+        extra = self._plate_inputs(p, recipe)          # per-part orientation and material, plate spacing (form/plates.py)
+        if extra:
+            ck = H(ck, "plates", extra)
         presets = {k: v["sha"] for k, v in s.get("presets", {}).items()} if s.get("available") else None
         sk = H("slice", ek, presets, slicer.version(s["app"], s.get("kind", "bambu")) if s.get("available") else None,
                *_slicer_tag(s))
+        if extra:
+            sk = H(sk, "plates", plates_mod.PLATES_VERSION, {k: v for k, v in extra.items() if k != "brief"})
         return {"geometry": gk, "exports": ek, "checks": ck, "slice": sk}
 
     def apath(self, p: dict, node: str, key: str) -> Path:
@@ -601,7 +713,10 @@ class Studio:
                 entry["made"] = made["ts"] if made else None
             out[node] = entry
             upstream_ok = upstream_ok and st == "current"
-        if not self.slicer_info(p=p).get("available"):
+        mode = self.slice_mode(p)
+        if not mode["on"]:                             # Design only: the slice is not part of this design's outputs
+            out["slice"] = {"state": "off", "key": keys["slice"], "label": NODE_LABEL["slice"], "blocked": False, "off": mode}
+        elif not self.slicer_info(p=p).get("available"):
             out["slice"]["unavailable"] = self.slicer_info(p=p).get("reason")
         return out
 
@@ -803,6 +918,23 @@ class Studio:
                 p["auto_slice"] = bool(body["auto_slice"])
             if "auto_run" in body:
                 p["auto_run"] = bool(body["auto_run"])
+            if "design_only" in body:
+                on = bool(body["design_only"]) if not isinstance(body["design_only"], str) else \
+                    body["design_only"].strip().lower() in ("1", "true", "yes", "on")
+                if on != bool(p.get("design_only")):
+                    self.decide(p, "design_only", "Design only: this design is not sliced." if on else "Slicing turned on for this design.")
+                p["design_only"] = on
+            if "material" in body:                     # the whole design's material (form/materials.py); "" clears it
+                m = str(body["material"] or "").strip()
+                if m and not materials_mod.normalise(m):
+                    raise StudioError(f"Unknown material “{m}”.", "Known: " + ", ".join(materials_mod.MATERIALS) + ".")
+                m = materials_mod.normalise(m) or ""
+                if m != (p.get("material") or ""):
+                    self.decide(p, "material", f"Material: {m}." if m else "Material: the selected filament.")
+                if m:
+                    p["material"] = m
+                else:
+                    p.pop("material", None)
             if "brief" in body:
                 p["brief"]["text"] = str(body["brief"])[:8000]
             if "name" in body and str(body["name"]).strip():
@@ -848,6 +980,8 @@ class Studio:
                 p = self.load(pid)
                 want = [n for n in NODES if not nodes or n in nodes]
                 if "slice" in want and not nodes and not p.get("auto_slice", True):
+                    want.remove("slice")
+                if "slice" in want and not self.slice_mode(p)["on"]:     # Design only: nothing to slice
                     want.remove("slice")
                 job["steps"] = [{"node": n, "label": NODE_LABEL[n], "state": "queued"} for n in want]
                 keys = self.keys(p)
@@ -930,13 +1064,30 @@ class Studio:
         s = self.slicer_info(p=p)
         pe = self.printer_env(p)
         a = self._k("analyse", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], stl_path=str(stl),
-                    nozzle=s.get("nozzle_mm", 0.4), envelope=pe["envelope"], orientation=p["orientation"], p=p)
+                    nozzle=s.get("nozzle_mm", 0.4), envelope=pe["envelope"], orientation=p["orientation"], p=p,
+                    orient=plates_mod.part_orientations(p), margin=pe["margin"])
         if a.get("mesh", {}).get("sha256") and a["mesh"]["sha256"] != ex["files"]["stl"]["sha256"]:
             raise StudioError("The STL on disk is not the one that was exported.", "Run the pipeline again to regenerate exports.")
         summary = self.read(p, "geometry", keys["geometry"])
         ctx = {"orientation": p["orientation"], "envelope": pe["envelope"],
                "margin": pe["margin"], "printer": pe["name"],
                "nozzle": s.get("nozzle_mm", 0.4), "nozzle_assumed": not s.get("available")}
+        mats = materials_mod.of_project(p, a.get("parts") or [])
+        parts = [dict(x, material=mats["parts"].get(x["id"], {}).get("material") or "",
+                      color=mats["parts"].get(x["id"], {}).get("color") or "") for x in a.get("parts") or []]
+        if parts:                                      # several printed parts: how they go onto plates (form/plates.py)
+            ctx["parts"] = parts
+            ctx["plates"] = plates_mod.plan(parts, pe["envelope"], plates_mod.spacing(self.cfg), pe["margin"])
+            ctx["plates"]["needed"] = plates_mod.needed(parts, ex.get("print_bbox") or [0, 0, 0], pe["envelope"], pe["margin"])
+        design_mat = materials_mod.stated(p) if not parts else None
+        if not design_mat and not parts and materials_mod.normalise(p.get("material")):
+            design_mat = materials_mod.normalise(p.get("material"))
+        ctx["materials"] = {x["label"]: x["material"] for x in parts if x["material"]} if parts else \
+            ({p["name"]: design_mat} if design_mat else {})
+        own = bool(self._plate_inputs(p, self.recipe(p)).get("brief"))     # the brief is in the key only then
+        ctx["material_brief"] = p["brief"].get("text", "") if own else ""
+        if mats["unknown"]:
+            ctx["materials_unknown"] = mats["unknown"]
         fit = self.fit(p)
         items = checks_mod.build(self.recipe(p), summary, a, ctx, fit)
         fc = self._freecad()
@@ -948,6 +1099,7 @@ class Studio:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({"rev": rev["n"], "checks": items, "rollup": checks_mod.rollup(items),
                                     "orientation_table": a["orientation_table"], "fit": fit, "context": ctx,
+                                    "parts": ctx.get("parts") or [],
                                     "stl_sha256": ex["files"]["stl"]["sha256"]}, indent=1), encoding="utf-8")
 
     def _make_slice(self, p, rev, keys, name):
@@ -957,10 +1109,117 @@ class Studio:
         s = self.slicer_info(refresh=True, p=p)
         if self.keys(p)["slice"] != keys["slice"]:
             raise StudioError("Slicer presets changed while the pipeline was running.", "Run again to slice with the presets now selected.")
+        if getattr(self.recipe(p), "solids", 1) > 1:
+            parts = self._plate_parts(p, rev, keys, name, s)
+            if parts:
+                pe = self.printer_env(p)
+                bed = list(pe["envelope"])               # the bed the checks planned with, so "N plates" is what is sliced
+                if plates_mod.needed(parts, ex.get("print_bbox") or [0, 0, 0], bed, pe["margin"]):
+                    return self._slice_plates(p, rev, keys, out, parts, bed, pe["margin"], s, ex)
         info = slicer.slice_stl(s, stl, out, timeout=self.cfg["slicer"]["timeout_s"])
         info.update({"rev": rev["n"], "stl_sha256": ex["files"]["stl"]["sha256"], "orientation": p["orientation"],
                      "evidence": "simulated"})
+        if s.get("material"):
+            info["material"] = s["material"]
         (out / "meta.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
+
+    # ---- several plates (form/plates.py) ---------------------------------
+    def _plate_parts(self, p, rev, keys, name, s) -> list:
+        """Each printed part as its own STL in its print orientation, with its material. [] for one solid."""
+        pe = self.printer_env(p)
+        tmp = self.dir(p["id"]) / "artifacts" / "slice" / f"{keys['slice']}.parts"
+        shutil.rmtree(tmp, ignore_errors=True)
+        r = self._k("plate_parts", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], out_dir=str(tmp), name=name,
+                    orientation=p["orientation"], orient=plates_mod.part_orientations(p),
+                    envelope=list(pe["envelope"]), margin=pe["margin"], p=p, timeout=300)
+        mats = materials_mod.of_project(p, r["parts"])
+        return [dict(x, material=mats["parts"].get(x["id"], {}).get("material") or "",
+                     color=mats["parts"].get(x["id"], {}).get("color") or "") for x in r["parts"]]
+
+    def _slice_plates(self, p, rev, keys, out, parts, bed, margin, s, ex):
+        """Pack the parts onto plates, slice each plate on its own, and add up the slicer's estimates."""
+        pl = plates_mod.plan(parts, bed, plates_mod.spacing(self.cfg), margin)
+        if pl["too_big"]:
+            b = pl["too_big"][0]
+            raise StudioError(f"{b['label']} is {' × '.join(f'{v:g}' for v in b['size'])} mm: larger than the plate "
+                              f"({bed[0]:g} × {bed[1]:g} mm, {margin:g} mm margin) however it lies.",
+                              "Split or scale the part, or choose a printer with a larger bed.")
+        stl_of = {x["id"]: x["stl"] for x in parts}
+        shutil.rmtree(out, ignore_errors=True)
+        out.mkdir(parents=True)
+        rows, t0 = [], time.time()
+        for plate in pl["plates"]:
+            n = plate["n"]
+            work = out / f".plate_{n}"
+            work.mkdir()
+            model = work / f"{p['id']}_r{rev['n']:02d}_plate{n}.stl"
+            geo = plates_mod.write_plate_stl(model, plate["parts"], stl_of)
+            res = s
+            if plate["material"] and plate["material"] != (s.get("material") or {}).get("material"):
+                res = self.slicer_info(p=p, material=plate["material"])       # this plate's filament
+            try:
+                info = slicer.slice_stl(res, model, work / "sliced", timeout=self.cfg["slicer"]["timeout_s"])
+            except (slicer.SlicerFailed, slicer.SlicerBlocked) as e:
+                why = f"Plate {n} of {pl['count']} ({', '.join(q['label'] for q in plate['parts'])}): {e}"
+                if isinstance(e, slicer.SlicerBlocked):
+                    raise slicer.SlicerBlocked(why)
+                raise slicer.SlicerFailed(why, e.hint, e.log)
+            sliced = work / "sliced"
+            files = {}
+            for src, dst in ((info.get("gcode"), f"plate_{n}.gcode"), (info.get("threemf"), f"plate_{n}.3mf")):
+                if src and (sliced / src).exists():
+                    shutil.move(str(sliced / src), out / dst)
+                    files[src] = dst
+            imgs = []
+            for img in info.get("images") or []:
+                if (sliced / img).exists():
+                    dst = f"plate_{n}.png" if img.startswith("plate") else f"plate_{n}_{img}"
+                    shutil.move(str(sliced / img), out / dst)
+                    imgs.append(dst)
+            if (sliced / "slicer.log").exists():
+                shutil.move(str(sliced / "slicer.log"), out / f"plate_{n}.slicer.log")
+            shutil.move(str(model), out / f"plate_{n}.stl")
+            shutil.rmtree(work, ignore_errors=True)
+            mat = res.get("material") or {}
+            rows.append({k: info.get(k) for k in ("time_s", "filament_g", "filament_mm", "layers", "max_z_mm", "support_used",
+                                                  "slicer_version", "presets", "warnings", "plate_warnings", "seconds")}
+                        | {"n": n, "gcode": files.get(info.get("gcode")), "threemf": files.get(info.get("threemf")),
+                           "images": imgs, "thumbnail": imgs[0] if imgs else None, "stl": f"plate_{n}.stl",
+                           "material": plate["material"], "filament": (info.get("presets") or {}).get("filament", {}).get("name"),
+                           "filament_note": mat.get("text") if mat.get("changed") or not mat.get("matched", True) else "",
+                           "parts": plate["parts"], "used_mm": plate["used_mm"], "triangles": geo["triangles"]})
+        def total(k):
+            vals = [r.get(k) for r in rows]
+            return None if any(v is None for v in vals) else round(sum(vals), 3)
+        first = rows[0]
+        meta = {"rev": rev["n"], "stl_sha256": ex["files"]["stl"]["sha256"], "orientation": p["orientation"], "evidence": "simulated",
+                "plates": rows, "plate_count": len(rows), "time_s": total("time_s"), "filament_g": total("filament_g"),
+                "filament_mm": total("filament_mm"), "layers": max((r.get("layers") or 0) for r in rows),
+                "max_z_mm": max((r.get("max_z_mm") or 0) for r in rows), "support_used": any(r.get("support_used") for r in rows),
+                "gcode": first["gcode"], "threemf": first["threemf"], "images": ["plate_1.png"] if "plate_1.png" in first["images"] else [],
+                "slicer_version": first.get("slicer_version"), "presets": first.get("presets"),
+                "slicer_kind": s.get("kind", "bambu"), "slicer_name": slicer.label(s.get("kind", "bambu")),
+                "seconds": round(time.time() - t0, 2), "warnings": sorted({w for r in rows for w in (r.get("warnings") or [])})[:12],
+                "plan": {k: pl[k] for k in ("count", "bed_mm", "spacing_mm", "margin_mm", "evidence", "note")},
+                "how": "one slice per plate"}
+        if s.get("material"):
+            meta["material"] = s["material"]
+        (out / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+        shutil.rmtree(self.dir(p["id"]) / "artifacts" / "slice" / f"{keys['slice']}.parts", ignore_errors=True)
+
+    def plate_meta(self, p: dict, plate: int | None = None) -> tuple[dict, Path, str]:
+        """(meta of one plate, the slice folder, its G-code name) of the current slice; plate None or 1 for a single slice."""
+        key = self.keys(p)["slice"]
+        meta = self.read(p, "slice", key)
+        if not meta:
+            raise StudioError("There is no current slice to inspect.", "Run the pipeline first.", status=409)
+        plates = meta.get("plates") or []
+        if plates and plate:
+            if not 1 <= int(plate) <= len(plates):
+                raise StudioError(f"There is no plate {plate}.", f"This slice has {len(plates)} plates.", status=404)
+            m = dict(meta, **{k: v for k, v in plates[int(plate) - 1].items() if v is not None})
+            return m, self.apath(p, "slice", key), m["gcode"]
+        return meta, self.apath(p, "slice", key), meta["gcode"]
 
     # ---- side prints: coupon / test piece --------------------------------
     def side_slice(self, p: dict, kind: str) -> dict:
@@ -1043,8 +1302,11 @@ class Studio:
         status = status or self.status(p)
         keys = self.keys(p)
         reasons, warns, failures = [], [], []
+        off = status["slice"].get("off") if status["slice"]["state"] == "off" else None
         for n in NODES:
             st = status[n]
+            if n == "slice" and off:                  # Design only: said below, never a reason to block
+                continue
             if st["state"] != "current":
                 why = {"stale": f"is stale (last made for r{st.get('last_rev')})", "failed": "failed",
                        "missing": "has not been produced"}[st["state"]]
@@ -1062,11 +1324,16 @@ class Studio:
                     warns.append({"id": c["id"], "label": c["label"], "value": c["value"]})
         # a coupon calibrates the printer; only a result from this part speaks for this revision
         physical = [e for e in p["evidence"] if e["rev"] == p["head"] and (e["kind"] == "fit" or e.get("source") == "part")]
-        level = "Geometry computed · slice simulated · " + ("physical result recorded for this revision" if physical else "not physically validated")
+        level = ("Geometry computed · not sliced (Design only) · " if off else "Geometry computed · slice simulated · ") \
+            + ("physical result recorded for this revision" if physical else "not physically validated")
         # a person may still release over failed checks: each one acknowledged and a reason written, and the release
         # says so in its manifest and report. Missing or stale outputs always block: there would be no files to freeze.
-        return {"ready": not reasons, "reasons": reasons, "warnings": warns, "failures": failures, "blocking": blocking,
-                "can_override": not blocking and bool(failures), "evidence_level": level, "physical": len(physical)}
+        out = {"ready": not reasons, "reasons": reasons, "warnings": warns, "failures": failures, "blocking": blocking,
+               "can_override": not blocking and bool(failures), "evidence_level": level, "physical": len(physical)}
+        if off:
+            out["design_only"] = off
+            out["not_covered"] = NOT_COVERED
+        return out
 
     def approve(self, p: dict, acknowledged: list, note: str = "", override_failures: list | None = None) -> dict:
         """Release the head revision. Warnings must each be acknowledged. Failed checks block, unless the person
@@ -1095,7 +1362,7 @@ class Studio:
             shutil.rmtree(rel, ignore_errors=True)
             rel.mkdir(parents=True)
             ex = self.read(p, "exports", keys["exports"])
-            sl = self.read(p, "slice", keys["slice"])
+            sl = None if g.get("design_only") else self.read(p, "slice", keys["slice"])
             ch = self.read(p, "checks", keys["checks"])
             files = {}
             for kind in ("step", "stl"):
@@ -1105,7 +1372,14 @@ class Studio:
                 shutil.copyfile(src, rel / src.name)
                 files[src.name] = ex["files"][kind]["sha256"]
             sdir = self.apath(p, "slice", keys["slice"])
-            for fname, target in ((sl.get("threemf"), f"{p['id']}_r{rev['n']:02d}_sliced.3mf"), (sl.get("gcode"), f"{p['id']}_r{rev['n']:02d}.gcode")):
+            stem = f"{p['id']}_r{rev['n']:02d}"
+            outs = []
+            if sl and sl.get("plates"):                   # several plates: every plate's sliced 3MF and G-code
+                for pl in sl["plates"]:
+                    outs += [(pl.get("threemf"), f"{stem}_plate{pl['n']}_sliced.3mf"), (pl.get("gcode"), f"{stem}_plate{pl['n']}.gcode")]
+            elif sl:
+                outs = [(sl.get("threemf"), f"{stem}_sliced.3mf"), (sl.get("gcode"), f"{stem}.gcode")]
+            for fname, target in outs:
                 if fname and (sdir / fname).exists():
                     shutil.copyfile(sdir / fname, rel / target)
                     files[target] = sha_file(rel / target)
@@ -1116,14 +1390,22 @@ class Studio:
                 "schema": "form-release/1", "project": p["id"], "name": p["name"], "revision": rev["n"], "approved": time.time(),
                 "units": "mm", "recipe": self.rid(p), "recipe_sha": self.recipe_sha(self.rid(p)), "kernel": self.kernel_id(),
                 "values": rev["values"], "provenance": rev["provenance"], "keys": keys, "files": files,
-                "orientation": p["orientation"], "slicer": {k: sl.get(k) for k in ("slicer_version", "presets", "time_s", "filament_g", "layers", "support_used")}
-                          | {k: sl[k] for k in ("slicer_kind", "slicer_name") if k in sl},
+                "orientation": p["orientation"],
+                "slicer": ({k: sl.get(k) for k in ("slicer_version", "presets", "time_s", "filament_g", "layers", "support_used")}
+                           | {k: sl[k] for k in ("slicer_kind", "slicer_name") if k in sl}
+                           | ({"plates": [{k: x.get(k) for k in ("n", "time_s", "filament_g", "layers", "material", "filament")}
+                                          | {"parts": [q["label"] for q in x.get("parts", [])]} for x in sl["plates"]]}
+                              if sl.get("plates") else {})
+                           | ({"material": sl["material"]} if sl.get("material") else {}))
+                          if sl else {"design_only": True, "why": g["design_only"]["why"], "text": g["design_only"]["text"]},
+                "not_covered": g.get("not_covered", []),
                 "checks": [{k: c[k] for k in ("id", "label", "status", "value", "evidence")} for c in ch["checks"]],
                 "acknowledged_warnings": [w for w in g["warnings"]], "released_with_failed_checks": overridden,
                 "note": note, "evidence_level": g["evidence_level"] + (" · released with failed checks" if overridden else ""),
                 "documents": sorted(documents),
                 "physical_evidence": [e for e in p["evidence"] if e["rev"] == rev["n"] and (e["kind"] == "fit" or e.get("source") == "part")],
-                "limits": ["Slicer output is a simulation, not a print.", "No structural analysis was performed.",
+                "limits": (["Not sliced (Design only): print time, filament and toolpaths were not estimated."] if not sl else
+                           ["Slicer output is a simulation, not a print."]) + ["No structural analysis was performed.",
                            "Fit yield is a statistical model; see checks for the source of each input."]
                           + (["Mesh design (OpenSCAD): no STEP file and no B-rep checks."] if getattr(self.recipe(p), "mesh", False) else []),
             }
@@ -1156,9 +1438,16 @@ class Studio:
         if m.get("released_with_failed_checks"):
             lines += ["", "**Released with failed checks:** " + ", ".join(f"{f['label']} ({f['value']})" for f in m["released_with_failed_checks"])
                       + f". Reason given at approval: {m.get('note') or '—'}"]
-        if s.get("time_s"):
-            lines += ["", "## Slice (simulated)", "", f"- {s.get('slicer_name') or 'Bambu Studio'} {s['slicer_version']}: {(f"{s['time_s']/60:.0f} min" if s.get('time_s') is not None else 'no time estimate')}, {(f"{s['filament_g']:.1f} g" if s.get('filament_g') is not None else 'no filament estimate')}, {s['layers']} layers, supports: {'yes' if s.get('support_used') else 'no'}",
+        if s.get("design_only"):
+            lines += ["", "## Slice", "", f"Not part of this release: Design only. {s.get('text', '')}"] + [f"- {x}" for x in m.get("not_covered", [])]
+        elif s.get("time_s"):
+            lines += ["", "## Slice (simulated)", "", f"- {s.get('slicer_name') or 'The slicer'} {s['slicer_version']}: {(f"{s['time_s']/60:.0f} min" if s.get('time_s') is not None else 'no time estimate')}, {(f"{s['filament_g']:.1f} g" if s.get('filament_g') is not None else 'no filament estimate')}, {s['layers']} layers, supports: {'yes' if s.get('support_used') else 'no'}",
                       "- Presets: " + " · ".join(v["name"] for v in s["presets"].values())]
+            for pl in s.get("plates") or []:
+                lines.append(f"- Plate {pl['n']}: " + ", ".join(pl["parts"]) + " · "
+                             + (f"{pl['time_s']/60:.0f} min" if pl.get("time_s") is not None else "no time estimate") + ", "
+                             + (f"{pl['filament_g']:.1f} g" if pl.get("filament_g") is not None else "no filament estimate")
+                             + (f" · {pl['filament']}" if pl.get("filament") else ""))
         lines += ["", "## Limits", ""] + [f"- {x}" for x in m["limits"]] + [""]
         return "\n".join(lines)
 
@@ -1345,15 +1634,14 @@ class Studio:
         out["documents"] = maker_docs.available(self, p)          # maker documents the working files can produce
         return out
 
-    def layers(self, p: dict) -> list:
+    def layers(self, p: dict, plate: int | None = None) -> list:
         key = self.keys(p)["slice"]
-        if key not in self._layers_cache:
-            meta = self.read(p, "slice", key)
-            if not meta:
-                raise StudioError("There is no current slice to inspect.", "Run the pipeline first.", status=409)
+        ck = f"{key}:{plate or 1}"
+        if ck not in self._layers_cache:
+            meta, folder, gcode = self.plate_meta(p, plate)
             self._layers_cache.clear()
-            self._layers_cache[key] = slicer.parse_layers(self.apath(p, "slice", key) / meta["gcode"], meta.get("slicer_kind"))
-        return self._layers_cache[key]
+            self._layers_cache[ck] = slicer.parse_layers(folder / gcode, meta.get("slicer_kind"))
+        return self._layers_cache[ck]
 
     # ── project housekeeping: rename, duplicate, delete (app shell) ──────────────────────────────────────────
     def _summary(self, pid: str) -> dict:

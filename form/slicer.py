@@ -60,6 +60,10 @@ def resolve(cfg: dict) -> dict:
     out["kind"] = kind
     out["chosen"] = want
     out.setdefault("label", label(kind))
+    if not out.get("available") and out.get("reason") and out.get("app"):
+        why = explain_failure(out, out["reason"])            # a preset format this version of Form Studio cannot read
+        if why:
+            out["reason"] = why[0] + " " + why[1]
     if want == "auto" and auto_kind(cfg) is None:
         others = ", ".join(label(k) for k in AUTO_ORDER if k != "bambu")
         out["reason"] = (f"{label('bambu')} was not found at {out.get('app') or 'its usual place'}, and neither was {others}. "
@@ -81,8 +85,27 @@ def public(resolved: dict) -> dict:
     return out
 
 
+def _version_of(resolved: dict) -> str:
+    try:
+        return adapter(resolved.get("kind", "bambu")).version(resolved.get("app") or "") if resolved.get("app") else ""
+    except Exception:
+        return ""
+
+
+def explain_failure(resolved: dict, message: str, log: str = "") -> tuple[str, str] | None:
+    """(message, hint) naming the supported versions, when the installed version is why it failed (form/compat.py)."""
+    from . import compat
+    return compat.wrap_message(resolved.get("kind", "bambu"), _version_of(resolved), message, log)
+
+
 def slice_stl(resolved: dict, stl, out_dir, timeout: float = 600) -> dict:
-    info = _for(resolved).slice_stl(resolved, stl, out_dir, timeout)
+    try:
+        info = _for(resolved).slice_stl(resolved, stl, out_dir, timeout)
+    except SlicerFailed as e:
+        why = explain_failure(resolved, str(e), e.log)
+        if why:
+            raise SlicerFailed(why[0], why[1], e.log) from e
+        raise
     kind = resolved.get("kind", "bambu")
     info.setdefault("slicer_kind", kind)
     info.setdefault("slicer_name", label(kind))
@@ -114,6 +137,8 @@ def detect_all(cfg: dict) -> list[dict]:
             "version": a.version(app) if app else None,
             "install": None if app else a.install_hint(),
         }
+        from . import compat                               # informational: which versions Form Studio is built for
+        entry["compat"] = compat.status(kind, entry["version"]) if app else {"range": compat.range_text(kind) if kind in compat.RANGES else ""}
         out.append(entry)
     return out
 

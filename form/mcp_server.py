@@ -454,10 +454,14 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def set_print_setup(project: str, orientation: str | None = None, fit_gap_min_mm: float | None = None,
-                              fit_gap_max_mm: float | None = None, auto_slice: bool | None = None) -> dict:
+                              fit_gap_max_mm: float | None = None, auto_slice: bool | None = None,
+                              design_only: bool | None = None, material: str | None = None) -> dict:
         """Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from
         suggest_orientation), the acceptable total fit gap
-        window, and whether the pipeline slices automatically. The checks include an orientation comparison table."""
+        window, and whether the pipeline slices automatically. The checks include an orientation comparison table.
+        design_only=True: the design is not sliced (checks, exports and release still work; the release says it was
+        not sliced). material: PLA, PETG, ABS, ASA, TPU, PA, PC, ... for the whole design ("" clears): the slice uses the
+        printer's filament preset for it and the checks add notes for that material. Ask the user before changing either."""
         st = studio()
         body: dict[str, Any] = {}
         if orientation is not None:
@@ -468,6 +472,10 @@ def build() -> MCPServer:
                            "gap_max": fit_gap_max_mm if fit_gap_max_mm is not None else cur["gap_max"]}
         if auto_slice is not None:
             body["auto_slice"] = auto_slice
+        if design_only is not None:
+            body["design_only"] = design_only
+        if material is not None:
+            body["material"] = material
         await _run(lambda: st.settings(st.load(project), body))
         jid = st.run(project)
         await _wait_job(st, jid, 45)
@@ -727,24 +735,25 @@ def build() -> MCPServer:
     # ---- print simulation, cost, plate packing -------------------------------------------------
     @mcp.tool(annotations=RO, structured_output=False)
     async def print_simulation(project: str, layer: int | None = None, only: list[str] | None = None,
-                               ctx: Context = None) -> list:
+                               plate: int | None = None, ctx: Context = None) -> list:
         """Look at the sliced print as it would stand at the end of `layer` (1-based; default: finished). Returns a
         picture drawn from the slicer's G-code toolpaths, coloured by line type, plus statistics: z, line types in
         that layer, whether it has bridges or overhang walls, slicer time elapsed and remaining, and the list of
         bridge and overhang layers. only: draw just these line types (e.g. ["Bridge", "Overhang wall"]).
-        Needs a current slice (run_pipeline). This is a simulation of the slice, not a print: say so."""
+        plate: which plate (1-based) when the design was sliced on several (plate_plan). Needs a current slice
+        (run_pipeline). This is a simulation of the slice, not a print: say so."""
         st = studio()
         def go():
             from . import simulate, toolpath
             p = st.load(project)
-            tp = toolpath.for_project(st, p)
+            tp = toolpath.for_project(st, p, plate)
             n = tp.layers if layer is None else max(1, min(tp.layers, int(layer)))
             bad = [t for t in (only or []) if t not in tp.types]
             if bad:
                 raise StudioError(f"Unknown line type “{bad[0]}”.", "This slice has: " + ", ".join(tp.types))
             cache = st.dir(p["id"]) / "artifacts" / "renders"
             cache.mkdir(parents=True, exist_ok=True)
-            f = cache / f"sim-{st.keys(p)['slice']}-{n}-{H(sorted(only or []))}.png"
+            f = cache / f"sim-{st.keys(p)['slice']}-{plate or 1}-{n}-{H(sorted(only or []))}.png"
             if not f.exists():
                 f.write_bytes(simulate.png_at(tp, float(n), title=f"{p['name']}  r{p['head']:02d}", only=only))
             s = tp.summary()
@@ -771,6 +780,34 @@ def build() -> MCPServer:
             out.pop("prefs", None)
             return out
         return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def plate_plan(project: str) -> dict:
+        """How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material),
+        the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts
+        too big for the plate, and per plate the slicer's time and filament when it has been sliced. Computed by FORM from
+        bounding boxes; each plate is sliced on its own. Needs current checks (run_pipeline)."""
+        st = studio()
+        def go():
+            from . import plates
+            return plates.for_project(st, st.load(project))
+        return await _run(go)
+
+    @mcp.tool()
+    async def set_part_print(project: str, part: str, orientation: str | None = None, material: str | None = None,
+                             color: str | None = None, ctx: Context = None) -> dict:
+        """Print settings for one printed part of a multi-part design (part ids from plate_plan): orientation (a named
+        one, a "down:x,y,z" id, or "auto" for the best-ranked way for that part alone), material (PLA, PETG, TPU, ...;
+        parts in different materials go on different plates, each sliced with its own filament), color ("#rrggbb").
+        "" clears a setting. Checks and slice go stale; the pipeline runs again."""
+        st = studio()
+        def go():
+            st.set_part(project, part, by=_origin(ctx).replace("agent:", "") or "agent",
+                        orientation=orientation, material=material, color=color)
+            return st.run(project)
+        jid = await _run(go)
+        await _wait_job(st, jid, 45)
+        return await _run(lambda: __import__("form.plates", fromlist=["for_project"]).for_project(st, st.load(project)))
 
     @mcp.tool(annotations=RO)
     async def pack_plate(project: str, copies: int = 1, spacing_mm: float | None = None) -> dict:
