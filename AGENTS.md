@@ -11,6 +11,9 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | See what exists | `form_overview` | `form doctor`, `form list` |
 | Learn a recipe's parameters | `describe_recipe` | `form recipe device_stand` |
 | Start a design | `create_project` | `form new "Desk stand" device_stand device_width=75.6` |
+| Start from words, photos, a sketch, files or links | — (Home in the app) | `form start --text "a hook for my desk" --photo desk.jpg` |
+| A blank design to shape | — | `form start --blank --name "Bracket"` |
+| Offer different concepts for a new idea, then let the person pick | `propose_concepts` → `pick_concept`, `list_concepts` | `form concepts`, `form concepts pick <group> <project>` |
 | Read the design | `get_project` | `form state <project>` |
 | Try a change, save nothing | `preview_change` | `form preview <project> lean=18` |
 | Look at it | `render` (`view="sheet"` for four views) | `form render <project> --view sheet` |
@@ -23,6 +26,7 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Show motion | `animate` (turntable or morph) | `form animate <p> --morph 1:4` |
 | Check this machine | `setup_status` (never run fixes without asking) | `form setup --check` |
 | Ask the person a blocking question | `ask_user` (a card in Form Studio's chat; elsewhere it tells you to ask yourself) | `form chat` prompts in the terminal |
+| Ask the person to measure a dimension | `ask_measurement` (where, tolerance, diagram; the answer is committed with how it was measured) | `form chat` prompts in the terminal |
 | Offer next steps | `suggest_replies` (up to three buttons under the reply) | — |
 
 Rules that keep the record honest:

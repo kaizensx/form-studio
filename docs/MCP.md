@@ -43,12 +43,22 @@ Rules:
 - You cannot approve a release. request_release returns a link that opens the release in Form Studio for the user.
 - Nothing here starts a print or sends files anywhere.
 - Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time,
-  at most three per task. Outside Form Studio's chat it tells you to ask in your own interface.
+  at most three per task. Outside Form Studio's chat it tells you to ask in your own interface. For a dimension the
+  person can measure, use ask_measurement (where to measure, tolerance, a diagram); it updates the design with how
+  it was measured.
+- A new idea that is not already a precise specification: propose_concepts with 3-4 genuinely different structural
+  approaches as real designs (not size variants), a one-line rationale each; then stop and let the person pick.
+  Refine the picked one with update_design. Recipes may be used as building blocks; do not offer them to the person.
+- Photos: find the scale from a reference object (bank card 85.60 x 53.98 mm, a coin's official diameter, a ruler);
+  dimensions read off a photo are "estimated from the photo (scale from <reference>)" and stay assumed until measured.
+  Sketches from Form Studio carry structured JSON: it is authoritative over the picture; stated dimensions override
+  drawn lengths. STEP/STL: import_reference. PDF drawings: read_document. Download only files the person gave you.
+- If the message has a "Purpose:" line, respect it: "just a 3D model" means no slicing and no print talk.
 ```
 
 ## Tools at a glance
 
-62 tools. Read-only tools never change a project.
+66 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -105,6 +115,10 @@ Rules:
 | [`list_printers`](#list_printers) | read-only | Every printer set up in every installed slicer (the user's own presets and the system printers they enabled), with slicer, bed size and nozzle, plus the default printer. |
 | [`choose_printer`](#choose_printer) | changes | Use a printer for one design (`project`) or as the default for designs without their own choice (`default=True`, written to studio.toml after a backup). |
 | [`ask_user`](#ask_user) | read-only | Ask the person one question and wait for the answer. |
+| [`ask_measurement`](#ask_measurement) | changes | Ask the person to measure one dimension of the design, and wait. |
+| [`propose_concepts`](#propose_concepts) | changes | For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one. |
+| [`pick_concept`](#pick_concept) | changes | The person picked a concept (in words; in the app they pick on the board). |
+| [`list_concepts`](#list_concepts) | read-only | Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>. |
 | [`suggest_replies`](#suggest_replies) | read-only | Offer up to 3 short follow-up messages the person might send next (each under 80 characters, written as the person would say it, e.g. "Make the walls 2 mm"). |
 | [`list_starters`](#list_starters) | read-only | The starting points Home offers, ranked from what this person designs (their projects' recipes and briefs, their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}. |
 | [`recipe_library`](#recipe_library) | read-only | Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index on the project website. |
@@ -837,6 +851,71 @@ can answer here and the result tells you to ask in your own interface.
 | `allow_text` | boolean |  |
 | `why` | string |  |
 | `kind` | string |  |
+
+### `ask_measurement`
+
+Ask the person to measure one dimension of the design, and wait. Form Studio shows a measurement card:
+the question, where to measure (where, e.g. "across the widest part of the phone, without the case"), the
+precision that matters (tolerance_mm), a diagram ({"shape": "box"|"cylinder"|"hole"|"gap"|"thickness",
+"axis": "x"|"y"|"z"|"d"}) and optionally a picture: image is an absolute path to a PNG or JPEG (a render, or
+the person's photo) with mark = [x0, y0, x1, y1] (0..1) outlining where to measure. The person types the
+number and says how they measured it (calipers, ruler, tape, or estimate). The answer becomes a new revision
+of the design with provenance measured (calipers sigma 0.05 mm, ruler 0.5, tape 1.0) or, for an estimate,
+assumed. One question at a time. Returns {answered, value, unit, method, source, rev}; when nobody answered,
+{answered: false, reason, note}. Outside Form Studio's chat it tells you to ask in your own interface.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `param` | string | yes |
+| `question` | string | yes |
+| `where` | string |  |
+| `unit` | string |  |
+| `tolerance_mm` | number \| null |  |
+| `diagram` | object \| null |  |
+| `image` | string \| null |  |
+| `mark` | array \| null |  |
+
+### `propose_concepts`
+
+For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one.
+concepts: [{"title": short name, "rationale": one line on the approach, "source": design code as for
+create_design (see design_guide), "language": "python", "values": {...} or null}]. Make them different
+structural approaches (how it holds, mounts, opens), not size variants. Each becomes its own project
+("<name> · A", "· B", ...). A concept that fails to build comes back in "failed" with its error; the others are
+kept. group: an open group's id to add concepts to (at most 6 in a group), e.g. one mixed concept when the
+person asks for "the base of A with the hook of C". With run=True each is exported and checked.
+Returns the board: {id, name, state, members: [{project, letter, title, rationale, numbers}], failed}.
+
+| Argument | Type | Required |
+|---|---|---|
+| `name` | string | yes |
+| `concepts` | array | yes |
+| `brief` | string |  |
+| `group` | string \| null |  |
+| `run` | boolean |  |
+
+### `pick_concept`
+
+The person picked a concept (in words; in the app they pick on the board). The picked project takes the
+group's name and records the choice; the other concepts move to the trash (recoverable) unless keep_others.
+Then refine the picked design with update_design. Only call this when the person said which one.
+
+| Argument | Type | Required |
+|---|---|---|
+| `group` | string | yes |
+| `project` | string | yes |
+| `keep_others` | boolean |  |
+
+### `list_concepts`
+
+*Read-only.*
+
+Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>.
+
+| Argument | Type | Required |
+|---|---|---|
+| `group` | string |  |
 
 ### `suggest_replies`
 

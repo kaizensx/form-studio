@@ -221,7 +221,7 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 44 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 66 tools ([MCP reference](MCP.md)) |
 
 ## Setup, settings and updates
 
