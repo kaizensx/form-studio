@@ -42,6 +42,8 @@
   form export-conversation <id> [--format md|json] [--out file]       one conversation as Markdown or JSON
   form starters [add "text" | edit ID "text" | remove ID | pin ID | unpin ID | restore]   Home's learned starters
   form recipes [list|inspect|install|uninstall|community|source] ...  the recipe library (installs need --sha256)
+  form recipes [export|import|submit|derive] ...  share a recipe as a .formrecipe, prepare a community submission,
+                                     turn a design into a recipe (nothing is uploaded; installs need --sha256)
 """
 from __future__ import annotations
 

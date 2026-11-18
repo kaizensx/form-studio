@@ -14,6 +14,9 @@ body:
         attach it (`recipe.py` renamed to `recipe.py.txt`, a `.zip`, or a `.formstudio` file renamed to `.zip`).
         Form Studio's automation builds it in the CAD kernel at its defaults and two other parameter sets, runs the
         checks, slices it with PrusaSlicer and replies here with pictures and results. Edit the issue to check again.
+
+        Submitting from Form Studio (**Share › Share to the community**) fills in the fields below. Drag `preview.png`
+        from the submission folder it saved into the Preview box, then submit.
   - type: dropdown
     id: kind
     attributes:
@@ -66,14 +69,23 @@ body:
       description: "For a submission: a few lowercase words people would search for, separated by commas."
       placeholder: desk, cable management, snap fit
   - type: textarea
-    id: source
+    id: recipe_meta
+    attributes:
+      label: meta.json
+      description: "For a submission: what the gallery shows. Form Studio fills this in from the recipe."
+  - type: textarea
+    id: recipe_code
     attributes:
       label: Recipe source
-      description: "For a submission: the whole recipe.py (one Recipe subclass) or recipe.scad."
-      render: python
+      description: "For a submission: the whole recipe.py (one Recipe subclass) or recipe.scad, in a code block. If it is too long, drag the file here."
   - type: input
     id: link
     attributes:
       label: Link to the recipe file
       description: "Instead of pasting: a link to the file on GitHub or in a gist."
       placeholder: https://github.com/you/your-repo/blob/main/recipe.py
+  - type: textarea
+    id: preview
+    attributes:
+      label: Preview
+      description: "Optional: drag preview.png from the saved submission folder here (the part at its default values)."

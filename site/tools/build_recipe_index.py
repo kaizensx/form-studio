@@ -12,7 +12,8 @@ The app fetches https://kaizensx.github.io/form-studio/recipes/index.json, so th
      "recipes": [{"id", "title", "summary", "author", "tags": [], "kind": "python" | "scad", "builtin": bool,
                   "url": raw.githubusercontent.com URL of the recipe file on main, or null for built-in recipes,
                   "sha256": hex digest of that file, or null,
-                  "preview": URL of a picture on the website, or null}]}
+                  "preview": URL of a picture on the website, or null,
+                  "discussion"?: its GitHub Discussions thread, "added"?: YYYY-MM-DD}]}
 
 Community previews are copied to site/recipes/previews/community-<id>.png.
 
@@ -35,6 +36,9 @@ OUT = SITE / "recipes" / "index.json"
 BASE = "https://kaizensx.github.io/form-studio/"
 RAW = "https://raw.githubusercontent.com/kaizensx/form-studio/main/"
 ID = re.compile(r"^[a-z0-9][a-z0-9-]{1,48}$")
+# Optional: the recipe's thread in GitHub Discussions, and the date it joined the gallery (for "newest" sorting).
+OPTIONAL = {"discussion": re.compile(r"^https://github\.com/kaizensx/form-studio/discussions/\d+$"),
+            "added": re.compile(r"^\d{4}-\d{2}-\d{2}$")}
 FIELDS = {"id": str, "title": str, "summary": str, "author": str, "tags": list, "kind": str, "params_count": int}
 
 # The order of the built-in recipes in the gallery (form/recipes/__init__.py registry order); others follow by id.
@@ -120,7 +124,8 @@ def community(errors: list[str]) -> list[dict]:
         out.append({"id": meta["id"], "title": meta["title"], "summary": meta["summary"], "author": meta["author"],
                     "tags": meta["tags"], "kind": meta["kind"], "builtin": False, "url": RAW + rel,
                     "sha256": hashlib.sha256(src.read_bytes()).hexdigest(), "params_count": meta["params_count"],
-                    "preview": f"{BASE}recipes/previews/community-{d.name}.png" if prev.is_file() else None})
+                    "preview": f"{BASE}recipes/previews/community-{d.name}.png" if prev.is_file() else None,
+                    **{k: meta[k] for k in OPTIONAL if isinstance(meta.get(k), str) and OPTIONAL[k].match(meta[k])}})
     return out
 
 

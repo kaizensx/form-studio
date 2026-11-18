@@ -17,6 +17,11 @@ Column {
             readonly property int life: modelData.bad ? 7000 : 3400
             readonly property int age: Date.now() - (modelData.ts || Date.now())
             width: tc.width; height: card.height
+            // over an open sheet a toast can sit on its buttons: there it lets clicks through and turns see-through
+            // under the pointer, so the button below is never blocked
+            readonly property bool overSheet: !!Store.sheet
+            opacity: overSheet && hov.hovered ? 0.18 : 1
+            Behavior on opacity { NumberAnimation { duration: Theme.fast } }
             function leave() { if (leaving) return; leaving = true; out.start() }
             Rectangle {
                 id: card
@@ -29,7 +34,7 @@ Column {
                     Txt { text: t.modelData.msg; width: parent.width; font.weight: Theme.wSemi }
                     Txt { kind: "fine"; visible: t.modelData.hint !== ""; text: t.modelData.hint; width: parent.width; color: Theme.ink2 } }
                 HoverHandler { id: hov }
-                MouseArea { anchors.fill: parent; onClicked: t.leave() }
+                MouseArea { anchors.fill: parent; enabled: !t.overSheet; onClicked: t.leave() }
             }
             Component.onCompleted: if (t.age <= 250) inn.start()
             ParallelAnimation { id: inn

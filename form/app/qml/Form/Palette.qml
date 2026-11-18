@@ -43,6 +43,7 @@ Item {
             add("Tools", "alternatives", "boxes", "Compare alternatives", "Build a grid of candidates", function () { Store.openSheet("alternatives") })
             add("Tools", "variants", "layout_grid", "Variants board", "Named variants side by side", function () { Store.openSheet("variants") })
             add("Tools", "share", "share_2", "Share card", "A 1600 × 900 image of this design", function () { Store.openSheet("share") })
+            add("Tools", "asrecipe", "wand", "Turn this design into a recipe", "Its values become the defaults; share it as a file or with the community", function () { Store.openSheet("designRecipe", { project: Store.pid }) })
             add("Tools", "render", "camera", "Render in Blender", "An illustration of the current revision", function () { Store.openSheet("render") })
             add("Tools", "timeline", "history", (Store.timelineOpen ? "Hide" : "Show") + " the revision timeline", "Scrub through revisions", function () { Store.timelineOpen = !Store.timelineOpen; if (!Store.timelineOpen) Store.endScrub() })
             add("Tools", "morph", "play", "Play the revision history", "Morph through every revision", function () { Store.timelineOpen = true; Store.playMorph() })

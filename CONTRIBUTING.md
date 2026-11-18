@@ -7,7 +7,7 @@ a slicer that behaves differently, a measured result, a sharper check.
 
 | Contribution | Where it goes | Start here |
 |---|---|---|
-| **Recipes** | `community/recipes/<id>/` (gallery) or `form/recipes/` (built-in) | [community/recipes](community/recipes/README.md), [Writing a recipe](docs/RECIPES.md) |
+| **Recipes** | `community/recipes/<id>/` (gallery) or `form/recipes/` (built-in) | [community/recipes](community/recipes/README.md), [Writing a recipe](docs/RECIPES.md); in the app, **Share… › To the community** prepares the folder and a pre-filled issue |
 | **Measured print results** | An issue or a Show and tell post | Printer, nozzle, filament, slicer preset and the measured numbers |
 | **Slicer and printer support** | `form/adapters/` | [`form/adapters/__init__.py`](form/adapters/__init__.py) defines the adapter interface |
 | **Agent support** | `form/agents/` | [`form/agents/base.py`](form/agents/base.py) defines the agent interface |

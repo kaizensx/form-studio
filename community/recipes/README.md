@@ -8,6 +8,31 @@ A recipe is a family of objects: typed parameters in, one valid solid out, built
 knows which feature it belongs to. Form Studio builds it in the CAD kernel and runs the full pipeline on it: checks,
 fit model, slicing, print simulation, revisions, variants, optimisation and release.
 
+## Submitting from Form Studio
+
+The quickest way: install your recipe (**New design › From a recipe › Install from a file…**, or **Turn this design into
+a recipe** from a design's menu), pick it under **Mine** and press **Share…**.
+
+- **As a file** saves one `.formrecipe`: the code, `meta.json` (title, summary, author, tags, every parameter with its
+  range, the code's SHA-256) and `preview.png`, drawn from a real build at the recipe's defaults. Anyone can open it
+  with **Install from a file…**; they see the code and the checksum before anything is installed.
+- **To the community** checks what the gallery would refuse (author, summary, tags, id), then offers two buttons.
+  **Open a pre-filled GitHub issue in your browser** opens the recipe form with the title, id, `meta.json` and code
+  filled in; drag `preview.png` into it, choose *This is*, and submit it yourself. **Save the submission folder…**
+  writes `<id>/` with exactly the three files below, for a pull request. Form Studio sends nothing on its own.
+
+The same from a terminal, each printing JSON:
+
+```bash
+form recipes export <id> --out my-recipe.formrecipe --author your-github-username --tags "desk, cables"
+form recipes import my-recipe.formrecipe                 # shows the code's SHA-256; add --sha256 <hex> to install
+form recipes submit <id> --out path/to/fork/community/recipes   # the folder, and the pre-filled issue link
+form recipes derive <project> --range wall=1.6:3              # a design as a recipe; --install --sha256 <hex>
+```
+
+Each recipe's page in the app links to its thread in the repository's
+[Discussions](https://github.com/kaizensx/form-studio/discussions), where people say how it printed.
+
 ## Layout
 
 ```
@@ -43,6 +68,8 @@ community/recipes/
 | `tags` | string[] | A few lowercase words people would search for |
 | `kind` | `"python"` or `"scad"` | `recipe.py` (build123d) or `recipe.scad` (OpenSCAD with Customizer ranges) |
 | `params_count` | integer | Number of parameters the recipe exposes |
+| `discussion` | string, optional | Its thread in GitHub Discussions (`https://github.com/kaizensx/form-studio/discussions/<n>`) |
+| `added` | string, optional | The date it joined the gallery, `YYYY-MM-DD`, for "newest" sorting |
 
 ### `recipe.py`
 

@@ -14,8 +14,8 @@ Column {
     readonly property var termOrder: ["support", "overhang", "contact", "height", "layers"]
 
     Row { spacing: 8
-        Btn { icon: "rotate_3d"; text: Store.orientBusy ? "Comparing…" : of.res ? "Compare again" : "Find the best orientation"
-            enabled: !Store.orientBusy; onClicked: Store.findOrientation()
+        Btn { icon: "rotate_3d"; text: of.res ? "Compare again" : "Find the best orientation"; busyText: "Comparing…"
+            busy: Store.orientBusy; onClicked: Store.findOrientation()
             tip: "Evaluates the six axis orientations and every flat face on the part’s convex hull, and ranks them by a score you can read." }
         Btn { kind: "quiet"; text: "Hide"; visible: !!of.res; onClicked: Store.orient = null } }
 

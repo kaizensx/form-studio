@@ -108,20 +108,117 @@ QtObject {
             if (ok) p[0](payload); else p[1](payload)
         }
     }
-    function get(path) { return new Promise(function (res, rej) { var id = ++_rid; _pending[id] = [res, rej]; Bridge.request(id, "GET", path, null) }) }
-    function post(path, body) { return new Promise(function (res, rej) { var id = ++_rid; _pending[id] = [res, rej]; Bridge.request(id, "POST", path, body || ({})) }) }
-    function upload(path, fileUrl) { return new Promise(function (res, rej) { var id = ++_rid; _pending[id] = [res, rej]; Bridge.upload(id, path, fileUrl) }) }
+    function get(path) { return _track(new Promise(function (res, rej) { var id = ++_rid; _pending[id] = [res, rej]; Bridge.request(id, "GET", path, null) }), "GET", path) }
+    function post(path, body) { return _track(new Promise(function (res, rej) { var id = ++_rid; _pending[id] = [res, rej]; Bridge.request(id, "POST", path, body || ({})) }), "POST", path) }
+    function upload(path, fileUrl) { return _track(new Promise(function (res, rej) { var id = ++_rid; _pending[id] = [res, rej]; Bridge.upload(id, path, fileUrl) }), "UPLOAD", path) }
     function pget(rest) { return get("/projects/" + pid + (rest || "")) }
     function ppost(rest, body) { return post("/projects/" + pid + rest, body) }
 
     // ── toasts ───────────────────────────────────────────────
     property int _toastId: 0
     function toast(msg, hint, bad) {
+        _toastAt = Date.now()
         var t = toasts.slice(); t.push({ id: ++_toastId, msg: msg, hint: hint || "", bad: !!bad, ts: Date.now() }); toasts = t
         if (toasts.length > 4) toasts = toasts.slice(-4)          // a burst must not cover the screen
     }
     function dropToast(id) { toasts = toasts.filter(function (t) { return t.id !== id }) }
     function fail(e) { toast(e.message || "Something went wrong", e.hint, true) }
+
+    // ── activity: what the engine is working on, named, for the bar under the top bar (ActivityBar.qml) ──
+    // Every request is timed. One that takes longer than 300 ms and has a name (from what the person clicked, from
+    // act(), or from the table in _labelFor) appears in the bar until it answers, and stays at least 400 ms. When a
+    // click's work answers and nobody said anything about it, a toast says it finished, or why it did not.
+    property var _clickOwner: null     // the Btn whose click is running right now (Btn.qml sets it)
+    property var activity: []          // on screen: [{ id, label, t0, progress (0..1 or -1), detail, done, ok }]
+    property var _acts: ({})
+    property var activityLog: []       // the last 30 named pieces of work: { label, ms, shown, ok } (diagnostics, tests)
+    property int _actId: 0
+    property real _toastAt: 0
+    property var _actTimer: Timer { interval: 100; repeat: true; onTriggered: s._actTick() }
+    function _labelFor(m, path) {
+        var p = String(path).replace(/\?.*$/, ""), r = p.replace(/^\/projects\/[a-z0-9-]+/, "")
+        var proj = p !== r
+        if (/\/(job|stamp)(\/|$)|^\/activity|^\/conversations|^\/chat|^\/setup\/(job|state|step|seen)|^\/install\/job|^\/claude\/login\/|^\/starters|^\/presets|^\/whatsnew|^\/recipes\/builtin|^\/recipes\/(mine|pending)\/|\/photo$|\/thumb/.test(p)) return ""
+        if (proj) {
+            var t = { "": m === "GET" ? "Loading the design" : "", "/view": "Loading the geometry", "/analysis": "Computing the analysis map", "/orient": "Ranking print orientations",
+                      "/layers": "Loading the sliced layers", "/toolpath": "Loading the toolpath", "/diff": "Comparing revisions", "/cost": "Estimating the cost",
+                      "/pack": "Packing the plate", "/preview": "Previewing the change", "/commit": "Saving the revision", "/checkout": "Switching revision",
+                      "/run": "Starting the pipeline", "/settings": "Saving the design settings", "/render_photo": "Starting the render", "/alternatives": "Building alternatives",
+                      "/variant_save": "Saving the variant", "/variant_promote": "Making the variant the design", "/variant_delete": "Deleting the variant",
+                      "/history_export": "Exporting the history", "/import_part": "Importing the part", "/open": "Opening the file", "/approve": "Recording the release",
+                      "/evidence": "Recording the result", "/test_piece": "Making the test piece", "/measure": "Measuring", "/intent": "Reading the request",
+                      "/duplicate": "Duplicating the design", "/delete": "Moving the design to the trash", "/rename": "Renaming", "/revisions": "Loading revisions",
+                      "/variants": "Loading variants", "/reference": "Saving the reference" }
+            return t[r] !== undefined ? t[r] : ""
+        }
+        var g = [[/^\/projects$/, "Creating the design"], [/^\/recipes\/create$/, "Creating the design"], [/^\/recipes\/library/, "Loading recipes"],
+                 [/^\/recipes\/community\/preview/, "Downloading and checking the recipe"], [/^\/recipes\/(community\/|package\/|derive\/)?install/, "Installing the recipe"],
+                 [/^\/recipes\/(package\/)?inspect/, "Reading the recipe"], [/^\/recipes\/share\/prepare/, "Preparing the recipe to share"],
+                 [/^\/recipes\/share\/submission/, "Saving the submission folder"], [/^\/recipes\/derive$/, "Building the recipe from the design"],
+                 [/^\/recipes\/uninstall/, "Uninstalling the recipe"], [/^\/(archive\/)?import/, "Importing"], [/^\/examples$/, m === "POST" ? "Adding the example" : ""],
+                 [/^\/setup$/, "Checking this computer"], [/^\/install$/, m === "GET" ? "Checking software" : "Starting the install"], [/^\/updates/, "Checking for updates"],
+                 [/^\/studio\/slicers/, "Finding slicers"], [/^\/studio\/slicer$/, "Switching slicer"], [/^\/printers/, "Reading printers"], [/^\/briefs/, "Writing the brief"],
+                 [/^\/config$/, m === "POST" ? "Saving settings" : ""]]
+        for (var i = 0; i < g.length; i++) if (g[i][0].test(p)) return g[i][1]
+        return ""
+    }
+    function _track(p, m, path) {
+        // a click owns the actions it starts (POST, upload); reads (GET) may come from whatever the click redraws
+        var o = m === "GET" ? null : _clickOwner, label = _labelFor(m, path)
+        // the button may be on its way out (its sheet was swapped by the same click): then it is not followed
+        if (o) { try { o.track(p); if (!label) label = o.busyText ? String(o.busyText).replace(/…$/, "") : o.text } catch (e) { o = null } }
+        if (!label) return p
+        return _act(label, p, { click: !!o, owner: o })
+    }
+    // Name a piece of work that is not one request (several in a row, or a file dialog's save): act("Exporting", promise)
+    function act(label, p, opts) { try { if (_clickOwner) _clickOwner.track(p) } catch (e) {} return _act(label, p, Object.assign({ click: true, explicit: true }, opts || {})) }
+    function _act(label, p, o) {
+        var id = ++_actId
+        _acts[id] = { id: id, label: label, t0: Date.now(), click: !!o.click, explicit: !!o.explicit, owner: o.owner || null, quiet: !!o.quiet, done: 0, ok: true }
+        _actTimer.start()
+        p.then(function () { s._actDone(id, true, null) }, function (e) { s._actDone(id, false, e) })
+        return p
+    }
+    function _actDone(id, ok, e) {
+        var a = _acts[id]
+        if (!a) return
+        a.done = Date.now(); a.ok = ok
+        activityLog = activityLog.concat([{ label: a.label, ms: a.done - a.t0, shown: !!a.shown, ok: ok }]).slice(-30)
+        if (!a.shown) { delete _acts[id]; _actTick(); return }
+        // a click whose work took a while gets a word when it ends, unless its own code already said something
+        if (a.click && !a.quiet) _afterAct.later(function () {
+            if (s._toastAt >= a.done - 5) return
+            if (!ok) s.toast((e && e.message) || (a.label + " did not finish"), e && e.hint, true)
+            // success is said only where nothing else shows it: the button that asked is still on screen
+            else if (a.done - a.t0 > 900 && (a.explicit || s._alive(a.owner))) s.toast(a.label + " · done", "Took " + ((a.done - a.t0) / 1000).toFixed(1) + " s.")
+        })
+        _actTick()
+    }
+    property var _afterAct: Timer { interval: 220; property var jobs: []
+        function later(f) { jobs.push(f); restart() }
+        onTriggered: { var j = jobs; jobs = []; j.forEach(function (f) { f() }) } }
+    function _alive(o) { try { return !!o && o.visible === true && o.width > 0 } catch (e) { return false } }
+    function _actTick() {
+        var now = Date.now(), list = [], left = false
+        for (var k in _acts) {
+            var a = _acts[k]
+            if (!a.shown && !a.done && now - a.t0 >= 300) { a.shown = now }
+            if (a.done && (!a.shown || now - a.shown >= 400) && now - a.done >= 160) { delete _acts[k]; continue }
+            left = true
+            if (a.shown) list.push({ id: a.id, label: a.label, t0: a.t0, progress: a.done ? 1 : -1, detail: "", done: !!a.done, ok: a.ok })
+        }
+        if (job && jobSteps.length) {
+            var n = jobSteps.length, fin = jobSteps.filter(function (x) { return x.state !== "queued" && x.state !== "running" }).length
+            var cur = jobSteps.filter(function (x) { return x.state === "running" })[0]
+            list.push({ id: "job", label: "Running the pipeline", t0: _jobT0, progress: n ? fin / n : -1, done: false, ok: true,
+                        detail: (cur ? cur.label : "") + " · " + fin + " of " + n })
+            left = true
+        }
+        if (JSON.stringify(list) !== JSON.stringify(activity)) activity = list
+        if (!left) _actTimer.stop()
+    }
+    property var jobSteps: []          // the running pipeline job's steps: [{ node, label, state }]
+    property real _jobT0: 0
 
     // ── viewport coupling ────────────────────────────────────
     function sectionNow() {
@@ -273,23 +370,25 @@ QtObject {
     property var _poll: Timer { interval: 160; onTriggered: s._tick() }
     function run(nodes, force) { ppost("/run", { nodes: nodes || [], force: !!force }).then(function (r) { track(r.job) }, fail) }
     function settings(body) { return ppost("/settings", body).then(function (r) { if (r.job) track(r.job); return refresh() }, fail) }
-    function track(id) { if (!id) return; job = id; _poll.restart() }
+    function track(id) { if (!id) return; job = id; jobSteps = []; _jobT0 = Date.now(); _poll.restart(); _actTimer.start() }
     function _tick() {
         var id = job
         pget("/job/" + id).then(function (j) {
             if (job !== id) return
             var r = ({})
             for (var i = 0; i < j.steps.length; i++) r[j.steps[i].node] = j.steps[i].state
-            running = r
+            running = r; jobSteps = j.steps
             if (j.state === "running") { _poll.restart(); return }
-            job = ""; running = ({}); layers = null
+            job = ""; running = ({}); layers = null; jobSteps = []
             var bad = null
             for (var k = 0; k < j.steps.length; k++) if (j.steps[k].state === "failed" || j.steps[k].state === "blocked") { bad = j.steps[k]; break }
             if (!bad && j.error) bad = { label: "Pipeline", error: j.error }
             if (bad) toast(bad.label + ": " + (bad.error && bad.error.message || "stopped"), bad.error && bad.error.hint, true)
+            else if (Date.now() - _jobT0 > 1500 && j.steps.some(function (x) { return x.state === "done" }))
+                toast("Outputs are current", F.plural(j.steps.filter(function (x) { return x.state === "done" }).length, "step") + " rebuilt in " + ((Date.now() - _jobT0) / 1000).toFixed(1) + " s.")
             var t = Object.assign({}, thumbTick); t[pid] = (t[pid] || 0) + 1; thumbTick = t
             refresh(true)
-        }, function () { job = ""; running = ({}) })
+        }, function () { job = ""; running = ({}); jobSteps = [] })
     }
 
     // ── stage & view ─────────────────────────────────────────
@@ -354,7 +453,7 @@ QtObject {
     function ask(dlg) {
         if (!Bridge.testDir) { dlg.open(); return }
         var pick = Bridge.testPick()
-        if (dlg.selectedFolder !== undefined && dlg.fileMode === undefined) dlg.selectedFolder = Bridge.fileUrl(pick || Bridge.testDir)
+        if (dlg.selectedFolder !== undefined && dlg.fileMode === undefined) { dlg.currentFolder = dlg.selectedFolder = Bridge.fileUrl(pick || Bridge.testDir) }
         else {
             var name = String(dlg.selectedFile || dlg.currentFile || "").replace(/^.*\//, "") || "file"
             dlg.selectedFile = Bridge.fileUrl(pick || (Bridge.testDir + "/" + name))

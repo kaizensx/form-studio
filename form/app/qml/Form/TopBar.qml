@@ -26,6 +26,7 @@ Rectangle {
                     { icon: "message_square_plus", text: "New conversation", keys: "Ctrl+Shift+O", run: function () { Store.newChat(); Store.talkOpen = true } },
                     { icon: "import", text: "Import…", run: function () { Store.askImport() } },
                     { icon: "archive", text: "Export this design…", enabled: !!Store.project, run: function () { Store.exportProject(Store.pid) } },
+                    { icon: "wand", text: "Turn this design into a recipe…", enabled: !!Store.project, run: function () { Store.openSheet("designRecipe", { project: Store.pid }) } },
                     { sep: true },
                     { icon: "home", text: "All designs", keys: "Ctrl+Shift+H", run: function () { Store.home() } },
                     { icon: "folder_open", text: "Open the projects folder", run: function () { Bridge.openDataFolder() } },
