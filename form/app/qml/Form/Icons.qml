@@ -4,6 +4,16 @@ import QtQuick
 // Lucide icon glyphs (ISC licence). Use with the Icon component: Icon { name: "ruler" }
 QtObject {
     readonly property var map: ({
+        "map_pin": "\ue111",
+        "map_pin_plus": "\ue613",
+        "brush": "\ue1d3",
+        "lasso": "\ue1ce",
+        "mouse_pointer_click": "\ue120",
+        "spline": "\ue38b",
+        "message_square_text": "\ue575",
+        "circle_dot": "\ue345",
+        "palette": "\ue1dd",
+        "box_select": "\ue1cb",
         "arrow_left": "\ue048",
         "arrow_right": "\ue049",
         "arrow_up": "\ue04a",

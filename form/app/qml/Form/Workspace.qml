@@ -93,6 +93,8 @@ Item {
         if (was === t) return
         Ws.tool = t
         if (was === "measure") Store.setMeasuring(false)
+        if (was === "annotate") Store.setSelecting(false)
+        if (t === "annotate") Store.setSelecting(true)
         if (was === "history") { Store.timelineOpen = false; Store.endScrub() }
         if (t === "measure") Store.setMeasuring(true)
         if (t === "history") Store.timelineOpen = true
@@ -102,6 +104,7 @@ Item {
     Connections {
         target: Store
         function onMeasuringChanged() { if (Store.measuring) Ws.tool = "measure"; else if (Ws.tool === "measure") Ws.tool = "select" }
+        function onSelectingChanged() { if (Store.selecting) Ws.tool = "annotate"; else if (Ws.tool === "annotate") Ws.tool = "select" }
         function onTimelineOpenChanged() { if (Store.timelineOpen) Ws.tool = "history"; else if (Ws.tool === "history") Ws.tool = "select" }
         function onSectionChanged() {
             var on = !!(Store.section && Store.section.axis)
@@ -119,6 +122,18 @@ Item {
     readonly property bool keys: Store.screen === "work" && !Store.sheet && !Store.paletteOpen && !(focusItem && focusItem.cursorPosition !== undefined)
     Shortcut { sequence: "V"; enabled: ws.keys; onActivated: ws.setTool("select") }
     Shortcut { sequence: "M"; enabled: ws.keys; onActivated: ws.setTool("measure") }
+    Shortcut { sequence: "N"; enabled: ws.keys; onActivated: ws.setTool("annotate") }
+    // inside a tool: its modes by key (measure: distance, face, diameter; annotate: point, edge, face, brush, lasso)
+    Shortcut { sequence: "D"; enabled: ws.keys && ws.tool === "measure"; onActivated: { Store.measureKind = "distance"; Store.measureFrom = null } }
+    Shortcut { sequence: "G"; enabled: ws.keys && ws.tool === "measure"; onActivated: { Store.measureKind = "face"; Store.measureFrom = null } }
+    Shortcut { sequence: "O"; enabled: ws.keys && ws.tool === "measure"; onActivated: { Store.measureKind = "diameter"; Store.measureFrom = null } }
+    Shortcut { sequence: "P"; enabled: ws.keys && ws.tool === "annotate"; onActivated: Store.selMode = "point" }
+    Shortcut { sequence: "G"; enabled: ws.keys && ws.tool === "annotate"; onActivated: Store.selMode = "face" }
+    Shortcut { sequence: "R"; enabled: ws.keys && ws.tool === "annotate"; onActivated: Store.selMode = "edge" }
+    Shortcut { sequence: "B"; enabled: ws.keys && ws.tool === "annotate"; onActivated: Store.selMode = "brush" }
+    Shortcut { sequence: "L"; enabled: ws.keys && ws.tool === "annotate"; onActivated: Store.selMode = "lasso" }
+    Shortcut { sequence: "["; enabled: ws.keys && ws.tool === "annotate"; onActivated: Store.brushMm = Math.max(0.5, Store.brushMm / 1.25) }
+    Shortcut { sequence: "]"; enabled: ws.keys && ws.tool === "annotate"; onActivated: Store.brushMm = Math.min(25, Store.brushMm * 1.25) }
     Shortcut { sequence: "A"; enabled: ws.keys; onActivated: ws.setTool("analyze") }
     Shortcut { sequence: "E"; enabled: ws.keys && !!Store.assembly; onActivated: ws.setTool("assembly") }
     Shortcut { sequence: "T"; enabled: ws.keys; onActivated: ws.setTool("history") }
@@ -152,6 +167,16 @@ Item {
             analysis: Store.hasDraft || Store.compare ? null : Store.analysis
             measuring: Store.measuring; measures: Store.measures; measureFrom: Store.measureFrom
             onProbed: function (hit, reach) { Store.measureClick(hit, reach) }
+            // selecting and annotations (form/selection.py)
+            selecting: Store.selecting; selectMode: Store.selMode; brushMm: Store.brushMm
+            selection: Store.selection ? Store.selection.items : []
+            focusItems: Store.annFocus && Store.annFocus.analysis ? Store.annFocus.analysis.items : []
+            annotations: Store.hasDraft || Store.scrub ? [] : Store.annotations
+            headRev: Store.project ? Store.project.head : 0
+            annFocusId: Store.annFocus ? Store.annFocus.id : ""
+            onSelPicked: function (items, add) { Store.selAdd(items, add) }
+            onSelMissed: Store.selNote("Nothing there. Pick on the part’s surface.")
+            onAnnotationClicked: function (id) { Store.focusAnnotation(Store.annFocus && Store.annFocus.id === id ? null : Store.annotationById(id)) }
             onProbeMissed: Store.measureNote("Nothing there. Click on the part’s surface.")
             onHoveredValue: function (v, x, y, on) { vchip.on = on; vchip.v = v; vchip.x = Math.min(x + 14, centre.width - vchip.width - 8); vchip.y = y + 14 }
         }
@@ -189,6 +214,8 @@ Item {
                     active: ws.tool === "select" && !ws.sim; onClicked: ws.setTool("select") }
                 RailBtn { icon: "pencil_ruler"; label: "Measure"; keys: "M"; hint: "Distances, faces and hole diameters, computed from the part’s surface."
                     active: ws.tool === "measure" && !ws.sim; marked: Store.measures.length > 0; onClicked: ws.setTool("measure") }
+                RailBtn { icon: "map_pin"; label: "Annotate"; keys: "N"; hint: "Pick faces, edges and points or paint a region; see what the solid says there, keep it with a note, ask the agent about it."
+                    active: ws.tool === "annotate" && !ws.sim; marked: Store.annotations.length > 0 || Store.selItems.length > 0; onClicked: ws.setTool("annotate") }
                 RailBtn { icon: "scissors"; label: "Section"; keys: "X"; hint: "Cut the part open along X, Y or Z."
                     active: ws.tool === "section" && !ws.sim; marked: !!Store.sectionNow(); onClicked: ws.setTool("section") }
                 RailBtn { icon: "scan_line"; label: "Analyze"; keys: "A"; hint: "Colour the part by wall thickness, overhang, section area or small features."
@@ -220,7 +247,26 @@ Item {
             x: 60; y: 14; z: 5; visible: !ws.sim && !!Store.view
             readonly property real room: Math.max(160, centre.width - 60 - 12 - viewCtl.width - 12)
             height: Math.max(sectionBar.shown ? sectionBar.height : 0, analyzeBar.shown ? analyzeBar.height : 0,
-                             measureBar.shown ? measureBar.height : 0, asmBar.shown ? asmBar.height : 0)
+                             measureBar.shown ? measureBar.height : 0, asmBar.shown ? asmBar.height : 0, annotateBar.shown ? annotateBar.height : 0)
+
+            HudBar { id: annotateBar; objectName: "annotateBar"; shown: ws.tool === "annotate"; maxWidth: opts.room
+                Seg { model: [{ value: "face", text: "Face", tip: "G" }, { value: "edge", text: "Edge", tip: "R" }, { value: "point", text: "Point", tip: "P" },
+                              { value: "brush", text: "Brush", tip: "B: paint a region on the surface" }, { value: "lasso", text: "Lasso", tip: "L: draw around what you see" }]
+                    value: Store.selMode; onPicked: function (v) { Store.selMode = v } }
+                HudSlider { visible: Store.selMode === "brush"; label: "Size"; unit: " mm"; decimals: 1; from: 0.5; to: 15; step: 0.5
+                    value: Store.brushMm; onMoved: function (v) { Store.brushMm = v } }
+                Rectangle { objectName: "annotateHint"; height: 26; width: Math.min(sh.implicitWidth + 20 + (sspin.visible ? 20 : 0), opts.room); radius: Theme.rSm
+                    color: Store.selSay ? Theme.alpha(Theme.amber, 0.12) : Theme.alpha(Theme.plate1, 0.9); border.color: Store.selSay ? Theme.alpha(Theme.amber, 0.35) : Theme.rule
+                    Behavior on color { Tint {} }
+                    Spinner { id: sspin; x: 9; anchors.verticalCenter: parent.verticalCenter; size: 12; visible: Store.selBusy > 0; color: Theme.annotate }
+                    Txt { id: sh; x: sspin.visible ? 28 : 10; width: parent.width - x - 10; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; wrapMode: Text.NoWrap; elide: Text.ElideRight
+                        color: Store.selSay ? Qt.lighter(Theme.amber, 1.25) : Theme.ink2
+                        text: Store.selSay ? Store.selSay : Store.selBusy > 0 ? "Analysing on the solid…"
+                            : Store.selMode === "brush" ? (ws.compact ? "Drag to paint" : "Drag to paint a region · Alt-drag orbits · Shift adds")
+                            : Store.selMode === "lasso" ? (ws.compact ? "Drag around it" : "Draw around what you see · Alt-drag orbits · Shift adds")
+                            : ws.compact ? "Click to pick" : "Click to pick a " + Store.selMode + " · Shift-click adds" } }
+                Btn { small: true; height: 26; text: "Clear"; visible: Store.selItems.length > 0; onClicked: Store.selClear() }
+            }
 
             HudBar { id: measureBar; objectName: "measureBar"; shown: ws.tool === "measure"; maxWidth: opts.room
                 Seg { model: [{ value: "distance", text: "Distance" }, { value: "face", text: "Face" }, { value: "diameter", text: "Diameter" }]
@@ -298,7 +344,8 @@ Item {
             readonly property bool folded: Ws.dockTouched ? Ws.dockCollapsed : ws.compact
             readonly property bool showMap: !!Store.analysisMap && !ws.mapBlocked
             readonly property bool showMeasures: Store.measures.length > 0
-            readonly property bool open: (showMap || showMeasures) && !folded
+            readonly property bool showSel: ws.tool === "annotate" || Store.selItems.length > 0 || !!Store.annFocus
+            readonly property bool open: (showMap || showMeasures || showSel) && !folded
             readonly property real room: Math.max(120, strip.y - y - 46)
             function flip() { var now = folded; Ws.dockTouched = true; Ws.dockCollapsed = !now }
             AnalysisLegend { objectName: "analysisLegend"; visible: opacity > 0.01; opacity: dock.showMap ? 1 : 0
@@ -306,6 +353,9 @@ Item {
                 map: Store.analysis; busy: Store.analysisBusy; pending: Store.analysisLabel(Store.analysisMap); check: Store.analysis ? Store.analysisCheck() : null
                 collapsed: dock.folded || (dock.showMeasures && ws.tool === "measure")
                 maxHeight: dock.room - (dock.showMeasures ? 44 : 0); onToggled: dock.flip() }
+            SelectionPanel { visible: dock.showSel
+                collapsed: dock.folded || ((dock.showMap || dock.showMeasures) && ws.tool !== "annotate" && !Store.annFocus)
+                maxHeight: dock.room - (dock.showMap ? 44 : 0) - (dock.showMeasures ? 44 : 0); onToggled: dock.flip() }
             MeasurePanel { objectName: "measurePanel"; visible: dock.showMeasures
                 collapsed: dock.folded || (dock.showMap && ws.tool !== "measure")
                 maxHeight: dock.room - (dock.showMap ? 44 : 0); onToggled: dock.flip() }

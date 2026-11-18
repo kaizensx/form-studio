@@ -130,6 +130,9 @@ Window {
         else if (Store.ctxMenu) Store.ctxMenu = null
         else if (Store.sheet) Store.openSheet(null)
         else if (Store.measuring) Store.setMeasuring(false)
+        else if (Store.selecting && Store.selItems.length) Store.selClear()
+        else if (Store.selecting) Store.setSelecting(false)
+        else if (Store.annFocus) Store.focusAnnotation(null)
         else if (Store.layers) Store.showLayers(false)
         else if (Store.feature) Store.select("")
     }

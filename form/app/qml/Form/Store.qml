@@ -987,6 +987,78 @@ QtObject {
         }, function (e) { done(); s.fail(e) })
     }
 
+    // ── selections and annotations (form/selection.py) ──
+    // The Annotate tool picks points, edges, faces or paints a region on the part; the engine analyses the selection
+    // on the CAD solid. Kept, it becomes an annotation of the head revision: a pin in the viewport, a row in the
+    // panel, and a message for the agent with the exact numbers.
+    property bool selecting: false
+    property string selMode: "face"            // point | edge | face | brush | lasso
+    property real brushMm: 3                   // brush radius, mm
+    property var selItems: []                  // what was picked: [{ kind, at | points, radius, part }] (print frame)
+    property var selection: null               // the engine's analysis of selItems: items with numbers and meshes, summary, text
+    property int selBusy: 0
+    property string selSay: ""
+    property int _selSeq: 0
+    property var annFocus: null                // a kept annotation being looked at: { id, analysis }
+    readonly property var annotations: project && project.annotations ? project.annotations : []
+    property var _selSayOff: Timer { interval: 2600; onTriggered: s.selSay = "" }
+    function selNote(t) { selSay = t; _selSayOff.restart() }
+    function setSelecting(on) {
+        selecting = !!on; selSay = ""
+        if (on && viewer) viewer.setMarker(null)
+    }
+    function selAdd(items, add) {              // add: keep what is selected (Shift); else start again
+        if (!items || !items.length) return
+        selItems = (add ? selItems : []).concat(items).slice(-24)
+        annFocus = null
+        _selRun()
+    }
+    function selRemove(i) { var a = selItems.slice(); a.splice(i, 1); selItems = a; if (a.length) _selRun(); else selection = null }
+    function selClear() { _selSelSeq(); selItems = []; selection = null }
+    function _selSelSeq() { return ++_selSeq }
+    function _selRun() {
+        var seq = _selSelSeq(), items = selItems
+        selBusy++
+        return ppost("/select", { items: items }).then(function (r) {
+            s.selBusy = Math.max(0, s.selBusy - 1)
+            if (seq === s._selSeq) s.selection = r
+        }, function (e) { s.selBusy = Math.max(0, s.selBusy - 1); if (seq === s._selSeq) s.fail(e) })
+    }
+    function keepSelection(name, note) {
+        if (!selItems.length) return Promise.resolve(null)
+        return ppost("/annotate", { items: selItems, name: name || "", note: note || "" }).then(function (a) {
+            s.toast("Kept as “" + a.name + "”", "Saved with " + F.pad(a.rev) + ". Its pin stays on the part.")
+            var an = s.selection
+            s.selItems = []; s.selection = null
+            s.annFocus = { id: a.id, analysis: an }
+            return s.refresh(false).then(function () { return a })
+        }, function (e) { s.fail(e); return null })
+    }
+    function focusAnnotation(a) {              // show a kept annotation: its numbers again, and its overlay
+        if (!a) { annFocus = null; return }
+        annFocus = { id: a.id, analysis: null }
+        var seq = _selSelSeq()
+        ppost("/annotation_analyze", { id: a.id, rev: a.rev <= (project ? project.head : a.rev) ? a.rev : null }).then(function (r) {
+            if (s.annFocus && s.annFocus.id === a.id) s.annFocus = { id: a.id, analysis: r }
+        }, function (e) { s.fail(e) })
+    }
+    function updateAnnotation(id, name, note) {
+        return ppost("/annotation", { id: id, name: name, note: note }).then(function () { return s.refresh(false) }, fail)
+    }
+    function deleteAnnotation(id) {
+        if (annFocus && annFocus.id === id) annFocus = null
+        return ppost("/annotation_delete", { id: id }).then(function () { s.toast("Annotation deleted"); return s.refresh(false) }, fail)
+    }
+    function annotationById(id) { for (var i = 0; i < annotations.length; i++) if (annotations[i].id === id) return annotations[i]; return null }
+    function askAboutSelection(text, what) {   // puts the selection, with its numbers, in the composer; you add the question
+        talkOpen = true
+        recallChat((what ? "About " + what + " on " + (project ? project.name : "this design") + ":\n" : "About this selection on " + (project ? project.name : "this design") + ":\n")
+            + text + "\n\nMy question: ")
+    }
+    property var _selReset: Connections { target: s
+        function onPidChanged() { s._selSeq++; s.selItems = []; s.selection = null; s.annFocus = null; s.selecting = false; s.selBusy = 0 }
+        function onAnalysisKeyChanged() { if (s.selItems.length) { s.selItems = []; s.selection = null }; s.annFocus = null } }
+
     // ── colours and materials (form/materials.py) ──
     // The project keeps { color, material, parts: { id: { color, material } } }; a part's own wins over the design's.
     property var materialCat: null             // GET /materials: [{ id, label, heat_c, density_g_cm3, color, note }], swatches

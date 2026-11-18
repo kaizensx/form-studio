@@ -375,6 +375,25 @@ class UI:
         self._pump(20)
         return b
 
+    def stroke(self, target, path, fx: float = 0.5, fy: float = 0.5, mods: str = "", steps: int = 4):
+        """Press on `target` at (fx, fy), move through `path` ((dx, dy) pixels relative to the press), release: a brush
+        stroke or a lasso drawn by hand, with modifiers (``mods="shift"``) held throughout."""
+        from PySide6.QtCore import QPoint
+        a = self._pt(target, fx, fy)
+        m = self._mods(mods)
+        self.T.mouseMove(self.win, a)
+        self.T.mousePress(self.win, self._btn("left"), m, a)
+        prev = a
+        for dx, dy in path:
+            q = QPoint(a.x() + int(dx), a.y() + int(dy))
+            for i in range(1, steps + 1):
+                self.T.mouseMove(self.win, QPoint(prev.x() + (q.x() - prev.x()) * i // steps, prev.y() + (q.y() - prev.y()) * i // steps))
+                self._pump(8)
+            prev = q
+        self.T.mouseRelease(self.win, self._btn("left"), m, prev)
+        self._pump(20)
+        return prev
+
     def release(self, at, button: str = "left"):
         self.T.mouseRelease(self.win, self._btn(button), self._mods(), self._pt(at))
         self._pump(20)
