@@ -26,7 +26,7 @@ maintainers would like a hand with.
 | `dev` | Integration and testing. Features and fixes land here first and are exercised on all three platforms before a release. |
 | `feat/*`, `fix/*` | Your work. Branch from `dev`. |
 
-**Pull requests target `dev`.** A release is a merge from `dev` into `main` followed by a version tag.
+**Pull requests target `dev`.** A release is a merge from `dev` into `main` followed by a version tag; when and how is in [RELEASING.md](docs/RELEASING.md).
 
 ## Development setup
 

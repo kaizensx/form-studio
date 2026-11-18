@@ -87,7 +87,8 @@ def release(ev):
     comps.append(d.row(d.link_button("Release notes", r["html_url"], "📝"), d.link_button("Website", S.SITE, "🧊")))
     ping = role("Release pings")
     content = (f"<@&{ping}> " if ping and not r.get("prerelease") else "") + f"**Form Studio {r['tag_name']}** is out."
-    for ch in ("releases", "announcements"):
+    # docs/RELEASING.md: only a stable release is announced (and crossposted); a preview goes to #releases alone
+    for ch in (("releases",) if r.get("prerelease") else ("releases", "announcements")):
         cid = channel(ch)
         m = d.call("POST", f"/channels/{cid}/messages", {"content": content, "embeds": [emb], "components": comps,
                                                           "allowed_mentions": {"roles": [ping] if ping else []}})

@@ -64,9 +64,19 @@ def parse(v: str) -> tuple | None:
     return (*rel, 0, 0)
 
 
+# Before the first public release, development builds were numbered 5.0.0 to 12.3.0; 12.3.0 was renamed 1.0.0 and the
+# public numbering goes on from there (docs/RELEASING.md). A copy still on one of those numbers is offered the public release as newer.
+DEV_ERA = (5, 12)
+
+
 def newer(latest: str, current: str) -> bool:
     a, b = parse(latest), parse(current)
-    return bool(a and b and a > b)
+    if not (a and b):
+        return False
+    dev_a, dev_b = DEV_ERA[0] <= a[0] <= DEV_ERA[1], DEV_ERA[0] <= b[0] <= DEV_ERA[1]
+    if dev_a != dev_b:
+        return dev_b                 # the public numbering is newer than any development build, whatever the digits
+    return a > b
 
 
 # ---- how this copy was installed -------------------------------------------

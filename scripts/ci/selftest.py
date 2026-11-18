@@ -144,9 +144,10 @@ class Data(unittest.TestCase):
         self.assertEqual(json.loads((out / "badge.json").read_text())["schemaVersion"], 1)
 
     def test_release_notes(self):
-        text = release_notes.notes_for("v11.1.1", (FIX.parent.parent.parent / "CHANGELOG.md").read_text())
+        text = release_notes.notes_for("v1.0.0", (FIX.parent.parent.parent / "CHANGELOG.md").read_text())
         self.assertIn("SHA256SUMS", text)
-        self.assertNotIn("## 11.1.0", text)
+        self.assertIn("Every printer you have, compared", text)                       # the 1.0.0 section, and only it
+        self.assertNotIn("## ", text.split("### Verify")[0])
         self.assertIn("Preview update channel", release_notes.notes_for("v99.0.0-preview.1", "## Unreleased\n\n- x\n"))
         body = release_notes.draft_body([{"number": 3, "title": "Fix it", "labels": [{"name": "type:bug"}], "user": {"login": "a"}}], "v1")
         self.assertIn("### Fixed", body)

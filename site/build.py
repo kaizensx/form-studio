@@ -40,6 +40,8 @@ PAGES = [
     ("architecture", "docs/ARCHITECTURE.md", "Architecture", "The engine, the kernel worker, adapters, staleness and the fit model."),
     ("verification", "docs/VERIFICATION.md", "Compatibility", "Platforms, slicers, agents and programs, and what CI exercises."),
     ("changelog", "CHANGELOG.md", "Changelog", "What changed in each version."),
+    ("releasing", "docs/RELEASING.md", "Releases", "Stable, preview and patch releases, and how versions are numbered."),
+    ("history", "docs/HISTORY.md", "Development history", "The development builds before 1.0.0."),
 ]
 BY_SOURCE = {src: slug for slug, src, _, _ in PAGES}
 
