@@ -148,8 +148,6 @@ Rectangle {
                 Btn { kind: "quiet"; icon: "mic"; tip: Theme.mac ? "Speak instead of typing: press Fn twice (macOS dictation), then talk" : "Speak instead of typing: Windows+H starts dictation in this field"
                     onClicked: { ta.forceActiveFocus(); Store.toast("Dictation", Theme.mac ? "Press Fn twice and speak; the words go into the field." : "Press Windows+H and speak; the words go into the field.") } } }
             Row { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 10
-                Txt { visible: !sc.narrow && Store.chatReady; kind: "fine"; tone: 3; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
-                    text: Store.chatAgentLabel + " · " + Store.modelShort(Store.chatAgent, Store.chatModel) }
                 Rectangle { id: go; objectName: "startSend"
                     width: gl.implicitWidth + 44; height: 38; radius: 19; anchors.verticalCenter: parent.verticalCenter
                     color: !sc.can ? Theme.plate3 : gm.pressed ? Theme.datum : gm.containsMouse ? Theme.datumHi : Theme.datum

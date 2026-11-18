@@ -13,6 +13,8 @@ Item {
     readonly property var pics: first && first.attachments ? first.attachments : []
     readonly property var tools: Store.chatItems.filter(function (e) { return e.t === "tool" && e.name !== "suggest_replies" })
     readonly property bool done: !Store.chatBusy && Store.chatItems.some(function (e) { return e.t === "end" || e.t === "error" })
+    // Start blank: nothing asked yet, nothing on the plate
+    readonly property bool empty: Store.blankCanvas && dz.me.length === 0 && !Store.chatBusy
     readonly property var steps: {
         var map = { design_guide: "Reading the design contract", create_design: "Writing the design as code", update_design: "Changing the code",
                     propose_concepts: "Building concepts side by side", render: "Looking at the part", read_document: "Reading the drawing",
@@ -44,7 +46,7 @@ Item {
     // the part that does not exist yet: a wireframe block assembling and dissolving, quietly, until the real one arrives
     Item {
         id: ghost; width: 220; height: 220; anchors.centerIn: parent; anchors.verticalCenterOffset: -30
-        visible: !dz.done
+        visible: !dz.done && !dz.empty
         Repeater { model: 12
             Rectangle { required property int index
                 readonly property var e: [[0,0,1,0],[1,0,1,1],[1,1,0,1],[0,1,0,0],[0,0,0.5,-0.35],[1,0,1.5,-0.35],[1,1,1.5,0.65],[0,1,0.5,0.65],[0.5,-0.35,1.5,-0.35],[1.5,-0.35,1.5,0.65],[1.5,0.65,0.5,0.65],[0.5,0.65,0.5,-0.35]][index]
@@ -60,6 +62,7 @@ Item {
 
     // what is happening, under the part
     Column {
+        visible: !dz.empty
         anchors.horizontalCenter: parent.horizontalCenter; anchors.top: ghost.bottom; anchors.topMargin: 8; spacing: 10; width: Math.min(parent.width - 80, 560)
         Txt { kind: "cap"; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter; text: dz.done ? "No design yet" : "Being designed" }
         Txt { objectName: "designingLine"; kind: "h2"; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width; text: dz.liveLine() }
@@ -72,7 +75,27 @@ Item {
                     Txt { kind: "fine"; tone: stepRow.now ? 2 : 3; text: stepRow.modelData } } } }
         Row { visible: dz.done; spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
             Btn { objectName: "designingHome"; icon: "arrow_left"; text: "Back to Home"; onClicked: Store.leaveDesigning() }
-            Btn { kind: "primary"; icon: "square_dashed"; text: "Start blank instead"; onClicked: run(function () { return Store.startBlank("") }) } }
+            Btn { kind: "primary"; icon: "square_dashed"; text: "Start from a block"; tip: "A rounded block with its width, depth, height and corners as sliders, no agent needed"
+                onClicked: run(function () { return Store.startBlock("") }) } }
+    }
+
+    // the blank canvas: an empty plate and the ways to put something on it
+    Column {
+        objectName: "blankCanvas"; visible: dz.empty
+        anchors.centerIn: parent; anchors.verticalCenterOffset: -20; spacing: 12; width: Math.min(parent.width - 80, 620)
+        Txt { kind: "cap"; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter; text: "Blank canvas" }
+        Txt { kind: "h2"; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width
+            text: "Nothing on the plate yet" }
+        Txt { kind: "body"; tone: 2; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width; wrapMode: Text.WordWrap
+            text: Store.chatReady ? "Say what goes here in the conversation on the left, draw it, or bring a part you have."
+                                  : "Draw it, bring a part you have, or start from a block you shape with sliders. Connect an agent in Settings › Agents to describe it in words." }
+        Item { width: 1; height: 4 }
+        Row { anchors.horizontalCenter: parent.horizontalCenter; spacing: 8
+            Btn { objectName: "blankSketch"; icon: "pen_tool"; text: "Sketch it"; onClicked: Store.openSheet("sketch") }
+            Btn { objectName: "blankImport"; icon: "import"; text: "Import a part or project"; onClicked: Store.openSheet("import") }
+            Btn { objectName: "blankBlock"; icon: "cuboid"; text: "Start from a block"; tip: "A rounded block with its width, depth, height and corners as sliders, no agent needed"
+                onClicked: run(function () { return Store.startBlock("") }) }
+            Btn { kind: "quiet"; icon: "arrow_left"; text: "Home"; onClicked: Store.home() } }
     }
 
     // what you gave it, kept in view: the photo, the sketch, the part

@@ -293,7 +293,7 @@ QtObject {
     }
     function reloadStudio() { return get("/studio").then(function (st) { studio = st }) }
     function home() {
-        screen = "home"; pid = ""; data = null; view = null; compare = null; layers = null; preview = null
+        screen = "home"; pid = ""; data = null; view = null; compare = null; layers = null; preview = null; blankCanvas = false
         draftValues = ({}); draftProv = ({}); _stamp = ""
         reloadStudio()
     }
@@ -309,7 +309,7 @@ QtObject {
         preview = null; draftError = null; feature = ""; compare = null; layers = null; section = null; ack = []
         _stamp = ""
         return refresh(true).then(function () {
-            screen = "work"; viewName = "iso"
+            screen = "work"; viewName = "iso"; blankCanvas = false
             if (viewer) { showHead(); viewer.setView("iso", false) }
             if (data.project.auto_run !== false && !job) {
                 var st = F.vals(data.status)
@@ -1471,9 +1471,19 @@ QtObject {
     // what the next design is for, chosen on Home: Store.newPurpose (form/purpose.py's default until one is picked)
     function setNewPurpose(p) { if (p === "print" || p === "model") newPurpose = p }
     readonly property string printerName: startInfo && startInfo.printer && startInfo.printer.name ? startInfo.printer.name : ""
-    // an empty design, no agent: straight into the workspace
-    function startBlank(name) {
-        var pu = newPurposeEffective; newPurpose = ""
+    // Start blank: the workspace with an empty build plate and nothing on it. No design exists until something is
+    // described, sketched or imported; what it is for (newPurpose) waits for that first message.
+    property bool blankCanvas: false
+    function startBlank() {
+        newChat()
+        pid = ""; data = null; view = null; compare = null; layers = null; preview = null
+        blankCanvas = true; designingSince = Date.now() / 1000
+        screen = "designing"
+        return Promise.resolve(true)
+    }
+    // the starting block (form/start.py BLANK_SOURCE): a rounded block with its sizes as parameters, no agent needed
+    function startBlock(name) {
+        var pu = newPurposeEffective; newPurpose = ""; blankCanvas = false
         return post("/start/blank", { name: name || "", purpose: pu }).then(function (r) {
             return reloadStudio().then(function () { return open(r.id).then(function () { track(r.job); setStage("shape") }) })
         }, fail)
@@ -1527,6 +1537,7 @@ QtObject {
         if (!chatReady) { toast("No agent is connected", "Start blank, or connect an agent in Settings › Agents.", true); return }
         if (pid) { pid = ""; data = null; view = null }
         designingSince = Date.now() / 1000
+        blankCanvas = false
         screen = "designing"
         send(text)
     }
