@@ -68,6 +68,7 @@
   <div class="wrap">
     <a class="brand" href="./"><img class="lk-d" src="assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="assets/lockup-light.svg" alt="" width="143" height="22"></a>
     <ul class="nav-links">
+      <li><a href="#reel">Watch</a></li>
       <li><a href="#start">Start</a></li>
       <li><a href="#features">Features</a></li>
       <li><a href="#agents">Agents</a></li>
@@ -82,6 +83,7 @@
       <a class="btn primary small" href="#download">Download</a>
     </div>
   </div>
+  <span class="scrolled-bar" id="scroll-bar" aria-hidden="true"></span>
 </header>
 
 <main id="main">
@@ -167,6 +169,38 @@
       <p>Form Studio, drawn live in this page with a sample project. The geometry comes from the CAD kernel, the checks and fit model from Form Studio’s engine, and the toolpath from the G-code Bambu Studio 2.9.1 wrote for a Bambu Lab A1 mini. The conversation re-enacts how the project was made.</p>
       <button class="story-ctl" type="button" id="story-ctl" aria-pressed="false"><span class="i" aria-hidden="true">&#xe12e;</span><span class="lbl">Pause</span><span class="bar" aria-hidden="true"><i id="story-bar"></i></span></button>
     </div>
+  </div>
+</section>
+
+<section class="block reel-sec" id="reel" aria-labelledby="reel-title">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <h2 id="reel-title">See it move.</h2>
+      <div>
+        <p>Recorded from the Form Studio window at 30 frames a second. The hinged box is one of the building blocks, built as a solid by the CAD kernel; its lid turns on the joint the design declares, and the print is played back from the G-code the slicer wrote.</p>
+      </div>
+    </div>
+    <div class="reel rv" id="reel-box">
+      <div class="reel-view island">
+        <video id="reel-v" muted playsinline preload="none" poster="assets/media/orbit.webp" aria-label="Form Studio turning the hinged box on its plate while the lid opens"></video>
+        <button class="reel-pp" type="button" id="reel-pp" aria-label="Pause"><span class="i" aria-hidden="true">&#xe12e;</span></button>
+      </div>
+      <div class="reel-side">
+      <div class="reel-tabs" role="tablist" aria-label="Clips">
+        <button type="button" role="tab" aria-selected="true" data-clip="orbit" data-label="Form Studio turning the hinged box on its plate while the lid opens"><span class="n">01</span><b>Turn it around</b><span>The workspace with the solid on its plate, its dimensions, the stages and the pipeline.</span><i></i></button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1" data-clip="hinge" data-label="The lid swung through its range on the Lid hinge slider, then the parts pulled apart and put back"><span class="n">02</span><b>Move the joints</b><span>The lid swept through its range on its hinge, then exploded and put back together.</span><i></i></button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1" data-clip="print" data-label="The print played back layer by layer from the slicer's G-code, with line types and the time per layer"><span class="n">03</span><b>Watch it print</b><span>Every layer and line type from the slicer’s G-code, before the printer starts.</span><i></i></button>
+      </div>
+      <p class="reel-note"><i aria-hidden="true"></i>Live from the app window, 30 frames a second.</p>
+      </div>
+    </div>
+    <ul class="stats rv" aria-label="In numbers">
+      <li><b data-count="66">66</b><span>MCP tools for any agent</span></li>
+      <li><b data-count="7">7</b><span>slicers, sliced for real in CI</span></li>
+      <li><b data-count="13">13</b><span>design skills for agents</span></li>
+      <li><b data-count="5">5</b><span>export formats, STEP to GLB</span></li>
+      <li><b data-count="3">3</b><span>desktop platforms, one app</span></li>
+    </ul>
   </div>
 </section>
 
