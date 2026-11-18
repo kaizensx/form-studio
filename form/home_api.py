@@ -123,10 +123,38 @@ def recipe_view(st, rid: str) -> dict:
     if rid not in books:
         raise StudioError("Unknown recipe.", status=404)
     cache = st.__dict__.setdefault("_recipe_views", {})
-    key = "rv-" + H(rid, st.recipe_sha(rid))
+    key = "rv-" + H(rid, st.recipe_sha(rid), _versions())
     if key not in cache:
-        vals = books[rid].defaults()
-        v = st._k("view", key=key, recipe_id=rid, values=vals, tol=0.08)
-        v["companions"] = []
+        # kept on disk too: building one takes seconds, and the library should not rebuild nine at every start
+        f = st.root / ".cache" / "recipe-views" / f"{key}.json"
+        v = None
+        if f.is_file():
+            try:
+                v = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                v = None
+        if v is None:
+            vals = books[rid].defaults()
+            v = st._k("view", key=key, recipe_id=rid, values=vals, tol=0.08)
+            v["companions"] = []
+            try:
+                from . import fsutil
+                f.parent.mkdir(parents=True, exist_ok=True)
+                tmp = f.with_suffix(".tmp")
+                tmp.write_text(json.dumps(v), encoding="utf-8")
+                fsutil.replace(tmp, f)
+            except OSError:
+                pass                                  # a cache that cannot be written only costs time
         cache[key] = v
     return cache[key]
+
+
+def _versions() -> str:
+    """What a recipe preview's geometry depends on besides the recipe's code: Form Studio and the CAD kernel."""
+    from importlib import metadata
+    from . import __version__
+    try:
+        b = metadata.version("build123d")
+    except metadata.PackageNotFoundError:
+        b = "?"
+    return f"{__version__}/{b}"

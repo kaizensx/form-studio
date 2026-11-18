@@ -550,3 +550,24 @@ class Routes(Tmp):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RecipePreviews(Tmp):
+    def test_a_built_in_preview_is_built_once_and_then_read_from_disk(self):
+        from unittest import mock
+        from form import home_api
+        self.st = make_studio(self.tmp)
+        built = []
+
+        def fake_k(op, **kw):
+            built.append(kw["recipe_id"])
+            return {"positions": "AAAA", "recipe": kw["recipe_id"]}
+        with mock.patch.object(self.st, "_k", side_effect=fake_k):
+            v = home_api.recipe_view(self.st, "hook")
+        self.assertEqual((built, v["companions"]), (["hook"], []))
+        self.assertEqual(len(list((self.st.root / ".cache" / "recipe-views").glob("*.json"))), 1)
+        st2 = make_studio(self.tmp)                          # a new start of the app: nothing in memory
+        with mock.patch.object(st2, "_k", side_effect=AssertionError("built again")):
+            self.assertEqual(home_api.recipe_view(st2, "hook")["recipe"], "hook")
+        with self.assertRaises(StudioError):
+            home_api.recipe_view(st2, "not-a-recipe")
