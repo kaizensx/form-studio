@@ -6,6 +6,12 @@ contact_links:
   - name: Ideas
     url: https://github.com/kaizensx/form-studio/discussions/categories/ideas
     about: Talk through an idea before it becomes a feature request.
+  - name: Printers and slicers
+    url: https://github.com/kaizensx/form-studio/discussions/categories/printers-slicers
+    about: Presets, filaments and slicer questions, answered by people who print.
+  - name: Agents and models
+    url: https://github.com/kaizensx/form-studio/discussions/categories/agents-models
+    about: Which agents, models and providers work well, and how to connect them.
   - name: Show and tell
     url: https://github.com/kaizensx/form-studio/discussions/categories/show-and-tell
     about: Share something you designed and printed with Form Studio.

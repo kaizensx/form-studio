@@ -1,0 +1,35 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Agents, models and providers: which ones work well for design, how to connect them in the app or over MCP, and what you have learned using them.
+        An agent that fails to connect or call tools is a bug: [open an agent issue](https://github.com/kaizensx/form-studio/issues/new?template=5-agent.yml).
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Where it runs
+      options:
+        - Inside Form Studio (chat in the app)
+        - Over MCP from the agent's own window
+        - The form CLI
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: Agent, model and provider
+      placeholder: "Claude Code · Opus · Anthropic  |  Codex · gpt-5 · OpenAI  |  Ollama · qwen3-coder (local)"
+    validations:
+      required: true
+  - type: textarea
+    id: body
+    attributes:
+      label: What you want to share or ask
+      description: A setup that works, a comparison on the same request, a prompt that helps, or a question.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: An example
+      description: The request you gave and what came back. A `.formstudio` export (renamed to `.zip`) carries the design and its conversation.
