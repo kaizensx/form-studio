@@ -243,6 +243,8 @@ Agents start from parametric building blocks of the things people print most: Gr
 
 ## Community
 
+**[Join the Form Studio Discord](https://discord.gg/b6ZgyndkmS)**: guides, every recipe, a help desk, the parts people made and every release as it ships.
+
 | | |
 |---|---|
 | **[Q&A](https://github.com/kaizensx/form-studio/discussions/categories/q-a)** | How to do something, or help with setup. |

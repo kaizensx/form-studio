@@ -27,8 +27,8 @@ BOT_DESCRIPTION = ("The Form Studio bot. Posts releases, GitHub activity and the
 
 # The permanent invite (to #welcome) that the README and the website link to. setup_server.py creates it when it is
 # missing and prints the code; keep the code here so the links stay the same.
-INVITE = "https://discord.gg/"   # completed with the code below
-INVITE_CODE = ""
+INVITE_CODE = "b6ZgyndkmS"
+INVITE = "https://discord.gg/" + INVITE_CODE
 
 # ---- roles -------------------------------------------------------------------------------------------------------
 # name, colour, hoist, mentionable. Listed top to bottom; setup orders them so (under the bot's own role).
@@ -171,7 +171,7 @@ ONBOARDING = [
         ("Local models", "Ollama, LM Studio, llama.cpp", ["Local models"], []),
     ]),
     ("Get a mention for every stable release?", [
-        ("Yes, mention me", "In #announcements, a few times a month at most", ["Release pings"], []),
+        ("Yes, mention me", "In #announcements, about once a month", ["Release pings"], []),
     ]),
     ("Which system do you use?", [
         ("macOS", "", ["macOS"], []), ("Windows", "", ["Windows"], []), ("Linux", "", ["Linux"], []),
@@ -184,17 +184,19 @@ ONBOARDING_SHOWN = 4
 # ---- the Server Guide (Server Settings › Onboarding › Server Guide) ---------------------------------------------------
 # Applied in the browser (the API has no endpoint a bot may use); kept here so it can be set again the same way.
 SERVER_GUIDE = {
-    "welcome": ("Form Studio is an open-source desktop app where an AI agent designs parts in a real CAD kernel, "
-                "checks them on the solid and slices them with your own slicer. This is where people who use it "
-                "and build it meet."),
+    "author": "the server owner",
+    "welcome": ("Hi [@username], welcome to Form Studio: an open-source desktop app where an AI agent designs parts in a "
+                "real CAD kernel, checks them on the solid and slices them with your own slicer. Start with the guides "
+                "below, show what you make, and ask when you are stuck."),
+    # (task, channel, done when: "visit" or "post"); Discord adds "Read the rules" itself
     "todos": [
-        ("Read the six rules", "rules"),
-        ("Learn the app, one guide at a time", "guides"),
-        ("Show a part you designed", "showcase"),
-        ("Ask when you are stuck", "help"),
+        ("Learn the app, one guide at a time", "guides", "visit"),
+        ("Show a part you designed", "showcase", "post"),
+        ("Ask when you are stuck", "help", "visit"),
     ],
+    # (title, channel, description); a resource channel leaves the channel list for the guide
     "resources": [
-        ("Install and first start", "guides"), ("Recipes", "recipes"), ("Releases", "releases"), ("Rules", "rules"),
+        ("About Form Studio", "welcome", "What Form Studio is, how a design goes, and where everything is."),
     ],
 }
 

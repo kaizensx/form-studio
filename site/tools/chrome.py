@@ -88,7 +88,7 @@ def foot(prefix: str) -> str:
       </div>
       <nav aria-label="Product"><span class="cap">Product</span><a href="{home}#how">How it works</a><a href="{prefix}recipes/">Recipes</a><a href="{prefix}compat/">Compatibility</a><a href="{prefix}bench/">Benchmarks</a><a href="{home}#download">Download</a></nav>
       <nav aria-label="Docs"><span class="cap">Docs</span><a href="{prefix}docs/features.html">Features</a><a href="{prefix}docs/app.html">The app</a><a href="{prefix}docs/cli.html">Command line</a><a href="{prefix}docs/mcp.html">MCP tools</a><a href="{prefix}docs/changelog.html">Changelog</a></nav>
-      <nav aria-label="Community"><span class="cap">Community</span><a href="{REPO}/discussions">Discussions</a><a href="{REPO}/issues/new?template=3-recipe.yml">Share a recipe</a><a href="{REPO}/issues/new/choose">Report an issue</a><a href="{REPO}/blob/main/CONTRIBUTING.md">Contributing</a></nav>
+      <nav aria-label="Community"><span class="cap">Community</span><a href="https://discord.gg/b6ZgyndkmS">Discord</a><a href="{REPO}/discussions">Discussions</a><a href="{REPO}/issues/new?template=3-recipe.yml">Share a recipe</a><a href="{REPO}/issues/new/choose">Report an issue</a><a href="{REPO}/blob/main/CONTRIBUTING.md">Contributing</a></nav>
     </div>
     <p class="foot-note">No cookies, trackers or third-party requests. Form Studio runs on your computer; it never uploads a design and never starts a print.</p>
   </div>

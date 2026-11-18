@@ -318,6 +318,10 @@ class Setup:
                 if trigger == 3:
                     patch.pop("trigger_metadata")
                 cur = {k: have.get(k) for k in patch}
+                if "trigger_metadata" in cur:          # Discord fills in the keys a rule does not use
+                    cur["trigger_metadata"] = {k: v for k, v in (cur["trigger_metadata"] or {}).items() if k in meta}
+                for a in cur.get("actions") or []:
+                    a["metadata"] = {k: v for k, v in a.get("metadata", {}).items() if v not in ("", None, 0)}
                 if json.dumps(cur, sort_keys=True) != json.dumps(patch, sort_keys=True):
                     self._try(f"automod {name}", lambda: self._do(
                         "PATCH", f"/guilds/{self.g}/auto-moderation/rules/{have['id']}", patch, f"AutoMod: update {name}"))

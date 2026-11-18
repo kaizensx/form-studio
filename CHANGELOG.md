@@ -8,6 +8,7 @@
 - **Fewer failed steps in conversations.** A design that fails to build says the error and the line it came from; an STL export that comes out with a gap is meshed again until it is closed; a reference part named without an extension keeps its format; assembled and exploded views work for every multi-part design.
 - **A safer engine.** Download file names can no longer add HTTP headers, web pages from other sites cannot send requests to the engine on your computer, design ids cannot point outside their folder, and lock files are private to you.
 - **Errors are kept.** An unexpected engine error is written with its details to `.logs/engine-errors.log` in your projects folder.
+- **A Discord server.** [discord.gg/b6ZgyndkmS](https://discord.gg/b6ZgyndkmS) has a guide for each part of the app, a post for every recipe, a help forum where the bot answers each new post with the guides for its tags, a showcase, ideas, and every release as it ships. It is linked from the README and the website's footer.
 
 ## 1.0.0
 
