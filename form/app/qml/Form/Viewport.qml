@@ -45,12 +45,13 @@ Item {
     property bool measuring: false           // a click probes the surface instead of selecting a feature
     property var measures: []                // drawn by MeasureLayer; labels below
     property var measureFrom: null
-    signal probed(var at, real reach)        // design-frame point on the surface, snap radius in mm (about 10 px)
+    signal probed(var hit, real reach)       // { at, shown, part, normal }: the surface point as printed (at) and as shown; snap radius in mm (about 10 px)
+    signal probeMissed(real x, real y)       // a measuring click that found no surface
     readonly property var labels: {          // 2D labels pinned to 3D points (design frame)
         var out = [], i, mk = _map && mapMix > 0.5 ? (_map.markers || []) : []
         for (i = 0; i < mk.length && i < 8; i++)
             out.push({ p: mk[i].at, text: mk[i].label, tint: mk[i].kind === "thin" || mk[i].severity === "fail" ? Theme.signal : Theme.amber })
-        for (i = 0; i < measures.length; i++) out.push({ p: measures[i].label_at, text: measures[i].label, tint: Theme.datum })
+        for (i = 0; i < shownMeasures.length; i++) out.push({ p: shownMeasures[i].label_at, text: shownMeasures[i].label, tint: Theme.datum })
         return out
     }
 
@@ -85,6 +86,50 @@ Item {
         if (asmMode === "exploded") t = t.plus(Qt.vector3d(x.explode[0], x.explode[1], x.explode[2]).times(explode))
         return { pos: t, rot: q }
     }
+    // ── points on parts, from the print frame (where the engine computes) to where the part is drawn now ──
+    // Measurements and selections keep their points on the part as printed, with the part's id, so they ride along
+    // when the view changes between print layout, assembled and exploded, or a joint moves.
+    function partById(id) {
+        var ps = asm ? asm.parts : []
+        for (var i = 0; i < ps.length; i++) if (ps[i].id === id) return ps[i]
+        return null
+    }
+    function shownXf(part) { var x = part && asmOn ? partById(part) : null; return x ? partXf(x) : null }
+    function shownPoint(part, p) {
+        if (!p) return p
+        var xf = shownXf(part)
+        if (!xf) return p
+        var q = xf.rot.times(Qt.vector3d(p[0], p[1], p[2])).plus(xf.pos)
+        return [q.x, q.y, q.z]
+    }
+    function shownDir(part, d) {
+        if (!d) return d
+        var xf = shownXf(part)
+        if (!xf) return d
+        var q = xf.rot.times(Qt.vector3d(d[0], d[1], d[2]))
+        return [q.x, q.y, q.z]
+    }
+    // the arrangement on screen, as one string: a distance between two parts belongs to the arrangement it was taken in
+    readonly property string frameTag: !asmOn ? "print" : asmMode + (asmMode === "exploded" ? ":" + explode.toFixed(2) : "") + ":" + JSON.stringify(pose)
+    readonly property var shownMeasures: {
+        var tag = frameTag, out = []                  // re-evaluated when the arrangement changes
+        for (var i = 0; i < measures.length; i++) {
+            var m = measures[i], o = Object.assign({}, m)
+            if (m.kind === "distance") {
+                if (m.pa !== m.pb && m.frame && m.frame !== tag) continue         // across parts, in another arrangement
+                o.a = shownPoint(m.pa, m.a); o.b = shownPoint(m.pb, m.b)
+                o.label_at = [(o.a[0] + o.b[0]) / 2, (o.a[1] + o.b[1]) / 2, (o.a[2] + o.b[2]) / 2]
+            } else {
+                o.at = shownPoint(m.part, m.at)
+                o.label_at = shownPoint(m.part, m.label_at)
+                if (m.face) o.face = Object.assign({}, m.face, { normal: shownDir(m.part, m.face.normal) })
+                if (m.circle && m.circle.center) o.circle = Object.assign({}, m.circle, { center: shownPoint(m.part, m.circle.center), axis: shownDir(m.part, m.circle.axis) })
+            }
+            out.push(o)
+        }
+        return out
+    }
+    readonly property var shownFrom: measureFrom ? { at: shownPoint(measureFrom.part, measureFrom.at) } : null
     function _frame() {                      // centre what is shown on the plate; bounds follow the mode
         if (!model) return
         // read the mode directly: this runs from onAsmModeChanged, possibly before the asmOn binding has updated
@@ -220,6 +265,15 @@ Item {
         thaw.restart()
     }
     function setGhost(v) { ghost = v }
+    // what is under a pixel: the point on the part as printed (the pick's local frame is the part's print frame,
+    // whatever arrangement it is drawn in), the same point where it is drawn now, the part and the feature
+    function hitAt(x, y) {
+        var r = view.pick(x, y)
+        if (!r.objectHit || r.objectHit.feature === undefined) return null
+        var sp = r.scenePosition, d = Qt.vector3d(sp.x, -sp.z, sp.y).minus(shift), l = r.position, n = r.normal
+        return { at: [l.x, l.y, l.z], shown: [d.x, d.y, d.z], part: r.objectHit.part || "", feature: r.objectHit.feature || "",
+                 normal: [n.x, n.y, n.z], x: x, y: y }
+    }
     function setSection(axis, t) { sectionAxis = axis || ""; sectionT = t === undefined ? 0.5 : t }
     function setMarker(m) {
         marker = m
@@ -318,6 +372,7 @@ Item {
                     Model {
                         required property var modelData
                         readonly property string feature: modelData.feature || ""
+                        readonly property string part: ""
                         pickable: !vp.mapShown; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0
                         geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                         materials: CustomMaterial {
@@ -357,6 +412,7 @@ Item {
                             Model {
                                 required property var modelData
                                 readonly property string feature: modelData.feature || ""
+                                readonly property string part: pn.modelData.id
                                 pickable: !vp.mapShown; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0
                                 geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                                 materials: CustomMaterial {
@@ -433,6 +489,8 @@ Item {
                 // the analysis map: the whole part as one mesh, coloured per vertex by the engine
                 Model {
                     id: amodel
+                    readonly property string feature: ""
+                    readonly property string part: ""
                     visible: vp.mapShown; pickable: vp.mapShown
                     geometry: MeshGeometry { id: ageo; source: vp._map }
                     materials: CustomMaterial {
@@ -470,7 +528,7 @@ Item {
                             materials: PrincipledMaterial { baseColor: modelData.kind === "thin" || modelData.severity === "fail" ? Theme.signal : Theme.amber; lighting: PrincipledMaterial.NoLighting } }
                     }
                 }
-                MeasureLayer { measures: vp.measures; from: vp.measureFrom; dot: vp.dist * 0.00004; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height)) }
+                MeasureLayer { measures: vp.shownMeasures; from: vp.shownFrom; opacity: vp.asmTween ? 0 : 1; dot: vp.dist * 0.00004; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height)) }
 
                 // a check pointing at a place: thin signal line between two points
                 Node {
@@ -629,10 +687,9 @@ Item {
                 else vp.hoveredValue(0, 0, 0, false)
             } }
         function probe(x, y) {                           // a click while measuring: the surface point, in design millimetres
-            var r = view.pick(x, y)
-            if (!r.objectHit) return
-            var sp = r.scenePosition, d = Qt.vector3d(sp.x, -sp.z, sp.y).minus(vp.shift)
-            vp.probed([d.x, d.y, d.z], vp.mmPerPx * 10)
+            var h = vp.hitAt(x, y)
+            if (!h) { vp.probeMissed(x, y); return }
+            vp.probed(h, vp.mmPerPx * 10)
         }
         // a press on the part takes the keyboard from whatever text box had it, so V, M, F and the rest work again
         onPressed: function (e) { vp.forceActiveFocus(); last = Qt.point(e.x, e.y); down = last; moved = false; vp.tween = false }

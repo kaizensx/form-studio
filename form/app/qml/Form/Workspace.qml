@@ -68,9 +68,21 @@ Item {
     readonly property bool sim: !!Store.layers
     // a design that declares how its parts go together: assembled / exploded / as printed. Separate bodies
     // with no declaration (form/recipes/assembly.py from_solids): as modelled / pulled apart.
-    readonly property var asmModes: Store.assembly && Store.assembly.derived
-        ? [{ value: "print", text: "As modelled" }, { value: "exploded", text: "Exploded" }]
+    // A design with separate bodies and no declaration is shown as modelled, or pulled apart; Assembled is there but
+    // off, and says what it needs: the design has to say where each part goes (assembly() in its source).
+    readonly property bool asmDerived: !!Store.assembly && !!Store.assembly.derived
+    readonly property var asmModes: asmDerived
+        ? [{ value: "assembled", text: "Assembled", off: true, tip: "This design does not say how its parts go together, so Form Studio cannot place them. Ask the agent to add that to the design." },
+           { value: "exploded", text: "Exploded" }, { value: "print", text: "As modelled" }]
         : [{ value: "assembled", text: "Assembled" }, { value: "exploded", text: "Exploded" }, { value: "print", text: "Print layout" }]
+    function askAssembly() {
+        var a = Store.assembly, n = a ? a.parts.length : 0
+        Store.talkOpen = true
+        Store.recallChat("This design prints " + n + " separate parts but does not say how they go together. "
+            + "Add assembly() to the design source (design_guide, ASSEMBLIES) so Form Studio can show it assembled and check it: "
+            + "place each part, give it an exploded offset and an assembly step, and declare the joints and any hardware. "
+            + "Keep the print layout as it is.")
+    }
     // the bed of the printer this design uses (form/printers.py), for the plate caption
     readonly property string bed: d && d.printer ? d.printer.env.envelope.slice(0, 2).map(function (x) { return F.fmt(x, 0) }).join(" × ") : "180 × 180"
     readonly property bool mapBlocked: !!Store.analysisMap && (Store.hasDraft || !!Store.compare)
@@ -137,7 +149,8 @@ Item {
             // analysis maps and measuring (maps describe the committed revision, so a draft hides them)
             analysis: Store.hasDraft || Store.compare ? null : Store.analysis
             measuring: Store.measuring; measures: Store.measures; measureFrom: Store.measureFrom
-            onProbed: function (at, reach) { Store.measureClick(at, reach) }
+            onProbed: function (hit, reach) { Store.measureClick(hit, reach) }
+            onProbeMissed: Store.measureNote("Nothing there. Click on the part’s surface.")
             onHoveredValue: function (v, x, y, on) { vchip.on = on; vchip.v = v; vchip.x = Math.min(x + 14, centre.width - vchip.width - 8); vchip.y = y + 14 }
         }
         Loader { id: lv; anchors.fill: parent; active: !!Store.layers; source: "LayerView.qml"
@@ -211,9 +224,14 @@ Item {
                 Seg { model: [{ value: "distance", text: "Distance" }, { value: "face", text: "Face" }, { value: "diameter", text: "Diameter" }]
                     value: Store.measureKind
                     onPicked: function (v) { Store.measureKind = v; Store.measureFrom = null } }
-                Rectangle { height: 26; width: Math.min(mh.implicitWidth + 20, opts.room); radius: Theme.rSm; color: Theme.alpha(Theme.plate1, 0.9); border.color: Theme.rule
-                    Txt { id: mh; x: 10; width: parent.width - 20; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; elide: Text.ElideRight
-                        text: Store.measureKind === "distance" ? (Store.measureFrom ? "Click the second point" : ws.compact ? "Click two points; they snap" : "Click two points. They snap to corners, midpoints and centres")
+                Rectangle { objectName: "measureHint"; height: 26; width: Math.min(mh.implicitWidth + 20 + (mspin.visible ? 20 : 0), opts.room); radius: Theme.rSm
+                    color: Store.measureSay ? Theme.alpha(Theme.amber, 0.12) : Theme.alpha(Theme.plate1, 0.9); border.color: Store.measureSay ? Theme.alpha(Theme.amber, 0.35) : Theme.rule
+                    Behavior on color { Tint {} }
+                    Spinner { id: mspin; x: 9; anchors.verticalCenter: parent.verticalCenter; size: 12; visible: Store.measureBusy > 0 }
+                    Txt { id: mh; x: mspin.visible ? 28 : 10; width: parent.width - x - 10; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; elide: Text.ElideRight
+                        color: Store.measureSay ? Qt.lighter(Theme.amber, 1.25) : Theme.ink2
+                        text: Store.measureSay ? Store.measureSay : Store.measureBusy > 0 ? "Measuring on the solid…"
+                            : Store.measureKind === "distance" ? (Store.measureFrom ? "Click the second point" : ws.compact ? "Click two points; they snap" : "Click two points. They snap to corners, midpoints and centres")
                             : Store.measureKind === "face" ? (ws.compact ? "Click a face: area and tilt" : "Click a face for its area and its tilt to the bed")
                             : ws.compact ? "Click a hole or round boss" : "Click the wall or rim of a hole or round boss" }
                     MouseArea { id: mhm; anchors.fill: parent; hoverEnabled: true }
@@ -240,7 +258,14 @@ Item {
                 Seg { visible: !ws.compact; model: ws.asmModes
                     value: Store.asmMode; onPicked: function (v) { Store.setAsmMode(v) } }
                 Pick { visible: ws.compact; width: 150; height: 26; value: Store.asmMode; onPicked: function (v) { Store.setAsmMode(v) }
-                    model: ws.asmModes }
+                    model: ws.asmModes.filter(function (m) { return !m.off }) }
+                Rectangle { objectName: "asmDerivedNote"; visible: ws.asmDerived; height: 26; width: Math.min(an.implicitWidth + 20, opts.room); radius: Theme.rSm
+                    color: Theme.alpha(Theme.plate1, 0.9); border.color: Theme.rule
+                    Txt { id: an; x: 10; width: parent.width - 20; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; tone: 3; wrapMode: Text.NoWrap; elide: Text.ElideRight
+                        text: ws.compact ? "Placement not declared" : "Not assembled: the design does not say where each part goes" } }
+                Btn { visible: ws.asmDerived; small: true; height: 26; icon: "sparkles"; text: ws.compact ? "Ask the agent" : "Ask the agent to add it"
+                    tip: "Puts a request in the conversation for you to send: describe how the parts go together in the design."
+                    onClicked: ws.askAssembly() }
                 HudSlider { visible: Store.asmMode === "exploded"; label: "Spread"; from: 0; to: 1.6; step: 0.05; base: 1; percent: true
                     value: Store.explode; onMoved: function (v) { Store.setExplode(v) } }
                 Repeater { model: Store.assembly && Store.asmMode !== "print" ? Store.assembly.joints : []

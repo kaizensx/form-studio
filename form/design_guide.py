@@ -81,7 +81,8 @@ HARDWARE: form.parts  (use it; do not guess screw, nut, insert, bearing or gear 
     boss = Cylinder(ins["boss_min_d"] / 2 + 0.4, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))
     boss = boss - Pos(0, 0, 10) * ins.shape        # derived(): rows += ins.derived("boss", "insert.")
 
-ASSEMBLIES (optional, for solids >= 2)
+ASSEMBLIES (for solids >= 2; without one the app can show the parts only as modelled and pulled apart, never
+  assembled, and checks nothing about how they meet)
   from form.recipes.base import Access, Assembly, Hardware, Part, hinge, slide
   Part(id, label, solid, move, rotate, explode, note)   solid = index of the printed body, numbered left to right on the
        plate (bounding-box centre X, then Y). Assembled placement = Pos(*move) * Rot(*rotate) applied to the part as printed.

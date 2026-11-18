@@ -926,48 +926,65 @@ QtObject {
         s._aseq++; s.analysisMap = ""; s.analysis = null; s.analysisBusy = false; s.orient = null; s.measures = []; s.measureFrom = null; s.measuring = false; s.measureOpen = false } }
 
     // measure tool: click points on the part. Every number comes back from the engine (POST /probe, /measure).
+    // A click gives the point on the part as printed (where the engine computes) and the part's id; the viewport
+    // draws each measurement where that part is shown now, so measuring works in print layout, assembled and exploded.
     property bool measuring: false             // clicks on the part measure instead of selecting
     property bool measureOpen: false           // the readout panel is showing
     property string measureKind: "distance"    // distance | face | diameter
-    property var measures: []                  // [{ id, kind, label, detail, how, label_at, ... }], kept until cleared
-    property var measureFrom: null             // first point of a distance: { at: [x, y, z], snap }
+    property var measures: []                  // [{ id, kind, label, detail, how, label_at, part | pa/pb, frame, ... }], kept until cleared
+    property var measureFrom: null             // first point of a distance: { at, shown, part, snap }
+    property int measureBusy: 0                // clicks the engine is still answering
+    property string measureSay: ""             // a short note in the tool's hint (a miss, a click with nothing to measure)
     property int _mid: 0
+    property var _measureSayOff: Timer { interval: 2600; onTriggered: s.measureSay = "" }
+    function measureNote(t) { measureSay = t; _measureSayOff.restart() }
     function setMeasuring(on) {
-        measuring = !!on; measureFrom = null
-        if (on) { measureOpen = true; if (assembly && asmMode !== "print") setAsmMode("print"); if (viewer) viewer.setMarker(null) }
+        measuring = !!on; measureFrom = null; measureSay = ""
+        if (on) { measureOpen = true; if (viewer) viewer.setMarker(null) }
     }
     function clearMeasures() { measures = []; measureFrom = null }
     function dropMeasure(id) { measures = measures.filter(function (m) { return m.id !== id }) }
     function _addMeasure(m) { m.id = ++_mid; measures = measures.concat([m]) }
-    function measureClick(pt, reach) {         // pt: [x, y, z] on the surface, design frame; reach: snap radius in mm
-        var kind = measureKind
-        return ppost("/probe", { at: pt }).then(function (pr) {
+    function _frameName(tag) { return !tag || tag === "print" ? "print layout" : tag.indexOf("assembled") === 0 ? "assembled view" : "exploded view" }
+    function measureClick(hit, reach) {        // hit: from Viewport.hitAt; reach: snap radius in mm
+        var kind = measureKind, part = hit.part || "", tag = viewer ? viewer.frameTag : "print"
+        measureBusy++
+        var done = function () { s.measureBusy = Math.max(0, s.measureBusy - 1) }
+        return ppost("/probe", { at: hit.at }).then(function (pr) {
+            done()
+            var shown = function (p) { return s.viewer ? s.viewer.shownPoint(part, p) : p }
             if (kind === "distance") {
                 var at = pr.on, snap = "surface"
                 if (pr.snaps.length && pr.snaps[0].distance_mm <= reach) { at = pr.snaps[0].at; snap = pr.snaps[0].kind }    // nearest first
-                if (!s.measureFrom) { s.measureFrom = { at: at, snap: snap }; return }
+                var end = { at: at, shown: shown(at), part: part, snap: snap }
+                if (!s.measureFrom) { s.measureFrom = end; return }
                 var from = s.measureFrom
                 s.measureFrom = null
-                return s.ppost("/measure", { from: from.at, to: at }).then(function (r) {
-                    s._addMeasure({ kind: "distance", a: r.from, b: r.to, how: "computed", label: F.fmt(r.distance_mm, 2) + " mm",
-                        detail: "dX " + F.fmt(Math.abs(r.dx_mm), 2) + "  dY " + F.fmt(Math.abs(r.dy_mm), 2) + "  dZ " + F.fmt(Math.abs(r.dz_mm), 2) + "  ·  " + from.snap + " to " + snap,
-                        label_at: [(r.from[0] + r.to[0]) / 2, (r.from[1] + r.to[1]) / 2, (r.from[2] + r.to[2]) / 2] })
-                }, s.fail)
+                s.measureBusy++
+                return s.ppost("/measure", { from: from.shown, to: end.shown, from_on: from.at, to_on: end.at }).then(function (r) {
+                    s.measureBusy = Math.max(0, s.measureBusy - 1)
+                    var across = from.part !== end.part
+                    s._addMeasure({ kind: "distance", a: from.at, b: end.at, pa: from.part, pb: end.part, frame: tag, how: "computed",
+                        label: F.fmt(r.distance_mm, 2) + " mm",
+                        detail: "dX " + F.fmt(Math.abs(r.dx_mm), 2) + "  dY " + F.fmt(Math.abs(r.dy_mm), 2) + "  dZ " + F.fmt(Math.abs(r.dz_mm), 2),
+                        context: from.snap.charAt(0).toUpperCase() + from.snap.slice(1) + " to " + snap + (across && tag !== "print" ? " · between parts, in the " + s._frameName(tag) : ""),
+                        label_at: [(from.at[0] + end.at[0]) / 2, (from.at[1] + end.at[1]) / 2, (from.at[2] + end.at[2]) / 2] })
+                }, function (e) { s.measureBusy = Math.max(0, s.measureBusy - 1); s.fail(e) })
             } else if (kind === "face") {
                 var f = pr.face, feat = s.featureById(pr.feature)
-                s._addMeasure({ kind: "face", at: pr.on, face: f, how: "computed", label: F.fmt(f.area_mm2, f.area_mm2 < 100 ? 2 : 1) + " mm²",
-                    detail: f.type + (feat ? " of " + feat.label : "") + " · normal " + F.fmt(f.tilt_deg, 1) + "° from straight up: " + f.tilt + " · " + f.method,
+                s._addMeasure({ kind: "face", at: pr.on, part: part, face: f, how: "computed", label: F.fmt(f.area_mm2, f.area_mm2 < 100 ? 2 : 1) + " mm²",
+                    detail: f.type + (feat ? " of " + feat.label : "") + " · normal " + F.fmt(f.tilt_deg, 1) + "° from straight up as printed: " + f.tilt + " · " + f.method,
                     label_at: [pr.on[0] + f.normal[0] * 7, pr.on[1] + f.normal[1] * 7, pr.on[2] + f.normal[2] * 7] })
             } else {
                 var c = pr.circle
                 if (!c || (c.edge_distance_mm !== undefined && c.edge_distance_mm > Math.max(reach * 2, 1.5)))
-                    return s.toast("No circle here", "Click the wall of a hole or round boss, or close to its rim.")
-                s._addMeasure({ kind: "diameter", at: pr.on, circle: c, how: c.method === "fitted" ? "fitted" : "computed", label: "Ø " + F.fmt(c.diameter_mm, 2) + " mm",
+                    return s.measureNote("No circle there. Click the wall or rim of a hole or round boss.")
+                s._addMeasure({ kind: "diameter", at: pr.on, part: part, circle: c, how: c.method === "fitted" ? "fitted" : "computed", label: "Ø " + F.fmt(c.diameter_mm, 2) + " mm",
                     detail: (c.hole === true ? "hole" : c.hole === false ? "round boss" : c.surface || "circle") + " · "
                         + (c.method === "fitted" ? "fitted to " + c.points + " mesh edge points, rms " + F.fmt(c.rms_mm, 3) + " mm" : "exact, from the CAD solid"),
                     label_at: c.center || pr.on })
             }
-        }, fail)
+        }, function (e) { done(); s.fail(e) })
     }
 
     // print orientation finder (GET /orient): candidates ranked by a score whose terms are shown

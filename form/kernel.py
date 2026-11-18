@@ -120,6 +120,18 @@ def _get(key: str, recipe_id: str, values: dict, tol: float):
     return m
 
 
+def _get_near(key: str, recipe_id: str, values: dict, tol: float):
+    """The built model for `key` at any tessellation already in the cache, else built at `tol`.
+
+    For questions answered on the B-rep (what face is here, how thick is the wall): the viewer's model is
+    tessellated at 0.03 mm, and building the same solid again at another tolerance can take as long as the first
+    build (a threaded part takes tens of seconds), so a click would seem to do nothing."""
+    for (k, t), m in _cache.items():
+        if k == key:
+            return m
+    return _get(key, recipe_id, values, tol)
+
+
 def _edges(shape) -> np.ndarray:
     segs = []
     for e in shape.edges():

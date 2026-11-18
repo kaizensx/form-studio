@@ -464,7 +464,8 @@ def make_handler(st: Studio):
                 return self._json(analysis.probe(st, p, body.get("at"), body.get("rev")))
             if action == "measure":
                 from . import analysis
-                return self._json(analysis.measure(st, p, body.get("from"), body.get("to"), body.get("rev")))
+                return self._json(analysis.measure(st, p, body.get("from"), body.get("to"), body.get("rev"),
+                                                   body.get("from_on"), body.get("to_on")))
             if action == "preview":
                 return self._json(st.preview(p, body.get("values", {})))
             if action == "commit":
