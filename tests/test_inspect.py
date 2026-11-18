@@ -207,6 +207,8 @@ class OnTheSolid(unittest.TestCase):
         p = self.st.load(d["id"])
         v = self.st.view(p)
         self.assertTrue(v["assembly"]["derived"])
+        self.assertEqual([x["label"] for x in v["assembly"]["parts"]], ["Body", "Lid"])     # named after their features
+        self.assertEqual([x["id"] for x in v["assembly"]["parts"]], ["part1", "part2"])     # ids stay what tools store
         a = v["assembly"]["parts"][1]
         c = [(a["bbox"][0][i] + a["bbox"][1][i]) / 2 for i in range(3)]
         c[2] = a["bbox"][1][2]

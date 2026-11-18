@@ -80,8 +80,32 @@ def get(model):
         for f in s.faces():
             owner[hash(f)] = i
     face_part = [owner.get(hash(f["face"]), -1) for f in model["faces"]]
+    if spec.derived:                                   # name each body after the feature that makes most of it
+        spec = _name_derived(spec, model, face_part)
     model["_asm"] = {"spec": spec, "error": None, "printed": printed, "placed": placed, "locs": locs, "face_part": face_part}
     return model["_asm"]
+
+
+def _name_derived(spec, model, face_part):
+    """"Pebble base", "Thumb bolts 1", "Thumb bolts 2" instead of "Part 1"…: the label of the feature with the most
+    surface on each body. The ids stay part1, part2… (they are what other tools store per part)."""
+    from dataclasses import replace
+    labels = {f.id: f.label for f in getattr(model["recipe"], "features", [])}
+    area = {}
+    for f, k in zip(model["faces"], face_part):
+        if k >= 0:
+            area.setdefault(k, {}).setdefault(f["feature"], 0.0)
+            area[k][f["feature"]] += f.get("area", 0.0)
+    names = [labels.get(max(area[k], key=area[k].get), "") if area.get(k) else "" for k in range(len(spec.parts))]
+    seen = {n: names.count(n) for n in names}
+    count, parts = {}, []
+    for p, n in zip(spec.parts, names):
+        if not n:
+            parts.append(p)
+            continue
+        count[n] = count.get(n, 0) + 1
+        parts.append(replace(p, label=f"{n} {count[n]}" if seen[n] > 1 else n))
+    return replace(spec, parts=parts)
 
 
 # ---- view payload ----------------------------------------------------------------------------------------
