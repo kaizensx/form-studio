@@ -217,7 +217,9 @@ Rectangle {
         boundsBehavior: Flickable.StopAtBounds
         model: blocks
         // a new message, step group or footer fades in where it lands; nothing moves, so the feed never jumps
-        add: Transition { Glide { property: "opacity"; from: 0; to: 1; duration: Theme.base } }
+        // and rises the last few pixels into place (a transform, so the rows around it never re-lay out)
+        add: Transition { ParallelAnimation { Glide { property: "opacity"; from: 0; to: 1; duration: Theme.base }
+            Glide { property: "rise"; from: Theme.shift(Theme.rise); to: 0; duration: Theme.move(Theme.panel) } } }
         function toEnd() { if (!stick) return; auto = true; positionViewAtEnd(); auto = false }
         onContentHeightChanged: Qt.callLater(toEnd)
         onHeightChanged: Qt.callLater(toEnd)
@@ -227,6 +229,9 @@ Rectangle {
             id: it
             required property string j
             required property string k
+            required property int index
+            property real rise: 0
+            transform: Translate { y: it.rise }
             readonly property var m: JSON.parse(j)
             width: feed.width; implicitHeight: body.item ? body.item.implicitHeight : 0; height: implicitHeight
             HoverHandler { id: hh }
@@ -265,7 +270,14 @@ Rectangle {
                                     HoverHandler { id: ah }
                                     Tip { show: ah.hovered; text: ach.modelData.name } } } }
                         Txt { id: ut; width: Math.min(implicitWidth, body.width - 54); text: it.m.text; lineHeight: 1.4 } } } } }
-            Component { id: cText; Md { objectName: "replyText"; source: it.m.text; width: body.width; revs: true } }
+            Component { id: cText; Md { id: rt; objectName: "replyText"; source: it.m.text; width: body.width; revs: true
+                // while the reply is still being written, a caret sits after its last word
+                property real endX: 0; property real endY: 0; property real endH: 16
+                onLineLaidOut: function (line) { rt.endX = line.x + line.implicitWidth; rt.endY = line.y; rt.endH = line.height }
+                Rectangle { objectName: "streamCaret"; visible: Store.chatBusy && it.index === feed.count - 1
+                    x: Math.min(rt.width - 2, rt.endX + 3); y: rt.endY + (rt.endH - height) / 2; width: 2; height: 15; radius: 1; color: Theme.datum
+                    SequentialAnimation on opacity { running: parent.visible; loops: Animation.Infinite; alwaysRunToEnd: true
+                        PauseAnimation { duration: 380 } NumberAnimation { to: 0.15; duration: 220 } PauseAnimation { duration: 220 } NumberAnimation { to: 1; duration: 160 } } } } }
             Component { id: cAsk; Loader { width: body.width; sourceComponent: it.m.q.kind === "measure" ? cMeasure : cQuestion
                 Component { id: cQuestion; TalkAsk { width: body.width; q: it.m.q } }
                 Component { id: cMeasure; MeasureAsk { width: body.width; q: it.m.q } } } }

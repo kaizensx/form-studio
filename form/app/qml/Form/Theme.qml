@@ -109,6 +109,13 @@ QtObject {
     readonly property int pop: 150
     readonly property int exit: 110
     readonly property int stagger: 45
+    //   screen 380 one screen handing over to the next (Home -> workspace -> designing)
+    //   panel 300  the panels of a screen arriving after it, `stagger` apart
+    //   rise 8     how far a message or row rises as it arrives
+    readonly property int screen: 380
+    readonly property int panel: 300
+    readonly property int rise: 8
+    readonly property var easeSpring: [0.2, 0.9, 0.25, 1.04, 1, 1]  // arrival with the faintest settle, for a pass
     function move(ms) { return reduced ? 0 : ms }
     function shift(px) { return reduced ? 0 : px }
     function from(scale) { return reduced ? 1 : scale }

@@ -58,7 +58,7 @@ Column {
                 model: [{ n: root.roll.PASS, l: "pass", c: Theme.pass }, { n: root.roll.WARN, l: "to review", c: Theme.amber }, { n: root.roll.FAIL, l: "failed", c: Theme.signal }]
                 Column { required property var modelData; required property int index
                     width: parent.width / 3; spacing: 0
-                    Tick { decimals: 0; value: modelData.n; font.pixelSize: Theme.tH1; font.weight: 600; font.letterSpacing: -0.6
+                    Tick { decimals: 0; value: modelData.n; countIn: true; font.pixelSize: Theme.tH1; font.weight: 600; font.letterSpacing: -0.6
                         color: modelData.n > 0 ? modelData.c : Theme.ink4 }
                     Txt { kind: "cap"; text: modelData.l; color: modelData.n > 0 ? Theme.ink2 : Theme.ink4 } }
             }
@@ -66,9 +66,16 @@ Column {
         // the same three numbers as one bar: how much of the evidence is settled
         Row { width: parent.width; height: 4; spacing: 2
             Repeater { model: [[root.roll.PASS, Theme.pass], [root.roll.WARN, Theme.amber], [root.roll.FAIL, Theme.signal]]
-                Rectangle { required property var modelData
+                Rectangle { required property var modelData; required property int index
                     visible: modelData[0] > 0; height: 4; radius: 2; color: modelData[1]
-                    width: Math.max(4, (parent.width - 4) * modelData[0] / root.total) } } }
+                    width: Math.max(4, (parent.width - 4) * modelData[0] / root.total)
+                    // the bar fills from the left as the numbers count up (a scale, not the width: no layout per frame)
+                    transform: Scale { id: grow; origin.x: 0; xScale: 1 }
+                    SequentialAnimation { id: fill
+                        PropertyAction { target: grow; property: "xScale"; value: Motion.reduced ? 1 : 0 }
+                        PauseAnimation { duration: Theme.move(120 + index * Theme.stagger * 2) }
+                        NumberAnimation { target: grow; property: "xScale"; to: 1; duration: Theme.move(Theme.slow * 2); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
+                    Component.onCompleted: fill.start() } } }
         Txt { kind: "fine"; width: parent.width
             text: root.ch ? "Checks for " + F.pad(root.ch.rev) + " · " + root.evidenceMix(root.all) + ". Each says how it is known." : "" }
     }
@@ -95,6 +102,13 @@ Column {
                     readonly property bool link: !!(modelData.at || modelData.feature)
                     width: parent.width; height: cc.implicitHeight + 18; radius: Theme.rMd
                     color: link && cm.containsMouse ? Theme.washHover : "transparent"
+                    Behavior on color { Tint {} }
+                    // rows tick in one after another as the stage opens
+                    opacity: 0; transform: Translate { id: crIn; y: Theme.shift(Theme.rise) }
+                    SequentialAnimation { running: true
+                        PauseAnimation { duration: 160 + Math.min(cr.index, 8) * Theme.stagger }
+                        ParallelAnimation { Glide { target: cr; property: "opacity"; to: 1; duration: Theme.panel }
+                            Glide { target: crIn; property: "y"; to: 0; duration: Theme.move(Theme.panel) } } }
                     Rectangle { visible: cr.index > 0; x: 8; width: parent.width - 16; height: 1; color: Theme.rule }
                     Column { id: cc; x: 8; y: 9; width: parent.width - 16; spacing: 5
                         Item { width: parent.width; height: Math.max(lab.implicitHeight, 17)
@@ -155,6 +169,13 @@ Column {
                     readonly property bool on: root.shown === index
                     width: parent.width; height: on ? 30 + pd.implicitHeight + 8 : 30; radius: Theme.rSm
                     color: pm.containsMouse || on ? Theme.washHover : "transparent"
+                    Behavior on color { Tint {} }
+                    // a pass ticks in: the row rises into place and lands with the faintest settle
+                    opacity: 0; transform: Translate { id: prIn; y: Theme.shift(Theme.rise) }
+                    SequentialAnimation { running: true
+                        PauseAnimation { duration: 200 + Math.min(pr.index, 10) * Theme.stagger }
+                        ParallelAnimation { Glide { target: pr; property: "opacity"; to: 1; duration: Theme.panel }
+                            NumberAnimation { target: prIn; property: "y"; to: 0; duration: Theme.move(Theme.panel + 80); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeSpring } } }
                     Tag { x: 8; y: 7; text: pr.modelData.evidence || "pass"; kind: pr.modelData.evidence ? pr.modelData.evidence : "PASS" }
                     Txt { x: 92; y: 6; width: parent.width - 92 - pv.width - 16; text: pr.modelData.label; wrapMode: Text.NoWrap; elide: Text.ElideRight }
                     Txt { id: pv; mono: true; font.pixelSize: 12; tone: 2; anchors.right: parent.right; anchors.rightMargin: 8; y: 7

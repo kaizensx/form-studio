@@ -116,9 +116,25 @@ Window {
         id: stage
         anchors.top: top.bottom; anchors.bottom: parent.bottom
         x: Math.max(rail.visible ? rail.width : 0, talk.x + talk.width); width: parent.width - x
-        Loader { id: homeLd; anchors.fill: parent; active: Store.screen === "home"; sourceComponent: Home {} }
-        Loader { anchors.fill: parent; active: Store.screen === "work"; sourceComponent: Workspace {} }
-        Loader { anchors.fill: parent; active: Store.screen === "designing"; sourceComponent: Designing {} }
+        // One screen hands over to the next along one axis, depth: going deeper (Home -> designing -> the workspace)
+        // the new screen pushes in from slightly small; coming back it settles from slightly large. Its panels then
+        // arrive a beat apart (each screen staggers its own). Reduced motion: a plain fade.
+        readonly property var order: ({ boot: -1, home: 0, designing: 1, work: 2 })
+        property string was: "boot"
+        function enter(it) {
+            var prev = stage.was; stage.was = Store.screen
+            if (!it || prev === "boot") return
+            var deeper = (stage.order[Store.screen] || 0) >= (stage.order[prev] || 0)
+            arrive.target = it
+            arriveScale.from = Theme.from(deeper ? 0.975 : 1.025)
+            arrive.restart()
+        }
+        ParallelAnimation { id: arrive; property Item target: null
+            NumberAnimation { target: arrive.target; property: "opacity"; from: 0; to: 1; duration: Theme.screen * 0.7; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut }
+            NumberAnimation { id: arriveScale; target: arrive.target; property: "scale"; to: 1; duration: Theme.move(Theme.screen); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
+        Loader { id: homeLd; anchors.fill: parent; active: Store.screen === "home"; onLoaded: stage.enter(item); sourceComponent: Home {} }
+        Loader { anchors.fill: parent; active: Store.screen === "work"; onLoaded: stage.enter(item); sourceComponent: Workspace {} }
+        Loader { anchors.fill: parent; active: Store.screen === "designing"; onLoaded: stage.enter(item); sourceComponent: Designing {} }
     }
     Loader { anchors.top: top.bottom; anchors.bottom: parent.bottom; width: parent.width; z: 30; active: Store.welcome; sourceComponent: Welcome {} }
     // the opening screen: the mark builds itself while the kernel starts; it stays at least until the mark is drawn

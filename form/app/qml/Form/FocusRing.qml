@@ -6,5 +6,10 @@ Rectangle {
     property int gap: 2
     anchors.fill: parent; anchors.margins: -gap - 1
     color: "transparent"; border.width: 2; border.color: Theme.focus
-    visible: on; z: 5
+    z: 5
+    // the ring closes in on the control as focus lands, and fades when it leaves
+    opacity: on ? 1 : 0; visible: opacity > 0
+    scale: on ? 1 : Theme.from(1.06)
+    Behavior on opacity { NumberAnimation { duration: on ? Theme.pop : Theme.exit } }
+    Behavior on scale { Glide { duration: Theme.pop } }
 }

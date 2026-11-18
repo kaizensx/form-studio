@@ -42,7 +42,8 @@ Column {
     Item {
         width: sg.width; height: 24
         Rectangle { anchors.fill: parent; radius: Theme.rXs; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent" }
-        Icon { x: 2; name: sg.expanded ? "chevron_down" : "chevron_right"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
+        Icon { x: 2; name: "chevron_right"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter
+            rotation: sg.expanded ? 90 : 0; Behavior on rotation { Glide { duration: Theme.move(Theme.ui) } } }
         Row { x: 20; spacing: 8; anchors.verticalCenter: parent.verticalCenter
             Txt { kind: "fine"; tone: 2; font.weight: 550; text: sg.steps.length + (sg.steps.length === 1 ? " step" : " steps") }
             Txt { kind: "fine"; visible: sg.failed > 0; color: Theme.signal; text: sg.failed + " failed" }
@@ -55,8 +56,15 @@ Column {
             id: st
             required property var modelData
             readonly property var r: sg.res(modelData)
+            required property int index
             readonly property var how: sg.rich(modelData)
             width: sg.width; spacing: 4
+            // unfolded steps cascade in under the header; a step the agent just took fades in where it lands
+            opacity: 0; transform: Translate { id: stIn; y: Theme.shift(-4) }
+            SequentialAnimation { running: true
+                PauseAnimation { duration: Math.min(st.index, 10) * (Theme.stagger / 2) }
+                ParallelAnimation { Glide { target: st; property: "opacity"; to: 1; duration: Theme.ui }
+                    Glide { target: stIn; property: "y"; to: 0; duration: Theme.move(Theme.ui) } } }
             Item {
                 width: parent.width; height: 22
                 Rectangle { x: 8; width: 1; height: parent.height; color: Theme.rule2 }

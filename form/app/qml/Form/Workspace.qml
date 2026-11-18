@@ -473,6 +473,16 @@ Item {
         id: insp
         anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom; width: 400
         color: Theme.plate1
+        // arriving with the workspace: the inspector slides in from its own edge, a beat after the screen
+        transform: Translate { id: inspIn }
+        SequentialAnimation { id: inspArrive
+            PropertyAction { target: inspIn; property: "x"; value: Theme.shift(28) }
+            PropertyAction { target: insp; property: "opacity"; value: 0 }
+            PauseAnimation { duration: Theme.stagger * 2 }
+            ParallelAnimation {
+                NumberAnimation { target: insp; property: "opacity"; to: 1; duration: Theme.panel; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut }
+                NumberAnimation { target: inspIn; property: "x"; to: 0; duration: Theme.move(Theme.panel + 60); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } } }
+        Component.onCompleted: inspArrive.start()
         readonly property int at: { for (var i = 0; i < Store.stages.length; i++) if (Store.stages[i].id === Store.stage) return i; return 0 }
         Rectangle { width: 1; height: parent.height; color: Theme.rule }
         // stage tabs: the lit tab slides to the stage you pick
