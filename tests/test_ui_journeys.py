@@ -111,7 +111,10 @@ class Journeys(unittest.TestCase):
         with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(toml)}):
             self.journey("new_tools.py")
 
-    def test_assembly_chain(self):          # a joint slider moves the whole chain; exploded follows the tree
+    def test_lighter_replace(self):        # 12.3: make it lighter (real checks, real slices), replace a broken part
+        self.journey("lighter_replace.py")
+
+    def test_assembly_chain(self):         # a joint slider moves the whole chain; exploded follows the tree
         self.journey("assembly_chain.py")
 
     def test_inspect(self):                 # measuring on parts in every view, annotations, colours and materials

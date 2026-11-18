@@ -563,6 +563,45 @@ def build() -> MCPServer:
         return await _run(go)
 
     @mcp.tool(annotations=RO)
+    async def make_lighter(project: str, builds: int = 4) -> dict:
+        """Make it lighter: search changes that reduce mass while every check that passes now still passes. Tries the
+        design's wall, thickness and lightening-pocket parameters (never interface parameters; a candidate that moves an
+        interface dimension is dropped), building a ladder of values in the kernel, then takes the lightest few (builds)
+        through the real checks and slicer. Also slices lower infill and one wall fewer over the slicer's process. Returns
+        the baseline and candidates (id, changes and/or settings, computed mass_g, slicer slice_g, every check before and
+        after) and what was rejected and why. Nothing is committed: keep one with apply_lighter."""
+        st = studio()
+        def go():
+            from . import lighten
+            return lighten.search(st, st.load(project), builds=builds)
+        act(project, "search", "Searching for a lighter design that keeps every check passing")
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def apply_lighter(project: str, changes: dict[str, float] | None = None, settings: dict[str, float] | None = None,
+                            expect_head: int | None = None) -> dict:
+        """Keep a make_lighter candidate: changes (parameter values) are committed as a new revision; settings
+        ({"infill": percent, "walls": count}) become this design's print settings over the slicer's process. Pass the
+        candidate's own changes and settings exactly. Then run_pipeline."""
+        st = studio()
+        def go():
+            from . import lighten
+            return lighten.apply_values(st, st.load(project), changes, settings, expect_head, origin="agent")
+        out = await _run(go)
+        if changes:
+            act(project, "commit", f"r{out['head']:02d}: lighter")
+        return out
+
+    @mcp.tool(annotations=RO)
+    async def replace_part_guide() -> dict:
+        """How to design a replacement for a broken part from the person's photo: find the scale from a reference
+        object in the photo and estimate sizes (assumed), ask_measurement for each fit-critical size (at most three),
+        then create_design with the measured values and strengthen where it broke. In Form Studio this flow starts from
+        Home › Replace a broken part."""
+        from . import replace
+        return replace.guide()
+
+    @mcp.tool(annotations=RO)
     async def turntable(project: str, fmt: str = "webp", frames: int = 36, elevation: float = 24) -> list:
         """Render a turntable of the head revision from the kernel's mesh. fmt: webp or gif (one animated file), png (a
         numbered PNG sequence, zipped), mp4 (H.264; needs ffmpeg installed, refused with the reason otherwise). Returns a

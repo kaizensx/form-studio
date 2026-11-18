@@ -21,6 +21,8 @@
   form animate <project> [--morph 1:4] [--out x.gif]   turntable or revision morph
   form turntable <project> --fmt mp4|png|webp|gif      a turntable video or PNG sequence
   form compare-printers <project>                      slice on every printer: time, filament, cost
+  form lighter <project> [--apply c1]                  lighter walls, pockets, infill; every passing check kept
+  form replace --photo broken.jpg [--name X]           a replacement for a broken part, from a photo, in a chat
   form feature <project> boss --at x,y,z --normal ...  a screw boss or snap-fit hook in the code
   form verify <project> <release>    re-hash a release against its manifest
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
@@ -146,6 +148,25 @@ def main(argv=None):
     if argv[:1] == ["chat"]:                      # chat workstream: one message to an agent, streamed, saved
         from .chat import main_chat
         return main_chat(argv[1:])
+    if argv[:1] == ["replace"]:                   # a replacement for a broken part: the guided brief, sent as one chat
+        from . import replace
+        from .chat import main_chat
+        ap = argparse.ArgumentParser(prog="form replace", description="Design a replacement for a broken part from a photo: "
+                                     "the agent estimates sizes from a reference object in the photo, asks you for the "
+                                     "critical measurements, then designs it.")
+        ap.add_argument("--photo", required=True, action="append", metavar="FILE", help="photo of the broken part (repeat)")
+        ap.add_argument("--name", default="")
+        ap.add_argument("--what", default="", help="what the part does, what it attaches to")
+        ap.add_argument("--broke", default="", help="where and how it broke")
+        ap.add_argument("--reference", default="card", choices=list(replace.REFERENCES), help="the object in the photo that gives the scale")
+        ap.add_argument("--coin", default="", help="which coin, with --reference coin")
+        ap.add_argument("--brief-only", action="store_true", help="print the message instead of sending it")
+        a, rest = ap.parse_known_args(argv[1:])
+        msg = replace.brief(a.name, a.what, a.reference, a.coin, a.broke)
+        if a.brief_only:
+            print(json.dumps({"message": msg, "steps": replace.STEPS, "photos": a.photo}, indent=1, ensure_ascii=False))
+            return 0
+        return main_chat([msg] + sum((["--attach", f] for f in a.photo), []) + rest)
     if argv[:1] == ["conversations"]:             # saved conversations: list | show | delete | rename | pin
         from .chat import main_conversations
         return main_conversations(argv[1:])
@@ -270,6 +291,11 @@ def main(argv=None):
     tt.add_argument("--frames", type=int, default=36)
     tt.add_argument("--elevation", type=float, default=24, help="camera height, degrees above the horizon")
     tt.add_argument("--out", help="copy the file here")
+    lt = sub.add_parser("lighter", help="search wall, pocket and infill changes that cut mass while every passing check still passes")
+    lt.add_argument("project")
+    lt.add_argument("--builds", type=int, default=4, help="how many geometry candidates go through the full checks")
+    lt.add_argument("--apply", metavar="ID", help="keep candidate ID (c1, c2, ...) from the search")
+    lt.add_argument("--expect-head", type=int)
     cp = sub.add_parser("compare-printers", help="slice the design on every printer in your slicers: time, filament, cost")
     cp.add_argument("project")
     cp.add_argument("--limit", type=int, default=8, help="how many printers (the selected ones first)")
@@ -494,6 +520,20 @@ def main(argv=None):
                 _sh.copyfile(info["file"], a.out)
                 info["copied_to"] = a.out
             _print(info)
+        elif a.cmd == "lighter":
+            from . import lighten
+            p = st.load(a.project)
+            if a.apply:
+                r = lighten.cached(st, p) or lighten.search(st, p, builds=a.builds)
+                c = next((x for x in r["candidates"] if x["id"] == a.apply), None)
+                if c is None:
+                    raise StudioError(f"No candidate {a.apply}.", "Run `form lighter <project>` and pick one of its ids.")
+                out = lighten.apply(st, p, c, a.expect_head, origin="cli")
+                if c.get("changes"):
+                    out["job"] = st.run_sync(a.project)["state"]
+                _print(out)
+            else:
+                _print(lighten.search(st, p, builds=a.builds))
         elif a.cmd == "compare-printers":
             from . import slicecompare
             _print(slicecompare.compare(st, st.load(a.project), a.limit, a.printer))

@@ -63,7 +63,7 @@ Rules:
 
 ## Tools at a glance
 
-74 tools. Read-only tools never change a project.
+77 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -90,6 +90,9 @@ Rules:
 | [`add_feature`](#add_feature) | changes | Add a standard feature on a flat face of a Python design, written into its source as a feature block and built in the kernel as a new revision. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature added with add_feature (feature_id like "boss_1" or "hook_1"). |
 | [`compare_printers`](#compare_printers) | read-only | Slice the head revision's exported model for real on every printer set up in every installed slicer (the selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and cheapest. |
+| [`make_lighter`](#make_lighter) | read-only | Make it lighter: search changes that reduce mass while every check that passes now still passes. |
+| [`apply_lighter`](#apply_lighter) | changes | Keep a make_lighter candidate: changes (parameter values) are committed as a new revision; settings ({"infill": percent, "walls": count}) become this design's print settings over the slicer's process. |
+| [`replace_part_guide`](#replace_part_guide) | read-only | How to design a replacement for a broken part from the person's photo: find the scale from a reference object in the photo and estimate sizes (assumed), ask_measurement for each fit-critical size (at most three), then create_design with the measured values and strengthen where it broke. |
 | [`turntable`](#turntable) | read-only | Render a turntable of the head revision from the kernel's mesh. |
 | [`remove_text`](#remove_text) | changes | Remove lettering added with add_text (mark_id like "text_1"; get_design_source shows the block). |
 | [`assembly_instructions`](#assembly_instructions) | changes | Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then one page per part going on (in the declaration's parent order, at its explode offset, with arrows). |
@@ -470,6 +473,44 @@ simulation, not a print. Slices are cached per model and presets.
 | `project` | string | yes |
 | `limit` | integer |  |
 | `printers` | array \| null |  |
+
+### `make_lighter`
+
+*Read-only.*
+
+Make it lighter: search changes that reduce mass while every check that passes now still passes. Tries the
+design's wall, thickness and lightening-pocket parameters (never interface parameters; a candidate that moves an
+interface dimension is dropped), building a ladder of values in the kernel, then takes the lightest few (builds)
+through the real checks and slicer. Also slices lower infill and one wall fewer over the slicer's process. Returns
+the baseline and candidates (id, changes and/or settings, computed mass_g, slicer slice_g, every check before and
+after) and what was rejected and why. Nothing is committed: keep one with apply_lighter.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `builds` | integer |  |
+
+### `apply_lighter`
+
+Keep a make_lighter candidate: changes (parameter values) are committed as a new revision; settings
+({"infill": percent, "walls": count}) become this design's print settings over the slicer's process. Pass the
+candidate's own changes and settings exactly. Then run_pipeline.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `changes` | object \| null |  |
+| `settings` | object \| null |  |
+| `expect_head` | integer \| null |  |
+
+### `replace_part_guide`
+
+*Read-only.*
+
+How to design a replacement for a broken part from the person's photo: find the scale from a reference
+object in the photo and estimate sizes (assumed), ask_measurement for each fit-critical size (at most three),
+then create_design with the measured values and strengthen where it broke. In Form Studio this flow starts from
+Home › Replace a broken part.
 
 ### `turntable`
 

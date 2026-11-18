@@ -493,6 +493,60 @@ QtObject {
             return refresh(true).then(function () { return true })
         }, function (e) { fail(e); return false })
     }
+    // Make it lighter (form/lighten.py): real candidates, every passing check kept, then one applied as a new revision
+    property var lighter: null
+    property bool lighterBusy: false
+    function searchLighter() {
+        if (lighterBusy) return Promise.resolve(null)
+        lighterBusy = true
+        var at = pid
+        return ppost("/lighten", { builds: 4 }).then(function (r) {
+            lighterBusy = false
+            if (pid === at) lighter = r
+            return r
+        }, function (e) { lighterBusy = false; fail(e); return null })
+    }
+    function loadLighter() {
+        var at = pid
+        lighter = null
+        pget("/lighten").then(function (r) { if (pid === at && !r.none) lighter = r }, function () {})
+    }
+    function applyLighter(c) {
+        return ppost("/lighten_apply", { changes: c.changes || null, settings: c.settings || null, expect_head: project ? project.head : null }).then(function (r) {
+            toast(c.changes ? "Lighter design as " + F.pad(r.head) : "Lighter print settings",
+                  (c.saves_slice_g !== null && c.saves_slice_g !== undefined ? F.fmt(c.saves_slice_g, 1) + " g less filament in the slicer" : F.fmt(c.saves_mass_g, 1) + " g less computed mass")
+                  + (c.settings ? "; the slice is redone with them." : "."))
+            sheet = null; lighter = null
+            if (r.job) track(r.job)
+            return refresh(true).then(function () { buildTick++; return true })
+        }, function (e) { fail(e); return false })
+    }
+    // Replace a broken part (form/replace.py): the conversation it started, and how far the agent has got
+    property string replaceConv: ""
+    readonly property bool replaceActive: {
+        if (!convId) return false
+        if (replaceConv === convId) return true
+        for (var i = 0; i < chatItems.length; i++) if (chatItems[i].t === "user") return String(chatItems[i].text || "").indexOf("Replace a broken part:") === 0
+        return false
+    }
+    // {done, active}: Photo is done once sent; Estimate while the agent first works; Measure from its first
+    // ask_measurement until answered; Design once a design is created
+    readonly property var replaceProgress: {
+        var asked = false, answered = false, designed = false, open = !!chatAsking && chatAsking.kind === "measure"
+        var askIds = ({})
+        for (var i = 0; i < chatItems.length; i++) {
+            var ev = chatItems[i]
+            if (ev.t === "tool" && ev.name === "ask_measurement") asked = true
+            if (ev.t === "ask" && ev.kind === "measure") { asked = true; askIds[ev.id] = true }
+            if (ev.t === "answer" && askIds[ev.id]) answered = true
+            if (ev.t === "tool" && ["create_design", "create_project", "pick_concept", "propose_concepts"].indexOf(ev.name) >= 0) designed = true
+        }
+        if (open) return { done: 2, active: 2 }                 // a measurement card is waiting for you
+        if (designed && !chatBusy) return { done: 4, active: -1 }
+        if (designed || answered) return { done: 3, active: chatBusy ? 3 : -1 }
+        if (asked) return { done: 2, active: chatBusy ? 2 : -1 }
+        return { done: 1, active: chatBusy ? 1 : -1 }
+    }
     // print time and cost on every printer (form/slicecompare.py): real slices, cached per model and presets
     property var printerCompare: null
     property bool printerCompareBusy: false

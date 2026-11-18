@@ -16,6 +16,8 @@ Home's start flow (form/start.py, form/concepts.py), by words in the FIRST line 
               parameter: where "Across the widest part, side to side", tolerance 0.1 mm, diagram box/x, current = its value.
               After the answer the reply has "You measured: <value> mm with <method>" (value as %g), or
               "You measured: nothing (<reason>)" when the question closed unanswered.
+  "Replace a broken part: <name>."  (form/replace.py) creates a tiny Block design named <name> (create_design), adds
+              "Replacement: <name>", then asks the measurement question above about it.
 Always, from the prompt Form Studio builds:
   "Attached files:" present   -> a line "I received: <name> (<kind>), ..." (file names without the 6-hex id and dash)
   the sketch heading present  -> a line "Sketch: <n> primitives" per sketch, counted from the inlined JSON
@@ -103,7 +105,10 @@ def main():
     extra = []
     if re.search(r"\bconcepts\b", first):
         extra.append(concepts(data, message))
-    if re.search(r"\bmeasure\b", first):
+    if first.startswith("Replace a broken part"):
+        extra.append(replacement(data, message))
+        extra.append(measure(data))
+    elif re.search(r"\bmeasure\b", first):
         extra.append(measure(data))
     if re.search(r"\bsuggest\b", first):
         out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t4", "name": "mcp__form__suggest_replies",
@@ -167,6 +172,27 @@ def concepts(data: Path, message: str) -> str:
     out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t5",
                                                   "content": [{"type": "text", "text": json.dumps(board, default=str)}]}]}})
     return "Concepts: " + ", ".join(f"{m['letter']} {m['title']}" for m in board["members"])
+
+
+def replacement(data: Path, message: str) -> str:
+    """Replace a broken part (form/replace.py): a tiny block design, reported as create_design, with a commit in the
+    activity log so the app follows it; then measure() asks for its size."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    os.environ.setdefault("FORM_DATA", str(data))
+    from form import config
+    from form.studio import Studio
+    name = message.splitlines()[0].split(":", 1)[1].strip().rstrip(".") or "Replacement"
+    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t7", "name": "mcp__form__create_design",
+                                                       "input": {"name": name}}]}})
+    st = Studio(config.load())
+    try:
+        p = st.create_design(name, _source("Block", TINY["Block"][0]), purpose=_purpose(message))
+        st.activity(p["id"], "commit", f"Created {name} (r01)", by="fake")
+    finally:
+        st.kernel.stop()
+    out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t7",
+                                                  "content": [{"type": "text", "text": json.dumps({"project": {"id": p["id"]}})}]}]}})
+    return f"Replacement: {name}"
 
 
 def measure(data: Path) -> str:
