@@ -80,7 +80,7 @@ class ProjectLock:
         self._r.acquire()
         if self._depth == 0 and (fcntl or msvcrt):
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self._fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o644)
+            self._fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600)
             _flock(self._fd, True)
         self._depth += 1
         return self

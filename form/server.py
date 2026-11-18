@@ -10,13 +10,23 @@ import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 from . import advisor, config
 from .cad_bridges import open_output
 from .studio import NODES, Studio, StudioError
 
 WEB = Path(__file__).resolve().parent / "web"
+
+
+_HEADER_CTL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _attachment(name: str) -> str:
+    """A Content-Disposition value for a download: an ASCII fallback name plus the exact name, percent-encoded."""
+    name = _HEADER_CTL.sub("", str(name))
+    plain = re.sub(r'[^A-Za-z0-9._ -]', "_", name) or "download"
+    return f'attachment; filename="{plain}"; filename*=UTF-8\'\'{quote(name, safe="")}'
 
 
 def _log_error(root, method: str, path: str, exc: BaseException) -> None:
@@ -65,7 +75,7 @@ def make_handler(st: Studio):
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             for k, v in (extra or {}).items():
-                self.send_header(k, v)
+                self.send_header(k, _HEADER_CTL.sub("", str(v)))     # no CR/LF: a value can never start a new header
             self.end_headers()
             self.wfile.write(body)
 
@@ -89,6 +99,10 @@ def make_handler(st: Studio):
                 host = (self.headers.get("Host") or "").split(":")[0]
                 if host not in ("127.0.0.1", "localhost", "[::1]"):
                     return self._json({"error": {"message": "Form Studio only answers on loopback."}}, 403)
+                origin = self.headers.get("Origin")
+                if origin and origin != "null" and urlparse(origin).hostname not in ("127.0.0.1", "localhost", "::1"):
+                    # a web page in a browser can reach loopback too; only Form Studio's own pages may call the engine
+                    return self._json({"error": {"message": "Form Studio does not answer other websites."}}, 403)
                 fn()
             except StudioError as e:
                 self._json({"error": e.public()}, e.status)
@@ -147,7 +161,7 @@ def make_handler(st: Studio):
             from . import home_api
             got = home_api.route_get(st, path, q)
             if isinstance(got, tuple):
-                return self._send(200, got[0], got[1], {"Content-Disposition": f'attachment; filename="{got[2]}"'})
+                return self._send(200, got[0], got[1], {"Content-Disposition": _attachment(got[2])})
             if got is not None:
                 return self._json(got)
             # -- brief templates (presets) --
@@ -276,7 +290,7 @@ def make_handler(st: Studio):
             if rest == "/archive":
                 f = st.export_archive(p)
                 return self._send(200, f.read_bytes(), "application/zip",
-                                  {"Content-Disposition": f'attachment; filename="{f.name}"'})
+                                  {"Content-Disposition": _attachment(f.name)})
             # -- design tools: revision timeline, variants board, share card (form/share.py, form/variants.py) --
             if rest == "/revisions":
                 from . import share
@@ -305,12 +319,12 @@ def make_handler(st: Studio):
                 if not f.is_relative_to(base.resolve()) or not f.is_file():
                     raise StudioError("That file does not exist (it may be stale and regenerated under a new key).", status=404)
                 ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
-                extra = {} if ctype.startswith("image/") else {"Content-Disposition": f'attachment; filename="{f.name}"'}
+                extra = {} if ctype.startswith("image/") else {"Content-Disposition": _attachment(f.name)}
                 return self._send(200, f.read_bytes(), ctype, extra)
             if rest == "/freecad_macro":                         # CAD bridges: FreeCAD macro download
                 name, text = st.freecad_macro(p)
                 return self._send(200, text.encode("utf-8"), "text/x-python; charset=utf-8",
-                                  {"Content-Disposition": f'attachment; filename="{name}"'})
+                                  {"Content-Disposition": _attachment(name)})
 
             # ---- maker documents (BOM, ASSEMBLY, PRINT_REPORT, MEASUREMENT_PLAN): working files, or a release's as .zip ----
             md = re.fullmatch(r"/docs/([A-Za-z0-9_.\-]+)", rest)
@@ -324,7 +338,7 @@ def make_handler(st: Studio):
                 else:
                     f = maker_docs.release_zip(st, p, rel) if rel else maker_docs.working(st, p, md.group(1))
                 ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
-                extra = {} if ctype.startswith("image/") else {"Content-Disposition": f'attachment; filename="{f.name}"'}
+                extra = {} if ctype.startswith("image/") else {"Content-Disposition": _attachment(f.name)}
                 return self._send(200, f.read_bytes(), ctype, extra)
             m3 = re.fullmatch(r"/release/(r\d+-[0-9a-f]+)", rest)
             if m3:

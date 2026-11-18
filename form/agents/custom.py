@@ -115,6 +115,12 @@ def _host(url: str) -> str:
     return urllib.parse.urlparse(url).netloc or url
 
 
+def _host_is(url: str, domain: str) -> bool:
+    """True when the URL's host is the domain or one of its subdomains (not a host that merely contains it)."""
+    h = (urllib.parse.urlparse(url).hostname or "").lower().rstrip(".")
+    return h == domain or h.endswith("." + domain)
+
+
 def _is_local(url: str) -> bool:
     host = (urllib.parse.urlparse(url).hostname or "").lower()
     if host in ("localhost",) or host.endswith((".localhost", ".local", ".lan", ".internal")):
@@ -343,7 +349,7 @@ def detect(url: str, key: str | None = None, timeout: float = 6.0) -> dict:
                 # the OpenAI one lists every model and calls tools the same way for all of them, so keep looking for
                 # it and use the Anthropic answer only when nothing else answers (Anthropic itself, or a proxy of it)
                 found = (kind, c, d, kind)
-                if "anthropic.com" in _host(c):
+                if _host_is(c, "anthropic.com"):
                     break
     if not found and not auth and not (last_err and len(tried) == 1):
         root = re.sub(r"/(v\d+|api(/v\d+)?|openai(/v\d+)?)$", "", u)          # Ollama's own list, then its /v1

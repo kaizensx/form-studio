@@ -138,7 +138,7 @@ export async function initHero() {
     const el = document.createElement("div");
     el.className = "panel" + (anim && !reducedMotion() ? " in" : ""); el.id = "panel"; el.setAttribute("role", "tabpanel");
     el.setAttribute("aria-labelledby", "tab-" + S.stage);
-    el.innerHTML = P[S.stage]();
+    el.innerHTML = (Object.prototype.hasOwnProperty.call(P, S.stage) ? P[S.stage] : P.shape)();
     if (panelEl) panelEl.remove();
     wrap.appendChild(el); panelEl = el;
     if (S.stage === "prove" && anim) countUp(el);
@@ -152,6 +152,7 @@ export async function initHero() {
     });
   }
   function setStage(id, anim = true) {
+    if (!Object.prototype.hasOwnProperty.call(P, id)) return;      // only the stages drawn above
     if (S.sim && id !== "prove") setSim(false);
     S.stage = id; renderTabs(); renderPanel(anim);
   }

@@ -35,10 +35,12 @@ def listed(recipes: dict | None = None) -> dict:
 import hashlib as _hashlib
 import importlib.util as _ilu
 import os as _os
+import re as _re
 from pathlib import Path as _Path
 
 SOURCE_PREFIX = "src:"
 SCAD_PREFIX = "scad:"            # OpenSCAD designs: <data>/.sources/<sha>.scad (see recipes/scad.py)
+_SOURCE_KEY = _re.compile(r"[0-9a-f]{1,64}")
 
 
 def is_source(rid: str) -> bool:
@@ -47,9 +49,12 @@ def is_source(rid: str) -> bool:
 
 
 def source_path(store: _Path, rid: str) -> _Path:
-    if rid.startswith(SCAD_PREFIX):
-        return store / f"{rid[len(SCAD_PREFIX):]}.scad"
-    return store / f"{rid[len(SOURCE_PREFIX):]}.py"
+    """The file of a design source. Ids are content hashes, so anything else (a path, '..') is refused."""
+    scad = rid.startswith(SCAD_PREFIX)
+    key = rid[len(SCAD_PREFIX if scad else SOURCE_PREFIX):]
+    if not _SOURCE_KEY.fullmatch(key):
+        raise KeyError(rid)
+    return store / f"{key}.{'scad' if scad else 'py'}"
 
 
 def source_id(text: str) -> str:
@@ -106,7 +111,7 @@ class RecipeBook(dict):
 
     def __missing__(self, key):
         if isinstance(key, str) and key.startswith(SOURCE_PREFIX) and self.store is not None:
-            r = load_source(self.store / f"{key[len(SOURCE_PREFIX):]}.py", key)
+            r = load_source(source_path(self.store, key), key)
             self[key] = r
             return r
         if isinstance(key, str) and key.startswith(SCAD_PREFIX) and self.store is not None:
@@ -120,7 +125,10 @@ class RecipeBook(dict):
         if dict.__contains__(self, key):
             return True
         if isinstance(key, str) and key.startswith(SCAD_PREFIX) and self.store is not None:
-            return source_path(self.store, key).exists()
+            try:
+                return source_path(self.store, key).exists()
+            except KeyError:
+                return False
         return False
 
     def builtins(self):
