@@ -40,9 +40,12 @@ def example(ui, pid, open=True):
 
 
 def open_project(ui, pid):
-    ui.run_js("Store.reloadStudio().then(function () { Store.open(%r) })" % pid)
+    # from another design the old model stays in Store.view until the new one arrives: drop it first (Home does the
+    # same), so "loaded" below means this design's model and not the previous one's
+    ui.run_js("if (Store.pid !== %r) Store.view = null; Store.reloadStudio().then(function () { Store.open(%r) })" % (pid, pid))
     ui.wait_until(lambda: ui.store.get("screen") == "work" and ui.store.get("pid") == pid, 60, f"{pid} to open")
-    ui.wait_until(lambda: ui.js("!!Store.view && !!Store.viewer"), 60, "the model to load")
+    ui.wait_until(lambda: ui.js("!!Store.view && !!Store.viewer && !!Store.data && Store.data.project.id === %r" % pid), 60,
+                  "the model to load")
     ui.idle(300)
     ui.settle(700)
 

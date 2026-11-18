@@ -177,6 +177,7 @@ class ChatJob:
         self.before: set | None = None         # project ids that existed when the message was sent
         self.attachments: list[dict] = []
         self.stop_asked = False
+        self.thread: threading.Thread | None = None
         self.ask = False                       # someone can answer ask_user (the app, or a terminal)
         self.asked: set = set()                # question ids already shown in the conversation
         self.waiting: dict | None = None       # the open question, while the agent waits for an answer
@@ -297,8 +298,22 @@ class Chat:
                 user["attachments"] = job.attachments
             job.events[0] = self.store.append(cid, user)
             self.jobs[job.id] = job
-        threading.Thread(target=self._run, args=(job, adapter, exe), daemon=True, name=f"form-chat-{job.id}").start()
+        job.thread = threading.Thread(target=self._run, args=(job, adapter, exe), daemon=True, name=f"form-chat-{job.id}")
+        job.thread.start()
         return job
+
+    def shutdown(self, seconds: float = 15.0) -> None:
+        """The app is quitting: stop every running message and wait (up to `seconds`) until each has ended with the
+        agent and its tool server, so nothing keeps running in a conversation's folder after Form Studio is gone."""
+        jobs = list(self.jobs.values())
+        for j in jobs:
+            if j.state == "running":
+                self.stop(j.id)
+        end = time.time() + seconds
+        for j in jobs:
+            t = getattr(j, "thread", None)
+            if t is not None and t.is_alive():
+                t.join(max(0.0, end - time.time()))
 
     def start(self, message: str, project: str | None = None, session: str | None = None) -> ChatJob:
         """The older entry point (web bench): continue the conversation that owns `session`, or start a new one."""
