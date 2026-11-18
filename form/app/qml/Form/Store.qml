@@ -577,6 +577,10 @@ QtObject {
     function agentInfo(id) { for (var i = 0; i < chatAgents.length; i++) if (chatAgents[i].id === id) return chatAgents[i]; return null }
     readonly property var chatAgentInfo: agentInfo(chatAgent)
     readonly property bool chatReady: !!chatAgentInfo && chatAgentInfo.available
+    // a provider with many models and none used yet has no Default: the first message asks for a model first
+    readonly property bool chatNeedsModel: chatReady && (chatModel === "" || (chatModel === "default" && !!chatAgentInfo.pick))
+    property string pendingSend: ""          // the message waiting for that pick; sent as soon as a model is chosen
+    signal modelPickWanted()
     readonly property string chatAgentLabel: chatAgentInfo ? chatAgentInfo.label : "your agent"
     function modelLabel(agent, model) {
         var a = agentInfo(agent), ms = a ? a.models : []
@@ -586,6 +590,7 @@ QtObject {
     // the composer's chip: the version the alias resolved to ("Opus 5.5"), else the picker's label
     function modelShort(agent, model) {
         var a = agentInfo(agent), ms = a ? a.models : []
+        if (a && a.available && (!model || (model === "default" && a.pick))) return "Choose a model"
         for (var i = 0; i < ms.length; i++) if (ms[i].id === model) return ms[i].resolved_label || ms[i].label
         return model || "Default"
     }
@@ -655,6 +660,7 @@ QtObject {
     function send(text) {
         text = (text || "").trim()
         if (!text || chatBusy) return
+        if (chatNeedsModel) { pendingSend = text; modelPickWanted(); return }
         var att = chatAttach, id = convId
         chatBusy = true; talkOpen = true; chatAttach = []; chatLive = null
         chatItems = chatItems.concat([{ t: "user", text: text, attachments: att, local: true }])
@@ -753,10 +759,12 @@ QtObject {
     function setChatChoice(agent, model, effort) {
         if (agent !== undefined && agent !== chatAgent) {
             chatAgent = agent
-            if (model === undefined) model = "default"
+            // the model last used with this agent; a provider that lists many and was never used asks for one
+            var info = agentInfo(agent)
+            if (model === undefined) model = info && info.last_model ? info.last_model : (info && info.pick ? "" : "default")
             if (effort === undefined) effort = ""
         }
-        if (model !== undefined) chatModel = model || "default"
+        if (model !== undefined) chatModel = model || (agent !== undefined && agentInfo(chatAgent) && agentInfo(chatAgent).pick ? "" : "default")
         if (effort !== undefined) chatEffort = effort || ""
         var body = { agent: chatAgent, model: chatModel, effort: chatEffort }
         post("/chat/defaults", body).then(function (r) {
@@ -764,6 +772,7 @@ QtObject {
         }, function () {})
         if (convId) post("/conversations/" + convId + "/settings", body).then(function (m) { if (convId === m.id) conv = Object.assign({}, conv, m) }, function () {})
         if (retryAfterPick && model !== undefined) { retryAfterPick = false; retryChat() }
+        else if (pendingSend && !chatNeedsModel) { var t = pendingSend; pendingSend = ""; send(t) }
     }
 
     // attachments: images, PDFs, STEP/STL. Copied into the conversation's folder; sent with the next message.

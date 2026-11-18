@@ -172,3 +172,24 @@ def help_text(exe: str, *args: str, timeout: float = 10) -> str:
 
 
 _HELP: dict = {}
+
+
+def read_json(path: Path) -> dict:
+    """A CLI's own JSON settings file, or {} (missing, unreadable or not an object). Only read, never written."""
+    try:
+        d = json.loads(Path(path).read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def setting(d: dict, *path):
+    """d["a"]["b"] for setting(d, "a", "b"); a plain string at the first key also counts (older settings shapes)."""
+    cur = d
+    for i, k in enumerate(path):
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(k)
+        if isinstance(cur, str) and i < len(path) - 1:
+            return cur or None
+    return cur if isinstance(cur, str) and cur else None

@@ -12,7 +12,7 @@ import json
 import os
 from pathlib import Path
 
-from .base import Adapter, Parser, Run
+from .base import Adapter, Parser, Run, read_json, setting
 from .claude import ClaudeParser
 
 KEY_VARS = ("OPENAI_API_KEY", "DASHSCOPE_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY")
@@ -53,6 +53,14 @@ class Qwen(Adapter):
         except (OSError, ValueError, AttributeError):
             pass
         return {"signed_in": False, "how": "No API key found. Set one up by running `qwen` once in a terminal."}
+
+    def models(self, cfg, exe):
+        home = Path(os.environ.get("QWEN_HOME") or Path.home() / ".qwen")
+        own = setting(read_json(home / "settings.json"), "model", "name")
+        row = {"id": "default", "label": "Default", "note": "Whatever Qwen Code is set to use"}
+        if own:
+            row.update(configured=own, note=f"From your Qwen Code settings: {own}")
+        return [row]
 
     def command(self, run: Run, exe: str) -> list[str]:
         mcp = {"mcpServers": {"form": dict(run.mcp, trust=True, timeout=int(run.tool_timeout_s * 1000))}}

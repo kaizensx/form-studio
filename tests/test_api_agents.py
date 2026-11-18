@@ -119,7 +119,8 @@ class Detection(Env):
                               "effort": {"supported": True, "low": {"supported": True}, "max": {"supported": False}}}}])
         with mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "k"}):
             st = ApiAdapter(prov.PROVIDERS["anthropic"]).status({"chat": {"anthropic_url": srv.url}})
-        self.assertEqual(st["models"][1], {"id": "claude-x-1", "label": "Claude X 1", "note": "claude-x-1", "efforts": ["low"]})
+        self.assertEqual(st["models"][1], {"id": "claude-x-1", "label": "Claude X 1", "note": "claude-x-1", "efforts": ["low"],
+                                           "images": True})
         self.assertEqual(st["models"][0]["label"], "Default · Claude X 1")
         self.assertEqual(srv.headers, [])           # listing is a GET; nothing was posted
 

@@ -57,6 +57,7 @@ Rectangle {
         var t = talk.tokens(m.usage)
         return t ? " · " + t : " · cost not reported"
     }
+    Connections { target: Store; function onModelPickWanted() { Qt.callLater(function () { if (!mpop.opened) mpop.open() }) } }
     function tryAnother() { Store.retryAfterPick = true; Qt.callLater(function () { mpop.open() }) }   // after the click ends: the menu may open under the pointer
     function secs(s) { return s === null || s === undefined ? "" : s < 90 ? Math.round(s) + " s" : Math.floor(s / 60) + " min " + Math.round(s % 60) + " s" }
 
@@ -415,8 +416,11 @@ Rectangle {
                             MouseArea { id: mcm; anchors.fill: parent; hoverEnabled: true; onClicked: mpop.opened ? mpop.close() : mpop.open() }
                             Tip { show: mcm.containsMouse && !mpop.opened; text: "Agent and model for this conversation" }
                             Pop {
-                                id: mpop; x: -34; width: Math.min(340, talk.width - 24); padding: 6
-                                onClosed: Store.retryAfterPick = false
+                                id: mpop; x: -34; width: Math.min(380, talk.width - 24); padding: 6
+                                onAboutToShow: mp.reset()
+                                onOpened: mp.opened()
+                                onClosed: { Store.retryAfterPick = false
+                                    if (Store.pendingSend) { Store.chatPrefill(Store.pendingSend); Store.pendingSend = "" } }
                                 height: Math.min(mp.implicitHeight + 12, talk.height - 70)
                                 y: talk.landing ? mchip.height + 6 : -height - 6
                                 origin: talk.landing ? Popup.TopLeft : Popup.BottomLeft

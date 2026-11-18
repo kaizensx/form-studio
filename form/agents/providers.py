@@ -10,8 +10,12 @@ Detection, without asking anyone:
 - a key stored by Form Studio (form/secrets.py) or set in the standard environment variable;
 - a local server answering GET <base>/models on its default port (or the URL in [chat] <id>_url).
 
-Models are always read from the provider's own models endpoint. None are written here, and the default for a
-provider is a choice made from that list (stated as such in the picker), never a name from this file.
+Models are always read from the provider's own models endpoint. None are written here. A provider's Default is the
+model last used with it in Form Studio (or [chat] <id>_model, or the only model it lists, or what a local server has
+loaded); otherwise the picker asks for one. Nothing is chosen for the person from a list of hundreds.
+
+Providers the person adds by URL (Settings › Agents › Add a provider, `form providers add`) live in
+form/agents/custom.py and are merged in by `all_providers()`.
 """
 from __future__ import annotations
 
@@ -51,9 +55,12 @@ class Provider:
     hint: str = ""                             # how to make it available, shown when it is not
     verified: str = "not run: not yet verified with a live reply"
     extra_headers: dict = field(default_factory=dict)
+    custom: bool = False                       # added by the person (form/agents/custom.py), not built in
+    probed: dict = field(default_factory=dict, hash=False)   # custom: {model: {"tools", "images"}} from a test
 
 
 _NOT_CHAT = r"embed|tts|whisper|dall-e|davinci|babbage|moderation|transcri|realtime|audio|image|imagen|veo|aqa|sora|guard|rerank|ocr"
+_NOT_INTERACTIVE = r":batch$"      # OpenRouter's batch variants answer later, in bulk: no use for a conversation
 
 PROVIDERS: dict[str, Provider] = {p.id: p for p in (
     Provider("anthropic", "Anthropic API", "anthropic", "https://api.anthropic.com/v1", key="anthropic_api_key",
@@ -88,6 +95,16 @@ PROVIDERS: dict[str, Provider] = {p.id: p for p in (
 )}
 
 
+def all_providers() -> dict[str, Provider]:
+    """The built-in providers and the ones the person added, by id."""
+    from . import custom
+    return {**PROVIDERS, **{p.id: p for p in custom.providers()}}
+
+
+def get(pid: str) -> Provider | None:
+    return all_providers().get(pid)
+
+
 class ProviderError(RuntimeError):
     def __init__(self, message: str, status: int | None = None, hint: str = "", retry_after: float | None = None):
         super().__init__(message)
@@ -115,7 +132,10 @@ def credentials(p: Provider) -> tuple[str | None, str]:
     """(key, where it came from). Never shown, never logged."""
     if not p.key:
         return None, ""
-    return secrets.value(p.key)
+    try:
+        return secrets.value(p.key)
+    except secrets.SecretError:
+        return None, ""
 
 
 def headers(p: Provider, key: str | None) -> dict:
@@ -263,9 +283,26 @@ def _parse_models(p: Provider, d: dict) -> list[dict]:
             mid = mid[len("models/"):]
         if p.skip and re.search(p.skip, mid, re.I) and p.id != "anthropic":
             continue
+        if re.search(_NOT_INTERACTIVE, mid):
+            continue
         row = {"id": mid, "label": str(m.get("display_name") or m.get("name") or "") or None,
                "created": m.get("created") or m.get("created_at") or 0, "images": None, "efforts": [], "tools": None,
-               "max_tokens": m.get("max_tokens") if isinstance(m.get("max_tokens"), int) else None}
+               "max_tokens": m.get("max_tokens") if isinstance(m.get("max_tokens"), int) else None,
+               "context": m.get("context_length") if isinstance(m.get("context_length"), int) else None,
+               "free": None, "vendor": None, "vendor_label": None}
+        if "/" in mid:                                               # vendor/model (OpenRouter, Groq's meta-llama/…)
+            row["vendor"] = mid.split("/", 1)[0]
+            lab = row["label"] or ""
+            if ": " in lab:                                          # OpenRouter names them "Vendor: Model"
+                row["vendor_label"], row["label"] = lab.split(": ", 1)
+        price = m.get("pricing")
+        if isinstance(price, dict) and price.get("prompt") is not None and price.get("completion") is not None:
+            try:
+                row["free"] = float(price["prompt"]) == 0 and float(price["completion"]) == 0
+            except (TypeError, ValueError):
+                row["free"] = None
+        if mid.endswith(":free"):
+            row["free"] = True
         caps = m.get("capabilities")
         if p.wire == "anthropic" and isinstance(caps, dict):
             img = caps.get("image_input")
@@ -278,14 +315,19 @@ def _parse_models(p: Provider, d: dict) -> list[dict]:
                 continue
             row["tools"] = caps.get("function_calling")
             row["images"] = caps.get("vision")
-        if p.id == "openrouter":
+        if isinstance(m.get("supported_parameters"), list):           # OpenRouter, and servers that copy its shape
             sp = m.get("supported_parameters") or []
             row["tools"] = "tools" in sp
             mods = (m.get("architecture") or {}).get("input_modalities") or []
             row["images"] = "image" in mods
             if "reasoning" in sp:
                 row["efforts"] = ["low", "medium", "high"]
-        if row["tools"] is False:
+        probe = p.probed.get(mid) if p.probed else None               # a custom provider's model, tested by the person
+        if isinstance(probe, dict):
+            for k in ("tools", "images"):
+                if probe.get(k) is not None:
+                    row[k] = probe[k]
+        if row["tools"] is False and not p.custom:
             continue                                                  # Form Studio needs tool calls
         out.append(row)
     return out
@@ -296,15 +338,18 @@ def _fetch(p: Provider, cfg: dict) -> dict:
     base = base_url(p, cfg)
     if p.key and not key:
         return {"available": False, "why": p.hint, "models": [], "base": base, "where": ""}
-    if not p.local and os.environ.get("FORM_PROVIDERS_OFFLINE") == "1" and not _configured(p, cfg):
+    if not p.local and not p.custom and os.environ.get("FORM_PROVIDERS_OFFLINE") == "1" and not _configured(p, cfg):
         return {"available": False, "why": "Not checked: provider lookups are off for this run (FORM_PROVIDERS_OFFLINE).",
                 "models": [], "base": base, "where": where}
     url = base + ("/models?limit=1000" if p.wire == "anthropic" else "/models")
     try:
-        d = get_json(p, url, key, timeout=1.5 if p.local else 6.0)
+        d = get_json(p, url, key, timeout=1.5 if p.local and not p.custom else 6.0)
     except ProviderError as e:
-        if p.local:
+        if p.local and not p.custom:
             return {"available": False, "why": p.hint, "models": [], "base": base, "where": ""}
+        if p.custom:
+            from .custom import explain_failure
+            return {"available": False, "why": explain_failure(p, e), "models": [], "base": base, "where": where, "error": True}
         why = str(e)
         if e.status in (401, 403):
             why = f"The {p.label} key was refused ({e.status}). Replace it in Settings › Agents."
@@ -344,7 +389,7 @@ def info(p: Provider, cfg: dict, refresh: bool = False) -> dict:
 
 def warm(cfg: dict, ids=None, timeout: float = 7.0) -> None:
     """Ask every detectable provider at once, so a status read waits for the slowest one, not for their sum."""
-    todo = [p for p in PROVIDERS.values() if (ids is None or p.id in ids) and (p.local or credentials(p)[0])]
+    todo = [p for p in all_providers().values() if (ids is None or p.id in ids) and (p.local or not p.key or credentials(p)[0])]
     if not todo:
         return
     ex = ThreadPoolExecutor(max_workers=len(todo), thread_name_prefix="form-providers")

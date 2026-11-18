@@ -8,10 +8,11 @@ the run and confines the file tools to that folder.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
-from .base import LIVE_TEXT_MAX, Adapter, Parser, Run, help_text, short, tool_name
+from .base import LIVE_TEXT_MAX, Adapter, Parser, Run, help_text, read_json, short, tool_name
 
 # Aliases the Claude Code documentation lists for --model; the CLI resolves each to its current model.
 # Anything `claude --help` itself names (e.g. 'fable') is added in front of these at run time.
@@ -86,11 +87,28 @@ class Claude(Adapter):
         text = help_text(exe)
         m = re.search(r"--model <model>(.*?)(?:\n\s+-|\Z)", text, re.S)
         named = re.findall(r"'([a-z][a-z0-9.\-\[\]]*)'", m.group(1)) if m else []
-        out = [{"id": "default", "label": "Default", "note": "Whatever Claude Code is set to use"}]
+        out = [dict({"id": "default", "label": "Default",
+                     "note": "Claude Code chooses for your account. Its version shows here after a reply with Default."},
+                    **self._configured(text))]
         for a in list(dict.fromkeys(named + list(DOCUMENTED_ALIASES))):
             out.append({"id": a, "label": a.capitalize(), "alias": True,
                         "note": "Alias for the latest " + a + " model. The version shows here after its first reply."})
         return out
+
+    @staticmethod
+    def _configured(help_out: str) -> dict:
+        """The model Claude Code's own settings name for a run with no --model: ANTHROPIC_MODEL, else the "model" key
+        of ~/.claude/settings.json (left out of the run by --restricted, so it does not count then)."""
+        env = os.environ.get("ANTHROPIC_MODEL", "").strip()
+        if env:
+            return {"configured": env, "note": f"ANTHROPIC_MODEL is set to {env}"}
+        if "--restricted" in help_out:
+            return {}
+        home = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
+        own = read_json(home / "settings.json").get("model")
+        if isinstance(own, str) and own.strip():
+            return {"configured": own.strip(), "note": f"From your Claude Code settings: {own.strip()}"}
+        return {}
 
     def efforts(self, cfg, exe):
         m = re.search(r"--effort <level>.*?\(([a-z, \n]+)\)", help_text(exe), re.S)

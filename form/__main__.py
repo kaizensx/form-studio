@@ -23,6 +23,7 @@
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
                                      one message to an agent with FORM's tools; streams the reply, saves the conversation
   form conversations list|show|delete|rename|pin    saved conversations
+  form providers list|add URL|edit ID|test ID|remove ID   model providers added by URL (format and models detected)
   form simulate <project> --gif out.gif | --frames dir | --png out.png [--layers a:b] [--layer n]
                                      the sliced toolpaths building up, from the slicer's G-code (not a print)
   form cost <project> [--price-per-kg X --kwh-price Y --watts Z --copies N] [--save]
@@ -122,6 +123,9 @@ def main(argv=None):
     if argv[:1] == ["config"]:
         from .config_edit import main as config_main
         return config_main(argv[1:])
+    if argv[:1] == ["providers"]:                  # model providers added by URL; keys never on the command line
+        from .agents.custom import main as providers_main
+        return providers_main(argv[1:])
     if argv[:1] == ["secrets"]:                    # agent keys (Gemini); values never on the command line
         from .secrets import main as secrets_main
         return secrets_main(argv[1:])
@@ -156,6 +160,8 @@ def main(argv=None):
     sub.add_parser("material", help="material <project> PLA|PETG|ABS|ASA|TPU|... ('' clears): the filament the slice uses")
     sub.add_parser("printers", help="every printer in your slicers | options KIND NAME | use KIND NAME (--project ID | --default)")
     sub.add_parser("secrets", help="status | set NAME (value from stdin or a hidden prompt) | clear NAME: agent keys such as gemini_api_key")
+    sub.add_parser("providers", help="list | add URL [--name N] | edit ID | test ID [--model M --tools|--images] | remove ID: "
+                                     "model providers added by URL; the key is read from stdin or a hidden prompt")
     sub.add_parser("examples", help="list the shipped examples; `add` copies them into your projects")
     sub.add_parser("doctor")
     sub.add_parser("list")

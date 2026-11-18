@@ -113,6 +113,16 @@ class Copilot(Adapter):
             return {"signed_in": True, "how": "Signed in to GitHub in Copilot CLI."}
         return {"signed_in": None, "how": "Sign-in could not be confirmed. If replies fail, run `copilot` and use /login."}
 
+    def models(self, cfg, exe):
+        """The choices `copilot --help` lists for --model, when it lists them."""
+        out = [{"id": "default", "label": "Default", "note": "Whatever Copilot CLI is set to use"}]
+        m = re.search(r"--model <model>(.*?)(?:\n\s+-|\Z)", help_text(exe), re.S)
+        ch = re.search(r"choices:\s*(.*?)\)", m.group(1), re.S) if m else None
+        from .models import pretty
+        for mid in dict.fromkeys(re.findall(r'"([A-Za-z0-9][A-Za-z0-9.\-_:/]*)"', ch.group(1)) if ch else []):
+            out.append({"id": mid, "label": pretty(mid), "note": mid + " (from `copilot --help`)"})
+        return out
+
     def efforts(self, cfg, exe):
         m = re.search(r"--reasoning-effort <level>.*?possible values: ([a-z, ]+)\]", help_text(exe), re.S)
         return [x.strip() for x in m.group(1).split(",") if x.strip()] if m else []

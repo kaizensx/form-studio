@@ -173,6 +173,9 @@ class Journeys(unittest.TestCase):
     def test_api_agents(self):
         self.journey("agents.py", env_extra={"FORM_UITEST_API_AGENTS": "1"})
 
+    def test_custom_providers(self):          # a provider added by address, and a model menu with hundreds of models
+        self.journey("providers.py", env_extra={"FORM_UITEST_API_AGENTS": "1"})
+
     def test_install_flow(self):
         self.journey("install.py", env_extra={"FORM_INSTALL_FAKE": "3", "FORM_SETUP_PRETEND_MISSING": "parts,claude.signin",
                                               "FORM_NO_AUTO_SETUP": ""})

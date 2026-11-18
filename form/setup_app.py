@@ -328,6 +328,9 @@ def route_get(st, path: str, q: dict):
         return config_edit.describe(st.cfg)
     if path == "/api/secrets":                    # which agent keys are stored: never their values
         return {"keys": list(agent_keys.status().values())}
+    if path == "/api/providers":                  # providers added by URL (form/agents/custom.py); never their keys
+        from .agents import custom
+        return {"providers": custom.listing()}
     if path == "/api/examples":
         from .studio import list_examples
         return {"examples": list_examples(st.root)}
@@ -387,6 +390,8 @@ def route_post(st, path: str, body):
                 pass
             st.activity(None, "settings", "Settings changed: " + ", ".join(done["changed"]) + ".", by="you")
         return {**done, "config": config_edit.describe(st.cfg)}
+    if path.startswith("/api/providers/"):         # add, edit, test, remove a provider added by URL
+        return _providers_post(st, path, body)
     if path == "/api/secrets":                    # {name, value} stores a key; {name, clear: true} removes it
         name = str(body.get("name") or "")
         if body.get("clear"):
@@ -405,3 +410,34 @@ def route_post(st, path: str, body):
         made = st.seed_examples(ids or None)
         return {"added": made, "projects": st.list()}
     return None
+
+
+def _providers_post(st, path: str, body: dict):
+    """/api/providers/detect {url, key?, id?}: what the server is, nothing saved (id: use that provider's stored key).
+    /api/providers/save {url, name?, key?, id?}: detect and save; an empty key keeps the stored one when editing.
+    /api/providers/probe {id, model, what: tools|images}: one small request to that model, on the person's click.
+    /api/providers/remove {id}. Keys are taken from the body only, never from the URL, and never returned."""
+    from .agents import custom
+    from .agents import providers as _prov
+    url, key, pid = str(body.get("url") or ""), str(body.get("key") or ""), str(body.get("id") or "") or None
+
+    def wrap(fn):
+        try:
+            return fn()
+        except (custom.ProviderSetupError, agent_keys.SecretError) as e:
+            raise StudioError(str(e), hint=getattr(e, "hint", ""))
+    if path == "/api/providers/detect":
+        return {"detected": custom.detect(url, key or (custom.stored_key(pid) if pid else None))}
+    if path == "/api/providers/save":
+        done = wrap(lambda: custom.save(str(body.get("name") or ""), url, key, pid=pid))
+        st.activity(None, "settings", f"Provider {done['provider']['name']} {'updated' if pid else 'added'}.", by="you")
+        return {**done, "providers": custom.listing()}
+    if path == "/api/providers/probe":
+        return {"probe": wrap(lambda: custom.probe(pid or "", str(body.get("model") or ""), str(body.get("what") or "tools"))),
+                "providers": custom.listing()}
+    if path == "/api/providers/remove":
+        done = wrap(lambda: custom.remove(pid or ""))
+        st.activity(None, "settings", f"Provider {pid} removed.", by="you")
+        _prov.forget(pid)
+        return done
+    raise StudioError("Not found.", status=404)

@@ -13,7 +13,7 @@ Item {
     signal clearKey()
     readonly property var si: a.signin || null
     readonly property bool api: a.kind === "api"
-    readonly property int count: Math.max(0, (a.models || []).length - 1)
+    readonly property int count: (a.models || []).filter(function (m) { return m.id !== "default" }).length
     readonly property bool needsKey: !!k && !k.set && !k.from_env
     readonly property bool untested: a.available && String(a.verified).indexOf("not run") === 0
     function status() {
@@ -60,5 +60,5 @@ Item {
             anchors.verticalCenter: parent.verticalCenter; onClicked: { kf.text = ""; ag.clearKey() } }
         Btn { visible: ag.a.available && Store.chatDefault.agent !== ag.a.id; small: true; kind: "quiet"; text: "Make default"
             anchors.verticalCenter: parent.verticalCenter
-            onClicked: Store.post("/chat/defaults", { agent: ag.a.id, model: "default", effort: "" }).then(function () { Store.reloadStudio() }, Store.fail) } }
+            onClicked: Store.post("/chat/defaults", { agent: ag.a.id, model: ag.a.last_model || "default", effort: "" }).then(function () { Store.reloadStudio() }, Store.fail) } }
 }

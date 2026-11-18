@@ -126,6 +126,8 @@ class Codex(Adapter):
         own = conf.get("model")
         out = [{"id": "default", "label": "Default",
                 "note": f"From your Codex config: {own}" if own else "Whatever Codex is set to use"}]
+        if isinstance(own, str) and own:
+            out[0].update(configured=own, configured_label=self.model_label(own))
         try:
             cache = json.loads((_home() / "models_cache.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):

@@ -40,7 +40,8 @@ Column {
     readonly property int dirty: F.keys(edits).length
     readonly property var rows: cfg ? cfg.settings.filter(function (r) { return r.tab === st.tab && !r.hidden }) : []
     spacing: 14
-    Component.onCompleted: { if (!Store.config) Store.loadConfig(); if (!Store.software) Store.checkSoftware(); st.loadKeys() }
+    Component.onCompleted: { if (!Store.config) Store.loadConfig(); if (!Store.software) Store.checkSoftware(); st.loadKeys(); st.loadProviders()
+        if (props.addProvider) st.editingProvider = null }
 
     // API keys: kept by Form Studio in a private file, never shown back; only "set" or "not set" comes from the engine
     property var keys: []
@@ -54,8 +55,13 @@ Column {
         return Store.post("/secrets", { name: name, clear: true }).then(function (r) {
             st.keys = r.keys; Store.toast(r.key.label + " removed", ""); Store.checkSoftware(); Store.refreshAgents() }, Store.fail) }
     readonly property var cliAgents: Store.chatAgents.filter(function (a) { return a.kind !== "api" })
-    readonly property var apiAgents: Store.chatAgents.filter(function (a) { return a.kind === "api" && !a.local })
-    readonly property var localAgents: Store.chatAgents.filter(function (a) { return a.kind === "api" && a.local })
+    readonly property var apiAgents: Store.chatAgents.filter(function (a) { return a.kind === "api" && !a.local && !a.custom })
+    readonly property var localAgents: Store.chatAgents.filter(function (a) { return a.kind === "api" && a.local && !a.custom })
+    // providers you added by address (form/agents/custom.py): their settings from GET /providers, their models from /chat
+    property var providers: []
+    property var editingProvider: undefined      // undefined: no editor; null: adding; a provider: editing it
+    function loadProviders() { Store.get("/providers").then(function (r) { st.providers = r.providers }, function () {}) }
+    function agentOf(id) { return Store.agentInfo(id) }
 
     function same(a, b) { return JSON.stringify(a) === JSON.stringify(b) }
     function current(r) { return st.edits[r.key] !== undefined ? st.edits[r.key] : r.value }
@@ -113,6 +119,29 @@ Column {
                         required property int index
                         onSaveKey: function (v) { return st.saveKey(modelData.key, v) }
                         onClearKey: st.clearKey(modelData.key) }
+                }
+            } }
+        // ── providers you added by address: any server in a format Form Studio speaks ──
+        Item { visible: st.tab === "chat"; width: parent.width; height: 30
+            Txt { kind: "cap"; text: "Your providers"; anchors.bottom: parent.bottom; anchors.bottomMargin: 2 }
+            Btn { objectName: "addProvider"; small: true; icon: "plus"; text: "Add a provider…"; anchors.right: parent.right
+                anchors.bottom: parent.bottom; visible: st.editingProvider !== null; onClicked: st.editingProvider = null } }
+        Txt { visible: st.tab === "chat"; kind: "fine"; width: parent.width
+            text: "A model service that is not listed above, a company gateway or a server on your network. Give its address; Form Studio finds the format, the models and whether they call tools." }
+        Loader { visible: st.tab === "chat" && active; width: parent.width; active: st.tab === "chat" && st.editingProvider !== undefined
+            sourceComponent: ProviderEditor { width: parent ? parent.width : 600; editing: st.editingProvider
+                onClosed: st.editingProvider = undefined
+                onSaved: function (p) { st.editingProvider = undefined; st.loadProviders(); st.loadKeys(); Store.refreshAgents() } } }
+        Rectangle { visible: st.tab === "chat" && st.providers.length > 0; width: parent.width; height: cpList.implicitHeight; radius: Theme.rMd
+            color: Theme.plate1; border.color: Theme.rule
+            Column { id: cpList; width: parent.width
+                Repeater {
+                    model: st.tab === "chat" ? st.providers : []
+                    ProviderRow { width: cpList.width; p: modelData; a: st.agentOf(modelData.id); first: index === 0; objectName: "providerRow"
+                        required property var modelData
+                        required property int index
+                        onEdit: st.editingProvider = modelData
+                        onChanged: st.loadProviders() }
                 }
             } }
         Item { visible: st.tab === "chat"; width: parent.width; height: 30

@@ -7,6 +7,11 @@
 
 A turn is a dict: {"text": "...", "tools": [(name, args), ...], "thinking": "...", "usage": {...}, "status": 401,
 "error": "..."}; turns are used in order, one per model request.
+
+For detecting a provider added by URL (form/agents/custom.py): `prefix` is where the API lives ("/v1", "", "/api/v1")
+and `strict=True` answers only there; `shape="gemini"` lists models the way Gemini's own API does, with an
+OpenAI-compatible endpoint under <prefix>/openai; `ollama=True` also answers /api/tags and /api/show (a model's
+"capabilities" key). An empty POST body is refused with 400, as real servers do, and uses no turn.
 """
 from __future__ import annotations
 
@@ -16,8 +21,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
 class FakeProvider:
-    def __init__(self, wire: str = "openai", models=None, script=None, key: str | None = None, delay: float = 0.0):
+    def __init__(self, wire: str = "openai", models=None, script=None, key: str | None = None, delay: float = 0.0,
+                 prefix: str = "/v1", strict: bool = False, shape: str | None = None, ollama: bool = False):
         self.wire, self.models, self.script, self.key, self.delay = wire, models or [], list(script or []), key, delay
+        self.prefix, self.strict, self.shape, self.ollama = prefix, strict, shape, ollama
+        self.gets: list[str] = []
         self.requests: list[dict] = []
         self.headers: list[dict] = []
         self.hold = threading.Event()             # set() releases a turn that has "hold": True
@@ -41,16 +49,41 @@ class FakeProvider:
                 self.end_headers()
                 self.wfile.write(b)
 
+            def _list(self):
+                ms = [{k: v for k, v in m.items() if not (outer.ollama and k == "capabilities")} for m in outer.models]
+                if outer.wire == "anthropic":
+                    return {"data": [dict(m, type="model") for m in ms], "has_more": False,
+                            "first_id": ms[0]["id"] if ms else None, "last_id": ms[-1]["id"] if ms else None}
+                return {"data": ms, "object": "list"}
+
             def do_GET(self):
-                if not self.path.split("?")[0].endswith("/models"):
+                path = self.path.split("?")[0]
+                outer.gets.append(path)
+                if outer.ollama and path == "/api/tags":
+                    return self._json(200, {"models": [{"name": m["id"], "model": m["id"], "digest": "0" * 12} for m in outer.models]})
+                if outer.shape == "gemini" and path == outer.prefix + "/models":
+                    if not self._auth_ok():
+                        return self._json(401, {"error": {"message": "API key not valid"}})
+                    return self._json(200, {"models": [{"name": "models/" + m["id"], "supportedGenerationMethods": ["generateContent"]}
+                                                       for m in outer.models]})
+                want = outer.prefix + ("/openai" if outer.shape == "gemini" else "") + "/models"
+                if not path.endswith("/models") or (outer.strict or outer.shape) and path != want:
                     return self._json(404, {"error": {"message": "not found"}})
                 if not self._auth_ok():
                     return self._json(401, {"error": {"message": "invalid api key"}})
-                self._json(200, {"data": outer.models, "object": "list"})
+                self._json(200, self._list())
 
             def do_POST(self):
                 n = int(self.headers.get("content-length") or 0)
                 body = json.loads(self.rfile.read(n) or b"{}")
+                path = self.path.split("?")[0]
+                if outer.ollama and path == "/api/show":
+                    m = next((m for m in outer.models if m["id"] == body.get("model")), None)
+                    return self._json(200 if m else 404, {"capabilities": (m or {}).get("capabilities", ["completion"])})
+                if body == {}:                              # how detection checks that the chat endpoint exists
+                    if outer.strict and not path.startswith(outer.prefix + "/"):
+                        return self._json(404, {"error": {"message": "not found"}})
+                    return self._json(400, {"error": {"message": "messages: field required"}})
                 outer.requests.append(body)
                 outer.headers.append(dict(self.headers))
                 if not self._auth_ok():
@@ -58,6 +91,18 @@ class FakeProvider:
                 turn = outer.script.pop(0) if outer.script else {"text": "(script ended)"}
                 if turn.get("status"):
                     return self._json(turn["status"], {"error": {"message": turn.get("error", "failed")}})
+                if not body.get("stream"):                  # one JSON answer (a provider test asks for that)
+                    calls = turn.get("tools", [])
+                    if outer.wire == "anthropic":
+                        content = ([{"type": "text", "text": turn["text"]}] if turn.get("text") else []) + [
+                            {"type": "tool_use", "id": f"toolu_{j}", "name": n, "input": a} for j, (n, a) in enumerate(calls)]
+                        return self._json(200, {"type": "message", "role": "assistant", "content": content,
+                                                "stop_reason": "tool_use" if calls else "end_turn"})
+                    msg = {"role": "assistant", "content": turn.get("text") or None}
+                    if calls:
+                        msg["tool_calls"] = [{"id": f"call_{j}", "type": "function", "function": {"name": n, "arguments": json.dumps(a)}}
+                                             for j, (n, a) in enumerate(calls)]
+                    return self._json(200, {"choices": [{"index": 0, "message": msg, "finish_reason": "tool_calls" if calls else "stop"}]})
                 self.send_response(200)
                 self.send_header("content-type", "text/event-stream")
                 self.end_headers()
@@ -124,7 +169,8 @@ class FakeProvider:
         self.server.daemon_threads = True
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
-        self.url = f"http://127.0.0.1:{self.server.server_address[1]}/v1"
+        self.root = f"http://127.0.0.1:{self.server.server_address[1]}"
+        self.url = self.root + prefix
 
     def close(self):
         self.hold.set()

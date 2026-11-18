@@ -14,7 +14,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from .base import Adapter, Parser, Run, short, tool_name
+from .base import Adapter, Parser, Run, read_json, short, tool_name
 
 _LISTS: dict = {}
 
@@ -109,6 +109,10 @@ class OpenCode(Adapter):
     def models(self, cfg, exe):
         """`opencode models` lists provider/model ids; only the providers you connected (and OpenCode's own) are shown."""
         out = [{"id": "default", "label": "Default", "note": "Whatever OpenCode is set to use"}]
+        conf = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+        own = read_json(Path(conf) / "opencode" / "opencode.json").get("model")
+        if isinstance(own, str) and own:
+            out[0].update(configured=own, configured_label=self.model_label(own), note=f"From your OpenCode config: {own}")
         if exe not in _LISTS:
             try:
                 r = subprocess.run([exe, "models"], capture_output=True, text=True, timeout=20, stdin=subprocess.DEVNULL,
@@ -117,9 +121,10 @@ class OpenCode(Adapter):
             except (OSError, subprocess.SubprocessError):
                 _LISTS[exe] = []
         mine = set(self._providers()) | {"opencode"}
-        ids = [m for m in _LISTS[exe] if m.split("/", 1)[0] in mine][:40]
+        ids = [m for m in _LISTS[exe] if m.split("/", 1)[0] in mine]
         for m in ids:
-            out.append({"id": m, "label": self.model_label(m), "note": m + " (from `opencode models`)"})
+            out.append({"id": m, "label": self.model_label(m), "note": m + " (from `opencode models`)",
+                        "vendor": m.split("/", 1)[0], "vendor_label": m.split("/", 1)[0]})
         return out
 
     def run_env(self, run: Run) -> dict:

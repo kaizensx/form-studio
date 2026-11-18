@@ -9,9 +9,14 @@ the conversation's own folder (project-level settings), never into the user's se
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from pathlib import Path
 
-from .base import LIVE_TEXT_MAX, Adapter, Parser, Run, short, tool_name
+from .base import LIVE_TEXT_MAX, Adapter, Parser, Run, read_json, setting, short, tool_name
+from .models import pretty
+
+_LISTS: dict = {}
 
 # What Gemini CLI prints when it has no way to sign in (seen with Gemini CLI 0.68.0, never signed in).
 NOT_SIGNED_IN = ("please set an auth method", "gemini_api_key")
@@ -78,6 +83,34 @@ class Gemini(Adapter):
     install_hint = "Install the Gemini CLI (gemini) and sign in to use it here."
     verified = "not run: not yet verified with a live reply"
     images, cost = False, False
+
+    def models(self, cfg, exe):
+        """`gemini models -o json` lists what this Gemini CLI offers (read once per run of Form Studio)."""
+        out = [dict({"id": "default", "label": "Default", "note": "Whatever Gemini CLI is set to use"}, **self._configured())]
+        if exe not in _LISTS:
+            try:
+                r = subprocess.run([exe, "models", "-o", "json"], capture_output=True, text=True, timeout=20,
+                                   stdin=subprocess.DEVNULL, encoding="utf-8", errors="replace")
+                txt = r.stdout or ""
+                d = json.loads(txt[txt.index("["):]) if "[" in txt else []
+                _LISTS[exe] = [m for m in d if isinstance(m, dict) and (m.get("id") or m.get("modelId"))]
+            except (OSError, subprocess.SubprocessError, ValueError):
+                _LISTS[exe] = []
+        for m in _LISTS[exe]:
+            mid = str(m.get("id") or m.get("modelId"))
+            name = str(m.get("displayName") or m.get("name") or "")
+            out.append({"id": mid, "label": name if name and name != mid else pretty(mid),
+                        "note": (m.get("description") or mid) + " (from `gemini models`)"})
+        return out
+
+    @staticmethod
+    def _configured() -> dict:
+        """GEMINI_MODEL, else model.name in ~/.gemini/settings.json: Gemini CLI's own choice for a run with no -m."""
+        env = os.environ.get("GEMINI_MODEL", "").strip()
+        if env:
+            return {"configured": env, "note": f"GEMINI_MODEL is set to {env}"}
+        own = setting(read_json(Path.home() / ".gemini" / "settings.json"), "model", "name")
+        return {"configured": own, "note": f"From your Gemini CLI settings: {own}"} if own else {}
 
     def signin(self, cfg, exe):
         from ..installer import gemini_signed_in

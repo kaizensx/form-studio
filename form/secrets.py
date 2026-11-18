@@ -47,6 +47,18 @@ KNOWN = {
 }
 
 
+# A provider the person added by URL (form/agents/custom.py) keeps its key here too, under custom_<slug>_api_key.
+_CUSTOM = re.compile(r"^custom_[a-z0-9_]{1,48}_api_key$")
+
+
+def custom_name(slug: str) -> str:
+    return f"custom_{slug.replace('-', '_')}_api_key"
+
+
+def _known(name: str) -> bool:
+    return name in KNOWN or bool(_CUSTOM.match(name or ""))
+
+
 class SecretError(ValueError):
     def __init__(self, message: str, hint: str = ""):
         super().__init__(message)
@@ -68,7 +80,7 @@ def _read() -> dict:
         d = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    return {k: v for k, v in d.items() if k in KNOWN and isinstance(v, str) and v} if isinstance(d, dict) else {}
+    return {k: v for k, v in d.items() if _known(k) and isinstance(v, str) and v} if isinstance(d, dict) else {}
 
 
 def _write(d: dict) -> None:
@@ -87,6 +99,9 @@ def _write(d: dict) -> None:
 
 def _check(name: str) -> dict:
     spec = KNOWN.get(name)
+    if spec is None and _CUSTOM.match(name or ""):
+        aid = "custom-" + name[len("custom_"):-len("_api_key")].replace("_", "-")
+        return _key("API key", [aid], "", "The key of a provider you added.", "")
     if spec is None:
         raise SecretError(f"Unknown key “{name}”.", "Known: " + ", ".join(KNOWN))
     return spec
@@ -103,7 +118,7 @@ def set_value(name: str, value: str) -> dict:
     d = _read()
     d[name] = v
     _write(d)
-    return status()[name]
+    return _row(name)
 
 
 def clear(name: str) -> dict:
@@ -111,12 +126,20 @@ def clear(name: str) -> dict:
     d = _read()
     if d.pop(name, None) is not None:
         _write(d)
-    return status()[name]
+    return _row(name)
+
+
+def _row(name: str) -> dict:
+    if name in KNOWN:
+        return status()[name]
+    spec = _check(name)
+    return {"name": name, "label": spec["label"], "help": spec["help"], "url": "", "agent": spec["agent"],
+            "agents": spec["agents"], "env": "", "set": bool(_read().get(name)), "from_env": False, "env_name": None}
 
 
 def _env_name(spec: dict) -> str | None:
     """The environment variable that holds this key for this process, if any."""
-    return next((v for v in [spec["env"], *spec["alt"]] if os.environ.get(v)), None)
+    return next((v for v in [spec["env"], *spec["alt"]] if v and os.environ.get(v)), None)
 
 
 def status() -> dict:

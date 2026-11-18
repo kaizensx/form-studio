@@ -31,7 +31,7 @@ from . import agents as agents_mod
 from . import ask as ask_mod
 from .agents import compat
 from .agents import providers as providers_mod
-from .agents.models import Learned
+from .agents.models import Learned, Recent
 from .agents.base import Run, short as _short  # noqa: F401  (_short: kept for callers of the old name)
 from .conversations import ConversationError, Conversations
 
@@ -79,16 +79,21 @@ def defaults(cfg: dict, agent_status: list[dict] | None = None) -> dict:
 def status(cfg: dict) -> dict:
     c = cfg.get("chat", {})
     on = c.get("enabled", True)
+    if on and c.get("api_agents", True):
+        agents_mod.refresh(_adapters(cfg))               # providers the person added, edited or removed
     ads = list(_adapters(cfg).values()) if on else []
     if any(getattr(a, "inline", False) for a in ads) and c.get("api_agents", True):
         providers_mod.warm(cfg, {a.id for a in ads if getattr(a, "inline", False)})     # all at once, not one by one
     if not c.get("api_agents", True):
         ads = [a for a in ads if not getattr(a, "inline", False)]
-    ags = [a.status(cfg) for a in ads]
+    learned = recent = None
     if cfg.get("data", {}).get("dir"):                    # the versions each alias resolved to on its last run
-        learned = Learned(Path(cfg["data"]["dir"]))
+        learned, recent = Learned(Path(cfg["data"]["dir"])), Recent(Path(cfg["data"]["dir"]))
         learned.seed()
-        ags = [learned.decorate(a) for a in ags]
+        recent.seed(learned)                              # before the statuses: a provider's Default is its last-used model
+    ags = [a.status(cfg) for a in ads]
+    if learned is not None:
+        ags = [learned.decorate(a, recent) for a in ags]
     d = defaults(cfg, ags)
     cur = next((a for a in ags if a["id"] == d["agent"] and a["available"]), None)
     note = None
@@ -192,12 +197,17 @@ class Chat:
         self.adapters = adapters or _adapters(cfg)
         self.store = Conversations(self.data)
         self.learned = Learned(self.data)
+        self.recent = Recent(self.data)
         self.jobs: dict[str, ChatJob] = {}
         self._lock = threading.Lock()
 
     # ---- state -------------------------------------------------------------------------------------------------
     def status(self) -> dict:
-        return status(dict(self.cfg, _adapters=self.adapters))
+        return status(dict(self._cfgd(), _adapters=self.adapters))
+
+    def _cfgd(self) -> dict:
+        """The configuration with this chat's data folder, where models.json and recent.json are read from."""
+        return dict(self.cfg, data=dict(self.cfg.get("data") or {}, dir=str(self.data)))
 
     def running(self, cid: str | None = None) -> list[ChatJob]:
         return [j for j in self.jobs.values() if j.state == "running" and (cid is None or j.conversation == cid)]
@@ -533,7 +543,7 @@ class Chat:
                 job.parser = None
                 job.proc = Control()
                 try:
-                    failure = adapter.execute(run, self.cfg, lambda evs: self._events(job, evs), job.proc)
+                    failure = adapter.execute(run, self._cfgd(), lambda evs: self._events(job, evs), job.proc)
                 except SessionGone:
                     if attempt == 1 and job.session:      # the saved history is gone: send again with a transcript
                         job.session = None
@@ -629,6 +639,11 @@ class Chat:
                 if err:
                     job.error = str(err)
                     self._add(job, {"t": "error", "text": job.error})
+                else:                          # a reply came: this model goes first in the menu and is the agent's last
+                    used = job.model or "default"
+                    if used == "default" and getattr(adapter, "inline", False) and job.model_id:
+                        used = job.model_id           # an API provider's Default is its last-used model: name it
+                    self.recent.use(job.agent, used)
                 continue
             self._add(job, ev)
 
@@ -706,7 +721,7 @@ def main_chat(argv: list[str]) -> int:
     ap.add_argument("--conversation", help="continue this conversation (id from `form conversations list`)")
     ap.add_argument("--agent", help="an agent CLI (claude, codex, gemini, cursor, opencode, qwen, copilot) or an API provider "
                                     "(anthropic, openai, google, openrouter, mistral, xai, deepseek, groq, ollama, lmstudio, "
-                                    "llamacpp); default: [chat] agent")
+                                    "llamacpp), or a provider you added (custom-<name>, see `form providers list`); default: [chat] agent")
     ap.add_argument("--model", help="a model alias or id the agent accepts (default: [chat] model)")
     ap.add_argument("--effort")
     ap.add_argument("--attach", action="append", default=[], metavar="FILE", help="image, PDF, STEP or STL (repeat)")

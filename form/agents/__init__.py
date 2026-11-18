@@ -4,7 +4,7 @@ CLI agents run a CLI headless on the user's own account; API agents (api.py) tal
 Form Studio's tools and need no CLI (providers.py lists them)."""
 from __future__ import annotations
 
-from .api import all_api_adapters
+from .api import all_api_adapters, sync
 from .base import Adapter, Parser, Run
 from .claude import Claude
 from .codex import Codex
@@ -18,4 +18,9 @@ ADAPTERS: dict[str, Adapter] = {a.id: a for a in (Claude(), Codex(), Gemini(), C
                                                   *all_api_adapters())}
 CLI_IDS = ("claude", "codex", "gemini", "cursor", "opencode", "qwen", "copilot")
 
-__all__ = ["ADAPTERS", "CLI_IDS", "Adapter", "Parser", "Run"]
+
+def refresh(adapters: dict | None = None) -> dict:
+    """Add, update or drop the providers the person added (form/agents/custom.py) in an adapter table, in place."""
+    return sync(ADAPTERS if adapters is None else adapters)
+
+__all__ = ["ADAPTERS", "CLI_IDS", "Adapter", "Parser", "Run", "refresh"]

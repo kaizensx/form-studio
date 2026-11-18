@@ -39,6 +39,7 @@ form chat "Make the base 92 mm deep" --project hallway-phone-dock --agent codex
 | `form install <id>` | Install one item, after showing its commands (`--yes`, `--dry-run`) |
 | `form config get [key]` / `form config set <key> <value>` | Read or change `studio.toml` |
 | `form secrets status \| set NAME \| clear NAME` | Agent keys such as `gemini_api_key`, read from a hidden prompt |
+| `form providers list \| add URL [--name N] [--no-key] \| edit ID \| test ID [--model M --tools\|--images] \| remove ID` | Model providers added by address: format and models detected; the key is read from stdin or a hidden prompt, never an argument |
 | `form update` | Is there a newer version (`--check` prints JSON; `--install` installs it) |
 | `form examples [add]` | List the shipped examples, or copy them into your projects |
 

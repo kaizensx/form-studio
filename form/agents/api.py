@@ -22,7 +22,7 @@ from pathlib import Path
 from . import providers as prov
 from .base import LIVE_TEXT_MAX, Adapter, Run, short
 from .mcp_client import MCPClient, MCPError
-from .models import pretty
+from .models import Recent, pretty
 
 MAX_ROUNDS = 80                    # model turns per message; each may call several tools
 MAX_HISTORY = 12_000_000           # bytes of saved API history; beyond that the next message starts from a transcript
@@ -142,17 +142,27 @@ class ApiAdapter(Adapter):
         return prov.info(self.p, cfg).get("models") or []
 
     def default_model(self, cfg: dict) -> str | None:
-        """The model "Default" means for this provider: [chat] <id>_model, else the newest one its list shows."""
+        """The model "Default" means for this provider, or None (the person picks one; nothing is chosen for them):
+        [chat] <id>_model; else the model last used with it in Form Studio; else, for a local server, what it has
+        loaded; else the only model the provider lists."""
+        return self._default(cfg)[0]
+
+    def _default(self, cfg: dict) -> tuple[str | None, str]:
         own = (cfg.get("chat", {}) or {}).get(f"{self.id}_model")
         if own:
-            return str(own)
+            return str(own), f"set as [chat] {self.id}_model"
         ms = self._models(cfg)
-        if not ms:
-            return None
-        if self.p.local:
-            return ms[0]["id"]                     # a local server lists what is loaded
-        return sorted(ms, key=lambda m: str(m.get("created") or ""), reverse=True)[0]["id"] if any(
-            m.get("created") for m in ms) else ms[0]["id"]
+        ids = {m["id"] for m in ms}
+        data = (cfg.get("data") or {}).get("dir") if isinstance(cfg, dict) else None
+        if data:
+            last = next((m for m in Recent(Path(data)).list(self.id) if m in ids), None)
+            if last:
+                return last, f"last used with {self.label} in Form Studio"
+        if self.p.local and not self.p.custom and ms:
+            return ms[0]["id"], f"loaded in {self.label}"
+        if len(ms) == 1:
+            return ms[0]["id"], f"the only model {self.label} lists"
+        return None, ""
 
     def model_label(self, model_id):
         m = self.model_info(self._cfg, model_id) if model_id else {}
@@ -163,8 +173,11 @@ class ApiAdapter(Adapter):
         key, where = prov.credentials(self.p)
         out = {"id": self.id, "label": self.label, "available": bool(got.get("available")), "cli": got.get("base"),
                "why": got.get("why"), "images": True, "reports_cost": self.cost, "verified": self.verified,
-               "kind": "api", "local": self.p.local, "docs": self.p.docs, "key": self.p.key}
-        if self.p.local:
+               "kind": "api", "local": self.p.local, "docs": self.p.docs, "key": self.p.key, "custom": self.p.custom}
+        if self.p.custom:
+            out["signin"] = {"signed_in": True if got.get("available") else (False if got.get("error") else None),
+                             "how": ("Key stored by Form Studio" if key else "No key") + " · " + got.get("base", "")}
+        elif self.p.local:
             out["signin"] = {"signed_in": True if got.get("available") else None,
                              "how": f"Local server at {got.get('base')}" if got.get("available") else self.p.hint}
         else:
@@ -174,21 +187,36 @@ class ApiAdapter(Adapter):
         if not out["available"]:
             out["models"], out["efforts"] = [], []
             return out
-        dflt = self.default_model(cfg)
-        dl = next((m.get("label") for m in got["models"] if m["id"] == dflt), None) or (dflt if self.p.local else pretty(dflt))
-        own = (cfg.get("chat", {}) or {}).get(f"{self.id}_model")
-        models = [{"id": "default", "label": "Default · " + dl, "resolved": dflt, "resolved_label": dl,
-                   "note": (f"{dflt}, set as [chat] {self.id}_model" if own else
-                            f"{dflt} · loaded in {self.label}" if self.p.local else
-                            f"{dflt} · the newest model {self.label} lists for this key")}]
-        for m in got["models"]:
-            row = {"id": m["id"], "label": m.get("label") or (m["id"] if self.p.local else pretty(m["id"])),
-                   "note": m["id"] + ("" if m.get("images") is not False else " · text only")}
-            if m.get("efforts"):
-                row["efforts"] = m["efforts"]
-            models.append(row)
-        out["models"], out["efforts"] = models, []
+        rows = [self._row(m) for m in _ordered(got["models"])]
+        dflt, why = self._default(cfg)
+        models = []
+        if dflt:
+            dl = next((r["label"] for r in rows if r["id"] == dflt), None) or (dflt if self.p.local else pretty(dflt))
+            models.append({"id": "default", "label": "Default · " + dl, "resolved": dflt, "resolved_label": dl,
+                           "note": f"{dflt} · {why}"})
+        out["models"], out["efforts"] = models + rows, []
+        out["pick"] = not dflt                     # no Default: the picker asks for a model before the first message
+        out["count"] = len(rows)
         return out
+
+    def _row(self, m: dict) -> dict:
+        label = m.get("label") or (m["id"] if self.p.local else pretty(m["id"]))
+        bits = [m["id"]]
+        if m.get("free"):
+            bits.append("free")
+        if m.get("images") is False:
+            bits.append("text only")
+        if m.get("tools") is False:
+            bits.append("no tool calls")
+        row = {"id": m["id"], "label": label, "note": " · ".join(bits)}
+        for k in ("vendor", "free", "images", "tools", "context"):
+            if m.get(k) is not None:
+                row[k] = m[k]
+        if m.get("vendor"):
+            row["vendor_label"] = m.get("vendor_label") or _vendor_name(m["vendor"])
+        if m.get("efforts"):
+            row["efforts"] = m["efforts"]
+        return row
 
     def model_info(self, cfg: dict, model: str) -> dict:
         return next((m for m in self._models(cfg) if m["id"] == model), {})
@@ -207,6 +235,10 @@ class ApiAdapter(Adapter):
         base = prov.base_url(p, cfg)
         model = run.model if run.model and run.model != "default" else self.default_model(cfg)
         if not model:
+            n = len(self._models(cfg))
+            if n:
+                return {"message": f"Pick a model for {p.label} first.",
+                        "hint": f"Open the model menu: {p.label} lists {n} models. The one you pick becomes its Default."}
             return {"message": f"{p.label} lists no model to use.", "hint": p.hint}
         minfo = self.model_info(cfg, model)
         hist_dir = Path(run.cwd) / ".api"
@@ -633,5 +665,56 @@ def explain(p: prov.Provider, e: prov.ProviderError, model: str) -> dict:
     return {"message": msg, "hint": ""}
 
 
+# Vendors people look for first when a provider resells many (OpenRouter lists several hundred models). Only an
+# order for the sections of the menu; model ids always come from the provider's own list.
+VENDOR_ORDER = ("anthropic", "openai", "google", "x-ai", "deepseek", "mistralai", "meta-llama", "qwen", "moonshotai",
+                "z-ai", "minimax", "nvidia", "microsoft", "cohere", "amazon", "perplexity")
+_VENDOR_NAMES = {"x-ai": "xAI", "meta-llama": "Meta", "mistralai": "Mistral", "openai": "OpenAI", "deepseek": "DeepSeek",
+                 "moonshotai": "Moonshot AI", "z-ai": "Z.ai", "minimax": "MiniMax", "nvidia": "NVIDIA"}
+
+
+def _vendor_name(v: str) -> str:
+    return _VENDOR_NAMES.get(v) or v.replace("-", " ").title()
+
+
+def _when(m: dict) -> float:
+    c = m.get("created")
+    if isinstance(c, (int, float)):
+        return float(c)
+    if isinstance(c, str) and c:
+        from datetime import datetime
+        try:
+            return datetime.fromisoformat(c.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            return 0.0
+    return 0.0
+
+
+def _ordered(models: list[dict]) -> list[dict]:
+    """Vendor sections (the well-known ones first, then by name), newest first inside each; a provider without
+    vendors keeps its own order unless its list is dated."""
+    if not any(m.get("vendor") for m in models):
+        return sorted(models, key=lambda m: -_when(m)) if any(_when(m) for m in models) else list(models)
+
+    def vkey(m):
+        v = m.get("vendor") or "~"
+        return (VENDOR_ORDER.index(v) if v in VENDOR_ORDER else len(VENDOR_ORDER),
+                (m.get("vendor_label") or _vendor_name(v)).lower() if v not in VENDOR_ORDER else "", -_when(m),
+                bool(m.get("free")), m["id"])
+    return sorted(models, key=vkey)
+
+
 def all_api_adapters() -> list[ApiAdapter]:
-    return [ApiAdapter(p) for p in prov.PROVIDERS.values()]
+    return [ApiAdapter(p) for p in prov.all_providers().values()]
+
+
+def sync(adapters: dict) -> dict:
+    """Bring the custom providers in `adapters` in line with the saved ones (added, edited, removed). In place."""
+    want = {p.id: p for p in prov.all_providers().values() if p.custom}
+    for aid in [k for k, a in adapters.items() if getattr(getattr(a, "p", None), "custom", False) and k not in want]:
+        del adapters[aid]
+    for pid, p in want.items():
+        a = adapters.get(pid)
+        if a is None or getattr(a, "p", None) != p:
+            adapters[pid] = ApiAdapter(p)
+    return adapters
