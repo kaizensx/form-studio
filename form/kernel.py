@@ -37,9 +37,29 @@ def _b64(a: np.ndarray) -> str:
     return base64.b64encode(np.ascontiguousarray(a).tobytes()).decode()
 
 
-def _skin(shape):
-    from build123d import Compound
-    return Compound(shape.faces())
+class _Skin:
+    """The faces of one build stage, for asking "is this point on that stage's surface?" quickly.
+
+    Measuring a point against the whole stage at once costs time in proportion to its faces, for every face of the
+    result: a design made of imported meshes (thousands of triangle faces) then took longer than the kernel's time
+    limit. A face carried over unchanged is recognised by identity; otherwise only faces whose box holds the point
+    are measured."""
+
+    def __init__(self, shape):
+        self.faces = shape.faces()
+        self.ids = {hash(f) for f in self.faces}
+        boxes = []
+        for f in self.faces:
+            bb = f.bounding_box()
+            boxes.append((bb.min.X, bb.min.Y, bb.min.Z, bb.max.X, bb.max.Y, bb.max.Z))
+        self.lo = np.array([b[:3] for b in boxes], dtype=np.float64).reshape(-1, 3)
+        self.hi = np.array([b[3:] for b in boxes], dtype=np.float64).reshape(-1, 3)
+
+    def holds(self, face, probe, pt, d: float) -> bool:
+        if hash(face) in self.ids:
+            return True
+        near = np.nonzero(np.all((self.lo - d <= probe) & (probe <= self.hi + d), axis=1))[0]
+        return any(pt.distance_to(self.faces[i]) <= d for i in near)
 
 
 def _where(e: BaseException, recipe) -> str:
@@ -81,7 +101,7 @@ def _build(recipe_id: str, values: dict, tol: float):
             f"The result is {len(solids)} solid(s) (valid={final.is_valid}); this design declares {want}", stages[-1].feature,
             "A cut has split the body, or parts touch and fused. Separate parts by a gap, or reduce the last change.")
 
-    skins = [_skin(s.shape) for s in stages[:-1]]
+    skins = [_Skin(s.shape) for s in stages[:-1]]
     faces, by_feature = [], {}
     # mesh the whole solid once (shared edge discretisation, parallel), then read each face's triangles
     from OCP.BRep import BRep_Tool
@@ -109,7 +129,7 @@ def _build(recipe_id: str, values: dict, tol: float):
         feature = stages[0].feature
         pt = Vertex(*probe)
         for i in range(len(skins) - 1, -1, -1):
-            if pt.distance_to(skins[i]) > max(1.5 * tol, 0.01):
+            if not skins[i].holds(face, probe, pt, max(1.5 * tol, 0.01)):
                 feature = stages[i + 1].feature
                 break
         faces.append({"feature": feature, "P": P, "T": T, "face": face, "area": float(areas.sum())})

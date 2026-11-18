@@ -107,6 +107,45 @@ class Stl(unittest.TestCase):
         self.assertEqual(kernel._open_edges(out), 0)
 
 
+class MeshReferences(unittest.TestCase):
+    """A design made of imported meshes (thousands of one-triangle faces) builds in seconds, each face credited to
+    the stage that added it. It took longer than the kernel's 180 s limit with three ~10k-triangle STLs."""
+
+    def test_many_face_meshes_build_quickly_and_attribute_right(self):
+        import time
+        from build123d import Pos, Sphere, Compound
+        from form.recipes import meshsolid
+        from form.recipes.base import Feature, Param, Recipe, Stage
+
+        def mesh_ball(r):
+            P, T = kernel._tessellate(Sphere(r), 0.02)
+            return meshsolid.solid_from_triangles([tuple(map(tuple, P[i])) for i in T])
+
+        a, b = mesh_ball(10), Pos(40, 0, 0) * mesh_ball(10)
+        self.assertGreater(len(a.faces()), 1500)
+
+        class Balls(Recipe):
+            title, summary, solids, mesh = "Balls", "Two mesh balls.", 2, True
+            params = [Param("x", "x", 1, 0, 2, 1, "mm", "form", "a")]
+            features = [Feature("a", "A", "structure"), Feature("b", "B", "structure")]
+
+            def build(self, v):
+                return [Stage("a", a), Stage("b", Compound(children=[a, b]))]
+
+        real = kernel.resolve
+        kernel.resolve = lambda rid: Balls()
+        try:
+            t0 = time.perf_counter()
+            m = kernel._build("balls", {"x": 1}, 0.05)
+            took = time.perf_counter() - t0
+        finally:
+            kernel.resolve = real
+        self.assertLess(took, 30)
+        ids = {"a": {hash(f) for f in a.faces()}, "b": {hash(f) for f in b.faces()}}
+        self.assertTrue(all(hash(x["face"]) in ids[x["feature"]] for x in m["faces"]))    # every face to its own ball
+        self.assertGreater(sum(x["feature"] == "b" for x in m["faces"]), 1500)
+
+
 class Models(unittest.TestCase):
     def test_unavailable_model_errors_are_recognised(self):
         self.assertTrue(_model_unavailable("The 'gpt-6.2-sol' model is not supported when using Codex with a ChatGPT account."))
