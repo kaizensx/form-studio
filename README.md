@@ -31,11 +31,29 @@
 </p>
 
 <p align="center">
-  <a href="https://kaizensx.github.io/form-studio/"><img src="docs/images/app-orbit.webp" width="960" alt="Form Studio turning a hinged box on its build plate: the conversation on the left, the solid with its dimensions in the viewport, the features and stages on the right, and the lid opening on its hinge as the front comes round"></a>
+  <a href="https://kaizensx.github.io/form-studio/#try"><img src="docs/images/try-it-workspace.webp" width="960" alt="Form Studio's workspace, recreated live on the website with a sample project: the conversation that made a phone dock, the dock built by the CAD kernel with its dimensions, and twelve checks for revision r04. Click to try it in your browser."></a>
 </p>
 
 <p align="center">
-  <a href="#see-it-move"><b>See it move</b></a> ·
+  <a href="https://kaizensx.github.io/form-studio/#try"><img alt="Try it in your browser" src="https://img.shields.io/badge/%E2%96%B6%20Try%20it%20in%20your%20browser-Home%2C%20workspace%2C%20model%20menu%2C%20print%20playback-b9e8d7?style=for-the-badge&labelColor=0e1113"></a>
+</p>
+
+<p align="center"><sub>The picture above is the website's live recreation of the app: click it to type on Home, turn the part, switch stages, open the model menu and play the print, all with the sample project's real engine data.</sub></p>
+
+<table>
+<tr>
+<td width="50%"><a href="https://kaizensx.github.io/form-studio/#try"><img src="docs/images/try-it.webp" alt="Home in the website's recreation: What are we making?, the centred composer, For my printer or Just a 3D model, the printer and the agent and model under it, Start blank, Continue, and two designs"></a></td>
+<td width="50%"><img src="docs/images/app-orbit.webp" alt="Recorded from the app at 30 frames a second: the workspace turning a hinged box on its build plate while the lid opens on its hinge"></td>
+</tr>
+<tr>
+<td valign="top"><b>Home, live on the website.</b> Type on it, pick the agent and model, open a design.</td>
+<td valign="top"><b>Recorded in the app.</b> The hinged box turning on its plate, its lid opening on its hinge.</td>
+</tr>
+</table>
+
+<p align="center">
+  <a href="https://kaizensx.github.io/form-studio/#try"><b>Try it in your browser</b></a> ·
+  <a href="#see-it-move">See it move</a> ·
   <a href="#a-tour">Tour</a> ·
   <a href="#download">Download</a> ·
   <a href="#headless-cli-and-mcp">CLI and MCP</a> ·
@@ -127,7 +145,7 @@ any agent.
 
 <table>
 <tr>
-<td align="center" width="20%"><img src="docs/images/home-empty.webp" alt="Home: What are we making?"><br><b>1 · Start</b><br><sub>Words, a photo, a sketch, a part or a link</sub></td>
+<td align="center" width="20%"><img src="docs/images/home-composer.webp" alt="Home: What are we making?"><br><b>1 · Start</b><br><sub>Words, a photo, a sketch, a part or a link</sub></td>
 <td align="center" width="20%"><img src="docs/images/concepts.webp" alt="Three concepts side by side, each real CAD"><br><b>2 · Concepts</b><br><sub>Three or four real designs to pick from</sub></td>
 <td align="center" width="20%"><img src="docs/images/prove.webp" alt="Prove: every check passing, with the slice"><br><b>3 · Prove</b><br><sub>Checks on the solid, fit, slicing</sub></td>
 <td align="center" width="20%"><img src="docs/images/print-sim.webp" alt="The print simulated in 3D from the G-code"><br><b>4 · Simulate</b><br><sub>The G-code played back, layer by layer</sub></td>
@@ -143,11 +161,14 @@ Click a section to open it. Every picture is a screenshot of Form Studio.
 <summary><b>Home: what are we making?</b> &nbsp;<sub>one composer for words, photos, sketches, parts and links</sub></summary>
 <br>
 
-<img src="docs/images/home-empty.webp" alt="Home on the first day: the composer, For my printer or Just a 3D model, Start blank, and the four ways to start: a photo, a sketch, a part, a link">
+<img src="docs/images/home-composer.webp" alt="Home: What are we making?, the composer in the middle, and under it For my printer or Just a 3D model, the printer, the agent and model, Start blank and a Continue link to the last design">
 
-Type it, dictate it, drop a photo or a part, draw on the sketch pad or paste a link. Choose **For my printer** or
-**Just a 3D model** for what starts next, or **Start blank**. With a bank card, a coin or a ruler in the photo, the
+Type it, dictate it, drop a photo or a part, draw on the sketch pad or paste a link. Under the composer choose
+**For my printer** or **Just a 3D model**, the printer, and the agent and model that design it, or **Start blank**;
+the last design is one click away with **Continue**. With a bank card, a coin or a ruler in the photo, the
 agent estimates sizes from it and keeps them marked *estimated from the photo* until you measure.
+
+<img src="docs/images/home-model-menu.webp" alt="The model menu opened from Home: agent apps Claude Code, Codex and Gemini CLI, the models Default, Fable, Opus, Sonnet and Haiku, a custom model id and the effort">
 
 <table>
 <tr>
