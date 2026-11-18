@@ -1,0 +1,31 @@
+name: Release draft
+
+# Keeps one draft release named "Unreleased" listing the pull requests merged into dev since the latest published
+# release, grouped by their type: label (New, Fixed, Faster, Documentation, Other). Nothing is published; it is the
+# starting point for the next CHANGELOG section. Version tags still make their own release (app.yml).
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-draft
+  cancel-in-progress: true
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write          # draft releases
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Update the draft
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/release_notes.py draft --base dev

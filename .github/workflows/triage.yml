@@ -1,0 +1,67 @@
+name: Triage
+
+# Keeps labels and assignees tidy without reading or running any code from a pull request:
+#   area labels   from the changed paths (.github/labeler.yml)
+#   size, type    size/XS…XL from lines changed; a type: label from the title when none is set (scripts/ci/triage.py)
+#   assignee      the author, when they are a maintainer and nobody is assigned
+#   welcome       a short note on a first issue or first pull request
+# pull_request_target gives the token write access for labels on pull requests from forks. That is safe here because
+# no step checks out or executes the pull request's code: the scripts come from the base branch, and the inputs are
+# the event's own fields.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+  issues:
+    types: [opened]
+
+permissions: {}
+
+concurrency:
+  group: triage-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  pull-request:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write              # creating the size labels the first time
+    steps:
+      - uses: actions/labeler@v7
+        with:
+          sync-labels: false
+      - uses: actions/checkout@v7          # the base branch: the automation's own script, never the pull request
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/ci
+      - name: Size, type and assignee
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/triage.py --event "$GITHUB_EVENT_PATH"
+
+  welcome:
+    if: github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/first-interaction@v3
+        with:
+          issue_message: |
+            Thank you for opening your first issue in Form Studio. A maintainer reads every new issue; if it is about a
+            print, the printer, nozzle, filament, slicer preset and any measured numbers help most.
+            For a recipe you wrote, choose "build and check it here" in the recipe form and the automation will build,
+            check and slice it for you.
+
+            — Form Studio automation
+          pr_message: |
+            Thank you for your first pull request to Form Studio. The tests run on the real CAD kernel; pull requests that
+            change recipes or the interface get a preview comment with before and after pictures. Please make sure it
+            targets `dev` and adds a line to `CHANGELOG.md` (see [CONTRIBUTING.md](https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md)).
+
+            — Form Studio automation

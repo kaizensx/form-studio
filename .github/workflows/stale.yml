@@ -1,0 +1,43 @@
+name: Stale
+
+# Gentle: only issues and pull requests waiting on their author (status:needs-info) are touched. After 30 days without
+# a reply they get a reminder; 14 days later they are closed as "not planned", and any reply reopens the conversation.
+# Nothing else is ever marked stale or closed.
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@v11
+        with:
+          only-labels: status:needs-info
+          days-before-stale: 30
+          days-before-close: 14
+          stale-issue-label: stale
+          stale-pr-label: stale
+          remove-stale-when-updated: true
+          labels-to-remove-when-unstale: status:needs-info
+          close-issue-reason: not_planned
+          exempt-issue-labels: status:confirmed,help wanted,good first issue
+          operations-per-run: 60
+          stale-issue-message: >
+            This issue is waiting for more information and has had no reply for 30 days. If it still matters, add a
+            comment with what was asked; otherwise it will be closed in 14 days. — Form Studio automation
+          stale-pr-message: >
+            This pull request is waiting on its author and has had no activity for 30 days. Push or comment to keep it
+            open; otherwise it will be closed in 14 days. — Form Studio automation
+          close-issue-message: >
+            Closed for now, as the information needed did not arrive. Comment with it and a maintainer will reopen.
+            — Form Studio automation
+          close-pr-message: >
+            Closed for now. You are welcome to reopen it when you pick it up again. — Form Studio automation

@@ -1,0 +1,138 @@
+name: Recipe check
+
+# A recipe submitted in an issue (the "New recipe" form with "build and check it here") is built for real and the
+# result is posted on the issue.
+#
+#   build  (no write access, no secrets): find the recipe in the issue (pasted, linked or attached), then build it in
+#          the CAD kernel at its defaults and two other parameter sets, run Form Studio's checks, render it and slice it
+#          with PrusaSlicer. The submitted code runs in scripts/ci/sandbox.sh: another user, no network, no access to
+#          the checkout or the runner's tokens. uv's cache is only read here, never written.
+#   report (issues and contents write, runs no submitted code): checks the build's files as data, puts the pictures
+#          on the ci-assets branch, keeps one comment on the issue up to date and labels it recipe:valid or
+#          recipe:needs-changes. A valid recipe is stored on ci-assets for recipe-accept.yml.
+#
+# Runs when a recipe issue is opened, reopened or its text edited, and by hand for any issue (maintainers).
+on:
+  issues:
+    types: [opened, edited, reopened]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue number
+        required: true
+        type: number
+
+permissions: {}
+
+concurrency:
+  group: recipe-check-${{ github.event.issue.number || inputs.issue }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build the recipe
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.issue.labels.*.name, 'area:recipes') &&
+       (github.event.action != 'edited' || github.event.changes.body != null))
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      found: ${{ steps.find.outputs.found }}
+      wants_check: ${{ steps.find.outputs.wants_check }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Find the recipe in the issue
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ inputs.issue }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/result"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            python3 scripts/ci/issue_recipe.py extract --issue "$ISSUE" --out "$RUNNER_TEMP/result/submission"
+          else
+            python3 scripts/ci/issue_recipe.py extract --event "$GITHUB_EVENT_PATH" --out "$RUNNER_TEMP/result/submission"
+          fi
+      - name: A folder outside the runner's home for the sandbox's Python
+        if: steps.find.outputs.found == 'true'
+        run: sudo install -d -o "$(id -u)" -g "$(id -g)" -m 0755 /opt/fsci
+      - name: Install Form Studio outside the runner's home
+        if: steps.find.outputs.found == 'true'
+        uses: ./.github/actions/setup-form
+        with:
+          venv: /opt/fsci/venv
+          python-install-dir: /opt/fsci/python
+          extras: parts
+          editable: "false"
+          save-cache: "false"
+      - name: Install PrusaSlicer
+        if: steps.find.outputs.found == 'true'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends prusa-slicer
+          prusa-slicer --help 2>/dev/null | head -n 1 || true
+      - name: Build, check, render and slice in the sandbox
+        if: steps.find.outputs.found == 'true'
+        env:
+          MODE: ${{ steps.find.outputs.mode }}
+        run: |
+          bash scripts/ci/sandbox.sh setup
+          SUB="$RUNNER_TEMP/result/submission"
+          sudo cp scripts/ci/build_recipe.py .github/ci-prusa.toml /srv/fsbuild/in/
+          FILE=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['file'])" "$SUB/submission.json")
+          sudo cp "$SUB/$FILE" /srv/fsbuild/in/
+          sudo chmod -R a+rX /srv/fsbuild/in /opt/fsci
+          if [ "$MODE" = "archive" ]; then ARGS=(--archive "/srv/fsbuild/in/$FILE" --turntable)
+          else ARGS=(--source "/srv/fsbuild/in/$FILE" --variants); fi
+          set +e
+          timeout 1200 bash scripts/ci/sandbox.sh run \
+            --env FORM_CONFIG=/srv/fsbuild/in/ci-prusa.toml --env FORM_DATA=/srv/fsbuild/home/data -- \
+            /opt/fsci/venv/bin/python /srv/fsbuild/in/build_recipe.py "${ARGS[@]}" --slice --sheet --out /srv/fsbuild/out
+          echo "build exit code: $?"
+          set -e
+          mkdir -p "$RUNNER_TEMP/result/out"
+          sudo find /srv/fsbuild/out -maxdepth 1 -type f \( -name '*.png' -o -name '*.gif' -o -name result.json \) \
+            -size -8M -exec cp {} "$RUNNER_TEMP/result/out/" \;
+          sudo chown -R "$(id -u)" "$RUNNER_TEMP/result"
+          ls -la "$RUNNER_TEMP/result/out"
+      - uses: actions/upload-artifact@v7
+        if: always() && steps.find.outputs.found == 'true'
+        with:
+          name: recipe-result
+          path: ${{ runner.temp }}/result
+          retention-days: 7
+          if-no-files-found: ignore
+
+  report:
+    name: Post the result
+    needs: build
+    if: >-
+      !cancelled() && needs.build.result != 'skipped' &&
+      (needs.build.outputs.found == 'true' || needs.build.outputs.wants_check == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write          # pictures and the validated bundle go to the ci-assets branch
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        if: needs.build.outputs.found == 'true'
+        continue-on-error: true
+        with:
+          name: recipe-result
+          path: ${{ runner.temp }}/result
+      - name: Comment and label
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number || inputs.issue }}
+          OUTCOME: ${{ needs.build.result }}
+        run: python3 scripts/ci/recipe_report.py --issue "$ISSUE" --result "$RUNNER_TEMP/result" --build-outcome "$OUTCOME"

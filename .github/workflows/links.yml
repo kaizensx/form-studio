@@ -1,0 +1,64 @@
+name: Links
+
+# Checks the links in the documentation and the website.
+#   pull requests that touch docs or the site: links inside the repository only (offline, fast, no flaky hosts)
+#   every Monday: every link, including external ones; broken links are listed in one issue, kept up to date and
+#   closed again when everything resolves.
+on:
+  pull_request:
+    paths: ["docs/**", "site/**", "*.md", "community/**/*.md", ".github/workflows/links.yml", ".github/lychee.toml"]
+  schedule:
+    - cron: "11 6 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: links-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write              # the scheduled report (the pull request token is read-only for forks anyway)
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Lychee cache
+        uses: actions/cache@v6
+        with:
+          path: .lycheecache
+          key: lychee-${{ github.run_id }}
+          restore-keys: lychee-
+      - name: Check links
+        id: lychee
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: >-
+            --config .github/lychee.toml
+            ${{ github.event_name == 'pull_request' && '--offline' || '' }}
+            --root-dir ${{ github.workspace }}/site
+            './**/*.md' './site/**/*.html'
+          output: ${{ runner.temp }}/links.md
+          fail: ${{ github.event_name == 'pull_request' }}
+          jobSummary: true
+      - name: Report broken links in an issue
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXIT: ${{ steps.lychee.outputs.exit_code }}
+          REPORT: ${{ runner.temp }}/links.md
+        run: |
+          TITLE="Broken links in the docs and website"
+          NUM=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')
+          if [ "$EXIT" != "0" ]; then
+            { cat "$REPORT"; echo; echo "— Form Studio automation, [run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"; } > body.md
+            if [ -n "$NUM" ]; then gh issue edit "$NUM" --body-file body.md
+            else gh issue create --title "$TITLE" --body-file body.md --label documentation; fi
+          elif [ -n "$NUM" ]; then
+            gh issue close "$NUM" --comment "Every link resolves again. — Form Studio automation"
+          fi

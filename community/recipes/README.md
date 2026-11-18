@@ -72,6 +72,15 @@ About 960 × 560 px, the part at its default values. The simplest way to make on
 form render <project> --view iso --out preview.png
 ```
 
+## Or submit it in an issue
+
+Open a [New recipe](https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml) issue, choose
+**build and check it here**, and paste `recipe.py` (or link to it, or attach it as `recipe.py.txt` or in a `.zip`).
+Form Studio's automation builds it in the CAD kernel at its defaults and at a smaller and a larger set of measured
+dimensions, runs the checks, slices it with PrusaSlicer and replies with pictures and results. Edit the issue to check
+again. Once it passes, a maintainer can accept it, and the automation opens the pull request with `recipe.py`,
+`meta.json` and `preview.png`, credited to you.
+
 ## Before you open a pull request
 
 1. Create a design from your file and run the pipeline. In the app: **New design › Import project**, or ask the agent

@@ -1,0 +1,80 @@
+name: Benchmarks
+
+# Times every change to dev that can move them: each built-in recipe through the pipeline (build, STEP and STL,
+# checks, a real PrusaSlicer slice) and the app's start (interface loaded, CAD kernel answering), on the same runner
+# image each time. The history (last 400 runs) is kept on the ci-assets branch (bench/history.json) and drawn on the
+# website at /bench/; pages.yml republishes the site when this workflow finishes.
+#
+#   measure  runs the project's code with a read-only token
+#   publish  appends the result to the history (contents write; runs no project code)
+on:
+  push:
+    branches: [dev]
+    paths:
+      - form/**
+      - pyproject.toml
+      - requirements.lock
+      - scripts/ci/bench.py
+      - .github/workflows/bench.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench
+  cancel-in-progress: false
+
+env:
+  FORM_NO_UPDATE_CHECK: 1
+
+jobs:
+  measure:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Linux libraries for Qt, and PrusaSlicer
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 libfontconfig1 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-xfixes0 libgl1-mesa-dri xvfb prusa-slicer
+      - uses: ./.github/actions/setup-form
+        id: form
+      - name: Measure
+        env:
+          PY: ${{ steps.form.outputs.python }}
+          FORM_CONFIG: ${{ github.workspace }}/.github/ci-prusa.toml
+        run: |
+          "$PY" scripts/ci/bench.py run --out "$RUNNER_TEMP/bench.json" --app-cmd "xvfb-run -a -s '-screen 0 1920x1200x24'"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bench
+          path: ${{ runner.temp }}/bench.json
+          retention-days: 30
+
+  publish:
+    needs: measure
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write          # the ci-assets branch
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: bench
+          path: ${{ runner.temp }}/in
+      - name: Append to the history
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench"
+          python3 scripts/ci/assets.py get --path bench/history.json --out "$RUNNER_TEMP/bench/history.json" || echo "[]" > "$RUNNER_TEMP/bench/history.json"
+          python3 scripts/ci/bench.py append --entry "$RUNNER_TEMP/in/bench.json" --history "$RUNNER_TEMP/bench/history.json"
+          python3 scripts/ci/assets.py put --src "$RUNNER_TEMP/bench" --dest bench --message "Benchmarks for ${GITHUB_SHA::10}"

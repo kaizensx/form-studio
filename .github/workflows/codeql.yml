@@ -1,0 +1,51 @@
+name: CodeQL
+
+# Static analysis of the Python engine and app, the website's JavaScript and the workflows themselves (actions).
+# Results appear under Security > Code scanning. Uses the workflow (advanced) setup; leave CodeQL "default setup" off
+# in the repository settings, since the two cannot run side by side.
+on:
+  push:
+    branches: [main, dev]
+    paths-ignore: ["docs/**", "**/*.md", "brand/**", "site/assets/**", "site/fonts/**"]
+  pull_request:
+    branches: [main, dev]
+    paths-ignore: ["docs/**", "**/*.md", "brand/**", "site/assets/**", "site/fonts/**"]
+  schedule:
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - site/vendor
+              - tests/fixtures
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}

@@ -1,0 +1,68 @@
+name: Set up Form Studio
+description: >
+  Python 3.12 and Form Studio in a virtual environment, with uv's download cache. Jobs that run code from outside the
+  project pass save-cache "false", so they can read the cache but never write it.
+inputs:
+  venv:
+    description: Where the virtual environment goes
+    default: .venv
+  extras:
+    description: Optional dependency groups, comma separated (all, app, parts) or empty
+    default: all
+  editable:
+    description: Install the checkout in editable mode ("true") or as a normal package ("false")
+    default: "true"
+  python-install-dir:
+    description: Where uv puts the Python interpreter (empty for uv's default)
+    default: ""
+  save-cache:
+    description: Save uv's cache after installing ("true" only in jobs that run the project's own code)
+    default: "true"
+  extra-packages:
+    description: More packages to install into the environment, space separated
+    default: ""
+outputs:
+  python:
+    description: The environment's python executable
+    value: ${{ steps.install.outputs.python }}
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      with:
+        enable-cache: false
+    - id: key
+      shell: bash
+      run: echo "key=uv-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pyproject.toml', 'requirements.lock') }}" >> "$GITHUB_OUTPUT"
+    - id: restore
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/.cache/uv
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: uv-${{ runner.os }}-${{ runner.arch }}-
+    - id: install
+      shell: bash
+      env:
+        VENV: ${{ inputs.venv }}
+        EXTRAS: ${{ inputs.extras }}
+        EDITABLE: ${{ inputs.editable }}
+        PYDIR: ${{ inputs.python-install-dir }}
+        MORE: ${{ inputs.extra-packages }}
+        UV_LINK_MODE: copy
+      run: |
+        export UV_CACHE_DIR="$HOME/.cache/uv"
+        if [ -n "$PYDIR" ]; then export UV_PYTHON_INSTALL_DIR="$PYDIR"; fi
+        uv venv --python 3.12 "$VENV"
+        PY="$VENV/bin/python"; [ -f "$PY" ] || PY="$VENV/Scripts/python.exe"
+        SPEC="."; [ -n "$EXTRAS" ] && SPEC=".[$EXTRAS]"
+        if [ "$EDITABLE" = "true" ]; then uv pip install --python "$PY" -e "$SPEC"; else uv pip install --python "$PY" "$SPEC"; fi
+        if [ -n "$MORE" ]; then
+          # shellcheck disable=SC2086
+          uv pip install --python "$PY" $MORE
+        fi
+        echo "python=$PY" >> "$GITHUB_OUTPUT"
+    - if: inputs.save-cache == 'true' && steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.cache/uv
+        key: ${{ steps.key.outputs.key }}

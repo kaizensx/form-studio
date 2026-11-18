@@ -1,0 +1,46 @@
+name: Recipe accept
+
+# A maintainer adds the label recipe:accept to an issue whose recipe check passed (recipe:valid). This opens a pull
+# request to dev that adds community/recipes/<id>/ (the recipe file, meta.json and the preview the check rendered),
+# committed by the automation with the submitter credited as co-author and as the recipe's author.
+#
+# Nothing submitted is run here: the files are the ones the recipe check stored on the ci-assets branch, and they must
+# match the issue's current text byte for byte (SHA-256). See scripts/ci/recipe_accept.py for every precondition.
+#
+# Repository setting needed: Settings > Actions > General > "Allow GitHub Actions to create and approve pull
+# requests". Pull requests opened with the default token do not start other workflows; to have CI run on them
+# automatically, add a fine-grained token with contents and pull-requests write as the secret RECIPE_PR_TOKEN.
+on:
+  issues:
+    types: [labeled]
+
+permissions: {}
+
+concurrency:
+  group: recipe-accept-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  accept:
+    if: github.event.label.name == 'recipe:accept'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v7          # the automation's own scripts, from the default branch
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v7          # the branch the pull request goes to
+        with:
+          ref: dev
+          path: dev-tree
+          token: ${{ secrets.RECIPE_PR_TOKEN || github.token }}
+      - name: Open the pull request
+        env:
+          GITHUB_TOKEN: ${{ secrets.RECIPE_PR_TOKEN || github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          SENDER: ${{ github.event.sender.login }}
+        run: python3 scripts/ci/recipe_accept.py --issue "$ISSUE" --sender "$SENDER" --repo-dir dev-tree --base dev

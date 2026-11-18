@@ -9,12 +9,18 @@ body:
         A recipe is a family of objects: typed parameters in, one valid solid out. See
         [Writing a recipe](https://kaizensx.github.io/form-studio/docs/recipes.html) and the
         [community gallery format](https://github.com/kaizensx/form-studio/tree/main/community/recipes).
+
+        **Submitting a recipe you wrote?** Choose "build and check it here" and paste the file below, link to it, or
+        attach it (`recipe.py` renamed to `recipe.py.txt`, a `.zip`, or a `.formstudio` file renamed to `.zip`).
+        Form Studio's automation builds it in the CAD kernel at its defaults and two other parameter sets, runs the
+        checks, slices it with PrusaSlicer and replies here with pictures and results. Edit the issue to check again.
   - type: dropdown
     id: kind
     attributes:
       label: This is
       options:
         - A request for a recipe
+        - "A recipe I wrote: build and check it here"
         - A recipe I wrote and will submit as a pull request
     validations:
       required: true
@@ -47,3 +53,27 @@ body:
         - Python (build123d)
         - OpenSCAD
         - Either
+  - type: input
+    id: recipe_id
+    attributes:
+      label: Recipe id
+      description: "For a submission: the gallery folder name, lowercase letters, digits and hyphens."
+      placeholder: cable-clip
+  - type: input
+    id: tags
+    attributes:
+      label: Tags
+      description: "For a submission: a few lowercase words people would search for, separated by commas."
+      placeholder: desk, cable management, snap fit
+  - type: textarea
+    id: source
+    attributes:
+      label: Recipe source
+      description: "For a submission: the whole recipe.py (one Recipe subclass) or recipe.scad."
+      render: python
+  - type: input
+    id: link
+    attributes:
+      label: Link to the recipe file
+      description: "Instead of pasting: a link to the file on GitHub or in a gist."
+      placeholder: https://github.com/you/your-repo/blob/main/recipe.py

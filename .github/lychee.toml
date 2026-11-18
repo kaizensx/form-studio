@@ -1,0 +1,15 @@
+# Link checker settings (workflows/links.yml).
+cache = true
+max_cache_age = "2d"
+max_retries = 3
+timeout = 20
+accept = ["200..=299", "403", "429"]
+exclude_path = ["site/vendor", "site/404.html", "node_modules", ".venv", ".dev", "tests/fixtures"]
+exclude = [
+  "^https://github\\.com/kaizensx/form-studio/(issues|pull|discussions|compare|releases)/new",
+  "^https://github\\.com/kaizensx/form-studio/security/advisories/new",
+  "^https://kaizensx\\.github\\.io/form-studio/(compat|bench)/",
+  "^mailto:",
+  "localhost",
+  "127\\.0\\.0\\.1",
+]
