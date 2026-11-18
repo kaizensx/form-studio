@@ -14,7 +14,7 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from form import checks as checks_mod, compat, materials, plates, slicer
+from form import checks as checks_mod, compat, filaments as materials, plates, slicer
 from form.adapters import common
 from form.studio import Studio, StudioError
 
@@ -141,19 +141,6 @@ class Materials(unittest.TestCase):
         m = materials.of_project({}, [{"id": "body", "material": "PETG"}])
         self.assertEqual(m["parts"]["body"]["source"], "recipe")
         self.assertEqual(materials.stated({"parts": {"lid": {"material": "TPU"}}}), None)   # one part never speaks for all
-
-    def test_notes(self):
-        row = {"steep_mm2": 40.0, "ceiling_mm2": 12.0}
-        pla = materials.checks({"Planter": "PLA"}, row, "A planter for the balcony, in the sun all day")
-        self.assertEqual(pla[0]["status"], "WARN")
-        self.assertIn("ASA", pla[0]["detail"])
-        self.assertEqual(materials.checks({"Planter": "PLA"}, row, "")[0]["status"], "PASS")
-        tpu = materials.checks({"Lid": "TPU", "Box": "PETG"}, row, "", per_part=True)
-        self.assertEqual([(c["label"], c["status"]) for c in tpu], [("Material: TPU (Lid)", "WARN"), ("Material: PETG (Box)", "PASS")])
-        self.assertIn("40 mm² of overhang", tpu[0]["detail"])
-        asa = materials.checks({"Panel": "ASA"}, None, "", [170, 40])
-        self.assertEqual(asa[0]["status"], "WARN")
-        self.assertTrue(all(c["evidence"] == "heuristic" for c in pla + tpu + asa))
 
 
 # ---- the plan ------------------------------------------------------------------------------------------------

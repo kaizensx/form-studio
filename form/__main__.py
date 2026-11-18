@@ -264,6 +264,27 @@ def main(argv=None):
     de = sub.add_parser("delete", help="move a project to .trash inside the projects folder (needs --yes)")
     de.add_argument("project")
     de.add_argument("--yes", action="store_true", help="really move it to the trash")
+    # -- selections, annotations, colours and materials (form/selection.py, form/materials.py) --
+    se = sub.add_parser("select", help="analyse points, edges, faces or a painted region on the solid; --keep saves it as an annotation")
+    se.add_argument("project")
+    for k in ("point", "edge", "face"):
+        se.add_argument(f"--{k}", action="append", default=[], metavar="x,y,z", help=f"a {k} at this surface point (repeatable)")
+    se.add_argument("--region", action="append", default=[], metavar="x,y,z;x,y,z;...", help="surface within --radius of these points")
+    se.add_argument("--radius", type=float, default=2.0, help="region radius, mm")
+    se.add_argument("--keep", metavar="NAME", help="keep it with the head revision under this name")
+    se.add_argument("--note", default="")
+    se.add_argument("--text", action="store_true", help="print the description instead of JSON")
+    an_ = sub.add_parser("annotations", help="kept selections: list | show ID | delete ID")
+    an_.add_argument("project")
+    an_.add_argument("verb", nargs="?", default="list", choices=["list", "show", "delete"])
+    an_.add_argument("id", nargs="?")
+    apx = sub.add_parser("appearance", help="colour and material of the design or one part: --color #rrggbb --material petg [--part ID]")
+    apx.add_argument("project")
+    apx.add_argument("--part", default="")
+    apx.add_argument("--color")
+    apx.add_argument("--material", help="PLA, PETG, ABS, ASA, TPU, PA, PC, PLA-CF, PETG-CF, PA-CF")
+    apx.add_argument("--clear", action="store_true", help="remove the colour and material of the design or that part")
+    apx.add_argument("--3mf", dest="threemf", metavar="FILE", help="write a 3MF of the head with these colours")
     a = ap.parse_args(argv)
 
     if a.cmd in (None, "serve"):
@@ -363,6 +384,46 @@ def main(argv=None):
                 _print(analysis.measure(st, p, xyz(a.a), xyz(a.b)))
             else:
                 raise StudioError("Give --from x,y,z and --to x,y,z, or --at x,y,z.", "Points are in millimetres in the design frame.")
+        elif a.cmd == "select":
+            from . import selection
+            xyz = lambda t: [float(x) for x in t.split(",")]
+            items = [{"kind": k, "at": xyz(v)} for k in ("point", "edge", "face") for v in getattr(a, k)]
+            items += [{"kind": "region", "points": [xyz(q) for q in r.split(";") if q.strip()], "radius": a.radius} for r in a.region]
+            if a.keep:
+                out = selection.add(st, a.project, items, a.keep, a.note, by="cli")
+                print(out["text"]) if a.text else _print(out)
+            else:
+                out = selection.analyze(st, st.load(a.project), items)
+                for x in out["items"]:
+                    x.pop("mesh", None)
+                    if isinstance(x.get("edge"), dict):
+                        x["edge"].pop("segments", None)
+                print(out["text"]) if a.text else _print(out)
+        elif a.cmd == "appearance":
+            from . import materials
+            if a.clear or a.color is not None or a.material is not None:
+                materials.set_appearance(st, a.project, a.part, None if a.clear else (a.color if a.color is not None else "keep"),
+                                         None if a.clear else (a.material if a.material is not None else "keep"), by="cli")
+            p = st.load(a.project)
+            out = {"appearance": materials.appearance(p)}
+            if a.threemf:
+                with open(a.threemf, "wb") as f:
+                    f.write(materials.threemf(st, p))
+                out["3mf"] = a.threemf
+            _print(out)
+        elif a.cmd == "annotations":
+            from . import selection
+            if a.verb == "list":
+                _print([{k: x[k] for k in ("id", "name", "note", "rev", "by")} for x in selection.listing(st, a.project)])
+            elif not a.id:
+                raise StudioError("Name the annotation: form annotations <project> show|delete <id>.")
+            elif a.verb == "show":
+                x = next((x for x in selection.listing(st, a.project) if x["id"] == a.id), None)
+                if x is None:
+                    raise StudioError("Unknown annotation.", "List them with: form annotations <project>.")
+                _print(x)
+            else:
+                _print(selection.delete(st, a.project, a.id))
         elif a.cmd == "orient":
             from . import analysis
             p = st.load(a.project)

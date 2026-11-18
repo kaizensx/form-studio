@@ -1052,49 +1052,179 @@ QtObject {
         s._aseq++; s.analysisMap = ""; s.analysis = null; s.analysisBusy = false; s.orient = null; s.measures = []; s.measureFrom = null; s.measuring = false; s.measureOpen = false } }
 
     // measure tool: click points on the part. Every number comes back from the engine (POST /probe, /measure).
+    // A click gives the point on the part as printed (where the engine computes) and the part's id; the viewport
+    // draws each measurement where that part is shown now, so measuring works in print layout, assembled and exploded.
     property bool measuring: false             // clicks on the part measure instead of selecting
     property bool measureOpen: false           // the readout panel is showing
     property string measureKind: "distance"    // distance | face | diameter
-    property var measures: []                  // [{ id, kind, label, detail, how, label_at, ... }], kept until cleared
-    property var measureFrom: null             // first point of a distance: { at: [x, y, z], snap }
+    property var measures: []                  // [{ id, kind, label, detail, how, label_at, part | pa/pb, frame, ... }], kept until cleared
+    property var measureFrom: null             // first point of a distance: { at, shown, part, snap }
+    property int measureBusy: 0                // clicks the engine is still answering
+    property string measureSay: ""             // a short note in the tool's hint (a miss, a click with nothing to measure)
     property int _mid: 0
+    property var _measureSayOff: Timer { interval: 2600; onTriggered: s.measureSay = "" }
+    function measureNote(t) { measureSay = t; _measureSayOff.restart() }
     function setMeasuring(on) {
-        measuring = !!on; measureFrom = null
-        if (on) { measureOpen = true; if (assembly && asmMode !== "print") setAsmMode("print"); if (viewer) viewer.setMarker(null) }
+        if (on && selecting) setSelecting(false)
+        measuring = !!on; measureFrom = null; measureSay = ""
+        if (on) { measureOpen = true; if (viewer) viewer.setMarker(null) }
     }
     function clearMeasures() { measures = []; measureFrom = null }
     function dropMeasure(id) { measures = measures.filter(function (m) { return m.id !== id }) }
     function _addMeasure(m) { m.id = ++_mid; measures = measures.concat([m]) }
-    function measureClick(pt, reach) {         // pt: [x, y, z] on the surface, design frame; reach: snap radius in mm
-        var kind = measureKind
-        return ppost("/probe", { at: pt }).then(function (pr) {
+    function _frameName(tag) { return !tag || tag === "print" ? "print layout" : tag.indexOf("assembled") === 0 ? "assembled view" : "exploded view" }
+    function measureClick(hit, reach) {        // hit: from Viewport.hitAt; reach: snap radius in mm
+        var kind = measureKind, part = hit.part || "", tag = viewer ? viewer.frameTag : "print"
+        measureBusy++
+        var done = function () { s.measureBusy = Math.max(0, s.measureBusy - 1) }
+        return ppost("/probe", { at: hit.at }).then(function (pr) {
+            done()
+            var shown = function (p) { return s.viewer ? s.viewer.shownPoint(part, p) : p }
             if (kind === "distance") {
                 var at = pr.on, snap = "surface"
                 if (pr.snaps.length && pr.snaps[0].distance_mm <= reach) { at = pr.snaps[0].at; snap = pr.snaps[0].kind }    // nearest first
-                if (!s.measureFrom) { s.measureFrom = { at: at, snap: snap }; return }
+                var end = { at: at, shown: shown(at), part: part, snap: snap }
+                if (!s.measureFrom) { s.measureFrom = end; return }
                 var from = s.measureFrom
                 s.measureFrom = null
-                return s.ppost("/measure", { from: from.at, to: at }).then(function (r) {
-                    s._addMeasure({ kind: "distance", a: r.from, b: r.to, how: "computed", label: F.fmt(r.distance_mm, 2) + " mm",
-                        detail: "dX " + F.fmt(Math.abs(r.dx_mm), 2) + "  dY " + F.fmt(Math.abs(r.dy_mm), 2) + "  dZ " + F.fmt(Math.abs(r.dz_mm), 2) + "  ·  " + from.snap + " to " + snap,
-                        label_at: [(r.from[0] + r.to[0]) / 2, (r.from[1] + r.to[1]) / 2, (r.from[2] + r.to[2]) / 2] })
-                }, s.fail)
+                s.measureBusy++
+                return s.ppost("/measure", { from: from.shown, to: end.shown, from_on: from.at, to_on: end.at }).then(function (r) {
+                    s.measureBusy = Math.max(0, s.measureBusy - 1)
+                    var across = from.part !== end.part
+                    s._addMeasure({ kind: "distance", a: from.at, b: end.at, pa: from.part, pb: end.part, frame: tag, how: "computed",
+                        label: F.fmt(r.distance_mm, 2) + " mm",
+                        detail: "dX " + F.fmt(Math.abs(r.dx_mm), 2) + "  dY " + F.fmt(Math.abs(r.dy_mm), 2) + "  dZ " + F.fmt(Math.abs(r.dz_mm), 2),
+                        context: from.snap.charAt(0).toUpperCase() + from.snap.slice(1) + " to " + snap + (across && tag !== "print" ? " · between parts, in the " + s._frameName(tag) : ""),
+                        label_at: [(from.at[0] + end.at[0]) / 2, (from.at[1] + end.at[1]) / 2, (from.at[2] + end.at[2]) / 2] })
+                }, function (e) { s.measureBusy = Math.max(0, s.measureBusy - 1); s.fail(e) })
             } else if (kind === "face") {
                 var f = pr.face, feat = s.featureById(pr.feature)
-                s._addMeasure({ kind: "face", at: pr.on, face: f, how: "computed", label: F.fmt(f.area_mm2, f.area_mm2 < 100 ? 2 : 1) + " mm²",
-                    detail: f.type + (feat ? " of " + feat.label : "") + " · normal " + F.fmt(f.tilt_deg, 1) + "° from straight up: " + f.tilt + " · " + f.method,
+                s._addMeasure({ kind: "face", at: pr.on, part: part, face: f, how: "computed", label: F.fmt(f.area_mm2, f.area_mm2 < 100 ? 2 : 1) + " mm²",
+                    detail: f.type + (feat ? " of " + feat.label : "") + " · normal " + F.fmt(f.tilt_deg, 1) + "° from straight up as printed: " + f.tilt + " · " + f.method,
                     label_at: [pr.on[0] + f.normal[0] * 7, pr.on[1] + f.normal[1] * 7, pr.on[2] + f.normal[2] * 7] })
             } else {
                 var c = pr.circle
                 if (!c || (c.edge_distance_mm !== undefined && c.edge_distance_mm > Math.max(reach * 2, 1.5)))
-                    return s.toast("No circle here", "Click the wall of a hole or round boss, or close to its rim.")
-                s._addMeasure({ kind: "diameter", at: pr.on, circle: c, how: c.method === "fitted" ? "fitted" : "computed", label: "Ø " + F.fmt(c.diameter_mm, 2) + " mm",
+                    return s.measureNote("No circle there. Click the wall or rim of a hole or round boss.")
+                s._addMeasure({ kind: "diameter", at: pr.on, part: part, circle: c, how: c.method === "fitted" ? "fitted" : "computed", label: "Ø " + F.fmt(c.diameter_mm, 2) + " mm",
                     detail: (c.hole === true ? "hole" : c.hole === false ? "round boss" : c.surface || "circle") + " · "
                         + (c.method === "fitted" ? "fitted to " + c.points + " mesh edge points, rms " + F.fmt(c.rms_mm, 3) + " mm" : "exact, from the CAD solid"),
                     label_at: c.center || pr.on })
             }
-        }, fail)
+        }, function (e) { done(); s.fail(e) })
     }
+
+    // ── selections and annotations (form/selection.py) ──
+    // The Annotate tool picks points, edges, faces or paints a region on the part; the engine analyses the selection
+    // on the CAD solid. Kept, it becomes an annotation of the head revision: a pin in the viewport, a row in the
+    // panel, and a message for the agent with the exact numbers.
+    property bool selecting: false
+    property string selMode: "face"            // point | edge | face | brush | lasso
+    property real brushMm: 3                   // brush radius, mm
+    property var selItems: []                  // what was picked: [{ kind, at | points, radius, part }] (print frame)
+    property var selection: null               // the engine's analysis of selItems: items with numbers and meshes, summary, text
+    property int selBusy: 0
+    property string selSay: ""
+    property int _selSeq: 0
+    property var annFocus: null                // a kept annotation being looked at: { id, analysis }
+    readonly property var annotations: project && project.annotations ? project.annotations : []
+    property var _selSayOff: Timer { interval: 2600; onTriggered: s.selSay = "" }
+    function selNote(t) { selSay = t; _selSayOff.restart() }
+    function setSelecting(on) {
+        if (on && measuring) setMeasuring(false)
+        selecting = !!on; selSay = ""
+        if (on && viewer) viewer.setMarker(null)
+    }
+    function selAdd(items, add) {              // add: keep what is selected (Shift); else start again
+        if (!items || !items.length) return
+        selItems = (add ? selItems : []).concat(items).slice(-24)
+        annFocus = null
+        _selRun()
+    }
+    function selRemove(i) { var a = selItems.slice(); a.splice(i, 1); selItems = a; if (a.length) _selRun(); else selection = null }
+    function selClear() { _selSelSeq(); selItems = []; selection = null }
+    function _selSelSeq() { return ++_selSeq }
+    function _selRun() {
+        var seq = _selSelSeq(), items = selItems
+        selBusy++
+        return ppost("/select", { items: items }).then(function (r) {
+            s.selBusy = Math.max(0, s.selBusy - 1)
+            if (seq === s._selSeq) s.selection = r
+        }, function (e) { s.selBusy = Math.max(0, s.selBusy - 1); if (seq === s._selSeq) s.fail(e) })
+    }
+    function keepSelection(name, note) {
+        if (!selItems.length) return Promise.resolve(null)
+        return ppost("/annotate", { items: selItems, name: name || "", note: note || "" }).then(function (a) {
+            s.toast("Kept as “" + a.name + "”", "Saved with " + F.pad(a.rev) + ". Its pin stays on the part.")
+            var an = s.selection
+            s.selItems = []; s.selection = null
+            s.annFocus = { id: a.id, analysis: an }
+            return s.refresh(false).then(function () { return a })
+        }, function (e) { s.fail(e); return null })
+    }
+    function focusAnnotation(a) {              // show a kept annotation: its numbers again, and its overlay
+        if (!a) { annFocus = null; return }
+        annFocus = { id: a.id, analysis: null }
+        var seq = _selSelSeq()
+        ppost("/annotation_analyze", { id: a.id, rev: a.rev <= (project ? project.head : a.rev) ? a.rev : null }).then(function (r) {
+            if (s.annFocus && s.annFocus.id === a.id) s.annFocus = { id: a.id, analysis: r }
+        }, function (e) { s.fail(e) })
+    }
+    function updateAnnotation(id, name, note) {
+        return ppost("/annotation", { id: id, name: name, note: note }).then(function () { return s.refresh(false) }, fail)
+    }
+    function deleteAnnotation(id) {
+        if (annFocus && annFocus.id === id) annFocus = null
+        return ppost("/annotation_delete", { id: id }).then(function () { s.toast("Annotation deleted"); return s.refresh(false) }, fail)
+    }
+    function cutThrough(x) {                   // a section through a selected point that contains its normal: the wall there, in section
+        if (!viewer || !x || !x.on) return
+        var part = x.part || "", p = viewer.shownPoint(part, x.on), n = viewer.shownDir(part, x.normal || [0, 0, 1])
+        var k = Math.abs(n[0]) >= Math.abs(n[1]) && Math.abs(n[0]) >= Math.abs(n[2]) ? 0 : Math.abs(n[1]) >= Math.abs(n[2]) ? 1 : 2
+        var i = k === 1 ? 0 : 1                 // facing X or Z: cut across Y; facing Y: cut across X
+        var ax = ["x", "y", "z"][i], b = viewer.bounds, sh = viewer.shiftTo
+        var v = p[i] + sh[ax], t = (v - b.lo[ax]) / Math.max(1e-6, b.hi[ax] - b.lo[ax])
+        setSection(ax, Math.min(0.98, Math.max(0.02, t)))
+    }
+    function annotationById(id) { for (var i = 0; i < annotations.length; i++) if (annotations[i].id === id) return annotations[i]; return null }
+    function askAboutSelection(text, what) {   // puts the selection, with its numbers, in the composer; you add the question
+        talkOpen = true
+        recallChat((what ? "About " + what + " on " + (project ? project.name : "this design") + ":\n" : "About this selection on " + (project ? project.name : "this design") + ":\n")
+            + text + "\n\nMy question: ")
+    }
+    property var _selReset: Connections { target: s
+        function onPidChanged() { s._selSeq++; s.selItems = []; s.selection = null; s.annFocus = null; s.selecting = false; s.selBusy = 0 }
+        function onAnalysisKeyChanged() { if (s.selItems.length) { s.selItems = []; s.selection = null }; s.annFocus = null } }
+
+    // ── colours and materials (form/materials.py) ──
+    // The project keeps color and material, and parts: { id: { color, material, ... } } (the slicer reads the same
+    // fields to pick the filament per part); a part's own wins over the design's.
+    property var materialCat: null             // GET /materials: [{ id, label, heat_c, density_g_cm3, color, note }], swatches
+    readonly property var appearance: {
+        if (!project) return { color: null, material: null, parts: ({}) }
+        var ps = project.parts || ({}), out = ({})
+        for (var k in ps) if (ps[k] && (ps[k].color || ps[k].material)) out[k] = { color: ps[k].color || null, material: ps[k].material || null }
+        return { color: project.color || null, material: project.material || null, parts: out }
+    }
+    function loadMaterials() { if (!materialCat) get("/materials").then(function (r) { s.materialCat = r }, function () {}) }
+    function material(id) {
+        var ms = materialCat ? materialCat.materials : [], k = id ? String(id).toUpperCase() : ""
+        if (k === "NYLON" || k === "PA/NYLON") k = "PA"
+        for (var i = 0; i < ms.length; i++) if (ms[i].id === k) return ms[i]
+        return null
+    }
+    function look(part) {                      // { color, material, own } as drawn and printed
+        var a = appearance, own = part && a.parts ? (a.parts[part] || {}) : {}
+        var mat = material(own.material) || material(a.material)
+        return { color: own.color || a.color || (mat ? mat.color : null), material: mat ? mat.id : null, own: !!(own.color || own.material) }
+    }
+    function setLook(part, color, material) {  // undefined keeps, null clears
+        var body = { part: part || "" }
+        if (color !== undefined) body.color = color
+        if (material !== undefined) body.material = material
+        return ppost("/appearance", body).then(function () { return s.refresh(false) }, fail)
+    }
+    property var _matLoad: Connections { target: s; function onPidChanged() { if (s.pid) s.loadMaterials() } }
 
     // print orientation finder (GET /orient): candidates ranked by a score whose terms are shown
     property var orient: null

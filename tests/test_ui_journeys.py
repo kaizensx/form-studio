@@ -75,6 +75,9 @@ class Journeys(unittest.TestCase):
     def test_viewport_tools(self):
         self.journey("tools.py")
 
+    def test_inspect(self):                 # measuring on parts in every view, annotations, colours and materials
+        self.journey("inspection.py")
+
     def test_fit_prove_release(self):
         self.journey("prove_release.py")
 

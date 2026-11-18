@@ -45,12 +45,37 @@ Item {
     property bool measuring: false           // a click probes the surface instead of selecting a feature
     property var measures: []                // drawn by MeasureLayer; labels below
     property var measureFrom: null
-    signal probed(var at, real reach)        // design-frame point on the surface, snap radius in mm (about 10 px)
+    signal probed(var hit, real reach)       // { at, shown, part, normal }: the surface point as printed (at) and as shown; snap radius in mm (about 10 px)
+    signal probeMissed(real x, real y)       // a measuring click that found no surface
+    // ── selecting (the Annotate tool, form/selection.py) ──
+    property bool selecting: false
+    property string selectMode: "face"       // point | edge | face | brush | lasso
+    property real brushMm: 3                 // brush radius on the surface
+    property var selection: []               // engine items of the live selection, drawn by SelectionLayer
+    property var focusItems: []              // engine items of the kept annotation being looked at
+    property var annotations: []             // kept annotations of this design (pins), each { id, name, rev, items, analysis }
+    property int headRev: 0
+    property string annFocusId: ""
+    signal selPicked(var items, bool add)    // engine items to analyse; add = keep what is already selected (Shift)
+    signal selMissed()
+    signal annotationClicked(string id)
+    property var stroke: []                  // the brush or lasso being drawn: screen points
+    function annAnchor(a) {                  // where an annotation's pin sits: its first item, as shown now
+        var res = a.analysis && a.analysis.items ? a.analysis.items : [], it = res.length ? res[0] : null, src = a.items[0]
+        var p = it ? (it.on || it.centroid) : (src.at || (src.points ? src.points[0] : null))
+        return p ? shownPoint(src.part || "", p) : null
+    }
     readonly property var labels: {          // 2D labels pinned to 3D points (design frame)
         var out = [], i, mk = _map && mapMix > 0.5 ? (_map.markers || []) : []
         for (i = 0; i < mk.length && i < 8; i++)
             out.push({ p: mk[i].at, text: mk[i].label, tint: mk[i].kind === "thin" || mk[i].severity === "fail" ? Theme.signal : Theme.amber })
-        for (i = 0; i < measures.length; i++) out.push({ p: measures[i].label_at, text: measures[i].label, tint: Theme.datum })
+        for (i = 0; i < shownMeasures.length; i++) out.push({ p: shownMeasures[i].label_at, text: shownMeasures[i].label, tint: Theme.datum })
+        var tag = frameTag
+        for (i = 0; i < annotations.length && !lite; i++) {
+            var a = annotations[i], q = annAnchor(a)
+            if (q) out.push({ p: q, text: (i + 1) + "  " + a.name + (a.rev !== headRev ? "  · " + F.pad(a.rev) : ""), tint: Theme.annotate,
+                              ann: a.id, old: a.rev !== headRev, on: a.id === annFocusId })
+        }
         return out
     }
 
@@ -85,6 +110,50 @@ Item {
         if (asmMode === "exploded") t = t.plus(Qt.vector3d(x.explode[0], x.explode[1], x.explode[2]).times(explode))
         return { pos: t, rot: q }
     }
+    // ── points on parts, from the print frame (where the engine computes) to where the part is drawn now ──
+    // Measurements and selections keep their points on the part as printed, with the part's id, so they ride along
+    // when the view changes between print layout, assembled and exploded, or a joint moves.
+    function partById(id) {
+        var ps = asm ? asm.parts : []
+        for (var i = 0; i < ps.length; i++) if (ps[i].id === id) return ps[i]
+        return null
+    }
+    function shownXf(part) { var x = part && asmOn ? partById(part) : null; return x ? partXf(x) : null }
+    function shownPoint(part, p) {
+        if (!p) return p
+        var xf = shownXf(part)
+        if (!xf) return p
+        var q = xf.rot.times(Qt.vector3d(p[0], p[1], p[2])).plus(xf.pos)
+        return [q.x, q.y, q.z]
+    }
+    function shownDir(part, d) {
+        if (!d) return d
+        var xf = shownXf(part)
+        if (!xf) return d
+        var q = xf.rot.times(Qt.vector3d(d[0], d[1], d[2]))
+        return [q.x, q.y, q.z]
+    }
+    // the arrangement on screen, as one string: a distance between two parts belongs to the arrangement it was taken in
+    readonly property string frameTag: !asmOn ? "print" : asmMode + (asmMode === "exploded" ? ":" + explode.toFixed(2) : "") + ":" + JSON.stringify(pose)
+    readonly property var shownMeasures: {
+        var tag = frameTag, out = []                  // re-evaluated when the arrangement changes
+        for (var i = 0; i < measures.length; i++) {
+            var m = measures[i], o = Object.assign({}, m)
+            if (m.kind === "distance") {
+                if (m.pa !== m.pb && m.frame && m.frame !== tag) continue         // across parts, in another arrangement
+                o.a = shownPoint(m.pa, m.a); o.b = shownPoint(m.pb, m.b)
+                o.label_at = [(o.a[0] + o.b[0]) / 2, (o.a[1] + o.b[1]) / 2, (o.a[2] + o.b[2]) / 2]
+            } else {
+                o.at = shownPoint(m.part, m.at)
+                o.label_at = shownPoint(m.part, m.label_at)
+                if (m.face) o.face = Object.assign({}, m.face, { normal: shownDir(m.part, m.face.normal) })
+                if (m.circle && m.circle.center) o.circle = Object.assign({}, m.circle, { center: shownPoint(m.part, m.circle.center), axis: shownDir(m.part, m.circle.axis) })
+            }
+            out.push(o)
+        }
+        return out
+    }
+    readonly property var shownFrom: measureFrom ? { at: shownPoint(measureFrom.part, measureFrom.at) } : null
     function _frame() {                      // centre what is shown on the plate; bounds follow the mode
         if (!model) return
         // read the mode directly: this runs from onAsmModeChanged, possibly before the asmOn binding has updated
@@ -220,6 +289,15 @@ Item {
         thaw.restart()
     }
     function setGhost(v) { ghost = v }
+    // what is under a pixel: the point on the part as printed (the pick's local frame is the part's print frame,
+    // whatever arrangement it is drawn in), the same point where it is drawn now, the part and the feature
+    function hitAt(x, y) {
+        var r = view.pick(x, y)
+        if (!r.objectHit || r.objectHit.feature === undefined) return null
+        var sp = r.scenePosition, d = Qt.vector3d(sp.x, -sp.z, sp.y).minus(shift), l = r.position, n = r.normal
+        return { at: [l.x, l.y, l.z], shown: [d.x, d.y, d.z], part: r.objectHit.part || "", feature: r.objectHit.feature || "",
+                 normal: [n.x, n.y, n.z], x: x, y: y }
+    }
     function setSection(axis, t) { sectionAxis = axis || ""; sectionT = t === undefined ? 0.5 : t }
     function setMarker(m) {
         marker = m
@@ -244,8 +322,18 @@ Item {
     // selection reads as an outline: a mint rim where the feature turns away from the eye, on top of a light tint.
     // Hover is the same idea, fainter, and immediate.
     function rimColor(id) { return id === selected ? Qt.rgba(0.42, 0.85, 0.7, 1) : id === hovered ? Qt.rgba(0.30, 0.30, 0.28, 1) : Qt.rgba(0, 0, 0, 1) }
-    function partColor(id) {
-        return id === selected ? "#b9e8d7" : flagged.indexOf(id) >= 0 ? "#a9bff5" : id === hovered ? "#f1eee6" : "#d8d3c8"
+    function partColor(id, part) {
+        var b = colorOf(part || "")
+        if (!b) return id === selected ? "#b9e8d7" : flagged.indexOf(id) >= 0 ? "#a9bff5" : id === hovered ? "#f1eee6" : "#d8d3c8"
+        return id === selected ? Qt.tint(b, "#9065d4b0") : flagged.indexOf(id) >= 0 ? Qt.tint(b, "#80a9bff5") : id === hovered ? Qt.lighter(b, 1.12) : b
+    }
+    // colours of the design and its parts (Store.look: the part's own, else the design's, else its material's); none = clay
+    property var colorOf: function (part) { return "" }
+    function edgeColor(part) {               // the kernel's edges stay readable on a dark part
+        var c = colorOf(part || "")
+        if (!c) return "#2b2925"
+        var k = Qt.color(c), l = 0.299 * k.r + 0.587 * k.g + 0.114 * k.b
+        return l < 0.32 ? Qt.lighter(c, 2.1) : Qt.darker(c, 2.6)
     }
 
     FrameAnimation { running: vp.spin && vp.visible; onTriggered: { vp.tween = false; vp.az += frameTime * 9 } }
@@ -318,12 +406,13 @@ Item {
                     Model {
                         required property var modelData
                         readonly property string feature: modelData.feature || ""
+                        readonly property string part: ""
                         pickable: !vp.mapShown; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0
                         geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                         materials: CustomMaterial {
                             shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
                             property real uMap: 0
-                            property color uColor: vp.partColor(feature)
+                            property color uColor: vp.partColor(feature, "")
                             property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
                             property color uRim: vp.rimColor(feature)
                             property vector3d uClipN: vp.clipN
@@ -357,12 +446,13 @@ Item {
                             Model {
                                 required property var modelData
                                 readonly property string feature: modelData.feature || ""
+                                readonly property string part: pn.modelData.id
                                 pickable: !vp.mapShown; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0
                                 geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                                 materials: CustomMaterial {
                                     shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
                                     property real uMap: 0
-                                    property color uColor: vp.partColor(feature)
+                                    property color uColor: vp.partColor(feature, pn.modelData.id)
                                     property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
                                     property color uRim: vp.rimColor(feature)
                                     property vector3d uClipN: vp.clipN
@@ -375,13 +465,13 @@ Item {
                         Model { pickable: false; castsShadows: false; depthBias: -2
                             geometry: LineGeometry { segments: pn.modelData.edges || "" }
                             materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
-                                property color uColor: "#2b2925"; property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
+                                property color uColor: vp.edgeColor(pn.modelData.id); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
                     }
                 }
                 Model { visible: !!(vp.model && vp.model.edges) && !vp.asm; pickable: false; castsShadows: false; depthBias: -2
                     geometry: LineGeometry { segments: vp.model && vp.model.edges ? vp.model.edges : "" }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
-                        property color uColor: "#2b2925"; property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
+                        property color uColor: vp.edgeColor(""); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
                 Model { visible: !!(vp.ghost && vp.ghost.edges) && !vp.asmOn; pickable: false; castsShadows: false
                     geometry: LineGeometry { segments: vp.ghost && vp.ghost.edges ? vp.ghost.edges : "" }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"; depthDrawMode: Material.NeverDepthDraw
@@ -433,6 +523,8 @@ Item {
                 // the analysis map: the whole part as one mesh, coloured per vertex by the engine
                 Model {
                     id: amodel
+                    readonly property string feature: ""
+                    readonly property string part: ""
                     visible: vp.mapShown; pickable: vp.mapShown
                     geometry: MeshGeometry { id: ageo; source: vp._map }
                     materials: CustomMaterial {
@@ -470,7 +562,22 @@ Item {
                             materials: PrincipledMaterial { baseColor: modelData.kind === "thin" || modelData.severity === "fail" ? Theme.signal : Theme.amber; lighting: PrincipledMaterial.NoLighting } }
                     }
                 }
-                MeasureLayer { measures: vp.measures; from: vp.measureFrom; dot: vp.dist * 0.00004; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height)) }
+                SelectionLayer { vp: vp; items: vp.focusItems; strength: 0.6; opacity: vp.asmTween ? 0 : 1
+                    dot: vp.dist * 0.000034; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height)) }
+                SelectionLayer { vp: vp; items: vp.selection; opacity: vp.asmTween ? 0 : 1
+                    dot: vp.dist * 0.00004; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height)) }
+                // annotation pins: a dot where each kept annotation is
+                Repeater3D {
+                    model: vp.lite ? [] : vp.annotations
+                    Model { required property var modelData; source: "#Sphere"; pickable: false; castsShadows: false
+                        readonly property var at: (vp.frameTag, vp.annAnchor(modelData))
+                        readonly property real k: vp.dist * (modelData.id === vp.annFocusId ? 0.000052 : 0.000036)
+                        visible: !!at; opacity: vp.asmTween ? 0 : 1
+                        scale: Qt.vector3d(k, k, k)
+                        position: at ? Qt.vector3d(at[0], at[1], at[2]) : Qt.vector3d(0, 0, 0)
+                        materials: PrincipledMaterial { baseColor: Theme.annotate; lighting: PrincipledMaterial.NoLighting } }
+                }
+                MeasureLayer { measures: vp.shownMeasures; from: vp.shownFrom; opacity: vp.asmTween ? 0 : 1; dot: vp.dist * 0.00004; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height)) }
 
                 // a check pointing at a place: thin signal line between two points
                 Node {
@@ -509,6 +616,33 @@ Item {
     SequentialAnimation { id: thaw
         NumberAnimation { target: still; property: "opacity"; from: 1; to: 0; duration: Motion.slow; easing.type: Easing.InOutQuad }
         ScriptAction { script: { still.z = -1; still.opacity = 1; still.live = true } } }
+
+    // the brush stroke or lasso outline being drawn, on top of the part
+    Canvas {
+        id: strokeCanvas
+        anchors.fill: view; visible: vp.stroke.length > 0
+        readonly property var pts: vp.stroke
+        onPtsChanged: requestPaint()
+        onPaint: {
+            var c = getContext("2d"), p = pts
+            c.reset()
+            if (!p.length) return
+            var col = Theme.annotate
+            c.lineJoin = "round"; c.lineCap = "round"
+            c.beginPath(); c.moveTo(p[0].x, p[0].y)
+            for (var i = 1; i < p.length; i++) c.lineTo(p[i].x, p[i].y)
+            if (vp.selectMode === "brush") {
+                c.strokeStyle = Qt.rgba(col.r, col.g, col.b, 0.38)
+                c.lineWidth = Math.max(4, 2 * vp.brushMm / Math.max(1e-6, vp.mmPerPx))
+                c.stroke()
+            } else {
+                c.closePath()
+                c.fillStyle = Qt.rgba(col.r, col.g, col.b, 0.14); c.fill()
+                c.strokeStyle = Qt.rgba(col.r, col.g, col.b, 0.9); c.lineWidth = 1.5
+                if (c.setLineDash) c.setLineDash([5, 4]); c.stroke()
+            }
+        }
+    }
 
     // ── 2D labels pinned to 3D points: dimension numbers, findings and measurements, notes on what the part holds.
     // One pass per frame projects their points and lets Labels.js seat them, so a marker never sits on a dimension.
@@ -589,9 +723,16 @@ Item {
             required property var modelData
             property bool shown: false
             property int cand: -1
-            width: pt.implicitWidth + 12; height: 19; radius: Theme.rXs; color: Theme.alpha(Theme.plate, 0.88); border.color: Theme.alpha(modelData.tint, 0.45)
+            width: pt.implicitWidth + 12; height: 19; radius: Theme.rXs
+            color: pl.modelData.on ? Theme.alpha(pl.modelData.tint, 0.22) : plm.containsMouse ? Theme.alpha(Theme.plate3, 0.95) : Theme.alpha(Theme.plate, 0.88)
+            border.color: Theme.alpha(modelData.tint, pl.modelData.on ? 0.8 : 0.45)
+            opacity: pl.modelData.old ? 0.7 : 1
+            z: pl.modelData.ann ? 3 : 0                 // an annotation's label is a button, above the orbit area
             visible: shown
-            Text { id: pt; anchors.centerIn: parent; text: pl.modelData.text; color: pl.modelData.tint; font.family: Theme.mono; font.pixelSize: Theme.tFine; renderType: Text.NativeRendering }
+            Text { id: pt; anchors.centerIn: parent; text: pl.modelData.text; color: pl.modelData.tint; font.family: pl.modelData.ann ? Theme.sans : Theme.mono
+                font.pixelSize: Theme.tFine; font.weight: pl.modelData.ann ? 550 : 400; renderType: Text.NativeRendering }
+            MouseArea { id: plm; anchors.fill: parent; enabled: !!pl.modelData.ann; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                onClicked: vp.annotationClicked(pl.modelData.ann) }
         }
     }
 
@@ -619,7 +760,7 @@ Item {
         property point last
         property point down
         property bool moved: false
-        cursorShape: pressed && moved ? Qt.ClosedHandCursor : vp.measuring ? Qt.CrossCursor : vp.hovered ? Qt.PointingHandCursor : pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+        cursorShape: painting ? Qt.CrossCursor : pressed && moved ? Qt.ClosedHandCursor : vp.measuring || vp.selecting ? Qt.CrossCursor : vp.hovered ? Qt.PointingHandCursor : pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
         function hit(x, y) { var r = view.pick(x, y); return r.objectHit && r.objectHit.feature !== undefined ? r.objectHit.feature : "" }
         property point hoverAt
         Timer { id: valueAt; interval: 30                // the map's value under the pointer: pick, then interpolate on the mesh
@@ -629,17 +770,75 @@ Item {
                 else vp.hoveredValue(0, 0, 0, false)
             } }
         function probe(x, y) {                           // a click while measuring: the surface point, in design millimetres
-            var r = view.pick(x, y)
-            if (!r.objectHit) return
-            var sp = r.scenePosition, d = Qt.vector3d(sp.x, -sp.z, sp.y).minus(vp.shift)
-            vp.probed([d.x, d.y, d.z], vp.mmPerPx * 10)
+            var h = vp.hitAt(x, y)
+            if (!h) { vp.probeMissed(x, y); return }
+            vp.probed(h, vp.mmPerPx * 10)
+        }
+        // ── the Annotate tool: a click picks (Shift adds); with Brush or Lasso a left-drag paints or draws instead of
+        // orbiting (Alt-drag still orbits). Every pick is a point on the part as printed, with the part's id.
+        property bool painting: false
+        property var _paint: []                          // brush: { at, part } samples on the surface
+        property point _lastSample
+        function pick(x, y, add) {
+            var h = vp.hitAt(x, y)
+            if (!h) { vp.selMissed(); return }
+            vp.selPicked([{ kind: vp.selectMode, at: h.at, part: h.part }], add)
+        }
+        function sampleBrush(x, y) {
+            var h = vp.hitAt(x, y)
+            if (h) _paint.push({ at: h.at, part: h.part })
+            _lastSample = Qt.point(x, y)
+        }
+        function regions(samples, radius, mode) {        // one region per part: each is analysed and drawn in its own frame
+            var by = {}, order = []
+            for (var i = 0; i < samples.length; i++) {
+                var k = samples[i].part || ""
+                if (!by[k]) { by[k] = []; order.push(k) }
+                by[k].push(samples[i].at)
+            }
+            return order.map(function (k) { return { kind: "region", points: by[k].slice(0, 1500), radius: radius, part: k, mode: mode } })
+        }
+        function inside(poly, x, y) {
+            var c = false
+            for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                var a = poly[i], b = poly[j]
+                if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) c = !c
+            }
+            return c
+        }
+        function finishLasso(poly) {                     // sample the visible surface inside the outline on an even grid
+            if (poly.length < 3) return []
+            var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9
+            for (var i = 0; i < poly.length; i++) { x0 = Math.min(x0, poly[i].x); y0 = Math.min(y0, poly[i].y); x1 = Math.max(x1, poly[i].x); y1 = Math.max(y1, poly[i].y) }
+            var step = Math.max(3, Math.sqrt((x1 - x0) * (y1 - y0) / 1400)), out = []
+            for (var y = y0 + step / 2; y < y1; y += step)
+                for (var x = x0 + step / 2; x < x1; x += step)
+                    if (inside(poly, x, y)) { var h = vp.hitAt(x, y); if (h) out.push({ at: h.at, part: h.part }) }
+            return regions(out, Math.max(0.3, step * vp.mmPerPx * 0.75), "lasso")
         }
         // a press on the part takes the keyboard from whatever text box had it, so V, M, F and the rest work again
-        onPressed: function (e) { vp.forceActiveFocus(); last = Qt.point(e.x, e.y); down = last; moved = false; vp.tween = false }
+        onPressed: function (e) {
+            vp.forceActiveFocus(); last = Qt.point(e.x, e.y); down = last; moved = false; vp.tween = false
+            if (vp.selecting && (vp.selectMode === "brush" || vp.selectMode === "lasso") && e.button === Qt.LeftButton && !(e.modifiers & Qt.AltModifier)) {
+                painting = true; _paint = []; vp.stroke = [Qt.point(e.x, e.y)]
+                if (vp.selectMode === "brush") sampleBrush(e.x, e.y)
+            }
+        }
         onPositionChanged: function (e) {
+            if (painting) {
+                if (Math.hypot(e.x - down.x, e.y - down.y) > 4) moved = true
+                var lp = vp.stroke[vp.stroke.length - 1]
+                if (Math.hypot(e.x - lp.x, e.y - lp.y) >= 2) vp.stroke = vp.stroke.concat([Qt.point(e.x, e.y)])
+                if (vp.selectMode === "brush") {          // a sample every half brush radius along the stroke
+                    var gap = Math.max(2, vp.brushMm / Math.max(1e-6, vp.mmPerPx) * 0.5), d = Math.hypot(e.x - _lastSample.x, e.y - _lastSample.y)
+                    for (var t = gap; t <= d; t += gap)
+                        sampleBrush(_lastSample.x + (e.x - _lastSample.x) * gap / d, _lastSample.y + (e.y - _lastSample.y) * gap / d)
+                }
+                return
+            }
             if (!pressed) {
                 if (vp.mapShown) { hoverAt = Qt.point(e.x, e.y); valueAt.restart(); return }
-                var f = vp.measuring ? "" : hit(e.x, e.y)
+                var f = vp.measuring || vp.selecting ? "" : hit(e.x, e.y)
                 if (f !== vp.hovered) vp.hovered = f
                 vp.hoveredFeature(f, e.x, e.y)
                 return
@@ -658,14 +857,30 @@ Item {
             }
         }
         onReleased: function (e) {
+            if (painting) {
+                painting = false
+                var add = !!(e.modifiers & Qt.ShiftModifier), items
+                if (vp.selectMode === "brush") { sampleBrush(e.x, e.y); items = regions(_paint, vp.brushMm, "brush") }
+                else if (!moved) {                        // a click with the lasso picks the face under it
+                    vp.stroke = []
+                    var h = vp.hitAt(e.x, e.y)
+                    if (h) vp.selPicked([{ kind: "face", at: h.at, part: h.part }], add); else vp.selMissed()
+                    return
+                } else items = finishLasso(vp.stroke)
+                vp.stroke = []
+                if (items.length) vp.selPicked(items, add); else vp.selMissed()
+                return
+            }
             if (held) { held = false; return }
             if (moved) return
             if (e.button === Qt.RightButton) { vp.contextRequested(hit(e.x, e.y), e.x, e.y); return }
             if (e.button !== Qt.LeftButton) return
-            if (vp.measuring) probe(e.x, e.y); else if (!vp.mapShown) vp.picked(hit(e.x, e.y))
+            if (vp.measuring) probe(e.x, e.y)
+            else if (vp.selecting) pick(e.x, e.y, !!(e.modifiers & Qt.ShiftModifier))
+            else if (!vp.mapShown) vp.picked(hit(e.x, e.y))
         }
         property bool held: false
-        onPressAndHold: function (e) { if (!moved && e.button === Qt.LeftButton && !vp.measuring) { held = true; vp.contextRequested(hit(e.x, e.y), e.x, e.y) } }
+        onPressAndHold: function (e) { if (!moved && !painting && e.button === Qt.LeftButton && !vp.measuring && !vp.selecting) { held = true; vp.contextRequested(hit(e.x, e.y), e.x, e.y) } }
         onExited: { if (vp.hovered) vp.hovered = ""; vp.hoveredFeature("", 0, 0); valueAt.stop(); vp.hoveredValue(0, 0, 0, false) }
         onWheel: function (w) {
             vp.tween = false

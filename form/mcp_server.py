@@ -700,6 +700,65 @@ def build() -> MCPServer:
             return analysis.measure(st, p, from_point, to_point, rev)
         return await _run(go)
 
+    # ── selections, annotations, colours and materials (form/selection.py, form/materials.py) ──
+    @mcp.tool(annotations=RO)
+    async def analyze_selection(project: str, items: list[dict], rev: int | None = None) -> dict:
+        """Analyse a selection on the CAD solid without saving it. items: up to 24 of
+        {"kind": "point" | "edge" | "face", "at": [x, y, z]} or {"kind": "region", "points": [[x, y, z], ...], "radius": mm}
+        in design millimetres with each part as printed (the frame measure uses). Per item: feature, face type, area,
+        normal and tilt to the bed, overhang, local wall thickness along the inward normal, gap in front, curvature radii,
+        height above the bed; an edge's length, radius and the angle its faces meet at; a region's painted area, overhang
+        share, features touched and thinnest sampled wall. Returns the numbers and `text`, the same in sentences.
+        Evidence class: computed."""
+        st = studio()
+        from . import selection
+        def go():
+            r = selection.analyze(st, st.load(project), items, rev)
+            for x in r["items"]:
+                x.pop("mesh", None)
+                if isinstance(x.get("edge"), dict):
+                    x["edge"].pop("segments", None)
+            return r
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def list_annotations(project: str) -> dict:
+        """The selections the person named and kept on this design (annotations): name, note, the revision they were
+        made on, the picked items and their computed analysis, and `text` describing each. An annotation from an older
+        revision describes that revision; reanalyse it with analyze_selection(items=...) to see the head."""
+        st = studio()
+        from . import selection
+        return {"annotations": await _run(selection.listing, st, project)}
+
+    @mcp.tool(annotations=RW)
+    async def annotate(project: str, items: list[dict], name: str = "", note: str = "", ctx: Context = None) -> dict:
+        """Keep a selection on the head revision with a name and a note (for example a place you want the person to look
+        at, or one you changed). items as in analyze_selection. Shown as a pin in Form Studio's viewport and listed in
+        its Annotations panel."""
+        st = studio()
+        from . import selection
+        a = await _run(selection.add, st, project, items, name, note, None, by=_origin(ctx))
+        act(project, "annotation", f"Annotated “{a['name']}”", ctx)
+        return a
+
+    @mcp.tool(annotations=RW)
+    async def set_appearance(project: str, part: str = "", color: str | None = None, material: str | None = None,
+                             clear: bool = False, ctx: Context = None) -> dict:
+        """Colour (#rrggbb) and material of the whole design (part="") or of one part (an assembly part id from
+        get_project / render). Materials: PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF. Form Studio draws the
+        colour, writes it into its 3MF and adds material notes to the checks (heat, sunlight, warping, flexible, fibre-filled);
+        stored in the same fields set_part_print uses (project material, parts.<id>.material), so the slicer picks the matching filament. Leave an argument out to keep it; clear=True removes both."""
+        st = studio()
+        from . import materials
+        def go():
+            had = materials.fingerprint(st.load(project))
+            out = materials.set_appearance(st, project, part, None if clear else (color if color is not None else "keep"),
+                                           None if clear else (material if material is not None else "keep"), by=_origin(ctx))
+            if materials.fingerprint(st.load(project)) != had and st.load(project).get("auto_run", True):
+                st.run(project)
+            return {"appearance": out, "materials": [{"id": k, "label": v["label"], "heat_c": v["heat_c"]} for k, v in materials.MATERIALS.items()]}
+        return await _run(go)
+
     @mcp.tool(annotations=RO, structured_output=False)
     async def suggest_orientation(project: str, ctx: Context = None) -> list:
         """Rank the ways the part can lie on the plate: the six axis orientations plus every flat face on its convex hull.

@@ -144,10 +144,7 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
             f"printer accuracy is {p['source']}" + (f" from {p['n']} measurements" if p["n"] else "") + ".",
             "model", feature=_fit_feature(recipe))
     out.extend(analysis.get("assembly") or [])     # interference, clearance, motion, tool access (form/assembly.py)
-    if ctx.get("materials"):                       # stated materials: heat, sun, flexible filament (form/materials.py)
-        from . import materials
-        big = max((x["size"][:2] for x in ctx.get("parts") or []), key=lambda s: s[0] * s[1], default=size[:2])
-        out.extend(materials.checks(ctx["materials"], row, ctx.get("material_brief", ""), big, bool(ctx.get("parts"))))
+    # material notes (heat, sunlight, warping, flexible and fibre-filled filament) come from form/materials.py
     return out
 
 

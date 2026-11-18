@@ -59,7 +59,7 @@ def bom(d) -> str:
     parts = asm["parts"] if asm else [{"label": d["p"]["name"], "solid": 0, "volume_mm3": d["view"]["volume_mm3"],
                                        "print_bbox": d["view"]["bbox"], "material": ""}]
     vol = sum(x["volume_mm3"] for x in parts) or 1.0
-    from . import materials                           # materials stated for the design or a part (form/materials.py)
+    from . import filaments as materials              # materials stated for the design or a part (form/filaments.py)
     stated = materials.of_project(d["p"], [{"id": x.get("id") or "", "material": x.get("material") or ""} for x in parts])
     for x in parts:
         x = dict(x, material=(stated["parts"].get(x.get("id") or "", {}).get("material") or materials.stated(d["p"])

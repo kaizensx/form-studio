@@ -873,7 +873,7 @@ def op_probe(key, recipe_id, values, at, orientation="as_modelled", tol=TOL):
     p = np.asarray(at, dtype=np.float64)
     if p.shape != (3,) or not np.all(np.isfinite(p)):
         raise ValueError("A point is x,y,z in millimetres.")
-    model = kernel._get(key, recipe_id, values, tol)
+    model = kernel._get_near(key, recipe_id, values, tol)
     mesh_design = bool(getattr(model["recipe"], "mesh", False))
     best = None
     for i, x in enumerate(model["faces"]):
@@ -892,7 +892,7 @@ def op_probe(key, recipe_id, values, at, orientation="as_modelled", tol=TOL):
     face = x["face"]
     R = orientation_matrix(orientation)
     out = {"at": [float(t) for t in p], "on": [float(t) for t in on], "off_surface_mm": round(dist, 4), "feature": x["feature"],
-           "evidence": "computed", "tessellation_mm": tol, "orientation": orientation, "mesh_design": mesh_design, "snaps": []}
+           "evidence": "computed", "tessellation_mm": model.get("tol", tol), "orientation": orientation, "mesh_design": mesh_design, "snaps": []}
 
     def tilt(n):
         up = float(np.clip((R @ np.asarray(n))[2], -1, 1))
@@ -1168,15 +1168,19 @@ def probe(st, p: dict, at, rev: int | None = None) -> dict:
                  orientation=p["orientation"], p=p)
 
 
-def measure(st, p: dict, a, b, rev: int | None = None) -> dict:
-    """Distance between two points, and what each of them is on."""
+def measure(st, p: dict, a, b, rev: int | None = None, a_on=None, b_on=None) -> dict:
+    """Distance between two points, and what each of them is on.
+
+    a and b are where the distance is taken. In an assembled or exploded view that is the arranged frame, while the
+    surface under each end is looked up on the part as printed: a_on and b_on, when given, are those points."""
     from .studio import StudioError
     try:
         out = distance([float(x) for x in a], [float(x) for x in b], p["orientation"])
+        ons = [[float(x) for x in q] if q is not None else None for q in (a_on, b_on)]
     except (TypeError, ValueError):
         raise StudioError("A measurement needs two points, each x,y,z in millimetres (design frame).")
     ends = []
-    for pt in (out["from"], out["to"]):
+    for pt in (ons[0] or out["from"], ons[1] or out["to"]):
         pr = probe(st, p, pt, rev)
         ends.append({"off_surface_mm": pr["off_surface_mm"], "feature": pr["feature"], "face": pr["face"]["type"]})
     out.update({"from_on": ends[0], "to_on": ends[1], "tessellation_mm": TOL, "rev": st.rev(p, rev)["n"],

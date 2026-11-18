@@ -23,7 +23,7 @@ from .recipes import RecipeBook, RecipeError, SCAD_PREFIX, SOURCE_PREFIX, is_sou
 from .worker import Kernel, KernelFailure
 from . import fsutil
 from . import printers as printers_mod
-from . import materials as materials_mod, plates as plates_mod
+from . import filaments as materials_mod, plates as plates_mod
 
 NODES = ["geometry", "exports", "checks", "slice"]
 STATICS_LABELS = {"tip_force_n": ("Tip-over force", "N"), "safety_factor": ("Bending safety factor", "x"),
@@ -662,6 +662,10 @@ class Studio:
         extra = self._plate_inputs(p, recipe)          # per-part orientation and material, plate spacing (form/plates.py)
         if extra:
             ck = H(ck, "plates", extra)
+        from . import materials as appearance_mod      # a chosen material adds its notes (none chosen: key unchanged)
+        mfp = appearance_mod.fingerprint(p)
+        if mfp:
+            ck = H(ck, "material", mfp)
         presets = {k: v["sha"] for k, v in s.get("presets", {}).items()} if s.get("available") else None
         sk = H("slice", ek, presets, slicer.version(s["app"], s.get("kind", "bambu")) if s.get("available") else None,
                *_slicer_tag(s))
@@ -1090,6 +1094,8 @@ class Studio:
             ctx["materials_unknown"] = mats["unknown"]
         fit = self.fit(p)
         items = checks_mod.build(self.recipe(p), summary, a, ctx, fit)
+        from . import materials as appearance_mod      # material notes: heat, sunlight, warping, flexible, fibre
+        items += appearance_mod.check_items(p, a, ctx)
         fc = self._freecad()
         if fc and "step" in ex["files"]:                # optional: re-read the exported STEP in FreeCAD
             step = self.apath(p, "exports", keys["exports"]) / ex["files"]["step"]["name"]

@@ -48,13 +48,14 @@ Rectangle {
                             Row { spacing: 8
                                 Txt { mono: true; font.pixelSize: 14; font.weight: 600; color: Theme.datum; text: row.modelData.label; wrapMode: Text.NoWrap }
                                 Tag { anchors.verticalCenter: parent.verticalCenter; text: row.modelData.how; kind: "computed" } }
-                            Txt { kind: "fine"; tone: 2; mono: row.modelData.kind === "distance"; width: parent.width; text: row.modelData.detail } }
+                            Txt { kind: "fine"; tone: 2; mono: row.modelData.kind === "distance"; width: parent.width; text: row.modelData.detail }
+                            Txt { kind: "fine"; tone: 3; width: parent.width; visible: !!row.modelData.context; text: row.modelData.context || "" } }
                         Btn { anchors.right: parent.right; anchors.rightMargin: -6; y: 4; small: true; kind: "quiet"; icon: "x"; tip: "Remove"; onClicked: Store.dropMeasure(row.modelData.id) }
                     }
                 }
             }
             Txt { kind: "fine"; width: parent.width
-                text: "Computed from the part’s surface, tessellated at 0.05 mm. Diameters marked exact come from the CAD solid; “fitted” means a circle fitted to mesh edges." }
+                text: "Computed on the part’s surface; faces and diameters marked exact come from the CAD solid, “fitted” means a circle fitted to mesh edges. A distance between two parts belongs to the view it was taken in." }
         }
     }
 }

@@ -34,6 +34,7 @@ QtObject {
     readonly property color amber: "#e9b860"
     readonly property color signal: "#ff6f51"
     readonly property color pass: "#86d9ad"
+    readonly property color annotate: "#c7b2ff"                 // selections and annotations on the part
     readonly property color clay: "#d8d3c8"
     readonly property color datumHi: "#cdf2e4"                  // primary button, hovered
     readonly property color focus: Qt.rgba(0.725, 0.91, 0.843, 0.6)   // keyboard focus ring (datum)
