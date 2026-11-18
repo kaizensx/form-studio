@@ -419,19 +419,113 @@ export async function initHero() {
     S.stage = "prove"; renderTabs(); renderPanel(false);
   }
 
+  // ---------- screens: Home (Home.qml) and the workspace ----------
+  const seg = document.querySelector(".scr-seg");
+  const homeField = $("#home-field"), homeGo = $("#home-go");
+  let screen = "work", skipHome = false;
+  function setScreen(s) {
+    screen = s;
+    app.classList.toggle("on-home", s === "home");
+    if (s === "home") app.classList.remove("blank");
+    seg?.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.scr === s)));
+    closeMenu();
+    if (s === "work") requestAnimationFrame(() => vp.kick());
+  }
+  const greet = () => { const h = new Date().getHours(); return h < 5 ? "Working late" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; };
+  $("#home-greet").textContent = greet();
+  seg?.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; story.takeover(); if (b.dataset.scr === "work" && !S.built) finished(); setScreen(b.dataset.scr); });
+  $("#tb-home").addEventListener("click", () => { story.takeover(); setScreen("home"); });
+  const goState = () => homeGo.classList.toggle("on", homeField.value.trim().length > 0);
+  homeField.addEventListener("input", () => { story.takeover(); goState(); });
+  homeField.addEventListener("focus", () => story.takeover());
+  homeField.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); homeGo.click(); } });
+  homeGo.addEventListener("click", () => {
+    if (!homeField.value.trim()) return;
+    // the page has one sample project: it opens, and the conversation that made it plays from the request on
+    story.takeover(); homeField.value = ""; goState();
+    skipHome = true; story.start();
+  });
+  const LEAD = { print: "Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD, checked and sliced for your printer.",
+    model: "Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD you can check and export." };
+  document.querySelector(".hseg").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return; story.takeover();
+    document.querySelectorAll(".hseg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    $("#home-lead").textContent = LEAD[b.dataset.p]; $("#home-printer").style.display = b.dataset.p === "print" ? "" : "none";
+  });
+  const openDock = () => { story.takeover(); app.classList.remove("blank"); finished(); setScreen("work"); };
+  $("#home-cont").addEventListener("click", openDock);
+  $("#home-scr").addEventListener("click", (e) => {
+    const c = e.target.closest(".hcard"); if (!c) return;
+    if (c.dataset.open === "dock") openDock();
+    else { story.takeover(); document.getElementById("assemblies")?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth" }); }
+  });
+  $("#home-blank").addEventListener("click", () => { story.takeover(); reset(); app.classList.add("blank"); $("#talk-title").textContent = "New conversation"; setScreen("work"); });
+
+  // ---------- the model menu (TalkModelPicker.qml), as the app shows it on a computer with three agent apps ----------
+  const AGENTS = [
+    { id: "claude", label: "Claude Code", note: "your account", efforts: ["default", "low", "medium", "high", "xhigh", "max"],
+      models: [{ id: "default", label: "Default", note: "Claude Code chooses for your account. Its version shows here after a reply with Default." },
+        ...["fable", "opus", "sonnet", "haiku"].map((a) => ({ id: a, label: a[0].toUpperCase() + a.slice(1), note: `Alias for the latest ${a} model. The version shows here after its first reply.` }))] },
+    { id: "codex", label: "Codex", note: "your account · no cost figure", models: [{ id: "default", label: "Default", note: "Whatever Codex is set to use" }] },
+    { id: "gemini", label: "Gemini CLI", note: "your account · no cost figure", models: [{ id: "default", label: "Default", note: "Whatever Gemini CLI is set to use" }] },
+  ];
+  const pick = { agent: "claude", model: "default", effort: "default" };
+  const menu = $("#mmenu");
+  let menuFor = null;
+  const chipText = () => { const a = AGENTS.find((x) => x.id === pick.agent), m = a.models.find((x) => x.id === pick.model) || a.models[0]; return `${a.label} · ${m.label}`; };
+  function renderMenu() {
+    const a = AGENTS.find((x) => x.id === pick.agent);
+    menu.innerHTML = `<span class="mm-cap">Agent apps</span>
+      ${AGENTS.map((x) => `<button type="button" class="mm-ag ${x.id === pick.agent ? "on" : ""}" data-ag="${x.id}" role="radio" aria-checked="${x.id === pick.agent}"><span class="rd"></span><b>${esc(x.label)}</b><small>${esc(x.note)}</small></button>`).join("")}
+      <div class="mm-add">${icon("e13d")}Add an agent, an API key, a provider or a local model…</div>
+      <div class="mm-rule"></div><span class="mm-cap">Model</span>
+      ${a.models.map((m) => `<button type="button" class="mm-mo ${m.id === pick.model ? "on" : ""}" data-mo="${m.id}" title="${esc(m.note)}"><b>${esc(m.label)}</b><span>${esc(m.note)}</span>${icon(I.check)}</button>`).join("")}
+      ${pick.agent === "claude" ? `<div class="mm-custom">Custom model id</div><div class="mm-rule"></div><span class="mm-cap">Effort</span>
+      <div class="mm-eff">${a.efforts.map((e) => `<button type="button" data-ef="${e}" aria-pressed="${e === pick.effort}">${e}</button>`).join("")}</div>` : ""}`;
+    document.querySelectorAll(".mpick .ml").forEach((l) => { l.textContent = chipText(); });
+  }
+  function placeMenu(anchor) {
+    const a = app.getBoundingClientRect(), r = anchor.getBoundingClientRect(), s = compact.matches ? 1 : a.width / 1440;
+    const x = (r.left - a.left + r.width / 2) / s, top = (r.top - a.top) / s, bottom = (r.bottom - a.top) / s;
+    menu.style.left = `${Math.max(10, Math.min(1440 - 390, x - 190))}px`;
+    if (anchor.id === "talk-model") { menu.style.top = ""; menu.style.bottom = `${(a.height / s) - top + 8}px`; menu.style.transformOrigin = "bottom center"; }
+    else { menu.style.bottom = ""; menu.style.top = `${bottom + 6}px`; menu.style.transformOrigin = "top center"; }
+    menu.style.maxHeight = compact.matches ? "" : `${Math.min(560, Math.max(220, anchor.id === "talk-model" ? top - 60 : 880 - bottom - 18))}px`;
+  }
+  function openMenu(anchor) {
+    if (menuFor === anchor) return closeMenu();
+    closeMenu(); renderMenu(); menu.hidden = false; placeMenu(anchor); menuFor = anchor; anchor.setAttribute("aria-expanded", "true");
+  }
+  function closeMenu() { if (!menuFor) return; menu.hidden = true; menuFor.setAttribute("aria-expanded", "false"); menuFor = null; }
+  document.querySelectorAll(".mpick").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); story.takeover(); openMenu(b); }));
+  menu.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const ag = e.target.closest("[data-ag]"), mo = e.target.closest("[data-mo]"), ef = e.target.closest("[data-ef]");
+    if (ag) { pick.agent = ag.dataset.ag; pick.model = "default"; pick.effort = "default"; renderMenu(); }
+    else if (mo) { pick.model = mo.dataset.mo; renderMenu(); closeMenu(); }
+    else if (ef) { pick.effort = ef.dataset.ef; renderMenu(); }
+  });
+  document.addEventListener("click", (e) => { if (menuFor && !menu.contains(e.target)) closeMenu(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
+  renderMenu();
+
   // ---------- the story ----------
   const story = makeStory(async (wait) => {
     reset();
-    await wait(900);
-    // the visitor's request
-    await pointTo(field, wait, 0.3, 0.5);
-    await click(wait);
-    field.className = "field"; field.innerHTML = '<span class="typed"></span>';
-    const typed = field.firstChild;
-    for (let i = 0; i <= d.brief.length; i += 3) { typed.textContent = d.brief.slice(0, i); await wait(24); }
-    typed.textContent = d.brief; send.classList.add("on");
-    await pointTo(send, wait); await click(wait);
-    field.textContent = "Ask about Hallway phone dock, or describe a change…"; field.className = "field ph"; send.classList.remove("on");
+    if (!skipHome) {
+      // the visitor's request, on Home: typed into the composer, then Design it
+      setScreen("home");
+      await wait(1100);
+      await pointTo(homeField, wait, 0.25, 0.4);
+      await click(wait);
+      for (let i = 0; i <= d.brief.length; i += 3) { homeField.value = d.brief.slice(0, i); goState(); await wait(26); }
+      homeField.value = d.brief; goState();
+      await wait(300);
+      await pointTo(homeGo, wait); await click(wait);
+      homeField.value = ""; goState();
+    }
+    skipHome = false;
+    setScreen("work");
     scroll.innerHTML = ""; addUser(d.brief);
     $("#talk-title").textContent = "A dock for my phone on the hallway shelf";
     ptr.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: "forwards" }); setTimeout(() => ptr.classList.remove("on"), 300); ptr.getAnimations().forEach((a) => a.id === "f" && a.cancel());
@@ -499,8 +593,10 @@ export async function initHero() {
 
   // ?still (or reduced motion) shows the finished state; ?stage=fit, ?sim=60, ?map open a given view of it
   const q = new URLSearchParams(location.search);
-  if (reducedMotion() || q.has("still") || q.has("stage") || q.has("sim") || q.has("map")) {
+  if (reducedMotion() || q.has("still") || q.has("home") || q.has("stage") || q.has("sim") || q.has("map")) {
     finished(); story.idle();
+    if (q.has("home")) setScreen("home");
+    if (q.get("home") === "menu") openMenu($("#home-model"));
     if (q.get("stage")) setStage(q.get("stage"), false);
     if (q.has("map")) setMap(true);
     if (q.has("sim")) { await setSim(true); setP(+q.get("sim") || TP.meta.z.length); }

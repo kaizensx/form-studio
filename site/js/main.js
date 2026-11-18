@@ -81,6 +81,87 @@ const os = /Win/i.test(plat + ua) ? "win" : /Linux|X11/i.test(plat) && !/Android
   }
 }
 
+// scroll progress, drawn under the nav
+{
+  const bar = $("#scroll-bar");
+  if (bar) {
+    let queued = false;
+    const draw = () => { queued = false; const h = document.documentElement.scrollHeight - innerHeight; bar.style.setProperty("--p", h > 0 ? Math.min(1, scrollY / h) : 0); };
+    addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(draw); } }, { passive: true });
+    draw();
+  }
+}
+
+// See it move: clips recorded from the app. One video element; the chapters advance on their own, the clip plays
+// only while it is on screen, and with reduced motion only the first frame is shown until the visitor presses play.
+{
+  const box = $("#reel-box");
+  if (box) {
+    const v = $("#reel-v"), pp = $("#reel-pp"), view = box.querySelector(".reel-view");
+    const tabs = [...box.querySelectorAll('[role="tab"]')];
+    // held: the visitor paused it; still: reduced motion and nothing pressed yet (only the poster shows)
+    let cur = 0, seen = false, held = false, still = reducedMotion();
+    const src = (clip) => `assets/media/${clip}.mp4`;
+    const icon = () => { const paused = v.paused; view.classList.toggle("paused", paused); pp.setAttribute("aria-label", paused ? "Play" : "Pause");
+      pp.querySelector(".i").innerHTML = paused ? "&#xe13c;" : "&#xe12e;"; };
+    const tryPlay = () => { if (still || held) return; const p = v.play(); if (p && p.catch) p.catch(() => icon()); };
+    const show = (i, play, picked) => {
+      cur = (i + tabs.length) % tabs.length;
+      const t = tabs[cur], clip = t.dataset.clip;
+      tabs.forEach((b, k) => { const on = k === cur; b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1; b.style.setProperty("--t", 0); });
+      v.classList.add("swap");
+      setTimeout(() => {
+        v.poster = `assets/media/${clip}.webp`;
+        v.src = src(clip);
+        v.setAttribute("aria-label", t.dataset.label);
+        v.load();
+        v.classList.remove("swap");
+        if (play && (seen || picked)) tryPlay();
+      }, 180);
+    };
+    const pick = (i) => { held = false; still = false; show(i, true, true); };
+    v.addEventListener("timeupdate", () => { if (v.duration) tabs[cur].style.setProperty("--t", v.currentTime / v.duration); });
+    v.addEventListener("ended", () => show(cur + 1, true));
+    v.addEventListener("play", icon); v.addEventListener("pause", icon);
+    pp.addEventListener("click", () => { if (v.paused) { held = false; still = false; tryPlay(); } else { held = true; v.pause(); } });
+    view.addEventListener("click", (e) => { if (e.target === v) pp.click(); });
+    box.querySelector('[role="tablist"]').addEventListener("click", (e) => { const b = e.target.closest('[role="tab"]'); if (b) pick(tabs.indexOf(b)); });
+    box.querySelector('[role="tablist"]').addEventListener("keydown", (e) => {
+      const d = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+      if (d) { e.preventDefault(); pick(cur + d); tabs[cur].focus(); }
+    });
+    new IntersectionObserver((es) => es.forEach((e) => {
+      seen = e.isIntersecting;
+      if (seen) { if (!v.getAttribute("src")) { v.preload = "auto"; show(cur, true); } else tryPlay(); }
+      else if (!v.paused) v.pause();
+    }), { threshold: 0.35 }).observe(view);
+    icon();
+  }
+}
+
+// numbers count up once, as they come into view
+{
+  const nums = [...document.querySelectorAll(".stats b[data-count]")];
+  if (nums.length && !reducedMotion()) {
+    const run = (el) => {
+      const to = +el.dataset.count, t0 = performance.now(), dur = 1100 + to * 4;
+      const step = (now) => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 4); el.textContent = String(Math.round(to * e)); if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    };
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { run(e.target); io.unobserve(e.target); } }), { threshold: 0.6 });
+    nums.forEach((el) => { if (el.getBoundingClientRect().top > innerHeight) { el.textContent = "0"; io.observe(el); } });
+  }
+}
+
+// a soft light follows the pointer over the cards
+document.addEventListener("pointermove", (e) => {
+  const c = e.target.closest && e.target.closest(".fgrid li, .cgrid li a, .reel-tabs button");
+  if (!c) return;
+  const r = c.getBoundingClientRect();
+  c.style.setProperty("--mx", `${e.clientX - r.left}px`);
+  c.style.setProperty("--my", `${e.clientY - r.top}px`);
+}, { passive: true });
+
 // recipes: the same index the app reads
 initRecipeCards($("#recipe-teaser"), { limit: 8, base: "" });
 
