@@ -94,7 +94,7 @@ def run(ui):
         ui.wait_until(lambda: ui.store.get("chatModel") not in ("", "default"), 5, "the model to be picked")
         picked = ui.store.get("chatModel")
         ui.check(picked.startswith("globex/vision-"), picked)
-        ui.wait_until(lambda: ui.store.get("chatBusy") is False and ui.sees("recipes for docks"), 90, "the reply")
+        ui.wait_until(lambda: ui.store.get("chatBusy") is False and ui.sees("recipes for docks"), 240, "the reply")    # the tool server loads the CAD kernel first: slow on Windows runners
         ui.eq(srv.requests[0]["model"], picked, "the waiting message went out with the model picked")
         ui.check(any(m["role"] == "tool" for m in srv.requests[1]["messages"]), "through Form Studio's real tools")
         ui.settle(300)

@@ -57,11 +57,8 @@ class Control:
                 r.close()
             except Exception:
                 pass
-        if self.mcp is not None and self.mcp.proc.poll() is None:
-            try:
-                self.mcp.proc.terminate()
-            except OSError:
-                pass
+        if self.mcp is not None:
+            self.mcp.kill()
 
     def wait(self, timeout=None):
         return self.returncode

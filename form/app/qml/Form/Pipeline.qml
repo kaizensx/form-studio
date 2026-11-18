@@ -50,7 +50,7 @@ Rectangle {
         if (s === "off") return pl.roomy ? "design only, not sliced" : "design only"
         if (s !== "current") return n.error ? n.error.message : (id === "slice" && n.unavailable) ? "slicer unavailable" : s === "stale" ? "made for " + F.pad(n.last_rev || 0) : s === "blocked" ? "waiting" : "not made"
         if (id === "geometry") return Store.view ? Store.view.faces + " faces" : ""
-        if (id === "exports") return d.exports ? (d.exports.files.step ? ".step .stl .3mf" : ".stl only (mesh)") : ""
+        if (id === "exports") return d.exports ? ["step", "stl", "obj", "glb"].filter(function (k) { return !!d.exports.files[k] }).map(function (k) { return "." + k }).join(" ") : ""
         if (id === "checks") { var r = d.checks ? d.checks.rollup : null; if (!r) return ""
             if (roomy) return r.PASS + " pass · " + r.WARN + " review · " + r.FAIL + " fail"
             return r.FAIL ? r.FAIL + " fail · " + r.WARN + " review" : r.WARN ? r.PASS + " pass · " + r.WARN + " review" : r.PASS + " pass" }
@@ -59,9 +59,12 @@ Rectangle {
         return ""
     }
     function tint(s) { return s === "current" ? Theme.pass : s === "running" ? Theme.datum : s === "failed" ? Theme.signal : s === "stale" ? Theme.amber : Theme.ink4 }
+    // a 3D model (form/purpose.py) is never sliced: its strip has no Slice step at all
     readonly property var nodes: [
         { id: "params", label: "Parameters", stage: "shape" }, { id: "geometry", label: "Solid", stage: "shape" }, { id: "exports", label: "Exports", stage: "release" },
         { id: "checks", label: "Checks", stage: "prove" }, { id: "slice", label: "Slice", stage: "prove" }, { id: "release", label: "Release", stage: "release" }]
+        .filter(function (n) { return n.id !== "slice" || !Store.modelDesign })
+    onNodesChanged: needs = nodes.map(function () { return 0 })
     Row {
         id: row; anchors.fill: parent; anchors.leftMargin: 4; anchors.rightMargin: 4
         Repeater {

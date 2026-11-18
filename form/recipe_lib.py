@@ -450,13 +450,14 @@ def tags(items: list[dict]) -> list[dict]:
     return [{"tag": t, "count": c} for t, c in sorted(n.items(), key=lambda kv: (-kv[1], kv[0]))]
 
 
-def create_from(st, rid: str, name: str = "", brief: str = "") -> dict:
+def create_from(st, rid: str, name: str = "", brief: str = "", purpose: str | None = None, process: str | None = None) -> dict:
     """A new project from an installed recipe. This runs the recipe's code in the kernel worker."""
     s = source(st.root, rid)
     if s["sha256_now"] != s["sha256"]:
         raise LibraryError("The installed file was changed after it was installed.",
                            "Uninstall it and install it again so you can review what it now contains.")
-    return st.create_design(name.strip() or s["title"], s["source"], brief, language="openscad" if s["kind"] == "scad" else "python")
+    return st.create_design(name.strip() or s["title"], s["source"], brief, language="openscad" if s["kind"] == "scad" else "python",
+                            purpose=purpose, process=process)
 
 
 # ---- command line ------------------------------------------------------------------------------------------------

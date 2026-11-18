@@ -42,15 +42,14 @@ def journey_blank(ui):
     home(ui)
     ui.shot("start-home-empty")
     # Just a 3D model: no printer, no print checks
-    ui.click_text("Just a 3D model", within=ui.item("purposeSeg"))
-    ui.wait_until(lambda: ui.store.get("purpose") == "model", 3, "the purpose to change")
-    ui.eq(ui.api("/start")["purpose"], "model", "the choice is remembered by the engine")
+    ui.click_text("Just a 3D model", within=ui.item("startPurpose"))
+    ui.wait_until(lambda: ui.js("Store.newPurposeEffective") == "model", 3, "the purpose of the next design to change")
     ui.click("startBlank")
     ui.wait_until(lambda: ui.store.get("screen") == "work" and ui.store.get("pid"), 120, "the blank design to open in the workspace")
     pid = ui.store.get("pid")
     p = ui.api("/projects/" + pid)["project"]
     ui.eq(p.get("purpose"), "model", "the blank design is just a 3D model")
-    ui.check(p.get("design_only") is True, "so it is not sliced")
+    ui.eq(ui.api("/projects/" + pid)["status"]["slice"]["off"]["why"], "purpose", "so it is not sliced")
     ui.eq(ui.store.get("chatBusy"), False, "no agent was started")
     wait_job(ui, pid)
     ui.settle(600)
@@ -60,8 +59,8 @@ def journey_blank(ui):
 
 def journey_photo_reaches_the_agent(ui):
     home(ui)
-    ui.click_text("For my printer", within=ui.item("purposeSeg"))
-    ui.wait_until(lambda: ui.api("/start")["purpose"] == "print", 5, "the purpose back to printing")
+    ui.click_text("For my printer", within=ui.item("startPurpose"))
+    ui.wait_until(lambda: ui.js("Store.newPurposeEffective") == "print", 5, "the purpose back to printing")
     photo = Path(ui.files) / "desk-clip.png"
     shutil.copyfile(ROOT / "form" / "app" / "assets" / "icon-256.png", photo)
     ui.pick_file(photo)

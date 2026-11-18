@@ -117,32 +117,27 @@ class Sketches(unittest.TestCase):
 # ---- purpose and Blank ---------------------------------------------------------------------------------------------
 
 class PurposeAndBlank(Env):
-    def test_blank_builds_and_purpose_sets_design_only(self):
+    def test_blank_builds_with_its_purpose(self):
         p = start.blank(self.st, "My block", "model")
-        self.assertEqual((p["name"], p["purpose"], p["design_only"]), ("My block", "model", True))
+        self.assertEqual((p["name"], p["purpose"]), ("My block", "model"))
         self.assertEqual(self.st.rev(p)["values"], {"width": 60.0, "depth": 40.0, "height": 20.0, "corner_r": 3.0})
         s = self.st.head_summary(p)                                         # a real build in the kernel
         size = [round(b - a, 3) for a, b in zip(*s["bbox"])]
         self.assertEqual(size, [60.0, 40.0, 20.0])
         self.assertLess(s["volume_mm3"], 60 * 40 * 20)                     # the corners are rounded
-        self.assertEqual(self.st.slice_mode(self.st.load(p["id"]))["why"], "project")
+        self.assertEqual(self.st.slice_mode(self.st.load(p["id"]))["why"], "purpose")
         p = start.set_purpose(self.st, p["id"], "print")
-        self.assertEqual((p["purpose"], p["design_only"]), ("print", False))
+        self.assertEqual(p["purpose"], "print")
         kinds = [d["kind"] for d in self.st.load(p["id"])["decisions"]]
-        self.assertIn("design_only", kinds)                               # the same record Settings makes
-        self.assertIn("purpose", kinds)
+        self.assertIn("purpose", kinds)                                   # the same record Settings makes
         row = next(r for r in self.st.list() if r["id"] == p["id"])
         self.assertEqual((row["purpose"], row["concept"]), ("print", None))
         with self.assertRaises(StudioError):
             start.set_purpose(self.st, p["id"], "toy")
 
-    def test_remembered_choice(self):
+    def test_default_purpose(self):            # the engine's default (form/purpose.py), and the printer's name
         self.assertIn(start.state(self.st)["purpose"], start.PURPOSES)
         self.assertIn("available", start.state(self.st)["printer"])
-        start.set_prefs(self.st, "model")
-        self.assertEqual(start.state(self.st)["purpose"], "model")
-        start.set_prefs(self.st, "print")
-        self.assertEqual(start.get_prefs(self.st)["purpose"], "print")
 
     def test_purpose_lines(self):
         self.assertEqual(start.purpose_line("print", "A1 mini"), "Purpose: for 3D printing on A1 mini")
@@ -425,11 +420,10 @@ class Concepts(Env):
                 return json.loads(e.read())
         try:
             self.assertIn(call("/start")["purpose"], start.PURPOSES)
-            self.assertEqual(call("/start/purpose", {"purpose": "model"})["purpose"], "model")
-            self.assertIn("error", call("/start/purpose", {"purpose": "toy"}))
-            got = call("/start/blank", {"name": "Route block"})
+            self.assertIn("error", call("/start/blank", {"name": "Toy", "purpose": "toy"}))
+            got = call("/start/blank", {"name": "Route block", "purpose": "model"})
             self.assertTrue(got["job"])
-            self.assertEqual(self.st.load(got["id"])["purpose"], "model")      # the remembered choice
+            self.assertEqual(self.st.load(got["id"])["purpose"], "model")
             row = call(f"/projects/{got['id']}/purpose", {"purpose": "print"})
             self.assertEqual((row["id"], row["purpose"]), (got["id"], "print"))
             b = concepts.create(self.st, "Route hook", TINY[:2])

@@ -25,7 +25,10 @@ def make_handler(st: Studio):
     if not hasattr(st, "chat"):
         st.chat = chat_mod.Chat(st.cfg, st.root, mcp_command())
     if getattr(st.chat, "studio", None) is None:      # names the printer in the agent's "Purpose:" line
-        st.chat.studio = st
+        try:
+            st.chat.studio = st
+        except AttributeError:                      # a stand-in chat (tests) that takes no attributes
+            pass
     from . import setup_app, updates           # first-run setup and update notices (desktop app)
     if not hasattr(st, "setup_app"):
         st.setup_app = setup_app.Setup(st.cfg, st)
@@ -412,7 +415,8 @@ def make_handler(st: Studio):
             path = urlparse(self.path).path
             body = self._body()
             if path == "/api/projects":
-                p = st.create(body.get("name", ""), body.get("recipe", ""), body.get("brief", ""), body.get("values"))
+                p = st.create(body.get("name", ""), body.get("recipe", ""), body.get("brief", ""), body.get("values"),
+                              purpose=body.get("purpose"), process=body.get("process"))
                 job = st.run(p["id"])
                 return self._json({"id": p["id"], "job": job})
             if path == "/api/import":

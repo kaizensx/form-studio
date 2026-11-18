@@ -637,9 +637,12 @@ def survey(cfg: dict, platform: str | None = None, which=None, only: list[str] |
                      "absent": sw.id.startswith("agent.") and f.status == "info"})
     by = {r["id"]: r for r in rows}
     families_ok = {r["one_of"] for r in rows if r["one_of"] and r["status"] == "ok"}
+    from . import purpose as purpose_mod
     for r in rows:
         if r["one_of"] in families_ok and r["status"] != "ok":
             r["level"] = "optional"                      # one slicer is enough
+        if r["group"] == "slicer" and not purpose_mod.printing(cfg):
+            r["level"] = "optional"                      # "I just design": no slicer is needed
         blocked = [n for n in r["needs"] if n in by and by[n]["status"] != "ok"]
         if blocked and r["status"] not in ("ok", "info"):
             r["installable"] = False
@@ -1182,8 +1185,16 @@ def auto_ids(rows: list[dict], cfg: dict | None = None) -> list[str]:
             continue
         if r["id"].startswith("slicer.") and cfg is not None and not (cfg.get("slicer") or {}).get("enabled", True):
             continue                                     # Design only: the person chose to work without a slicer
+        if r["id"].startswith("slicer.") and cfg is not None and not _prints(cfg):
+            continue                                     # no printer, or not said yet: a slicer waits for "I have a 3D printer"
         out.append(r["id"])
     return out
+
+
+def _prints(cfg: dict) -> bool:
+    """A slicer is installed by itself only for someone who said they have a 3D printer."""
+    from . import purpose as purpose_mod
+    return purpose_mod.printing(cfg) and purpose_mod.decided(cfg)
 
 
 def _fake_s() -> float:

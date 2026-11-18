@@ -115,7 +115,8 @@ def route_post(st, path: str, body, q: dict):
     if path == "/api/recipes/uninstall":
         return _call(recipe_lib.uninstall, st.root, str(b.get("id", "")))
     if path == "/api/recipes/create":
-        p = _call(recipe_lib.create_from, st, str(b.get("id", "")), str(b.get("name", "")), str(b.get("brief", "")))
+        p = _call(recipe_lib.create_from, st, str(b.get("id", "")), str(b.get("name", "")), str(b.get("brief", "")),
+                  b.get("purpose"), b.get("process"))
         return {"id": p["id"], "job": st.run(p["id"])}
     if path == "/api/archive/import":
         if not isinstance(body, bytes):

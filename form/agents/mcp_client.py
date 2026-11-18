@@ -23,9 +23,14 @@ class MCPError(RuntimeError):
 
 class MCPClient:
     def __init__(self, command: str, args: list, env: dict | None = None, cwd: str | None = None):
+        kw = {}
+        if os.name == "nt":
+            kw["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        else:
+            kw["start_new_session"] = True              # its own process group: kill() also ends the CAD kernel it started
         self.proc = subprocess.Popen([command, *args], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
-                                     bufsize=1, cwd=cwd, env=dict(os.environ, **(env or {})))
+                                     bufsize=1, cwd=cwd, env=dict(os.environ, **(env or {})), **kw)
         self._next = 0
         self._wait: dict[int, dict | None] = {}
         self._cv = threading.Condition()
@@ -119,22 +124,47 @@ class MCPClient:
         except MCPError as e:
             return {"content": [{"type": "text", "text": str(e)}], "isError": True}
 
-    def close(self) -> None:
+    def close(self, grace: float = 10.0) -> None:
+        """End the server: it exits on its own when its input closes; after `grace` seconds it and everything it
+        started are killed. Returns once the process has ended, so nothing still holds the conversation folder (on
+        Windows a folder cannot be deleted while a process runs in it)."""
         if self.proc.poll() is None:
             try:
                 self.proc.stdin.close()
             except OSError:
                 pass
             try:
-                self.proc.wait(timeout=2)
+                self.proc.wait(timeout=grace)
             except subprocess.TimeoutExpired:
-                self.proc.terminate()
-                try:
-                    self.proc.wait(timeout=3)
-                except subprocess.TimeoutExpired:
-                    self.proc.kill()
-        for pipe in (self.proc.stdout, self.proc.stderr):
+                self.kill()
+        for pipe in (self.proc.stdin, self.proc.stdout, self.proc.stderr):
             try:
                 pipe.close()
             except (OSError, ValueError):
+                pass
+
+    def kill(self) -> None:
+        """Stop the server and its children now (the CAD kernel worker; on Windows the interpreter a venv's
+        python.exe starts). Never raises."""
+        if self.proc.poll() is not None:
+            return
+        try:
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/T", "/F", "/PID", str(self.proc.pid)], capture_output=True,
+                               stdin=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            else:
+                import signal
+                try:
+                    os.killpg(self.proc.pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    self.proc.kill()
+        except OSError:
+            pass
+        try:
+            self.proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            try:
+                self.proc.kill()
+                self.proc.wait(timeout=5)
+            except (OSError, subprocess.TimeoutExpired):
                 pass

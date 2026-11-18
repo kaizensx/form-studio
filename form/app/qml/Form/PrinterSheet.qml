@@ -68,7 +68,7 @@ Column {
         else if (where === "project") body.project = Store.pid
         Store.post("/printers/use", body).then(function (r) {
             return Store.reloadStudio().then(function () { return Store.pid ? Store.refresh() : null }).then(function () {
-                ps.busy = ""; ps.load(false)
+                ps.busy = ""; ps.load(false); Store.loadConfig(); Store.rerunIfStale()
                 Store.toast(where === "clear" ? "This design follows the default printer again"
                             : where === "default" ? "Default printer: " + ps.pick.name : "Printer for this design: " + ps.pick.name,
                             where === "default" ? "Saved in studio.toml" + (r.backup ? " (backup kept)." : ".") : "The slice and checks follow it on the next run.")

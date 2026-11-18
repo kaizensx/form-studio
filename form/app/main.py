@@ -170,6 +170,8 @@ def main(argv=None) -> int:
     tick = QTimer(); tick.start(250); tick.timeout.connect(lambda: None)     # let Python see Ctrl+C
     app.exec()
     httpd.shutdown()
+    if getattr(st, "chat", None) is not None:        # end agent runs and their tool servers with the app
+        st.chat.shutdown()
     st.kernel.stop()
     return code["rc"]
 

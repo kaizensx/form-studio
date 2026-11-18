@@ -24,6 +24,7 @@ from .worker import Kernel, KernelFailure
 from . import fsutil
 from . import printers as printers_mod
 from . import filaments as materials_mod, plates as plates_mod
+from . import purpose as purpose_mod
 
 NODES = ["geometry", "exports", "checks", "slice"]
 STATICS_LABELS = {"tip_force_n": ("Tip-over force", "N"), "safety_factor": ("Bending safety factor", "x"),
@@ -32,6 +33,7 @@ NODE_LABEL = {"geometry": "Solid", "exports": "STEP + STL", "checks": "Checks", 
 # what a Design only release does not contain or say, in the gate, the manifest and the report
 NOT_COVERED = ["No slice: print time and filament are not estimated.", "No sliced 3MF or G-code in the release.",
                "No print simulation: supports, bridges and the first layer are not previewed."]
+MODEL_ENVELOPE = [1e6, 1e6, 1e6]       # a 3D model is checked against no printer: nothing is too big
 STL_TOL = 0.01
 REF_FORMATS = (".step", ".stp", ".stl")
 SCHEMA = "form-project/1"
@@ -273,7 +275,10 @@ class Studio:
 
     # ---- Design only: slicing is optional (per design, for every design, or because no slicer is installed) ----
     def slice_mode(self, p: dict | None = None) -> dict:
-        """{"on": bool, "why": "" | "settings" | "project" | "no_slicer", "text", "how"}."""
+        """{"on": bool, "why": "" | "purpose" | "settings" | "project" | "no_slicer", "text", "how"}."""
+        if purpose_mod.is_model(p):
+            return {"on": False, "why": "purpose", "text": "This design is a 3D model, not made for 3D printing, so it is not sliced.",
+                    "how": "To print it, set its purpose to “For 3D printing” in the design's settings."}
         if not self.cfg["slicer"].get("enabled", True):
             return {"on": False, "why": "settings", "text": "Slicing is turned off for every design.",
                     "how": "Turn on Settings › Printer and slicer › Slice designs, or set [slicer].enabled = true in studio.toml."}
@@ -395,6 +400,7 @@ class Studio:
     def environment(self) -> dict:
         s = self.slicer_info()
         return {"version": __version__, "kernel": self.kernel_id(), "slicer": slicer.public(s), "slicing": self.slice_mode(),
+                "purpose": purpose_mod.catalogue(self.cfg),
                 "printer": self.cfg["printer"], "profile": self.profile(),
                 "models": {k: v for k, v in self.cfg["models"].items()},
                 "config_path": self.cfg["_path"], "data_dir": str(self.root),
@@ -420,8 +426,7 @@ class Studio:
                     out.append({"id": p["id"], "name": p["name"], "recipe": p["recipe"], "head": p["head"],
                                 "revisions": len(p["revisions"]), "updated": p.get("updated", p["created"]),
                                 "approved_rev": (p["approvals"][-1]["rev"] if p["approvals"] else None),
-                                # concepts first (form/concepts.py) and what the design is for (form/start.py)
-                                "concept": p.get("concept"), "purpose": p.get("purpose")})
+                                "purpose": purpose_mod.of(p), "concept": p.get("concept")})   # concepts: form/concepts.py
                 except StudioError as e:
                     out.append({"id": d.name, "name": d.name, "error": str(e)})
         return out
@@ -518,7 +523,8 @@ class Studio:
         return rid
 
     def create_design(self, name: str, source: str, brief: str = "", values: dict | None = None,
-                      language: str = "python", references: list | None = None) -> dict:
+                      language: str = "python", references: list | None = None, purpose: str | None = None,
+                      process: str | None = None) -> dict:
         """A new project whose geometry is defined by source: Python (one Recipe subclass) or OpenSCAD.
 
         references: STEP/STL files to import first, so the design can call self.reference(name) on its first build.
@@ -532,7 +538,7 @@ class Studio:
             refs[self._ref_name(src.name)] = str(src.resolve())
         self._k("summary", key="pv-" + H(rid, values or {}), recipe_id=rid, refs=refs,
                 values={**self.recipes[rid].defaults(), **(values or {})}, tol=0.1)        # must build before it is saved
-        p = self.create(name, rid, brief, values)
+        p = self.create(name, rid, brief, values, purpose=purpose, process=process)
         for path in refs.values():
             self.import_reference(p, Path(path))
         return self.load(p["id"])
@@ -604,9 +610,20 @@ class Studio:
             f = source_path(self.sources, rid)
         return f.read_text(encoding="utf-8") if f.exists() else None
 
-    def create(self, name: str, recipe_id: str, brief: str = "", values: dict | None = None) -> dict:
+    def _purpose_args(self, purpose, process) -> tuple[str, str]:
+        pur = purpose_mod.normalise(purpose) if purpose not in (None, "") else purpose_mod.default(self.cfg)
+        if pur is None:
+            raise StudioError(f"Unknown purpose “{purpose}”.", "Use “print” (for 3D printing) or “model” (just a 3D model).")
+        pr = purpose_mod.normalise_process(process) if process not in (None, "") else ""
+        if pr is None:
+            raise StudioError(f"Unknown process “{process}”.", "Known: " + ", ".join(k for k in purpose_mod.PROCESSES if k) + ".")
+        return pur, (pr if pur == "model" else "")
+
+    def create(self, name: str, recipe_id: str, brief: str = "", values: dict | None = None, purpose: str | None = None,
+               process: str | None = None) -> dict:
         if recipe_id not in self.recipes:
             raise StudioError("Unknown recipe.")
+        pur, proc = self._purpose_args(purpose, process)
         r = self.recipes[recipe_id]
         base = slugify(name)
         pid, i = base, 2
@@ -619,7 +636,7 @@ class Studio:
         p = {"schema": SCHEMA, "id": pid, "name": name.strip() or r.title, "recipe": recipe_id, "created": now,
              "brief": {"text": brief, "references": []},
              "fit": dict(zip(("gap_min", "gap_max"), (r.fit or {}).get("window", (0.10, 0.80)))),
-             "orientation": "as_modelled", "auto_slice": True,
+             "orientation": "as_modelled", "auto_slice": True, "purpose": pur,
              "revisions": [{"n": 1, "parent": None, "ts": now, "values": vals, "recipe": recipe_id,
                             "note": "Starting point from recipe defaults" if not is_source(recipe_id) else "First version of the design",
                             "origin": "recipe", "provenance": {pp.key: _initial_provenance(pp) for pp in r.params}}],
@@ -628,6 +645,11 @@ class Studio:
         filled = presets.attach(self.root, brief)
         if filled:
             p["brief"].update(filled)
+        if proc:
+            p["process"] = proc
+        if pur == "model":
+            p["decisions"].append({"ts": now, "rev": 1, "kind": "purpose", "text": "Purpose: just a 3D model, not for 3D printing"
+                                   + (f" ({purpose_mod.PROCESSES[proc]['label']})." if proc else ".")})
         self.save(p)
         return p
 
@@ -658,9 +680,12 @@ class Studio:
         fit_in = None
         if recipe.fit:
             fit_in = [p["fit"], self.calibration.fingerprint(self.profile(p)), r["provenance"].get(recipe.fit["mating"])]
-        pe = self.printer_env(p)
-        ck = H("checks", ek, pe["envelope"], pe["margin"],
-               s.get("nozzle_mm", 0.4), checks_mod.CHECKS_VERSION, fit_in)
+        if purpose_mod.is_model(p):                    # a 3D model: no printer, nozzle or fit model enters its checks
+            ck = H("checks", ek, "model", purpose_mod.process(p), checks_mod.CHECKS_VERSION)
+        else:
+            pe = self.printer_env(p)
+            ck = H("checks", ek, pe["envelope"], pe["margin"],
+                   s.get("nozzle_mm", 0.4), checks_mod.CHECKS_VERSION, fit_in)
         fc = self._freecad()
         if fc and not getattr(recipe, "mesh", False):  # an installed FreeCAD adds a re-import check
             ck = H(ck, "freecad", fc)
@@ -668,7 +693,7 @@ class Studio:
         if extra:
             ck = H(ck, "plates", extra)
         from . import materials as appearance_mod      # a chosen material adds its notes (none chosen: key unchanged)
-        mfp = appearance_mod.fingerprint(p)
+        mfp = appearance_mod.fingerprint(p) if not purpose_mod.is_model(p) else None
         if mfp:
             ck = H(ck, "material", mfp)
         presets = {k: v["sha"] for k, v in s.get("presets", {}).items()} if s.get("available") else None
@@ -933,6 +958,23 @@ class Studio:
                 if on != bool(p.get("design_only")):
                     self.decide(p, "design_only", "Design only: this design is not sliced." if on else "Slicing turned on for this design.")
                 p["design_only"] = on
+            if "purpose" in body or "process" in body:  # what the design is for (form/purpose.py)
+                pur = purpose_mod.normalise(body["purpose"]) if "purpose" in body else purpose_mod.of(p)
+                if pur is None:
+                    raise StudioError(f"Unknown purpose “{body['purpose']}”.", "Use “print” (for 3D printing) or “model” (just a 3D model).")
+                proc = purpose_mod.normalise_process(body["process"]) if "process" in body else purpose_mod.process(p)
+                if proc is None:
+                    raise StudioError(f"Unknown process “{body['process']}”.", "Known: " + ", ".join(k for k in purpose_mod.PROCESSES if k) + ".")
+                proc = proc if pur == "model" else ""
+                if pur != purpose_mod.of(p) or proc != purpose_mod.process(p):
+                    self.decide(p, "purpose", "Purpose: for 3D printing." if pur == "print" else
+                                "Purpose: just a 3D model, not for 3D printing"
+                                + (f" ({purpose_mod.PROCESSES[proc]['label']})." if proc else "."))
+                p["purpose"] = pur
+                if proc:
+                    p["process"] = proc
+                else:
+                    p.pop("process", None)
             if "material" in body:                     # the whole design's material (form/materials.py); "" clears it
                 m = str(body["material"] or "").strip()
                 if m and not materials_mod.normalise(m):
@@ -1062,6 +1104,12 @@ class Studio:
         meta = {"rev": rev["n"], "files": files, "orientation": p["orientation"], "stl_tolerance_mm": STL_TOL,
                 "print_bbox": r["print_bbox"], "units": "mm", "source": f"recipe {self.rid(p)}@{self.recipe_sha(self.rid(p))}",
                 "kernel": self.kernel_id(), "geometry_key": keys["geometry"]}
+        if "stl" in files:                                # OBJ and GLB for viewers, renderers and other tools (form/meshio.py)
+            from . import meshio
+            for kind, (_, _, make) in meshio.FORMATS.items():
+                f = tmp / f"{name}.{kind}"
+                f.write_bytes(make(tmp / files["stl"]["name"], p["name"]))
+                files[kind] = {"name": f.name, "bytes": f.stat().st_size, "sha256": sha_file(f)}
         if r.get("unavailable"):
             meta["unavailable"] = r["unavailable"]
         (tmp / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
@@ -1070,8 +1118,9 @@ class Studio:
     def _make_checks(self, p, rev, keys, name):
         ex = self.read(p, "exports", keys["exports"])
         stl = self.apath(p, "exports", keys["exports"]) / ex["files"]["stl"]["name"]
-        s = self.slicer_info(p=p)
-        pe = self.printer_env(p)
+        model = purpose_mod.is_model(p)
+        s = self.slicer_info(p=p) if not model else {}
+        pe = self.printer_env(p) if not model else {"envelope": MODEL_ENVELOPE, "margin": 0.0, "name": "no printer"}
         a = self._k("analyse", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], stl_path=str(stl),
                     nozzle=s.get("nozzle_mm", 0.4), envelope=pe["envelope"], orientation=p["orientation"], p=p,
                     orient=plates_mod.part_orientations(p), margin=pe["margin"])
@@ -1081,6 +1130,21 @@ class Studio:
         ctx = {"orientation": p["orientation"], "envelope": pe["envelope"],
                "margin": pe["margin"], "printer": pe["name"],
                "nozzle": s.get("nozzle_mm", 0.4), "nozzle_assumed": not s.get("available")}
+        if model:                                      # a 3D model: no printer, no plates, no filament (form/purpose.py)
+            ctx = {"orientation": p["orientation"], "purpose": "model", "process": purpose_mod.process(p)}
+            items = checks_mod.build(self.recipe(p), summary, a, ctx, None)
+            fc = self._freecad()
+            if fc and "step" in ex["files"]:
+                step = self.apath(p, "exports", keys["exports"]) / ex["files"]["step"]["name"]
+                res = cad_bridges.freecad_recheck(fc, step, timeout=(self.cfg.get("cad") or {}).get("timeout_s", 120))
+                items.append(cad_bridges.recheck_item(res, a["brep"]["volume_mm3"], summary["bbox"]))
+            path = self.apath(p, "checks", keys["checks"])
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"rev": rev["n"], "checks": items, "rollup": checks_mod.rollup(items),
+                                        "orientation_table": a["orientation_table"], "fit": None, "context": ctx, "parts": [],
+                                        "not_applicable": [label for _, label in purpose_mod.PRINT_ONLY],
+                                        "stl_sha256": ex["files"]["stl"]["sha256"]}, indent=1), encoding="utf-8")
+            return
         mats = materials_mod.of_project(p, a.get("parts") or [])
         parts = [dict(x, material=mats["parts"].get(x["id"], {}).get("material") or "",
                       color=mats["parts"].get(x["id"], {}).get("color") or "") for x in a.get("parts") or []]
@@ -1338,13 +1402,17 @@ class Studio:
                     warns.append({"id": c["id"], "label": c["label"], "value": c["value"]})
         # a coupon calibrates the printer; only a result from this part speaks for this revision
         physical = [e for e in p["evidence"] if e["rev"] == p["head"] and (e["kind"] == "fit" or e.get("source") == "part")]
-        level = ("Geometry computed · not sliced (Design only) · " if off else "Geometry computed · slice simulated · ") \
+        model = bool(off) and off.get("why") == "purpose"
+        level = "Geometry computed · 3D model, not for 3D printing" if model else \
+            ("Geometry computed · not sliced (Design only) · " if off else "Geometry computed · slice simulated · ") \
             + ("physical result recorded for this revision" if physical else "not physically validated")
         # a person may still release over failed checks: each one acknowledged and a reason written, and the release
         # says so in its manifest and report. Missing or stale outputs always block: there would be no files to freeze.
         out = {"ready": not reasons, "reasons": reasons, "warnings": warns, "failures": failures, "blocking": blocking,
                "can_override": not blocking and bool(failures), "evidence_level": level, "physical": len(physical)}
-        if off:
+        if model:                                      # nothing about slicing is missing from a model: it is not a print
+            out["purpose"] = "model"
+        elif off:
             out["design_only"] = off
             out["not_covered"] = NOT_COVERED
         return out
@@ -1376,15 +1444,17 @@ class Studio:
             shutil.rmtree(rel, ignore_errors=True)
             rel.mkdir(parents=True)
             ex = self.read(p, "exports", keys["exports"])
-            sl = None if g.get("design_only") else self.read(p, "slice", keys["slice"])
+            model = g.get("purpose") == "model"
+            sl = None if (g.get("design_only") or model) else self.read(p, "slice", keys["slice"])
             ch = self.read(p, "checks", keys["checks"])
             files = {}
-            for kind in ("step", "stl"):
+            for kind in ("step", "stl", "obj", "glb"):
                 if kind not in ex["files"]:
                     continue
                 src = self.apath(p, "exports", keys["exports"]) / ex["files"][kind]["name"]
                 shutil.copyfile(src, rel / src.name)
                 files[src.name] = ex["files"][kind]["sha256"]
+            files.update(self._release_extras(p, rel, ex, keys, model))
             sdir = self.apath(p, "slice", keys["slice"])
             stem = f"{p['id']}_r{rev['n']:02d}"
             outs = []
@@ -1411,16 +1481,19 @@ class Studio:
                                           | {"parts": [q["label"] for q in x.get("parts", [])]} for x in sl["plates"]]}
                               if sl.get("plates") else {})
                            | ({"material": sl["material"]} if sl.get("material") else {}))
-                          if sl else {"design_only": True, "why": g["design_only"]["why"], "text": g["design_only"]["text"]},
+                          if sl else {"not_for_printing": True, "text": "A 3D model, not made for 3D printing."} if model else
+                          {"design_only": True, "why": g["design_only"]["why"], "text": g["design_only"]["text"]},
+                "purpose": purpose_mod.describe(p),
                 "not_covered": g.get("not_covered", []),
                 "checks": [{k: c[k] for k in ("id", "label", "status", "value", "evidence")} for c in ch["checks"]],
                 "acknowledged_warnings": [w for w in g["warnings"]], "released_with_failed_checks": overridden,
                 "note": note, "evidence_level": g["evidence_level"] + (" · released with failed checks" if overridden else ""),
                 "documents": sorted(documents),
                 "physical_evidence": [e for e in p["evidence"] if e["rev"] == rev["n"] and (e["kind"] == "fit" or e.get("source") == "part")],
-                "limits": (["Not sliced (Design only): print time, filament and toolpaths were not estimated."] if not sl else
-                           ["Slicer output is a simulation, not a print."]) + ["No structural analysis was performed.",
-                           "Fit yield is a statistical model; see checks for the source of each input."]
+                "limits": (["A 3D model: print checks and slicing do not apply."] if model else
+                           ["Not sliced (Design only): print time, filament and toolpaths were not estimated."] if not sl else
+                           ["Slicer output is a simulation, not a print."]) + ["No structural analysis was performed."]
+                          + ([] if model else ["Fit yield is a statistical model; see checks for the source of each input."])
                           + (["Mesh design (OpenSCAD): no STEP file and no B-rep checks."] if getattr(self.recipe(p), "mesh", False) else []),
             }
             (rel / "MANIFEST.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
@@ -1433,13 +1506,41 @@ class Studio:
             self.save(p)
             return {"release": rel.name, "manifest": manifest}
 
+    def _release_extras(self, p, rel: Path, ex: dict, keys: dict, model: bool) -> dict:
+        """What a release carries besides the exports: for a 3D model, a 3MF and rendered views (a four-view sheet and
+        an iso view), so it can go to a renderer, a machine shop or a client without Form Studio. {file: sha256}."""
+        out = {}
+        stem = f"{p['id']}_r{p['head']:02d}"
+        if model:
+            try:
+                from . import materials as appearance_mod
+                (rel / f"{stem}.3mf").write_bytes(appearance_mod.threemf(self, p))
+                out[f"{stem}.3mf"] = sha_file(rel / f"{stem}.3mf")
+            except Exception:                         # a 3MF is a convenience; the STEP and STL are the record
+                pass
+            try:
+                from . import render as rendering
+                v = self.view(p)
+                feats = [{"id": f.id, "label": f.label} for f in self.recipe(p).features]
+                title = f"{p['name']} - r{p['head']:02d}"
+                (rel / f"{stem}_views.png").write_bytes(rendering.contact_sheet(
+                    [rendering.render_png(v, feats, vw, None, size=(640, 460), title=title) for vw in ("iso", "front", "top", "right")]))
+                (rel / f"{stem}_iso.png").write_bytes(rendering.render_png(v, feats, "iso", None, size=(1280, 900), title=title))
+                for f in (f"{stem}_views.png", f"{stem}_iso.png"):
+                    out[f] = sha_file(rel / f)
+            except Exception:
+                pass
+        return out
+
     def _report(self, p, m) -> str:
         t = time.strftime("%Y-%m-%d %H:%M", time.localtime(m["approved"]))
         s = m["slicer"]
         lines = [f"# {m['name']} — release r{m['revision']:02d}", "", f"Approved {t}. Units: mm. **{m['evidence_level']}.**", "",
                  "## Files", ""] + [f"- `{k}` — sha256 `{v[:16]}…`" for k, v in m["files"].items()] + ["",
-                 "## Source", "", f"- Recipe `{m['recipe']}` @ `{m['recipe_sha']}`, {m['kernel']}",
-                 f"- Print orientation: {m['orientation']}", "",
+                 "## Source", "", f"- Recipe `{m['recipe']}` @ `{m['recipe_sha']}`, {m['kernel']}"]
+        if not s.get("not_for_printing"):
+            lines.append(f"- Print orientation: {m['orientation']}")
+        lines += ["",
                  "## Parameters", "", "| Parameter | Value | Source |", "|---|---|---|"]
         r = self.recipes[m["recipe"]]
         for k, v in m["values"].items():
@@ -1452,7 +1553,11 @@ class Studio:
         if m.get("released_with_failed_checks"):
             lines += ["", "**Released with failed checks:** " + ", ".join(f"{f['label']} ({f['value']})" for f in m["released_with_failed_checks"])
                       + f". Reason given at approval: {m.get('note') or '—'}"]
-        if s.get("design_only"):
+        if s.get("not_for_printing"):
+            pu = m.get("purpose") or {}
+            lines += ["", "## Purpose", "", "A 3D model, not made for 3D printing"
+                      + (f": {pu['process_label']}" if pu.get("process") else "") + ". Print checks and slicing do not apply."]
+        elif s.get("design_only"):
             lines += ["", "## Slice", "", f"Not part of this release: Design only. {s.get('text', '')}"] + [f"- {x}" for x in m.get("not_covered", [])]
         elif s.get("time_s"):
             lines += ["", "## Slice (simulated)", "", f"- {s.get('slicer_name') or 'The slicer'} {s['slicer_version']}: {(f"{s['time_s']/60:.0f} min" if s.get('time_s') is not None else 'no time estimate')}, {(f"{s['filament_g']:.1f} g" if s.get('filament_g') is not None else 'no filament estimate')}, {s['layers']} layers, supports: {'yes' if s.get('support_used') else 'no'}",
@@ -1629,9 +1734,11 @@ class Studio:
         recipe = self.recipe(p)
         status = self.status(p)
         keys = {n: status[n]["key"] for n in NODES}
-        fit = self.fit(p)
-        costs = self.costs(p)
+        model = purpose_mod.is_model(p)
+        fit = None if model else self.fit(p)          # the fit model is about a printer's accuracy
+        costs = {} if model else self.costs(p)
         out = {
+            "purpose": purpose_mod.describe(p),
             "project": {k: v for k, v in p.items() if k != "produced"},
             "recipe": recipe.public(), "status": status, "approval": self.approval_state(p, status),
             "gate": self.gate(p, status), "fit": fit, "actions": fit_mod.next_actions(fit, costs), "costs": costs,

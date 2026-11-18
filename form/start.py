@@ -3,9 +3,9 @@
 Home takes words, photos, sketches, files and links in one place and offers three ways to begin: Blank (a plain block
 to shape), For my printer, or Just a 3D model. This module is the engine side of that:
 
-- purpose: "print" (for 3D printing on the person's printer) or "model" (a 3D model only, never sliced). It is kept
-  per design in project.json and remembered as the next choice in <data>/.start.json. The adapter below is deliberately
-  tiny: a later per-design purpose in the engine replaces set_purpose without touching its callers.
+- purpose: "print" (for 3D printing on the person's printer) or "model" (a 3D model only, never sliced). The engine
+  owns it (form/purpose.py: the design's purpose, and the default from "I have a 3D printer"); Home only says which
+  one the next design gets.
 - blank(): a clean, minimal design written as code that builds in the real kernel.
 - fetch(): a link pasted on Home. Only a file the person linked to is downloaded (STL, STEP, 3MF, PDF, an image);
   a web page is passed to the agent as a link and nothing is fetched. Nothing is crawled.
@@ -32,7 +32,6 @@ from .studio import StudioError
 
 PURPOSES = ("print", "model")
 ENV_PURPOSE = "FORM_PURPOSE"          # given to the MCP server of one chat run: designs it creates get this purpose
-PREFS = ".start.json"
 FETCH_EXT = (".stl", ".step", ".stp", ".3mf", ".pdf", ".png", ".jpg", ".jpeg", ".webp")
 MAX_FETCH = 50_000_000
 FETCH_TIMEOUT = 30
@@ -55,34 +54,10 @@ def env_purpose() -> str | None:
 # ---- purpose ---------------------------------------------------------------------------------------------------
 
 def set_purpose(st, pid: str, purpose: str) -> dict:
-    """Record what the design is for. "model" turns on Design only (no slicing) through the same path as Settings,
-    so the decision is in the design's history; "print" turns it off."""
+    """What the design is for, through the engine's own setting (form/purpose.py), so it is in the design's history."""
     purpose = _purpose(purpose)
     with st.lock(pid):
-        p = st.load(pid)
-        if p.get("purpose") != purpose:
-            st.decide(p, "purpose", "Purpose: for 3D printing." if purpose == "print" else "Purpose: just a 3D model.")
-        p["purpose"] = purpose
-        st.save(p)
-        return st.settings(p, {"design_only": purpose == "model"})
-
-
-def get_prefs(st) -> dict:
-    try:
-        d = json.loads((Path(st.root) / PREFS).read_text(encoding="utf-8"))
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError):
-        return {}
-
-
-def set_prefs(st, purpose: str) -> dict:
-    """Remember the start option for next time."""
-    d = dict(get_prefs(st), purpose=_purpose(purpose), ts=time.time())
-    f = Path(st.root) / PREFS
-    tmp = f.with_suffix(".tmp")
-    tmp.write_text(json.dumps(d), encoding="utf-8")
-    os.replace(tmp, f)
-    return d
+        return st.settings(st.load(pid), {"purpose": purpose})
 
 
 def printer_name_cfg(cfg: dict) -> str | None:
@@ -93,8 +68,9 @@ def printer_name_cfg(cfg: dict) -> str | None:
 
 
 def state(st) -> dict:
-    """{"purpose": the remembered choice, or "print" when a slicer can slice and "model" when not,
+    """{"purpose": what a new design is for by default (form/purpose.py: "I have a 3D printer" or not),
         "printer": {"name", "available"}}."""
+    from . import purpose as purpose_mod
     from . import printers as printers_mod
     try:
         available = bool(st.slice_mode()["on"])
@@ -105,9 +81,7 @@ def state(st) -> dict:
     name = ((choice or {}).get("machine")
             or (((s.get("presets") or {}).get("machine") or {}).get("name") if s.get("available") else None)
             or (st.cfg.get("printer") or {}).get("name") or None)
-    remembered = get_prefs(st).get("purpose")
-    return {"purpose": remembered if remembered in PURPOSES else ("print" if available else "model"),
-            "printer": {"name": name, "available": available}}
+    return {"purpose": purpose_mod.default(st.cfg), "printer": {"name": name, "available": available}}
 
 
 def purpose_line(purpose: str | None, printer: str | None) -> str:
@@ -160,8 +134,7 @@ def blank(st, name: str = "Untitled design", purpose: str = "print") -> dict:
     """A new design from BLANK_SOURCE with its purpose recorded. Returns the project."""
     purpose = _purpose(purpose)
     name = " ".join(str(name or "").split())[:80] or "Untitled design"
-    p = st.create_design(name, BLANK_SOURCE, "")
-    set_purpose(st, p["id"], purpose)
+    p = st.create_design(name, BLANK_SOURCE, "", purpose=purpose)
     st.activity(p["id"], "commit", f"Created {name} (blank design)", by="you")
     return st.load(p["id"])
 
@@ -328,9 +301,6 @@ def route_get(st, path: str, q: dict):
 def route_post(st, path: str, body):
     from . import concepts
     b = body if isinstance(body, dict) else {}
-    if path == "/api/start/purpose":
-        set_prefs(st, b.get("purpose"))
-        return state(st)
     if path == "/api/start/blank":
         p = blank(st, b.get("name") or "Untitled design", b.get("purpose") or state(st)["purpose"])
         return {"id": p["id"], "job": st.run(p["id"])}
@@ -365,7 +335,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--file", action="append", default=[], metavar="FILE", help="a STEP, STL, 3MF or PDF (repeat)")
     ap.add_argument("--sketch", metavar="F.json", help="a sketch as Form Studio's sketch JSON (see form/sketch.py)")
     ap.add_argument("--link", action="append", default=[], metavar="URL", help="a link: a file is downloaded, a page is passed on (repeat)")
-    ap.add_argument("--purpose", choices=PURPOSES, help="print: for my printer; model: just a 3D model (default: the remembered choice)")
+    ap.add_argument("--purpose", choices=PURPOSES, help="print: for my printer; model: just a 3D model (default: whether you said you have a 3D printer)")
     ap.add_argument("--blank", action="store_true", help="create a blank design instead of sending a message")
     ap.add_argument("--name", default="Untitled design", help="with --blank: the design's name")
     ap.add_argument("--agent")

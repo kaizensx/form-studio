@@ -28,7 +28,8 @@ Clients configured with a JSON file (Gemini CLI, Cursor, Claude Desktop and most
 Every client receives these instructions when it connects:
 
 ```
-Form Studio designs 3D-printable parts from parametric recipes and keeps an honest record of what is known.
+Form Studio designs parts with a real CAD kernel, for 3D printing or as plain 3D models, and keeps an honest record of
+what is known.
 
 Workflow: form_overview -> describe_recipe -> create_project (or get_project) -> preview_change ->
 render (look at it) -> commit_change -> run_pipeline -> get_project (gate, checks, next actions) ->
@@ -42,6 +43,10 @@ Rules:
 - A slice is a simulation, not a print. Fit yield is a model. Say so when you report them.
 - You cannot approve a release. request_release returns a link that opens the release in Form Studio for the user.
 - Nothing here starts a print or sends files anywhere.
+- Every design has a purpose: "print" (for 3D printing) or "model" (just a 3D model: rendering, CAD exchange, CNC,
+  laser cutting, moulding). get_project reports it. For a model never ask about a printer, slicer, filament or
+  orientation; print checks and slicing do not apply. Pass purpose to create_project/create_design when the person
+  says what it is for; otherwise Form Studio uses their default (form_overview: purpose_default).
 - Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time,
   at most three per task. Outside Form Studio's chat it tells you to ask in your own interface. For a dimension the
   person can measure, use ask_measurement (where to measure, tolerance, a diagram); it updates the design with how
@@ -195,6 +200,8 @@ back with the line and a hint; fix and call again. Then render(view="sheet") and
 language="openscad": source is an OpenSCAD file; parameters come from Customizer comments (`w = 40; // [20:1:120]`).
 OpenSCAD output is a mesh: no STEP, no B-rep checks (reported as not available, never faked).
 references: absolute paths of STEP/STL parts to import first, so a Python design can use self.reference("name.step").
+purpose: "print" (for 3D printing) or "model" (just a 3D model; not sliced, no print checks). Omitted: the
+person's default. process (models only): cnc, laser, injection, casting, sheet_metal, render, cad, other.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -205,6 +212,8 @@ references: absolute paths of STEP/STL parts to import first, so a Python design
 | `run` | boolean |  |
 | `language` | string |  |
 | `references` | array \| null |  |
+| `purpose` | string \| null |  |
+| `process` | string \| null |  |
 
 ### `update_design`
 
@@ -238,7 +247,8 @@ The exact code a revision was built from (built-in recipes return their recipe f
 
 Create a project from a built-in recipe (form_overview lists them: gridfinity_bin, storage_box, pegboard, device_stand, ...).
 For anything else, write a design: design_guide, then create_design. values override recipe defaults (all start as 'assumed').
-With run=True the solid, exports and checks are built (and sliced if a slicer is available).
+With run=True the solid, exports and checks are built (and sliced if a slicer is available and it is for printing).
+purpose: "print" or "model" (just a 3D model); omitted: the person's default. process: see create_design.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -247,6 +257,8 @@ With run=True the solid, exports and checks are built (and sliced if a slicer is
 | `brief` | string |  |
 | `values` | object \| null |  |
 | `run` | boolean |  |
+| `purpose` | string \| null |  |
+| `process` | string \| null |  |
 
 ### `get_project`
 
@@ -374,6 +386,7 @@ window, and whether the pipeline slices automatically. The checks include an ori
 design_only=True: the design is not sliced (checks, exports and release still work; the release says it was
 not sliced). material: PLA, PETG, ABS, ASA, TPU, PA, PC, ... for the whole design ("" clears): the slice uses the
 printer's filament preset for it and the checks add notes for that material. Ask the user before changing either.
+purpose: "print" or "model" (just a 3D model, never sliced); process: for a model, how it will be made.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -384,6 +397,8 @@ printer's filament preset for it and the checks add notes for that material. Ask
 | `auto_slice` | boolean \| null |  |
 | `design_only` | boolean \| null |  |
 | `material` | string \| null |  |
+| `purpose` | string \| null |  |
+| `process` | string \| null |  |
 
 ### `explore_alternatives`
 

@@ -95,7 +95,7 @@ def create(st, name: str, concepts: list, brief: str = "", group: str | None = N
                 raise StudioError("This concept has no source code.")
             vals = {k: float(v) for k, v in (c.get("values") or {}).items()}
             p = st.create_design(f"{g['name']} · {letter}", str(c["source"]), g["brief"], vals or None,
-                                 str(c.get("language") or "python"))
+                                 str(c.get("language") or "python"), purpose=purpose or None)
         except StudioError as e:
             failed.append({"letter": letter, "title": title, "error": e.public()})
             continue
@@ -108,8 +108,6 @@ def create(st, name: str, concepts: list, brief: str = "", group: str | None = N
             q["concept"] = info
             st.decide(q, "concept", f"Concept {letter} of “{g['name']}”: {title}." + (f" {why}" if why else ""))
             st.save(q)
-        if purpose:
-            start.set_purpose(st, p["id"], purpose)
         built.append({"project": p["id"], "letter": letter, "title": title, "rationale": why, "trashed": False})
     if not built:
         raise StudioError("None of the concepts built.",

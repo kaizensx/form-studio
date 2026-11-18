@@ -447,7 +447,7 @@ Item {
                 Txt { text: "·"; tone: 4; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact }
                 Txt { font.pixelSize: 12; tone: 3; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact; wrapMode: Text.NoWrap
                     text: !Store.assembly ? "plate " + ws.bed : Store.asmMode === "assembled" ? "assembled" : Store.asmMode === "exploded" ? (Store.assembly.derived ? "as modelled, shown pulled apart" : "assembled size, shown exploded")
-                        : (Store.assembly.derived ? "as modelled, " : "as printed, ") + F.plural(Store.assembly.parts.length, "part") } }
+                        : (Store.assembly.derived || Store.modelDesign ? "as modelled, " : "as printed, ") + F.plural(Store.assembly.parts.length, "part") } }
         }
 
         // ── bottom: history above now ────────────────────────

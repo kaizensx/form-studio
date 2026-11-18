@@ -182,20 +182,20 @@ Item {
                     Item { width: 1; height: 14 }
                     Txt { width: Math.min(parent.width, 600); x: home.split ? 0 : (parent.width - width) / 2; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
                         tone: 2; font.pixelSize: Theme.tLead; lineHeight: 1.4
-                        text: Store.purpose === "model" ? "Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD you can check and export."
+                        text: Store.newPurposeEffective === "model" ? "Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD you can check and export."
                                                          : "Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD, checked and sliced for your printer." }
                     Item { width: 1; height: 30 }
                     StartComposer { id: composer; width: parent.width; dragging: home.dropping; onSketchWanted: Store.openSheet("sketch") }
                     Item { width: 1; height: 16 }
                     // ── start options: the purpose of what starts next, and a blank design ──
                     Item { width: parent.width; height: 34
-                        Seg { id: purposeSeg; objectName: "purposeSeg"; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 30
-                            value: Store.purpose; onPicked: function (v) { Store.setPurpose(v) }
+                        Seg { id: purposeSeg; objectName: "startPurpose"; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 30
+                            value: Store.newPurposeEffective; onPicked: function (v) { Store.setNewPurpose(v) }
                             model: [{ value: "print", text: "For my printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" },
                                     { value: "model", text: "Just a 3D model", tip: "No printer: no slicing and no print checks. STEP and STL are still exported." }] }
                         Txt { anchors.left: purposeSeg.right; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; kind: "fine"; tone: 3
                             width: parent.width - purposeSeg.width - blank.width - 36; elide: Text.ElideRight; wrapMode: Text.NoWrap
-                            text: Store.purpose === "model" ? "No printer, no print checks" : Store.printerName ? Store.printerName : "No printer set up yet" }
+                            text: Store.newPurposeEffective === "model" ? "Not sliced, no print checks" : Store.printerName ? Store.printerName : Store.prints ? "No printer set up yet" : "You said you just design: no printer is set up" }
                         Btn { id: blank; objectName: "startBlank"; kind: "quiet"; icon: "square_dashed"; text: "Start blank"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                             tip: "An empty design and the workspace, no agent. Shape it with its parameters, or bring the agent in later."
                             onClicked: run(function () { return Store.startBlank("") }) } }

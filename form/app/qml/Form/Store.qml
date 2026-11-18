@@ -70,13 +70,43 @@ QtObject {
     readonly property var slicer: studio ? studio.env.slicer : ({ available: false })
     // engine workstream: what the open design slices with (its own printer, the default, or the slicer's selection)
     readonly property var printing: pid && data && data.printer ? data.printer.slicer : slicer
+    // ── purpose (form/purpose.py): does this person print at all, and what is the open design for ──
+    // prints: "I have a 3D printer" (Settings › General, first run); unanswered reads as true. printingDecided: answered.
+    readonly property var purposeInfo: studio && studio.env.purpose ? studio.env.purpose : ({ printing: true, decided: true, "default": "print", purposes: [], processes: [] })
+    readonly property bool prints: purposeInfo.printing !== false
+    readonly property bool printingDecided: !!purposeInfo.decided
+    // the open design: "print" | "model"; a model is never sliced and never checked against a printer
+    readonly property string purpose: data && data.purpose ? data.purpose.purpose : ""
+    readonly property bool modelDesign: purpose === "model"
+    // what the next new design is for: "" = the default (purposeInfo.default). The new-design flow sets it.
+    property string newPurpose: ""
+    property string newProcess: ""
+    readonly property string newPurposeEffective: newPurpose || purposeInfo["default"] || "print"
+    function setPrinting(on) {           // "I have a 3D printer" (true) / "I just design" (false)
+        if (!on) {                       // nothing printing-related is installed for someone who only designs
+            if (installJob && installJob.state === "running")
+                installJob.steps.forEach(function (st) { if (st.id.indexOf("slicer.") === 0 && st.state !== "done") skipInstall(st.id) })
+            var pk = Object.assign({}, installPick); F.keys(pk).forEach(function (k) { if (k.indexOf("slicer.") === 0) pk[k] = false }); installPick = pk
+        }
+        return saveConfig({ "general.printing": !!on }, true).then(function (r) {
+            if (r) { checkSoftware(); checkSetup() }
+            return r })
+    }
+    function setPurpose(purpose, process) {   // the open design: "print" | "model", and for a model how it is made
+        var b = { purpose: purpose }
+        if (process !== undefined) b.process = process
+        return settings(b)
+    }
+    // one call for every way to start a design: { name, recipe, brief, purpose, process } (purpose/process optional)
+    function newDesign(o) { o = o || {}; return create(o.name || "", o.recipe, o.brief || "", o.purpose, o.process) }
     readonly property var stages: [
         { id: "brief", title: "Brief", hint: "What it is for, what is known" },
         { id: "shape", title: "Shape", hint: "Select a feature, change it" },
         { id: "fit", title: "Fit", hint: "Clearance under uncertainty" },
-        { id: "prove", title: "Prove", hint: "Checks and the slice" },
+        { id: "prove", title: "Prove", hint: modelDesign ? "Checks" : "Checks and the slice" },
         { id: "release", title: "Release", hint: "Gate, history, files" }
-    ]
+    ].filter(function (x) { return x.id !== "fit" || !modelDesign })     // the fit model is a printer's accuracy: not for a 3D model
+    onModelDesignChanged: if (modelDesign && stage === "fit") stage = "prove"
 
     function revision(n) {
         if (!project) return null
@@ -190,7 +220,8 @@ QtObject {
             if (s._toastAt >= a.done - 5) return
             if (!ok) s.toast((e && e.message) || (a.label + " did not finish"), e && e.hint, true)
             // success is said only where nothing else shows it: the button that asked is still on screen
-            else if (a.done - a.t0 > 900 && (a.explicit || s._alive(a.owner))) s.toast(a.label + " · done", "Took " + ((a.done - a.t0) / 1000).toFixed(1) + " s.")
+            // only long, named work: a step that moved the screen on, or anything quick, needs no word of its own
+            else if (a.done - a.t0 > 3000 && a.explicit) s.toast(a.label + " · done", "Took " + ((a.done - a.t0) / 1000).toFixed(1) + " s.")
         })
         _actTick()
     }
@@ -260,6 +291,12 @@ QtObject {
         screen = "home"; pid = ""; data = null; view = null; compare = null; layers = null; preview = null
         draftValues = ({}); draftProv = ({}); _stamp = ""
         reloadStudio()
+    }
+    // after a change outside the design (the printer, a setting): bring its outputs up to date when Auto is on
+    function rerunIfStale() {
+        if (!data || data.project.auto_run === false || job) return
+        var st = F.vals(data.status)
+        for (var i = 0; i < st.length; i++) if (st[i].state === "stale" || st[i].state === "missing") { run(); return }
     }
     function open(id) {
         pid = id
@@ -462,9 +499,11 @@ QtObject {
     }
     function openSheet(kind, props) { sheet = kind ? { kind: kind, props: props || ({}) } : null }
 
-    function create(name, recipeId, brief) {
-        post("/projects", { name: name, recipe: recipeId, brief: brief || "" }).then(function (r) {
-            sheet = null; stage = "shape"
+    function create(name, recipeId, brief, purpose, process) {
+        var b = { name: name, recipe: recipeId, brief: brief || "", purpose: purpose || newPurpose || "" }
+        if (process || newProcess) b.process = process || newProcess
+        return post("/projects", b).then(function (r) {
+            sheet = null; stage = "shape"; newPurpose = ""; newProcess = ""
             reloadStudio().then(function () { open(r.id).then(function () { track(r.job) }) })
         }, fail)
     }
@@ -674,9 +713,13 @@ QtObject {
         if (links.length) text += "\n\nLinks:\n" + links.map(function (l) { return "- " + l.url }).join("\n")
         chatBusy = true; talkOpen = true; chatAttach = []; chatLinks = []; chatLive = null
         chatItems = chatItems.concat([{ t: "user", text: text, attachments: att, local: true }])
-        var body = { message: text, project: pid || null, agent: chatAgent, model: chatModel || "default", effort: chatEffort,
+        // a new design: what it is for goes with the conversation (form/start.py), so the agent reads it on every
+        // message and the designs it creates get it; how a model will be made is said in words
+        var said = text, fresh = !pid && !(conv && conv.messages)
+        if (fresh && newPurposeEffective === "model" && newProcess) said += "\n\nThis 3D model will be made by: " + newProcess + " (pass process=\"" + newProcess + "\")."
+        var body = { message: said, project: pid || null, agent: chatAgent, model: chatModel || "default", effort: chatEffort,
                      attachments: att.map(function (a) { return a.id }) }
-        if (!pid && !(conv && conv.messages)) body.purpose = purpose        // a new design: for my printer, or just a model
+        if (fresh) { body.purpose = newPurposeEffective; newPurpose = ""; newProcess = "" }
         post(id ? "/conversations/" + id + "/send" : "/conversations/send", body).then(function (r) {
             if (convId !== id) return
             convId = r.conversation; conv = r.meta
@@ -971,11 +1014,14 @@ QtObject {
         }, function () { _loginPoll.restart() })
     }
     function loadConfig() { return get("/config").then(function (c) { config = c; return c }, function (e) { fail(e); return null }) }
-    function saveConfig(values) {
+    function saveConfig(values, quiet) {     // quiet: the change shows itself (no "Saved" toast)
         return post("/config", { values: values }).then(function (r) {
-            config = r.config; reloadStudio()
+            config = r.config
+            // every setting applies at once: the studio (printer chip, purpose), the open design (checks, plate) and setup
+            reloadStudio().then(function () { if (pid) refresh().then(function () { rerunIfStale() }) })
             var n = F.keys(r.changed).length
-            if (!n) toast("Nothing to change")
+            if (quiet) {}
+            else if (!n) toast("Nothing to change")
             else toast("Saved " + F.plural(n, "setting"), r.restart ? "The project folder changes when Form Studio restarts." : r.backup ? "The previous file was kept as a backup next to it." : "", false)
             return r
         }, function (e) { fail(e); return null })
@@ -1026,9 +1072,13 @@ QtObject {
             + "Review at three scales. Silhouette: is the mass balanced, the useful volume clear, does it look stable and intentional? "
             + "Relationships: spacing, wall thickness, radius families, repeated features, contact points. "
             + "Details: seam, entry chamfers, finger relief, drainage, support scars, tool access, the underside and the assembled state.\n\n"
-            + "Do three passes: designer (proportion, interaction, finish); engineer (interfaces, load path, assembly, tolerances, "
-            + "from the checks and the fit model); print technician (orientation, layer direction at loaded roots, overhangs, "
-            + "supports, seams, from the simulated slice).\n\n"
+            + (modelDesign
+               ? "Do two passes: designer (proportion, interaction, finish); engineer (interfaces, load path, assembly, tolerances, "
+                 + "from the checks). It is a 3D model, not for 3D printing: say nothing about printing, slicing or supports"
+                 + (data && data.purpose && data.purpose.process ? "; judge manufacturability for " + data.purpose.process_label : "") + ".\n\n"
+               : "Do three passes: designer (proportion, interaction, finish); engineer (interfaces, load path, assembly, tolerances, "
+                 + "from the checks and the fit model); print technician (orientation, layer direction at loaded roots, overhangs, "
+                 + "supports, seams, from the simulated slice).\n\n")
             + "Score 0 to 5: function and fit, proportion, geometric coherence, manufacturing integration, assembly and use, "
             + "visual restraint. Explain the two weakest with evidence from the renders or checks. Then list concrete defects, "
             + "each with the parameter or feature to change. Call out any critical functional defect regardless of the scores.\n\n"
@@ -1400,8 +1450,6 @@ QtObject {
     // Recipes and briefs are not offered here any more; agents may still use recipes, and older designs open as before.
     property var whatsNew: null        // GET /whatsnew: { version, show, markdown, highlights } while the modal is up
     property var startInfo: null       // GET /start: { purpose, printer: { name, available } }
-    property int _purposeSet: 0
-    property string purpose: "print"   // print (for my printer) | model (just a 3D model): applied to what starts next
     property var chatLinks: []         // page links pasted into the composer: { url, host }; passed on, never downloaded
     property var concepts: []          // open concept groups (form/concepts.py): boards with members and numbers
     property int startFocus: 0         // bumps when Home's composer should take the keyboard
@@ -1412,18 +1460,15 @@ QtObject {
             if (!s.chatBusy && s.conv && s.conv.messages) s.newChat()      // Home's composer always starts something new
         } }
     function loadStart() {
-        var asked = _purposeSet
-        return get("/start").then(function (r) { startInfo = r; if (asked === _purposeSet) purpose = r.purpose || "print"; return r }, function () { return null })
+        return get("/start").then(function (r) { startInfo = r; return r }, function () { return null })
     }
-    function setPurpose(p) {
-        if (p !== "print" && p !== "model") return
-        purpose = p; _purposeSet++              // a reload that was already on its way must not put the old choice back
-        return post("/start/purpose", { purpose: p }).then(function () {}, function () {})
-    }
+    // what the next design is for, chosen on Home: Store.newPurpose (form/purpose.py's default until one is picked)
+    function setNewPurpose(p) { if (p === "print" || p === "model") newPurpose = p }
     readonly property string printerName: startInfo && startInfo.printer && startInfo.printer.name ? startInfo.printer.name : ""
     // an empty design, no agent: straight into the workspace
     function startBlank(name) {
-        return post("/start/blank", { name: name || "", purpose: purpose }).then(function (r) {
+        var pu = newPurposeEffective; newPurpose = ""
+        return post("/start/blank", { name: name || "", purpose: pu }).then(function (r) {
             return reloadStudio().then(function () { return open(r.id).then(function () { track(r.job); setStage("shape") }) })
         }, fail)
     }
@@ -1454,7 +1499,7 @@ QtObject {
     // a sketch from the sketch pad: its structured geometry (JSON) and its picture go with the next message
     function attachSketch(sketch, pngUrl) {
         return ensureConv().then(function (id) {
-            var both = [post("/conversations/" + id + "/sketch", { sketch: sketch, name: "sketch" })]
+            var both = [post("/conversations/" + id + "/sketch", { "sketch": sketch, "name": "sketch" })]
             if (pngUrl) both.push(upload("/conversations/" + id + "/attach?name=sketch.png", pngUrl))
             return Promise.all(both).then(function (rs) {
                 if (convId !== id) return rs[0]
@@ -1501,7 +1546,7 @@ QtObject {
             sheet = null; loadConcepts()
             return reloadStudio().then(function () { return open(project) }).then(function () {
                 buildTick++
-                toast("Continuing with " + (r.name || "the concept you picked"), r.trashed && r.trashed.length ? F.plural(r.trashed.length, "other concept") + " moved to .trash, kept until you remove it." : "")
+                toast("Continuing with " + (r.group && r.group.name ? r.group.name : "the concept you picked"), r.trashed && r.trashed.length ? F.plural(r.trashed.length, "other concept") + " moved to .trash, kept until you remove it." : "")
             })
         }, fail)
     }

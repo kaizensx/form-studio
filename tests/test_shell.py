@@ -52,7 +52,7 @@ class Engine(Base):
         p = self.new("Rename me")
         row = self.st.rename_project(p["id"], "  Wall   dock ")
         self.assertEqual((row["id"], row["name"]), (p["id"], "Wall dock"))
-        self.assertEqual(set(row), {"id", "name", "recipe", "head", "revisions", "updated", "approved_rev"})
+        self.assertEqual(set(row), {"id", "name", "recipe", "head", "revisions", "updated", "approved_rev", "purpose", "concept"})
         self.assertEqual({r["id"]: r["name"] for r in self.st.list()}[p["id"]], "Wall dock")
         self.assertTrue((Path(TMP) / p["id"]).is_dir())
         self.assertEqual(self.st.rename_project(self.st.load(p["id"]), "By dict")["name"], "By dict")   # a loaded project works too

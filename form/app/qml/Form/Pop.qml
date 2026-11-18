@@ -16,6 +16,10 @@ Popup {
     enter: Transition { enabled: !pop.instant
         Glide { property: "opacity"; from: 0; to: 1; duration: Theme.pop }
         Glide { property: "scale"; from: Theme.from(0.96); to: 1; duration: Theme.pop } }
+    // while it fades out it takes no clicks: a press meant for what lies under it (often the control that opens it,
+    // when the popover had to move up to fit the window) must not pick a row of a menu that is already closing
+    onAboutToHide: pop.enabled = false
+    onAboutToShow: pop.enabled = true
     exit: Transition { enabled: !pop.instant
         NumberAnimation { property: "opacity"; to: 0; duration: Theme.exit }
         NumberAnimation { property: "scale"; to: Theme.from(0.98); duration: Theme.exit } }
