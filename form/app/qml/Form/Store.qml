@@ -698,7 +698,8 @@ QtObject {
     }
     function send(text) {
         text = (text || "").trim()
-        if (!text || chatBusy) return
+        if (!text) return
+        if (chatBusy) { chatPrefill(text); return }        // never lose a message: it waits in the box until the reply ends
         if (chatNeedsModel) { pendingSend = text; modelPickWanted(); return }
         var att = chatAttach, id = convId
         chatBusy = true; talkOpen = true; chatAttach = []; chatLive = null

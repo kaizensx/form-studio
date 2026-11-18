@@ -421,8 +421,9 @@ Rectangle {
                                 id: mpop; x: -34; width: Math.min(380, talk.width - 24); padding: 6
                                 onAboutToShow: mp.reset()
                                 onOpened: mp.opened()
-                                onClosed: { Store.retryAfterPick = false
-                                    if (Store.pendingSend) { Store.chatPrefill(Store.pendingSend); Store.pendingSend = "" } }
+                                onClosed: Qt.callLater(function () {     // after a pick in the same moment has had its turn: it sends the message
+                                    Store.retryAfterPick = false
+                                    if (Store.pendingSend) { Store.chatPrefill(Store.pendingSend); Store.pendingSend = "" } })
                                 height: Math.min(mp.implicitHeight + 12, talk.height - 70)
                                 y: talk.landing ? mchip.height + 6 : -height - 6
                                 origin: talk.landing ? Popup.TopLeft : Popup.BottomLeft

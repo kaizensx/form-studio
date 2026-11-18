@@ -349,6 +349,7 @@ Rectangle {
                     text: "Untick everything to continue without installing" }
                 Btn { visible: Store.installing; large: true; icon: "x"; text: Store.installJob && Store.installJob.kind === "auto" ? "Cancel setup" : "Cancel install"; onClicked: Store.cancelInstall() }
                 Btn { kind: "primary"; large: true; busy: Store.installing || !wl.sw
+                    autoBusy: false              // moving between steps saves the step in the background: never wait for it
                     icon: wl.chosen.length ? "download" : wl.step < 2 ? "arrow_right" : "check"
                     text: Store.installing ? (Store.installJob && Store.installJob.kind === "auto" ? "Setting up…" : "Installing…") : !wl.sw ? "Checking…" : wl.chosen.length ? "Install " + wl.chosen.length + " selected"
                         : wl.step < 2 ? "Continue" : "Open Form Studio"

@@ -52,7 +52,8 @@ def journey_busy_feedback(ui):
     ui.wait_until(lambda: not btn.property("showsBusy"), 4, "the button to come back")
     ui.check(time.time() - t0 >= 1.5, "busy for as long as the work ran")
     ui.wait_until(lambda: ui.js("Store.activity.length") == 0, 3, "the bar to clear")
-    ui.wait_until(lambda: any("Running a slow test action" in t["msg"] for t in ui.store.get("toasts")), 2, "a toast when it finished")
+    ui.settle(600)                                       # work under 3 s says nothing when it ends: the button already did
+    ui.check(not any("Running a slow test action" in t["msg"] for t in ui.store.get("toasts")), "no toast for short work")
     # a quick answer never flashes: the spinner waits a moment before it shows
     ui.run_js("""var q = Qt.createQmlObject('import QtQuick; import Form; Btn { objectName: "fakeQuick"; x: 520; y: 300; text: "Quick" }', win.contentItem); q.z = 999
         q.clicked.connect(function () { q.run(function () { return Promise.resolve(1) }) })""")
