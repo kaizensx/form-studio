@@ -41,13 +41,20 @@ Window {
         mem.talkWidth = Store.talkWidth; mem.talkOpen = Store.talkOpen; mem.recent = JSON.stringify(Store.paletteRecent)
     }
     Timer { id: later; interval: 600; onTriggered: win.remember() }
-    onXChanged: later.restart(); onYChanged: later.restart(); onWidthChanged: later.restart(); onHeightChanged: later.restart()
+    onXChanged: later.restart(); onYChanged: later.restart()
+    onWidthChanged: { later.restart(); buttons.restart() } onHeightChanged: { later.restart(); buttons.restart() }
+    // macOS: the window buttons sit in the middle of the top bar, not above it; AppKit puts them back after a resize
+    // or full screen, so they are moved again then
+    function centerButtons() { if (mac && !full && !headless) Bridge.centerWindowButtons(win, top.height) }
+    Timer { id: buttons; interval: 0; onTriggered: win.centerButtons() }
+    onVisibilityChanged: buttons.restart()
+    onActiveChanged: buttons.restart()
     onClosing: remember()
     Connections { target: Store
         function onTalkWidthChanged() { later.restart() }
         function onTalkOpenChanged() { later.restart() }
         function onPaletteRecentChanged() { later.restart() } }
-    Component.onCompleted: { restore(); Store.boot(startProject, startStage); Store.bootSetup(headless); Store.checkWhatsNew(headless) }
+    Component.onCompleted: { restore(); buttons.restart(); Store.boot(startProject, startStage); Store.bootSetup(headless); Store.checkWhatsNew(headless) }
 
     // the native menu bar (macOS). Elsewhere the same actions are in the top bar's menu button and the palette.
     Loader { active: win.mac; sourceComponent: MacMenu { onFullScreen: win.visibility = win.full ? Window.Windowed : Window.FullScreen } }

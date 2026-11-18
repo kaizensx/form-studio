@@ -89,6 +89,17 @@ class Bridge(QObject):
         self.pool = QThreadPool.globalInstance()
         self.pool.setMaxThreadCount(max(8, self.pool.maxThreadCount()))
 
+    @Slot(QObject, float, result=bool)
+    def centerWindowButtons(self, window, bar_height: float) -> bool:
+        """macOS: the close, minimise and zoom buttons centred on the top bar (form/app/macwin.py)."""
+        if sys.platform != "darwin" or window is None:
+            return False
+        from . import macwin
+        try:
+            return macwin.center_buttons(int(window.winId()), float(bar_height))
+        except Exception:
+            return False
+
     # -- interaction tests (form/app/uitest.py): no native dialogs, nothing opened outside the app -------------
     def _test_dir(self) -> str:
         import os
