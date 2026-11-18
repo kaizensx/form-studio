@@ -57,6 +57,9 @@ def run_journey(script: str, size: str = "1440x900", env_extra: dict | None = No
         env.update(env_extra or {})
         r = subprocess.run([sys.executable, "-m", "form.app", "--uitest", str(JOURNEYS / script), "--size", size],
                            cwd=ROOT, env=env, capture_output=True, text=True, timeout=timeout)
+        sys.path.insert(0, str(ROOT))
+        from form import fsutil
+        fsutil.rmtree(data, 20)              # retried: on Windows a folder frees a moment after the last process in it ends
         return r.returncode, (r.stdout + r.stderr)[-6000:]
 
 
