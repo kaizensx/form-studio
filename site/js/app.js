@@ -130,7 +130,7 @@ export async function initHero() {
       <div class="pbtns"><button class="pbtn primary" type="button" id="approve" ${ok ? "" : "disabled"}>${icon(I.shield)}Approve and release r04</button></div>
       <p class="small" id="approve-note">${ok ? "Only a person can approve. Agents can do everything else." : ""}</p>
       <div class="sec"><div class="sec-h"><span class="cap">Revisions</span><small>${d.revisions.length} · head r04</small></div>
-      ${[...d.revisions].reverse().map((r) => `<div class="revrow ${r.n === d.head ? "head" : ""}"><span class="n">r0${r.n}</span><b>${esc(r.summary || r.note)}</b><small>${new Date(r.ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</small><span>${r.n > 1 ? "from r0" + (r.n - 1) : "from the recipe"}${r.origin.startsWith("proposal") ? " · by an agent" : ""}</span></div>`).join("")}</div>`;
+      ${[...d.revisions].reverse().map((r) => `<div class="revrow ${r.n === d.head ? "head" : ""}"><span class="n">r0${r.n}</span><b>${esc(r.summary || r.note)}</b><small>${new Date(r.ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</small><span>${r.n > 1 ? "from r0" + (r.n - 1) : "from the building block"}${r.origin.startsWith("proposal") ? " · by an agent" : ""}</span></div>`).join("")}</div>`;
     },
   };
   let panelEl = null;
@@ -310,14 +310,14 @@ export async function initHero() {
   const scroll = $("#talk-scroll"), field = $("#composer-field"), send = $("#send");
   const emptyState = () => `<div class="empty"><h3>Ask about this design,<br>or describe a change.</h3><p>The agent works on the design with Form Studio’s tools. Changes arrive as a draft or a new revision you can compare and undo.</p></div>`;
   const STEPS = [
-    { tool: "create_project", text: "Started a design from the dock recipe", icon: I.cube, rich: true },
+    { tool: "create_project", text: "Started from the dock building block", icon: I.cube, rich: true },
     { tool: "render", text: "Looked at the iso view", icon: I.eye, rich: true, img: true },
     { tool: "preview_change", text: "depth=92", rich: false },
     { tool: "commit_change", text: "Committed a revision", icon: I.commit, rich: true },
     { tool: "run_pipeline", text: "solid, exports, checks, slice", rich: false },
   ];
   const ANSWER = [
-    `I started from the dock recipe and sized the pocket for a ${d.values.device_width} × ${d.values.device_thickness} mm phone with ${d.values.clearance} mm of clearance per side. At 78 mm deep the dock tipped backwards when the screen was tapped, so the base is now ${d.values.depth} mm deep. The cable leaves through a bridged channel at the back.`,
+    `I started from the dock building block and sized the pocket for a ${d.values.device_width} × ${d.values.device_thickness} mm phone with ${d.values.clearance} mm of clearance per side. At 78 mm deep the dock tipped backwards when the screen was tapped, so the base is now ${d.values.depth} mm deep. The cable leaves through a bridged channel at the back.`,
     `${passes.length} checks pass and ${warns.length} need a look. Tip-over resistance is ${warns[0].value}, a model that assumes the infill mass. The fit is ${fitY}% modelled because the phone’s width is assumed: measure it with calipers and the model gives ${d.next_actions[0].yield_after}. The slice is simulated: ${hm(d.slice_meta.time_s)} and ${d.slice_meta.filament_g.toFixed(1)} g of PLA on your A1 mini.`,
   ];
   let stepsEl = null;
@@ -437,7 +437,7 @@ export async function initHero() {
     ptr.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: "forwards" }); setTimeout(() => ptr.classList.remove("on"), 300); ptr.getAnimations().forEach((a) => a.id === "f" && a.cancel());
     await wait(500);
     stepsGroup();
-    // 1: the design, from the recipe; the kernel builds it feature by feature
+    // 1: the design, from the building block; the kernel builds it feature by feature
     let el = addStep(STEPS[0], 0); node("params", "running");
     await wait(700); node("params", "current"); node("geometry", "running");
     const order = d.features.map((f) => f.id).filter((id) => vp.features.has(id));

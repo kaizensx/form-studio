@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Recipe gallery · Form Studio</title>
-<meta name="description" content="Parametric recipes for Form Studio: built-in part families and community contributions, each with its parameters and engineering checks. Open any of them as a new design.">
+<meta name="description" content="Parametric building blocks for Form Studio: the built-in part families agents start from and community contributions, each with its parameters and engineering checks.">
 <meta name="theme-color" content="#0e1113" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
 <link rel="canonical" href="https://kaizensx.github.io/form-studio/recipes/">
@@ -54,7 +54,7 @@
 <main id="main" class="wrap gallery">
   <div class="gallery-head">
     <h1>Recipe gallery</h1>
-    <p class="lead">Parametric families of parts. Each recipe builds a valid solid from typed parameters, attributes every face to a feature, and brings its own engineering checks. In the app, open any of them from <b>New design › From recipe</b> or <b>Community recipes</b>.</p>
+    <p class="lead">Parametric families of parts. Each recipe builds a valid solid from typed parameters, attributes every face to a feature and brings its own engineering checks. Agents start from them and change anything; install a community recipe with <code>form recipes install</code> after reading its source.</p>
     <div class="gallery-tools">
       <label class="search"><svg class="ic" aria-hidden="true"><use href="#ic-search"/></svg><span class="sr">Search recipes</span><input type="search" id="q" placeholder="Search by name, use or tag" autocomplete="off"></label>
       <div class="seg" role="group" aria-label="Show" id="filter"><button type="button" data-f="all" aria-pressed="true">All</button><button type="button" data-f="builtin" aria-pressed="false">Built in</button><button type="button" data-f="community" aria-pressed="false">Community</button></div>
@@ -66,12 +66,12 @@
   <section class="contribute" aria-labelledby="contrib-title">
     <div>
       <h2 id="contrib-title">Add your recipe</h2>
-      <p>A community recipe is a folder with three files: <code>recipe.py</code> (or <code>recipe.scad</code>), <code>meta.json</code> and <code>preview.png</code>. Open a pull request against <code>dev</code>; the gallery and the app pick it up with the next release.</p>
+      <p>A community recipe is a folder with three files: <code>recipe.py</code> (or <code>recipe.scad</code>), <code>meta.json</code> and <code>preview.png</code>. Paste it in a recipe issue, or run <code>form recipes submit</code>: it is built, checked and sliced automatically and the issue is answered with pictures. Accepted recipes join the gallery.</p>
     </div>
     <div class="actions">
       <a class="btn primary" href="https://github.com/kaizensx/form-studio/tree/main/community/recipes">The format</a>
       <a class="btn" href="../docs/recipes.html">Writing a recipe</a>
-      <a class="btn" href="https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml">Request a recipe</a>
+      <a class="btn" href="https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml">Share or request a recipe</a>
     </div>
   </section>
   <p class="fine machine">For tools: <a href="index.json">index.json</a> lists every recipe with its source URL and SHA-256 (schema version 1).</p>
