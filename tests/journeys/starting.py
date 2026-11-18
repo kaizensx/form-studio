@@ -99,17 +99,17 @@ def journey_new_design_flow(ui):
     card = ui.item("sheetCard")
     # search the library
     ui.click("recipeSearch")
-    ui.type("gear")
-    ui.wait_until(lambda: ui.item("recipeGrid").property("count") == 1 and ui.exists(text="Spur gear pair", within=card), 30, "only the gears")    # live previews keep a software-rendered runner busy
-    ui.click_text("Spur gear pair", within=card)
+    ui.type("skadis")
+    ui.wait_until(lambda: ui.item("recipeGrid").property("count") == 1 and ui.exists(text="SKÅDIS pegboard accessory", within=card), 30, "only the pegboard accessory")    # live previews keep a software-rendered runner busy
+    ui.click_text("SKÅDIS pegboard accessory", within=card)
     ui.click("newName")
-    ui.type("Clock gears")
+    ui.type("Pegboard hook")
     ui.shot("new-library-search")
     ui.click("recipePrimary")
     ui.wait_until(lambda: ui.store.get("screen") == "work", 120, "the new design to open")
     pid = ui.store.get("pid")
-    ui.eq(ui.api("/projects/" + pid)["project"]["recipe"], "gear_pair")
-    ui.eq(ui.api("/projects/" + pid)["project"]["name"], "Clock gears")
+    ui.eq(ui.api("/projects/" + pid)["project"]["recipe"], "pegboard")
+    ui.eq(ui.api("/projects/" + pid)["project"]["name"], "Pegboard hook")
     wait_job(ui, pid)
     ui.run_js("Store.home()")
     home(ui)

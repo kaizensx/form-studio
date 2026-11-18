@@ -61,7 +61,7 @@ Rules:
 | [`create_design`](#create_design) | changes | Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass, built with build123d. |
 | [`update_design`](#update_design) | changes | Replace a design's code as a new revision (history keeps every version). |
 | [`get_design_source`](#get_design_source) | read-only | The exact code a revision was built from (built-in recipes return their recipe file). |
-| [`create_project`](#create_project) | changes | Create a project from a built-in recipe (dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob). |
+| [`create_project`](#create_project) | changes | Create a project from a built-in recipe (form_overview lists them: gridfinity_bin, storage_box, pegboard, device_stand, ...). |
 | [`get_project`](#get_project) | read-only | Current revision with every parameter and its provenance, output status (current/stale/failed/missing), checks, fit model, next best actions, simulated slice, file paths, release gate and bench link. |
 | [`preview_change`](#preview_change) | read-only | Build a candidate change for real and report what it would touch, without saving anything: changed features, interface dimensions, stability, fit yield, which outputs it would invalidate. |
 | [`commit_change`](#commit_change) | changes | Save a change as a new revision (history is never rewritten). |
@@ -222,7 +222,7 @@ The exact code a revision was built from (built-in recipes return their recipe f
 
 ### `create_project`
 
-Create a project from a built-in recipe (dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob).
+Create a project from a built-in recipe (form_overview lists them: gridfinity_bin, storage_box, pegboard, device_stand, ...).
 For anything else, write a design: design_guide, then create_design. values override recipe defaults (all start as 'assumed').
 With run=True the solid, exports and checks are built (and sliced if a slicer is available).
 

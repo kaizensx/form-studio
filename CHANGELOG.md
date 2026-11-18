@@ -2,6 +2,7 @@
 
 ## 12.0.0
 
+- **A new recipe library, made of the things people print most:** Gridfinity bin and baseplate, a box with a sliding, press-on or hinged lid, SKÅDIS pegboard accessories, a phone and tablet stand, a cable organizer, an under-desk hanger, a shelf bracket, a hose and pipe adapter, a self-watering planter, a faceted vase and lamp shade, and a battery and card holder. Each passes its checks at its defaults and prints without supports; multi-part recipes show Assembled and Exploded views. Recipes have categories and tags for search, in the app and the website gallery. The older dock, wall hook, twisted planter, gear pair, knob, hinged box and Gridfinity bin leave the library; designs that use them still open and build.
 - **A new Home.** A new install shows every way to start, starters and the built-in recipes drawn live in 3D. With designs, starters sit above the live design grid.
 - **Starters learn from you.** They are ranked by what you design, your briefs, your printer and your material. Pin, edit, remove or add your own, and save a filled-in brief as your own template.
 - **Every way to start a design:** describe it (with a reference STEP or STL), pick from a searchable recipe library (built-in, yours, community), fill in a brief, or import.
