@@ -160,6 +160,7 @@ def journey_annotate(ui):
     # keep it, with a name and a note
     ui.click(ui.item("keepSelection"))
     ui.settle(300)
+    ui.click(ui.item("annName"))
     ui.type("Lid corner")
     ui.click(ui.item("annNote"))
     ui.type("Is the wall thick enough here?")
