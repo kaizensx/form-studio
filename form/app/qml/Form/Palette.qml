@@ -56,7 +56,8 @@ Item {
         }
         add("Tools", "new", "plus", "New design", "Describe it, or drop a photo, a sketch, a part or a link", function () { if (Store.screen !== "home") Store.home(); Store.startFocus++ }, "Ctrl+N")
         add("Tools", "sketch", "pen_tool", "Sketch a new design", "Lines, circles, arcs and dimensions in mm", function () { if (Store.screen !== "home") Store.home(); Store.openSheet("sketch") })
-        add("Tools", "blank", "square_dashed", "Start a blank design", "An empty design, no agent", function () { Store.startBlank("") })
+        add("Tools", "blank", "square_dashed", "Start blank", "An empty build plate: describe, sketch or import what goes on it", function () { Store.startBlank() })
+        add("Tools", "block", "cuboid", "Start from a block", "A rounded block shaped with sliders, no agent", function () { Store.startBlock("") })
         if (Store.concepts.length) add("Tools", "concepts", "boxes", "Concepts waiting for a pick", Store.concepts[0].name, function () { Store.openConcepts(Store.concepts[0].id) })
         add("Tools", "example", "box", "Open an example", "Finished designs that ship with Form Studio", function () { Store.openSheet("import", { examples: true }) })
         if (Store.studio) Store.studio.projects.forEach(function (p) { if (!p.error && p.id !== Store.pid) add("Designs", "p." + p.id, "cuboid", p.name, F.pad(p.head) + " · " + F.ago(p.updated), function () { Store.open(p.id) }) })

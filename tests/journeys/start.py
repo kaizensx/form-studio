@@ -44,8 +44,21 @@ def journey_blank(ui):
     # Just a 3D model: no printer, no print checks
     ui.click_text("Just a 3D model", within=ui.item("startPurpose"))
     ui.wait_until(lambda: ui.js("Store.newPurposeEffective") == "model", 3, "the purpose of the next design to change")
+    # the printer and the agent are chosen right under the composer
+    ui.check(ui.exists("startModel"), "the agent and model chip is under the composer")
+    ui.check(not ui.exists("startPrinter"), "no printer chip for a 3D model")
+    n_before = len(ui.api("/studio")["projects"])
     ui.click("startBlank")
-    ui.wait_until(lambda: ui.store.get("screen") == "work" and ui.store.get("pid"), 120, "the blank design to open in the workspace")
+    # Start blank is really blank: an empty plate, the conversation open, no design made
+    ui.wait_until(lambda: ui.store.get("screen") == "designing" and ui.js("Store.blankCanvas"), 10, "the blank canvas")
+    ui.wait_until(lambda: ui.exists("blankCanvas"), 5, "the blank canvas's ways to start")
+    ui.eq(ui.store.get("pid"), "", "no design is open")
+    ui.eq(len(ui.api("/studio")["projects"]), n_before, "no design was created")
+    ui.settle(400)
+    ui.shot("start-blank-canvas")
+    # a block to shape with sliders, no agent
+    ui.click("blankBlock")
+    ui.wait_until(lambda: ui.store.get("screen") == "work" and ui.store.get("pid"), 120, "the block to open in the workspace")
     pid = ui.store.get("pid")
     p = ui.api("/projects/" + pid)["project"]
     ui.eq(p.get("purpose"), "model", "the blank design is just a 3D model")

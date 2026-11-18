@@ -844,6 +844,36 @@ class Studio:
             pub = e.public() if hasattr(e, "public") else {"message": str(e)}
             raise StudioError(pub["message"], pub.get("hint", ""), feature=pub.get("feature"), params=pub.get("params", []), kind="recipe")
 
+    # A design's tessellated view, kept on disk: the CAD kernel takes seconds per design, and Home and the workspace
+    # would otherwise rebuild every one at each start. The name holds everything the view depends on.
+    VIEW_CACHE_MAX = 400
+
+    def _view_cache_file(self, op, kw):
+        if op != "view" or not kw.get("key"):
+            return None
+        from importlib import metadata
+        from . import __version__
+        try:
+            b123 = metadata.version("build123d")
+        except metadata.PackageNotFoundError:
+            b123 = "?"
+        sig = H(kw["key"], kw.get("recipe_id"), kw.get("values"), kw.get("tol"), kw.get("dock_mass_g"), kw.get("_mark"),
+                kw.get("_refs"), self.recipe_sha(kw["recipe_id"]) if kw.get("recipe_id") else "", __version__, b123)
+        return self.root / ".cache" / "views" / f"{sig}.json"
+
+    def _view_cache_put(self, f, out):
+        from . import fsutil
+        try:
+            f.parent.mkdir(parents=True, exist_ok=True)
+            tmp = f.with_suffix(".tmp")
+            tmp.write_text(json.dumps(out), encoding="utf-8")
+            fsutil.replace(tmp, f)
+            files = sorted(f.parent.glob("*.json"), key=lambda x: x.stat().st_mtime)
+            for old in files[:-self.VIEW_CACHE_MAX]:          # the oldest go first; a miss only costs a rebuild
+                old.unlink(missing_ok=True)
+        except OSError:
+            pass
+
     def _k(self, op, timeout=60, p=None, refs=None, rev=None, **kw):
         """One kernel call. With p (the project), a design that reads imported parts gets their paths, and a
         design with marks gets the label text and the revision (rev, or the one the values belong to)."""
@@ -862,8 +892,17 @@ class Studio:
             kw["_refs"] = refs
             if "key" in kw:
                 kw["key"] = f"{kw['key']}-{H(sorted((k, sha_file(Path(v))) for k, v in refs.items()))}"
+        cache = self._view_cache_file(op, kw)
+        if cache is not None and cache.is_file():
+            try:
+                return json.loads(cache.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                pass
         try:
-            return self.kernel.call(op, timeout=timeout, **kw)
+            out = self.kernel.call(op, timeout=timeout, **kw)
+            if cache is not None and isinstance(out, dict):
+                self._view_cache_put(cache, out)
+            return out
         except KernelFailure as e:
             i = e.info
             raise StudioError(i.get("message", "Kernel failure"), i.get("hint", ""), status=422 if i.get("kind") == "recipe" else 500,

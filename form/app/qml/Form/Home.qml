@@ -34,8 +34,8 @@ Item {
     readonly property var talks: Store.convs.filter(function (c) { return c.messages > 0 }).slice(0, home.width > 1500 ? 4 : 3)
     readonly property real cw: Math.min(width - (width < 1000 ? 48 : 96), 1200)          // content width
     readonly property real heroH: fresh ? height : Math.max(500, Math.min(620, height * 0.7))
-    // wide enough: the words on the left, the part you made last on the right, turning on the bench
-    readonly property bool split: !fresh && !!latest && width >= 1180
+    // the composer always sits in the middle; the bench behind it stays empty (the part you made last is in the list below)
+    readonly property bool split: false
     readonly property real side: Math.round((width - cw) / 2)
     function openGroup(gid) { for (var i = 0; i < Store.concepts.length; i++) if (Store.concepts[i].id === gid) return true; return false }
     // newest Blender render of each project's current geometry (form/photo.py)
@@ -45,7 +45,9 @@ Item {
     // Everything rises in once, when Home appears. Sorting, filtering or a reload afterwards puts things in place at once.
     property bool entered: false
     Timer { interval: 40 + 9 * Theme.stagger + Theme.slow; running: true; onTriggered: home.entered = true }
-    Connections { target: Store; function onStudioChanged() { home.loadPhotos() } }
+    Connections { target: Store; function onStudioChanged() { home.loadPhotos() }
+        function onSheetChanged() { if (!Store.sheet) Store.loadStart() }                 // a printer chosen in its sheet shows here
+        function onModelPickWanted() { if (Store.screen === "home" && !Store.talkOpen) Qt.callLater(function () { if (!homeModelPop.opened) homeModelPop.open() }) } }
     function recipeTitle(id) {
         if (!Store.studio) return ""
         if (String(id).indexOf("src:") === 0 || String(id).indexOf("scad:") === 0) return "Designed as code"
@@ -187,18 +189,40 @@ Item {
                     Item { width: 1; height: 30 }
                     StartComposer { id: composer; width: parent.width; dragging: home.dropping; onSketchWanted: Store.openSheet("sketch") }
                     Item { width: 1; height: 16 }
-                    // ── start options: the purpose of what starts next, and a blank design ──
-                    Item { width: parent.width; height: 34
+                    // ── under the composer: what it is for, which printer, which agent and model, or a blank canvas ──
+                    Row { id: opts; objectName: "startOptions"; anchors.horizontalCenter: parent.horizontalCenter; spacing: 6; height: 30
                         Seg { id: purposeSeg; objectName: "startPurpose"; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 30
                             value: Store.newPurposeEffective; onPicked: function (v) { Store.setNewPurpose(v) }
                             model: [{ value: "print", text: "For my printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" },
                                     { value: "model", text: "Just a 3D model", tip: "No printer: no slicing and no print checks. STEP and STL are still exported." }] }
-                        Txt { anchors.left: purposeSeg.right; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; kind: "fine"; tone: 3
-                            width: parent.width - purposeSeg.width - blank.width - 36; elide: Text.ElideRight; wrapMode: Text.NoWrap
-                            text: Store.newPurposeEffective === "model" ? "Not sliced, no print checks" : Store.printerName ? Store.printerName : Store.prints ? "No printer set up yet" : "You said you just design: no printer is set up" }
-                        Btn { id: blank; objectName: "startBlank"; kind: "quiet"; icon: "square_dashed"; text: "Start blank"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                            tip: "An empty design and the workspace, no agent. Shape it with its parameters, or bring the agent in later."
-                            onClicked: run(function () { return Store.startBlank("") }) } }
+                        Btn { id: printerChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startPrinter"; small: true; kind: "quiet"; icon: "printer"; visible: Store.newPurposeEffective === "print"
+                            text: Store.printerName ? Store.printerName : "Choose a printer"
+                            tip: "The printer the next design is checked and sliced for. Click to change it."
+                            onClicked: Store.openSheet("printer") }
+                        Btn { id: modelChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startModel"; small: true; kind: "quiet"; icon: "sparkles"; active: homeModelPop.opened
+                            text: Store.chatReady ? Store.chatAgentLabel + " · " + Store.modelShort(Store.chatAgent, Store.chatModel) : "Connect an agent"
+                            tip: Store.chatReady ? "The agent and model that design it. Click to change them." : "No agent is connected: add one in Settings › Agents"
+                            onClicked: Store.chatReady ? (homeModelPop.opened ? homeModelPop.close() : homeModelPop.open()) : Store.openSettings("agents")
+                            Pop {
+                                id: homeModelPop; y: parent.height + 6; x: Math.round((parent.width - width) / 2); width: 380; padding: 6; origin: Popup.TopLeft
+                                height: Math.min(hmp.implicitHeight + 12, home.height * 0.6)
+                                onAboutToShow: hmp.reset()
+                                onOpened: hmp.opened()
+                                onClosed: Qt.callLater(function () {
+                                    Store.retryAfterPick = false
+                                    if (Store.pendingSend) { Store.chatPrefill(Store.pendingSend); Store.pendingSend = "" } })
+                                Flickable { anchors.fill: parent; clip: true; contentHeight: hmp.implicitHeight; boundsBehavior: Flickable.StopAtBounds
+                                    ScrollBar.vertical: ScrollBar { width: 6 }
+                                    TalkModelPicker { id: hmp; width: parent.width; onDone: homeModelPop.close() } } } }
+                        Item { width: 9; height: 30; anchors.verticalCenter: parent.verticalCenter; Rectangle { width: 1; height: 16; color: Theme.rule2; anchors.centerIn: parent } }
+                        Btn { id: blank; anchors.verticalCenter: parent.verticalCenter; objectName: "startBlank"; small: true; kind: "quiet"; icon: "square_dashed"; text: "Start blank"
+                            tip: "An empty build plate and the workspace. Describe, sketch or import what goes on it."
+                            onClicked: Store.startBlank() } }
+                    // the design you were on, one click away
+                    Item { visible: !home.fresh && !!home.latest; width: 1; height: 14 }
+                    Txt { objectName: "homeContinue"; visible: !home.fresh && !!home.latest; anchors.horizontalCenter: parent.horizontalCenter; kind: "fine"; tone: cm.containsMouse ? 1 : 3
+                        text: home.latest ? "Continue “" + home.latest.name + "” · " + F.pad(home.latest.head) + " · " + F.ago(home.latest.updated) + "  →" : ""
+                        MouseArea { id: cm; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.open(home.latest.id) } }
                     Item { visible: home.fresh; width: 1; height: 40 }
                     Grid { id: ways; visible: home.fresh; width: parent.width; columns: 4; spacing: 10
                         readonly property real tw: Math.floor((width - 3 * spacing) / 4)
@@ -223,13 +247,6 @@ Item {
                                 MouseArea { id: wm; anchors.fill: parent; hoverEnabled: true; onClicked: way.modelData.run() } } } }
                     Note { visible: !!Store.fatal; width: parent.width; kind: "red"; title: Store.fatal ? Store.fatal.message : ""; text: Store.fatal ? (Store.fatal.hint || "") : "" }
                 }
-                // what is turning on the bench
-                Column { visible: home.split; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: 34; spacing: 2
-                    Txt { kind: "cap"; text: "Last worked on"; anchors.right: parent.right }
-                    Txt { text: home.latest ? home.latest.name : ""; font.weight: Theme.wMedium; anchors.right: parent.right
-                        color: lwm.containsMouse ? Theme.datum : Theme.ink
-                        MouseArea { id: lwm; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.open(home.latest.id) } }
-                    Txt { kind: "fine"; tone: 3; anchors.right: parent.right; text: home.latest ? F.pad(home.latest.head) + " · " + F.ago(home.latest.updated) : "" } }
                 // the empty bench says where the work will appear, once
                 Txt { visible: home.fresh; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 26
                     kind: "fine"; tone: 4; text: "Every part is built in a real CAD kernel and checked before you print it. Nothing prints or uploads on its own." }
