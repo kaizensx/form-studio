@@ -56,8 +56,26 @@ uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizens
 
 ### Home
 
-Every design as a live 3D card, filtered by released and in progress and sorted by name or date. Right-click a card to
-rename, duplicate, export or move it to the trash.
+Home is where a design starts. One composer takes whatever you have: words (typed, or spoken with your system's
+dictation), a photo (with a bank card, a coin or a ruler in it, the agent estimates sizes from it and labels them
+"estimated from the photo"), a sketch drawn on the sketch pad, a STEP, STL or 3MF part, a PDF drawing, or a link (a
+model page is passed to the agent as a link; a direct STL, STEP, 3MF, PDF or picture link is downloaded and shown on
+the composer). Drop files anywhere on Home or paste them. Under the composer: **For my printer** or **Just a 3D
+model** (no slicing, no print checks), and **Start blank** (an empty design in the workspace, no agent).
+
+Sending opens the workspace at once in a "being designed" state with what the agent is doing; the design is attached
+the moment it exists and builds up feature by feature in the viewport, each feature named as it arrives. For a new idea
+the agent proposes three or four concepts as real CAD, side by side and turning, with a line on each and their computed
+size and volume: continue with one, or ask in words for a mix ("the base of A with the hook of C"). When it needs a
+real number, a **Measure this** card shows where to measure on a picture or a diagram, the tolerance that matters and
+what the design assumes now; the number you type is committed with how you measured it, and the part updates.
+
+Below: concepts waiting for a pick, recent conversations, and every design as a live 3D card, filtered by released and
+in progress and sorted by name or date. Right-click a card to rename, duplicate, export or move it to the trash.
+
+**Sketch pad.** Lines, rectangles, circles, arcs (centre, start, end), freehand strokes and dimensions, snapped to a
+5 mm grid and to the points already drawn (Alt draws freely), with undo and redo. A typed dimension is "stated" and
+overrides the drawn length. The agent receives the shapes as structured geometry in millimetres and the picture.
 
 ![Home](images/app-home.webp)
 
@@ -66,7 +84,7 @@ rename, duplicate, export or move it to the trash.
 | Key | Does |
 |---|---|
 | Ctrl/⌘ K | Search and commands: every action and every design |
-| Ctrl/⌘ N | New design |
+| Ctrl/⌘ N | New design: Home, with the composer ready |
 | Ctrl/⌘ Shift O | New conversation |
 | Ctrl/⌘ J | Show or hide the conversation |
 | Ctrl/⌘ Shift H | All designs (Home) |

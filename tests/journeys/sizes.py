@@ -90,7 +90,7 @@ def run(ui):
         ui.shot(f"size-{tag}-simulate")
         ui.run_js("Store.showLayers(false)")
         ui.settle(300)
-    for opener, kind in (("Ctrl+N", "new"), ("Ctrl+,", "settings"), ("?", "shortcuts")):
+    for opener, kind in (("Ctrl+,", "settings"), ("?", "shortcuts")):
         ui.key(opener)
         open_sheet_wait(ui, kind)
         card = rect(ui.item("sheetCard"))

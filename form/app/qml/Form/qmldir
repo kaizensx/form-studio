@@ -26,6 +26,7 @@ Pipeline 1.0 Pipeline.qml
 Workspace 1.0 Workspace.qml
 MiniView 1.0 MiniView.qml
 Home 1.0 Home.qml
+Designing 1.0 Designing.qml
 TopBar 1.0 TopBar.qml
 Toasts 1.0 Toasts.qml
 Palette 1.0 Palette.qml

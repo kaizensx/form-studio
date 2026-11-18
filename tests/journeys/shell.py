@@ -52,7 +52,7 @@ def journey_setup(ui):
 
 def journey_every_sheet_opens_and_closes(ui):
     opens = [
-        ("new", lambda: ui.key("Ctrl+N"), "New design"),
+        ("import", lambda: palette(ui, "open an example", "Open an example"), "Import"),
         ("settings", lambda: ui.key("Ctrl+,"), "Settings"),
         ("shortcuts", lambda: ui.key("?"), "Keyboard shortcuts"),
         ("slicer", lambda: palette(ui, "choose slicer", "Choose slicer"), "Slicer"),
@@ -63,6 +63,7 @@ def journey_every_sheet_opens_and_closes(ui):
         ("about", lambda: palette(ui, "about form", "About Form Studio"), "About Form Studio"),
         ("settings", lambda: palette(ui, "software install", "Software: install or check"), "Settings"),
         ("update", lambda: palette(ui, "check for updates", "Check for updates"), None),
+        ("sketch", lambda: palette(ui, "sketch a new design", "Sketch a new design"), "Sketch it"),     # goes to Home: last
     ]
     for kind, how, title in opens:
         how()
@@ -82,31 +83,14 @@ def journey_every_sheet_opens_and_closes(ui):
         close_sheet_esc(ui)
         ui.check(not ui.find_all(name="sheetCard") or ui.item("sheetCard").opacity() < 0.05 or True, "closed")
     # a click outside the card closes a sheet too
-    ui.key("Ctrl+N")
-    open_sheet_wait(ui, "new")
+    ui.key("Ctrl+,")
+    open_sheet_wait(ui, "settings")
     ui.click((30, 400))
     ui.wait_until(lambda: sheet(ui) is None, 3, "a click on the scrim to close the sheet")
     ui.settle(250)
-
-
-def journey_new_sheet_tabs(ui):
-    ui.key("Ctrl+N")
-    open_sheet_wait(ui, "new")
-    card = ui.item("sheetCard")
-    ui.click_text("Planter", within=card, exact=False)
-    ui.wait_until(lambda: ui.item(text="Create design").property("enabled") is True, 2, "a recipe to be picked")
-    # the brief tab: templates, questions
-    ui.click_text("From a brief", within=card, exact=False)
-    ui.settle(300)
-    ui.expect("Enclosure", within=card)
-    ui.click_text("Enclosure", within=card)
-    ui.settle(300)
-    ui.expect("All templates", within=card)
-    ui.shot("sheet-new-brief")
-    ui.click_text("All templates", within=card)
-    ui.settle(200)
-    close_sheet_esc(ui)
-    ui.eq(len(ui.api("/studio")["projects"]), 1, "nothing was created by looking")
+    ui.run_js("Store.open(%r)" % S["pid"])             # the sketch pad took us to Home
+    ui.wait_until(lambda: ui.store.get("screen") == "work", 30, "back in the design")
+    ui.settle(400)
 
 
 def journey_settings_saves_to_the_file(ui):
@@ -538,10 +522,12 @@ def journey_every_listed_shortcut(ui):
         ui.key("Ctrl+K")
         ui.wait_until(lambda: ui.store.get("paletteOpen") is False, 3, "Ctrl+K again to close")
 
-    def do_new():
+    def do_new():                     # a new design starts on Home, in its composer
         ui.key("Ctrl+N")
-        open_sheet_wait(ui, "new")
-        close_sheet_esc(ui)
+        ui.wait_until(lambda: ui.store.get("screen") == "home" and ui.focus_inside("startComposer"), 10, "Home's composer to take the keyboard")
+        ui.run_js("Store.open(%r)" % S["pid"])
+        ui.wait_until(lambda: ui.store.get("screen") == "work", 30, "back in the design")
+        ui.settle(400)
 
     def do_new_chat():
         ui.run_js("Store.talkOpen = false")

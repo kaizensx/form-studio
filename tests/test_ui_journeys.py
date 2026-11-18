@@ -90,14 +90,13 @@ class Journeys(unittest.TestCase):
     def test_home(self):
         self.journey("home.py")
 
-    def test_starting_a_design(self):
-        # learned starters, the new-design sheet and its recipe library, archives, What's New; the community index
-        # is a local copy (tests/fixtures/community), so nothing is fetched
-        self.journey("starting.py", env_extra={"FORM_RECIPES_INDEX": str(HERE / "fixtures" / "community" / "index.json")})
+    def test_start(self):                    # Home's start: blank, a photo, a sketch, concepts, a measurement
+        self.journey("start.py")
 
-    def test_sharing_and_busy_feedback(self):
-        # a slow action's busy button and activity bar; a recipe exported and imported again; the community
-        # submission (its GitHub link is recorded, not opened); a design turned into a recipe
+    def test_import_and_whats_new(self):     # a project archive round trip, What's New once
+        self.journey("starting.py")
+
+    def test_busy_feedback(self):            # a slow action's busy button and activity bar
         self.journey("sharing.py")
 
     def test_sheets_palette_shortcuts(self):

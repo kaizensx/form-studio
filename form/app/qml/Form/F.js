@@ -2,6 +2,7 @@
 // Formatting shared by every screen.
 function fmt(v, d) { if (d === undefined) d = 2; return (v === null || v === undefined || isNaN(v)) ? "—" : Number(v).toFixed(d) }
 function trim(v, d) { if (d === undefined) d = 3; return (v === null || v === undefined) ? "—" : String(parseFloat(Number(v).toFixed(d))) }
+function bytes(n) { n = Number(n) || 0; return n >= 1e6 ? (n / 1e6).toFixed(1) + " MB" : n >= 1e3 ? Math.round(n / 1e3) + " kB" : n + " B" }
 function pad(n) { var s = String(n); return "r" + (s.length < 2 ? "0" + s : s) }
 function dur(s) {
     if (s === null || s === undefined) return "—"

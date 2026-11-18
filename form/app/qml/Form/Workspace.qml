@@ -138,6 +138,41 @@ Item {
     Shortcut { sequence: "E"; enabled: ws.keys && !!Store.assembly; onActivated: ws.setTool("assembly") }
     Shortcut { sequence: "T"; enabled: ws.keys; onActivated: ws.setTool("history") }
 
+    // ── the build-up: a new build from the agent (or a pick, or a measurement) grows in feature by feature, in build
+    //    order, each one named as it arrives, so you watch the part being made. It is the real geometry of this
+    //    revision revealed stage by stage; no extra builds run, so it costs nothing on a small machine. ──
+    QtObject {
+        id: build
+        property var hide: []
+        property var order: []
+        property int at: -1
+        property string label: ""
+        property string sub: ""
+        function start() {
+            var v = Store.view, d = Store.data
+            if (!v || !v.mesh || !d || Theme.reduced) return
+            var seen = ({}), ids = []
+            v.mesh.forEach(function (m) { var f = m.feature || ""; if (f && !seen[f]) { seen[f] = true; ids.push(f) } })
+            var feats = d.recipe && d.recipe.features ? d.recipe.features : []
+            var ordered = feats.map(function (f) { return f.id }).filter(function (id) { return seen[id] })
+            ids.forEach(function (id) { if (ordered.indexOf(id) < 0) ordered.push(id) })
+            if (ordered.length < 2) { label = ordered.length ? (Store.featureById(ordered[0]) || {}).label || "" : ""; at = 0; order = ordered; flash.restart(); return }
+            order = ordered; at = 0; hide = ordered.slice(1); step()
+            stepper.interval = Math.max(260, Math.min(700, 2600 / ordered.length)); stepper.restart()
+        }
+        function step() {
+            var f = Store.featureById(order[at]) || ({ label: order[at] })
+            label = f.label || order[at]; sub = (at + 1) + " of " + order.length
+        }
+        function next() {
+            if (at >= order.length - 1) { hide = []; flash.restart(); return }
+            at++; hide = order.slice(at + 1); step(); stepper.restart()
+        }
+    }
+    Timer { id: stepper; onTriggered: build.next() }
+    Timer { id: flash; interval: 1400; onTriggered: { build.label = ""; build.sub = "" } }
+    Connections { target: Store; function onBuildTickChanged() { Qt.callLater(build.start) } }
+
     // ── centre: the part ─────────────────────────────────────
     Item {
         id: centre
@@ -150,7 +185,7 @@ Item {
             visible: !Store.layers
             asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
             plateSize: ws.d && ws.d.printer ? Math.max(60, Math.max(ws.d.printer.env.envelope[0], ws.d.printer.env.envelope[1])) : 180
-            hiddenFeatures: Store.hidden                                             // design tools: quick actions
+            hiddenFeatures: Store.hidden.concat(build.hide)                        // design tools: quick actions; the build-up
             // colours and materials: re-made whenever the design's appearance or the catalogue changes
             colorOf: { var a = Store.appearance, c = Store.materialCat; return function (part) { return Store.look(part).color || "" } }
             // what the HUD covers: the rail and options, the dock when it is open, the strip and the readout
@@ -187,6 +222,19 @@ Item {
             gradient: Gradient { orientation: Gradient.Vertical
                 GradientStop { position: 0; color: Theme.alpha(Theme.plate, 0.5) } GradientStop { position: 0.16; color: "transparent" }
                 GradientStop { position: 0.82; color: "transparent" } GradientStop { position: 1; color: Theme.alpha(Theme.plate, 0.75) } } }
+
+        // the build-up's caption: which feature just arrived
+        Rectangle {
+            id: buildCap; objectName: "buildCaption"; z: 6
+            anchors.horizontalCenter: parent.horizontalCenter; y: 58
+            width: bcr.implicitWidth + 28; height: 32; radius: 16; color: Theme.alpha(Theme.plate3, 0.94); border.color: Theme.alpha(Theme.datum, 0.45)
+            opacity: build.label ? 1 : 0; visible: opacity > 0.01
+            Behavior on opacity { NumberAnimation { duration: build.label ? Theme.fast : 420 } }
+            Row { id: bcr; anchors.centerIn: parent; spacing: 9
+                Rectangle { width: 6; height: 6; radius: 3; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
+                Txt { kind: "cap"; color: Theme.datum; text: build.sub ? "Building" : "Built"; anchors.verticalCenter: parent.verticalCenter }
+                Txt { text: build.label; font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter }
+                Txt { visible: !!build.sub; kind: "fine"; mono: true; tone: 3; text: build.sub; anchors.verticalCenter: parent.verticalCenter } } }
 
         // what is under the pointer: appears at once, no delay
         Rectangle { id: chip; property var feat: null; visible: !!feat && !Store.layers; z: 5

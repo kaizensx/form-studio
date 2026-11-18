@@ -44,7 +44,6 @@ Item {
             add("Tools", "alternatives", "boxes", "Compare alternatives", "Build a grid of candidates", function () { Store.openSheet("alternatives") })
             add("Tools", "variants", "layout_grid", "Variants board", "Named variants side by side", function () { Store.openSheet("variants") })
             add("Tools", "share", "share_2", "Share card", "A 1600 × 900 image of this design", function () { Store.openSheet("share") })
-            add("Tools", "asrecipe", "wand", "Turn this design into a recipe", "Its values become the defaults; share it as a file or with the community", function () { Store.openSheet("designRecipe", { project: Store.pid }) })
             add("Tools", "render", "camera", "Render in Blender", "An illustration of the current revision", function () { Store.openSheet("render") })
             add("Tools", "timeline", "history", (Store.timelineOpen ? "Hide" : "Show") + " the revision timeline", "Scrub through revisions", function () { Store.timelineOpen = !Store.timelineOpen; if (!Store.timelineOpen) Store.endScrub() })
             add("Tools", "morph", "play", "Play the revision history", "Morph through every revision", function () { Store.timelineOpen = true; Store.playMorph() })
@@ -55,9 +54,11 @@ Item {
             add("Tools", "freecad", "external_link", "Open the STEP in FreeCAD", "Release · working files", function () { Store.openIn("step", "freecad") })
             if (Store.canAskReview) add("Tools", "review", "eye", "Ask for a design review", "Silhouette, relationships, details", function () { Store.askReview() })
         }
-        add("Tools", "new", "plus", "New design from a recipe", "", function () { Store.openSheet("new") }, "Ctrl+N")
-        add("Tools", "brief", "file_text", "New design from a brief", "Guided questions, then the agent designs it", function () { Store.openSheet("new", { tab: "brief" }) })
-        add("Tools", "example", "box", "Open an example", "Finished designs that ship with Form Studio", function () { Store.openSheet("new", { examples: true }) })
+        add("Tools", "new", "plus", "New design", "Describe it, or drop a photo, a sketch, a part or a link", function () { if (Store.screen !== "home") Store.home(); Store.startFocus++ }, "Ctrl+N")
+        add("Tools", "sketch", "pen_tool", "Sketch a new design", "Lines, circles, arcs and dimensions in mm", function () { if (Store.screen !== "home") Store.home(); Store.openSheet("sketch") })
+        add("Tools", "blank", "square_dashed", "Start a blank design", "An empty design, no agent", function () { Store.startBlank("") })
+        if (Store.concepts.length) add("Tools", "concepts", "boxes", "Concepts waiting for a pick", Store.concepts[0].name, function () { Store.openConcepts(Store.concepts[0].id) })
+        add("Tools", "example", "box", "Open an example", "Finished designs that ship with Form Studio", function () { Store.openSheet("import", { examples: true }) })
         if (Store.studio) Store.studio.projects.forEach(function (p) { if (!p.error && p.id !== Store.pid) add("Designs", "p." + p.id, "cuboid", p.name, F.pad(p.head) + " · " + F.ago(p.updated), function () { Store.open(p.id) }) })
         add("Conversations", "chat.new", "message_square_plus", "New conversation", "", function () { Store.newChat(); Store.talkOpen = true }, "Ctrl+Shift+O")
         if (w) add("Conversations", "chat.toggle", "panel_left", (Store.talkOpen ? "Hide" : "Show") + " the conversation", "", function () { Store.talkOpen = !Store.talkOpen }, "Ctrl+J")
@@ -84,7 +85,6 @@ Item {
         if (Store.project) add("Settings", "export.project", "archive", "Export this design", "One .formstudio file with its conversations", function () { Store.exportProject(Store.pid) })
         if (Store.convId) add("Conversations", "export.conv.md", "file_text", "Export this conversation as Markdown", "", function () { Store.exportConversation(Store.convId, "md") })
         if (Store.convId) add("Conversations", "export.conv.json", "file_code", "Export this conversation as JSON", "Import brings it back", function () { Store.exportConversation(Store.convId, "json") })
-        add("Settings", "recipes", "library", "Recipe library", "Built-in, yours and community", function () { Store.openSheet("new", { tab: "recipe" }) })
         return c
     }
     // loose match: every letter of the query, in order. Returns { score, at: [indices] } or null.

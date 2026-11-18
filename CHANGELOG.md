@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Start from anything.** Home is one composer for words, a photo, a sketch, a STEP, STL or 3MF part, a PDF drawing or a link; drop or paste them anywhere on Home. A model page link is passed to the agent; only a direct file link is downloaded, and the composer shows what was fetched. `form start --text … --photo … --sketch … --file … --link …`.
+- **Photos with a scale.** With a bank card, a coin or a ruler in the photo, the agent estimates sizes from it, labels them "estimated from the photo" and keeps them assumed until you measure.
+- **A sketch pad.** Lines, rectangles, circles, arcs, freehand and dimensions in millimetres, snapped to a grid and to your points, with undo. The agent receives the shapes as structured geometry and the picture, and extrudes or revolves them faithfully.
+- **For my printer, or just a 3D model.** Chosen on Home for what starts next; a 3D model is not sliced and has no print checks. **Start blank** opens an empty design with no agent.
+- **The workspace opens at once.** Sending from Home shows the design being made, with what the agent is doing, and attaches the design the moment it exists.
+- **Watch it being built.** Each new build from the agent grows into the viewport feature by feature, in build order, each one named as it arrives.
+- **Concepts first.** For a new idea the agent proposes three or four genuinely different concepts as real CAD, side by side and turning, with a line on each and their computed size and volume. Continue with one, or ask for a mix in words. MCP `propose_concepts`, `pick_concept`, `list_concepts`; `form concepts`.
+- **Measure this.** When the agent needs a real number it shows where to measure on a picture or a diagram, the unit, the tolerance that matters and what the design assumes now. The number you enter is committed with how you measured it (calipers, ruler, tape, or an estimate kept as assumed) and the part updates. MCP `ask_measurement`.
+- **Recipes and briefs leave the interface.** No recipe library, brief templates or starter chips on Home, in the new-design flow or the command palette; agents may still build on recipes, community recipes still install from the CLI, and existing designs open and build as before. The New design sheet is now Import.
+
 ## 12.0.0
 
 - **A new recipe library, made of the things people print most:** Gridfinity bin and baseplate, a box with a sliding, press-on or hinged lid, SKÅDIS pegboard accessories, a phone and tablet stand, a cable organizer, an under-desk hanger, a shelf bracket, a hose and pipe adapter, a self-watering planter, a faceted vase and lamp shade, and a battery and card holder. Each passes its checks at its defaults and prints without supports; multi-part recipes show Assembled and Exploded views. Recipes have categories and tags for search, in the app and the website gallery. The older dock, wall hook, twisted planter, gear pair, knob, hinged box and Gridfinity bin leave the library; designs that use them still open and build.

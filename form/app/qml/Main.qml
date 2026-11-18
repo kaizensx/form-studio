@@ -4,7 +4,7 @@ import QtCore
 import Form
 import FormNative
 
-// FORM — the window. The agent on the left, the work in the middle.
+// FORM — the window. Home is where a design starts; the agent on the left, the work in the middle.
 Window {
     id: win
     property string startProject: ""
@@ -81,15 +81,18 @@ Window {
         readonly property int maxW: Math.max(minW, Math.min(560, win.width - 760))
         property bool dragging: false
         anchors.top: top.bottom; anchors.bottom: parent.bottom
-        hero: Store.screen !== "work"
-        readonly property bool shown: Store.screen !== "work" || Store.talkOpen
-        width: hero ? Math.max(380, Math.min(440, win.width * 0.29)) : Math.max(minW, Math.min(maxW, Store.talkWidth))
+        // Home is the start: the column appears there once a conversation is under way. While a design is being made
+        // it is always there; in the workspace it can be folded away.
+        readonly property bool shown: Store.screen === "designing" ? true
+                                    : Store.screen === "home" ? Store.talkOpen && (Store.chatItems.length > 0 || Store.chatBusy)
+                                    : Store.screen === "work" && Store.talkOpen
+        width: Math.max(minW, Math.min(maxW, Store.talkWidth))
         x: shown ? 0 : -width
         Behavior on x { NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
         Behavior on width { enabled: !talk.dragging && win.restored; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
         // drag the edge to resize; double-click puts it back
         MouseArea {
-            visible: !talk.hero; z: 9
+            visible: talk.shown; z: 9
             anchors.right: parent.right; anchors.rightMargin: -4; width: 9; height: parent.height
             hoverEnabled: true; cursorShape: Qt.SplitHCursor; preventStealing: true
             property real x0: 0; property real w0: 0
@@ -108,6 +111,7 @@ Window {
         x: Math.max(rail.visible ? rail.width : 0, talk.x + talk.width); width: parent.width - x
         Loader { id: homeLd; anchors.fill: parent; active: Store.screen === "home"; sourceComponent: Home {} }
         Loader { anchors.fill: parent; active: Store.screen === "work"; sourceComponent: Workspace {} }
+        Loader { anchors.fill: parent; active: Store.screen === "designing"; sourceComponent: Designing {} }
         Column { anchors.centerIn: parent; visible: Store.screen === "boot"; spacing: 12
             Logo { size: 36; anchors.horizontalCenter: parent.horizontalCenter }
             Item { width: 1; height: 8 }
@@ -147,7 +151,8 @@ Window {
     Shortcut { sequence: "Ctrl+4"; onActivated: win.stageKey("prove"); onActivatedAmbiguously: win.stageKey("prove") }
     Shortcut { sequence: "Ctrl+5"; onActivated: win.stageKey("release"); onActivatedAmbiguously: win.stageKey("release") }
     Shortcut { sequence: "Ctrl+Return"; onActivated: win.commitKey(); onActivatedAmbiguously: win.commitKey() }
-    Shortcut { sequences: [StandardKey.New]; onActivated: Store.openSheet("new"); onActivatedAmbiguously: Store.openSheet("new") }
+    function newDesign() { Store.openSheet(null); if (Store.screen !== "home") Store.home(); Store.startFocus++ }
+    Shortcut { sequences: [StandardKey.New]; onActivated: win.newDesign(); onActivatedAmbiguously: win.newDesign() }
     Shortcut { sequence: "Ctrl+J"; onActivated: Store.talkOpen = !Store.talkOpen; onActivatedAmbiguously: Store.talkOpen = !Store.talkOpen }
     Shortcut { sequences: ["Ctrl+,"]; onActivated: Store.openSettings("general"); onActivatedAmbiguously: Store.openSettings("general") }      // Settings (⌘, on macOS)
     Shortcut { sequence: "Ctrl+Shift+O"; onActivated: { Store.newChat(); Store.talkOpen = true } onActivatedAmbiguously: { Store.newChat(); Store.talkOpen = true } }

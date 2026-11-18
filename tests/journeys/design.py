@@ -1,4 +1,4 @@
-"""A new design from a recipe: create, pipeline, stages, select on the model, draft by slider and by typing,
+"""A new design (a recipe is still a building block agents use; here it is made through the engine): pipeline, stages, select on the model, draft by slider and by typing,
 commit, and go back with the timeline."""
 from _lib import head, open_sheet_wait, wait_job
 
@@ -8,18 +8,15 @@ DATA = "fresh"
 def run(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     ui.settle(300)
-    # ── create from the recipe sheet ──
-    ui.click_text("Start from a recipe")
-    open_sheet_wait(ui, "new")
-    ui.click_text("Electronics enclosure")
-    name = ui.item("newName")
-    ui.click(name)
-    ui.type("Sensor case")
-    ui.shot("design-new-sheet")
-    ui.key("Return")                                   # Enter in the name field creates it, once
+    # ── created the way an agent does, opened the way a person does: its card on Home ──
+    pid = ui.api("/projects", {"name": "Sensor case", "recipe": "enclosure", "brief": ""})["id"]
+    ui.run_js("Store.reloadStudio()")
+    card = ui.wait_until(lambda: next((c for c in ui.find_all(name="projectCard") if ui.sees("Sensor case", c)), None), 30, "the new design on Home")
+    ui.scroll_to(card)
+    ui.click(card, 0.5, 0.4)
     ui.wait_until(lambda: ui.store.get("screen") == "work", 120, "the new project to open")
-    ui.eq(len(ui.api("/studio")["projects"]), 1, "one Enter makes one project")
-    pid = ui.store.get("pid")
+    ui.eq(len(ui.api("/studio")["projects"]), 1, "one project")
+    ui.eq(ui.store.get("pid"), pid)
     ui.eq(ui.api("/projects/" + pid)["project"]["name"], "Sensor case", "the typed name reached the engine")
     ui.eq(ui.api("/projects/" + pid)["project"]["recipe"], "enclosure")
     wait_job(ui, pid)
