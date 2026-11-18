@@ -484,6 +484,61 @@ def build() -> MCPServer:
         return await _run(go)
 
     @mcp.tool(annotations=RW)
+    async def geometry_diff(project: str, a: int, b: int | None = None) -> dict:
+        """What changed in the solid between revision a and b (default the head): material added (b minus a) and removed
+        (a minus b), each with its volume in mm³, number of separate regions and bounding box, computed with booleans on
+        the B-rep. Also writes a picture (added green, removed red, the rest grey); look at it with the returned path."""
+        st = studio()
+        def go():
+            from . import geomdiff
+            p = st.load(project)
+            d = geomdiff.compute(st, p, a, b)
+            return {**d, "png": str(geomdiff.png_path(st, p, d))}
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def add_text(project: str, text: str, at: list[float], normal: list[float], height: float = 6.0,
+                       depth: float = 0.6, sunk: bool = False, up: list[float] | None = None,
+                       expect_head: int | None = None) -> dict:
+        """Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source:
+        a new revision whose build adds a stage text_N with Form Studio's bundled font. at: a point on the face and
+        normal: its outward normal, both in design millimetres (analyze_selection on a face returns them). height is the
+        cap height, depth how far the letters stand out or sink in. Returns the new head, the marks and printability
+        (stroke width against the nozzle, computed on the glyphs). Remove one with remove_text."""
+        st = studio()
+        def go():
+            from . import engrave
+            p = st.load(project)
+            out = engrave.add(st, p, text, at, normal, height, depth, sunk, up, expect_head, origin="agent")
+            out["printability"] = engrave.printability(text, height, depth, sunk, st.slicer_info(p=p).get("nozzle_mm"))
+            return out
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def remove_text(project: str, mark_id: str, expect_head: int | None = None) -> dict:
+        """Remove lettering added with add_text (mark_id like "text_1"; get_design_source shows the block). A new revision."""
+        st = studio()
+        def go():
+            from . import engrave
+            return engrave.remove(st, st.load(project), mark_id, expect_head, origin="agent")
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def assembly_instructions(project: str, rev: int | None = None) -> dict:
+        """Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then
+        one page per part going on (in the declaration's parent order, at its explode offset, with arrows). Step text is
+        the part's note, or what the declaration says. Returns the PDF path, page images and the steps. A design without
+        an assembly() has none."""
+        st = studio()
+        def go():
+            from . import instructions
+            p = st.load(project)
+            out = instructions.build(st, p, rev)
+            d = Path(out["pdf_path"]).parent
+            return {**out, "page_images": [str(d / x) for x in out["pages"]]}
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
     async def checkout_revision(project: str, rev: int) -> dict:
         """Make an earlier revision the head again (nothing is deleted). Outputs for it are reused if still cached."""
         st = studio()

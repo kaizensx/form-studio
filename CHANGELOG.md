@@ -1,5 +1,11 @@
 # Changelog
 
+## 12.1.0
+
+- **Text on any flat face.** In Annotate, pick a point on a flat face and choose **Text here…**: type the words, raised or sunk, cap height and depth, with the stroke width and cap height checked against your nozzle as you type (computed on the glyphs). **Add to design** writes the lettering into the design's own code as a feature (one stage per text, in Form Studio's bundled font) and builds a new revision in the kernel; text off the part or on a curved face is refused with the reason. `form engrave <project> TEXT --at x,y,z --normal x,y,z [--sunk]`, `--list`, `--remove text_N`; MCP `add_text`, `remove_text`.
+- **What changed, on the solids.** Compare with head (Release › Revisions) now also compares the two solids in the kernel: material added in green and removed in red over the new revision, the whole part and a view framed on the change, with the volume and number of regions of each, computed with booleans on the B-rep. `form diff <project> A [B] --png out.png`; MCP `geometry_diff`.
+- **Assembly instructions as a PDF.** Maker documents › **Make assembly instructions** draws a parts page (each part with its computed volume) and one page per part going on, in the order the assembly declaration attaches them, at its exploded offset with an arrow to where it seats. Step text is the part's own note, or exactly what the declaration says; a design without an assembly declaration has none. Page previews in the app, **Save PDF…**; `form instructions <project> [--out file.pdf]`; MCP `assembly_instructions`.
+
 ## 12.0.0
 
 - **Start from anything.** Home is one composer for words, a photo, a sketch, a STEP, STL or 3MF part, a PDF drawing or a link; drop or paste them anywhere on Home. A model page link is passed to the agent; only a direct file link is downloaded, and the composer shows what was fetched. `form start --text … --photo … --sketch … --file … --link …`.

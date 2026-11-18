@@ -63,7 +63,7 @@ Rules:
 
 ## Tools at a glance
 
-66 tools. Read-only tools never change a project.
+70 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -85,6 +85,10 @@ Rules:
 | [`render`](#render) | read-only | Look at the part. Returns a PNG rendered from the real kernel geometry, coloured by feature. |
 | [`animate`](#animate) | read-only | Make motion from real geometry. |
 | [`compare_revisions`](#compare_revisions) | read-only | What changed between two revisions: parameters, features, interfaces, stability, fit. |
+| [`geometry_diff`](#geometry_diff) | changes | What changed in the solid between revision a and b (default the head): material added (b minus a) and removed (a minus b), each with its volume in mm³, number of separate regions and bounding box, computed with booleans on the B-rep. |
+| [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
+| [`remove_text`](#remove_text) | changes | Remove lettering added with add_text (mark_id like "text_1"; get_design_source shows the block). |
+| [`assembly_instructions`](#assembly_instructions) | changes | Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then one page per part going on (in the declaration's parent order, at its explode offset, with arrows). |
 | [`checkout_revision`](#checkout_revision) | changes | Make an earlier revision the head again (nothing is deleted). |
 | [`set_print_setup`](#set_print_setup) | changes | Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from suggest_orientation), the acceptable total fit gap window, and whether the pipeline slices automatically. |
 | [`explore_alternatives`](#explore_alternatives) | read-only | Build a small grid of real variants (1-2 parameters, up to 5 values each) and rank them. |
@@ -373,6 +377,60 @@ What changed between two revisions: parameters, features, interfaces, stability,
 | `project` | string | yes |
 | `a` | integer | yes |
 | `b` | integer | yes |
+
+### `geometry_diff`
+
+What changed in the solid between revision a and b (default the head): material added (b minus a) and removed
+(a minus b), each with its volume in mm³, number of separate regions and bounding box, computed with booleans on
+the B-rep. Also writes a picture (added green, removed red, the rest grey); look at it with the returned path.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `a` | integer | yes |
+| `b` | integer \| null |  |
+
+### `add_text`
+
+Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source:
+a new revision whose build adds a stage text_N with Form Studio's bundled font. at: a point on the face and
+normal: its outward normal, both in design millimetres (analyze_selection on a face returns them). height is the
+cap height, depth how far the letters stand out or sink in. Returns the new head, the marks and printability
+(stroke width against the nozzle, computed on the glyphs). Remove one with remove_text.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `text` | string | yes |
+| `at` | array | yes |
+| `normal` | array | yes |
+| `height` | number |  |
+| `depth` | number |  |
+| `sunk` | boolean |  |
+| `up` | array \| null |  |
+| `expect_head` | integer \| null |  |
+
+### `remove_text`
+
+Remove lettering added with add_text (mark_id like "text_1"; get_design_source shows the block). A new revision.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `mark_id` | string | yes |
+| `expect_head` | integer \| null |  |
+
+### `assembly_instructions`
+
+Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then
+one page per part going on (in the declaration's parent order, at its explode offset, with arrows). Step text is
+the part's note, or what the declaration says. Returns the PDF path, page images and the steps. A design without
+an assembly() has none.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `rev` | integer \| null |  |
 
 ### `checkout_revision`
 
