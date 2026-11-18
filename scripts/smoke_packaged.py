@@ -60,10 +60,19 @@ async def mcp_steps(exe: Path, env: dict) -> None:
             step("brief_presets by the agent's words", "FAIL" if res.is_error else "PASS", text[:80].replace("\n", " "))
 
             url = "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf"
-            res, text = await call("read_document", source=url, pages="1")
-            imgs = sum(1 for c in res.content if getattr(c, "type", "") == "image")
-            step("read_document over https", "FAIL" if res.is_error or not imgs else "PASS",
-                 (text[:120] if res.is_error else f"{imgs} page image(s)").replace("\n", " "))
+            import urllib.request
+            try:                                             # the step tests the app over https, not that site's uptime
+                urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=15).close()
+                reachable = True
+            except Exception as e:
+                reachable, why = False, str(e)[:80]
+            if not reachable:
+                step("read_document over https", "SKIP", f"the test document's site did not answer ({why})")
+            else:
+                res, text = await call("read_document", source=url, pages="1")
+                imgs = sum(1 for c in res.content if getattr(c, "type", "") == "image")
+                step("read_document over https", "FAIL" if res.is_error or not imgs else "PASS",
+                     (text[:120] if res.is_error else f"{imgs} page image(s)").replace("\n", " "))
 
             if os.environ.get("SMOKE_BLENDER", "1") != "0":
                 res, text = await call("render_photo", project="hallway-phone-dock", preset="studio", fast=True)
