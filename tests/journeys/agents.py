@@ -53,7 +53,9 @@ def run(ui):
 
         # ── a reply through the real tools ──
         send(ui, "What can you make?")
-        ui.wait_until(lambda: ui.store.get("chatBusy") is False and ui.sees("built-in recipes for docks"), 90, "the reply")
+        # generous: the agent's tool server starts its own CAD kernel, which a software-rendered Windows runner
+        # imports in well over a minute while the app's kernel loads too
+        ui.wait_until(lambda: ui.store.get("chatBusy") is False and ui.sees("built-in recipes for docks"), 240, "the reply")
         ui.check(ui.find(name="stepGroup") is not None, "the tool call is shown as a step")
         ui.wait_until(lambda: len(ui.find_all(name="suggestChip")) == 2, 10, "the two follow-ups")
         ui.check(ui.sees("tokens", within=None), "the footer counts tokens when the provider reports no price")
@@ -64,14 +66,14 @@ def run(ui):
 
         # ── a failure says what happened and offers another model ──
         send(ui, "Again please")
-        ui.wait_until(lambda: ui.store.get("chatBusy") is False and ui.find(text="Try another model…") is not None, 60,
+        ui.wait_until(lambda: ui.store.get("chatBusy") is False and ui.find(text="Try another model…") is not None, 240,
                       "the error with its actions")
         ui.check(any("no model “tool-model:8b” loaded" in t for t in ui.texts()), "the error names the model problem")
         ui.shot("agents-error")
         ui.click_text("Try another model…")
         ui.expect("your last message is sent again", timeout=5)
         ui.click_text("other-model:3b")
-        ui.wait_until(lambda: ui.store.get("chatBusy") is False and ui.sees("Answered by the other model."), 60, "the resent reply")
+        ui.wait_until(lambda: ui.store.get("chatBusy") is False and ui.sees("Answered by the other model."), 240, "the resent reply")
         ui.eq(srv.requests[-1]["model"], "other-model:3b", "sent again with the model picked")
 
         # ── Settings › Agents lists it ──
