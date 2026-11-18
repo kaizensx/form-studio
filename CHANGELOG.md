@@ -4,6 +4,10 @@
 
 - **Make it lighter.** Tools › Make it lighter (also the palette, the menu and the chat's suggestions) tries thinner walls and floors and larger lightening pockets where the design has them (never an interface parameter), building a ladder of candidates in the kernel and taking the lightest through the real checks and slicer, plus lower infill and one wall fewer over the slicer's process. Only candidates that keep every passing check passing are shown, each with its computed mass and the slicer's grams before and after and its checks; **Apply** commits the chosen one as a new revision (its outputs are already built) or sets the design's own infill and wall count. `form lighter <project> [--apply c1]`; MCP `make_lighter`, `apply_lighter`.
 - **Replace a broken part.** On Home, **Replace a broken part** takes a photo of the part with a bank card, coin or ruler beside it, what it is and where it broke, and starts one conversation: the agent estimates sizes from the photo's scale, asks you for the sizes that decide the fit with a measurement card, then designs the replacement. Four steps (Photo, Estimate, Measure, Design) sit above the conversation and follow what the agent really does. `form replace --photo broken.jpg --name "Shelf clip"`; MCP `replace_part_guide`.
+- **Designs made of imported parts build in seconds.** Three imported STL meshes of about 10,000 triangles each used to pass the kernel's 180 s limit; they now build in about 8 s.
+- **Fewer failed steps in conversations.** A design that fails to build says the error and the line it came from; an STL export that comes out with a gap is meshed again until it is closed; a reference part named without an extension keeps its format; assembled and exploded views work for every multi-part design.
+- **A safer engine.** Download file names can no longer add HTTP headers, web pages from other sites cannot send requests to the engine on your computer, design ids cannot point outside their folder, and lock files are private to you.
+- **Errors are kept.** An unexpected engine error is written with its details to `.logs/engine-errors.log` in your projects folder.
 
 ## 1.0.0
 
