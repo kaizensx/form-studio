@@ -210,6 +210,8 @@ def journey_colours_and_materials(ui):
     # the material re-runs the checks and the panel redraws: open the lid's row only once it holds still, and make
     # sure it is the one open before picking its colour
     ui.wait_until(lambda: ui.js("Store.activity.length") == 0, 120, "the checks to finish")
+    from _lib import wait_job
+    wait_job(ui, pid)                                  # a material re-slices; changes wait for the running pipeline
     for _ in range(3):
         ui.settle(300)
         ui.click(ui.item("look-lid"), 0.5, 0.1)
