@@ -99,6 +99,8 @@ message, with what the design is for.
 | `form select <project> [--point\|--edge\|--face x,y,z]... [--region "x,y,z;..." --radius R] [--keep NAME --note TEXT] [--text]` | Analyse points, edges, faces or a painted region on the solid: area, tilt, overhang, wall thickness, curvature, height; `--keep` saves it as an annotation |
 | `form annotations <project> [list\|show\|delete] [ID]` | Kept selections |
 | `form appearance <project> [--part PART] [--color #hex] [--material M] [--clear] [--3mf FILE]` | Colour and material of the design or one part; `--3mf` writes a 3MF with colours |
+| `form engrave <project> TEXT --at x,y,z --normal x,y,z [--up x,y,z] [--height MM] [--depth MM] [--sunk]` | Raised or sunk text on a flat face, written into the design's code as a feature and built as a new revision; `--list` and `--remove text_N` |
+| `form diff <project> A [B] [--png FILE]` | What changed between two revisions on the solids: material added and removed, with volumes and regions |
 
 ## Print
 
@@ -116,6 +118,8 @@ message, with what the design is for.
 | `form pack <project> [--copies N] [--spacing MM] [--no-rotate]` | Do N copies fit on one plate |
 | `form optimize <project> --vary key:min:max ... --minimize\|--maximize METRIC [--require EXPR] [--budget N]` | Goal seek over parameters |
 | `form verify <project> <release>` | Re-hash a release against its manifest |
+| `form release-files <project> [release] [--out FILE.zip]` | Every file of a release in one .zip: models, G-code, sliced 3MF, report, documents and manifest (the newest release by default) |
+| `form instructions <project> [--rev N] [--out FILE.pdf]` | Assembly instructions as a PDF: a parts page, then one page per part in the order the assembly attaches them |
 
 ## Agents
 

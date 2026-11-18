@@ -236,6 +236,10 @@ def main(argv=None):
     v = sub.add_parser("verify")
     v.add_argument("project")
     v.add_argument("release")
+    rf = sub.add_parser("release-files", help="every file of a release in one .zip: models, G-code, sliced 3MF, report, documents")
+    rf.add_argument("project")
+    rf.add_argument("release", nargs="?", help="r03 (default: the newest release)")
+    rf.add_argument("--out", help="where to write the .zip (default: <project>-<release>.zip here)")
     # -- print simulation, cost, plate packing --
     sm = sub.add_parser("simulate", help="pictures of the sliced toolpaths building up (from the slicer's G-code)")
     sm.add_argument("project")
@@ -522,6 +526,21 @@ def main(argv=None):
             res = st.verify_release(st.load(a.project), a.release)
             _print(res)
             return 0 if res["intact"] else 1
+        elif a.cmd == "release-files":
+            import shutil
+            from . import maker_docs
+            p = st.load(a.project)
+            rels = sorted(d.name for d in (st.dir(p["id"]) / "releases").glob("*") if (d / "MANIFEST.json").is_file()) \
+                if (st.dir(p["id"]) / "releases").is_dir() else []
+            release = a.release or (rels[-1] if rels else None)
+            if not release:
+                raise StudioError("This design has no release yet.", "A person approves a revision in the app (Release); then its files can be saved here.")
+            z = maker_docs.release_files_zip(st, p, release)
+            out = Path(a.out or f"{p['id']}-{release}.zip").expanduser().resolve()
+            shutil.move(str(z), out)
+            with __import__("zipfile").ZipFile(out) as zf:
+                names = zf.namelist()
+            _print({"project": p["id"], "release": release, "zip": str(out), "files": len(names), "bytes": out.stat().st_size})
         elif a.cmd == "simulate":
             from . import simulate, toolpath
             p = st.load(a.project)

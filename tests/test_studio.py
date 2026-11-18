@@ -248,6 +248,20 @@ class Pipeline(unittest.TestCase):
         self.assertTrue(self.st.verify_release(self.load(), rel)["intact"])
         # the coupon measurements from test_05 calibrate the printer; they are not validation of this part
         self.assertIn("not physically validated", (self.st.dir(p["id"]) / "releases" / rel / "REPORT.md").read_text(encoding="utf-8"))
+        # headless Save files…: every file of the release in one .zip
+        import io, json as _json, zipfile
+        from contextlib import redirect_stdout
+        from form.__main__ import main
+        out_zip = Path(tempfile.mkdtemp()) / "rel.zip"
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            self.assertEqual(main(["release-files", p["id"], "--out", str(out_zip)]), 0)
+        info = _json.loads(buf.getvalue())
+        self.assertEqual(info["release"], rel)
+        with zipfile.ZipFile(out_zip) as zf:
+            names = zf.namelist()
+        self.assertIn(f"{p['id']}-{rel}/MANIFEST.json", names)
+        self.assertTrue(any(n.endswith(".stl") for n in names) and any(n.endswith(".gcode") for n in names))
         p = self.st.commit(self.load(), {"relief_depth": 5})
         ap = self.st.approval_state(p)
         self.assertEqual(ap["state"], "superseded")

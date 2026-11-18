@@ -59,6 +59,11 @@ def main() -> int:
     pages += sorted((SITE / "compat").glob("*.html")) + sorted((SITE / "bench").glob("*.html"))
     if not (SITE / "docs" / "index.html").exists():
         errors.append("site/docs is missing: run python site/build.py first")
+    # the number of MCP tools on the home page is the one docs/MCP.md states (scripts/gen_mcp_docs.py writes it)
+    m = re.search(r"^(\d+) tools\.", (SITE.parent / "docs" / "MCP.md").read_text(encoding="utf-8"), re.M)
+    shown = re.search(r'id="why-tools"[^>]*>(\d+)<|data-count="(\d+)" id="why-tools"', (SITE / "index.html").read_text(encoding="utf-8"))
+    if m and shown and (shown.group(1) or shown.group(2)) != m.group(1):
+        errors.append(f"index.html says {shown.group(1) or shown.group(2)} MCP tools; docs/MCP.md says {m.group(1)}")
     parsed = {}
     for f in pages:
         p = Page()

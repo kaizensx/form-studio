@@ -32,7 +32,7 @@ siteData().then(({ dock: d }) => {
   $("#why-faces2").textContent = `a ${d.faces}-face solid`;
   $("#why-ms").textContent = `${d.build_ms} ms`;
 });
-countUp(document.querySelector('.why-grid b[data-count="66"]'), 66);     // docs/MCP.md: 66 tools
+countUp($("#why-tools"), +$("#why-tools").dataset.count);     // docs/MCP.md: N tools (site/tools/check_site.py keeps it in step)
 
 // a soft light follows the pointer over the cards
 document.addEventListener("pointermove", (e) => {

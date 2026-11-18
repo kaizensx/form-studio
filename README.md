@@ -9,7 +9,7 @@
   <a href="https://github.com/kaizensx/form-studio/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/kaizensx/form-studio?label=release&color=1d7457&labelColor=0e1113&style=flat-square"></a>
   <a href="https://github.com/kaizensx/form-studio/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/kaizensx/form-studio/ci.yml?branch=main&label=CI&labelColor=0e1113&style=flat-square"></a>
   <img alt="macOS, Windows, Linux" src="https://img.shields.io/badge/runs%20on-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-21282d?labelColor=0e1113&style=flat-square">
-  <a href="docs/MCP.md"><img alt="66 MCP tools" src="https://img.shields.io/badge/MCP-66%20tools-21282d?labelColor=0e1113&style=flat-square"></a>
+  <a href="docs/MCP.md"><img alt="70 MCP tools" src="https://img.shields.io/badge/MCP-70%20tools-21282d?labelColor=0e1113&style=flat-square"></a>
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-21282d?labelColor=0e1113&style=flat-square"></a>
   <a href="https://github.com/kaizensx/form-studio/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/kaizensx/form-studio?color=b9e8d7&labelColor=0e1113&style=flat-square"></a>
   <a href="https://github.com/kaizensx/form-studio/discussions"><img alt="Discussions" src="https://img.shields.io/github/discussions/kaizensx/form-studio?color=21282d&labelColor=0e1113&style=flat-square"></a>
@@ -57,7 +57,7 @@ are frozen with their hashes.
 
 <table>
 <tr>
-<td align="center" width="20%"><h3>66</h3><sub>MCP tools for any agent</sub></td>
+<td align="center" width="20%"><h3>70</h3><sub>MCP tools for any agent</sub></td>
 <td align="center" width="20%"><h3>7</h3><sub>slicers, sliced for real in CI</sub></td>
 <td align="center" width="20%"><h3>13</h3><sub>design skills for agents</sub></td>
 <td align="center" width="20%"><h3>5</h3><sub>export formats, STEP to GLB</sub></td>
@@ -141,6 +141,18 @@ asks for it with a card: where to measure, the tolerance that matters and what t
 </details>
 
 <details>
+<summary><b>Finish it and hand it off</b> &nbsp;<sub>text on faces, what changed, instructions, every file</sub></summary>
+<br>
+
+| | |
+|---|---|
+| **Text on any flat face** | Pick a flat face in Annotate, type the words, raised or sunk. Stroke width and cap height are checked against your nozzle as you type, and the lettering becomes a feature in the design's own code. `form engrave` |
+| **What changed, on the solids** | Compare two revisions in the kernel: material added in green, removed in red, with the volume and regions of each. `form diff` |
+| **Assembly instructions** | A PDF with a parts page and one page per part, in the order the assembly attaches them, each at its exploded offset. `form instructions` |
+| **Every file of a release** | **Save files…** gives one .zip with STEP, STL, the sliced 3MF, G-code, the report and documents. `form release-files` |
+</details>
+
+<details>
 <summary><b>Any agent, any model</b> &nbsp;<sub>agent apps, model APIs, local models, your own endpoints</sub></summary>
 <br>
 
@@ -183,7 +195,7 @@ re-import check and a parameter macro), **OpenSCAD** (`.scad` designs with Custo
 ```mermaid
 flowchart TB
   you(["You · words, a photo, a sketch, a part or a link"]) --> agent
-  agent["Your agent · an agent app, a model API or a local model"] -- "66 MCP tools · form CLI" --> engine
+  agent["Your agent · an agent app, a model API or a local model"] -- "70 MCP tools · form CLI" --> engine
   engine["Form Studio engine · parameters with provenance · revisions · hashed artifacts"]
   subgraph every["Every revision, on your computer"]
     direction LR
@@ -323,7 +335,7 @@ form chat "Make the base 92 mm deep" --project desk-stand --agent codex
 ```
 </details>
 
-Reference: [every command](docs/CLI.md) · [66 MCP tools](docs/MCP.md) · [guide for coding agents](AGENTS.md)
+Reference: [every command](docs/CLI.md) · [70 MCP tools](docs/MCP.md) · [guide for coding agents](AGENTS.md)
 
 ## Keyboard
 

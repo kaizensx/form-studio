@@ -181,6 +181,9 @@ from the top bar. `form new … --purpose model --process cnc`, `form purpose <p
 - **Timeline.** Scrub through revisions in the viewport, play them as a morph, and export the morph as GIF or WebP.
 - **Branches.** Check out any earlier revision and continue from it; nothing is deleted.
 - **Compare.** Parameters, features, interface dimensions, stability and fit between any two revisions.
+- **What changed, on the solids.** Comparing with head also compares the two solids in the kernel: material added in
+  green and removed in red, with the volume and number of regions of each, computed with booleans on the B-rep.
+  `form diff`; MCP `geometry_diff`.
 - **Variants.** Named sets of values kept next to the revisions ("Travel version", "Thick walls"), compared side by
   side on a variants board and promoted to a revision when you choose.
 
@@ -247,6 +250,10 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
   overhang, wall thickness, curvature and height above the bed computed on the solid. Keep a selection with a name and
   a note as a pin on its revision, ask the agent about it with the exact numbers, or cut a section through it.
   `form select`, `form annotations`; MCP `analyze_selection`, `annotate`, `list_annotations`.
+- **Text on any flat face.** In Annotate, pick a point on a flat face and choose **Text here…**: raised or sunk,
+  cap height and depth, with stroke width and cap height checked against your nozzle as you type. **Add to design**
+  writes the lettering into the design's own code as a feature and builds a new revision. `form engrave`; MCP
+  `add_text`, `remove_text`.
 - **Section (X):** a clipping plane through the solid with filled cut faces.
 - **Orientation finder:** ranks print orientations by overhang area, support, contact and height, with the numbers
   behind the ranking, and applies the one you choose.
@@ -309,6 +316,9 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
 - **Declarations are checked** when a design is created or updated: an unknown part, a loop or a part with two parents
   is refused with the reason.
 - **A bill of materials** for the bought hardware; a release adds `BOM.csv` and `ASSEMBLY.md`.
+- **Assembly instructions as a PDF.** A parts page with each part's computed volume, then one page per part in the
+  order the assembly attaches them, at its exploded offset with an arrow to where it seats. `form instructions`; MCP
+  `assembly_instructions`.
 
 | | |
 |---|---|
@@ -343,6 +353,8 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
 - **Released over failed checks, on the record.** Tick each failed check and write why; the release, its manifest and
   its report say it was released with failed checks. Missing or stale files still block.
 - **Verify at any time** that a release still matches its hashes; a later commit marks it superseded.
+- **Save files…** puts every file of a release in one .zip (STEP, STL, the sliced 3MF, G-code, report, documents and
+  manifest); **Show in Finder** opens its folder. `form release-files`.
 
 ## Moving and sharing designs
 
@@ -378,7 +390,7 @@ Writing one: [Writing a recipe](RECIPES.md) and [community recipes](../community
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 66 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 70 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
