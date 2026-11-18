@@ -2,7 +2,7 @@
   "id": "remote-holder",
   "title": "Remote holder",
   "summary": "A pocket or cradle that holds a remote control, free-standing or mounted.",
-  "closest_recipe": "dock",
+  "closest_recipe": "device_stand",
   "questions": [
     {"key": "width", "label": "Remote width", "kind": "number", "unit": "mm", "required": true,
      "why": "Sets the pocket width. Measure across the widest point."},

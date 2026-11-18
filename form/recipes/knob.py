@@ -19,6 +19,7 @@ SKIRT_SLOPE = 1.25       # skirt cone height per mm of overhang: about 39° from
 
 class Knob(Recipe):
     id = "knob"
+    legacy = True          # retired from the library: still opens and builds for designs that use it
     title = "Control knob"
     summary = ("A knurled knob for a D-flat or round shaft: press fit or an M3 set screw in a captive nut, "
                "a pointer line and an optional skirt. Printed face down, no supports.")

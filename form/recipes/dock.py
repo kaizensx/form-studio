@@ -18,6 +18,7 @@ PLA_DENSITY = 1.24e-3  # g/mm³
 
 class Dock(Recipe):
     id = "dock"
+    legacy = True          # retired from the library: still opens and builds for designs that use it
     title = "Device dock"
     summary = "A leaning desk cradle with a cable pass-through, sized to a measured device."
     fit = {"cavity": "pocket_width", "mating": "device_width", "clearance": "clearance",

@@ -13,6 +13,8 @@ from .base import Feature, Param, Recipe, RecipeError, Stage
 
 class Coupon(Recipe):
     id = "coupon"
+    category = "Calibration"
+    tags = ("fit", "tolerance", "calibration")
     title = "Fit coupon"
     summary = "A slot comb for calibrating internal-feature accuracy on your printer and material."
     fit = None

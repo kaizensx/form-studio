@@ -18,15 +18,17 @@ def load():
 
 class RecipeIndex(unittest.TestCase):
     def test_builtin_recipes_match_the_registry(self):
-        from form.recipes import registry
+        from form.recipes import LIBRARY, listed
         idx = load()
         found = {r["id"]: r for r in idx.builtin()}
-        reg = registry()
-        self.assertEqual(set(found), set(reg))
+        reg = listed()
+        self.assertEqual(set(found), set(reg))                  # legacy recipes stay out of the gallery
+        self.assertEqual([r["id"] for r in idx.builtin()], list(LIBRARY))
         for rid, r in reg.items():
             self.assertEqual(found[rid]["title"], r.title)
             self.assertEqual(found[rid]["params_count"], len(r.params))
             self.assertTrue(found[rid]["builtin"])
+            self.assertEqual(found[rid]["tags"], list(r.tags))
             self.assertIsNone(found[rid]["url"])
 
     def test_schema(self):

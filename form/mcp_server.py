@@ -188,10 +188,12 @@ def build() -> MCPServer:
         """Parameters (unit, range, group, the feature each one drives), features and what the recipe checks."""
         st = studio()
         if recipe not in st.recipes:
-            raise ToolError(f"Unknown recipe “{recipe}”. Known: {', '.join(st.recipes)}.")
+            raise ToolError(f"Unknown recipe “{recipe}”. Known: {', '.join(st.recipes.builtins())}.")
         r = st.recipes[recipe]
         pub = r.public()
-        return {"id": r.id, "title": r.title, "summary": r.summary,
+        return {"id": r.id, "title": r.title, "summary": r.summary, "category": r.category, "tags": list(r.tags),
+                **({"legacy": "Retired from the library; kept so designs that use it still build. Prefer a listed recipe for new designs."}
+                   if r.legacy else {}),
                 "parameters": [{k: pp[k] for k in ("key", "label", "unit", "default", "min", "max", "group", "feature", "doc") if k in pp}
                                for pp in pub["params"]],
                 "features": [{"id": f.id, "label": f.label, "role": f.role} for f in r.features],
@@ -278,7 +280,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def create_project(name: str, recipe: str, brief: str = "", values: dict[str, float] | None = None,
                              run: bool = True, ctx: Context = None) -> dict:
-        """Create a project from a built-in recipe (dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob).
+        """Create a project from a built-in recipe (form_overview lists them: gridfinity_bin, storage_box, pegboard, device_stand, ...).
         For anything else, write a design: design_guide, then create_design. values override recipe defaults (all start as 'assumed').
         With run=True the solid, exports and checks are built (and sliced if a slicer is available)."""
         st = studio()

@@ -2,7 +2,7 @@
   "id": "bathroom-mount",
   "title": "Bathroom mount",
   "summary": "A holder or shelf for a wet room: tile, glass or a painted wall.",
-  "closest_recipe": "hook",
+  "closest_recipe": null,
   "questions": [
     {"key": "holds", "label": "What it holds", "kind": "text", "required": true,
      "placeholder": "e.g. a shampoo bottle, a razor, a toothbrush cup",

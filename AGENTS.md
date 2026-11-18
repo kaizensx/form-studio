@@ -9,8 +9,8 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Step | MCP tool | CLI |
 |---|---|---|
 | See what exists | `form_overview` | `form doctor`, `form list` |
-| Learn a recipe's parameters | `describe_recipe` | `form recipe dock` |
-| Start a design | `create_project` | `form new "Desk dock" dock device_width=75.6` |
+| Learn a recipe's parameters | `describe_recipe` | `form recipe device_stand` |
+| Start a design | `create_project` | `form new "Desk stand" device_stand device_width=75.6` |
 | Read the design | `get_project` | `form state <project>` |
 | Try a change, save nothing | `preview_change` | `form preview <project> lean=18` |
 | Look at it | `render` (`view="sheet"` for four views) | `form render <project> --view sheet` |
@@ -37,7 +37,8 @@ Rules that keep the record honest:
 
 ## Recipes
 
-Built-in: `dock`, `gridfinity`, `hook`, `planter`, `coupon`, `enclosure`, `gear_pair`, `knob`, `hinged_box`.
+Built-in: `gridfinity_bin`, `gridfinity_baseplate`, `storage_box`, `pegboard`, `device_stand`, `cable_organizer`, `desk_hanger`, `shelf_bracket`, `hose_adapter`, `plant_pot`, `vase`, `battery_holder`, `enclosure`, `coupon`.
+Retired (`legacy`, never listed, but designs that use them still build): `dock`, `gridfinity`, `hook`, `planter`, `gear_pair`, `knob`, `hinged_box`.
 Community recipes are in `community/recipes/`. To write a new one, see `docs/RECIPES.md` and `community/recipes/README.md`.
 
 ## Skills

@@ -15,6 +15,7 @@ from .base import Feature, Param, Recipe, RecipeError, Stage
 
 class TwistPlanter(Recipe):
     id = "planter"
+    legacy = True          # retired from the library: still opens and builds for designs that use it
     title = "Twisted planter"
     summary = "A polygon planter that twists as it rises, with a drainage hole that fits a standard cork or mesh plug."
     fit = {"cavity": "drain_hole", "mating": "plug_d", "clearance": "plug_clearance",

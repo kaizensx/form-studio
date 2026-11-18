@@ -2,7 +2,36 @@
 
 A recipe is a family of objects: typed parameters in, one valid solid out, built in named stages so that every face knows which feature it belongs to. Everything else in Form Studio depends on recipes: checks, fit, the optimizer, renders, animations and releases. It all works on a new recipe automatically.
 
-Start from [`form/recipes/hook.py`](../form/recipes/hook.py). It is short and uses every hook.
+Start from [`form/recipes/shelf_bracket.py`](../form/recipes/shelf_bracket.py). It is short and uses most hooks: a measured interface with a fit window, a load model, hardware with tool access, and a ghost of the shelf it carries.
+
+## The built-in library
+
+The library is the recipes people print most, each designed to be bought, not only to work:
+
+| id | title | category |
+|---|---|---|
+| `gridfinity_bin` | Gridfinity bin | Storage |
+| `gridfinity_baseplate` | Gridfinity baseplate | Storage |
+| `storage_box` | Box with lid (sliding, press-on or hinged) | Storage |
+| `pegboard` | SKÅDIS pegboard accessory (hook, cup, shelf, bin) | Wall & desk |
+| `device_stand` | Phone and tablet stand | Desk |
+| `cable_organizer` | Cable organizer | Wall & desk |
+| `desk_hanger` | Under-desk hanger | Wall & desk |
+| `shelf_bracket` | Shelf bracket | Wall & desk |
+| `hose_adapter` | Hose and pipe adapter | Workshop |
+| `plant_pot` | Self-watering planter | Home |
+| `vase` | Faceted vase and lamp shade | Home |
+| `battery_holder` | Battery and card holder | Storage |
+| `enclosure` | Electronics enclosure | Enclosures |
+| `coupon` | Fit coupon | Calibration |
+
+The order is `LIBRARY` in [`form/recipes/__init__.py`](../form/recipes/__init__.py). Each recipe lives in `form/recipes/<id>.py`: the file name is the id, because the build cache hashes that file.
+
+**Design language.** [`form/recipes/style.py`](../form/recipes/style.py) holds the shared proportions and print rules: soft plan corners, a chamfer where the part meets the plate (it hides the first-layer flare), rounded top edges, and teardrop holes that print in a vertical wall. Model each part in its print orientation and keep every downward face within 45° of vertical, or a short bridge.
+
+> **Tip:** an exact 45° chamfer or cone around a curved edge tessellates a little past 45° and trips the overhang check. Use a chamfer that rises more than it runs (0.3 mm in, 0.5 mm up), or 40° cones.
+
+**Legacy recipes.** `dock`, `gridfinity`, `hook`, `planter`, `gear_pair`, `knob` and `hinged_box` are retired (`legacy = True`). They are left out of every listing: the library, the New design sheet, Home, `form_overview` and the website gallery. Designs that name them still open, build and release exactly as before. To retire a recipe, set `legacy = True` and move its id from `LIBRARY` to `LEGACY`; never delete its file.
 
 ## 1. Parameters
 
@@ -76,11 +105,20 @@ fit = {"cavity": "screw_hole", "mating": "screw_d", "clearance": "screw_clearanc
 | `companions(v)` | Objects drawn with the part but not printed, such as the phone in the dock. |
 | `test_piece(v, shape)` | A small piece cut from the real geometry around the interface. Printing it is the cheapest physical test. |
 
-## 6. Register and test
+## 6. Library metadata
+
+```python
+category = "Wall & desk"
+tags = ("skadis", "ikea", "pegboard", "hook")
+```
+
+`category` files the recipe in the library and the gallery; `tags` are the words people search for. Keep `summary` to one sentence.
+
+## 7. Register and test
 
 Built-in recipes live in `form/recipes/`. Community recipes live in [`community/recipes/`](../community/recipes/README.md) and need no registration.
 
-1. Add the recipe to `registry()` in [`form/recipes/__init__.py`](../form/recipes/__init__.py).
+1. Add the id to `LIBRARY` in [`form/recipes/__init__.py`](../form/recipes/__init__.py).
 2. Run these checks:
 
 ```bash
@@ -89,6 +127,8 @@ form render try-it --view sheet --out try.png
 form optimize try-it --vary wall:1:4 --minimize solid_mass_g
 python -m unittest discover -s tests
 ```
+
+Add a test that builds the recipe at its defaults and at the ends of its ranges with [`tests/recipe_harness.py`](../tests/recipe_harness.py): it checks the solid count, the plate, a 180 mm bed, feature attribution and every interface dimension as modelled. See `tests/test_library_*.py`.
 
 Look at the render. Most recipe mistakes are visible there before any check catches them, such as a screw a screwdriver cannot reach, or a knife-edge shelf.
 

@@ -2,7 +2,7 @@
   "id": "organizer",
   "title": "Drawer organizer",
   "summary": "Bins or a tool insert for a drawer, optionally on a Gridfinity grid.",
-  "closest_recipe": "gridfinity",
+  "closest_recipe": "gridfinity_bin",
   "questions": [
     {"key": "drawer_w", "label": "Drawer inner width", "kind": "number", "unit": "mm", "required": true,
      "why": "Sets how many grid cells or how wide the insert can be."},

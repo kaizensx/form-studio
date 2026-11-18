@@ -21,6 +21,7 @@ GAP = 6.0
 
 class GearPair(Recipe):
     id = "gear_pair"
+    legacy = True          # retired from the library: still opens and builds for designs that use it
     title = "Spur gear pair"
     summary = ("Two printable involute spur gears and a plate with axle pegs at the right centre distance, "
                "with a mesh check (centre distance, backlash, contact ratio) and a tooth-strength estimate.")

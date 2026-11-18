@@ -25,6 +25,7 @@ def _rr(w, d, r, z):
 
 class GridfinityBin(Recipe):
     id = "gridfinity"
+    legacy = True          # retired from the library: still opens and builds for designs that use it
     title = "Gridfinity-style bin"
     summary = "A storage bin on the 42 mm Gridfinity grid: stepped feet, stacking lip, optional dividers, scoop, label shelf and magnet pockets."
     fit = {"cavity": "magnet_hole", "mating": "magnet_d", "clearance": "magnet_clearance",

@@ -27,6 +27,8 @@ def _rbox(w, d, h, r, z=0.0):
 
 class Enclosure(Recipe):
     id = "enclosure"
+    category = "Enclosures"
+    tags = ("electronics", "raspberry pi", "pcb", "heat-set inserts", "lid")
     title = "Electronics enclosure"
     summary = ("A box and screw-down lid for a circuit board: corner bosses for heat-set inserts or self-tapping screws, "
                "PCB standoffs on the board's hole pattern, USB-C and round wall cut-outs, and lid vents.")
