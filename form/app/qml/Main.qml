@@ -119,14 +119,11 @@ Window {
         Loader { id: homeLd; anchors.fill: parent; active: Store.screen === "home"; sourceComponent: Home {} }
         Loader { anchors.fill: parent; active: Store.screen === "work"; sourceComponent: Workspace {} }
         Loader { anchors.fill: parent; active: Store.screen === "designing"; sourceComponent: Designing {} }
-        Column { anchors.centerIn: parent; visible: Store.screen === "boot"; spacing: 12
-            Logo { size: 36; anchors.horizontalCenter: parent.horizontalCenter }
-            Item { width: 1; height: 8 }
-            Row { spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
-                Spinner { size: 12; anchors.verticalCenter: parent.verticalCenter }
-                Txt { kind: "fine"; text: "Starting the CAD kernel…" } } }
     }
     Loader { anchors.top: top.bottom; anchors.bottom: parent.bottom; width: parent.width; z: 30; active: Store.welcome; sourceComponent: Welcome {} }
+    // the opening screen: the mark builds itself while the kernel starts; it stays at least until the mark is drawn
+    Splash { anchors.fill: parent; z: 90; done: Store.screen !== "boot" && splashMin.ran
+        Timer { id: splashMin; property bool ran: win.headless; interval: 2300; running: true; onTriggered: ran = true } }
     Toasts { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 18; z: 80 }
     ActivityBar { anchors.top: top.bottom; width: parent.width; z: 70 }          // named engine work over 300 ms, with progress
     SheetHost {}
