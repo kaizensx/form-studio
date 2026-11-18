@@ -129,9 +129,9 @@ def run(ui):
     # ── opening a conversation opens its design ──
     ui.run_js("Store.home()")
     ui.wait_until(lambda: ui.store.get("screen") == "home" and ui.store.get("pid") == "", 10, "Home")
-    rows = lambda: [r for r in ui.find_all(name="convRow") if r.property("modelData")["id"] == conv]
-    ui.wait_until(rows, 10, "the conversation in the list")
-    ui.settle(1500)                                  # Home lays itself out (suggestions arrive one by one)
+    rows = lambda: [r for r in ui.find_all(name="homeConversation") if r.property("modelData")["id"] == conv]
+    ui.wait_until(rows, 10, "the conversation on Home")
+    ui.settle(1500)                                  # Home lays itself out (its cards arrive one by one)
     ui.click(rows()[0])
     ui.wait_until(lambda: ui.store.get("screen") == "work" and ui.store.get("pid") == pid, 30, "the design to open with its conversation")
     ui.wait_until(lambda: ui.js("!!Store.view"), 30, "the model")

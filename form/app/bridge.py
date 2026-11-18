@@ -12,6 +12,7 @@ import mimetypes
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QRunnable, QStandardPaths, QThreadPool, QUrl, Signal, Slot
@@ -239,6 +240,25 @@ class Bridge(QObject):
     @Slot(str)
     def copy(self, text: str):
         QGuiApplication.clipboard().setText(text)
+
+    @Slot(result=str)
+    def clipboardText(self) -> str:
+        return QGuiApplication.clipboard().text() or ""
+
+    @Slot(result=QUrl)
+    def clipboardImage(self) -> QUrl:
+        """A picture on the clipboard (a screenshot, a copied photo), saved as a PNG to attach; empty when there is none."""
+        img = QGuiApplication.clipboard().image()
+        if img.isNull():
+            return QUrl()
+        f = Path(tempfile.mkdtemp(prefix="form-paste-")) / "pasted.png"
+        return QUrl.fromLocalFile(str(f)) if img.save(str(f), "PNG") else QUrl()
+
+    @Slot(str, result=str)
+    def tempFile(self, name: str) -> str:
+        """A path in a fresh temporary folder (a sketch's picture is written there before it is attached)."""
+        safe = "".join(c for c in name if c.isalnum() or c in "-_.") or "file"
+        return str(Path(tempfile.mkdtemp(prefix="form-tmp-")) / safe)
 
     @Slot(str, result=bool)
     def copyImage(self, api_path: str) -> bool:

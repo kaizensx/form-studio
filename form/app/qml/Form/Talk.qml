@@ -9,15 +9,9 @@ import "F.js" as F
 // what any other agent does to your designs.
 Rectangle {
     id: talk
-    property bool hero: false                 // home screen: larger intro, wider column
     color: Theme.plate1
     readonly property bool empty: Store.chatItems.length === 0 && !Store.chatBusy
-    readonly property bool landing: hero && empty      // home with nothing open: the prompt sits at the top, recent conversations under it
     property var openGroups: ({})             // step group key → unfolded
-    property var presets: []
-    // starting points are learned from the person's designs (form/starters.py); on Home they are shown, pinned and
-    // edited in the Home pane (home workstream), so the landing column keeps only the composer and recent conversations
-    readonly property var ideas: talk.landing || !Store.starters ? [] : Store.starters.prompts.slice(0, 3).map(function (p) { return p.text })
     // suggestions for the open design, from its real state
     readonly property var forProject: {
         var d = Store.data, out = []
@@ -33,7 +27,7 @@ Rectangle {
         if (d.fit && d.fit.yield < 0.95) out.push({ label: "Improve the modelled fit yield", prompt: "The modelled fit yield is " + Math.round(d.fit.yield * 100) + "%. What drives it, and what change would raise it? It is a model, so say what a test print should confirm." })
         return out.slice(0, 4)
     }
-    Component.onCompleted: { Store.get("/presets").then(function (r) { talk.presets = r.presets }, function () {}); sync() }
+    Component.onCompleted: sync()
 
     function liveText() {
         var L = Store.chatLive, who = Store.chatAgentLabel
@@ -80,9 +74,12 @@ Rectangle {
             if (ev.t === "answer") continue
             group = null
             if (ev.t === "ask") {
-                out.push({ t: "ask", k: "q" + i, q: { id: ev.id, question: ev.question, choices: ev.choices || [], multi: !!ev.multi, free: ev.free !== false,
-                                                     why: ev.why || "", kind: ev.kind || "question", answer: answers[ev.id] || null,
-                                                     open: !!Store.chatAsking && Store.chatAsking.id === ev.id && !answers[ev.id] } })
+                var q = { id: ev.id, question: ev.question, choices: ev.choices || [], multi: !!ev.multi, free: ev.free !== false,
+                          why: ev.why || "", kind: ev.kind || "question", answer: answers[ev.id] || null,
+                          open: !!Store.chatAsking && Store.chatAsking.id === ev.id && !answers[ev.id] }
+                if (q.kind === "measure")                // a guided measurement: where, the picture, the unit and tolerance
+                    ["project", "param", "unit", "tolerance_mm", "where", "diagram", "image_url", "mark", "current"].forEach(function (f) { q[f] = ev[f] === undefined ? null : ev[f] })
+                out.push({ t: "ask", k: "q" + i, q: q })
                 continue
             }
             if (ev.t === "suggest") { out.push({ t: "suggest", k: "g" + i, options: ev.options || [] }); continue }
@@ -163,30 +160,28 @@ Rectangle {
     Column {
         id: intro
         visible: talk.empty
-        x: talk.hero ? 28 : 16; width: parent.width - 2 * x; spacing: talk.hero ? 14 : 10
-        anchors.top: head.bottom; anchors.topMargin: talk.hero ? Math.max(36, Math.min(84, talk.height * 0.09)) : 24
-        Txt { kind: talk.hero ? "h1" : "h3"; width: parent.width; lineHeight: 1.08; font.weight: Theme.wSemi
-            font.pixelSize: talk.hero ? (talk.width >= 420 ? 34 : 30) : Theme.tH3
-            text: talk.hero ? "What do you need\nto print?" : Store.project ? "Ask about this design,\nor describe a change." : "Describe a change,\nor a new part." }
+        x: 16; width: parent.width - 2 * x; spacing: 10
+        anchors.top: head.bottom; anchors.topMargin: 24
+        Txt { kind: "h3"; width: parent.width; lineHeight: 1.08; font.weight: Theme.wSemi
+            text: Store.project ? "Ask about this design,\nor describe a change." : "Describe a change,\nor a new part." }
         Txt { tone: 2; width: parent.width; lineHeight: 1.4
-            text: talk.hero ? "Describe it. The agent designs it in a real CAD kernel while you watch, with checks, a fit model and a real slice. Nothing prints or uploads."
-                            : "The agent works on the design with Form Studio's tools. Changes arrive as a draft or a new revision you can compare and undo." }
+            text: "The agent works on the design with Form Studio's tools. Changes arrive as a draft or a new revision you can compare and undo." }
         Note { visible: !Store.chat.available && !!Store.studio; kind: "amber"; title: "No agent is connected"
-            text: (Store.chat.note || "") + " You can still start from a recipe and edit everything by hand." }
+            text: (Store.chat.note || "") + " You can still start a blank design and edit everything by hand." }
     }
-    // suggestions (and, on the home screen, recent conversations) fill the space the feed will use
+    // suggestions for the open design fill the space the feed will use
     Flickable {
         id: start
         visible: talk.empty
         anchors.left: parent.left; anchors.right: parent.right
-        anchors.top: talk.landing ? foot.bottom : intro.bottom; anchors.topMargin: talk.landing ? 6 : 16
-        anchors.bottom: talk.landing ? parent.bottom : foot.top
+        anchors.top: intro.bottom; anchors.topMargin: 16
+        anchors.bottom: foot.top
         contentHeight: sc.implicitHeight + 20; clip: true; boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { width: 6 }
         Column {
-            id: sc; x: talk.hero ? 28 : 16; width: parent.width - 2 * x; spacing: 6
+            id: sc; x: 16; width: parent.width - 2 * x; spacing: 6
             Repeater {
-                model: !Store.chat.available ? [] : Store.project ? talk.forProject : talk.ideas.map(function (t) { return { label: t, prompt: t } })
+                model: !Store.chat.available || !Store.project ? [] : talk.forProject
                 Rectangle {
                     id: idea
                     required property var modelData
@@ -208,25 +203,6 @@ Rectangle {
                         onClicked: idea.modelData.review ? Store.askReview() : Store.send(idea.modelData.prompt) }
                 }
             }
-            // brief templates: guided questions first, then the agent designs it
-            Item { visible: !Store.project && !talk.landing && talk.presets.length > 0; width: 1; height: 6 }
-            Txt { visible: !Store.project && !talk.landing && talk.presets.length > 0; kind: "cap"; text: "Or answer a few questions first" }
-            Flow { visible: !Store.project && !talk.landing && talk.presets.length > 0; width: sc.width; spacing: 6
-                Repeater { model: Store.project ? [] : talk.presets
-                    Rectangle { id: pc; required property var modelData
-                        width: pt.implicitWidth + 20; height: 26; radius: 13; color: pm.pressed ? Theme.plate1 : pm.containsMouse ? Theme.plate3 : "transparent"; border.color: pm.containsMouse ? Theme.rule3 : Theme.rule2
-                        Behavior on color { Tint {} }
-                        Txt { id: pt; anchors.centerIn: parent; font.pixelSize: 12; tone: pm.containsMouse ? 1 : 2; text: pc.modelData.title }
-                        MouseArea { id: pm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSheet("new", { tab: "brief", preset: pc.modelData.id }) }
-                        Tip { show: pm.containsMouse; text: pc.modelData.summary } } } }
-            // home: pick up where you left off
-            Item { visible: talk.landing && rc.all.length > 0; width: 1; height: 10 }
-            Item { visible: talk.landing && rc.all.length > 0; width: sc.width; height: 20
-                Txt { kind: "cap"; text: "Recent conversations"; anchors.verticalCenter: parent.verticalCenter }
-                Txt { kind: "fine"; visible: rc.all.length > rc.limit; text: "All " + rc.all.length; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                    color: am.containsMouse ? Theme.ink : Theme.ink3
-                    MouseArea { id: am; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; onClicked: list.open() } } }
-            ConversationList { id: rc; visible: talk.landing && rc.all.length > 0; compact: true; x: -8; width: sc.width + 16 }
         }
     }
 
@@ -290,7 +266,9 @@ Rectangle {
                                     Tip { show: ah.hovered; text: ach.modelData.name } } } }
                         Txt { id: ut; width: Math.min(implicitWidth, body.width - 54); text: it.m.text; lineHeight: 1.4 } } } } }
             Component { id: cText; Md { objectName: "replyText"; source: it.m.text; width: body.width; revs: true } }
-            Component { id: cAsk; TalkAsk { width: body.width; q: it.m.q } }
+            Component { id: cAsk; Loader { width: body.width; sourceComponent: it.m.q.kind === "measure" ? cMeasure : cQuestion
+                Component { id: cQuestion; TalkAsk { width: body.width; q: it.m.q } }
+                Component { id: cMeasure; MeasureAsk { width: body.width; q: it.m.q } } } }
             // what you might say next, offered by the agent (suggest_replies): one click sends it
             Component { id: cSuggest; Flow { objectName: "suggestions"; width: body.width; spacing: 6
                 Repeater { model: it.m.options
@@ -350,9 +328,9 @@ Rectangle {
     // ── composer ──
     Item {
         id: foot; width: parent.width; height: comp.height + 36; z: 2
-        y: talk.landing ? intro.y + intro.height + 8 : talk.height - height
+        y: talk.height - height
         Rectangle {
-            id: comp; x: talk.hero ? 22 : 12; y: 8; width: parent.width - 2 * x; height: inner.implicitHeight; radius: Theme.rLg
+            id: comp; x: 12; y: 8; width: parent.width - 2 * x; height: inner.implicitHeight; radius: Theme.rLg
             color: Theme.well; border.width: 1; border.color: ta.activeFocus ? Theme.alpha(Theme.datum, 0.7) : ch.hovered ? Theme.rule3 : Theme.rule2
             Behavior on border.color { Tint {} }
             HoverHandler { id: ch }
@@ -377,7 +355,7 @@ Rectangle {
                                     onClicked: Store.dropAttachment(chip.modelData.id) } } } } }
                 ScrollView {
                     width: parent.width; clip: true
-                    height: Math.min(220, Math.max((talk.hero ? 3 : 2) * 19 + 18, ta.implicitHeight))
+                    height: Math.min(220, Math.max(2 * 19 + 18, ta.implicitHeight))
                     Behavior on height { NumberAnimation { duration: Theme.move(Theme.fast); easing.type: Easing.OutQuad } }
                     TextArea {
                         id: ta
@@ -385,13 +363,13 @@ Rectangle {
                         // "Ask about this feature…" from the viewport's context menu lands here
                         Connections { target: Store; function onChatPrefill(text) { Store.talkOpen = true; ta.text = text; ta.cursorPosition = text.length; ta.forceActiveFocus() } }
                         wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: 13
-                        placeholderText: !Store.chat.available ? "No agent is connected" : Store.chatAsking && Store.chatAsking.free ? "Answer the question above…" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to print…"
+                        placeholderText: !Store.chat.available ? "No agent is connected" : Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure" ? "Answer the question above…" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to print…"
                         placeholderTextColor: Theme.ink4; enabled: Store.chat.available
                         selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
                         leftPadding: 12; rightPadding: 12; topPadding: 10; bottomPadding: 6; background: null; renderType: Text.NativeRendering
                         function submit() {
                             if (!text.trim()) return
-                            if (Store.chatAsking && Store.chatAsking.free) { Store.answerAsk(Store.chatAsking.id, text.trim(), []); text = ""; return }
+                            if (Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure") { Store.answerAsk(Store.chatAsking.id, text.trim(), []); text = ""; return }
                             if (!Store.chatBusy && Store.chatReady) { Store.send(text); text = "" } }
                         Keys.onTabPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
                         Keys.onBacktabPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.BacktabFocusReason)
@@ -425,8 +403,8 @@ Rectangle {
                                     Store.retryAfterPick = false
                                     if (Store.pendingSend) { Store.chatPrefill(Store.pendingSend); Store.pendingSend = "" } })
                                 height: Math.min(mp.implicitHeight + 12, talk.height - 70)
-                                y: talk.landing ? mchip.height + 6 : -height - 6
-                                origin: talk.landing ? Popup.TopLeft : Popup.BottomLeft
+                                y: -height - 6
+                                origin: Popup.BottomLeft
                                 Flickable { anchors.fill: parent; clip: true; contentHeight: mp.implicitHeight; boundsBehavior: Flickable.StopAtBounds
                                     ScrollBar.vertical: ScrollBar { width: 6 }
                                     TalkModelPicker { id: mp; width: parent.width; onDone: mpop.close() } }
@@ -435,7 +413,7 @@ Rectangle {
                     }
                     // send, or stop while a reply is being written: one round button in one place
                     Rectangle { id: sendBtn; objectName: "sendBtn"
-                        readonly property bool answering: !!Store.chatAsking && !!Store.chatAsking.free && ta.text.trim() !== ""
+                        readonly property bool answering: !!Store.chatAsking && !!Store.chatAsking.free && Store.chatAsking.kind !== "measure" && ta.text.trim() !== ""
                         readonly property bool stops: Store.chatBusy && !answering
                         readonly property bool can: Store.chatBusy || (Store.chatReady && ta.text.trim() !== "")
                         anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
@@ -453,9 +431,9 @@ Rectangle {
                 }
             }
         }
-        Txt { kind: "fine"; x: talk.hero ? 28 : 16; anchors.top: comp.bottom; anchors.topMargin: 7; width: parent.width - 2 * x; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 3
+        Txt { kind: "fine"; x: 16; anchors.top: comp.bottom; anchors.topMargin: 7; width: parent.width - 2 * x; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 3
             color: Store.chatAsking ? Theme.amber : Theme.ink3
-            text: Store.chatAsking ? "The agent is waiting for your answer. Enter sends it."
+            text: Store.chatAsking ? (Store.chatAsking.kind === "measure" ? "The agent is waiting for a measurement: answer on the card above." : "The agent is waiting for your answer. Enter sends it.")
                 : Store.chatBusy ? "Working. Other conversations can run meanwhile."
                 : Store.conv && Store.conv.messages ? "Enter sends · ↑ brings back your last message"
                 : "Enter sends · Shift+Enter for a new line · drop files to attach" }

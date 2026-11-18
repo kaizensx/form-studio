@@ -43,6 +43,27 @@ form chat "Make the base 92 mm deep" --project hallway-phone-dock --agent codex
 | `form update` | Is there a newer version (`--check` prints JSON; `--install` installs it) |
 | `form examples [add]` | List the shipped examples, or copy them into your projects |
 
+## Start a design
+
+`form start` starts a design the way Home does: words, photos, files, a sketch and links go to an agent in one
+message, with what the design is for.
+
+| Command | Does |
+|---|---|
+| `form start --text "…" [--photo F]... [--file F]... [--sketch F.json] [--link URL]... [--purpose print\|model] [--agent ID] [--model X] [--json]` | A new conversation with everything attached, sent to the agent; prints like `form chat` |
+| `form start --blank [--name N] [--purpose print\|model]` | A blank design (a rounded 60 × 40 × 20 mm block) built in the kernel; prints `{id, name, purpose}` |
+| `form concepts` | Open concept groups, newest first |
+| `form concepts <group-or-project>` | One group's board: each concept's project, title, rationale and computed size and volume |
+| `form concepts pick <group> <project> [--keep-others]` | Keep one concept: it takes the group's name; the others move to the trash unless `--keep-others` |
+
+- `--purpose print` is for 3D printing on your printer; `model` is just a 3D model: Design only is set and nothing is
+  sliced. Without it, the choice you made last on Home is used, else `print` when a slicer is installed.
+- `--link`: a link to a file (STL, STEP, 3MF, PDF, PNG, JPEG, WebP) is downloaded once (up to 50 MB) and attached;
+  any other link is passed to the agent as a page and nothing is downloaded.
+- `--sketch` takes Form Studio's sketch JSON (millimetres, y up; see `form/sketch.py`). The agent reads its geometry
+  as exact numbers; a dimension with a stated value overrides the drawn length.
+- Concepts are made by the agent (`propose_concepts`): three or four genuinely different designs, each a real project.
+
 ## Designs
 
 | Command | Does |

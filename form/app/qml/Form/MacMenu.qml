@@ -10,8 +10,8 @@ P.MenuBar {
     signal fullScreen()
     readonly property bool work: Store.screen === "work"
     P.Menu { title: "File"
-        P.MenuItem { text: "New Design…"; shortcut: StandardKey.New; onTriggered: Store.openSheet("new") }
-        P.MenuItem { text: "New Design from a Brief…"; onTriggered: Store.openSheet("new", { tab: "brief" }) }
+        P.MenuItem { text: "New Design"; shortcut: StandardKey.New; onTriggered: { if (Store.screen !== "home") Store.home(); Store.startFocus++ } }
+        P.MenuItem { text: "Sketch a New Design…"; onTriggered: { if (Store.screen !== "home") Store.home(); Store.openSheet("sketch") } }
         P.MenuItem { text: "Import…"; onTriggered: Store.askImport() }
         P.MenuItem { text: "Export Design…"; enabled: mb.work; onTriggered: Store.exportProject(Store.pid) }
         P.MenuItem { text: "Export Conversation as Markdown…"; enabled: !!Store.convId; onTriggered: Store.exportConversation(Store.convId, "md") }

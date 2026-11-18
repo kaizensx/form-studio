@@ -86,7 +86,7 @@ class Sheets(unittest.TestCase):
 
     def test_every_registered_sheet_is_a_file_with_a_title(self):
         files = self.files()
-        for kind in ("new", "alternatives", "photo", "ring", "setup", "settings", "update", "slicer", "render", "variants",
+        for kind in ("import", "sketch", "concepts", "alternatives", "photo", "ring", "setup", "settings", "update", "slicer", "render", "variants",
                      "share", "shortcuts", "about"):
             self.assertIn(kind, files)
         for kind, name in files.items():

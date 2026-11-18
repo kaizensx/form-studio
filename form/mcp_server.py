@@ -53,7 +53,17 @@ Rules:
   orientation; print checks and slicing do not apply. Pass purpose to create_project/create_design when the person
   says what it is for; otherwise Form Studio uses their default (form_overview: purpose_default).
 - Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time,
-  at most three per task. Outside Form Studio's chat it tells you to ask in your own interface.
+  at most three per task. Outside Form Studio's chat it tells you to ask in your own interface. For a dimension the
+  person can measure, use ask_measurement (where to measure, tolerance, a diagram); it updates the design with how
+  it was measured.
+- A new idea that is not already a precise specification: propose_concepts with 3-4 genuinely different structural
+  approaches as real designs (not size variants), a one-line rationale each; then stop and let the person pick.
+  Refine the picked one with update_design. Recipes may be used as building blocks; do not offer them to the person.
+- Photos: find the scale from a reference object (bank card 85.60 x 53.98 mm, a coin's official diameter, a ruler);
+  dimensions read off a photo are "estimated from the photo (scale from <reference>)" and stay assumed until measured.
+  Sketches from Form Studio carry structured JSON: it is authoritative over the picture; stated dimensions override
+  drawn lengths. STEP/STL: import_reference. PDF drawings: read_document. Download only files the person gave you.
+- If the message has a "Purpose:" line, respect it: "just a 3D model" means no slicing and no print talk.
 """
 
 S: dict[str, Any] = {"studio": None, "bench": {"url": None}, "lock": threading.Lock()}
@@ -108,6 +118,15 @@ def act(pid, kind: str, text: str, ctx=None, **extra):
             webbrowser.open(f"{url}/#p={pid}")
         except Exception:
             pass
+
+
+def _purpose(purpose: str | None) -> str | None:
+    """The purpose a design gets: the agent's, else the one the person chose on Home for this chat run (FORM_PURPOSE),
+    else None (the person's default, form/purpose.py)."""
+    if purpose:
+        return purpose
+    from . import start
+    return start.env_purpose()
 
 
 def digest(st: Studio, pid: str) -> dict:
@@ -259,7 +278,7 @@ def build() -> MCPServer:
         person's default. process (models only): cnc, laser, injection, casting, sheet_metal, render, cad, other."""
         st = studio()
         act(None, "design", f"Writing a new design: {name}", ctx)
-        p = await _run(st.create_design, name, source, brief, values, language, references, purpose, process)
+        p = await _run(st.create_design, name, source, brief, values, language, references, _purpose(purpose), process)
         act(p["id"], "commit", f"Created {name} (r01)", ctx)
         if run:
             jid = st.run(p["id"])
@@ -303,7 +322,7 @@ def build() -> MCPServer:
         With run=True the solid, exports and checks are built (and sliced if a slicer is available and it is for printing).
         purpose: "print" or "model" (just a 3D model); omitted: the person's default. process: see create_design."""
         st = studio()
-        p = await _run(lambda: st.create(name, recipe, brief, values, purpose=purpose, process=process))
+        p = await _run(lambda: st.create(name, recipe, brief, values, purpose=_purpose(purpose), process=process))
         act(p["id"], "commit", f"Created {name} from the {recipe} recipe", ctx)
         if run:
             jid = st.run(p["id"])
@@ -1081,6 +1100,116 @@ def build() -> MCPServer:
             elif _os.getppid() != parent:            # the agent that asked is gone
                 ask_mod.close(Path(folder), qid, "ended")
             await anyio.sleep(0.25)
+
+    @mcp.tool(annotations=RW)
+    async def ask_measurement(project: str, param: str, question: str, where: str = "", unit: str = "mm",
+                              tolerance_mm: float | None = None, diagram: dict | None = None, image: str | None = None,
+                              mark: list[float] | None = None) -> dict:
+        """Ask the person to measure one dimension of the design, and wait. Form Studio shows a measurement card:
+        the question, where to measure (where, e.g. "across the widest part of the phone, without the case"), the
+        precision that matters (tolerance_mm), a diagram ({"shape": "box"|"cylinder"|"hole"|"gap"|"thickness",
+        "axis": "x"|"y"|"z"|"d"}) and optionally a picture: image is an absolute path to a PNG or JPEG (a render, or
+        the person's photo) with mark = [x0, y0, x1, y1] (0..1) outlining where to measure. The person types the
+        number and says how they measured it (calipers, ruler, tape, or estimate). The answer becomes a new revision
+        of the design with provenance measured (calipers sigma 0.05 mm, ruler 0.5, tape 1.0) or, for an estimate,
+        assumed. One question at a time. Returns {answered, value, unit, method, source, rev}; when nobody answered,
+        {answered: false, reason, note}. Outside Form Studio's chat it tells you to ask in your own interface."""
+        from . import ask as ask_mod
+        from . import start
+        import os as _os
+        import shutil as _sh
+        st = studio()
+
+        def check():
+            p = st.load(project)
+            head = st.rev(p)
+            if param not in head["values"]:
+                raise StudioError(f"“{param}” is not a parameter of {project}.", "get_project lists the parameters.")
+            return head["values"][param]
+        current = await _run(check)
+        folder = _os.environ.get(ask_mod.ENV_DIR)
+        qid = ask_mod.new_id()
+        ext = None
+        if image:
+            src = Path(image).expanduser()
+            ext = src.suffix.lower().lstrip(".")
+            if not src.is_absolute() or not src.is_file() or ext not in ("png", "jpg", "jpeg"):
+                raise ToolError("image must be the absolute path of a PNG or JPEG file.")
+        try:
+            q = ask_mod.measure_question(question, project, param, where, unit, tolerance_mm, diagram,
+                                         f"{qid}.{ext}" if ext else None, mark, current)
+        except ask_mod.AskError as e:
+            raise ToolError(str(e))
+        if not folder:
+            return {**ask_mod.unreachable(q), "param": param, "current": current, "where": q["where"]}
+        Path(folder).mkdir(parents=True, exist_ok=True)
+        if ext:
+            _sh.copyfile(Path(image).expanduser(), Path(folder) / f"{qid}.{ext}")   # before the question appears
+        timeout = ask_mod.timeout_from_env()
+        ask_mod.post(Path(folder), q, timeout, qid=qid)
+        parent, t0 = _os.getppid(), time.time()
+        while True:
+            st_, extra = ask_mod.state(Path(folder), qid)
+            if st_ != "open":
+                break
+            if time.time() - t0 > timeout:
+                ask_mod.close(Path(folder), qid, "timeout")
+            elif _os.getppid() != parent:
+                ask_mod.close(Path(folder), qid, "ended")
+            await anyio.sleep(0.25)
+        res = ask_mod.measure_result(q, st_, extra)
+        if res.get("answered") and res.get("value") is not None and not res.get("rev") and res.get("method"):
+            # answered where nothing committed it (a terminal): record it here, the same way the app does
+            rec = await _run(start.apply_measurement, st, project, param, res["value"], res["method"])
+            res = {**res, "rev": rec["rev"], "source": rec["source"],
+                   "note": ask_mod.measure_result(q, st_, {**(extra or {}), **rec})["note"]}
+        return res
+
+    # ---- concepts first (form/concepts.py) --------------------------------------------------------------------
+    @mcp.tool(annotations=RW)
+    async def propose_concepts(name: str, concepts: list[dict], brief: str = "", group: str | None = None,
+                               run: bool = True, ctx: Context = None) -> dict:
+        """For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one.
+        concepts: [{"title": short name, "rationale": one line on the approach, "source": design code as for
+        create_design (see design_guide), "language": "python", "values": {...} or null}]. Make them different
+        structural approaches (how it holds, mounts, opens), not size variants. Each becomes its own project
+        ("<name> · A", "· B", ...). A concept that fails to build comes back in "failed" with its error; the others are
+        kept. group: an open group's id to add concepts to (at most 6 in a group), e.g. one mixed concept when the
+        person asks for "the base of A with the hook of C". With run=True each is exported and checked.
+        Returns the board: {id, name, state, members: [{project, letter, title, rationale, numbers}], failed}."""
+        from . import concepts as concepts_mod
+        st = studio()
+        by = _origin(ctx).replace("agent:", "") or "agent"
+        act(None, "design", f"Building concepts for {name}", ctx)
+        res = await _run(concepts_mod.create, st, name, concepts, brief, group, None, by)
+        if run:
+            jobs = [st.run(m["project"]) for m in res["members"] if not m.get("trashed") and not m.get("error")]
+            t0 = time.time()
+            for j in jobs:
+                await _wait_job(st, j, max(1.0, 60 - (time.time() - t0)))
+            res = {**await _run(concepts_mod.board, st, res["id"]), "failed": res["failed"]}
+        res["note"] = ("Stop here and let the person pick in Form Studio's concepts view. If they pick in words, call "
+                       "pick_concept(group, project). If they ask for a mix (\"the base of A with the hook of C\"), call "
+                       "propose_concepts(name, [one mixed concept], group=\"" + res["id"] + "\").")
+        return res
+
+    @mcp.tool(annotations=RW)
+    async def pick_concept(group: str, project: str, keep_others: bool = False, ctx: Context = None) -> dict:
+        """The person picked a concept (in words; in the app they pick on the board). The picked project takes the
+        group's name and records the choice; the other concepts move to the trash (recoverable) unless keep_others.
+        Then refine the picked design with update_design. Only call this when the person said which one."""
+        from . import concepts as concepts_mod
+        st = studio()
+        return await _run(concepts_mod.pick, st, group, project, keep_others, _origin(ctx).replace("agent:", "") or "agent")
+
+    @mcp.tool(annotations=RO)
+    async def list_concepts(group: str = "") -> dict:
+        """Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>."""
+        from . import concepts as concepts_mod
+        st = studio()
+        if group:
+            return await _run(concepts_mod.board, st, group)
+        return {"groups": await _run(concepts_mod.groups, st, "open")}
 
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False))
     async def suggest_replies(options: list[str]) -> dict:

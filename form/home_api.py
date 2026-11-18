@@ -31,7 +31,11 @@ def _call(fn, *a, **kw):
 
 
 def route_get(st, path: str, q: dict):
-    from . import bundle, recipe_lib, recipe_share, starters, whatsnew
+    from . import bundle, recipe_lib, recipe_share, start, starters, whatsnew
+    if path.startswith(("/api/start", "/api/concepts")):     # how a design starts, concepts (form/start.py)
+        got = start.route_get(st, path, q)
+        if got is not None:
+            return got
     if path.startswith("/api/recipes/"):          # sharing: packages, submissions, a design as a recipe (form/recipe_share.py)
         got = _call(recipe_share.route_get, st, path, q)
         if got is not None:
@@ -73,8 +77,12 @@ def route_get(st, path: str, q: dict):
 
 
 def route_post(st, path: str, body, q: dict):
-    from . import bundle, recipe_lib, recipe_share, starters, whatsnew
+    from . import bundle, recipe_lib, recipe_share, start, starters, whatsnew
     b = body if isinstance(body, dict) else {}
+    if path.startswith(("/api/start/", "/api/concepts/")) or path.endswith("/purpose"):   # form/start.py
+        got = start.route_post(st, path, body)
+        if got is not None:
+            return got
     if path.startswith("/api/recipes/"):          # sharing (form/recipe_share.py)
         got = _call(recipe_share.route_post, st, path, body, q)
         if got is not None:

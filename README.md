@@ -96,8 +96,8 @@ A share card with every number and how it is known, photoreal Blender renders in
 
 | | |
 |---|---|
-| **Conversations** | Many per design or free-standing; agent, model and effort per conversation; attachments; streaming steps; questions answered with cards; *Fix with agent* on failed checks; starters that learn from the design. |
-| **Start a design** | Blank, from one of nine built-in recipes, from the [community gallery](https://kaizensx.github.io/form-studio/recipes/), from an imported project, or from a brief with measured dimensions and photos. Import STEP or STL reference parts to design around. |
+| **Conversations** | Many per design or free-standing; agent, model and effort per conversation; attachments; streaming steps; questions answered with cards; *Measure this* cards that commit what you measured; *Fix with agent* on failed checks. |
+| **Start a design** | One composer on Home: describe it, drop a photo (sizes estimated from a card, coin or ruler in it, and labelled so), draw it on the sketch pad, drop a STEP, STL, 3MF or PDF drawing, or paste a link. For my printer or just a 3D model, or start blank. New ideas come back as several real concepts side by side; pick one or ask for a mix. |
 | **Design** | Real B-rep geometry, STEP and STL. Python (build123d) or OpenSCAD. Parameters with units, ranges and provenance. Click a feature on the model to change it; drafts show their computed impact before you commit. |
 | **Hardware** | ISO 273 screw clearances, heat-set insert pockets, nut traps, magnet pockets, bearing seats, printable threads, involute gears, lettering and vent patterns, each with its source. |
 | **Revisions** | Every change is a revision with its author. A timeline to scrub and play as a morph, branches from any revision, compare any two, named variants. |
@@ -107,7 +107,7 @@ A share card with every number and how it is known, photoreal Blender renders in
 | **Optimise** | Goal seek over parameters with real kernel builds, and a ranked grid of alternatives. |
 | **Release** | One approval by a person freezes STEP, STL, 3MF and G-code with SHA-256 hashes and a report. Verify any time. |
 | **Setup** | First start installs what is missing from inside the app; Settings for everything; What's New after each update. |
-| **Headless** | Every capability as a `form` command printing JSON, and as one of 44 MCP tools. |
+| **Headless** | Every capability as a `form` command printing JSON, and as one of 66 MCP tools. |
 
 The full list, with screenshots: **[docs/FEATURES.md](docs/FEATURES.md)**.
 
@@ -176,7 +176,7 @@ Other clients use `{ "mcpServers": { "form": { "command": "form-mcp" } } }`, and
 Claude Code can also install thirteen design skills as a plugin:
 `claude plugin marketplace add kaizensx/form-studio`, then `claude plugin install form@form-studio`.
 
-Reference: [44 MCP tools](docs/MCP.md) · [agent guide](AGENTS.md)
+Reference: [66 MCP tools](docs/MCP.md) · [agent guide](AGENTS.md)
 
 ## Or without a window
 

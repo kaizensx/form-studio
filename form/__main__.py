@@ -23,6 +23,10 @@
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
                                      one message to an agent with FORM's tools; streams the reply, saves the conversation
   form conversations list|show|delete|rename|pin    saved conversations
+  form start --text "…" [--photo F] [--file F] [--sketch F.json] [--link URL] [--purpose print|model] [--json]
+                                     start a design the way Home does (words, photos, files, a sketch, links)
+  form start --blank [--name N] [--purpose print|model]   a blank design: a rounded block to shape
+  form concepts [<group-or-project> | pick <group> <project> [--keep-others]]   concepts to pick from
   form providers list|add URL|edit ID|test ID|remove ID   model providers added by URL (format and models detected)
   form simulate <project> --gif out.gif | --frames dir | --png out.png [--layers a:b] [--layer n]
                                      the sliced toolpaths building up, from the slicer's G-code (not a print)
@@ -99,6 +103,12 @@ def main(argv=None):
     if argv[:1] == ["conversations"]:             # saved conversations: list | show | delete | rename | pin
         from .chat import main_conversations
         return main_conversations(argv[1:])
+    if argv[:1] == ["start"]:                     # how a design starts: Home's composer, or a blank design
+        from .start import main as start_main
+        return start_main(argv[1:])
+    if argv[:1] == ["concepts"]:                  # concepts first: open groups, one board, pick one
+        from .concepts import main as concepts_main
+        return concepts_main(argv[1:])
     # -- home workstream: archives, conversation export, learned starters, recipe library (each prints JSON) --
     if argv[:1] in (["export"], ["import"], ["export-conversation"]):
         from . import bundle
@@ -153,6 +163,9 @@ def main(argv=None):
     sub.add_parser("update", help="is there a newer Form Studio? (--check prints JSON; never installs)")
     sub.add_parser("chat", help='send one message to an agent: form chat "message" [--project ID] [--model X] [--json]')
     sub.add_parser("conversations", help="saved conversations: list | show ID | delete ID | rename ID TITLE | pin ID")
+    sub.add_parser("start", help='start a design: --text "…" [--photo F] [--file F] [--sketch F.json] [--link URL] '
+                                 '[--purpose print|model], or --blank [--name N]')
+    sub.add_parser("concepts", help="concept groups: [<group-or-project>] | pick <group> <project> [--keep-others]")
     sub.add_parser("install", help="install what Form Studio uses (--list, <id>, --yes, --dry-run)")
     sub.add_parser("config", help="get [key] | set <key> <value>: read or change studio.toml")
     sub.add_parser("plates", help="how the design's parts go onto plates | --orient PART=O --material PART=M --color PART=#hex")

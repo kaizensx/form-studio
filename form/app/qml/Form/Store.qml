@@ -168,7 +168,7 @@ QtObject {
     function _labelFor(m, path) {
         var p = String(path).replace(/\?.*$/, ""), r = p.replace(/^\/projects\/[a-z0-9-]+/, "")
         var proj = p !== r
-        if (/\/(job|stamp)(\/|$)|^\/activity|^\/conversations|^\/chat|^\/setup\/(job|state|step|seen)|^\/install\/job|^\/claude\/login\/|^\/starters|^\/presets|^\/whatsnew|^\/recipes\/builtin|^\/recipes\/(mine|pending)\/|\/photo$|\/thumb/.test(p)) return ""
+        if (/\/(job|stamp)(\/|$)|^\/activity|^\/conversations|^\/chat|^\/setup\/(job|state|step|seen)|^\/install\/job|^\/claude\/login\/|^\/starters|^\/presets|^\/start$|^\/concepts|^\/whatsnew|^\/recipes\/builtin|^\/recipes\/(mine|pending)\/|\/photo$|\/thumb/.test(p)) return ""
         if (proj) {
             var t = { "": m === "GET" ? "Loading the design" : "", "/view": "Loading the geometry", "/analysis": "Computing the analysis map", "/orient": "Ranking print orientations",
                       "/layers": "Loading the sliced layers", "/toolpath": "Loading the toolpath", "/diff": "Comparing revisions", "/cost": "Estimating the cost",
@@ -566,18 +566,27 @@ QtObject {
     }
     readonly property var _viewMap: ({ iso: "iso", sheet: "iso", front: "front", back: "back", iso_back: "back", left: "side", right: "side", top: "top", bottom: "under" })
     function follow(ev) {
+        if (ev.kind === "concepts") {                  // the agent proposed concepts, or one was picked
+            loadConcepts().then(function () {
+                if (ev.picked) { if (screen === "designing") reloadStudio().then(function () { open(ev.picked) }); return }
+                if (ev.group && (screen === "designing" || screen === "home")) openSheet("concepts", { group: ev.group })
+            })
+            return
+        }
         if (!ev.project) return
+        if (screen === "designing" && ev.ts < designingSince - 1) return
         if (ev.project !== pid) {
             if (["commit", "draft", "look", "search"].indexOf(ev.kind) < 0) return
-            reloadStudio().then(function () { open(ev.project) })
-            toast("Following " + ev.by, ev.text)
+            var fresh = screen === "designing"
+            reloadStudio().then(function () { open(ev.project).then(function () { if (fresh) buildTick++ }) })
+            if (!fresh) toast("Following " + ev.by, ev.text)
             return
         }
         var userDraft = hasDraft && !draftAgent
         if (ev.kind === "commit") {
             if (draftAgent) discard()
             var t = Object.assign({}, thumbTick); t[pid] = (t[pid] || 0) + 1; thumbTick = t
-            refresh(true)
+            refresh(true).then(function () { buildTick++ })     // the new build grows in, feature by feature
         } else if (ev.values && F.keys(ev.values).length && !userDraft) {
             loadDraft(Object.assign({}, head.values, ev.values), "agent:" + ev.by, undefined, ev.by)
         } else if (userDraft && ev.values) {
@@ -652,7 +661,7 @@ QtObject {
 
     function newChat() {
         _chatPoll.stop()
-        convId = ""; conv = null; chatItems = []; chatTools = ({}); chatLive = null; chatNext = 0; chatBusy = false; chatAttach = []
+        convId = ""; conv = null; chatItems = []; chatTools = ({}); chatLive = null; chatNext = 0; chatBusy = false; chatAttach = []; chatLinks = []
         chatAsking = null
         if (studio) _useDefaults()
         talkOpen = true; chatFocus++
@@ -706,18 +715,17 @@ QtObject {
         if (!text) return
         if (chatBusy) { chatPrefill(text); return }        // never lose a message: it waits in the box until the reply ends
         if (chatNeedsModel) { pendingSend = text; modelPickWanted(); return }
-        var att = chatAttach, id = convId
-        chatBusy = true; talkOpen = true; chatAttach = []; chatLive = null
+        var att = chatAttach, id = convId, links = chatLinks
+        if (links.length) text += "\n\nLinks:\n" + links.map(function (l) { return "- " + l.url }).join("\n")
+        chatBusy = true; talkOpen = true; chatAttach = []; chatLinks = []; chatLive = null
         chatItems = chatItems.concat([{ t: "user", text: text, attachments: att, local: true }])
-        // a new design asked for with a purpose (newPurpose, set by the new-design flow): the agent is told which
-        var said = text
-        if (!pid && newPurpose) {
-            said += newPurpose === "model" ? "\n\nPurpose: just a 3D model, not for 3D printing (create it with purpose=\"model\"" + (newProcess ? ", process=\"" + newProcess + "\"" : "") + ")."
-                                           : "\n\nPurpose: for 3D printing (create it with purpose=\"print\")."
-            newPurpose = ""; newProcess = ""
-        }
+        // a new design: what it is for goes with the conversation (form/start.py), so the agent reads it on every
+        // message and the designs it creates get it; how a model will be made is said in words
+        var said = text, fresh = !pid && !(conv && conv.messages)
+        if (fresh && newPurposeEffective === "model" && newProcess) said += "\n\nThis 3D model will be made by: " + newProcess + " (pass process=\"" + newProcess + "\")."
         var body = { message: said, project: pid || null, agent: chatAgent, model: chatModel || "default", effort: chatEffort,
                      attachments: att.map(function (a) { return a.id }) }
+        if (fresh) { body.purpose = newPurposeEffective; newPurpose = ""; newProcess = "" }
         post(id ? "/conversations/" + id + "/send" : "/conversations/send", body).then(function (r) {
             if (convId !== id) return
             convId = r.conversation; conv = r.meta
@@ -840,11 +848,7 @@ QtObject {
                 }, fail)
             })
         }
-        if (convId) return go(convId)
-        post("/conversations", { project: pid || null, agent: chatAgent, model: chatModel, effort: chatEffort }).then(function (m) {
-            if (convId !== "") return
-            convId = m.id; conv = m; go(m.id)
-        }, fail)
+        ensureConv().then(go, fail)
     }
     function dropAttachment(id) { chatAttach = chatAttach.filter(function (a) { return a.id !== id }) }
     function attachmentUrl(file, cid) { return Bridge.baseUrl + "/api/conversations/" + (cid || convId) + "/file/" + file }
@@ -1448,35 +1452,121 @@ QtObject {
             toast("Moved to the trash", "It is in .trash inside your projects folder until you remove it."); return r }, fail)
     }
 
-    // ── Home and new design (home workstream): learned starters, archives, What's New ──────────────────────
-    // form/starters.py ranks the starters from this person's own designs; form/bundle.py writes and reads .formstudio files.
-    property var starters: null        // GET /starters: { prompts: [{ id, text, source, pinned, why }], briefs: [...], history }
+    // ── How a design starts (form/start.py): Home's composer, purpose, blank, links, sketches; concepts; measurements ──
+    // Recipes and briefs are not offered here any more; agents may still use recipes, and older designs open as before.
     property var whatsNew: null        // GET /whatsnew: { version, show, markdown, highlights } while the modal is up
-    property var _startersReload: Connections { target: s
-        function onStudioChanged() { if (s.screen !== "work") s.loadStarters() }
-        function onScreenChanged() { if (s.screen === "home") s.loadStarters() } }
-    function loadStarters() { return get("/starters").then(function (r) { starters = r; return r }, function () { return null }) }
-    function _starterCall(verb, body, msg) {
-        return post("/starters/" + verb, body || ({})).then(function (r) { loadStarters(); if (msg) toast(msg); return r }, function (e) { fail(e); return null })
+    property var startInfo: null       // GET /start: { purpose, printer: { name, available } }
+    property var chatLinks: []         // page links pasted into the composer: { url, host }; passed on, never downloaded
+    property var concepts: []          // open concept groups (form/concepts.py): boards with members and numbers
+    property int startFocus: 0         // bumps when Home's composer should take the keyboard
+    property var _startLoad: Connections { target: s
+        function onScreenChanged() {
+            if (s.screen !== "home") return
+            s.loadStart(); s.loadConcepts()
+            if (!s.chatBusy && s.conv && s.conv.messages) s.newChat()      // Home's composer always starts something new
+        } }
+    function loadStart() {
+        return get("/start").then(function (r) { startInfo = r; return r }, function () { return null })
     }
-    // a prompt goes into the composer, so it can be adjusted before it is sent
-    function useStarter(st) {
-        post("/starters/used", { id: st.id }).then(function () {}, function () {})
-        talkOpen = true
-        recallChat(st.text)
+    // what the next design is for, chosen on Home: Store.newPurpose (form/purpose.py's default until one is picked)
+    function setNewPurpose(p) { if (p === "print" || p === "model") newPurpose = p }
+    readonly property string printerName: startInfo && startInfo.printer && startInfo.printer.name ? startInfo.printer.name : ""
+    // an empty design, no agent: straight into the workspace
+    function startBlank(name) {
+        var pu = newPurposeEffective; newPurpose = ""
+        return post("/start/blank", { name: name || "", purpose: pu }).then(function (r) {
+            return reloadStudio().then(function () { return open(r.id).then(function () { track(r.job); setStage("shape") }) })
+        }, fail)
     }
-    function useBrief(b) {
-        post("/starters/used", { id: b.id }).then(function () {}, function () {})
-        openSheet("new", { tab: "brief", preset: b.preset, answers: b.answers || ({}), measured: !!b.measured })
+    // the conversation that files, sketches and links attach to before the first message is sent
+    function ensureConv() {
+        if (convId) return Promise.resolve(convId)
+        return post("/conversations", { project: pid || null, agent: chatAgent, model: chatModel, effort: chatEffort }).then(function (m) {
+            if (convId === "") { convId = m.id; conv = m }
+            return convId
+        })
     }
-    function pinStarter(id, on) { return _starterCall("pin", { id: id, on: on }, on ? "Pinned to Home" : "Unpinned") }
-    function removeStarter(id) { return _starterCall("remove", { id: id }) }
-    function addStarter(text) { return _starterCall("add", { text: text }, "Starter added") }
-    function editStarter(id, text) { return _starterCall("edit", { id: id, text: text }) }
-    function restoreStarters() { return _starterCall("restore", {}, "Suggestions restored") }
-    function saveBriefTemplate(preset, answers, title, measured) {
-        return _starterCall("template", { preset: preset, answers: answers, title: title || "", measured: !!measured }, "Saved as your template")
+    // a link: a file (STL, STEP, 3MF, PDF, picture) is fetched and attached; a page is passed to the agent as a link
+    function fetchLink(url) {
+        url = String(url || "").trim()
+        if (!/^https?:\/\//i.test(url)) { toast("That is not a web address", "Paste a link that starts with https://", true); return Promise.resolve(null) }
+        return ensureConv().then(function (id) {
+            return post("/conversations/" + id + "/fetch", { url: url }).then(function (r) {
+                if (convId !== id) return r
+                if (r.attachments) {
+                    chatAttach = chatAttach.concat(r.attachments)
+                    toast("Fetched " + r.fetched.name, F.bytes(r.fetched.bytes) + " from " + r.fetched.host)
+                } else if (r.link) chatLinks = chatLinks.filter(function (l) { return l.url !== r.link.url }).concat([r.link])
+                return r
+            })
+        }).then(function (r) { return r }, function (e) { fail(e); return null })
     }
+    function dropLink(url) { chatLinks = chatLinks.filter(function (l) { return l.url !== url }) }
+    // a sketch from the sketch pad: its structured geometry (JSON) and its picture go with the next message
+    function attachSketch(sketch, pngUrl) {
+        return ensureConv().then(function (id) {
+            var both = [post("/conversations/" + id + "/sketch", { "sketch": sketch, "name": "sketch" })]
+            if (pngUrl) both.push(upload("/conversations/" + id + "/attach?name=sketch.png", pngUrl))
+            return Promise.all(both).then(function (rs) {
+                if (convId !== id) return rs[0]
+                var add = []
+                rs.forEach(function (r) { add = add.concat(r.attachments || []) })
+                chatAttach = chatAttach.concat(add)
+                return rs[0]
+            })
+        }).then(function (r) { return r }, function (e) { fail(e); return null })
+    }
+    // Home's composer: the message goes to the agent and the workspace opens at once, in its "being designed" state;
+    // the design is attached the moment the agent creates it (follow, below)
+    function startDesign(text) {
+        text = (text || "").trim()
+        if (!text && !chatAttach.length && !chatLinks.length) return
+        if (!text) text = chatAttach.some(function (a) { return a.kind === "sketch" }) ? "Design this from my sketch."
+                        : chatAttach.some(function (a) { return a.kind === "image" }) ? "Design a part from this photo."
+                        : chatAttach.length ? "Design a part around this file." : "Start from this link."
+        if (!chatReady) { toast("No agent is connected", "Start blank, or connect an agent in Settings › Agents.", true); return }
+        if (pid) { pid = ""; data = null; view = null }
+        designingSince = Date.now() / 1000
+        screen = "designing"
+        send(text)
+    }
+    property real designingSince: 0
+    function leaveDesigning() { if (screen === "designing") home() }
+    function answerMeasure(qid, value, method) {
+        var id = convId
+        if (!id) return Promise.resolve()
+        chatAsking = null
+        return post("/conversations/" + id + "/answer", { id: qid, text: String(value), choices: [method], measure: { value: value, method: method } }).then(function (a) {
+            if (convId === id) _chatTick()
+            var m = a && a.rev ? a : null
+            if (m && pid) refresh(true).then(function () { buildTick++ })
+            if (m) toast("Measured " + F.fmt(value, 2) + " mm", "Committed as " + F.pad(m.rev) + (method === "estimate" ? ", still assumed." : ", measured with " + method + "."))
+            return a
+        }, function (e) { fail(e); if (convId === id) _chatTick() })
+    }
+    // concepts: several real designs side by side; the person picks one, or asks the agent for a mix
+    function loadConcepts() { return get("/concepts?state=open").then(function (r) { concepts = r.groups || []; return concepts }, function () { return [] }) }
+    function openConcepts(gid) { loadConcepts().then(function () { openSheet("concepts", { group: gid }) }) }
+    function pickConcept(gid, project, keepOthers) {
+        return post("/concepts/" + gid + "/pick", { project: project, keep_others: !!keepOthers }).then(function (r) {
+            sheet = null; loadConcepts()
+            return reloadStudio().then(function () { return open(project) }).then(function () {
+                buildTick++
+                toast("Continuing with " + (r.group && r.group.name ? r.group.name : "the concept you picked"), r.trashed && r.trashed.length ? F.plural(r.trashed.length, "other concept") + " moved to .trash, kept until you remove it." : "")
+            })
+        }, fail)
+    }
+    function mixConcepts(gid, words) {
+        var g = concepts.filter(function (c) { return c.id === gid })[0]
+        if (!g || !String(words).trim()) return
+        var list = g.members.map(function (m) { return m.letter + " = " + m.project + " (" + m.title + ")" }).join("; ")
+        sheet = null
+        if (convId && conv && conv.project && pid) { pid = ""; data = null; view = null }
+        screen = "designing"; designingSince = Date.now() / 1000
+        send("Mix the concepts of group " + gid + ": " + String(words).trim() + ". The concepts are " + list
+             + ". Write the mix as one new concept with propose_concepts(group=\"" + gid + "\").")
+    }
+    property int buildTick: 0          // bumps when the workspace should build the part up, feature by feature
     // .formstudio (or an older .formproj) archive, or a conversation exported as JSON
     function importFile(fileUrl) {
         var name = decodeURIComponent(String(fileUrl).replace(/^.*[\/\\]/, ""))

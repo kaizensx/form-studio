@@ -427,7 +427,7 @@ class Studio:
                     out.append({"id": p["id"], "name": p["name"], "recipe": p["recipe"], "head": p["head"],
                                 "revisions": len(p["revisions"]), "updated": p.get("updated", p["created"]),
                                 "approved_rev": (p["approvals"][-1]["rev"] if p["approvals"] else None),
-                                "purpose": purpose_mod.of(p)})
+                                "purpose": purpose_mod.of(p), "concept": p.get("concept")})   # concepts: form/concepts.py
                 except StudioError as e:
                     out.append({"id": d.name, "name": d.name, "error": str(e)})
         return out
