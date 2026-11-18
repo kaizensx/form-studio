@@ -826,6 +826,7 @@ Item {
         }
         onPositionChanged: function (e) {
             if (painting) {
+                if (Math.hypot(e.x - down.x, e.y - down.y) > 4) moved = true
                 var lp = vp.stroke[vp.stroke.length - 1]
                 if (Math.hypot(e.x - lp.x, e.y - lp.y) >= 2) vp.stroke = vp.stroke.concat([Qt.point(e.x, e.y)])
                 if (vp.selectMode === "brush") {          // a sample every half brush radius along the stroke
@@ -860,7 +861,12 @@ Item {
                 painting = false
                 var add = !!(e.modifiers & Qt.ShiftModifier), items
                 if (vp.selectMode === "brush") { sampleBrush(e.x, e.y); items = regions(_paint, vp.brushMm, "brush") }
-                else items = finishLasso(vp.stroke)
+                else if (!moved) {                        // a click with the lasso picks the face under it
+                    vp.stroke = []
+                    var h = vp.hitAt(e.x, e.y)
+                    if (h) vp.selPicked([{ kind: "face", at: h.at, part: h.part }], add); else vp.selMissed()
+                    return
+                } else items = finishLasso(vp.stroke)
                 vp.stroke = []
                 if (items.length) vp.selPicked(items, add); else vp.selMissed()
                 return

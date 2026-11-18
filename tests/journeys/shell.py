@@ -606,7 +606,64 @@ def journey_every_listed_shortcut(ui):
         ui.clear()
         ui.click("viewport", 0.05, 0.9)
 
+    # ── inside Measure and Annotate (keys only work while that tool is open) ──
+    def in_tool(open_key, key, prop, value):
+        ui.key("V")
+        ui.key(open_key)
+        ui.key(key)
+        ui.wait_until(lambda: ui.store.get(prop) == value, 3, f"{key} in that tool to pick {value}")
+        ui.key("V")
+
+    def on_part():
+        import json as _j
+        vp = ui.item("viewport")
+        for j in range(12):
+            for i in range(12):
+                fx, fy = 0.2 + 0.6 * i / 11, 0.2 + 0.6 * j / 11
+                r = ui.js("JSON.stringify(Store.viewer.hitAt(%f, %f))" % (fx * vp.width(), fy * vp.height()))
+                if r and r != "null":
+                    yield fx, fy
+
+    def do_brush_size(key, grows):
+        ui.key("V")
+        ui.key("N")
+        b0 = ui.store.get("brushMm")
+        ui.key(key)
+        ui.wait_until(lambda: (ui.store.get("brushMm") > b0) is grows and ui.store.get("brushMm") != b0, 3, f"{key} to change the brush size")
+        ui.key("V")
+
+    def do_shift_click():
+        ui.key("V")
+        ui.key("N")
+        ui.key("G")
+        ui.settle(800)
+        pts = list(on_part())
+        ui.click("viewport", *pts[len(pts) // 3])
+        ui.wait_until(lambda: len((ui.store.get("selection") or {}).get("items", [])) == 1, 60, "a pick")
+        ui.click("viewport", *pts[2 * len(pts) // 3], mods="shift")
+        ui.wait_until(lambda: len((ui.store.get("selection") or {}).get("items", [])) == 2, 60, "Shift+Click to add to the selection")
+        ui.run_js("Store.selClear()")
+        ui.key("V")
+
+    def do_alt_drag():
+        ui.key("V")
+        ui.key("N")
+        ui.key("B")
+        ui.settle(300)
+        az = ui.item("viewport").property("az")
+        ui.stroke("viewport", [(40, 0), (80, 0)], fx=0.5, fy=0.5, mods="alt")
+        ui.check(abs(ui.item("viewport").property("az") - az) > 1, "Alt+Drag orbits while painting")
+        ui.eq(ui.store.get("selItems"), [], "and paints nothing")
+        ui.key("V")
+
     checks = {
+        "N": lambda: (a_tool("N", "annotate"), ui.key("V")),
+        "D": lambda: in_tool("M", "D", "measureKind", "distance"), "O": lambda: in_tool("M", "O", "measureKind", "diameter"),
+        "G": lambda: (in_tool("M", "G", "measureKind", "face"), in_tool("N", "B", "selMode", "brush"), in_tool("N", "G", "selMode", "face")),
+        "R": lambda: in_tool("N", "R", "selMode", "edge"), "P": lambda: in_tool("N", "P", "selMode", "point"),
+        "B": lambda: in_tool("N", "B", "selMode", "brush"), "L": lambda: in_tool("N", "L", "selMode", "lasso"),
+        "[": lambda: do_brush_size("[", False), "]": lambda: do_brush_size("]", True),
+        "Shift+Click": do_shift_click, "Alt+Drag": do_alt_drag,
         "V": lambda: (ui.key("M"), ui.key("V"), ui.wait_until(lambda: tool(ui) == "select", 3, "V to pick Select")),
         "M": lambda: (a_tool("M", "measure"), ui.key("V")),
         "X": do_x,

@@ -420,9 +420,6 @@ class UI:
         k, mods = kc.key(), kc.keyboardModifiers()
         if seq.lower().endswith("shift+tab"):
             k = Qt.Key.Key_Backtab
-        if not self.win.isActive():            # window shortcuts only fire in the active window
-            self.win.requestActivate()
-            self._pump(60)
         for _ in range(n):
             self.T.keyClick(self.win, k, mods)
             self._pump(20)
