@@ -9,7 +9,7 @@ import QtQuick
 //   busy: true                       bound by the caller (a job, a flag)
 //   busyWhile: somePromise           until that promise settles
 //   onClicked: run(function () { return Store.post(...) })      the same, for the promise the function returns
-//   autoBusy (default on)            any engine request the click starts (Store.get/post/upload) keeps it busy until
+//   autoBusy (default on)            any engine action the click starts (Store.post/upload) keeps it busy until
 //                                    the engine answers; the request is also named in the activity bar (Store.activity)
 Item {
     id: b
@@ -34,7 +34,7 @@ Item {
     property real _since: 0
     readonly property bool working: busy || _pending > 0
     readonly property bool showsBusy: _shown           // what is on screen (after the delay, for the minimum time)
-    readonly property string label: _shown && busyText !== "" ? busyText : text
+    readonly property string shownText: _shown && busyText !== "" ? busyText : text
     readonly property bool down: (ma.pressed || kdown) && enabled && !working
     signal clicked()
     function track(p) {
@@ -70,7 +70,7 @@ Item {
     scale: down ? Theme.from(0.97) : 1
     activeFocusOnTab: true          // Qt skips hidden and disabled items by itself
     Accessible.role: Accessible.Button
-    Accessible.name: label || tip
+    Accessible.name: shownText || tip
     Accessible.description: _shown ? "Working" : ""
     Behavior on scale { Glide { duration: Theme.press } }
     Keys.onPressed: function (e) { if (e.key === Qt.Key_Space || e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { e.accepted = true; if (!e.isAutoRepeat) kdown = true } }
@@ -105,7 +105,7 @@ Item {
             Icon { anchors.centerIn: parent; visible: !b._shown; name: b.icon; size: parent.width
                 color: b.kind === "primary" ? Theme.datumInk : b.kind === "danger" ? Theme.signal : (b.active || ma.containsMouse) ? Theme.ink : Theme.ink2 }
             Spinner { objectName: "btnSpinner"; anchors.centerIn: parent; visible: b._shown; size: parent.width; color: b.kind === "primary" ? Theme.datumInk : Theme.ink2 } }
-        Text { id: lbl; visible: b.text !== ""; text: b.label; anchors.verticalCenter: parent.verticalCenter
+        Text { id: lbl; visible: b.text !== ""; text: b.shownText; anchors.verticalCenter: parent.verticalCenter
             width: b._textW; horizontalAlignment: b.icon !== "" || b._shown ? Text.AlignLeft : Text.AlignHCenter; elide: Text.ElideRight
             font.family: Theme.sans; font.pixelSize: b.small ? 12 : 13; font.weight: b.kind === "primary" ? Theme.wSemi : Theme.wMedium; renderType: Text.NativeRendering
             color: b.kind === "primary" ? Theme.datumInk : b.kind === "danger" ? Theme.signal : (b.kind === "quiet" && !b.active && !ma.containsMouse) ? Theme.ink2 : Theme.ink }

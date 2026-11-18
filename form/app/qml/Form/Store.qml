@@ -163,7 +163,8 @@ QtObject {
         return ""
     }
     function _track(p, m, path) {
-        var o = _clickOwner, label = _labelFor(m, path)
+        // a click owns the actions it starts (POST, upload); reads (GET) may come from whatever the click redraws
+        var o = m === "GET" ? null : _clickOwner, label = _labelFor(m, path)
         // the button may be on its way out (its sheet was swapped by the same click): then it is not followed
         if (o) { try { o.track(p); if (!label) label = o.busyText ? String(o.busyText).replace(/…$/, "") : o.text } catch (e) { o = null } }
         if (!label) return p

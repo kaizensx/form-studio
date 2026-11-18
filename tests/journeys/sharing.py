@@ -42,7 +42,7 @@ def journey_busy_feedback(ui):
     ui.wait_until(lambda: btn.property("showsBusy"), 1.0, "the spinner on the button")
     shown_after = time.time() - t0
     ui.check(shown_after < 0.6, f"busy within {shown_after:.2f} s of the click")
-    ui.eq(btn.property("label"), "Running…")
+    ui.eq(btn.property("shownText"), "Running…")
     ui.check(ui.find(name="btnSpinner", within=btn) is not None, "a spinner replaces the icon")
     ui.click(btn)                                       # a second click while busy does nothing
     ui.eq(btn.property("clicks"), 1, "presses ignored while busy")
