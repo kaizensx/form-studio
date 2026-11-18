@@ -333,7 +333,9 @@ class Studio:
         out = {}
         if p.get("material"):
             out["material"] = materials_mod.normalise(p["material"])
-        own = {k: v for k, v in sorted((p.get("parts") or {}).items()) if isinstance(v, dict) and v}
+        # a colour is only how a part is shown: it changes neither the checks nor the slice
+        own = {k: w for k, w in ((k, {kk: vv for kk, vv in v.items() if kk != "color"})
+                                 for k, v in sorted((p.get("parts") or {}).items()) if isinstance(v, dict)) if w}
         if own:
             out["parts"] = own
         if getattr(recipe, "solids", 1) > 1:

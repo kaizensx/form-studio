@@ -140,7 +140,14 @@ def run(ui):
     ui.click("convSwitch")
     ui.settle(350)
     row = ui.wait_until(lambda: next((r for r in ui.find_all(name="convRow") if ui.sees("Second conversation", r)), None), 5, "the second row")
-    ui.hover(row)
+    for _ in range(5):                    # the delete button shows on hover; a pointer already resting there sends none
+        ui.hover((4, 4))
+        ui.settle(100)
+        ui.hover(row)
+        ui.settle(250)
+        d = ui.find("convDelete", within=row)
+        if d is not None and d.property("visible"):
+            break
     ui.click(ui.item("convDelete", within=row))
     ui.click(ui.item("convDeleteYes", within=row))
     ui.wait_until(lambda: len(convs(ui)) == 1 and convs(ui)[0]["id"] == first_id, 5, "the conversation to be deleted in the engine")
