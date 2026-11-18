@@ -160,7 +160,10 @@ class Setup:
             prompts.append({"id": have.get(title, {}).get("id", str(base + i)), "type": 0, "title": title,
                             "options": opts, "single_select": False,
                             "required": False, "in_onboarding": True})
-        defaults = [c["id"] for c in self.channels if c["type"] in (S.TEXT, S.NEWS, S.FORUM)]
+        # default channels must be open to @everyone: the ones without an @everyone overwrite (not read-only)
+        self.channels = d.call("GET", f"/guilds/{self.g}/channels")
+        defaults = [c["id"] for c in self.channels if c["type"] in (S.TEXT, S.NEWS, S.FORUM)
+                    and not any(o["id"] == self.everyone for o in c.get("permission_overwrites", []))]
         try:
             self._do("PUT", f"/guilds/{self.g}/onboarding",
                      {"prompts": prompts, "default_channel_ids": defaults, "enabled": True, "mode": 0},
