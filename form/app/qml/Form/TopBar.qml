@@ -47,7 +47,7 @@ Rectangle {
                 ] } }
         Btn { visible: bar.work; kind: "quiet"; icon: Store.talkOpen ? "panel_left_close" : "panel_left_open"; keys: "Ctrl+J"
             tip: Store.talkOpen ? "Hide the conversation" : "Show the conversation"; onClicked: Store.talkOpen = !Store.talkOpen }
-        Item { id: logoBox; width: mark.implicitWidth + 16; height: 28; anchors.verticalCenter: parent.verticalCenter
+        Item { id: logoBox; objectName: "homeButton"; width: mark.implicitWidth + 16; height: 28; anchors.verticalCenter: parent.verticalCenter
             baselineOffset: mark.y + mark.baselineOffset          // the name, revision and tag sit on the wordmark's baseline
             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
             Logo { id: mark; anchors.centerIn: parent; size: 14; ink: bar.work ? Theme.ink2 : Theme.ink; ink2: bar.work ? Theme.ink3 : Theme.ink2 }

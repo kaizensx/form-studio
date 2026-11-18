@@ -1,5 +1,6 @@
 """Home: filter, sort, a card's menu (rename, duplicate, export as .formstudio, move to trash), and what happens to a deleted
 design's conversations."""
+import sys
 import zipfile
 
 from _lib import wait_job
@@ -121,7 +122,11 @@ def run(ui):
     ui.click(card(ui, "Echo dock"), 0.5, 0.4)
     ui.wait_until(lambda: ui.store.get("screen") == "work" and ui.store.get("pid") == rel, 30, "the design to open")
     ui.idle(120)
-    ui.key("Ctrl+Shift+H")
-    ui.wait_until(lambda: ui.store.get("screen") == "home", 5, "Home again with the shortcut")
+    if sys.platform == "darwin":
+        # the native menu bar owns ⌘⇧H on macOS (MacMenu.qml), and a synthetic key never reaches it: the logo goes Home
+        ui.click("homeButton")
+    else:
+        ui.key("Ctrl+Shift+H")
+    ui.wait_until(lambda: ui.store.get("screen") == "home", 5, "Home again")
     ui.settle(600)
     ui.shot("home-after")
