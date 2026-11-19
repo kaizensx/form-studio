@@ -57,6 +57,8 @@ jobs:
           cfapi() { curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "$@"; }
           why() { jq -c '{success, errors: [.errors[]? | {code, message}]}'; }
           cfapi https://api.cloudflare.com/client/v4/user/tokens/verify | why
+          echo "accounts this token can use:"; cfapi "https://api.cloudflare.com/client/v4/accounts?per_page=50" | jq -c '[.result[]? | {id, name}], .errors'
+          cfapi "https://api.cloudflare.com/client/v4/user/tokens/verify" | jq -c '.result | {status, expires_on}'
           r=$(cfapi "$CF/storage/kv/namespaces?per_page=100"); echo "$r" | why
           id=$(echo "$r" | jq -r '.result[]? | select(.title=="form-studio-bot-state") | .id')
           if [ -z "$id" ]; then
