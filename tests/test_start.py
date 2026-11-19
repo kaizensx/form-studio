@@ -404,6 +404,41 @@ class Concepts(Env):
         with self.assertRaises(StudioError):
             concepts.board(self.st, "../../etc")
 
+    def test_dismiss_keep_all_and_none(self):
+        b = concepts.create(self.st, "Desk clip", TINY[:2])
+        r = concepts.dismiss(self.st, b["id"], "all")
+        ids = [m["project"] for m in b["members"]]
+        self.assertEqual((r["keep"], sorted(r["kept"]), r["trashed"]), ("all", sorted(ids), []))
+        for pid in ids:
+            p = self.st.load(pid)                  # an ordinary design now: no concept tag, a record of the decision
+            self.assertNotIn("concept", p)
+            self.assertTrue(any("as a design of its own" in d["text"] for d in p["decisions"]))
+        self.assertEqual(concepts.board(self.st, b["id"])["state"], "dismissed")
+        self.assertNotIn(b["id"], [g["id"] for g in concepts.groups(self.st)])
+        self.assertIn(b["id"], [g["id"] for g in concepts.groups(self.st, "dismissed")])
+        with self.assertRaises(StudioError) as e:
+            concepts.dismiss(self.st, b["id"], "all")
+        self.assertEqual(e.exception.status, 409)
+
+        c = concepts.create(self.st, "Desk clip 2", TINY[:2])
+        with self.assertRaises(StudioError):
+            concepts.dismiss(self.st, c["id"], "some")
+        r = concepts.dismiss(self.st, c["id"], "none")
+        self.assertEqual((r["kept"], sorted(r["trashed"])), ([], sorted(m["project"] for m in c["members"])))
+        for pid in r["trashed"]:
+            self.assertFalse((self.data / pid).exists())
+            self.assertTrue(any(d.name.startswith(pid + "-") for d in (self.data / ".trash").iterdir()))
+        self.assertTrue(all(m["trashed"] for m in concepts.board(self.st, c["id"])["members"]))
+
+    def test_a_group_with_nothing_left_closes(self):
+        b = concepts.create(self.st, "Gone hook", TINY[:2])
+        self.assertIn(b["id"], [g["id"] for g in concepts.groups(self.st)])
+        for m in b["members"]:                     # deleted one by one from Home, not through the group
+            self.st.delete_project(m["project"])
+        self.assertNotIn(b["id"], [g["id"] for g in concepts.groups(self.st)])
+        self.assertEqual(concepts.board(self.st, b["id"])["state"], "closed")
+        self.assertIn(b["id"], [g["id"] for g in concepts.groups(self.st, "closed")])
+
     def test_http_routes(self):
         from form.server import make_handler
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.st))
@@ -431,6 +466,11 @@ class Concepts(Env):
             self.assertEqual(call(f"/concepts/{b['id']}")["name"], "Route hook")
             r = call(f"/concepts/{b['id']}/pick", {"project": b["members"][0]["project"], "keep_others": True})
             self.assertEqual(r["picked"], b["members"][0]["project"])
+            d = concepts.create(self.st, "Route rack", TINY[:2])
+            self.assertIn("error", call(f"/concepts/{d['id']}/dismiss", {"keep": "maybe"}))
+            r = call(f"/concepts/{d['id']}/dismiss", {"keep": "all"})
+            self.assertEqual((r["dismissed"], r["group"]["state"]), (d["id"], "dismissed"))
+            self.assertEqual(call(f"/concepts/{d['id']}/dismiss", {})["error"]["message"], "This concept group is already closed.")
             cid = self.st.chat.store.create()["id"]
             sk = call(f"/conversations/{cid}/sketch", {"sketch": SKETCH, "name": "plate"})
             self.assertEqual((sk["attachments"][0]["kind"], sk["attachments"][0]["name"]), ("sketch", "plate.sketch.json"))
@@ -480,6 +520,9 @@ class McpAndCli(unittest.TestCase):
                 self.assertTrue(bad.is_error)
                 r = data(await c.call_tool("pick_concept", {"group": b["id"], "project": pid}))
                 self.assertEqual(r["picked"], pid)
+                b2 = data(await c.call_tool("propose_concepts", {"name": "Mug rest 2", "concepts": TINY[:2], "run": False}))
+                r = data(await c.call_tool("dismiss_concepts", {"group": b2["id"], "keep": "none"}))
+                self.assertEqual(len(r["trashed"]), 2)
 
     def test_cli_start_blank_and_concepts(self):
         with tempfile.TemporaryDirectory() as d:
@@ -503,6 +546,15 @@ class McpAndCli(unittest.TestCase):
             r = json.loads(run("concepts", "pick", b["id"], b["members"][1]["project"], "--keep-others").stdout)
             self.assertEqual((r["picked"], r["trashed"]), (b["members"][1]["project"], []))
             self.assertEqual(run("concepts", "nothing-here").returncode, 2)
+            with mock.patch.dict(os.environ, {"FORM_DATA": d, "FORM_CONFIG": env["FORM_CONFIG"]}):
+                st = Studio(config.load())
+                try:
+                    c = concepts.create(st, "CLI rack", TINY[:2])
+                finally:
+                    st.kernel.stop()
+            got = json.loads(run("concepts", "dismiss", c["id"], "--discard").stdout)
+            self.assertEqual((got["keep"], len(got["trashed"])), ("none", 2))
+            self.assertEqual(json.loads(run("concepts").stdout), {"groups": []})
             self.assertNotEqual(run("start").returncode, 0)
 
 

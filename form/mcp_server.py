@@ -1364,6 +1364,15 @@ def build() -> MCPServer:
         st = studio()
         return await _run(concepts_mod.pick, st, group, project, keep_others, _origin(ctx).replace("agent:", "") or "agent")
 
+    @mcp.tool(annotations=RW)
+    async def dismiss_concepts(group: str, keep: str = "all", ctx: Context = None) -> dict:
+        """The person wants none of the concepts picked: close the group without a pick. keep="all" keeps every
+        concept as an ordinary design; keep="none" moves them all to the trash (recoverable). Only call this when
+        the person said so."""
+        from . import concepts as concepts_mod
+        st = studio()
+        return await _run(concepts_mod.dismiss, st, group, keep, _origin(ctx).replace("agent:", "") or "agent")
+
     @mcp.tool(annotations=RO)
     async def list_concepts(group: str = "") -> dict:
         """Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>."""

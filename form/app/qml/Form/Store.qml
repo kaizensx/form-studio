@@ -1700,6 +1700,16 @@ QtObject {
             })
         }, fail)
     }
+    // close a group without a pick: keep "all" leaves every concept as a design of its own, "none" moves them to .trash
+    function dismissConcepts(gid, keep) {
+        return post("/concepts/" + gid + "/dismiss", { keep: keep === "none" ? "none" : "all" }).then(function (r) {
+            if (sheet && sheet.kind === "concepts") sheet = null
+            loadConcepts(); reloadStudio()
+            if (r.keep === "none") toast("Concepts discarded", F.plural(r.trashed.length, "concept") + " moved to .trash, kept until you remove it.")
+            else toast("Concepts kept as designs", F.plural(r.kept.length, "design") + " added to your designs.")
+            return r
+        }, fail)
+    }
     function mixConcepts(gid, words) {
         var g = concepts.filter(function (c) { return c.id === gid })[0]
         if (!g || !String(words).trim()) return

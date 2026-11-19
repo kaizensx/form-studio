@@ -77,6 +77,19 @@ Item {
         onAccepted: { if (Bridge.save("/archive/" + pid + ".formstudio", selectedFile)) Store.toast("Exported", "The design, its history, its conversations and its code are in one file. Outputs are rebuilt where it is opened.")
                       else Store.toast("Could not write that file", "Choose another place.", true) } }
     PopMenu { id: pm; model: home.menuFor ? home.menu(home.menuFor) : [] }
+    // a concept group: open it, or close it without a pick
+    property var groupFor: null
+    function groupMenu(g) {
+        return [
+            { icon: "arrow_up_right", text: "Open the concepts", run: function () { Store.openSheet("concepts", { group: g.id }) } },
+            { sep: true },
+            { icon: "copy_plus", text: "Keep all as designs", run: function () { Store.dismissConcepts(g.id, "all") } },
+            { icon: "trash_2", text: "Discard all", danger: true, run: function () { Store.dismissConcepts(g.id, "none") } }
+        ]
+    }
+    PopMenu { id: gpm; objectName: "conceptGroupMenu"; closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside; model: home.groupFor ? home.groupMenu(home.groupFor) : [] }
+    // the menu stays on Home itself: the group cards are re-made whenever the groups reload, and must not take it along
+    function openGroupMenu(g, item, x, y) { groupFor = g; gpm.openAt(item, Math.max(0, Math.min(x, item.width - gpm.width)), y) }
     function openMenu(p, item, x, y) { menuFor = p; pm.parent = item; pm.openAt(item, x, y) }
 
     // ════ the bench: a live build plate behind the hero, your last design turning slowly on it ════
@@ -286,12 +299,19 @@ Item {
                             Txt { kind: "h3"; text: cg.modelData.name; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
                             Txt { kind: "fine"; tone: 2; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
                                 text: cg.modelData.members.map(function (m) { return m.letter + "  " + m.title }).join("    ") } }
-                        Row { id: thumbs; anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+                        Row { id: thumbs; anchors.right: parent.right; anchors.rightMargin: 48; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                             Repeater { model: cg.modelData.members.slice(0, home.cw > 900 ? 4 : 2)
                                 Rectangle { required property var modelData; width: 120; height: 104; radius: Theme.rMd + 2; color: Theme.plate; border.color: Theme.rule; clip: true
                                     MiniView { anchors.fill: parent; anchors.margins: 1; projectId: parent.modelData.project; turning: cgm.containsMouse }
                                     Txt { x: 8; y: 6; text: parent.modelData.letter; font.weight: Theme.wBold; color: Theme.datum; font.pixelSize: 12 } } } }
-                        MouseArea { id: cgm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSheet("concepts", { group: cg.modelData.id }) }
+                        MouseArea { id: cgm; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onClicked: function (e) {
+                                if (e.button === Qt.RightButton) home.openGroupMenu(cg.modelData, cgc, e.x, e.y)
+                                else Store.openSheet("concepts", { group: cg.modelData.id }) } }
+                        // close it without a pick; the menu says what happens to the concepts
+                        Btn { objectName: "conceptGroupClose"; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 6; small: true; kind: "quiet"
+                            icon: "x"; tip: "Close without picking"; opacity: cgm.containsMouse || hovered || gpm.opened ? 1 : 0.55
+                            onClicked: home.openGroupMenu(cg.modelData, cgc, cgc.width - 6, 34) }
                     }
                 }
             }

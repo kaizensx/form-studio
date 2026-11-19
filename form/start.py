@@ -312,6 +312,9 @@ def route_post(st, path: str, body):
     m = re.fullmatch(r"/api/concepts/([0-9a-f]{10})/pick", path)
     if m:
         return concepts.pick(st, m.group(1), str(b.get("project") or ""), bool(b.get("keep_others")), by="you")
+    m = re.fullmatch(r"/api/concepts/([0-9a-f]{10})/dismiss", path)
+    if m:
+        return concepts.dismiss(st, m.group(1), str(b.get("keep") or "all"), by="you")
     return None
 
 

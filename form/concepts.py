@@ -1,12 +1,14 @@
 """Concepts first: a new idea starts as a few genuinely different designs, built for real, and the person picks one.
 
-    <data>/.concepts/<gid>.json   {"id", "name", "brief", "state": "open" | "picked", "picked", "created",
+    <data>/.concepts/<gid>.json   {"id", "name", "brief", "state": "open" | "picked" | "dismissed" | "closed",
+                                   "picked", "created",
                                    "members": [{"project", "letter", "title", "rationale", "trashed"}], "failed": [...]}
 
 Each concept is an ordinary project (written as code, built in the kernel), named "<name> · A", "· B", ..., whose
 project.json carries {"concept": {"group", "letter", "title", "rationale"}}. Picking one renames it to the group's
 name, records the decision on it, and moves the others to the trash (<data>/.trash, recoverable) unless they are
-kept. The numbers on the board come from the kernel's own summary of each design; when it is not available they are
+kept. A group can also be dismissed without a pick: its concepts stay as ordinary designs (keep="all") or all go
+to the trash (keep="none"). A group whose concepts are all gone closes by itself. The numbers on the board come from the kernel's own summary of each design; when it is not available they are
 left out, never estimated.
 """
 from __future__ import annotations
@@ -161,8 +163,29 @@ def board(st, gid: str, compute: bool = True) -> dict:
             "created": g["created"], "members": members}
 
 
+def _close_if_empty(st, g: dict) -> dict:
+    """An open group whose concepts are all gone (deleted, trashed elsewhere) closes: nothing is left to pick."""
+    if g.get("state") != "open" or not g.get("members"):
+        return g
+    for m in g["members"]:
+        if m.get("trashed"):
+            continue
+        try:
+            st.load(m["project"])
+            return g
+        except StudioError as e:
+            if getattr(e, "status", 400) != 404:
+                return g
+    g.update(state="closed", closed_at=time.time())
+    try:
+        _write(st, g)
+    except OSError:
+        pass
+    return g
+
+
 def groups(st, state: str = "open") -> list:
-    """Concept groups, newest first. state: "open", "picked", or "all"."""
+    """Concept groups, newest first. state: "open", "picked", "dismissed", "closed" or "all"."""
     out = []
     d = _dir(st)
     if not d.is_dir():
@@ -174,7 +197,8 @@ def groups(st, state: str = "open") -> list:
             g = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if state in ("open", "picked") and g.get("state") != state:
+        g = _close_if_empty(st, g)
+        if state != "all" and g.get("state") != state:
             continue
         out.append((g.get("created", 0), f.stem))
     out.sort(reverse=True)
@@ -230,7 +254,51 @@ def pick(st, gid: str, project: str, keep_others: bool = False, by: str = "you")
     return {"picked": project, "trashed": trashed, "kept": kept, "group": board(st, gid, compute=False)}
 
 
-# ---- command line: form concepts [<group-or-project> | pick <group> <project> [--keep-others]] -------------------
+def dismiss(st, gid: str, keep: str = "all", by: str = "you") -> dict:
+    """Close an open group without picking. keep="all": every concept stays as an ordinary design (it leaves the
+    group and keeps its own name); keep="none": every concept goes to the trash (recoverable from <data>/.trash)."""
+    if keep not in ("all", "none"):
+        raise StudioError("keep is \"all\" or \"none\".", "Keep every concept as a design, or move them all to the trash.")
+    g = _read(st, gid)
+    if g["state"] != "open":
+        raise StudioError("This concept group is already closed.", status=409, state=g["state"], picked=g.get("picked"))
+    kept, trashed = [], []
+    for m in g["members"]:
+        if m.get("trashed"):
+            continue
+        if keep == "none":
+            try:
+                st.delete_project(m["project"])
+                m["trashed"] = True
+                trashed.append(m["project"])
+            except StudioError as e:
+                if getattr(e, "status", 400) == 404:
+                    m["trashed"] = True
+                else:
+                    m["kept_because"] = str(e)
+                    kept.append(m["project"])
+            continue
+        try:
+            with st.lock(m["project"]):
+                p = st.load(m["project"])
+                p.pop("concept", None)
+                st.decide(p, "concept", f"Kept concept {m['letter']} ({m['title']}) of “{g['name']}” as a design of its own.")
+                st.save(p)
+            kept.append(m["project"])
+        except StudioError as e:
+            if getattr(e, "status", 400) == 404:
+                m["trashed"] = True
+            else:
+                raise
+    g.update(state="dismissed", dismissed=keep, dismissed_at=time.time())
+    _write(st, g)
+    if kept:
+        st.activity(kept[0], "concepts", f"Kept {len(kept)} concepts of {g['name']} as designs", group=gid, by=by)
+    return {"dismissed": gid, "keep": keep, "kept": kept, "trashed": trashed, "group": board(st, gid, compute=False)}
+
+
+# ---- command line: form concepts [<group-or-project> | pick <group> <project> [--keep-others]
+#                                   | dismiss <group> [--discard]] ---------------------------------------------
 
 def main(argv: list[str]) -> int:
     from . import config
@@ -248,6 +316,12 @@ def main(argv: list[str]) -> int:
                 out({"error": {"message": "Usage: form concepts pick <group> <project> [--keep-others]"}})
                 return 2
             out(pick(st, rest[0], rest[1], "--keep-others" in argv, by="cli"))
+        elif argv[0] == "dismiss":
+            rest = [a for a in argv[1:] if not a.startswith("--")]
+            if len(rest) != 1:
+                out({"error": {"message": "Usage: form concepts dismiss <group> [--discard]"}})
+                return 2
+            out(dismiss(st, rest[0], "none" if "--discard" in argv else "all", by="cli"))
         elif argv[0] in ("--all", "all"):
             out({"groups": groups(st, "all")})
         else:

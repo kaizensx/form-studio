@@ -63,7 +63,7 @@ Rules:
 
 ## Tools at a glance
 
-77 tools. Read-only tools never change a project.
+78 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -134,6 +134,7 @@ Rules:
 | [`ask_measurement`](#ask_measurement) | changes | Ask the person to measure one dimension of the design, and wait. |
 | [`propose_concepts`](#propose_concepts) | changes | For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one. |
 | [`pick_concept`](#pick_concept) | changes | The person picked a concept (in words; in the app they pick on the board). |
+| [`dismiss_concepts`](#dismiss_concepts) | changes | The person wants none of the concepts picked: close the group without a pick. |
 | [`list_concepts`](#list_concepts) | read-only | Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>. |
 | [`suggest_replies`](#suggest_replies) | read-only | Offer up to 3 short follow-up messages the person might send next (each under 80 characters, written as the person would say it, e.g. "Make the walls 2 mm"). |
 | [`list_starters`](#list_starters) | read-only | Ideas for what this person might design next, ranked from what they already design (the building blocks and kinds of part in their projects, their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}. |
@@ -344,7 +345,8 @@ Status of a pipeline job started by run_pipeline/commit_change; waits up to wait
 *Read-only.*
 
 Look at the part. Returns a PNG rendered from the real kernel geometry, coloured by feature.
-view: iso, iso_back, front, back, left, right, top, bottom, or "sheet" (four views at once).
+view: iso, iso_back, front, back, left, right, top, bottom, "sheet" (four views at once), or for a design with
+several parts "assembled" (put together) and "exploded" (pulled apart along its explode offsets).
 highlight: a feature id to pick out. values: render an uncommitted candidate (same as preview_change).
 
 | Argument | Type | Required |
@@ -1102,6 +1104,17 @@ Then refine the picked design with update_design. Only call this when the person
 | `group` | string | yes |
 | `project` | string | yes |
 | `keep_others` | boolean |  |
+
+### `dismiss_concepts`
+
+The person wants none of the concepts picked: close the group without a pick. keep="all" keeps every
+concept as an ordinary design; keep="none" moves them all to the trash (recoverable). Only call this when
+the person said so.
+
+| Argument | Type | Required |
+|---|---|---|
+| `group` | string | yes |
+| `keep` | string |  |
 
 ### `list_concepts`
 

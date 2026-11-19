@@ -184,3 +184,56 @@ def journey_measure_updates_the_design(ui):
     ui.settle(800)
     ui.shot("start-measure-answered")
     ui.no_warnings()
+
+
+def _group(ui, name):
+    """An open concept group with two tiny concepts, made the way propose_concepts makes them."""
+    import importlib.util
+    from form import concepts
+    spec = importlib.util.spec_from_file_location("fake_agent", ROOT / "tests" / "fixtures" / "fake_agent.py")
+    fa = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fa)
+    tiny = [{"title": t, "rationale": why, "source": fa._source(t, expr)} for t, (expr, why) in list(fa.TINY.items())[:2]]
+    g = concepts.create(ui.studio, name, tiny)
+    ui.run_js("Store.loadConcepts()")
+    return g
+
+
+def journey_concepts_dismiss(ui):
+    home(ui)
+    # a new group opens its sheet on Home; Not now closes it and the group waits on Home
+    g = _group(ui, "Shelf peg")
+    ui.wait_until(lambda: ui.exists("conceptsSheet") and len(ui.find_all(name="conceptCard")) == 2, 20, "the concepts sheet")
+    ui.settle(1500)
+    ui.shot("start-concepts-sheet-dismiss")
+    ui.click("conceptsNotNow")
+    ui.wait_until(lambda: not ui.exists("conceptsSheet"), 4, "Not now to close the sheet")
+    ui.eq(ui.api("/concepts/" + g["id"])["state"], "open")
+    # Home: close the waiting group from its card, keeping both concepts as designs
+    card = ui.wait_until(lambda: next((c for c in ui.find_all(name="conceptGroup") if ui.sees("Shelf peg", within=c)), None), 10, "the group's card")
+    ui.scroll_to(card)
+    ui.right_click(card, 0.3, 0.5)
+    ui.wait_until(lambda: ui.sees("Keep all as designs"), 4, "the group's menu")
+    ui.key("Escape")
+    ui.wait_until(lambda: not ui.sees("Keep all as designs"), 4, "the menu to close")
+    ui.hover(card, 0.5, 0.5)
+    ui.click(ui.item("conceptGroupClose", within=card))
+    ui.wait_until(lambda: ui.sees("Discard all"), 4, "the close button's menu")
+    ui.settle(250)
+    ui.shot("start-concepts-close-menu")
+    ui.click_text("Keep all as designs")
+    ui.wait_until(lambda: ui.api("/concepts/" + g["id"])["state"] == "dismissed", 10, "the group to close")
+    ids = [p["id"] for p in ui.api("/studio")["projects"]]
+    ui.check(all(m["project"] in ids for m in g["members"]), "both concepts are designs now")
+    ui.wait_until(lambda: not any(ui.sees("Shelf peg", within=c) for c in ui.find_all(name="conceptGroup")), 10, "the card to leave Home")
+    # the sheet: Discard all moves them to the trash
+    g2 = _group(ui, "Cup hook")
+    ui.wait_until(lambda: ui.exists("conceptsDiscardAll") and len(ui.find_all(name="conceptCard")) == 2, 20, "the second group's sheet")
+    ui.settle(800)
+    ui.click("conceptsDiscardAll")
+    ui.wait_until(lambda: ui.api("/concepts/" + g2["id"])["state"] == "dismissed", 10, "Discard all")
+    ids = [p["id"] for p in ui.api("/studio")["projects"]]
+    ui.check(not any(m["project"] in ids for m in g2["members"]), "both concepts went to the trash")
+    ui.wait_until(lambda: not ui.exists("conceptsSheet"), 4, "the sheet to close")
+    ui.settle(600)
+    ui.shot("start-concepts-dismissed")

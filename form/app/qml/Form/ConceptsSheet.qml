@@ -31,6 +31,13 @@ Item {
         Txt { kind: "fine"; tone: 2; anchors.verticalCenter: parent.verticalCenter; text: "Keep the other concepts as designs"
             MouseArea { anchors.fill: parent; onClicked: cs.keep = !cs.keep } }
         Txt { kind: "fine"; tone: 4; anchors.verticalCenter: parent.verticalCenter; visible: !cs.keep; text: "(otherwise they go to .trash, recoverable)" } } }
+    // none of them, for now or for good: close without a pick
+    property Component footer: Component { Row { spacing: 8
+        Btn { objectName: "conceptsNotNow"; kind: "quiet"; text: "Not now"; tip: "Close; the concepts wait on Home"; onClicked: Store.sheet = null }
+        Btn { objectName: "conceptsKeepAll"; icon: "copy_plus"; text: "Keep all"; tip: "Every concept becomes a design of its own"
+            enabled: !!cs.g; onClicked: run(function () { return Store.dismissConcepts(cs.g.id, "all") }) }
+        Btn { objectName: "conceptsDiscardAll"; kind: "danger"; icon: "trash_2"; text: "Discard all"; tip: "Move every concept to .trash (recoverable)"
+            enabled: !!cs.g; onClicked: run(function () { return Store.dismissConcepts(cs.g.id, "none") }) } } }
 
     Column {
         id: col; width: parent.width; spacing: 18
