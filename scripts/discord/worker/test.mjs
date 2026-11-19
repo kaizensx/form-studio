@@ -111,11 +111,20 @@ await t("role picker adds and removes within its group only", async () => {
   calls.length = 0;
   const sys = C.picker.find(([k]) => k === "system")[2];
   const r = await send({ type: 3, guild_id: GUILD, member: member("u1", [R(sys[1]), R("🛠️ Maintainer")]),
-                         data: { custom_id: "roles:system", values: [R(sys[0])] } });
+                         message: { flags: 64 }, data: { custom_id: "roles:system", values: [R(sys[0])] } });
   assert.match(r.data.content, /Added/);
   assert.ok(calls.some(([m, p]) => m === "PUT" && p.endsWith(`/roles/${R(sys[0])}`)));
   assert.ok(calls.some(([m, p]) => m === "DELETE" && p.endsWith(`/roles/${R(sys[1])}`)));
   assert.ok(!calls.some(([, p]) => p.endsWith(`/roles/${R("🛠️ Maintainer")}`)));
+});
+await t("the shared #roles menu toggles only what was picked", async () => {
+  calls.length = 0;
+  const pings = C.picker.find(([k]) => k === "pings")[2];
+  const r = await send({ type: 3, guild_id: GUILD, member: member("u1", [R(pings[0]), R(pings[1])]), message: { flags: 0 },
+                         data: { custom_id: "roles:pings", values: [R(pings[1])] } });
+  assert.match(r.data.content, /removed/);
+  assert.ok(calls.some(([m, p]) => m === "DELETE" && p.endsWith(`/roles/${R(pings[1])}`)));
+  assert.ok(!calls.some(([, p]) => p.endsWith(`/roles/${R(pings[0])}`)));     // the role not picked is left alone
 });
 await t("showcase: a modal, then a forum post with XP", async () => {
   assert.equal((await send(cmd("showcase"))).type, 9);

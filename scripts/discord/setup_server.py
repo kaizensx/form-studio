@@ -556,7 +556,7 @@ class Setup:
         lv = " → ".join(n for _, n in S.LEVELS)
         emb = {"color": d.VIOLET, "title": "🎭 Pick your roles",
                "description": ("Choose what you use, so people with the same printer or agent can find each other, and "
-                               "the pings you want. Pick again any time; what you leave out is removed.\n\n"
+                               "the pings you want. Pick a role to add it; pick it again to remove it. `/roles` shows the ones you have.\n\n"
                                f"**Levels** come by themselves as you talk, share and help: {lv}. "
                                "Check yours with `/rank`.")}
         self.pinned_post("roles", "Roles", [emb], rows[:5])

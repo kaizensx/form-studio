@@ -244,9 +244,13 @@ async function rolesChosen(env, i) {
   const ids = group[2].map((n) => g.roles.find((r) => r.name === n)?.id).filter(Boolean);
   const want = new Set(i.data.values), have = new Set(i.member.roles);
   const u = userOf(i).id, add = [], drop = [];
+  // the shared menu in #roles cannot show each member's roles, so there a pick toggles that role; the private picker
+  // (/roles, the welcome button) shows your roles ticked, so there the picks are the whole set for the group
+  const shared = !((i.message?.flags || 0) & EPHEMERAL);
   for (const id of ids) {
-    if (want.has(id) && !have.has(id)) { await api(env, "PUT", `/guilds/${env.GUILD_ID}/members/${u}/roles/${id}`); add.push(id); }
-    if (!want.has(id) && have.has(id)) { await api(env, "DELETE", `/guilds/${env.GUILD_ID}/members/${u}/roles/${id}`); drop.push(id); }
+    const on = shared ? (want.has(id) ? !have.has(id) : have.has(id)) : want.has(id);
+    if (on && !have.has(id)) { await api(env, "PUT", `/guilds/${env.GUILD_ID}/members/${u}/roles/${id}`); add.push(id); }
+    if (!on && have.has(id)) { await api(env, "DELETE", `/guilds/${env.GUILD_ID}/members/${u}/roles/${id}`); drop.push(id); }
   }
   const say = [add.length && `Added ${add.map((r) => `<@&${r}>`).join(" ")}`, drop.length && `removed ${drop.map((r) => `<@&${r}>`).join(" ")}`]
     .filter(Boolean).join(", ");
