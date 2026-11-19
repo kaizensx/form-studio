@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.svg">
-    <img src="docs/readme/hero-light.svg" width="828" alt="Form Studio. What are we making? Describe a part. An agent designs it as real CAD while you watch. A desk phone stand built by the CAD kernel draws itself as its edges, fills in and turns: 70.0 × 115.6 × 88.9 mm, 11 of 11 checks pass, 1 h 56 min and 72.4 g in the slicer.">
+    <img src="docs/readme/hero-light.svg" width="828" alt="Form Studio. Describe anything. An engineer-grade agent builds it as real, editable CAD. Two designs written as build123d code and built by the CAD kernel draw themselves as their edges and fill in: a planetary gear stage, 6 parts, 1 : 5, 91.5 × 91.5 × 22.0 mm, and an ergonomic mouse shell, 64.1 × 118.6 × 38.0 mm.">
   </picture>
 </p>
 
@@ -18,12 +18,12 @@
 
 <br>
 
-**Form Studio is an open-source desktop app that turns a description into a part you can make.** Type what you need, drop a photo or a sketch, or paste a link. An agent of your choice designs it as parametric B-rep geometry in [build123d](https://github.com/gumyr/build123d) on OpenCascade while you watch. Every revision is checked on the solid, sliced by your own slicer with your own presets and played back layer by layer. When you approve, the files are frozen with their hashes.
+**Form Studio is the open-source AI CAD studio: describe anything, and an engineer-grade agent builds it as real, editable CAD.** Type what you need, drop a photo or a sketch, or bring a part. The agent of your choice writes a parametric design in [build123d](https://github.com/gumyr/build123d), and the OpenCascade kernel builds it as a B-rep solid while you watch: features you can click, parameters you can change, and every revision checked on the solid itself. Take it out as STEP for your CAD program or a CNC shop, as meshes for renders and the web, or to your own slicer if you print. Everything runs on your computer.
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-1-dark.svg">
-    <img src="docs/readme/numbers-1-light.svg" width="414" alt="7 slicers it drives for real. 74 MCP tools for any agent.">
+    <img src="docs/readme/numbers-1-light.svg" width="414" alt="77 MCP tools for any agent. 18 agent apps, model APIs and local models.">
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-2-dark.svg">
@@ -40,11 +40,11 @@
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/steps-2-dark.svg">
-    <img src="docs/readme/steps-2-light.svg" width="414" alt="3, Prove: every revision is checked on the solid itself; 11 of 11 checks pass. 4, Slice: your slicer and your presets, played back layer by layer from the G-code.">
+    <img src="docs/readme/steps-2-light.svg" width="414" alt="3, Review: every revision is checked on the solid itself; 5 of 5 checks pass on the planetary gear stage. 4, Make: STEP for CAD and CNC, meshes for renders, your slicer if you print.">
   </picture>
 </p>
 
-Form Studio does not replace your CAD program or your slicer. It sits between your agent and that software and keeps the record of what was designed, checked and released. An output is current only when it exists under the hash of its inputs, so a changed clearance invalidates exactly what depends on it.
+Form Studio sits between your agent and the CAD kernel and keeps the record of what was designed, checked and released. Every number carries how it is known, every revision is kept, and an output is current only when it exists under the hash of its inputs, so a changed clearance invalidates exactly what depends on it.
 
 <details>
 <summary><b>What runs where</b></summary>
@@ -53,20 +53,20 @@ Form Studio does not replace your CAD program or your slicer. It sits between yo
 ```mermaid
 flowchart LR
   you(["You: words, a photo,<br/>a sketch, a part, a link"]) --> agent["Your agent<br/>app, model API or local model"]
-  agent -- "74 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
+  agent -- "77 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
   engine --> kernel["CAD kernel<br/>build123d on OpenCascade"]
   kernel --> checks["Checks<br/>solid · mesh · fits · joints"]
-  checks --> slicer["Your slicer<br/>your printer and presets"]
-  slicer --> release{{"You approve<br/>files frozen with SHA-256"}}
+  checks --> release{{"You approve<br/>files frozen with SHA-256"}}
+  release --> out["STEP · STL · OBJ · GLB<br/>renders · your slicer"]
   classDef datum fill:#b9e8d7,stroke:#0d1a16,color:#0d1a16
   classDef plate fill:#191e22,stroke:#2a3238,color:#e8edeb
   class release datum
-  class agent,engine,kernel,checks,slicer plate
+  class agent,engine,kernel,checks,out plate
 ```
 
 | Principle | What it means |
 |---|---|
-| **Local** | Designs are never uploaded and prints are never started. |
+| **Local** | Designs are never uploaded and nothing is sent to a machine. |
 | **A person releases** | Agents propose and build; only you approve the files. |
 | **Every number says how it is known** | Computed, heuristic, modelled, simulated, measured or assumed. |
 | **Nothing exists only in the window** | Every action is also a `form` command and an MCP tool. |
@@ -74,7 +74,7 @@ flowchart LR
 More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 </details>
 
-## What it does
+## Design
 
 <p align="center">
   <picture>
@@ -82,43 +82,85 @@ More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
     <img src="docs/readme/feature-start-light.svg" width="414" alt="Start from anything: words, a photo with a coin for scale, a sketch with real dimensions, a STEP, STL or 3MF part, a PDF drawing or a link, in one composer.">
   </picture>
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-talk-dark.svg">
-    <img src="docs/readme/feature-talk-light.svg" width="414" alt="Talk to any model. Agent apps: Claude Code, Codex, Gemini CLI, Cursor CLI, OpenCode, Qwen Code, GitHub Copilot CLI. Model APIs: Anthropic, OpenAI, Gemini, OpenRouter, Mistral, xAI, DeepSeek, Groq. Local: Ollama, LM Studio, llama.cpp.">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-shape-dark.svg">
+    <img src="docs/readme/feature-shape-light.svg" width="414" alt="Shapes, not just boxes: an ergonomic mouse shell, 64.1 × 118.6 × 38.0 mm, lofted through rounded sections and hollowed to an even 1.8 mm wall, with a thumb scoop, split buttons and a wheel slot.">
   </picture>
+</p>
+
+Start from words, a photo with a card or coin for scale, a sketch with real dimensions, a part to design around, a PDF drawing or a link. For a new idea the agent proposes several genuinely different concepts, each a real CAD model, and you pick one. When a number decides the fit, it asks you to measure it and shows where. The result is a parametric design, not a frozen mesh: every face belongs to a named feature, and every parameter has a unit, a range and a source.
+
+## Engineer
+
+<p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-proved-dark.svg">
-    <img src="docs/readme/feature-proved-light.svg" width="414" alt="Proved on the solid: 11 checks pass on the desk phone stand, 8 computed, 1 heuristic and 2 model.">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-gears-dark.svg">
+    <img src="docs/readme/feature-gears-light.svg" width="414" alt="Mechanisms that mesh: the planetary gear stage seen from above, turning with the carrier held: sun 12, planets 18, ring 48 teeth; 1 : 5 with the ring held, 1 : 4 reversed with the carrier held.">
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-move-dark.svg">
     <img src="docs/readme/feature-move-light.svg" width="414" alt="Assemblies that move: the hinged box's lid swings on the lid hinge from 0 to 110 degrees; the lid hinge moves freely, 0 mm³ at 107 positions.">
   </picture>
+</p>
+
+Agents design with engineering parts that carry their sources: ISO 273 screw clearances, heat-set insert pockets, nut traps, bearing seats, printable threads and involute gears. Assemblies are declared as parts, joints and mates; every joint is swept through its range and checked for collisions, with Assembled and Exploded views and assembly instructions as a PDF. Constraints refuse impossible combinations with the feature, the parameters and a way forward, and an optimiser finds the best values under the requirements you state.
+
+<!-- optional: design helpers (WP mechanisms, surfacing, texture). Drop this paragraph if the helper library is not in the release. -->
+A library of design helpers gives the agent proven building blocks for mechanisms (hinges, snap fits, bayonets, ratchets, cams, gear trains and planetary sets), for surfaces (lofts, sweeps, shells and variable fillets) and for texture (knurls and embossed patterns on the solid itself), each with typed fallbacks and a clear error when a value cannot work.
+<!-- /optional -->
+
+## Reconstruct
+
+Bring the part you already have. A STEP or STL of a board, a phone or a motor becomes a reference the design is built around, with clearance cut from the real geometry. A photo of a broken part with a card or coin beside it starts **Replace a broken part**: sizes estimated from the photo stay *assumed* until you measure the ones that decide the fit, then the agent designs the replacement and strengthens it where it broke.
+
+<!-- optional: mesh to editable CAD (WP reconstruction). Drop this paragraph if the feature is not in the release. -->
+**Make editable** turns a mesh (STL, 3MF or OBJ) into CAD you can change: it always builds an exact solid from the triangles, then fits planes, cylinders, cones, spheres and tori where the surface allows and rebuilds holes, extrusions and patterns as parameters. A report gives the two-sided deviation, the volume change and how much of the area became parametric; anything that does not fit within tolerance stays exact rather than being guessed.
+<!-- /optional -->
+
+## Review
+
+<p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-slicer-dark.svg">
-    <img src="docs/readme/feature-slicer-light.svg" width="414" alt="Your slicer, for real: one layer of the hinged box drawn line type by line type from Bambu Studio's G-code. Bambu Studio, OrcaSlicer, PrusaSlicer, SuperSlicer, QIDISlicer, ElegooSlicer and Snapmaker Orca.">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-compare-dark.svg">
-    <img src="docs/readme/feature-compare-light.svg" width="414" alt="Every printer compared: the desk phone stand sliced for real on five printers, with each slicer's time and filament side by side and the fastest marked.">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-proved-dark.svg">
+    <img src="docs/readme/feature-proved-light.svg" width="414" alt="Proved on the solid: 11 checks pass on the desk phone stand, 8 computed, 1 heuristic and 2 model.">
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-release-dark.svg">
-    <img src="docs/readme/feature-release-light.svg" width="414" alt="Release what you approved: STEP, STL, 3MF, OBJ, GLB and G-code of the desk phone stand with their SHA-256 hashes.">
-  </picture>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-headless-dark.svg">
-    <img src="docs/readme/feature-headless-light.svg" width="414" alt="Everything headless: form state desk-phone-stand prints the design as JSON, with every parameter's provenance and every check.">
+    <img src="docs/readme/feature-release-light.svg" width="414" alt="Release what you approved: STEP, STL, OBJ and GLB of the planetary gear stage with their SHA-256 hashes.">
   </picture>
 </p>
 
-> [!NOTE]
-> Nothing on this page is mocked up. The parts are the CAD kernel's own meshes and edges; the checks, slicer times, G-code layers, printer comparison, joint sweep and file hashes are what a real run of the engine produced. [`scripts/readme_art.py`](scripts/readme_art.py) draws every picture again from a fresh run.
+Every revision is checked on the B-rep and its mesh: a valid solid, a closed export mesh, the STL against the CAD volume, the STEP re-imported in FreeCAD, fits, joints and loads. Each result says whether it was computed, a stated rule of thumb or a model. Compare any two revisions on the solids themselves, branch, keep variants, and go back at any point. Only a person approves a release, and its files are frozen with their hashes and a report of every check.
 
-Also in 1.0.0: concepts that come back as several genuinely different designs, screw bosses and snap-fit hooks placed with a click, text on any flat face, what changed between two revisions on the solids, assembly instructions as a PDF, turntable videos, and **Just a 3D model** for designs you will not print. All of it is in the [changelog](CHANGELOG.md) and [docs/FEATURES.md](docs/FEATURES.md).
+## Make it
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-slicer-dark.svg">
+    <img src="docs/readme/feature-slicer-light.svg" width="414" alt="Your slicer, if you print: one layer of the desk phone stand drawn line type by line type from the slicer's G-code. Bambu Studio, OrcaSlicer, PrusaSlicer, SuperSlicer, QIDISlicer, ElegooSlicer and Snapmaker Orca.">
+  </picture>
+</p>
+
+One design, the output you need:
+
+| Output | What you get |
+|---|---|
+| **CAD exchange** | STEP from the B-rep, re-imported in FreeCAD as a check; FreeCAD macros to carry on in FreeCAD, and OpenSCAD designs welcome as a source. |
+| **CNC, laser and moulding** | Mark a design *Just a 3D model* for its process: its thinnest feature is compared with what that process can make, and no print checks get in the way. |
+| **Renders and the web** | OBJ and GLB, four-view sheets, turntable videos and photoreal renders in Blender. |
+| **3D printing (optional)** | Your own slicer with your printer's presets, slices played back layer by layer, every printer you have compared, fits modelled against your printer's accuracy. Turn it on when you print; it stays out of the way when you do not. |
+
+Also in 1.0.0: concepts that come back as several genuinely different designs, screw bosses and snap-fit hooks placed with a click, text on any flat face, what changed between two revisions on the solids, assembly instructions as a PDF and turntable videos. All of it is in the [changelog](CHANGELOG.md) and [docs/FEATURES.md](docs/FEATURES.md).
+
+> [!NOTE]
+> Nothing on this page is mocked up. The parts are the CAD kernel's own meshes and edges, and the gears turn by their own tooth counts. The two designs at the top are build123d code in [`scripts/readme_designs/`](scripts/readme_designs), built through the same `create_design` tool an agent calls; the checks, ratios, G-code layer, joint sweep and file hashes are what a real run of the engine produced. [`scripts/readme_art.py`](scripts/readme_art.py) draws every picture again from a fresh run.
 
 ## Install
 
-Download the app for your platform and open it. The first start installs what is missing (the standard-parts libraries, a slicer if you print, an agent and its sign-in), one click of consent each, in its own window.
+Download the app for your platform and open it. The first start installs what is missing (the standard-parts libraries, an agent and its sign-in, and a slicer only if you print), one click of consent each, in its own window.
+
+<!-- optional: capability launcher (WP setup). Drop this paragraph if the launcher is not in the release. -->
+The first start asks what you want to make and installs only that: mechanical parts, an agent, photoreal renders, CAD exchange, mesh to CAD, or 3D printing. Turn any of them on later in Settings › Set up for.
+<!-- /optional -->
 
 <details>
 <summary><b>macOS</b> &nbsp;·&nbsp; Apple silicon and Intel</summary>
@@ -160,7 +202,14 @@ Every release ships with `SHA256SUMS`, signed build provenance and an SBOM.
 
 ## Use it from your agent
 
-Form Studio is an MCP server. Add it once and your agent can design, check, slice and prepare a release from its own window while the open app follows along. `form setup` finds the agents on your computer and writes the entry for you.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-talk-dark.svg">
+    <img src="docs/readme/feature-talk-light.svg" width="414" alt="Talk to any model. Agent apps: Claude Code, Codex, Gemini CLI, Cursor CLI, OpenCode, Qwen Code, GitHub Copilot CLI. Model APIs: Anthropic, OpenAI, Gemini, OpenRouter, Mistral, xAI, DeepSeek, Groq. Local: Ollama, LM Studio, llama.cpp.">
+  </picture>
+</p>
+
+Form Studio is an MCP server. Add it once and your agent can design, check, review and prepare a release from its own window while the open app follows along. `form setup` finds the agents on your computer and writes the entry for you.
 
 <details>
 <summary><b>Claude Code</b></summary>
@@ -170,7 +219,7 @@ Form Studio is an MCP server. Add it once and your agent can design, check, slic
 claude mcp add --scope user form -- form-mcp
 ```
 
-Thirteen design skills (intake, parametric design, fit calibration, verify print and more) install as a plugin:
+Thirteen design skills (intake, parametric design, industrial design, assemblies and mechanisms, design review and more) install as a plugin:
 
 ```bash
 claude plugin marketplace add kaizensx/form-studio
@@ -218,45 +267,52 @@ Agents follow the same rules as the app: units in millimetres, preview before co
 
 ## Headless
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-headless-dark.svg">
+    <img src="docs/readme/feature-headless-light.svg" width="414" alt="Everything headless: form state desk-phone-stand prints the design as JSON, with every parameter's provenance and every check.">
+  </picture>
+</p>
+
 Every action is a `form` command that prints JSON, and every MCP tool can be called as `form tool NAME '{json}'`.
 
 ```bash
-form start --text "a hook for my headphones under the desk" --photo desk.jpg   # start from words and a photo
-form new "Desk stand" device_stand device_width=75.6                           # from a building block: solid, checks, slice
-form commit desk-stand lean=18 --expect-head 1                                 # a new revision, rebuilt, checked and sliced
-form compare-printers desk-stand                                               # sliced on every printer you have set up
-form simulate desk-stand --png print.png --layer 40                            # the print at layer 40, from the G-code
-form tool get_project '{"project": "desk-stand"}'                              # any MCP tool, from the shell
+form start --text "a planetary stage, 1:5, on a 5 mm shaft" --purpose model    # start from words
+form start --text "a hook for my headphones under the desk" --photo desk.jpg    # from words and a photo
+form new "Desk stand" device_stand device_width=75.6                            # from a building block
+form commit desk-stand lean=18 --expect-head 1                                  # a new revision, rebuilt and checked
+form diff desk-stand 1 2 --png diff.png                                         # what changed in the solid
+form tool get_project '{"project": "desk-stand"}'                               # any MCP tool, from the shell
 ```
 
 | | |
 |---|---|
 | **Every command** | [docs/CLI.md](docs/CLI.md) |
-| **74 MCP tools** | [docs/MCP.md](docs/MCP.md) |
+| **77 MCP tools** | [docs/MCP.md](docs/MCP.md) |
 | **How the engine is built** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 
 ## Building blocks
 
 <p align="center"><img src="docs/images/recipes.webp" width="828" alt="Building blocks rendered by Form Studio's engine: Gridfinity bin, box with lid, phone and tablet stand, SKÅDIS pegboard accessory, self-watering planter, faceted vase, cable organizer, under-desk hanger, shelf bracket, hose adapter, battery and card holder, electronics enclosure"></p>
 
-Agents start from parametric building blocks of the things people print most: Gridfinity bins and baseplates, boxes with sliding, press-on or hinged lids, SKÅDIS pegboard accessories, phone and tablet stands, cable organizers, under-desk hangers, shelf brackets, hose adapters, self-watering planters, faceted vases, battery and card holders and electronics enclosures. Each passes its checks at its defaults and prints without supports. Browse them, and what the community adds, in the **[recipe gallery](https://kaizensx.github.io/form-studio/recipes/)**.
+Agents can also start from parametric building blocks: Gridfinity bins and baseplates, boxes with sliding, press-on or hinged lids, SKÅDIS pegboard accessories, phone and tablet stands, cable organizers, under-desk hangers, shelf brackets, hose adapters, self-watering planters, faceted vases, battery and card holders and electronics enclosures. Each passes its checks at its defaults. Browse them, and what the community adds, in the **[recipe gallery](https://kaizensx.github.io/form-studio/recipes/)**.
 
 ## Community
 
-**[Join the Form Studio Discord](https://discord.gg/b6ZgyndkmS)**: help, the parts people made, recipes, ideas and every release as it ships.
+**[Join the Form Studio Discord](https://discord.gg/b6ZgyndkmS)**: help, the things people made, recipes, ideas and every release as it ships.
 
 | | |
 |---|---|
 | **[Q&A](https://github.com/kaizensx/form-studio/discussions/categories/q-a)** | How to do something, or help with setup. |
-| **[Printers and slicers](https://github.com/kaizensx/form-studio/discussions/categories/printers-slicers)** | Presets, filaments and slicer questions, answered by people who print. |
 | **[Agents and models](https://github.com/kaizensx/form-studio/discussions/categories/agents-models)** | Which agents and models design well, and how to connect them. |
 | **[Ideas](https://github.com/kaizensx/form-studio/discussions/categories/ideas)** | Talk an idea through before it becomes a feature request. |
-| **[Show and tell](https://github.com/kaizensx/form-studio/discussions/categories/show-and-tell)** | The parts you made, and how they printed. |
+| **[Show and tell](https://github.com/kaizensx/form-studio/discussions/categories/show-and-tell)** | The things you made, and how they came out. |
+| **[Printers and slicers](https://github.com/kaizensx/form-studio/discussions/categories/printers-slicers)** | Presets, filaments and slicer questions, answered by people who print. |
 
-**Contributing.** Recipes, slicer adapters, agent integrations and measured print results are all welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Branch from `dev` and open the pull request against it. To share a recipe, [open a recipe issue](https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml) or run `form recipes submit`; it is built, checked and sliced automatically and answered with pictures.
+**Contributing.** Recipes, design helpers, agent integrations, software adapters and measured results are all welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Branch from `dev` and open the pull request against it. To share a recipe, [open a recipe issue](https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml) or run `form recipes submit`; it is built and checked automatically and answered with pictures.
 
 **Security.** Report a vulnerability privately as described in [SECURITY.md](SECURITY.md). [Code of Conduct](CODE_OF_CONDUCT.md) · [Support](SUPPORT.md) · [Changelog](CHANGELOG.md)
 
 ## Licence
 
-MIT. Form Studio calls build123d (Apache-2.0), OpenCascade (LGPL-2.1), your slicer and other programs as separate programs; none of them is bundled into its code. three.js (MIT) draws the website. Instrument Sans and Geist Mono (SIL OFL 1.1) are drawn in the app and in the pictures on this page, and Lucide icons (ISC) in the app. The Gridfinity system was created by Zack Freedman and SKÅDIS is a product of IKEA; Form Studio's building blocks follow their published dimensions and are not affiliated with either.
+MIT. Form Studio calls build123d (Apache-2.0), OpenCascade (LGPL-2.1), your slicer and other programs as separate programs; none of them is bundled into its code. py_gearworks (Apache-2.0) draws involute gears. three.js (MIT) draws the website. Instrument Sans and Geist Mono (SIL OFL 1.1) are drawn in the app and in the pictures on this page, and Lucide icons (ISC) in the app. The Gridfinity system was created by Zack Freedman and SKÅDIS is a product of IKEA; Form Studio's building blocks follow their published dimensions and are not affiliated with either.
