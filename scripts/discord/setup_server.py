@@ -157,9 +157,10 @@ class Setup:
         return []
 
     def rename_channels(self):
+        raw = lambda n: next((c for c in self.channels if c["name"] == n), None)  # noqa: E731  exact names here
         for old, new in S.CHANNEL_RENAMES.items():
-            c = self.find(old)
-            if c and not self.find(new):
+            c = raw(old)
+            if c and not raw(new):
                 self._do("PATCH", f"/channels/{c['id']}", {"name": new}, f"rename {old} to {new}")
                 c["name"] = new
 
@@ -489,7 +490,7 @@ class Setup:
         return {t["name"]: t for t in active + archived}
 
     def forum_post(self, forum, threads, title, tag, embed, components, files=None, pin=False):
-        tags = {t["name"]: t["id"] for t in forum.get("available_tags", [])}
+        tags = {t["name"]: t.get("id") for t in forum.get("available_tags", [])}
         applied = [tags[tag]] if tag in tags else []
         sig = sig_of(embed, components, {n: hashlib.sha1(b).hexdigest() for n, b in (files or {}).items()}, applied)
         embed["footer"] = d.footer(forum["name"].capitalize(), sig)
