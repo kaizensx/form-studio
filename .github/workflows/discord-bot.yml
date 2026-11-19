@@ -104,4 +104,5 @@ jobs:
       - name: Run the cron once
         if: ${{ github.event_name == 'push' || inputs.tick }}
         run: |
-          curl -sf -X POST -H "Authorization: Bot $DISCORD_BOT_TOKEN" "$WORKER_URL/tick" | jq -c .
+          curl -s --max-time 60 -w "\nHTTP %{http_code}\n" -X POST -H "Authorization: Bot $DISCORD_BOT_TOKEN" "$WORKER_URL/tick" | tee tick.txt
+          grep -q "HTTP 200" tick.txt
