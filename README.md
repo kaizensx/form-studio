@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <sub><b>Version 1.0.0</b>, the first public release &nbsp;·&nbsp; <a href="CHANGELOG.md">What is in it</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/#try">Try it in your browser</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/docs/">Docs</a></sub>
+  <sub><b>Version 1.0.0</b>, the first public release &nbsp;·&nbsp; <a href="CHANGELOG.md">What is in it</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/#try">Try it in your browser</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/docs/">Docs</a> &nbsp;·&nbsp; <a href="https://discord.gg/b6ZgyndkmS">Discord</a></sub>
 </p>
 
 <br>
@@ -242,6 +242,8 @@ form tool get_project '{"project": "desk-stand"}'                              #
 Agents start from parametric building blocks of the things people print most: Gridfinity bins and baseplates, boxes with sliding, press-on or hinged lids, SKÅDIS pegboard accessories, phone and tablet stands, cable organizers, under-desk hangers, shelf brackets, hose adapters, self-watering planters, faceted vases, battery and card holders and electronics enclosures. Each passes its checks at its defaults and prints without supports. Browse them, and what the community adds, in the **[recipe gallery](https://kaizensx.github.io/form-studio/recipes/)**.
 
 ## Community
+
+**[Join the Form Studio Discord](https://discord.gg/b6ZgyndkmS)**: help, the parts people made, recipes, ideas and every release as it ships.
 
 | | |
 |---|---|

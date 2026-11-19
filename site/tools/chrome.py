@@ -24,6 +24,7 @@ ICONS = """<svg width="0" height="0" style="position:absolute" aria-hidden="true
 <symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></symbol>
 <symbol id="ic-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 019.5 4.5a8 8 0 1010 10z"/></symbol>
 <symbol id="ic-gh" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-6-2.5m12 4.5v-3.4a3 3 0 00-.8-2.3c2.7-.3 5.5-1.3 5.5-6a4.6 4.6 0 00-1.3-3.2 4.3 4.3 0 00-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 00-6 0C6.5 2.6 5.5 2.9 5.5 2.9a4.3 4.3 0 00-.1 3.2A4.6 4.6 0 004 9.3c0 4.6 2.8 5.6 5.5 6a3 3 0 00-.8 2.3V21"/></symbol>
+<symbol id="ic-dc" viewBox="0 0 24 24"><path d="M8.5 7.5a12 12 0 017 0M7 17c3 1.3 7 1.3 10 0M8.6 4.8A16 16 0 004.5 6.5C2.8 9.4 2 12.5 2.3 16.2a15.6 15.6 0 004.8 2.3l1.1-1.9M15.4 4.8a16 16 0 014.1 1.7c1.7 2.9 2.5 6 2.2 9.7a15.6 15.6 0 01-4.8 2.3l-1.1-1.9"/><circle cx="9" cy="12.5" r="1.2"/><circle cx="15" cy="12.5" r="1.2"/></symbol>
 </defs></svg>"""
 
 
@@ -63,13 +64,14 @@ def nav(prefix: str, current: str = "") -> str:
     <nav class="nav-links" aria-label="Site"><ul>{items}</ul></nav>
     <div class="end">
       <button class="theme" type="button" id="theme" aria-label="Switch between light and dark"><svg class="ic sun" aria-hidden="true"><use href="#ic-sun"/></svg><svg class="ic moon" aria-hidden="true"><use href="#ic-moon"/></svg></button>
+      <a class="gh" href="https://discord.gg/b6ZgyndkmS"><svg class="ic" aria-hidden="true"><use href="#ic-dc"/></svg><span>Discord</span></a>
       <a class="gh" href="{REPO}"><svg class="ic" aria-hidden="true"><use href="#ic-gh"/></svg><span>GitHub</span></a>
       <a class="btn primary small dl-btn" href="{home}#download">Download</a>
       <button class="menu-btn" type="button" id="menu-btn" aria-expanded="false" aria-controls="menu" aria-label="Menu"><i></i><i></i></button>
     </div>
   </div>
   <div class="menu" id="menu" hidden>
-    <ul>{items}<li><a href="{REPO}">GitHub</a></li></ul>
+    <ul>{items}<li><a href="https://discord.gg/b6ZgyndkmS">Discord</a></li><li><a href="{REPO}">GitHub</a></li></ul>
   </div>
   <span class="scrolled-bar" id="scroll-bar" aria-hidden="true"></span>
 </header>
@@ -88,7 +90,7 @@ def foot(prefix: str) -> str:
       </div>
       <nav aria-label="Product"><span class="cap">Product</span><a href="{home}#how">How it works</a><a href="{prefix}recipes/">Recipes</a><a href="{prefix}compat/">Compatibility</a><a href="{prefix}bench/">Benchmarks</a><a href="{home}#download">Download</a></nav>
       <nav aria-label="Docs"><span class="cap">Docs</span><a href="{prefix}docs/features.html">Features</a><a href="{prefix}docs/app.html">The app</a><a href="{prefix}docs/cli.html">Command line</a><a href="{prefix}docs/mcp.html">MCP tools</a><a href="{prefix}docs/changelog.html">Changelog</a></nav>
-      <nav aria-label="Community"><span class="cap">Community</span><a href="{REPO}/discussions">Discussions</a><a href="{REPO}/issues/new?template=3-recipe.yml">Share a recipe</a><a href="{REPO}/issues/new/choose">Report an issue</a><a href="{REPO}/blob/main/CONTRIBUTING.md">Contributing</a></nav>
+      <nav aria-label="Community"><span class="cap">Community</span><a href="https://discord.gg/b6ZgyndkmS">Discord</a><a href="{REPO}/discussions">Discussions</a><a href="{REPO}/issues/new?template=3-recipe.yml">Share a recipe</a><a href="{REPO}/issues/new/choose">Report an issue</a><a href="{REPO}/blob/main/CONTRIBUTING.md">Contributing</a></nav>
     </div>
     <p class="foot-note">No cookies, trackers or third-party requests. Form Studio runs on your computer; it never uploads a design and never starts a print.</p>
   </div>
