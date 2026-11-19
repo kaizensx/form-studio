@@ -94,4 +94,5 @@ jobs:
             https://discord.com/api/v10/applications/@me -d "{\"interactions_endpoint_url\": \"$WORKER_URL\"}" | jq -r .interactions_endpoint_url
       - name: Run the cron once
         if: ${{ github.event_name == 'push' || inputs.tick }}
-        run: curl -sf -X POST -H "Authorization: Bot $DISCORD_BOT_TOKEN" "$WORKER_URL/tick" | jq -c .
+        run: |
+          curl -sf -X POST -H "Authorization: Bot $DISCORD_BOT_TOKEN" "$WORKER_URL/tick" | jq -c .
