@@ -32,7 +32,7 @@ Column {
             id: grp
             required property var modelData
             width: sp.width; spacing: 6; visible: list.rows.length > 0
-            Txt { kind: "cap"; text: grp.modelData.title + (grp.modelData.id === "slicer" && !Store.prints ? "  ·  not needed: you just design" : "") }
+            Txt { kind: "cap"; text: grp.modelData.title + (grp.modelData.id === "slicer" && !Store.printOn ? "  ·  3D printing is off" : "") }
             SetupList { id: list; width: parent.width; ids: grp.modelData.items }
             ClaudeSignIn { width: parent.width; visible: grp.modelData.id === "ai" }
         }

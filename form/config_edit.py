@@ -27,9 +27,13 @@ from . import fsutil
 SCHEMA: dict[str, dict] = {
     # tab: general | printer (Printing, shown only to someone who prints) | chat (Agents) | apps | updates | advanced.
     # type "printer" rows are not text: the Settings sheet shows the default printer and opens the printer picker.
-    "general.printing": {"type": "bool", "tab": "general", "label": "I have a 3D printer",
-                         "help": "Off: you just design. No printer or slicer is needed or suggested, and new designs start as "
-                                 "3D models (STEP, STL, 3MF, OBJ, GLB and renders). Any design can still be made for printing."},
+    # what Form Studio is set up for (form/capabilities.py): Settings shows it as the "Set up for" cards, not a field
+    "general.capabilities": {"type": "capabilities", "tab": "general", "hidden": True, "label": "Set up for",
+                             "help": "Ids from form/capabilities.py: core, parts, mesh, render, exchange, print. Turning one "
+                                     "off hides it and never uninstalls anything."},
+    # the older answer; writing it sets the capability "print" instead (kept so older scripts and CLIs still work)
+    "general.printing": {"type": "bool", "tab": "general", "hidden": True, "label": "3D printing",
+                         "help": "true turns the 3D printing capability on, false turns it off (general.capabilities)."},
     "data.dir": {"type": "path", "tab": "general", "label": "Project folder", "restart": True,
                  "help": "Where designs, their history and releases are kept. Takes effect when Form Studio restarts; "
                          "existing projects are not moved."},
@@ -161,6 +165,16 @@ def coerce(key: str, value):
             if any(x < spec["min"] or x > spec["max"] for x in v):
                 raise ValueError(f"each must be between {spec['min']} and {spec['max']}")
             return [int(x) if x == int(x) else x for x in v]
+        if t == "capabilities":
+            from . import capabilities
+            raw = [x for x in re.split(r"[,\s]+", value.strip().strip("[]")) if x] if isinstance(value, str) else value
+            if not isinstance(raw, (list, tuple)):
+                raise ValueError("expected a list of capability ids")
+            raw = [str(x).strip().strip("\"'").lower() for x in raw]
+            bad = [x for x in raw if x not in capabilities.IDS]
+            if bad:
+                raise ValueError(f"unknown capability {bad[0]}; known: " + ", ".join(capabilities.IDS))
+            return capabilities.normalise(raw)
         if t in ("agent", "model", "effort"):
             t = "str"
         if t == "choice":
@@ -246,6 +260,11 @@ def set_values(cfg: dict, values: dict, path: Path | None = None) -> dict:
     Returns {"path", "backup", "changed": {key: value}, "restart": bool}."""
     if not isinstance(values, dict) or not values:
         raise ConfigError("Nothing to change.")
+    if "general.printing" in values:                # the older yes/no: it turns the capability "print" on or off
+        from . import capabilities
+        values = dict(values)
+        on = coerce("general.printing", values.pop("general.printing"))
+        values.setdefault("general.capabilities", capabilities.with_cap(cfg, "print", on))
     clean = {k: coerce(k, v) for k, v in values.items()}
     path = Path(path) if path else target(cfg)
     try:

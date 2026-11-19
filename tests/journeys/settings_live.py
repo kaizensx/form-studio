@@ -1,9 +1,10 @@
 """Settings apply at once, both ways: the default printer chosen from Settings › Printing shows in Settings, the top bar
-and the open design's checks; "I just design" in Settings › General hides the Printing tab and the printer chip, and
-"I have a 3D printer" brings them back. Nothing needs a restart.
+and the open design's checks; turning 3D printing off in Settings › General › Set up for hides the Printing tab, the
+printer chip and the Fit stage (nothing is uninstalled), and turning it on brings them back. Nothing needs a restart.
 
 Environment (tests/test_ui_journeys.py test_settings_live): Bambu Studio is a fixture config folder (an A1 mini, an X1
-Carbon and a user printer "My mini"); every other slicer points at a program that does not exist."""
+Carbon and a user printer "My mini"); every other slicer points at a program that does not exist. Because a slicer is
+configured, the one-time migration (form/capabilities.py) turns 3D printing on at the first start."""
 from _lib import make, open_sheet_wait, sheet, toasts_gone
 
 DATA = "fresh"
@@ -58,27 +59,41 @@ def journey_search(ui):
 
 def journey_just_design_from_settings(ui):
     toasts_gone(ui)
+    ui.check(ui.js("Store.printOn") is True, "a configured slicer kept this person on printing")
     ui.run_js("Store.openSettings('general')")
     open_sheet_wait(ui, "settings")
-    ui.click("settingsJustDesign")
-    ui.wait_until(lambda: ui.js("!Store.prints"), 10, "“I just design” to apply")
+    ui.wait_until(lambda: ui.find(name="capCard_print") is not None, 10, "the Set up for cards")
+    ui.settle(300)
+    ui.shot("settings-set-up-for")
+    ui.click("capCard_print")
+    ui.wait_until(lambda: ui.js("!Store.printOn"), 10, "3D printing to turn off")
     ui.settle(300)
     tabs = ui.texts("sheetCard")
     ui.check("Printing" not in tabs, f"the Printing tab is gone: {tabs[:12]}")
     ui.shot("settings-just-design")
     ui.key("Escape")
     ui.wait_until(lambda: sheet(ui) is None, 4, "the sheet to close")
-    # the open design was made for printing: it keeps its printer chip; Home says "just designing"
-    ui.check(ui.find(name="printerChip") is not None, "a design made for printing still shows its printer")
+    # printing off hides every print surface, even for a design made for printing; nothing was uninstalled
+    ui.wait_until(lambda: ui.find(name="printerChip") is None, 5, "the printer chip to go")
+    ui.check(ui.find(name="purposeChip") is None, "no “just designing” chip either")
+    ui.check("fit" not in [s["id"] for s in ui.js("Store.stages")], "no Fit stage")
+    ui.check((ui.api("/install") and any(r["id"] == "slicer.bambu" and r["status"] == "ok" for r in ui.api("/install")["software"])),
+             "the slicer is still installed")
+    ui.shot("workspace-printing-off")
     ui.run_js("Store.home()")
     ui.wait_until(lambda: ui.store.get("screen") == "home", 10, "Home")
-    ui.wait_until(lambda: ui.find(name="purposeChip") is not None, 5, "the “just designing” chip")
     ui.check(ui.js("Store.purposeInfo['default']") == "model", "new designs now start as 3D models")
-    ui.settle(800)                                     # Home sets its bench and the top bar settles before the click
-    ui.click("purposeChip")
+    ui.settle(800)
+    ui.run_js("Store.openSettings('general')")
     open_sheet_wait(ui, "settings")
-    ui.click("settingsPrinter")
-    ui.wait_until(lambda: ui.js("Store.prints"), 10, "“I have a 3D printer” to apply")
+    ui.wait_until(lambda: ui.find(name="capCard_print") is not None, 10, "the Set up for cards")
+    ui.click("capCard_print")
+    ui.wait_until(lambda: ui.js("Store.printOn"), 10, "3D printing to turn on again")
     ui.wait_until(lambda: "Printing" in ui.texts("sheetCard"), 5, "the Printing tab back")
     ui.key("Escape")
-    ui.wait_until(lambda: ui.find(name="printerChip") is not None, 5, "the printer chip back")
+    ui.run_js("Store.open(Store.studio.projects[0].id)")
+    ui.wait_until(lambda: ui.store.get("screen") == "work", 30, "the design")
+    ui.wait_until(lambda: ui.find(name="printerChip") is not None, 10, "the printer chip back")
+    ui.check("fit" in [s["id"] for s in ui.js("Store.stages")], "the Fit stage back")
+    ui.settle(600)
+    ui.shot("workspace-printing-on")

@@ -4,7 +4,7 @@ import zipfile
 
 from PySide6.QtCore import QPointF
 
-from _lib import example, fold, head, toasts_gone, wait_job
+from _lib import fold, head, phone_dock, toasts_gone, wait_job
 
 DATA = "fresh"
 S = {}
@@ -16,7 +16,7 @@ def data(ui):
 
 def journey_setup(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
-    S["pid"] = example(ui, "hallway-phone-dock")
+    S["pid"] = phone_dock(ui)
 
 
 def journey_companion(ui):
@@ -73,7 +73,7 @@ def journey_fit(ui):
         ui.wait_until(lambda: ui.store.get("hasDraft") is False, 3, "Discard")
     else:
         raise AssertionError("no suggested action carries a change")
-    # back to the window the example ships with
+    # back to the window the design started with
     ui.key("Ctrl+3")
     ui.settle(400)
     ui.fill("fitHi", str(hi), enter=True)

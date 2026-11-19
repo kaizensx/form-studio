@@ -2,48 +2,62 @@ import QtQuick
 import QtQuick.Controls
 import FormNative
 
-// First run: three short steps instead of one long list. 1 Form Studio itself, 2 your printer and slicer, 3 your agent:
-// a choice between the agent apps found here, model provider APIs (keys found or added) and local models.
-// A hands-free setup starts by itself (Store.autoSetup, form/installer.py AutoJob): what Form Studio needs is installed
-// with every command in the log, and it pauses only where the person must act. Optional items stay ticks. The step you reached is remembered in the data folder. Afterwards you land on Home.
+// First run, a launcher in three steps: 1 "What do you want to make?" (capability cards, form/capabilities.py, with a
+// live download total), 2 your agent (agent apps, model provider APIs, local models), 3 an install run of only what
+// was chosen (form/installer.py AutoJob: every command in the log; it pauses only where the person must act).
+// Nothing is installed before step 3. 3D printing is optional and off unless it is ticked. The step reached is
+// remembered in the data folder; everything can be changed later in Settings › General › Set up for.
 Rectangle {
     id: wl
     color: Theme.plate
     readonly property var sw: Store.software
     readonly property int step: Store.onboardStep
     readonly property var steps: [
-        { title: "Form Studio itself", sub: "The CAD kernel and where your designs live", ids: ["kernel", "data", "parts"] },
-        { title: "Printer, or just designing", sub: "Only what your use needs is set up", ids: ["slicer.bambu", "slicer.orca", "slicer.prusa"] },
-        { title: "Your agent", sub: "Who designs with you in chat", ids: ["claude", "claude.signin", "agent.claude", "agent.codex", "agent.gemini", "agent.cursor", "agent.desktop"] }
+        { title: "What do you want to make?", sub: "Choose what to set up" },
+        { title: "Your agent", sub: "Who designs with you in chat" },
+        { title: "Set up", sub: "Only what you chose is downloaded" }
     ]
     readonly property var here: steps[step]
-    // "I have a 3D printer" / "I just design" (form/purpose.py); slicers are offered only after the first
-    readonly property bool justDesign: Store.printingDecided && !Store.prints
-    readonly property bool withPrinter: Store.printingDecided && Store.prints
-    // ticked rows of this step only
-    readonly property var chosen: Store.installChosen.filter(function (id) { return wl.here.ids.indexOf(id) >= 0 && (wl.step !== 1 || wl.withPrinter) })
-    readonly property bool anySlicer: !!sw && ["slicer.bambu", "slicer.orca", "slicer.prusa"].some(function (id) { var it = Store.softwareItem(id); return it && it.status === "ok" })
-    readonly property bool designOnly: !!Store.studio && !!Store.studio.env.slicing && Store.studio.env.slicing.why === "settings"
-    readonly property var absentAgents: sw ? sw.software.filter(function (r) { return r.absent }).map(function (r) { return r.label.replace("Form Studio tools in ", "") }) : []
+    readonly property var agentIds: ["claude", "claude.signin", "agent.claude", "codex", "gemini", "agent.codex", "agent.gemini", "agent.cursor", "agent.desktop"]
+
+    // step 1: the cards' local pick, from the engine until the person changes it
+    property var pick: []
+    property bool picked: false
+    readonly property var caps: Store.caps ? Store.caps.capabilities : []
+    Connections { target: Store; function onCapsChanged() { if (!wl.picked && Store.caps) wl.pick = Store.caps.chosen.slice() } }
+    function toggle(id, on) {
+        var p = wl.pick.filter(function (x) { return x !== id })
+        if (on) p.push(id)
+        wl.pick = p; wl.picked = true
+    }
+    function mb(n) { return n >= 1000 ? "about " + (n / 1000).toFixed(1) + " GB" : "about " + n + " MB" }
+    readonly property int pickMb: wl.caps.filter(function (c) { return wl.pick.indexOf(c.id) >= 0 }).reduce(function (a, c) { return a + c.size_mb }, 0)
+
+    // step 3: what the run installs: what the chosen capabilities need, plus the agent apps ticked in step 2
+    readonly property var capInstall: Store.caps ? Store.caps.install : []
+    readonly property var agentInstall: Store.installChosen.filter(function (id) { return wl.agentIds.indexOf(id) >= 0 && wl.capInstall.indexOf(id) < 0 })
+    readonly property var runIds: wl.capInstall.concat(wl.agentInstall)
+    readonly property var runRows: wl.runIds.map(function (id) { return Store.softwareItem(id) }).filter(function (r) { return !!r })
+    readonly property int runMb: wl.runRows.reduce(function (a, r) { var m = /([\d.]+)\s*(MB|GB)/i.exec(r.size || ""); return a + (m ? Number(m[1]) * (m[2].toUpperCase() === "GB" ? 1000 : 1) : 0) }, 0)
+    readonly property bool ran: !!Store.installJob && Store.installJob.kind === "auto" && Store.installJob.state !== "running"
+    Connections { target: Store; function onInstallingChanged() { if (!Store.installing) Store.loadCaps() } }
+
     function stepState(i) {          // done | todo | open — for the rail
-        if (!sw) return "open"
-        var need = steps[i].ids.map(function (id) { return Store.softwareItem(id) }).filter(function (r) {
-            return r && !r.absent && r.level !== "optional" && r.status !== "ok" && r.status !== "info" })
-        if (i === 1) return wl.anySlicer || wl.designOnly || wl.justDesign ? "done" : "todo"
-        if (i === 2) return Store.chat.available ? "done" : "todo"
-        return need.length ? "todo" : "done"
+        if (!sw || !Store.caps) return "open"
+        if (i === 0) return Store.caps.decided ? "done" : "todo"
+        if (i === 1) return Store.chat.available ? "done" : "todo"
+        return wl.runIds.length ? "todo" : "done"
     }
     function stepNote(i) {
-        if (!sw) return "Checking…"
-        if (i === 1) return wl.justDesign ? "Just designing" : wl.anySlicer ? "A slicer is ready" : wl.designOnly ? "Design only" : wl.withPrinter ? "No slicer yet" : "Choose one"
-        if (i === 2) { var n = Store.chatAgents.filter(function (a) { return a.available }).length
+        if (!sw || !Store.caps) return "Checking…"
+        if (i === 0) { var on = wl.caps.filter(function (c) { return wl.pick.indexOf(c.id) >= 0 }).length
+                       return on + " of " + wl.caps.length + " chosen" + (wl.pick.indexOf("print") >= 0 ? " · with 3D printing" : "") }
+        if (i === 1) { var n = Store.chatAgents.filter(function (a) { return a.available }).length
                        return n ? n + (n === 1 ? " agent ready" : " agents ready") : "Choose one" }
-        var rows = steps[i].ids.map(function (id) { return Store.softwareItem(id) }).filter(function (r) { return r && !r.absent && r.status !== "info" })
-        var ok = rows.filter(function (r) { return r.status === "ok" }).length
-        return ok + " of " + rows.length + " ready"
+        return wl.runIds.length ? wl.runIds.length + (wl.runIds.length === 1 ? " item to install" : " items to install") : "Everything is ready"
     }
     function go(n) { Store.setOnboardStep(n) }
-    // step 3: which way to reach a model is shown; it starts on the first one that has something ready
+    // step 2: which way to reach a model is shown; it starts on the first one that has something ready
     function agentsOf(way) {
         return Store.chatAgents.filter(function (a) {
             return way === "cli" ? a.kind !== "api" : way === "local" ? a.kind === "api" && a.local : a.kind === "api" && !a.local })
@@ -51,10 +65,11 @@ Rectangle {
     property string way: ""
     readonly property var missingApps: sw ? ["claude", "codex", "gemini"].filter(function (id) { var r = Store.softwareItem(id); return r && r.status !== "ok" }) : []
     readonly property string firstWay: ["cli", "api", "local"].filter(function (w) { return wl.agentsOf(w).some(function (a) { return a.available }) })[0] || "cli"
-    onFirstWayChanged: if (!wl.picked) wl.way = wl.firstWay
-    property bool picked: false
-    onWayChanged: if (wl.way !== wl.firstWay) wl.picked = true
-    Component.onCompleted: { wl.way = wl.firstWay; wl.loadKeys() }
+    onFirstWayChanged: if (!wl.wayPicked) wl.way = wl.firstWay
+    property bool wayPicked: false
+    onWayChanged: if (wl.way !== wl.firstWay) wl.wayPicked = true
+    readonly property var absentAgents: sw ? sw.software.filter(function (r) { return r.absent }).map(function (r) { return r.label.replace("Form Studio tools in ", "") }) : []
+    Component.onCompleted: { wl.way = wl.firstWay; wl.loadKeys(); if (!Store.caps) Store.loadCaps(); else wl.pick = Store.caps.chosen.slice(); if (wl.step >= 1) wl.untickOthers() }
     property var keys: []
     function loadKeys() { Store.get("/secrets").then(function (r) { wl.keys = r.keys }, function () {}) }
     function keyFor(name) { for (var i = 0; i < wl.keys.length; i++) if (wl.keys[i].name === name) return wl.keys[i]; return null }
@@ -65,13 +80,23 @@ Rectangle {
     function clearKey(name) {
         return Store.post("/secrets", { name: name, clear: true }).then(function (r) { wl.keys = r.keys; Store.refreshAgents() }, Store.fail) }
     // each step arrives the same way: the page fades in and settles upward
-    onStepChanged: { fl.contentY = 0; arrive.restart() }
+    onStepChanged: { fl.contentY = 0; arrive.restart(); if (step === 1) wl.untickOthers() }
+    // other agents' settings are never edited without a click: their integrations start unticked here
+    property bool othersUnticked: false
+    function untickOthers() {
+        if (wl.othersUnticked) return
+        wl.othersUnticked = true
+        var p = Object.assign({}, Store.installPick)
+        ;["agent.codex", "agent.gemini", "agent.cursor", "agent.desktop"].forEach(function (id) { p[id] = false })
+        Store.installPick = p
+    }
     ParallelAnimation { id: arrive
         Glide { target: body; property: "opacity"; from: 0; to: 1; duration: Theme.slow }
         Glide { target: bodyShift; property: "y"; from: Theme.shift(10); to: 0; duration: Theme.slow } }
     function primary() {
-        if (wl.chosen.length) Store.installSoftware(wl.chosen)
-        else if (wl.step < 2) wl.go(wl.step + 1)
+        if (wl.step === 0) { Store.setCaps(wl.pick).then(function (r) { if (r) wl.go(1) }); return }
+        if (wl.step === 1) { wl.go(2); return }
+        if (wl.runIds.length && !wl.ran) Store.runSetup(wl.runIds)
         else Store.closeWelcome("done")
     }
     MouseArea { anchors.fill: parent; hoverEnabled: true; onWheel: function (w) { w.accepted = true } }     // Home underneath stays inert
@@ -85,7 +110,7 @@ Rectangle {
             Logo { size: 24 }
             Item { width: 1; height: 22 }
             Txt { kind: "cap"; text: "Set up Form Studio" }
-            Txt { kind: "h2"; text: "Three short steps"; width: parent.width }
+            Txt { kind: "h2"; text: "Describe it. Form Studio engineers it."; width: parent.width; wrapMode: Text.WordWrap }
             Item { width: 1; height: 18 }
             Repeater {
                 model: wl.steps
@@ -111,14 +136,15 @@ Rectangle {
                         Txt { kind: "fine"; text: wl.stepNote(rs.index); wrapMode: Text.NoWrap
                             color: rs.state_ === "done" ? Theme.pass : rs.state_ === "todo" && rs.index < wl.step ? Theme.amber : Theme.ink3 } }
                     Rectangle { x: -10; y: -8; width: parent.width + 20; height: 54; radius: Theme.rMd; z: -1; color: sm.pressed ? Theme.washPress : sm.containsMouse && !rs.current ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
-                    MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; enabled: !Store.installing; onClicked: wl.go(rs.index) }
+                    // forward only through Continue, so the choice of step 1 is always saved first
+                    MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; enabled: !Store.installing && rs.index <= wl.step; onClicked: wl.go(rs.index) }
                 }
             }
         }
         Column { x: 32; anchors.bottom: parent.bottom; anchors.bottomMargin: 28; width: parent.width - 64; spacing: 6
             Icon { name: "shield_check"; size: 16; color: Theme.ink3 }
             Txt { kind: "fine"; width: parent.width
-                text: "Form Studio installs what it needs by itself and pauses only when you have to sign in or download something. Every command is in the log; Cancel stops it. It never asks for a password." } }
+                text: "Nothing is downloaded until the last step, and only what you chose. Every command is in the log; Cancel stops it. Form Studio never asks for a password." } }
     }
 
     // ── the step ────────────────────────────────────────────
@@ -129,127 +155,35 @@ Rectangle {
         ScrollBar.vertical: ScrollBar { width: 6 }
         Column {
             id: body
-            width: Math.min(680, fl.width - 96); x: Math.max(48, (fl.width - width) / 2); y: 52
+            width: Math.min(720, fl.width - 96); x: Math.max(48, (fl.width - width) / 2); y: 52
             spacing: 20
             transform: Translate { id: bodyShift }
             Column { width: parent.width; spacing: 8
                 Txt { kind: "cap"; text: "Step " + (wl.step + 1) + " of 3" }
                 Txt { kind: "h1"; text: wl.here.title; width: parent.width; font.weight: Theme.wSemi }
                 Txt { kind: "lead"; tone: 2; width: parent.width; lineHeight: 1.35
-                    text: wl.step === 0 ? "Form Studio builds real geometry with a CAD kernel and keeps every design in a folder you own. This is checked for you."
-                        : wl.step === 1 ? "Form Studio designs with or without a 3D printer. Say which, and only what that needs is set up. You can change it any time in Settings."
-                        : "Chat works with the agent you choose. Each one designs with Form Studio's tools and runs on your own account or computer. You can change it per conversation." } }
+                    text: wl.step === 0 ? "Describe a part, a product or a mechanism and Form Studio engineers it as real, editable CAD. Pick what to set up; only that is downloaded, and you can change it any time in Settings."
+                        : wl.step === 1 ? "Chat works with the agent you choose. Each one designs with Form Studio's tools and runs on your own account or computer. You can change it per conversation."
+                        : "This installs only what you chose, one item after another, with every command in the log. It stops only where you need to sign in or download something yourself." } }
 
-            // step 1: a checklist that fills in as each part answers
-            Column { visible: wl.step === 0; width: parent.width; spacing: 16
-                Rectangle { width: parent.width; height: cl.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
-                    Column { id: cl; width: parent.width
-                        Repeater {
-                            model: wl.step === 0 ? ["kernel", "data", "parts"] : []
-                            Item {
-                                id: ck
-                                required property var modelData
-                                required property int index
-                                readonly property var r: Store.softwareItem(modelData)
-                                // the kernel row waits for the real kernel to answer (GET /setup), not only for the files
-                                readonly property var live: modelData === "kernel" ? Store.setupItem("kernel") : null
-                                readonly property bool ok: !!r && r.status === "ok" && (modelData !== "kernel" || (!!live && live.status === "ok"))
-                                readonly property bool pending: !r || (modelData === "kernel" && !live)
-                                property bool shownOk: false
-                                onOkChanged: if (ok) tick.restart(); else shownOk = false
-                                Component.onCompleted: if (ok) tick.restart()
-                                SequentialAnimation { id: tick
-                                    PauseAnimation { duration: 180 + ck.index * 260 }
-                                    ScriptAction { script: ck.shownOk = true }
-                                    Glide { target: mark; property: "scale"; from: Theme.from(0.6); to: 1; duration: Theme.cross } }
-                                width: cl.width; height: 62
-                                Rectangle { visible: ck.index > 0; width: parent.width; height: 1; color: Theme.rule }
-                                Item { x: 18; width: 22; height: 22; anchors.verticalCenter: parent.verticalCenter
-                                    Rectangle { anchors.fill: parent; radius: 11; color: "transparent"; border.width: 2
-                                        border.color: ck.shownOk ? Theme.pass : (!ck.pending && !ck.ok) ? Theme.amber : Theme.rule2
-                                        Behavior on border.color { ColorAnimation { duration: Theme.slow } } }
-                                    Icon { id: mark; visible: ck.shownOk; anchors.centerIn: parent; name: "check"; size: 13; color: Theme.pass }
-                                    Spinner { visible: !ck.shownOk && (ck.pending || ck.ok); anchors.centerIn: parent; size: 12; color: Theme.ink3; running: visible && wl.step === 0 } }
-                                Column { x: 56; width: parent.width - 56 - 120; anchors.verticalCenter: parent.verticalCenter; spacing: 2
-                                    Txt { text: ck.r ? ck.r.label : ({ kernel: "CAD kernel", data: "Project folder", parts: "Standard-parts libraries" })[ck.modelData]; font.weight: 600 }
-                                    Txt { kind: "fine"; tone: 2; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
-                                        text: ck.pending ? (ck.modelData === "kernel" ? "Starting the kernel… this takes a few seconds the first time" : "Checking…")
-                                            : ck.live && ck.live.status === "ok" ? ck.live.detail : ck.live ? ck.live.detail : ck.r.status === "ok" ? ck.r.detail : ck.r.why } }
-                                Txt { anchors.right: parent.right; anchors.rightMargin: 18; anchors.verticalCenter: parent.verticalCenter; kind: "fine"
-                                    text: ck.shownOk ? "ready" : ck.pending || ck.ok ? "checking" : ck.r.level === "required" ? "needs attention" : "not installed"
-                                    color: ck.shownOk ? Theme.pass : ck.pending || ck.ok ? Theme.ink3 : Theme.amber }
-                            }
-                        }
-                    } }
-                // only what is not ready gets the full row with its command
-                SetupList { width: parent.width; visible: rows.length > 0
-                    ids: wl.sw ? ["kernel", "data", "parts"].filter(function (id) { var r = Store.softwareItem(id); return r && r.status !== "ok" }) : [] }
+            // step 1: what do you want to make? capability cards, a live download total
+            Column { visible: wl.step === 0; width: parent.width; spacing: 14
+                CapCards { width: parent.width; pick: wl.pick; onToggled: function (id, on) { wl.toggle(id, on) } }
+                Rectangle { objectName: "welcomeDownloadTotal"; width: parent.width; height: 44; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+                    Row { x: 16; spacing: 10; anchors.verticalCenter: parent.verticalCenter
+                        Icon { name: "cloud_download"; size: 15; color: Theme.ink2; anchors.verticalCenter: parent.verticalCenter }
+                        Txt { font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
+                            text: !Store.caps ? "Looking at what is installed…" : wl.pickMb > 0 ? "To download: " + wl.mb(wl.pickMb) : "Nothing to download: what you chose is here" } }
+                    Txt { kind: "fine"; anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
+                        text: "Agents are the next step" } }
                 Row { spacing: 10
                     Icon { name: "folder_open"; size: 14; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
                     Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; elide: Text.ElideMiddle; width: Math.min(implicitWidth, body.width - 30)
                         text: "Designs are kept in " + Bridge.dataDirShort + "  ·  change it later in Settings" } }
             }
 
-            // step 2: a printer, or just designing (form/purpose.py); slicers only for someone who prints
+            // step 2: the agent: three ways to reach a model, with what was found for each
             Column { visible: wl.step === 1; width: parent.width; spacing: 16
-                Row { id: uses; width: parent.width; spacing: 10
-                    Repeater {
-                        model: [{ id: "print", icon: "printer", title: "I have a 3D printer", sub: "Designs are checked against your printer and sliced with your slicer." },
-                                { id: "design", icon: "pencil", title: "I just design", sub: "No printer or slicer. Export STEP, STL, 3MF, OBJ, GLB and renders for anything: CNC, laser, moulding, rendering." }]
-                        Rectangle {
-                            id: use
-                            required property var modelData
-                            readonly property bool on: modelData.id === "print" ? wl.withPrinter : wl.justDesign
-                            objectName: modelData.id === "print" ? "welcomePrinter" : "welcomeJustDesign"   // objectName: "welcomePrinter" / objectName: "welcomeJustDesign"
-                            width: (uses.width - 10) / 2; height: uc2.implicitHeight + 28; radius: Theme.rMd
-                            color: on ? Theme.alpha(Theme.datum, 0.07) : um.containsMouse ? Theme.washHover : Theme.plate1
-                            border.color: on ? Theme.datum : Theme.rule; border.width: on ? 1.5 : 1
-                            Behavior on color { Tint {} }
-                            Column { id: uc2; x: 16; y: 14; width: parent.width - 32; spacing: 5
-                                Row { spacing: 8
-                                    Icon { name: use.modelData.icon; size: 16; color: use.on ? Theme.datum : Theme.ink2; anchors.verticalCenter: parent.verticalCenter }
-                                    Txt { text: use.modelData.title; font.weight: Theme.wSemi; anchors.verticalCenter: parent.verticalCenter } }
-                                Txt { kind: "fine"; tone: 2; width: parent.width; text: use.modelData.sub } }
-                            Icon { visible: use.on; name: "circle_check"; size: 16; color: Theme.datum; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 10 }
-                            MouseArea { id: um; anchors.fill: parent; hoverEnabled: true; enabled: !use.on
-                                onClicked: Store.setPrinting(use.modelData.id === "print") }
-                        }
-                    }
-                }
-                Txt { visible: wl.justDesign; width: parent.width; tone: 2
-                    text: "Nothing printing-related is installed. New designs start as 3D models; any one of them can still be made for printing later, and a slicer is offered then." }
-                Column { visible: wl.withPrinter; width: parent.width; spacing: 16
-                Rectangle { visible: wl.anySlicer && Store.slicer.available; width: parent.width; height: uc.implicitHeight + 28; radius: Theme.rMd
-                    color: Theme.alpha(Theme.pass, 0.06); border.color: Theme.alpha(Theme.pass, 0.25)
-                    Column { id: uc; x: 16; y: 14; width: parent.width - 32; spacing: 4
-                        Row { spacing: 8
-                            Icon { name: "printer"; size: 15; color: Theme.pass; anchors.verticalCenter: parent.verticalCenter }
-                            Txt { font.weight: 600; text: "Form Studio will slice with " + (Store.slicer.label || "your slicer"); anchors.verticalCenter: parent.verticalCenter } }
-                        Txt { kind: "fine"; tone: 2; width: parent.width
-                            text: Store.slicer.available ? Store.slicer.presets.machine.name + "  ·  " + Store.slicer.presets.filament.name + "  ·  " + Store.slicer.presets.process.name : "" }
-                        Txt { kind: "fine"; width: parent.width; text: "Read from what is selected in the slicer. Change the printer or filament there and Form Studio follows, or pick another one in Settings › Printing." } } }
-                Txt { visible: !!wl.sw && !wl.anySlicer; width: parent.width; tone: 2
-                    text: "No slicer was found. Pick the one that matches your printer; Bambu Studio is ticked because it is Form Studio's default. Untick it to install one later: designs, checks and exports work without it." }
-                SetupList { width: parent.width; ids: ["slicer.bambu", "slicer.orca", "slicer.prusa"] }
-                // no slicer: the bed size is the one thing FORM still needs to know
-                Rectangle { visible: !!wl.sw && !wl.anySlicer; width: parent.width; height: bc.implicitHeight + 28; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
-                    Column { id: bc; x: 16; y: 14; width: parent.width - 32; spacing: 10
-                        Txt { font.weight: 600; text: "Or tell Form Studio your printer's size" }
-                        Txt { kind: "fine"; tone: 2; width: parent.width
-                            text: "Without a slicer Form Studio still checks that a part fits the bed. With a slicer, the printer selected there is used instead." }
-                        Row { spacing: 8
-                            Field { id: pn; width: 220; placeholder: "Printer name"; text: Store.studio ? Store.studio.env.printer.name : "" }
-                            Field { id: px; width: 78; numeric: true; unit: "X"; text: Store.studio ? String(Store.studio.env.printer.envelope_mm[0]) : "" }
-                            Field { id: py; width: 78; numeric: true; unit: "Y"; text: Store.studio ? String(Store.studio.env.printer.envelope_mm[1]) : "" }
-                            Field { id: pz; width: 78; numeric: true; unit: "Z"; text: Store.studio ? String(Store.studio.env.printer.envelope_mm[2]) : "" }
-                            Txt { kind: "fine"; text: "mm"; anchors.verticalCenter: parent.verticalCenter }
-                            Btn { text: "Save size"; anchors.verticalCenter: parent.verticalCenter
-                                onClicked: Store.saveConfig({ "printer.name": pn.text, "printer.envelope_mm": [Number(px.text), Number(py.text), Number(pz.text)] }) } } } }
-                }
-            }
-
-            // step 3: the agent: three ways to reach a model, with what was found for each
-            Column { visible: wl.step === 2; width: parent.width; spacing: 16
                 Row { id: ways; width: parent.width; spacing: 10
                     Repeater {
                         model: [{ id: "cli", icon: "monitor", title: "An agent app", sub: "Claude Code, Codex, Gemini CLI and others, on their own accounts" },
@@ -276,17 +210,18 @@ Rectangle {
                         }
                     }
                 }
-                // an agent app: what is installed, and the installs and sign-ins for the ones Form Studio can set up
+                // an agent app: what is installed, and the agent apps Form Studio can install in the last step
                 Column { visible: wl.way === "cli"; width: parent.width; spacing: 16
                     Rectangle { visible: wcli.children.length > 1; width: parent.width; height: wcli.implicitHeight; radius: Theme.rMd
                         color: Theme.plate1; border.color: Theme.rule
                         Column { id: wcli; width: parent.width
                             Repeater {
-                                model: wl.step === 2 && wl.way === "cli" ? wl.agentsOf("cli").filter(function (a) { return a.available }) : []
+                                model: wl.step === 1 && wl.way === "cli" ? wl.agentsOf("cli").filter(function (a) { return a.available }) : []
                                 AgentRow { width: wcli.width; a: modelData; first: index === 0
                                     required property var modelData
                                     required property int index } } } }
                     Txt { visible: wl.sw && wl.missingApps.length > 0; kind: "cap"; text: "Agent apps Form Studio can install" }
+                    Txt { visible: wl.sw && wl.missingApps.length > 0; kind: "fine"; width: parent.width; text: "Tick the ones you want; they are installed in the last step with the rest." }
                     SetupList { width: parent.width; visible: wl.missingApps.length > 0; ids: wl.missingApps }
                     ClaudeSignIn { width: parent.width; visible: !!Store.softwareItem("claude") && Store.softwareItem("claude").status === "ok" }
                     Column { width: parent.width; spacing: 6; visible: others.rows.length > 0
@@ -302,7 +237,7 @@ Rectangle {
                     Rectangle { width: parent.width; height: wapi.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
                         Column { id: wapi; width: parent.width
                             Repeater {
-                                model: wl.step === 2 && wl.way === "api" ? wl.agentsOf("api") : []
+                                model: wl.step === 1 && wl.way === "api" ? wl.agentsOf("api") : []
                                 AgentRow { width: wapi.width; a: modelData; first: index === 0; k: wl.keyFor(modelData.key || "")
                                     required property var modelData
                                     required property int index
@@ -318,10 +253,49 @@ Rectangle {
                     Rectangle { width: parent.width; height: wloc.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
                         Column { id: wloc; width: parent.width
                             Repeater {
-                                model: wl.step === 2 && wl.way === "local" ? wl.agentsOf("local") : []
+                                model: wl.step === 1 && wl.way === "local" ? wl.agentsOf("local") : []
                                 AgentRow { width: wloc.width; a: modelData; first: index === 0
                                     required property var modelData
                                     required property int index } } } } }
+            }
+
+            // step 3: the install run of only what was chosen
+            Column { visible: wl.step === 2; width: parent.width; spacing: 14
+                Rectangle { objectName: "welcomeInstallList"; width: parent.width; height: il.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+                    Column { id: il; width: parent.width
+                        Item { visible: wl.runRows.length === 0; width: parent.width; height: 62
+                            Icon { x: 18; name: "circle_check"; size: 18; color: Theme.pass; anchors.verticalCenter: parent.verticalCenter }
+                            Column { x: 50; width: parent.width - 68; anchors.verticalCenter: parent.verticalCenter; spacing: 2
+                                Txt { font.weight: Theme.wSemi; text: "Everything you chose is ready" }
+                                Txt { kind: "fine"; tone: 2; width: parent.width; text: "Nothing to download. Open Form Studio and describe what you want to make." } } }
+                        Repeater {
+                            model: wl.step === 2 ? wl.runRows : []
+                            Item {
+                                id: ir
+                                required property var modelData
+                                required property int index
+                                readonly property var st: Store.installStep(modelData.id)
+                                width: il.width; height: 58
+                                Rectangle { visible: ir.index > 0; width: parent.width; height: 1; color: Theme.rule }
+                                Item { x: 18; width: 18; height: 18; anchors.verticalCenter: parent.verticalCenter
+                                    Icon { visible: !!ir.st && ir.st.state === "done"; anchors.centerIn: parent; name: "circle_check"; size: 16; color: Theme.pass }
+                                    Spinner { visible: !!ir.st && (ir.st.state === "running" || ir.st.state === "needs_user"); anchors.centerIn: parent; size: 12 }
+                                    Rectangle { visible: !ir.st || ["waiting", "failed", "skipped", "cancelled"].indexOf(ir.st.state) >= 0; anchors.centerIn: parent; width: 8; height: 8; radius: 4
+                                        color: ir.st && ir.st.state === "failed" ? Theme.signal : Theme.ink3 } }
+                                Column { x: 50; width: parent.width - 50 - 140; anchors.verticalCenter: parent.verticalCenter; spacing: 2
+                                    Txt { text: ir.modelData.label; font.weight: 600; wrapMode: Text.NoWrap; elide: Text.ElideRight; width: parent.width }
+                                    Txt { kind: "fine"; tone: 2; width: parent.width; wrapMode: Text.NoWrap; elide: Text.ElideRight
+                                        text: ir.st && ir.st.message ? ir.st.message : ir.modelData.why } }
+                                Txt { anchors.right: parent.right; anchors.rightMargin: 18; anchors.verticalCenter: parent.verticalCenter; kind: "fine"; mono: true
+                                    text: ir.st ? (ir.st.state === "needs_user" ? "your turn" : ir.st.state) : ir.modelData.installable ? (ir.modelData.size || "")
+                                        : ir.modelData.plan && ir.modelData.plan.kind === "login" || ir.modelData.id.indexOf(".signin") > 0 ? "sign-in" : "download page" }
+                            }
+                        }
+                    } }
+                Txt { visible: wl.runRows.length > 0 && !Store.installing && !wl.ran; kind: "fine"; tone: 2; width: parent.width
+                    text: "In all " + (wl.runMb > 0 ? wl.mb(wl.runMb) : "a small download") + ". Something Form Studio cannot install by itself opens its official download page, and the setup goes on when it is there." }
+                Txt { visible: Store.caps && !Store.capOn("print"); kind: "fine"; width: parent.width
+                    text: "3D printing is off. Turn it on any time in Settings › General › Set up for; only then is a slicer installed." }
             }
         }
     }
@@ -342,18 +316,20 @@ Rectangle {
         Item { width: body.width; x: body.x; height: 32; anchors.verticalCenter: parent.verticalCenter
             Row { spacing: 8; anchors.verticalCenter: parent.verticalCenter
                 Btn { kind: "quiet"; icon: "arrow_left"; text: "Back"; visible: wl.step > 0; enabled: !Store.installing; onClicked: wl.go(wl.step - 1) }
-                Btn { kind: "quiet"; text: "Skip setup"; enabled: !Store.installing; tip: "You can run it again from the command palette"
+                Btn { kind: "quiet"; text: "Skip setup"; visible: wl.step < 2; enabled: !Store.installing; tip: "You can run it again from the command palette"
                     onClicked: Store.closeWelcome("skipped") } }
             Row { spacing: 10; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; visible: !Store.installing && wl.chosen.length > 0
-                    text: "Untick everything to continue without installing" }
-                Btn { visible: Store.installing; large: true; icon: "x"; text: Store.installJob && Store.installJob.kind === "auto" ? "Cancel setup" : "Cancel install"; onClicked: Store.cancelInstall() }
-                Btn { kind: "primary"; large: true; busy: Store.installing || !wl.sw
+                Btn { objectName: "welcomeOpenWithout"; kind: "quiet"; visible: wl.step === 2 && !Store.installing && wl.runIds.length > 0
+                    text: wl.ran ? "Open Form Studio" : "Open without installing"; onClicked: Store.closeWelcome("done") }
+                Btn { visible: Store.installing; large: true; icon: "x"; text: "Cancel setup"; onClicked: Store.cancelInstall() }
+                Btn { objectName: "welcomePrimary"; kind: "primary"; large: true; busy: Store.installing || !wl.sw || !Store.caps
                     autoBusy: false              // moving between steps saves the step in the background: never wait for it
-                    icon: wl.chosen.length ? "download" : wl.step < 2 ? "arrow_right" : "check"
-                    text: Store.installing ? (Store.installJob && Store.installJob.kind === "auto" ? "Setting up…" : "Installing…") : !wl.sw ? "Checking…" : wl.chosen.length ? "Install " + wl.chosen.length + " selected"
-                        : wl.step < 2 ? "Continue" : "Open Form Studio"
-                    onClicked: wl.primary() } }
+                    icon: wl.step < 2 ? "arrow_right" : wl.runIds.length && !wl.ran ? "download" : "check"
+                    text: Store.installing ? "Setting up…" : !wl.sw || !Store.caps ? "Checking…"
+                        : wl.step < 2 ? "Continue"
+                        : wl.runIds.length && !wl.ran ? "Install " + wl.runIds.length + (wl.runIds.length === 1 ? " item" : " items")
+                        : wl.runIds.length ? "Try again" : "Open Form Studio"
+                    onClicked: wl.step === 2 && wl.ran && wl.runIds.length ? Store.runSetup(wl.runIds) : wl.primary() } }
         }
     }
 }

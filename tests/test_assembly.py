@@ -20,6 +20,7 @@ from form import assembly as asm, config  # noqa: E402
 from form.design_guide import EXAMPLE  # noqa: E402
 from form.recipes.base import Access, Assembly, Feature, Hardware, Param, Part, Recipe, hinge, slide  # noqa: E402
 from form.studio import Studio  # noqa: E402
+from printing_cfg import with_printing  # noqa: E402
 
 A = (Align.CENTER, Align.CENTER, Align.MIN)
 
@@ -190,7 +191,7 @@ class StudioAssembly(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ["FORM_DATA"] = TMP
-        cls.st = Studio(config.load())
+        cls.st = Studio(with_printing(config.load()))
 
     @classmethod
     def tearDownClass(cls):

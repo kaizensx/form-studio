@@ -366,6 +366,7 @@ def _real_slicer():
             os.environ.pop("FORM_CONFIG", None)
         else:
             os.environ["FORM_CONFIG"] = old
+    cfg["general"]["capabilities"] = ["core", "parts", "mesh", "print"]   # a real slice: printing is opt-in
     r = slicer.resolve(cfg)
     return cfg if r.get("available") and r["kind"] in ("bambu", "orca") else None
 

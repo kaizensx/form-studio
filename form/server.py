@@ -846,6 +846,8 @@ def _open(url, cfg):
 
 def serve(cfg=None):
     cfg = cfg or config.load()
+    from .capabilities import migrate_safely
+    migrate_safely(cfg)                                  # once: people who already print keep printing
     st = Studio(cfg)
     host, port = cfg["server"]["host"], int(cfg["server"]["port"])
     if host not in ("127.0.0.1", "localhost", "::1"):

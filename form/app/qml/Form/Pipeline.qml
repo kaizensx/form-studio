@@ -63,7 +63,7 @@ Rectangle {
     readonly property var nodes: [
         { id: "params", label: "Parameters", stage: "shape" }, { id: "geometry", label: "Solid", stage: "shape" }, { id: "exports", label: "Exports", stage: "release" },
         { id: "checks", label: "Checks", stage: "prove" }, { id: "slice", label: "Slice", stage: "prove" }, { id: "release", label: "Release", stage: "release" }]
-        .filter(function (n) { return n.id !== "slice" || !Store.modelDesign })
+        .filter(function (n) { return n.id !== "slice" || Store.printUi })
     onNodesChanged: needs = nodes.map(function () { return 0 })
     Row {
         id: row; anchors.fill: parent; anchors.leftMargin: 4; anchors.rightMargin: 4

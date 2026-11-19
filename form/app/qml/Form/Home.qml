@@ -9,7 +9,7 @@ import "F.js" as F
 //     words, a photo, a sketch, a part or a drawing, or a link. For my printer / Just a 3D model, or Start blank.
 //   · concepts the agent proposed and you have not picked yet
 //   · your designs as live parts on their plates; your recent conversations
-// Nothing pre-made: no recipes, no briefs, no example projects (an example is added only from Import).
+// Nothing pre-made: no recipes, no briefs, no example projects. Every design starts from what the person describes.
 Item {
     id: home
     objectName: "homeView"
@@ -197,13 +197,13 @@ Item {
                     Item { width: 1; height: 14 }
                     Txt { objectName: "homeTitle"; width: parent.width; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
                         font.pixelSize: home.cw > 900 ? 52 : 42; font.weight: Theme.wSemi; font.letterSpacing: home.cw > 900 ? -2.0 : -1.5; lineHeight: 1.0
-                        text: "What are we making?" }
+                        text: "What do you want to make?" }
                     Item { width: 1; height: 14 }
                     Txt { width: Math.min(parent.width, 600); x: home.split ? 0 : (parent.width - width) / 2; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
                         tone: 2; font.pixelSize: Theme.tLead; lineHeight: 1.4
                         text: home.chatting ? "You are talking with " + Store.chatAgentLabel + " in the column on the left. Open one of your designs to work on it together, or start a new design."
-                            : Store.newPurposeEffective === "model" ? "Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD you can check and export."
-                                                         : "Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD, checked and sliced for your printer." }
+                            : Store.printOn && Store.newPurposeEffective === "print" ? "Describe it. Form Studio engineers it: real, editable CAD, checked and sliced for your printer. Drop a photo, a part or a sketch too."
+                                                         : "Describe it. Form Studio engineers it: real, editable CAD you can check, render and export. Drop a photo, a part or a sketch too." }
                     Item { width: 1; height: 30 }
                     Row { objectName: "homeChatting"; visible: home.chatting; spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
                         Btn { objectName: "homeNewDesign"; kind: "primary"; icon: "plus"; text: "New design"; keys: "Ctrl+N"; onClicked: Store.startNew() }
@@ -215,11 +215,11 @@ Item {
                     Item { visible: !home.chatting; width: 1; height: 16 }
                     // ── under the composer: what it is for, which printer, which agent and model, or a blank canvas ──
                     Row { id: opts; objectName: "startOptions"; visible: !home.chatting; anchors.horizontalCenter: parent.horizontalCenter; spacing: 6; height: 30
-                        Seg { id: purposeSeg; objectName: "startPurpose"; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 30
+                        Seg { id: purposeSeg; objectName: "startPurpose"; visible: Store.printOn; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 30
                             value: Store.newPurposeEffective; onPicked: function (v) { Store.setNewPurpose(v) }
                             model: [{ value: "print", text: "For my printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" },
                                     { value: "model", text: "Just a 3D model", tip: "No printer: no slicing and no print checks. STEP and STL are still exported." }] }
-                        Btn { id: printerChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startPrinter"; small: true; kind: "quiet"; icon: "printer"; visible: Store.newPurposeEffective === "print"
+                        Btn { id: printerChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startPrinter"; small: true; kind: "quiet"; icon: "printer"; visible: Store.printOn && Store.newPurposeEffective === "print"
                             text: Store.printerName ? Store.printerName : "Choose a printer"
                             tip: "The printer the next design is checked and sliced for. Click to change it."
                             onClicked: Store.openSheet("printer") }
@@ -278,7 +278,7 @@ Item {
                 Txt { visible: home.fresh; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 26
                     kind: "fine"; tone: 4; text: "Every part is built in a real CAD kernel and checked before you print it. Nothing prints or uploads on its own." }
                 Btn { visible: home.fresh; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: 18; kind: "quiet"; small: true; icon: "import"; text: "Import…"
-                    tip: "A .formstudio project, a conversation, or an example"; onClicked: Store.openSheet("import") }
+                    tip: "A .formstudio project or a conversation"; onClicked: Store.openSheet("import") }
             }
 
             Note { visible: home.broken.length > 0; width: parent.width; kind: "amber"; title: F.plural(home.broken.length, "folder") + " could not be read"
@@ -356,7 +356,7 @@ Item {
                         model: [{ value: "all", text: "All" }, { value: "open", text: "In progress" }, { value: "released", text: "Released" }] }
                     Btn { visible: home.everything.length > 6; kind: "quiet"; icon: "arrow_up_down"; text: home.order === "recent" ? "Last changed" : "Name"; tip: "Sort order"
                         onClicked: home.order = home.order === "recent" ? "name" : "recent" }
-                    Btn { kind: "quiet"; icon: "import"; text: "Import…"; tip: "A .formstudio project, a .formproj, a conversation, or an example"; onClicked: Store.openSheet("import") }
+                    Btn { kind: "quiet"; icon: "import"; text: "Import…"; tip: "A .formstudio project, a .formproj, or a conversation"; onClicked: Store.openSheet("import") }
                     Btn { kind: "quiet"; icon: "folder_open"; tip: "Open the projects folder: " + Bridge.dataDirShort; onClicked: Bridge.openDataFolder() } } }
             Item { visible: home.everything.length > 0; width: 1; height: 14 }
             Grid {

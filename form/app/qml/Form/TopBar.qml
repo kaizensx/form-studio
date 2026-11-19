@@ -74,20 +74,19 @@ Rectangle {
     }
     Row { id: right; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 6
         StatusChips { anchors.verticalCenter: parent.verticalCenter; compact: bar.work ? !bar.roomy : bar.tight }      // setup / update notices
-        // what the open design is for, or that this person just designs (form/purpose.py); opens the choice
+        // what the open design is for (form/purpose.py), only when 3D printing is on: then a model says it is not a print
         Item { id: purposeChip; objectName: "purposeChip"; width: pchip.implicitWidth + 16; height: 26; anchors.verticalCenter: parent.verticalCenter
             readonly property bool model: !!Store.project && Store.modelDesign
-            visible: !!Store.studio && (model || (!Store.prints && !(Store.project && Store.purpose === "print")))
+            visible: Store.printOn && model
             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: pm.pressed ? Theme.washPress : pm.containsMouse || purposeMenu.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
             Row { id: pchip; x: 8; spacing: 7; anchors.verticalCenter: parent.verticalCenter
-                Icon { name: purposeChip.model ? "box" : "pencil"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
+                Icon { name: "box"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
                 Txt { kind: "fine"; color: Theme.ink2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
-                    text: purposeChip.model ? (bar.tight && bar.work ? "3D model" : "3D model · not for printing") : (bar.tight && bar.work ? "No printer" : "No printer · Just designing") } }
+                    text: bar.tight && bar.work ? "3D model" : "3D model · not for printing" } }
             MouseArea { id: pm; anchors.fill: parent; hoverEnabled: true
-                onClicked: purposeChip.model ? (purposeMenu.opened ? purposeMenu.close() : purposeMenu.open()) : Store.openSettings("general") }
+                onClicked: purposeMenu.opened ? purposeMenu.close() : purposeMenu.open() }
             Tip { show: pm.containsMouse && !purposeMenu.opened
-                text: purposeChip.model ? "This design is a 3D model: no printer, slicer or print checks. Click to change what it is for."
-                    : "You just design: no printer or slicer is needed. Click to change it in Settings." }
+                text: "This design is a 3D model: no printer, slicer or print checks. Click to change what it is for." }
             PopMenu { id: purposeMenu; y: parent.height + 6; width: 250
                 model: [
                     { icon: "box", text: "Just a 3D model", run: function () { Store.setPurpose("model") } },
@@ -97,7 +96,7 @@ Rectangle {
         // what it will print on; opens the printer picker
         Item { width: chip.implicitWidth + 16; height: 26; anchors.verticalCenter: parent.verticalCenter
             objectName: "printerChip"
-            visible: !!Store.studio && !purposeChip.visible
+            visible: Store.printUi
             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: cm.pressed ? Theme.washPress : cm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
             Row { id: chip; x: 8; spacing: 7; anchors.verticalCenter: parent.verticalCenter
                 Icon { name: "printer"; size: 13; anchors.verticalCenter: parent.verticalCenter; color: Store.printing.available ? Theme.ink3 : Theme.amber }

@@ -4,8 +4,18 @@ The project's goals: the brief every contributor works from.
 
 ## The product
 
-**FORM is the best open-source AI-to-CAD app.** You open it, describe a physical part, and an AI agent designs it with a
-real CAD kernel while you watch. It checks the part, slices it with your real slicer, and tells you honestly what is known.
+**Form Studio is the open-source AI CAD studio: describe anything, and an engineer-grade agent builds it as real,
+editable CAD.** A part, a product shell, a mechanism or an organic form: you describe it, add a photo, a sketch, a
+drawing or a mesh, and the agent designs it with a parametric CAD kernel while you watch. Every design stays editable:
+named parameters, features you can select and change, a revision history and checks that say honestly what is known.
+
+Making it is the last step, and printing is one way among several: STEP for another CAD program, renders, CNC, laser
+cutting, moulding, or 3D printing with your own slicer. 3D printing is optional and opt-in; nothing about printers or
+slicers appears until you turn it on.
+
+Setup is a launcher. It asks what you want to make, which agent designs with you, and then downloads only that. Every
+choice can be changed later in Settings.
+
 It should feel like a first-class native creative tool (the calm of Linear, the craft of Things, the viewport of a pro
 CAD package), not like a developer demo.
 

@@ -25,6 +25,7 @@ from build123d import Align, Box, Cylinder, Face, Pos, Solid, Vector, Wire  # no
 from form import analysis as an, config, kernel  # noqa: E402
 from form.recipes.base import Feature, Recipe  # noqa: E402
 from form.studio import Studio, StudioError  # noqa: E402
+from printing_cfg import with_printing  # noqa: E402
 
 A = (Align.CENTER, Align.CENTER, Align.MIN)
 
@@ -362,7 +363,7 @@ class StudioAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ["FORM_DATA"] = TMP
-        cls.st = Studio(config.load())
+        cls.st = Studio(with_printing(config.load()))
         p = cls.st.create("Analysis hook", "hook")
         cls.pid = p["id"]
         cls.st.run_sync(cls.pid, ["geometry", "exports", "checks"])

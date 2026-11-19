@@ -7,7 +7,7 @@ import json
 import shutil
 from pathlib import Path
 
-from _lib import make, wait_job
+from _lib import make, printing_on, wait_job
 
 DATA = "fresh"
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,9 +41,10 @@ def reply(ui, timeout=60):
 def journey_blank(ui):
     home(ui)
     ui.shot("start-home-empty")
-    # Just a 3D model: no printer, no print checks
-    ui.click_text("Just a 3D model", within=ui.item("startPurpose"))
-    ui.wait_until(lambda: ui.js("Store.newPurposeEffective") == "model", 3, "the purpose of the next design to change")
+    # printing is opt-in: a new person's next design is a 3D model and Home says nothing about printers
+    ui.eq(ui.js("Store.newPurposeEffective"), "model", "a new design is a 3D model")
+    ui.check(ui.find(name="startPurpose") is None or not ui.item("startPurpose").isVisible(), "no print choice while printing is off")
+    ui.check(ui.find(name="purposeChip") is None and ui.find(name="printerChip") is None, "no printer talk in the top bar")
     # the printer and the agent are chosen right under the composer
     ui.check(ui.exists("startModel"), "the agent and model chip is under the composer")
     ui.check(not ui.exists("startPrinter"), "no printer chip for a 3D model")
@@ -72,6 +73,7 @@ def journey_blank(ui):
 
 def journey_photo_reaches_the_agent(ui):
     home(ui)
+    printing_on(ui)                                  # someone who prints: Home offers the purpose
     ui.click_text("For my printer", within=ui.item("startPurpose"))
     ui.wait_until(lambda: ui.js("Store.newPurposeEffective") == "print", 5, "the purpose back to printing")
     photo = Path(ui.files) / "desk-clip.png"

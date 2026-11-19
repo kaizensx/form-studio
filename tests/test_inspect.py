@@ -15,6 +15,7 @@ TMP = tempfile.mkdtemp(prefix="form-inspect-")
 from form import config, kernel, materials, selection  # noqa: E402
 from form.design_guide import EXAMPLE  # noqa: E402
 from form.studio import Studio, StudioError  # noqa: E402
+from printing_cfg import with_printing  # noqa: E402
 
 NO_ASSEMBLY = EXAMPLE.split("    def assembly(self, v):")[0]          # the example box, two bodies, nothing declared
 
@@ -118,7 +119,7 @@ class OnTheSolid(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ["FORM_DATA"] = TMP
-        cls.st = Studio(config.load())
+        cls.st = Studio(with_printing(config.load()))
         cls.box = cls.st.create("Hinged", "hinged_box")
         cls.v = cls.st.view(cls.st.load(cls.box["id"]))
 

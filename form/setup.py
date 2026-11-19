@@ -217,8 +217,8 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
 
     # --- slicer -----------------------------------------------------------
     from . import purpose as purpose_mod
-    if not purpose_mod.printing(cfg):                              # "I just design": nothing to set up
-        items.append(Item("slicer", "Slicer", "info", "Not needed: you just design. Turn on “I have a 3D printer” in Settings › General to slice designs."))
+    if not purpose_mod.printing(cfg):                              # 3D printing is off: nothing to set up
+        items.append(Item("slicer", "Slicer", "info", "Not needed: 3D printing is off. Turn it on in Settings › General › Set up for to slice designs."))
     else:
         s = slicer.resolve(cfg)
         name = s.get("label") or "Bambu Studio"

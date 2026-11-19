@@ -62,7 +62,6 @@ Item {
         add("Tools", "blank", "square_dashed", "Start blank", "An empty build plate: describe, sketch or import what goes on it", function () { Store.startBlank() })
         add("Tools", "block", "cuboid", "Start from a block", "A rounded block shaped with sliders, no agent", function () { Store.startBlock("") })
         if (Store.concepts.length) add("Tools", "concepts", "boxes", "Concepts waiting for a pick", Store.concepts[0].name, function () { Store.openConcepts(Store.concepts[0].id) })
-        add("Tools", "example", "box", "Open an example", "Finished designs that ship with Form Studio", function () { Store.openSheet("import", { examples: true }) })
         if (Store.studio) Store.studio.projects.forEach(function (p) { if (!p.error && p.id !== Store.pid) add("Designs", "p." + p.id, "cuboid", p.name, F.pad(p.head) + " · " + F.ago(p.updated), function () { Store.open(p.id) }) })
         add("Conversations", "chat.new", "message_square_plus", "New conversation", "", function () { Store.newChat(); Store.talkOpen = true }, "Ctrl+Shift+O")
         if (w) add("Conversations", "chat.toggle", "panel_left", (Store.talkOpen ? "Hide" : "Show") + " the conversation", "", function () { Store.talkOpen = !Store.talkOpen }, "Ctrl+J")
@@ -72,14 +71,14 @@ Item {
         if (ai) (ai.models || []).forEach(function (m) { add("Conversations", "model." + ai.id + "." + m.id, "bot", "Model: " + m.label, Store.chatModel === m.id || (m.id === "default" && !Store.chatModel) ? "In use · " + ai.label : ai.label, function () { Store.setChatChoice(undefined, m.id) }) })
         ;(Store.chatAgents || []).forEach(function (a) { if (a.available && a.id !== Store.chatAgent) add("Conversations", "agent." + a.id, "bot", "Agent: " + a.label, "Switch the agent that answers", function () { Store.setChatChoice(a.id) }) })
         add("Settings", "settings", "settings", "Settings", "", function () { Store.openSettings("general") }, "Ctrl+,")
-        if (Store.prints) add("Settings", "settings.printer", "printer", "Settings: printing", "Default printer, slicer, bed", function () { Store.openSettings("printer") })
-        add("Settings", "settings.use", Store.prints ? "pencil" : "printer", Store.prints ? "I just design (no printer)" : "I have a 3D printer",
-            "How you use Form Studio; change it any time", function () { Store.setPrinting(!Store.prints) })
-        if (Store.project) add("Settings", "purpose", Store.modelDesign ? "printer" : "box", Store.modelDesign ? "Make this design for 3D printing" : "Make this design just a 3D model",
+        if (Store.printOn) add("Settings", "settings.printer", "printer", "Settings: printing", "Default printer, slicer, bed", function () { Store.openSettings("printer") })
+        add("Settings", "settings.use", "printer", Store.printOn ? "Turn 3D printing off" : "Turn 3D printing on",
+            "Set up for: printing is optional; off hides it and uninstalls nothing", function () { Store.setCap("print", !Store.printOn) })
+        if (Store.project && Store.printOn) add("Settings", "purpose", Store.modelDesign ? "printer" : "box", Store.modelDesign ? "Make this design for 3D printing" : "Make this design just a 3D model",
             "What this design is for", function () { Store.setPurpose(Store.modelDesign ? "print" : "model") })
         add("Settings", "settings.chat", "message_square", "Settings: agents", "Agent apps, API keys, local models", function () { Store.openSettings("chat") })
-        add("Settings", "printer", "printer", "Choose printer", "Printer, filament and process for this design", function () { Store.openSheet("printer") })
-        add("Settings", "slicer", "printer", "Choose slicer", Store.slicer.label || "", function () { Store.openSheet("slicer") })
+        if (Store.printOn) add("Settings", "printer", "printer", "Choose printer", "Printer, filament and process for this design", function () { Store.openSheet("printer") })
+        if (Store.printOn) add("Settings", "slicer", "printer", "Choose slicer", Store.slicer.label || "", function () { Store.openSheet("slicer") })
         add("Settings", "software", "wrench", "Software: install or check", "Slicer, agents, CAD apps", function () { Store.openSettings("software") })
         add("Settings", "setup", "list_checks", "Setup checklist", "What Form Studio found on this computer", function () { Store.openSetup() })
         add("Settings", "onboard", "sparkles", "Run the first-time setup again", "Three short steps", function () { Store.setOnboardStep(0); Store.checkSoftware(); Store.welcome = true })

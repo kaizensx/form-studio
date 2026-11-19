@@ -1,9 +1,9 @@
 """What an agent needs to write a FORM design: the contract, the rules, and an example that builds."""
 
-GUIDE = """\
+_TEMPLATE = """\
 A Form Studio design is one Python file that defines one subclass of Recipe. Form Studio imports it, builds it in the
 CAD kernel (build123d on OpenCascade), attributes every face to a feature, and runs the full pipeline:
-renders, checks, fit model, slice, revisions, optimizer, animation, release.
+{pipeline}
 
 CONTRACT
   from build123d import *                      # algebra API only: Box, Cylinder, Pos, Rot, Plane, fillet, ...
@@ -11,7 +11,7 @@ CONTRACT
 
   class Design(Recipe):
       title, summary = "...", "..."
-      solids = 1                               # separate printed bodies in the result (2 for case + lid)
+      solids = 1                               # separate bodies in the result (2 for case + lid)
       params = [Param(key, label, default, min, max, step, unit, group, feature, doc), ...]
       features = [Feature(id, label, role), ...]          # role: structure | interface | access | finish
       fit = None or {"cavity": derived_key, "mating": param_key, "clearance": param_key,
@@ -32,10 +32,7 @@ RULES
      objects created inside an active builder silently join the part.
   4. Each Stage holds the WHOLE solid after that feature. Order matters: a face belongs to the last stage
      that created its surface. Give each feature its own stage so renders and impact can name it.
-  5. Print orientation: model every part as it sits on the bed (flat face on z = 0). Put multiple parts
-     side by side with at least 5 mm between them and set solids = N.
-  6. Prefer chamfers on bottom edges and 45° ceilings over flat overhangs. Walls >= 1.2 mm (3 lines).
-  7. Dimensions from datasheets or drawings (open them with read_document): put them in params with
+{rules_5_6}  7. Dimensions from datasheets or drawings (open them with read_document): put them in params with
      provenance="specified" and the source in doc ("Raspberry Pi 5 mechanical drawing"). Values the user
      measured: provenance="measured". Your own estimates stay "assumed". Say in your reply which you could not confirm.
   8. constraints() must catch every combination that would build something useless or invalid, naming the
@@ -145,6 +142,31 @@ WORKFLOW
   design_guide -> write source -> create_design (or update_design) -> render -> get_project (checks, slice)
   -> fix -> request_release. Parameter-only changes: preview_change / commit_change, as for any project.
 """
+
+# rules 5-6 depend on what the design is for (form/purpose.py): bed orientation, overhangs and nozzle walls only for a print
+_PRINT = {"pipeline": "renders, checks, fit model, slice, revisions, optimizer, animation, release.",
+          "rules_5_6": """\
+  5. Print orientation: model every part as it sits on the bed (flat face on z = 0). Put multiple parts
+     side by side with at least 5 mm between them and set solids = N.
+  6. Prefer chamfers on bottom edges and 45° ceilings over flat overhangs. Walls >= 1.2 mm (3 lines).
+"""}
+_MODEL = {"pipeline": "renders, checks, exports (STEP, STL, 3MF, OBJ, GLB), revisions, optimizer, animation, release.",
+          "rules_5_6": """\
+  5. Model each part in the coordinates it is used in (base on z = 0 where it has one). Put multiple parts side
+     by side with a gap and set solids = N, or declare an assembly() so they are shown in place.
+  6. Design for how it will be made when the person says (CNC, moulding, casting, sheet metal: the checks name the
+     smallest feature that process holds). Otherwise favour proportion and finish: real fillets and chamfers,
+     consistent wall thickness, no knife edges.
+"""}
+
+
+def guide(purpose: str | None = "model") -> str:
+    """The guide for a design made for `purpose`: "print" adds bed orientation, overhang and nozzle-wall rules."""
+    v = _PRINT if purpose == "print" else _MODEL
+    return _TEMPLATE.replace("{pipeline}", v["pipeline"]).replace("{rules_5_6}", v["rules_5_6"])
+
+
+GUIDE = guide("model")
 
 EXAMPLE = '''\
 """Two-part box with a press-fit lid and a cable notch. Form Studio example design."""

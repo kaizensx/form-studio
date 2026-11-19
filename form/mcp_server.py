@@ -33,8 +33,9 @@ from .digest import digest as _digest
 from .studio import H, Studio, StudioError
 
 INSTRUCTIONS = """\
-Form Studio designs parts with a real CAD kernel, for 3D printing or as plain 3D models, and keeps an honest record of
-what is known.
+Form Studio is an AI CAD studio: it designs parts, products and mechanisms as real, editable CAD (a parametric kernel)
+and keeps an honest record of what is known. 3D printing is one optional way to make a design; it is off unless the
+person turned it on (form_overview: has_printer).
 
 Workflow: form_overview -> describe_recipe -> create_project (or get_project) -> preview_change ->
 render (look at it) -> commit_change -> run_pipeline -> get_project (gate, checks, next actions) ->
@@ -129,6 +130,23 @@ def _purpose(purpose: str | None) -> str | None:
     return start.env_purpose()
 
 
+# Tools that only make sense for someone who prints (form/capabilities.py "print"). With printing off they are left out
+# of form_overview and refuse with PRINTING_OFF: Form Studio is for making things; printing is opt-in.
+PRINT_TOOLS = ("choose_printer", "plate_plan", "pack_plate", "print_simulation", "slice_test_piece", "set_print_setup")
+PRINTING_OFF = ("printing is off; enable it in Settings (Set up for › 3D printing). Form Studio still designs, checks "
+                "and exports this as a 3D model (STEP, STL, 3MF, OBJ, GLB).")
+
+
+def _printing_on() -> bool:
+    from . import purpose as purpose_mod
+    return purpose_mod.printing(studio().cfg)
+
+
+def _need_printing() -> None:
+    if not _printing_on():
+        raise ToolError(PRINTING_OFF)
+
+
 def digest(st: Studio, pid: str) -> dict:
     return _digest(st, pid, S["bench"].get("url"))
 
@@ -145,7 +163,7 @@ async def _wait_job(st: Studio, jid: str, wait_s: float) -> dict:
 # ---- server ---------------------------------------------------------------
 
 def build() -> MCPServer:
-    mcp = MCPServer("form", title="Form Studio print-design studio", version=__version__, instructions=INSTRUCTIONS)
+    mcp = MCPServer("form", title="Form Studio AI CAD studio", version=__version__, instructions=INSTRUCTIONS)
     RO = ToolAnnotations(read_only_hint=True, open_world_hint=False)
     RW = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
 
@@ -164,10 +182,14 @@ def build() -> MCPServer:
                 "projects": [{k: q.get(k) for k in ("id", "name", "recipe", "head", "approved_rev", "purpose")} for q in st.list()],
                 "data_dir": env["data_dir"], "bench": _bench(),
                 "has_printer": env["purpose"]["printing"], "purpose_default": env["purpose"]["default"],
+                "capabilities": env["purpose"].get("capabilities", []),
+                "print_tools": list(PRINT_TOOLS),
             }
-            if not env["purpose"]["printing"]:      # someone who only designs: no printer talk at all
-                out.pop("printer"); out.pop("calibration_profile")
-                out["slicer"] = {"needed": False, "note": "This person does not 3D print. Do not suggest a printer or a slicer."}
+            if not env["purpose"]["printing"]:      # printing is off (the default): no printer talk at all
+                out.pop("printer"); out.pop("calibration_profile"); out.pop("print_tools")
+                out["slicer"] = {"needed": False, "note": "3D printing is off. Do not suggest a printer, a slicer, filament "
+                                                          "or print orientation; the print tools refuse until the person "
+                                                          "turns 3D printing on in Settings."}
             return out
         return await _run(go)
 
@@ -231,12 +253,15 @@ def build() -> MCPServer:
                            "form": "free design choices"}}
 
     @mcp.tool(annotations=RO)
-    async def design_guide() -> dict:
+    async def design_guide(purpose: str | None = None) -> dict:
         """Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
         holder, mechanism...). Returns the contract for a design written as code, the rules, and a complete example
-        that builds. Then call create_design."""
-        from .design_guide import EXAMPLE, GUIDE
-        return {"guide": GUIDE, "example_source": EXAMPLE,
+        that builds. Then call create_design. purpose: "print" or "model" (default: the person's default, see
+        form_overview); the print rules (bed orientation, overhangs, nozzle walls) are only in the guide for "print"."""
+        from . import purpose as purpose_mod
+        from .design_guide import EXAMPLE, guide
+        pur = purpose_mod.normalise(_purpose(purpose)) or purpose_mod.default(studio().cfg)
+        return {"guide": guide(pur), "purpose": pur, "example_source": EXAMPLE,
                 "built_in_recipes": "dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob (use create_project for these)"}
 
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True), structured_output=False)
@@ -664,8 +689,12 @@ def build() -> MCPServer:
         design_only=True: the design is not sliced (checks, exports and release still work; the release says it was
         not sliced). material: PLA, PETG, ABS, ASA, TPU, PA, PC, ... for the whole design ("" clears): the slice uses the
         printer's filament preset for it and the checks add notes for that material. Ask the user before changing either.
-        purpose: "print" or "model" (just a 3D model, never sliced); process: for a model, how it will be made."""
+        purpose: "print" or "model" (just a 3D model, never sliced); process: for a model, how it will be made.
+        With 3D printing off only purpose="model" and process are accepted."""
         st = studio()
+        if not _printing_on() and (any(v is not None for v in (orientation, fit_gap_min_mm, fit_gap_max_mm, auto_slice,
+                                                                design_only, material)) or (purpose and purpose != "model")):
+            raise ToolError(PRINTING_OFF)
         body: dict[str, Any] = {}
         if orientation is not None:
             body["orientation"] = orientation
@@ -731,6 +760,7 @@ def build() -> MCPServer:
     async def slice_test_piece(project: str) -> dict:
         """Cut a thin ring through the fit interface of this revision and slice it, so a cheap test print can check the fit
         before the whole part. Returns its STL path and simulated time and material."""
+        _need_printing()
         st = studio()
         def go():
             p = st.load(project)
@@ -1009,6 +1039,7 @@ def build() -> MCPServer:
         bridge and overhang layers. only: draw just these line types (e.g. ["Bridge", "Overhang wall"]).
         plate: which plate (1-based) when the design was sliced on several (plate_plan). Needs a current slice
         (run_pipeline). This is a simulation of the slice, not a print: say so."""
+        _need_printing()
         st = studio()
         def go():
             from . import simulate, toolpath
@@ -1054,6 +1085,7 @@ def build() -> MCPServer:
         the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts
         too big for the plate, and per plate the slicer's time and filament when it has been sliced. Computed by FORM from
         bounding boxes; each plate is sliced on its own. Needs current checks (run_pipeline)."""
+        _need_printing()
         st = studio()
         def go():
             from . import plates
@@ -1081,6 +1113,7 @@ def build() -> MCPServer:
         """Do `copies` of this design fit on one plate? Bounding-box packing with a gap (default 6 mm) and 90° turns,
         on the selected printer's bed. Returns the layout and the most copies this packer can place. Computed by FORM;
         the slicer arranges again when it slices, and FORM's export stays one plate."""
+        _need_printing()
         st = studio()
         def go():
             from . import packing
@@ -1207,6 +1240,7 @@ def build() -> MCPServer:
         A1 mini 0.4 nozzle"); "" with a project clears its choice. Filament and process default to what the slicer would
         pick for that printer. Slicing and the bed-size and nozzle checks follow the choice; the slice goes stale.
         Ask the user which printer before calling this."""
+        _need_printing()
         def go():
             from . import printers
             st = studio()
@@ -1506,6 +1540,8 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     mcp = build()
     st = studio()
+    from .capabilities import migrate_safely
+    migrate_safely(st.cfg)                               # once: people who already print keep printing
     if not a.no_bench:
         from .server import start_bench
         S["bench"] = start_bench(st)

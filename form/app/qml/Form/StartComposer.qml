@@ -113,10 +113,10 @@ Rectangle {
                 property int n: 0
                 readonly property var lines: !Store.chatReady && Store.studio ? ["No agent is connected. Start blank, or connect one in Settings › Agents."]
                     : ["Describe it, or drop a photo, a sketch, a part or a link…",
-                       "A wall bracket for a 120 mm fan, two M4 screws 105 mm apart",
-                       "A clip that holds this cable to the edge of my desk",
-                       "A knob like the one in my photo, with a 6 mm D-shaft",
-                       "A case for the board in this STEP file, with a snap lid"]
+                       "A planetary gearbox for a NEMA 17 motor, about 1:16",
+                       "A case for the board in this STEP file, with a snap lid",
+                       "An ergonomic handle shaped to the palm, with a soft taper",
+                       "A knob like the one in my photo, with a 6 mm D-shaft"]
                 text: lines[n % lines.length]
                 Timer { interval: 4200; repeat: true; running: ph.visible && ph.lines.length > 1 && !ta.activeFocus
                     onTriggered: phSwap.start() }

@@ -11,12 +11,13 @@ from pathlib import Path
 from form import advisor, config, fit as fit_mod, slicer
 from form.recipes import RecipeError, registry
 from form.studio import NODES, Studio, StudioError
+from printing_cfg import with_printing  # noqa: E402
 from form.worker import KernelFailure
 
 
 def make_studio(tmp, **over):
     os.environ["FORM_DATA"] = str(tmp)
-    cfg = config.load()
+    cfg = with_printing(config.load())
     for section, values in over.items():
         cfg[section].update(values)
     return Studio(cfg)

@@ -11,7 +11,6 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "form" / "app" / "assets"), "form/app/assets"),
          (str(ROOT / "form" / "web"), "form/web"),
          (str(ROOT / "form" / "recipes"), "form/recipes"),      # recipe sources are hashed into artifact keys
-         (str(ROOT / "form" / "examples"), "form/examples"),
          (str(ROOT / "form" / "fonts"), "form/fonts"),          # the font used for text on parts
          (str(ROOT / "form" / "presets"), "form/presets"),
          # What's New after an update reads the running version's section from here (form/whatsnew.py)

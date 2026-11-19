@@ -17,8 +17,8 @@ Column {
     readonly property string head: d ? F.pad(d.project.head) : ""
     readonly property bool busy: Store.job !== ""
     readonly property bool sliceFailed: !!sn && sn.state === "failed"
-    readonly property bool sliceOff: !!sn && sn.state === "off" && !Store.modelDesign  // Design only
-    readonly property bool model: Store.modelDesign                                     // a 3D model: no print checks, no slice
+    readonly property bool sliceOff: !!sn && sn.state === "off" && Store.printUi      // Design only
+    readonly property bool model: !Store.printUi                                        // a 3D model or printing off: no print rows
     readonly property var plates: Store.plates                                          // several plates (form/plates.py)
     readonly property var pl: plates.length ? plates[Store.plateShown - 1] : null        // the plate on screen
     readonly property var shownSlice: pl ? Object.assign({}, sl, pl) : sl                // that plate, or the one slice
@@ -136,9 +136,9 @@ Column {
     Item { width: 1; height: 6; visible: !!root.ch }
 
     // ── a 3D model: which print checks do not apply, and the way back to printing ──
-    Note { objectName: "modelChecksNote"; visible: root.model && !!root.ch; kind: "plain"; title: "3D model: print checks do not apply"
+    Note { objectName: "modelChecksNote"; visible: Store.printOn && root.model && !!root.ch; kind: "plain"; title: "3D model: print checks do not apply"
         text: root.ch && root.ch.not_applicable ? "Not run, because this design is not for 3D printing: " + root.ch.not_applicable.join(", ") + "." : "" }
-    Row { visible: root.model && !!root.ch; spacing: 8; topPadding: 6
+    Row { visible: Store.printOn && root.model && !!root.ch; spacing: 8; topPadding: 6
         Btn { objectName: "makePrintable"; small: true; icon: "printer"; text: "Make it for 3D printing"; enabled: !root.busy
             tip: "Run the print checks and slice it (when a slicer is installed)"; onClicked: Store.setPurpose("print") } }
 
@@ -234,7 +234,7 @@ Column {
     }
 
     // ── slice ────────────────────────────────────────────────
-    Sec { visible: !!root.sl
+    Sec { visible: !!root.sl && !root.model
         title: root.sl ? "Slice of " + F.pad(root.sl.rev) + (root.plates.length > 1 ? " · " + root.plates.length + " plates" : "") : ""; tag: "simulated"
         Row { width: parent.width; topPadding: 4; bottomPadding: 2
             Repeater {
