@@ -11,10 +11,11 @@ print time, grams and checks are shown only when a revision with the same values
 """
 from __future__ import annotations
 
+import os
 import re
 import time
 
-from .studio import H, StudioError
+from .studio import H, StudioError, lineage
 
 MAX_VARIANTS = 24
 
@@ -46,7 +47,7 @@ def find(p: dict, ident: str) -> dict:
 
 
 def save(st, p: dict, name: str, values: dict | None = None, rev: int | None = None, note: str = "", by: str = "you",
-         source: str = "") -> dict:
+         source: str = "", conversation: str | None = None) -> dict:
     """Save a variant. values: changes on top of the head (or of rev). Without values it is the head (or rev) itself.
     A variant with the same name is replaced. The candidate must build before it is saved."""
     name = " ".join(str(name or "").split())[:60]
@@ -69,7 +70,12 @@ def save(st, p: dict, name: str, values: dict | None = None, rev: int | None = N
         if len(old) >= MAX_VARIANTS:
             raise StudioError(f"A project keeps up to {MAX_VARIANTS} variants.", "Delete one first.")
         rec = {"id": vid, "name": name, "values": vals, "recipe": rid, "note": str(note or "")[:300], "by": by,
-               "created": time.time(), "source": source or ("revision" if _rev_of(st, p, vals) else "draft")}
+               "created": time.time(), "source": source or ("revision" if _rev_of(st, p, vals) else "draft"),
+               "lineage": lineage(p, "variant") | {"parent_rev": base["n"]}}
+        # saved from a conversation (an agent's tool call carries it): the variant names it, so it stays linked
+        cid = conversation if conversation is not None else os.environ.get("FORM_CONVERSATION", "")
+        if re.fullmatch(r"[0-9a-f]{12}", str(cid or "")):
+            rec["conversation"] = cid
         p["variants"] = old + [rec]
         st.decide(p, "variant", f"Variant “{name}” saved" + (f" ({rec['note']})" if rec["note"] else "") + ".")
         st.save(p)

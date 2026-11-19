@@ -1,14 +1,23 @@
 """Conversations: every chat is a folder on disk, so it reloads exactly as it was.
 
-    <data>/.conversations/<id>/meta.json       id, title, project, agent, model, effort, session, pinned, cost, …
+    <data>/.conversations/<id>/meta.json       id, title, project, agent, model, effort, session, pinned, cost,
+                                               thread, parent, fork_event, fork_reason, projects, …
     <data>/.conversations/<id>/events.jsonl    one event per line: user, start, text, tool, result, act, end, error
     <data>/.conversations/<id>/files/          attachments, copied in (the only folder the agent may read)
+
+Conversations are linked, never scattered. Every conversation belongs to a thread (the id of the one it all started
+from; an old conversation without one is its own thread). A fork copies a conversation's events up to a point into a
+new one in the same thread, with `parent`, `fork_event` and `fork_reason` saying where it branched; its agent session
+starts fresh and is handed a transcript of what came before. A design that moves on (a concept picked, a copy, a
+design the agent made in the conversation) takes the conversation with it: `link` moves it and remembers the designs
+it was about in `projects`.
 
 Nothing here talks to an agent; form/chat.py runs the agent and appends what it says.
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import threading
@@ -95,12 +104,24 @@ class Conversations:
         f = self.dir(cid) / "meta.json"
         for attempt in range(20):                 # Windows: a file being replaced can refuse a read for a moment
             try:
-                return json.loads(f.read_text(encoding="utf-8"))
+                return self._migrate(json.loads(f.read_text(encoding="utf-8")))
             except PermissionError:
                 time.sleep(0.02 * (attempt + 1))
             except (OSError, ValueError):
                 break
         raise ConversationError("Unknown conversation.")
+
+    def _migrate(self, meta: dict) -> dict:
+        """A conversation saved before threads existed is the root of its own thread; written back once."""
+        if not isinstance(meta, dict) or "id" not in meta or "thread" in meta:
+            return meta
+        meta.update(thread=meta["id"], parent=None, fork_event=None, fork_reason="")
+        try:
+            with self._lock:
+                self._write(meta)
+        except OSError:
+            pass                                  # read-only: it is migrated again next time
+        return meta
 
     def _write(self, meta: dict) -> dict:
         d = self.dir(meta["id"])
@@ -113,7 +134,9 @@ class Conversations:
     def create(self, project: str | None = None, agent: str = "claude", model: str = "default", effort: str = "",
                title: str = "") -> dict:
         now = _now()
-        meta = {"id": uuid.uuid4().hex[:12], "title": title.strip()[:120] or "New conversation", "title_auto": not title.strip(),
+        cid = uuid.uuid4().hex[:12]
+        meta = {"id": cid, "title": title.strip()[:120] or "New conversation", "title_auto": not title.strip(),
+                "thread": cid, "parent": None, "fork_event": None, "fork_reason": "",
                 "project": project or None, "agent": agent, "model": model or "default", "effort": effort or "",
                 "session": None, "session_agent": None, "resolved_model": None, "resolved_agent": None,
                 "created": now, "updated": now, "pinned": False, "cost_usd": 0.0, "cost_known": True,
@@ -147,6 +170,67 @@ class Conversations:
 
     def pin(self, cid: str, on: bool = True) -> dict:
         return self.update(cid, pinned=bool(on))
+
+    def link(self, cid: str, project: str | None) -> dict:
+        """The conversation follows its design to a new project (a picked concept, a design it made). The designs it
+        was about before are kept in `projects`, oldest first."""
+        with self._lock:
+            meta = self._read(cid)
+            old = meta.get("project")
+            if old == project:
+                return meta
+            seen = [p for p in (meta.get("projects") or []) if p]
+            if old and old not in seen:
+                seen.append(old)
+            meta.update(project=project or None, projects=seen)
+            return self._write(meta)
+
+    def fork(self, cid: str, at_event: int | None = None, project: str | None = None, reason: str = "") -> dict:
+        """A new conversation in the same thread holding this one's events up to and including event `at_event`
+        (all of them when None). Attachments are hard-linked where the disk allows, copied otherwise. It starts a new
+        agent session: the first message it sends carries a transcript of what came before."""
+        with self._lock:
+            src = self._read(cid)
+            evs = self.events(cid)
+            if at_event is not None:
+                try:
+                    at_event = int(at_event)
+                except (TypeError, ValueError):
+                    raise ConversationError("Fork at an event number.")
+                if not 0 <= at_event < len(evs):
+                    raise ConversationError(f"This conversation has no event {at_event}.")
+                evs = evs[:at_event + 1]
+            meta = self.create(project if project is not None else src.get("project"), src.get("agent") or "claude",
+                               src.get("model") or "default", src.get("effort") or "", src.get("title") or "")
+            meta.update(thread=src.get("thread") or src["id"], parent=src["id"],
+                        fork_event=(len(evs) - 1) if evs else None, fork_reason=re.sub(r"\s+", " ", str(reason or ""))[:120],
+                        title_auto=bool(src.get("title_auto")), purpose=src.get("purpose"),
+                        messages=sum(1 for e in evs if e.get("t") == "user"), events=len(evs),
+                        preview=src.get("preview", "") if len(evs) == len(self.events(cid)) else next(
+                            (re.sub(r"\s+", " ", str(e.get("text", "")))[:140] for e in reversed(evs) if e.get("t") in ("user", "text")), ""))
+            if not meta.get("purpose"):
+                meta.pop("purpose", None)
+            d = self.dir(meta["id"])
+            with open(d / "events.jsonl", "w", encoding="utf-8") as fh:
+                for e in evs:
+                    fh.write(json.dumps(e, ensure_ascii=False, default=str) + "\n")
+            sd = self.dir(cid) / "files"
+            if sd.is_dir():
+                dd = self.files_dir(meta["id"])
+                for f in sd.iterdir():
+                    if not f.is_file():
+                        continue
+                    try:
+                        os.link(f, dd / f.name)
+                    except OSError:
+                        shutil.copyfile(f, dd / f.name)
+            return self._write(meta)
+
+    def thread(self, cid: str) -> list[dict]:
+        """Every conversation of this one's thread, the root first, then the branches oldest first."""
+        meta = self.meta(cid)
+        rows = self.list(thread=meta.get("thread") or meta["id"], limit=100000)
+        return sorted(rows, key=lambda m: (m["id"] != m.get("thread"), m.get("created", 0)))
 
     def delete(self, cid: str) -> None:
         with self._lock:
@@ -222,8 +306,9 @@ class Conversations:
         evs = self.events(cid, start)
         return {**meta, "events_from": start, "items": evs, "next": start + len(evs)}
 
-    def list(self, project: str | None = None, q: str | None = None, limit: int = 200) -> list[dict]:
-        """Pinned first, then newest. project: only that design's. q: words that must all appear in the title or text."""
+    def list(self, project: str | None = None, q: str | None = None, limit: int = 200, thread: str | None = None) -> list[dict]:
+        """Pinned first, then newest. project: only that design's. thread: only that thread's. q: words that must all
+        appear in the title or text; a search lists one row per thread (its best match, newest first)."""
         out = []
         if not self.root.is_dir():
             return out
@@ -237,6 +322,8 @@ class Conversations:
                 continue
             if project is not None and meta.get("project") != project:
                 continue
+            if thread is not None and (meta.get("thread") or meta["id"]) != thread:
+                continue
             if words:
                 hay = (meta.get("title", "") + " " + meta.get("preview", "")).lower()
                 if not all(w in hay for w in words):
@@ -246,6 +333,14 @@ class Conversations:
                     meta = dict(meta, match=self._snippet(hay, words[0]))
             out.append(meta)
         out.sort(key=lambda m: (not m.get("pinned"), -m.get("updated", 0)))
+        if words:                                   # one row per thread: the branches say the same things
+            seen, one = set(), []
+            for m in out:
+                t = m.get("thread") or m["id"]
+                if t not in seen:
+                    seen.add(t)
+                    one.append(m)
+            out = one
         return out[:limit]
 
     @staticmethod

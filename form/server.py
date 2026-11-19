@@ -366,6 +366,9 @@ def make_handler(st: Studio):
         def _conv_get(self, path, q):
             if path == "/api/conversations":
                 proj = q.get("project")
+                if q.get("thread"):
+                    return self._json({"conversations": st.chat.list(None, q.get("q"), thread=q["thread"]),
+                                       "running": len(st.chat.running())})
                 return self._json({"conversations": st.chat.list(proj if proj else None, q.get("q")),
                                    "running": len(st.chat.running())})
             mr = re.fullmatch(r"/api/conversations/render/([a-z0-9-]+)/([A-Za-z0-9_.\-]+\.png)", path)
@@ -406,7 +409,7 @@ def make_handler(st: Studio):
             if path == "/api/conversations/send":           # first message of a new conversation
                 cid = None
             else:
-                m = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/(send|stop|rename|pin|delete|attach|settings|note|answer|fetch|sketch)", path)
+                m = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/(send|stop|rename|pin|delete|attach|settings|note|answer|fetch|sketch|fork|link)", path)
                 if not m:
                     raise StudioError("Not found.", status=404)
                 cid, verb = m.group(1), m.group(2)
@@ -414,6 +417,15 @@ def make_handler(st: Studio):
                     return self._json({"stopped": st.chat.stop(cid)})
                 if verb == "rename":
                     return self._json(self._conv(lambda: st.chat.store.rename(cid, str(body.get("title", "")))))
+                if verb == "fork":                          # a branch of this conversation, in the same thread
+                    at = body.get("at_event")
+                    return self._json(self._conv(lambda: st.chat.store.fork(
+                        cid, None if at is None else at, body.get("project") or None, str(body.get("reason") or ""))))
+                if verb == "link":                          # the conversation follows its design to another project
+                    proj = body.get("project") or None
+                    if proj:
+                        st.load(proj)                       # 404 for a design that does not exist
+                    return self._json(self._conv(lambda: st.chat.store.link(cid, proj)))
                 if verb == "pin":
                     return self._json(self._conv(lambda: st.chat.store.pin(cid, bool(body.get("on", True)))))
                 if verb == "delete":

@@ -31,7 +31,9 @@ Item {
     }
     readonly property var latest: everything.length ? everything.slice().sort(function (a, b) { return b.updated - a.updated })[0] : null
     readonly property int released: everything.filter(function (p) { return p.approved_rev === p.head }).length
-    readonly property var talks: Store.convs.filter(function (c) { return c.messages > 0 }).slice(0, home.width > 1500 ? 4 : 3)
+    // one card per conversation thread (its newest branch): a fork is not a second conversation
+    readonly property var talks: { var seen = {}; return Store.convs.filter(function (c) {
+        var t = c.thread || c.id; if (c.messages <= 0 || seen[t]) return false; seen[t] = true; return true }).slice(0, home.width > 1500 ? 4 : 3) }
     readonly property real cw: Math.min(width - (width < 1000 ? 48 : 96), 1200)          // content width
     readonly property real heroH: fresh ? height : Math.max(500, Math.min(620, height * 0.7))
     // a conversation is open in the column on the left: that is where you type, so the middle does not offer a second box

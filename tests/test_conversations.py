@@ -300,6 +300,14 @@ class Http(Base):
             self.assertEqual(self.call("POST", f"/api/conversations/{cid}/note", {"by": "codex", "text": "Looking"})[1]["t"], "act")
             self.assertEqual(self.call("POST", f"/api/conversations/{cid}/settings", {"model": "small"})[1]["model"], "small")
             self.assertEqual(self.call("POST", f"/api/conversations/{cid}/stop", {})[1], {"stopped": False})
+            # linked conversations: a branch from an event, the thread, a search with one row per thread
+            code, br = self.call("POST", f"/api/conversations/{cid}/fork", {"at_event": 0, "reason": "another way"})
+            self.assertEqual((code, br["thread"], br["parent"], br["fork_event"], br["events"]), (200, cid, cid, 0, 1))
+            self.assertEqual(self.call("POST", f"/api/conversations/{cid}/fork", {"at_event": 999})[0], 400)
+            thr = self.call("GET", f"/api/conversations?thread={cid}")[1]["conversations"]
+            self.assertEqual({x["id"] for x in thr}, {cid, br["id"]})
+            self.assertEqual(len(self.call("GET", "/api/conversations?q=render")[1]["conversations"]), 1)
+            self.assertIsNone(self.call("POST", f"/api/conversations/{br['id']}/link", {"project": None})[1]["project"])
             code, r2 = self.call("POST", "/api/conversations/send", {"message": "A new one"})
             self.assertNotEqual(r2["conversation"], cid)
             wait(self.chat.jobs[r2["id"]])

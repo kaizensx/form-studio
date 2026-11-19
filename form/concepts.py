@@ -229,8 +229,20 @@ def pick(st, gid: str, project: str, keep_others: bool = False, by: str = "you")
     with st.lock(project):
         p = st.load(project)
         p["concept"] = dict(p.get("concept") or {}, picked=True)
+        p["lineage"] = {"root": project, "parent": None, "parent_rev": None, "via": "concept", "group": gid}
         st.decide(p, "concept", f"Picked concept {mem['letter']}: {mem['title']} from {len(live)} concepts.")
         st.save(p)
+    # the conversation that proposed the concepts carries on with the one picked: it is linked, not left behind
+    # (before the others go to the trash, which would detach the conversations open on them)
+    from .conversations import Conversations
+    store = Conversations(st.root)
+    members = {m["project"] for m in g["members"]}
+    for c in store.list(limit=100000):
+        if (c.get("project") in members or gid in (c.get("concepts") or [])) and c.get("project") != project:
+            try:
+                store.link(c["id"], project)
+            except Exception:
+                pass
     trashed, kept = [], []
     for m in live:
         if m["project"] == project:

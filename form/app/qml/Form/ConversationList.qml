@@ -3,7 +3,8 @@ import QtQuick.Controls
 import "F.js" as F
 
 // Saved conversations: search, open, rename, pin, delete (with a confirm). Used in the switcher popover of the
-// agent column and, compact, under the prompt on the home screen.
+// agent column and, compact, under the prompt on the home screen. Branches of a conversation (forks, a copied design's
+// carried-over talk) sit under the conversation they came from, indented, so a thread reads as one.
 Item {
     id: cl
     property bool compact: false           // home: no search box, no groups, a short list
@@ -16,8 +17,20 @@ Item {
     implicitHeight: col.implicitHeight
 
     readonly property var all: (found !== null ? found : Store.convs).filter(function (c) { return c.messages > 0 || c.id === Store.convId })
-    readonly property var here: compact || !Store.pid ? [] : all.filter(function (c) { return c.project === Store.pid })
-    readonly property var rest: (compact || !Store.pid ? all : all.filter(function (c) { return c.project !== Store.pid })).slice(0, limit)
+    // one block per thread, in the order its newest conversation comes; inside it the first one, then the branches
+    function threaded(list) {
+        var order = [], by = {}
+        list.forEach(function (c) { var t = c.thread || c.id; if (!by[t]) { by[t] = []; order.push(t) } by[t].push(c) })
+        var out = []
+        order.forEach(function (t) {
+            var g = by[t].slice().sort(function (a, b) { return ((a.id === t) ? 0 : 1) - ((b.id === t) ? 0 : 1) || a.created - b.created })
+            var root = g.some(function (c) { return c.id === t })
+            g.forEach(function (c, i) { out.push(Object.assign({}, c, { branch: g.length > 1 && (i > 0 || !root), branchNo: root ? i + 1 : i + 2 })) })
+        })
+        return out
+    }
+    readonly property var here: compact || !Store.pid ? [] : threaded(all.filter(function (c) { return c.project === Store.pid }))
+    readonly property var rest: threaded(compact || !Store.pid ? all : all.filter(function (c) { return c.project !== Store.pid })).slice(0, limit)
     function projectName(id) {
         if (!id) return "General"
         var ps = Store.studio ? Store.studio.projects : []
@@ -71,12 +84,17 @@ Item {
             Behavior on color { Tint {} }
             MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true
                 onClicked: { if (!row.asking && !row.editing) { Store.openConv(row.c.id); cl.chosen() } } }
+            // a branch: indented under the conversation it came from, with a line back to it
+            Rectangle { visible: !!row.c.branch; x: 14; y: -2; width: 1; height: parent.height / 2 + 2; color: Theme.rule2 }
+            Rectangle { visible: !!row.c.branch; x: 14; y: parent.height / 2; width: 8; height: 1; color: Theme.rule2 }
             // normal
-            Column { visible: !row.asking && !row.editing; x: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 2
-                width: parent.width - 20 - (acts.visible ? acts.width + 4 : dot.visible ? 16 : 0)
+            Column { visible: !row.asking && !row.editing; x: row.c.branch ? 28 : 10; anchors.verticalCenter: parent.verticalCenter; spacing: 2
+                width: parent.width - x - 10 - (acts.visible ? acts.width + 4 : dot.visible ? 16 : 0)
                 Row { spacing: 6; width: parent.width
                     Icon { visible: row.c.pinned; name: "pin"; size: 11; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
-                    Txt { text: row.c.title; width: parent.width - (row.c.pinned ? 17 : 0); elide: Text.ElideRight; wrapMode: Text.NoWrap; font.weight: row.current ? 600 : 500 } }
+                    Icon { visible: !!row.c.branch; name: "git_branch"; size: 11; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { text: row.c.branch ? "Branch " + row.c.branchNo + (row.c.fork_reason ? " · " + row.c.fork_reason : "") : row.c.title
+                        width: parent.width - (row.c.pinned ? 17 : 0) - (row.c.branch ? 17 : 0); elide: Text.ElideRight; wrapMode: Text.NoWrap; font.weight: row.current ? 600 : 500 } }
                 Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
                     color: row.c.state === "asking" ? Theme.amber : Theme.ink3
                     text: row.c.state === "asking" ? "Waiting for your answer · " + cl.projectName(row.c.project) : row.c.match ? row.c.match

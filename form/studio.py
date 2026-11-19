@@ -94,6 +94,13 @@ class ProjectLock:
         self._r.release()
 
 
+
+def lineage(src: dict, via: str) -> dict:
+    """Where a design came from: {root, parent, parent_rev, via}. root is the first design of the family, so a copy of
+    a copy still names the one it all started from."""
+    lin = src.get("lineage") or {}
+    return {"root": lin.get("root") or src["id"], "parent": src["id"], "parent_rev": src.get("head"), "via": via}
+
 class StudioError(Exception):
     def __init__(self, message, hint="", status=400, **extra):
         super().__init__(message)
@@ -463,7 +470,8 @@ class Studio:
                     out.append({"id": p["id"], "name": p["name"], "recipe": p["recipe"], "head": p["head"],
                                 "revisions": len(p["revisions"]), "updated": p.get("updated", p["created"]),
                                 "approved_rev": (p["approvals"][-1]["rev"] if p["approvals"] else None),
-                                "purpose": purpose_mod.of(p), "concept": p.get("concept")})   # concepts: form/concepts.py
+                                "purpose": purpose_mod.of(p), "concept": p.get("concept"),   # concepts: form/concepts.py
+                                "lineage": p.get("lineage")})                                # where it came from
                 except StudioError as e:
                     out.append({"id": d.name, "name": d.name, "error": str(e)})
         return out
@@ -1984,7 +1992,8 @@ class Studio:
                 shutil.copytree(self.dir(src_id), dest, ignore=shutil.ignore_patterns("*.tmp", "*.bak", "releases"))
                 p = json.loads((dest / "project.json").read_text(encoding="utf-8"))
                 had = len(p.get("approvals") or [])
-                p.update({"id": pid, "name": name, "created": time.time(), "approvals": []})
+                p.update({"id": pid, "name": name, "created": time.time(), "approvals": [],
+                          "lineage": lineage(src, "duplicate")})
                 p.setdefault("decisions", []).append({
                     "ts": time.time(), "rev": p["head"], "kind": "note",
                     "text": f"Copied from “{src['name']}” ({src_id})."
@@ -1994,6 +2003,15 @@ class Studio:
                 shutil.rmtree(dest, ignore_errors=True)
                 raise StudioError(f"Could not copy the project: {e}",
                                   "Check that the projects folder is writable and has free space.", status=500)
+        # the copy carries on the original's latest conversation as a branch of the same thread, not a blank one
+        from .conversations import Conversations
+        try:
+            store = Conversations(self.root)
+            last = store.latest(src_id)
+            if last:
+                store.fork(last["id"], project=pid, reason="duplicate")
+        except Exception as e:                        # the copy exists either way; say what was not linked
+            self.activity(pid, "warning", f"The conversation of {src['name']} was not carried over: {e}", by="Form Studio")
         return self._summary(pid)
 
     def delete_project(self, p_or_id) -> dict:

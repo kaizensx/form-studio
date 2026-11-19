@@ -44,6 +44,7 @@ QtObject {
     property string convId: ""         // the open conversation; "" = a new one that is not saved yet
     property var conv: null            // its record: { id, title, project, agent, model, effort, resolved_model, cost_usd, … }
     property var convs: []             // every saved conversation, pinned first, then newest
+    property var convBranches: []      // the open conversation's thread: the first conversation, then its branches
     property int chatNext: 0           // how many saved events of the open conversation are loaded
     property bool chatBusy: false      // the open conversation is answering
     property var chatItems: []         // its events (user, start, text, tool, act, end, error), plus unsent local ones
@@ -793,7 +794,7 @@ QtObject {
 
     function newChat() {
         _chatPoll.stop()
-        convId = ""; conv = null; chatItems = []; chatTools = ({}); chatLive = null; chatNext = 0; chatBusy = false; chatAttach = []; chatLinks = []
+        convId = ""; conv = null; convBranches = []; chatItems = []; chatTools = ({}); chatLive = null; chatNext = 0; chatBusy = false; chatAttach = []; chatLinks = []
         chatAsking = null
         if (studio) _useDefaults()
         talkOpen = true; chatFocus++
@@ -821,6 +822,7 @@ QtObject {
         var items = chatItems.filter(function (it) { return !it.local }), tools = Object.assign({}, chatTools)
         for (var i = 0; i < r.items.length; i++) {
             var ev = r.items[i]
+            ev.n = (r.events_from || 0) + i              // its place in the saved conversation ("Fork from here")
             if (ev.t === "result") tools[ev.id] = ev
             else items.push(ev)
         }
@@ -829,7 +831,32 @@ QtObject {
         chatBusy = r.state === "running"
         chatAsking = r.asking || null
         var m = Object.assign({}, r); delete m.items; delete m.live
+        var thread = conv && conv.id === m.id ? conv.thread : ""
         conv = m
+        if (m.thread !== thread || !convBranches.length) loadBranches()
+    }
+    // the open conversation's branches (form/conversations.py threads)
+    function loadBranches() {
+        var c = conv
+        if (!c || !c.id) { convBranches = []; return Promise.resolve([]) }
+        return get("/conversations?thread=" + (c.thread || c.id)).then(function (r) {
+            if (!conv || conv.id !== c.id) return []
+            convBranches = r.conversations.slice().sort(function (a, b) {
+                return (a.id === a.thread ? 0 : 1) - (b.id === b.thread ? 0 : 1) || a.created - b.created })
+            return convBranches
+        }, function () { return [] })
+    }
+    // "Fork from here": a new branch holding this conversation up to event n; the agent gets a transcript of it
+    function forkConv(n, reason) {
+        if (!convId) return Promise.resolve(null)
+        if (chatBusy) { toast("The conversation is still answering", "Fork it when the reply has ended.", true); return Promise.resolve(null) }
+        return post("/conversations/" + convId + "/fork", { at_event: n === undefined ? null : n, reason: reason || "" }).then(function (m) {
+            loadConvs()
+            return openConv(m.id).then(function () {
+                toast("Branched the conversation", "The earlier messages are here; the original is unchanged. Switch branches at the top of the column.")
+                return m
+            })
+        }, fail)
     }
     function _chatTick() {
         var id = convId
@@ -869,6 +896,13 @@ QtObject {
         })
     }
     // ── the agent asks, you answer (ask_user); its follow-ups; Fix with the agent (chat workstream) ──
+    // two designs of one family: one came from the other, or both from the same first design (lineage)
+    function rootOf(id) {
+        var ps = studio ? studio.projects : []
+        for (var i = 0; i < ps.length; i++) if (ps[i].id === id) return ps[i].lineage && ps[i].lineage.root ? ps[i].lineage.root : id
+        return id
+    }
+    function sameFamily(a, b) { return !!a && !!b && rootOf(a) === rootOf(b) }
     function projectExists(id) {
         var ps = studio ? studio.projects : []
         for (var i = 0; i < ps.length; i++) if (ps[i].id === id && !ps[i].error) return true
@@ -1006,6 +1040,9 @@ QtObject {
                 var best = null
                 r.conversations.forEach(function (c) { if (c.messages && (!best || c.updated > best.updated)) best = c })
                 if (best) { if (best.id !== s.convId) s.openConv(best.id) }
+                // the same design family (a copy, a picked concept): the conversation goes along, it does not restart
+                else if (s.conv && s.convId && s.sameFamily(s.conv.project, id))
+                    s.post("/conversations/" + s.convId + "/link", { project: id }).then(function (m) { if (s.convId === m.id) s.conv = Object.assign({}, s.conv, m); s.loadConvs() }, function () {})
                 else if (s.convId || s.chatItems.length) s.newChat()
             }, function () {})
         }

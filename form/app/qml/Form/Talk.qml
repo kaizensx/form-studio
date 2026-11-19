@@ -83,8 +83,8 @@ Rectangle {
                 continue
             }
             if (ev.t === "suggest") { out.push({ t: "suggest", k: "g" + i, options: ev.options || [] }); continue }
-            if (ev.t === "user") out.push({ t: "user", k: "u" + i, text: ev.text, attachments: ev.attachments || [], local: !!ev.local })
-            else if (ev.t === "text") out.push({ t: "text", k: "t" + i, text: ev.text })
+            if (ev.t === "user") out.push({ t: "user", k: "u" + i, text: ev.text, attachments: ev.attachments || [], local: !!ev.local, n: ev.n === undefined ? -1 : ev.n })
+            else if (ev.t === "text") out.push({ t: "text", k: "t" + i, text: ev.text, n: ev.n === undefined ? -1 : ev.n })
             else if (ev.t === "act") out.push({ t: "act", k: "a" + i, by: ev.by, text: ev.text })
             else if (ev.t === "end") out.push({ t: "end", k: "e" + i, cost: ev.cost_usd, steps: ev.steps, seconds: ev.seconds, stopped: !!ev.stopped,
                                                 model: Store.modelName(ev) || model, agent: ev.agent || agent, change: ev.change || null,
@@ -128,6 +128,8 @@ Rectangle {
         onAccepted: Store.attachFiles(selectedFiles) }
     Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.rule }
 
+    readonly property int branchCount: Store.convBranches.length
+    readonly property int branchAt: { for (var i = 0; i < Store.convBranches.length; i++) if (Store.convBranches[i].id === Store.convId) return i; return -1 }
     // ── header: the conversation switcher ──
     Item {
         id: head; width: parent.width; height: 40; z: 3
@@ -143,6 +145,16 @@ Rectangle {
             MouseArea { id: swm; anchors.fill: parent; hoverEnabled: true; onClicked: list.opened ? list.close() : list.open() }
             Tip { show: swm.containsMouse && !list.opened; text: "Conversations" } }
         Row { id: tools; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 0
+            // a conversation with branches: which one this is, and the others
+            Btn { id: branchBtn; objectName: "branchSwitch"; small: true; kind: "quiet"; icon: "git_branch"; visible: talk.branchCount > 1
+                text: talk.branchAt >= 0 ? "Branch " + (talk.branchAt + 1) + " of " + talk.branchCount : F.plural(talk.branchCount, "branch")
+                tip: "Branches of this conversation"; active: branchMenu.opened
+                anchors.verticalCenter: parent.verticalCenter; onClicked: branchMenu.opened ? branchMenu.close() : branchMenu.open()
+                PopMenu { id: branchMenu; objectName: "branchMenu"; y: branchBtn.height + 6; x: branchBtn.width - width; width: 300
+                    model: Store.convBranches.map(function (b, i) {
+                        return { icon: i === 0 ? "message_square" : "git_branch", checked: b.id === Store.convId,
+                                 text: (i === 0 ? "Original" : "Branch " + (i + 1)) + (b.fork_reason ? " · " + b.fork_reason : "") + " · " + F.ago(b.updated),
+                                 run: function () { if (b.id !== Store.convId) Store.openConv(b.id) } } }) } }
             Btn { objectName: "talkNewChat"; kind: "quiet"; icon: "message_square_plus"; tip: "New conversation"; keys: "Ctrl+Shift+O"
                 visible: !talk.empty || Store.convId !== ""; onClicked: Store.newChat() } }
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule }
@@ -244,13 +256,15 @@ Rectangle {
             Loader { id: body; x: 16; width: parent.width - 32
                 sourceComponent: it.m.t === "user" ? cUser : it.m.t === "text" ? cText : it.m.t === "steps" ? cSteps : it.m.t === "act" ? cAct
                                : it.m.t === "end" ? cEnd : it.m.t === "ask" ? cAsk : it.m.t === "suggest" ? cSuggest : cErr }
-            // actions on hover: copy, and for your own message, edit and send again
-            Rectangle { readonly property bool want: (hh.hovered || cb.hovered || eb.hovered) && (it.m.t === "user" || it.m.t === "text") && !it.m.local
+            // actions on hover: copy, fork from here, and for your own message, edit and send again
+            Rectangle { readonly property bool want: (hh.hovered || cb.hovered || eb.hovered || fb.hovered) && (it.m.t === "user" || it.m.t === "text") && !it.m.local
                 opacity: want ? 1 : 0; visible: opacity > 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } }
                 z: 2; anchors.right: parent.right; anchors.rightMargin: 14; y: it.m.t === "user" ? it.height - 6 : -10
                 width: ar.implicitWidth + 4; height: 26; radius: Theme.rSm + 1; color: Theme.plate3; border.color: Theme.rule2
                 Row { id: ar; anchors.centerIn: parent
                     Btn { id: cb; small: true; kind: "quiet"; icon: "copy"; tip: "Copy"; onClicked: { Bridge.copy(it.m.text); Store.toast("Copied") } }
+                    Btn { id: fb; objectName: "msgFork"; small: true; kind: "quiet"; icon: "git_branch"; tip: "Fork from here: a new branch with the conversation up to this message"
+                        visible: it.m.n >= 0 && !Store.chatBusy; onClicked: Store.forkConv(it.m.n) }
                     Btn { id: eb; small: true; kind: "quiet"; icon: "pencil"; tip: "Edit and send again"; visible: it.m.t === "user"; onClicked: Store.recallChat(it.m.text) } } }
 
             Component { id: cUser; Item { implicitHeight: ub.height

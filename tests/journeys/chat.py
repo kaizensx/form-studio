@@ -160,3 +160,42 @@ def run(ui):
     ui.wait_until(lambda: len(convs(ui)) == 1 and convs(ui)[0]["id"] == first_id, 5, "the conversation to be deleted in the engine")
     ui.key("Escape")
     ui.settle(300)
+
+    # ── fork from a message: a branch in the same thread, switched from the header ──
+    msg = ui.wait_until(lambda: next((m for m in ui.find_all(name="replyText") if "You said: Hello there" in m.property("text")), None),
+                        5, "the first reply")
+    ui.scroll_to(msg)
+    fork = None
+    for _ in range(5):                    # the message actions show on hover
+        ui.hover((4, 4))
+        ui.settle(100)
+        ui.hover(msg, 0.5, 0.5)
+        ui.settle(250)
+        fork = next((b for b in ui.find_all(name="msgFork") if b.property("visible")), None)
+        if fork is not None:
+            break
+    ui.check(fork is not None, "Fork from here shows on a hovered message")
+    ui.click(fork)
+    ui.wait_until(lambda: ui.store.get("convId") not in ("", first_id), 5, "the branch to open")
+    branch = ui.store.get("conv")
+    ui.eq((branch["thread"], branch["parent"]), (first_id, first_id), "the branch is in the first conversation's thread")
+    ui.check(ui.sees("You said: Hello there") and not ui.sees("You said: make a part and render it"), "the branch holds the conversation up to that message")
+    sw = ui.wait_until(lambda: ui.find(name="branchSwitch"), 5, "the branch switcher in the header")
+    ui.wait_until(lambda: ui.sees("Branch 2 of 2", sw), 5, "which branch this is")
+    ui.settle(400)
+    ui.shot("chat-branch")
+    ui.click(sw)
+    ui.wait_until(lambda: ui.sees("Original"), 3, "the branch menu")
+    ui.settle(250)
+    ui.shot("chat-branch-menu")
+    ui.click(next(t for t in ui.find_all(text="Original", exact=False) if str(t.property("text")).startswith("Original ·")))
+    ui.wait_until(lambda: ui.store.get("convId") == first_id, 5, "the original to open from the menu")
+    ui.expect("You said: make a part and render it")
+    # the list shows the branch under its conversation; a search finds the thread once
+    ui.click("convSwitch")
+    ui.settle(350)
+    ui.wait_until(lambda: any(ui.sees("Branch 2", r) for r in ui.find_all(name="convRow")), 5, "the branch row under its conversation")
+    ui.shot("chat-list-branches")
+    ui.key("Escape")
+    ui.eq(len(ui.api("/conversations?q=Hello")["conversations"]), 1, "a search lists the thread once")
+    ui.settle(300)

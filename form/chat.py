@@ -275,9 +275,9 @@ class Chat:
             out["resolved_label"] = ad.model_label(out["resolved_model"]) if ad else out["resolved_model"]
         return out
 
-    def list(self, project: str | None = None, q: str | None = None) -> list[dict]:
+    def list(self, project: str | None = None, q: str | None = None, thread: str | None = None) -> list[dict]:
         busy = {j.conversation: ("asking" if j.waiting else "running") for j in self.running()}
-        return [dict(m, state=busy.get(m["id"], "idle")) for m in self.store.list(project, q)]
+        return [dict(m, state=busy.get(m["id"], "idle")) for m in self.store.list(project, q, thread=thread)]
 
     def delete(self, cid: str) -> None:
         for j in self.running(cid):
@@ -477,6 +477,8 @@ class Chat:
         if job is not None and job.ask and job.conversation:          # ask_user reaches this conversation
             env[ask_mod.ENV_DIR] = str(self.ask_dir(job.conversation))
             env[ask_mod.ENV_TIMEOUT] = str(int(self._ask_timeout()))
+        if job is not None and job.conversation:                      # what the agent saves can name its conversation
+            env["FORM_CONVERSATION"] = job.conversation
         if job is not None and job.purpose:                           # designs created in this run get this purpose
             from .start import ENV_PURPOSE
             env[ENV_PURPOSE] = job.purpose
@@ -501,7 +503,15 @@ class Chat:
                 elif e.get("t") == "text":
                     lines.append("Assistant: " + str(e.get("text", "")))
             recap = "\n".join(lines)[-RECAP_CHARS:]
-            if recap.strip():
+            try:
+                forked = bool(self.store.meta(job.conversation).get("parent"))
+            except ConversationError:
+                forked = False
+            if recap.strip() and forked:
+                parts.append("This conversation continues from an earlier one (a branch of it; its agent session is not "
+                             "carried over, so this is a transcript; check the project with Form Studio's tools rather "
+                             "than trusting it):\n" + recap + "\n\nNow:")
+            elif recap.strip():
                 parts.append("Earlier in this conversation (the earlier agent session is not available, so this is a "
                              "transcript; check the project with Form Studio's tools rather than trusting it):\n" + recap + "\n\nNow:")
         parts.append(job.message)
@@ -845,16 +855,24 @@ class Chat:
             m = re.search(r'"id"\s*:\s*"([0-9a-f]{10})"', full)
             if m:
                 ev["concepts"] = {"group": m.group(1)}
+                if job.conversation:            # the pick (form/concepts.py) finds this conversation by the group
+                    try:
+                        groups = list(self.store.meta(job.conversation).get("concepts") or [])
+                        if m.group(1) not in groups:
+                            self.store.update(job.conversation, concepts=groups + [m.group(1)])
+                    except ConversationError:
+                        pass
         if name.startswith("create_") and ev.get("ok") and job.before is not None:
             new = self._project_ids() - job.before
             hit = [p for p in new if f'"{p}"' in full] or (list(new) if len(new) == 1 else [])
             if hit:
                 ev["project"] = hit[0]
-                job.project = job.project or hit[0]
+                # the conversation follows the design it just made: the next message is about that one, in this
+                # same conversation (the designs it was about before stay listed in its meta)
+                job.project = hit[0]
                 if job.conversation:
                     try:
-                        if not self.store.meta(job.conversation).get("project"):
-                            self.store.update(job.conversation, project=hit[0])
+                        self.store.link(job.conversation, hit[0])
                     except ConversationError:
                         pass
 
@@ -1022,7 +1040,8 @@ def _measure_terminal(chat: "Chat", job: ChatJob, q: dict) -> None:
 
 
 def main_conversations(argv: list[str]) -> int:
-    """form conversations list [--project ID] [--search TEXT] | show ID | delete ID | rename ID TITLE | pin ID [--off]"""
+    """form conversations list [--project ID] [--thread ID] [--search TEXT] | show ID | delete ID | rename ID TITLE
+    | pin ID [--off] | fork ID [--at N] [--project ID] [--reason TEXT]"""
     import argparse
     from . import config
     ap = argparse.ArgumentParser(prog="form conversations", description="Saved conversations (JSON).")
@@ -1030,6 +1049,12 @@ def main_conversations(argv: list[str]) -> int:
     ls = sub.add_parser("list")
     ls.add_argument("--project")
     ls.add_argument("--search")
+    ls.add_argument("--thread")
+    fk = sub.add_parser("fork")
+    fk.add_argument("id")
+    fk.add_argument("--at", type=int)
+    fk.add_argument("--project")
+    fk.add_argument("--reason", default="")
     for name in ("show", "delete", "pin"):
         p = sub.add_parser(name)
         p.add_argument("id")
@@ -1046,7 +1071,9 @@ def main_conversations(argv: list[str]) -> int:
         print(json.dumps(obj, indent=1, default=str, ensure_ascii=False))
     try:
         if a.cmd == "list":
-            out(store.list(a.project, a.search))
+            out(store.list(a.project, a.search, thread=a.thread))
+        elif a.cmd == "fork":
+            out(store.fork(a.id, a.at, a.project, a.reason))
         elif a.cmd == "show":
             out(store.get(a.id))
         elif a.cmd == "delete":
