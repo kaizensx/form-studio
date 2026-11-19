@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <sub><b>Version 1.0.0</b>, the first public release &nbsp;·&nbsp; <a href="CHANGELOG.md">What is in it</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/#try">Try it in your browser</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/docs/">Docs</a></sub>
+  <sub><b>Version 1.0.0</b>, the first public release &nbsp;·&nbsp; <a href="CHANGELOG.md">What is in it</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/#try">Try it in your browser</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/docs/">Docs</a> &nbsp;·&nbsp; <a href="https://discord.gg/b6ZgyndkmS">Discord</a></sub>
 </p>
 
 <br>
@@ -243,7 +243,7 @@ Agents start from parametric building blocks of the things people print most: Gr
 
 ## Community
 
-**[Join the Form Studio Discord](https://discord.gg/b6ZgyndkmS)**: guides, every recipe, a help desk, the parts people made and every release as it ships.
+**[Join the Form Studio Discord](https://discord.gg/b6ZgyndkmS)**: help, the parts people made, recipes, ideas and every release as it ships.
 
 | | |
 |---|---|
