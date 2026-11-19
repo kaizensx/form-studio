@@ -1,4 +1,4 @@
-"""The installer registry, install jobs, studio.toml write-back, and no seeded examples.
+"""The installer registry, install jobs, studio.toml write-back, capabilities, and no examples.
 Nothing here installs anything or touches the network: commands are harmless Python one-liners."""
 import json
 import os
@@ -422,21 +422,16 @@ class ConfigWriteBack(unittest.TestCase):
 
 
 class NoSeeding(unittest.TestCase):
-    def test_fresh_data_folder_stays_empty_until_asked(self):
-        from form.studio import Studio, add_examples, list_examples
+    def test_fresh_data_folder_stays_empty(self):
+        from form import studio as studio_mod
         with tempfile.TemporaryDirectory() as d:
-            st = Studio(cfg_for(d))
+            st = studio_mod.Studio(cfg_for(d))
             try:
                 self.assertEqual(st.list(), [])
                 self.assertEqual([p.name for p in Path(d).iterdir() if (p / "project.json").exists()], [])
-                ex = list_examples(d)
-                self.assertTrue(ex and not any(e["present"] for e in ex))
-                self.assertEqual(st.seed_examples(["hallway-phone-dock"]), ["hallway-phone-dock"])
-                self.assertEqual([p["id"] for p in st.list()], ["hallway-phone-dock"])
-                self.assertEqual(st.seed_examples(["hallway-phone-dock"]), [])          # never overwritten
-                self.assertEqual(len(add_examples(d)), len(ex) - 1)
-                with self.assertRaises(Exception):
-                    add_examples(d, ["no-such-example"])
+                self.assertFalse(hasattr(st, "seed_examples") or hasattr(studio_mod, "add_examples"),
+                                 "no examples ship with Form Studio")
+                self.assertFalse((Path(studio_mod.__file__).parent / "examples").exists())
             finally:
                 st.kernel.stop()
 
@@ -467,8 +462,7 @@ class Routes(unittest.TestCase):
             fake("thing", [f"{PY} -c \"print('working'); open(r'{cls.marker}', 'w').close()\""], marker=cls.marker, level="recommended")])
         cls.reg.start()
         st = SimpleNamespace(cfg=cfg, root=Path(cls.tmp), chat=object(), activity=lambda *a, **k: None,
-                             slicer_info=lambda refresh=False: {}, list=lambda: [],
-                             seed_examples=lambda ids=None: __import__("form.studio", fromlist=["x"]).add_examples(cls.tmp, ids))
+                             slicer_info=lambda refresh=False: {}, list=lambda: [])
         st.setup_app = setup_app.Setup(cfg)
         cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(st))
         threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
@@ -508,7 +502,7 @@ class Routes(unittest.TestCase):
         self.assertEqual(self.call("GET", "/api/install/job/0000000000")[0], 404)
         self.assertEqual(self.call("POST", f"/api/install/job/{j['id']}/cancel", {})[0], 200)
 
-    def test_config_step_and_examples_routes(self):
+    def test_config_step_and_capabilities_routes(self):
         code, c = self.call("GET", "/api/config")
         self.assertEqual(code, 200)
         self.assertIn("chat.model", [r["key"] for r in c["settings"]])
@@ -519,10 +513,19 @@ class Routes(unittest.TestCase):
         self.assertEqual(self.cfg["chat"]["model"], "sonnet")
         self.assertEqual(self.call("POST", "/api/setup/step", {"step": 1})[1]["step"], 1)
         self.assertEqual(self.call("GET", "/api/setup/state")[1]["onboarding"]["step"], 1)
-        code, ex = self.call("GET", "/api/examples")
-        self.assertFalse(any(e["present"] for e in ex["examples"]))
-        code, r = self.call("POST", "/api/examples", {"ids": [ex["examples"][0]["id"]]})
-        self.assertEqual(r["added"], [ex["examples"][0]["id"]])
+        self.assertEqual(self.call("GET", "/api/examples")[0], 404, "no examples ship with Form Studio")
+        code, c = self.call("GET", "/api/capabilities")
+        self.assertEqual(code, 200)
+        self.assertEqual([x["id"] for x in c["capabilities"]][-1], "print")
+        self.assertNotIn("print", c["chosen"], "3D printing is off until it is chosen")
+        with mock.patch.dict(os.environ, {"FORM_CONFIG": str(Path(self.tmp) / "studio.toml")}):
+            code, r = self.call("POST", "/api/capabilities", {"id": "print", "on": True})
+            self.assertEqual(code, 200)
+            self.assertIn("print", r["chosen"])
+            self.assertIn("general.capabilities", r["changed"])
+            self.assertEqual(self.call("POST", "/api/capabilities", {"id": "banana", "on": True})[0], 400)
+            code, r = self.call("POST", "/api/capabilities", {"capabilities": ["parts"]})
+            self.assertEqual(r["chosen"], ["core", "parts"])
         self.assertEqual(self.call("POST", "/api/claude/login/0000000000/cancel", {})[0], 404)
 
 

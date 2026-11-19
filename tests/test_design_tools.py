@@ -18,6 +18,7 @@ from form import config, marks, patterns, share, variants  # noqa: E402
 from form.recipes import registry  # noqa: E402
 from form.recipes.base import RecipeError  # noqa: E402
 from form.studio import Studio, StudioError  # noqa: E402
+from printing_cfg import with_printing  # noqa: E402
 
 A = (Align.CENTER, Align.CENTER, Align.MIN)
 
@@ -181,7 +182,7 @@ class StudioTools(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ["FORM_DATA"] = TMP
-        cls.st = Studio(config.load())
+        cls.st = Studio(with_printing(config.load()))
         cls.pid = cls.st.create("Tools dock", "dock")["id"]
         cls.st.settings(cls.st.load(cls.pid), {"mark_text": "TOOLS"})
 
@@ -247,7 +248,7 @@ class StudioTools(unittest.TestCase):
             variants.save(st, self.load(), "Broken", {"side_wall": 0.1})                       # must build
         with self.assertRaises(StudioError):
             variants.save(st, self.load(), "  ")
-        st2 = Studio(config.load())                                                            # a second process sees them
+        st2 = Studio(with_printing(config.load()))                                                            # a second process sees them
         try:
             saved = st2.load(self.pid)["variants"]
             self.assertEqual([v["name"] for v in saved], ["Thick walls", "As it is"])

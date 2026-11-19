@@ -75,12 +75,15 @@ async def mcp_steps(exe: Path, env: dict) -> None:
                      (text[:120] if res.is_error else f"{imgs} page image(s)").replace("\n", " "))
 
             if os.environ.get("SMOKE_BLENDER", "1") != "0":
-                res, text = await call("render_photo", project="hallway-phone-dock", preset="studio", fast=True)
+                res, text = await call("render_photo", project=PID, preset="studio", fast=True)
                 if res.is_error and "not found" in text.lower() and "blender" in text.lower():
                     step("Blender render", "SKIP", "Blender is not installed")
                 else:
                     imgs = sum(1 for c in res.content if getattr(c, "type", "") == "image")
                     step("Blender render", "FAIL" if res.is_error or not imgs else "PASS", text[:160].replace("\n", " "))
+
+
+PID = "phone-stand"              # the design main() makes from the device_stand recipe
 
 
 def main(argv: list[str]) -> int:
@@ -104,16 +107,16 @@ def main(argv: list[str]) -> int:
     ok = "ok:" in out and "kernel: build123d" in out
     step("window opens and the CAD kernel starts", "PASS" if ok else "FAIL", " ".join(out.split())[:120] or "no output")
 
-    r = cli(exe, env, "examples", "add")
-    step("examples add", "PASS" if r.returncode == 0 else "FAIL", r.stderr.strip()[-160:])
-    r = cli(exe, env, "run", "hallway-phone-dock")
+    r = cli(exe, env, "new", "Phone stand", "device_stand", "--purpose", "print")     # a design from a recipe
+    step("new design from a recipe", "PASS" if r.returncode == 0 else "FAIL", r.stderr.strip()[-160:])
+    r = cli(exe, env, "run", PID)
     step("pipeline: solid, exports, checks", "PASS" if r.returncode == 0 else "FAIL", r.stderr.strip()[-160:])
-    st = json.loads(cli(exe, env, "state", "hallway-phone-dock").stdout or "{}")
+    st = json.loads(cli(exe, env, "state", PID).stdout or "{}")
     sl = st.get("slice_simulated") or {}
     if sl.get("layers"):
         step("slice with the installed slicer", "PASS", f"{sl.get('layers')} layers, {sl.get('filament_g')} g")
         png = tmp / "sim.png"
-        r = cli(exe, env, "simulate", "hallway-phone-dock", "--png", str(png))
+        r = cli(exe, env, "simulate", PID, "--png", str(png))
         step("print simulation picture", "PASS" if png.exists() else "FAIL", r.stderr.strip()[-160:])
     else:
         step("slice with the installed slicer", "SKIP", "no slicer found or not configured")

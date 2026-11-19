@@ -4,7 +4,7 @@
   form install --list                everything FORM uses: found or not, and the command that installs it
   form install <id> [--yes] [--dry-run]   install one thing (ids from --list, or "recommended")
   form config get [key] | set <key> <value>   read or change studio.toml (backup first)
-  form examples [add [id ...]]       list the shipped examples, or add them to your projects
+  form capabilities [on|off <id>]    what Form Studio is set up for (3D printing is opt-in); off never uninstalls
   form serve                         the bench on http://127.0.0.1:4173
   form mcp                           MCP server over stdio (what agents launch)
   form update [--check]              is there a newer release on GitHub? (never installs)
@@ -187,7 +187,7 @@ def main(argv=None):
     if argv[:1] == ["recipes"]:
         from .recipe_lib import main as recipes_main
         return recipes_main(argv[1:])
-    # -- setup workstream: installer, settings, examples (each prints JSON; none starts the kernel) --
+    # -- setup workstream: installer, settings, capabilities (each prints JSON; none starts the kernel) --
     if argv[:1] == ["install"]:
         from .installer import main as install_main
         return install_main(argv[1:])
@@ -208,20 +208,25 @@ def main(argv=None):
         return secrets_main(argv[1:])
     if argv[:1] == ["tool"]:                       # any MCP tool, headless, with the same arguments and rules
         return _tool(argv[1:])
-    if argv[:1] == ["examples"]:
-        from . import config
-        from .studio import StudioError, add_examples, list_examples
-        root = config.load()["data"]["dir"]
+    if argv[:1] == ["capabilities"]:
+        from . import config, setup_app
+        from .studio import StudioError
+        cfg = config.load()
         try:
-            if argv[1:2] == ["add"]:
-                _print({"added": add_examples(root, argv[2:] or None), "data_dir": root})
+            if argv[1:2] in (["on"], ["off"]) and len(argv) == 3:
+                out = setup_app.set_capabilities(cfg, {"id": argv[2], "on": argv[1] == "on"})
+                out["next"] = ("form setup --auto installs " + ", ".join(out["install"])) if out["install"] else "nothing to install"
+            elif len(argv) == 1:
+                out = setup_app.capabilities_view(cfg)
             else:
-                _print({"examples": list_examples(root), "add_with": "form examples add [id ...]"})
+                _print({"error": {"message": "Use: form capabilities [on|off <id>]"}})
+                return 2
+            _print(out)
         except StudioError as e:
             _print({"error": e.public()})
             return 2
         return 0
-    ap = argparse.ArgumentParser(prog="form", description="Form Studio print-design studio",
+    ap = argparse.ArgumentParser(prog="form", description="Form Studio AI CAD studio",
                                  formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__.split("\n", 2)[2])
     sub = ap.add_subparsers(dest="cmd")
     sub.add_parser("app", help="open the desktop app (needs the [app] extra)")
@@ -245,7 +250,7 @@ def main(argv=None):
     sub.add_parser("secrets", help="status | set NAME (value from stdin or a hidden prompt) | clear NAME: agent keys such as gemini_api_key")
     sub.add_parser("providers", help="list | add URL [--name N] | edit ID | test ID [--model M --tools|--images] | remove ID: "
                                      "model providers added by URL; the key is read from stdin or a hidden prompt")
-    sub.add_parser("examples", help="list the shipped examples; `add` copies them into your projects")
+    sub.add_parser("capabilities", help="what Form Studio is set up for | on|off <id> (core, parts, mesh, render, exchange, print)")
     sub.add_parser("doctor")
     sub.add_parser("list")
     r = sub.add_parser("recipe")

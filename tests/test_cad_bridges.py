@@ -18,6 +18,7 @@ TMP = tempfile.mkdtemp(prefix="form-cad-")
 from form import cad_bridges, checks, config  # noqa: E402
 from form.design_guide import EXAMPLE, GUIDE  # noqa: E402
 from form.studio import Studio, StudioError  # noqa: E402
+from printing_cfg import with_printing  # noqa: E402
 
 SCAD = """// Cable box with a side hole
 // A FORM OpenSCAD test design.
@@ -166,7 +167,7 @@ class Bridges(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ["FORM_DATA"] = TMP
-        cls.st = Studio(config.load())
+        cls.st = Studio(with_printing(config.load()))
 
     @classmethod
     def tearDownClass(cls):

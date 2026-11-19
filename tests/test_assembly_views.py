@@ -13,6 +13,7 @@ from form import assembly as asm, config  # noqa: E402
 from form.design_guide import EXAMPLE  # noqa: E402
 from form.recipes.assembly import from_solids  # noqa: E402
 from form.studio import Studio  # noqa: E402
+from printing_cfg import with_printing  # noqa: E402
 from test_assembly import model  # noqa: E402
 
 PARTS = importlib.util.find_spec("py_gearworks") is not None and importlib.util.find_spec("bd_warehouse") is not None
@@ -45,7 +46,7 @@ class Studio_(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ["FORM_DATA"] = TMP
-        cls.st = Studio(config.load())
+        cls.st = Studio(with_printing(config.load()))
 
     @classmethod
     def tearDownClass(cls):

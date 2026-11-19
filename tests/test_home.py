@@ -60,7 +60,7 @@ class Starters(Tmp):
     def test_a_new_folder_gets_the_defaults_in_order(self):
         out = starters.listing(self.tmp, [], PRESETS, now=self.NOW)
         self.assertFalse(out["history"])
-        self.assertEqual([p["id"] for p in out["prompts"][:3]], ["d-pi5-case", "d-gridfinity", "d-hook"])
+        self.assertEqual([p["id"] for p in out["prompts"][:3]], ["d-gearbox", "d-pi5-case", "d-grip"])
         self.assertTrue(all(p["source"] == "suggested" for p in out["prompts"]))
         self.assertEqual([b["preset"] for b in out["briefs"]], ["remote-holder", "organizer", "enclosure"])
 
@@ -76,7 +76,7 @@ class Starters(Tmp):
         ids = [p["id"] for p in out["prompts"]]
         self.assertIn("d-gridfinity", ids)                       # a default that matches what they make stays
         self.assertNotIn("d-hook", ids)                          # one that does not, goes
-        self.assertNotIn("d-planter", ids)
+        self.assertNotIn("d-vase", ids)
         self.assertLess(ids.index(next(i for i in ids if i.startswith("l-kind-"))), ids.index("d-gridfinity"))
         self.assertEqual(out["briefs"][0]["preset"], "organizer")  # the template they used ranks first
         self.assertEqual(out["briefs"][0]["source"], "learned")
@@ -116,9 +116,9 @@ class Starters(Tmp):
 
     def test_use_counts_rank_a_starter_up(self):
         for _ in range(3):
-            starters.used(self.tmp, "d-planter")
+            starters.used(self.tmp, "d-vase")
         out = starters.listing(self.tmp, [], PRESETS, now=time.time())["prompts"]
-        self.assertEqual(out[0]["id"], "d-planter")
+        self.assertEqual(out[0]["id"], "d-vase")
 
     def test_a_filled_brief_saved_as_a_template(self):
         t = starters.save_template(self.tmp, "remote-holder", {"width": "48", "thickness": "21", "mounting": "Screws", "nope": "x"},
@@ -535,7 +535,7 @@ class Routes(Tmp):
                 return json.loads(e.read())
         try:
             s = call("/starters")
-            self.assertEqual(s["prompts"][0]["id"], "d-pi5-case")
+            self.assertEqual(s["prompts"][0]["id"], "d-gearbox")
             self.assertEqual(call("/starters/pin", {"id": "d-hook", "on": True})["pinned"], True)
             self.assertEqual(call("/starters")["prompts"][0]["id"], "d-hook")
             self.assertIn("error", call("/starters/pin", {"id": "zzz"}))

@@ -6,7 +6,7 @@
     POST /api/setup/seen            remember that the welcome was shown (the user pressed Skip or Done)
     POST /api/setup/step            {step} remember which onboarding step the user reached
 
-The installer registry (form/installer.py), sign-in, settings and examples, all through route_get/route_post:
+The installer registry (form/installer.py), sign-in, settings and capabilities, all through route_get/route_post:
     GET  /api/install               every installable thing, detected, with the commands an install would run
     POST /api/install               {ids, shown: {id: [commands]}, methods?} → job (runs only what was shown)
     GET  /api/install/job/<id>?from=N   state, steps, new log lines
@@ -18,7 +18,10 @@ The installer registry (form/installer.py), sign-in, settings and examples, all 
     POST /api/claude/login          start `claude auth login` in the background → job with the sign-in link
     GET  /api/claude/login/<id>     POST …/code {code}     POST …/cancel
     GET  /api/config                studio.toml settings and their schema;  POST /api/config {values} writes them
-    GET  /api/examples              shipped examples;  POST /api/examples {ids?} adds them (never automatic)
+    GET  /api/capabilities          what Form Studio is set up for (form/capabilities.py): each capability, whether it
+                                    is on, what it needs and what turning it on would download
+    POST /api/capabilities {capabilities: [...]} or {id, on}   writes [general].capabilities; returns the same plus
+                                    "install": the ids a setup run would install now. Off never uninstalls anything.
 
 Same safety as the CLI: a fix runs only when the user ticked it and pressed Apply; the commands it runs must be
 exactly the ones the app showed (otherwise it refuses and asks to check again); config files are backed up by the
@@ -286,7 +289,7 @@ class Setup:
         return j
 
 
-# ---- installer, sign-in, settings, examples: the engine routes (form/server.py calls these two) ---------------------
+# ---- installer, sign-in, settings, capabilities: the engine routes (form/server.py calls these two) ---------------------
 
 def _wrap(fn):
     try:
@@ -317,8 +320,11 @@ def route_get(st, path: str, q: dict):
         return _wrap(lambda: sa.installer.job(m.group(1)).public(int(q.get("from") or 0)))
     if path == "/api/install/auto":               # hands-free setup: would it start, and for what (engine workstream)
         import os
+        from . import capabilities
         return {"enabled": os.environ.get("FORM_NO_AUTO_SETUP", "") != "1",
-                "ids": installer.auto_ids(installer.survey(st.cfg), st.cfg)}
+                "ids": capabilities.install_ids(st.cfg, installer.survey(st.cfg))}
+    if path == "/api/capabilities":
+        return capabilities_view(st.cfg)
     if path == "/api/claude/auth":
         return installer.claude_auth(st.cfg)
     m = re.fullmatch(r"/api/claude/login/([0-9a-f]{10})", path)
@@ -331,10 +337,29 @@ def route_get(st, path: str, q: dict):
     if path == "/api/providers":                  # providers added by URL (form/agents/custom.py); never their keys
         from .agents import custom
         return {"providers": custom.listing()}
-    if path == "/api/examples":
-        from .studio import list_examples
-        return {"examples": list_examples(st.root)}
     return None
+
+
+def capabilities_view(cfg: dict) -> dict:
+    from . import capabilities
+    rows = installer.survey(cfg)
+    return {**capabilities.describe(cfg, rows), "install": capabilities.install_ids(cfg, rows)}
+
+
+def set_capabilities(cfg: dict, body: dict) -> dict:
+    """{capabilities: [...]} replaces the list; {id, on} turns one on or off. Nothing is installed or removed here:
+    the app starts a setup run for "install" when the person turned something on."""
+    from . import capabilities
+    if isinstance(body.get("capabilities"), list):
+        caps = body["capabilities"]
+    elif isinstance(body.get("id"), str):
+        if body["id"] not in capabilities.IDS:
+            raise StudioError(f"Unknown capability “{body['id']}”.", hint="Known: " + ", ".join(capabilities.IDS) + ".")
+        caps = capabilities.with_cap(cfg, body["id"], bool(body.get("on")))
+    else:
+        raise StudioError("Send {capabilities: [...]} or {id, on}.")
+    done = _wrap(lambda: config_edit.set_values(cfg, {"general.capabilities": caps}))
+    return {**capabilities_view(cfg), "changed": done["changed"]}
 
 
 def route_post(st, path: str, body):
@@ -355,6 +380,10 @@ def route_post(st, path: str, body):
     # -- hands-free setup (engine workstream): install everything needed, pause only for the person --
     if path == "/api/install/auto":
         ids = body.get("ids") if isinstance(body.get("ids"), list) else None
+        import os
+        if os.environ.get("FORM_NO_AUTO_SETUP", "") == "1" and not os.environ.get("FORM_INSTALL_FAKE"):
+            raise StudioError("Setup runs are turned off here (FORM_NO_AUTO_SETUP=1).",
+                              hint="Install single items under Settings › Software, or run `form setup`.", status=409)
         job = _wrap(lambda: sa.installer.auto(ids))
         if job.steps:
             st.activity(None, "setup", "Setting up: " + ", ".join(s["label"] for s in job.steps), by="you")
@@ -403,12 +432,16 @@ def route_post(st, path: str, body):
         from .agents import providers as _prov            # the model lists that key gave (or did not) are stale
         _prov.forget()
         return {"key": row, "keys": list(agent_keys.status().values())}
-    if path == "/api/examples":
-        ids = body.get("ids")
-        if ids is not None and not (isinstance(ids, list) and all(isinstance(x, str) for x in ids)):
-            raise StudioError("ids must be a list of example ids.")
-        made = st.seed_examples(ids or None)
-        return {"added": made, "projects": st.list()}
+    if path == "/api/capabilities":
+        out = set_capabilities(st.cfg, body)
+        if out["changed"]:
+            try:
+                st.slicer_info(refresh=True)
+            except Exception:
+                pass
+            on = [c["title"] for c in out["capabilities"] if c["on"]]
+            st.activity(None, "settings", "Set up for: " + ", ".join(on) + ".", by="you")
+        return out
     return None
 
 

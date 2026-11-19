@@ -2,9 +2,10 @@
 
 Two answers shape the whole app:
 
-  [general].printing in studio.toml   "I have a 3D printer" (true) or "I just design" (false). Unset until the
-                                      person answers on the first run or in Settings › General; unset reads as
-                                      printing, so installs from before this setting existed behave as they did.
+  [general].capabilities              what the person set Form Studio up for (form/capabilities.py). Printing is the
+                                      capability "print": off unless they turn it on in the launcher or in Settings ›
+                                      Set up for. Form Studio is for making things first; printing is one optional way
+                                      to make them. Older files with only [general].printing still read as they did.
   project["purpose"]                  "print" (made to be 3D printed) or "model" (just a 3D model: for rendering,
                                       CAD exchange, CNC, laser cutting, moulding, visualisation, ...). A new design
                                       starts from the global answer; a design saved before purposes existed is "print".
@@ -71,19 +72,19 @@ def normalise_process(v) -> str | None:
 
 
 def printing(cfg: dict) -> bool:
-    """Does the person print? [general].printing, true when it was never answered."""
-    v = (cfg.get("general") or {}).get("printing", True)
-    return v is not False and str(v).strip().lower() not in ("false", "no", "off", "0")
+    """Does the person print? The capability "print" (form/capabilities.py); off when it was never chosen."""
+    from . import capabilities
+    return capabilities.has(cfg, "print")
 
 
 def decided(cfg: dict) -> bool:
-    """Has the person answered "I have a 3D printer" / "I just design"? Only a value in the file counts."""
-    from . import config_edit
-    return config_edit.file_value(cfg, "general.printing") is not None
+    """Has the person chosen what to set Form Studio up for? Only a value in the file counts."""
+    from . import capabilities
+    return capabilities.decided(cfg)
 
 
 def default(cfg: dict) -> str:
-    """What a new design is for, when nobody says: a model for someone who only designs, else a print."""
+    """What a new design is for, when nobody says: a print only for someone who turned 3D printing on, else a model."""
     return "print" if printing(cfg) else "model"
 
 
@@ -118,4 +119,10 @@ def catalogue(cfg: dict) -> dict:
     return {"purposes": [{"id": k, **v} for k, v in PURPOSES.items()],
             "processes": [{"id": k, "label": v["label"], "min_feature_mm": v["min_feature_mm"], "why": v.get("why", "")}
                           for k, v in PROCESSES.items()],
-            "printing": printing(cfg), "decided": decided(cfg), "default": default(cfg)}
+            "printing": printing(cfg), "decided": decided(cfg), "default": default(cfg),
+            "capabilities": capabilities_of(cfg)}
+
+
+def capabilities_of(cfg: dict) -> list[str]:
+    from . import capabilities
+    return capabilities.of(cfg)

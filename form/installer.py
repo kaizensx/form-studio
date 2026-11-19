@@ -44,8 +44,12 @@ PARTS_PINS = ("bd_warehouse==0.4.0", "py_gearworks==0.0.24")  # the same pins as
 KERNEL_PIN = "build123d==0.13.0"
 DEFAULT_TIMEOUT_S = 1800
 LEVELS = ("required", "recommended", "optional")
-GROUPS = [("engine", "Form Studio itself"), ("slicer", "Printer and slicer"), ("ai", "Claude Code"),
-          ("agents", "Other agent apps"), ("cad", "CAD and 3D apps")]
+# 3D printing is optional and comes last: Form Studio is for making things; printing is one way to make them
+GROUPS = [("engine", "Form Studio itself"), ("ai", "Claude Code"), ("agents", "Other agent apps"),
+          ("cad", "CAD and 3D apps"), ("slicer", "3D printing (optional)")]
+# group → the capability (form/capabilities.py) a registry item belongs to, unless it names its own
+CAPABILITY_OF_GROUP = {"engine": "core", "slicer": "print", "ai": "agent", "agents": "agent", "form": "core"}
+CAPABILITY_OF_ID = {"parts": "parts", "blender": "render", "freecad": "exchange", "openscad": "exchange"}
 
 
 # ---- model --------------------------------------------------------------------------------------------------------
@@ -91,6 +95,11 @@ class Software:
     homepage: str = ""
     one_of: str = ""            # a family where one installed member is enough (slicers)
     needs: tuple[str, ...] = () # registry ids that must be installed first
+    capability: str = ""        # what it is for (form/capabilities.py: core, parts, render, exchange, print) or "agent"
+
+    def __post_init__(self):
+        if not self.capability:
+            self.capability = CAPABILITY_OF_ID.get(self.id) or CAPABILITY_OF_GROUP.get(self.group, "")
 
 
 def platform_key(p: str | None = None) -> str:
@@ -629,6 +638,7 @@ def survey(cfg: dict, platform: str | None = None, which=None, only: list[str] |
         ms = methods_for(sw, platform, which, ctx) if f.status != "ok" else []
         chosen = next((m for m in ms if m.available and m.kind in ("command", "action", "login")), None)
         rows.append({"id": sw.id, "label": sw.label, "why": sw.why, "level": sw.level, "group": sw.group, "size": sw.size,
+                     "capability": sw.capability,
                      "status": f.status, "detail": f.detail.replace(home, "~") if len(home) > 1 else f.detail,
                      "version": f.version, "homepage": sw.homepage, "one_of": sw.one_of, "needs": list(sw.needs),
                      "methods": [m.public() for m in ms], "plan": chosen.public() if chosen else None,
@@ -642,7 +652,7 @@ def survey(cfg: dict, platform: str | None = None, which=None, only: list[str] |
         if r["one_of"] in families_ok and r["status"] != "ok":
             r["level"] = "optional"                      # one slicer is enough
         if r["group"] == "slicer" and not purpose_mod.printing(cfg):
-            r["level"] = "optional"                      # "I just design": no slicer is needed
+            r["level"] = "optional"                      # 3D printing is off: no slicer is needed
         blocked = [n for n in r["needs"] if n in by and by[n]["status"] != "ok"]
         if blocked and r["status"] not in ("ok", "info"):
             r["installable"] = False
@@ -1168,15 +1178,22 @@ AUTO_GROUPS = ("engine", "slicer", "ai")
 
 def auto_ids(rows: list[dict], cfg: dict | None = None) -> list[str]:
     """What a hands-free setup takes care of: every required or recommended item Form Studio itself needs (the engine,
-    a slicer) that is missing, in registry order. One slicer is enough (survey makes the rest optional). Which agent
+    a slicer) that is missing, in registry order. With a configuration, only items of the capabilities the person
+    chose are taken (form/capabilities.py). One slicer is enough (survey makes the rest optional). Which agent
     to chat with is the person's choice (the setup's last step), so no agent is installed by itself; for an agent
     that is already installed, its sign-in and Form Studio's tools in it are finished. Other agents' settings are
     never edited without a click: they stay in the list."""
     out = []
     by = {r["id"]: r for r in rows}
+    caps = None
+    if cfg is not None:
+        from . import capabilities
+        caps = set(capabilities.of(cfg)) | {"agent"}
     for r in rows:
         if r["level"] not in ("required", "recommended") or r["status"] not in ("missing", "warn") or r.get("absent"):
             continue
+        if caps is not None and r.get("capability") and r["capability"] not in caps:
+            continue                                     # a capability the person did not choose: never installed
         if r["group"] not in AUTO_GROUPS:
             continue
         if r["group"] == "ai" and not (r.get("needs") and all(by.get(n, {}).get("status") == "ok" for n in r["needs"])):
@@ -1186,13 +1203,13 @@ def auto_ids(rows: list[dict], cfg: dict | None = None) -> list[str]:
         if r["id"].startswith("slicer.") and cfg is not None and not (cfg.get("slicer") or {}).get("enabled", True):
             continue                                     # Design only: the person chose to work without a slicer
         if r["id"].startswith("slicer.") and cfg is not None and not _prints(cfg):
-            continue                                     # no printer, or not said yet: a slicer waits for "I have a 3D printer"
+            continue                                     # printing is off, or not chosen yet: a slicer waits for it
         out.append(r["id"])
     return out
 
 
 def _prints(cfg: dict) -> bool:
-    """A slicer is installed by itself only for someone who said they have a 3D printer."""
+    """A slicer is installed by itself only for someone who turned 3D printing on."""
     from . import purpose as purpose_mod
     return purpose_mod.printing(cfg) and purpose_mod.decided(cfg)
 
@@ -1343,7 +1360,9 @@ def _installer_auto(self: "Installer", ids: list[str] | None = None, start: bool
         if any(j.state == "running" for j in self.jobs.values()):
             raise InstallError("An install is already running.", "Wait for it, or cancel it.", status=409)
         rows = survey(self.cfg)
-        ids = auto_ids(rows, self.cfg) if ids is None else ids
+        if ids is None:                                 # what the chosen capabilities need (form/capabilities.py)
+            from . import capabilities
+            ids = capabilities.install_ids(self.cfg, rows)
         job = AutoJob(self.cfg, ids, self, poll_s=poll_s, on_done=self.on_done)
         self.jobs[job.id] = job
     if start:

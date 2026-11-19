@@ -1,5 +1,6 @@
-"""Designing without a 3D printer: the global "I just design" answer, a design's purpose (print or model), the checks
-and release of a 3D model with no slicer installed, OBJ and GLB exports, and settings that apply at once.
+"""Designing without a 3D printer: printing is an opt-in capability (form/capabilities.py), a design's purpose (print
+or model), the checks and release of a 3D model with no slicer installed, OBJ and GLB exports, settings that apply at
+once, and the one-time migration that keeps people who already print on printing.
 
 Every slicer points at a program that does not exist (tests/test_slicers.py base_cfg), so nothing here can slice.
 """
@@ -14,7 +15,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from form import checks as checks_mod, config_edit, installer, meshio, purpose
+from form import capabilities, checks as checks_mod, config_edit, installer, meshio, purpose
 from form.digest import digest
 from form.studio import Studio, StudioError
 
@@ -26,8 +27,7 @@ def cfg_for(tmp: Path, printing=None) -> dict:
     cfg = copy.deepcopy(base_cfg())
     cfg["data"]["dir"] = str(tmp / "data")
     cfg["printer"]["envelope_mm"] = [180, 180, 180]
-    if printing is not None:
-        cfg["general"] = {"printing": printing}
+    cfg["general"] = {} if printing is None else {"printing": printing}     # nothing chosen yet, or the older answer
     return cfg
 
 
@@ -40,8 +40,13 @@ class Purposes(unittest.TestCase):
         self.assertEqual(purpose.normalise_process("molding"), "injection")
         self.assertIsNone(purpose.normalise_process("knitting"))
         self.assertEqual(purpose.of({}), "print", "a design saved before purposes existed was a print")
-        self.assertTrue(purpose.printing({}), "an unanswered question reads as printing, as before")
+        self.assertFalse(purpose.printing({}), "printing is opt-in: unset is off")
+        self.assertEqual(purpose.default({}), "model", "a new design is a 3D model unless printing is on")
         self.assertEqual(purpose.default({"general": {"printing": False}}), "model")
+        self.assertTrue(purpose.printing({"general": {"printing": True}}), "the older answer still reads as it did")
+        self.assertEqual(purpose.default({"general": {"capabilities": ["core", "print"]}}), "print")
+        self.assertFalse(purpose.printing({"general": {"capabilities": ["parts"], "printing": True}}),
+                         "capabilities win over the older answer")
         d = purpose.describe({"purpose": "model", "process": "cnc"})
         self.assertEqual((d["process"], d["min_feature_mm"]), ("cnc", 0.8))
         self.assertIn("Plate contact", d["not_applicable"])
@@ -212,15 +217,70 @@ class SettingsApply(unittest.TestCase):
         cfg = cfg_for(self.tmp)
         cfg["_path"] = str(self.toml)
         self.assertFalse(purpose.decided(cfg))
-        done = config_edit.set_values(cfg, {"general.printing": "false"})
-        self.assertEqual(done["changed"], {"general.printing": False})
-        self.assertFalse(purpose.printing(cfg), "applied to the running configuration at once")
+        done = config_edit.set_values(cfg, {"general.printing": "true"})      # the older key sets the capability
+        self.assertEqual(done["changed"], {"general.capabilities": ["core", "parts", "mesh", "print"]})
+        self.assertTrue(purpose.printing(cfg), "applied to the running configuration at once")
         self.assertTrue(purpose.decided(cfg))
         text = self.toml.read_text(encoding="utf-8")
         self.assertIn("# mine", text)
-        self.assertIn("[general]\nprinting = false", text)
+        self.assertIn('[general]\ncapabilities = ["core", "parts", "mesh", "print"]', text)
         from form import config
-        self.assertFalse(config.load()["general"]["printing"], "survives a restart")
+        self.assertTrue(purpose.printing(config.load()), "survives a restart")
+        config_edit.set_values(cfg, {"general.capabilities": "parts, render"})
+        self.assertEqual(capabilities.of(cfg), ["core", "parts", "render"], "core is always on")
+        self.assertFalse(purpose.printing(cfg))
+        with self.assertRaises(config_edit.ConfigError):
+            config_edit.set_values(cfg, {"general.capabilities": ["banana"]})
+
+    def test_capability_plan_names_what_turning_one_on_downloads(self):
+        rows = [{"id": "kernel", "level": "required", "status": "ok", "group": "engine", "one_of": "", "needs": [],
+                 "capability": "core", "size": "about 250 MB", "installable": False},
+                {"id": "blender", "level": "optional", "status": "missing", "group": "cad", "one_of": "", "needs": [],
+                 "capability": "render", "size": "about 400 MB", "installable": True},
+                {"id": "slicer.bambu", "level": "recommended", "status": "missing", "group": "slicer", "one_of": "slicer",
+                 "needs": [], "capability": "print", "size": "about 200 MB", "installable": True},
+                {"id": "slicer.orca", "level": "optional", "status": "missing", "group": "slicer", "one_of": "slicer",
+                 "needs": [], "capability": "print", "size": "about 150 MB", "installable": True}]
+        plan = {c["id"]: c for c in capabilities.plan(rows, ["core", "render"])["capabilities"]}
+        self.assertEqual((plan["core"]["size_mb"], plan["core"]["ready"]), (0, True))
+        self.assertEqual((plan["render"]["install"], plan["render"]["size_mb"], plan["render"]["on"]), (["blender"], 400, True))
+        self.assertEqual(plan["print"]["install"], ["slicer.bambu"], "one slicer is enough")
+        self.assertEqual([c["id"] for c in capabilities.CATALOGUE][-1], "print", "3D printing is the last card")
+        cfg = {"general": {"capabilities": ["core", "render"]}}
+        with mock.patch.object(purpose, "decided", return_value=True):
+            self.assertEqual(capabilities.install_ids(cfg, rows), ["blender"], "only what was chosen is installed")
+
+    def test_migration_keeps_people_who_print_on_printing_once(self):
+        cfg = cfg_for(self.tmp)
+        cfg["_path"] = str(self.toml)
+        root = self.tmp / "data"
+        (root / "old-dock").mkdir(parents=True)
+        (root / "old-dock" / "project.json").write_text(json.dumps({"id": "old-dock", "name": "Dock"}), encoding="utf-8")
+        out = capabilities.migrate(cfg, root)
+        self.assertTrue(out["migrated"], out)
+        self.assertIn("old-dock", out["why"])
+        self.assertTrue(purpose.printing(cfg))
+        self.assertIn("print", self.toml.read_text(encoding="utf-8"))
+        config_edit.set_values(cfg, {"general.capabilities": ["core"]})
+        self.assertEqual(capabilities.migrate(cfg, root)["why"], "already done", "it runs once")
+        self.assertFalse(purpose.printing(cfg), "the person's later answer stands")
+
+    def test_migration_leaves_a_new_person_creating(self):
+        cfg = cfg_for(self.tmp)
+        cfg["_path"] = str(self.toml)
+        root = self.tmp / "data"
+        root.mkdir(parents=True, exist_ok=True)
+        out = capabilities.migrate(cfg, root)
+        self.assertFalse(out["migrated"])
+        self.assertFalse(purpose.printing(cfg))
+        self.assertNotIn("capabilities", self.toml.read_text(encoding="utf-8"))
+
+    def test_migration_reads_a_configured_slicer(self):
+        self.toml.write_text('[slicer]\nkind = "orca"\n', encoding="utf-8")
+        cfg = cfg_for(self.tmp)
+        cfg["_path"] = str(self.toml)
+        out = capabilities.migrate(cfg, self.tmp / "data2")
+        self.assertTrue(out["migrated"] and "orca" in out["why"], out)
 
     def test_settings_name_what_is_installed(self):
         cfg = cfg_for(self.tmp)

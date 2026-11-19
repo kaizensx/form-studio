@@ -29,9 +29,9 @@ else:
     _BAMBU_CONF = "~/AppData/Roaming/BambuStudio"
 
 DEFAULTS = {
-    # printing: "I have a 3D printer" (true) or "I just design" (false); asked on the first run (form/purpose.py).
-    # false: no printer or slicer is needed or suggested, and new designs start as 3D models, not prints.
-    "general": {"printing": True},
+    # capabilities: what Form Studio is set up for (form/capabilities.py), chosen in the launcher and in Settings ›
+    # Set up for. Unset: parametric CAD, mechanical parts and mesh to CAD. 3D printing ("print") is opt-in.
+    "general": {},
     "server": {"host": "127.0.0.1", "port": 4173},
     "data": {"dir": "~/FORM"},
     # slicer/machine/process/filament: the default printer (form/printers.py); empty = the slicer's own selection.

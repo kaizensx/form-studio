@@ -28,8 +28,9 @@ Clients configured with a JSON file (Gemini CLI, Cursor, Claude Desktop and most
 Every client receives these instructions when it connects:
 
 ```
-Form Studio designs parts with a real CAD kernel, for 3D printing or as plain 3D models, and keeps an honest record of
-what is known.
+Form Studio is an AI CAD studio: it designs parts, products and mechanisms as real, editable CAD (a parametric kernel)
+and keeps an honest record of what is known. 3D printing is one optional way to make a design; it is off unless the
+person turned it on (form_overview: has_printer).
 
 Workflow: form_overview -> describe_recipe -> create_project (or get_project) -> preview_change ->
 render (look at it) -> commit_change -> run_pipeline -> get_project (gate, checks, next actions) ->
@@ -188,7 +189,12 @@ Parameters (unit, range, group, the feature each one drives), features and what 
 
 Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
 holder, mechanism...). Returns the contract for a design written as code, the rules, and a complete example
-that builds. Then call create_design.
+that builds. Then call create_design. purpose: "print" or "model" (default: the person's default, see
+form_overview); the print rules (bed orientation, overhangs, nozzle walls) are only in the guide for "print".
+
+| Argument | Type | Required |
+|---|---|---|
+| `purpose` | string \| null |  |
 
 ### `read_document`
 
@@ -344,7 +350,8 @@ Status of a pipeline job started by run_pipeline/commit_change; waits up to wait
 *Read-only.*
 
 Look at the part. Returns a PNG rendered from the real kernel geometry, coloured by feature.
-view: iso, iso_back, front, back, left, right, top, bottom, or "sheet" (four views at once).
+view: iso, iso_back, front, back, left, right, top, bottom, "sheet" (four views at once), or for a design with
+several parts "assembled" (put together) and "exploded" (pulled apart along its explode offsets).
 highlight: a feature id to pick out. values: render an uncommitted candidate (same as preview_change).
 
 | Argument | Type | Required |
@@ -567,6 +574,7 @@ design_only=True: the design is not sliced (checks, exports and release still wo
 not sliced). material: PLA, PETG, ABS, ASA, TPU, PA, PC, ... for the whole design ("" clears): the slice uses the
 printer's filament preset for it and the checks add notes for that material. Ask the user before changing either.
 purpose: "print" or "model" (just a 3D model, never sliced); process: for a model, how it will be made.
+With 3D printing off only purpose="model" and process are accepted.
 
 | Argument | Type | Required |
 |---|---|---|

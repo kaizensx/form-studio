@@ -36,25 +36,27 @@ MIN_PROMPTS = 3
 
 # Defaults for a new data folder. `recipes` and `presets` say which kinds of design each one is about, so a default
 # survives into a person's history only when it matches what they make.
-DEFAULT_PROMPTS = [
+DEFAULT_PROMPTS = [                                  # mechanisms, product shells and organic forms, mixed
+    {"id": "d-gearbox", "text": "A two-stage planetary gearbox for a NEMA 17 motor, about 1:16",
+     "recipes": ["gear_pair"], "presets": []},
     {"id": "d-pi5-case", "text": "A case for a Raspberry Pi 5 with a snap-on lid",
      "recipes": ["enclosure", "storage_box", "hinged_box"], "presets": ["enclosure"]},
-    {"id": "d-gridfinity", "text": "A Gridfinity bin, 3 × 1, for screwdrivers",
-     "recipes": ["gridfinity_bin", "gridfinity_baseplate", "gridfinity"], "presets": ["organizer"]},
+    {"id": "d-grip", "text": "An ergonomic chisel handle shaped to the palm, with a soft taper",
+     "recipes": [], "presets": []},
+    {"id": "d-hinge", "text": "A friction hinge for a laptop stand that holds any angle",
+     "recipes": ["hinged_box"], "presets": []},
+    {"id": "d-speaker", "text": "A rounded shell for a portable speaker, with a grille and a rubber foot",
+     "recipes": ["enclosure"], "presets": ["enclosure"]},
+    {"id": "d-vase", "text": "A twisted vase with a flowing, organic profile",
+     "recipes": ["vase", "plant_pot", "planter"], "presets": []},
     {"id": "d-hook", "text": "The lightest wall hook that safely holds 5 kg",
      "recipes": ["pegboard", "shelf_bracket", "hook"], "presets": ["bathroom-mount"]},
+    {"id": "d-clamp", "text": "A quick-release clamp for a 25 mm tube, opened with one hand",
+     "recipes": [], "presets": []},
+    {"id": "d-gridfinity", "text": "A Gridfinity bin, 3 × 1, for screwdrivers",
+     "recipes": ["gridfinity_bin", "gridfinity_baseplate", "gridfinity"], "presets": ["organizer"]},
     {"id": "d-dock", "text": "A phone stand for video calls, with a slot for the charging cable",
      "recipes": ["device_stand", "dock"], "presets": ["desk-accessory"]},
-    {"id": "d-skadis", "text": "A SKÅDIS pegboard cup for pens and screwdrivers",
-     "recipes": ["pegboard"], "presets": []},
-    {"id": "d-remote", "text": "A holder for the TV remote that screws under the coffee table",
-     "recipes": ["device_stand", "dock"], "presets": ["remote-holder"]},
-    {"id": "d-planter", "text": "A self-watering pot for a 9 cm nursery pot, for herbs on the windowsill",
-     "recipes": ["plant_pot", "planter"], "presets": []},
-    {"id": "d-hose", "text": "An adapter from my 35 mm vacuum hose to a 32 mm tool",
-     "recipes": ["hose_adapter"], "presets": []},
-    {"id": "d-car", "text": "A cable clip for the car's air vent that survives a hot summer",
-     "recipes": ["cable_organizer"], "presets": ["automotive-accessory"]},
 ]
 
 

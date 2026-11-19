@@ -146,7 +146,7 @@ class Auto(unittest.TestCase):
 
     def test_headless_run_auto_skips_what_needs_the_person(self):
         page = [Method("download", "Page", kind="open", url="https://example.invalid/w")]
-        self.registry(fake("w", methods=page, group="slicer", level="recommended"))
+        self.registry(fake("w", methods=page, group="engine", level="recommended"))
         lines = []
         job = installer.run_auto(self.cfg, echo=lines.append, wait=False, poll_s=0.05)
         self.assertEqual((job.state, job.steps[0]["state"]), ("done", "skipped"))

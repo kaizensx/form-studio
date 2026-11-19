@@ -4,7 +4,7 @@ Home takes words, photos, sketches, files and links in one place and offers thre
 to shape), For my printer, or Just a 3D model. This module is the engine side of that:
 
 - purpose: "print" (for 3D printing on the person's printer) or "model" (a 3D model only, never sliced). The engine
-  owns it (form/purpose.py: the design's purpose, and the default from "I have a 3D printer"); Home only says which
+  owns it (form/purpose.py: the design's purpose, and the default from the 3D printing capability); Home only says which
   one the next design gets.
 - blank(): a clean, minimal design written as code that builds in the real kernel.
 - fetch(): a link pasted on Home. Only a file the person linked to is downloaded (STL, STEP, 3MF, PDF, an image);
@@ -68,7 +68,7 @@ def printer_name_cfg(cfg: dict) -> str | None:
 
 
 def state(st) -> dict:
-    """{"purpose": what a new design is for by default (form/purpose.py: "I have a 3D printer" or not),
+    """{"purpose": what a new design is for by default (form/purpose.py: a print only when 3D printing is on),
         "printer": {"name", "available"}}."""
     from . import purpose as purpose_mod
     from . import printers as printers_mod

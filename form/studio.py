@@ -135,41 +135,6 @@ def slugify(name: str) -> str:
     return s or "project"
 
 
-EXAMPLES = Path(__file__).parent / "examples"
-
-
-def list_examples(root: Path | None = None) -> list:
-    """The example projects that ship with FORM: id, name, whether this data folder already has it."""
-    out = []
-    for f in sorted(EXAMPLES.glob("*.json")):
-        try:
-            name = json.loads(f.read_text(encoding="utf-8")).get("name", f.stem)
-        except (OSError, ValueError):
-            name = f.stem
-        out.append({"id": f.stem, "name": name, "present": bool(root and (Path(root) / f.stem).exists())})
-    return out
-
-
-def add_examples(root: Path, ids=None) -> list:
-    """Copy shipped examples into a data folder. Only on an explicit request: the New design sheet's
-    "Open an example", `form examples add`, or POST /api/examples. Existing folders are never overwritten."""
-    root = Path(root)
-    known = {f.stem: f for f in sorted(EXAMPLES.glob("*.json"))}
-    want = list(known) if not ids else list(ids)
-    bad = [i for i in want if i not in known]
-    if bad:
-        raise StudioError(f"Unknown example “{bad[0]}”.", "Known: " + ", ".join(known))
-    made = []
-    for i in want:
-        d = root / i
-        if d.exists():
-            continue
-        (d / "artifacts").mkdir(parents=True)
-        shutil.copyfile(known[i], d / "project.json")
-        made.append(i)
-    return made
-
-
 class Studio:
     def __init__(self, cfg: dict):
         self.cfg = cfg
@@ -191,11 +156,7 @@ class Studio:
         self._kernel_id = None
         self._recipe_sha: dict = {}
         self._layers_cache: dict = {}
-        # A new data folder stays empty: nothing is created until the user asks (see add_examples).
-
-    def seed_examples(self, ids=None) -> list:
-        """Add shipped examples on request (design history only; outputs are rebuilt). Never called automatically."""
-        return add_examples(self.root, ids)
+        # A new data folder stays empty: nothing is created until the person makes something.
 
     # ---- environment -----------------------------------------------------
     def slicer_info(self, refresh=False, p: dict | None = None, material: str | None = None) -> dict:
