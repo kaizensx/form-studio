@@ -174,9 +174,10 @@ class Journeys(unittest.TestCase):
                         + "".join(f"[slicer.{k}]\napp = {json.dumps(NOWHERE)}\n" for k in SLICERS if k != "bambu"), encoding="utf-8")
         return toml
 
-    def test_design_only(self):
+    def test_design_only(self):          # someone who prints but has no slicer: 3D printing is on, nothing slices
         from unittest import mock
-        with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(self._no_slicers_toml())}):
+        toml = self._no_slicers_toml('[general]\ncapabilities = ["core", "parts", "mesh", "print"]\n')
+        with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(toml)}):
             self.journey("design_only.py")
 
     # -- designing without a printer, and settings that apply at once (tests/journeys/no_printer.py, settings_live.py) --

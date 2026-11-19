@@ -71,7 +71,7 @@ QtObject {
     // engine workstream: what the open design slices with (its own printer, the default, or the slicer's selection)
     readonly property var printing: pid && data && data.printer ? data.printer.slicer : slicer
     // ── purpose (form/purpose.py): does this person print at all, and what is the open design for ──
-    // prints: "I have a 3D printer" (Settings › General, first run); unanswered reads as true. printingDecided: answered.
+    // prints: the 3D printing capability (form/capabilities.py; off unless chosen). printingDecided: a choice is saved.
     readonly property var purposeInfo: studio && studio.env.purpose ? studio.env.purpose : ({ printing: true, decided: true, "default": "print", purposes: [], processes: [] })
     readonly property bool prints: purposeInfo.printing !== false
     readonly property bool printingDecided: !!purposeInfo.decided
@@ -82,7 +82,7 @@ QtObject {
     property string newPurpose: ""
     property string newProcess: ""
     readonly property string newPurposeEffective: newPurpose || purposeInfo["default"] || "print"
-    function setPrinting(on) {           // "I have a 3D printer" (true) / "I just design" (false)
+    function setPrinting(on) {           // 3D printing on or off (general.printing is written as general.capabilities)
         if (!on) {                       // nothing printing-related is installed for someone who only designs
             if (installJob && installJob.state === "running")
                 installJob.steps.forEach(function (st) { if (st.id.indexOf("slicer.") === 0 && st.state !== "done") skipInstall(st.id) })
@@ -113,8 +113,8 @@ QtObject {
         { id: "fit", title: "Fit", hint: "Clearance under uncertainty" },
         { id: "prove", title: "Prove", hint: modelDesign ? "Checks" : "Checks and the slice" },
         { id: "release", title: "Release", hint: "Gate, history, files" }
-    ].filter(function (x) { return x.id !== "fit" || !modelDesign })     // the fit model is a printer's accuracy: not for a 3D model
-    onModelDesignChanged: if (modelDesign && stage === "fit") stage = "prove"
+    ].filter(function (x) { return x.id !== "fit" || printUi })     // the fit model is a printer's accuracy: only for a print
+    onPrintUiChanged: if (!printUi && stage === "fit") stage = "prove"
 
     function revision(n) {
         if (!project) return null
@@ -193,7 +193,7 @@ QtObject {
                  [/^\/recipes\/community\/preview/, "Downloading and checking the recipe"], [/^\/recipes\/(community\/|package\/|derive\/)?install/, "Installing the recipe"],
                  [/^\/recipes\/(package\/)?inspect/, "Reading the recipe"], [/^\/recipes\/share\/prepare/, "Preparing the recipe to share"],
                  [/^\/recipes\/share\/submission/, "Saving the submission folder"], [/^\/recipes\/derive$/, "Building the recipe from the design"],
-                 [/^\/recipes\/uninstall/, "Uninstalling the recipe"], [/^\/(archive\/)?import/, "Importing"], [/^\/examples$/, m === "POST" ? "Adding the example" : ""],
+                 [/^\/recipes\/uninstall/, "Uninstalling the recipe"], [/^\/(archive\/)?import/, "Importing"], [/^\/capabilities$/, m === "POST" ? "Saving what Form Studio is set up for" : ""],
                  [/^\/setup$/, "Checking this computer"], [/^\/install$/, m === "GET" ? "Checking software" : "Starting the install"], [/^\/updates/, "Checking for updates"],
                  [/^\/studio\/slicers/, "Finding slicers"], [/^\/studio\/slicer$/, "Switching slicer"], [/^\/printers/, "Reading printers"], [/^\/briefs/, "Writing the brief"],
                  [/^\/config$/, m === "POST" ? "Saving settings" : ""]]
@@ -1029,7 +1029,8 @@ QtObject {
         get("/setup/state").then(function (r) {
             var empty = r.fresh
             if (r.onboarding) onboardStep = r.onboarding.step
-            if (r.first_run && (!headless || empty)) { welcome = true; checkSoftware(); if (!headless) autoSetup(false) }
+            // the launcher asks what to set up; nothing is installed before its last step (Welcome.qml)
+            if (r.first_run && (!headless || empty)) { welcome = true; checkSoftware(); loadCaps() }
             checkSetup().then(function (st) { if (st && !st.required_ok && (!headless || empty)) welcome = true })
         }, function () {})
         if (!headless) checkUpdates(false)
@@ -1064,9 +1065,38 @@ QtObject {
         }, function () { _setupPoll.restart() })
     }
     function closeWelcome(how) { welcome = false; post("/setup/seen", { how: how || "skipped" }).then(function () {}, function () {}) }
+    // ── what Form Studio is set up for (form/capabilities.py): the launcher's cards and Settings › Set up for ──
+    // Printing is the capability "print" and is off unless the person turns it on. printOn: printing is on;
+    // printUi: printing is on and the open design (if any) is made for printing. Every print surface follows printUi.
+    property var caps: null            // GET /capabilities: { capabilities: [...], chosen, download_mb, decided, install }
+    readonly property bool printOn: !!studio && !!studio.env.purpose && studio.env.purpose.printing === true
+    readonly property bool printUi: printOn && !modelDesign
+    function capOn(id) { return !!caps && caps.chosen.indexOf(id) >= 0 }
+    function loadCaps() { return get("/capabilities").then(function (r) { caps = r; return r }, function (e) { fail(e); return null }) }
+    // the whole list (the launcher's first step): written, nothing installed yet
+    function setCaps(list) {
+        return post("/capabilities", { capabilities: list }).then(function (r) {
+            caps = r; reloadStudio(); checkSoftware(); checkSetup(); return r }, function (e) { fail(e); return null })
+    }
+    // Settings: on installs only what that capability needs; off hides it and never uninstalls anything
+    function setCap(id, on) {
+        return post("/capabilities", { id: id, on: !!on }).then(function (r) {
+            caps = r
+            reloadStudio().then(function () { if (pid) refresh() })
+            checkSoftware(); checkSetup()
+            var c = r.capabilities.filter(function (x) { return x.id === id })[0]
+            if (on && c && c.install.length) runSetup(c.install)
+            else toast((c ? c.title : id) + (on ? " is on" : " is off"), on ? (c && c.manual.length ? "Some of it is downloaded from its own page: Settings › Software." : "Nothing to download.") : "Hidden in Form Studio. Nothing was uninstalled.")
+            return r }, function (e) { fail(e); return null })
+    }
+    // a setup run of exactly these registry ids, with every command in the log (form/installer.py AutoJob)
+    function runSetup(ids) {
+        if (installing || !ids || !ids.length) return
+        post("/install/auto", { ids: ids }).then(function (j) { installLog = j.log; installJob = j; installPick = ({}); _installPoll.restart() }, fail)
+    }
     function openSetup() { openSettings("software"); checkSetup() }
 
-    // ── installer, sign-in, settings, examples (setup workstream) ─────────────
+    // ── installer, sign-in, settings (setup workstream) ─────────────
     // The registry is form/installer.py. An install runs only for ids the user ticked (or pressed Install on), and the
     // engine refuses if the commands differ from the ones shown here. FORM never asks for a password.
     property var software: null        // GET /install: { software: [...], groups, required_ok, onboarding, platform, packaged }
@@ -1171,10 +1201,7 @@ QtObject {
         var v = onboardStep, send = function () { return post("/setup/step", { step: v }).then(function () {}, function () {}) }
         _stepSave = _stepSave ? _stepSave.then(send) : send()
     }
-    function openSettings(tab) { openSheet("settings", { tab: tab || "general" }); loadConfig(); checkSoftware() }
-    function addExample(id) {
-        return post("/examples", { ids: [id] }).then(function () { sheet = null; return reloadStudio().then(function () { return open(id) }) }, fail)
-    }
+    function openSettings(tab) { openSheet("settings", { tab: tab || "general" }); loadConfig(); checkSoftware(); loadCaps() }
     // "Update now" (pip / uv / source installs): the upgrade command runs as an install job with a streamed log.
     // The running app keeps its code until it is restarted; the sheet says so.
     property var updateJob: null       // { id, state, steps, log, seconds, fake }

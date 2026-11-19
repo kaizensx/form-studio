@@ -67,12 +67,12 @@ P.MenuBar {
             P.MenuItem { text: "Overhang"; enabled: mb.work; onTriggered: Store.setAnalysis("overhang") }
             P.MenuItem { text: "Section"; enabled: mb.work; onTriggered: Store.setAnalysis("section") }
             P.MenuItem { text: "Features"; enabled: mb.work; onTriggered: Store.setAnalysis("features") } }
-        P.MenuItem { text: "Find a Print Orientation"; enabled: mb.work; onTriggered: { Store.setStage("prove"); Store.findOrientation() } }
-        P.MenuItem { text: "Simulate the Print"; enabled: mb.work; onTriggered: Store.simulate() }
+        P.MenuItem { text: "Find a Print Orientation"; enabled: mb.work && Store.printUi; onTriggered: { Store.setStage("prove"); Store.findOrientation() } }
+        P.MenuItem { text: "Simulate the Print"; enabled: mb.work && Store.printUi; onTriggered: Store.simulate() }
         P.MenuSeparator {}
         P.MenuItem { text: "Ask for a Design Review"; enabled: mb.work && Store.canAskReview; onTriggered: Store.askReview() }
-        P.MenuItem { text: "Choose Printer…"; onTriggered: Store.openSheet("printer") }
-        P.MenuItem { text: "Choose Slicer…"; onTriggered: Store.openSheet("slicer") }
+        P.MenuItem { text: "Choose Printer…"; enabled: Store.printOn; onTriggered: Store.openSheet("printer") }
+        P.MenuItem { text: "Choose Slicer…"; enabled: Store.printOn; onTriggered: Store.openSheet("slicer") }
     }
     P.Menu { title: "Window"
         P.MenuItem { text: "Software: Install or Check…"; onTriggered: Store.openSetup() }

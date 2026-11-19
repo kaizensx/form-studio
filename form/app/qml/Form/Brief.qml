@@ -71,12 +71,13 @@ Column {
                 function onBriefChanged() { if (!intent.area.activeFocus && intent.text !== (root.brief.text || "")) intent.text = root.brief.text || "" } } } }
 
     // what the design is for (form/purpose.py): a print is checked against a printer and sliced; a model is not
-    Sec { id: purposeSec; title: "Purpose"; objectName: "briefPurpose"
+    // with 3D printing off every design is a 3D model: only how it will be made is asked
+    Sec { id: purposeSec; title: Store.printOn ? "Purpose" : "Made by"; objectName: "briefPurpose"
         readonly property var pu: Store.data && Store.data.purpose ? Store.data.purpose : ({ purpose: "print" })
-        Seg { objectName: "purposeSeg"; value: purposeSec.pu.purpose; enabled: !Store.job
+        Seg { objectName: "purposeSeg"; visible: Store.printOn; value: purposeSec.pu.purpose; enabled: !Store.job
             model: [{ value: "print", text: "For 3D printing" }, { value: "model", text: "Just a 3D model" }]
             onPicked: function (v) { if (v !== Store.purpose) Store.setPurpose(v) } }
-        Txt { kind: "fine"; width: parent.width
+        Txt { kind: "fine"; width: parent.width; visible: Store.printOn
             text: purposeSec.pu.purpose === "model"
                 ? "For rendering, CAD exchange, CNC, laser cutting, moulding or visualisation. No printer or slicer is used; print checks such as overhangs, plate contact and the build volume do not apply. Releases carry STEP, STL, 3MF, OBJ, GLB and rendered views."
                 : "Checked against your printer (build volume, walls for the nozzle, overhangs, plate contact) and sliced when a slicer is installed." }
@@ -132,7 +133,7 @@ Column {
         Btn { text: "Import part…"; icon: "box"; onClicked: Store.ask(partDlg) } }
 
     Fold { title: "Printer context"; key: "brief.printer"; openByDefault: !root.sl.available && Store.prints
-        visible: !Store.modelDesign                    // a 3D model has no printer
+        visible: Store.printUi                         // a 3D model, or printing off: no printer
         note: root.sl.available ? root.sl.presets.machine.name : Store.prints ? "no slicer" : "no printer"; noteColor: root.sl.available || !Store.prints ? Theme.ink3 : Theme.amber
         Tag { visible: !!root.sl.available; text: "specified" }
         Column { width: parent.width; visible: !!root.sl.available
@@ -147,7 +148,7 @@ Column {
                 : "Read from " + (root.sl.label || "Bambu Studio") + " " + root.sl.version + " (" + root.sl.source.machine + "). Choose another printer below, or change the selection there; the slice goes stale when it changes." }
         Note { visible: !root.sl.available; kind: Store.prints ? "amber" : "plain"; title: Store.prints ? "No slicer" : "No printer"
             text: Store.prints ? (root.sl.reason || "") + " Checks use the bed size in Settings › Printing until one is set up."
-                : "You just design, so this design is checked against the bed size in Settings and not sliced. To make it a 3D model instead, choose “Just a 3D model” above." }
+                : "3D printing is off, so this design is checked against the bed size in Settings and not sliced. To make it a 3D model instead, choose “Just a 3D model” above." }
         Row { spacing: 4; x: -8
             Btn { visible: !!root.sl.available; kind: "quiet"; icon: "refresh_cw"; text: root.busy ? "Re-reading…" : "Re-read presets"; enabled: !root.busy
                 onClicked: root.reread() }

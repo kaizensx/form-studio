@@ -4,22 +4,19 @@ import QtQuick.Dialogs
 import FormNative
 import "F.js" as F
 
-// Import: a .formstudio / .formproj archive, a conversation, or an example that ships with Form Studio.
+// Import: a .formstudio / .formproj archive, or a conversation.
 // (A design starts on Home; this sheet only brings in work made elsewhere.)
-//   Store.openSheet("import")   Store.openSheet("import", { examples: true })
+//   Store.openSheet("import")
 Column {
     id: ns
     objectName: "importSheet"
     property string title: "Import"
-    property string note: "Work made elsewhere: a project with its history and conversations, a conversation, or an example."
+    property string note: "Work made elsewhere: a project with its history and conversations, or a conversation."
     property int sheetWidth: Theme.sheetL
     readonly property var props: Store.sheet && Store.sheet.props ? Store.sheet.props : ({})
     spacing: 14
-    Component.onCompleted: loadExamples()
 
     // ════ Import ═══════════════════════════════════════════════════════════════════════
-    property var examples: []
-    function loadExamples() { Store.get("/examples").then(function (r) { ns.examples = r.examples }, Store.fail) }
     Column { width: parent.width; spacing: 16
         Row { width: parent.width; spacing: 12
             ImportTile { objectName: "importProject"; icon: "archive"; title: "A project"; onPicked: Store.ask(projDlg)
@@ -27,17 +24,6 @@ Column {
             ImportTile { objectName: "importConversation"; icon: "message_square"; title: "A conversation"; onPicked: Store.ask(convDlg)
                 text: "A conversation exported as JSON from Form Studio. It is added to your conversations; its design link is kept when that design is here." } }
         Txt { kind: "fine"; width: parent.width; text: "Files are checked before anything is written: a damaged or unsafe archive is refused whole. A design or conversation whose id already exists here gets a new one; nothing is overwritten." }
-        Column { width: parent.width; spacing: 6
-            Txt { kind: "cap"; text: "Examples that ship with Form Studio" }
-            Txt { kind: "fine"; width: parent.width; text: "Opening one copies its design history into your projects; its outputs are rebuilt on your computer." }
-            Repeater { model: ns.examples
-                Rectangle { id: ex; required property var modelData
-                    width: ns.width; height: 40; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
-                    Icon { x: 12; name: "box"; size: 14; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
-                    Txt { x: 34; text: ex.modelData.name; font.weight: 600; anchors.verticalCenter: parent.verticalCenter }
-                    Btn { objectName: "exampleAdd"; small: true; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
-                        text: ex.modelData.present ? "Open" : "Add and open"
-                        onClicked: { if (ex.modelData.present) { Store.openSheet(null); Store.open(ex.modelData.id) } else Store.addExample(ex.modelData.id) } } } } }
     }
 
     component ImportTile: Rectangle {

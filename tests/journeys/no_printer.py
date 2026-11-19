@@ -1,5 +1,6 @@
-"""Someone with no 3D printer and no slicer: the first run asks, "I just design" installs nothing printing-related, a new
-design is a 3D model, and its checks, Prove, Release and exports work without any slicer. Then the design is switched
+"""Someone with no 3D printer and no slicer: printing is opt-in, so the launcher leaves 3D printing off and installs
+nothing printing-related, a new design is a 3D model, and its checks, Prove, Release and exports work without any
+slicer and without a word about printing. Then 3D printing is turned on in Settings › Set up for, the design is switched
 to "For 3D printing" in its Brief and back, and the top bar follows.
 
 Environment (tests/test_ui_journeys.py test_no_printer): every slicer points at a program that does not exist."""
@@ -22,30 +23,33 @@ def toml(ui):
 
 def journey_first_run_just_designing(ui):
     ui.wait_until(lambda: ui.store.get("welcome") is True, 30, "the first-run screen")
-    ui.wait_until(lambda: ui.store.get("software") is not None, 90, "the software check")
-    ui.run_js("Store.installPick = ({})")          # nothing is installed in a test
+    ui.wait_until(lambda: ui.store.get("software") is not None and ui.js("!!Store.caps"), 90, "the software check")
+    ui.expect("What do you want to make?")
+    ui.check(not ui.js("Store.capOn('print')"), "3D printing starts off")
+    ui.check(not ui.js("Store.printingDecided"), "nothing is written before Continue")
+    ui.settle(300)
+    ui.shot("noprinter-first-run-choice")
     ui.click_text("Continue")
     ui.expect("Step 2 of 3")
-    ui.expect("I have a 3D printer")
-    ui.check(not ui.js("Store.printingDecided"), "the question starts unanswered")
-    ui.shot("noprinter-first-run-choice")
-    ui.click("welcomeJustDesign")
-    ui.wait_until(lambda: ui.js("Store.printingDecided && !Store.prints"), 10, "the answer to be applied")
-    ui.check("printing = false" in toml(ui), "written to studio.toml")
-    ui.expect("Nothing printing-related is installed")
-    ui.check(not any(i.startswith("slicer.") for i in ui.js("Store.installChosen")), "no slicer is ticked")
+    ui.wait_until(lambda: ui.js("Store.printingDecided && !Store.prints"), 10, "the choice to be applied")
+    ui.check("capabilities = " in toml(ui) and '"print"' not in toml(ui), "written to studio.toml without printing")
     sw = ui.api("/install")
     sl = [r for r in sw["software"] if r["id"].startswith("slicer.")]
-    ui.check(sl and all(r["level"] == "optional" for r in sl), "slicers are optional for someone who only designs")
-    ui.settle(300)
-    ui.shot("noprinter-first-run-just-design")
+    ui.check(sl and all(r["level"] == "optional" for r in sl), "slicers are optional while printing is off")
+    ui.eq([g["id"] for g in sw["groups"]][-1], "slicer", "3D printing is the last group in Software")
+    ui.run_js("var p = {}; Store.software.software.forEach(function (r) { p[r.id] = false }); Store.installPick = p")
     ui.click_text("Continue")
     ui.expect("Step 3 of 3")
-    ui.run_js("Store.installPick = ({})")
-    ui.click_text("Open Form Studio")
+    ui.check(not any(i.startswith("slicer.") for i in ui.api("/capabilities")["install"]), "no slicer is installed")
+    ui.expect("3D printing is off")
+    ui.settle(300)
+    ui.shot("noprinter-first-run-just-design")
+    if ui.find(name="welcomeOpenWithout") is not None:
+        ui.click("welcomeOpenWithout")
+    else:
+        ui.click_text("Open Form Studio")
     ui.wait_until(lambda: ui.store.get("screen") == "home" and ui.store.get("welcome") is False, 30, "Home")
-    chip = ui.item("purposeChip")
-    ui.check(ui.sees("No printer · Just designing", chip), "the top bar says so instead of a printer")
+    ui.check(ui.find(name="purposeChip") is None, "no “just designing” chip")
     ui.check(ui.find(name="printerChip") is None, "no printer chip")
     ui.check(not ui.js("Store.setup && Store.setup.attention.some(function (i) { return i.indexOf('slicer') === 0 })"),
              "setup does not ask for a slicer")
@@ -63,15 +67,15 @@ def journey_a_3d_model(ui):
     ui.eq(d["purpose"]["purpose"], "model", "a 3D model")
     ui.eq(d["status"]["slice"]["off"]["why"], "purpose", "not sliced because it is not for printing")
     ui.check("Slice" not in ui.texts("pipeline"), "the pipeline strip has no Slice step")
-    ui.check(ui.sees("3D model", ui.item("purposeChip")), "the top bar names what it is")
+    ui.check(ui.find(name="purposeChip") is None and ui.find(name="printerChip") is None, "the top bar says nothing about printing")
+    ui.check("fit" not in [x["id"] for x in ui.js("Store.stages")], "no Fit stage")
     ids = [c["id"] for c in d["checks"]["checks"]]
     ui.check(not {"envelope", "overhang", "adhesion", "wall"} & set(ids), f"no print checks: {ids}")
     ui.check({"glb", "obj", "step", "stl"} <= set(d["exports"]["files"]), "STEP, STL, OBJ and GLB exports")
     ui.click("stage-prove")
     ui.wait_until(lambda: ui.store.get("stage") == "prove", 3, "Prove")
-    note = ui.item("modelChecksNote")
-    ui.scroll_to(note, 0.5)
-    ui.check(ui.sees("Plate contact", note), "Prove names the print checks that do not apply")
+    ui.settle(300)
+    ui.check(ui.find(name="modelChecksNote") is None and ui.find(name="makePrintable") is None, "Prove does not talk about printing")
     ui.check(not ui.exists(text="Print orientation"), "no print orientation table")
     ui.check(not ui.exists(name="designOnlyNote"), "no Design only note: nothing is missing")
     ui.settle(300)
@@ -86,7 +90,7 @@ def journey_release_a_model(ui):
     g = data(ui)["gate"]
     ui.check(not any("slice" in r.lower() for r in g["reasons"]) and "slice" not in g["evidence_level"].lower(),
              f"the gate says nothing about slicing: {g}")
-    ui.check(ui.sees("A 3D model, not for printing", ui.item("releaseModel")), "Release says what it will hold")
+    ui.check(ui.find(name="releaseModel") is None, "Release does not talk about printing while it is off")
     for c in ui.find_all(name="ackCheck"):
         ui.click(c)
     btn = ui.item(text="Approve and release r%02d" % data(ui)["project"]["head"])
@@ -104,6 +108,16 @@ def journey_release_a_model(ui):
 
 def journey_purpose_switch(ui):
     toasts_gone(ui)
+    ui.check(ui.find(name="purposeSeg") is None, "no print purpose to pick while printing is off")
+    ui.run_js("Store.openSettings('general')")
+    ui.wait_until(lambda: ui.find(name="capCard_print") is not None, 10, "the Set up for cards")
+    ui.click("capCard_print")                          # turn 3D printing on; no slicer here, so nothing installs
+    ui.wait_until(lambda: ui.js("Store.printOn"), 10, "3D printing to turn on")
+    ui.key("Escape")
+    ui.wait_until(lambda: ui.store.get("sheet") is None, 4, "the sheet to close")
+    ui.wait_until(lambda: ui.find(name="purposeChip") is not None, 5, "a 3D model now says it is not a print")
+    toasts_gone(ui)
+    ui.settle(600)                                     # the top bar and stage tabs settle after printing turns on
     ui.click("stage-brief")
     ui.wait_until(lambda: ui.store.get("stage") == "brief", 3, "Brief")
     seg = ui.item("purposeSeg")

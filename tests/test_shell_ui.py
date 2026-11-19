@@ -10,7 +10,7 @@ QML = Path(__file__).resolve().parent.parent / "form" / "app" / "qml" / "Form"
 # every function Store.qml had before the shell redesign; other screens call these
 STORE_FUNCTIONS = [
     "_addMeasure", "_chatTick", "_installTick", "_loginTick", "_morphStep", "_setupTick", "_showScrub", "_take",
-    "_tick", "_useDefaults", "addExample", "agentInfo", "analysisCheck", "analysisLabel", "applySetup",
+    "_tick", "_useDefaults", "agentInfo", "analysisCheck", "analysisLabel", "applySetup",
     "applyStageView", "askAbout", "askImportPart", "askReview", "asmFor", "attachFiles", "attachmentUrl", "boot",
     "bootSetup", "branchFrom", "cancelClaudeLogin", "cancelInstall", "checkSetup", "checkSoftware", "checkUpdates",
     "checkout", "clearMeasures", "closeWelcome", "commit", "compareWith", "convTitle", "copyDims", "create",

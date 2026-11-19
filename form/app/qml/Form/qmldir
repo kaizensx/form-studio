@@ -33,6 +33,7 @@ Palette 1.0 Palette.qml
 SheetHost 1.0 SheetHost.qml
 Exports 1.0 Exports.qml
 SetupList 1.0 SetupList.qml
+CapCards 1.0 CapCards.qml
 Welcome 1.0 Welcome.qml
 StatusChips 1.0 StatusChips.qml
 PhotoRenderSheet 1.0 PhotoRenderSheet.qml

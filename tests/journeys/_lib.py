@@ -20,9 +20,9 @@ def wait_job(ui, pid, timeout=300):
                       f"last jobs={last}") from None
 
 
-def make(ui, recipe, name, values=None, open=True):
+def make(ui, recipe, name, values=None, open=True, purpose=None):
     """Create a project from a recipe through the engine, wait for its pipeline, open it in the window."""
-    r = ui.api("/projects", {"name": name, "recipe": recipe, "brief": "", "values": values})
+    r = ui.api("/projects", {"name": name, "recipe": recipe, "brief": "", "values": values, "purpose": purpose})
     pid = r["id"]
     wait_job(ui, pid)
     if open:
@@ -30,13 +30,24 @@ def make(ui, recipe, name, values=None, open=True):
     return pid
 
 
-def example(ui, pid, open=True):
-    ui.api("/examples", {"ids": [pid]})
-    ui.api("/projects/" + pid + "/run", {"nodes": [], "force": False})
-    wait_job(ui, pid)
-    if open:
-        open_project(ui, pid)
-    return pid
+def printing_on(ui):
+    """Turn the 3D printing capability on (Settings › Set up for), as someone who prints would; nothing is installed."""
+    ui.api("/capabilities", {"id": "print", "on": True})
+    ui.run_js("Store.reloadStudio(); Store.loadCaps()")
+    ui.wait_until(lambda: ui.js("Store.printOn") is True, 10, "printing to be on")
+
+
+# A phone dock for the hallway, built from the dock recipe with the values the journeys measure against
+DOCK = {"device_width": 71.5, "device_thickness": 7.8, "device_height": 147.0, "device_mass": 170.0, "clearance": 0.3,
+        "plug_width": 13.0, "plug_thickness": 7.0, "cable_diameter": 4.5, "lean": 15.0, "floor": 7.0, "side_wall": 7.0,
+        "lip": 6.0, "front_height": 18.0, "back_height": 36.0, "depth": 92.0, "corner_r": 12.0, "edge_r": 2.5,
+        "lead_in": 0.8, "relief_width": 30.0, "relief_depth": 7.0}
+
+
+def phone_dock(ui, open=True):
+    """A design made for 3D printing (its fit, checks and slice), from a recipe: printing is turned on first."""
+    printing_on(ui)
+    return make(ui, "dock", "Hallway phone dock", DOCK, open=open, purpose="print")
 
 
 def open_project(ui, pid):

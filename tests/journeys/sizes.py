@@ -2,7 +2,7 @@
 large laptop screen (1728 × 1117). Nothing may overlap or run off its container, and the main controls still work."""
 from PySide6.QtCore import QPointF, QRectF
 
-from _lib import example, has_slicer, open_sheet_wait, close_sheet_esc
+from _lib import has_slicer, open_sheet_wait, close_sheet_esc, phone_dock
 
 DATA = "fresh"
 
@@ -44,7 +44,7 @@ def run(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     ui.settle(500)
     ui.shot(f"size-{tag}-home")
-    pid = example(ui, "hallway-phone-dock")
+    pid = phone_dock(ui)
     ui.settle(600)
     ui.check(no_overlaps(ui, "pipeline", "the pipeline strip") >= 1, "the pipeline strip says where the design stands")
     no_overlaps(ui, "topBar", "the top bar")

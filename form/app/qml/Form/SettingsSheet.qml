@@ -7,14 +7,15 @@ import "F.js" as F
 // Edits collect in `edits` and are written by "Save changes": only the changed keys are rewritten, comments and
 // other keys stay, and the previous file is kept as a backup next to it (form/config_edit.py).
 // Open with Store.openSettings("general" | "printer" (Printing) | "chat" (Agents) | "apps" | "updates" | "advanced" | "software").
-// "I have a 3D printer" applies at once (it changes what the app shows); the printer itself is chosen in the printer
-// picker, which writes the default printer; everything else collects in `edits`. A search filters every tab.
+// "Set up for" (form/capabilities.py) applies at once: turning a capability on installs what it needs, off hides it and
+// never uninstalls. Printing (and its tab) appears only with the 3D printing capability. The printer itself is chosen in
+// the printer picker, which writes the default printer; everything else collects in `edits`. A search filters every tab.
 Column {
     id: st
     property string title: "Settings"
     property int sheetWidth: Theme.sheetL
     property int sheetHeight: 520
-    readonly property var tabs: [{ value: "general", text: "General" }].concat(Store.prints ? [{ value: "printer", text: "Printing" }] : [])
+    readonly property var tabs: [{ value: "general", text: "General" }].concat(Store.printOn ? [{ value: "printer", text: "Printing" }] : [])
         .concat([{ value: "chat", text: "Agents" }, { value: "apps", text: "Other apps" }, { value: "updates", text: "Updates" },
                  { value: "advanced", text: "Advanced" },
                  { value: "software", text: "Software", badge: Store.setupAttention && Store.setupAttention.length ? Store.setupAttention.length : 0 }])
@@ -38,7 +39,7 @@ Column {
             text: Store.installing ? "Installing…" : Store.installChosen.length ? "Install " + Store.installChosen.length + " selected" : "Install selected"
             onClicked: Store.installSoftware() } }
     readonly property var props: Store.sheet && Store.sheet.props ? Store.sheet.props : ({})
-    property string tab: props.tab === "printer" && !Store.prints ? "general" : (props.tab || "general")
+    property string tab: props.tab === "printer" && !Store.printOn ? "general" : (props.tab || "general")
     property string query: ""                  // Settings search: rows from every tab whose label, help or key match
     property var edits: ({})                   // key → new value, not yet saved
     property int rev: 0                        // bumped on Revert and Save so the fields show the stored values again
@@ -47,8 +48,8 @@ Column {
     readonly property bool searching: query.trim() !== ""
     function matches(r) { var q = query.trim().toLowerCase(); return (r.label + " " + (r.help || "") + " " + r.key + " " + (st.tabNames[r.tab] || "")).toLowerCase().indexOf(q) >= 0 }
     readonly property var rows: cfg ? cfg.settings.filter(function (r) {
-        if (r.hidden || r.key === "general.printing") return false
-        if (r.tab === "printer" && !Store.prints) return false
+        if (r.hidden) return false
+        if (r.tab === "printer" && !Store.printOn) return false
         return st.searching ? st.matches(r) : r.tab === st.tab }) : []
     function isDefault(r) { return st.same(st.current(r), r["default"]) }
     function rangeError(r, t) {
@@ -120,24 +121,12 @@ Column {
         Txt { visible: st.searching && st.rows.length === 0 && !!st.cfg; tone: 3; text: "No setting matches “" + st.query.trim() + "”." }
         // ── General: how this person uses Form Studio; applied at once ──
         Column { visible: st.tab === "general" && !st.searching; width: parent.width; spacing: 8
-            Txt { kind: "cap"; text: "How you use Form Studio" }
-            Row { id: useRow; width: parent.width; spacing: 10
-                Repeater { model: [{ on: true, icon: "printer", title: "I have a 3D printer", sub: "Designs are checked against your printer and sliced. Settings › Printing appears." },
-                                   { on: false, icon: "pencil", title: "I just design", sub: "No printer or slicer is needed or suggested. New designs start as 3D models." }]
-                    Rectangle { id: uc; required property var modelData
-                        readonly property bool sel: Store.prints === modelData.on
-                        objectName: modelData.on ? "settingsPrinter" : "settingsJustDesign"   // objectName: "settingsPrinter" / objectName: "settingsJustDesign"
-                        width: (useRow.width - 10) / 2; height: ut.implicitHeight + 24; radius: Theme.rMd
-                        color: sel ? Theme.alpha(Theme.datum, 0.07) : um2.containsMouse ? Theme.washHover : Theme.plate1
-                        border.color: sel ? Theme.datum : Theme.rule; border.width: sel ? 1.5 : 1
-                        Column { id: ut; x: 14; y: 12; width: parent.width - 28; spacing: 4
-                            Row { spacing: 8
-                                Icon { name: uc.modelData.icon; size: 15; color: uc.sel ? Theme.datum : Theme.ink2; anchors.verticalCenter: parent.verticalCenter }
-                                Txt { text: uc.modelData.title; font.weight: Theme.wSemi; anchors.verticalCenter: parent.verticalCenter } }
-                            Txt { kind: "fine"; tone: 2; width: parent.width; text: uc.modelData.sub } }
-                        MouseArea { id: um2; anchors.fill: parent; hoverEnabled: true; enabled: !uc.sel; onClicked: Store.setPrinting(uc.modelData.on) } } } }
-            Txt { kind: "fine"; width: parent.width
-                text: "This is the default for new designs. Each design can still be made for 3D printing or as a 3D model in its Brief." } }
+            Txt { kind: "cap"; text: "Set up for" }
+            Txt { kind: "fine"; tone: 2; width: parent.width
+                text: "What Form Studio is set up for. Turning one on installs only what it needs, with every command in the log. Turning one off hides it; nothing is uninstalled." }
+            CapCards { objectName: "settingsCaps"; width: parent.width; settings: true; pick: Store.caps ? Store.caps.chosen : []
+                onToggled: function (id, on) { Store.setCap(id, on) } }
+            InstallLog { width: parent.width } }
         // ── Printing: the default printer, picked from the printers set up in your slicers ──
         Rectangle { visible: st.tab === "printer" && !st.searching; objectName: "settingsDefaultPrinter"
             width: parent.width; height: dp.implicitHeight + 24; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
