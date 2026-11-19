@@ -15,9 +15,13 @@ Download the bundle for your system from the [latest release](https://github.com
 | Windows 10 and 11 | `FORM-windows-x64.zip` | Unzip and run `FORM.exe`; in SmartScreen choose **More info** › **Run anyway** |
 | Linux x64 | `FORM-linux-x64.tar.gz` | Unpack and run `FORM/FORM` |
 
-On first start Form Studio asks how you use it ("I have a 3D printer" or "I just design"), then installs what it
-needs by itself: the standard-parts libraries, a slicer if you print, an agent and its sign-in. It pauses only when you
-have to sign in or download something, and carries on once that is done. Every command is shown before it runs.
+On first start a launcher asks three things. **What do you want to make?** shows a card for each thing Form Studio
+can be set up for: parametric CAD (always on), mechanical parts, mesh to CAD, photoreal renders (Blender), CAD exchange
+(FreeCAD and OpenSCAD) and, last and optional, 3D printing (one slicer). Each card names what it installs, and the total
+download updates as you tick. **Your agent** picks who designs with you: an agent app, a model API key or a local model.
+**Set up** then installs only what you chose, one item after another, with every command in the log; it pauses only
+when you have to sign in or download something, and carries on once that is done. Nothing is downloaded before that
+step. Change any of it later in Settings › General › Set up for.
 
 ### From Python
 
@@ -74,7 +78,7 @@ what the design assumes now; the number you type is committed with how you measu
 Below: concepts waiting for a pick, recent conversations, and every design as a live 3D card, filtered by released and
 in progress and sorted by name or date. Right-click a card to rename, duplicate, export or move it to the trash.
 **Import** (from Home or the command palette) opens a `.formstudio` or `.formproj` design, a conversation exported as
-JSON, or one of the shipped examples.
+JSON.
 
 **Sketch pad.** Lines, rectangles, circles, arcs (centre, start, end), freehand strokes and dimensions, snapped to a
 5 mm grid and to the points already drawn (Alt draws freely), with undo and redo. A typed dimension is "stated" and
@@ -136,8 +140,8 @@ printer updates the top bar, the plate and the open design's checks without a re
 
 | Tab | Holds |
 |---|---|
-| General | How you use Form Studio ("I have a 3D printer" or "I just design") and the project folder |
-| Printing | The default printer, filament and process, from every printer set up in your slicers; the slicer, and whether designs made for printing are sliced; the keep-out margin and the gap between parts on a plate; which program "Open in slicer" uses. Shown only when you print |
+| General | Set up for: the same cards as the launcher. Turning one on installs only what it needs; turning one off hides it and never uninstalls anything. And the project folder |
+| Printing | The default printer, filament and process, from every printer set up in your slicers; the slicer, and whether designs made for printing are sliced; the keep-out margin and the gap between parts on a plate; which program "Open in slicer" uses. Shown only when 3D printing is on |
 | Agents | Agent apps, model API keys, local models and providers you added, in one list; Add a provider…; the agent, model and effort for new conversations; web lookups; a spending limit per message; opening Form Studio when an outside agent starts working. Keys are stored privately and never shown again |
 | Other apps | Blender, OpenSCAD and FreeCAD: whether and where each was found, Browse as a fallback, and what each one unlocks; which programs "Open in CAD" and "Open in viewer" use |
 | Updates | The daily check for a newer Form Studio, and the Stable or Preview channel |

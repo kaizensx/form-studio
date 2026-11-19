@@ -168,9 +168,11 @@ from the top bar. `form new … --purpose model --process cnc`, `form purpose <p
   or injection moulding, 2 mm for casting). The pipeline has no Slice step and the Fit stage is hidden.
 - **Its release** holds STEP, STL, 3MF, OBJ and GLB, a four-view sheet and an iso render, with no G-code and no print
   report.
-- **Design without a 3D printer.** The first run and Settings › General ask once: "I have a 3D printer" or "I just
-  design". If you only design, there is no printer chip, no slicer install, no slicer in setup and no Printing tab;
-  the top bar reads "No printer · Just designing".
+- **3D printing is optional.** It is off until you turn it on in the launcher or in Settings › General › Set up
+  for. While it is off there is no printer chip, no Fit stage, no slicer install, no print rows in Prove, no Printing
+  tab and no print tools for agents (they answer "printing is off; enable it in Settings"). New designs are 3D models.
+  People who already printed before this change keep printing: a configured slicer or printer, or designs made for
+  printing, turn it on once at the first start.
 - **Design only.** Slicing is optional per design, for every design, or when no slicer is installed. Checks, exports,
   renders and releases work without it, and the release says what it does not cover.
 
