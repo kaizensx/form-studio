@@ -54,16 +54,23 @@ jobs:
           echo "PUBLIC_KEY=$(echo "$app" | jq -r .verify_key)" >> "$GITHUB_ENV"
       - name: KV namespace and workers.dev subdomain
         run: |
-          auth=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
-          id=$(curl -sf "${auth[@]}" "$CF/storage/kv/namespaces?per_page=100" | jq -r '.result[] | select(.title=="form-studio-bot-state") | .id')
+          cfapi() { curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "$@"; }
+          why() { jq -c '{success, errors: [.errors[]? | {code, message}]}'; }
+          cfapi https://api.cloudflare.com/client/v4/user/tokens/verify | why
+          r=$(cfapi "$CF/storage/kv/namespaces?per_page=100"); echo "$r" | why
+          id=$(echo "$r" | jq -r '.result[]? | select(.title=="form-studio-bot-state") | .id')
           if [ -z "$id" ]; then
-            id=$(curl -sf "${auth[@]}" -X POST "$CF/storage/kv/namespaces" -d '{"title":"form-studio-bot-state"}' | jq -r .result.id)
+            r=$(cfapi -X POST "$CF/storage/kv/namespaces" -d '{"title":"form-studio-bot-state"}'); echo "$r" | why
+            id=$(echo "$r" | jq -r '.result.id // empty')
           fi
-          echo "KV_ID=$id" >> "$GITHUB_ENV"
-          sub=$(curl -s "${auth[@]}" "$CF/workers/subdomain" | jq -r '.result.subdomain // empty')
+          r=$(cfapi "$CF/workers/subdomain"); echo "$r" | why
+          sub=$(echo "$r" | jq -r '.result.subdomain // empty')
           if [ -z "$sub" ]; then
-            sub=$(curl -sf "${auth[@]}" -X PUT "$CF/workers/subdomain" -d '{"subdomain":"form-studio-bot"}' | jq -r .result.subdomain)
+            r=$(cfapi -X PUT "$CF/workers/subdomain" -d '{"subdomain":"form-studio-bot"}'); echo "$r" | why
+            sub=$(echo "$r" | jq -r '.result.subdomain // empty')
           fi
+          [ -n "$id" ] && [ -n "$sub" ] || { echo "::error::Cloudflare: KV namespace or workers.dev subdomain missing (see above)"; exit 1; }
+          echo "KV_ID=$id" >> "$GITHUB_ENV"
           echo "WORKER_URL=https://form-studio-bot.$sub.workers.dev" >> "$GITHUB_ENV"
       - name: wrangler.toml
         run: |
