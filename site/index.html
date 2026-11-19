@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Form Studio: what are we making?</title>
-<meta name="description" content="Form Studio is an open-source desktop app for macOS, Windows and Linux. Describe a part; an AI agent designs it in a real CAD kernel, Form Studio checks every revision, slices it with your slicer and plays the print back.">
+<title>Form Studio: describe anything, build real CAD</title>
+<meta name="description" content="Form Studio is the open-source AI CAD studio for macOS, Windows and Linux. Describe anything, and an engineer-grade agent builds it as real, editable CAD: parametric build123d on OpenCascade, checked on the solid, out as STEP, meshes and renders, or to your slicer if you print.">
 <meta name="theme-color" content="#0e1113" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
 <link rel="canonical" href="https://kaizensx.github.io/form-studio/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Form Studio">
-<meta property="og:title" content="Form Studio: what are we making?">
-<meta property="og:description" content="Describe a part. An agent designs it as real CAD; Form Studio checks it, slices it with your slicer and plays the print back. macOS, Windows and Linux. MIT licence.">
+<meta property="og:title" content="Form Studio: describe anything, build real CAD">
+<meta property="og:description" content="The open-source AI CAD studio. Describe anything, and an engineer-grade agent builds it as real, editable CAD. macOS, Windows and Linux. MIT licence.">
 <meta property="og:url" content="https://kaizensx.github.io/form-studio/">
 <meta property="og:image" content="https://kaizensx.github.io/form-studio/assets/og.png">
 <meta property="og:image:width" content="1200">
@@ -38,6 +38,7 @@
 <!--nav-->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></symbol>
+<symbol id="ic-chev" viewBox="0 0 24 24"><path d="M6.5 9.5l5.5 5.5 5.5-5.5"/></symbol>
 <symbol id="ic-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 019.5 4.5a8 8 0 1010 10z"/></symbol>
 <symbol id="ic-gh" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-6-2.5m12 4.5v-3.4a3 3 0 00-.8-2.3c2.7-.3 5.5-1.3 5.5-6a4.6 4.6 0 00-1.3-3.2 4.3 4.3 0 00-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 00-6 0C6.5 2.6 5.5 2.9 5.5 2.9a4.3 4.3 0 00-.1 3.2A4.6 4.6 0 004 9.3c0 4.6 2.8 5.6 5.5 6a3 3 0 00-.8 2.3V21"/></symbol>
 <symbol id="ic-dc" viewBox="0 0 24 24"><path d="M8.5 7.5a12 12 0 017 0M7 17c3 1.3 7 1.3 10 0M8.6 4.8A16 16 0 004.5 6.5C2.8 9.4 2 12.5 2.3 16.2a15.6 15.6 0 004.8 2.3l1.1-1.9M15.4 4.8a16 16 0 014.1 1.7c1.7 2.9 2.5 6 2.2 9.7a15.6 15.6 0 01-4.8 2.3l-1.1-1.9"/><circle cx="9" cy="12.5" r="1.2"/><circle cx="15" cy="12.5" r="1.2"/></symbol>
@@ -46,7 +47,7 @@
 <header class="nav" id="nav">
   <div class="wrap">
     <a class="brand" href="./"><img class="lk-d" src="assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="assets/lockup-light.svg" alt="" width="143" height="22"></a>
-    <nav class="nav-links" aria-label="Site"><ul><li><a href="./#how">How it works</a></li><li><a href="recipes/">Recipes</a></li><li><a href="compat/">Compatibility</a></li><li><a href="bench/">Benchmarks</a></li><li><a href="docs/">Docs</a></li></ul></nav>
+    <nav class="nav-links" aria-label="Site"><ul><li><a href="./#how">How it works</a></li><li><a href="./#make">What you can make</a></li><li><a href="recipes/">Recipes</a></li><li class="grp"><button type="button" class="grp-btn" aria-expanded="false" aria-controls="grp-print">3D printing<svg class="ic chev" aria-hidden="true"><use href="#ic-chev"/></svg></button><ul class="grp-menu" id="grp-print"><li><a href="compat/">Slicer compatibility</a></li><li><a href="bench/">Benchmarks</a></li></ul></li><li><a href="docs/">Docs</a></li></ul></nav>
     <div class="end">
       <button class="theme" type="button" id="theme" aria-label="Switch between light and dark"><svg class="ic sun" aria-hidden="true"><use href="#ic-sun"/></svg><svg class="ic moon" aria-hidden="true"><use href="#ic-moon"/></svg></button>
       <a class="gh" href="https://discord.gg/b6ZgyndkmS"><svg class="ic" aria-hidden="true"><use href="#ic-dc"/></svg><span>Discord</span></a>
@@ -56,7 +57,7 @@
     </div>
   </div>
   <div class="menu" id="menu" hidden>
-    <ul><li><a href="./#how">How it works</a></li><li><a href="recipes/">Recipes</a></li><li><a href="compat/">Compatibility</a></li><li><a href="bench/">Benchmarks</a></li><li><a href="docs/">Docs</a></li><li><a href="https://discord.gg/b6ZgyndkmS">Discord</a></li><li><a href="https://github.com/kaizensx/form-studio">GitHub</a></li></ul>
+    <ul><li><a href="./#how">How it works</a></li><li><a href="./#make">What you can make</a></li><li><a href="recipes/">Recipes</a></li><li class="grp-cap"><span>3D printing</span><ul><li><a href="compat/">Slicer compatibility</a></li><li><a href="bench/">Benchmarks</a></li></ul></li><li><a href="docs/">Docs</a></li><li><a href="https://discord.gg/b6ZgyndkmS">Discord</a></li><li><a href="https://github.com/kaizensx/form-studio">GitHub</a></li></ul>
   </div>
   <span class="scrolled-bar" id="scroll-bar" aria-hidden="true"></span>
 </header>
@@ -73,8 +74,8 @@
   <div class="hero-bg" aria-hidden="true"><div class="hero-grid" data-par="-0.12"></div><div class="hero-glow" data-par="0.18"></div></div>
   <div class="wrap hero-copy" id="hero-copy">
     <p class="eyebrow in-1"><a class="launch" href="https://github.com/kaizensx/form-studio/releases/latest"><span class="pip"></span><b>Form Studio 1.0.0</b> · the first public release · macOS, Windows and Linux <span aria-hidden="true">→</span></a></p>
-    <h1 id="hero-title" class="hero-title"><span class="ln"><span>What are we</span></span> <span class="ln"><span>making?</span></span></h1>
-    <p class="lead in-2">Describe a part. An agent designs it in a real CAD kernel; Form Studio checks it, slices it with your slicer and plays the print back before you start it.</p>
+    <h1 id="hero-title" class="hero-title"><span class="ln"><span>Describe</span></span> <span class="ln"><span>anything.</span></span></h1>
+    <p class="lead in-2">An engineer-grade agent builds it as real, editable CAD: a parametric design in a real CAD kernel, checked on the solid, ready for your CAD program, a CNC shop, a render or your slicer.</p>
     <div class="cta in-3">
       <a class="btn primary big" id="cta-dl" href="#download"><span class="i" aria-hidden="true">&#xe0b2;</span><span>Download</span></a>
       <a class="btn big ghost" href="#how"><span>See how it works</span><span class="i" aria-hidden="true">&#xe06d;</span></a>
@@ -195,16 +196,16 @@
 <section class="how" id="how" aria-labelledby="how-title">
   <div class="wrap how-head">
     <p class="eyebrow rv">How it works</p>
-    <h2 id="how-title" class="rv">From a sentence to a print<br class="br"> you can trust.</h2>
+    <h2 id="how-title" class="rv">From a sentence to CAD<br class="br"> you can trust.</h2>
   </div>
   <div class="how-track" id="how-track">
     <div class="how-pin">
       <div class="wrap how-grid">
         <ol class="how-steps" id="how-steps">
-          <li class="on"><span class="n">01</span><h3>Describe it</h3><p>Words, a photo with a coin for scale, a sketch, a part or a link. Choose your printer, or just a 3D model.</p></li>
+          <li class="on"><span class="n">01</span><h3>Describe it</h3><p>Words, a photo with a coin for scale, a sketch, a part or a link. A 3D model, or something to print.</p></li>
           <li><span class="n">02</span><h3>It is built as real CAD</h3><p>An agent writes a parametric design; build123d on OpenCascade builds the solid, feature by feature.</p></li>
-          <li><span class="n">03</span><h3>Every revision is checked</h3><p>Validity, walls, overhangs, plate contact, tip-over and fit. Each result says how it is known.</p></li>
-          <li><span class="n">04</span><h3>Sliced, then played back</h3><p>Your slicer writes the G-code. Form Studio plays every layer back before the printer starts.</p></li>
+          <li><span class="n">03</span><h3>Every revision is checked</h3><p>A valid solid, a closed mesh, the STEP round trip, fits and joints; walls and overhangs when you print. Each result says how it is known.</p></li>
+          <li><span class="n">04</span><h3>Made the way you need</h3><p>STEP for CAD and CNC, OBJ and GLB for renders. If you print, your slicer writes the G-code and every layer plays back first.</p></li>
         </ol>
         <div class="how-win island" id="how-win" aria-hidden="true">
           <div class="mtb"><span class="lights"><i></i><i></i><i></i></span><img src="assets/lockup.svg" alt="" width="98" height="15"><span class="slash">/</span><span class="pn" id="hw-name">New design</span><span class="rv-chip mono" id="hw-rev"></span><span class="sp"></span><span class="tag t-ink" id="hw-stage">Home</span></div>
@@ -234,6 +235,42 @@
           <div class="win-prog"><i></i><i></i><i></i><i></i></div>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<section class="make" id="make" aria-labelledby="make-title">
+  <div class="wrap">
+    <div class="make-head">
+      <p class="eyebrow rv">What you can make</p>
+      <h2 id="make-title" class="rv">One studio, from the idea<br class="br"> to the part.</h2>
+      <p class="rv">Every picture here is drawn from a real run of the engine: the designs are build123d code, built by the CAD kernel, and the gears turn by their own tooth counts.</p>
+    </div>
+    <div class="mk-rows">
+      <article class="mk rv">
+        <div class="mk-copy"><span class="n">Design</span><h3>Shapes, not just boxes.</h3><p>Start from words, a photo with a coin for scale, a sketch with real dimensions, a part or a link. For a new idea the agent proposes genuinely different concepts as real CAD, and you pick one. Lofts, scoops and splits are written as code and built as solids you can still edit.</p></div>
+        <div class="art-crop"><img class="art-d" src="assets/art/feature-shape-dark.svg" width="414" height="436" alt="An ergonomic mouse shell, 64.1 by 118.6 by 38.0 mm, lofted and hollowed to an even 1.8 mm wall, drawing itself as edges and filling in." loading="lazy" decoding="async"><img class="art-l" src="assets/art/feature-shape-light.svg" width="414" height="436" alt="" loading="lazy" decoding="async"></div>
+      </article>
+      <article class="mk rv">
+        <div class="mk-copy"><span class="n">Engineer</span><h3>Mechanisms that mesh.</h3><p>Screw clearances, inserts, bearing seats, threads and involute gears come with their sources. Assemblies are parts, joints and mates; every joint is swept through its range and checked for collisions, and constraints refuse what cannot work, with a way forward.</p></div>
+        <div class="art-crop"><img class="art-d" src="assets/art/feature-gears-dark.svg" width="414" height="436" alt="A planetary gear stage seen from above, turning with the carrier held: sun 12, planets 18, ring 48 teeth; 1 : 5 with the ring held." loading="lazy" decoding="async"><img class="art-l" src="assets/art/feature-gears-light.svg" width="414" height="436" alt="" loading="lazy" decoding="async"></div>
+      </article>
+      <article class="mk mk-text rv">
+        <div class="mk-copy"><span class="n">Reconstruct</span><h3>Start from the part you have.</h3><p>A STEP or STL of a board, a phone or a motor becomes the reference a design is built around, with clearance cut from its real geometry. A photo of a broken part with a card beside it starts a replacement: sizes from the photo stay assumed until you measure the ones that decide the fit.</p>
+        <!-- optional: mesh to editable CAD (WP reconstruction). Drop this paragraph if the feature is not in the release. -->
+        <p>Make editable turns a mesh into CAD you can change: an exact solid first, then planes, cylinders, cones, spheres and tori fitted where the surface allows, with a report of the deviation and how much became parametric.</p>
+        <!-- /optional -->
+        </div>
+        <ul class="mk-list"><li><b>STEP or STL</b><span>a reference to design around</span></li><li><b>A photo</b><span>scale from a card, coin or ruler</span></li><li><b>A drawing</b><span>PDF datasheets read as pictures</span></li><li><b>Measure this</b><span>the numbers that decide the fit</span></li></ul>
+      </article>
+      <article class="mk rv">
+        <div class="mk-copy"><span class="n">Review</span><h3>Proved on the solid.</h3><p>Every revision is checked on the B-rep and its mesh, and every number says how it is known: computed, heuristic, modelled or measured. Compare revisions on the solids themselves. Only a person approves a release, and its files are frozen with SHA-256 hashes.</p></div>
+        <div class="art-crop"><img class="art-d" src="assets/art/feature-proved-dark.svg" width="414" height="436" alt="Eleven checks pass on the desk phone stand: 8 computed, 1 heuristic and 2 model." loading="lazy" decoding="async"><img class="art-l" src="assets/art/feature-proved-light.svg" width="414" height="436" alt="" loading="lazy" decoding="async"></div>
+      </article>
+      <article class="mk mk-text rv">
+        <div class="mk-copy"><span class="n">Make</span><h3>The output you need.</h3><p>One design, taken where it is going next. Printing is one option among several: turn it on when you print, and it stays out of the way when you do not.</p></div>
+        <ul class="mk-list"><li><b>CAD exchange</b><span>STEP from the B-rep, re-imported in FreeCAD as a check</span></li><li><b>CNC, laser, moulding</b><span>the thinnest feature checked against the process</span></li><li><b>Renders and the web</b><span>OBJ, GLB, sheets, turntables, Blender renders</span></li><li><b>3D printing</b><span>your slicer and presets, every layer played back · <a href="compat/">compatibility</a> · <a href="bench/">benchmarks</a></span></li></ul>
+      </article>
     </div>
   </div>
 </section>
@@ -282,8 +319,8 @@
       <article class="rv">
         <svg class="ic" aria-hidden="true"><use href="#ic-plug"/></svg>
         <p class="num"><b data-count="77" id="why-tools">77</b><span>MCP tools</span></p>
-        <h3>Your agent, your slicer</h3>
-        <p>Claude Code, Codex, Gemini CLI and four more, or local models. Seven slicers, from Bambu Studio to PrusaSlicer. Every action is also a command.</p>
+        <h3>Your agent, your tools</h3>
+        <p>Claude Code, Codex, Gemini CLI and four more, model APIs or local models. FreeCAD, Blender and OpenSCAD, and seven slicers if you print. Every action is also a command.</p>
       </article>
     </div>
     <p class="why-more rv"><a class="more" href="docs/features.html">Every feature, in the docs <span aria-hidden="true">→</span></a></p>
@@ -322,13 +359,14 @@
     <div class="foot-top">
       <div class="foot-brand">
         <a class="brand" href="./"><img class="lk-d" src="assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="assets/lockup-light.svg" alt="" width="143" height="22"></a>
-        <p>What are we making? Open source, MIT licence.</p>
+        <p>Describe anything. The open-source AI CAD studio, MIT licence.</p>
       </div>
-      <nav aria-label="Product"><span class="cap">Product</span><a href="./#how">How it works</a><a href="recipes/">Recipes</a><a href="compat/">Compatibility</a><a href="bench/">Benchmarks</a><a href="./#download">Download</a></nav>
+      <nav aria-label="Product"><span class="cap">Product</span><a href="./#how">How it works</a><a href="./#make">What you can make</a><a href="recipes/">Recipes</a><a href="./#download">Download</a></nav>
+      <nav aria-label="3D printing"><span class="cap">3D printing</span><a href="compat/">Slicer compatibility</a><a href="bench/">Benchmarks</a><a href="docs/features.html#3d-printing-optional">Printing features</a></nav>
       <nav aria-label="Docs"><span class="cap">Docs</span><a href="docs/features.html">Features</a><a href="docs/app.html">The app</a><a href="docs/cli.html">Command line</a><a href="docs/mcp.html">MCP tools</a><a href="docs/changelog.html">Changelog</a></nav>
       <nav aria-label="Community"><span class="cap">Community</span><a href="https://discord.gg/b6ZgyndkmS">Discord</a><a href="https://github.com/kaizensx/form-studio/discussions">Discussions</a><a href="https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml">Share a recipe</a><a href="https://github.com/kaizensx/form-studio/issues/new/choose">Report an issue</a><a href="https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md">Contributing</a></nav>
     </div>
-    <p class="foot-note">No cookies, trackers or third-party requests. Form Studio runs on your computer; it never uploads a design and never starts a print.</p>
+    <p class="foot-note">No cookies, trackers or third-party requests. Form Studio runs on your computer; it never uploads a design and never sends a file to a machine.</p>
   </div>
 </footer>
 <!--/foot-->
