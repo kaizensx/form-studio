@@ -445,8 +445,8 @@ Item {
                 Tick { font.pixelSize: 12; tone: 2; value: ro.bb ? ro.bb[1][2] - ro.bb[0][2] : 0; unit: " mm"; anchors.verticalCenter: parent.verticalCenter }
                 Txt { text: "·"; tone: 4; anchors.verticalCenter: parent.verticalCenter }
                 Tick { font.pixelSize: 12; tone: 2; value: Store.shown ? Store.shown.volume_mm3 / 1000 : 0; unit: " cm³"; anchors.verticalCenter: parent.verticalCenter }
-                Txt { text: "·"; tone: 4; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact }
-                Txt { font.pixelSize: 12; tone: 3; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact; wrapMode: Text.NoWrap
+                Txt { text: "·"; tone: 4; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact && (Store.printUi || !!Store.assembly) }
+                Txt { font.pixelSize: 12; tone: 3; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact && (Store.printUi || !!Store.assembly); wrapMode: Text.NoWrap
                     text: !Store.assembly ? "plate " + ws.bed : Store.asmMode === "assembled" ? "assembled" : Store.asmMode === "exploded" ? (Store.assembly.derived ? "as modelled, shown pulled apart" : "assembled size, shown exploded")
                         : (Store.assembly.derived || !Store.printUi ? "as modelled, " : "as printed, ") + F.plural(Store.assembly.parts.length, "part") } }
         }

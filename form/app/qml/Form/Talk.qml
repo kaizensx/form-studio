@@ -18,8 +18,8 @@ Rectangle {
         if (!d || !Store.project) return out
         var roll = d.checks ? d.checks.rollup : null, rev = F.pad(Store.project.head)
         if (roll && roll.FAIL) out.push({ label: "Fix what fails in " + rev, prompt: "The checks on " + rev + " of this design report " + roll.FAIL + " failure(s). Read them with Form Studio's tools, explain each in one line, and preview the smallest change that fixes them. Do not commit until I say so." })
-        else if (roll && roll.WARN) out.push({ label: "Explain the " + F.plural(roll.WARN, "warning") + " on " + rev, prompt: "Explain the warnings on " + rev + " of this design: what each one means for " + (Store.modelDesign ? "the part" : "the print or the fit") + ", and which I can safely acknowledge." })
-        var model = Store.modelDesign
+        else if (roll && roll.WARN) out.push({ label: "Explain the " + F.plural(roll.WARN, "warning") + " on " + rev, prompt: "Explain the warnings on " + rev + " of this design: what each one means for " + (!Store.printUi ? "the part" : "the print or the fit") + ", and which I can safely acknowledge." })
+        var model = !Store.printUi
         out.push({ label: "Review " + rev + (model ? ": design and engineering" : ": design, engineering, print"), review: true })
         out.push({ label: "Make it lighter without failing a check", sheet: "lighter" })
         if (model) out.push({ label: "Which dimensions are still assumed?", prompt: "Which numbers in this design are assumed rather than measured or specified? Tell me which matter most and how to confirm each." })

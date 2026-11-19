@@ -179,7 +179,8 @@ def run(ui):
     ui.wait_until(lambda: ui.store.get("convId") not in ("", first_id), 5, "the branch to open")
     branch = ui.store.get("conv")
     ui.eq((branch["thread"], branch["parent"]), (first_id, first_id), "the branch is in the first conversation's thread")
-    ui.check(ui.sees("You said: Hello there") and not ui.sees("You said: make a part and render it"), "the branch holds the conversation up to that message")
+    ui.wait_until(lambda: ui.sees("You said: Hello there") and not ui.sees("You said: make a part and render it"), 5,
+                  "the branch to hold the conversation up to that message")
     sw = ui.wait_until(lambda: ui.find(name="branchSwitch"), 5, "the branch switcher in the header")
     ui.wait_until(lambda: ui.sees("Branch 2 of 2", sw), 5, "which branch this is")
     ui.settle(400)
