@@ -58,9 +58,16 @@ env.PUBLIC_KEY = Buffer.from(await crypto.subtle.exportKey("raw", keys.publicKey
 async function send(i, sign = true) {
   const body = JSON.stringify(i), ts = "1700000000";
   const sig = Buffer.from(await crypto.subtle.sign("Ed25519", keys.privateKey, new TextEncoder().encode(ts + body))).toString("hex");
+  const pending = [];
   const r = await worker.fetch(new Request("https://bot/", { method: "POST", body,
-    headers: { "X-Signature-Ed25519": sign ? sig : "00".repeat(64), "X-Signature-Timestamp": ts } }), env, {});
-  return r.status === 200 ? r.json() : r.status;
+    headers: { "X-Signature-Ed25519": sign ? sig : "00".repeat(64), "X-Signature-Timestamp": ts } }), env,
+    { waitUntil: (p) => pending.push(p) });
+  if (r.status !== 200) return r.status;
+  const out = await r.json();
+  if (out.type !== 5) return out;
+  await Promise.all(pending);                    // a deferred reply: what the follow-up edited in
+  const edit = calls.filter(([m, p]) => m === "PATCH" && p.includes("/messages/@original")).pop();
+  return { type: 4, deferred: out.data, data: { ...edit[2], flags: out.data.flags } };
 }
 const member = (id, rs = []) => ({ user: { id, username: id }, roles: rs });
 const cmd = (name, options = [], extra = {}) => ({ type: 2, guild_id: GUILD, channel_id: ch("general").id, member: member("u1"),

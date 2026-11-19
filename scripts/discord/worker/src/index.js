@@ -19,7 +19,9 @@ export async function api(env, method, path, body) {
     });
     if (r.status === 429) {
       const j = await r.json().catch(() => ({}));
-      await new Promise((res) => setTimeout(res, Math.min(10, j.retry_after || 1) * 1000 + 100));
+      console.log("429", path, JSON.stringify(j).slice(0, 200));
+      if ((j.retry_after || 1) > 5) throw new Error(`${method} ${path}: rate limited for ${j.retry_after}s`);
+      await new Promise((res) => setTimeout(res, (j.retry_after || 1) * 1000 + 100));
       continue;
     }
     if (r.status === 204) return null;
@@ -115,7 +117,7 @@ async function cmdRecipe(env, i, random = false) {
     : all.find((x) => x.id === want || x.title.toLowerCase() === want) || all.find((x) => x.title.toLowerCase().includes(want));
   if (!r) return reply({ content: `No recipe matches “${want}”. Try \`/recipe\` and pick from the list.` });
   return reply({ embeds: [recipeEmbed(r)], components: [row(linkBtn("Open the gallery", C.site + "recipes/", "🧩"),
-    btn("Another one", "open:recipe", "🎲"))] }, random);
+    btn("Another one", "open:recipe", "🎲"))] }, random || !want);
 }
 
 async function autocomplete(env, i) {
@@ -307,6 +309,17 @@ export async function handle(env, i) {
   return reply({ content: "That did not work. Try again in a moment." });
 }
 
+// answered at once: PING, autocomplete, the showcase form, and commands that need nothing from Discord
+const INSTANT = new Set(["showcase", "poll", "download"]);
+function immediate(i) { return i.type === 1 || i.type === 4 || (i.type === 2 && INSTANT.has(i.data.name)); }
+const PUBLIC = new Set(["guide", "rank", "leaderboard", "thanks", "challenge", "Mark as solved", "recipe"]);
+function ephemeral(i) {
+  if (i.type !== 2 || !PUBLIC.has(i.data.name)) return true;
+  if (i.data.name === "recipe") return !opt(i, "name");
+  if (i.data.name === "challenge") return true;
+  return false;
+}
+
 function hex(s) { return new Uint8Array(s.match(/../g).map((h) => parseInt(h, 16))); }
 export async function verify(publicKey, signature, timestamp, body) {
   try {
@@ -436,6 +449,14 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (request.method === "GET") return new Response("Form Studio bot is running.", { status: 200 });
+    if (url.pathname === "/diag") {           // one Discord call, timed (Actions, with the bot token as the key)
+      if (request.headers.get("Authorization") !== `Bot ${env.DISCORD_BOT_TOKEN}`) return new Response("no", { status: 401 });
+      const t0 = Date.now();
+      const r = await fetch(`${API}/guilds/${env.GUILD_ID}/channels`, { headers: { Authorization: `Bot ${env.DISCORD_BOT_TOKEN}`,
+        "User-Agent": "DiscordBot (https://github.com/kaizensx/form-studio, 2.0) FormStudio" } });
+      const body = await r.text();
+      return Response.json({ status: r.status, ms: Date.now() - t0, kv: !!env.STATE, body: r.ok ? `${JSON.parse(body).length} channels` : body.slice(0, 300) });
+    }
     if (url.pathname === "/tick") {           // run the cron by hand (Actions, with the bot token as the key)
       if (request.headers.get("Authorization") !== `Bot ${env.DISCORD_BOT_TOKEN}`) return new Response("no", { status: 401 });
       const s = await tick(env);
@@ -445,12 +466,21 @@ export default {
     const ok = await verify(env.PUBLIC_KEY, request.headers.get("X-Signature-Ed25519") || "",
                             request.headers.get("X-Signature-Timestamp") || "", body);
     if (!ok) return new Response("bad signature", { status: 401 });
-    try {
-      return Response.json(await handle(env, JSON.parse(body)));
-    } catch (e) {
-      console.log("interaction", String(e));
-      return Response.json(reply({ content: "Something went wrong on our side. Try again in a moment." }));
+    const i = JSON.parse(body);
+    if (immediate(i)) {
+      try { return Response.json(await handle(env, i)); }
+      catch (e) { console.log("interaction", String(e)); return Response.json(reply({ content: "Something went wrong. Try again in a moment." })); }
     }
+    // everything that calls Discord: acknowledge now (Discord allows 3 s), finish in the background, edit the reply in
+    ctx.waitUntil((async () => {
+      let out;
+      try { out = await handle(env, i); } catch (e) { console.log("interaction", String(e)); out = reply({ content: "Something went wrong. Try again in a moment." }); }
+      const data = { ...(out.data || {}) }; delete data.flags;
+      const r = await fetch(`${API}/webhooks/${env.APP_ID}/${i.token}/messages/@original`, { method: "PATCH",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (!r.ok) console.log("follow-up", r.status, (await r.text()).slice(0, 300));
+    })());
+    return Response.json({ type: 5, data: { flags: ephemeral(i) ? EPHEMERAL : 0 } });
   },
   async scheduled(event, env, ctx) { ctx.waitUntil(tick(env)); },
 };
