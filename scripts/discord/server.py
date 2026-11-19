@@ -1,17 +1,16 @@
-"""The Form Studio Discord server, as data: roles, channels, forums, onboarding, guides, AutoMod and the posts.
+"""The Form Studio Discord server, as data: roles, channels, forums, onboarding, levels, challenges and the posts.
 
-setup_server.py makes the server match this, by name, as often as it is run. It deletes only what RETIRE lists,
-and only while it is empty. snapshot.py records the server before and after every setup (Actions artifacts), so
-any run can be compared or rolled back.
+setup_server.py makes the server match this, as often as it is run. It deletes only what RETIRE lists, and only while
+it is empty. snapshot.py records the server before and after every setup (Actions artifacts) for rollback.
+The interactive bot (slash commands, buttons, role pickers, levels, weekly challenges) is the Cloudflare Worker in
+scripts/discord/worker/; it reads the channel names and roles from here (worker/config.json, written by setup).
 
-The design system, in one place:
-- Names. Categories are plain words in capitals; channels are lowercase single words. No emoji in names or titles.
-- Colour is evidence, as in the app (form/app/qml/Form/Theme.qml): datum = settled and official, blueprint = in
-  progress or discussion, violet = previews and recipes, amber = needs attention, signal = failed, pass = done.
-  Only roles that say something about a person (Maintainer, Contributor, Recipe author) have a colour.
-- Embeds. One colour from the palette, a sentence-case title, short paragraphs, and the footer "Form Studio · Section"
-  with the Form Studio mark. Buttons are links with plain labels.
-- Copy. Plain sentences that say what a place is for and what to post there.
+The design system:
+- Names. Every category and channel has one emoji and a short lowercase name: "🧊・showcase". Code refers to channels
+  by their key ("showcase"); NAMES maps a key to the name shown.
+- Colour carries meaning, as in the app (form/app/qml/Form/Theme.qml): datum = official, blueprint = discussion,
+  violet = previews and recipes, amber = attention, signal = failed, pass = done.
+- Embeds. One palette colour, a title with one emoji, short paragraphs, and the footer "Form Studio · Section".
 """
 
 SITE = "https://kaizensx.github.io/form-studio/"
@@ -33,26 +32,47 @@ INVITE = "https://discord.gg/" + INVITE_CODE
 # ---- roles -------------------------------------------------------------------------------------------------------
 # name, colour, hoist, mentionable. Listed top to bottom; setup orders them so (under the bot's own role).
 ROLES = [
-    ("Maintainer", 0xB9E8D7, True, False),       # datum: keeps Form Studio
-    ("Contributor", 0x86A8FF, True, False),      # blueprint: has a merged pull request
-    ("Recipe author", 0xC7B2FF, True, False),    # violet: has a recipe in the community gallery
-    # picked in onboarding; no colour, so a coloured name always means something
-    ("macOS", 0, False, False),
-    ("Windows", 0, False, False),
-    ("Linux", 0, False, False),
-    ("Bambu Lab", 0, False, False),
-    ("Prusa", 0, False, False),
-    ("Creality", 0, False, False),
-    ("Other printer", 0, False, False),
-    ("No printer yet", 0, False, False),
-    ("Claude Code", 0, False, False),
-    ("Codex", 0, False, False),
-    ("Gemini CLI", 0, False, False),
-    ("Model API", 0, False, False),
-    ("Local models", 0, False, False),
-    ("Release pings", 0, False, False),          # the bot mentions it for every stable release
+    ("🛠️ Maintainer", 0xB9E8D7, True, False),          # keeps Form Studio
+    ("🧑‍💻 Contributor", 0x86A8FF, True, False),         # has a merged pull request
+    ("🧩 Recipe author", 0xC7B2FF, True, False),        # has a recipe in the community gallery
+    ("🏆 Challenge winner", 0xE9B860, True, False),     # won a weekly challenge (the bot gives it)
+    # levels: earned by talking, sharing and helping (the bot counts it; /rank shows yours)
+    ("🏭 Print Farm", 0xFF6F51, True, False),           # level 40
+    ("⚙️ Assembly", 0xC7B2FF, True, False),            # level 25
+    ("🧊 Solid", 0x86A8FF, True, False),               # level 15
+    ("📏 Calibrated", 0x86D9AD, True, False),           # level 8
+    ("🧱 First Layer", 0xD8D3C8, False, False),         # level 3
+    # picked in onboarding or #roles
+    ("🍎 macOS", 0, False, False), ("🪟 Windows", 0, False, False), ("🐧 Linux", 0, False, False),
+    ("🟢 Bambu Lab", 0, False, False), ("🟠 Prusa", 0, False, False), ("🔵 Creality", 0, False, False),
+    ("🖨️ Other printer", 0, False, False), ("✏️ No printer yet", 0, False, False),
+    ("🧡 Claude Code", 0, False, False), ("⚪ Codex", 0, False, False), ("🔷 Gemini CLI", 0, False, False),
+    ("🔑 Model API", 0, False, False), ("🖥️ Local models", 0, False, False),
+    ("🔔 Release pings", 0, False, True),               # mentioned for every stable release
+    ("🏁 Challenge pings", 0, False, True),             # mentioned when a weekly challenge starts
+    ("📅 Event pings", 0, False, True),                 # mentioned when a live session is scheduled
 ]
-ROLE_RENAMES = {"Creality / Elegoo / other": "Other printer", "Just designing": "No printer yet"}
+LEVELS = [(3, "🧱 First Layer"), (8, "📏 Calibrated"), (15, "🧊 Solid"), (25, "⚙️ Assembly"), (40, "🏭 Print Farm")]
+# old name -> new name (same role, same members)
+ROLE_RENAMES = {
+    "Maintainer": "🛠️ Maintainer", "Contributor": "🧑‍💻 Contributor", "Recipe author": "🧩 Recipe author",
+    "macOS": "🍎 macOS", "Windows": "🪟 Windows", "Linux": "🐧 Linux", "Bambu Lab": "🟢 Bambu Lab",
+    "Prusa": "🟠 Prusa", "Creality": "🔵 Creality", "Other printer": "🖨️ Other printer",
+    "No printer yet": "✏️ No printer yet", "Claude Code": "🧡 Claude Code", "Codex": "⚪ Codex",
+    "Gemini CLI": "🔷 Gemini CLI", "Model API": "🔑 Model API", "Local models": "🖥️ Local models",
+    "Release pings": "🔔 Release pings",
+    "Creality / Elegoo / other": "🖨️ Other printer", "Just designing": "✏️ No printer yet",
+}
+R = {k: k for k, *_ in ROLES}
+R.update({old: new for old, new in ROLE_RENAMES.items()})   # code may say R["Maintainer"]
+
+# self-assigned in #roles (the bot's role picker) as well as in onboarding: (group, placeholder, [roles])
+ROLE_PICKER = [
+    ("system", "Your system", ["🍎 macOS", "🪟 Windows", "🐧 Linux"]),
+    ("printer", "What you print with", ["🟢 Bambu Lab", "🟠 Prusa", "🔵 Creality", "🖨️ Other printer", "✏️ No printer yet"]),
+    ("agent", "Your agent or model", ["🧡 Claude Code", "⚪ Codex", "🔷 Gemini CLI", "🔑 Model API", "🖥️ Local models"]),
+    ("pings", "Notifications", ["🔔 Release pings", "🏁 Challenge pings", "📅 Event pings"]),
+]
 
 # Recognition. Discord user ids (Developer Mode › right-click a name › Copy User ID).
 # The server owner is always a Maintainer. To get the Contributor role, add your GitHub login and Discord id here in
@@ -64,117 +84,151 @@ RECIPE_AUTHORS: dict[str, str] = {}   # GitHub login -> Discord user id
 # ---- channels ----------------------------------------------------------------------------------------------------
 TEXT, VOICE, CATEGORY, NEWS, STAGE, FORUM = 0, 2, 4, 5, 13, 15
 
-# options:
+# (key, name shown, type, topic, options). options:
 #   access    "read_only" (members react and read), "replies" (forum: members reply, only staff post),
-#             "private" (Maintainer and the bot only); default: open
+#             "private" (Maintainers and the bot only); default: open
 #   default   in every member's channel list from the start (onboarding)
 #   tags, emoji, layout ("list"/"gallery"), require_tag, slowmode
 LAYOUT = [
-    ("START HERE", [
-        ("welcome", TEXT, "What Form Studio is and where everything is. Start here.",
+    ("📌 START HERE", [
+        ("welcome", "👋・welcome", TEXT, "What Form Studio is and where everything is. Start here.",
          {"access": "read_only", "default": True}),
-        ("rules", TEXT, "Six short rules. Read them once.", {"access": "read_only", "default": True}),
-        ("announcements", NEWS, "Stable releases and news, nothing else. Follow it to get them in your own server.",
+        ("rules", "📜・rules", TEXT, "Six short rules. Read them once.", {"access": "read_only", "default": True}),
+        ("roles", "🎭・roles", TEXT, "Pick your system, printer, agent and pings with the menus below. Change them any time.",
          {"access": "read_only", "default": True}),
-        ("releases", TEXT, "Every build with its notes and downloads: stable releases and previews from dev.",
+        ("announcements", "📣・announcements", NEWS, "Stable releases and news. Follow it to get them in your own server.",
+         {"access": "read_only", "default": True}),
+        ("releases", "🚀・releases", TEXT, "Every build with its notes and downloads: stable releases and previews.",
          {"access": "read_only", "default": True}),
     ]),
-    ("COMMUNITY", [
-        ("general", TEXT, "Talk about designing and printing parts. Questions that need an answer go to #help.",
+    ("💬 COMMUNITY", [
+        ("general", "💬・general", TEXT, "Talk about designing and printing parts. Try /recipe, /guide or /rank.",
          {"default": True}),
-        ("showcase", FORUM, (
-            "Parts you designed with Form Studio. One post per part.\n\n"
-            "A good post has:\n"
-            "- a photo of the print, or a render if it is a 3D model\n"
-            "- what it is for and what you asked for\n"
-            "- the printer, filament and slicer\n"
-            "- what you learned, failures included: they teach the most\n\n"
-            "Attach the .formstudio file if you want others to remix it, with its licence."),
-         {"tags": ["Printed", "3D model", "Assembly", "Remix", "First print", "Failure"], "emoji": "👍",
-          "layout": "gallery", "default": True}),
-        ("Workshop", VOICE, "", {"default": True}),
+        ("introductions", "🙋・introductions", TEXT,
+         "Say hi: what you print with, what you want to design, which agent you use.", {"default": True, "slowmode": 30}),
+        ("showcase", "🧊・showcase", FORUM, (
+            "Parts you designed with Form Studio. One post per part, or use /showcase.\n\n"
+            "A good post has a photo of the print (or a render), what it is for, the printer, filament and slicer, and "
+            "what you learned. Attach the .formstudio file if others may remix it, with its licence."),
+         {"tags": ["🖨️ Printed", "🧊 3D model", "⚙️ Assembly", "🔁 Remix", "🌱 First print", "💥 Failure"],
+          "emoji": "🔥", "layout": "gallery", "default": True}),
+        ("wins-and-fails", "🍝・wins-and-fails", TEXT,
+         "The print that came out perfect, and the spaghetti. Both teach something.", {"default": True}),
+        ("off-topic", "🎲・off-topic", TEXT, "Everything that is not Form Studio.", {"default": True, "slowmode": 5}),
     ]),
-    ("LIBRARY", [
-        ("guides", FORUM, (
+    ("🔧 WORKSHOP", [
+        ("printers", "🖨️・printers-and-slicers", TEXT,
+         "Bambu Studio, OrcaSlicer, PrusaSlicer and friends: profiles, presets, filaments.", {"default": True}),
+        ("agents", "🤖・agents-and-models", TEXT,
+         "Claude Code, Codex, Gemini CLI, model APIs and local models: what designs well.", {"default": True}),
+        ("design-tips", "📐・design-tips", TEXT,
+         "Tolerances, fits, overhangs, wall thickness, threads: CAD know-how.", {"default": True}),
+        ("calibration", "🧪・calibration", TEXT,
+         "Fit coupons, measured results and printer bias: numbers that make fits land.", {}),
+    ]),
+    ("🏁 CHALLENGES & EVENTS", [
+        ("challenges", "🏁・weekly-challenge", FORUM, (
+            "A new design brief every week. Reply in its post with your design: a render or a photo, and how you "
+            "made it. Star (⭐) the entries you like. On Sunday at 21:00 UTC the most starred entry wins the "
+            "🏆 Challenge winner role and the next brief opens."),
+         {"access": "replies", "tags": ["🟢 Open", "🏆 Closed"], "emoji": "⭐", "layout": "gallery", "default": True}),
+        ("polls", "🗳️・polls", TEXT, "Polls about what comes next. Make one with /poll.", {"default": True}),
+        ("events", "📅・events", TEXT, "Live build sessions, challenge results and other scheduled events.",
+         {"access": "read_only", "default": True}),
+        ("lounge", "🔊 Lounge", VOICE, "", {"default": True}),
+        ("live", "🎙️ Live builds", STAGE, "", {"default": True}),
+    ]),
+    ("📚 LIBRARY", [
+        ("guides", "📘・guides", FORUM, (
             "How to do things in Form Studio, one guide per post, with links to the full documentation. "
-            "Reply in a guide to ask about it; questions of your own go to #help."),
-         {"access": "replies", "tags": ["Start", "Agents", "Printing", "App", "Reference"], "emoji": "👍",
-          "default": True}),
-        ("recipes", FORUM, (
-            "Recipes are parametric building blocks written as code, with their own checks. "
-            "Every built-in recipe has a post here; the gallery is on the website.\n\n"
-            "Share your own: a post with the .formrecipe file, a render from a real build, what its parameters do and "
-            "its licence. Tag it Review wanted. Accepted recipes go into the community gallery."),
-         {"tags": ["Built-in", "Community", "Review wanted", "Accepted", "Idea"], "emoji": "👍",
+            "Reply in a guide to ask about it; /guide finds one from anywhere."),
+         {"access": "replies", "tags": ["🚀 Start", "🤖 Agents", "🖨️ Printing", "🧭 App", "📖 Reference"],
+          "emoji": "👍", "default": True}),
+        ("recipes", "🧩・recipes", FORUM, (
+            "Recipes are parametric building blocks written as code, with their own checks. Every built-in recipe has "
+            "a post here; /recipe shows one anywhere.\n\nShare your own: the .formrecipe file, a render from a real "
+            "build, what its parameters do and its licence. Tag it Review wanted."),
+         {"tags": ["📦 Built-in", "🌍 Community", "👀 Review wanted", "✅ Accepted", "💡 Idea"], "emoji": "👍",
           "layout": "gallery", "default": True}),
     ]),
-    ("HELP & FEEDBACK", [
-        ("help", FORUM, (
+    ("🛟 HELP & FEEDBACK", [
+        ("help", "🛟・help", FORUM, (
             "Stuck? One post per question, with a tag.\n\n"
-            "Say:\n"
-            "- your system and Form Studio version (Help › About)\n"
-            "- your printer and slicer, or that it is a 3D model\n"
-            "- what you did, what you expected and what happened\n"
-            "- the output of `form doctor` when it is about setup\n\n"
-            "When it is solved, add the Solved tag. Bugs you can reproduce: open an issue on GitHub."),
-         {"tags": ["Install", "Agents & models", "Printers & slicers", "Checks & fit", "Export", "Bug", "Solved"],
-          "emoji": "👍", "require_tag": True, "default": True}),
-        ("ideas", FORUM, (
+            "Say your system and Form Studio version (Help › About), your printer and slicer, what you did, what you "
+            "expected and what happened, and `form doctor` for setup problems.\n\n"
+            "When it is solved, right-click the answer › Apps › Mark as solved."),
+         {"tags": ["📥 Install", "🤖 Agents & models", "🖨️ Printers & slicers", "📏 Checks & fit", "📤 Export",
+                   "🐞 Bug", "✅ Solved"], "emoji": "👍", "require_tag": True, "default": True}),
+        ("ideas", "💡・ideas", FORUM, (
             "What Form Studio should do next. One idea per post: the problem first, then what you would want. "
             "Vote with the reaction. Maintainers tag what is Planned and what Shipped."),
-         {"tags": ["Feature", "Agent tool", "Printer support", "Recipe", "Planned", "Shipped"], "emoji": "👍",
-          "default": True}),
+         {"tags": ["✨ Feature", "🔧 Agent tool", "🖨️ Printer support", "🧩 Recipe", "🗺️ Planned", "🚢 Shipped"],
+          "emoji": "👍", "default": True}),
     ]),
-    ("BUILD", [
-        ("contributing", TEXT, "Working on Form Studio's code, docs, recipes or the website. Start with the pinned post.", {}),
-        ("github", TEXT, "Issues, pull requests and discussions on github.com/kaizensx/form-studio, posted by the bot.",
+    ("⚙️ BUILD", [
+        ("contributing", "🧑‍💻・contributing", TEXT,
+         "Working on Form Studio's code, docs, recipes or the website. Start with the pinned post.", {}),
+        ("github", "🐙・github", TEXT, "Issues, pull requests and discussions on GitHub, posted by the bot.",
          {"access": "read_only"}),
-        ("ci", TEXT, "Failed runs on main and dev, posted by the bot.", {"access": "read_only"}),
+        ("ci", "🧯・ci", TEXT, "Failed runs on main and dev, posted by the bot.", {"access": "read_only"}),
     ]),
-    ("STAFF", [
-        ("mod-log", TEXT, "AutoMod alerts, Discord's community updates and the help desk queue.", {"access": "private"}),
+    ("🔒 STAFF", [
+        ("mod-log", "🔒・mod-log", TEXT, "AutoMod alerts, Discord's community updates and the help desk queue.",
+         {"access": "private"}),
     ]),
 ]
+NAMES = {k: n for _, chans in LAYOUT for k, n, *_ in chans}
 
-# Renamed in this layout: old name -> new name (the channel, its id and its history are kept)
+
+def N(key: str) -> str:
+    """The name a channel is shown with, from its key."""
+    return NAMES.get(key, key)
+
+
+# Renamed: old name -> new name (the channel, its id and its history are kept). Every plain key is renamed too.
 CHANNEL_RENAMES = {
-    "👋  START HERE": "START HERE",
-    "💬  COMMUNITY": "COMMUNITY",
-    "🛟  HELP": "HELP & FEEDBACK",
-    "🛠  BUILD FORM STUDIO": "BUILD",
-    "moderator-only": "mod-log",
+    "👋  START HERE": "📌 START HERE", "START HERE": "📌 START HERE", "COMMUNITY": "💬 COMMUNITY",
+    "💬  COMMUNITY": "💬 COMMUNITY", "LIBRARY": "📚 LIBRARY", "HELP & FEEDBACK": "🛟 HELP & FEEDBACK",
+    "🛟  HELP": "🛟 HELP & FEEDBACK", "BUILD": "⚙️ BUILD", "🛠  BUILD FORM STUDIO": "⚙️ BUILD", "STAFF": "🔒 STAFF",
+    "moderator-only": "🔒・mod-log", "Workshop": "🔊 Lounge",
+    **{k: n for k, n in NAMES.items()},
 }
 
 # Deleted by setup, but only while empty (no messages, no channels inside). The before-snapshot records them.
 RETIRE = [
-    ("prints", TEXT), ("off-topic", TEXT), ("printers-and-slicers", TEXT), ("agents-and-models", TEXT),
-    ("Print queue", VOICE), ("General", VOICE),
+    ("prints", TEXT), ("Print queue", VOICE), ("General", VOICE),
     ("🧊  FORM STUDIO", CATEGORY), ("🔊  WORKSHOP", CATEGORY), ("Text Channels", CATEGORY), ("Voice Channels", CATEGORY),
 ]
 
 # ---- onboarding (Server Settings › Onboarding) ---------------------------------------------------------------------
-# (question, [(option, description, roles, channels)])
+# (question, [(option, description, emoji, roles, channels)])
 ONBOARDING = [
     ("What brings you here?", [
-        ("Designing parts", "Show what you made, find recipes", [], ["showcase", "recipes"]),
-        ("Getting help", "Guides and the help forum", [], ["help", "guides"]),
-        ("Building Form Studio", "The code, CI and GitHub channels", [], ["contributing", "github", "ci"]),
+        ("Designing parts", "Show what you made, find recipes, join the challenge", "🧊", [], ["showcase", "recipes", "challenges"]),
+        ("Getting help", "Guides and the help forum", "🛟", [], ["help", "guides"]),
+        ("Calibrating my printer", "Fit coupons and measured results", "🧪", [], ["calibration"]),
+        ("Building Form Studio", "The code, CI and GitHub channels", "🧑‍💻", [], ["contributing", "github", "ci"]),
     ]),
     ("What do you print with?", [
-        ("Bambu Lab", "", ["Bambu Lab"], []), ("Prusa", "", ["Prusa"], []), ("Creality", "", ["Creality"], []),
-        ("Another printer", "Elegoo, Anycubic, Voron, Snapmaker…", ["Other printer"], []),
-        ("No printer yet", "3D models, or printing elsewhere", ["No printer yet"], []),
+        ("Bambu Lab", "", "🟢", ["🟢 Bambu Lab"], []), ("Prusa", "", "🟠", ["🟠 Prusa"], []),
+        ("Creality", "", "🔵", ["🔵 Creality"], []),
+        ("Another printer", "Elegoo, Anycubic, Voron, Snapmaker…", "🖨️", ["🖨️ Other printer"], []),
+        ("No printer yet", "3D models, or printing elsewhere", "✏️", ["✏️ No printer yet"], []),
     ]),
     ("Which agent or model do you use?", [
-        ("Claude Code", "", ["Claude Code"], []), ("Codex", "", ["Codex"], []), ("Gemini CLI", "", ["Gemini CLI"], []),
-        ("A model API", "Anthropic, OpenAI, OpenRouter…", ["Model API"], []),
-        ("Local models", "Ollama, LM Studio, llama.cpp", ["Local models"], []),
+        ("Claude Code", "", "🧡", ["🧡 Claude Code"], []), ("Codex", "", "⚪", ["⚪ Codex"], []),
+        ("Gemini CLI", "", "🔷", ["🔷 Gemini CLI"], []),
+        ("A model API", "Anthropic, OpenAI, OpenRouter…", "🔑", ["🔑 Model API"], []),
+        ("Local models", "Ollama, LM Studio, llama.cpp", "🖥️", ["🖥️ Local models"], []),
     ]),
-    ("Get a mention for every stable release?", [
-        ("Yes, mention me", "In #announcements, about once a month", ["Release pings"], []),
+    ("What should we ping you for?", [
+        ("Stable releases", "In #announcements, about once a month", "🔔", ["🔔 Release pings"], []),
+        ("Weekly challenges", "Every Sunday night, when a new brief opens", "🏁", ["🏁 Challenge pings"], []),
+        ("Live sessions", "When a live build is scheduled", "📅", ["📅 Event pings"], []),
     ]),
     ("Which system do you use?", [
-        ("macOS", "", ["macOS"], []), ("Windows", "", ["Windows"], []), ("Linux", "", ["Linux"], []),
+        ("macOS", "", "🍎", ["🍎 macOS"], []), ("Windows", "", "🪟", ["🪟 Windows"], []),
+        ("Linux", "", "🐧", ["🐧 Linux"], []),
     ]),
 ]
 
@@ -301,3 +355,45 @@ HELP_GUIDES = {
     "Export": ["Release a design", "Move and share designs"],
     "Bug": [],
 }
+
+# ---- levels and challenges (run by the worker, scripts/discord/worker) -------------------------------------------------
+# XP: one message earns 15–25 XP, at most once a minute; a /thanks gives 25; an answer marked solved gives 40;
+# a /showcase post gives 30. XP for the next level from level n: 5n² + 50n + 100 (the usual curve).
+XP = {"message": [15, 25], "cooldown_s": 60, "thanks": 25, "thanks_per_day": 3, "solved": 40, "showcase": 30}
+
+# One brief a week: it closes on Sunday 21:00 UTC, the most ⭐ entry wins, and the next brief opens at once.
+# (title, the brief, what makes an entry count)
+CHALLENGES = [
+    ("Desk-edge cable clip", "A clip that holds three cables along the edge of a desk 18–25 mm thick.",
+     "Prints without supports. Show the fit on your own desk."),
+    ("A bin for your smallest tool", "A Gridfinity bin shaped around the smallest tool you own.",
+     "Measure the tool and say how you measured it."),
+    ("A hook that holds 2 kg", "A wall or pegboard hook that carries 2 kg without creeping.",
+     "Show the checks, and a photo with the weight if you printed it."),
+    ("Headphone stand under 60 g", "A stand for over-ear headphones that weighs less than 60 g of filament.",
+     "Post the slicer's grams. Make it lighter is allowed."),
+    ("A replacement knob", "A knob for something you own whose knob broke or went missing.",
+     "Measure the shaft. Real fit beats pretty."),
+    ("Phone stand, two angles", "A phone stand with a reading angle and a video-call angle.",
+     "One print, no glue."),
+    ("Spool holder adapter", "An adapter that lets a spool with an odd hub sit on your printer's holder.",
+     "Say the hub diameter and the printer."),
+    ("Self-watering planter", "A planter with a water reservoir for a herb on your windowsill.",
+     "Show it with soil in it, or a render with the reservoir cut open."),
+    ("Battery organiser", "A holder for AA and AAA cells with a place for the dead ones.",
+     "Fits a drawer you own."),
+    ("Drawer divider from one measurement", "Dividers for a drawer, made from its inside width alone.",
+     "Say the one number you measured."),
+    ("Print-in-place hinge", "A box or case with a hinge printed in place.",
+     "Show it opening. Say the clearance you used."),
+    ("SD and USB holder", "A holder for SD cards and USB sticks that lives on your desk.",
+     "Every slot labelled."),
+    ("Shelf bracket for a 20 mm board", "A bracket that holds a 20 mm shelf to a wall.",
+     "Show where it would fail first and why it won't."),
+    ("Desk grommet", "A cable grommet for a 60 mm hole with a lid that closes around the cables.",
+     "Two parts, one plate."),
+    ("Filament clip", "A clip that keeps a spool's loose end from unwinding, without tools.",
+     "Works on two different spools."),
+    ("Something you fixed", "Free brief: a part that fixed something broken in your home.",
+     "Tell the story: what broke, what you measured, how it fits now."),
+]

@@ -24,6 +24,7 @@ REPO = os.environ.get("GITHUB_REPOSITORY", "kaizensx/form-studio")
 
 
 def channel(name: str) -> str:
+    name = S.N(name)                                   # a key ("releases") or the name shown
     for c in d.call("GET", f"/guilds/{os.environ['DISCORD_GUILD_ID']}/channels"):
         if c["name"] == name:
             return c["id"]
@@ -31,6 +32,7 @@ def channel(name: str) -> str:
 
 
 def role(name: str) -> str | None:
+    name = S.R.get(name, name)
     for r in d.call("GET", f"/guilds/{os.environ['DISCORD_GUILD_ID']}/roles"):
         if r["name"] == name:
             return r["id"]

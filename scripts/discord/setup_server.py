@@ -38,6 +38,12 @@ STAFF_ALLOW = VIEW | SEND | SEND_THREADS | HISTORY
 REQUIRE_TAG, PINNED = 1 << 4, 1 << 1
 
 
+def tag(t: str) -> dict:
+    """ "🖨️ Printed" -> a forum tag named Printed with its emoji."""
+    first, _, rest = t.partition(" ")
+    return {"name": rest, "emoji_name": first} if rest and not first.isascii() else {"name": t}
+
+
 def log(*a):
     print(*a, flush=True)
 
@@ -112,9 +118,9 @@ class Setup:
 
     def ensure_members(self):
         """Recognition: the owner and MAINTAINERS are Maintainers; CONTRIBUTORS and RECIPE_AUTHORS get their roles."""
-        give = [(self.guild["owner_id"], "Maintainer")] + [(u, "Maintainer") for u in S.MAINTAINERS]
-        give += [(u, "Contributor") for u in S.CONTRIBUTORS.values()]
-        give += [(u, "Recipe author") for u in S.RECIPE_AUTHORS.values()]
+        give = [(self.guild["owner_id"], S.R["Maintainer"])] + [(u, S.R["Maintainer"]) for u in S.MAINTAINERS]
+        give += [(u, S.R["Contributor"]) for u in S.CONTRIBUTORS.values()]
+        give += [(u, S.R["Recipe author"]) for u in S.RECIPE_AUTHORS.values()]
         for user, role in give:
             r = self.roles.get(role)
             if not r or not user:
@@ -129,6 +135,7 @@ class Setup:
 
     # ---- channels ------------------------------------------------------------------------------------
     def find(self, name, type_=None):
+        name = S.N(name)                                          # a key ("showcase") or a shown name
         for c in self.channels:
             if c["name"] == name and (type_ is None or c["type"] == type_ or {c["type"], type_} <= {S.TEXT, S.NEWS}):
                 return c
@@ -136,7 +143,7 @@ class Setup:
 
     def overwrites(self, opts):
         access = opts.get("access")
-        m = self.roles.get("Maintainer")
+        m = self.roles.get(S.R["Maintainer"])
         staff = [{"id": self.me["id"], "type": 1, "allow": str(STAFF_ALLOW), "deny": "0"}]
         if m:
             staff.insert(0, {"id": m["id"], "type": 0, "allow": str(STAFF_ALLOW), "deny": "0"})
@@ -165,7 +172,7 @@ class Setup:
                 self.channels.append(cat)
             elif cat.get("position") != pos:
                 self._do("PATCH", f"/channels/{cat['id']}", {"position": pos}, f"move category {cat_name}")
-            for i, (name, type_, topic, opts) in enumerate(chans):
+            for i, (key, name, type_, topic, opts) in enumerate(chans):
                 body = {"name": name, "type": type_, "parent_id": cat["id"], "position": i,
                         "permission_overwrites": self.overwrites(opts)}
                 if type_ in (S.TEXT, S.NEWS, S.FORUM):
@@ -183,14 +190,16 @@ class Setup:
                     if type_ == S.NEWS and "COMMUNITY" not in self.guild.get("features", []):
                         body["type"] = S.TEXT                             # announcement channels need a community server
                     if type_ == S.FORUM:
-                        body["available_tags"] = [{"name": t} for t in tags]
+                        body["available_tags"] = [tag(t) for t in tags]
                     c = self._do("POST", f"/guilds/{self.g}/channels", body, f"create #{name}")
                     self.channels.append(c)
                 else:
                     if type_ == S.FORUM:      # keep the tags that exist (posts carry their ids), in the listed order
                         have = {t["name"]: t for t in c.get("available_tags", [])}
-                        body["available_tags"] = [have.get(t, {"name": t}) for t in tags] + \
-                            [t for n, t in have.items() if n not in tags]
+                        want = [tag(t) for t in tags]
+                        names = {w["name"] for w in want}
+                        body["available_tags"] = [{**({"id": have[w["name"]]["id"]} if w["name"] in have else {}), **w}
+                                                  for w in want] + [t for n, t in have.items() if n not in names]
                     body.pop("type")
                     if self._differs(c, body):
                         self._do("PATCH", f"/channels/{c['id']}", body, f"update #{name}")
@@ -204,7 +213,7 @@ class Setup:
                 if norm(c.get(k, [])) != norm(v):
                     return True
             elif k == "available_tags":
-                if [t["name"] for t in c.get(k, [])] != [t["name"] for t in v]:
+                if [(t["name"], t.get("emoji_name")) for t in c.get(k, [])] != [(t["name"], t.get("emoji_name")) for t in v]:
                     return True
             elif k == "default_reaction_emoji":
                 if (c.get(k) or {}).get("emoji_name") != v["emoji_name"]:
@@ -279,16 +288,17 @@ class Setup:
         for i, (title, options) in enumerate(S.ONBOARDING):
             old = {o["title"]: o["id"] for o in have.get(title, {}).get("options", [])}
             opts = []
-            for j, (label, desc, roles, chans) in enumerate(options):
+            for j, (label, desc, emoji, roles, chans) in enumerate(options):
                 role_ids = [self.roles[r]["id"] for r in roles if r in self.roles]
                 chan_ids = [self.channel(c)["id"] for c in chans if self.find(c)]
                 if role_ids or chan_ids:
                     opts.append({"id": old.get(label, str(base + 1000 + 100 * i + j)), "title": label,
-                                 "description": desc, "role_ids": role_ids, "channel_ids": chan_ids})
+                                 "description": desc, "emoji": {"name": emoji}, "role_ids": role_ids,
+                                 "channel_ids": chan_ids})
             prompts.append({"id": have.get(title, {}).get("id", str(base + 10 + i)), "type": 0, "title": title,
                             "options": opts, "single_select": False, "required": False,
                             "in_onboarding": i < S.ONBOARDING_SHOWN})
-        defaults = [self.channel(n)["id"] for _, chans in S.LAYOUT for n, t, _, o in chans
+        defaults = [self.channel(n)["id"] for _, chans in S.LAYOUT for n, _, t, _, o in chans
                     if o.get("default") and t in (S.TEXT, S.NEWS, S.FORUM) and self.find(n)]
         self._try("onboarding", lambda: self._do(
             "PUT", f"/guilds/{self.g}/onboarding",
@@ -298,7 +308,7 @@ class Setup:
     def ensure_automod(self):
         rules = d.call("GET", f"/guilds/{self.g}/auto-moderation/rules")
         log_ch = self.channel("mod-log")["id"]
-        m = self.roles.get("Maintainer")
+        m = self.roles.get(S.R["Maintainer"])
         for name, trigger, meta, block in S.AUTOMOD:
             actions = ([{"type": 1, "metadata": {"custom_message": "Blocked by the server's rules (#rules)."}}]
                        if block else []) + [{"type": 2, "metadata": {"channel_id": log_ch}}]
@@ -403,33 +413,44 @@ class Setup:
                                 "It comes back as real CAD you can measure, prove and release.")}
         if files:
             hero["image"] = {"url": "attachment://" + next(iter(files))}
-        where = {"color": d.PLATE, "title": "Where things are", "fields": [
-            {"name": "Show what you made", "value": c("showcase"), "inline": True},
-            {"name": "Learn the app", "value": c("guides"), "inline": True},
-            {"name": "Find a recipe", "value": c("recipes"), "inline": True},
-            {"name": "Ask for help", "value": c("help"), "inline": True},
-            {"name": "Propose an idea", "value": c("ideas"), "inline": True},
-            {"name": "Talk", "value": c("general"), "inline": True},
-            {"name": "Follow releases", "value": f"{c('announcements')} · {c('releases')}", "inline": True},
-            {"name": "Build it with us", "value": c("contributing"), "inline": True},
-            {"name": "Your channels and roles", "value": "<id:customize>", "inline": True}]}
-        how = {"color": d.BLUEPRINT, "title": "How a design goes", "description":
+        where = {"color": d.PLATE, "title": "🗺️ Where things are", "fields": [
+            {"name": "🧊 Show what you made", "value": c("showcase"), "inline": True},
+            {"name": "🏁 This week's challenge", "value": c("challenges"), "inline": True},
+            {"name": "🙋 Say hi", "value": c("introductions"), "inline": True},
+            {"name": "📘 Learn the app", "value": c("guides"), "inline": True},
+            {"name": "🧩 Find a recipe", "value": c("recipes"), "inline": True},
+            {"name": "🛟 Get help", "value": c("help"), "inline": True},
+            {"name": "🖨️ Printers & slicers", "value": c("printers"), "inline": True},
+            {"name": "🤖 Agents & models", "value": c("agents"), "inline": True},
+            {"name": "💡 Ideas", "value": c("ideas"), "inline": True},
+            {"name": "🎭 Your roles", "value": c("roles"), "inline": True},
+            {"name": "🚀 Releases", "value": c("releases"), "inline": True},
+            {"name": "🧑‍💻 Build it with us", "value": c("contributing"), "inline": True}]}
+        bot = {"color": d.VIOLET, "title": "🤖 Things to try", "description":
+               "`/recipe` a building block with its render · `/guide` the right guide · `/help` where to ask\n"
+               "`/rank` your level · `/leaderboard` the most active makers · `/thanks @someone` say thank you (+XP)\n"
+               "`/showcase` post a part · `/challenge` this week's brief · `/poll` ask the server · `/download`\n\n"
+               "Talking, sharing and helping earn XP: 🧱 First Layer → 📏 Calibrated → 🧊 Solid → ⚙️ Assembly → 🏭 Print Farm."}
+        how = {"color": d.BLUEPRINT, "title": "🛠️ How a design goes", "description":
                "`1` **Start**  words, a photo, a sketch, a STEP, STL or 3MF part, a PDF or a link\n"
                "`2` **Concepts**  three or four genuinely different designs, each real CAD\n"
                "`3` **Shape and fit**  parameters that say how they are known, fits modelled for your printer\n"
                "`4` **Prove**  checks on the solid, the slice from your slicer, the print played back\n"
                "`5` **Release**  you approve; STEP, STL, 3MF and G-code frozen with SHA-256 hashes"}
-        buttons = [d.row(d.link_button("Download", S.REPO + "/releases/latest"),
-                         d.link_button("Try it in your browser", S.SITE + "#try"),
-                         d.link_button("Docs", S.DOCS),
-                         d.link_button("GitHub", S.REPO),
-                         d.link_button("Discussions", S.REPO + "/discussions"))]
-        self.pinned_post("welcome", "Welcome", [hero, where, how], buttons, files or None, legacy="welcome")
+        buttons = [d.row({"type": 2, "style": 1, "label": "Pick my roles", "custom_id": "open:roles", "emoji": {"name": "🎭"}},
+                         {"type": 2, "style": 2, "label": "Where do I start?", "custom_id": "open:start", "emoji": {"name": "🧭"}},
+                         {"type": 2, "style": 2, "label": "Random recipe", "custom_id": "open:recipe", "emoji": {"name": "🎲"}}),
+                   d.row(d.link_button("Download", S.REPO + "/releases/latest", "⬇️"),
+                         d.link_button("Try it in your browser", S.SITE + "#try", "🧊"),
+                         d.link_button("Docs", S.DOCS, "📘"),
+                         d.link_button("GitHub", S.REPO, "⭐"))]
+        hero["title"] = "👋 Welcome to Form Studio"
+        self.pinned_post("welcome", "Welcome", [hero, where, bot, how], buttons, files or None, legacy="welcome")
 
     def rules(self):
         files = {"rules.png": (ART / "cards" / "rules.png").read_bytes()} if (ART / "cards" / "rules.png").exists() else None
         fields = [{"name": f"`{i}`  {t}", "value": v, "inline": False} for i, (t, v) in enumerate(S.RULES, 1)]
-        emb = {"color": d.AMBER, "title": "Rules", "fields": fields,
+        emb = {"color": d.AMBER, "title": "📜 Rules", "fields": fields,
                "description": "Short, so they get read. Moderators may remove what breaks them. "
                               "The full [code of conduct](" + S.REPO + "/blob/main/CODE_OF_CONDUCT.md) applies here too."}
         if files:
@@ -439,7 +460,7 @@ class Setup:
     def contributing(self):
         files = {"contributing.png": (ART / "cards" / "contributing.png").read_bytes()} \
             if (ART / "cards" / "contributing.png").exists() else None
-        emb = {"color": d.BLUEPRINT, "title": "Build Form Studio with us",
+        emb = {"color": d.BLUEPRINT, "title": "🧑‍💻 Build Form Studio with us",
                "description": ("Form Studio is open source: the app, the engine, recipes, docs and the website.\n\n"
                                "`1` Read **CONTRIBUTING.md** for the setup and the tests, and **AGENTS.md** if an agent "
                                "helps you.\n"
@@ -522,6 +543,23 @@ class Setup:
                              *([d.link_button("Source", src)] if src.startswith("https://") else []))]
             self.forum_post(forum, threads, r["title"], "Built-in" if r.get("builtin") else "Community", emb, buttons)
 
+    def roles_post(self):
+        """#roles: one select menu per group; the bot (worker) gives and removes the roles."""
+        rows = []
+        for key, placeholder, names in S.ROLE_PICKER:
+            opts = [{"label": n.split(" ", 1)[1], "value": self.roles[n]["id"], "emoji": {"name": n.split(" ", 1)[0]}}
+                    for n in names if n in self.roles and self.roles[n].get("id", "0") != "0"]
+            if opts:
+                rows.append({"type": 1, "components": [{"type": 3, "custom_id": f"roles:{key}", "placeholder": placeholder,
+                                                        "min_values": 0, "max_values": len(opts), "options": opts}]})
+        lv = " → ".join(n for _, n in S.LEVELS)
+        emb = {"color": d.VIOLET, "title": "🎭 Pick your roles",
+               "description": ("Choose what you use, so people with the same printer or agent can find each other, and "
+                               "the pings you want. Pick again any time; what you leave out is removed.\n\n"
+                               f"**Levels** come by themselves as you talk, share and help: {lv}. "
+                               "Check yours with `/rank`.")}
+        self.pinned_post("roles", "Roles", [emb], rows[:5])
+
     @staticmethod
     def _reachable(url):
         try:
@@ -544,6 +582,7 @@ class Setup:
         self.welcome()
         self.rules()
         self.contributing()
+        self.roles_post()
         self.guides()
         self.recipes()
         code = self.ensure_invite()

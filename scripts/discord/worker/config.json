@@ -1,0 +1,409 @@
+{
+ "site": "https://kaizensx.github.io/form-studio/",
+ "docs": "https://kaizensx.github.io/form-studio/docs/",
+ "repo": "https://github.com/kaizensx/form-studio",
+ "icon": "https://raw.githubusercontent.com/kaizensx/form-studio/main/form/app/assets/icon-64.png",
+ "invite": "https://discord.gg/b6ZgyndkmS",
+ "names": {
+  "welcome": "👋・welcome",
+  "rules": "📜・rules",
+  "roles": "🎭・roles",
+  "announcements": "📣・announcements",
+  "releases": "🚀・releases",
+  "general": "💬・general",
+  "introductions": "🙋・introductions",
+  "showcase": "🧊・showcase",
+  "wins-and-fails": "🍝・wins-and-fails",
+  "off-topic": "🎲・off-topic",
+  "printers": "🖨️・printers-and-slicers",
+  "agents": "🤖・agents-and-models",
+  "design-tips": "📐・design-tips",
+  "calibration": "🧪・calibration",
+  "challenges": "🏁・weekly-challenge",
+  "polls": "🗳️・polls",
+  "events": "📅・events",
+  "lounge": "🔊 Lounge",
+  "live": "🎙️ Live builds",
+  "guides": "📘・guides",
+  "recipes": "🧩・recipes",
+  "help": "🛟・help",
+  "ideas": "💡・ideas",
+  "contributing": "🧑‍💻・contributing",
+  "github": "🐙・github",
+  "ci": "🧯・ci",
+  "mod-log": "🔒・mod-log"
+ },
+ "roles": {
+  "🛠️ Maintainer": "🛠️ Maintainer",
+  "🧑‍💻 Contributor": "🧑‍💻 Contributor",
+  "🧩 Recipe author": "🧩 Recipe author",
+  "🏆 Challenge winner": "🏆 Challenge winner",
+  "🏭 Print Farm": "🏭 Print Farm",
+  "⚙️ Assembly": "⚙️ Assembly",
+  "🧊 Solid": "🧊 Solid",
+  "📏 Calibrated": "📏 Calibrated",
+  "🧱 First Layer": "🧱 First Layer",
+  "🍎 macOS": "🍎 macOS",
+  "🪟 Windows": "🪟 Windows",
+  "🐧 Linux": "🐧 Linux",
+  "🟢 Bambu Lab": "🟢 Bambu Lab",
+  "🟠 Prusa": "🟠 Prusa",
+  "🔵 Creality": "🔵 Creality",
+  "🖨️ Other printer": "🖨️ Other printer",
+  "✏️ No printer yet": "✏️ No printer yet",
+  "🧡 Claude Code": "🧡 Claude Code",
+  "⚪ Codex": "⚪ Codex",
+  "🔷 Gemini CLI": "🔷 Gemini CLI",
+  "🔑 Model API": "🔑 Model API",
+  "🖥️ Local models": "🖥️ Local models",
+  "🔔 Release pings": "🔔 Release pings",
+  "🏁 Challenge pings": "🏁 Challenge pings",
+  "📅 Event pings": "📅 Event pings",
+  "Maintainer": "🛠️ Maintainer",
+  "Contributor": "🧑‍💻 Contributor",
+  "Recipe author": "🧩 Recipe author",
+  "macOS": "🍎 macOS",
+  "Windows": "🪟 Windows",
+  "Linux": "🐧 Linux",
+  "Bambu Lab": "🟢 Bambu Lab",
+  "Prusa": "🟠 Prusa",
+  "Creality": "🔵 Creality",
+  "Other printer": "🖨️ Other printer",
+  "No printer yet": "✏️ No printer yet",
+  "Claude Code": "🧡 Claude Code",
+  "Codex": "⚪ Codex",
+  "Gemini CLI": "🔷 Gemini CLI",
+  "Model API": "🔑 Model API",
+  "Local models": "🖥️ Local models",
+  "Release pings": "🔔 Release pings",
+  "Creality / Elegoo / other": "🖨️ Other printer",
+  "Just designing": "✏️ No printer yet"
+ },
+ "levels": [
+  [
+   3,
+   "🧱 First Layer"
+  ],
+  [
+   8,
+   "📏 Calibrated"
+  ],
+  [
+   15,
+   "🧊 Solid"
+  ],
+  [
+   25,
+   "⚙️ Assembly"
+  ],
+  [
+   40,
+   "🏭 Print Farm"
+  ]
+ ],
+ "picker": [
+  [
+   "system",
+   "Your system",
+   [
+    "🍎 macOS",
+    "🪟 Windows",
+    "🐧 Linux"
+   ]
+  ],
+  [
+   "printer",
+   "What you print with",
+   [
+    "🟢 Bambu Lab",
+    "🟠 Prusa",
+    "🔵 Creality",
+    "🖨️ Other printer",
+    "✏️ No printer yet"
+   ]
+  ],
+  [
+   "agent",
+   "Your agent or model",
+   [
+    "🧡 Claude Code",
+    "⚪ Codex",
+    "🔷 Gemini CLI",
+    "🔑 Model API",
+    "🖥️ Local models"
+   ]
+  ],
+  [
+   "pings",
+   "Notifications",
+   [
+    "🔔 Release pings",
+    "🏁 Challenge pings",
+    "📅 Event pings"
+   ]
+  ]
+ ],
+ "guides": [
+  [
+   "Install and first start",
+   "Start",
+   [
+    [
+     "Download",
+     "https://github.com/kaizensx/form-studio/releases/latest"
+    ],
+    [
+     "Setup and updates",
+     "https://kaizensx.github.io/form-studio/docs/features.html#setup-settings-and-updates"
+    ],
+    [
+     "Try it in your browser",
+     "https://kaizensx.github.io/form-studio/#try"
+    ]
+   ]
+  ],
+  [
+   "Start a design from anything",
+   "Start",
+   [
+    [
+     "Start from anything",
+     "https://kaizensx.github.io/form-studio/docs/features.html#start-from-anything"
+    ],
+    [
+     "Concepts and measurements",
+     "https://kaizensx.github.io/form-studio/docs/features.html#concepts-and-measurements"
+    ]
+   ]
+  ],
+  [
+   "Agents and models",
+   "Agents",
+   [
+    [
+     "Conversations and agents",
+     "https://kaizensx.github.io/form-studio/docs/features.html#conversations-and-agents"
+    ],
+    [
+     "Any model, any provider",
+     "https://kaizensx.github.io/form-studio/docs/features.html#any-model-any-provider"
+    ]
+   ]
+  ],
+  [
+   "How a part is proved: checks and fit",
+   "Printing",
+   [
+    [
+     "Checks and evidence",
+     "https://kaizensx.github.io/form-studio/docs/features.html#checks-and-evidence"
+    ],
+    [
+     "Fit",
+     "https://kaizensx.github.io/form-studio/docs/features.html#fit"
+    ],
+    [
+     "Verification",
+     "https://kaizensx.github.io/form-studio/docs/verification.html"
+    ]
+   ]
+  ],
+  [
+   "Your slicer, your printers",
+   "Printing",
+   [
+    [
+     "Printers, slicing and print simulation",
+     "https://kaizensx.github.io/form-studio/docs/features.html#printers-slicing-and-print-simulation"
+    ]
+   ]
+  ],
+  [
+   "Revisions, compare and variants",
+   "App",
+   [
+    [
+     "Revisions, branches and variants",
+     "https://kaizensx.github.io/form-studio/docs/features.html#revisions-branches-and-variants"
+    ]
+   ]
+  ],
+  [
+   "Release a design",
+   "App",
+   [
+    [
+     "Release",
+     "https://kaizensx.github.io/form-studio/docs/features.html#release"
+    ]
+   ]
+  ],
+  [
+   "Move and share designs",
+   "App",
+   [
+    [
+     "Moving and sharing designs",
+     "https://kaizensx.github.io/form-studio/docs/features.html#moving-and-sharing-designs"
+    ],
+    [
+     "Pictures",
+     "https://kaizensx.github.io/form-studio/docs/features.html#pictures-renders-share-cards-animations"
+    ]
+   ]
+  ],
+  [
+   "Headless: the CLI and MCP",
+   "Reference",
+   [
+    [
+     "CLI",
+     "https://kaizensx.github.io/form-studio/docs/cli.html"
+    ],
+    [
+     "MCP tools",
+     "https://kaizensx.github.io/form-studio/docs/mcp.html"
+    ],
+    [
+     "Architecture",
+     "https://kaizensx.github.io/form-studio/docs/architecture.html"
+    ]
+   ]
+  ],
+  [
+   "Recipes: use, write and share",
+   "Reference",
+   [
+    [
+     "Recipe gallery",
+     "https://kaizensx.github.io/form-studio/recipes/"
+    ],
+    [
+     "Writing recipes",
+     "https://kaizensx.github.io/form-studio/docs/recipes.html"
+    ]
+   ]
+  ]
+ ],
+ "help_guides": {
+  "Install": [
+   "Install and first start"
+  ],
+  "Agents & models": [
+   "Agents and models"
+  ],
+  "Printers & slicers": [
+   "Your slicer, your printers"
+  ],
+  "Checks & fit": [
+   "How a part is proved: checks and fit"
+  ],
+  "Export": [
+   "Release a design",
+   "Move and share designs"
+  ],
+  "Bug": []
+ },
+ "xp": {
+  "message": [
+   15,
+   25
+  ],
+  "cooldown_s": 60,
+  "thanks": 25,
+  "thanks_per_day": 3,
+  "solved": 40,
+  "showcase": 30
+ },
+ "challenges": [
+  [
+   "Desk-edge cable clip",
+   "A clip that holds three cables along the edge of a desk 18–25 mm thick.",
+   "Prints without supports. Show the fit on your own desk."
+  ],
+  [
+   "A bin for your smallest tool",
+   "A Gridfinity bin shaped around the smallest tool you own.",
+   "Measure the tool and say how you measured it."
+  ],
+  [
+   "A hook that holds 2 kg",
+   "A wall or pegboard hook that carries 2 kg without creeping.",
+   "Show the checks, and a photo with the weight if you printed it."
+  ],
+  [
+   "Headphone stand under 60 g",
+   "A stand for over-ear headphones that weighs less than 60 g of filament.",
+   "Post the slicer's grams. Make it lighter is allowed."
+  ],
+  [
+   "A replacement knob",
+   "A knob for something you own whose knob broke or went missing.",
+   "Measure the shaft. Real fit beats pretty."
+  ],
+  [
+   "Phone stand, two angles",
+   "A phone stand with a reading angle and a video-call angle.",
+   "One print, no glue."
+  ],
+  [
+   "Spool holder adapter",
+   "An adapter that lets a spool with an odd hub sit on your printer's holder.",
+   "Say the hub diameter and the printer."
+  ],
+  [
+   "Self-watering planter",
+   "A planter with a water reservoir for a herb on your windowsill.",
+   "Show it with soil in it, or a render with the reservoir cut open."
+  ],
+  [
+   "Battery organiser",
+   "A holder for AA and AAA cells with a place for the dead ones.",
+   "Fits a drawer you own."
+  ],
+  [
+   "Drawer divider from one measurement",
+   "Dividers for a drawer, made from its inside width alone.",
+   "Say the one number you measured."
+  ],
+  [
+   "Print-in-place hinge",
+   "A box or case with a hinge printed in place.",
+   "Show it opening. Say the clearance you used."
+  ],
+  [
+   "SD and USB holder",
+   "A holder for SD cards and USB sticks that lives on your desk.",
+   "Every slot labelled."
+  ],
+  [
+   "Shelf bracket for a 20 mm board",
+   "A bracket that holds a 20 mm shelf to a wall.",
+   "Show where it would fail first and why it won't."
+  ],
+  [
+   "Desk grommet",
+   "A cable grommet for a 60 mm hole with a lid that closes around the cables.",
+   "Two parts, one plate."
+  ],
+  [
+   "Filament clip",
+   "A clip that keeps a spool's loose end from unwinding, without tools.",
+   "Works on two different spools."
+  ],
+  [
+   "Something you fixed",
+   "Free brief: a part that fixed something broken in your home.",
+   "Tell the story: what broke, what you measured, how it fits now."
+  ]
+ ],
+ "colors": {
+  "datum": 12183767,
+  "blueprint": 8825087,
+  "violet": 13087487,
+  "amber": 15317088,
+  "signal": 16740177,
+  "pass": 8837549,
+  "plate": 921875
+ }
+}

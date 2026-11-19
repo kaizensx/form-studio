@@ -27,11 +27,11 @@ def snowflake(when: datetime) -> str:
 class FakeDiscord:
     def __init__(self):
         self.sent, self.patched, self.puts = [], [], []
-        self.channels = [{"id": str(10 + i), "name": n, "type": 0} for i, n in enumerate(
+        self.channels = [{"id": str(10 + i), "name": S.N(n), "type": 0} for i, n in enumerate(
             ["releases", "announcements", "github", "ci", "contributing", "mod-log", "guides"])]
-        self.channels.append({"id": "50", "name": "help", "type": 15, "available_tags": [
+        self.channels.append({"id": "50", "name": S.N("help"), "type": 15, "available_tags": [
             {"id": "t1", "name": "Install"}, {"id": "t2", "name": "Bug"}, {"id": "t9", "name": "Solved"}]})
-        self.roles = [{"id": "r1", "name": "Release pings"}, {"id": "r2", "name": "Contributor"}]
+        self.roles = [{"id": "r1", "name": S.R["Release pings"]}, {"id": "r2", "name": S.R["Contributor"]}]
         self.threads, self.messages = [], {}
 
     def call(self, method, path, body=None, *, files=None, reason=""):
@@ -61,7 +61,8 @@ class FakeDiscord:
         return {}
 
     def name_of(self, cid):
-        return next((c["name"] for c in self.channels if c["id"] == cid), cid)
+        n = next((c["name"] for c in self.channels if c["id"] == cid), cid)
+        return next((k for k, v in S.NAMES.items() if v == n), n)
 
 
 class BotTest(unittest.TestCase):
@@ -152,23 +153,44 @@ class BotTest(unittest.TestCase):
 class LayoutTest(unittest.TestCase):
     def test_names_follow_the_design_system(self):
         for cat, chans in S.LAYOUT:
-            self.assertTrue(cat.isupper() and cat.isascii(), cat)
-            for name, type_, topic, opts in chans:
-                if type_ != S.VOICE:
-                    self.assertTrue(name == name.lower() and name.isascii(), name)
+            emoji, _, words = cat.partition(" ")
+            self.assertTrue(not emoji.isascii() and words.isupper(), cat)
+            for key, name, type_, topic, opts in chans:
+                if type_ not in (S.VOICE, S.STAGE):
+                    self.assertTrue("・" in name and name == name.lower(), name)
                 self.assertLessEqual(len(topic), 4096 if type_ == S.FORUM else 1024, name)
+                self.assertLessEqual(len(name), 100)
 
     def test_onboarding_and_guides_point_at_what_exists(self):
         roles = {r[0] for r in S.ROLES}
-        chans = {n for _, cs in S.LAYOUT for n, *_ in cs}
+        chans = {k for _, cs in S.LAYOUT for k, *_ in cs}
         for _, options in S.ONBOARDING:
-            for _, _, rs, cs in options:
-                self.assertTrue(set(rs) <= roles and set(cs) <= chans)
+            for _, _, _, rs, cs in options:
+                self.assertTrue(set(rs) <= roles and set(cs) <= chans, (rs, cs))
+        for _, _, names in S.ROLE_PICKER:
+            self.assertTrue(set(names) <= roles)
+        self.assertTrue({n for _, n in S.LEVELS} <= roles)
         titles = {g[0] for g in S.GUIDES}
         for guides in S.HELP_GUIDES.values():
             self.assertTrue(set(guides) <= titles)
         for i in range(1, len(S.GUIDES) + 1):
             self.assertTrue((HERE / "art" / "guides" / f"{i:02d}.png").exists())
+
+
+class WorkerTest(unittest.TestCase):
+    def test_config_matches_server_py(self):
+        import export_config
+        self.assertEqual(export_config.OUT.read_text(encoding="utf-8"), export_config.render(),
+                         "run python scripts/discord/export_config.py")
+
+    def test_worker(self):
+        import shutil
+        import subprocess
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node is not installed")
+        r = subprocess.run([node, str(HERE / "worker" / "test.mjs")], capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-2000:])
 
 
 if __name__ == "__main__":

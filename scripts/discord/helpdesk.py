@@ -32,7 +32,7 @@ def main():
     g = os.environ["DISCORD_GUILD_ID"]
     me = d.call("GET", "/users/@me")
     chans = {c["name"]: c for c in d.call("GET", f"/guilds/{g}/channels")}
-    helpf, guides, modlog = chans["help"], chans.get("guides"), chans.get("mod-log")
+    helpf, guides, modlog = chans[S.N("help")], chans.get(S.N("guides")), chans.get(S.N("mod-log"))
     tags = {t["id"]: t["name"] for t in helpf.get("available_tags", [])}
     solved = next((i for i, n in tags.items() if n == "Solved"), None)
     guide_links = {}
@@ -60,9 +60,9 @@ def main():
                          "- your printer and slicer, or that it is a 3D model\n"
                          "- what you did, what you expected and what happened\n"
                          "- for setup: the output of `form doctor`")
-            emb = {"color": d.BLUEPRINT, "title": "Thanks for the post",
+            emb = {"color": d.BLUEPRINT, "title": "🛟 Thanks for the post",
                    "description": "A person will answer here. So they can help at once, add whatever is missing:\n" + checklist
-                   + "\n\nWhen it is fixed, add the **Solved** tag.",
+                   + "\n\nWhen it is fixed, right-click the answer › **Apps › Mark as solved** (or add the ✅ Solved tag).",
                    "footer": d.footer("Help desk")}
             if links:
                 emb["fields"] = [{"name": "Guides that may help", "value": " · ".join(dict.fromkeys(links)), "inline": False}]

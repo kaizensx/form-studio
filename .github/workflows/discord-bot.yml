@@ -1,0 +1,97 @@
+# The interactive Form Studio bot: a Cloudflare Worker (scripts/discord/worker) that answers slash commands, buttons
+# and the role picker, counts XP and runs the weekly challenge. This deploys it, registers the commands and points
+# the Discord application's Interactions Endpoint URL at it.
+# Needs: secrets DISCORD_BOT_TOKEN, CLOUDFLARE_API_TOKEN (template "Edit Cloudflare Workers");
+#        variables DISCORD_GUILD_ID, CLOUDFLARE_ACCOUNT_ID.
+name: Discord bot
+
+on:
+  push:
+    branches: [dev]
+    paths: ["scripts/discord/worker/**", "scripts/discord/server.py", ".github/workflows/discord-bot.yml"]
+  workflow_dispatch:
+    inputs:
+      tick:
+        description: Run the cron once after deploying (XP, level roles, challenge)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: discord-bot
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ vars.CLOUDFLARE_ACCOUNT_ID != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      GUILD_ID: ${{ vars.DISCORD_GUILD_ID }}
+      CF: https://api.cloudflare.com/client/v4/accounts/${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    defaults:
+      run:
+        working-directory: scripts/discord/worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Config from server.py
+        run: python ../export_config.py
+      - name: The Discord application
+        run: |
+          app=$(curl -sf -H "Authorization: Bot $DISCORD_BOT_TOKEN" https://discord.com/api/v10/applications/@me)
+          echo "APP_ID=$(echo "$app" | jq -r .id)" >> "$GITHUB_ENV"
+          echo "PUBLIC_KEY=$(echo "$app" | jq -r .verify_key)" >> "$GITHUB_ENV"
+      - name: KV namespace and workers.dev subdomain
+        run: |
+          auth=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+          id=$(curl -sf "${auth[@]}" "$CF/storage/kv/namespaces?per_page=100" | jq -r '.result[] | select(.title=="form-studio-bot-state") | .id')
+          if [ -z "$id" ]; then
+            id=$(curl -sf "${auth[@]}" -X POST "$CF/storage/kv/namespaces" -d '{"title":"form-studio-bot-state"}' | jq -r .result.id)
+          fi
+          echo "KV_ID=$id" >> "$GITHUB_ENV"
+          sub=$(curl -s "${auth[@]}" "$CF/workers/subdomain" | jq -r '.result.subdomain // empty')
+          if [ -z "$sub" ]; then
+            sub=$(curl -sf "${auth[@]}" -X PUT "$CF/workers/subdomain" -d '{"subdomain":"form-studio-bot"}' | jq -r .result.subdomain)
+          fi
+          echo "WORKER_URL=https://form-studio-bot.$sub.workers.dev" >> "$GITHUB_ENV"
+      - name: wrangler.toml
+        run: |
+          cat > wrangler.toml <<EOF
+          name = "form-studio-bot"
+          main = "src/index.js"
+          compatibility_date = "2025-06-01"
+          workers_dev = true
+          [vars]
+          APP_ID = "$APP_ID"
+          PUBLIC_KEY = "$PUBLIC_KEY"
+          GUILD_ID = "$GUILD_ID"
+          [[kv_namespaces]]
+          binding = "STATE"
+          id = "$KV_ID"
+          [triggers]
+          crons = ["*/10 * * * *"]
+          EOF
+      - name: Deploy
+        run: |
+          npx -y wrangler@4 deploy
+          printf '%s' "$DISCORD_BOT_TOKEN" | npx -y wrangler@4 secret put DISCORD_BOT_TOKEN
+      - name: Commands and the interactions endpoint
+        run: |
+          node commands.mjs
+          for i in 1 2 3 4 5 6; do curl -sf "$WORKER_URL" && break; sleep 5; done
+          curl -sf -X PATCH -H "Authorization: Bot $DISCORD_BOT_TOKEN" -H "Content-Type: application/json" \
+            https://discord.com/api/v10/applications/@me -d "{\"interactions_endpoint_url\": \"$WORKER_URL\"}" | jq -r .interactions_endpoint_url
+      - name: Run the cron once
+        if: ${{ github.event_name == 'push' || inputs.tick }}
+        run: curl -sf -X POST -H "Authorization: Bot $DISCORD_BOT_TOKEN" "$WORKER_URL/tick" | jq -c .
