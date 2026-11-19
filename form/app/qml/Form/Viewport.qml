@@ -88,8 +88,8 @@ Item {
     property vector3d shiftTo: Qt.vector3d(0, 0, 0)   // where shift is going (it animates between modes)
     readonly property var asm: model && model.assembly && !model.assembly.error ? model.assembly : null
     readonly property bool asmOn: !!asm && asmMode !== "print"
-    onAsmModeChanged: { asmTween = true; _frame(); asmTweenOff.restart(); if (interactive && model && model.assembly) setView(Store.viewName, true) }
-    onExplodeChanged: _frame()
+    onAsmModeChanged: { _stale(); asmTween = true; _frame(); asmTweenOff.restart(); if (interactive && model && model.assembly) setView(Store.viewName, true) }
+    onExplodeChanged: { _frame(); _stale() }
     Timer { id: asmTweenOff; interval: Motion.part + 60 + Motion.stagger * (vp.asm ? Math.min(6, vp.asm.parts.length) : 0); onTriggered: vp.asmTween = false }
     function jointOf(id) {
         var js = asm ? asm.joints : []
@@ -238,11 +238,29 @@ Item {
     Behavior on insetRight { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
     Behavior on insetTop { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
     Behavior on insetBottom { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
-    readonly property real freeW: Math.max(120, width - insetLeft - insetRight)
-    readonly property real freeH: Math.max(120, height - insetTop - insetBottom)
+    // A panel that opens or a window that shrinks can leave almost no free area, or an inset mid-glide that is not a
+    // number yet: the free area never drops under 40 px, and the pull-back stays at most 4x, so the camera never runs
+    // past its far plane and the view never goes black.
+    function _fin(v, d) { return isFinite(v) ? v : d }
+    readonly property real freeW: Math.max(40, Math.min(120, width), _fin(width - insetLeft - insetRight, width))
+    readonly property real freeH: Math.max(40, Math.min(120, height), _fin(height - insetTop - insetBottom, height))
     // pull back when the free area is much smaller than the view, so the framing keeps its margin
-    readonly property real fitK: Math.max(1, 0.78 * height / freeH, Math.min(1.5, 0.6 * height / freeW))
-    readonly property real mmPerPx: dist * fitK * 2 * Math.tan(13 * Math.PI / 180) / Math.max(1, height)
+    readonly property real fitK: Math.min(4, Math.max(1, _fin(0.78 * height / freeH, 1), Math.min(1.5, _fin(0.6 * height / freeW, 1))))
+    readonly property real mmPerPx: _fin(dist, 420) * fitK * 2 * Math.tan(13 * Math.PI / 180) / Math.max(1, height)
+    // the orbit centre stays near what is on the plate: a long pan or a jump never leaves the part in the dark
+    readonly property real reach: Math.max(plateSize, 2 * radius(bounds)) * 1.5 + 200
+    function clampTarget(t) {
+        var c = center(bounds), r = reach
+        if (!t || !isFinite(t.x) || !isFinite(t.y) || !isFinite(t.z)) return c
+        return Qt.vector3d(Math.max(c.x - r, Math.min(c.x + r, t.x)), Math.max(c.y - r, Math.min(c.y + r, t.y)),
+                           Math.max(Math.min(0, c.z) - r, Math.min(c.z + r, t.z)))
+    }
+    onTargetChanged: { if (!isFinite(target.x) || !isFinite(target.y) || !isFinite(target.z)) { tween = false; target = center(bounds) }; _stale() }
+    onDistChanged: { if (!isFinite(dist) || dist <= 0) { tween = false; dist = frame(bounds, 1.5) }; _stale() }
+    onAzChanged: { if (!isFinite(az)) { tween = false; az = -34 }; _stale() }
+    onElChanged: { if (!isFinite(el)) { tween = false; el = 28.4 }; _stale() }
+    // the camera's last good placement: a frame whose numbers are not finite keeps the one before it
+    readonly property var _camGood: ({ pos: Qt.vector3d(0, -420, 220), aim: Qt.vector3d(0, 0, 20) })
 
     // which sides of the part face the camera (the dimension lines stand on those)
     readonly property bool camRight: Math.sin(az * Math.PI / 180) > 0.02
@@ -296,10 +314,41 @@ Item {
     property bool crossfade: interactive && !lite
     property real _lastModel: 0
     property bool _swapping: false
+    // The still is a snapshot, not a live copy: it is refreshed (scheduleUpdate) a moment after the view settles, and
+    // a swap uses it only while it shows what is on screen now. While the pointer is down (orbiting, panning, a
+    // pinch) or the camera has moved since, the change is applied directly. Whatever happens in apply(), the still
+    // goes back behind the view: a frame held on top is never left there.
+    property bool _stillFresh: false
+    function _stale() { _stillFresh = false; if (crossfade) stillRefresh.restart() }
+    onWidthChanged: _stale()
+    onHeightChanged: _stale()
+    onFitKChanged: _stale()
+    onModelChanged: _stale()
+    onVisibleChanged: _stale()
+    onSelectedChanged: _stale()
+    onHoveredChanged: _stale()
+    onFlaggedChanged: _stale()
+    onHiddenFeaturesChanged: _stale()
+    onGhostChanged: _stale()
+    onSectionAxisChanged: _stale()
+    onSectionTChanged: _stale()
+    onShowDimsChanged: _stale()
+    onShiftChanged: _stale()
+    Timer { id: stillRefresh; interval: 160
+        onTriggered: {
+            if (ma.pressed || pinch.active) { restart(); return }
+            still.scheduleUpdate(); stillReady.restart()
+        } }
+    Timer { id: stillReady; interval: 50; onTriggered: vp._stillFresh = true }   // the frame after the capture is drawn
+    function _unfreeze() { thaw.stop(); still.opacity = 1; still.z = -1 }
     function swap(apply) {
-        if (!crossfade || !visible || width < 2) { apply(); return }
-        thaw.stop(); still.live = false; still.opacity = 1; still.z = 1
-        _swapping = true; apply(); _swapping = false
+        var fade = crossfade && visible && width >= 2 && _stillFresh && !ma.pressed && !pinch.active
+        if (!fade) { _unfreeze(); apply(); return }
+        thaw.stop(); still.opacity = 1; still.z = 1
+        _swapping = true
+        try { apply() }
+        catch (e) { _unfreeze(); throw e }
+        finally { _swapping = false }
         thaw.restart()
     }
     function setGhost(v) { ghost = v }
@@ -364,7 +413,12 @@ Item {
         }
         PerspectiveCamera {
             id: cam
-            fieldOfView: 26; clipNear: 2; clipFar: 6000
+            fieldOfView: 26
+            // the depth range follows the camera: near enough for a close look, far enough for the part, the plate and
+            // the bench around it at any zoom (a fixed far plane went black once zoomed out with a panel open)
+            readonly property real span: Math.max(vp.plateSize, 2 * vp.radius(vp.bounds))
+            clipNear: Math.max(0.5, Math.min(20, far * 0.01))
+            clipFar: Math.max(6000, far + span * 6 + 2000)
             readonly property real ra: vp.az * Math.PI / 180
             readonly property real re: Math.max(-89, Math.min(89, vp.el)) * Math.PI / 180
             // the look-at point, moved so the orbit centre lands in the middle of the free area
@@ -373,12 +427,20 @@ Item {
             readonly property vector3d aim: Qt.vector3d(vp.target.x - Math.cos(ra) * ox - Math.sin(ra) * Math.sin(re) * oy,
                                                         vp.target.y - Math.sin(ra) * ox + Math.cos(ra) * Math.sin(re) * oy,
                                                         vp.target.z + Math.cos(re) * oy)
-            readonly property real far: vp.dist * vp.fitK
+            readonly property real far: Math.max(1, vp._fin(vp.dist * vp.fitK, 420))
             readonly property vector3d zpos: Qt.vector3d(aim.x + far * Math.sin(ra) * Math.cos(re),
                                                          aim.y - far * Math.cos(ra) * Math.cos(re),
                                                          aim.z + far * Math.sin(re))
-            position: vp.scene(zpos)
-            rotation: Quaternion.lookAt(vp.scene(zpos), vp.scene(aim))
+            readonly property var place: {
+                var p = zpos, a = aim, g = vp._camGood
+                if (isFinite(p.x) && isFinite(p.y) && isFinite(p.z) && isFinite(a.x) && isFinite(a.y) && isFinite(a.z) && p.minus(a).length() > 1e-3) {
+                    g.pos = p; g.aim = a                     // plain fields: remembering it does not re-run this binding
+                    return { pos: p, aim: a }
+                }
+                return { pos: g.pos, aim: g.aim }
+            }
+            position: vp.scene(place.pos)
+            rotation: Quaternion.lookAt(vp.scene(place.pos), vp.scene(place.aim))
         }
         // key from the upper left front (casts the shadow), a warm fill, a cool rim from behind that draws the
         // far silhouette, and a little light from straight above so top faces separate from walls
@@ -626,10 +688,13 @@ Item {
     }
     // the frame before a geometry change, held on top and let go (see swap)
     // It is kept current by sitting, fully covered, behind the 3D view; a swap lifts it in front and fades it.
-    ShaderEffectSource { id: still; anchors.fill: view; sourceItem: view; live: true; z: -1; visible: vp.crossfade }
+    ShaderEffectSource { id: still; objectName: "viewportStill"; anchors.fill: view; sourceItem: view; live: false; z: -1; visible: vp.crossfade }
     SequentialAnimation { id: thaw
         NumberAnimation { target: still; property: "opacity"; from: 1; to: 0; duration: Motion.slow; easing.type: Easing.InOutQuad }
-        ScriptAction { script: { still.z = -1; still.opacity = 1; still.live = true } } }
+        ScriptAction { script: vp._unfreeze() } }
+    // a held frame that is somehow still on top with nothing fading it is let go
+    Timer { interval: 1000; repeat: true; running: still.z > 0
+        onTriggered: if (!thaw.running) vp._unfreeze() }
 
     // the brush stroke or lasso outline being drawn, on top of the part
     Canvas {
@@ -867,7 +932,7 @@ Item {
                 var ra = vp.az * Math.PI / 180, re = vp.el * Math.PI / 180
                 var right = Qt.vector3d(Math.cos(ra), Math.sin(ra), 0)
                 var up = Qt.vector3d(-Math.sin(ra) * Math.sin(re), Math.cos(ra) * Math.sin(re), Math.cos(re))
-                vp.target = vp.target.minus(right.times(dx * k)).plus(up.times(dy * k))
+                vp.target = vp.clampTarget(vp.target.minus(right.times(dx * k)).plus(up.times(dy * k)))
             }
         }
         onReleased: function (e) {
@@ -903,6 +968,7 @@ Item {
         }
     }
     PinchHandler {
+        id: pinch
         enabled: vp.interactive; target: null
         property real d0: 0
         onActiveChanged: if (active) { d0 = vp.dist; vp.tween = false }

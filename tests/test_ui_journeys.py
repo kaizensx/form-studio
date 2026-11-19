@@ -78,6 +78,9 @@ class Journeys(unittest.TestCase):
     def test_viewport_tools(self):
         self.journey("tools.py")
 
+    def test_viewport_stress(self):         # orbit, pan and zoom to extremes with panels toggling: never a black view
+        self.journey("viewport_stress.py")
+
     def test_maker_tools(self):
         self.journey("maker_tools.py")
 
