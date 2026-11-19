@@ -32,7 +32,8 @@ def main():
     g = os.environ["DISCORD_GUILD_ID"]
     me = d.call("GET", "/users/@me")
     chans = {c["name"]: c for c in d.call("GET", f"/guilds/{g}/channels")}
-    helpf, guides, modlog = chans[S.N("help")], chans.get(S.N("guides")), chans.get(S.N("mod-log"))
+    pick = lambda k: chans.get(S.N(k)) or chans.get(k)  # noqa: E731  (the plain name, before setup renames it)
+    helpf, guides, modlog = pick("help"), pick("guides"), pick("mod-log")
     tags = {t["id"]: t["name"] for t in helpf.get("available_tags", [])}
     solved = next((i for i, n in tags.items() if n == "Solved"), None)
     guide_links = {}
