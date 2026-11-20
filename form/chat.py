@@ -293,9 +293,10 @@ class Chat:
     # ---- sending -----------------------------------------------------------------------------------------------
     def send(self, message: str, conversation: str | None = None, project: str | None = None, agent: str | None = None,
              model: str | None = None, effort: str | None = None, attachments: list[str] | None = None,
-             ask: bool = True, purpose: str | None = None) -> ChatJob:
+             ask: bool = True, purpose: str | None = None, note: str = "") -> ChatJob:
         """ask: a person can answer the agent's questions (the app; `form chat` in a terminal).
-        purpose: "print" or "model" (form/start.py); kept in the conversation, so later messages keep it."""
+        purpose: "print" or "model" (form/start.py); kept in the conversation, so later messages keep it.
+        note: for the agent only, not shown as part of the person's message (what the engine fetched from links)."""
         message = (message or "").strip()
         if not message:
             raise RuntimeError("Write a message first.")
@@ -338,6 +339,7 @@ class Chat:
             session = meta.get("session") if meta.get("session_agent") == agent else None
             job = ChatJob(message, meta.get("project") or project, session, cid, agent, model, effort or "")
             job.attachments = self.store.attachments(cid, attachments or [])
+            job.note = note or ""
             job.before = self._project_ids()
             job.ask = bool(ask)
             job.head0 = self._head(job.project)
@@ -524,6 +526,8 @@ class Chat:
         line = self._purpose_line(job.purpose)
         if line:
             parts.append(line)
+        if getattr(job, "note", ""):
+            parts.append(job.note)
         if job.attachments:
             d = self.store.files_dir(job.conversation)
             what = {"image": "image", "pdf": "PDF; read_document(path) also opens it page by page",
@@ -531,10 +535,15 @@ class Chat:
                     "sketch": "sketch drawn in Form Studio; its geometry is below"}
 
             def hint(a):
-                if a["file"].lower().endswith(".3mf"):          # import_reference reads STEP and STL only
-                    return ("3MF file; Form Studio cannot import 3MF as a reference part, so ask the person for a STEP or "
-                            "STL export of it, and do not guess its geometry")
-                return what.get(a["kind"], a["kind"])
+                h = what.get(a["kind"], a["kind"])
+                if a["file"].lower().endswith(".3mf"):          # read with lib3mf: named parts, placed as in the slicer
+                    h = "3MF with named parts, Bambu, Orca and MakerWorld layouts included; use import_reference(project, path)"
+                if a["kind"] == "cad" and (a.get("mesh") or {}).get("class") in ("heavy", "very heavy"):
+                    h += f"; a {a['mesh']['class']} mesh: call mesh_preflight(path) first"
+                src = a.get("source") or {}
+                if src.get("url"):
+                    h += f"; from {src['url']}" + (f", licence: {src['license']}" if src.get("license") else "")
+                return h
             parts.append("Attached files:\n" + "\n".join(f"- {d / a['file']} ({hint(a)})" for a in job.attachments))
             for a in job.attachments:
                 if a["kind"] == "sketch":

@@ -7,8 +7,10 @@ to shape), For my printer, or Just a 3D model. This module is the engine side of
   owns it (form/purpose.py: the design's purpose, and the default from the 3D printing capability); Home only says which
   one the next design gets.
 - blank(): a clean, minimal design written as code that builds in the real kernel.
-- fetch(): a link pasted on Home. Only a file the person linked to is downloaded (STL, STEP, 3MF, PDF, an image);
-  a web page is passed to the agent as a link and nothing is fetched. Nothing is crawled.
+- fetch(): a link pasted on Home or in a chat. A file the person linked to is downloaded (STL, STEP, 3MF, OBJ, PDF,
+  an image); a model page on Printables has its part files downloaded with title, author and licence;
+  Thingiverse and MakerWorld pages say why their files cannot be fetched (form/sources); any other page is
+  passed to the agent as a link and nothing is fetched. Nothing is crawled.
 - apply_measurement(): a number the person measured in a guided measurement card becomes a new revision whose
   provenance says how it was measured. An estimate stays "assumed".
 
@@ -21,9 +23,10 @@ import json
 import math
 import os
 import re
+import threading
 import time
 import urllib.error
-import urllib.request
+import uuid
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlparse
 
@@ -32,8 +35,7 @@ from .studio import StudioError
 
 PURPOSES = ("print", "model")
 ENV_PURPOSE = "FORM_PURPOSE"          # given to the MCP server of one chat run: designs it creates get this purpose
-FETCH_EXT = (".stl", ".step", ".stp", ".3mf", ".pdf", ".png", ".jpg", ".jpeg", ".webp")
-MAX_FETCH = 50_000_000
+MAX_FETCH = 2_000_000_000             # the attachment limit (form/conversations.py); streamed to disk, never held
 FETCH_TIMEOUT = 30
 METHOD_SIGMA = {"calipers": 0.05, "ruler": 0.5, "tape": 1.0}     # mm, one standard deviation, per instrument
 
@@ -140,6 +142,18 @@ def blank(st, name: str = "Untitled design", purpose: str = "print") -> dict:
 
 
 # ---- links -----------------------------------------------------------------------------------------------------
+#
+# A link is one of three things (form/sources): a direct file (downloaded, streamed to disk), a model page on a site
+# Form Studio knows (Printables: its files are fetched; Thingiverse without an app token and MakerWorld: the reason and
+# what to do instead), or any other page (passed to the agent as a link, nothing read). Downloads stream into the
+# conversation's folder with their progress in PROGRESS, and are attached with where they came from and the licence.
+
+PROGRESS: dict[str, dict] = {}          # url -> {"name", "bytes", "total", "started"} while a download runs
+_PROGRESS_LOCK = threading.Lock()
+LINK_RE = re.compile(r"https?://[^\s<>\"'`]+", re.IGNORECASE)
+MAX_LINKS = 5                           # links fetched from one chat message
+MAX_MODEL_FILES = 8                     # files fetched from one model page
+
 
 def _store(st):
     chat = getattr(st, "chat", None)
@@ -149,10 +163,148 @@ def _store(st):
     return Conversations(st.root)
 
 
+def progress() -> list[dict]:
+    """Downloads running now: [{url, name, bytes, total}] (total None when the site does not say)."""
+    with _PROGRESS_LOCK:
+        return [{"url": u, **v} for u, v in PROGRESS.items()]
+
+
+def _limit() -> str:
+    return f"{MAX_FETCH / 1e9:g} GB" if MAX_FETCH >= 1e9 else f"{MAX_FETCH / 1e6:g} MB"
+
+
+def _name_from(r, url: str) -> str:
+    cd = r.headers.get("Content-Disposition") or ""
+    m = re.search(r"filename\*=UTF-8''([^;]+)", cd, flags=re.I) or re.search(r'filename="?([^";]+)"?', cd, flags=re.I)
+    return unquote(m.group(1)).strip() if m else unquote(PurePosixPath(urlparse(url).path).name)
+
+
+def download(url: str, folder: Path, name: str | None = None, headers: dict | None = None) -> tuple[Path, str, int]:
+    """Stream one file into `folder` (never held in memory). Returns (temporary path, file name, bytes).
+    Refuses a web page served under a file's name, and anything over MAX_FETCH."""
+    from . import net
+    from . import sources
+    host = urlparse(url).hostname or url
+    folder.mkdir(parents=True, exist_ok=True)
+    req = sources._request(url, headers=headers)
+    tmp = folder / f".incoming-{uuid.uuid4().hex[:8]}"
+    total = 0
+    try:
+        with net.urlopen(req, timeout=FETCH_TIMEOUT) as r:          # urllib follows redirects; no cookies are kept
+            ctype = r.headers.get_content_type()
+            nm = name or _name_from(r, r.geturl() or url) or "file"
+            size = r.headers.get("Content-Length")
+            size = int(size) if size and size.isdigit() else None
+            if size and size > MAX_FETCH:
+                raise StudioError(f"{nm} is larger than {_limit()}.",
+                                  "Download it yourself and drop the file here if you still want it attached.")
+            if ctype == "text/html":
+                raise StudioError("That link opens a web page, not the file itself.",
+                                  "Use the file's direct download link (often a Download or Raw button), or paste the "
+                                  "page link as text so the agent can read the page.")
+            with _PROGRESS_LOCK:
+                PROGRESS[url] = {"name": nm, "bytes": 0, "total": size, "started": time.time()}
+            with open(tmp, "wb") as out:
+                while True:
+                    b = r.read(1 << 20)
+                    if not b:
+                        break
+                    total += len(b)
+                    if total > MAX_FETCH:
+                        raise StudioError(f"{nm} is larger than {_limit()}.",
+                                          "Download it yourself and drop the file here if you still want it attached.")
+                    out.write(b)
+                    with _PROGRESS_LOCK:
+                        PROGRESS[url]["bytes"] = total
+    except urllib.error.HTTPError as e:
+        tmp.unlink(missing_ok=True)
+        hint = ("The link may have expired: signed download links (MakerWorld's) last only minutes. Copy a fresh one, "
+                "or download the file and drop it here." if e.code in (401, 403, 410) else
+                "Check that the link opens in a browser without signing in, or download the file and drop it here.")
+        raise StudioError(f"{host} answered {e.code} for that link.", hint)
+    except (urllib.error.URLError, OSError, TimeoutError) as e:
+        tmp.unlink(missing_ok=True)
+        reason = getattr(e, "reason", e)
+        raise StudioError(f"Could not download from {host}: {reason}.",
+                          "Check the connection and the link, or download the file and drop it here.")
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+    finally:
+        with _PROGRESS_LOCK:
+            PROGRESS.pop(url, None)
+    if not total:
+        tmp.unlink(missing_ok=True)
+        raise StudioError(f"{host} sent an empty file.", "Check the link, or download the file and drop it here.")
+    return tmp, nm, total
+
+
+def _source_record(r: dict, file_link: str | None = None) -> dict:
+    rec = {"url": r["url"], "site": r["site"], "title": r.get("title"), "author": r.get("author"),
+           "license": r.get("license"), "fetched": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    if file_link and r["site"] == "file":
+        rec["url"] = file_link
+    return rec
+
+
+def _model_summary(r: dict) -> dict:
+    keep = ("url", "site", "title", "author", "license", "images", "downloadable", "reason", "how", "zip")
+    out = {k: r[k] for k in keep if r.get(k) not in (None, [], "")}
+    out["files"] = [{k: f[k] for k in ("name", "size") if f.get(k) is not None} for f in r.get("files") or []]
+    return out
+
+
+def fetch_into(url: str, folder: Path, place) -> dict:
+    """The core of every link fetch. place(tmp_path, name, source) puts one downloaded file where it belongs and
+    returns its record. Returns {"attachments": [...], "fetched": {...}, "model": {...}} for what was downloaded, or
+    {"link": {...}} for a page (with "site", "title", "reason", "how" for a known site whose files cannot be fetched)."""
+    from . import sources
+    url = str(url or "").strip()
+    try:
+        kind = sources.classify(url)
+    except sources.SourceError as e:
+        raise StudioError(str(e), e.hint)
+    host = urlparse(url).hostname
+    if kind == "page":                                # nothing is read: the agent gets the link
+        return {"link": {"url": url, "host": host, "kind": "page"}}
+    try:
+        r = sources.resolve(url, generic=False)
+    except sources.SourceError as e:
+        raise StudioError(str(e), e.hint or "Download the file in a browser and drop it here.")
+    if not r["downloadable"]:
+        link = {"url": url, "host": host, "kind": "page", "site": r["site"]}
+        link.update({k: r[k] for k in ("title", "reason", "how") if r.get(k)})
+        return {"link": link, "model": _model_summary(r)}
+    files = r["files"] if kind == "file" else sources.model_files(r)[:MAX_MODEL_FILES]
+    if not files:
+        link = {"url": url, "host": host, "kind": "page", "site": r["site"], "title": r.get("title"),
+                "reason": "The page lists no STL, 3MF, OBJ or STEP files."}
+        return {"link": link, "model": _model_summary(r)}
+    site = sources.site_for(url)
+    recs, total = [], 0
+    for f in files:
+        try:
+            furl = sources.file_url(r, f)
+        except sources.SourceError as e:
+            raise StudioError(str(e), e.hint)
+        extra = site.headers_for(furl) if site is not None and hasattr(site, "headers_for") else None
+        tmp, nm, n = download(furl, folder, None if kind == "file" else f["name"], extra)
+        if kind == "file":
+            nm = sources.file_name(url) or nm
+        recs.append(place(tmp, nm, _source_record(r, url if kind == "file" else None)))
+        total += n
+    out = {"attachments": recs, "fetched": {"url": url, "host": host, "bytes": total,
+                                            "name": recs[0]["name"] if len(recs) == 1 else f"{len(recs)} files"}}
+    if kind != "file":
+        out["model"] = _model_summary(r)
+    return out
+
+
 def fetch(st, conversation_id: str, url: str) -> dict:
-    """A link the person pasted. A link to a file (STL, STEP, 3MF, PDF, PNG, JPEG, WebP) is downloaded once and
-    attached to the conversation; anything else is a page: nothing is downloaded, the agent gets the link."""
-    from . import __version__, net
+    """A link the person pasted, for a conversation. A file link (STL, STEP, 3MF, OBJ, PDF, PNG, JPEG, WebP) is
+    downloaded and attached; a Printables model page has its part files downloaded and attached with the model's title,
+    author and licence; a Thingiverse or MakerWorld page says why its files cannot be fetched and what to do; anything
+    else is a page: nothing is downloaded, the agent gets the link."""
     from .conversations import ConversationError
     url = str(url or "").strip()
     u = urlparse(url)
@@ -163,47 +315,80 @@ def fetch(st, conversation_id: str, url: str) -> dict:
         store.meta(conversation_id)
     except ConversationError as e:
         raise StudioError(str(e), status=404)
-    host = u.hostname
-    name = unquote(PurePosixPath(u.path).name)
-    if Path(name).suffix.lower() not in FETCH_EXT:
-        return {"link": {"url": url, "host": host, "kind": "page"}}
-    req = urllib.request.Request(url, headers={"User-Agent": f"FormStudio/{__version__}", "Accept": "*/*"})
-    try:
-        with net.urlopen(req, timeout=FETCH_TIMEOUT) as r:          # urllib follows redirects
-            ctype = r.headers.get_content_type()
-            size = r.headers.get("Content-Length")
-            if size and size.isdigit() and int(size) > MAX_FETCH:
-                raise StudioError(f"{name} is larger than {MAX_FETCH // 1_000_000} MB.",
-                                  "Download it yourself and drop the file on Home if you still want it attached.")
-            chunks, total = [], 0
-            while True:
-                b = r.read(1 << 20)
-                if not b:
-                    break
-                total += len(b)
-                if total > MAX_FETCH:
-                    raise StudioError(f"{name} is larger than {MAX_FETCH // 1_000_000} MB.",
-                                      "Download it yourself and drop the file on Home if you still want it attached.")
-                chunks.append(b)
-    except urllib.error.HTTPError as e:
-        raise StudioError(f"{host} answered {e.code} for that link.",
-                          "Check that the link opens in a browser without signing in, or download the file and drop it on Home.")
-    except (urllib.error.URLError, OSError, TimeoutError) as e:
-        reason = getattr(e, "reason", e)
-        raise StudioError(f"Could not download from {host}: {reason}.",
-                          "Check the connection and the link, or download the file and drop it on Home.")
-    if ctype == "text/html":
-        raise StudioError("That link opens a web page, not the file itself.",
-                          "Use the file's direct download link (often a Download or Raw button), or paste the page link "
-                          "as text so the agent can read the page.")
-    data = b"".join(chunks)
-    if not data:
-        raise StudioError(f"{host} sent an empty file.", "Check the link, or download the file and drop it on Home.")
-    try:
-        rec = store.attach(conversation_id, name=name, data=data)
-    except ConversationError as e:
-        raise StudioError(str(e))
-    return {"attachments": [rec], "fetched": {"url": url, "host": host, "bytes": len(data), "name": rec["name"]}}
+
+    def place(tmp: Path, name: str, source: dict) -> dict:
+        try:
+            return store.attach(conversation_id, tmp, name=name, source=source, move=True)
+        except ConversationError as e:
+            tmp.unlink(missing_ok=True)
+            raise StudioError(str(e))
+    return fetch_into(url, store.dir(conversation_id) / ".incoming", place)
+
+
+def fetch_to_folder(url: str, folder: Path) -> dict:
+    """The same fetch without a conversation (the MCP tool fetch_link from an agent outside Form Studio's chat): files
+    land in `folder`, with a .source.json beside each saying where it came from."""
+    folder = Path(folder)
+
+    def place(tmp: Path, name: str, source: dict) -> dict:
+        safe = re.sub(r"[^A-Za-z0-9_.\-]+", "-", Path(name).name).strip("-.") or "file"
+        dst = folder / safe
+        k = 1
+        while dst.exists():
+            dst = folder / f"{Path(safe).stem}-{k}{Path(safe).suffix}"
+            k += 1
+        os.replace(tmp, dst)
+        (folder / (dst.name + ".source.json")).write_text(json.dumps(source, indent=1, ensure_ascii=False), encoding="utf-8")
+        return {"name": name, "path": str(dst), "size": dst.stat().st_size, "source": source}
+    return fetch_into(url, folder / ".incoming", place)
+
+
+def links_in(text: str) -> list[str]:
+    """The http(s) links in a message, in order, without trailing punctuation, each once."""
+    out = []
+    for m in LINK_RE.finditer(text or ""):
+        u = m.group(0).rstrip(".,;:!?)]}>")
+        if u not in out:
+            out.append(u)
+    return out[:MAX_LINKS]
+
+
+def conversation_for(st, body: dict) -> str:
+    """A new conversation for a first message that carries links, made the way chat.send would make it, so the links
+    can be fetched into it before the message is sent."""
+    d = st.chat.status()["default"]
+    agent = body.get("agent") or d["agent"]
+    mine = agent == d["agent"]                        # the default model and effort belong to the default agent
+    model = body.get("model") or (d["model"] if mine else "default")
+    effort = body.get("effort") if body.get("effort") is not None else (d["effort"] if mine else "")
+    return st.chat.store.create(body.get("project") or None, agent, model, effort or "")["id"]
+
+
+def fetch_message_links(st, conversation_id: str, text: str) -> tuple[list[str], str]:
+    """Links pasted in a chat message, fetched by the engine before the agent sees the message (an agent's sandbox
+    usually has no network, and signed links expire in minutes). Returns (attachment ids, a note for the agent about
+    each link: what was attached, with its source and licence, or why it could not be fetched)."""
+    ids, lines = [], []
+    for url in links_in(text):
+        try:
+            got = fetch(st, conversation_id, url)
+        except StudioError as e:
+            lines.append(f"- {url}: not fetched. {e}" + (f" {e.hint}" if e.hint else ""))
+            continue
+        if got.get("attachments"):
+            ids += [a["id"] for a in got["attachments"]]
+            m = got.get("model") or {}
+            what = ", ".join(a["name"] for a in got["attachments"])
+            extra = "; ".join(x for x in (m.get("title") and f"“{m['title']}”", m.get("author") and f"by {m['author']}",
+                                          m.get("license") and f"licence: {m['license']}") if x)
+            lines.append(f"- {url}: downloaded by Form Studio and attached ({what})" + (f"; {extra}" if extra else ""))
+        elif (got.get("link") or {}).get("reason"):
+            ln = got["link"]
+            lines.append(f"- {url}: {ln.get('title') + ': ' if ln.get('title') else ''}not downloaded. {ln['reason']} "
+                         f"{ln.get('how') or ''}".rstrip())
+    note = ("Links in this message (Form Studio fetched what it could; tell the person plainly about any it could not):\n"
+            + "\n".join(lines)) if lines else ""
+    return ids, note
 
 
 # ---- measurements ----------------------------------------------------------------------------------------------
@@ -400,3 +585,38 @@ def main(argv: list[str]) -> int:
         return chat_mod.stream(chat, job, a.json, interactive)
     finally:
         st.kernel.stop()
+
+
+def main_inputs(argv: list[str]) -> int:
+    """form fetch URL [--conversation ID] | form resolve URL | form mesh-preflight FILE [--no-proxy]. Prints JSON."""
+    import argparse
+
+    from . import config, meshprep, sources
+    from .studio import Studio
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "mesh-preflight":
+        return meshprep.main(rest)
+    ap = argparse.ArgumentParser(prog=f"form {cmd}")
+    ap.add_argument("url")
+    if cmd == "fetch":
+        ap.add_argument("--conversation", default="", help="attach to this conversation (else saved under the data folder)")
+    a = ap.parse_args(rest)
+    try:
+        if cmd == "resolve":
+            out = sources.resolve(a.url)
+        else:
+            st = Studio(config.load())
+            if a.conversation:
+                out = fetch(st, a.conversation, a.url)
+            else:
+                import hashlib
+                out = fetch_to_folder(a.url, st.root / ".references" / "links" / hashlib.sha256(a.url.encode()).hexdigest()[:12])
+    except sources.SourceError as e:
+        print(json.dumps({"error": {"message": str(e), "hint": e.hint}}, ensure_ascii=False))
+        return 2
+    except StudioError as e:
+        print(json.dumps({"error": e.public()}, ensure_ascii=False))
+        return 2
+    print(json.dumps(out, indent=1, ensure_ascii=False, default=str))
+    return 0
+

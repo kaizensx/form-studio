@@ -201,6 +201,9 @@ def main(argv=None):
     if argv[:1] == ["start"]:                     # how a design starts: Home's composer, or a blank design
         from .start import main as start_main
         return start_main(argv[1:])
+    if argv[:1] in (["fetch"], ["resolve"], ["mesh-preflight"]):   # inputs: model links and big meshes (JSON)
+        from .start import main_inputs
+        return main_inputs(argv)
     if argv[:1] == ["concepts"]:                  # concepts first: open groups, one board, pick one
         from .concepts import main as concepts_main
         return concepts_main(argv[1:])
@@ -267,6 +270,10 @@ def main(argv=None):
     sub.add_parser("conversations", help="saved conversations: list | show ID | delete ID | rename ID TITLE | pin ID")
     sub.add_parser("start", help='start a design: --text "…" [--photo F] [--file F] [--sketch F.json] [--link URL] '
                                  '[--purpose print|model], or --blank [--name N]')
+    sub.add_parser("fetch", help="fetch URL [--conversation ID]: download a linked file or a model page's files (JSON)")
+    sub.add_parser("resolve", help="resolve URL: what a model link is (site, title, licence, files) without downloading")
+    sub.add_parser("mesh-preflight", help="mesh-preflight FILE [--no-proxy]: triangles, size, closed, class, time "
+                                          "estimate and a display proxy for a large STL/OBJ/3MF")
     sub.add_parser("concepts", help="concept groups: [<group-or-project>] | pick <group> <project> [--keep-others]")
     sub.add_parser("install", help="install what Form Studio uses (--list, <id>, --yes, --dry-run)")
     sub.add_parser("config", help="get [key] | set <key> <value>: read or change studio.toml")

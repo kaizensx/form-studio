@@ -63,7 +63,9 @@ Rules:
 - Photos: find the scale from a reference object (bank card 85.60 x 53.98 mm, a coin's official diameter, a ruler);
   dimensions read off a photo are "estimated from the photo (scale from <reference>)" and stay assumed until measured.
   Sketches from Form Studio carry structured JSON: it is authoritative over the picture; stated dimensions override
-  drawn lengths. STEP/STL: import_reference. PDF drawings: read_document. Download only files the person gave you.
+  drawn lengths. STEP/STL/3MF: import_reference. PDF drawings: read_document. Download only files the person gave you.
+- A link the person gives (a file, a Printables/MakerWorld/Thingiverse page, a signed download link): fetch_link,
+  never a shell. A large mesh: mesh_preflight before analysing it.
 - Meshes to make editable or understand: never embed them as the design. design_guide(topic="reference_parts"):
   analyze_reference (and analyze_assembly for several parts) -> plan named features -> build123d with Params ->
   compare_to_reference -> refine until within tolerance (0.1 mm by default for a remodel).
@@ -401,6 +403,83 @@ def build() -> MCPServer:
         out.append(f"Pages {r['pages']} of {r['page_count']} from {source} (saved as {f.name})."
                    + (f"\n\nText on the page:\n{r['text'][:4000]}" if r["text"] else ""))
         return out
+
+    # -- links and big meshes (form/sources, form/start.py, form/meshprep.py) ------------------------------------
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=True))
+    async def fetch_link(url: str, conversation: str = "") -> dict:
+        """Download what a link the person gave points to, from Form Studio's engine (use this instead of a shell: it
+        works where your sandbox has no network). A file link (STL, 3MF, OBJ, STEP, PDF, image; also a signed
+        MakerWorld download link, fetched at once before it expires) is downloaded; a Printables model page has its
+        part files downloaded with title, author and licence; a Thingiverse or MakerWorld page returns why its files
+        cannot be fetched and what the person can do; any other page is not read (resolve_model_page reads its title).
+        In a Form Studio chat the files are attached to the conversation; otherwise they are saved under the data
+        folder. Each mesh comes with its preflight (triangles, size, closed or not, class). Only fetch links the
+        person gave you."""
+        import hashlib
+        import os
+        st = studio()
+        from . import meshprep
+        from . import start as start_mod
+        cid = conversation or os.environ.get("FORM_CONVERSATION", "")
+
+        def go():
+            if cid:
+                from .conversations import Conversations
+                store = Conversations(st.root)
+                got = start_mod.fetch(st, cid, url)
+                for a in got.get("attachments", []):
+                    a["path"] = str(store.attachment(cid, a["file"]))
+            else:
+                key = hashlib.sha256(url.encode()).hexdigest()[:12]
+                got = start_mod.fetch_to_folder(url, st.root / ".references" / "links" / key)
+            for a in got.get("attachments", []):
+                if a["path"].lower().endswith((".stl", ".obj", ".3mf")):
+                    try:
+                        pf = meshprep.preflight(Path(a["path"]), cache=st.root / ".cache" / "meshprep")
+                        a["preflight"] = {k: pf.get(k) for k in ("triangles", "size_mm", "closed", "class", "estimate_s",
+                                                                 "parts", "warning") if pf.get(k) is not None}
+                    except (OSError, ValueError) as e:
+                        a["preflight"] = {"error": str(e)}
+            return got
+        got = await _run(go)
+        act(None, "look", f"Fetching {url[:80]}", None)
+        if got.get("attachments"):
+            got["next"] = ("Import a part with import_reference(project, path), or analyze_reference(path) to understand "
+                           "it. Keep the licence in mind when the design copies a published model.")
+        return got
+
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
+    async def resolve_model_page(url: str) -> dict:
+        """What a model link is, without downloading files: site, title, author, licence, pictures and the file list
+        (Printables, Thingiverse with an app token), or why the files cannot be fetched and how the person gets them
+        (MakerWorld, Thingiverse without a token). Any other page: its OpenGraph title, description and pictures as a
+        visual reference. Then fetch_link(url) downloads what can be downloaded."""
+        from . import sources
+
+        def go():
+            try:
+                r = sources.resolve(url)
+            except sources.SourceError as e:
+                raise StudioError(str(e), e.hint)
+            r.pop("model_id", None)
+            return r
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def mesh_preflight(path: str) -> dict:
+        """Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class
+        (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display
+        proxy for a heavy one. The proxy is for display only; analysis and import always use the file itself.
+        path: absolute local path. Cached by path, size and time, so asking again is instant."""
+        st = studio()
+        from . import meshprep
+
+        def go():
+            try:
+                return meshprep.preflight(Path(path).expanduser(), cache=st.root / ".cache" / "meshprep")
+            except (OSError, ValueError) as e:
+                raise StudioError(f"Could not read {Path(path).name} as a mesh: {e}", "Give the absolute path of an STL, OBJ or 3MF.")
+        return await _run(go)
 
     async def _with_views(st, pid: str, payload: dict) -> list:
         """The tool's result as text plus the six-view sheet and the section (form/critique.py design_views)."""

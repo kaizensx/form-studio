@@ -380,6 +380,17 @@ def make_handler(st: Studio):
                 if not f.is_relative_to(base) or not f.is_file():
                     raise StudioError("That render is no longer on disk.", status=404)
                 return self._send(200, f.read_bytes(), "image/png")
+            if path == "/api/conversations/fetches":       # downloads running now, for a progress toast
+                from . import start as start_mod
+                return self._json({"fetches": start_mod.progress()})
+            mp = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/preflight/([A-Za-z0-9_.\-]+)", path)
+            if mp:                                          # a mesh attachment's preflight and display proxy
+                from . import meshprep
+                f = self._conv(lambda: st.chat.store.attachment(mp.group(1), mp.group(2)))
+                try:
+                    return self._json(meshprep.preflight(f, cache=st.root / ".cache" / "meshprep"))
+                except ValueError as e:
+                    raise StudioError(f"{mp.group(2)[7:]} could not be read as a mesh: {e}")
             mf = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/file/([A-Za-z0-9_.\-]+)", path)
             if mf:
                 f = self._conv(lambda: st.chat.store.attachment(mf.group(1), mf.group(2)))
@@ -438,7 +449,7 @@ def make_handler(st: Studio):
                     return self._json(self._conv(lambda: start_mod.answer(
                         st, cid, str(body.get("id", "")), str(body.get("text") or ""),
                         [str(c) for c in (body.get("choices") or [])], body.get("measure"))))
-                if verb == "fetch":                         # a link pasted on Home: a file is attached, a page passed on
+                if verb == "fetch":                         # a pasted link: a file or a model's files attached, a page passed on
                     from . import start as start_mod
                     return self._json(start_mod.fetch(st, cid, str(body.get("url") or "")))
                 if verb == "sketch":                        # a sketch drawn in Form Studio, as structured geometry
@@ -463,7 +474,10 @@ def make_handler(st: Studio):
                     if isinstance(body, bytes):             # raw upload: ?name=file.png
                         rec = self._conv(lambda: st.chat.store.attach(cid, name=q.get("name") or "file", data=body))
                         return self._json({"attachments": [rec]})
-                    recs = self._conv(lambda: [st.chat.store.attach(cid, Path(str(p))) for p in (body.get("paths") or [])])
+                    paths, names = list(body.get("paths") or []), list(body.get("names") or [])
+                    names += [""] * (len(paths) - len(names))
+                    recs = self._conv(lambda: [st.chat.store.attach(cid, Path(str(p)), name=str(n) or None)    # by path:
+                                               for p, n in zip(paths, names)])                            # never read whole
                     return self._json({"attachments": recs})
             msg = str(body.get("message", "")).strip()[:16000]
             if not msg:
@@ -471,9 +485,18 @@ def make_handler(st: Studio):
             purpose = body.get("purpose") or None          # "print" | "model" (form/start.py), kept on the conversation
             if purpose is not None and purpose not in ("print", "model"):
                 raise StudioError(f"Unknown purpose “{purpose}”.", "Use \"print\" or \"model\".")
+            attach_ids = list(body.get("attachments") or [])
+            from . import start as start_mod              # links pasted in the message: the engine fetches them now
+            if start_mod.links_in(msg):
+                if cid is None:
+                    cid = self._conv(lambda: start_mod.conversation_for(st, body))
+                got_ids, link_note = start_mod.fetch_message_links(st, cid, msg)
+                attach_ids += [i for i in got_ids if i not in attach_ids]
+            else:
+                link_note = ""
             job = self._conv(lambda: st.chat.send(msg, cid, body.get("project") or None, body.get("agent") or None,
-                                                  body.get("model") or None, body.get("effort"), body.get("attachments") or [],
-                                                  purpose=purpose))
+                                                  body.get("model") or None, body.get("effort"), attach_ids,
+                                                  purpose=purpose, note=link_note))
             st.activity(job.project, "chat", msg[:200], by="you")
             return self._json({"id": job.id, "conversation": job.conversation, "meta": st.chat.store.meta(job.conversation)})
 
