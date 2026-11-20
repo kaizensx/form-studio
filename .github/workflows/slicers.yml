@@ -208,7 +208,7 @@ jobs:
           RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a"
           export FORM_DATA="$RUNNER_TEMP/form-slice"
           mkdir -p "$RUNNER_TEMP/out"
-          "$PY" -m form examples add
+          "$PY" -m form new "Hallway phone dock" dock --purpose print > /dev/null
           $RUN "$PY" -m form run hallway-phone-dock
           "$PY" -m form state hallway-phone-dock > "$RUNNER_TEMP/state.json"
           "$PY" -c "import sys,json; s=json.load(open(sys.argv[1],encoding='utf-8')).get('slice_simulated') or {}; print('sliced:', {k:s.get(k) for k in ('time_min','filament_g','layers','slicer','presets')}); sys.exit(0 if s.get('layers') and s.get('time_min') and s.get('filament_g') and s.get('slicer') == sys.argv[2] else 1)" "$RUNNER_TEMP/state.json" "$REPORTS"

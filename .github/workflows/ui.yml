@@ -59,7 +59,7 @@ jobs:
         run: |
           PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
           export FORM_CONFIG=.github/ci-prusa.toml FORM_DATA="$RUNNER_TEMP/form-slice"
-          "$PY" -m form examples add
+          "$PY" -m form new "Hallway phone dock" dock --purpose print > /dev/null
           "$PY" -m form run hallway-phone-dock
           "$PY" -m form state hallway-phone-dock > "$RUNNER_TEMP/state.json"
           "$PY" -c "import sys,json; s=json.load(open(sys.argv[1],encoding='utf-8')).get('slice_simulated') or {}; print('sliced:', {k:s.get(k) for k in ('time_s','filament_g','layers','slicer','slicer_version')}); sys.exit(0 if s.get('layers') else 1)" "$RUNNER_TEMP/state.json"
