@@ -20,7 +20,7 @@ from pathlib import Path
 from . import __version__, checks as checks_mod, fit as fit_mod, slicer
 from . import cad_bridges
 from .recipes import RecipeBook, RecipeError, SCAD_PREFIX, SOURCE_PREFIX, is_source, source_path, store_source
-from .worker import Kernel, KernelFailure
+from .worker import KernelFailure, KernelPool
 from . import fsutil
 from . import printers as printers_mod
 from . import filaments as materials_mod, plates as plates_mod
@@ -153,7 +153,7 @@ class Studio:
         os.environ["FORM_SOURCES"] = str(self.sources)       # the kernel worker inherits this and resolves src: ids
         if (cfg.get("cad") or {}).get("openscad"):
             os.environ["FORM_OPENSCAD"] = str(cfg["cad"]["openscad"])   # OpenSCAD designs build in the worker
-        self.kernel = Kernel()
+        self.kernel = KernelPool(cfg=cfg)                   # parallel kernel workers (form/worker.py)
         self._tl = threading.local()                        # the pipeline step running on this thread (progress)
         self.recipes = RecipeBook(self.sources)
         self.calibration = fit_mod.Calibration(self.root / "calibration.json")
@@ -924,7 +924,7 @@ class Studio:
         except KernelFailure as e:
             i = e.info
             raise StudioError(i.get("message", "Kernel failure"), i.get("hint", ""), status=422 if i.get("kind") == "recipe" else 500,
-                              feature=i.get("feature"), params=i.get("params", []), kind=i.get("kind"))
+                              feature=i.get("feature"), params=i.get("params", []), kind=i.get("kind"), **({"diagnosis": i["diagnosis"]} if i.get("diagnosis") else {}))
 
     def view(self, p: dict, n: int | None = None, tol=0.03, timeout: float = 60) -> dict:
         r = self.rev(p, n)
