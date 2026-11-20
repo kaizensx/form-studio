@@ -181,7 +181,7 @@ QtObject {
         if (proj) {
             var t = { "": m === "GET" ? "Loading the design" : "", "/view": "Loading the geometry", "/analysis": "Computing the analysis map", "/orient": "Ranking print orientations",
                       "/layers": "Loading the sliced layers", "/toolpath": "Loading the toolpath", "/diff": "Comparing revisions", "/cost": "Estimating the cost",
-                      "/pack": "Packing the plate", "/preview": "Previewing the change", "/commit": "Saving the revision", "/checkout": "Switching revision",
+                      "/pack": "Packing the plate", "/preview": "", "/commit": "Saving the revision", "/checkout": "Switching revision",
                       "/run": "Starting the pipeline", "/settings": "Saving the design settings", "/render_photo": "Starting the render", "/alternatives": "Building alternatives",
                       "/variant_save": "Saving the variant", "/variant_promote": "Making the variant the design", "/variant_delete": "Deleting the variant",
                       "/history_export": "Exporting the history", "/import_part": "Importing the part", "/reconstruct": "Reconstructing the mesh as CAD", "/open": "Opening the file", "/approve": "Recording the release",
@@ -284,7 +284,9 @@ QtObject {
     }
     function showHead() {
         if (!view || !viewer || scrub) return       // while a revision is being viewed from the timeline, leave it up
-        viewer.setModel(view)
+        var grow = Date.now() - _buildNext < 15000          // a new build (see _buildNext): it grows in, feature by feature
+        if (grow) _buildNext = 0
+        viewer.setModel(view, grow ? "build" : "")
         viewer.setGhost(compare ? compare.view : null)
         viewer.selected = feature
         Qt.callLater(applyStageView)
@@ -332,7 +334,7 @@ QtObject {
             if (d.recovered) toast("Project recovered", d.recovered)
             if (withView || !view || view.rev !== d.project.head) {
                 return pget("/view").then(function (v) {
-                    v.rev = d.project.head; view = v
+                    v.rev = d.project.head; v.pid = d.project.id; view = v
                     if (!hasDraft) showHead()
                 }, function (e) { fail(e) })
             }
@@ -359,15 +361,27 @@ QtObject {
         draftAgent = agent || ""
         runPreview()
     }
+    // One preview is built at a time. Values that change while it builds go next, as one request with the latest
+    // values, and an answer that arrives while newer values wait is drawn anyway: dragging a slider shows the part
+    // following it, instead of a queue of builds that are thrown away one after another.
+    property bool _pvBusy: false
+    property bool _pvAgain: false
     function runPreview() {
         var seq = ++_seq
         if (!F.keys(draftValues).length) {
+            _pvAgain = false
             preview = null; draftError = null
             showHead(); if (viewer) viewer.flagged = []
             return
         }
+        if (_pvBusy) { _pvAgain = true; return }
+        _pvBusy = true; _pvAgain = false
+        var at = pid
+        function next() { s._pvBusy = false; if (s._pvAgain && s.pid === at) s.runPreview(); else s._pvAgain = false }
         ppost("/preview", { values: draftValues }).then(function (pv) {
-            if (seq !== _seq) return
+            var show = s.pid === at && (seq === s._seq || s._pvAgain)
+            next()
+            if (!show) return
             preview = pv; draftError = null
             if (viewer) {
                 viewer.setModel(pv)
@@ -377,6 +391,7 @@ QtObject {
                 Qt.callLater(applyStageView)
             }
         }, function (e) {
+            next()
             if (seq !== _seq) return
             draftError = e                      // keep showing the last geometry that built
             if (viewer) viewer.flagged = e.feature ? [e.feature] : []
@@ -384,13 +399,14 @@ QtObject {
     }
     function discard() {
         draftValues = ({}); draftProv = ({}); draftNote = ""; draftOrigin = ""; draftAgent = ""
-        preview = null; draftError = null; _seq++
+        preview = null; draftError = null; _seq++; _pvAgain = false
         if (viewer) viewer.flagged = []
         showHead()
     }
     function commit() {
         ppost("/commit", { values: draftValues, provenance: draftProv, note: draftNote, origin: draftOrigin || "user" }).then(function (r) {
             draftValues = ({}); draftProv = ({}); draftNote = ""; draftOrigin = ""; draftAgent = ""; preview = null; ack = []
+            _seq++; _pvAgain = false                // a preview still on its way is not the head
             if (viewer) viewer.flagged = []
             toast("Committed as " + F.pad(r.head), r.job ? "Regenerating solid, exports, checks and slice." : "Auto-regenerate is off: outputs are now stale.")
             if (r.job) track(r.job)
@@ -523,6 +539,7 @@ QtObject {
                   + (c.settings ? "; the slice is redone with them." : "."))
             sheet = null; lighter = null
             if (r.job) track(r.job)
+            _buildNext = Date.now()
             return refresh(true).then(function () { buildTick++; return true })
         }, function (e) { fail(e); return false })
     }
@@ -688,7 +705,10 @@ QtObject {
                 var key = st.head + ":" + st.updated
                 if (s._stamp && key !== s._stamp && !s.hasDraft) {
                     var last = st.last || ({})
-                    if (last.origin && last.origin.indexOf("agent") === 0) s.toast(F.pad(st.head) + " by " + last.origin.replace("agent:", ""), last.note || "")
+                    if (last.origin && last.origin.indexOf("agent") === 0) {
+                        s.toast(F.pad(st.head) + " by " + last.origin.replace("agent:", ""), last.note || "")
+                        s._buildNext = Date.now()     // the agent's revision grows in, whichever of this and the activity feed sees it first
+                    }
                     s.refresh(true)
                 }
                 s._stamp = key
@@ -721,6 +741,7 @@ QtObject {
         if (ev.project !== pid) {
             if (["commit", "draft", "look", "search"].indexOf(ev.kind) < 0) return
             var fresh = screen === "designing"
+            if (fresh) _buildNext = Date.now()
             reloadStudio().then(function () { open(ev.project).then(function () { if (fresh) buildTick++ }) })
             if (!fresh) toast("Following " + ev.by, ev.text)
             return
@@ -729,6 +750,7 @@ QtObject {
         if (ev.kind === "commit") {
             if (draftAgent) discard()
             var t = Object.assign({}, thumbTick); t[pid] = (t[pid] || 0) + 1; thumbTick = t
+            _buildNext = Date.now()
             refresh(true).then(function () { buildTick++ })     // the new build grows in, feature by feature
         } else if (ev.values && F.keys(ev.values).length && !userDraft) {
             loadDraft(Object.assign({}, head.values, ev.values), "agent:" + ev.by, undefined, ev.by)
@@ -1757,7 +1779,7 @@ QtObject {
         return post("/conversations/" + id + "/answer", { id: qid, text: String(value), choices: [method], measure: { value: value, method: method } }).then(function (a) {
             if (convId === id) _chatTick()
             var m = a && a.rev ? a : null
-            if (m && pid) refresh(true).then(function () { buildTick++ })
+            if (m && pid) { _buildNext = Date.now(); refresh(true).then(function () { buildTick++ }) }
             if (m) toast("Measured " + F.fmt(value, 2) + " mm", "Committed as " + F.pad(m.rev) + (method === "estimate" ? ", still assumed." : ", measured with " + method + "."))
             return a
         }, function (e) { fail(e); if (convId === id) _chatTick() })
@@ -1768,6 +1790,7 @@ QtObject {
     function pickConcept(gid, project, keepOthers) {
         return post("/concepts/" + gid + "/pick", { project: project, keep_others: !!keepOthers }).then(function (r) {
             sheet = null; loadConcepts()
+            _buildNext = Date.now()
             return reloadStudio().then(function () { return open(project) }).then(function () {
                 buildTick++
                 toast("Continuing with " + (r.group && r.group.name ? r.group.name : "the concept you picked"), r.trashed && r.trashed.length ? F.plural(r.trashed.length, "other concept") + " moved to .trash, kept until you remove it." : "")
@@ -1795,6 +1818,9 @@ QtObject {
              + ". Write the mix as one new concept with propose_concepts(group=\"" + gid + "\").")
     }
     property int buildTick: 0          // bumps when the workspace should build the part up, feature by feature
+    // when a new build was asked to grow in: the next head geometry shown (showHead) is revealed feature by feature.
+    // Set before the geometry loads, so the finished part is never drawn first and then taken apart.
+    property real _buildNext: 0
     // .formstudio (or an older .formproj) archive, or a conversation exported as JSON
     function importFile(fileUrl) {
         var name = decodeURIComponent(String(fileUrl).replace(/^.*[\/\\]/, ""))

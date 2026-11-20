@@ -54,7 +54,7 @@ uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizens
 | Stage | What you do there |
 |---|---|
 | **Brief** | What the part is for and its purpose (for 3D printing, or just a 3D model and how it will be made), the dimensions you measured with their provenance, reference photos and imported parts |
-| **Shape** | Features in build order and their parameters. Select a feature on the model or in the list and change it; the draft shows its computed impact before you commit |
+| **Shape** | Features in build order and their parameters. Select a feature on the model or in the list and change it; dragging a slider rebuilds the part in place while you drag, and the draft shows its computed impact before you commit |
 | **Fit** | The fit model for each interface: a section, the clearance, the chance of fitting and how to raise it. Hidden for a 3D model |
 | **Prove** | Every check with its evidence, print orientation, the plates, and the slice: time, filament, layers, Watch it print. A 3D model shows the checks that apply to it and says which do not |
 | **Release** | The release gate, approval (over failed checks only with a reason for each, on the record), the released files with their hashes, and the revision history |
@@ -69,7 +69,8 @@ the composer). Drop files anywhere on Home or paste them. Under the composer: **
 model** (no slicing, no print checks), and **Start blank** (an empty design in the workspace, no agent).
 
 Sending opens the workspace at once in a "being designed" state with what the agent is doing; the design is attached
-the moment it exists and builds up feature by feature in the viewport, each feature named as it arrives. For a new idea
+the moment it exists and builds up feature by feature in the viewport, in build order, each feature fading and rising
+into place as it is named; a later revision grows in only the features whose geometry changed. For a new idea
 the agent proposes three or four concepts as real CAD, side by side and turning, with a line on each and their computed
 size and volume: continue with one, or ask in words for a mix ("the base of A with the hook of C"). When it needs a
 real number, a **Measure this** card shows where to measure on a picture or a diagram, the tolerance that matters and

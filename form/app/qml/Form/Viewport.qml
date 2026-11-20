@@ -88,8 +88,8 @@ Item {
     property vector3d shiftTo: Qt.vector3d(0, 0, 0)   // where shift is going (it animates between modes)
     readonly property var asm: model && model.assembly && !model.assembly.error ? model.assembly : null
     readonly property bool asmOn: !!asm && asmMode !== "print"
-    onAsmModeChanged: { _stale(); asmTween = true; _frame(); asmTweenOff.restart(); if (interactive && model && model.assembly) setView(Store.viewName, true) }
-    onExplodeChanged: { _frame(); _stale() }
+    onAsmModeChanged: { asmTween = true; _frame(); asmTweenOff.restart(); if (interactive && model && model.assembly) setView(Store.viewName, true) }
+    onExplodeChanged: _frame()
     Timer { id: asmTweenOff; interval: Motion.part + 60 + Motion.stagger * (vp.asm ? Math.min(6, vp.asm.parts.length) : 0); onTriggered: vp.asmTween = false }
     function jointOf(id) {
         var js = asm ? asm.joints : []
@@ -255,10 +255,10 @@ Item {
         return Qt.vector3d(Math.max(c.x - r, Math.min(c.x + r, t.x)), Math.max(c.y - r, Math.min(c.y + r, t.y)),
                            Math.max(Math.min(0, c.z) - r, Math.min(c.z + r, t.z)))
     }
-    onTargetChanged: { if (!isFinite(target.x) || !isFinite(target.y) || !isFinite(target.z)) { tween = false; target = center(bounds) }; _stale() }
-    onDistChanged: { if (!isFinite(dist) || dist <= 0) { tween = false; dist = frame(bounds, 1.5) }; _stale() }
-    onAzChanged: { if (!isFinite(az)) { tween = false; az = -34 }; _stale() }
-    onElChanged: { if (!isFinite(el)) { tween = false; el = 28.4 }; _stale() }
+    onTargetChanged: if (!isFinite(target.x) || !isFinite(target.y) || !isFinite(target.z)) { tween = false; target = center(bounds) }
+    onDistChanged: if (!isFinite(dist) || dist <= 0) { tween = false; dist = frame(bounds, 1.5) }
+    onAzChanged: if (!isFinite(az)) { tween = false; az = -34 }
+    onElChanged: if (!isFinite(el)) { tween = false; el = 28.4 }
     // the camera's last good placement: a frame whose numbers are not finite keeps the one before it
     readonly property var _camGood: ({ pos: Qt.vector3d(0, -420, 220), aim: Qt.vector3d(0, 0, 20) })
 
@@ -302,55 +302,85 @@ Item {
         var b = featureBox(id); if (!b) return
         tween = true; target = center(b); dist = Math.max(14, radius(b)) / Math.sin(13 * Math.PI / 180) * 1.9
     }
-    function setModel(v) {
-        // a rebuilt part is shown, not popped: the last frame stays on top and fades while the new mesh is underneath.
-        // Rapid rebuilds (dragging a slider) skip it, so direct manipulation stays direct.
-        var now = Date.now(), calm = now - _lastModel > 420
-        _lastModel = now
-        if (model && v && calm && !_swapping && crossfade) swap(function () { vp.model = v; vp._frame() })
-        else { model = v; if (v) _frame() }
+    // ── a new model: drawn in place, in the same frame, with no snapshot on top ──
+    // Drafts while a slider moves, commits, the timeline: the meshes are swapped directly, so moving, zooming and
+    // rebuilding never show a held or stale picture. Geometry that did not change keeps its meshes (a reload of the
+    // same revision redraws nothing). how === "build" grows the new geometry in (see the build-up below).
+    function setModel(v, how) {
+        if (v === model) { if (v) _frame(); return }
+        var old = model, same = _sameMesh(old, v), grow = false
+        if (how === "build" && v && interactive && !lite) grow = _planReveal(old, v)
+        else if (!same) _endReveal()          // the same geometry again (a reload) lets a build-up carry on
+        if (!same || grow) _mesh = v && v.mesh ? v.mesh : []     // held features are created hidden: they never fade out first
+        model = v
+        if (v) _frame()
+        if (grow) { _stepAt = 0; stepper.interval = 16; stepper.restart() }
     }
-    // ── cross-fade: the one mechanism for "the geometry changed" (drafts, commits, the timeline, Store.fadeTo) ──
-    property bool crossfade: interactive && !lite
-    property real _lastModel: 0
-    property bool _swapping: false
-    // The still is a snapshot, not a live copy: it is refreshed (scheduleUpdate) a moment after the view settles, and
-    // a swap uses it only while it shows what is on screen now. While the pointer is down (orbiting, panning, a
-    // pinch) or the camera has moved since, the change is applied directly. Whatever happens in apply(), the still
-    // goes back behind the view: a frame held on top is never left there.
-    property bool _stillFresh: false
-    function _stale() { _stillFresh = false; if (crossfade) stillRefresh.restart() }
-    onWidthChanged: _stale()
-    onHeightChanged: _stale()
-    onFitKChanged: _stale()
-    onModelChanged: _stale()
-    onVisibleChanged: _stale()
-    onSelectedChanged: _stale()
-    onHoveredChanged: _stale()
-    onFlaggedChanged: _stale()
-    onHiddenFeaturesChanged: _stale()
-    onGhostChanged: _stale()
-    onSectionAxisChanged: _stale()
-    onSectionTChanged: _stale()
-    onShowDimsChanged: _stale()
-    onShiftChanged: _stale()
-    Timer { id: stillRefresh; interval: 160
-        onTriggered: {
-            if (ma.pressed || pinch.active) { restart(); return }
-            still.scheduleUpdate(); stillReady.restart()
-        } }
-    Timer { id: stillReady; interval: 50; onTriggered: vp._stillFresh = true }   // the frame after the capture is drawn
-    function _unfreeze() { thaw.stop(); still.opacity = 1; still.z = -1 }
-    function swap(apply) {
-        var fade = crossfade && visible && width >= 2 && _stillFresh && !ma.pressed && !pinch.active
-        if (!fade) { _unfreeze(); apply(); return }
-        thaw.stop(); still.opacity = 1; still.z = 1
-        _swapping = true
-        try { apply() }
-        catch (e) { _unfreeze(); throw e }
-        finally { _swapping = false }
-        thaw.restart()
+    // the meshes drawn by the parts repeaters: replaced only when the geometry really changed
+    property var _mesh: []
+    function _sameMesh(a, b) {
+        if (!a || !b || !a.mesh || !b.mesh || a.mesh.length !== b.mesh.length) return false
+        for (var i = 0; i < a.mesh.length; i++) {
+            var x = a.mesh[i], y = b.mesh[i]
+            if (x.feature !== y.feature || x.part !== y.part || x.positions !== y.positions || x.indices !== y.indices) return false
+        }
+        return true
     }
+    // The timeline and anything else that swaps the geometry (Store.fadeTo) apply it directly, like any model change.
+    function swap(apply) { apply() }
+
+    // ── the build-up: a new build grows in feature by feature, in build order ──
+    // Each step fades its features in and lets them rise the last few millimetres into place (eased, about a third of
+    // a second); what is already shown is never touched, and the last step leaves exactly the final model. Features
+    // whose geometry did not change since the model before stay as they are. With reduced motion everything new
+    // fades in at once, without moving.
+    property var order: []                   // feature ids in build order (the recipe's); others follow in mesh order
+    property var _hold: []                   // features of the drawn model not revealed yet
+    property var _steps: []                  // [[feature ids], ...] still to reveal
+    property int _stepAt: 0
+    readonly property bool revealing: _steps.length > 0
+    readonly property int revealMs: Theme.reduced ? 220 : 340
+    readonly property real riseMm: Theme.reduced ? 0 : Math.max(2, Math.min(8, radius(bounds) * 0.08))
+    signal revealStep(var ids, int at, int count)
+    signal revealDone()
+    function _featureGeo(m) {                // feature id → its meshes' geometry, as one comparable string
+        var out = ({}), ms = m && m.mesh ? m.mesh : []
+        for (var i = 0; i < ms.length; i++) {
+            var f = ms[i].feature || ""
+            out[f] = (out[f] || "") + "|" + (ms[i].part || "") + ":" + ms[i].positions + ":" + ms[i].indices
+        }
+        return out
+    }
+    function _planReveal(old, v) {           // true when something will grow in
+        var was = _featureGeo(old && old.pid === v.pid ? old : null), now = _featureGeo(v), ids = [], i   // another design: all of it is new
+        for (i = 0; i < order.length; i++) if (now[order[i]] !== undefined && ids.indexOf(order[i]) < 0) ids.push(order[i])
+        for (var f in now) if (ids.indexOf(f) < 0) ids.push(f)
+        var held = _hold                    // a build-up already running: what it had not shown yet still grows in
+        var fresh = ids.filter(function (id) { return was[id] !== now[id] || held.indexOf(id) >= 0 })
+        if (!fresh.length || fresh.join() === held.join() && _sameMesh(old, v)) return false   // nothing new: carry on as is
+        stepper.stop()
+        // at most a dozen steps: a design with many features reveals them a few at a time
+        var n = Theme.reduced ? 1 : Math.min(12, fresh.length), steps = []
+        for (i = 0; i < n; i++) steps.push(fresh.slice(Math.floor(i * fresh.length / n), Math.floor((i + 1) * fresh.length / n)))
+        _steps = steps
+        _hold = fresh
+        return true
+    }
+    function _nextStep() {
+        if (_stepAt >= _steps.length) { _steps = []; _hold = []; revealDone(); return }
+        var ids = _steps[_stepAt]
+        _hold = _hold.filter(function (f) { return ids.indexOf(f) < 0 })
+        revealStep(ids, _stepAt, _steps.length)
+        _stepAt++
+        stepper.interval = _stepAt >= _steps.length ? revealMs : Math.max(250, Math.min(400, 2600 / _steps.length))
+        stepper.restart()
+    }
+    function _endReveal() {                  // anything else that changes the model shows it whole, at once
+        var was = _steps.length > 0
+        stepper.stop(); _steps = []; _hold = []
+        if (was) revealDone()
+    }
+    Timer { id: stepper; onTriggered: vp._nextStep() }
     function setGhost(v) { ghost = v }
     // what is under a pixel: the point on the part as printed (the pick's local frame is the part's print frame,
     // whatever arrangement it is drawn in), the same point where it is drawn now, the part and the feature
@@ -445,7 +475,8 @@ Item {
         // key from the upper left front (casts the shadow), a warm fill, a cool rim from behind that draws the
         // far silhouette, and a little light from straight above so top faces separate from walls
         DirectionalLight { eulerRotation: Qt.vector3d(-50, -34, 0); brightness: 2.0; color: "#fffaf2"
-            castsShadow: !vp.lite; shadowFactor: 86; shadowMapQuality: Light.ShadowMapQualityVeryHigh; softShadowQuality: Light.PCF32; pcfFactor: 9; shadowMapFar: 1400; csmNumSplits: 1 }
+            castsShadow: !vp.lite; shadowFactor: 86; shadowMapQuality: Light.ShadowMapQualityVeryHigh; softShadowQuality: Light.PCF32; pcfFactor: 9; shadowMapFar: 1400; csmNumSplits: 1
+            lockShadowmapTexels: true }       // the shadow map's texels stay put while the camera moves: no shimmering edges
         DirectionalLight { eulerRotation: Qt.vector3d(-16, 112, 0); brightness: 0.62; color: "#ffeedd" }
         DirectionalLight { eulerRotation: Qt.vector3d(-24, 164, 0); brightness: 0.9; color: "#c4dcff" }
         DirectionalLight { eulerRotation: Qt.vector3d(-90, 0, 0); brightness: 0.22 }
@@ -478,15 +509,20 @@ Item {
                 position: vp.shift
                 Repeater3D {
                     id: parts
-                    model: vp.model && !vp.asm ? vp.model.mesh : []
+                    model: vp.model && !vp.asm ? vp._mesh : []
                     Model {
+                        id: pmod
                         required property var modelData
                         readonly property string feature: modelData.feature || ""
                         readonly property string part: ""
-                        pickable: !vp.mapShown; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0
+                        // the build-up: 0 while held, eased to 1 when its step comes (it fades in and rises into place)
+                        property real k: vp._hold.indexOf(feature) < 0 ? 1 : 0
+                        Behavior on k { NumberAnimation { duration: vp.revealMs; easing.type: Easing.OutCubic } }
+                        opacity: k; z: -(1 - k) * vp.riseMm
+                        pickable: !vp.mapShown && k > 0.5; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0 && k > 0.001
                         geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                         materials: CustomMaterial {
-                            shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                            shadingMode: CustomMaterial.Shaded; cullMode: pmod.k < 1 ? Material.BackFaceCulling : Material.NoCulling; fragmentShader: "shaders/clay.frag"
                             property real uMap: 0
                             property color uColor: vp.partColor(feature, "")
                             property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
@@ -518,15 +554,19 @@ Item {
                             QuaternionAnimation { duration: Motion.part; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }
                         Repeater3D {
                             id: pm
-                            model: vp.model ? vp.model.mesh.filter(function (m) { return m.part === pn.modelData.id }) : []
+                            model: vp.model ? vp._mesh.filter(function (m) { return m.part === pn.modelData.id }) : []
                             Model {
+                                id: amod
                                 required property var modelData
                                 readonly property string feature: modelData.feature || ""
                                 readonly property string part: pn.modelData.id
-                                pickable: !vp.mapShown; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0
+                                property real k: vp._hold.indexOf(feature) < 0 ? 1 : 0
+                                Behavior on k { NumberAnimation { duration: vp.revealMs; easing.type: Easing.OutCubic } }
+                                opacity: k; z: -(1 - k) * vp.riseMm
+                                pickable: !vp.mapShown && k > 0.5; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0 && k > 0.001
                                 geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                                 materials: CustomMaterial {
-                                    shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                                    shadingMode: CustomMaterial.Shaded; cullMode: amod.k < 1 ? Material.BackFaceCulling : Material.NoCulling; fragmentShader: "shaders/clay.frag"
                                     property real uMap: 0
                                     property color uColor: vp.partColor(feature, pn.modelData.id)
                                     property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
@@ -686,16 +726,6 @@ Item {
                     property color uColor: Theme.alpha(Theme.datum, 0.72); property vector3d uClipN; property real uClipD; property real uClip: 0 } }
         }
     }
-    // the frame before a geometry change, held on top and let go (see swap)
-    // It is kept current by sitting, fully covered, behind the 3D view; a swap lifts it in front and fades it.
-    ShaderEffectSource { id: still; objectName: "viewportStill"; anchors.fill: view; sourceItem: view; live: false; z: -1; visible: vp.crossfade }
-    SequentialAnimation { id: thaw
-        NumberAnimation { target: still; property: "opacity"; from: 1; to: 0; duration: Motion.slow; easing.type: Easing.InOutQuad }
-        ScriptAction { script: vp._unfreeze() } }
-    // a held frame that is somehow still on top with nothing fading it is let go
-    Timer { interval: 1000; repeat: true; running: still.z > 0
-        onTriggered: if (!thaw.running) vp._unfreeze() }
-
     // the brush stroke or lasso outline being drawn, on top of the part
     Canvas {
         id: strokeCanvas
@@ -787,7 +817,8 @@ Item {
             readonly property var b: vp.bounds
             readonly property real mm: index === 0 ? b.hi.x - b.lo.x : index === 1 ? b.hi.y - b.lo.y : b.hi.z
             width: t.implicitWidth + 10; height: 17; radius: Theme.rXs; color: Theme.plate; border.color: Theme.alpha(Theme.datum, 0.28)
-            visible: shown
+            opacity: shown ? 1 : 0; visible: opacity > 0.01                // a label that loses its seat fades, never blinks
+            Behavior on opacity { NumberAnimation { duration: 120 } }
             Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.datum; font.family: Theme.mono; font.pixelSize: Theme.tFine; font.weight: 500; renderType: Text.NativeRendering }
         }
     }
@@ -805,9 +836,9 @@ Item {
             width: pt.implicitWidth + 12; height: 19; radius: Theme.rXs
             color: pl.modelData.on ? Theme.alpha(pl.modelData.tint, 0.22) : plm.containsMouse ? Theme.alpha(Theme.plate3, 0.95) : Theme.alpha(Theme.plate, 0.88)
             border.color: Theme.alpha(modelData.tint, pl.modelData.on ? 0.8 : 0.45)
-            opacity: pl.modelData.old ? 0.7 : 1
+            opacity: shown ? (pl.modelData.old ? 0.7 : 1) : 0; visible: opacity > 0.01
+            Behavior on opacity { NumberAnimation { duration: 120 } }
             z: pl.modelData.ann ? 3 : 0                 // an annotation's label is a button, above the orbit area
-            visible: shown
             Text { id: pt; anchors.centerIn: parent; text: pl.modelData.text; color: pl.modelData.tint; font.family: pl.modelData.ann ? Theme.sans : Theme.mono
                 font.pixelSize: Theme.tFine; font.weight: pl.modelData.ann ? 550 : 400; renderType: Text.NativeRendering }
             MouseArea { id: plm; anchors.fill: parent; enabled: !!pl.modelData.ann; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
@@ -826,7 +857,8 @@ Item {
             property bool shown: false
             property int cand: -1
             width: rt.implicitWidth + 12; height: 19; radius: Theme.rXs; color: Theme.alpha(Theme.plate, 0.88); border.color: Theme.alpha(Theme.blueprint, 0.4)
-            visible: shown
+            opacity: shown ? 1 : 0; visible: opacity > 0.01
+            Behavior on opacity { NumberAnimation { duration: 120 } }
             Txt { id: rt; anchors.centerIn: parent; kind: "fine"; text: rl.modelData.text; color: Theme.blueprint; wrapMode: Text.NoWrap }
         }
     }
