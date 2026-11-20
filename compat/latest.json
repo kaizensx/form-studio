@@ -1,9 +1,15 @@
 {
  "schema": 1,
- "generated": "2026-11-19T12:09:20+00:00",
+ "generated": "2026-11-20T12:20:14+00:00",
  "commit": "5634e93462d12a3be052d8f20846e0f102c85460",
- "run_url": "https://github.com/kaizensx/form-studio/actions/runs/44517836640",
+ "run_url": "https://github.com/kaizensx/form-studio/actions/runs/44730314541",
  "slicers": [
+  {
+   "kind": "bambu",
+   "name": "Bambu Studio",
+   "version": "02.09.01.70",
+   "runner": "ubuntu-24.04"
+  },
   {
    "kind": "elegoo",
    "name": "ElegooSlicer",
@@ -155,16 +161,37 @@
  ],
  "cells": {
   "battery_holder": {
+   "bambu": {
+    "title": "Battery and card holder",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.539,
+     "exports": 0.379,
+     "checks": 0.943,
+     "slice": 8.971,
+     "load": 0.004
+    },
+    "rollup": {
+     "PASS": 8,
+     "WARN": 0,
+     "FAIL": 0
+    },
+    "time_s": 5372.0,
+    "filament_g": 43.36,
+    "layers": 121,
+    "supports": false
+   },
    "elegoo": {
     "title": "Battery and card holder",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.535,
-     "exports": 0.392,
-     "checks": 0.974,
-     "slice": 7.867,
-     "load": 0.004
+     "geometry": 0.366,
+     "exports": 0.259,
+     "checks": 0.604,
+     "slice": 5.864,
+     "load": 0.003
     },
     "rollup": {
      "PASS": 8,
@@ -178,10 +205,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.335,
-     "exports": 0.238,
-     "checks": 0.595,
-     "slice": 4.814,
+     "geometry": 0.398,
+     "exports": 0.294,
+     "checks": 0.699,
+     "slice": 6.135,
      "load": 0.003
     },
     "rollup": {
@@ -199,10 +226,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.319,
-     "exports": 0.227,
-     "checks": 0.563,
-     "slice": 2.385,
+     "geometry": 0.524,
+     "exports": 0.362,
+     "checks": 0.903,
+     "slice": 4.056,
      "load": 0.003
     },
     "rollup": {
@@ -210,7 +237,7 @@
      "WARN": 0,
      "FAIL": 0
     },
-    "time_s": 12420.0,
+    "time_s": 12423.0,
     "filament_g": 37.85,
     "layers": 121,
     "supports": false
@@ -220,10 +247,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.399,
-     "exports": 0.294,
-     "checks": 0.69,
-     "slice": 6.368,
+     "geometry": 0.371,
+     "exports": 0.258,
+     "checks": 0.598,
+     "slice": 6.205,
      "load": 0.003
     },
     "rollup": {
@@ -241,11 +268,11 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.528,
-     "exports": 0.378,
-     "checks": 0.951,
-     "slice": 11.217,
-     "load": 0.004
+     "geometry": 0.315,
+     "exports": 0.228,
+     "checks": 0.567,
+     "slice": 7.146,
+     "load": 0.003
     },
     "rollup": {
      "PASS": 8,
@@ -259,11 +286,11 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.541,
-     "exports": 0.365,
-     "checks": 0.899,
-     "slice": 7.158,
-     "load": 0.004
+     "geometry": 0.532,
+     "exports": 0.366,
+     "checks": 0.968,
+     "slice": 7.045,
+     "load": 0.003
     },
     "rollup": {
      "PASS": 8,
@@ -277,15 +304,36 @@
    }
   },
   "cable_organizer": {
+   "bambu": {
+    "title": "Cable organizer",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.23,
+     "exports": 0.064,
+     "checks": 0.321,
+     "slice": 0.745,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 9,
+     "WARN": 1,
+     "FAIL": 0
+    },
+    "time_s": 298.0,
+    "filament_g": 1.9,
+    "layers": 43,
+    "supports": false
+   },
    "elegoo": {
     "title": "Cable organizer",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.228,
-     "exports": 0.064,
-     "checks": 0.316,
-     "slice": 0.978,
+     "geometry": 0.177,
+     "exports": 0.047,
+     "checks": 0.184,
+     "slice": 0.731,
      "load": 0.001
     },
     "rollup": {
@@ -300,10 +348,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.164,
-     "exports": 0.045,
-     "checks": 0.154,
-     "slice": 0.718,
+     "geometry": 0.225,
+     "exports": 0.051,
+     "checks": 0.196,
+     "slice": 0.882,
      "load": 0.001
     },
     "rollup": {
@@ -321,10 +369,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.155,
-     "exports": 0.041,
-     "checks": 0.15,
-     "slice": 0.085,
+     "geometry": 0.231,
+     "exports": 0.064,
+     "checks": 0.312,
+     "slice": 0.146,
      "load": 0.001
     },
     "rollup": {
@@ -342,10 +390,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.173,
-     "exports": 0.051,
-     "checks": 0.197,
-     "slice": 0.606,
+     "geometry": 0.176,
+     "exports": 0.046,
+     "checks": 0.187,
+     "slice": 0.575,
      "load": 0.001
     },
     "rollup": {
@@ -363,10 +411,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.231,
-     "exports": 0.066,
-     "checks": 0.313,
-     "slice": 2.147,
+     "geometry": 0.147,
+     "exports": 0.04,
+     "checks": 0.14,
+     "slice": 2.1,
      "load": 0.001
     },
     "rollup": {
@@ -381,10 +429,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.228,
-     "exports": 0.063,
+     "geometry": 0.238,
+     "exports": 0.066,
      "checks": 0.309,
-     "slice": 0.779,
+     "slice": 0.783,
      "load": 0.001
     },
     "rollup": {
@@ -399,15 +447,36 @@
    }
   },
   "coupon": {
+   "bambu": {
+    "title": "Fit coupon",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.087,
+     "exports": 0.02,
+     "checks": 0.23,
+     "slice": 0.271,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 8,
+     "WARN": 0,
+     "FAIL": 0
+    },
+    "time_s": 640.0,
+    "filament_g": 4.52,
+    "layers": 50,
+    "supports": false
+   },
    "elegoo": {
     "title": "Fit coupon",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.087,
-     "exports": 0.019,
-     "checks": 0.235,
-     "slice": 0.397,
+     "geometry": 0.07,
+     "exports": 0.017,
+     "checks": 0.131,
+     "slice": 0.278,
      "load": 0.001
     },
     "rollup": {
@@ -422,10 +491,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.062,
-     "exports": 0.015,
-     "checks": 0.096,
-     "slice": 0.356,
+     "geometry": 0.066,
+     "exports": 0.016,
+     "checks": 0.143,
+     "slice": 0.521,
      "load": 0.001
     },
     "rollup": {
@@ -443,10 +512,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.056,
-     "exports": 0.014,
-     "checks": 0.098,
-     "slice": 0.082,
+     "geometry": 0.086,
+     "exports": 0.021,
+     "checks": 0.229,
+     "slice": 0.144,
      "load": 0.001
     },
     "rollup": {
@@ -464,10 +533,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.066,
-     "exports": 0.015,
-     "checks": 0.133,
-     "slice": 0.205,
+     "geometry": 0.068,
+     "exports": 0.017,
+     "checks": 0.129,
+     "slice": 0.179,
      "load": 0.001
     },
     "rollup": {
@@ -485,10 +554,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.089,
-     "exports": 0.02,
-     "checks": 0.233,
-     "slice": 2.15,
+     "geometry": 0.055,
+     "exports": 0.014,
+     "checks": 0.097,
+     "slice": 2.102,
      "load": 0.001
     },
     "rollup": {
@@ -503,9 +572,9 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.088,
-     "exports": 0.021,
-     "checks": 0.226,
+     "geometry": 0.087,
+     "exports": 0.02,
+     "checks": 0.227,
      "slice": 0.299,
      "load": 0.001
     },
@@ -521,15 +590,36 @@
    }
   },
   "desk_hanger": {
+   "bambu": {
+    "title": "Under-desk hanger",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.732,
+     "exports": 0.09,
+     "checks": 0.462,
+     "slice": 2.684,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0
+    },
+    "time_s": 3330.0,
+    "filament_g": 35.61,
+    "layers": 200,
+    "supports": false
+   },
    "elegoo": {
     "title": "Under-desk hanger",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.728,
-     "exports": 0.089,
-     "checks": 0.463,
-     "slice": 2.231,
+     "geometry": 0.553,
+     "exports": 0.07,
+     "checks": 0.271,
+     "slice": 1.63,
      "load": 0.001
     },
     "rollup": {
@@ -544,10 +634,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.471,
-     "exports": 0.058,
-     "checks": 0.221,
-     "slice": 1.033,
+     "geometry": 0.521,
+     "exports": 0.072,
+     "checks": 0.295,
+     "slice": 1.323,
      "load": 0.001
     },
     "rollup": {
@@ -565,10 +655,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.474,
-     "exports": 0.057,
-     "checks": 0.212,
-     "slice": 0.496,
+     "geometry": 0.715,
+     "exports": 0.093,
+     "checks": 0.451,
+     "slice": 0.862,
      "load": 0.001
     },
     "rollup": {
@@ -586,10 +676,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.516,
+     "geometry": 0.543,
      "exports": 0.069,
-     "checks": 0.291,
-     "slice": 1.502,
+     "checks": 0.274,
+     "slice": 1.444,
      "load": 0.001
     },
     "rollup": {
@@ -607,10 +697,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.729,
-     "exports": 0.09,
-     "checks": 0.465,
-     "slice": 4.183,
+     "geometry": 0.465,
+     "exports": 0.055,
+     "checks": 0.209,
+     "slice": 3.12,
      "load": 0.001
     },
     "rollup": {
@@ -625,10 +715,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.712,
-     "exports": 0.089,
-     "checks": 0.452,
-     "slice": 1.964,
+     "geometry": 0.726,
+     "exports": 0.098,
+     "checks": 0.461,
+     "slice": 1.999,
      "load": 0.001
     },
     "rollup": {
@@ -643,15 +733,36 @@
    }
   },
   "device_stand": {
+   "bambu": {
+    "title": "Phone and tablet stand",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.461,
+     "exports": 0.44,
+     "checks": 0.915,
+     "slice": 4.193,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 10,
+     "WARN": 0,
+     "FAIL": 0
+    },
+    "time_s": 7579.0,
+    "filament_g": 86.4,
+    "layers": 445,
+    "supports": false
+   },
    "elegoo": {
     "title": "Phone and tablet stand",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.462,
-     "exports": 0.442,
-     "checks": 0.913,
-     "slice": 4.064,
+     "geometry": 0.334,
+     "exports": 0.3,
+     "checks": 0.592,
+     "slice": 3.017,
      "load": 0.001
     },
     "rollup": {
@@ -666,10 +777,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.291,
-     "exports": 0.259,
-     "checks": 0.572,
-     "slice": 2.183,
+     "geometry": 0.35,
+     "exports": 0.342,
+     "checks": 0.687,
+     "slice": 2.57,
      "load": 0.001
     },
     "rollup": {
@@ -687,10 +798,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.292,
-     "exports": 0.258,
-     "checks": 0.549,
-     "slice": 0.984,
+     "geometry": 0.46,
+     "exports": 0.425,
+     "checks": 0.892,
+     "slice": 1.773,
      "load": 0.001
     },
     "rollup": {
@@ -708,10 +819,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.344,
-     "exports": 0.344,
-     "checks": 0.705,
-     "slice": 3.596,
+     "geometry": 0.337,
+     "exports": 0.3,
+     "checks": 0.6,
+     "slice": 3.59,
      "load": 0.001
     },
     "rollup": {
@@ -729,10 +840,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.459,
-     "exports": 0.438,
-     "checks": 0.942,
-     "slice": 5.209,
+     "geometry": 0.281,
+     "exports": 0.257,
+     "checks": 0.529,
+     "slice": 4.13,
      "load": 0.001
     },
     "rollup": {
@@ -747,10 +858,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.458,
-     "exports": 0.427,
-     "checks": 0.885,
-     "slice": 4.622,
+     "geometry": 0.467,
+     "exports": 0.429,
+     "checks": 0.925,
+     "slice": 4.688,
      "load": 0.001
     },
     "rollup": {
@@ -765,15 +876,36 @@
    }
   },
   "dock": {
+   "bambu": {
+    "title": "Device dock",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.471,
+     "exports": 0.151,
+     "checks": 0.634,
+     "slice": 2.012,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 9,
+     "WARN": 2,
+     "FAIL": 0
+    },
+    "time_s": 4074.0,
+    "filament_g": 57.81,
+    "layers": 177,
+    "supports": false
+   },
    "elegoo": {
     "title": "Device dock",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.473,
-     "exports": 0.155,
-     "checks": 0.643,
-     "slice": 1.939,
+     "geometry": 0.325,
+     "exports": 0.106,
+     "checks": 0.405,
+     "slice": 1.464,
      "load": 0.001
     },
     "rollup": {
@@ -788,10 +920,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.29,
-     "exports": 0.094,
-     "checks": 0.401,
-     "slice": 0.961,
+     "geometry": 0.354,
+     "exports": 0.115,
+     "checks": 0.465,
+     "slice": 1.201,
      "load": 0.001
     },
     "rollup": {
@@ -809,10 +941,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.279,
-     "exports": 0.094,
-     "checks": 0.393,
-     "slice": 0.598,
+     "geometry": 0.468,
+     "exports": 0.145,
+     "checks": 0.612,
+     "slice": 1.084,
      "load": 0.001
     },
     "rollup": {
@@ -830,10 +962,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.353,
-     "exports": 0.117,
-     "checks": 0.477,
-     "slice": 1.674,
+     "geometry": 0.327,
+     "exports": 0.106,
+     "checks": 0.408,
+     "slice": 1.556,
      "load": 0.001
     },
     "rollup": {
@@ -851,10 +983,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.473,
-     "exports": 0.153,
-     "checks": 0.659,
-     "slice": 4.202,
+     "geometry": 0.258,
+     "exports": 0.087,
+     "checks": 0.361,
+     "slice": 3.12,
      "load": 0.001
     },
     "rollup": {
@@ -869,10 +1001,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.468,
-     "exports": 0.144,
-     "checks": 0.619,
-     "slice": 3.49,
+     "geometry": 0.481,
+     "exports": 0.147,
+     "checks": 0.632,
+     "slice": 3.499,
      "load": 0.001
     },
     "rollup": {
@@ -887,16 +1019,37 @@
    }
   },
   "enclosure": {
+   "bambu": {
+    "title": "Electronics enclosure",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 1.18,
+     "exports": 0.311,
+     "checks": 1.5,
+     "slice": 5.328,
+     "load": 0.026
+    },
+    "rollup": {
+     "PASS": 14,
+     "WARN": 2,
+     "FAIL": 0
+    },
+    "time_s": 6620.0,
+    "filament_g": 68.64,
+    "layers": 160,
+    "supports": false
+   },
    "elegoo": {
     "title": "Electronics enclosure",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 1.19,
-     "exports": 0.314,
-     "checks": 1.53,
-     "slice": 4.871,
-     "load": 0.025
+     "geometry": 0.915,
+     "exports": 0.224,
+     "checks": 1.028,
+     "slice": 3.576,
+     "load": 0.019
     },
     "rollup": {
      "PASS": 14,
@@ -910,11 +1063,11 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.81,
-     "exports": 0.2,
-     "checks": 0.962,
-     "slice": 2.169,
-     "load": 0.017
+     "geometry": 0.886,
+     "exports": 0.246,
+     "checks": 1.141,
+     "slice": 2.716,
+     "load": 0.019
     },
     "rollup": {
      "PASS": 14,
@@ -931,11 +1084,11 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.784,
-     "exports": 0.19,
-     "checks": 0.913,
-     "slice": 1.23,
-     "load": 0.018
+     "geometry": 1.173,
+     "exports": 0.296,
+     "checks": 1.47,
+     "slice": 2.006,
+     "load": 0.025
     },
     "rollup": {
      "PASS": 14,
@@ -952,11 +1105,11 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.877,
-     "exports": 0.244,
-     "checks": 1.144,
-     "slice": 3.64,
-     "load": 0.019
+     "geometry": 0.933,
+     "exports": 0.223,
+     "checks": 1.049,
+     "slice": 3.47,
+     "load": 0.02
     },
     "rollup": {
      "PASS": 14,
@@ -973,11 +1126,11 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 1.204,
-     "exports": 0.315,
-     "checks": 1.56,
-     "slice": 6.338,
-     "load": 0.026
+     "geometry": 0.734,
+     "exports": 0.188,
+     "checks": 0.846,
+     "slice": 4.202,
+     "load": 0.017
     },
     "rollup": {
      "PASS": 14,
@@ -991,10 +1144,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 1.158,
-     "exports": 0.296,
-     "checks": 1.471,
-     "slice": 3.305,
+     "geometry": 1.182,
+     "exports": 0.3,
+     "checks": 1.497,
+     "slice": 3.247,
      "load": 0.025
     },
     "rollup": {
@@ -1009,16 +1162,37 @@
    }
   },
   "gear_pair": {
+   "bambu": {
+    "title": "Spur gear pair",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 6.336,
+     "exports": 2.402,
+     "checks": 11.04,
+     "slice": 5.598,
+     "load": 0.855
+    },
+    "rollup": {
+     "PASS": 16,
+     "WARN": 1,
+     "FAIL": 0
+    },
+    "time_s": 2216.0,
+    "filament_g": 17.96,
+    "layers": 58,
+    "supports": false
+   },
    "elegoo": {
     "title": "Spur gear pair",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 6.659,
-     "exports": 2.445,
-     "checks": 11.314,
-     "slice": 5.322,
-     "load": 0.869
+     "geometry": 4.373,
+     "exports": 1.708,
+     "checks": 7.793,
+     "slice": 4.005,
+     "load": 0.467
     },
     "rollup": {
      "PASS": 16,
@@ -1032,11 +1206,11 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 3.633,
-     "exports": 1.593,
-     "checks": 7.405,
-     "slice": 3.06,
-     "load": 0.328
+     "geometry": 4.327,
+     "exports": 1.939,
+     "checks": 8.757,
+     "slice": 3.657,
+     "load": 0.476
     },
     "rollup": {
      "PASS": 16,
@@ -1053,11 +1227,11 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 3.41,
-     "exports": 1.55,
-     "checks": 7.181,
-     "slice": 2.35,
-     "load": 0.3
+     "geometry": 6.119,
+     "exports": 2.275,
+     "checks": 10.8,
+     "slice": 3.617,
+     "load": 0.797
     },
     "rollup": {
      "PASS": 16,
@@ -1074,11 +1248,11 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 4.303,
-     "exports": 1.971,
-     "checks": 8.773,
-     "slice": 10.85,
-     "load": 0.477
+     "geometry": 4.428,
+     "exports": 1.695,
+     "checks": 7.83,
+     "slice": 12.066,
+     "load": 0.461
     },
     "rollup": {
      "PASS": 16,
@@ -1095,11 +1269,11 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 6.302,
-     "exports": 2.46,
-     "checks": 11.274,
-     "slice": 7.275,
-     "load": 0.873
+     "geometry": 3.231,
+     "exports": 1.421,
+     "checks": 6.658,
+     "slice": 4.804,
+     "load": 0.303
     },
     "rollup": {
      "PASS": 16,
@@ -1113,33 +1287,54 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 6.033,
-     "exports": 2.298,
-     "checks": 10.705,
-     "slice": 4.096,
-     "load": 0.784
+     "geometry": 6.204,
+     "exports": 2.312,
+     "checks": 11.048,
+     "slice": 4.145,
+     "load": 0.783
     },
     "rollup": {
      "PASS": 16,
      "WARN": 1,
      "FAIL": 0
     },
-    "time_s": 5061.0,
+    "time_s": 5063.0,
     "filament_g": 17.6,
     "layers": 58,
     "supports": false
    }
   },
   "gridfinity": {
+   "bambu": {
+    "title": "Gridfinity-style bin",
+    "builtin": true,
+    "state": "check-failed",
+    "seconds": {
+     "geometry": 1.401,
+     "exports": 0.195,
+     "checks": 0.944,
+     "slice": 2.452,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 6,
+     "WARN": 3,
+     "FAIL": 1
+    },
+    "time_s": 3192.0,
+    "filament_g": 35.89,
+    "layers": 230,
+    "supports": false
+   },
    "elegoo": {
     "title": "Gridfinity-style bin",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 1.43,
-     "exports": 0.192,
-     "checks": 0.991,
-     "slice": 2.542,
+     "geometry": 1.058,
+     "exports": 0.141,
+     "checks": 0.612,
+     "slice": 1.833,
      "load": 0.001
     },
     "rollup": {
@@ -1154,10 +1349,10 @@
     "builtin": true,
     "state": "check-failed",
     "seconds": {
-     "geometry": 0.92,
-     "exports": 0.125,
-     "checks": 0.565,
-     "slice": 1.291,
+     "geometry": 1.038,
+     "exports": 0.145,
+     "checks": 0.699,
+     "slice": 1.636,
      "load": 0.001
     },
     "rollup": {
@@ -1175,10 +1370,10 @@
     "builtin": true,
     "state": "check-failed",
     "seconds": {
-     "geometry": 0.912,
-     "exports": 0.119,
-     "checks": 0.576,
-     "slice": 0.79,
+     "geometry": 1.388,
+     "exports": 0.185,
+     "checks": 0.933,
+     "slice": 1.362,
      "load": 0.001
     },
     "rollup": {
@@ -1196,10 +1391,10 @@
     "builtin": true,
     "state": "check-failed",
     "seconds": {
-     "geometry": 1.04,
-     "exports": 0.151,
-     "checks": 0.688,
-     "slice": 1.805,
+     "geometry": 1.063,
+     "exports": 0.141,
+     "checks": 0.618,
+     "slice": 1.694,
      "load": 0.001
     },
     "rollup": {
@@ -1217,10 +1412,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 1.396,
-     "exports": 0.192,
-     "checks": 0.96,
-     "slice": 4.221,
+     "geometry": 0.825,
+     "exports": 0.112,
+     "checks": 0.541,
+     "slice": 3.133,
      "load": 0.001
     },
     "rollup": {
@@ -1235,10 +1430,10 @@
     "builtin": true,
     "state": "check-failed",
     "seconds": {
-     "geometry": 1.404,
-     "exports": 0.184,
-     "checks": 0.918,
-     "slice": 2.067,
+     "geometry": 1.414,
+     "exports": 0.191,
+     "checks": 0.96,
+     "slice": 2.063,
      "load": 0.001
     },
     "rollup": {
@@ -1253,15 +1448,36 @@
    }
   },
   "gridfinity_baseplate": {
+   "bambu": {
+    "title": "Gridfinity baseplate",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 5.829,
+     "exports": 0.592,
+     "checks": 2.039,
+     "slice": 2.285,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 8,
+     "WARN": 0,
+     "FAIL": 0
+    },
+    "time_s": 2558.0,
+    "filament_g": 22.49,
+    "layers": 23,
+    "supports": false
+   },
    "elegoo": {
     "title": "Gridfinity baseplate",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 5.998,
-     "exports": 0.574,
-     "checks": 2.06,
-     "slice": 2.216,
+     "geometry": 4.762,
+     "exports": 0.439,
+     "checks": 1.388,
+     "slice": 1.657,
      "load": 0.001
     },
     "rollup": {
@@ -1276,10 +1492,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 4.356,
-     "exports": 0.421,
-     "checks": 1.273,
-     "slice": 1.337,
+     "geometry": 4.378,
+     "exports": 0.466,
+     "checks": 1.469,
+     "slice": 1.636,
      "load": 0.001
     },
     "rollup": {
@@ -1297,10 +1513,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 3.917,
-     "exports": 0.387,
-     "checks": 1.258,
-     "slice": 0.673,
+     "geometry": 5.788,
+     "exports": 0.554,
+     "checks": 2.004,
+     "slice": 1.1,
      "load": 0.001
     },
     "rollup": {
@@ -1308,7 +1524,7 @@
      "WARN": 0,
      "FAIL": 0
     },
-    "time_s": 8572.0,
+    "time_s": 8578.0,
     "filament_g": 22.41,
     "layers": 23,
     "supports": false
@@ -1318,10 +1534,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 4.334,
-     "exports": 0.448,
-     "checks": 1.45,
-     "slice": 1.55,
+     "geometry": 4.704,
+     "exports": 0.436,
+     "checks": 1.375,
+     "slice": 1.473,
      "load": 0.001
     },
     "rollup": {
@@ -1329,7 +1545,7 @@
      "WARN": 0,
      "FAIL": 0
     },
-    "time_s": 2887.0,
+    "time_s": 2886.0,
     "filament_g": 20.03,
     "layers": 23,
     "supports": false
@@ -1339,10 +1555,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 5.941,
-     "exports": 0.586,
-     "checks": 2.009,
-     "slice": 4.2,
+     "geometry": 3.612,
+     "exports": 0.353,
+     "checks": 1.124,
+     "slice": 3.125,
      "load": 0.001
     },
     "rollup": {
@@ -1357,10 +1573,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 5.741,
-     "exports": 0.564,
-     "checks": 1.993,
-     "slice": 2.586,
+     "geometry": 5.969,
+     "exports": 0.581,
+     "checks": 2.024,
+     "slice": 2.578,
      "load": 0.001
     },
     "rollup": {
@@ -1368,22 +1584,43 @@
      "WARN": 0,
      "FAIL": 0
     },
-    "time_s": 7017.0,
+    "time_s": 7016.0,
     "filament_g": 19.41,
     "layers": 23,
     "supports": false
    }
   },
   "gridfinity_bin": {
+   "bambu": {
+    "title": "Gridfinity bin",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 1.261,
+     "exports": 0.191,
+     "checks": 0.783,
+     "slice": 2.53,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 9,
+     "WARN": 1,
+     "FAIL": 0
+    },
+    "time_s": 3388.0,
+    "filament_g": 36.94,
+    "layers": 230,
+    "supports": false
+   },
    "elegoo": {
     "title": "Gridfinity bin",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 1.274,
-     "exports": 0.192,
-     "checks": 0.782,
-     "slice": 2.594,
+     "geometry": 0.978,
+     "exports": 0.141,
+     "checks": 0.502,
+     "slice": 1.885,
      "load": 0.001
     },
     "rollup": {
@@ -1398,10 +1635,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.81,
-     "exports": 0.123,
-     "checks": 0.483,
-     "slice": 1.369,
+     "geometry": 0.937,
+     "exports": 0.148,
+     "checks": 0.562,
+     "slice": 1.703,
      "load": 0.001
     },
     "rollup": {
@@ -1419,10 +1656,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.808,
-     "exports": 0.12,
-     "checks": 0.475,
-     "slice": 0.755,
+     "geometry": 1.246,
+     "exports": 0.185,
+     "checks": 0.758,
+     "slice": 1.299,
      "load": 0.001
     },
     "rollup": {
@@ -1440,10 +1677,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.935,
-     "exports": 0.15,
-     "checks": 0.552,
-     "slice": 1.706,
+     "geometry": 0.978,
+     "exports": 0.143,
+     "checks": 0.507,
+     "slice": 1.64,
      "load": 0.001
     },
     "rollup": {
@@ -1461,10 +1698,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 1.267,
-     "exports": 0.193,
-     "checks": 0.82,
-     "slice": 4.218,
+     "geometry": 0.777,
+     "exports": 0.118,
+     "checks": 0.441,
+     "slice": 3.133,
      "load": 0.001
     },
     "rollup": {
@@ -1479,10 +1716,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 1.25,
-     "exports": 0.185,
-     "checks": 0.756,
-     "slice": 2.158,
+     "geometry": 1.28,
+     "exports": 0.189,
+     "checks": 0.787,
+     "slice": 2.178,
      "load": 0.001
     },
     "rollup": {
@@ -1497,15 +1734,36 @@
    }
   },
   "hinged_box": {
+   "bambu": {
+    "title": "Hinged box",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.258,
+     "exports": 0.089,
+     "checks": 23.003,
+     "slice": 1.361,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 13,
+     "WARN": 2,
+     "FAIL": 0
+    },
+    "time_s": 3049.0,
+    "filament_g": 34.98,
+    "layers": 172,
+    "supports": false
+   },
    "elegoo": {
     "title": "Hinged box",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.257,
-     "exports": 0.086,
-     "checks": 22.469,
-     "slice": 1.516,
+     "geometry": 0.201,
+     "exports": 0.065,
+     "checks": 16.571,
+     "slice": 1.121,
      "load": 0.001
     },
     "rollup": {
@@ -1520,10 +1778,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.186,
-     "exports": 0.061,
-     "checks": 14.85,
-     "slice": 0.898,
+     "geometry": 0.194,
+     "exports": 0.068,
+     "checks": 18.857,
+     "slice": 1.106,
      "load": 0.001
     },
     "rollup": {
@@ -1541,10 +1799,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.165,
-     "exports": 0.054,
-     "checks": 14.283,
-     "slice": 0.327,
+     "geometry": 0.256,
+     "exports": 0.083,
+     "checks": 23.473,
+     "slice": 0.576,
      "load": 0.001
     },
     "rollup": {
@@ -1562,10 +1820,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.194,
-     "exports": 0.069,
-     "checks": 18.729,
-     "slice": 0.896,
+     "geometry": 0.205,
+     "exports": 0.065,
+     "checks": 17.049,
+     "slice": 0.838,
      "load": 0.001
     },
     "rollup": {
@@ -1583,10 +1841,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.258,
-     "exports": 0.086,
-     "checks": 23.131,
-     "slice": 3.257,
+     "geometry": 0.155,
+     "exports": 0.052,
+     "checks": 13.637,
+     "slice": 2.159,
      "load": 0.001
     },
     "rollup": {
@@ -1601,9 +1859,9 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.259,
-     "exports": 0.084,
-     "checks": 23.981,
+     "geometry": 0.27,
+     "exports": 0.087,
+     "checks": 24.732,
      "slice": 1.333,
      "load": 0.001
     },
@@ -1612,22 +1870,43 @@
      "WARN": 2,
      "FAIL": 0
     },
-    "time_s": 10012.0,
+    "time_s": 10007.0,
     "filament_g": 34.96,
     "layers": 172,
     "supports": false
    }
   },
   "hook": {
+   "bambu": {
+    "title": "Wall hook",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.117,
+     "exports": 0.049,
+     "checks": 0.298,
+     "slice": 0.618,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 9,
+     "WARN": 3,
+     "FAIL": 0
+    },
+    "time_s": 1744.0,
+    "filament_g": 16.11,
+    "layers": 400,
+    "supports": false
+   },
    "elegoo": {
     "title": "Wall hook",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.117,
-     "exports": 0.05,
-     "checks": 0.305,
-     "slice": 0.697,
+     "geometry": 0.088,
+     "exports": 0.036,
+     "checks": 0.168,
+     "slice": 0.485,
      "load": 0.001
     },
     "rollup": {
@@ -1642,10 +1921,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.082,
-     "exports": 0.034,
-     "checks": 0.136,
-     "slice": 0.451,
+     "geometry": 0.086,
+     "exports": 0.039,
+     "checks": 0.18,
+     "slice": 0.569,
      "load": 0.001
     },
     "rollup": {
@@ -1663,10 +1942,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.077,
-     "exports": 0.033,
-     "checks": 0.128,
-     "slice": 0.177,
+     "geometry": 0.116,
+     "exports": 0.047,
+     "checks": 0.29,
+     "slice": 0.323,
      "load": 0.001
     },
     "rollup": {
@@ -1684,10 +1963,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.086,
-     "exports": 0.04,
-     "checks": 0.182,
-     "slice": 0.328,
+     "geometry": 0.087,
+     "exports": 0.036,
+     "checks": 0.168,
+     "slice": 0.294,
      "load": 0.001
     },
     "rollup": {
@@ -1705,10 +1984,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.117,
-     "exports": 0.05,
-     "checks": 0.311,
-     "slice": 2.161,
+     "geometry": 0.072,
+     "exports": 0.031,
+     "checks": 0.126,
+     "slice": 2.103,
      "load": 0.001
     },
     "rollup": {
@@ -1724,9 +2003,9 @@
     "state": "ok",
     "seconds": {
      "geometry": 0.116,
-     "exports": 0.048,
-     "checks": 0.297,
-     "slice": 0.774,
+     "exports": 0.047,
+     "checks": 0.288,
+     "slice": 0.789,
      "load": 0.001
     },
     "rollup": {
@@ -1741,15 +2020,36 @@
    }
   },
   "hose_adapter": {
+   "bambu": {
+    "title": "Hose and pipe adapter",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.79,
+     "exports": 0.601,
+     "checks": 1.153,
+     "slice": 6.212,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 8,
+     "WARN": 1,
+     "FAIL": 0
+    },
+    "time_s": 2523.0,
+    "filament_g": 26.57,
+    "layers": 382,
+    "supports": false
+   },
    "elegoo": {
     "title": "Hose and pipe adapter",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.785,
-     "exports": 0.604,
-     "checks": 1.156,
-     "slice": 4.752,
+     "geometry": 0.527,
+     "exports": 0.411,
+     "checks": 0.758,
+     "slice": 3.463,
      "load": 0.001
     },
     "rollup": {
@@ -1764,10 +2064,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.497,
-     "exports": 0.371,
-     "checks": 0.714,
-     "slice": 2.453,
+     "geometry": 0.6,
+     "exports": 0.459,
+     "checks": 0.856,
+     "slice": 3.096,
      "load": 0.001
     },
     "rollup": {
@@ -1785,10 +2085,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.49,
-     "exports": 0.363,
-     "checks": 0.687,
-     "slice": 0.967,
+     "geometry": 0.793,
+     "exports": 0.587,
+     "checks": 1.118,
+     "slice": 1.641,
      "load": 0.001
     },
     "rollup": {
@@ -1806,10 +2106,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.61,
-     "exports": 0.459,
-     "checks": 0.865,
-     "slice": 2.766,
+     "geometry": 0.531,
+     "exports": 0.408,
+     "checks": 0.749,
+     "slice": 2.677,
      "load": 0.001
     },
     "rollup": {
@@ -1827,10 +2127,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.79,
-     "exports": 0.601,
-     "checks": 1.179,
-     "slice": 7.196,
+     "geometry": 0.464,
+     "exports": 0.362,
+     "checks": 0.672,
+     "slice": 5.133,
      "load": 0.001
     },
     "rollup": {
@@ -1845,10 +2145,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.793,
-     "exports": 0.593,
-     "checks": 1.113,
-     "slice": 3.399,
+     "geometry": 0.798,
+     "exports": 0.592,
+     "checks": 1.14,
+     "slice": 3.447,
      "load": 0.001
     },
     "rollup": {
@@ -1863,16 +2163,37 @@
    }
   },
   "knob": {
+   "bambu": {
+    "title": "Control knob",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 3.241,
+     "exports": 0.427,
+     "checks": 1.339,
+     "slice": 2.663,
+     "load": 0.011
+    },
+    "rollup": {
+     "PASS": 9,
+     "WARN": 3,
+     "FAIL": 0
+    },
+    "time_s": 881.0,
+    "filament_g": 5.32,
+    "layers": 80,
+    "supports": false
+   },
    "elegoo": {
     "title": "Control knob",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 3.241,
-     "exports": 0.425,
-     "checks": 1.352,
-     "slice": 2.553,
-     "load": 0.01
+     "geometry": 2.359,
+     "exports": 0.313,
+     "checks": 0.881,
+     "slice": 1.916,
+     "load": 0.009
     },
     "rollup": {
      "PASS": 9,
@@ -1886,10 +2207,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 2.09,
-     "exports": 0.289,
-     "checks": 0.796,
-     "slice": 1.435,
+     "geometry": 2.5,
+     "exports": 0.337,
+     "checks": 0.997,
+     "slice": 1.755,
      "load": 0.008
     },
     "rollup": {
@@ -1907,11 +2228,11 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 2.094,
-     "exports": 0.273,
-     "checks": 0.804,
-     "slice": 0.67,
-     "load": 0.007
+     "geometry": 3.256,
+     "exports": 0.413,
+     "checks": 1.317,
+     "slice": 1.104,
+     "load": 0.01
     },
     "rollup": {
      "PASS": 9,
@@ -1928,10 +2249,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 2.477,
-     "exports": 0.338,
-     "checks": 0.978,
-     "slice": 2.295,
+     "geometry": 2.399,
+     "exports": 0.313,
+     "checks": 0.897,
+     "slice": 2.192,
      "load": 0.008
     },
     "rollup": {
@@ -1949,11 +2270,11 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 3.302,
-     "exports": 0.44,
-     "checks": 1.385,
-     "slice": 4.164,
-     "load": 0.011
+     "geometry": 1.953,
+     "exports": 0.271,
+     "checks": 0.822,
+     "slice": 3.113,
+     "load": 0.007
     },
     "rollup": {
      "PASS": 9,
@@ -1967,11 +2288,11 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 3.253,
-     "exports": 0.413,
-     "checks": 1.311,
-     "slice": 1.974,
-     "load": 0.009
+     "geometry": 3.399,
+     "exports": 0.425,
+     "checks": 1.329,
+     "slice": 1.987,
+     "load": 0.011
     },
     "rollup": {
      "PASS": 9,
@@ -1985,15 +2306,36 @@
    }
   },
   "pegboard": {
+   "bambu": {
+    "title": "SK\u00c5DIS pegboard accessory",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.471,
+     "exports": 0.061,
+     "checks": 0.389,
+     "slice": 0.383,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 10,
+     "WARN": 0,
+     "FAIL": 0
+    },
+    "time_s": 441.0,
+    "filament_g": 3.35,
+    "layers": 22,
+    "supports": false
+   },
    "elegoo": {
     "title": "SK\u00c5DIS pegboard accessory",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.479,
-     "exports": 0.061,
-     "checks": 0.391,
-     "slice": 0.495,
+     "geometry": 0.336,
+     "exports": 0.048,
+     "checks": 0.231,
+     "slice": 0.354,
      "load": 0.001
     },
     "rollup": {
@@ -2008,10 +2350,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.284,
-     "exports": 0.041,
-     "checks": 0.176,
-     "slice": 0.369,
+     "geometry": 0.333,
+     "exports": 0.048,
+     "checks": 0.243,
+     "slice": 0.445,
      "load": 0.001
     },
     "rollup": {
@@ -2029,10 +2371,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.298,
-     "exports": 0.042,
-     "checks": 0.179,
-     "slice": 0.12,
+     "geometry": 0.469,
+     "exports": 0.061,
+     "checks": 0.386,
+     "slice": 0.183,
      "load": 0.001
     },
     "rollup": {
@@ -2050,10 +2392,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.332,
-     "exports": 0.048,
-     "checks": 0.238,
-     "slice": 0.282,
+     "geometry": 0.337,
+     "exports": 0.049,
+     "checks": 0.23,
+     "slice": 0.261,
      "load": 0.001
     },
     "rollup": {
@@ -2071,10 +2413,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.471,
-     "exports": 0.061,
-     "checks": 0.386,
-     "slice": 2.149,
+     "geometry": 0.284,
+     "exports": 0.039,
+     "checks": 0.176,
+     "slice": 2.102,
      "load": 0.001
     },
     "rollup": {
@@ -2089,10 +2431,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.466,
+     "geometry": 0.472,
      "exports": 0.061,
-     "checks": 0.372,
-     "slice": 0.322,
+     "checks": 0.38,
+     "slice": 0.32,
      "load": 0.001
     },
     "rollup": {
@@ -2107,15 +2449,36 @@
    }
   },
   "plant_pot": {
+   "bambu": {
+    "title": "Self-watering planter",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 31.656,
+     "exports": 0.521,
+     "checks": 4.347,
+     "slice": 21.582,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 12,
+     "WARN": 0,
+     "FAIL": 0
+    },
+    "time_s": 24324.0,
+    "filament_g": 237.25,
+    "layers": 630,
+    "supports": false
+   },
    "elegoo": {
     "title": "Self-watering planter",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 31.821,
-     "exports": 0.556,
-     "checks": 4.452,
-     "slice": 11.239,
+     "geometry": 27.266,
+     "exports": 0.476,
+     "checks": 3.382,
+     "slice": 8.468,
      "load": 0.001
     },
     "rollup": {
@@ -2130,10 +2493,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 24.046,
-     "exports": 0.467,
-     "checks": 2.691,
-     "slice": 6.569,
+     "geometry": 25.329,
+     "exports": 0.449,
+     "checks": 3.412,
+     "slice": 8.238,
      "load": 0.001
     },
     "rollup": {
@@ -2151,10 +2514,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 23.431,
-     "exports": 0.428,
-     "checks": 2.66,
-     "slice": 3.42,
+     "geometry": 31.094,
+     "exports": 0.503,
+     "checks": 4.27,
+     "slice": 5.837,
      "load": 0.001
     },
     "rollup": {
@@ -2172,10 +2535,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 24.374,
-     "exports": 0.376,
-     "checks": 3.357,
-     "slice": 7.213,
+     "geometry": 27.494,
+     "exports": 0.439,
+     "checks": 3.439,
+     "slice": 7.076,
      "load": 0.001
     },
     "rollup": {
@@ -2193,10 +2556,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 32.098,
-     "exports": 0.543,
-     "checks": 4.358,
-     "slice": 20.522,
+     "geometry": 18.673,
+     "exports": 0.346,
+     "checks": 2.466,
+     "slice": 13.307,
      "load": 0.001
     },
     "rollup": {
@@ -2211,10 +2574,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 30.875,
-     "exports": 0.504,
-     "checks": 4.269,
-     "slice": 13.939,
+     "geometry": 31.459,
+     "exports": 0.529,
+     "checks": 4.34,
+     "slice": 14.015,
      "load": 0.001
     },
     "rollup": {
@@ -2229,15 +2592,36 @@
    }
   },
   "planter": {
+   "bambu": {
+    "title": "Twisted planter",
+    "builtin": true,
+    "state": "check-failed",
+    "seconds": {
+     "geometry": 0.312,
+     "exports": 0.071,
+     "checks": 1.246,
+     "slice": 5.614,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 8,
+     "WARN": 0,
+     "FAIL": 1
+    },
+    "time_s": 5585.0,
+    "filament_g": 114.52,
+    "layers": 500,
+    "supports": false
+   },
    "elegoo": {
     "title": "Twisted planter",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.312,
-     "exports": 0.07,
-     "checks": 1.238,
-     "slice": 3.138,
+     "geometry": 0.213,
+     "exports": 0.05,
+     "checks": 0.796,
+     "slice": 2.369,
      "load": 0.001
     },
     "rollup": {
@@ -2252,10 +2636,10 @@
     "builtin": true,
     "state": "check-failed",
     "seconds": {
-     "geometry": 0.204,
-     "exports": 0.046,
-     "checks": 0.654,
-     "slice": 2.188,
+     "geometry": 0.238,
+     "exports": 0.055,
+     "checks": 0.92,
+     "slice": 2.667,
      "load": 0.001
     },
     "rollup": {
@@ -2273,10 +2657,10 @@
     "builtin": true,
     "state": "check-failed",
     "seconds": {
-     "geometry": 0.182,
-     "exports": 0.043,
-     "checks": 0.605,
-     "slice": 0.68,
+     "geometry": 0.305,
+     "exports": 0.068,
+     "checks": 1.235,
+     "slice": 1.208,
      "load": 0.001
     },
     "rollup": {
@@ -2294,10 +2678,10 @@
     "builtin": true,
     "state": "check-failed",
     "seconds": {
-     "geometry": 0.239,
-     "exports": 0.057,
-     "checks": 0.93,
-     "slice": 1.787,
+     "geometry": 0.218,
+     "exports": 0.051,
+     "checks": 0.806,
+     "slice": 1.713,
      "load": 0.001
     },
     "rollup": {
@@ -2315,10 +2699,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.308,
-     "exports": 0.071,
-     "checks": 1.238,
-     "slice": 6.198,
+     "geometry": 0.173,
+     "exports": 0.041,
+     "checks": 0.587,
+     "slice": 4.131,
      "load": 0.001
     },
     "rollup": {
@@ -2333,10 +2717,10 @@
     "builtin": true,
     "state": "check-failed",
     "seconds": {
-     "geometry": 0.304,
-     "exports": 0.067,
-     "checks": 1.204,
-     "slice": 3.617,
+     "geometry": 0.309,
+     "exports": 0.068,
+     "checks": 1.223,
+     "slice": 3.611,
      "load": 0.001
     },
     "rollup": {
@@ -2351,15 +2735,36 @@
    }
   },
   "shelf_bracket": {
+   "bambu": {
+    "title": "Shelf bracket",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.368,
+     "exports": 0.214,
+     "checks": 0.749,
+     "slice": 1.41,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 14,
+     "WARN": 0,
+     "FAIL": 0
+    },
+    "time_s": 3306.0,
+    "filament_g": 39.28,
+    "layers": 120,
+    "supports": false
+   },
    "elegoo": {
     "title": "Shelf bracket",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.365,
-     "exports": 0.211,
-     "checks": 0.749,
-     "slice": 1.081,
+     "geometry": 0.265,
+     "exports": 0.143,
+     "checks": 0.481,
+     "slice": 0.79,
      "load": 0.001
     },
     "rollup": {
@@ -2374,10 +2779,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.236,
-     "exports": 0.13,
-     "checks": 0.481,
-     "slice": 0.708,
+     "geometry": 0.265,
+     "exports": 0.161,
+     "checks": 0.54,
+     "slice": 0.862,
      "load": 0.001
     },
     "rollup": {
@@ -2395,10 +2800,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.238,
-     "exports": 0.132,
-     "checks": 0.478,
-     "slice": 0.359,
+     "geometry": 0.357,
+     "exports": 0.206,
+     "checks": 0.719,
+     "slice": 0.62,
      "load": 0.001
     },
     "rollup": {
@@ -2416,10 +2821,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.27,
-     "exports": 0.163,
-     "checks": 0.556,
-     "slice": 0.719,
+     "geometry": 0.267,
+     "exports": 0.146,
+     "checks": 0.506,
+     "slice": 0.669,
      "load": 0.001
     },
     "rollup": {
@@ -2437,10 +2842,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.387,
-     "exports": 0.217,
-     "checks": 0.749,
-     "slice": 3.185,
+     "geometry": 0.212,
+     "exports": 0.123,
+     "checks": 0.414,
+     "slice": 2.115,
      "load": 0.001
     },
     "rollup": {
@@ -2455,10 +2860,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.355,
-     "exports": 0.206,
-     "checks": 0.725,
-     "slice": 1.878,
+     "geometry": 0.359,
+     "exports": 0.207,
+     "checks": 0.734,
+     "slice": 1.884,
      "load": 0.001
     },
     "rollup": {
@@ -2473,15 +2878,36 @@
    }
   },
   "storage_box": {
+   "bambu": {
+    "title": "Box with lid",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.583,
+     "exports": 0.235,
+     "checks": 2.63,
+     "slice": 2.477,
+     "load": 0.001
+    },
+    "rollup": {
+     "PASS": 12,
+     "WARN": 0,
+     "FAIL": 0
+    },
+    "time_s": 3627.0,
+    "filament_g": 53.74,
+    "layers": 200,
+    "supports": false
+   },
    "elegoo": {
     "title": "Box with lid",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.617,
-     "exports": 0.24,
-     "checks": 2.746,
-     "slice": 2.071,
+     "geometry": 0.441,
+     "exports": 0.162,
+     "checks": 1.923,
+     "slice": 1.495,
      "load": 0.001
     },
     "rollup": {
@@ -2496,10 +2922,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.411,
-     "exports": 0.152,
-     "checks": 1.721,
-     "slice": 1.061,
+     "geometry": 0.44,
+     "exports": 0.177,
+     "checks": 2.173,
+     "slice": 1.299,
      "load": 0.001
     },
     "rollup": {
@@ -2517,10 +2943,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.377,
-     "exports": 0.144,
-     "checks": 1.647,
-     "slice": 0.512,
+     "geometry": 0.586,
+     "exports": 0.228,
+     "checks": 2.719,
+     "slice": 0.886,
      "load": 0.001
     },
     "rollup": {
@@ -2538,10 +2964,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.45,
-     "exports": 0.183,
-     "checks": 2.145,
-     "slice": 1.502,
+     "geometry": 0.447,
+     "exports": 0.165,
+     "checks": 1.93,
+     "slice": 1.418,
      "load": 0.001
     },
     "rollup": {
@@ -2559,10 +2985,10 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.599,
-     "exports": 0.235,
-     "checks": 2.752,
-     "slice": 4.341,
+     "geometry": 0.36,
+     "exports": 0.143,
+     "checks": 1.615,
+     "slice": 3.215,
      "load": 0.001
     },
     "rollup": {
@@ -2577,10 +3003,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.58,
-     "exports": 0.23,
-     "checks": 2.686,
-     "slice": 2.01,
+     "geometry": 0.608,
+     "exports": 0.233,
+     "checks": 2.75,
+     "slice": 2.006,
      "load": 0.001
     },
     "rollup": {
@@ -2595,16 +3021,37 @@
    }
   },
   "vase": {
+   "bambu": {
+    "title": "Faceted vase and lamp shade",
+    "builtin": true,
+    "state": "ok",
+    "seconds": {
+     "geometry": 1.069,
+     "exports": 0.16,
+     "checks": 1.07,
+     "slice": 3.578,
+     "load": 0.002
+    },
+    "rollup": {
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0
+    },
+    "time_s": 6127.0,
+    "filament_g": 72.77,
+    "layers": 750,
+    "supports": false
+   },
    "elegoo": {
     "title": "Faceted vase and lamp shade",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 1.085,
-     "exports": 0.176,
-     "checks": 1.105,
-     "slice": 2.023,
-     "load": 0.002
+     "geometry": 0.752,
+     "exports": 0.137,
+     "checks": 0.662,
+     "slice": 1.443,
+     "load": 0.001
     },
     "rollup": {
      "PASS": 7,
@@ -2618,10 +3065,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.635,
-     "exports": 0.146,
-     "checks": 0.581,
-     "slice": 1.251,
+     "geometry": 0.758,
+     "exports": 0.12,
+     "checks": 0.674,
+     "slice": 1.523,
      "load": 0.002
     },
     "rollup": {
@@ -2639,11 +3086,11 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.566,
-     "exports": 0.115,
-     "checks": 0.531,
-     "slice": 0.451,
-     "load": 0.001
+     "geometry": 1.047,
+     "exports": 0.152,
+     "checks": 1.046,
+     "slice": 0.749,
+     "load": 0.002
     },
     "rollup": {
      "PASS": 7,
@@ -2660,11 +3107,11 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 0.768,
-     "exports": 0.126,
-     "checks": 0.673,
-     "slice": 1.028,
-     "load": 0.002
+     "geometry": 0.756,
+     "exports": 0.142,
+     "checks": 0.677,
+     "slice": 0.973,
+     "load": 0.001
     },
     "rollup": {
      "PASS": 7,
@@ -2681,11 +3128,11 @@
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 1.051,
-     "exports": 0.151,
-     "checks": 1.086,
-     "slice": 5.22,
-     "load": 0.002
+     "geometry": 0.531,
+     "exports": 0.096,
+     "checks": 0.526,
+     "slice": 3.141,
+     "load": 0.001
     },
     "rollup": {
      "PASS": 7,
@@ -2699,10 +3146,10 @@
     "builtin": true,
     "state": "ok",
     "seconds": {
-     "geometry": 1.027,
-     "exports": 0.149,
-     "checks": 1.096,
-     "slice": 1.5,
+     "geometry": 1.048,
+     "exports": 0.16,
+     "checks": 1.065,
+     "slice": 1.529,
      "load": 0.002
     },
     "rollup": {
@@ -2717,16 +3164,37 @@
    }
   },
   "cable-clip": {
+   "bambu": {
+    "title": "Cable clip",
+    "builtin": false,
+    "state": "ok",
+    "seconds": {
+     "geometry": 0.068,
+     "exports": 0.033,
+     "checks": 0.259,
+     "slice": 0.662,
+     "load": 0.086
+    },
+    "rollup": {
+     "PASS": 7,
+     "WARN": 1,
+     "FAIL": 0
+    },
+    "time_s": 207.0,
+    "filament_g": 1.0,
+    "layers": 39,
+    "supports": false
+   },
    "elegoo": {
     "title": "Cable clip",
     "builtin": false,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.069,
-     "exports": 0.033,
-     "checks": 0.264,
-     "slice": 0.871,
-     "load": 0.088
+     "geometry": 0.051,
+     "exports": 0.024,
+     "checks": 0.139,
+     "slice": 0.65,
+     "load": 0.067
     },
     "rollup": {
      "PASS": 7,
@@ -2740,11 +3208,11 @@
     "builtin": false,
     "state": "ok",
     "seconds": {
-     "geometry": 0.046,
-     "exports": 0.023,
-     "checks": 0.111,
-     "slice": 0.653,
-     "load": 0.059
+     "geometry": 0.051,
+     "exports": 0.026,
+     "checks": 0.151,
+     "slice": 0.784,
+     "load": 0.065
     },
     "rollup": {
      "PASS": 7,
@@ -2761,11 +3229,11 @@
     "builtin": false,
     "state": "ok",
     "seconds": {
-     "geometry": 0.043,
-     "exports": 0.023,
-     "checks": 0.103,
-     "slice": 0.089,
-     "load": 0.056
+     "geometry": 0.066,
+     "exports": 0.031,
+     "checks": 0.253,
+     "slice": 0.157,
+     "load": 0.084
     },
     "rollup": {
      "PASS": 7,
@@ -2782,11 +3250,11 @@
     "builtin": false,
     "state": "ok",
     "seconds": {
-     "geometry": 0.05,
-     "exports": 0.026,
-     "checks": 0.152,
-     "slice": 0.532,
-     "load": 0.064
+     "geometry": 0.051,
+     "exports": 0.024,
+     "checks": 0.142,
+     "slice": 0.506,
+     "load": 0.066
     },
     "rollup": {
      "PASS": 7,
@@ -2803,11 +3271,11 @@
     "builtin": false,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.066,
-     "exports": 0.034,
-     "checks": 0.251,
-     "slice": 2.15,
-     "load": 0.086
+     "geometry": 0.04,
+     "exports": 0.02,
+     "checks": 0.101,
+     "slice": 2.097,
+     "load": 0.051
     },
     "rollup": {
      "PASS": 7,
@@ -2821,10 +3289,10 @@
     "builtin": false,
     "state": "ok",
     "seconds": {
-     "geometry": 0.066,
+     "geometry": 0.067,
      "exports": 0.031,
-     "checks": 0.243,
-     "slice": 0.642,
+     "checks": 0.248,
+     "slice": 0.647,
      "load": 0.083
     },
     "rollup": {
@@ -2840,8 +3308,8 @@
   }
  },
  "totals": {
-  "ok": 80,
-  "sliced": 88,
-  "cells": 132
+  "ok": 100,
+  "sliced": 110,
+  "cells": 154
  }
 }
