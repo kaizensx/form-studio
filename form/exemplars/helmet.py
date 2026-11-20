@@ -1,167 +1,218 @@
-"""Full-face motorcycle-style helmet shell: lofted head form, eye port, chin bar vents, crown scoops, rear spoiler,
-visor pivots, and a carbon-like twill mesh texture on the outside. Form Studio exemplar design (a 3D model).
+"""Full-face motorcycle helmet in carbon twill: a shell sized from a head (EN 960 headform, ANSUR II proportions),
+shaped in three views by guide curves, with an eye port cut in two views, a smoked visor on two pivots, rubber trim on
+the lower edge and round the port, chin and brow intakes, crown scoops, a ducktail spoiler over two exhausts, and a
+carbon twill on the outside. Form Studio exemplar design (a 3D model and form study, not a certified helmet).
 """
 
-from build123d import Align, Axis, Box, Cylinder, Plane, Pos, Rot, SlotOverall, Wire, extrude, make_face
+from build123d import Axis, Cylinder, Plane, Pos, Rot, extrude
 
 from form import craft
 from form.craft import MeshTexture
 from form.recipes.base import Feature, Param, Recipe, RecipeError, Stage
 
 META = {
-    "title": "Textured full-face helmet shell",
-    "tags": ["helmet", "motorcycle", "shell", "organic", "texture", "textured", "carbon", "vents", "visor", "loft",
-             "mesh texture", "styled", "wearable"],
-    "techniques": ["craft.section_body of superellipse sections with a crown point", "craft.dome_sections",
-                   "craft.section_shell (inset sections) before cutting openings", "side-profile cutter for the lower "
-                   "edge", "pads that follow the surface (craft.inflate sections, clipped to a footprint, minus the "
-                   "inside)", "MeshTexture weave with facing='out'"],
+    "title": "Carbon full-face helmet",
+    "tags": ["helmet", "motorcycle", "full-face", "shell", "organic", "texture", "textured", "carbon", "twill",
+             "vents", "visor", "spoiler", "loft", "mesh texture", "styled", "wearable", "head", "trim"],
+    "techniques": ["craft.helmet_fullface (head size -> guide curves -> sections)", "craft.checked_body (loft with "
+                   "fold check)", "craft.inset_body hollowing", "side-profile cutter for the lower edge",
+                   "craft.two_view_cutter for the eye port and the visor", "craft.surface_band for trim, scoops, pads, "
+                   "spoiler", "craft.slot_grille vents", "MeshTexture weave outside only", "appearance() zones for "
+                   "photos: carbon shell, smoked visor, rubber trim"],
     "lessons": [
-        "Start from the head, not from a dome: a head is about 200 x 160 mm; the shell and liner add 45-50 mm a side, "
-        "so the outer form is about 300 x 250 mm, crown behind centre, widest just above the ears.",
-        "Describe the form by sections that follow laws (an ellipse in elevation, egg-shaped in plan, the chin "
-        "projecting forward low down). Hand-picked boxes and spheres never read as a helmet.",
-        "Hollow the closed form first, then cut the eye port and the lower edge through both walls. A lofted dome's "
-        "crown point defeats offsets, so hollow it with craft.section_shell: the same sections inset by the wall.",
-        "The lower edge is a side-profile curve (low at the chin, rising at the jaw, dipping at the nape) cut as a "
-        "prism along Y, so the silhouette has the swoop real helmets have.",
-        "Details that follow the surface (crown scoops, the chin intake, the spoiler) are the outer form grown a few mm "
-        "(craft.inflate), clipped to a footprint, minus the inside: they always sit on the shell, in one design "
-        "language of raised pads with slots.",
-        "Texture is a mesh texture (twill weave, outside only): the STEP stays the smooth surface for tooling; STL, "
-        "GLB and renders carry the weave.",
-        "A visor is a separate body: the same sections inflated by the gap and by gap + thickness, one minus the other, "
-        "clipped by a side-profile window that reaches back to both pivots (craft.helmet_sections gives the sections). "
-        "A band clipped by a box that stops short leaves the pivot tabs as loose pieces.",
+        "Size it from a head, not from a dome: craft.head_form(\"J\") gives an EN 960 headform's length, breadth, eye "
+        "line and chin; add comfort liner + EPS + shell (about 47 mm a side) and the shell comes out near 290 x 250 x "
+        "300 mm, like a size M helmet. A blob sized by eye never does.",
+        "Decide the silhouette in three views first. craft.helmet_fullface draws the side view (the chin bar's nose "
+        "ahead of an upright face, the back tucking in to the nape), the front view (widest at the temples, narrower "
+        "at the chin bar) and the plan (a narrow prow at the chin) as guide curves; profile_sections turns them into "
+        "sections. Only then add details.",
+        "Hollow along the normal, not in plan: an inset that only shrinks each section's half-widths leaves the flat "
+        "crown about a millimetre thick (critique's ray wall check finds it). craft.inset_body offsets "
+        "along the surface normal.",
+        "Check every loft: craft.checked_body runs check_sections (order, seams, steep steps) and loft_report (the "
+        "skin's normals; a fold is a crease inside a face that should be smooth) and leaves a note if it folds.",
+        "The lower edge is the line people recognise: lowest under the chin, a scoop up under the jaw, then rising "
+        "gently to the nape. Cut it as a side-profile prism through both walls, and round the lip.",
+        "Cut the eye port in two views (two_view_cutter): the side outline says how far it wraps back toward the "
+        "pivot, the front outline gives the brow line and the dip at the nose. A port cut from the front only is a "
+        "letterbox and never wraps.",
+        "What makes it read as a helmet is the break-up: a smoked visor (a separate body 2 mm off the shell on two "
+        "pivots), rubber trim on the lower edge and round the port, intakes on the chin and brow, scoops on the "
+        "crown, a ducktail spoiler. Every one is the shell's surface grown a few mm (surface_band) and clipped to an "
+        "outline, so it always sits on the shell, in one design language.",
+        "Give each zone its own material (appearance()): carbon shell, smoked visor, rubber trim, matte black vents. "
+        "One colour over everything renders as a blob however good the geometry is.",
+        "Texture is a mesh texture (2x2 twill, outside only): the STEP stays the smooth surface for tooling; STL, GLB "
+        "and renders carry the weave, and the Blender carbon material adds the tows' sheen.",
     ],
 }
 
 
-def _prism_y(points, half_w=200):
-    """A prism of an (x, z) outline, centred on Y and 2 x half_w wide."""
-    f = make_face(Wire.make_polygon([Plane.XZ.from_local_coords((x, z, 0)) for x, z in points], close=True)).faces()[0]
-    return Pos(0, half_w, 0) * extrude(f, 2 * half_w)
+def _prism_y(points):
+    """A smooth (x, z) outline extruded through the whole width."""
+    return extrude(craft.spline_profile(points, plane=Plane.XZ), 400, both=True)
+
+
+def _shift(points, dz):
+    return [(x, z + dz) for x, z in points]
 
 
 class Design(Recipe):
-    title, summary = "Full-face helmet shell", ("Lofted full-face helmet shell with eye port, chin and crown vents, rear "
-                                                 "spoiler, visor pivots and a twill mesh texture.")
-    solids = 1
-    photo_color = "#2b2d31"
+    title, summary = "Carbon full-face helmet", ("Full-face helmet shell sized from a head: eye port, smoked visor on "
+                                                  "pivots, rubber trim, chin and brow intakes, crown scoops, ducktail "
+                                                  "spoiler and a carbon twill.")
+    solids = 2
+    photo_color = "#2a2c30"
     params = [
-        Param("length", "Shell length", 300, 260, 340, 1, "mm", "brief", "shell", "Front to back, outside."),
-        Param("width", "Shell width", 248, 220, 290, 1, "mm", "brief", "shell"),
-        Param("height", "Shell height", 270, 230, 310, 1, "mm", "brief", "shell"),
+        Param("head", "Head circumference", 570, 500, 620, 10, "mm", "brief", "shell",
+              "EN 960 headform sizes: A 500, E 540, J 570, M 600, O 620."),
+        Param("cephalic", "Head breadth / length", 0.78, 0.72, 0.86, 0.01, "", "brief", "shell",
+              "0.78 ANSUR II mean (long oval); 0.83+ a round head."),
         Param("wall", "Shell wall", 3.5, 2, 6, 0.1, "mm", "form", "shell"),
-        Param("port_w", "Eye port width", 190, 150, 220, 1, "mm", "form", "eye_port"),
-        Param("port_h", "Eye port height", 72, 55, 95, 1, "mm", "form", "eye_port"),
-        Param("texture", "Twill texture depth", 0.35, 0, 0.8, 0.05, "mm", "form", "shell", "0 = smooth. Mesh texture."),
+        Param("chin", "Chin bar projection", 1.25, 0.6, 1.4, 0.05, "", "form", "shell"),
+        Param("visor_gap", "Visor gap", 2.0, 1.2, 3.5, 0.1, "mm", "interface", "visor"),
+        Param("texture", "Twill depth", 0.06, 0, 0.6, 0.02, "mm", "form", "shell",
+              "0 = smooth. Mesh texture; a clear-coated carbon shell is nearly smooth."),
     ]
-    features = [Feature("shell", "Shell", "structure"), Feature("lower_edge", "Lower edge", "structure"),
-                Feature("eye_port", "Eye port", "access"), Feature("crown_scoops", "Crown scoops", "finish"),
-                Feature("spoiler", "Rear spoiler", "finish"), Feature("chin_vents", "Chin vents", "access"),
-                Feature("pivots", "Visor pivots", "interface")]
+    features = [Feature("shell", "Carbon shell", "structure"), Feature("lower_edge", "Lower edge", "structure"),
+                Feature("eye_port", "Eye port", "access"), Feature("trim", "Rubber trim", "finish"),
+                Feature("pivots", "Visor pivot plates", "interface"), Feature("chin_vent", "Chin intake", "access"),
+                Feature("brow_vents", "Brow intakes", "access"), Feature("crown_scoops", "Crown scoops", "access"),
+                Feature("spoiler", "Ducktail spoiler", "finish"), Feature("exhaust", "Rear exhausts", "access"),
+                Feature("visor", "Smoked visor", "structure")]
 
     def constraints(self, v):
-        if v["port_w"] > v["width"] - 40:
-            return [RecipeError("The eye port is wider than the shell allows", "eye_port", "Narrow the port.", ["port_w"])]
+        if v["wall"] > 5 and v["head"] < 520:
+            return [RecipeError("A 5 mm wall on the smallest shell leaves no room for the liner", "shell",
+                                "Use a thinner wall.", ["wall"])]
         return []
 
-    # ---- the outer form ----
-    def _outer(self, v):
-        L, W, H = v["length"], v["width"], v["height"]
-        lower = H * 0.48                                          # straight-ish lower walls up to the temples
-        a0, b0 = L / 2, W / 2
-        # the lower sections tuck in (a narrower neck opening) and move forward (the chin bar projects)
-        secs = [dict(z=0.0, a=a0 * 0.89, b=b0 * 0.80, n=2.3, cx=L * 0.06, squash=0.30),
-                dict(z=lower * 0.33, a=a0 * 0.955, b=b0 * 0.90, n=2.3, cx=L * 0.045, squash=0.24),
-                dict(z=lower * 0.70, a=a0 * 0.995, b=b0 * 0.985, n=2.25, cx=L * 0.015, squash=0.16)]
-        dome, tip = craft.dome_sections(L, W, H - lower, levels=8, crown_back=L * 0.045, squash_front=0.12, z0=lower,
-                                        n_base=2.2, n_top=2.05)
-        return secs + dome, tip
-
-    def _grown(self, secs, tip, amount):
-        """The outer form grown by amount (inflated sections: a near-offset that never fails)."""
-        s2, t2 = craft.inflate(secs, amount, tip)
-        return craft.section_body(s2, tip=t2, count=72)
+    def form(self, v):
+        return craft.helmet_fullface(v["head"], cephalic=v["cephalic"], chin=v["chin"])
 
     def build(self, v):
-        L, W, H, t = v["length"], v["width"], v["height"], v["wall"]
-        secs, tip = self._outer(v)
-        outer, shell = craft.section_shell(secs, t, tip=tip, count=72)     # robust where an offset of a crown point fails
-        void = outer - shell                                                # the inside of the helmet
-        stages = [Stage("shell", shell)]
+        F = self.form(v)
+        L, W, H, t = F["L"], F["W"], F["H"], v["wall"]
+        hl = L / 2
+        secs, tip = F["sections"], F["tip"]
+        outer = craft.checked_body(secs, tip, label="shell")
+        inner = craft.inset_body(secs, t, tip=tip)
+        body = craft.cut(outer, inner)
+        stages = [Stage("shell", body)]
 
-        # lower edge: low at the chin, up at the jaw, a dip at the nape, cut along Y through both walls
-        xf, xb = L * 0.62, -L * 0.62
-        edge = [(xf, 3), (L * 0.5, 4.5), (L * 0.38, 9), (L * 0.2, 34), (0, 40), (-L * 0.2, 30), (-L * 0.36, 20),
-                (-L * 0.5, 30), (xb, 40), (xb, -20), (xf, -20)]
-        cut = _prism_y(edge)
-        body = shell - cut
+        # the lower edge: a side-profile cut through both walls, its lip rounded
+        cut = _prism_y(F["edge"])
+        body = craft.cut(body, cut)
+        lip = [e for e in body.edges() if e.center().Z < 0.2 * H]
+        body = craft.safe_fillet(body, lip, 1.4)
         stages.append(Stage("lower_edge", body))
 
-        # eye port: a soft rectangle seen from the front, cut through the front half only
-        zc = H * 0.555
-        port = Plane.YZ.offset(L * 0.05) * craft.superellipse_face(v["port_w"] / 2, v["port_h"] / 2, 3.4,
-                                                                     center=(0, zc), count=72)
-        port_cut = extrude(port, L)
-        body = body - port_cut
-        port_edges = [e for e in body.edges() if e.center().X > L * 0.15 and abs(e.center().Z - zc) < v["port_h"] / 2 + 6
-                      and abs(e.center().Y) < v["port_w"] / 2 + 6]
-        body = craft.safe_fillet(body, port_edges, min(1.4, t * 0.4))
+        # the eye port, drawn in two views, cut through the front half only
+        port = craft.two_view_cutter(F["port_side"], F["port_front"], x_range=(0, L))
+        body = craft.cut(body, port)
+        pb, pt = F["port_z"]
+        rim = [e for e in body.edges() if e.center().X > 0 and pb - 12 < e.center().Z < pt + 12]
+        body = craft.safe_fillet(body, rim, 1.2)
         stages.append(Stage("eye_port", body))
 
-        # crown scoops: two pads that follow the crown, each with a slot through the shell
-        grown = self._grown(secs, tip, 4.0)
-        for sy in (-1, 1):
-            foot = Pos(L * 0.16, sy * W * 0.13, H * 0.6) * extrude(craft.superellipse_face(34, 12, 3.0, rotate=sy * 6), H)
-            pad = (grown & foot) - void
-            body = body + pad
-            slot = Pos(L * 0.17, sy * W * 0.13, H * 0.6) * Rot(0, 0, sy * 6) * extrude(SlotOverall(40, 5.5), H)
-            body = body - slot
+        # rubber trim: a 2 mm band along the lower edge and a 1.5 mm gasket round the port (it shows through the visor)
+        edge_band = _prism_y(_shift(F["edge"], 11)) - cut
+        trim = craft.surface_band(secs, tip, 2.0, edge_band, depth=t / 2)
+        grown_port = craft.two_view_cutter(craft.grow_outline(F["port_side"], 7), craft.grow_outline(F["port_front"], 7),
+                                           x_range=(0, L))
+        trim = trim + craft.surface_band(secs, tip, 1.0, grown_port - port, depth=t / 2)
+        body = craft.fuse(body, trim)
+        stages.append(Stage("trim", body))
+
+        # pivot plates: a raised disc each side where the visor turns
+        px, pz = F["pivot"]
+        disc = Pos(px, 0, pz) * Rot(90, 0, 0) * Cylinder(26, W + 40)
+        # 1.3 mm: not the gasket's 1.0 (two bands on the same offset surface share faces where they meet)
+        body = craft.fuse(body, craft.surface_band(secs, tip, 1.3, disc, depth=t / 2.5))
+        stages.append(Stage("pivots", body))
+
+        # chin intake: a pad on the chin bar with a lens-shaped grille of horizontal slots
+        zc = 0.155 * H
+        chin_reg = craft.two_view_cutter([(hl * 0.55, zc - 22), (hl * 1.3, zc - 26), (hl * 1.3, zc + 26),
+                                          (hl * 0.55, zc + 18)],
+                                         [(0, zc - 24), (34, zc - 18), (40, zc), (34, zc + 18), (0, zc + 23),
+                                          (-34, zc + 18), (-40, zc), (-34, zc - 18)], x_range=(0, L),
+                                         smooth=(False, True))
+        body = craft.fuse(body, craft.surface_band(secs, tip, 3.0, chin_reg, depth=t / 2))
+        body = craft.cut(body, craft.slot_grille((hl * 1.02, 0, zc), (1, 0, 0), count=4, length=58, width=4.2, pitch=9,
+                                                 depth=hl * 0.7, taper=0.35, angle=90))
+        stages.append(Stage("chin_vent", body))
+
+        # brow intake: one slender pad above the port, centred, with three slots facing the wind
+        zb = pt + 36
+        oval = [(32 * x, zb + 7 * y) for x, y in craft.superellipse(1, 1, 3.0, count=16)]
+        reg = craft.two_view_cutter([(0, zb - 9), (hl * 1.3, zb - 9), (hl * 1.3, zb + 9), (0, zb + 9)], oval,
+                                    x_range=(0, L), smooth=(False, True))
+        body = craft.fuse(body, craft.surface_band(secs, tip, 2.0, reg, depth=t / 2))
+        body = craft.cut(body, craft.slot_grille((hl, 0, zb), (1, 0, 0.45), count=3, length=12, width=3.0, pitch=16,
+                                                 depth=60, angle=0))
+        stages.append(Stage("brow_vents", body))
+
+        # crown scoops: two raised fins on top, each with a forward-facing intake slot
+        feet = [Pos(L * 0.06, sy * W * 0.11, H * 0.5) * extrude(craft.superellipse_face(40, 11, 3.2, rotate=sy * 5), H)
+                for sy in (-1, 1)]
+        scoops = craft.surface_band(secs, tip, 5.5, feet[0] + feet[1], depth=t / 2)
+        top = [e for e in scoops.edges() if e.center().Z > H * 0.82]          # soften the scoops' top edges
+        body = craft.fuse(body, craft.safe_fillet(scoops, top, 1.6))
+        slots = [craft.slot_grille((L * 0.17, sy * W * 0.11, H - 18), (0.55, 0, 1), count=1, length=20, width=5,
+                                   pitch=8, depth=40, angle=90) for sy in (-1, 1)]
+        body = craft.cut(body, slots[0] + slots[1])
         stages.append(Stage("crown_scoops", body))
 
-        # rear spoiler: a band that wraps the back of the head, 6 mm proud, its lower edge a crisp lip over three
-        # exhaust slots. The footprint is a soft rectangle seen from behind, extruded forward through the back half.
-        zs = H * 0.66
-        band = Plane.YZ.offset(-L) * craft.superellipse_face(W * 0.30, 20, 4.0, center=(0, zs), count=72)
-        foot = extrude(band, L * 0.78)                                   # from x = -L to x = -0.22 L
-        spoiler = (self._grown(secs, tip, 6.0) & foot) - void
-        body = body + spoiler
-        for yy in (-W * 0.11, 0.0, W * 0.11):
-            ex = Pos(-L * 0.62, yy, zs - 27) * Rot(0, 90, 0) * extrude(SlotOverall(22, 5.0), L * 0.3)
-            body = body - ex
+        # ducktail spoiler: a crescent band over the back of the crown, its leading edge rounded into the shell and a
+        # crisp trailing lip over the exhausts
+        zs = H * 0.62
+        cres = craft.spline_profile([(-hl * 0.20, zs + 60), (-hl * 0.70, zs + 42), (-hl * 1.3, zs + 10),
+                                     (-hl * 1.3, zs - 12), (-hl * 0.85, zs + 8), (-hl * 0.45, zs + 38)], plane=Plane.XZ)
+        reg = extrude(cres, W * 0.34, both=True)
+        spoiler = craft.surface_band(secs, tip, 3.5, reg, depth=t / 2)
+        spoiler = craft.safe_fillet(spoiler, [e for e in spoiler.edges() if e.center().X > -hl * 0.9], 1.5)
+        body = craft.fuse(body, spoiler)
         stages.append(Stage("spoiler", body))
 
-        # chin intake: a pad on the chin bar (the same language as the crown scoops) with three slots through it
-        zc0 = H * 0.2
-        face = Plane.YZ.offset(L * 0.25) * craft.superellipse_face(30, 17, 3.2, center=(0, zc0), count=64)
-        chin = (self._grown(secs, tip, 3.0) & extrude(face, L)) - void
-        body = body + chin
-        for i, zz in enumerate((zc0 - 8, zc0, zc0 + 8)):
-            slot = Pos(L * 0.3, 0, zz) * Rot(0, 90, 0) * Rot(0, 0, 90) * extrude(SlotOverall(40 - 6 * abs(i - 1), 3.6), L * 0.4)
-            body = body - slot
-        stages.append(Stage("chin_vents", body))
+        # rear exhausts: two short grilles under the spoiler's lip
+        g1, g2 = (craft.slot_grille((-hl, sy * W * 0.12, zs - 26), (-1, 0, 0), count=3, length=22, width=3.5,
+                                    pitch=7.5, depth=60, angle=90 + sy * 8) for sy in (-1, 1))
+        body = craft.cut(body, g1 + g2)
+        stages.append(Stage("exhaust", body))
 
-        # visor pivots: a raised disc on each side at the temple, with a recess for the visor plate and a screw hole
-        for sy in (-1, 1):
-            hit = outer.find_intersection_points(Axis((L * 0.12, 0, zc), (0, sy, 0)))
-            y_s = max(abs(p[0].Y) for p in hit) if hit else W / 2
-            # the disc starts inside the wall (never reaching the inside surface, so no faces coincide)
-            sink = min(2.0, t * 0.6)
-            boss = Pos(L * 0.12, sy * (y_s - sink), zc) * Rot(-90 * sy, 0, 0) * Cylinder(21, sink + 2.5, align=(Align.CENTER, Align.CENTER, Align.MIN))
-            body = body + boss
-            body = body - Pos(L * 0.12, sy * (y_s + 2.2), zc) * Rot(-90 * sy, 0, 0) * Cylinder(15, 4)
-            body = body - Pos(L * 0.12, sy * y_s, zc) * Rot(90, 0, 0) * Cylinder(2.6, 40)
-        stages.append(Stage("pivots", body))
+        # smoked visor: the shell's surface grown by the gap, 2.5 mm thick, clipped to its outline in two views
+        g = v["visor_gap"]
+        window = craft.two_view_cutter(F["visor_side"], [(-W, -50), (W, -50), (W, H + 50), (-W, H + 50)],
+                                       x_range=(px - 40, L), smooth=(True, False))
+        hi = craft.offset_body(secs, tip, g + 2.5)
+        visor = (hi & (window + Pos(px, 0, pz) * Rot(90, 0, 0) * Cylinder(21, W + 40))) - craft.offset_body(secs, tip, g)
+        visor = visor - Pos(px, 0, pz) * Rot(90, 0, 0) * Cylinder(5, W + 40)
+        visor = craft.safe_fillet(visor, [e for e in visor.edges() if e.length > 25], 0.9)
+        body = craft.fuse(body, visor, max_solids=2, min_solids=2)
+        stages.append(Stage("visor", body))
         return stages
 
     def mesh_texture(self, v):
         if v["texture"] <= 0:
             return []
-        return [MeshTexture("weave", amplitude=v["texture"], scale=4.0, features=["shell"], facing="out",
-                            edge_falloff=2.5)]
+        return [MeshTexture("weave", amplitude=v["texture"], scale=3.0, features=["shell", "spoiler", "crown_scoops"],
+                            facing="out", edge_falloff=2.0)]
+
+    def appearance(self, v):
+        return [{"features": ["visor"], "finish": "smoke", "color": "#2c333b"},
+                {"features": ["trim"], "finish": "rubber", "color": "#151617"},
+                {"features": ["chin_vent", "brow_vents", "exhaust", "pivots"], "finish": "matte", "color": "#1d1f22"},
+                {"features": ["shell", "lower_edge", "eye_port", "crown_scoops", "spoiler"], "finish": "carbon",
+                 "color": "#2a2c30"}]
 
     def derived(self, v):
-        return [{"key": "head_room", "label": "Inside length (head + liner)", "value": v["length"] - 2 * v["wall"],
-                 "unit": "mm", "feature": "shell", "formula": "length - 2 x wall", "interface": True}]
+        F = self.form(v)
+        hd = F["head"]
+        return [{"key": "shell_length", "label": "Shell length", "value": F["L"], "unit": "mm", "feature": "shell",
+                 "formula": "head length + 2 x (comfort + EPS + shell)", "interface": False},
+                {"key": "shell_width", "label": "Shell width", "value": F["W"], "unit": "mm", "feature": "shell",
+                 "formula": "head breadth + 2 x (comfort + EPS + shell)", "interface": False},
+                {"key": "head_length", "label": "Head length", "value": hd["length"], "unit": "mm", "feature": "shell",
+                 "formula": hd["source"], "interface": True}]
