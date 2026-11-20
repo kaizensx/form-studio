@@ -110,6 +110,9 @@ class CodexParser(Parser):
 
 
 class Codex(Adapter):
+    sandbox = ("your shell runs in a read-only sandbox (sandbox_mode=read-only) with no network: commands cannot write "
+               "files, reach the internet or see Form Studio's data, so do not use the shell at all; only Form Studio's "
+               "tools (and web search where it is on) work.")
     id, label, cli = "codex", "Codex", "codex"
     install_hint = "Install the Codex CLI (codex) and sign in to use it here."
     verified = "follows `codex exec --help` and the Codex non-interactive documentation; stream parsing is tested with recorded samples"

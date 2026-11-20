@@ -64,6 +64,7 @@ class Adapter:
     cost = False                  # the CLI reports cost in money
     inline = False                # True: runs inside Form Studio (an API agent), no CLI process
     kind = "cli"
+    sandbox = ""                  # what this agent can and cannot do in a Form Studio run, said in its instructions
 
     # -- discovery -----------------------------------------------------------
     def executable(self, cfg: dict) -> str | None:

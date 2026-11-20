@@ -42,9 +42,20 @@ PROMPT = """\
 You are working inside Form Studio, a design studio for parts made with a real CAD kernel: for 3D printing, or as
 plain 3D models (rendering, CAD exchange, CNC, laser cutting, moulding). The user is looking at Form Studio's page: every Form Studio
 tool you call shows up there live (3D model, drafts, checks, slice), so you do not need to describe geometry at length.
+- Your environment: {sandbox} Never try python, python3, curl, rg, grep, cat or ls to read skills, memory files or the
+  web: it fails and wastes the person's time. Everything you need is a Form Studio tool: design_guide (how to write a
+  design), design_examples (40+ exemplar designs; technique="..." for just the block that does one thing),
+  create_design / update_design (the kernel builds it), build_candidates (several versions at once), render, critique,
+  analyze_reference and compare_to_reference (meshes), read_document (PDFs and drawings), get_design_source.
 - Use Form Studio tools for all design work: call design_guide, then write the design as code with create_design; iterate
   with update_design. Built-in recipes (form_overview lists them) are allowed as building blocks with create_project,
   but do not offer recipes to the person.
+- Build robustly: for booleans, lofts, fillets, chamfers and shells use form.craft's safe_union, safe_cut, safe_loft,
+  safe_fillet, safe_chamfer and safe_shell (they retry the way the kernel needs and note what they gave up). When a
+  build fails, read the error's diagnosis (the feature, the line, the likely cause, ranked fixes) and apply the first
+  fix; do not guess. A risky step with two or three plausible constructions (a loft or a sweep, a thick or a thin wall):
+  write them all and call build_candidates once; it builds them in parallel, scores each (builds, brief, quality,
+  robustness, editability) and keeps the best.
 - Something complex (a mechanism, an organic or styled form, a texture, several parts): analyse it like a top engineer
   and designer before any code. design_brief (requirements, key dimensions, unknowns), design_guide(topic=...) and
   design_examples for a close exemplar, plan_design (every feature and how it is built, risks), then
@@ -84,12 +95,18 @@ Current project on the page: {project}.
 """
 
 
-def system_prompt(cfg: dict, project: str | None) -> str:
-    """The instructions every in-app agent gets: the project on the page, and whether this person prints at all."""
+SANDBOX = ("you run headless inside Form Studio with Form Studio's tools; there is no shell you can use, no network "
+           "except Form Studio's tools and web search where you have it, and no files except the person's attachments.")
+
+
+def system_prompt(cfg: dict, project: str | None, adapter=None) -> str:
+    """The instructions every in-app agent gets: its sandbox (said plainly, so it does not spend steps finding out),
+    the project on the page, and whether this person prints at all."""
     from . import purpose
     note = ("This person has a 3D printer; new designs are for printing unless they say otherwise." if purpose.printing(cfg) else
             "This person does not 3D print: new designs are 3D models (pass purpose=\"model\"), and never suggest a printer or a slicer.")
-    return PROMPT.format(project=project or "none (start a new one if asked)", printing=note)
+    box = getattr(adapter, "sandbox", "") or SANDBOX
+    return PROMPT.format(project=project or "none (start a new one if asked)", printing=note, sandbox=box)
 
 
 def _adapters(cfg: dict) -> dict:
@@ -502,7 +519,7 @@ class Chat:
             return ask_mod.DEFAULT_TIMEOUT
 
     def _system(self, job: ChatJob) -> str:
-        return system_prompt(self.cfg, job.project)
+        return system_prompt(self.cfg, job.project, self.adapters.get(job.agent))
 
     def _prompt(self, job: ChatJob, with_recap: bool) -> str:
         parts = []
@@ -604,7 +621,7 @@ class Chat:
                 files = [fdir / a["file"] for a in job.attachments]
                 run = Run(message=self._prompt(job, with_recap=had_history and not job.session),
                           system=self._system(job),
-                          model=job.model, effort=job.effort, session=job.session, cwd=cwd, scratch=tmp, mcp=self._mcp(job),
+                          model=job.model, effort=self._effort(job, adapter, exe), session=job.session, cwd=cwd, scratch=tmp, mcp=self._mcp(job),
                           tool_timeout_s=self._ask_timeout() + 300,
                           web=bool(c.get("web", True)), budget_usd=float(c.get("budget_usd_per_message", 3.0)),
                           images=[f for f, a in zip(files, job.attachments) if a["kind"] == "image"], files=files)
@@ -661,12 +678,14 @@ class Chat:
             else:
                 if not job.error:
                     job.error = err_text.strip()[-800:] or f"{adapter.label} exited with code {rc}"
-                    known = adapter.explain(job.error) or compat.diagnose(
+                    known = self._limit(job, job.error + " " + err_text) or adapter.explain(job.error) or compat.diagnose(
                         adapter.id, adapter.label, exe, rc, err_text, job.unread,
                         sum(1 for e in job.events[n0:] if e["t"] in ("start", "text", "tool", "end")), __version__)
                     if known:                                   # a known failure, said plainly with the fix inside FORM
                         job.error = known["message"]
-                        self._add(job, {"t": "error", "text": known["message"], "hint": known.get("hint", "")})
+                        self._add(job, {"t": "error", "text": known["message"], "hint": known.get("hint", ""),
+                                        **({k: known[k] for k in ("kind", "agent", "until") if known.get(k)}
+                                           if known.get("kind") == "usage_limit" else {})})
                     else:
                         self._add(job, {"t": "error", "text": job.error})
                 job.state = "failed"
@@ -767,6 +786,8 @@ class Chat:
             if t == "start":
                 ev["agent"] = job.agent
                 ev["asked"] = job.model
+                if getattr(job, "_effort_why", ""):
+                    ev["effort"], ev["effort_why"] = job._effort_picked, job._effort_why
                 if ev.get("model"):               # learned once the reply finishes: a model that fails is not kept
                     job.model_id = ev["model"]
                     ev["label"] = adapter.model_label(ev["model"])
@@ -782,6 +803,11 @@ class Chat:
                     if opts:
                         self._add(job, {"t": "suggest", "options": opts})
                     continue
+            elif t == "error" and self._limit(job, str(ev.get("text", ""))):
+                card = self._limit(job, str(ev.get("text", "")))   # the CLI's own words carry an upsell: replace them
+                job.error = card["message"]
+                ev = {"t": "error", "text": card["message"], "hint": card["hint"], "kind": "usage_limit",
+                      "agent": card["agent"], "until": card["until"]}
             elif t == "end":
                 job.cost = ev.get("cost_usd")
                 err = ev.pop("error", None)
@@ -795,6 +821,13 @@ class Chat:
                 if err and _model_unavailable(str(err)):
                     job.error = self._drop_model(job, str(err))
                     self._add(job, {"t": "error", "text": job.error})
+                elif err and self._limit(job, str(err)):       # a usage limit: a calm card, no upsell text
+                    card = self._limit(job, str(err))
+                    said = job.error == card["message"]          # the stream already said it as an error event
+                    job.error = card["message"]
+                    if not said:
+                        self._add(job, {"t": "error", "text": card["message"], "hint": card["hint"], "kind": "usage_limit",
+                                    "agent": card["agent"], "until": card["until"]})
                 elif err:
                     job.error = str(err)
                     self._add(job, {"t": "error", "text": job.error})
@@ -807,6 +840,35 @@ class Chat:
                     self.recent.use(job.agent, used)
                 continue
             self._add(job, ev)
+
+    def _effort(self, job: ChatJob, adapter, exe: str) -> str:
+        """The effort this message runs at: the conversation's, raised for a hard task (a mesh to make editable, a
+        mechanism, a styled form, several parts) when [chat] auto_effort is on (the default). Said in the
+        reply's start event when it changes."""
+        if not self.cfg.get("chat", {}).get("auto_effort", True) or getattr(job, "_effort_picked", None) is not None:
+            return getattr(job, "_effort_picked", None) or job.effort
+        from .agents import effort as effort_mod
+        try:
+            levels = adapter.efforts(self.cfg, exe) or []
+        except Exception:
+            levels = []
+        eff, why = effort_mod.pick(job.message, job.attachments, job.effort, levels)
+        job._effort_picked = eff
+        job._effort_why = why                          # shown on the reply's start event
+        return eff
+
+    def _limit(self, job: ChatJob, text: str) -> dict | None:
+        """The agent hit its plan's usage limit: {kind, agent, until, message, hint} without the CLI's upsell text,
+        naming the designs this run made (they are kept). None when the error is something else."""
+        from .agents import limits
+        if not limits.is_usage_limit(text):
+            return None
+        who = getattr(self.adapters.get(job.agent), "label", None) or job.agent
+        try:
+            made = sorted(self._project_ids() - (job.before or set()))
+        except Exception:
+            made = []
+        return limits.usage_limit(text, who, made)
 
     def _drop_model(self, job: ChatJob, err: str) -> str:
         """The account cannot use the model this conversation asked for. Forget it (so it is no one's default) and
