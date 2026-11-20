@@ -2,7 +2,9 @@
 
 The fixtures are real build123d parts exported as STL (tests/recon_fixtures.py): a box with holes, a turned part, a
 filleted bracket and a spur gear with spline flanks. The pipeline runs in this process for the layer checks and once
-through the Studio (kernel worker) for the project, CLI and "Make editable" routes.
+through the Studio (kernel worker) for the project, CLI and "Make editable" routes. The layer checks here run the
+pipeline without its program route (sketches and extrusions read off the mesh, tested in test_recon_program.py), so
+Layers 0, 1 and the feature tree are always exercised.
 """
 import json
 import os
@@ -25,16 +27,26 @@ TESTED_AT = {"spur_gear": 0.05}       # the tolerance each fixture's full run us
 _runs = {}
 
 
-def run(name, tolerance=TOL, layer=2):
-    """The pipeline's report for one fixture (computed once per setting)."""
+LAYERED = ("box_with_holes", "turned_part", "filleted_bracket", "gear", "stepped_bracket", "flanged_shaft", "spur_gear",
+           "organic_blob")
+
+
+def run(name, tolerance=TOL, layer=2, program=False):
+    """The pipeline's report for one fixture (computed once per setting); without the program route unless asked."""
     from form.recon import pipeline
-    key = (name, tolerance, layer)
+    key = (name, tolerance, layer, program)
     if key not in _runs:
         stl = Path(TMP) / f"{name}.stl"
         if not stl.exists():
             fx.export(name, TMP)
-        out = Path(TMP) / f"out-{name}-{tolerance}-{layer}"
-        _runs[key] = (pipeline.reconstruct(stl, out, name, tolerance, layer), out)
+        out = Path(TMP) / f"out-{name}-{tolerance}-{layer}{'-p' if program else ''}"
+        keep = pipeline._program
+        if not program:
+            pipeline._program = lambda *a, **k: {"report": {"method": "sketches and extrusions", "error": "off for this test"}}
+        try:
+            _runs[key] = (pipeline.reconstruct(stl, out, name, tolerance, layer), out)
+        finally:
+            pipeline._program = keep
     return _runs[key]
 
 
@@ -113,7 +125,7 @@ class Layers(unittest.TestCase):
     """Accuracy on each fixture. The numbers are computed by comparing with the mesh, never assumed."""
 
     def test_layer0_is_the_mesh_exactly(self):
-        for name in fx.FIXTURES:
+        for name in LAYERED:
             with self.subTest(name):
                 rep, out = run(name, TESTED_AT.get(name, TOL))
                 L0 = rep["layers"]["0"]
@@ -355,9 +367,11 @@ class Surfaces(unittest.TestCase):
         p = st.load(out["project"])
         self.assertEqual(p["reconstruction"]["summary"]["layer"], 2)
         self.assertTrue(p["reconstruction"]["summary"]["recipe_verified"])
+        self.assertTrue(p["reconstruction"]["summary"]["headline"].startswith("100% editable"))
         prov = st.rev(p)["provenance"]
-        self.assertEqual(prov["hole2_d"]["source"], "mesh")
-        self.assertIn("M5 clearance", prov["hole2_d"]["note"])
+        m5 = [v for v in prov.values() if "M5 clearance" in (v.get("note") or "")]
+        self.assertTrue(m5, prov)                                  # the four Ø5.5 holes: one Param, a standard size
+        self.assertEqual(m5[0]["source"], "mesh")
         self.assertTrue((st.dir(p["id"]) / "reconstruction" / "box_with_holes_report.json").is_file() or
                         any(f.endswith("_report.json") for f in p["reconstruction"]["files"]))
         self.assertIn("reconstruct", [d["kind"] for d in p["decisions"]])

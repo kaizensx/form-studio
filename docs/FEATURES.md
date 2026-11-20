@@ -250,7 +250,28 @@ Bring an STL, OBJ or 3MF and Form Studio rebuilds it as CAD, then measures how c
 [--layer 0|1|2]`, or the MCP tool `reconstruct`. The result is a new design; the original mesh stays beside it in
 blueprint, and the report, the deviation map and every solid are kept in the design's `reconstruction` folder.
 
-- **Layer 0, always: the mesh as an exact solid.** Vertices are welded, every triangle becomes a planar face, the faces
+Every result leads with **editable**: the share of its surface that its Params make (sketches, extrusions, holes,
+fillets), then its distance to the mesh (two-sided Hausdorff) and whether that is within the tolerance you asked
+for. A result outside the tolerance is still offered when it is the best verified one, and says so. The share of
+the area on planes, cylinders and other analytic surfaces is in the report too, but a solid can be all analytic and
+still not editable.
+
+- **Sketches and extrusions first (beta).** The part is read the way it was modelled: along its main direction it
+  is cut at every height a mesh vertex sits at, each section's loops become sketches of lines, arcs and rounded
+  corners (corners where the neighbouring lines and arcs meet, line directions snapped to 15° steps), and a loop that
+  does not change between two levels becomes an extrusion, one that changes linearly between two faces (a chamfer, a
+  draft) a ruled loft between two sketches. Coordinates, levels, radii and diameters are pooled across the whole part:
+  values within a quarter of the tolerance become one Param, snapped to a round number when that is within reach,
+  mirrored about the centre plane when both sides agree, diameters snapped to standard hole sizes, each Param saying
+  where its value came from. Holes and pockets are cuts, bosses and steps are additions, in the order the levels nest.
+  What does not read as a sketch (a rounded top, a curved or freeform band) is kept as the mesh's own slices and
+  booleaned in: the rest stays parametric, and editable says how much. Blocks of levels that hold a cross hole or a
+  rounding seen from the side are carved by the sketches seen along the other axes when that verifies better. When this
+  verifies with most of the surface editable, it is the result in seconds; otherwise the layers below run and the
+  verified result with the most editable surface wins. Several parts of one mechanism can have their meeting
+  dimensions tied (walls facing across a gap, a pin in a hole) as one Param plus a clearance
+  (`form.recon.assembly`).
+- **Layer 0: the mesh as an exact solid.** Vertices are welded, every triangle becomes a planar face, the faces
   are sewn into a solid and coplanar facets are merged. The two-sided Hausdorff distance to the mesh is at float
   precision. Open boundaries and non-manifold edges are reported; holes are closed only as a listed repair.
 - **Layer 1 (beta): analytic and freeform faces.** Regions are grown over the mesh and fitted with planes,
@@ -258,8 +279,11 @@ blueprint, and the report, the deviation map and every solid are kept in the des
   (default 0.02 mm) and its facets are no farther from the surface than the mesh's own chord error. Smooth regions
   that no simple surface explains (a sculpted handle, a scan, a blob) are fitted with bicubic B-spline patches
   instead, each through its vertices within a third of the tolerance, and reported as "freeform (B-spline fitted)".
-  The faces are trimmed along the mesh's edges (lines, circles and arcs where the boundary is one) and sewn, with
-  frozen facets for whatever is left, into one solid. The report gives the share of area that is parametric
+  Where two fitted planes meet, the edge is their exact intersection line, trimmed at corners moved onto all the
+  planes round them (the kernel's surface intersection, which can also trim curved pairs: `brep.EXACT_CURVED`); other
+  boundaries are lines, circles and arcs through the mesh's boundary points where they are one. Where that does not
+  close into a valid solid, the mesh's own boundaries are used. The faces are sewn, with frozen facets for whatever is
+  left, into one solid. The report gives the share of area that is parametric
   (analytic), freeform and frozen.
 - **Layer 2 (beta): a feature tree.** The features of the Layer 1 solid are found and taken off it: holes (plain,
   counterbored, countersunk, blind or through, on any axis), constant-radius fillets and equal-distance chamfers. What
@@ -278,12 +302,17 @@ blueprint, and the report, the deviation map and every solid are kept in the des
   limit. The report also gives the share of the area the Params drive.
 - **Drawn like a part.** A mesh or a faceted solid is shaded smooth, and only creases sharper than 25° and
   boundaries are drawn as edges (the 3D view, card thumbnails and render sheets).
-- **Verification, every time.** Two-sided Hausdorff distance, volume difference, parametric, freeform and frozen
-  area, and a deviation map coloured against the tolerance.
+- **Verification, every time.** Editable share, two-sided Hausdorff distance (samples of a tessellation triangle
+  laid outside its own face are checked against the solid and left out), volume difference, parametric, freeform and
+  frozen area, and a deviation map coloured against the tolerance. Progress is reported about every second while it
+  runs. `scripts/recon_bench.py` measures editable share, deviation, time and a sweep of every Param (does it change
+  the part, does the part rebuild over its range) and writes `docs/RECON_BENCH.md`.
 
-What it does not do (yet): a base that is neither an extrusion stack nor a revolution (a part with sloped faces or
-curved faces across its main direction, a casting, a scan) stays an embedded solid under its parametric features: exact
-to the mesh, but its outline is not a set of Params. Fillets of varying radius, fillets whose sharp edge cannot be
+What it does not do (yet): a part whose surfaces curve across every axis (a casting, a scan, a rounded top)
+keeps those parts as the mesh's own slices, exact but not editable; the sketches route reads one main direction plus
+the three axes, not tilted ones. A large part takes longer than 30 s. In the feature tree, a base that is neither an
+extrusion stack nor a revolution stays an embedded solid under its parametric features: exact to the mesh, but its
+outline is not a set of Params. Fillets of varying radius, fillets whose sharp edge cannot be
 rebuilt, and holes that cannot be taken off the solid stay in the base and are listed. Outline coordinates of an
 extrusion stack are numbers read off the mesh (only rectangles and circles get size Params), and a fillet or chamfer
 finds its edge near where it was, so a large change of a height can leave it without an edge (the rebuild then

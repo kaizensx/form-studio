@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- **Make editable makes it editable.** A mesh is now read the way it was modelled: sketches of lines, arcs and rounded
+  corners extruded and lofted between levels, with every coordinate, level, radius and diameter a Param (pooled,
+  snapped to round numbers and standard hole sizes, mirrored about the centre, each saying where it came from). What
+  does not read as a sketch is kept as the mesh's own slices beside the parametric features instead of turning the
+  whole part into an embedded solid. Prismatic parts come back fully editable in seconds to a minute (the numbers per
+  part are in `docs/RECON_BENCH.md`).
+- **Editable first.** Every reconstruction, its activity line and the app's toast lead with the share of the surface
+  its Params drive and its distance to the mesh, and say when the result is outside the tolerance you asked for. The
+  share of analytic area stays in the report.
+- **Faster and never silent.** Surface fitting uses analytic derivatives (segmentation is several times faster),
+  and a reconstruction reports progress about every second.
+- **Exact edges.** Layer 1 trims its planes with their exact intersection lines and moves corners onto every plane
+  round them (curved pairs can be trimmed the same way), falling back to the mesh's own boundaries where that does not
+  make a valid solid. The program route's faces are exact by construction: every edge is where two sketch features
+  meet.
+- **Parts that fit stay fitting.** `form.recon.assembly` ties the dimensions where several reconstructed parts meet
+  (walls across a gap, a pin in a hole) into one Param plus a clearance and writes them as one multi-part design.
+- **A benchmark.** `scripts/recon_bench.py` writes `docs/RECON_BENCH.md`: editable share, deviation, time and a sweep of
+  every Param, before and after, on the synthetic fixtures.
+
 - **Organic products that read as the real thing.** `form.craft` draws a product's silhouette in three views as guide curves and turns them into sections (`profile_sections`), checks every loft for folds and twisted seams (`checked_body`, `loft_report`), and sizes product families from named proportions: full-face and cycling helmets from an EN 960 headform and ANSUR II head data with typical liner and shell build-up, a palm-grip mouse from the hand, power grips, drinks bottles with a PCO 1881 neck. Details follow the surface (`surface_band` for trim, pads, scoops, spoilers and raised panels), openings are drawn in two views (`two_view_cutter`), vent grilles are B-rep (`slot_grille`), and `craft.cut` / `craft.fuse` retry free-form booleans with fuzzy tolerances and refuse a visor that touches the shell.
 - **The helmet exemplar, rebuilt, and a mouse exemplar.** A carbon full-face helmet sized from a head: eye port cut in two views, a smoked visor on pivots, rubber trim, chin and brow intakes, crown scoops, a ducktail spoiler over exhausts and a carbon twill. An ergonomic mouse sized from the hand, with a thumb groove, split buttons, a rubber-tyred wheel, side buttons and rubber grips.
 - **Critique knows what a product looks like.** It checks lofted skins for folds, measures wall thickness by rays (break-through and paper-thin spots with where they are) and lists sharp turns in the silhouettes. For a product class named in the brief or the plan (`helmet_fullface`, `helmet_open`, `mouse`, `bottle`) it compares the side, front and top silhouettes with the class outline, the proportions with real products (sources given) and its signature (an eye port and a visor, a neck opening, a palm hump, a scroll wheel), and keeps asking "does it read as one?" until the agent answers after looking (`critique(reads_as=...)`, `plan_design(product_class=...)`).

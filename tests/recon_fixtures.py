@@ -140,9 +140,26 @@ def organic_blob():
     return blob, {"holes": [6.0], "prismatic": False, "freeform": True}
 
 
+def wallet_plate():
+    """A card-holder plate modelled the way a person models a 2.5D part: a rounded plate with a chamfered bottom edge,
+    two rails with rounded ends standing on it (mirrored about the centre), a pin, a shallow pocket and a clearance
+    hole. Every feature is a sketch extruded between levels."""
+    from build123d import Align, Cylinder, Pos, RectangleRounded, chamfer, extrude
+    plate = extrude(RectangleRounded(60, 100, 5), 2.5)
+    bottom = [e for e in plate.edges() if abs(e.center().Z) < 1e-6]
+    plate = chamfer(bottom, 0.5)                                                      # a ruled band all round
+    for x in (-26.0, 26.0):
+        plate = plate + Pos(x, 0, 2.5) * extrude(RectangleRounded(2.0, 80, 0.9), 6.5)  # rails 2 wide, 6.5 tall
+    A = (Align.CENTER, Align.CENTER, Align.MIN)
+    plate = plate + Pos(-18, -40, 2.5) * Cylinder(3.0, 3.5, align=A)                    # Ø6 pin
+    plate = plate - Pos(0, 10, 1.5) * extrude(RectangleRounded(30, 20, 2.0), 2.0)       # pocket 1 deep
+    plate = plate - Pos(18, -40, -1) * Cylinder(1.7, 5, align=A)                        # Ø3.4: M3 clearance
+    return plate, {"holes": [3.4], "prismatic": True, "pins": [6.0]}
+
+
 FIXTURES = {"box_with_holes": box_with_holes, "turned_part": turned_part, "filleted_bracket": filleted_bracket, "gear": gear,
             "stepped_bracket": stepped_bracket, "flanged_shaft": flanged_shaft, "spur_gear": spur_gear_part,
-            "organic_blob": organic_blob}
+            "organic_blob": organic_blob, "wallet_plate": wallet_plate}
 
 
 # A smooth shape meshed finely, the way a scan or a careful export is: its facets are within 0.01 mm of the surface
