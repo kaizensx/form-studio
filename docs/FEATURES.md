@@ -210,26 +210,45 @@ blueprint, and the report, the deviation map and every solid are kept in the des
 - **Layer 0, always: the mesh as an exact solid.** Vertices are welded, every triangle becomes a planar face, the faces
   are sewn into a solid and coplanar facets are merged. The two-sided Hausdorff distance to the mesh is at float
   precision. Open boundaries and non-manifold edges are reported; holes are closed only as a listed repair.
-- **Layer 1 (beta): analytic faces.** Regions are grown over the mesh and fitted with planes, cylinders, cones,
-  spheres and tori. A region is accepted only when every vertex on it is within the tolerance (default 0.02 mm) and its
-  facets are no farther from the surface than the mesh's own chord error; the faces are trimmed along the mesh's
-  edges (lines, circles and arcs where the boundary is one) and sewn with frozen facets for the rest into one solid.
-  The report gives the share of area that is parametric.
-- **Layer 2 (beta): a feature recipe.** When the part is one extrusion or one revolution, a build123d design with
-  Params is written: the profile, holes with standard sizes (ISO 273 clearances, tap drills, drill sizes) and
-  provenance "computed from mesh", and hole grids, lines and circles as patterns. Mirror planes and rotational
-  symmetry are reported. The recipe is rebuilt and compared with the mesh, and it is used only when it is within the
-  limit.
-- **Verification, every time.** Two-sided Hausdorff distance, volume difference, parametric versus frozen area, and
-  a deviation map coloured against the tolerance.
+- **Layer 1 (beta): analytic and freeform faces.** Regions are grown over the mesh and fitted with planes,
+  cylinders, cones, spheres and tori. A region is accepted only when every vertex on it is within the tolerance
+  (default 0.02 mm) and its facets are no farther from the surface than the mesh's own chord error. Smooth regions
+  that no simple surface explains (a sculpted handle, a scan, a blob) are fitted with bicubic B-spline patches
+  instead, each through its vertices within a third of the tolerance, and reported as "freeform (B-spline fitted)".
+  The faces are trimmed along the mesh's edges (lines, circles and arcs where the boundary is one) and sewn, with
+  frozen facets for whatever is left, into one solid. The report gives the share of area that is parametric
+  (analytic), freeform and frozen.
+- **Layer 2 (beta): a feature tree.** The features of the Layer 1 solid are found and taken off it: holes (plain,
+  counterbored, countersunk, blind or through, on any axis), constant-radius fillets and equal-distance chamfers. What
+  is left becomes the base of a build123d design: an extrusion stack (the base, steps and bosses, pockets and
+  cutouts, with heights, depths and rectangle and circle sizes as Params), a revolution (diameters and heights as
+  Params, turned fillets and chamfers rounded in the profile), or, when the base is neither, the reconstructed solid
+  itself, kept exactly (with its analytic, freeform and frozen faces) under parametric features. The features go back
+  on as real operations: fillets and chamfers on the edges nearest where they were (radius and distance are Params),
+  holes with their diameters snapped to standard sizes (ISO 273 clearances, tap drills, drill sizes), counterbore and
+  countersink sizes and depths, and holes of one kind on a grid, a line or a circle as one pattern with pitch Params.
+  A spur gear is recognised from its outline (tooth count, module and pressure angle from involute flanks) and
+  becomes a parametric gear: the gear Form Studio makes (`form.parts.spur_gear`) when that is it, otherwise an
+  involute outline with its tip and root as the mesh has them. Every value has provenance "computed from mesh";
+  mirror planes and rotational symmetry are reported. The design is rebuilt and compared with the mesh; a feature that
+  does not verify is left in the base and named in the report, and the recipe is used only when it is within the
+  limit. The report also gives the share of the area the Params drive.
+- **Verification, every time.** Two-sided Hausdorff distance, volume difference, parametric, freeform and frozen
+  area, and a deviation map coloured against the tolerance.
 
-What it does not do (yet): scans, sculpted and organic shapes stay faceted: exact to the mesh but not parametric.
-Freeform surfaces (splines, lofts) are not fitted; a spline that a cylinder or torus matches within the tolerance is
-reported as that surface. Layer 2 handles one extrusion or one revolution with holes; steps, pockets, bosses on
-other axes and fillets across the extrusion leave the result at Layer 1 and the report says why. Accuracy is measured
-against the mesh, not the original object, so the mesh's own chord error and scan noise are in the input. Units are
-millimetres unless the file says otherwise (3MF does). Nothing is decimated: a mesh over 200,000 triangles shows
-progress and takes minutes.
+What it does not do (yet): a base that is neither an extrusion stack nor a revolution (a part with sloped faces or
+curved faces across its main direction, a casting, a scan) stays an embedded solid under its parametric features: exact
+to the mesh, but its outline is not a set of Params. Fillets of varying radius, fillets whose sharp edge cannot be
+rebuilt, and holes that cannot be taken off the solid stay in the base and are listed. Outline coordinates of an
+extrusion stack are numbers read off the mesh (only rectangles and circles get size Params), and a fillet or chamfer
+finds its edge near where it was, so a large change of a height can leave it without an edge (the rebuild then
+says which). Freeform patches meet along the mesh's edges between them, so their boundaries follow the triangles; a
+freeform patch is smooth CAD within the tolerance but not a dimension you can change. Gears: spur gears only (no
+helical, bevel or internal gears), and the module and pressure angle assume no profile shift. Accuracy is measured
+against the mesh, not the original object: a mesh's own chord error and scan noise are in the input, and a coarse
+mesh of a curved surface can be farther from any smooth surface than the tolerance (the gear flanks of a default STL
+export are 0.03 to 0.04 mm from the gear they came from). Units are millimetres unless the file says otherwise (3MF
+does). Nothing is decimated: a mesh over 200,000 triangles shows progress and takes minutes.
 
 ## Checks and evidence
 

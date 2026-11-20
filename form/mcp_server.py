@@ -999,11 +999,15 @@ def build() -> MCPServer:
         """Turn a mesh (STL, OBJ or 3MF) into editable CAD as a new design. project_or_file: an absolute path to the
         mesh, or a project id whose imported mesh reference to use (reference: which one; default the first mesh).
         Layer 0 is always built: the mesh as an exact solid (Hausdorff at float precision). Layer 1 (beta) replaces
-        facets with planes, cylinders, cones, spheres and tori where they fit within `tolerance` mm; the rest stay
-        frozen facets. Layer 2 (beta) writes a build123d recipe with Params (one extrusion or revolution, holes
-        snapped to standard sizes, patterns) and is used only if its rebuild is within the limit. Returns the new
-        project and the verification (two-sided Hausdorff, volume delta, % parametric area). Values are computed from
-        the mesh; nothing is decimated and every repair is listed. Large meshes take minutes."""
+        facets with planes, cylinders, cones, spheres and tori where they fit within `tolerance` mm, and smooth
+        organic regions with fitted B-spline surfaces ("freeform"); the rest stay frozen facets. Layer 2 (beta)
+        writes a build123d recipe with Params as a feature tree: a base (extrusion stack with steps and pockets, a
+        revolution, or the reconstructed solid itself) then fillets, chamfers and holes (counterbores, countersinks,
+        holes on any axis, snapped to standard sizes, patterns); a spur gear becomes a parametric gear (teeth, module,
+        pressure angle). A feature that does not verify stays in the base and is reported; the recipe is used only
+        if its rebuild is within the limit. Returns the new project and the verification (two-sided Hausdorff, volume
+        delta, % parametric, freeform and frozen area, % driven by Params). Values are computed from the mesh;
+        nothing is decimated and every repair is listed. Large meshes take minutes."""
         st = studio()
         progress = None
         if ctx is not None:
