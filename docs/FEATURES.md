@@ -249,6 +249,9 @@ Bring an STL, OBJ or 3MF and Form Studio rebuilds it as CAD, then measures how c
 **Make editable** on an imported mesh (Describe › Reference parts), `form reconstruct FILE [--name] [--tolerance MM]
 [--layer 0|1|2]`, or the MCP tool `reconstruct`. The result is a new design; the original mesh stays beside it in
 blueprint, and the report, the deviation map and every solid are kept in the design's `reconstruction` folder.
+Several meshes of one product (`form reconstruct A.stl B.stl C.stl`, MCP `reconstruct(files=[...])`) become **one
+design with one part per mesh**, in the positions the files give; each part keeps its own parameters, named after the
+part (`base__fillet1_r`), and a part that cannot be reconstructed is reported while the others are kept.
 
 - **Layer 0, always: the mesh as an exact solid.** Vertices are welded, every triangle becomes a planar face, the faces
   are sewn into a solid and coplanar facets are merged. The two-sided Hausdorff distance to the mesh is at float
@@ -432,6 +435,12 @@ and what to do.
   reply.
 - **Many conversations.** Tied to a design or free-standing; searchable, pinnable, renamable. Opening a conversation
   opens its design. The conversation column is resizable and hides with Ctrl/⌘ J.
+- **One request, one design.** A conversation keeps every design it made or touched, in order, with its role (made,
+  concept, continued) and whether it is still there or in the trash; each design records the conversation and request
+  that made it. Designs one request makes share one family, so Home shows them as one card. In a conversation that
+  already has a design, the agent says what new code is for: a new revision, a part of it, an alternative or something
+  new. A design brief serves every design of its request. Attaching a file before writing makes a draft that becomes a
+  conversation when you send; one never sent is cleared.
 - **Visible work.** The agent's tool calls fold into a group of steps, the views it rendered appear inline, and time,
   tokens and cost are shown per reply. Retry any reply with another model.
 - **Questions as cards.** When the agent needs a decision it asks in the conversation with choices, several choices,
