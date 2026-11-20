@@ -13,6 +13,14 @@ Column {
     readonly property var meshes: parts.filter(function (r) { return r.format !== "step" }).map(function (r) { return r.file })
     readonly property var recon: Store.project && Store.project.reconstruction ? (Store.project.reconstruction.summary || null) : null
     function size(b) { return [0, 1, 2].map(function (i) { return F.fmt(b[1][i] - b[0][i], 1) }).join(" × ") }
+    // where a reference came from and under which licence (stored per attachment by the engine: source, licence)
+    function origin(r) {
+        if (!r) return ""
+        var src = r.source ? String(r.source) : "", m = src.match(/^https?:\/\/([^\/?#]+)/i), out = []
+        if (src) out.push("from " + (m ? m[1].replace(/^www\./, "") : src))
+        if (r.licence || r.license) out.push(String(r.licence || r.license))
+        return out.join(" · ")
+    }
     readonly property var known: Store.recipe ? Store.recipe.params.filter(function (p) { return p.group === "brief" }) : []
     // the printer this design uses (its own choice, the default, or the slicer's selection: form/printers.py)
     readonly property var pr: Store.data && Store.data.printer ? Store.data.printer : null
@@ -118,7 +126,7 @@ Column {
             Repeater { model: root.refs
                 KV { id: rr; required property var modelData; required property int index; first: index === 0
                     k: modelData.file
-                    sub: modelData.scale_mm_per_px ? "scale set · " + F.plural((modelData.measurements || []).length, "measurement") : "no scale yet"
+                    sub: (modelData.scale_mm_per_px ? "scale set · " + F.plural((modelData.measurements || []).length, "measurement") : "no scale yet") + (root.origin(modelData) ? " · " + root.origin(modelData) : "")
                     Btn { kind: "quiet"; small: true; icon: "ruler"; text: "Measure"; onClicked: Store.openSheet("photo", { ref: rr.modelData }) } } } }
         Btn { text: "Attach photo"; icon: "image"; onClicked: Store.ask(dlg) } }
 
@@ -129,7 +137,7 @@ Column {
             Repeater { model: root.parts
                 KV { id: pr; required property var modelData; required property int index; first: index === 0
                     k: modelData.file
-                    sub: modelData.format.toUpperCase() + (modelData.volume_mm3 ? " · " + F.fmt(modelData.volume_mm3 / 1000, 2) + " cm³" : "")
+                    sub: modelData.format.toUpperCase() + (modelData.volume_mm3 ? " · " + F.fmt(modelData.volume_mm3 / 1000, 2) + " cm³" : "") + (root.origin(modelData) ? " · " + root.origin(modelData) : "")
                     Txt { mono: true; tone: 2; text: root.size(pr.modelData.bbox) + " mm"; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter }
                     Tag { text: pr.modelData.evidence || "computed"; anchors.verticalCenter: parent.verticalCenter }
                     Btn { kind: "quiet"; small: true; icon: "box"; text: "Make editable"; visible: pr.modelData.format !== "step"

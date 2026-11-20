@@ -425,6 +425,8 @@ Rectangle {
                 opacity: ta.activeFocus ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
             Column {
                 id: inner; width: parent.width
+                // a file on its way in
+                FetchProgress { x: 12; width: parent.width - 24 }
                 // files that go with the next message
                 Item { visible: Store.chatAttach.length > 0 || Store.chatLinks.length > 0; width: parent.width; height: visible ? chips.implicitHeight + 10 : 0
                     Flow { id: chips; x: 10; y: 10; width: parent.width - 20; spacing: 6
@@ -448,7 +450,7 @@ Rectangle {
                                 Txt { id: ln; x: 27; width: parent.width - x - 26; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
                                     text: lchip.modelData.host || lchip.modelData.url }
                                 HoverHandler { id: lh }
-                                Tip { show: lh.hovered; text: lchip.modelData.url + "\nA page: it goes with the message as a link. Nothing is downloaded." }
+                                Tip { show: lh.hovered; text: lchip.modelData.url + "\n" + (lchip.modelData.reason ? lchip.modelData.reason + (lchip.modelData.how ? " " + lchip.modelData.how : "") : "A page: it goes with the message as a link. Nothing is downloaded.") }
                                 Btn { small: true; kind: "quiet"; icon: "x"; anchors.right: parent.right; anchors.rightMargin: 2; anchors.verticalCenter: parent.verticalCenter
                                     tip: "Remove"; onClicked: Store.dropLink(lchip.modelData.url) } } } } }
                 ScrollView {

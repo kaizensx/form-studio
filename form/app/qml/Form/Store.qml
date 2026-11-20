@@ -978,6 +978,23 @@ QtObject {
         var seen = ({}); urls = urls.filter(function (u) { u = u.replace(/[.,;:!?]+$/, ""); if (seen[u]) return false; seen[u] = true; return true })
         return Promise.all(urls.map(function (u) { return fetchLink(u.replace(/[.,;:!?]+$/, "")) })).then(function () { send(text) }, function () { send(text) })
     }
+    // downloads and uploads under way (links fetched, files attached): the engine reports each one's progress at
+    // GET /conversations/fetches; polled only while one runs. Each row: { name|url, bytes|done, total, state }.
+    property int fetching: 0
+    property var fetches: []
+    readonly property var fetchProgress: {
+        var rows = (fetches || []).filter(function (f) { return f && f.state !== "done" && f.state !== "failed" })
+        if (!rows.length) return null
+        var done = 0, total = 0, known = true
+        rows.forEach(function (f) { done += Number(f.bytes || f.done || 0); var t = Number(f.total || f.size || 0); if (t > 0) total += t; else known = false })
+        var first = rows[0], name = first.name || (first.url ? decodeURIComponent(String(first.url).replace(/[?#].*$/, "").replace(/^.*\//, "")) : "")
+        return { count: rows.length, name: name, done: done, total: known ? total : 0, fraction: known && total > 0 ? Math.min(1, done / total) : -1 }
+    }
+    property var _fetchPoll: Timer {
+        interval: 400; repeat: true; running: s.fetching > 0
+        onTriggered: s.get("/conversations/fetches").then(function (r) { s.fetches = r && r.fetches ? r.fetches : (Array.isArray(r) ? r : []) }, function () {})
+        onRunningChanged: if (!running) s.fetches = []
+    }
 
     // merge a reply from GET /conversations/<id>?from=chatNext into the feed
     function _take(r) {
@@ -1174,9 +1191,11 @@ QtObject {
         var go = function (id) {
             list.forEach(function (u) {
                 var name = decodeURIComponent(String(u).replace(/^.*[\/\\]/, ""))
+                fetching++
                 upload("/conversations/" + id + "/attach?name=" + encodeURIComponent(name), u).then(function (r) {
+                    fetching = Math.max(0, fetching - 1)
                     if (convId === id) chatAttach = chatAttach.concat(r.attachments)
-                }, fail)
+                }, function (e) { fetching = Math.max(0, fetching - 1); fail(e) })
             })
         }
         ensureConv().then(go, fail)
@@ -1871,15 +1890,21 @@ QtObject {
         url = String(url || "").trim()
         if (!/^https?:\/\//i.test(url)) { toast("That is not a web address", "Paste a link that starts with https://", true); return Promise.resolve(null) }
         return ensureConv().then(function (id) {
+            fetching++                                     // the download shows its progress (fetchProgress) while it runs
             return post("/conversations/" + id + "/fetch", { url: url }).then(function (r) {
+                fetching = Math.max(0, fetching - 1)
                 if (convId !== id) return r
                 if (r.attachments) {
                     chatAttach = chatAttach.concat(r.attachments)
                     toast("Fetched " + r.fetched.name, F.bytes(r.fetched.bytes) + " from " + r.fetched.host)
-                } else if (r.link) chatLinks = chatLinks.filter(function (l) { return l.url !== r.link.url }).concat([r.link])
+                } else if (r.link) {
+                    chatLinks = chatLinks.filter(function (l) { return l.url !== r.link.url }).concat([r.link])
+                    // a site that will not hand the file over (a sign-in, a token): say why and what to do, calmly
+                    if (r.link.reason) toast(r.link.reason, r.link.how || "")
+                }
                 return r
             })
-        }).then(function (r) { return r }, function (e) { fail(e); return null })
+        }).then(function (r) { return r }, function (e) { fetching = Math.max(0, fetching - 1); fail(e); return null })
     }
     function dropLink(url) { chatLinks = chatLinks.filter(function (l) { return l.url !== url }) }
     // a sketch from the sketch pad: its structured geometry (JSON) and its picture go with the next message

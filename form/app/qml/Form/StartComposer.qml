@@ -40,6 +40,7 @@ Rectangle {
     Column {
         id: col; width: parent.width
 
+        FetchProgress { x: 18; width: parent.width - 36 }
         // ── what goes with the words: photos large enough to recognise, parts and drawings, sketches, links ──
         Item { visible: Store.chatAttach.length > 0 || Store.chatLinks.length > 0; width: parent.width; height: visible ? shelf.implicitHeight + 18 : 0
             Flow { id: shelf; objectName: "startShelf"; x: 16; y: 16; width: parent.width - 32; spacing: 8

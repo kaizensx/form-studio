@@ -24,6 +24,7 @@ DraftCard 1.0 DraftCard.qml
 Talk 1.0 Talk.qml
 Pipeline 1.0 Pipeline.qml
 PrinterChip 1.0 PrinterChip.qml
+FetchProgress 1.0 FetchProgress.qml
 Workspace 1.0 Workspace.qml
 MiniView 1.0 MiniView.qml
 Home 1.0 Home.qml
