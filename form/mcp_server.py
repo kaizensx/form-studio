@@ -377,19 +377,32 @@ def build() -> MCPServer:
                              "(or update_design for an existing project). Look at the sheet and the section it returns."}
 
     @mcp.tool(annotations=RO)
-    async def design_examples(query: str = "", name: str = "") -> dict:
-        """Complete, high-quality example designs (build123d + form.craft) to learn construction from: a carbon
-        full-face helmet, an ergonomic mouse, a planetary gearbox, a hinged case with a snap latch, an ergonomic
-        handle, a knurled knob, a spiral-ribbed vase and more. query: words to search; name: one exemplar, returned with its full source.
-        They are references for you, never projects, and never shown to the person as designs."""
+    async def design_examples(query: str = "", name: str = "", technique: str = "", category: str = "") -> dict:
+        """Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of
+        them: mechanical parts (linear slide, shaft coupler, pillow block, cam follower, gearbox), consumer products
+        (mouse, earbud case, bottle and cap, game controller), organic forms (mask, horn, handle), textured parts
+        (knurl, hex relief, woven, fluted), assemblies (hinged case, ratchet wrench, robot head), helmets (full-face,
+        open-face, sci-fi prop) and enclosures (electronics box with bosses, sliding battery box, handheld shell).
+        query: words to search (ranked); name: one exemplar with its full source; technique: just the code block that
+        does one thing ("hollow a lofted shell", "snap-fit lid", "two-view opening"); category: mechanical, consumer,
+        organic, textured, assembly, helmet or enclosure. They are references for you, never projects, and never
+        shown to the person as designs."""
         from . import exemplars
         if name:
             try:
                 return exemplars.get(name)
             except KeyError:
                 raise ToolError(f"Unknown exemplar “{name}”. Known: {', '.join(e['name'] for e in exemplars.catalogue())}.")
-        hits = exemplars.search(query, 5) if query else exemplars.catalogue()
-        return {"examples": hits, "next": "design_examples(name=...) returns the full source and the lessons."}
+        if technique:
+            return {"snippets": exemplars.snippets(technique, 4),
+                    "next": "design_examples(name=...) returns the whole design a snippet comes from."}
+        if query:
+            hits = exemplars.search(query, 5, category or None)
+        else:
+            keep = ("name", "title", "category", "summary", "tags", "snippets")
+            hits = [{k: e.get(k) for k in keep} for e in exemplars.catalogue() if not category or e["category"] == category]
+        return {"examples": hits, "next": "design_examples(name=...) returns the full source and the lessons; "
+                                          "technique=... returns just the block that does one thing."}
 
     @mcp.tool(annotations=RW, structured_output=False)
     async def critique(project: str, notes: str = "", reads_as: str = "", product_class: str = "",
@@ -632,6 +645,41 @@ def build() -> MCPServer:
                                "for them (or run_pipeline(project), which reuses finished outputs); look at the sheet meanwhile.")
         res["project"] = await _run(digest, st, project)
         return await _with_views(st, project, res)
+
+    @mcp.tool(annotations=RW, structured_output=False)
+    async def build_candidates(candidates: list[dict], name: str = "", project: str = "", brief: str = "",
+                               targets: dict | None = None, product_class: str = "", keep: str = "best",
+                               purpose: str | None = None, plan: str = "", expect_head: int | None = None,
+                               sweep: bool = True, ctx: Context = None) -> list:
+        """Build 2-6 versions of a risky design or step at the same time (one kernel worker each), verify and score
+        every one, and keep the best. candidates: [{label, source}] or, after the first, {label, values} to try other
+        values on the first one's source. Use it when there are two or three plausible constructions (a loft or a
+        sweep, one shell or two halves, a thick or a thin wall) instead of trying them one by one.
+        Scores (0-100, heuristic, the parts are returned): builds (a valid solid with the declared count; a failure
+        carries its diagnosis), brief (targets: {"size_mm": [x, y, z], "tolerance_mm": 1, "solids": n,
+        "derived": {key: value}}), quality (critique metrics; the product class silhouette with product_class),
+        robust (fewer form.craft fallbacks) and editable (the share of parameters that still build at both ends of
+        their range). keep="best": create the design `name` from the winner (or a new revision of `project`, with
+        expect_head); keep="none": only compare. A candidate that fails never sinks the others. Returns the ranking
+        and, when a design was kept, its six-view sheet: look."""
+        st = studio()
+        from . import candidates as cand, staged
+        if keep == "best" and name and not project:
+            first = next((c.get("source") for c in candidates if isinstance(c, dict) and c.get("source")), "")
+            await _run(staged.require_plan, st, f"{name}. {brief}", first, plan)
+        act(project or None, "design", f"Building {len(candidates)} candidates" + (f" for {name}" if name else ""), ctx)
+        r = await _run(cand.run, st, candidates, name, project, brief, targets, product_class or None, keep,
+                       _purpose(purpose), sweep, 25.0, "", expect_head, _origin(ctx))
+        pid = r.get("project")
+        if not pid:
+            return [json.dumps(r, indent=1, default=str)]
+        if not project:
+            _made(pid, "build_candidates")
+            if plan:
+                await _run(staged.attach_pending, st, pid, plan)
+        act(pid, "commit", f"r{r['head']:02d}: best of {len(candidates)} candidates ({r['best']})", ctx)
+        r["project"] = await _run(digest, st, pid)
+        return await _with_views(st, pid, r)
 
     @mcp.tool(annotations=RO)
     async def get_design_source(project: str, rev: int | None = None) -> dict:

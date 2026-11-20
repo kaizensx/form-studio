@@ -59,7 +59,8 @@ DRAFT_DAYS = 7                                  # a draft nobody sent is cleared
 #: MCP tools that put a new design in front of the person, and the role it plays in the conversation.
 #: tests/test_request_family.py fails on a tool that returns a new project id and is not listed here.
 CREATOR_TOOLS = {"create_project": "made", "create_design": "made", "reconstruct": "made", "duplicate_project": "made",
-                 "import_project": "made", "pick_concept": "made", "propose_concepts": "concept"}
+                 "import_project": "made", "pick_concept": "made", "propose_concepts": "concept",
+                 "build_candidates": "made"}
 EVENT_KINDS = ("user", "start", "text", "tool", "result", "act", "end", "error", "ask", "answer", "suggest")
 
 
