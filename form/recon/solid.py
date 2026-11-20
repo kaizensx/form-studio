@@ -32,7 +32,7 @@ def _faces_from_triangles(V, F, progress=None):
     return out, skipped
 
 
-def shape_from_faces(faces, tol, progress=None, stage="layer0", base=0.4):
+def shape_from_faces(faces, tol, progress=None, stage="layer0", base=0.4, keep=None):
     """Sew faces and close them into a solid. Returns (TopoDS_Shape, info)."""
     from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid, BRepBuilderAPI_Sewing
     from OCP.BRep import BRep_Builder
@@ -46,6 +46,8 @@ def shape_from_faces(faces, tol, progress=None, stage="layer0", base=0.4):
     if progress:
         progress({"stage": stage, "text": f"Sewing {len(faces):,} faces", "fraction": base})
     sew.Perform()
+    if keep is not None:
+        keep["sew"] = sew
     sewn = sew.SewedShape()
     info = {"free_edges": sew.NbFreeEdges(), "multiple_edges": sew.NbMultipleEdges(), "degenerated": sew.NbDegeneratedShapes()}
     shells = []
@@ -125,8 +127,85 @@ def layer0(V: np.ndarray, F: np.ndarray, progress=None, merge: bool = True) -> t
     return shape, info
 
 
-def tessellate(shape, tol: float):
-    """(V, F) of a shape's faces, outward-wound."""
+def tessellate(shape, tol: float, levels: int = 4):
+    """(V, F) of a shape's faces, outward-wound, within about `tol` of the surfaces.
+
+    The kernel's mesher keeps its nodes on the surfaces, but on B-spline faces the middles of its triangles can be
+    several times `tol` away. So every triangle whose middle is farther than `tol` from the surface (evaluated at the
+    middle of its parameters) is cut in four, the new corners evaluated on the surface, up to `levels` times. Cut
+    triangles may leave cracks narrower than `tol` against uncut neighbours: this mesh is for measuring, not export."""
     from build123d import Shape
-    from ..kernel import _tessellate
-    return _tessellate(Shape.cast(shape) if not hasattr(shape, "wrapped") else shape, tol)
+    from OCP.BRep import BRep_Tool
+    from OCP.BRepAdaptor import BRepAdaptor_Surface
+    from OCP.BRepMesh import BRepMesh_IncrementalMesh
+    from OCP.TopAbs import TopAbs_FACE, TopAbs_REVERSED
+    from OCP.TopExp import TopExp_Explorer
+    from OCP.TopLoc import TopLoc_Location
+    from OCP.TopoDS import TopoDS
+    sh = Shape.cast(shape) if not hasattr(shape, "wrapped") else shape
+    BRepMesh_IncrementalMesh(sh.wrapped, tol, False, 0.35, True)
+    Ps, Ts, off = [], [], 0
+    ex = TopExp_Explorer(sh.wrapped, TopAbs_FACE)
+    while ex.More():
+        face = TopoDS.Face(ex.Current())
+        ex.Next()
+        loc = TopLoc_Location()
+        tri = BRep_Tool.Triangulation_s(face, loc)
+        if tri is None or tri.NbTriangles() == 0:
+            continue
+        trsf = loc.Transformation()
+        n = tri.NbNodes()
+        P = np.empty((n, 3))
+        for i in range(1, n + 1):
+            q = tri.Node(i).Transformed(trsf)
+            P[i - 1] = (q.X(), q.Y(), q.Z())
+        T = np.array([tri.Triangle(i).Get() for i in range(1, tri.NbTriangles() + 1)], dtype=np.int64) - 1
+        if tri.HasUVNodes():
+            UV = np.array([(tri.UVNode(i).X(), tri.UVNode(i).Y()) for i in range(1, n + 1)])
+            P, T = _refine(BRepAdaptor_Surface(face), P, UV, T, tol, levels)
+        if face.Orientation() == TopAbs_REVERSED:
+            T = T[:, [0, 2, 1]]
+        Ps.append(P)
+        Ts.append(T + off)
+        off += len(P)
+    if not Ps:
+        return np.zeros((0, 3)), np.zeros((0, 3), dtype=np.int64)
+    return np.concatenate(Ps), np.concatenate(Ts)
+
+
+def _refine(surf, P, UV, T, tol, levels):
+    """Cut triangles whose middle is farther than tol from the surface into four, corners on the surface."""
+    def at(uv):
+        out = np.empty((len(uv), 3))
+        for k, (u, v) in enumerate(uv):
+            q = surf.Value(float(u), float(v))
+            out[k] = (q.X(), q.Y(), q.Z())
+        return out
+    P, UV = list(P), list(UV)
+    T = np.asarray(T)
+    for _ in range(levels):
+        Pa, UVa = np.array(P), np.array(UV)
+        cen = at(UVa[T].mean(axis=1))
+        dev = np.linalg.norm(cen - Pa[T].mean(axis=1), axis=1)
+        bad = dev > tol
+        if not bad.any():
+            break
+        mids = {}
+        new = [T[~bad]]
+        for a, b, c in T[bad].tolist():
+            m = []
+            for i, j in ((a, b), (b, c), (c, a)):
+                k = (min(i, j), max(i, j))
+                if k not in mids:
+                    mids[k] = len(UV)
+                    UV.append(0.5 * (UVa[i] + UVa[j]))
+                    P.append(None)
+                m.append(mids[k])
+            ab, bc, ca = m
+            new.append(np.array([[a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]]))
+        idx = list(mids.values())
+        pts = at(np.array([UV[i] for i in idx]))
+        for i, q in zip(idx, pts):
+            P[i] = q
+        T = np.concatenate(new)
+    return np.array(P), T

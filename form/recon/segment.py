@@ -27,6 +27,7 @@ FLAT_DEG = 0.25
 SMOOTH_DEG = 40.0
 CURVED = ("cylinder", "cone", "sphere", "torus")
 NORMAL_DEG = 20.0          # a facet may lean this far from the fitted surface's normal (chord of a coarse curve)
+FREEFORM_SEEDS = 24        # seeds tried in a smooth part before it is judged freeform
 
 
 @dataclass
@@ -234,12 +235,28 @@ def segment(V, F, tol=0.02, budget_s=60.0, progress=None) -> tuple[list[Region],
     np.add.at(sl, ub[smooth], adj.len[smooth])
     smooth_frac = sl / np.maximum(border, 1e-300)
     order = np.argsort(-uarea, kind="stable")             # big pieces first: a strip of a cylinder says more than a speck
+    # smooth parts of the mesh (bends under 30 degrees): where the first seeds of a part only find small pieces of
+    # different surfaces, the part is freeform (a sculpt, a scan) and is left to the B-spline fit (freeform.py)
+    from .freeform import SMOOTH_DEG as _FF_DEG
+    smooth_part = _components(nu, ua[cross & (adj.angle < _FF_DEG)], ub[cross & (adj.angle < _FF_DEG)])
+    part_area = np.bincount(smooth_part, weights=uarea)
+    part_seeds = np.zeros(len(part_area), dtype=np.int64)
+    part_found = np.zeros(len(part_area))
+    part_big = np.zeros(len(part_area))
+    freeform_parts = set()
     for k_seed, s in enumerate(order.tolist()):
         if time.perf_counter() - t0 > budget_s:
             stats["timed_out"] = True
             break
         if owner[s] >= 0 or tried[s] or smooth_frac[s] < 0.3:
             continue
+        sp = int(smooth_part[s])
+        if sp in freeform_parts:
+            continue
+        if part_seeds[sp] >= FREEFORM_SEEDS and part_big[sp] < 0.1 * part_area[sp] and part_found[sp] < 0.5 * part_area[sp]:
+            freeform_parts.add(sp)
+            continue
+        part_seeds[sp] += 1
         tried[s] = True
         stats["seeds"] += 1
         if progress and stats["seeds"] % 25 == 0:
@@ -288,6 +305,8 @@ def segment(V, F, tol=0.02, budget_s=60.0, progress=None) -> tuple[list[Region],
         regions.append(Region(rid, prim.kind, ts, prim, float(A[ts].sum())))
         owner[us] = rid
         note_axis(prim, float(A[ts].sum()))
+        part_found[sp] += float(A[ts].sum())
+        part_big[sp] = max(part_big[sp], float(A[ts].sum()))
 
     # neighbouring curved regions that one surface holds become one region (a seed can stop short at a seam)
     merged = True
@@ -376,6 +395,7 @@ def segment(V, F, tol=0.02, budget_s=60.0, progress=None) -> tuple[list[Region],
     for r in regions:                                  # report the fit on every vertex, not on the fitting subset
         if r.prim is not None:
             fitmod._finish(r.prim, V[np.unique(F[r.tris])])
+    stats["freeform_parts"] = len(freeform_parts)
     stats["seconds"] = round(time.perf_counter() - t0, 2)
     return regions, stats
 
@@ -387,6 +407,8 @@ def summary(regions: list[Region]) -> dict:
         d = by.setdefault(r.kind, {"regions": 0, "area_mm2": 0.0})
         d["regions"] += 1
         d["area_mm2"] += r.area
-    par = sum(r.area for r in regions if r.parametric)
-    return {"parametric_area_pct": round(100 * par / tot, 2), "frozen_area_pct": round(100 * (tot - par) / tot, 2),
+    par = sum(r.area for r in regions if r.parametric and r.kind != "bspline")
+    ff = sum(r.area for r in regions if r.kind == "bspline")
+    return {"parametric_area_pct": round(100 * par / tot, 2), "freeform_area_pct": round(100 * ff / tot, 2),
+            "frozen_area_pct": round(100 * (tot - par - ff) / tot, 2),
             "by_kind": {k: {"regions": v["regions"], "area_mm2": round(v["area_mm2"], 3)} for k, v in sorted(by.items())}}

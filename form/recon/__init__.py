@@ -1,10 +1,10 @@
 """Mesh to editable CAD: STL, OBJ or 3MF in, a verified solid and (where it fits) a feature recipe out.
 
     Layer 0  exact solid: one planar face per triangle, sewn and merged where coplanar     solid.py
-    Layer 1  analytic faces (plane, cylinder, cone, sphere, torus) where they fit, frozen   segment.py, brep.py
-             facets elsewhere, in one hybrid solid (beta)
-    Layer 2  a build123d Recipe with Params: one extrusion or revolution, holes snapped to  features.py, holes.py
-             standard sizes, patterns; rebuilt and compared with the mesh (beta)
+    Layer 1  analytic faces (plane, cylinder, cone, sphere, torus) and B-spline patches     segment.py, freeform.py,
+             (freeform) where they fit, frozen facets elsewhere, in one solid (beta)         brep.py
+    Layer 2  a build123d Recipe with Params: a feature tree (base, then fillets, chamfers,  tree.py, graph.py, ops.py,
+             holes, patterns) or a parametric spur gear; rebuilt and compared (beta)       gears.py, features.py
 
 Every layer is checked against the mesh (verify.py: two-sided Hausdorff, volume, deviation map). Readers and checks
 (mesh.py, distance.py, fit.py, segment.py) are numpy and scipy only; the rest runs in the kernel worker.

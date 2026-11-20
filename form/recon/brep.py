@@ -129,7 +129,7 @@ class Builder:
         from OCP.GC import GC_MakeArcOfCircle
         from OCP.gp import gp_Ax2, gp_Circ, gp_Dir, gp_Pnt
         P = self.V[vs]
-        both = self.regions[r].parametric and self.regions[q].parametric
+        both = all(self.regions[k].parametric and self.regions[k].kind != "bspline" for k in (r, q))
         if not both or len(vs) == 2:
             return self._segments(vs)
         a, b = P[0], P[-1]
@@ -187,8 +187,16 @@ class Builder:
                          self.V[self.F[reg.tris[0], 2]] - self.V[self.F[reg.tris[0], 0]])
             pr = fitmod.Prim("plane", {"o": self.V[vid].mean(axis=0), "a": n / np.linalg.norm(n)})
         p = pr.p
-        o, a = gp_Pnt(*map(float, p["o"])), gp_Dir(*map(float, p["a"]))
-        ax = gp_Ax3(o, a)
+        if pr.kind == "bspline":
+            if "_geom" not in pr.p:
+                pr.p["_geom"] = pr.surface()
+            return pr.p["_geom"]
+        o, a = gp_Pnt(*map(float, p["o"])), gp_Dir(*map(float, p.get("a", (0.0, 0.0, 1.0))))   # a sphere has no axis
+        x = reg.info.get("xdir")
+        if x is not None and pr.kind != "plane":                 # the seam where the face has no material
+            ax = gp_Ax3(o, a, gp_Dir(*map(float, x)))
+        else:
+            ax = gp_Ax3(o, a)
         k = pr.kind
         if k == "plane":
             return Geom_Plane(ax)
@@ -250,10 +258,159 @@ class Builder:
         return f if agree else f.Reversed()
 
 
+PERIODIC = ("cylinder", "cone", "torus")
+
+
+def _circles_only(V, loops, tol) -> bool:
+    """Every boundary loop is one closed run on a circle (a plain hole or boss): a seam across it is harmless."""
+    for loop in loops:
+        runs = _runs(loop)
+        if len(runs) != 1 or not runs[0][2] or len(runs[0][1]) < 5:
+            return False
+        _, _, rad, dev = _circle(V[runs[0][1][:-1]])
+        if dev > min(0.25 * tol, 0.01 * rad):
+            return False
+    return True
+
+
+def _seam_between_loops(V, loops, o, u, w, tol):
+    """For a face that goes all the way round: True if its default seam is harmless (every boundary is a circle round
+    the axis), an angle for the seam that misses every other boundary (holes through the face), or None if there is
+    no such angle (a boundary that goes round the axis without being a circle)."""
+    spans = []
+    for loop in loops:
+        vs = [h[0] for h in loop]
+        P = V[vs] - o
+        ang = np.sort(np.arctan2(P @ w, P @ u))
+        gaps = np.diff(np.r_[ang, ang[0] + 2 * np.pi])
+        k = int(np.argmax(gaps))
+        if gaps[k] < math.radians(30):                   # goes round the axis: must be one closed circle
+            if not _circles_only(V, [loop], tol):
+                return None
+            continue
+        spans.append((ang[(k + 1) % len(ang)], ang[k]))  # from the end of the gap round to its start
+    if not spans:
+        return True
+    # free angles: not inside any span
+    test = np.linspace(-np.pi, np.pi, 720, endpoint=False)
+    free = np.ones(len(test), dtype=bool)
+    for a0, a1 in spans:
+        rel = (test - a0) % (2 * np.pi)
+        free &= rel > ((a1 - a0) % (2 * np.pi)) + math.radians(2)
+        free &= rel < 2 * np.pi - math.radians(2)
+    if not free.any():
+        return None
+    # the middle of the longest run of free angles
+    idx = np.flatnonzero(free)
+    runs = np.split(idx, np.flatnonzero(np.diff(idx) > 1) + 1)
+    if len(runs) > 1 and runs[0][0] == 0 and runs[-1][-1] == len(test) - 1:
+        runs = [np.r_[runs[-1], runs[0] + len(test)]] + runs[1:-1]
+    best = max(runs, key=len)
+    return float(test[best[len(best) // 2] % len(test)])
+
+
+def split_periodic(V, F, regions: list[Region], loops=None, tol=0.02, turn=0.0):
+    """Faces on periodic surfaces (cylinder, cone, torus) get their seam where they have no material, so no boundary
+    crosses it. A region that goes all the way round has no such place: it is split in two halves, each with its
+    seam in the middle of the other half. Returns (regions, origin) with origin[i] the input region of region i."""
+    out, origin = [], []
+    for r in regions:
+        if r.kind not in PERIODIC or r.prim is None:
+            out.append(r)
+            origin.append(r.id)
+            continue
+        o, a = r.prim.p["o"], r.prim.p["a"]
+        t = np.array([1.0, 0, 0]) if abs(a[0]) < 0.9 else np.array([0, 1.0, 0])
+        u = np.cross(a, t)
+        u /= np.linalg.norm(u)
+        w = np.cross(a, u)
+        P = V[np.unique(F[r.tris])] - o
+        ang = np.sort(np.arctan2(P @ w, P @ u))
+        gaps = np.diff(np.r_[ang, ang[0] + 2 * np.pi])
+        k = int(np.argmax(gaps))
+        if gaps[k] > math.radians(30):
+            mid = ang[k] + 0.5 * gaps[k]
+            r.info["xdir"] = math.cos(mid) * u + math.sin(mid) * w
+            out.append(r)
+            origin.append(r.id)
+            continue
+        if loops is not None:
+            seam = _seam_between_loops(V, loops.get(r.id, []), o, u, w, tol)
+            if seam is not None:
+                if seam is not True:
+                    r.info["xdir"] = math.cos(seam) * u + math.sin(seam) * w
+                out.append(r)
+                origin.append(r.id)
+                continue
+        C = V[F[r.tris]].mean(axis=1) - o
+        th = (np.arctan2(C @ w, C @ u) - turn + np.pi) % (2 * np.pi) - np.pi
+        halves = [r.tris[th >= 0], r.tris[th < 0]]
+        if min(len(h) for h in halves) < 2:
+            out.append(r)
+            origin.append(r.id)
+            continue
+        _, A = _areas(V, F)
+        sw = math.cos(turn + np.pi / 2) * u + math.sin(turn + np.pi / 2) * w
+        for h, seam in zip(halves, (-sw, sw)):
+            q = Region(0, r.kind, h, r.prim, float(A[h].sum()), {"xdir": seam, "half_of": r.id})
+            out.append(q)
+            origin.append(r.id)
+    for i, r in enumerate(out):
+        if r is regions[origin[i]] and r.id != i:
+            r = Region(i, r.kind, r.tris, r.prim, r.area, dict(r.info))
+            out[i] = r
+        r.id = i
+    return out, origin
+
+
+def _areas(V, F):
+    from .mesh import tri_normals
+    return tri_normals(V, F)
+
+
+def _free_edge_regions(sew, V, F, tri_region, regions, origin):
+    """Input regions next to the edges sewing could not join (matched by the mesh vertices at the edge's ends)."""
+    from OCP.BRep import BRep_Tool
+    from OCP.TopExp import TopExp
+    from scipy.spatial import cKDTree
+    tree = cKDTree(V)
+    out = set()
+    for i in range(1, sew.NbFreeEdges() + 1):
+        e = sew.FreeEdge(i)
+        for vx in (TopExp.FirstVertex_s(e), TopExp.LastVertex_s(e)):
+            p = BRep_Tool.Pnt_s(vx)
+            _, vi = tree.query([p.X(), p.Y(), p.Z()])
+            for t in np.flatnonzero((F == vi).any(axis=1)).tolist():
+                r = regions[int(tri_region[t])]
+                if r.parametric:
+                    out.add(origin[r.id])
+    return sorted(out)
+
+
 def build(V, F, regions: list[Region], tol: float, progress=None):
-    """A solid with one face per region. Returns (TopoDS_Shape or None, info)."""
+    """A solid with one face per region. Returns (TopoDS_Shape or None, info). Region ids in the info are those of
+    the input list (a region split for its seam is reported as itself)."""
+    lab = np.empty(len(F), dtype=np.int64)
+    for r in regions:
+        lab[r.tris] = r.id
+    rloops = _loops(F, lab)
+    tries = [(rloops, 0.0), (rloops, np.pi / 2), (None, 0.0)]    # seams between holes; halves split two ways
+    for k, (lp, turn) in enumerate(tries):
+        shape, info = _build(V, F, [_copy(r) for r in regions], tol, progress, lp, turn)
+        info["seam_strategy"] = k
+        if shape is not None or info.get("face_failures"):
+            break
+    return shape, info
+
+
+def _copy(r):
+    return Region(r.id, r.kind, r.tris, r.prim, r.area, dict(r.info))
+
+
+def _build(V, F, regions, tol, progress, rloops, turn):
     from .solid import check, shape_from_faces, unify
     t0 = time.perf_counter()
+    regions, origin = split_periodic(V, F, regions, rloops, tol, turn)
     b = Builder(V, F, regions, tol)
     loops = _loops(F, b.tri_region)
     faces, failed = [], []
@@ -263,13 +420,17 @@ def build(V, F, regions: list[Region], tol: float, progress=None):
         try:
             faces.append(b.face(reg, loops.get(reg.id, [])))
         except Exception as e:                     # noqa: BLE001  (OCCT raises many kinds)
-            failed.append({"region": reg.id, "kind": reg.kind, "error": f"{type(e).__name__}: {e}"[:200]})
-    info = {"faces_built": len(faces), "face_failures": failed, **b.stats}
+            failed.append({"region": origin[reg.id], "kind": reg.kind, "error": f"{type(e).__name__}: {e}"[:200]})
+    info = {"faces_built": len(faces), "face_failures": failed, "split_for_seam": len(regions) - len(set(origin)), **b.stats}
     if failed:
         return None, info
-    shape, si = shape_from_faces(faces, tol=max(1e-6, 1e-6 * b.size), progress=progress, stage="layer1", base=0.85)
+    sew_out = {}
+    shape, si = shape_from_faces(faces, tol=max(1e-6, 1e-6 * b.size), progress=progress, stage="layer1", base=0.85,
+                                 keep=sew_out)
     info.update(si)
     if not si["solid"]:
+        if si.get("free_edges") and "sew" in sew_out:
+            info["free_edge_regions"] = _free_edge_regions(sew_out["sew"], V, F, b.tri_region, regions, origin)
         return None, info
     ck = check(shape)
     if ck["valid"]:
