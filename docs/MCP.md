@@ -67,7 +67,7 @@ Rules:
 
 ## Tools at a glance
 
-83 tools. Read-only tools never change a project.
+84 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -113,6 +113,7 @@ Rules:
 | [`request_release`](#request_release) | read-only | Check whether the head revision can be released and hand the decision to the user. |
 | [`verify_release`](#verify_release) | read-only | Re-hash every file of a release against its manifest and say whether it still matches the head revision. |
 | [`open_in`](#open_in) | changes | Open a current output in the user's own software: what = step \| stl \| 3mf \| gcode \| folder. |
+| [`open_in_slicer`](#open_in_slicer) | changes | Open the design in the user's slicer, sliced with settings chosen for this part on this printer: orientation (the orientation finder's first choice), layer height, walls, top/bottom layers, infill and pattern, supports (only where overhangs need them), brim, seam, filament for the design's material and the speed profile (one of the printer's own process presets). |
 | [`open_bench`](#open_bench) | changes | The bench is the local web page where the user inspects the 3D model, compares revisions and approves releases. |
 | [`brief_presets`](#brief_presets) | read-only | Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure, car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a material to start from and the checks to plan for. |
 | [`import_reference`](#import_reference) | changes | Import an existing part (STEP or STL, e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's references. |
@@ -767,6 +768,23 @@ nothing is uploaded.
 | `project` | string | yes |
 | `what` | string |  |
 | `app` | string |  |
+
+### `open_in_slicer`
+
+Open the design in the user's slicer, sliced with settings chosen for this part on this printer: orientation
+(the orientation finder's first choice), layer height, walls, top/bottom layers, infill and pattern, supports
+(only where overhangs need them), brim, seam, filament for the design's material and the speed profile (one of
+the printer's own process presets). Each decision has a one-line reason labelled "computed" or "heuristic".
+It starts from the slicer's own preset and overrides only those keys, slices for real (time and grams are the
+slicer's simulation), writes a project 3MF with the plate, the oriented part, the settings and the filament,
+checks the settings are in that file, and opens it in the slicer's app. printer: an id from list_printers
+(default: the design's printer). open_app=false writes the file without opening it. Nothing is printed or sent.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `printer` | string |  |
+| `open_app` | boolean |  |
 
 ### `open_bench`
 

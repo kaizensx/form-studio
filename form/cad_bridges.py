@@ -389,7 +389,15 @@ except Exception:
 # ---- opening a file in the user's own program -----------------------------------------------------------------------
 
 def open_file(target: str, app: str = "") -> dict:
-    """Hand a file to another program with the system's open command. Raises RuntimeError on failure."""
+    """Hand a file to another program with the system's open command. Raises RuntimeError on failure.
+
+    FORM_FAKE_LAUNCH=<file> (tests): append {"opened", "with"} to that file as one JSON line instead of opening."""
+    fake = os.environ.get("FORM_FAKE_LAUNCH")
+    if fake:
+        import json
+        with open(fake, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"opened": target, "with": app}) + "\n")
+        return {"opened": target, "with": app or "system default", "fake": True}
     if sys.platform == "darwin":
         cmd = ["open"] + (["-a", app] if app else []) + [target]
     elif sys.platform.startswith("win") and not app:

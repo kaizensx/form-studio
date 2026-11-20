@@ -316,6 +316,7 @@ QtObject {
         pid = id
         draftValues = ({}); draftProv = ({}); draftNote = ""; draftOrigin = ""; draftAgent = ""
         preview = null; draftError = null; feature = ""; compare = null; instructions = null; layers = null; section = null; ack = []
+        slicerOpened = null
         _stamp = ""
         return refresh(true).then(function () {
             screen = "work"; viewName = "iso"; blankCanvas = false
@@ -673,6 +674,22 @@ QtObject {
                   + F.fmt(m.hausdorff_mm, 4) + " mm from the mesh (computed)")
             return reloadStudio().then(function () { open(r.project) })
         }, fail)
+    }
+    // Open in <Slicer>: settings chosen for this part, sliced for real, the project opened in the slicer (form/slicer_open.py)
+    property bool slicerOpenBusy: false
+    property var slicerOpened: null                // the last result for this design: decisions, time, grams, file
+    readonly property string slicerName: (data && data.slice && data.slice.slicer_name) || slicer.label || "your slicer"
+    function openInSlicer() {
+        if (slicerOpenBusy) return Promise.resolve(null)
+        slicerOpenBusy = true
+        var at = pid
+        return ppost("/slicer_open", {}).then(function (r) {
+            slicerOpenBusy = false
+            if (pid === at) slicerOpened = r
+            toast("Opened in " + r.slicer, F.dur(r.time_s) + " · " + F.fmt(r.filament_g, 1) + " g (the slicer's estimate) · "
+                  + r.decisions.filter(function (d) { return d.changed }).length + " settings chosen for this part")
+            return r
+        }, function (e) { slicerOpenBusy = false; fail(e); return null })
     }
     function openIn(what, app) {
         ppost("/open", { what: what, app: app || "" }).then(function (r) { toast("Opened in " + (app === "freecad" ? "FreeCAD" : r.with), String(r.opened).replace(/^.*[\/\\]/, "")) }, fail)

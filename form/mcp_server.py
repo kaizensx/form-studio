@@ -135,7 +135,8 @@ def _purpose(purpose: str | None) -> str | None:
 
 # Tools that only make sense for someone who prints (form/capabilities.py "print"). With printing off they are left out
 # of form_overview and refuse with PRINTING_OFF: Form Studio is for making things; printing is opt-in.
-PRINT_TOOLS = ("choose_printer", "plate_plan", "pack_plate", "print_simulation", "slice_test_piece", "set_print_setup")
+PRINT_TOOLS = ("choose_printer", "plate_plan", "pack_plate", "print_simulation", "slice_test_piece", "set_print_setup",
+               "open_in_slicer")
 PRINTING_OFF = ("printing is off; enable it in Settings (Set up for › 3D printing). Form Studio still designs, checks "
                 "and exports this as a 3D model (STEP, STL, 3MF, OBJ, GLB).")
 
@@ -949,6 +950,24 @@ def build() -> MCPServer:
         st = studio()
         from .cad_bridges import open_output
         return await _run(open_output, st, project, what, app)
+
+    @mcp.tool(annotations=OPEN)
+    async def open_in_slicer(project: str, printer: str = "", open_app: bool = True, ctx: Context = None) -> dict:
+        """Open the design in the user's slicer, sliced with settings chosen for this part on this printer: orientation
+        (the orientation finder's first choice), layer height, walls, top/bottom layers, infill and pattern, supports
+        (only where overhangs need them), brim, seam, filament for the design's material and the speed profile (one of
+        the printer's own process presets). Each decision has a one-line reason labelled "computed" or "heuristic".
+        It starts from the slicer's own preset and overrides only those keys, slices for real (time and grams are the
+        slicer's simulation), writes a project 3MF with the plate, the oriented part, the settings and the filament,
+        checks the settings are in that file, and opens it in the slicer's app. printer: an id from list_printers
+        (default: the design's printer). open_app=false writes the file without opening it. Nothing is printed or sent."""
+        _need_printing()
+        st = studio()
+        act(project, "look", "Choosing print settings and opening the design in the slicer", ctx)
+        def go():
+            from . import slicer_open
+            return slicer_open.run(st, st.load(project), printer or None, open_app=open_app)
+        return await _run(go)
 
     @mcp.tool(annotations=OPEN)
     async def open_bench(project: str | None = None, open_browser: bool = True) -> dict:

@@ -38,6 +38,7 @@ Item {
             Store.analysisMaps.forEach(function (m) { if (m.value) add("Tools", "map." + m.value, "layers", "Analysis map: " + m.text, Store.analysisMap === m.value ? "Showing now" : "Colour the part by " + m.text.toLowerCase(), function () { Store.setAnalysis(m.value) }) })
             if (Store.analysisMap) add("Tools", "map.off", "layers", "Hide the analysis map", Store.analysisLabel(Store.analysisMap), function () { Store.setAnalysis("") })
             add("Tools", "orient", "move_3d", "Find a print orientation", "Ranks the ways it can sit on the plate", function () { Store.setStage("prove"); Store.findOrientation() })
+            if (Store.printUi) add("Tools", "slicerOpen", "external_link", "Open in " + Store.slicerName, "Sliced with settings chosen for this part", function () { Store.setStage("prove"); Store.openInSlicer() })
             add("Tools", "simulate", "film", "Simulate the print", "Layer by layer, from the real slice", function () { Store.simulate() })
             add("Tools", "layers", "layers", Store.layers ? "Close the layer view" : "Show the sliced layers", "The toolpath of the current slice", function () { Store.showLayers(!Store.layers) })
             add("Tools", "run", "play", "Regenerate everything", "Solid, exports, checks, slice", function () { Store.run() })

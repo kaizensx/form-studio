@@ -659,6 +659,11 @@ def make_handler(st: Studio):
                 st.activity(pid, "design", "Lighter: " + (f"r{out['head']:02d}" if body.get("changes") else "print settings") + ".", by="you")
                 out["job"] = auto(st.load(pid))
                 return self._json(out)
+            if action == "slicer_open":                    # Open in <Slicer>: chosen settings, sliced, opened (form/slicer_open.py)
+                from . import slicer_open
+                out = slicer_open.run(st, p, body.get("printer") or None, open_app=body.get("open", True) is not False)
+                st.activity(pid, "look", f"Opened in {out['slicer']} with settings chosen for this part.", by="you")
+                return self._json(out)
             if action == "slicecompare":
                 from . import slicecompare
                 return self._json(slicecompare.compare(st, p, limit=int(body.get("limit") or slicecompare.LIMIT),

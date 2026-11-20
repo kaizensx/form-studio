@@ -353,7 +353,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 83 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 84 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
@@ -502,6 +502,15 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
 
 ![Several plates in Prove, each sliced on its own](images/plates.webp)
 
+- **Open in your slicer, ready to print.** Prove › **Open in Bambu Studio** (or OrcaSlicer, PrusaSlicer and the other
+  slicers) chooses the settings for this part on this printer and says why, one line each, labelled computed or
+  heuristic: the orientation finder's first choice, layer height from the nozzle and the part's slopes and size, walls
+  and top and bottom layers from its load and thinnest wall, infill and pattern, supports only where overhangs need
+  them (tree or normal), a brim for tall, narrow or warping parts, the seam, the filament for its material and the
+  speed profile (one of the printer's own process presets). It starts from the slicer's preset and overrides only
+  those keys, slices for real so time and grams show first, writes a project 3MF with the plate, the oriented part,
+  the settings and the filament, reads the settings back from it and opens it in the slicer. `form slicer-open`;
+  MCP `open_in_slicer`.
 - **Every printer you have, compared.** Prove › Every printer slices the design for real on each printer set up in
   each installed slicer, with its own process and filament, and shows time, filament and cost side by side with the
   fastest, least filament and cheapest marked. `form compare-printers`; MCP `compare_printers`.
