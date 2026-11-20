@@ -44,7 +44,8 @@ class Purposes(unittest.TestCase):
         self.assertEqual(purpose.default({}), "model", "a new design is a 3D model unless printing is on")
         self.assertEqual(purpose.default({"general": {"printing": False}}), "model")
         self.assertTrue(purpose.printing({"general": {"printing": True}}), "the older answer still reads as it did")
-        self.assertEqual(purpose.default({"general": {"capabilities": ["core", "print"]}}), "print")
+        self.assertEqual(purpose.default({"general": {"capabilities": ["core", "print"]}}), "model",
+                         "creation first: a new design is a 3D model even for someone who prints")
         self.assertFalse(purpose.printing({"general": {"capabilities": ["parts"], "printing": True}}),
                          "capabilities win over the older answer")
         d = purpose.describe({"purpose": "model", "process": "cnc"})
