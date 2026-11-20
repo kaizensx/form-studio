@@ -2,7 +2,7 @@ import QtQuick
 import FormNative
 import "F.js" as F
 
-// One design on Home: the live part on its plate, its name, where it stands. Home shows one card per design family
+// One design on Home: the live part in the studio, its name, where it stands. Home shows one card per design family
 // (a design with its copies, variants and picked concepts); that card carries the family's count and opens the family.
 // `member` is the same card inside an opened family: smaller, with how it came to be instead of the count.
 // Rename and move-to-trash happen in place; the state for both lives on Home (`host`), because a list refresh rebuilds
@@ -12,7 +12,7 @@ Item {
     objectName: "projectCard"            // an opened family names its members "familyMember" (Home.qml)
     property Item host: null                 // Home
     property var p: ({})                     // the design (a row of /studio projects)
-    property int index: 0
+    property int order: 0                    // its place on Home, for the stagger as cards arrive (not `index`: a Repeater sets that)
     property bool member: false
     property int count: 1                    // designs in this family (the family's face only)
     property bool opened: false              // the family is open under this row
@@ -30,7 +30,7 @@ Item {
 
     opacity: 0
     Component.onCompleted: { if (!host || host.entered || member) opacity = 1; else appear.start() }
-    SequentialAnimation { id: appear; PauseAnimation { duration: 260 + Math.min(card.index, 9) * Theme.stagger }
+    SequentialAnimation { id: appear; PauseAnimation { duration: 260 + Math.min(card.order, 9) * Theme.stagger }
         ParallelAnimation { Glide { target: card; property: "opacity"; to: 1; duration: Theme.slow }
             Glide { target: rise; property: "y"; from: Theme.shift(14); to: 0; duration: Theme.slow } } }
     transform: Translate { id: rise; y: 0 }
@@ -54,7 +54,7 @@ Item {
         Behavior on scale { Glide { duration: Theme.press } }
         Behavior on border.color { Tint {} }
         Shadow { radius: parent.radius; spread: 30; drop: 16; opacity: card.hot ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.base } } }
-        // the part on its plate, turning while you look at it
+        // the part on the studio floor, turning while you look at it
         Rectangle { id: stagePv; x: 1; y: 1; width: parent.width - 2; height: parent.height - card.foot - 1; clip: true
             color: Theme.plate; topLeftRadius: face.radius - 1; topRightRadius: face.radius - 1
             MiniView { anchors.fill: parent; projectId: card.p.id || ""; turning: card.hot && !card.asking } }
@@ -71,7 +71,7 @@ Item {
             Txt { text: card.p.name || ""; font.weight: Theme.wSemi; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
             Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
                 text: (card.member ? (card.root ? "the first design" : card.via ? "a " + card.via : "design")
-                                   : card.p.purpose === "model" ? "3D model" : card.host ? card.host.recipeTitle(card.p.recipe) : "") + "  ·  " + F.ago(card.p.updated) } }
+                                   : card.p.purpose === "print" && Store.printOn ? "For 3D printing" : card.host ? card.host.recipeTitle(card.p.recipe) : "") + "  ·  " + F.ago(card.p.updated) } }      // a model is the normal case: no label
         Column { id: side; visible: !card.editing && !card.asking; anchors.right: parent.right; anchors.rightMargin: 16; y: parent.height - card.foot + (card.member ? 10 : 12); spacing: 5
             Txt { mono: true; font.pixelSize: 12; text: F.pad(card.p.head); anchors.right: parent.right; tone: 2 }
             Tag { anchors.right: parent.right; visible: !!card.p.approved_rev

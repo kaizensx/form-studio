@@ -9,6 +9,8 @@ import "F.js" as F
 // what any other agent does to your designs.
 Rectangle {
     id: talk
+    objectName: "talk"
+    readonly property var attachFilters: pick.nameFilters     // what the attach dialog offers (tests/journeys/open_conv.py)
     color: Theme.plate1
     readonly property bool empty: Store.chatItems.length === 0 && !Store.chatBusy
     property var openGroups: ({})             // step group key → unfolded
@@ -89,7 +91,7 @@ Rectangle {
             else if (ev.t === "end") out.push({ t: "end", k: "e" + i, cost: ev.cost_usd, steps: ev.steps, seconds: ev.seconds, stopped: !!ev.stopped,
                                                 model: Store.modelName(ev) || model, agent: ev.agent || agent, change: ev.change || null,
                                                 usage: ev.usage || null })
-            else if (ev.t === "error") out.push({ t: "error", k: "x" + i, text: ev.text, hint: ev.hint || "" })
+            else if (ev.t === "error") out.push({ t: "error", k: "x" + i, text: ev.text, hint: ev.hint || "", agent: ev.agent || agent })
         }
         // follow-ups: only the newest, only until you write again, and shown under the reply's footer
         var sg = -1
@@ -124,7 +126,8 @@ Rectangle {
         function onChatRecallChanged() { if (Store.chatRecall) { ta.text = Store.chatRecall; ta.cursorPosition = ta.text.length } } }
 
     FileDialog { id: pick; title: "Attach files"; fileMode: FileDialog.OpenFiles
-        nameFilters: ["Images, PDFs, CAD and meshes (*.png *.jpg *.jpeg *.webp *.gif *.bmp *.pdf *.step *.stp *.stl *.3mf *.obj)"]
+        nameFilters: ["Everything Form Studio reads (*.png *.jpg *.jpeg *.webp *.heic *.gif *.bmp *.pdf *.step *.stp *.stl *.3mf *.obj)",
+                      "Parts and meshes (*.step *.stp *.stl *.3mf *.obj)", "Photos and pictures (*.png *.jpg *.jpeg *.webp *.heic *.gif *.bmp)", "Drawings (*.pdf)"]
         onAccepted: Store.attachFiles(selectedFiles) }
     Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.rule }
 
@@ -173,6 +176,39 @@ Rectangle {
         anchors.top: head.bottom; width: parent.width - 1; height: visible ? 62 : 0; color: Theme.plate1
         ReplaceSteps { x: 14; y: 9; width: parent.width - 28; done: Store.replaceProgress.done; active: Store.replaceProgress.active }
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule } }
+
+    // ── the designs this conversation made, when it made more than one: click one to open it ──
+    Rectangle {
+        id: strip; objectName: "designStrip"; z: 2
+        visible: Store.designsHere.length > 1
+        anchors.top: rsteps.visible ? rsteps.bottom : head.bottom; width: parent.width - 1; height: visible ? 52 : 0; color: Theme.plate1
+        ListView {
+            id: stripList; x: 10; y: 8; width: parent.width - 20; height: 36; orientation: ListView.Horizontal; spacing: 6; clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            model: Store.designsHere
+            delegate: Rectangle {
+                id: dsi; objectName: "designStripItem"; required property var modelData; required property int index
+                readonly property bool here: modelData.project === Store.pid
+                readonly property string title: modelData.name
+                width: Math.min(200, dl.implicitWidth + 50); height: 36; radius: Theme.rMd
+                color: here ? Theme.plate3 : dm.pressed ? Theme.washPress : dm.containsMouse && modelData.live ? Theme.washHover : "transparent"
+                border.color: here ? Theme.alpha(Theme.datum, 0.45) : Theme.rule
+                opacity: modelData.live ? 1 : 0.55
+                Behavior on color { Tint {} }
+                Rectangle { x: 4; width: 28; height: 28; radius: Theme.rSm; color: Theme.plate; clip: true; anchors.verticalCenter: parent.verticalCenter
+                    MiniView { visible: dsi.modelData.live; anchors.fill: parent; projectId: dsi.modelData.live ? dsi.modelData.project : "" }
+                    Icon { visible: !dsi.modelData.live; anchors.centerIn: parent; name: "trash_2"; size: 12; color: Theme.ink4 } }
+                Txt { id: dl; x: 38; width: parent.width - 46; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; font.weight: dsi.here ? Theme.wSemi : Theme.wMedium
+                    tone: dsi.here ? 1 : 2; elide: Text.ElideRight; wrapMode: Text.NoWrap; text: dsi.modelData.name }
+                MouseArea { id: dm; anchors.fill: parent; hoverEnabled: true; enabled: dsi.modelData.live
+                    cursorShape: dsi.modelData.live && !dsi.here ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: Store.openConvDesign(dsi.modelData.project) }
+                Tip { show: dm.containsMouse; text: !dsi.modelData.live ? dsi.modelData.name + " is in the trash" : dsi.here ? dsi.modelData.name + " is open"
+                    : "Open " + dsi.modelData.name + ({ concept: " (a concept)", continued: " (carried on here)" }[dsi.modelData.role] || "") }
+            }
+        }
+        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule }
+    }
 
     // ── nothing open yet: what you can ask ──
     Column {
@@ -230,7 +266,7 @@ Rectangle {
         property bool stick: true              // follow the newest message unless the reader scrolled up
         property bool auto: false
         visible: !talk.empty
-        anchors.top: rsteps.visible ? rsteps.bottom : head.bottom; anchors.bottom: foot.top; anchors.left: parent.left; anchors.right: parent.right
+        anchors.top: strip.visible ? strip.bottom : rsteps.visible ? rsteps.bottom : head.bottom; anchors.bottom: foot.top; anchors.left: parent.left; anchors.right: parent.right
         topMargin: 16; bottomMargin: 12; clip: true; spacing: 14
         boundsBehavior: Flickable.StopAtBounds
         model: blocks
@@ -333,9 +369,28 @@ Rectangle {
                     Btn { small: true; kind: "quiet"; icon: "rotate_cw"; tip: "Send your last message again"; onClicked: Store.retryChat() } } }
               // what this reply changed in the design: compare it, or go back
               TalkChange { visible: !!it.m.change; width: body.width; change: it.m.change } } }
-            Component { id: cErr; Column { spacing: 6
-                Note { kind: "red"; text: it.m.text + (it.m.hint ? "\n" + it.m.hint : ""); width: body.width }
-                Row { visible: !!it.m.last; spacing: 6
+            Component { id: cErr; Column { id: ec; spacing: 6
+                // a usage limit is not a failure: a calm card that says which agent, until when, and what is kept
+                readonly property var limit: Store.usageLimit(it.m.text)
+                readonly property string who: { var a = Store.agentInfo(it.m.agent || Store.chatAgent); return a ? a.label : "The agent" }
+                property bool later: false
+                Rectangle { objectName: "usageLimitCard"; visible: !!ec.limit; width: body.width; height: visible ? lc2.implicitHeight + 26 : 0
+                    radius: Theme.rLg; color: Theme.plate2; border.color: Theme.rule2
+                    Column { id: lc2; x: 14; y: 13; width: parent.width - 28; spacing: 6
+                        Row { spacing: 8
+                            Icon { name: "clock"; size: 14; color: Theme.amber; anchors.verticalCenter: parent.verticalCenter }
+                            Txt { font.weight: Theme.wSemi; anchors.verticalCenter: parent.verticalCenter
+                                text: ec.who + " has reached its usage limit" } }
+                        Txt { tone: 2; width: parent.width; wrapMode: Text.WordWrap; lineHeight: 1.35
+                            text: (ec.limit && ec.limit.until ? "It can work again " + (/^\d/.test(ec.limit.until) ? "at " : "") + ec.limit.until + ". " : "It can work again once the limit resets. ")
+                                + (Store.liveDesignsHere.length ? "Everything committed so far is saved: " + Store.liveDesignsHere.map(function (d) { return d.name }).join(", ") + "."
+                                                                : "Nothing was lost; what it committed before the limit is saved.") }
+                        Row { visible: !!it.m.last && !ec.later; spacing: 6; topPadding: 4
+                            Btn { objectName: "limitSwitch"; small: true; kind: "primary"; icon: "repeat"; text: "Use another agent…"; onClicked: talk.tryAnother() }
+                            Btn { objectName: "limitLater"; small: true; kind: "quiet"; text: "Continue later"; onClicked: ec.later = true } }
+                        Btn { visible: ec.later && !!it.m.last; small: true; kind: "quiet"; icon: "rotate_cw"; text: "Send my last message again"; onClicked: Store.retryChat() } } }
+                Note { visible: !ec.limit; kind: "red"; text: it.m.text + (it.m.hint ? "\n" + it.m.hint : ""); width: body.width }
+                Row { visible: !!it.m.last && !ec.limit; spacing: 6
                     Btn { small: true; icon: "rotate_cw"; text: "Retry"; onClicked: Store.retryChat() }
                     Btn { small: true; kind: "quiet"; icon: "repeat"; text: "Try another model…"; onClicked: talk.tryAnother() } } } }
         }
@@ -371,7 +426,7 @@ Rectangle {
             Column {
                 id: inner; width: parent.width
                 // files that go with the next message
-                Item { visible: Store.chatAttach.length > 0; width: parent.width; height: visible ? chips.implicitHeight + 10 : 0
+                Item { visible: Store.chatAttach.length > 0 || Store.chatLinks.length > 0; width: parent.width; height: visible ? chips.implicitHeight + 10 : 0
                     Flow { id: chips; x: 10; y: 10; width: parent.width - 20; spacing: 6
                         Repeater { model: Store.chatAttach
                             Rectangle { id: chip; objectName: "attachChip"; required property var modelData
@@ -384,7 +439,18 @@ Rectangle {
                                 Txt { id: cn; x: chip.pic ? 33 : 27; width: parent.width - x - 26; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; text: chip.modelData.name }
                                 Btn { small: true; kind: "quiet"; icon: "x"; anchors.right: parent.right; anchors.rightMargin: 2; anchors.verticalCenter: parent.verticalCenter
                                     tip: chip.modelData.kind === "cad" ? "Remove. The agent is told to import this part as a reference." : "Remove"
-                                    onClicked: Store.dropAttachment(chip.modelData.id) } } } } }
+                                    onClicked: Store.dropAttachment(chip.modelData.id) } } }
+                        // a page link (not a file): it goes with the message; nothing is downloaded
+                        Repeater { model: Store.chatLinks
+                            Rectangle { id: lchip; objectName: "linkChip"; required property var modelData
+                                width: Math.min(chips.width, ln.implicitWidth + 56); height: 30; radius: Theme.rSm; color: Theme.plate2; border.color: Theme.rule2
+                                Icon { x: 8; size: 13; anchors.verticalCenter: parent.verticalCenter; name: "globe"; color: Theme.blueprint }
+                                Txt { id: ln; x: 27; width: parent.width - x - 26; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
+                                    text: lchip.modelData.host || lchip.modelData.url }
+                                HoverHandler { id: lh }
+                                Tip { show: lh.hovered; text: lchip.modelData.url + "\nA page: it goes with the message as a link. Nothing is downloaded." }
+                                Btn { small: true; kind: "quiet"; icon: "x"; anchors.right: parent.right; anchors.rightMargin: 2; anchors.verticalCenter: parent.verticalCenter
+                                    tip: "Remove"; onClicked: Store.dropLink(lchip.modelData.url) } } } } }
                 ScrollView {
                     width: parent.width; clip: true
                     height: Math.min(220, Math.max(2 * 19 + 18, ta.implicitHeight))
@@ -402,10 +468,15 @@ Rectangle {
                         function submit() {
                             if (!text.trim()) return
                             if (Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure") { Store.answerAsk(Store.chatAsking.id, text.trim(), []); text = ""; return }
-                            if (!Store.chatBusy && Store.chatReady) { Store.send(text); text = "" } }
+                            if (!Store.chatBusy && Store.chatReady) { Store.sendWithLinks(text); text = "" } }
                         Keys.onTabPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
                         Keys.onBacktabPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.BacktabFocusReason)
                         Keys.onPressed: function (e) {
+                            if (e.matches(StandardKey.Paste)) {         // a pasted link is fetched like one added on Home; a pasted photo is attached
+                                var clip = String(Bridge.clipboardText()).trim()
+                                if (/^https?:\/\/\S+$/i.test(clip)) { e.accepted = true; Store.fetchLink(clip); return }
+                                if (!clip) { var img = Bridge.clipboardImage(); if (String(img)) { e.accepted = true; Store.attachFiles([img]); return } }
+                            }
                             if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && !(e.modifiers & Qt.ShiftModifier)) { e.accepted = true; submit() }
                             else if (e.key === Qt.Key_Up && text === "") {            // edit the last message: bring it back
                                 var t = Store.lastUserText()
@@ -416,7 +487,7 @@ Rectangle {
                 }
                 Item { width: parent.width; height: 38
                     Row { x: 6; anchors.verticalCenter: parent.verticalCenter; spacing: 2
-                        Btn { small: true; kind: "quiet"; icon: "paperclip"; tip: "Attach a photo, sketch, PDF, or a STEP/STL part. You can also drop files here."
+                        Btn { small: true; kind: "quiet"; icon: "paperclip"; tip: "Attach a photo, a PDF drawing, or a STEP, STL, 3MF or OBJ part. You can also drop files here, or paste a link."
                             enabled: Store.chat.available; onClicked: Store.ask(pick) }
                         // agent and model for this conversation
                         Item { id: mchip; objectName: "modelChip"; width: ml.width + 31; height: 24
@@ -474,13 +545,19 @@ Rectangle {
     // drop photos, sketches, PDFs, STEP/STL anywhere on the column
     DropArea {
         id: drop; anchors.fill: parent; z: 5
-        onEntered: function (d) { d.accepted = d.hasUrls }
-        onDropped: function (d) { if (d.hasUrls) { Store.attachFiles(d.urls); d.accepted = true } }
+        onEntered: function (d) { d.accepted = d.hasUrls || (d.hasText && /^https?:\/\/\S+$/i.test(String(d.text).trim())) }
+        onDropped: function (d) {
+            var files = [], links = []
+            for (var i = 0; i < (d.urls || []).length; i++) { var u = String(d.urls[i]); if (/^file:/i.test(u)) files.push(d.urls[i]); else if (/^https?:/i.test(u)) links.push(u) }
+            if (!files.length && !links.length && d.hasText && /^https?:\/\/\S+$/i.test(String(d.text).trim())) links.push(String(d.text).trim())
+            if (files.length) Store.attachFiles(files)
+            links.forEach(function (l) { Store.fetchLink(l) })
+            d.accepted = files.length + links.length > 0 }
         Rectangle { anchors.fill: parent; anchors.margins: 6; visible: drop.containsDrag; radius: Theme.rLg
             color: Theme.alpha(Theme.plate, 0.86); border.width: 1; border.color: Theme.datum
             Column { anchors.centerIn: parent; spacing: 8
                 Icon { name: "paperclip"; size: 22; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter }
                 Txt { text: "Drop to attach"; font.weight: Theme.wSemi; anchors.horizontalCenter: parent.horizontalCenter }
-                Txt { kind: "fine"; text: "Images, PDFs, STEP or STL"; anchors.horizontalCenter: parent.horizontalCenter } } }
+                Txt { kind: "fine"; text: "Photos, PDFs, STEP, STL, 3MF, OBJ or a link"; anchors.horizontalCenter: parent.horizontalCenter } } }
     }
 }

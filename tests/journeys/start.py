@@ -74,7 +74,7 @@ def journey_blank(ui):
 def journey_photo_reaches_the_agent(ui):
     home(ui)
     printing_on(ui)                                  # someone who prints: Home offers the purpose
-    ui.click_text("For my printer", within=ui.item("startPurpose"))
+    ui.click_text("My printer", within=ui.item("startPurpose"))
     ui.wait_until(lambda: ui.js("Store.newPurposeEffective") == "print", 5, "the purpose back to printing")
     photo = Path(ui.files) / "desk-clip.png"
     shutil.copyfile(ROOT / "form" / "app" / "assets" / "icon-256.png", photo)

@@ -29,8 +29,10 @@ Item {
         })
         return out
     }
-    readonly property var here: compact || !Store.pid ? [] : threaded(all.filter(function (c) { return c.project === Store.pid }))
-    readonly property var rest: threaded(compact || !Store.pid ? all : all.filter(function (c) { return c.project !== Store.pid })).slice(0, limit)
+    // a conversation is about the open design when it is the one in front or any design it made (Store.convDesigns)
+    function about(c) { return c.project === Store.pid || (c.designs || c.projects || []).some(function (d) { return (d && d.project !== undefined ? d.project : d) === Store.pid }) }
+    readonly property var here: compact || !Store.pid ? [] : threaded(all.filter(function (c) { return cl.about(c) }))
+    readonly property var rest: threaded(compact || !Store.pid ? all : all.filter(function (c) { return !cl.about(c) })).slice(0, limit)
     function projectName(id) {
         if (!id) return "General"
         var ps = Store.studio ? Store.studio.projects : []

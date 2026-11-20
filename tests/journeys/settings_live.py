@@ -1,4 +1,4 @@
-"""Settings apply at once, both ways: the default printer chosen from Settings › Printing shows in Settings, the top bar
+"""Settings apply at once, both ways: the default printer chosen from Settings › Printing shows in Settings, in Review
 and the open design's checks; turning 3D printing off in Settings › General › Set up for hides the Printing tab, the
 printer chip and the Fit stage (nothing is uninstalled), and turning it on brings them back. Nothing needs a restart.
 
@@ -12,7 +12,8 @@ X1 = "Bambu Lab X1 Carbon 0.4 nozzle"
 
 
 def journey_default_printer_from_settings(ui):
-    pid = make(ui, "hook", "Settings journey")
+    pid = make(ui, "hook", "Settings journey", purpose="print")    # made for printing: new designs are 3D models unless said
+    ui.run_js("Store.setStage('prove')")                        # the printer is named in Fit, Review and Make
     ui.run_js("Store.openSettings('printer')")
     open_sheet_wait(ui, "settings")
     ui.wait_until(lambda: ui.find(name="settingsPrinterName") is not None, 10, "the default printer card")
@@ -33,7 +34,7 @@ def journey_default_printer_from_settings(ui):
     ui.wait_until(lambda: sh.property("busy") == "", 20, "the sheet to finish")
     # the top bar and the open design follow, with no restart and no click on the design
     ui.wait_until(lambda: ui.js("Store.printing.available && Store.printing.presets.machine.name") == X1, 10, "the app to follow")
-    ui.wait_until(lambda: ui.sees(X1, ui.item("printerChip")), 10, "the top bar chip")
+    ui.wait_until(lambda: ui.sees(X1, ui.item("printerChip")), 10, "the printer chip in Review")
     ui.wait_until(lambda: (ui.api("/projects/" + pid).get("checks") or {}).get("context", {}).get("envelope") == [256.0, 256.0, 250.0],
                   120, "the design's checks to use the X1's bed")
     # and Settings shows it when opened again
@@ -91,7 +92,7 @@ def journey_just_design_from_settings(ui):
     ui.wait_until(lambda: ui.js("Store.printOn"), 10, "3D printing to turn on again")
     ui.wait_until(lambda: "Printing" in ui.texts("sheetCard"), 5, "the Printing tab back")
     ui.key("Escape")
-    ui.run_js("Store.open(Store.studio.projects[0].id)")
+    ui.run_js("Store.open(Store.studio.projects[0].id).then(function () { Store.setStage('prove') })")
     ui.wait_until(lambda: ui.store.get("screen") == "work", 30, "the design")
     ui.wait_until(lambda: ui.find(name="printerChip") is not None, 10, "the printer chip back")
     ui.check("fit" in [s["id"] for s in ui.js("Store.stages")], "the Fit stage back")

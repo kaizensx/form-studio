@@ -17,7 +17,7 @@ def journey_two_plates(ui):
     printing_on(ui)                      # this journey is about printing: turn it on as someone who prints would
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     ui.check(has_slicer(ui), "a slicer is set up for this journey")
-    S["pid"] = make(ui, "hinged_box", "Wide box", {"inner_w": 110, "inner_d": 80})
+    S["pid"] = make(ui, "hinged_box", "Wide box", {"inner_w": 110, "inner_d": 80}, purpose="print")
     d = data(ui)
     ui.eq(d["status"]["slice"]["state"], "current", "sliced")
     env = next(c for c in d["checks"]["checks"] if c["id"] == "envelope")

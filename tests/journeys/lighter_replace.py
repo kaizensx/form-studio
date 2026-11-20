@@ -26,7 +26,7 @@ def png(path):
 def journey_lighter(ui):
     printing_on(ui)                      # this journey is about printing: turn it on as someone who prints would
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
-    pid = S["pid"] = make(ui, "storage_box", "Drawer box")
+    pid = S["pid"] = make(ui, "storage_box", "Drawer box", purpose="print")
     head0 = ui.api("/projects/" + pid)["project"]["head"]
     ui.run_js("Store.openSheet('lighter')")
     open_sheet_wait(ui, "lighter")

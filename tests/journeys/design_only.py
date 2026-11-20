@@ -17,7 +17,7 @@ def data(ui):
 def journey_no_slicer(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     ui.check(not ui.js("Store.slicer.available"), "no slicer is available here")
-    S["pid"] = make(ui, "hook", "Design only hook")
+    S["pid"] = make(ui, "hook", "Design only hook", purpose="print")
     d = data(ui)
     ui.eq(d["status"]["slice"]["state"], "off", "the slice is off, not missing or failed")
     ui.eq(d["status"]["slice"]["off"]["why"], "no_slicer", "because no slicer is installed")

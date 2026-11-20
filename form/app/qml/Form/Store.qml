@@ -73,7 +73,7 @@ QtObject {
     readonly property var printing: pid && data && data.printer ? data.printer.slicer : slicer
     // ── purpose (form/purpose.py): does this person print at all, and what is the open design for ──
     // prints: the 3D printing capability (form/capabilities.py; off unless chosen). printingDecided: a choice is saved.
-    readonly property var purposeInfo: studio && studio.env.purpose ? studio.env.purpose : ({ printing: true, decided: true, "default": "print", purposes: [], processes: [] })
+    readonly property var purposeInfo: studio && studio.env.purpose ? studio.env.purpose : ({ printing: true, decided: true, "default": "model", purposes: [], processes: [] })
     readonly property bool prints: purposeInfo.printing !== false
     readonly property bool printingDecided: !!purposeInfo.decided
     // the open design: "print" | "model"; a model is never sliced and never checked against a printer
@@ -82,7 +82,7 @@ QtObject {
     // what the next new design is for: "" = the default (purposeInfo.default). The new-design flow sets it.
     property string newPurpose: ""
     property string newProcess: ""
-    readonly property string newPurposeEffective: newPurpose || purposeInfo["default"] || "print"
+    readonly property string newPurposeEffective: newPurpose || purposeInfo["default"] || "model"
     function setPrinting(on) {           // 3D printing on or off (general.printing is written as general.capabilities)
         if (!on) {                       // nothing printing-related is installed for someone who only designs
             if (installJob && installJob.state === "running")
@@ -327,6 +327,7 @@ QtObject {
     }
     function reloadStudio() { return get("/studio").then(function (st) { studio = st }) }
     function home() {
+        steered = false; agentElsewhere = null; convNoDesign = false
         screen = "home"; pid = ""; data = null; view = null; compare = null; layers = null; preview = null; blankCanvas = false
         draftValues = ({}); draftProv = ({}); _stamp = ""
         reloadStudio()
@@ -337,7 +338,11 @@ QtObject {
         var st = F.vals(data.status)
         for (var i = 0; i < st.length; i++) if (st[i].state === "stale" || st[i].state === "missing") { run(); return }
     }
-    function open(id) {
+    // how: "" (the person opened it: from then on an agent working elsewhere never takes the view away),
+    // "follow" (an agent's activity brought it in) or "conv" (it is the design of the conversation just opened)
+    function open(id, how) {
+        steered = !how
+        agentElsewhere = null; convNoDesign = false; showPlate = false
         pid = id
         draftValues = ({}); draftProv = ({}); draftNote = ""; draftOrigin = ""; draftAgent = ""
         preview = null; draftError = null; feature = ""; compare = null; instructions = null; layers = null; section = null; ack = []
@@ -370,6 +375,7 @@ QtObject {
     property int _seq: 0
     property var _previewTimer: Timer { interval: 70; onTriggered: s.runPreview() }
     function setParam(key, value, immediate) {
+        steered = true
         var v = Object.assign({}, draftValues)
         if (Math.abs(value - head.values[key]) < 1e-9) delete v[key]; else v[key] = value
         draftValues = v
@@ -453,7 +459,7 @@ QtObject {
 
     // ── selection ────────────────────────────────────────────
     function select(f) {
-        feature = f || ""
+        feature = f || ""; if (f) steered = true
         if (!viewer) return
         viewer.selected = feature
         if (feature) viewer.focusFeature(feature); else viewer.setView(viewName, true)
@@ -780,7 +786,7 @@ QtObject {
     function follow(ev) {
         if (ev.kind === "concepts") {                  // the agent proposed concepts, or one was picked
             loadConcepts().then(function () {
-                if (ev.picked) { if (screen === "designing") reloadStudio().then(function () { open(ev.picked) }); return }
+                if (ev.picked) { if (screen === "designing") reloadStudio().then(function () { open(ev.picked, "follow") }); return }
                 if (ev.group && (screen === "designing" || screen === "home")) openSheet("concepts", { group: ev.group })
             })
             return
@@ -790,8 +796,10 @@ QtObject {
         if (ev.project !== pid) {
             if (["commit", "draft", "look", "search"].indexOf(ev.kind) < 0) return
             var fresh = screen === "designing"
+            // once the person has worked on the open design, an agent busy elsewhere is named, never jumped to
+            if (!fresh && steered && screen === "work") { _noteElsewhere(ev); return }
             if (fresh) _buildNext = Date.now()
-            reloadStudio().then(function () { open(ev.project).then(function () { if (fresh) buildTick++ }) })
+            reloadStudio().then(function () { open(ev.project, "follow").then(function () { if (fresh) buildTick++ }) })
             if (!fresh) toast("Following " + ev.by, ev.text)
             return
         }
@@ -807,7 +815,7 @@ QtObject {
             toast(ev.by + " is trying a change", "Your own draft is kept; discard it to watch.")
         }
         if (ev.kind === "look" && ev.view && _viewMap[ev.view]) setView(_viewMap[ev.view])
-        if (ev.kind === "look" && ev.highlight) select(ev.highlight)
+        if (ev.kind === "look" && ev.highlight) { var was = steered; select(ev.highlight); steered = was }
     }
 
     // ── assembly: Assembled / Exploded / Print layout (designs that declare assembly()) ──
@@ -894,10 +902,82 @@ QtObject {
             chatAgent = r.agent; chatModel = r.model; chatEffort = r.effort || ""
             if (r.state === "running") _chatPoll.restart()
             chatFocus++
-            // a conversation about a design opens that design: viewport, checks and all (not when it was deleted)
-            if (r.project && r.project !== pid && projectExists(r.project)) return open(r.project)
+            return _landOnConv(r)
         }, function (e) { fail(e); newChat(); loadConvs() })
     }
+    // ── a conversation's designs: opening one lands on what it made; a strip when it made several ──
+    // The engine keeps `designs` on the conversation ([{ project, role, ts, state }], roles made | concept |
+    // reference-study | continued, state live | trashed) and `project` as the one in front. A record written before
+    // that has only `project` and the older `projects`; both read the same here. A design whose folder is gone is
+    // shown as trashed whatever the record says.
+    property bool steered: false       // the person has worked on the open design: follow() names other designs instead of jumping
+    property var agentElsewhere: null  // { project, name, by, kind }: an agent is working on another design than the open one
+    property bool convNoDesign: false  // the open conversation has made no design yet (Designing.qml says so)
+    function projectRow(id) {
+        var ps = studio ? studio.projects : []
+        for (var i = 0; i < ps.length; i++) if (ps[i].id === id) return ps[i]
+        return null
+    }
+    function convDesigns(c) {
+        if (!c) return []
+        var seen = ({}), out = []
+        function add(id, role, state, ts) {
+            if (!id || seen[id]) return
+            seen[id] = true
+            var row = projectRow(id), live = !!row && !row.error && state !== "trashed"
+            out.push({ project: id, role: role || "made", state: live ? "live" : "trashed", ts: ts || 0,
+                       name: row ? row.name : id, head: row ? row.head : 0, live: live })
+        }
+        var ds = c.designs
+        if (ds && ds.length) ds.forEach(function (d) { if (typeof d === "string") add(d); else if (d) add(d.project, d.role, d.state, d.ts) })
+        else (c.projects || []).forEach(function (id) { add(id) })
+        add(c.project)                 // the one in front is always listed
+        return out.filter(function (d) { return d.role !== "reference-study" || d.live })
+    }
+    readonly property var designsHere: convDesigns(conv)
+    readonly property var liveDesignsHere: designsHere.filter(function (d) { return d.live })
+    function _landOnConv(r) {
+        var ds = convDesigns(r).filter(function (d) { return d.live })
+        var want = r.project && ds.some(function (d) { return d.project === r.project }) ? r.project : ds.length ? ds[ds.length - 1].project : ""
+        if (want) {
+            convNoDesign = false
+            if (want === pid && screen === "work") return
+            return reloadStudio().then(function () { return open(want, "conv") })
+        }
+        // nothing to show: the conversation's own "no design yet" state, never the Home question
+        convNoDesign = true; steered = false; agentElsewhere = null       // first: pid "" below must not start a new chat
+        pid = ""; data = null; view = null; compare = null; layers = null; preview = null; blankCanvas = false
+        draftValues = ({}); draftProv = ({})
+        convNoDesign = true; designingSince = Date.now() / 1000
+        screen = "designing"
+    }
+    function openConvDesign(id) {     // the strip: the person picks one of the conversation's designs
+        if (!id || id === pid) return Promise.resolve()
+        return open(id)
+    }
+    function _noteElsewhere(ev) {
+        var row = projectRow(ev.project)
+        agentElsewhere = { project: ev.project, name: row ? row.name : ev.project, by: ev.by || "The agent", kind: ev.kind }
+        if (ev.kind === "commit") reloadStudio()
+    }
+    function showElsewhere() { var a = agentElsewhere; if (a) reloadStudio().then(function () { open(a.project, "follow") }) }
+    // a usage limit, said calmly: which agent, until when; no upsell links. null when the error is something else.
+    function usageLimit(text) {
+        var t = String(text || "")
+        if (!/usage limit|hit your limit|rate.?limit|limit (was )?reached|quota|too many requests|429/i.test(t)) return null
+        var m = t.match(/(?:try again|resets?|available again|again)\s+(?:at|after|in|on)\s+([^.,;()]+?)(?:[.,;()]|$)/i)
+        return { until: m ? m[1].trim() : "" }
+    }
+    // a message: every https link in it is offered to the engine first (a file is fetched and attached; a page goes
+    // with the message as a link), then the message is sent. The words keep the links as written.
+    function sendWithLinks(text) {
+        text = String(text || "").trim()
+        var urls = text.match(/https?:\/\/[^\s<>"'`)\]]+/gi) || []
+        if (!urls.length) return send(text)
+        var seen = ({}); urls = urls.filter(function (u) { u = u.replace(/[.,;:!?]+$/, ""); if (seen[u]) return false; seen[u] = true; return true })
+        return Promise.all(urls.map(function (u) { return fetchLink(u.replace(/[.,;:!?]+$/, "")) })).then(function () { send(text) }, function () { send(text) })
+    }
+
     // merge a reply from GET /conversations/<id>?from=chatNext into the feed
     function _take(r) {
         var items = chatItems.filter(function (it) { return !it.local }), tools = Object.assign({}, chatTools)
@@ -956,6 +1036,7 @@ QtObject {
         if (chatBusy) { chatPrefill(text); return }        // never lose a message: it waits in the box until the reply ends
         if (chatNeedsModel) { pendingSend = text; modelPickWanted(); return }
         var att = chatAttach, id = convId, links = chatLinks
+        links = links.filter(function (l) { return text.indexOf(l.url) < 0 })      // a link already in the words is not listed twice
         if (links.length) text += "\n\nLinks:\n" + links.map(function (l) { return "- " + l.url }).join("\n")
         chatBusy = true; talkOpen = true; chatAttach = []; chatLinks = []; chatLive = null
         chatItems = chatItems.concat([{ t: "user", text: text, attachments: att, local: true }])
@@ -965,7 +1046,9 @@ QtObject {
         if (fresh && newPurposeEffective === "model" && newProcess) said += "\n\nThis 3D model will be made by: " + newProcess + " (pass process=\"" + newProcess + "\")."
         var body = { message: said, project: pid || null, agent: chatAgent, model: chatModel || "default", effort: chatEffort,
                      attachments: att.map(function (a) { return a.id }) }
-        if (fresh) { body.purpose = newPurposeEffective; newPurpose = ""; newProcess = "" }
+        // only a purpose the person chose goes with it: unsaid, the design is a 3D model unless the request itself
+        // says it is for printing (the agent then passes purpose="print")
+        if (fresh) { if (newPurpose) body.purpose = newPurpose; newPurpose = ""; newProcess = "" }
         post(id ? "/conversations/" + id + "/send" : "/conversations/send", body).then(function (r) {
             if (convId !== id) return
             convId = r.conversation; conv = r.meta
@@ -1113,8 +1196,8 @@ QtObject {
         target: s
         function onPidChanged() {
             var id = s.pid
-            if (id === "") { if (!s.chatBusy && s.convId) s.newChat(); return }
-            if (s.conv && s.conv.project === id) return
+            if (id === "") { if (!s.chatBusy && s.convId && !s.convNoDesign) s.newChat(); return }
+            if (s.conv && (s.conv.project === id || s.convDesigns(s.conv).some(function (d) { return d.project === id }))) return      // one of its designs: the strip
             if (s.chatBusy) return                       // the running conversation is probably making this design
             s.get("/conversations?project=" + id).then(function (r) {
                 if (s.pid !== id || s.chatBusy) return
@@ -1185,10 +1268,17 @@ QtObject {
     function closeWelcome(how) { welcome = false; post("/setup/seen", { how: how || "skipped" }).then(function () {}, function () {}) }
     // ── what Form Studio is set up for (form/capabilities.py): the launcher's cards and Settings › Set up for ──
     // Printing is the capability "print" and is off unless the person turns it on. printOn: printing is on;
-    // printUi: printing is on and the open design (if any) is made for printing. Every print surface follows printUi.
+    // printUi: printing is on and a design made for printing is open. With no design open (Home, a design being made)
+    // there is nothing to print, so nothing about printing shows. Every print surface follows printUi.
     property var caps: null            // GET /capabilities: { capabilities: [...], chosen, download_mb, decided, install }
     readonly property bool printOn: !!studio && !!studio.env.purpose && studio.env.purpose.printing === true
-    readonly property bool printUi: printOn && !modelDesign
+    readonly property bool printUi: printOn && purpose === "print"
+    // the ground under the part (Viewport.stageMode): a neutral studio floor for every design. The printer's build
+    // plate appears only where the printer matters, Fit, Review and Make of a design made for printing, or when the
+    // person asks for it ("Show build plate"), and leaves again on the way back.
+    property bool showPlate: false
+    readonly property bool plateWanted: printUi && (showPlate || stage === "fit" || stage === "prove" || stage === "release")
+    readonly property string stageMode: plateWanted ? "plate" : "studio"
     function capOn(id) { return !!caps && caps.chosen.indexOf(id) >= 0 }
     function loadCaps() { return get("/capabilities").then(function (r) { caps = r; return r }, function (e) { fail(e); return null }) }
     // the whole list (the launcher's first step): written, nothing installed yet
@@ -1747,7 +1837,8 @@ QtObject {
         return get("/start").then(function (r) { startInfo = r; return r }, function () { return null })
     }
     // what the next design is for, chosen on Home: Store.newPurpose (form/purpose.py's default until one is picked)
-    function setNewPurpose(p) { if (p === "print" || p === "model") newPurpose = p }
+    // "any" (Home's "Make it for: Anything") leaves it unsaid: a 3D model unless the request says it is for printing
+    function setNewPurpose(p) { if (p === "print" || p === "model") newPurpose = p; else if (p === "any" || p === "") newPurpose = "" }
     readonly property string printerName: startInfo && startInfo.printer && startInfo.printer.name ? startInfo.printer.name : ""
     // Start blank: the workspace with an empty build plate and nothing on it. No design exists until something is
     // described, sketched or imported; what it is for (newPurpose) waits for that first message.
@@ -1755,7 +1846,7 @@ QtObject {
     function startBlank() {
         newChat()
         pid = ""; data = null; view = null; compare = null; layers = null; preview = null
-        blankCanvas = true; designingSince = Date.now() / 1000
+        blankCanvas = true; designingSince = Date.now() / 1000; convNoDesign = false; steered = false; agentElsewhere = null
         screen = "designing"
         return Promise.resolve(true)
     }
@@ -1815,7 +1906,7 @@ QtObject {
         if (!chatReady) { toast("No agent is connected", "Start blank, or connect an agent in Settings › Agents.", true); return }
         if (pid) { pid = ""; data = null; view = null }
         designingSince = Date.now() / 1000
-        blankCanvas = false
+        blankCanvas = false; convNoDesign = false; steered = false; agentElsewhere = null
         screen = "designing"
         send(text)
     }

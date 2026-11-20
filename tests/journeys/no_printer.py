@@ -115,7 +115,9 @@ def journey_purpose_switch(ui):
     ui.wait_until(lambda: ui.js("Store.printOn"), 10, "3D printing to turn on")
     ui.key("Escape")
     ui.wait_until(lambda: ui.store.get("sheet") is None, 4, "the sheet to close")
-    ui.wait_until(lambda: ui.find(name="purposeChip") is not None, 5, "a 3D model now says it is not a print")
+    ui.settle(300)
+    ui.check(ui.find(name="purposeChip") is None and ui.find(name="printerChip") is None,
+             "a 3D model needs no label: the top bar stays quiet when printing turns on")
     toasts_gone(ui)
     ui.settle(600)                                     # the top bar and stage tabs settle after printing turns on
     ui.click("stage-brief")
@@ -126,7 +128,12 @@ def journey_purpose_switch(ui):
     ui.wait_until(lambda: data(ui)["purpose"]["purpose"] == "print", 10, "the design to be for printing")
     ui.wait_until(lambda: ui.js("Store.purpose") == "print", 10, "the app to follow")
     ui.eq(data(ui)["status"]["slice"]["off"]["why"], "no_slicer", "a print with no slicer: Design only, never an error")
-    ui.wait_until(lambda: ui.find(name="printerChip") is not None, 5, "the printer chip for a design made for printing")
+    ui.check(ui.find(name="printerChip") is None, "no printer in Describe: it is named where it matters")
+    ui.click("stage-prove")
+    ui.wait_until(lambda: ui.find(name="printerChip") is not None, 5, "the printer chip in Review for a design made for printing")
+    ui.wait_until(lambda: ui.js("Store.viewer && Store.viewer.plateShown") is True, 5, "the build plate in Review")
+    ui.click("stage-brief")
+    ui.wait_until(lambda: ui.store.get("stage") == "brief", 3, "Brief again")
     wait_job(ui, S["pid"])
     ids = [c["id"] for c in data(ui)["checks"]["checks"]]
     ui.check("envelope" in ids, f"the print checks run now: {ids}")
@@ -134,7 +141,7 @@ def journey_purpose_switch(ui):
     ui.shot("noprinter-switched-to-print")
     ui.click_text("Just a 3D model", within=ui.item("purposeSeg"))
     ui.wait_until(lambda: data(ui)["purpose"]["purpose"] == "model", 10, "a 3D model again")
-    ui.wait_until(lambda: ui.find(name="purposeChip") is not None, 5, "the 3D model chip again")
+    ui.wait_until(lambda: ui.find(name="printerChip") is None and ui.find(name="purposeChip") is None, 5, "nothing about printing again")
     pick = ui.item("processPick")
     ui.check(pick is not None, "a model can name how it will be made")
     ui.run_js("Store.setPurpose('model', 'cnc')")
