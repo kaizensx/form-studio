@@ -98,7 +98,7 @@ jobs:
       - name: Commands and the interactions endpoint
         run: |
           node commands.mjs
-          for i in 1 2 3 4 5 6; do curl -sf "$WORKER_URL" && break; sleep 5; done
+          for _ in 1 2 3 4 5 6; do curl -sf "$WORKER_URL" && break; sleep 5; done
           curl -sf -X PATCH -H "Authorization: Bot $DISCORD_BOT_TOKEN" -H "Content-Type: application/json" \
             https://discord.com/api/v10/applications/@me -d "{\"interactions_endpoint_url\": \"$WORKER_URL\"}" | jq -r .interactions_endpoint_url
       - name: Run the cron once

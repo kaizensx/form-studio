@@ -1,0 +1,27 @@
+{
+ "data": {
+  "print": {
+   "id": "3161",
+   "name": "3D BENCHY",
+   "slug": "3d-benchy",
+   "license": {
+    "name": "Creative Commons \u2014 Public Domain",
+    "abbreviation": "CC0"
+   },
+   "user": {
+    "publicUsername": "Prusa Research"
+   },
+   "image": {
+    "filePath": "media/prints/3161/images/20206_70fde6a0-6da1-4522-ba46-25f1bece7199/benchy.jpg"
+   },
+   "stls": [
+    {
+     "id": "49068",
+     "name": "3dbenchy.stl",
+     "fileSize": 11285384
+    }
+   ],
+   "otherFiles": []
+  }
+ }
+}

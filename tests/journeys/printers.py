@@ -37,7 +37,7 @@ def pick(ui, pid):
 
 
 def run(ui):
-    pid = make(ui, "hook", "Printer journey")
+    pid = make(ui, "hook", "Printer journey", purpose="print")
     inv = ui.api("/printers")
     ids = [p["id"] for p in inv["printers"]]
     ui.check({"bambu:My mini", "bambu:Bambu Lab X1 Carbon 0.4 nozzle", "bambu:Bambu Lab A1 mini 0.6 nozzle"} <= set(ids), f"printers: {ids}")

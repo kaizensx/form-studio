@@ -460,7 +460,12 @@ def summary(items: list) -> dict:
     return out
 
 
-KERNEL_OPS = {"select": op_select}
+def _drag_face(*a, **k):
+    from .dragface import op_drag_face          # drag a face, change the parameter behind it (form/dragface.py)
+    return op_drag_face(*a, **k)
+
+
+KERNEL_OPS = {"select": op_select, "drag_face": _drag_face}
 
 
 # ── engine side: analyse, describe, keep ────────────────────────────────────

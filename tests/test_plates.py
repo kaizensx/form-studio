@@ -383,7 +383,7 @@ class SeveralPlatesWithTheRealSlicer(unittest.TestCase):
             cfg["data"]["dir"] = str(tmp)
             cfg["printer"]["envelope_mm"] = [180, 180, 180]
             st = Studio(cfg)
-            p = st.create("Wide box", "hinged_box", values=WIDE)
+            p = st.create("Wide box", "hinged_box", values=WIDE, purpose="print")     # made for printing: it is sliced
             job = st.run_sync(p["id"])
             self.assertEqual(job["state"], "done", json.dumps(job["steps"]))
             sl = st.state(p["id"])["slice"]

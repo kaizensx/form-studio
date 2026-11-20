@@ -52,10 +52,14 @@ def main():
         out({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "Working"}}})
         time.sleep(60)
         return 0
+    first0 = message.splitlines()[0] if message.strip() else ""
+    if re.search(r"\beditable\b", first0):
+        return editable(data, message, sid)
     if "make" in message:
         pid = "made-" + uuid.uuid4().hex[:6]
         (data / pid).mkdir(parents=True)
         (data / pid / "project.json").write_text("{}", encoding="utf-8")
+        link(data, pid, "create_project")
         out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t1", "name": "mcp__form__create_project",
                                                            "input": {"name": "Made", "recipe": "hook"}}]}})
         out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t1",
@@ -150,6 +154,117 @@ def _source(title: str, expr: str) -> str:
             f"        return [Stage('body', {expr})]\n")
 
 
+def link(data: Path, project, tool: str, role: str = "made", group=None):
+    """What Form Studio's MCP server does when a tool makes a design: record it in the conversation
+    ($FORM_CONVERSATION), the same function the server calls."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from form import conversations
+    conversations.made(data, project, role, tool, group=group)
+
+
+def _attached(message: str) -> list:
+    lines = message.splitlines()
+    if "Attached files:" not in lines:
+        return []
+    out = []
+    for ln in lines[lines.index("Attached files:") + 1:]:
+        if not ln.startswith("- "):
+            break
+        p = ln[2:].rsplit(" (", 1)[0]
+        if p.lower().endswith((".stl", ".obj", ".3mf")):
+            out.append(p)
+    return out
+
+
+def editable(data: Path, message: str, sid: str) -> int:
+    """"make this editable" with meshes attached, through Form Studio's real MCP tools (in this process, with this
+    conversation's $FORM_CONVERSATION). First line words:
+      "together"  the new way: one reconstruct(files=[...]) -> one design with one part per mesh;
+      otherwise   a replay of what an agent did with the owner's three STLs: design_brief, one reconstruct per file,
+                  then create_design without a relation (refused: the conversation has a design in front), again with
+                  relation="alternative" and the brief, and once more with the same brief (one brief, several designs).
+    "layer N" picks the reconstruction layer (default 0, fast). Ends with a line "Projects: id, id, ..."."""
+    import asyncio
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    os.environ["FORM_DATA"] = str(data)
+    from form import mcp_server
+    first = message.splitlines()[0]
+    m = re.search(r"\blayer (\d)\b", first)
+    layer = int(m.group(1)) if m else 0
+    files = _attached(message)
+    srv = mcp_server.build()
+    made, notes, n = [], [], [10]
+
+    async def call(name, args):
+        n[0] += 1
+        tid = f"t{n[0]}"
+        out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": tid, "name": "mcp__form__" + name,
+                                                           "input": {k: v for k, v in args.items() if k != "source"}}]}})
+        try:
+            res = await srv.call_tool(name, args)
+            sc = getattr(res, "structured_content", None) or getattr(res, "structuredContent", None)
+            text = json.dumps(sc.get("result", sc) if isinstance(sc, dict) else sc, default=str) if sc is not None else \
+                "".join(getattr(c, "text", "") for c in res.content)
+            err = bool(getattr(res, "is_error", False) or getattr(res, "isError", False))
+        except Exception as e:                              # ToolError: the agent sees the message
+            text, err = str(e), True
+        out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": tid, "is_error": err,
+                                                      "content": [{"type": "text", "text": text}]}]}})
+        if err:
+            return None, text
+        try:
+            return json.loads(text), text
+        except ValueError:                                  # a result with pictures: the first block is the JSON
+            first_block = next((getattr(c, "text", "") for c in res.content if getattr(c, "text", "")), "")
+            try:
+                return json.loads(first_block), text
+            except ValueError:
+                return {}, text
+
+    async def run():
+        if re.search(r"\btogether\b", first):
+            r, _ = await call("reconstruct", {"files": files, "layer": layer, "tolerance": 0.1})
+            if r:
+                made.append(r["project"])
+            return
+        b, _ = await call("design_brief", {"name": "Editable parts", "goal": "Rebuild the supplied parts as clean "
+                                           "parametric CAD within 0.1 mm.", "purpose": "model"})
+        if b:
+            await call("plan_design", {"brief": b["brief"], "risks": ["sections that do not close"],
+                                       "features": [{"id": "body", "label": "Body", "how": "extrude the outline"},
+                                                    {"id": "pocket", "label": "Pocket", "how": "cut the pocket"},
+                                                    {"id": "edges", "label": "Edges", "how": "fillet the outside"}]})
+        for f in files:
+            r, _ = await call("reconstruct", {"project_or_file": f, "layer": layer, "tolerance": 0.1,
+                                              "name": Path(f).stem[7:] + " editable"})
+            if r:
+                made.append(r["project"])
+        src = _source("Block", TINY["Block"][0])
+        args = {"name": "Parametric part", "source": src, "run": False, "purpose": "model"}
+        r, text = await call("create_design", args)
+        notes.append("Refused without a relation: " + ("yes" if r is None and "relation" in text else "no"))
+        for name in ("Parametric part", "Parametric part two"):     # one brief serves both
+            r, text = await call("create_design", {**args, "name": name, "relation": "alternative",
+                                                   "plan": b["brief"] if b else ""})
+            hit = re.search(r'"project"\s*:\s*"([a-z0-9-]+)"', text) if r is not None else None
+            if hit:
+                made.append(hit.group(1))
+            else:
+                notes.append(f"create_design {name} failed: {text[:300]}")
+
+    try:
+        asyncio.run(run())
+    finally:
+        try:
+            mcp_server.studio().kernel.stop()
+        except Exception:
+            pass
+    reply = "You said: " + first + "\n\nProjects: " + ", ".join(made) + "".join("\n\n" + x for x in notes)
+    out({"type": "assistant", "message": {"content": [{"type": "text", "text": reply}]}})
+    out({"type": "result", "total_cost_usd": 0.0, "num_turns": 1, "session_id": sid})
+    return 0
+
+
 def _purpose(message: str):
     line = next((ln for ln in message.splitlines() if ln.startswith("Purpose:")), "")
     return "model" if "just a 3D model" in line else "print" if "3D printing" in line else None
@@ -169,6 +284,9 @@ def concepts(data: Path, message: str) -> str:
         board = concepts_mod.create(st, "Desk hook", items, "A hook for the desk.", purpose=_purpose(message), by="fake")
     finally:
         st.kernel.stop()
+    link(data, None, "propose_concepts", role="concept", group=board["id"])
+    for m in board["members"]:
+        link(data, m["project"], "propose_concepts", role="concept", group=board["id"])
     out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t5",
                                                   "content": [{"type": "text", "text": json.dumps(board, default=str)}]}]}})
     return "Concepts: " + ", ".join(f"{m['letter']} {m['title']}" for m in board["members"])
@@ -190,6 +308,7 @@ def replacement(data: Path, message: str) -> str:
         st.activity(p["id"], "commit", f"Created {name} (r01)", by="fake")
     finally:
         st.kernel.stop()
+    link(data, p["id"], "create_design")
     out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t7",
                                                   "content": [{"type": "text", "text": json.dumps({"project": {"id": p["id"]}})}]}]}})
     return f"Replacement: {name}"

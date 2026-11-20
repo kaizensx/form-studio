@@ -28,7 +28,8 @@ dependencies = [
 
 [project.optional-dependencies]
 app = ["PySide6>=6.9,<7"]
-all = ["form-studio[app,parts]"]
+all = ["form-studio[app,parts,organic]"]
+organic = ["manifold3d>=3.0"]  # form.meshbody: exact booleans on sculpted mesh bodies (wheels for macOS, Windows, Linux)
 parts = ["bd_warehouse==0.4.0", "py_gearworks==0.0.24"]  # form.parts: fasteners, threads, bearings, gears
 
 [project.urls]

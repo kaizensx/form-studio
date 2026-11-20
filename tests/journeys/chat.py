@@ -107,7 +107,7 @@ def run(ui):
     # ── attach a file: the chip shows, the agent gets it ──
     pic = png(ui.files / "sketch.png")
     ui.pick_file(pic)
-    ui.click_text("Attach a photo, sketch, PDF, or a STEP/STL part. You can also drop files here.")
+    ui.click_text("Attach a photo, a PDF drawing, or a STEP, STL, 3MF or OBJ part. You can also drop files here, or paste a link.")
     chip = ui.wait_until(lambda: ui.find(name="attachChip"), 10, "the attachment chip")
     ui.check(ui.sees("sketch.png", chip), "the chip names the file")
     ui.eq(len(ui.store.get("chatAttach")), 1)

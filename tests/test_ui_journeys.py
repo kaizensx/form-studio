@@ -134,6 +134,9 @@ class Journeys(unittest.TestCase):
     def test_assembly_chain(self):         # a joint slider moves the whole chain; exploded follows the tree
         self.journey("assembly_chain.py")
 
+    def test_drag_edit(self):               # Cmd-drag a face: the parameter behind it changes, live, with its impact
+        self.journey("drag_edit.py")
+
     def test_inspect(self):                 # measuring on parts in every view, annotations, colours and materials
         self.journey("inspection.py")
 
@@ -148,6 +151,18 @@ class Journeys(unittest.TestCase):
 
     def test_home(self):
         self.journey("home.py")
+
+    def test_open_conversation(self):        # a conversation opens its design; a strip for several; "No design yet"
+        self.journey("open_conv.py")
+
+    def test_open_conversation_small(self):
+        self.journey("open_conv.py", size="1120x700")
+
+    def test_ground(self):                   # the studio floor; the plate and the printer only where printing matters
+        self.journey("ground.py")
+
+    def test_ground_small(self):
+        self.journey("ground.py", size="1120x700")
 
     def test_start(self):                    # Home's start: blank, a photo, a sketch, concepts, a measurement
         self.journey("start.py")

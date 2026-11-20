@@ -259,7 +259,7 @@ class ChatPath(Env):
         inline = json.loads(msg.split(chat.Chat.SKETCH_HEADING, 1)[1].splitlines()[1])
         self.assertEqual(len(inline["primitives"]), 7)
         self.assertIn("Purpose: just a 3D model, no printer: do not slice; print checks do not apply.", msg)
-        self.assertIn("cannot import 3MF", msg)                           # said, not faked
+        self.assertIn("3MF with named parts", msg)                        # read with lib3mf (tests/test_3mf.py)
         self.assertEqual([f.name for f in self.fake.runs[-1].images], [a2["file"]])
         text = self.reply(job)
         self.assertIn("I received: plate.sketch.json (sketch), photo.png (image), model.3mf (cad)", text)
@@ -272,6 +272,47 @@ class ChatPath(Env):
         self.assertIn("Purpose: for 3D printing on Test printer", self.reply(job))
         with self.assertRaises(RuntimeError):
             self.chat.send("x", purpose="toy")
+
+    def test_links_in_a_chat_message_are_fetched_by_the_engine(self):
+        """Found in use: a signed MakerWorld .3mf link pasted in a chat was never fetched; the agent's sandbox could not."""
+        www = self.tmp / "www-chat"
+        www.mkdir(exist_ok=True)
+        (www / "hook.3mf").write_bytes(b"PK 3mf bytes")
+
+        class H(SimpleHTTPRequestHandler):
+            def __init__(self, *a, **kw):
+                super().__init__(*a, directory=str(www), **kw)
+
+            def log_message(self, *a):
+                pass
+        files = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=files.serve_forever, daemon=True).start()
+        from form.server import make_handler
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.st))
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            link = f"http://127.0.0.1:{files.server_address[1]}/hook.3mf?exp=1763650000&key=abc"
+            text = f"Make this hook 20% bigger: {link}"
+            req = urllib.request.Request(f"http://127.0.0.1:{httpd.server_address[1]}/api/conversations/send",
+                                         data=json.dumps({"message": text}).encode(),
+                                         headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                got = json.loads(r.read())
+            job = wait(self.chat.jobs[got["id"]])
+            msg = self.fake.runs[-1].message
+            self.assertIn("downloaded by Form Studio and attached (hook.3mf)", msg)
+            (att,) = job.attachments
+            self.assertEqual((att["name"], att["source"]["url"]), ("hook.3mf", link))
+            f = self.chat.store.attachment(got["conversation"], att["file"])
+            self.assertEqual(f.read_bytes(), b"PK 3mf bytes")
+            self.assertIn(f"/files/{f.name} (3MF with named parts", msg)
+            user = next(e for e in self.chat.store.events(got["conversation"]) if e["t"] == "user")
+            self.assertEqual(user["text"], text)                          # the person's words stay theirs
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            files.shutdown()
+            files.server_close()
 
     def test_a_long_sketch_is_cut_by_whole_primitives(self):
         big = {"primitives": [{"type": "line", "a": [i, 0], "b": [i, 10]} for i in range(1500)]}

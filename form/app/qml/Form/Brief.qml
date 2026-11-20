@@ -13,6 +13,18 @@ Column {
     readonly property var meshes: parts.filter(function (r) { return r.format !== "step" }).map(function (r) { return r.file })
     readonly property var recon: Store.project && Store.project.reconstruction ? (Store.project.reconstruction.summary || null) : null
     function size(b) { return [0, 1, 2].map(function (i) { return F.fmt(b[1][i] - b[0][i], 1) }).join(" × ") }
+    // where a reference came from and under which licence. The engine keeps it per attachment as `source`: a link, or
+    // { url, site, title, author, licence } (form/conversations.py sources); older rows may carry licence beside it.
+    function origin(r) {
+        if (!r) return ""
+        var s = r.source, o = s && typeof s === "object" ? s : ({ url: s ? String(s) : "" }), out = []
+        var url = String(o.url || ""), m = url.match(/^https?:\/\/([^\/?#]+)/i)
+        var site = o.site || (m ? m[1].replace(/^www\./, "") : url)
+        if (site) out.push("from " + site + (o.author ? " by " + o.author : ""))
+        var lic = o.licence || o.license || r.licence || r.license
+        if (lic) out.push(String(lic))
+        return out.join(" · ")
+    }
     readonly property var known: Store.recipe ? Store.recipe.params.filter(function (p) { return p.group === "brief" }) : []
     // the printer this design uses (its own choice, the default, or the slicer's selection: form/printers.py)
     readonly property var pr: Store.data && Store.data.printer ? Store.data.printer : null
@@ -118,7 +130,7 @@ Column {
             Repeater { model: root.refs
                 KV { id: rr; required property var modelData; required property int index; first: index === 0
                     k: modelData.file
-                    sub: modelData.scale_mm_per_px ? "scale set · " + F.plural((modelData.measurements || []).length, "measurement") : "no scale yet"
+                    sub: (modelData.scale_mm_per_px ? "scale set · " + F.plural((modelData.measurements || []).length, "measurement") : "no scale yet") + (root.origin(modelData) ? " · " + root.origin(modelData) : "")
                     Btn { kind: "quiet"; small: true; icon: "ruler"; text: "Measure"; onClicked: Store.openSheet("photo", { ref: rr.modelData }) } } } }
         Btn { text: "Attach photo"; icon: "image"; onClicked: Store.ask(dlg) } }
 
@@ -129,7 +141,7 @@ Column {
             Repeater { model: root.parts
                 KV { id: pr; required property var modelData; required property int index; first: index === 0
                     k: modelData.file
-                    sub: modelData.format.toUpperCase() + (modelData.volume_mm3 ? " · " + F.fmt(modelData.volume_mm3 / 1000, 2) + " cm³" : "")
+                    sub: modelData.format.toUpperCase() + (modelData.volume_mm3 ? " · " + F.fmt(modelData.volume_mm3 / 1000, 2) + " cm³" : "") + (root.origin(modelData) ? " · " + root.origin(modelData) : "")
                     Txt { mono: true; tone: 2; text: root.size(pr.modelData.bbox) + " mm"; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter }
                     Tag { text: pr.modelData.evidence || "computed"; anchors.verticalCenter: parent.verticalCenter }
                     Btn { kind: "quiet"; small: true; icon: "box"; text: "Make editable"; visible: pr.modelData.format !== "step"

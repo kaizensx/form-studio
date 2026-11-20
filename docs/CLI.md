@@ -59,8 +59,26 @@ message, with what the design is for.
 
 - `--purpose print` is for 3D printing on your printer; `model` is just a 3D model: Design only is set and nothing is
   sliced. Without it, the choice you made last on Home is used, else `print` when a slicer is installed.
-- `--link`: a link to a file (STL, STEP, 3MF, PDF, PNG, JPEG, WebP) is downloaded once (up to 50 MB) and attached;
-  any other link is passed to the agent as a page and nothing is downloaded.
+- `--link`: a link to a file (STL, STEP, 3MF, OBJ, PDF, PNG, JPEG, WebP) is downloaded (streamed, up to 2 GB) and
+  attached; a Printables model page has its part files attached with title, author and licence; a MakerWorld or
+  Thingiverse page says why its files cannot be fetched; any other link is passed to the agent as a page and nothing
+  is downloaded.
+- `--file` attaches up to 2 GB. The file is cloned into the conversation (copy-on-write on APFS, Btrfs and XFS), else
+  hard-linked or streamed; it is never read whole.
+
+### Links and big meshes
+
+| Command | Does |
+|---|---|
+| `form resolve URL` | What a model link is, without downloading: site, title, author, licence, pictures, files, and whether and why not they can be fetched |
+| `form fetch URL [--conversation ID]` | Download what the link points to: into a conversation, else under `<data>/.references/links/` with a `.source.json` beside each file |
+| `form mesh-preflight FILE [--no-proxy]` | Triangles, vertices, bounds, closed or not, class, estimated seconds, and a display proxy for a heavy STL, OBJ or 3MF |
+
+- Sites: Printables (public API, no account), Thingiverse (needs `FORM_THINGIVERSE_TOKEN`, an app token sent only to
+  api.thingiverse.com; without it the page and the reason are returned), MakerWorld (files need a signed-in person:
+  the reason and how to download it; a signed download link pasted from the browser is a direct file link). Every
+  request carries the user agent `FormStudio/<version>`, no cookies and nothing about you.
+- The preflight is cached under `<data>/.cache/meshprep/` by the file's path, size and modification time.
 - `--sketch` takes Form Studio's sketch JSON (millimetres, y up; see `form/sketch.py`). The agent reads its geometry
   as exact numbers; a dimension with a stated value overrides the drawn length.
 - Concepts are made by the agent (`propose_concepts`): three or four genuinely different designs, each a real project.
@@ -104,7 +122,7 @@ message, with what the design is for.
 | `form engrave <project> TEXT --at x,y,z --normal x,y,z [--up x,y,z] [--height MM] [--depth MM] [--sunk]` | Raised or sunk text on a flat face, written into the design's code as a feature and built as a new revision; `--list` and `--remove text_N` |
 | `form feature <project> boss\|snap_hook --at x,y,z --normal x,y,z [--size M3] [--hole tapped\|clearance\|insert] ...` | A screw boss or a snap-fit hook on a flat face, written into the design's code and built as a new revision |
 | `form diff <project> A [B] [--png FILE]` | What changed between two revisions on the solids: material added and removed, with volumes and regions |
-| `form reconstruct FILE [--name N] [--tolerance MM] [--layer 0\|1\|2]` | A mesh (STL, OBJ, 3MF) as a new design: the exact solid, analytic faces (beta) and a feature recipe (beta), each compared with the mesh |
+| `form reconstruct FILE [FILE ...] [--name N] [--tolerance MM] [--layer 0\|1\|2]` | A mesh (STL, OBJ, 3MF) as a new design: the exact solid, analytic faces (beta) and a feature recipe (beta), each compared with the mesh. Several files of one product: one design with one part per mesh |
 | `form analyze-reference <project> <mesh> [--tolerance MM] [--levels JSON]` | An imported mesh read like an engineer: dimensioned sections (pictures and outlines), features with sizes, symmetry, walls |
 | `form analyze-assembly <project> FIXED OTHER... [--fixed P] [--near MM]` | How imported meshes go together and move: mating surfaces, clearances, slide and turn ranges, couplings |
 | `form compare-reference <project> <mesh> [--part P] [--tolerance MM] [--rev N] [--png FILE]` | The design, or one part, against an imported mesh: Hausdorff, worst regions by place, per-feature differences |
@@ -143,7 +161,9 @@ message, with what the design is for.
 | Command | Does |
 |---|---|
 | `form chat "message" [--project ID] [--conversation ID] [--agent ID] [--model X] [--effort L] [--json]` | Send one message to an agent, with Form Studio's tools |
-| `form conversations list \| show ID \| rename ID TITLE \| pin ID \| delete ID` | Saved conversations |
+| `form conversations list [--project ID] [--involving ID] \| show ID \| rename ID TITLE \| pin ID \| delete ID` | Saved conversations; `--involving` lists every conversation that made or touched a design |
+| `form conversations designs ID` | The designs a conversation made or touched, in order, with role (made, concept, continued) and state (live, trashed, gone) |
+| `form conversations migrate [--dry-run] [--no-families]` | Rebuild the design list of older conversations from their events, tidy empty ones away, and join each request's designs into one family (the app does this once on its own) |
 | `form export-conversation <id> [--format md\|json] [--out FILE]` | One conversation as Markdown (to read) or JSON (to import again) |
 
 `form chat` asks the agent's questions in the terminal, and takes `--attach FILE` for files.

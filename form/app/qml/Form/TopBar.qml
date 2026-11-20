@@ -4,8 +4,9 @@ import FormNative
 import "F.js" as F
 
 // The window's own title bar, one calm line. Left: the agent column's toggle, where you are, which revision and whether
-// it is released. Right: notices, what it will print on, search, settings. It gives up detail, never function, as the
-// window narrows: the slicer chip drops the filament, then the name; search becomes its icon; notices become dots.
+// it is released. Right: notices, search, settings. No printer and no purpose: not printing is the normal case and
+// needs no label, and the printer is named where it matters (PrinterChip in Fit, Review and Make). It gives up detail,
+// never function, as the window narrows: search becomes its icon; notices become dots.
 Rectangle {
     id: bar
     objectName: "topBar"
@@ -76,42 +77,6 @@ Rectangle {
     }
     Row { id: right; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 6
         StatusChips { anchors.verticalCenter: parent.verticalCenter; compact: bar.work ? !bar.roomy : bar.tight }      // setup / update notices
-        // what the open design is for (form/purpose.py), only when 3D printing is on: then a model says it is not a print
-        Item { id: purposeChip; objectName: "purposeChip"; width: pchip.implicitWidth + 16; height: 26; anchors.verticalCenter: parent.verticalCenter
-            readonly property bool model: !!Store.project && Store.modelDesign
-            visible: Store.printOn && model
-            Rectangle { anchors.fill: parent; radius: Theme.rSm; color: pm.pressed ? Theme.washPress : pm.containsMouse || purposeMenu.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
-            Row { id: pchip; x: 8; spacing: 7; anchors.verticalCenter: parent.verticalCenter
-                Icon { name: "box"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
-                Txt { kind: "fine"; color: Theme.ink2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
-                    text: bar.tight && bar.work ? "3D model" : "3D model · not for printing" } }
-            MouseArea { id: pm; anchors.fill: parent; hoverEnabled: true
-                onClicked: purposeMenu.opened ? purposeMenu.close() : purposeMenu.open() }
-            Tip { show: pm.containsMouse && !purposeMenu.opened
-                text: "This design is a 3D model: no printer, slicer or print checks. Click to change what it is for." }
-            PopMenu { id: purposeMenu; y: parent.height + 6; width: 250
-                model: [
-                    { icon: "box", text: "Just a 3D model", run: function () { Store.setPurpose("model") } },
-                    { icon: "printer", text: "For 3D printing", run: function () { Store.setPurpose("print") } },
-                    { sep: true },
-                    { icon: "settings", text: "What it is for, in Describe…", run: function () { Store.setStage("brief") } }] } }
-        // what it will print on; opens the printer picker
-        Item { width: chip.implicitWidth + 16; height: 26; anchors.verticalCenter: parent.verticalCenter
-            objectName: "printerChip"
-            visible: Store.printUi
-            Rectangle { anchors.fill: parent; radius: Theme.rSm; color: cm.pressed ? Theme.washPress : cm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
-            Row { id: chip; x: 8; spacing: 7; anchors.verticalCenter: parent.verticalCenter
-                Icon { name: "printer"; size: 13; anchors.verticalCenter: parent.verticalCenter; color: Store.printing.available ? Theme.ink3 : Theme.amber }
-                Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; color: Theme.ink2; visible: !bar.tight || !bar.work
-                    width: Math.min(implicitWidth, 190); elide: Text.ElideRight; wrapMode: Text.NoWrap
-                    text: Store.printing.available ? Store.printing.presets.machine.name : "No slicer" }
-                Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; visible: Store.printing.available && bar.roomy
-                    width: Math.min(implicitWidth, 150); elide: Text.ElideRight; wrapMode: Text.NoWrap
-                    text: Store.printing.available ? Store.printing.presets.filament.name : "" } }
-            MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSheet("printer") }
-            Tip { show: cm.containsMouse
-                text: Store.printing.available ? (Store.printing.label || "Slicer") + (Store.printing.version ? " " + Store.printing.version : "") + " · " + Store.printing.presets.machine.name + " · " + Store.printing.presets.filament.name + " · " + Store.printing.presets.process.name + ". Click to choose the printer."
-                    : "No slicer was found. Click to see which Form Studio can use." } }
         Rectangle { visible: !bar.tight; width: bar.roomy ? 220 : 170; height: 26; radius: Theme.rSm; anchors.verticalCenter: parent.verticalCenter
             color: sm.pressed ? Theme.plate : sm.containsMouse ? Theme.plate2 : Theme.well; border.color: sm.containsMouse ? Theme.rule2 : Theme.rule
             Behavior on color { Tint {} }

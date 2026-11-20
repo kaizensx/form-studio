@@ -4,8 +4,11 @@ import FormNative
 import "F.js" as F
 import "Labels.js" as Labels
 
-// The part on its build plate. Millimetres, Z up. Everything the engine returns is drawn as-is:
+// The part in the studio. Millimetres, Z up. Everything the engine returns is drawn as-is:
 // one mesh per feature, the kernel's own edges, and overall dimensions as drawing-style dimension lines.
+// The ground is a neutral studio floor with a faint origin cross and a scale cue (stageMode "studio"); the printer's
+// build plate, its grid and its outline appear only in stageMode "plate" (Store.stageMode: Fit, Review and Make of a
+// design made for printing, or "Show build plate").
 Item {
     id: vp
     // ── public state ─────────────────────────────────────────
@@ -20,6 +23,13 @@ Item {
     property bool spin: false                // slow turntable (home screen)
     property bool lite: false                // thumbnails: no shadow map, no AO, lighter MSAA (many on screen at once)
     property real plateSize: 180
+    property string stageMode: "studio"      // studio: the neutral floor | plate: the printer's build plate on it
+    // the plate fades in and out with its stage instead of cutting; plateShown is what a test reads
+    property real plateK: stageMode === "plate" ? 1 : 0
+    Behavior on plateK { NumberAnimation { duration: Motion.slow; easing.type: Easing.OutCubic } }
+    readonly property bool plateShown: plateK > 0.001
+    // what the camera frames and the floor fades from: the plate in plate mode, the part (with some floor) otherwise
+    readonly property real groundSpan: stageMode === "plate" ? plateSize : Math.max(80, 2.4 * radius(bounds))
     property var bounds: ({ lo: Qt.vector3d(-40, -40, 0), hi: Qt.vector3d(40, 40, 40) })   // on the plate
     property vector3d shift: Qt.vector3d(0, 0, 0)
     property var marker: null                // { at:[x,y,z], to:[x,y,z] } in design coordinates
@@ -248,7 +258,7 @@ Item {
     readonly property real fitK: Math.min(4, Math.max(1, _fin(0.78 * height / freeH, 1), Math.min(1.5, _fin(0.6 * height / freeW, 1))))
     readonly property real mmPerPx: _fin(dist, 420) * fitK * 2 * Math.tan(13 * Math.PI / 180) / Math.max(1, height)
     // the orbit centre stays near what is on the plate: a long pan or a jump never leaves the part in the dark
-    readonly property real reach: Math.max(plateSize, 2 * radius(bounds)) * 1.5 + 200
+    readonly property real reach: Math.max(groundSpan, 2 * radius(bounds)) * 1.5 + 200
     function clampTarget(t) {
         var c = center(bounds), r = reach
         if (!t || !isFinite(t.x) || !isFinite(t.y) || !isFinite(t.z)) return c
@@ -446,7 +456,7 @@ Item {
             fieldOfView: 26
             // the depth range follows the camera: near enough for a close look, far enough for the part, the plate and
             // the bench around it at any zoom (a fixed far plane went black once zoomed out with a panel open)
-            readonly property real span: Math.max(vp.plateSize, 2 * vp.radius(vp.bounds))
+            readonly property real span: Math.max(vp.groundSpan, 2 * vp.radius(vp.bounds))
             clipNear: Math.max(0.5, Math.min(20, far * 0.01))
             clipFar: Math.max(6000, far + span * 6 + 2000)
             readonly property real ra: vp.az * Math.PI / 180
@@ -485,21 +495,28 @@ Item {
             id: zup
             eulerRotation.x: -90                       // everything below is in Z-up millimetres
 
-            // build plate: ground that catches the shadow, a 10 mm grid, a firm outline
-            // the bench runs to the horizon and fades into the background; the plate is a slightly lighter slab on it
+            // the studio floor: matte, catches the part's shadow, runs to the horizon and fades into the background
             Model { source: "#Rectangle"; scale: Qt.vector3d(60, 60, 1); z: -0.09; receivesShadows: true; castsShadows: false; pickable: false
                 materials: CustomMaterial { shadingMode: CustomMaterial.Shaded; fragmentShader: "shaders/ground.frag"
-                    property color uColor: Theme.benchGround; property color uFar: Theme.plate; property real uFade: Math.max(vp.plateSize * 1.6, vp.dist * 0.9) } }
-            Model { source: "#Rectangle"; scale: Qt.vector3d(vp.plateSize / 100, vp.plateSize / 100, 1); z: -0.05; receivesShadows: true; castsShadows: false; pickable: false
-                materials: PrincipledMaterial { baseColor: Theme.benchPlate; roughness: 1; specularAmount: 0 } }
-            Model { pickable: false; castsShadows: false
+                    property color uColor: Theme.benchGround; property color uFar: Theme.plate; property real uFade: Math.max(vp.groundSpan * 1.6, vp.dist * 0.9) } }
+            // studio: a faint origin cross, the one fixed point on the floor (it gives way to the plate)
+            Model { objectName: "originCross"; pickable: false; castsShadows: false; visible: vp.plateK < 0.5; position: Qt.vector3d(vp.shift.x, vp.shift.y, 0)
+                geometry: LineGeometry { points: { var h = Math.max(6, Math.min(40, vp.radius(vp.bounds) * 0.22)); return [-h, 0, 0, h, 0, 0, 0, -h, 0, 0, h, 0] } }
+                materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
+                    property color uColor: Theme.benchGrid; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+            // the printer's build plate (stageMode "plate" only): a slightly lighter slab, a 10 mm grid, a firm outline.
+            // The slab's tone eases in from the floor's, so the plate arrives and leaves instead of cutting.
+            Model { objectName: "buildPlate"; source: "#Rectangle"; scale: Qt.vector3d(vp.plateSize / 100, vp.plateSize / 100, 1); z: -0.05; receivesShadows: true; castsShadows: false; pickable: false
+                visible: vp.plateShown
+                materials: PrincipledMaterial { baseColor: Qt.tint(Theme.benchGround, Theme.alpha(Theme.benchPlate, vp.plateK)); roughness: 1; specularAmount: 0 } }
+            Model { pickable: false; castsShadows: false; visible: vp.plateK >= 0.5
                 geometry: LineGeometry { points: {
                     var p = [], h = vp.plateSize / 2
                     for (var x = -h; x <= h + 1e-6; x += 10) { p.push(x, -h, 0, x, h, 0); p.push(-h, x, 0, h, x, 0) }
                     return p } }
                 materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
                     property color uColor: Theme.benchGrid; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
-            Model { pickable: false; castsShadows: false
+            Model { pickable: false; castsShadows: false; visible: vp.plateK >= 0.5
                 geometry: LineGeometry { points: { var h = vp.plateSize / 2; return [-h, -h, 0, h, -h, 0, h, -h, 0, h, h, 0, h, h, 0, -h, h, 0, -h, h, 0, -h, -h, 0] } }
                 materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
                     property color uColor: Theme.benchEdge; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
@@ -753,6 +770,29 @@ Item {
         }
     }
 
+    // ── the scale cue (studio floor): a round length drawn at the part's distance, bottom right of the free area ──
+    Item {
+        id: scaleCue; objectName: "scaleCue"
+        readonly property var steps: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
+        readonly property real mm: { var k = vp.mmPerPx; if (!(k > 0)) return 10
+            for (var i = 0; i < steps.length; i++) if (steps[i] / k >= 44) return steps[i]
+            return steps[steps.length - 1] }
+        readonly property real px: Math.min(140, mm / Math.max(1e-6, vp.mmPerPx))
+        visible: vp.interactive && !vp.lite && !!vp.model && vp.plateK < 0.5 && isFinite(px) && px > 8
+        opacity: 1 - vp.plateK * 2
+        width: px; height: 22
+        x: vp.width - vp.insetRight - width - 18
+        y: vp.height - Math.max(0, vp.insetBottom) + 6 - height
+        Behavior on width { NumberAnimation { duration: Motion.ui } }
+        Rectangle { y: parent.height - 5; width: parent.width; height: 1; color: Theme.ink4 }
+        Rectangle { y: parent.height - 9; width: 1; height: 9; color: Theme.ink4 }
+        Rectangle { x: parent.width - 1; y: parent.height - 9; width: 1; height: 9; color: Theme.ink4 }
+        Txt { anchors.horizontalCenter: parent.horizontalCenter; y: 0; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap
+            text: scaleCue.mm >= 1000 ? (scaleCue.mm / 1000) + " m" : scaleCue.mm + " mm" }
+        HoverHandler { id: scaleHover }
+        Tip { show: scaleHover.hovered; text: "About " + scaleCue.mm + " mm at the part’s distance. Nearer things look larger." }
+    }
+
     // ── 2D labels pinned to 3D points: dimension numbers, findings and measurements, notes on what the part holds.
     // One pass per frame projects their points and lets Labels.js seat them, so a marker never sits on a dimension.
     function _px(p) {                        // plate-frame millimetres → view pixels, or null behind the camera
@@ -999,6 +1039,8 @@ Item {
             vp.dist = Math.max(30, Math.min(3000, vp.dist * Math.exp(-d)))
         }
     }
+    // Cmd-drag (Ctrl-drag) on a face changes the parameter that drives it (FaceDrag.qml, form/dragface.py)
+    FaceDrag { id: faceDrag; vp: vp; anchors.fill: parent; enabled: vp.interactive && !vp.lite }
     PinchHandler {
         id: pinch
         enabled: vp.interactive; target: null

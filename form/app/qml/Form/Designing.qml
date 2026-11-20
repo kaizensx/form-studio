@@ -2,9 +2,10 @@ import QtQuick
 import QtQuick.Controls
 import "F.js" as F
 
-// The workspace while a design is being made, before the agent has created it: the empty build plate, what you
+// The workspace while a design is being made, before the agent has created it: the empty studio floor, what you
 // gave it, and what the agent is doing right now. The design is attached the moment it exists (Store.follow opens
-// it, and it builds up feature by feature); concepts open their own view.
+// it, and it builds up feature by feature); concepts open their own view. A conversation opened from the list that has
+// made no design yet lands here too (Store.convNoDesign): it says so and offers to go on, never the Home question.
 Item {
     id: dz
     objectName: "designingView"
@@ -12,7 +13,7 @@ Item {
     readonly property var first: me.length ? me[me.length - 1] : null
     readonly property var pics: first && first.attachments ? first.attachments : []
     readonly property var tools: Store.chatItems.filter(function (e) { return e.t === "tool" && e.name !== "suggest_replies" })
-    readonly property bool done: !Store.chatBusy && Store.chatItems.some(function (e) { return e.t === "end" || e.t === "error" })
+    readonly property bool done: !Store.chatBusy && (Store.convNoDesign || Store.chatItems.some(function (e) { return e.t === "end" || e.t === "error" }))
     // Start blank: nothing asked yet, nothing on the plate
     readonly property bool empty: Store.blankCanvas && dz.me.length === 0 && !Store.chatBusy
     readonly property var steps: {
@@ -29,7 +30,7 @@ Item {
     function liveLine() {
         var L = Store.chatLive
         if (Store.chatAsking) return "Waiting for your answer"
-        if (!Store.chatBusy) return dz.done ? "The agent answered without creating a design" : "Starting the agent…"
+        if (!Store.chatBusy) return dz.done ? (Store.convNoDesign ? "This conversation has not made a design yet" : "The agent answered without creating a design") : "Starting the agent…"
         if (!L) return "Thinking about it…"
         if (L.kind === "tool") return (L.name === "create_design" || L.name === "update_design" || L.name === "propose_concepts")
                                       ? "Writing design code · " + (L.chars / 1000).toFixed(1) + " kB" : "Working…"
@@ -38,7 +39,7 @@ Item {
         return "Working…"
     }
 
-    Viewport { anchors.fill: parent; lite: false; interactive: true; showDims: false; showCompanions: false; plateSize: 200
+    Viewport { anchors.fill: parent; lite: false; interactive: true; showDims: false; showCompanions: false
         Component.onCompleted: { setModel(null); setView("iso", false) } }
     Rectangle { anchors.fill: parent
         gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.plate, 0.15) } GradientStop { position: 0.7; color: Theme.alpha(Theme.plate, 0.05) } GradientStop { position: 1; color: Theme.alpha(Theme.plate, 0.55) } } }
@@ -62,10 +63,15 @@ Item {
 
     // what is happening, under the part
     Column {
-        visible: !dz.empty
-        anchors.horizontalCenter: parent.horizontalCenter; anchors.top: ghost.bottom; anchors.topMargin: 8; spacing: 10; width: Math.min(parent.width - 80, 560)
-        Txt { kind: "cap"; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter; text: dz.done ? "No design yet" : "Being designed" }
+        objectName: "designingState"; visible: !dz.empty
+        anchors.horizontalCenter: parent.horizontalCenter; anchors.top: ghost.bottom; anchors.topMargin: dz.done ? -120 : 8; spacing: 10; width: Math.min(parent.width - 80, 560)
+        Txt { kind: "cap"; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter; objectName: "designingCaption"; text: dz.done ? "No design yet" : "Being designed" }
         Txt { objectName: "designingLine"; kind: "h2"; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width; text: dz.liveLine() }
+        // a conversation whose designs were all moved to the trash says so, rather than pretending it made none
+        Txt { visible: dz.done && Store.convNoDesign && Store.designsHere.length > 0; kind: "body"; tone: 2; width: parent.width
+            horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
+            text: Store.designsHere.length === 1 ? "Its design, “" + Store.designsHere[0].name + "”, is in the trash (.trash in your projects folder)."
+                : F.plural(Store.designsHere.length, "design") + " it made are in the trash (.trash in your projects folder)." }
         Column { anchors.horizontalCenter: parent.horizontalCenter; spacing: 4; visible: dz.steps.length > 0
             Repeater { model: dz.steps
                 Row { id: stepRow; required property string modelData; required property int index; spacing: 8; anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
@@ -74,18 +80,20 @@ Item {
                         RotationAnimation on rotation { running: stepRow.now && !Theme.reduced; loops: Animation.Infinite; from: 0; to: 360; duration: 1100 } }
                     Txt { kind: "fine"; tone: stepRow.now ? 2 : 3; text: stepRow.modelData } } } }
         Row { visible: dz.done; spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
+            Btn { objectName: "designingContinue"; kind: "primary"; icon: "message_square"; text: "Continue the conversation"; visible: Store.chatReady && Store.convId !== ""
+                tip: "Say what to make; it appears here as it is built"; onClicked: { Store.talkOpen = true; Store.chatFocus++ } }
             Btn { objectName: "designingHome"; icon: "arrow_left"; text: "Back to Home"; onClicked: Store.leaveDesigning() }
-            Btn { kind: "primary"; icon: "square_dashed"; text: "Start from a block"; tip: "A rounded block with its width, depth, height and corners as sliders, no agent needed"
+            Btn { kind: Store.convId !== "" && Store.chatReady ? "quiet" : "primary"; icon: "square_dashed"; text: "Start from a block"; tip: "A rounded block with its width, depth, height and corners as sliders, no agent needed"
                 onClicked: run(function () { return Store.startBlock("") }) } }
     }
 
-    // the blank canvas: an empty plate and the ways to put something on it
+    // the blank canvas: the empty studio floor and the ways to put something on it
     Column {
         objectName: "blankCanvas"; visible: dz.empty
         anchors.centerIn: parent; anchors.verticalCenterOffset: -20; spacing: 12; width: Math.min(parent.width - 80, 620)
         Txt { kind: "cap"; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter; text: "Blank canvas" }
         Txt { kind: "h2"; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width
-            text: "Nothing on the plate yet" }
+            text: "Nothing here yet" }
         Txt { kind: "body"; tone: 2; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width; wrapMode: Text.WordWrap
             text: Store.chatReady ? "Say what goes here in the conversation on the left, draw it, or bring a part you have."
                                   : "Draw it, bring a part you have, or start from a block you shape with sliders. Connect an agent in Settings › Agents to describe it in words." }

@@ -31,7 +31,7 @@ else:
 DEFAULTS = {
     # capabilities: what Form Studio is set up for (form/capabilities.py), chosen in the launcher and in Settings ›
     # Set up for. Unset: parametric CAD, mechanical parts and mesh to CAD. 3D printing ("print") is opt-in.
-    "general": {},
+    "general": {"new_designs": "model"},  # a new design is a 3D model unless said (form/purpose.py default)
     "server": {"host": "127.0.0.1", "port": 4173},
     "data": {"dir": "~/FORM"},
     # slicer/machine/process/filament: the default printer (form/printers.py); empty = the slicer's own selection.

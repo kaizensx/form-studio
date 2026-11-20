@@ -12,7 +12,8 @@ tools enforce three stages, and this module keeps their record:
                      its head revision has one.
 
 Briefs and plans written before the project exists live in <data>/.briefs/<id>.json; create_design(plan=<id>)
-attaches them to the project as p["design"] = {"brief", "plan", "critiques"}.
+copies them onto the project as p["design"] = {"brief", "plan", "critiques"}. The brief file stays (with the
+conversation it belongs to and `used_by`), so one brief serves every design its request makes.
 Plain data and file I/O only: no kernel.
 """
 from __future__ import annotations
@@ -136,6 +137,15 @@ def save_brief(st, name: str, goal: str, requirements=None, dimensions=None, con
          "dimensions": norm, "constraints": _clean_list(constraints, "constraints"),
          "unknowns": _clean_list(unknowns, "unknowns"), "style": style, "purpose": purpose,
          "references": _clean_list(references, "references"), "ts": time.time(), "assessment": a, "plan": None}
+    from .conversations import env_conversation
+    cid = env_conversation()
+    if cid:                                       # the brief belongs to the conversation that asked for it
+        b["conversation"] = cid
+        from .conversations import ConversationError, Conversations
+        try:
+            Conversations(st.root).add_brief(cid, b["id"])
+        except (ConversationError, OSError):
+            pass
     if project:
         attach(st, project, brief=b)
     else:
@@ -148,6 +158,17 @@ def load_brief(st, ref: str) -> dict:
     f = _dir(st) / f"{ref}.json"
     if f.is_file():
         return json.loads(f.read_text(encoding="utf-8"))
+    if re.fullmatch(r"b-[0-9a-f]{8}", str(ref or "")):
+        # a brief used before briefs were kept (its file was deleted when the first design took it): find that design
+        for row in st.list():
+            try:
+                d = (st.load(row["id"]).get("design") or {}) if not row.get("error") else {}
+            except StudioError:
+                continue
+            if (d.get("brief") or {}).get("id") == ref:
+                b = {**d["brief"], "plan": d.get("plan")}
+                f.write_text(json.dumps(b, indent=1), encoding="utf-8")    # kept from now on
+                return b
     try:
         p = st.load(ref)
     except StudioError:
@@ -217,13 +238,17 @@ def attach(st, pid: str, brief: dict | None = None, plan: dict | None = None) ->
 
 
 def attach_pending(st, pid: str, ref: str) -> dict:
-    """Move a pending brief (and its plan) onto a project created from it."""
+    """Copy a brief (and its plan) onto a project created from it. The brief stays: it belongs to the request (and
+    its conversation), and one brief can serve every design that request makes (three parts of one product, a
+    replacement after a failed attempt). The brief file lists the projects that used it in `used_by`."""
     f = _dir(st) / f"{ref}.json"
     if not f.is_file():
         raise StudioError(f"Unknown brief {ref!r}.", "Pass the id design_brief returned.")
     b = json.loads(f.read_text(encoding="utf-8"))
     d = attach(st, pid, brief=b)
-    f.unlink(missing_ok=True)
+    used = [u for u in b.get("used_by") or [] if u != pid] + [pid]
+    b["used_by"] = used
+    f.write_text(json.dumps(b, indent=1), encoding="utf-8")
     return d
 
 
