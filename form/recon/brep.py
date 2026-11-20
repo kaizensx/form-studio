@@ -4,11 +4,14 @@ Each region of `segment` becomes one face. Its surface is the fitted plane, cyli
 facet keeps the plane of its triangles). Its boundary is where it meets the neighbouring regions, followed along the
 mesh edges, so neighbouring faces share the same edges:
 
-- a boundary between two fitted surfaces that is straight becomes one line, one that lies on a circle becomes that
-  circle or an arc of it (holes, bosses, turned parts), anything else a chain of straight segments;
-- a boundary with a frozen facet stays the facet's own straight edges, so the facet keeps its exact shape.
-
-The vertices of every boundary are the mesh's own vertices, so the result can be compared with the mesh directly.
+- a boundary between two fitted surfaces is their exact intersection curve (plane-plane a line, plane-cylinder a
+  circle, an ellipse or a line, any other pair the curve OCCT's surface intersection gives), trimmed at the corners,
+  when that curve passes within the tolerance of the mesh's boundary; otherwise a line or circle through the mesh's
+  boundary points, else a chain of straight segments;
+- a corner where only fitted surfaces meet is moved onto all of them (the point nearest every surface, found by
+  Gauss-Newton from the mesh vertex), so the edges meeting there end exactly where the surfaces cross;
+- a boundary with a frozen facet stays the facet's own straight edges, so the facet keeps its exact shape (its
+  corners stay the mesh's own vertices).
 """
 from __future__ import annotations
 
@@ -96,24 +99,153 @@ def _circle(P):
 
 
 class Builder:
-    def __init__(self, V, F, regions: list[Region], tol: float):
+    def __init__(self, V, F, regions: list[Region], tol: float, exact: bool = True):
         self.V, self.F, self.regions, self.tol = V, F, regions, tol
+        self.exact = exact and EXACT_EDGES
         self.size = float(np.ptp(V, axis=0).max()) or 1.0
         self.tri_region = np.empty(len(F), dtype=np.int64)
         for r in regions:
             self.tri_region[r.tris] = r.id
         self._vtx = {}
+        self._pos = {}
         self._chains = {}
-        self.stats = {"edges_line": 0, "edges_circle": 0, "edges_arc": 0, "edges_segment": 0}
+        self._surf = {}
+        self.stats = {"edges_line": 0, "edges_circle": 0, "edges_arc": 0, "edges_curve": 0, "edges_segment": 0,
+                      "edges_exact": 0, "corners_moved": 0}
+        # the regions round each vertex (to put a corner where its surfaces cross)
+        vr = np.c_[self.F.ravel(), np.repeat(self.tri_region, 3)]
+        vr = np.unique(vr, axis=0)
+        self._vreg = {}
+        for vi, ri in vr.tolist():
+            self._vreg.setdefault(vi, []).append(ri)
+
+    def position(self, i):
+        """Where mesh vertex i goes: onto every fitted surface round it when only fitted surfaces meet there."""
+        p = self._pos.get(i)
+        if not self.exact:
+            return self.V[i]
+        if p is not None:
+            return p
+        p = self.V[i]
+        regs = [self.regions[r] for r in self._vreg.get(i, [])]
+        if len(regs) >= 2 and all(r.parametric and r.kind != "bspline" and r.prim is not None for r in regs):
+            q = p.copy()
+            for _ in range(8):
+                J = np.array([r.prim.normal(q[None])[0] for r in regs])
+                f = np.array([float(r.prim.dist(q[None])[0]) for r in regs])
+                # least squares step, damped toward the mesh vertex (an under-determined corner keeps its place)
+                A = J.T @ J + 1e-6 * np.eye(3)
+                step = np.linalg.solve(A, -J.T @ f)
+                q = q + step
+                if np.linalg.norm(step) < 1e-10 * self.size:
+                    break
+            res = max(abs(float(r.prim.dist(q[None])[0])) for r in regs)
+            if res < 1e-7 * self.size + 1e-9 and np.linalg.norm(q - p) <= self.tol:
+                if np.linalg.norm(q - p) > 1e-9:
+                    self.stats["corners_moved"] += 1
+                p = q
+        self._pos[i] = p
+        return p
 
     def vertex(self, i):
         v = self._vtx.get(i)
         if v is None:
             from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
             from OCP.gp import gp_Pnt
-            v = BRepBuilderAPI_MakeVertex(gp_Pnt(*map(float, self.V[i]))).Vertex()
+            v = BRepBuilderAPI_MakeVertex(gp_Pnt(*map(float, self.position(i)))).Vertex()
             self._vtx[i] = v
         return v
+
+    def _geom(self, rid):
+        g = self._surf.get(rid)
+        if g is None:
+            g = self.surface(self.regions[rid])
+            self._surf[rid] = g
+        return g
+
+    def _exact(self, r, q, vs, closed):
+        """The edge along the intersection of regions r and q's surfaces, trimmed at the run's corners, when it passes
+        within the tolerance of the run's mesh points. None otherwise."""
+        from OCP.BRep import BRep_Tool
+        from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
+        from OCP.GeomAdaptor import GeomAdaptor_Curve
+        from OCP.GeomAbs import GeomAbs_Circle, GeomAbs_Ellipse, GeomAbs_Line
+        from OCP.GeomAPI import GeomAPI_IntSS, GeomAPI_ProjectPointOnCurve
+        from OCP.gp import gp_Pnt
+        kinds = {self.regions[k].kind for k in (r, q)}
+        if "bspline" in kinds or "facet" in kinds:
+            return None
+        P = self.V[vs]
+        if not closed:
+            P = np.vstack([self.position(vs[0]), P[1:-1], self.position(vs[-1])])
+        try:
+            inter = GeomAPI_IntSS(self._geom(r), self._geom(q), 1e-7)
+        except Exception:                              # noqa: BLE001
+            return None
+        if not inter.IsDone() or inter.NbLines() == 0:
+            return None
+        pick = P[np.linspace(0, len(P) - 1, min(len(P), 24)).astype(int)]
+        best = None
+        for k in range(1, inter.NbLines() + 1):
+            c = inter.Line(k)
+            dmax, prm = 0.0, []
+            for x in pick:
+                pr = GeomAPI_ProjectPointOnCurve(gp_Pnt(*map(float, x)), c)
+                if pr.NbPoints() == 0:
+                    dmax = np.inf
+                    break
+                dmax = max(dmax, pr.LowerDistance())
+                prm.append(pr.LowerDistanceParameter())
+            if best is None or dmax < best[0]:
+                best = (dmax, c, prm)
+        dmax, c, prm = best
+        if dmax > self.tol:
+            return None
+        ad = GeomAdaptor_Curve(c)
+        kind = ad.GetType()
+        try:
+            if closed:
+                if not ad.IsClosed() and not ad.IsPeriodic():
+                    return None
+                e = BRepBuilderAPI_MakeEdge(c).Edge()
+                stat = "edges_circle" if kind == GeomAbs_Circle else "edges_curve"
+            else:
+                u0, u1 = prm[0], prm[-1]
+                if ad.IsPeriodic():
+                    T = ad.Period()
+                    um = prm[len(prm) // 2]
+                    # go from u0 to u1 the way that passes the middle of the run
+                    a1 = (u1 - u0) % T
+                    am = (um - u0) % T
+                    u1 = u0 + a1 if am <= a1 else u0 + a1 - T
+                    if u1 < u0:
+                        u0, u1 = u1, u0
+                        v0, v1 = self.vertex(vs[-1]), self.vertex(vs[0])
+                        flip = True
+                    else:
+                        v0, v1 = self.vertex(vs[0]), self.vertex(vs[-1])
+                        flip = False
+                else:
+                    flip = u1 < u0
+                    if flip:
+                        u0, u1 = u1, u0
+                    v0, v1 = (self.vertex(vs[-1]), self.vertex(vs[0])) if flip else (self.vertex(vs[0]), self.vertex(vs[-1]))
+                if abs(u1 - u0) < 1e-12:
+                    return None
+                mk = BRepBuilderAPI_MakeEdge(c, v0, v1, u0, u1)
+                if not mk.IsDone():
+                    return None
+                e = mk.Edge()
+                if flip:
+                    e = e.Reversed()
+                stat = {GeomAbs_Line: "edges_line", GeomAbs_Circle: "edges_arc"}.get(kind, "edges_curve")
+                del BRep_Tool
+        except Exception:                              # noqa: BLE001
+            return None
+        self.stats[stat] += 1
+        self.stats["edges_exact"] += 1
+        del GeomAbs_Ellipse
+        return [e]
 
     def _segments(self, vs):
         from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
@@ -128,8 +260,12 @@ class Builder:
         from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
         from OCP.GC import GC_MakeArcOfCircle
         from OCP.gp import gp_Ax2, gp_Circ, gp_Dir, gp_Pnt
-        P = self.V[vs]
+        P = np.array([self.position(v) for v in vs])
         both = all(self.regions[k].parametric and self.regions[k].kind != "bspline" for k in (r, q))
+        if both and self.exact:
+            got = self._exact(r, q, vs, closed)
+            if got is not None:
+                return got
         if not both or len(vs) == 2:
             return self._segments(vs)
         a, b = P[0], P[-1]
@@ -259,6 +395,7 @@ class Builder:
 
 
 PERIODIC = ("cylinder", "cone", "torus")
+EXACT_EDGES = True         # boundaries between two fitted surfaces follow their intersection curve (else the mesh)
 
 
 def _circles_only(V, loops, tol) -> bool:
@@ -395,11 +532,19 @@ def build(V, F, regions: list[Region], tol: float, progress=None):
         lab[r.tris] = r.id
     rloops = _loops(F, lab)
     tries = [(rloops, 0.0), (rloops, np.pi / 2), (None, 0.0)]    # seams between holes; halves split two ways
-    for k, (lp, turn) in enumerate(tries):
-        shape, info = _build(V, F, [_copy(r) for r in regions], tol, progress, lp, turn)
-        info["seam_strategy"] = k
-        if shape is not None or info.get("face_failures"):
+    for exact in ((True, False) if EXACT_EDGES else (False,)):
+        for k, (lp, turn) in enumerate(tries):
+            shape, info = _build(V, F, [_copy(r) for r in regions], tol, progress, lp, turn, exact)
+            info["seam_strategy"] = k
+            if shape is not None or info.get("face_failures"):
+                break
+        info["exact_edges"] = exact
+        if shape is not None and info.get("valid"):
             break
+        if exact:                                       # exact edges that do not close into a valid solid: the mesh's
+            info_exact = {k: info.get(k) for k in ("valid", "free_edges", "faces")}    # own boundaries instead
+    if shape is not None and not info.get("exact_edges") and EXACT_EDGES:
+        info["exact_edges_failed"] = info_exact
     return shape, info
 
 
@@ -407,11 +552,11 @@ def _copy(r):
     return Region(r.id, r.kind, r.tris, r.prim, r.area, dict(r.info))
 
 
-def _build(V, F, regions, tol, progress, rloops, turn):
+def _build(V, F, regions, tol, progress, rloops, turn, exact=True):
     from .solid import check, shape_from_faces, unify
     t0 = time.perf_counter()
     regions, origin = split_periodic(V, F, regions, rloops, tol, turn)
-    b = Builder(V, F, regions, tol)
+    b = Builder(V, F, regions, tol, exact)
     loops = _loops(F, b.tri_region)
     faces, failed = [], []
     for i, reg in enumerate(regions):
