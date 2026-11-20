@@ -127,7 +127,7 @@ def layer0(V: np.ndarray, F: np.ndarray, progress=None, merge: bool = True) -> t
     return shape, info
 
 
-def tessellate(shape, tol: float, levels: int = 4):
+def tessellate(shape, tol: float, levels: int = 4, faces_out: list | None = None):
     """(V, F) of a shape's faces, outward-wound, within about `tol` of the surfaces.
 
     The kernel's mesher keeps its nodes on the surfaces, but on B-spline faces the middles of its triangles can be
@@ -168,6 +168,8 @@ def tessellate(shape, tol: float, levels: int = 4):
         Ps.append(P)
         Ts.append(T + off)
         off += len(P)
+        if faces_out is not None:                     # which face each triangle is on, for whoever asks
+            faces_out.append((face, len(T)))
     if not Ps:
         return np.zeros((0, 3)), np.zeros((0, 3), dtype=np.int64)
     return np.concatenate(Ps), np.concatenate(Ts)

@@ -122,8 +122,11 @@ class MeshDistance:
             idx = np.flatnonzero(lvl == L)
             self.bins.append((cKDTree(cen[idx]), idx, float(R[idx].max())))
 
-    def closest(self, P: np.ndarray, chunk: int = 20000) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """(distance (n,), closest point (n, 3), triangle (n,))."""
+    def closest(self, P: np.ndarray, chunk: int = 20000,
+                exact_above: float = 0.0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """(distance (n,), closest point (n, 3), triangle (n,)). A point whose distance to its nearest candidates is
+        already under `exact_above` keeps that distance (an upper bound: the exact one can only be smaller), which
+        saves the exact search where two surfaces lie on each other."""
         P = np.asarray(P, dtype=np.float64)
         D = np.empty(len(P))
         Q = np.empty_like(P)
@@ -147,7 +150,7 @@ class MeshDistance:
             # exact: a triangle closer than `best` has its bounding-sphere centre within best + its radius of p.
             # Test every such triangle (one ball query per bin of similar radii, so each is found once).
             # Points already within 1e-9 of the size of the mesh of a triangle keep that distance (error below that).
-            far = np.flatnonzero(best > self.eps)
+            far = np.flatnonzero(best > max(self.eps, exact_above))
             PI, CI = [], []
             for tree, idx, rb in (self.bins if len(far) else []):
                 balls = tree.query_ball_point(p[far], best[far] + rb * 1.000001 + self.eps, workers=-1)

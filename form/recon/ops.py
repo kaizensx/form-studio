@@ -7,6 +7,9 @@ it stays readable and every number in it is a Param or a coordinate read off the
     vertices_near(shape, points)           the corner nearest each point (a profile corner to round)
     hole(origin, direction, steps)         a drilled hole: plain, counterbored, countersunk, blind or through
     spur_gear_profile(...)                 an involute spur gear outline (tip and root as the mesh has them)
+    profile(plane, nodes, edges)           a sketch: corners (with corner radii) joined by lines and arcs, as a face
+    disc(plane, x, y, d)                   a circle of diameter d as a face
+    slab(face, z0, z1, top=None)           the solid between two levels: an extrusion, or a ruled loft to `top`
 """
 from __future__ import annotations
 
@@ -132,3 +135,39 @@ def spur_gear_profile(teeth: int, module: float, pressure_angle: float, tip_d: f
         else:
             edges.append(Line(right[-1], nl[0]))
     return Wire(edges)
+
+
+def profile(plane, nodes, edges=None):
+    """A face on `plane` from a sketch: nodes [(x, y, corner_radius)] in the plane's coordinates, joined in order by
+    edges [None for a line | (R, ccw, large) for an arc of radius R], edges[i] from nodes[i] to nodes[i + 1]. A corner
+    radius rounds the corner between two lines. Raises ValueError when a radius does not fit (a Param too large)."""
+    from build123d import Face, Line, ThreePointArc, Wire
+    from .sketch import path
+    edges = edges or [None] * len(nodes)
+    q = lambda p: plane.from_local_coords((float(p[0]), float(p[1])))
+    out = []
+    for pc in path(nodes, edges):
+        out.append(Line(q(pc[1]), q(pc[2])) if pc[0] == "line" else ThreePointArc(q(pc[1]), q(pc[2]), q(pc[3])))
+    face = Face(Wire(out))
+    if face.area < 1e-12:
+        raise ValueError("the sketch encloses no area")
+    return face
+
+
+def disc(plane, x, y, d):
+    """A circle of diameter d centred at (x, y) on `plane`, as a face."""
+    from build123d import Edge, Face, Plane, Wire
+    c = plane.from_local_coords((float(x), float(y)))
+    return Face(Wire([Edge.make_circle(float(d) / 2, Plane(origin=c, x_dir=plane.x_dir, z_dir=plane.z_dir))]))
+
+
+def slab(face, z0, z1, top=None):
+    """The solid a sketch makes between levels z0 and z1 (along the sketch plane's normal; `face` lies at z0): an
+    extrusion, or with `top` (the same sketch at z1, other sizes) a ruled loft from one to the other (a chamfer or a
+    draft along the walls)."""
+    from build123d import extrude, loft
+    if z1 <= z0:
+        raise ValueError(f"a slab from {z0:g} to {z1:g} has no height")
+    if top is None:
+        return extrude(face, amount=float(z1 - z0))
+    return loft([face, top], ruled=True)
