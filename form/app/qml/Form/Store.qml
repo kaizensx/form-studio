@@ -1769,7 +1769,7 @@ QtObject {
     // the conversation that files, sketches and links attach to before the first message is sent
     function ensureConv() {
         if (convId) return Promise.resolve(convId)
-        return post("/conversations", { project: pid || null, agent: chatAgent, model: chatModel, effort: chatEffort }).then(function (m) {
+        return post("/conversations", { project: pid || null, agent: chatAgent, model: chatModel, effort: chatEffort, draft: true }).then(function (m) {
             if (convId === "") { convId = m.id; conv = m }
             return convId
         })

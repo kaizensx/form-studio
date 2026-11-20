@@ -12,6 +12,21 @@ starts fresh and is handed a transcript of what came before. A design that moves
 design the agent made in the conversation) takes the conversation with it: `link` moves it and remembers the designs
 it was about in `projects`.
 
+One request, one design. A conversation owns the ordered list of every design it touched, `designs`:
+
+    [{"project": id, "role": "made" | "concept" | "reference-study" | "continued", "state": "live" | "trashed" | "gone",
+      "request": index of the user event that asked for it, "ts", "tool"}, ...]
+
+with a concept group listed once as {"group": id, "role": "concept", "state": "open" | "picked" | "dismissed"}.
+`project` stays "the design in front". The MCP server writes `designs` the moment a tool creates, picks, duplicates
+or reconstructs a design (`made()`, from $FORM_CONVERSATION); the app writes it for what the person does. The first
+design a request makes is its family's root; later designs made by the same request join that family
+(`lineage.via == "request"`), so Home shows one card for one request. Conversations saved before `designs` existed
+get it rebuilt from their events, their meta and the activity log the first time they are read (`rebuild_designs`).
+
+A conversation started by attaching a file is a draft (`.conversations/.drafts/<id>`) until its first message is sent;
+a draft that is never sent never shows up as an empty conversation, and old drafts are cleared.
+
 Nothing here talks to an agent; form/chat.py runs the agent and appends what it says.
 """
 from __future__ import annotations
@@ -32,6 +47,16 @@ CAD_EXT = {".step", ".stp", ".stl", ".3mf"}
 SKETCH_SUFFIX = ".sketch.json"        # a sketch drawn in Form Studio (form/sketch.py): structured geometry, read as JSON
 MAX_ATTACHMENT = 60_000_000
 ID_RE = re.compile(r"[0-9a-f]{12}")
+PID_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,60}")
+GID_RE = re.compile(r"[0-9a-f]{10}")
+ENV_CONVERSATION = "FORM_CONVERSATION"          # set by form/chat.py for the MCP server of one conversation's run
+ROLES = ("made", "concept", "reference-study", "continued")
+DRAFTS = ".drafts"
+DRAFT_DAYS = 7                                  # a draft nobody sent is cleared after this many days
+#: MCP tools that put a new design in front of the person, and the role it plays in the conversation.
+#: tests/test_request_family.py fails on a tool that returns a new project id and is not listed here.
+CREATOR_TOOLS = {"create_project": "made", "create_design": "made", "reconstruct": "made", "duplicate_project": "made",
+                 "import_project": "made", "pick_concept": "made", "propose_concepts": "concept"}
 EVENT_KINDS = ("user", "start", "text", "tool", "result", "act", "end", "error", "ask", "answer", "suggest")
 
 
@@ -74,25 +99,47 @@ _LOCKS: dict[str, threading.RLock] = {}
 _LOCKS_GUARD = threading.Lock()
 
 
-def _lock_for(root: Path) -> threading.RLock:
-    """One lock per conversations folder, shared by every Conversations object in the process. The chat service and
-    the engine (deleting a design detaches its conversations) each make their own object; with separate locks a read
-    could meet a half-done write, which on Windows fails instead of waiting."""
+def _lock_for(root: Path):
+    """One lock per conversations folder, shared by every Conversations object in the process and exclusive across
+    processes. The chat service and the engine (deleting a design detaches its conversations) each make their own
+    object, and the MCP server of a running conversation records the designs it makes from its own process while the
+    chat process appends events: every read-modify-write of meta.json holds this lock, so neither loses the other's
+    change. Re-entrant within a process."""
     key = str(Path(root).resolve())
     with _LOCKS_GUARD:
-        return _LOCKS.setdefault(key, threading.RLock())
+        if key not in _LOCKS:
+            from .studio import ProjectLock       # flock on POSIX, a region lock on Windows
+            _LOCKS[key] = ProjectLock(Path(root) / ".lock")
+        return _LOCKS[key]
 
 
 class Conversations:
     def __init__(self, root: Path):
+        self.data = Path(root)
         self.root = Path(root) / ".conversations"
         self._lock = _lock_for(self.root)
+        self._activity: list | None = None        # the activity log, read once for rebuilding older conversations
 
     # -- paths ---------------------------------------------------------------
     def dir(self, cid: str) -> Path:
+        """The conversation's folder: <root>/<id>, or <root>/.drafts/<id> while it is a draft nobody has sent."""
         if not ID_RE.fullmatch(str(cid or "")):
             raise ConversationError("Unknown conversation.")
-        return self.root / cid
+        main = self.root / cid
+        if not main.exists():
+            draft = self.root / DRAFTS / cid
+            if draft.exists():
+                return draft
+        return main
+
+    def is_draft(self, cid: str) -> bool:
+        return self.dir(cid).parent.name == DRAFTS
+
+    def _promote(self, cid: str) -> None:
+        """A draft becomes a conversation when its first message is sent."""
+        d = self.dir(cid)
+        if d.parent.name == DRAFTS:
+            fsutil.replace(d, self.root / cid)
 
     def files_dir(self, cid: str) -> Path:
         d = self.dir(cid) / "files"
@@ -112,10 +159,23 @@ class Conversations:
         raise ConversationError("Unknown conversation.")
 
     def _migrate(self, meta: dict) -> dict:
-        """A conversation saved before threads existed is the root of its own thread; written back once."""
-        if not isinstance(meta, dict) or "id" not in meta or "thread" in meta:
+        """A conversation saved before threads existed is the root of its own thread; one saved before `designs`
+        existed gets the list rebuilt from its events (rebuild_designs). Written back once."""
+        if not isinstance(meta, dict) or "id" not in meta or ("thread" in meta and "designs" in meta):
             return meta
-        meta.update(thread=meta["id"], parent=None, fork_event=None, fork_reason="")
+        if "thread" not in meta:
+            meta.update(thread=meta["id"], parent=None, fork_event=None, fork_reason="")
+        if "designs" not in meta:
+            try:
+                meta["designs"] = rebuild_designs(meta, self.events(meta["id"]), self.data, self.activity())
+                meta["designs_rebuilt"] = _now()
+                if not meta.get("project"):        # it lost its design in front: the newest one still live leads
+                    live = [e["project"] for e in meta["designs"] if e.get("project") and e.get("state") == "live"
+                            and e.get("role") != "concept"]
+                    if live:
+                        meta["project"] = live[-1]
+            except Exception:                     # never lose a conversation over its history
+                meta["designs"] = []
         try:
             with self._lock:
                 self._write(meta)
@@ -132,7 +192,9 @@ class Conversations:
         return meta
 
     def create(self, project: str | None = None, agent: str = "claude", model: str = "default", effort: str = "",
-               title: str = "") -> dict:
+               title: str = "", draft: bool = False) -> dict:
+        """A new conversation. draft=True (files, sketches or links attached before the first message): it lives in
+        .drafts and is not listed until its first message is sent; one that is never sent is cleared later."""
         now = _now()
         cid = uuid.uuid4().hex[:12]
         meta = {"id": cid, "title": title.strip()[:120] or "New conversation", "title_auto": not title.strip(),
@@ -140,10 +202,18 @@ class Conversations:
                 "project": project or None, "agent": agent, "model": model or "default", "effort": effort or "",
                 "session": None, "session_agent": None, "resolved_model": None, "resolved_agent": None,
                 "created": now, "updated": now, "pinned": False, "cost_usd": 0.0, "cost_known": True,
-                "messages": 0, "events": 0, "preview": ""}
+                "messages": 0, "events": 0, "preview": "", "designs": []}
+        if project:
+            meta["designs"].append(_entry(project, "continued", None, now, "", self.data))
+        if draft:
+            meta["draft"] = True
         with self._lock:
+            d = (self.root / DRAFTS / cid) if draft else (self.root / cid)
+            d.mkdir(parents=True, exist_ok=True)
             self._write(meta)
-            (self.dir(meta["id"]) / "events.jsonl").write_text("", encoding="utf-8")
+            (d / "events.jsonl").write_text("", encoding="utf-8")
+        if draft:
+            self.prune_drafts()
         return meta
 
     def meta(self, cid: str) -> dict:
@@ -171,19 +241,79 @@ class Conversations:
     def pin(self, cid: str, on: bool = True) -> dict:
         return self.update(cid, pinned=bool(on))
 
-    def link(self, cid: str, project: str | None) -> dict:
+    def link(self, cid: str, project: str | None, role: str = "continued", group: str | None = None,
+             tool: str = "") -> dict:
         """The conversation follows its design to a new project (a picked concept, a design it made). The designs it
-        was about before are kept in `projects`, oldest first."""
+        was about before are kept in `projects`, oldest first; every design is listed in `designs` with its role."""
+        if project is None:
+            with self._lock:
+                meta = self._read(cid)
+                if meta.get("project") is None:
+                    return meta
+        return self.record(cid, project, role, tool=tool, group=group)
+
+    def record(self, cid: str, project: str | None, role: str = "made", tool: str = "", group: str | None = None,
+               front: bool = True, request: int | None = None, state: str | None = None) -> dict:
+        """List a design (or, with project None and a group, a concept group) in the conversation.
+        front: the design becomes the one in front (`project`); the one before is kept in `projects`.
+        request: the user event that asked for it (default: the latest one)."""
+        if role not in ROLES:
+            raise ConversationError(f"Unknown role “{role}”.")
         with self._lock:
             meta = self._read(cid)
-            old = meta.get("project")
-            if old == project:
-                return meta
-            seen = [p for p in (meta.get("projects") or []) if p]
-            if old and old not in seen:
-                seen.append(old)
-            meta.update(project=project or None, projects=seen)
+            req = self.request_index(cid) if request is None else request
+            if project or group:
+                _add_design(meta, project, role, req, tool, self.data, group=group, state=state)
+            if front and meta.get("project") != project and (project or not group):
+                seen = [p for p in (meta.get("projects") or []) if p]
+                if meta.get("project") and meta["project"] not in seen:
+                    seen.append(meta["project"])
+                meta.update(project=project or None, projects=seen)
             return self._write(meta)
+
+    def add_brief(self, cid: str, brief: str) -> dict:
+        """A design brief written in this conversation (form/staged.py): kept in `briefs`, newest last."""
+        with self._lock:
+            meta = self._read(cid)
+            bs = [b for b in meta.get("briefs") or [] if b != brief] + [brief]
+            meta["briefs"] = bs[-20:]
+            return self._write(meta)
+
+    def request_index(self, cid: str) -> int | None:
+        """The index of the latest user event: the request a tool is answering right now."""
+        last = None
+        for i, e in enumerate(self.events(cid)):
+            if e.get("t") == "user":
+                last = i
+        return last
+
+    def designs(self, cid: str, fresh: bool = True) -> list[dict]:
+        """The conversation's designs in order. fresh: each with its state now (live, trashed or gone) and name; a
+        concept group with its name, state, members and pick."""
+        return [_fresh(e, self.data) if fresh else dict(e) for e in self.meta(cid).get("designs") or []]
+
+    def mark_trashed(self, project: str) -> int:
+        """A design moved to the trash: every conversation that lists it says so (it stays listed). Returns how many
+        conversations changed."""
+        n = 0
+        if not self.root.is_dir():
+            return n
+        with self._lock:
+            for d in self.root.iterdir():
+                if not ID_RE.fullmatch(d.name):
+                    continue
+                try:
+                    meta = self._read(d.name)
+                except ConversationError:
+                    continue
+                hit = False
+                for e in meta.get("designs") or []:
+                    if e.get("project") == project and e.get("state") != "trashed":
+                        e["state"], hit = "trashed", True
+                if hit:
+                    self._write(meta)
+                    n += 1
+        return n
 
     def fork(self, cid: str, at_event: int | None = None, project: str | None = None, reason: str = "") -> dict:
         """A new conversation in the same thread holding this one's events up to and including event `at_event`
@@ -210,6 +340,8 @@ class Conversations:
                             (re.sub(r"\s+", " ", str(e.get("text", "")))[:140] for e in reversed(evs) if e.get("t") in ("user", "text")), ""))
             if not meta.get("purpose"):
                 meta.pop("purpose", None)
+            if meta.get("project"):                   # a branch is about one design: its own, or the one it was given
+                meta["designs"] = [_entry(meta["project"], "continued", None, _now(), "fork", self.data)]
             d = self.dir(meta["id"])
             with open(d / "events.jsonl", "w", encoding="utf-8") as fh:
                 for e in evs:
@@ -287,6 +419,9 @@ class Conversations:
         ev.setdefault("ts", _now())
         with self._lock:
             meta = self._read(cid)
+            if ev["t"] == "user" and self.is_draft(cid):    # the first message: the draft becomes a conversation
+                self._promote(cid)
+                meta.pop("draft", None)
             with open(self.dir(cid) / "events.jsonl", "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(ev, ensure_ascii=False, default=str) + "\n")
             meta["events"] = meta.get("events", 0) + 1
@@ -329,9 +464,11 @@ class Conversations:
         evs = self.events(cid, start)
         return {**meta, "events_from": start, "items": evs, "next": start + len(evs)}
 
-    def list(self, project: str | None = None, q: str | None = None, limit: int = 200, thread: str | None = None) -> list[dict]:
-        """Pinned first, then newest. project: only that design's. thread: only that thread's. q: words that must all
-        appear in the title or text; a search lists one row per thread (its best match, newest first)."""
+    def list(self, project: str | None = None, q: str | None = None, limit: int = 200, thread: str | None = None,
+             involving: str | None = None) -> list[dict]:
+        """Pinned first, then newest. project: only that design's (the design in front). involving: every conversation
+        that lists the design in `designs`, in front or not. thread: only that thread's. q: words that must all appear
+        in the title or text; a search lists one row per thread (its best match, newest first)."""
         out = []
         if not self.root.is_dir():
             return out
@@ -344,6 +481,9 @@ class Conversations:
             except ConversationError:
                 continue
             if project is not None and meta.get("project") != project:
+                continue
+            if involving is not None and meta.get("project") != involving and not any(
+                    e.get("project") == involving for e in meta.get("designs") or []):
                 continue
             if thread is not None and (meta.get("thread") or meta["id"]) != thread:
                 continue
@@ -375,9 +515,96 @@ class Conversations:
         return ("…" if a else "") + re.sub(r"\s+", " ", hay[a:b]).strip() + ("…" if b < len(hay) else "")
 
     def latest(self, project: str | None) -> dict | None:
-        """The conversation to show when a design is opened: its most recently used one."""
+        """The conversation to show when a design is opened: its most recently used one; else the most recent one
+        that made or touched it (a request that made several designs leads back from each of them)."""
         ms = [m for m in self.list(project) if m.get("messages")]
+        if not ms and project:
+            ms = [m for m in self.list(involving=project) if m.get("messages")]
         return max(ms, key=lambda m: m.get("updated", 0)) if ms else None
+
+    # -- housekeeping ----------------------------------------------------------
+    def activity(self) -> list:
+        """The activity log (<data>/.activity.jsonl), read once; used to rebuild older conversations' designs."""
+        if self._activity is None:
+            out = []
+            try:
+                with open(self.data / ".activity.jsonl", encoding="utf-8") as fh:
+                    for line in fh:
+                        try:
+                            out.append(json.loads(line))
+                        except ValueError:
+                            continue
+            except OSError:
+                pass
+            self._activity = out
+        return self._activity
+
+    def prune_drafts(self, days: float = DRAFT_DAYS) -> list[str]:
+        """Clear drafts (attachments nobody sent) older than `days`. Returns their ids."""
+        gone, d = [], self.root / DRAFTS
+        if not d.is_dir():
+            return gone
+        cut = time.time() - days * 86400
+        for x in d.iterdir():
+            try:
+                if ID_RE.fullmatch(x.name) and (x / "meta.json").stat().st_mtime < cut:
+                    shutil.rmtree(x, ignore_errors=True)
+                    gone.append(x.name)
+            except OSError:
+                continue
+        return gone
+
+    def migrate(self, dry_run: bool = False, families: bool = True) -> dict:
+        """Bring every saved conversation up to date (run by the engine at start and by `form conversations
+        migrate`; running it again changes nothing):
+        - `designs` rebuilt from events, meta and the activity log where it is missing (rebuild_designs);
+        - a conversation with no message, no event and no pin, untouched for an hour, becomes a draft: it was made
+          by attaching a file and never sent, so it is not listed (drafts are cleared after DRAFT_DAYS);
+        - families: the designs one request made join the family of its first (lineage via "request"), so Home shows
+          one card for them. A design that already has a lineage keeps it.
+        dry_run: report what would change and write nothing."""
+        report = {"conversations": 0, "rebuilt": [], "drafts": [], "families": []}
+        if not self.root.is_dir():
+            return report
+        for d in sorted(self.root.iterdir()):
+            if not ID_RE.fullmatch(d.name):
+                continue
+            try:
+                raw = json.loads((d / "meta.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            report["conversations"] += 1
+            if not raw.get("messages") and not raw.get("events") and not raw.get("pinned") \
+                    and (raw.get("updated") or 0) < time.time() - 3600:      # never one that is being written
+                report["drafts"].append(d.name)
+                if not dry_run:
+                    with self._lock:
+                        (self.root / DRAFTS).mkdir(parents=True, exist_ok=True)
+                        fsutil.replace(d, self.root / DRAFTS / d.name)
+                continue
+            if "designs" in raw:
+                designs = raw["designs"]
+            else:
+                designs = rebuild_designs(raw, self.events(d.name), self.data, self.activity())
+                report["rebuilt"].append({"id": d.name, "title": raw.get("title", ""),
+                                          "designs": [{k: e.get(k) for k in ("project", "group", "role", "state")}
+                                                      for e in designs]})
+                if not dry_run:
+                    self.meta(d.name)                         # _migrate rebuilds and writes it back
+            if families:
+                by_req: dict = {}
+                for e in designs:
+                    if e.get("project") and e.get("role") == "made" and _state_of(self.data, e["project"])[0] == "live":
+                        by_req.setdefault(e.get("request"), []).append(e["project"])
+                for req, pids in by_req.items():
+                    if req is None or len(pids) < 2:
+                        continue
+                    for pid in pids[1:]:
+                        if dry_run or stamp_request(self.data, pid, d.name, req, pids[0]):
+                            report["families"].append({"conversation": d.name, "project": pid, "root": pids[0]})
+        if not dry_run:
+            self.prune_drafts()
+        return report
 
     # -- attachments ---------------------------------------------------------
     def attach(self, cid: str, src: Path | None = None, name: str | None = None, data: bytes | None = None) -> dict:
@@ -429,3 +656,299 @@ class Conversations:
                 out.append({"id": aid, "name": f.name[7:], "kind": kind_of(f.name), "size": f.stat().st_size, "file": f.name})
                 break
         return out
+
+
+# ---- designs: what a conversation made or touched ------------------------------------------------------------------
+
+_TRASH_RE = re.compile(r"(?P<pid>[a-z0-9][a-z0-9-]*?)-\d{8}T\d{6}Z(?:-\d+)?")
+_RANK = {"made": 0, "concept": 1, "reference-study": 2, "continued": 3}
+
+
+def _project_file(data: Path, pid: str) -> Path | None:
+    """project.json of a live design, or of its newest copy in the trash, else None."""
+    f = Path(data) / pid / "project.json"
+    if f.is_file():
+        return f
+    t = Path(data) / ".trash"
+    if t.is_dir():
+        hits = sorted((d for d in t.iterdir() if (m := _TRASH_RE.fullmatch(d.name)) and m.group("pid") == pid),
+                      key=lambda d: d.name)
+        for d in reversed(hits):
+            if (d / "project.json").is_file():
+                return d / "project.json"
+    return None
+
+
+def _state_of(data: Path, pid: str) -> tuple[str, str]:
+    """(state, name) of a design: live, trashed (in <data>/.trash) or gone."""
+    f = _project_file(data, pid)
+    if f is None:
+        return "gone", pid
+    try:
+        name = json.loads(f.read_text(encoding="utf-8")).get("name") or pid
+    except (OSError, ValueError):
+        name = pid
+    return ("live" if f.parent.parent == Path(data) else "trashed"), str(name)
+
+
+def _group(data: Path, gid: str) -> dict | None:
+    try:
+        return json.loads((Path(data) / ".concepts" / f"{gid}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _entry(project: str | None, role: str, request: int | None, ts: float, tool: str, data: Path,
+           group: str | None = None, state: str | None = None) -> dict:
+    e = {"project": project, "role": role, "request": request, "ts": ts, "tool": tool}
+    if group:
+        e["group"] = group
+    if project:
+        e["state"] = state or _state_of(data, project)[0]
+    else:
+        g = _group(data, group) if group else None
+        e["state"] = state or (g or {}).get("state") or "open"
+    return e
+
+
+def _add_design(meta: dict, project: str | None, role: str, request: int | None, tool: str, data: Path,
+                group: str | None = None, state: str | None = None) -> dict:
+    """Add a design (or a concept group) to meta["designs"], or update the one already there: a stronger role
+    (made over concept over continued) wins, the first request and time are kept, the state is refreshed."""
+    ds = meta.setdefault("designs", [])
+    key = ("project", project) if project else ("group", group)
+    for e in ds:
+        if key[1] and e.get(key[0]) == key[1] and (project or not e.get("project")):
+            if _RANK.get(role, 9) < _RANK.get(e.get("role"), 9):
+                e["role"] = role
+                if tool:
+                    e["tool"] = tool
+            if group and not e.get("group"):
+                e["group"] = group
+            if project:
+                e["state"] = state or _state_of(data, project)[0]
+            elif state:
+                e["state"] = state
+            if e.get("request") is None and request is not None:
+                e["request"] = request
+            return e
+    e = _entry(project, role, request, _now(), tool, data, group=group, state=state)
+    ds.append(e)
+    return e
+
+
+def _fresh(e: dict, data: Path) -> dict:
+    e = dict(e)
+    if e.get("project"):
+        e["state"], e["name"] = _state_of(data, e["project"])
+    elif e.get("group"):
+        g = _group(data, e["group"])
+        if g:
+            e.update(state=g.get("state") or e.get("state"), name=g.get("name"), picked=g.get("picked"),
+                     members=[m.get("project") for m in g.get("members") or []])
+    return e
+
+
+_PROJECT_IN = r'"project"\s*:\s*(?:\{\s*"id"\s*:\s*)?"([a-z0-9][a-z0-9-]{0,60})"'
+_RESULT_ID = {   # where each creator tool's result names the design it made
+    "create_project": _PROJECT_IN,
+    "create_design": _PROJECT_IN,
+    "reconstruct": _PROJECT_IN,
+    "duplicate_project": r'"id"\s*:\s*"([a-z0-9][a-z0-9-]{0,60})"',
+    "import_project": r'"id"\s*:\s*"([a-z0-9][a-z0-9-]{0,60})"',
+    "pick_concept": r'"picked"\s*:\s*"([a-z0-9][a-z0-9-]{0,60})"',
+}
+_INPUT_ID = re.compile(r"\bproject(?:_or_file)?=([a-z0-9][a-z0-9-]{0,60})(?=\s|$)")
+_MADE_KINDS = ("commit", "reconstruct", "project", "concepts")
+
+
+def rebuild_designs(meta: dict, events: list[dict], data: Path, activity: list | None = None) -> list[dict]:
+    """`designs` for a conversation saved before it existed, from what it recorded:
+    - a creator tool's result (CREATOR_TOOLS): the project its result names, or the `project` the app tagged it with,
+      or else the design the activity log says was created between the call and its result ("Created …",
+      "Reconstructed …", "Copied from …", "Imported …"): role made (concept for a concept group);
+    - any other tool called with project=<id> of a design that exists or is in the trash: role continued (a concept
+      group's members are left out unless picked; the group itself is listed);
+    - meta: the design in front, earlier ones in `projects`, a deleted one in `project_was`, concept groups.
+    `request` is the user event each one answered. Nothing is invented: an id that is neither a design nor in the
+    trash is left out unless meta names it (then its state is "gone")."""
+    data = Path(data)
+    out: list[dict] = []
+    tools: dict = {}
+    request = None
+    groups = [g for g in (meta.get("concepts") or []) if GID_RE.fullmatch(str(g))]
+    for e in events:                              # groups proposed here, so their members are known up front
+        c = e.get("concepts")
+        if e.get("t") == "result" and isinstance(c, dict) and GID_RE.fullmatch(str(c.get("group"))) \
+                and c["group"] not in groups:
+            groups.append(c["group"])
+    members, picked = {}, set()                   # concept project -> its group; the picked ones
+    for g in groups:
+        info = _group(data, g) or {}
+        members.update({m.get("project"): g for m in info.get("members") or [] if m.get("project")})
+        if info.get("picked"):
+            picked.add(info["picked"])
+
+    def add(pid, role, req, ts, tool, group=None, must_exist=True):
+        if pid and not PID_RE.fullmatch(pid):
+            return
+        if pid and must_exist and _state_of(data, pid)[0] == "gone":
+            return
+        if pid and role == "continued" and pid in members and pid not in picked:
+            role, group = "concept", members[pid]          # a concept the person did not pick
+        n = len(out)
+        e = _add_design({"designs": out}, pid, role, req, tool, data, group=group)
+        if len(out) > n and ts:                       # a new entry: dated when the conversation met it
+            e["ts"] = ts
+
+    for i, e in enumerate(events):
+        t = e.get("t")
+        if t == "user":
+            request = i
+        elif t == "tool":
+            name = str(e.get("name") or "").split("__")[-1]
+            tools[e.get("id")] = (name, e.get("ts") or 0, request)
+            for pid in _INPUT_ID.findall(str(e.get("input") or "")):
+                add(pid, "continued", request, e.get("ts"), name)
+        elif t == "result" and e.get("ok"):
+            name0, t0, req = tools.get(e.get("id"), ("", e.get("ts") or 0, request))
+            name = str(e.get("name") or name0).split("__")[-1]
+            role = CREATOR_TOOLS.get(name)
+            if role == "concept":
+                g = (e.get("concepts") or {}).get("group") if isinstance(e.get("concepts"), dict) else None
+                m = g or (re.search(r'"id"\s*:\s*"([0-9a-f]{10})"', str(e.get("text") or "")) or [None, None])[1]
+                if m:
+                    if m not in groups:
+                        groups.append(m)
+                    add(None, "concept", req, e.get("ts"), name, group=m)
+                continue
+            if not role:
+                if e.get("project"):
+                    add(e["project"], "continued", req, e.get("ts"), name)
+                continue
+            ids = [e["project"]] if e.get("project") else []
+            if not ids and name in _RESULT_ID:
+                ids = re.findall(_RESULT_ID[name], str(e.get("text") or ""))[:1]
+            if not ids and activity:
+                lo, hi = (t0 or e.get("ts") or 0) - 1, (e.get("ts") or 0) + 1
+                ids = [a["project"] for a in activity if a.get("project") and a.get("by") != "you"
+                       and a.get("kind") in _MADE_KINDS and lo <= (a.get("ts") or 0) <= hi
+                       and str(a.get("text") or "").startswith(("Created", "Reconstructed", "Copied", "Imported",
+                                                               "Picked"))][:1]
+            for pid in ids:
+                add(pid, role, req, e.get("ts"), name)
+    for g in groups:
+        add(None, "concept", None, meta.get("created"), "", group=g)
+    for pid in [*(meta.get("projects") or []), meta.get("project")]:
+        if pid:
+            add(pid, "continued", None, meta.get("updated"), "", must_exist=False)
+    was = (meta.get("project_was") or {}).get("id")
+    if was:
+        add(was, "continued", None, meta.get("updated"), "", must_exist=False)
+    for e in out:
+        e["migrated"] = True
+    return out
+
+
+def stamp_request(data: Path, project: str, conversation: str, request: int | None, root_pid: str | None,
+                  tool: str = "") -> bool:
+    """Record where a design came from (`origin`: the conversation and the request) and, when an earlier design of the
+    same request exists (root_pid), put it in that design's family: lineage {root, parent: root_pid, via "request"}.
+    A design that already has a lineage (a copy, a variant, a picked concept) keeps it. Returns True when the family
+    changed. Works on project.json under the project's lock, so the app, the MCP server and the CLI can all call it."""
+    from .studio import ProjectLock, SCHEMA
+    data = Path(data)
+    if not PID_RE.fullmatch(str(project or "")):
+        return False
+    f = data / project / "project.json"
+    if not f.is_file():
+        return False
+    with ProjectLock(data / ".locks" / f"{project}.lock"):
+        try:
+            p = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return False
+        if not isinstance(p, dict) or p.get("schema") != SCHEMA:
+            return False
+        changed = False
+        if not p.get("origin"):
+            p["origin"] = {"conversation": conversation, "request_event": request, "tool": tool}
+        if root_pid and root_pid != project and not p.get("lineage"):
+            root = root_pid
+            try:
+                rp = json.loads((data / root_pid / "project.json").read_text(encoding="utf-8"))
+                root = ((rp.get("lineage") or {}).get("root")) or root_pid
+            except (OSError, ValueError):
+                pass
+            p["lineage"] = {"root": root, "parent": root_pid, "parent_rev": None, "via": "request"}
+            changed = True
+        p["updated"] = time.time()
+        tmp = f.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(p, indent=1), encoding="utf-8")
+        fsutil.replace(tmp, f)
+        return changed
+
+
+MIGRATION_KEY = "conversation_designs"
+
+
+def migrate_once(data: Path) -> dict | None:
+    """Run Conversations.migrate once per data folder (recorded in <data>/.form-migrations.json, the file
+    form/capabilities.py keeps one-time changes in). Returns the report, or None when it already ran."""
+    f = Path(data) / ".form-migrations.json"
+    try:
+        done = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        done = {}
+    if not isinstance(done, dict) or MIGRATION_KEY in done:
+        return None
+    rep = Conversations(data).migrate()
+    done[MIGRATION_KEY] = {"ts": time.time(), "conversations": rep["conversations"], "rebuilt": len(rep["rebuilt"]),
+                           "drafts": rep["drafts"], "families": rep["families"]}
+    try:
+        tmp = f.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(done), encoding="utf-8")
+        fsutil.replace(tmp, f)
+    except OSError:
+        pass
+    return rep
+
+
+def env_conversation() -> str | None:
+    """The conversation this process works for ($FORM_CONVERSATION, set by form/chat.py for its MCP server)."""
+    cid = os.environ.get(ENV_CONVERSATION, "").strip()
+    return cid if ID_RE.fullmatch(cid) else None
+
+
+def made(data: Path, project: str | None, role: str = "made", tool: str = "", conversation: str | None = None,
+         group: str | None = None, family: bool = True, front: bool | None = None) -> dict | None:
+    """A tool just made, picked, copied or reconstructed `project` (or proposed concept `group`) for a conversation:
+    list it in the conversation's `designs` (and put it in front, unless it is a concept group), record its origin,
+    and, for the second and later design one request makes, put it in the family of the first (family=False: an
+    unrelated design, e.g. create_design(relation="new")). conversation: default $FORM_CONVERSATION; without one
+    (the CLI, an agent outside Form Studio's chat) nothing is recorded. Returns the conversation's meta, or None."""
+    cid = conversation or env_conversation()
+    if not cid:
+        return None
+    store = Conversations(data)
+    try:
+        meta = store.meta(cid)
+    except ConversationError:
+        return None
+    req = store.request_index(cid)
+    if project and role == "made":
+        root = None
+        if family:
+            root = next((e["project"] for e in meta.get("designs") or []
+                         if e.get("project") and e.get("project") != project and e.get("role") == "made"
+                         and e.get("request") == req and req is not None
+                         and _state_of(Path(data), e["project"])[0] == "live"), None)
+        try:
+            stamp_request(Path(data), project, cid, req, root, tool)
+        except OSError:
+            pass
+    try:
+        return store.record(cid, project, role, tool=tool, group=group, request=req,
+                            front=(role != "concept") if front is None else front)
+    except ConversationError:
+        return None

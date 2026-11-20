@@ -52,6 +52,9 @@ def make_handler(st: Studio):
     from .setup import mcp_command
     if not hasattr(st, "chat"):
         st.chat = chat_mod.Chat(st.cfg, st.root, mcp_command())
+        from .conversations import migrate_once           # once per data folder: designs for older conversations
+        threading.Thread(target=lambda: _quiet(lambda: migrate_once(st.root)), daemon=True,
+                         name="form-migrate-conversations").start()
     if getattr(st.chat, "studio", None) is None:      # names the printer in the agent's "Purpose:" line
         try:
             st.chat.studio = st
@@ -371,6 +374,9 @@ def make_handler(st: Studio):
                 if q.get("thread"):
                     return self._json({"conversations": st.chat.list(None, q.get("q"), thread=q["thread"]),
                                        "running": len(st.chat.running())})
+                if q.get("involving"):                      # every conversation that made or touched this design
+                    return self._json({"conversations": st.chat.list(None, q.get("q"), involving=q["involving"]),
+                                       "running": len(st.chat.running())})
                 return self._json({"conversations": st.chat.list(proj if proj else None, q.get("q")),
                                    "running": len(st.chat.running())})
             mr = re.fullmatch(r"/api/conversations/render/([a-z0-9-]+)/([A-Za-z0-9_.\-]+\.png)", path)
@@ -384,6 +390,11 @@ def make_handler(st: Studio):
             if mf:
                 f = self._conv(lambda: st.chat.store.attachment(mf.group(1), mf.group(2)))
                 return self._send(200, f.read_bytes(), mimetypes.guess_type(f.name)[0] or "application/octet-stream")
+            md = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/designs", path)
+            if md:                                          # the designs it made or touched, in order, state now
+                cid = md.group(1)
+                return self._json(self._conv(lambda: {"conversation": cid, "project": st.chat.store.meta(cid).get("project"),
+                                                      "designs": st.chat.store.designs(cid)}))
             mi = re.fullmatch(r"/api/conversations/([0-9a-f]{12})/ask/([0-9a-f]{10})/image", path)
             if mi:                                          # the picture of a measurement question (ask_measurement)
                 f = self._conv(lambda: st.chat.ask_image(mi.group(1), mi.group(2)))
@@ -403,11 +414,13 @@ def make_handler(st: Studio):
                 except ValueError as e:
                     raise StudioError(str(e))
             if path == "/api/conversations":
+                # draft: files, sketches or links attached before the first message; it becomes a conversation (and
+                # is listed) when that message is sent, and is cleared if it never is
                 d = st.chat.status()["default"]
                 return self._json(st.chat.store.create(body.get("project") or None, body.get("agent") or d["agent"],
                                                        body.get("model") or d["model"],
                                                        body.get("effort") if body.get("effort") is not None else d["effort"],
-                                                       str(body.get("title") or "")))
+                                                       str(body.get("title") or ""), draft=bool(body.get("draft"))))
             if path == "/api/conversations/send":           # first message of a new conversation
                 cid = None
             else:
@@ -596,8 +609,27 @@ def make_handler(st: Studio):
                     kw["tolerance"] = float(body["tolerance"])
                 if body.get("layer") is not None:
                     kw["layer"] = int(body["layer"])
-                out = st.reconstruct_reference(p, str(body.get("file") or ""), **kw)
-                st.activity(out["project"], "design", f"Made {body.get('file')} editable as “{out['name']}”.", by="you")
+                files = [str(f) for f in body.get("files") or [] if f]
+                if len(files) >= 2:                     # the parts of one product: one design, one part per mesh
+                    from . import multipart
+                    known = {r["file"] for r in st.references(p)}
+                    bad = [f for f in files if f not in known]
+                    if bad:
+                        raise StudioError(f"There is no reference part {', '.join(bad)} in this project.",
+                                          "Import the meshes first (Brief > Import part).")
+                    out = multipart.reconstruct_parts(st, [st.dir(pid) / "references" / f for f in files], **kw)
+                    what = f"{len(out['parts'])} meshes"
+                else:
+                    out = st.reconstruct_reference(p, str(body.get("file") or (files[0] if files else "")), **kw)
+                    what = str(body.get("file") or files[0])
+                # it comes from this design: same family, and the conversations about this design list it
+                st.adopt(out["project"], pid, "reconstruct")
+                from .conversations import Conversations
+                store = Conversations(st.root)
+                last = store.latest(pid)
+                if last:
+                    store.record(last["id"], out["project"], "made", tool="reconstruct", front=False)
+                st.activity(out["project"], "design", f"Made {what} editable as “{out['name']}”.", by="you")
                 return self._json(out)
             # -- "Rebuild as editable CAD": the message that starts the agent remodel (form/remodel) --
             if action == "rebuild_brief":
