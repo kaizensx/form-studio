@@ -394,6 +394,92 @@ class Migration(unittest.TestCase):
         self.assertEqual(other["project"], "wallet-editable")         # it leads to its design again
         self.assertEqual(self.s.migrate()["families"], [])            # once is enough
 
+    def test_migration_never_deletes_and_skips_what_it_cannot_read(self):
+        """Data safety: malformed conversations are skipped and reported; attachments, linked designs and old drafts
+        are never moved or erased; every meta.json it changes is backed up first; it runs once even when an item
+        fails, and running it again changes nothing."""
+        cdir = self.data / ".conversations"
+        t = 1795188849.0
+
+        def raw(cid, meta=None, text=None, events=""):
+            (cdir / cid).mkdir(parents=True)
+            if text is None:
+                text = json.dumps({"id": cid, "title": "x", "project": None, "created": t, "updated": t,
+                                   "pinned": False, "messages": 0, "events": 0, **(meta or {})})
+            (cdir / cid / "meta.json").write_text(text)
+            if events is not None:
+                (cdir / cid / "events.jsonl").write_text(events)
+        raw("aaaaaaaaaaa1", text="{not json")                                     # malformed: unreadable
+        raw("aaaaaaaaaaa2", text="[1, 2]")                                        # malformed: not an object
+        raw("aaaaaaaaaaa3", text=json.dumps({"id": "ffffffffffff", "messages": 0}))  # malformed: another id
+        raw("aaaaaaaaaaa4", events=None)
+        (cdir / "aaaaaaaaaaa4" / "events.jsonl").mkdir()                          # malformed: events unreadable
+        raw("bbbbbbbbbbb1")                                                       # counters 0, but a file attached
+        (cdir / "bbbbbbbbbbb1" / "files").mkdir()
+        (cdir / "bbbbbbbbbbb1" / "files" / "abc123-part.stl").write_text("solid x\nendsolid x\n")
+        raw("bbbbbbbbbbb2", {"project": "wallet-editable"})                       # counters 0, linked to a design
+        raw("bbbbbbbbbbb3", {"designs": [{"project": "wallet-editable", "role": "made"}]})
+        raw("bbbbbbbbbbb4", events=json.dumps({"t": "user", "text": "stale counters", "ts": t}) + "\n")
+        old_draft = cdir / ".drafts" / "dddddddddddd"                             # an unsent draft from long ago
+        old_draft.mkdir(parents=True)
+        (old_draft / "meta.json").write_text(json.dumps({"id": "dddddddddddd", "messages": 0, "draft": True}))
+        (old_draft / "files").mkdir()
+        (old_draft / "files" / "abc123-photo.png").write_bytes(b"\x89PNG")
+        old = time.time() - 30 * 86400
+        os.utime(old_draft / "meta.json", (old, old))
+        before = {p: p.read_bytes() for p in cdir.rglob("*") if p.is_file()}
+
+        dry = self.s.migrate(dry_run=True)
+        self.assertEqual({p: p.read_bytes() for p in cdir.rglob("*") if p.is_file()}, before, "a dry run writes nothing")
+        self.assertFalse((self.data / ".backups").exists())
+        self.assertEqual(dry["drafts"], ["5c5600ae0bda"])
+
+        rep = conv_mod.migrate_once(self.data)
+        self.assertEqual(sorted(x["id"] for x in rep["skipped"]),
+                         ["aaaaaaaaaaa1", "aaaaaaaaaaa2", "aaaaaaaaaaa3", "aaaaaaaaaaa4"])
+        self.assertEqual(rep["drafts"], ["5c5600ae0bda"], "only the one with nothing in it")
+        for cid in ("aaaaaaaaaaa1", "aaaaaaaaaaa2", "aaaaaaaaaaa3", "aaaaaaaaaaa4", "bbbbbbbbbbb1", "bbbbbbbbbbb2",
+                    "bbbbbbbbbbb3", "bbbbbbbbbbb4"):
+            self.assertTrue((cdir / cid / "meta.json").is_file(), cid)
+        self.assertEqual((cdir / "aaaaaaaaaaa1" / "meta.json").read_text(), "{not json", "a bad one is left as it was")
+        self.assertTrue((cdir / "bbbbbbbbbbb1" / "files" / "abc123-part.stl").is_file())
+        self.assertTrue((old_draft / "files" / "abc123-photo.png").is_file(), "the migration prunes no draft")
+        self.assertFalse((self.data / ".trash" / "conversations").exists())
+        # backups: every meta.json it changed, as it was before
+        bdir = Path(rep["backup"])
+        self.assertEqual(bdir.parent, self.data / ".backups")
+        self.assertTrue(bdir.name.startswith("migration-"))
+        for cid in ("5c5600ae0bda", "c78efb9beec4", "c9d21220b6e0"):
+            self.assertEqual((bdir / cid / "meta.json").read_bytes(), before[cdir / cid / "meta.json"], cid)
+        self.assertTrue((bdir / "projects" / "wallet-slider-editable" / "project.json").is_file())
+        # recorded as done although four failed: no retry at the next start, and a second run changes nothing
+        done = json.loads((self.data / ".form-migrations.json").read_text())
+        self.assertEqual(len(done[conv_mod.MIGRATION_KEY]["skipped"]), 4)
+        self.assertIsNone(conv_mod.migrate_once(self.data))
+        snap = {p: p.read_bytes() for p in self.data.rglob("*") if p.is_file() and ".backups" not in p.parts}
+        again = self.s.migrate()
+        self.assertEqual((again["drafts"], again["rebuilt"], again["families"]), ([], [], []))
+        self.assertIsNone(again["backup"])
+        self.assertEqual({p: p.read_bytes() for p in self.data.rglob("*") if p.is_file() and ".backups" not in p.parts},
+                         snap, "running it again changes nothing")
+
+    def test_a_migration_that_fails_outright_is_still_recorded(self):
+        with mock.patch.object(Conversations, "migrate", side_effect=RuntimeError("boom")):
+            rep = conv_mod.migrate_once(self.data)
+        self.assertIn("boom", rep["error"])
+        self.assertIsNone(conv_mod.migrate_once(self.data), "it does not retry at every start")
+
+    def test_old_drafts_go_to_the_trash_not_away(self):
+        d = self.s.create(agent="fake", draft=True)
+        self.s.attach(d["id"], name="x.png", data=b"\x89PNG")
+        old = time.time() - 8 * 86400
+        os.utime(self.data / ".conversations" / ".drafts" / d["id"] / "meta.json", (old, old))
+        self.assertEqual(self.s.prune_drafts(), [d["id"]])
+        moved = list((self.data / ".trash" / "conversations").iterdir())
+        self.assertEqual(len(moved), 1)
+        self.assertTrue(moved[0].name.startswith(d["id"] + "-"))
+        self.assertEqual([f.read_bytes() for f in (moved[0] / "files").iterdir()], [b"\x89PNG"])
+
     @unittest.skipUnless(os.environ.get("FORM_MIGRATION_COPY"), "set FORM_MIGRATION_COPY to a COPY of a data folder")
     def test_on_a_copy_of_real_data(self):
         """Every conversation with a project id in its events lists it. Runs on a copy; the copy is copied again."""

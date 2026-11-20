@@ -26,13 +26,15 @@ design a request makes is its family's root; later designs made by the same requ
 get it rebuilt from their events, their meta and the activity log the first time they are read (`rebuild_designs`).
 
 A conversation started by attaching a file is a draft (`.conversations/.drafts/<id>`) until its first message is sent;
-a draft that is never sent never shows up as an empty conversation, and old drafts are cleared.
+a draft that is never sent never shows up as an empty conversation, and old drafts are moved to the trash
+(<data>/.trash/conversations), never erased.
 
 Nothing here talks to an agent; form/chat.py runs the agent and appends what it says.
 """
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -41,6 +43,8 @@ import time
 import uuid
 from pathlib import Path
 from . import fsutil
+
+_log = logging.getLogger("form.conversations")
 
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 PDF_EXT = {".pdf"}
@@ -55,7 +59,7 @@ GID_RE = re.compile(r"[0-9a-f]{10}")
 ENV_CONVERSATION = "FORM_CONVERSATION"          # set by form/chat.py for the MCP server of one conversation's run
 ROLES = ("made", "concept", "reference-study", "continued")
 DRAFTS = ".drafts"
-DRAFT_DAYS = 7                                  # a draft nobody sent is cleared after this many days
+DRAFT_DAYS = 7                                  # a draft nobody sent goes to the trash after this many days
 #: MCP tools that put a new design in front of the person, and the role it plays in the conversation.
 #: tests/test_request_family.py fails on a tool that returns a new project id and is not listed here.
 CREATOR_TOOLS = {"create_project": "made", "create_design": "made", "reconstruct": "made", "duplicate_project": "made",
@@ -236,7 +240,7 @@ class Conversations:
     def create(self, project: str | None = None, agent: str = "claude", model: str = "default", effort: str = "",
                title: str = "", draft: bool = False) -> dict:
         """A new conversation. draft=True (files, sketches or links attached before the first message): it lives in
-        .drafts and is not listed until its first message is sent; one that is never sent is cleared later."""
+        .drafts and is not listed until its first message is sent; one that is never sent goes to the trash later."""
         now = _now()
         cid = uuid.uuid4().hex[:12]
         meta = {"id": cid, "title": title.strip()[:120] or "New conversation", "title_auto": not title.strip(),
@@ -582,7 +586,8 @@ class Conversations:
         return self._activity
 
     def prune_drafts(self, days: float = DRAFT_DAYS) -> list[str]:
-        """Clear drafts (attachments nobody sent) older than `days`. Returns their ids."""
+        """Move drafts (attachments nobody sent) older than `days` to the trash, <data>/.trash/conversations/<id>-<UTC
+        time>. Nothing is erased: moving the folder back into .conversations/.drafts restores it. Returns their ids."""
         gone, d = [], self.root / DRAFTS
         if not d.is_dir():
             return gone
@@ -590,63 +595,128 @@ class Conversations:
         for x in d.iterdir():
             try:
                 if ID_RE.fullmatch(x.name) and (x / "meta.json").stat().st_mtime < cut:
-                    shutil.rmtree(x, ignore_errors=True)
+                    self._to_trash(x)
                     gone.append(x.name)
-            except OSError:
+            except OSError as e:
+                _log.warning("draft %s was not moved to the trash: %s", x.name, e)
                 continue
         return gone
 
+    def _to_trash(self, folder: Path) -> Path:
+        trash = self.data / ".trash" / "conversations"
+        trash.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        dest, i = trash / f"{folder.name}-{stamp}", 2
+        while dest.exists():
+            dest, i = trash / f"{folder.name}-{stamp}-{i}", i + 1
+        shutil.move(str(folder), str(dest))
+        return dest
+
+    def _is_empty(self, d: Path, raw: dict) -> str | None:
+        """Why a saved conversation is an unsent draft, or None when it is not. Only one with no user message (in
+        meta and in events.jsonl), no event at all, no attachment, no linked design and no pin, untouched for an
+        hour, is one. Anything that cannot be read counts as not empty."""
+        if raw.get("messages") or raw.get("events") or raw.get("pinned"):
+            return None
+        if raw.get("project") or raw.get("designs") or raw.get("projects") or raw.get("project_was"):
+            return None
+        if (raw.get("updated") or 0) >= time.time() - 3600:          # never one that is being written
+            return None
+        ev = d / "events.jsonl"
+        if ev.exists():
+            text = ev.read_text(encoding="utf-8")                    # unreadable: raises, and the caller skips it
+            if text.strip():
+                return None
+        files = d / "files"
+        if files.exists() and (not files.is_dir() or any(files.iterdir())):
+            return None
+        if (d / "sources.json").exists():
+            return None
+        return "no message, no event, no attachment and no design"
+
     def migrate(self, dry_run: bool = False, families: bool = True) -> dict:
         """Bring every saved conversation up to date (run by the engine at start and by `form conversations
-        migrate`; running it again changes nothing):
+        migrate`; running it again changes nothing). It never deletes anything:
         - `designs` rebuilt from events, meta and the activity log where it is missing (rebuild_designs);
-        - a conversation with no message, no event and no pin, untouched for an hour, becomes a draft: it was made
-          by attaching a file and never sent, so it is not listed (drafts are cleared after DRAFT_DAYS);
+        - a conversation with no user message, no event, no attachment, no linked design and no pin, untouched for an
+          hour, becomes a draft: it was made by attaching a file and never sent, so it is not listed. Drafts are not
+          pruned here;
         - families: the designs one request made join the family of its first (lineage via "request"), so Home shows
           one card for them. A design that already has a lineage keeps it.
+        Each conversation is guarded on its own: one that cannot be read or migrated is skipped and reported in
+        `skipped`, and the rest go on. Before anything is changed, every meta.json and project.json it touches is
+        copied to <data>/.backups/migration-<UTC time>/ (`backup` in the report).
         dry_run: report what would change and write nothing."""
-        report = {"conversations": 0, "rebuilt": [], "drafts": [], "families": []}
+        report = {"conversations": 0, "rebuilt": [], "drafts": [], "families": [], "skipped": [], "backup": None}
         if not self.root.is_dir():
             return report
+        stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        backup_dir = self.data / ".backups" / f"migration-{stamp}"
+
+        def backup(f: Path, rel: str) -> None:
+            if dry_run or not f.is_file():
+                return
+            dest = backup_dir / rel
+            if dest.exists():
+                return
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(f, dest)
+            report["backup"] = str(backup_dir)
+
         for d in sorted(self.root.iterdir()):
-            if not ID_RE.fullmatch(d.name):
+            if not ID_RE.fullmatch(d.name) or not d.is_dir():
                 continue
             try:
-                raw = json.loads((d / "meta.json").read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue
-            report["conversations"] += 1
-            if not raw.get("messages") and not raw.get("events") and not raw.get("pinned") \
-                    and (raw.get("updated") or 0) < time.time() - 3600:      # never one that is being written
-                report["drafts"].append(d.name)
-                if not dry_run:
-                    with self._lock:
-                        (self.root / DRAFTS).mkdir(parents=True, exist_ok=True)
-                        fsutil.replace(d, self.root / DRAFTS / d.name)
-                continue
-            if "designs" in raw:
-                designs = raw["designs"]
-            else:
-                designs = rebuild_designs(raw, self.events(d.name), self.data, self.activity())
-                report["rebuilt"].append({"id": d.name, "title": raw.get("title", ""),
-                                          "designs": [{k: e.get(k) for k in ("project", "group", "role", "state")}
-                                                      for e in designs]})
-                if not dry_run:
-                    self.meta(d.name)                         # _migrate rebuilds and writes it back
-            if families:
-                by_req: dict = {}
-                for e in designs:
-                    if e.get("project") and e.get("role") == "made" and _state_of(self.data, e["project"])[0] == "live":
-                        by_req.setdefault(e.get("request"), []).append(e["project"])
-                for req, pids in by_req.items():
-                    if req is None or len(pids) < 2:
-                        continue
-                    for pid in pids[1:]:
-                        if dry_run or stamp_request(self.data, pid, d.name, req, pids[0]):
-                            report["families"].append({"conversation": d.name, "project": pid, "root": pids[0]})
-        if not dry_run:
-            self.prune_drafts()
+                self._migrate_one(d, report, dry_run, families, backup)
+            except Exception as e:                    # one bad conversation never stops the others
+                why = f"{type(e).__name__}: {e}"
+                report["skipped"].append({"id": d.name, "why": why})
+                _log.warning("conversation %s was skipped by the migration: %s", d.name, why)
         return report
+
+    def _migrate_one(self, d: Path, report: dict, dry_run: bool, families: bool, backup) -> None:
+        f = d / "meta.json"
+        raw = json.loads(f.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict) or raw.get("id") != d.name:
+            raise ValueError("meta.json does not describe this conversation")
+        report["conversations"] += 1
+        if self._is_empty(d, raw):
+            report["drafts"].append(d.name)
+            if not dry_run:
+                backup(f, f"{d.name}/meta.json")
+                with self._lock:
+                    (self.root / DRAFTS).mkdir(parents=True, exist_ok=True)
+                    fsutil.replace(d, self.root / DRAFTS / d.name)
+            return
+        if "designs" in raw and isinstance(raw["designs"], list):
+            designs = raw["designs"]
+        else:
+            designs = rebuild_designs(raw, self.events(d.name), self.data, self.activity())
+            report["rebuilt"].append({"id": d.name, "title": raw.get("title", ""),
+                                      "designs": [{k: e.get(k) for k in ("project", "group", "role", "state")}
+                                                  for e in designs]})
+            if not dry_run:
+                backup(f, f"{d.name}/meta.json")
+                self.meta(d.name)                         # _migrate rebuilds and writes it back
+        if not families:
+            return
+        by_req: dict = {}
+        for e in designs:
+            if isinstance(e, dict) and e.get("project") and e.get("role") == "made" \
+                    and _state_of(self.data, e["project"])[0] == "live":
+                by_req.setdefault(e.get("request"), []).append(e["project"])
+        for req, pids in by_req.items():
+            if req is None or len(pids) < 2:
+                continue
+            for pid in pids[1:]:
+                if dry_run:
+                    if _would_stamp(self.data, pid, pids[0]):
+                        report["families"].append({"conversation": d.name, "project": pid, "root": pids[0]})
+                    continue
+                if PID_RE.fullmatch(str(pid)):
+                    backup(self.data / pid / "project.json", f"projects/{pid}/project.json")
+                if stamp_request(self.data, pid, d.name, req, pids[0]):
+                    report["families"].append({"conversation": d.name, "project": pid, "root": pids[0]})
 
     # -- attachments ---------------------------------------------------------
     def attach(self, cid: str, src: Path | None = None, name: str | None = None, data: bytes | None = None,
@@ -957,9 +1027,10 @@ def stamp_request(data: Path, project: str, conversation: str, request: int | No
             return False
         if not isinstance(p, dict) or p.get("schema") != SCHEMA:
             return False
-        changed = False
+        changed, wrote = False, False
         if not p.get("origin"):
             p["origin"] = {"conversation": conversation, "request_event": request, "tool": tool}
+            wrote = True
         if root_pid and root_pid != project and not p.get("lineage"):
             root = root_pid
             try:
@@ -968,12 +1039,22 @@ def stamp_request(data: Path, project: str, conversation: str, request: int | No
             except (OSError, ValueError):
                 pass
             p["lineage"] = {"root": root, "parent": root_pid, "parent_rev": None, "via": "request"}
-            changed = True
-        p["updated"] = time.time()
+            changed = wrote = True
+        if not wrote:                             # nothing new: leave the file (and Home's order) as it is
+            return False
         tmp = f.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(p, indent=1), encoding="utf-8")
         fsutil.replace(tmp, f)
         return changed
+
+
+def _would_stamp(data: Path, project: str, root_pid: str | None) -> bool:
+    """What stamp_request would answer, without writing (for a dry run)."""
+    try:
+        p = json.loads((Path(data) / project / "project.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return False
+    return bool(isinstance(p, dict) and root_pid and root_pid != project and not p.get("lineage"))
 
 
 MIGRATION_KEY = "conversation_designs"
@@ -989,9 +1070,15 @@ def migrate_once(data: Path) -> dict | None:
         done = {}
     if not isinstance(done, dict) or MIGRATION_KEY in done:
         return None
-    rep = Conversations(data).migrate()
+    try:
+        rep = Conversations(data).migrate()
+    except Exception as e:                        # recorded as done anyway: it never retries and fails at every start
+        _log.warning("the conversation migration stopped: %s", e)
+        rep = {"conversations": 0, "rebuilt": [], "drafts": [], "families": [], "skipped": [],
+               "backup": None, "error": f"{type(e).__name__}: {e}"}
     done[MIGRATION_KEY] = {"ts": time.time(), "conversations": rep["conversations"], "rebuilt": len(rep["rebuilt"]),
-                           "drafts": rep["drafts"], "families": rep["families"]}
+                           "drafts": rep["drafts"], "families": rep["families"], "skipped": rep.get("skipped", []),
+                           "backup": rep.get("backup"), **({"error": rep["error"]} if rep.get("error") else {})}
     try:
         tmp = f.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(done), encoding="utf-8")
