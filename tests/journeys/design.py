@@ -10,7 +10,7 @@ def run(ui):
     ui.settle(300)
     printing_on(ui)                      # this journey walks the print stages (Fit, slice)
     # ── created the way an agent does, opened the way a person does: its card on Home ──
-    pid = ui.api("/projects", {"name": "Sensor case", "recipe": "enclosure", "brief": ""})["id"]
+    pid = ui.api("/projects", {"name": "Sensor case", "recipe": "enclosure", "brief": "", "purpose": "print"})["id"]     # made for printing
     ui.run_js("Store.reloadStudio()")
     card = ui.wait_until(lambda: next((c for c in ui.find_all(name="projectCard") if ui.sees("Sensor case", c)), None), 30, "the new design on Home")
     ui.scroll_to(card)
