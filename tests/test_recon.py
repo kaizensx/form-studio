@@ -398,5 +398,28 @@ class Surfaces(unittest.TestCase):
         self.assertIn("reconstruct", anyio.run(names))
 
 
+class PartialFreeze(unittest.TestCase):
+    """A plane with a few triangles off it keeps the rest of its triangles as a plane, one region per connected piece."""
+
+    def test_plane_keeps_its_good_triangles(self):
+        from form.recon import fit, pipeline
+        from form.recon.segment import Region
+        # a 4 x 1 strip of quads (8 triangles) on z = 0; the two middle triangles are "off"
+        V = np.array([[x, y, 0.0] for y in (0, 1) for x in range(5)])
+        F = []
+        for x in range(4):
+            a, b, c, d = x, x + 1, 5 + x + 1, 5 + x
+            F += [[a, b, c], [a, c, d]]
+        F = np.array(F)
+        plane = Region(0, "plane", np.arange(8), fit.fit_plane(V), 4.0)
+        out = pipeline._freeze(V, F, [plane], [0], {0: np.array([2, 3])})
+        kinds = sorted(r.kind for r in out)
+        self.assertEqual(kinds.count("facet"), 2)
+        planes = [r for r in out if r.kind == "plane"]
+        self.assertEqual(sorted(len(r.tris) for r in planes), [2, 4])      # two pieces either side of the frozen quad
+        self.assertEqual([r.id for r in out], list(range(len(out))))
+        self.assertEqual(len(pipeline._pieces(F, np.array([0, 1, 6, 7]))), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

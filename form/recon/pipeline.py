@@ -143,7 +143,8 @@ def reconstruct(path, out_dir, name: str | None = None, tolerance: float = 0.02,
     elif layer >= 2 and regions is not None:
         say({"stage": "layer2", "text": "Looking for features: base, holes, fillets, chamfers, patterns", "fraction": 0.72})
         r2 = layer2(V, F, regions, l1shape, tol, name, out, rep["layers"]["1"],
-                    progress=lambda d: say({**d, "fraction": 0.72 + 0.25 * d.get("fraction", 0)}))
+                    progress=lambda d: say({**d, "fraction": 0.72 + 0.25 * d.get("fraction", 0)}),
+                    deadline=t0 + 0.92 * float(budget_s))
         if gear is not None:
             r2["report"]["also_tried"] = r2["report"].get("also_tried", []) + [
                 {k: gear["report"].get(k) for k in ("method", "base", "verified", "hausdorff_mm", "error") if gear["report"].get(k) is not None}]
@@ -203,7 +204,7 @@ def _gear(V, F, tol, name, say):
     return None
 
 
-def layer2(V, F, regions, l1shape, tol, name, out, l1rep, progress=None) -> dict:
+def layer2(V, F, regions, l1shape, tol, name, out, l1rep, progress=None, deadline=None) -> dict:
     """The best verified recipe: the feature tree (tree.py) first, the single extrusion or revolution (features.py)
     when the tree is not within the limit. Both are reported."""
     from . import features, tree
@@ -212,11 +213,11 @@ def layer2(V, F, regions, l1shape, tol, name, out, l1rep, progress=None) -> dict
     tried = []
     try:
         t = tree.recipe(V, F, l1shape, tol, name=name, limit=limit, out_dir=out,
-                        progress=lambda d: say({**d, "fraction": 0.8 * d.get("fraction", 0)}))
+                        progress=lambda d: say({**d, "fraction": 0.8 * d.get("fraction", 0)}), deadline=deadline)
     except Exception as e:                              # noqa: BLE001
         t = {"report": {"method": "feature tree", "error": f"{type(e).__name__}: {e}"[:300]}}
     tried.append(t)
-    if not t.get("verified"):
+    if not t.get("verified") and (deadline is None or time.perf_counter() < deadline):
         try:
             f = features.recipe(V, F, regions, tol, name=name, limit=limit,
                                 progress=lambda d: say({**d, "fraction": 0.8 + 0.2 * d.get("fraction", 0)}))
@@ -273,6 +274,7 @@ def _layer1(V, F, tol, budget_s, progress):
     for attempt in range(5):
         shape, info = brep.build(V, F, regions, tol, progress=progress)
         frozen = []
+        partial = {}                                    # region id -> its triangles that are off the surface
         if shape is None or not info.get("valid"):
             ids = sorted({f["region"] for f in info.get("face_failures", [])} | set(info.get("free_edge_regions", [])))
             if shape is not None and not ids:
@@ -292,14 +294,17 @@ def _layer1(V, F, tol, budget_s, progress):
             exact = [r for r in regions if r.parametric and r.kind != "plane" and vertex_dev(r, V, F) < tol / 20]
             chord = max((float(dev[r.tris].max()) for r in exact), default=None)
             for r in regions:
-                if r.parametric and np.any(dev[r.tris] > _allowance(V, F, r.tris, r, tol, chord)):
+                off = dev[r.tris] > _allowance(V, F, r.tris, r, tol, chord)
+                if r.parametric and np.any(off):
                     frozen.append(r.id)
+                    if r.kind == "plane" and attempt < 3:         # a plane keeps the triangles that are on it
+                        partial[r.id] = r.tris[off]
         rounds.append({"build": {k: info[k] for k in ("faces", "valid", "edges_line", "edges_circle", "edges_arc", "edges_segment")
                                  if k in info}, "hausdorff_mm": round(cmp["hausdorff_mm"], 6) if cmp else None,
                        "frozen_regions": [{"id": i, "kind": regions[i].kind} for i in frozen]})
         if not frozen:
             break
-        regions = _freeze(V, F, regions, frozen)
+        regions = _freeze(V, F, regions, frozen, partial)
         shape = None
     summ = segment.summary(regions)
     rep = {**summ, "segmentation": st, "rounds": rounds,
@@ -314,17 +319,45 @@ def _layer1(V, F, tol, budget_s, progress):
     return {"report": rep, "shape": shape, "regions": regions, "P": P, "T": T, "cmp": cmp}
 
 
-def _freeze(V, F, regions, ids):
-    """Turn regions into frozen facets, one per triangle, and renumber."""
+def _freeze(V, F, regions, ids, partial=None):
+    """Turn regions into frozen facets, one per triangle, and renumber. A region in `partial` freezes only the given
+    triangles; the rest keep its surface, one region per connected piece (a plane with a bad corner stays a plane)."""
     from .segment import Region
     _, A = meshmod.tri_normals(V, F)
     ids = set(ids)
+    partial = partial or {}
     out = []
     for r in regions:
-        if r.id in ids:
+        if r.id in ids and r.id in partial and len(partial[r.id]) < len(r.tris):
+            bad = set(partial[r.id].tolist())
+            good = np.array([t for t in r.tris.tolist() if t not in bad])
+            out += [Region(0, "facet", np.array([t]), None, float(A[t])) for t in sorted(bad)]
+            for piece in _pieces(F, good):
+                out.append(Region(0, r.kind, piece, r.prim, float(A[piece].sum()), dict(r.info)))
+        elif r.id in ids:
             out += [Region(0, "facet", np.array([t]), None, float(A[t])) for t in r.tris.tolist()]
         else:
             out.append(r)
     for i, r in enumerate(out):
         r.id = i
     return out
+
+
+def _pieces(F, tris):
+    """Triangles split into pieces connected through shared edges."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    tris = np.asarray(tris)
+    if len(tris) < 2:
+        return [tris] if len(tris) else []
+    sub = F[tris]
+    E = np.sort(np.concatenate([sub[:, [0, 1]], sub[:, [1, 2]], sub[:, [2, 0]]]), axis=1)
+    owner = np.tile(np.arange(len(tris)), 3)
+    _, inv = np.unique(E, axis=0, return_inverse=True)
+    inv = inv.reshape(-1)
+    o = np.argsort(inv, kind="stable")
+    a, b = owner[o][:-1], owner[o][1:]
+    same = inv[o][1:] == inv[o][:-1]
+    g = coo_matrix((np.ones(int(same.sum())), (a[same], b[same])), shape=(len(tris), len(tris)))
+    k, lab = connected_components(g, directed=False)
+    return [tris[lab == i] for i in range(k)]
