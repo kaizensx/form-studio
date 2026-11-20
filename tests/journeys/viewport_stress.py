@@ -116,7 +116,7 @@ def journey_panels_while_moving(ui):
         ui.settle(80)
         ui.release((at.x(), at.y()))
         not_blank(ui, f"with the conversation toggled ({i})", need=2)
-    ui.resize(900, 560)
+    ui.resize(1120, 728)                 # the smallest window the app allows
     ui.drag("viewport", (-200, 80), fx=0.5, fy=0.5, steps=10)
     not_blank(ui, "in a small window", need=2)
     ui.resize(w0, h0)
