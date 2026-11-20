@@ -620,6 +620,11 @@ def make_handler(st: Studio):
                 if materials.fingerprint(st.load(pid)) != had:
                     auto(st.load(pid))
                 return self._json(out)
+            # -- drag a face, change the parameter behind it (form/dragface.py) --
+            if action == "drag_face":
+                from . import dragface
+                return self._json(dragface.find(st, p, body.get("at"), body.get("normal"),
+                                                int(body["rev"]) if body.get("rev") is not None else None))
             # -- selections and annotations (form/selection.py) --
             if action in ("select", "annotate", "annotation", "annotation_delete", "annotation_analyze"):
                 from . import selection
