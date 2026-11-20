@@ -210,18 +210,31 @@ KERNEL_OPS = {"drag_face": op_drag_face}
 
 # ── engine side ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-def find(st, p: dict, at, normal=None, rev: int | None = None) -> dict:
-    """Which parameter a drag on the face at `at` changes (head revision by default)."""
-    from .studio import StudioError
+def find(st, p: dict, at, normal=None, rev: int | None = None, values: dict | None = None) -> dict:
+    """Which parameter a drag on the face at `at` changes (head revision by default). values: the open draft's
+    values (the parameters it changed); the drag then starts from them and from the shape the draft shows, so a
+    second drag on a parameter the draft already moved carries on from there instead of jumping back."""
+    from .studio import H, StudioError
     try:
         at = [float(x) for x in at]
         assert len(at) == 3 and all(math.isfinite(x) for x in at)
     except Exception:
         raise StudioError("A face drag needs the point that was pressed: x, y, z in design millimetres.")
     r = st.rev(p, rev)
-    out = st._k("drag_face", timeout=180, key=st.keys(p, r["n"])["geometry"], recipe_id=st.rid(p, r["n"]),
-                values=r["values"], at=at, normal=normal, p=p)
-    out.update({"rev": r["n"], "project": p["id"]})
+    vals, key = r["values"], st.keys(p, r["n"])["geometry"]
+    draft = {}
+    for k, v in (values or {}).items():
+        try:
+            if k in vals and math.isfinite(float(v)) and abs(float(v) - float(vals[k])) > 1e-12:
+                draft[k] = float(v)
+        except (TypeError, ValueError):
+            continue
+    if draft:
+        vals = {**vals, **draft}
+        key = "pv-" + H(st.rid(p, r["n"]), vals)          # the draft's own build, as Studio.preview keys it
+    out = st._k("drag_face", timeout=180, key=key, recipe_id=st.rid(p, r["n"]), values=vals, at=at, normal=normal,
+                p=p)
+    out.update({"rev": r["n"], "project": p["id"], "from_draft": bool(draft)})
     b = out.get("best")
     if b:
         out["text"] = (f"Dragging this face of {out.get('feature_label') or 'the part'} changes {b['label']}: "

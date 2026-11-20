@@ -1,6 +1,7 @@
 """Drag a face, change the parameter that drives it (form/dragface.py, WP-F). Ten fixture designs: the face under a
 known ray and the parameter a designer means when they pull it. Acceptance: right on at least 8 of 10."""
 import unittest
+from pathlib import Path
 
 from build123d import extrude
 
@@ -65,6 +66,38 @@ class DragFace(unittest.TestCase):
         self.assertEqual(dragface.value_for(b, 10.2), 46.0)
         self.assertEqual(dragface.value_for({**b, "rate": 0.5}, 5), 46.0)        # a symmetric width moves half
         self.assertEqual(dragface.value_for(b, -100), 8)
+
+    def test_a_drag_starts_from_the_open_draft(self):
+        """A second drag on a parameter the draft already moved starts from the draft's value and shape."""
+        calls = []
+
+        class St:
+            def rev(self, p, n=None):
+                return {"n": 3, "values": {"height": 20.0, "width": 40.0}}
+
+            def keys(self, p, n):
+                return {"geometry": "head-geometry-key"}
+
+            def rid(self, p, n=None):
+                return "coupon"
+
+            def _k(self, op, **kw):
+                calls.append(kw)
+                b = {"key": "height", "label": "Height", "value": kw["values"]["height"], "rate": 1.0, "unit": "mm",
+                     "min": 1, "max": 100, "step": 0.1}
+                return {"best": b, "feature_label": "Body"}
+        st, p = St(), {"id": "c1"}
+        head = dragface.find(st, p, [0, 0, 20], [0, 0, 1])
+        self.assertEqual((calls[-1]["values"]["height"], calls[-1]["key"], head["from_draft"]), (20.0, "head-geometry-key", False))
+        out = dragface.find(st, p, [0, 0, 26], [0, 0, 1], values={"height": 26.0, "unknown": 5, "width": "x"})
+        self.assertEqual(calls[-1]["values"], {"height": 26.0, "width": 40.0})       # the draft's value, known keys only
+        self.assertNotEqual(calls[-1]["key"], "head-geometry-key")                   # the draft's own build
+        self.assertTrue(calls[-1]["key"].startswith("pv-"))
+        self.assertEqual(out["best"]["value"], 26.0)
+        self.assertTrue(out["from_draft"])
+        self.assertEqual(dragface.value_for(out["best"], 2.0), 28.0)                 # carries on, never jumps back to 20
+        qml = (Path(dragface.__file__).parent / "app" / "qml" / "Form" / "FaceDrag.qml").read_text(encoding="utf-8")
+        self.assertIn("values: Store.draftValues", qml)
 
     def test_switches_are_never_dragged(self):
         keys = [p.key for p in dragface.candidates(registry()["storage_box"], "shell")]

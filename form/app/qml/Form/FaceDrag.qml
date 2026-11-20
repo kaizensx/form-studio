@@ -55,7 +55,8 @@ Item {
             var dx = a && b ? (b.x - a.x) / 10 : 0, dy = a && b ? (b.y - a.y) / 10 : 0
             // a face seen square-on: pull up to push it out
             fd.dir = Math.hypot(dx, dy) > 0.15 / Math.max(1e-6, fd.vp.mmPerPx) ? Qt.point(dx, dy) : Qt.point(0, -1 / Math.max(1e-6, fd.vp.mmPerPx))
-            Store.ppost("/drag_face", { at: h.at, normal: h.normal }).then(function (r) {
+            // from the open draft's values, so a second drag carries on from where the first left the parameter
+            Store.ppost("/drag_face", { at: h.at, normal: h.normal, values: Store.draftValues || ({}) }).then(function (r) {
                 fd.asking = false
                 if (!fd.active) return
                 fd.info = r

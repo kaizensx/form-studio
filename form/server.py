@@ -679,7 +679,8 @@ def make_handler(st: Studio):
             if action == "drag_face":
                 from . import dragface
                 return self._json(dragface.find(st, p, body.get("at"), body.get("normal"),
-                                                int(body["rev"]) if body.get("rev") is not None else None))
+                                                int(body["rev"]) if body.get("rev") is not None else None,
+                                                body.get("values") if isinstance(body.get("values"), dict) else None))
             # -- selections and annotations (form/selection.py) --
             if action in ("select", "annotate", "annotation", "annotation_delete", "annotation_analyze"):
                 from . import selection
