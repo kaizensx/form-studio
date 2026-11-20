@@ -3,7 +3,7 @@ feature of the code), the design sliced on every printer and compared in Prove, 
 mesh. Every number checked here is read back from the engine."""
 from pathlib import Path
 
-from _lib import fold, open_project, open_sheet_wait, sheet, toasts_gone, wait_job
+from _lib import fold, open_project, open_sheet_wait, sheet, toasts_gone, wait_job, printing_on
 
 DATA = "fresh"
 S = {}
@@ -25,6 +25,7 @@ class Design(Recipe):
 
 
 def journey_setup(ui):
+    printing_on(ui)                      # this journey is about printing: turn it on as someone who prints would
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     d = ui.studio.create_design("Mount plate", SOURCE)
     S["pid"] = d["id"]

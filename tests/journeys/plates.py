@@ -3,7 +3,7 @@ simulation switch between plates. Then Design only for this design, and slicing 
 
 Runs with whatever slicer the test gives it (tests/test_ui_journeys.py): a stand-in OrcaSlicer on every machine, and
 the slicer installed here when there is one (test_plates_real_slicer)."""
-from _lib import has_slicer, make, toasts_gone, wait_job
+from _lib import has_slicer, make, toasts_gone, wait_job, printing_on
 
 DATA = "fresh"
 S = {}
@@ -14,6 +14,7 @@ def data(ui):
 
 
 def journey_two_plates(ui):
+    printing_on(ui)                      # this journey is about printing: turn it on as someone who prints would
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     ui.check(has_slicer(ui), "a slicer is set up for this journey")
     S["pid"] = make(ui, "hinged_box", "Wide box", {"inner_w": 110, "inner_d": 80})

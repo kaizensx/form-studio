@@ -88,7 +88,7 @@ Item {
         add("Settings", "about", "info", "About Form Studio", "Version and licences", function () { Store.openSheet("about") })
         // home workstream: what's new, import and export
         add("Settings", "whatsnew", "sparkle", "What’s new", "Form Studio " + Bridge.version, function () { Store.showWhatsNew() })
-        add("Settings", "import", "import", "Import a project or conversation", ".formstudio, .formproj or .json", function () { Store.askImport() })
+        add("Settings", "import", "import", "Import a project or conversation", ".formstudio, .formproj or .json", function () { Store.openSheet("import") })
         if (Store.project) add("Settings", "export.project", "archive", "Export this design", "One .formstudio file with its conversations", function () { Store.exportProject(Store.pid) })
         if (Store.convId) add("Conversations", "export.conv.md", "file_text", "Export this conversation as Markdown", "", function () { Store.exportConversation(Store.convId, "md") })
         if (Store.convId) add("Conversations", "export.conv.json", "file_code", "Export this conversation as JSON", "Import brings it back", function () { Store.exportConversation(Store.convId, "json") })

@@ -5,7 +5,7 @@ the sheet shows the engine's own numbers, and applying the lightest geometry can
 exactly its values. Replace a broken part: from Home, a photo and a name; the message goes through the normal chat to
 the stand-in agent (tests/fixtures/fake_agent.py), which creates a design and asks for a measurement; the steps above
 the conversation follow, and the measured value is committed as measured. No model is called."""
-from _lib import make, open_sheet_wait, sheet, toasts_gone, wait_job
+from _lib import make, open_sheet_wait, sheet, toasts_gone, wait_job, printing_on
 
 DATA = "fresh"
 S = {}
@@ -24,6 +24,7 @@ def png(path):
 
 
 def journey_lighter(ui):
+    printing_on(ui)                      # this journey is about printing: turn it on as someone who prints would
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     pid = S["pid"] = make(ui, "storage_box", "Drawer box")
     head0 = ui.api("/projects/" + pid)["project"]["head"]

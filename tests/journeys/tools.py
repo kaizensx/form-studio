@@ -2,7 +2,7 @@
 print simulation, photo render."""
 import os
 
-from _lib import has_slicer, make, open_project, open_sheet_wait, close_sheet_esc
+from _lib import has_slicer, make, open_project, open_sheet_wait, close_sheet_esc, printing_on
 
 DATA = "fresh"
 S = {}
@@ -20,6 +20,7 @@ def box(it):
 
 
 def journey_setup(ui):
+    printing_on(ui)                      # this journey is about printing: turn it on as someone who prints would
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     S["box"] = make(ui, "enclosure", "Tool box", open=False)
     S["hinged"] = make(ui, "hinged_box", "Hinged box", open=False)

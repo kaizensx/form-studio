@@ -1,6 +1,6 @@
 """A new design (a recipe is still a building block agents use; here it is made through the engine): pipeline, stages, select on the model, draft by slider and by typing,
 commit, and go back with the timeline."""
-from _lib import head, open_sheet_wait, wait_job
+from _lib import head, open_sheet_wait, printing_on, wait_job
 
 DATA = "fresh"
 
@@ -8,6 +8,7 @@ DATA = "fresh"
 def run(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     ui.settle(300)
+    printing_on(ui)                      # this journey walks the print stages (Fit, slice)
     # ── created the way an agent does, opened the way a person does: its card on Home ──
     pid = ui.api("/projects", {"name": "Sensor case", "recipe": "enclosure", "brief": ""})["id"]
     ui.run_js("Store.reloadStudio()")

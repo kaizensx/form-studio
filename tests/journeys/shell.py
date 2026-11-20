@@ -8,7 +8,7 @@ import os
 import time
 from pathlib import Path
 
-from _lib import close_sheet_esc, head, make, open_sheet_wait, sheet, toasts_gone, wait_job
+from _lib import close_sheet_esc, head, make, open_sheet_wait, sheet, toasts_gone, wait_job, printing_on
 
 DATA = "fresh"
 S = {}
@@ -46,13 +46,14 @@ def tab_stays_inside(ui, presses=14):
 
 def journey_setup(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
-    S["pid"] = make(ui, "enclosure", "Shell box")
+    printing_on(ui)                      # the stages, slicer and print sheets are part of the tour
+    S["pid"] = make(ui, "enclosure", "Shell box", purpose="print")
     ui.wait_until(lambda: ui.store.get("software") is not None or True, 1)
 
 
 def journey_every_sheet_opens_and_closes(ui):
     opens = [
-        ("import", lambda: palette(ui, "open an example", "Open an example"), "Import"),
+        ("import", lambda: palette(ui, "import a project", "Import a project or conversation"), "Import"),
         ("settings", lambda: ui.key("Ctrl+,"), "Settings"),
         ("shortcuts", lambda: ui.key("?"), "Keyboard shortcuts"),
         ("slicer", lambda: palette(ui, "choose slicer", "Choose slicer"), "Slicer"),

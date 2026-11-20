@@ -4,7 +4,7 @@ the pixels to click are found by asking the viewport what is under them, part by
 import json
 import zipfile
 
-from _lib import make, open_project, wait_job
+from _lib import make, open_project, wait_job, printing_on
 
 DATA = "fresh"
 S = {}
@@ -38,6 +38,7 @@ def two_parts(ui):
 
 
 def journey_setup(ui):
+    printing_on(ui)                      # this journey is about printing: turn it on as someone who prints would
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     S["hinged"] = make(ui, "hinged_box", "Hinged box", open=False)
     S["gears"] = make(ui, "gear_pair", "Gear pair", open=False)
