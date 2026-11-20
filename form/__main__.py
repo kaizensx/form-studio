@@ -21,6 +21,8 @@
   form animate <project> [--morph 1:4] [--out x.gif]   turntable or revision morph
   form turntable <project> --fmt mp4|png|webp|gif      a turntable video or PNG sequence
   form compare-printers <project>                      slice on every printer: time, filament, cost
+  form slicer-open <project> [--printer ID] [--explain] [--no-open]
+                                     slice with settings chosen for this part, open the project in the slicer
   form lighter <project> [--apply c1]                  lighter walls, pockets, infill; every passing check kept
   form replace --photo broken.jpg [--name X]           a replacement for a broken part, from a photo, in a chat
   form feature <project> boss --at x,y,z --normal ...  a screw boss or snap-fit hook in the code
@@ -301,6 +303,11 @@ def main(argv=None):
     lt.add_argument("--builds", type=int, default=4, help="how many geometry candidates go through the full checks")
     lt.add_argument("--apply", metavar="ID", help="keep candidate ID (c1, c2, ...) from the search")
     lt.add_argument("--expect-head", type=int)
+    so = sub.add_parser("slicer-open", help="slice with settings chosen for this part on this printer and open the project in the slicer")
+    so.add_argument("project")
+    so.add_argument("--printer", metavar="ID", help="a printer id from `form printers` (default: the design's printer)")
+    so.add_argument("--explain", action="store_true", help="lead the JSON with each decision as one plain line")
+    so.add_argument("--no-open", action="store_true", help="slice and write the project 3MF, but do not open the slicer")
     cp = sub.add_parser("compare-printers", help="slice the design on every printer in your slicers: time, filament, cost")
     cp.add_argument("project")
     cp.add_argument("--limit", type=int, default=8, help="how many printers (the selected ones first)")
@@ -555,6 +562,12 @@ def main(argv=None):
                 _print(out)
             else:
                 _print(lighten.search(st, p, builds=a.builds))
+        elif a.cmd == "slicer-open":
+            from . import slicer_open
+            r = slicer_open.run(st, st.load(a.project), a.printer, open_app=not a.no_open)
+            if a.explain:
+                r = {"explain": slicer_open.explain(r).splitlines(), **r}
+            _print(r)
         elif a.cmd == "compare-printers":
             from . import slicecompare
             _print(slicecompare.compare(st, st.load(a.project), a.limit, a.printer))

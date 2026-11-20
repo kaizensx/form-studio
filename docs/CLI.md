@@ -121,6 +121,7 @@ message, with what the design is for.
 | `form cost <project> [--price-per-kg] [--kwh-price] [--watts] [--machine-rate] [--copies] [--save]` | Filament, electricity and machine time |
 | `form pack <project> [--copies N] [--spacing MM] [--no-rotate]` | Do N copies fit on one plate |
 | `form optimize <project> --vary key:min:max ... --minimize\|--maximize METRIC [--require EXPR] [--budget N]` | Goal seek over parameters |
+| `form slicer-open <project> [--printer ID] [--explain] [--no-open]` | Choose settings for this part on this printer (orientation, layer height, walls, top and bottom layers, infill, supports, brim, seam, filament, speed profile; each with its reason, computed or heuristic), slice it for real, write a project 3MF with those settings and open it in the slicer. `--explain` leads the JSON with one line per decision; `--no-open` writes the file only |
 | `form compare-printers <project> [--printer ID] [--limit N]` | Slice the design for real on every printer in your slicers: time, filament and cost side by side |
 | `form lighter <project> [--builds N] [--apply ID]` | Lighter versions that keep every passing check passing: thinner walls, bigger pockets, less infill, each with its mass and the slicer's grams; `--apply` commits one |
 | `form verify <project> <release>` | Re-hash a release against its manifest |
