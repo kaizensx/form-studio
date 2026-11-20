@@ -8,7 +8,8 @@ import "F.js" as F
 //   · the hero: the bench itself (a live build plate with your last design turning on it) and one composer that takes
 //     words, a photo, a sketch, a part or a drawing, or a link. For my printer / Just a 3D model, or Start blank.
 //   · concepts the agent proposed and you have not picked yet
-//   · your designs as live parts on their plates; your recent conversations
+//   · your designs as live parts on their plates, one card per design family (a design with its copies, variants and
+//     picked concepts: they share lineage.root); a family opens under its row. Then your recent conversations.
 // Nothing pre-made: no recipes, no briefs, no example projects. Every design starts from what the person describes.
 Item {
     id: home
@@ -25,10 +26,26 @@ Item {
     readonly property var everything: Store.studio ? Store.studio.projects.filter(function (p) { return !p.error && !(p.concept && home.openGroup(p.concept.group)) }) : []
     readonly property var broken: Store.studio ? Store.studio.projects.filter(function (p) { return !!p.error }) : []
     readonly property bool fresh: everything.length === 0 && Store.concepts.length === 0
-    readonly property var projects: {
-        var l = everything.filter(function (p) { return home.filter === "all" || (home.filter === "released") === (p.approved_rev === p.head) })
-        return l.sort(function (a, b) { return home.order === "name" ? String(a.name).localeCompare(String(b.name)) : b.updated - a.updated })
+    // One card per family. A family is every design that shares an origin (Store.rootOf: lineage.root, or itself);
+    // its face is the member changed last, which is the one you would go on with. Filter and sort act on the family:
+    // it is shown when any member matches, and sorted by its face.
+    property string openFamily: ""            // the root id of the family opened under its row
+    readonly property var families: {
+        var by = {}, order = []
+        for (var i = 0; i < everything.length; i++) {
+            var q = everything[i], r = Store.rootOf(q.id)
+            if (!by[r]) { by[r] = { root: r, members: [] }; order.push(r) }
+            by[r].members.push(q)
+        }
+        var out = order.map(function (r) {
+            var m = by[r].members.slice().sort(function (a, b) { return b.updated - a.updated })
+            return { root: r, face: m[0], members: m, count: m.length,
+                     shown: m.some(function (q) { return home.filter === "all" || (home.filter === "released") === (q.approved_rev === q.head) }) }
+        }).filter(function (f) { return f.shown })
+        return out.sort(function (a, b) { return home.order === "name" ? String(a.face.name).localeCompare(String(b.face.name)) : b.face.updated - a.face.updated })
     }
+    readonly property int grouped: everything.length - families.length          // designs tucked into a family
+    function menuOpenFor(q) { return pm.opened && !!home.menuFor && home.menuFor.id === q.id }
     readonly property var latest: everything.length ? everything.slice().sort(function (a, b) { return b.updated - a.updated })[0] : null
     readonly property int released: everything.filter(function (p) { return p.approved_rev === p.head }).length
     // one card per conversation thread (its newest branch): a fork is not a second conversation
@@ -196,10 +213,13 @@ Item {
                         text: home.fresh ? "Form Studio" : home.greeting() }
                     Item { width: 1; height: 14 }
                     Txt { objectName: "homeTitle"; width: parent.width; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
-                        font.pixelSize: home.cw > 900 ? 52 : 42; font.weight: Theme.wSemi; font.letterSpacing: home.cw > 900 ? -2.0 : -1.5; lineHeight: 1.0
+                        font.pixelSize: home.cw > 900 ? Theme.tDisplay : 42; font.weight: Theme.wSemi; font.letterSpacing: home.cw > 900 ? -2.0 : -1.5; lineHeight: 1.0
                         text: "What do you want to make?" }
-                    Item { width: 1; height: 14 }
-                    Txt { width: Math.min(parent.width, 600); x: home.split ? 0 : (parent.width - width) / 2; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
+                    // the sentence under the question is for a first visit, or says where the conversation went; once there
+                    // are designs the composer's own words are enough
+                    Item { visible: lead.visible; width: 1; height: 14 }
+                    Txt { id: lead; visible: home.fresh || home.chatting
+                        width: Math.min(parent.width, 600); x: home.split ? 0 : (parent.width - width) / 2; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
                         tone: 2; font.pixelSize: Theme.tLead; lineHeight: 1.4
                         text: home.chatting ? "You are talking with " + Store.chatAgentLabel + " in the column on the left. Open one of your designs to work on it together, or start a new design."
                             : Store.printOn && Store.newPurposeEffective === "print" ? "Describe it. Form Studio engineers it: real, editable CAD, checked and sliced for your printer. Drop a photo, a part or a sketch too."
@@ -276,7 +296,9 @@ Item {
                 }
                 // the empty bench says where the work will appear, once
                 Txt { visible: home.fresh; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 26
-                    kind: "fine"; tone: 4; text: "Every part is built in a real CAD kernel and checked before you print it. Nothing prints or uploads on its own." }
+                    kind: "fine"; tone: 4
+                    text: Store.printOn ? "Every design is built in a real CAD kernel and checked before you print it. Nothing prints or uploads on its own."
+                                        : "Every design is built in a real CAD kernel and checked. Nothing uploads on its own." }
                 Btn { visible: home.fresh; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: 18; kind: "quiet"; small: true; icon: "import"; text: "Import…"
                     tip: "A .formstudio project or a conversation"; onClicked: Store.openSheet("import") }
             }
@@ -318,8 +340,78 @@ Item {
                 }
             }
 
+            // ════ the designs ════
+            Item { visible: home.everything.length > 0; width: 1; height: 8 }
+            Item { width: parent.width; height: 34; visible: home.everything.length > 0
+                Row { spacing: 12; anchors.verticalCenter: parent.verticalCenter
+                    Txt { kind: "h3"; text: "Designs" }
+                    Txt { mono: true; tone: 3; font.pixelSize: 12; text: home.everything.length + (home.grouped > 0 ? "  ·  " + home.families.length + (home.families.length === 1 ? " family" : " families") : "") + (home.released ? "  ·  " + home.released + " released" : ""); anchors.baseline: parent.children[0].baseline } }
+                Row { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+                    Seg { visible: home.everything.length > 6; anchors.verticalCenter: parent.verticalCenter; value: home.filter; onPicked: function (v) { home.filter = v }
+                        model: [{ value: "all", text: "All" }, { value: "open", text: "In progress" }, { value: "released", text: "Released" }] }
+                    Btn { visible: home.everything.length > 6; kind: "quiet"; icon: "arrow_up_down"; text: home.order === "recent" ? "Last changed" : "Name"; tip: "Sort order"
+                        onClicked: home.order = home.order === "recent" ? "name" : "recent" }
+                    Btn { kind: "quiet"; icon: "import"; text: "Import…"; tip: "A .formstudio project, a .formproj, or a conversation"; onClicked: Store.openSheet("import") }
+                    Btn { kind: "quiet"; icon: "folder_open"; tip: "Open the projects folder: " + Bridge.dataDirShort; onClicked: Bridge.openDataFolder() } } }
+            Item { visible: home.everything.length > 0; width: 1; height: 14 }
+            // rows of families; the family opened by its count sits under its own row, across the full width
+            Column {
+                id: grid; objectName: "designGrid"; width: parent.width; visible: home.everything.length > 0; spacing: 16
+                readonly property int columns: Math.max(2, Math.floor((width + 16) / 280))
+                readonly property real cw: Math.floor((width - (columns - 1) * 16) / columns)
+                readonly property var rows: { var out = [], f = home.families; for (var i = 0; i < f.length; i += columns) out.push(f.slice(i, i + columns)); return out }
+                Repeater {
+                    model: grid.rows
+                    Column {
+                        id: band; required property var modelData; required property int index
+                        width: grid.width; spacing: 16
+                        readonly property var open: { for (var i = 0; i < modelData.length; i++) if (modelData[i].root === home.openFamily && modelData[i].count > 1) return modelData[i]; return null }
+                        readonly property int openAt: { for (var i = 0; i < modelData.length; i++) if (modelData[i].root === home.openFamily) return i; return 0 }
+                        Row { spacing: 16
+                            Repeater { model: band.modelData
+                                DesignCard { required property var modelData; required property int index
+                                    width: grid.cw; host: home; p: modelData.face; count: modelData.count; photo: home.photos[modelData.face.id] || null
+                                    index: band.index * grid.columns + index
+                                    opened: home.openFamily === modelData.root && modelData.count > 1
+                                    onToggled: home.openFamily = opened ? "" : modelData.root } } }
+                        // the opened family: every design that shares the origin, the first one first
+                        Rectangle {
+                            id: fam; objectName: "familyPanel"; visible: !!band.open; width: parent.width
+                            height: visible ? famCol.implicitHeight + 36 : 0; radius: Theme.rLg + 2
+                            color: Theme.plate1; border.color: Theme.rule
+                            readonly property var members: band.open ? band.open.members.slice().sort(function (a, b) {
+                                var ar = !a.lineage || !a.lineage.parent, br = !b.lineage || !b.lineage.parent
+                                return ar !== br ? (ar ? -1 : 1) : b.updated - a.updated }) : []
+                            readonly property int per: Math.max(3, Math.floor((width - 36 + 12) / 232))
+                            readonly property real mw: Math.floor((width - 36 - (per - 1) * 12) / per)
+                            opacity: 0; onVisibleChanged: if (visible) { opacity = 0; famIn.restart() }
+                            ParallelAnimation { id: famIn
+                                Glide { target: fam; property: "opacity"; to: 1; duration: Theme.base }
+                                Glide { target: famTr; property: "y"; from: Theme.shift(-6); to: 0; duration: Theme.base } }
+                            transform: Translate { id: famTr }
+                            // a notch points at the card it belongs to
+                            Rectangle { width: 12; height: 12; rotation: 45; y: -6; x: Math.round(band.openAt * (grid.cw + 16) + 16); color: Theme.plate1; border.color: Theme.rule }
+                            Rectangle { y: 1; x: Math.round(band.openAt * (grid.cw + 16) + 11); width: 22; height: 9; color: Theme.plate1 }
+                            Column { id: famCol; x: 18; y: 16; width: parent.width - 36; spacing: 14
+                                Item { width: parent.width; height: 22
+                                    Row { spacing: 10; anchors.verticalCenter: parent.verticalCenter
+                                        Txt { kind: "cap"; text: "Design family"; anchors.verticalCenter: parent.verticalCenter }
+                                        Txt { kind: "fine"; tone: 2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
+                                            text: F.plural(fam.members.length, "design") + " from one origin: the first design, then its copies, variants and picked concepts" } }
+                                    Btn { objectName: "familyClose"; small: true; kind: "quiet"; icon: "x"; tip: "Close the family"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                                        onClicked: home.openFamily = "" } }
+                                Flow { width: parent.width; spacing: 12
+                                    Repeater { model: fam.members
+                                        DesignCard { required property var modelData; required property int index
+                                            width: fam.mw; host: home; p: modelData; member: true; photo: home.photos[modelData.id] || null } } } }
+                        }
+                    }
+                }
+            }
+            Txt { visible: home.everything.length > 0 && home.families.length === 0; tone: 3; text: home.filter === "released" ? "Nothing is released yet. A design is released from Make, its last stage." : "Every design here is released." }
+
             // ════ recent conversations ════
-            Item { visible: home.talks.length > 0; width: 1; height: 8 }
+            Item { visible: home.talks.length > 0; width: 1; height: home.everything.length > 0 ? Theme.s12 : 8 }
             Item { visible: home.talks.length > 0; width: parent.width; height: 30
                 Txt { kind: "h3"; text: "Conversations"; anchors.verticalCenter: parent.verticalCenter }
                 Btn { small: true; kind: "quiet"; icon: "history"; text: "All"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
@@ -344,117 +436,6 @@ Item {
                                     text: (tc.modelData.state === "asking" ? "Waiting for you · " : tc.modelData.state === "running" ? "Working · " : "") + F.ago(tc.modelData.updated) } }
                             Txt { text: tc.modelData.title; font.weight: Theme.wMedium; width: parent.width; maximumLineCount: 2; elide: Text.ElideRight; lineHeight: 1.3 } }
                         MouseArea { id: tcm; anchors.fill: parent; hoverEnabled: true; onClicked: { Store.talkOpen = true; Store.openConv(tc.modelData.id) } } } } }
-
-            // ════ the designs ════
-            Item { visible: home.everything.length > 0; width: 1; height: home.talks.length > 0 ? 40 : 8 }
-            Item { width: parent.width; height: 34; visible: home.everything.length > 0
-                Row { spacing: 12; anchors.verticalCenter: parent.verticalCenter
-                    Txt { kind: "h3"; text: "Designs" }
-                    Txt { mono: true; tone: 3; font.pixelSize: 12; text: home.everything.length + (home.released ? "  ·  " + home.released + " released" : ""); anchors.baseline: parent.children[0].baseline } }
-                Row { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 8
-                    Seg { visible: home.everything.length > 6; anchors.verticalCenter: parent.verticalCenter; value: home.filter; onPicked: function (v) { home.filter = v }
-                        model: [{ value: "all", text: "All" }, { value: "open", text: "In progress" }, { value: "released", text: "Released" }] }
-                    Btn { visible: home.everything.length > 6; kind: "quiet"; icon: "arrow_up_down"; text: home.order === "recent" ? "Last changed" : "Name"; tip: "Sort order"
-                        onClicked: home.order = home.order === "recent" ? "name" : "recent" }
-                    Btn { kind: "quiet"; icon: "import"; text: "Import…"; tip: "A .formstudio project, a .formproj, or a conversation"; onClicked: Store.openSheet("import") }
-                    Btn { kind: "quiet"; icon: "folder_open"; tip: "Open the projects folder: " + Bridge.dataDirShort; onClicked: Bridge.openDataFolder() } } }
-            Item { visible: home.everything.length > 0; width: 1; height: 14 }
-            Grid {
-                id: grid; width: parent.width; visible: home.everything.length > 0
-                columns: Math.max(2, Math.floor((width + 16) / 280)); spacing: 16
-                readonly property real cw: Math.floor((width - (columns - 1) * 16) / columns)
-                Repeater {
-                    model: home.projects
-                    Item {
-                        id: card
-                        required property var modelData
-                        required property int index
-                        readonly property var p: modelData
-                        objectName: "projectCard"
-                        readonly property string title: p.name
-                        readonly property bool hot: cm.containsMouse || more.hovered || (pm.opened && home.menuFor === p)
-                        readonly property bool editing: home.renaming === p.id
-                        readonly property bool asking: home.confirming === p.id
-                        readonly property var ph: home.photos[p.id] || null
-                        readonly property int foot: 62
-                        width: grid.cw; height: Math.round(grid.cw * 0.74) + foot
-                        opacity: 0
-                        Component.onCompleted: { if (home.entered) opacity = 1; else appear.start() }
-                        SequentialAnimation { id: appear; PauseAnimation { duration: 260 + Math.min(card.index, 9) * Theme.stagger }
-                            ParallelAnimation { Glide { target: card; property: "opacity"; to: 1; duration: Theme.slow }
-                                Glide { target: rise; property: "y"; from: Theme.shift(14); to: 0; duration: Theme.slow } } }
-                        transform: Translate { id: rise; y: 0 }
-                        Rectangle {
-                            id: face
-                            width: parent.width; height: parent.height; radius: Theme.rLg + 2
-                            y: card.hot && !cm.pressed ? Theme.shift(-4) : 0
-                            scale: cm.pressed ? Theme.from(0.985) : 1
-                            color: Theme.plate1; border.color: card.asking ? Theme.alpha(Theme.signal, 0.5) : card.hot ? Theme.rule3 : Theme.rule
-                            Behavior on y { Glide { duration: Theme.base } }
-                            Behavior on scale { Glide { duration: Theme.press } }
-                            Behavior on border.color { Tint {} }
-                            Shadow { radius: parent.radius; spread: 30; drop: 16; opacity: card.hot ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.base } } }
-                            // the part on its plate, turning while you look at it
-                            Item { id: stagePv; x: 1; y: 1; width: parent.width - 2; height: parent.height - card.foot - 1; clip: true
-                                MiniView { anchors.fill: parent; projectId: card.p.id; turning: card.hot && !card.asking } }
-                            Rectangle { visible: !!card.ph && pim.status === Image.Ready; anchors.right: stagePv.right; anchors.bottom: stagePv.bottom; anchors.margins: 10
-                                width: 58; height: 44; radius: Theme.rSm; color: Theme.plate; border.color: phm.containsMouse ? Theme.rule3 : Theme.rule2; clip: true; z: 2
-                                scale: phm.containsMouse ? 1.06 : 1; Behavior on scale { Glide { duration: Theme.fast } }
-                                Image { id: pim; anchors.fill: parent; anchors.margins: 1; fillMode: Image.PreserveAspectCrop; asynchronous: true; sourceSize.width: 160
-                                    source: card.ph ? Bridge.baseUrl + "/api/projects/" + card.p.id + "/photo/" + card.ph.key + ".png" : "" }
-                                MouseArea { id: phm; anchors.fill: parent; hoverEnabled: true
-                                    onClicked: Store.showImage(Bridge.baseUrl + "/api/projects/" + card.p.id + "/photo/" + card.ph.key + ".png", card.p.name, "Blender render · an illustration, not evidence") }
-                                Tip { show: phm.containsMouse; text: "Blender render of this revision · illustration" } }
-                            Rectangle { y: parent.height - card.foot; x: 1; width: parent.width - 2; height: 1; color: Theme.rule }
-                            Column { visible: !card.editing && !card.asking; x: 16; y: parent.height - card.foot + 12; width: parent.width - 32 - side.width - 10; spacing: 3
-                                Txt { text: card.p.name; font.weight: Theme.wSemi; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
-                                Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
-                                    text: (card.p.purpose === "model" ? "3D model" : home.recipeTitle(card.p.recipe)) + "  ·  " + F.ago(card.p.updated) } }
-                            Column { id: side; visible: !card.editing && !card.asking; anchors.right: parent.right; anchors.rightMargin: 16; y: parent.height - card.foot + 12; spacing: 5
-                                Txt { mono: true; font.pixelSize: 12; text: F.pad(card.p.head); anchors.right: parent.right; tone: 2 }
-                                Tag { anchors.right: parent.right; visible: !!card.p.approved_rev
-                                    text: card.p.approved_rev === card.p.head ? "released" : card.p.approved_rev ? F.pad(card.p.approved_rev) + " released" : ""
-                                    kind: card.p.approved_rev === card.p.head ? "PASS" : card.p.approved_rev ? "WARN" : "" } }
-                            MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.LeftButton | Qt.RightButton; enabled: !card.editing && !card.asking
-                                onClicked: function (e) {
-                                    if (e.button === Qt.RightButton) home.openMenu(card.p, card, e.x, e.y)
-                                    else Store.open(card.p.id) } }
-                            Btn { id: more; objectName: "cardMore"; kind: "quiet"; icon: "ellipsis"; tip: "Rename, duplicate, export, delete"; x: parent.width - width - 8; y: 8; z: 3
-                                opacity: card.hot && !card.asking && !card.editing ? 1 : 0; visible: opacity > 0
-                                Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-                                onClicked: home.openMenu(card.p, card, more.x, more.y + more.height + 4) }
-                            // rename in place
-                            Field { id: rf; visible: card.editing; x: 12; y: parent.height - card.foot + 17; width: parent.width - 24
-                                // The card menu gives focus back to whatever had it when it closes, a moment after this
-                                // field appears. Take it, take it again once the menu is gone, and only then treat losing
-                                // it as a cancel.
-                                property bool armed: false
-                                function grab() { input.forceActiveFocus(); if (text === card.p.name) input.selectAll(); else input.cursorPosition = text.length }
-                                function begin() { text = home.renameDraft; grab(); arm.restart() }
-                                Component.onCompleted: if (visible) begin()      // the card was rebuilt in the middle of a rename
-                                onEdited: function (t) { home.renameDraft = t }
-                                Timer { id: arm; interval: 140; onTriggered: { if (!rf.input.activeFocus) rf.grab(); rf.armed = true } }
-                                onVisibleChanged: { armed = false; if (visible) begin(); else arm.stop() }
-                                onAccepted: function (t) { if (!card.editing) return; home.renaming = ""; if (t.trim() && t.trim() !== card.p.name) Store.renameProject(card.p.id, t.trim()) }
-                                Keys.onEscapePressed: home.renaming = ""
-                                Connections { target: rf.input; function onActiveFocusChanged() {
-                                    if (rf.armed && !rf.input.activeFocus && card.editing && rf.Window.window && rf.Window.window.active) home.renaming = "" } }
-                                Connections { target: rf.Window.window; enabled: card.editing
-                                    function onActiveChanged() { if (rf.Window.window.active && card.editing && !rf.input.activeFocus) rf.input.forceActiveFocus() } } }
-                            // move to trash?
-                            Rectangle { visible: card.asking; x: 1; y: 1; width: parent.width - 2; height: parent.height - card.foot - 1; radius: Theme.rLg + 1; color: Theme.alpha(Theme.plate, 0.72) }
-                            Item { visible: card.asking; x: 16; y: parent.height - card.foot; width: parent.width - 32; height: card.foot
-                                Column { anchors.verticalCenter: parent.verticalCenter; width: parent.width - tacts.width - 10; spacing: 2
-                                    Txt { text: "Move to the trash?"; font.weight: Theme.wMedium; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
-                                    Txt { kind: "fine"; text: card.p.name + " · kept in .trash"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
-                                Row { id: tacts; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 6
-                                    Btn { small: true; kind: "quiet"; text: "Keep"; onClicked: home.confirming = "" }
-                                    Btn { small: true; kind: "danger"; text: "Move to trash"; onClicked: { home.confirming = ""; Store.deleteProject(card.p.id) } } } }
-                        }
-                    }
-                }
-            }
-            Txt { visible: home.everything.length > 0 && home.projects.length === 0; tone: 3; text: home.filter === "released" ? "Nothing is released yet. A design is released from its Release stage." : "Every design here is released." }
         }
     }
 

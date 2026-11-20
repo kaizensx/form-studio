@@ -1,4 +1,4 @@
-"""Home: filter, sort, a card's menu (rename, duplicate, export as .formstudio, move to trash), and what happens to a deleted
+"""Home: filter, sort, design families (one card per family), a card's menu (rename, duplicate, export as .formstudio, move to trash), and what happens to a deleted
 design's conversations."""
 import sys
 import zipfile
@@ -83,9 +83,22 @@ def run(ui):
     ui.wait_until(lambda: len(projects(ui)) == 8, 10, "a copy in the engine")
     copy = [p for p in projects(ui) if p["id"] not in ids.values()][0]
     ui.check("Bravo bin" in copy["name"] and copy["id"] != ids["Bravo bin"], f"the copy is its own project: {copy['name']}")
-    ui.wait_until(lambda: len(ui.find_all(name="projectCard")) == 8, 20, "eight cards")
-    ui.wait_until(lambda: shown_names(ui)[0] == copy["name"], 10, "the copy to move to the front")
-    ui.settle(500)                # the grid has stopped moving before the next right-click
+    # ── a design and its copy are one family: one card with a count, and the family opens under its row ──
+    ui.eq(copy["lineage"]["root"], ids["Bravo bin"], "the copy records where it came from")
+    ui.wait_until(lambda: shown_names(ui)[0] == copy["name"], 10, "the family to move to the front, showing its newest design")
+    ui.eq(len(ui.find_all(name="projectCard")), 7, "the copy did not add a card: it joined its family")
+    fam = card(ui, copy["name"])
+    ui.eq(fam.property("count"), 2, "the card counts the family")
+    ui.check(not ui.exists("familyMember"), "the family is closed until asked for")
+    ui.settle(500)                # the grid has stopped moving
+    ui.click(ui.item("familyToggle", within=fam))
+    ui.wait_until(lambda: len(ui.find_all(name="familyMember")) == 2, 5, "both designs of the family")
+    ui.eq([m.property("title") for m in ui.find_all(name="familyMember")], ["Bravo bin", copy["name"]], "the first design first, then its copy")
+    ui.settle(700)
+    ui.shot("home-family-open")
+    ui.click("familyClose")
+    ui.wait_until(lambda: not ui.exists("familyMember"), 3, "the family to close")
+    ui.settle(300)
 
     # ── export: one .formstudio file ──
     menu(ui, "Delta coupon", "Export…")
@@ -116,7 +129,7 @@ def run(ui):
     meta = [c for c in ui.api("/conversations")["conversations"] if c["id"] == conv["id"]][0]
     ui.eq(meta["project"], None, "the conversation no longer points at the deleted design")
     ui.eq(meta["project_was"]["name"], "Zebra hook", "and remembers what it was about")
-    ui.wait_until(lambda: len(ui.find_all(name="projectCard")) == 7, 5, "seven cards")
+    ui.wait_until(lambda: len(ui.find_all(name="projectCard")) == 6, 5, "six cards: seven designs, two of them one family")
 
     # ── a click opens a design ──
     ui.click(card(ui, "Echo dock"), 0.5, 0.4)

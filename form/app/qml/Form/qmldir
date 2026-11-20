@@ -58,3 +58,4 @@ PopMenu 1.0 PopMenu.qml
 ActivityBar 1.0 ActivityBar.qml
 Splash 1.0 Splash.qml
 MorphFrame 1.0 MorphFrame.qml
+DesignCard 1.0 DesignCard.qml
