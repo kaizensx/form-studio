@@ -372,6 +372,24 @@ def _numbers_on(code: str, tb) -> list[float]:
     return vals
 
 
+def _stage_of_line(tb, ids: list[str]) -> str | None:
+    """The feature whose Stage(...) uses the variable the failing line assigns, read from the source below it."""
+    import linecache
+    f, n = tb.tb_frame.f_code.co_filename, tb.tb_lineno
+    m = re.match(r"\s*([A-Za-z_]\w*)\s*(?:[-+*]?=)(?!=)", linecache.getline(f, n))
+    if not m:
+        return None
+    var = re.compile(r"\b" + re.escape(m.group(1)) + r"\b")
+    for k in range(n + 1, n + 120):
+        line = linecache.getline(f, k)
+        if not line:
+            break
+        for st in re.finditer(r"Stage\(\s*[\"'](\w+)[\"']\s*,([^()]*(?:\([^()]*\)[^()]*)*)\)", line):
+            if st.group(1) in ids and var.search(st.group(2)):
+                return st.group(1)
+    return None
+
+
 def _failing_feature(exc: BaseException, recipe) -> tuple[str, str]:
     """The feature being built when it failed: the one after the last Stage the build appended (read from the
     build() frame), else the design's first feature that has no stage yet."""
@@ -389,6 +407,10 @@ def _failing_feature(exc: BaseException, recipe) -> tuple[str, str]:
             pass
         tb = tb.tb_next
     ids = [f for f, _ in feats]
+    frames = _design_frames(exc, recipe)
+    via = _stage_of_line(frames[-1], ids) if frames else None
+    if via:                                          # the Stage the failing line's result goes into
+        return next(f for f in feats if f[0] == via)
     if done and done[-1] in ids:
         i = ids.index(done[-1]) + 1
         if i < len(ids):

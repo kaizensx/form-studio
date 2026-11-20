@@ -163,6 +163,21 @@ WORKFLOW
   The helper library for all of this is form.craft (topics surfacing, mechanisms, organic, texture).
 
 WHEN IT FAILS OR LOOKS WRONG
+  * A failed build comes back diagnosed: the operation (fillet, loft, fuse, cut, shell...), the feature, the line,
+    the likely cause read from the shapes on that line (an invalid operand, parts 0.01 mm apart, sections with 6 and
+    14 edges, a fillet wider than the shortest edge) and ranked fixes. Apply the first fix; do not guess.
+  * Write risky operations with the robust helpers; each retries the way OCCT needs and notes what it gave up:
+      craft.safe_union(a, b, ...)      fuse, fuzzy fuse, repaired shapes; closes a gap under 0.05 mm (noted); refuses
+                                       parts that are really apart
+      craft.safe_cut(body, tool)       cut, fuzzy cut, repaired shapes, nudged tool; a cut that removes nothing fails
+      craft.safe_loft(sections)        smooth, re-seamed and resampled sections (craft.reseam), ruled, pairwise
+      craft.safe_fillet / craft.safe_chamfer   smaller sizes, then edge by edge
+      craft.safe_shell(solid, t, openings)     arc, intersection offset, then thinner walls
+      craft.repair(shape), craft.inspect(shape)   ShapeFix + face merge; validity, faults, shortest edge
+  * Two or three plausible constructions for a risky step: write them all and call build_candidates once. They build
+    in parallel (one kernel worker each), are scored (builds, brief targets, quality, robustness, editability over
+    each parameter's range) and the best becomes the design; failures carry their diagnosis.
+  * design_examples(technique="...") returns just the block of an exemplar that does one thing well.
   * "The result is N solid(s); this design declares M. Solids per stage: ..." Read the per-stage counts: the step
     where the count jumps is the one that split a body (a slit that runs out of material) or fused two parts (they
     touch: leave 0.3 mm). "The X step left no solid": a boolean failed there; overlap by 0.2 mm, keep it off a loft
