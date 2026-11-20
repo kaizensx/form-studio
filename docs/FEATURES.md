@@ -360,7 +360,10 @@ still not editable.
   limit. The report also gives the share of the area the Params drive.
 - **Drawn like a part.** A mesh or a faceted solid is shaded smooth, and only creases sharper than 25° and
   boundaries are drawn as edges (the 3D view, card thumbnails and render sheets).
-- **Verification, every time.** Editable share, two-sided Hausdorff distance (samples of a tessellation triangle
+- **Verification, every time.** Editable share (the share of the design's Params that are real dimensions, such as
+  lengths, diameters, radii, angles and levels rather than the positions of sketch corners, and that move 0.5 mm with
+  the design still building; a design is titled "(editable)" only from 50%, "(partly editable)" below that and
+  "(exact copy)" at 0%), the share of the surface parametric features make, two-sided Hausdorff distance (samples of a tessellation triangle
   laid outside its own face are checked against the solid and left out), volume difference, parametric, freeform and
   frozen area, and a deviation map coloured against the tolerance. Progress is reported about every second while it
   runs. `scripts/recon_bench.py` measures editable share, deviation, time and a sweep of every Param (does it change

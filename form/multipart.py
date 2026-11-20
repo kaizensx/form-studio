@@ -284,16 +284,19 @@ def reconstruct_parts(st, srcs: list, name: str | None = None, tolerance: float 
                 refs = [sub / res["step"]]
             built.append({**q, "code": code, "refs": refs, "summary": summ, "rep": rep, "dir": sub,
                           "point": interior_point(q["src"])})
-            st.activity(None, "reconstruct", f"{q['label']}: Layer {res['layer']}, "
-                        f"{res['hausdorff_mm']:.3g} mm from the mesh (computed)", by="engine", part=q["id"])
+            st.activity(None, "reconstruct", f"{q['label']}: {res.get('editable_pct') or 0:g}% editable, "
+                        f"{res['hausdorff_mm']:.3g} mm from the mesh (Layer {res['layer']}, computed)", by="engine",
+                        part=q["id"])
         if not built:
             raise StudioError("None of the meshes could be reconstructed.",
                               "; ".join(f"{f['label']}: {f['error']}" for f in failed)[:1500], failed=failed)
         parts = [{"id": b["id"], "label": b["label"], "source": b["code"], "point": b["point"]} for b in built]
-        lines = [f"{b['label']} (from {b['src'].name}): Layer {b['summary']['layer']}, "
-                 f"{b['summary']['hausdorff_mm']:.4g} mm"
-                 + (f", {b['summary']['driven_by_params_pct']:g}% driven by Params" if b["summary"].get("recipe_verified")
-                    and b["summary"].get("driven_by_params_pct") is not None else "") for b in built]
+        lines = [f"{b['label']} (from {b['src'].name}): {b['summary'].get('editable_pct') or 0:g}% editable, "
+                 f"{b['summary']['hausdorff_mm']:.4g} mm from the mesh"
+                 + (f" ({b['summary']['dimension_params']} dimensions that move; "
+                    f"{b['summary'].get('feature_area_pct') or 0:g}% of the surface from parametric features)"
+                    if b["summary"].get("recipe_verified") and b["summary"].get("dimension_params") is not None else "")
+                 + f", Layer {b['summary']['layer']}" for b in built]
         brief = (f"Reconstructed from {len(built)} meshes as one design with {len(built)} parts (computed): "
                  + "; ".join(lines) + "." + (f" Not reconstructed: {', '.join(f['label'] for f in failed)}." if failed else ""))
         refs = [str(r) for b in built for r in b["refs"]]

@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -281,6 +282,27 @@ class FeatureTree(unittest.TestCase):
         self.assert_edits("stepped_bracket", out, convex, 1.0, -1)
         self.assert_edits("stepped_bracket", out, "hole1_d", 1.0, -1)
         self.assert_edits("stepped_bracket", out, "pocket1_depth", 1.0, -1)
+
+    def test_shipped_configuration_keeps_layer1_its_time(self):
+        """The pipeline as the app runs it: the program route ON (no stub) and the default 240 s budget. The program
+        route is held to its share of the budget and the layers below start their own clock after it, so the
+        feature tree finds what it finds without the program route."""
+        from form.recon import pipeline
+        stl = Path(TMP) / "stepped_bracket.stl"
+        if not stl.exists():
+            fx.export("stepped_bracket", TMP)
+        t = time.perf_counter()
+        rep = pipeline.reconstruct(stl, Path(TMP) / "out-shipped-stepped_bracket", "stepped_bracket", TOL, 2)
+        took = time.perf_counter() - t
+        self.assertLessEqual(rep["program_seconds"], pipeline.PROGRAM_SHARE * 240 + 30, "the program route keeps to its share")
+        L1, L2 = rep["layers"]["1"], rep["layers"]["2"]
+        self.assertNotIn("error", L1)
+        self.assertEqual(rep["layer_achieved"], 2, L2.get("error"))
+        self.assertLessEqual(rep["result"]["hausdorff_mm"], TOL)
+        if L2.get("kind") != "program":                    # the feature tree won: it found every hole, as without
+            self.assertEqual(sorted(h["diameter_mm"] for h in L2["holes"]), facts("stepped_bracket")["holes"])
+        self.assertGreater(rep["result"]["editable_pct"], 0.0)
+        self.assertLess(took, 240 * 1.5, f"{took:.0f} s")
 
     def test_flanged_shaft(self):
         rep, out = run("flanged_shaft")

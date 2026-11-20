@@ -206,6 +206,53 @@ class Pipeline(unittest.TestCase):
         self.assertFalse(flag["result"]["within_tolerance"])
         self.assertIn("outside the 0.1 mm", flag["result"]["headline"])
         self.assertIn("warning", flag["result"])
+        self.assertTrue(flag["result"]["headline"].startswith("0% editable"))      # no Params: never "editable"
+        self.assertEqual(res["dimensions"]["movable"], res["dimensions"]["params"])
+        self.assertEqual(res["feature_area_pct"], 100.0)                          # both numbers are reported
+        self.assertEqual(project.title_for("box", res), "box (editable)")
+
+    def test_editable_counts_only_dimensions_that_move(self):
+        """Positions of sketch corners are not dimensions; a dimension whose range is narrower than 0.5 mm, or that
+        breaks the solid when moved, is not counted; a 0% result is never titled editable."""
+        from form.recon import program, project
+        self.assertTrue(program.is_dimension("d1", "Diameter 5.5 · Hole 1", "mm"))
+        self.assertTrue(program.is_dimension("x2", "X ±30 · Base", "mm"))        # half of a symmetric width
+        self.assertTrue(program.is_dimension("z1", "Z 10 · Base", "mm"))         # a level
+        self.assertFalse(program.is_dimension("x3", "X 25.02 · Step 4, tapered", "mm"))   # a corner position
+        self.assertFalse(program.is_dimension("y7", "Y -3.1 · Step 2", "mm"))
+        self.assertFalse(program.is_dimension("scale_pct", "Scale", "%"))
+        self.assertFalse(program.is_dimension("teeth", "Teeth", ""))
+        src = '''from build123d import Box, Pos
+from form.recipes.base import Feature, Param, Recipe, Stage
+
+
+class Design(Recipe):
+    title = "t"
+    params = [Param("w", "Width", 20, 10, 40, 0.01, "mm", "form", "body"),
+              Param("x1", "X 4 · Step 1", 4, 0, 8, 0.01, "mm", "form", "body"),
+              Param("h", "Height", 5, 4.9, 5.1, 0.01, "mm", "form", "body"),
+              Param("gap", "Gap", 2, 0, 4, 0.01, "mm", "form", "body")]
+    features = [Feature("body", "Body", "structure")]
+
+    def build(self, v):
+        if v["gap"] > 2.2:
+            raise ValueError("too wide")
+        return [Stage("body", Box(v["w"], 10, v["h"]) + Pos(v["x1"], 0, 0) * Box(2, 2, 8))]
+'''
+        d = program.movable_dimensions(src)
+        self.assertEqual((d["params"], d["dimensions"], d["movable"]), (4, 3, 1))
+        self.assertEqual(d["keys"], ["w"])
+        res = {"recipe_verified": True, "driven_by_params_pct": 92.0, "hausdorff_mm": 0.021, "dimensions": d}
+        from form.recon import pipeline
+        rep = {"result": res}
+        pipeline._headline(rep, 0.05)
+        self.assertEqual(res["editable_pct"], 25.0)
+        self.assertEqual(res["feature_area_pct"], 92.0)
+        self.assertTrue(res["headline"].startswith("25% editable (1 of 4 Params are dimensions that move 0.5 mm), "
+                                                   "0.021 mm from the mesh"), res["headline"])
+        self.assertEqual(project.title_for("Base", res), "Base (partly editable)")
+        self.assertEqual(project.title_for("Slider", {"recipe_verified": True, "editable_pct": 0.0}), "Slider (exact copy)")
+        self.assertEqual(project.title_for("Lid", {"recipe_verified": False, "layer": 1}), "Lid (exact copy)")
 
 
 class ExactEdges(unittest.TestCase):

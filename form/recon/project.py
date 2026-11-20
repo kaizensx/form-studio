@@ -41,14 +41,29 @@ class Design(Recipe):
 '''
 
 
+EDITABLE_TITLE_PCT = 50.0   # "(editable)" only when at least half the Params are dimensions a person can change
+
+
+def title_for(stem: str, res: dict) -> str:
+    """The new design's name says what it is: "(editable)" when at least EDITABLE_TITLE_PCT % of its Params are real
+    dimensions that move (at that point most of what the person sees in Params is a size they can change),
+    "(partly editable)" when some are, else "(exact copy)"."""
+    edit = float(res.get("editable_pct") or 0.0)
+    if res.get("recipe_verified") and edit >= EDITABLE_TITLE_PCT:
+        return f"{stem} (editable)"
+    if res.get("recipe_verified") and edit > 0:
+        return f"{stem} (partly editable)"
+    return f"{stem} (exact copy)"
+
+
 def headline(res: dict, tol: float | None = None) -> str:
     """The one line every surface shows first: how much of the part its Params drive, how far it is from the mesh,
     and whether that is within the tolerance asked for."""
     if res.get("headline"):
         return res["headline"]
-    edit = res.get("editable_pct", res.get("driven_by_params_pct")) or 0.0
+    edit = res.get("editable_pct") or 0.0
     h = res.get("hausdorff_mm")
-    line = f"{edit:g}% editable (driven by Params)"
+    line = f"{edit:g}% editable"
     if h is not None:
         line += f", {h:.4g} mm from the mesh"
         if tol is not None and h > tol + 1e-12:
@@ -61,9 +76,13 @@ def summary(rep: dict) -> dict:
     surface, holes, and why a layer was not reached."""
     res = rep.get("result") or {}
     L = rep.get("layers", {})
-    edit = res.get("editable_pct", res.get("driven_by_params_pct"))
+    edit = res.get("editable_pct")
+    dims = res.get("dimensions") or {}
     out = {"headline": headline(res, rep.get("tolerance_mm")) if res else None, "editable_pct": edit,
            "hausdorff_mm": res.get("hausdorff_mm"), "within_tolerance": res.get("within_tolerance"),
+           "feature_area_pct": res.get("feature_area_pct", res.get("driven_by_params_pct")),
+           "dimension_params": dims.get("movable"), "dimensions_total": dims.get("dimensions"),
+           "params_total": dims.get("params"),
            "layer": rep.get("layer_achieved"), "layer_requested": rep.get("layer_requested"), "tolerance_mm": rep.get("tolerance_mm"),
            "volume_delta_pct": res.get("volume_delta_pct"), "method": res.get("method"), "params": res.get("params"),
            "parametric_area_pct": res.get("parametric_area_pct"), "freeform_area_pct": res.get("freeform_area_pct"),
@@ -108,7 +127,7 @@ def reconstruct(st, src, name: str | None = None, tolerance: float = 0.02, layer
         if not res:
             raise StudioError(rep.get("error") or "The mesh could not be reconstructed.", rep.get("hint", ""))
         summ = summary(rep)
-        title = (name or f"{src.stem} (editable)").strip()
+        title = (name or title_for(src.stem, res)).strip()
         brief = (f"Reconstructed from the mesh {src.name}: {headline(res, float(tolerance))} (two-sided Hausdorff, computed). "
                  f"Layer {res['layer']}" + (f", {res['method']}" if res.get("method") else "")
                  + f"; geometry: {res['parametric_area_pct']:g}% of the area on planes, cylinders, cones, spheres or tori"

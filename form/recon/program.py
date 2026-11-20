@@ -26,6 +26,7 @@ Kernel worker only (builds with build123d). Returns the same shape of result as 
 from __future__ import annotations
 
 import math
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -363,6 +364,10 @@ def read(V, F, tol, d=None, deadline=None, progress=None, O=None, min_score=MIN_
     sl = Slicer(V, F, Hz, UV)
     subs = []
     for k in range(len(reps) - 1):
+        if deadline is not None and time.perf_counter() > deadline:
+            return {"error": "The time budget for this route ran out while slicing the part.", "score": score}
+        if k and k % 100 == 0:
+            say({"stage": "layer2", "text": f"Slicing: {k} of {len(reps) - 1} slabs", "fraction": 0.1 * k / len(reps)})
         a, b = float(reps[k]), float(reps[k + 1])
         loops = []
         for eids in sl.loops((a + b) / 2):
@@ -1609,6 +1614,66 @@ def _regularised(pool) -> dict:
 
 
 # ---- the editability sweep -------------------------------------------------------------------------------------------
+
+DIMENSION_UNITS = ("mm", "°", "deg")
+COORDINATE_LABEL = re.compile(r"^([XYUW])\s+(±)?")     # the program route's corner coordinates: "X 12.5 · Step 4"
+DIMENSION_MOVE = 0.5                                    # a dimension counts when it moves this far and still builds
+
+
+def is_dimension(key: str, label: str, unit: str) -> bool:
+    """A Param a person would call a dimension: a length, diameter, radius, angle or level, in mm or degrees.
+    The program route's Params count this way: radii, diameters and levels (Z, Level) are dimensions; a mirrored
+    coordinate ("X ±30") is half of a symmetric width, so it is one too; a plain X, Y, U or W coordinate of a sketch
+    corner ("X 12.5 · Step 4") is a position, not a dimension. A scale or a count is never one."""
+    if str(unit or "") not in DIMENSION_UNITS:
+        return False
+    m = COORDINATE_LABEL.match(str(label or "").strip())
+    return m is None or bool(m.group(2))
+
+
+def movable_dimensions(src, refs=None, deadline=None, move: float = DIMENSION_MOVE) -> dict:
+    """The Params that are real dimensions (is_dimension) and can move at least `move` (mm or degrees) inside their
+    range with the recipe still building one valid solid. Each is rebuilt once at default + move (or - move when the
+    range has no room above). A dimension not checked before the deadline is not counted.
+    Returns {"params", "dimensions", "movable", "checked", "unchecked", "keys", "move"}."""
+    import tempfile
+    from ..recipes import SOURCE_PREFIX, load_source, meshsolid, source_id
+    rid = source_id(src)
+    out = {"params": 0, "dimensions": 0, "movable": 0, "checked": 0, "unchecked": 0, "keys": [], "move": move}
+    meshsolid.set_paths(refs or {})
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / f"{rid[len(SOURCE_PREFIX):]}.py"
+            p.write_text(src, encoding="utf-8")
+            rec = load_source(p, rid)
+            base = rec.defaults()
+            out["params"] = len(rec.params)
+            for prm in rec.params:
+                if not is_dimension(prm.key, prm.label, prm.unit):
+                    continue
+                out["dimensions"] += 1
+                if prm.max - prm.default >= move - 1e-9:
+                    x = prm.default + move
+                elif prm.default - prm.min >= move - 1e-9:
+                    x = prm.default - move
+                else:
+                    continue                           # its range is narrower than a useful move
+                if deadline is not None and time.perf_counter() > deadline:
+                    out["unchecked"] += 1
+                    continue
+                out["checked"] += 1
+                try:
+                    sh = rec.build(rec.validate({**base, prm.key: x}))[-1].shape
+                    good = sh.is_valid and len(sh.solids()) == getattr(rec, "solids", 1)
+                except Exception:                      # noqa: BLE001
+                    good = False
+                if good:
+                    out["movable"] += 1
+                    out["keys"].append(prm.key)
+    finally:
+        meshsolid.set_paths({})
+    return out
+
 
 def sweep(src, refs=None, keys=None, samples: int = 5, deadline=None) -> list:
     """For each Param (or those in `keys`): does changing it change the solid, and across how much of its range does

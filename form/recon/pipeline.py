@@ -39,7 +39,8 @@ LIMITS = [
     "what the mesh's own facets or a kept slice of the mesh make is not editable, however exact it is.",
 ]
 
-PROGRAM_ENOUGH = 80.0      # % editable at which the program route's verified result is taken without the slower layers
+PROGRAM_ENOUGH = 80.0      # % of the surface from its features at which the program route's result is taken alone
+PROGRAM_SHARE = 0.25       # of the budget the program route may use; the layers below then get their own full budget
 
 
 class Heartbeat:
@@ -161,11 +162,16 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         say({"stage": "layer2", "text": "Reading the part as sketches and extrusions", "fraction": 0.02})
         prog = _program(V, F, tol, name, out, say, t0, budget_s)
         if prog.get("verified") and prog["report"].get("editable_pct", 0.0) >= PROGRAM_ENOUGH:
-            why = (f"The program route verified first with {prog['report']['editable_pct']:g}% of the surface editable; "
-                   "the slower layers were not needed.")
+            why = (f"The program route verified first with {prog['report']['editable_pct']:g}% of the surface made by its "
+                   "features; the slower layers were not needed.")
             rep["layers"]["0"] = {"skipped": why}
             rep["layers"]["1"] = {"skipped": why}
-            return _take_program(rep, prog, V, F, mvol, out, name, t0, tol)
+            return _take_program(rep, prog, V, F, mvol, out, name, t0, tol, budget_s)
+    # the layers below get the whole budget they had before the program route existed: their clock starts after it
+    # (the program route itself is held to PROGRAM_SHARE of the budget), so a part it gives up on is never worse off
+    tl = time.perf_counter() if prog is not None else t0
+    if prog is not None:
+        rep["program_seconds"] = round(tl - t0, 2)
 
     # Layer 0
     say({"stage": "layer0", "text": "Building the exact solid", "fraction": 0.02})
@@ -196,7 +202,7 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     if layer >= 1 and best is not None and not (gear and gear.get("verified")):
         say({"stage": "layer1", "text": "Finding planes, cylinders, cones, spheres and tori", "fraction": 0.3})
         try:
-            got = _layer1(V, F, tol, budget_s=max(10.0, budget_s * 0.5 - (time.perf_counter() - t0)),
+            got = _layer1(V, F, tol, budget_s=max(10.0, budget_s * 0.5 - (time.perf_counter() - tl)),
                           progress=lambda d: say({**d, "fraction": 0.3 + 0.4 * d.get("fraction", 0)}))
         except Exception as e:                          # noqa: BLE001
             got = {"report": {"error": f"{type(e).__name__}: {e}"[:300]}}
@@ -209,6 +215,7 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     # Layer 2
     recipe = None
     refs = []
+    ref_paths = {}
     if gear is not None and gear.get("verified"):
         recipe = gear["source"]
         (out / f"{name}_recipe.py").write_text(recipe, encoding="utf-8")
@@ -218,7 +225,7 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         say({"stage": "layer2", "text": "Looking for features: base, holes, fillets, chamfers, patterns", "fraction": 0.72})
         r2 = layer2(V, F, regions, l1shape, tol, name, out, rep["layers"]["1"],
                     progress=lambda d: say({**d, "fraction": 0.72 + 0.25 * d.get("fraction", 0)}),
-                    deadline=t0 + 0.92 * float(budget_s))
+                    deadline=tl + 0.92 * float(budget_s))
         if gear is not None:
             r2["report"]["also_tried"] = r2["report"].get("also_tried", []) + [
                 {k: gear["report"].get(k) for k in ("method", "base", "verified", "hausdorff_mm", "error") if gear["report"].get(k) is not None}]
@@ -238,11 +245,12 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
             if r2.get("verified"):
                 best = ("2", r2["shape"], r2["P"], r2["T"], r2["cmp"], regions)
                 refs = sorted(r2.get("refs") or [])
+                ref_paths = dict(r2["refs"]) if isinstance(r2.get("refs"), dict) else {}
 
     if prog is not None and prog.get("verified") and (best is None or best[0] != "2"):
         rep["layers"]["2"] = {**prog["report"], **({"also_tried": rep["layers"]["2"].get("also_tried", [])}
                                                   if isinstance(rep["layers"].get("2"), dict) else {})}
-        return _take_program(rep, prog, V, F, mvol, out, name, t0, tol)
+        return _take_program(rep, prog, V, F, mvol, out, name, t0, tol, budget_s)
     if best is None:
         rep["error"] = "No layer produced a valid solid."
         return _finish(rep, out, name, t0)
@@ -265,6 +273,8 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
                      "hausdorff_mm": round(cmp["hausdorff_mm"], 6), "parametric_area_pct": par, "freeform_area_pct": ff,
                      "frozen_area_pct": round(max(0.0, 100.0 - par - ff), 2),
                      "driven_by_params_pct": rep["layers"]["2"].get("driven_by_params_pct") if lay == "2" else 0.0}
+    if lay == "2" and recipe:
+        _dimensions(rep, recipe, ref_paths, t0, budget_s, say)
     _headline(rep, tol)
     dmap = verify.deviation_map(P, T, cmp["_rec_dev"], tol)
     (out / f"{name}_deviation.json").write_text(json.dumps(dmap), encoding="utf-8")
@@ -273,12 +283,12 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
 
 
 def _program(V, F, tol, name, out, say, t0, budget_s) -> dict:
-    """The program route (program.py), within about half the budget. Never raises."""
+    """The program route (program.py), within PROGRAM_SHARE of the budget. Never raises."""
     from . import program
     try:
         return program.recipe(V, F, tol, name=name, limit=tol, out_dir=out,
                               progress=lambda d: say({**d, "fraction": 0.02 + 0.6 * d.get("fraction", 0)}),
-                              deadline=t0 + 0.5 * float(budget_s))
+                              deadline=t0 + PROGRAM_SHARE * float(budget_s))
     except Exception as e:                              # noqa: BLE001
         return {"report": {"method": "sketches and extrusions", "error": f"{type(e).__name__}: {e}"[:300]}}
 
@@ -293,7 +303,7 @@ def _better(a, b) -> bool:
     return key(a) > key(b)
 
 
-def _take_program(rep, prog, V, F, mvol, out, name, t0, tol):
+def _take_program(rep, prog, V, F, mvol, out, name, t0, tol, budget_s=240.0):
     """Finish the report with the program route's result."""
     from . import solid
     r2 = prog["report"]
@@ -318,6 +328,9 @@ def _take_program(rep, prog, V, F, mvol, out, name, t0, tol):
                      "parametric_area_pct": round(edit, 2), "freeform_area_pct": 0.0,
                      "frozen_area_pct": round(100.0 - edit, 2), "driven_by_params_pct": round(edit, 2),
                      "params": r2.get("params")}
+    refs = prog.get("refs") or {}
+    _dimensions(rep, prog["source"], {k: str(v) for k, v in refs.items()} if isinstance(refs, dict) else {},
+                t0, budget_s, lambda d: None)
     _headline(rep, tol)
     dmap = verify.deviation_map(P, T, cmp["_rec_dev"], tol)
     (out / f"{name}_deviation.json").write_text(json.dumps(dmap), encoding="utf-8")
@@ -325,15 +338,44 @@ def _take_program(rep, prog, V, F, mvol, out, name, t0, tol):
     return _finish(rep, out, name, t0)
 
 
+DIMENSION_TIME = (5.0, 30.0)   # seconds the dimension check may take: at least, at most (within what is left)
+
+
+def _dimensions(rep, src, refs, t0, budget_s, say):
+    """Which Params are real dimensions that move (program.movable_dimensions), within what is left of the budget."""
+    from . import program
+    left = float(budget_s) - (time.perf_counter() - t0)
+    say({"stage": "layer2", "text": "Checking which dimensions can be changed", "fraction": 0.96})
+    try:
+        d = program.movable_dimensions(src, refs, deadline=time.perf_counter()
+                                       + min(DIMENSION_TIME[1], max(DIMENSION_TIME[0], left)))
+    except Exception as e:                              # noqa: BLE001
+        d = {"error": f"{type(e).__name__}: {e}"[:300], "params": 0, "dimensions": 0, "movable": 0}
+    rep["result"]["dimensions"] = d
+
+
 def _headline(rep, tol):
-    """Editable first, then the deviation and whether it is within the tolerance asked for."""
+    """Editable first, then the deviation and whether it is within the tolerance asked for.
+
+    Editable is the share of the design's Params that are real dimensions (lengths, diameters, radii, angles, levels;
+    not the positions of sketch corners: program.is_dimension) and that move at least 0.5 mm with the design still
+    building. The share of the surface that parametric features make (positions included) is reported beside it as
+    feature_area_pct."""
     res = rep["result"]
-    edit = res.get("driven_by_params_pct") or 0.0
-    res["editable_pct"] = round(float(edit), 2)
+    area = float(res.get("driven_by_params_pct") or 0.0)
+    res["feature_area_pct"] = round(area, 2)
+    d = res.get("dimensions") or {}
+    n, mv = int(d.get("params") or 0), int(d.get("movable") or 0)
+    res["editable_pct"] = round(100.0 * mv / n, 1) if n else 0.0
     h = float(res.get("hausdorff_mm") or 0.0)
     res["within_tolerance"] = bool(h <= tol + 1e-12)
-    res["headline"] = (f"{res['editable_pct']:g}% editable (driven by Params), {h:.4g} mm from the mesh"
-                       + ("" if res["within_tolerance"] else f", outside the {tol:g} mm asked for"))
+    if n:
+        what = (f"{res['editable_pct']:g}% editable ({mv} of {n} Params are dimensions that move "
+                f"{d.get('move', 0.5):g} mm), {h:.4g} mm from the mesh; {res['feature_area_pct']:g}% of the surface "
+                "from parametric features")
+    else:
+        what = f"0% editable (an exact copy of the mesh as a solid, no dimensions), {h:.4g} mm from the mesh"
+    res["headline"] = what + ("" if res["within_tolerance"] else f", outside the {tol:g} mm asked for")
     if not res["within_tolerance"]:
         res["warning"] = (f"The result is {h:.4g} mm from the mesh, more than the {tol:g} mm tolerance asked for: the best "
                           "verified layer is offered, but it is not within the tolerance.")

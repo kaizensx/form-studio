@@ -1270,9 +1270,15 @@ def build() -> MCPServer:
         revolution, or the reconstructed solid itself) then fillets, chamfers and holes (counterbores, countersinks,
         holes on any axis, snapped to standard sizes, patterns); a spur gear becomes a parametric gear (teeth, module,
         pressure angle). A feature that does not verify stays in the base and is reported; the recipe is used only
-        if its rebuild is within the limit. Returns the new project and the verification (two-sided Hausdorff, volume
-        delta, % parametric, freeform and frozen area, % driven by Params). Values are computed from the mesh;
-        nothing is decimated and every repair is listed. Large meshes take minutes."""
+        if its rebuild is within the limit. Before any of these, the program route reads the part as sketches
+        extruded and lofted between levels, and keeps what does not read as a sketch as the mesh's own slices.
+        Returns the new project and the verification, led by summary.headline: editable_pct (the share of Params
+        that are real dimensions, lengths, diameters, radii, angles and levels rather than positions of sketch
+        corners, and that move 0.5 mm with the design still building) and the two-sided Hausdorff distance to
+        the mesh; then feature_area_pct (the share of the surface parametric features make), the volume delta and
+        the parametric, freeform and frozen area. Tell the person the editable share first and never call a result
+        with 0% editable "editable". Values are computed from the mesh; nothing is decimated and every repair is
+        listed. Large meshes take minutes."""
         st = studio()
         said = [0.0]
 
@@ -1326,7 +1332,9 @@ def build() -> MCPServer:
             act(out["project"], "design", f"Reconstructed {len(out['parts'])} meshes as one design with "
                                           f"{len(out['parts'])} parts", ctx)
         else:
-            act(out["project"], "design", f"Reconstructed a mesh as CAD (Layer {out['summary']['layer']})", ctx)
+            sm = out["summary"]
+            act(out["project"], "design", f"Reconstructed a mesh as CAD: {sm.get('editable_pct') or 0:g}% editable, "
+                f"{sm.get('hausdorff_mm') or 0:.4g} mm from the mesh (Layer {sm['layer']})", ctx)
         _made(out["project"], "reconstruct")
         return {**out, "evidence": "computed (Form Studio's kernel compared the result with the mesh)",
                 "next": "get_project to read the design; get_design_source to edit the recipe or add features."}

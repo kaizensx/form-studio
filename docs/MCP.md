@@ -32,16 +32,17 @@ Form Studio is an AI CAD studio: it designs parts, products and mechanisms as re
 and keeps an honest record of what is known. 3D printing is one optional way to make a design; it is off unless the
 person turned it on (form_overview: has_printer).
 
-Workflow: form_overview -> describe_recipe -> create_project (or get_project) -> preview_change ->
-render (look at it) -> commit_change -> run_pipeline -> get_project (gate, checks, next actions) ->
-request_release (a person approves in Form Studio).
+Workflow: form_overview -> create_design from your own code (design_guide; design_brief first for a complex
+design), or create_project from a recipe (describe_recipe) -> render (look at it) -> preview_change ->
+commit_change, or update_design -> get_project (checks, next actions). Only for a design whose purpose is "print":
+run_pipeline (exports, print checks, a slice) -> request_release (a person approves in Form Studio).
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
 - Always preview_change before commit_change; pass expect_head so you never overwrite a newer revision.
 - Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number.
   Never invent physical results; record_physical_result is only for what the user reports.
-- A slice is a simulation, not a print. Fit yield is a model. Say so when you report them.
+- For a print design: a slice is a simulation, not a print, and fit yield is a model. Say so when you report them.
 - You cannot approve a release. request_release returns a link that opens the release in Form Studio for the user.
 - Nothing here starts a print or sends files anywhere.
 - Every design has a purpose: "print" (for 3D printing) or "model" (just a 3D model: rendering, CAD exchange, CNC,
@@ -86,7 +87,7 @@ Rules:
 | [`design_guide`](#design_guide) | read-only | Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter, holder, mechanism...). |
 | [`design_brief`](#design_brief) | changes | Stage 1 of a complex design: store the structured brief before any geometry. |
 | [`plan_design`](#plan_design) | changes | Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id). |
-| [`design_examples`](#design_examples) | read-only | Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of them: mechanical parts (linear slide, shaft coupler, pillow block, cam follower, gearbox), consumer products (mouse, earbud case, bottle and cap, game controller), organic forms (mask, horn, handle), textured parts (knurl, hex relief, woven, fluted), assemblies (hinged case, ratchet wrench, robot head), helmets (full-face, open-face, sci-fi prop) and enclosures (electronics box with bosses, sliding battery box, handheld shell). |
+| [`design_examples`](#design_examples) | read-only | Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of them: mechanical parts (linear slide, shaft coupler, pillow block, cam follower, gearbox), consumer products (mouse, earbud case, bottle and cap, game controller), organic forms (horn, handle), textured parts (knurl, hex relief, woven, fluted), assemblies (hinged case, ratchet wrench, robot head), helmets (full-face, open-face) and enclosures (electronics box with bosses, sliding battery box, handheld shell). |
 | [`critique`](#critique) | changes | Stage 5: look closely and measure. |
 | [`read_document`](#read_document) | read-only | Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). |
 | [`fetch_link`](#fetch_link) | changes | Download what a link the person gave points to, from Form Studio's engine (use this instead of a shell: it works where your sandbox has no network). |
@@ -278,9 +279,9 @@ Then create_design(..., plan=<brief id>).
 
 Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of
 them: mechanical parts (linear slide, shaft coupler, pillow block, cam follower, gearbox), consumer products
-(mouse, earbud case, bottle and cap, game controller), organic forms (mask, horn, handle), textured parts
+(mouse, earbud case, bottle and cap, game controller), organic forms (horn, handle), textured parts
 (knurl, hex relief, woven, fluted), assemblies (hinged case, ratchet wrench, robot head), helmets (full-face,
-open-face, sci-fi prop) and enclosures (electronics box with bosses, sliding battery box, handheld shell).
+open-face) and enclosures (electronics box with bosses, sliding battery box, handheld shell).
 query: words to search (ranked); name: one exemplar with its full source; technique: just the code block that
 does one thing ("hollow a lofted shell", "snap-fit lid", "two-view opening"); category: mechanical, consumer,
 organic, textured, assembly, helmet or enclosure. They are references for you, never projects, and never
@@ -372,8 +373,9 @@ path: absolute local path. Cached by path, size and time, so asking again is ins
 ### `create_design`
 
 Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
-built with build123d. FORM builds it, and with run=True exports, checks and slices it. Load or build errors come
-back with the line and a hint; fix and call again. Then render(view="sheet") and look at it.
+built with build123d. Form Studio builds it and returns a six-view sheet and a section to look at; with
+run=True it also exports STEP and STL and runs the checks (and, for a design whose purpose is "print", the
+print checks and a slice). Load or build errors come back with the line and a hint; fix and call again.
 Several parts: declare assembly() (design_guide, ASSEMBLIES): parts with attach=, joints with parent= (chains: a
 joint moves everything attached below it), Mate() for pins and threads. A declaration that cannot be used
 (unknown part, a loop, two parents) is refused with the reason; the assembly checks then run in their own time
@@ -945,9 +947,15 @@ writes a build123d recipe with Params as a feature tree: a base (extrusion stack
 revolution, or the reconstructed solid itself) then fillets, chamfers and holes (counterbores, countersinks,
 holes on any axis, snapped to standard sizes, patterns); a spur gear becomes a parametric gear (teeth, module,
 pressure angle). A feature that does not verify stays in the base and is reported; the recipe is used only
-if its rebuild is within the limit. Returns the new project and the verification (two-sided Hausdorff, volume
-delta, % parametric, freeform and frozen area, % driven by Params). Values are computed from the mesh;
-nothing is decimated and every repair is listed. Large meshes take minutes.
+if its rebuild is within the limit. Before any of these, the program route reads the part as sketches
+extruded and lofted between levels, and keeps what does not read as a sketch as the mesh's own slices.
+Returns the new project and the verification, led by summary.headline: editable_pct (the share of Params
+that are real dimensions, lengths, diameters, radii, angles and levels rather than positions of sketch
+corners, and that move 0.5 mm with the design still building) and the two-sided Hausdorff distance to
+the mesh; then feature_area_pct (the share of the surface parametric features make), the volume delta and
+the parametric, freeform and frozen area. Tell the person the editable share first and never call a result
+with 0% editable "editable". Values are computed from the mesh; nothing is decimated and every repair is
+listed. Large meshes take minutes.
 
 | Argument | Type | Required |
 |---|---|---|

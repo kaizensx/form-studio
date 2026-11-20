@@ -8,9 +8,16 @@
   does not read as a sketch is kept as the mesh's own slices beside the parametric features instead of turning the
   whole part into an embedded solid. Prismatic parts come back fully editable in seconds to a minute (the numbers per
   part are in `docs/RECON_BENCH.md`).
-- **Editable first.** Every reconstruction, its activity line and the app's toast lead with the share of the surface
-  its Params drive and its distance to the mesh, and say when the result is outside the tolerance you asked for. The
-  share of analytic area stays in the report.
+- **Editable first, and honest about it.** Every reconstruction, its activity line, the multi-part lines and the
+  app's toast lead with how editable it is and its distance to the mesh, and say when the result is outside the
+  tolerance you asked for. Editable now counts only Params that are real dimensions (lengths, diameters, radii,
+  angles, levels; a mirrored ±X is half a symmetric width) and that move 0.5 mm with the design still building; the
+  positions of sketch corners do not count. The share of the surface its features make is reported beside it. A new
+  design is named "(editable)" only when at least half its Params are such dimensions, "(partly editable)" below
+  that and "(exact copy)" when none are; a 0% result is never called editable.
+- **The old route keeps its time.** The sketches route may use a quarter of the reconstruction budget, and the
+  layers below it then get the whole budget they had before it existed, so a part it gives up on is no longer
+  starved of time for finding planes, cylinders and features.
 - **Faster and never silent.** Surface fitting uses analytic derivatives (segmentation is several times faster),
   and a reconstruction reports progress about every second.
 - **Exact edges.** The program route's faces are exact by construction: every edge is where two sketch features meet.

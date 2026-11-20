@@ -716,10 +716,15 @@ QtObject {
         toast("Reconstructing " + file, "Building the solid and fitting surfaces. A large mesh takes a few minutes.")
         return ppost("/reconstruct", { file: file }).then(function (r) {
             var m = r.summary || ({})
-            if (m.recipe_verified)
-                toast("“" + r.name + "” is editable", F.fmt(m.editable_pct !== undefined ? m.editable_pct : m.driven_by_params_pct, 0)
-                      + "% driven by Params · " + F.fmt(m.hausdorff_mm, 4) + " mm from the mesh"
-                      + (m.within_tolerance === false ? " (outside the tolerance)" : "") + " · Layer " + m.layer + " (computed)")
+            var ed = Number(m.editable_pct || 0)
+            if (m.recipe_verified && ed > 0)           // "editable" only for a share of real dimensions (form/recon)
+                toast("“" + r.name + "”: " + F.fmt(ed, 0) + "% editable", F.fmt(m.hausdorff_mm, 4) + " mm from the mesh"
+                      + (m.within_tolerance === false ? " (outside the tolerance)" : "")
+                      + " · " + (m.dimension_params || 0) + " dimensions you can change · "
+                      + F.fmt(m.feature_area_pct || 0, 0) + "% of the surface from features · Layer " + m.layer + " (computed)")
+            else if (m.recipe_verified)
+                toast("“" + r.name + "”: 0% editable", F.fmt(m.hausdorff_mm, 4) + " mm from the mesh. Its Params are "
+                      + "positions, not dimensions. Rebuild as editable CAD has the agent model it with named features.")
             else                                       // no verified feature recipe: the agent remodel is the next step
                 toast("“" + r.name + "” reached Layer " + m.layer, F.fmt(m.frozen_area_pct, 0) + "% frozen facets, no verified feature "
                       + "recipe. Rebuild as editable CAD has the agent model it with named features.")
