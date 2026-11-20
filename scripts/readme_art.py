@@ -238,7 +238,7 @@ class Svg:
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 # The engine: two real designs, built, checked and sliced
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-DESIGNS = {"desk-phone-stand": ("Desk phone stand", "device_stand", []),
+DESIGNS = {"desk-phone-stand": ("Desk phone stand", "device_stand", ["--purpose", "print"]),   # the slicer card: made for printing
            "hinged-box": ("Hinged box", "storage_box", ["lid=2"])}
 # designs written as build123d code, the way an agent writes them (scripts/readme_designs/), built with create_design
 # as plain 3D models: no printer, no slicing
@@ -246,6 +246,21 @@ CODE_DESIGNS = {"planetary-gear-stage": ("Planetary gear stage", "planetary.py",
                                          "A planetary gear stage for a 5 mm D shaft: sun, three planets, a ring in a flanged housing."),
                 "ergonomic-mouse-shell": ("Ergonomic mouse shell", "mouse_shell.py",
                                           "An ergonomic mouse shell with a thumb scoop, split buttons and a wheel slot.")}
+# the staged workflow an agent follows for a complex design: the brief and the feature plan, before the code
+PLANS = {"planetary-gear-stage": {
+             "features": [{"id": "ring", "label": "Ring gear and housing", "how": "py_gearworks SpurRingGear plus a bolted flange"},
+                          {"id": "sun", "label": "Sun gear", "how": "py_gearworks SpurGear with a D bore"},
+                          {"id": "planets", "label": "Planet gears", "how": "three SpurGears meshed to the sun at 120 degrees"},
+                          {"id": "carrier", "label": "Planet carrier", "how": "a plate with three pins into the planet bores and a hub"}],
+             "mechanisms": ["sun, planets and ring mesh with 0.05 mm backlash per gear"],
+             "risks": ["three planets need sun + ring teeth divisible by 3",
+                       "the ring must be turned so its teeth sit in the planets' gaps (checked by overlap)"]},
+         "ergonomic-mouse-shell": {
+             "features": [{"id": "body", "label": "Shell", "how": "loft through rounded-rectangle sections, shelled"},
+                          {"id": "scoop", "label": "Thumb scoop", "how": "an even-wall dent in the left flank"},
+                          {"id": "buttons", "label": "Button split", "how": "a slot cut across the front"},
+                          {"id": "wheel", "label": "Wheel slot", "how": "a slot on the centre line"}],
+             "risks": ["the scoop must not cut through the wall", "lofted surfaces mesh more coarsely than prismatic ones"]}}
 
 
 def _b64f(s: str, dt="<f4") -> np.ndarray:
@@ -263,8 +278,16 @@ def engine(data_dir: Path) -> dict:
     for pid, (name, fname, brief) in CODE_DESIGNS.items():
         if not (data_dir / pid).exists():
             print("building %s from its design code…" % name, flush=True)
+            env = {**os.environ, "FORM_DATA": str(data_dir)}
+
+            def tool(t, a):
+                r = subprocess.run([sys.executable, "-m", "form", "tool", t, json.dumps(a)], cwd=ROOT, check=True,
+                                   capture_output=True, text=True, env=env)
+                return json.loads(r.stdout)
+            bid = tool("design_brief", {"name": name, "goal": brief, "purpose": "model"})["brief"]
+            tool("plan_design", {"brief": bid, **PLANS[pid]})
             args = {"name": name, "source": (ROOT / "scripts" / "readme_designs" / fname).read_text(encoding="utf-8"),
-                    "brief": brief, "purpose": "model", "process": "cad"}
+                    "brief": brief, "purpose": "model", "process": "cad", "plan": bid}
             subprocess.run([sys.executable, "-m", "form", "tool", "create_design", json.dumps(args)], cwd=ROOT, check=True,
                            stdout=subprocess.DEVNULL, env={**os.environ, "FORM_DATA": str(data_dir)})
     from form import config, toolpath

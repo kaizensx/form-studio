@@ -23,7 +23,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-1-dark.svg">
-    <img src="docs/readme/numbers-1-light.svg" width="414" alt="77 MCP tools for any agent. 18 agent apps, model APIs and local models.">
+    <img src="docs/readme/numbers-1-light.svg" width="414" alt="83 MCP tools for any agent. 18 agent apps, model APIs and local models.">
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-2-dark.svg">
@@ -53,7 +53,7 @@ Form Studio sits between your agent and the CAD kernel and keeps the record of w
 ```mermaid
 flowchart LR
   you(["You: words, a photo,<br/>a sketch, a part, a link"]) --> agent["Your agent<br/>app, model API or local model"]
-  agent -- "77 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
+  agent -- "83 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
   engine --> kernel["CAD kernel<br/>build123d on OpenCascade"]
   kernel --> checks["Checks<br/>solid · mesh · fits · joints"]
   checks --> release{{"You approve<br/>files frozen with SHA-256"}}
@@ -104,17 +104,13 @@ Start from words, a photo with a card or coin for scale, a sketch with real dime
 
 Agents design with engineering parts that carry their sources: ISO 273 screw clearances, heat-set insert pockets, nut traps, bearing seats, printable threads and involute gears. Assemblies are declared as parts, joints and mates; every joint is swept through its range and checked for collisions, with Assembled and Exploded views and assembly instructions as a PDF. Constraints refuse impossible combinations with the feature, the parameters and a way forward, and an optimiser finds the best values under the requirements you state.
 
-<!-- optional: design helpers (WP mechanisms, surfacing, texture). Drop this paragraph if the helper library is not in the release. -->
-A library of design helpers gives the agent proven building blocks for mechanisms (hinges, snap fits, bayonets, ratchets, cams, gear trains and planetary sets), for surfaces (lofts, sweeps, shells and variable fillets) and for texture (knurls and embossed patterns on the solid itself), each with typed fallbacks and a clear error when a value cannot work.
-<!-- /optional -->
+A library of design helpers gives the agent proven building blocks for mechanisms (hinges, snap fits, bayonets, ratchets, cams, gear trains and planetary sets), for surfaces (lofts, sweeps, shells and variable fillets), for organic forms (helmet shells, grips, handles) and for texture (knurls and embossed patterns on the solid itself, fine grain as a mesh texture), each with typed fallbacks and a clear error when a value cannot work.
 
 ## Reconstruct
 
 Bring the part you already have. A STEP or STL of a board, a phone or a motor becomes a reference the design is built around, with clearance cut from the real geometry. A photo of a broken part with a card or coin beside it starts **Replace a broken part**: sizes estimated from the photo stay *assumed* until you measure the ones that decide the fit, then the agent designs the replacement and strengthens it where it broke.
 
-<!-- optional: mesh to editable CAD (WP reconstruction). Drop this paragraph if the feature is not in the release. -->
-**Make editable** turns a mesh (STL, 3MF or OBJ) into CAD you can change: it always builds an exact solid from the triangles, then fits planes, cylinders, cones, spheres and tori where the surface allows and rebuilds holes, extrusions and patterns as parameters. A report gives the two-sided deviation, the volume change and how much of the area became parametric; anything that does not fit within tolerance stays exact rather than being guessed.
-<!-- /optional -->
+**Make editable** turns a mesh (STL, 3MF or OBJ) into CAD you can change: it always builds an exact solid from the triangles, then fits planes, cylinders, cones, spheres and tori where the surface allows and, for a part that is one extrusion or one revolution, rebuilds the profile, holes and patterns as parameters. A report gives the two-sided deviation, the volume change and how much of the area became parametric; anything that does not fit within tolerance stays exact rather than being guessed.
 
 ## Review
 
@@ -158,9 +154,7 @@ Also in 1.0.0: concepts that come back as several genuinely different designs, s
 
 Download the app for your platform and open it. The first start installs what is missing (the standard-parts libraries, an agent and its sign-in, and a slicer only if you print), one click of consent each, in its own window.
 
-<!-- optional: capability launcher (WP setup). Drop this paragraph if the launcher is not in the release. -->
 The first start asks what you want to make and installs only that: mechanical parts, an agent, photoreal renders, CAD exchange, mesh to CAD, or 3D printing. Turn any of them on later in Settings › Set up for.
-<!-- /optional -->
 
 <details>
 <summary><b>macOS</b> &nbsp;·&nbsp; Apple silicon and Intel</summary>
@@ -288,7 +282,7 @@ form tool get_project '{"project": "desk-stand"}'                               
 | | |
 |---|---|
 | **Every command** | [docs/CLI.md](docs/CLI.md) |
-| **77 MCP tools** | [docs/MCP.md](docs/MCP.md) |
+| **83 MCP tools** | [docs/MCP.md](docs/MCP.md) |
 | **How the engine is built** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 
 ## Building blocks
