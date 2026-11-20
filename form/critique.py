@@ -30,7 +30,7 @@ EVIDENCE = "heuristic"
 RATIOS = {"1:1": 1.0, "4:5": 1.25, "sqrt2": math.sqrt(2), "3:2": 1.5, "golden": (1 + 5 ** 0.5) / 2, "2:1": 2.0,
           "3:1": 3.0}
 SECTION_ID, CUT_BODY = "_section", "_cut"
-VERSION = 2
+VERSION = 4
 
 
 # ---- kernel side ---------------------------------------------------------------------------------------------------
@@ -156,7 +156,125 @@ def symmetry(P, T, lo, hi) -> dict:
     return out
 
 
-def op_critique_metrics(key, recipe_id, values, tol=0.05):
+def walls(shape, P, T, n: int = 500, seed: int = 5, skip=None) -> dict:
+    """Wall thickness by rays: from n area-weighted points on the surface, along the inward normal, the distance to
+    the next surface of the solid (OCCT IntCurvesFace_ShapeIntersector on the B-rep). Reports min, 2nd and 5th
+    percentile, median, and the points thinner than 35 % of the median: on a shell those are break-through (the inner
+    surface crossing the outer) or paper-thin spots. Rays that leave the solid without hitting are ignored.
+    skip: a boolean per triangle to leave out (texture facets)."""
+    from OCP.gp import gp_Dir, gp_Lin, gp_Pnt
+    from OCP.IntCurvesFace import IntCurvesFace_ShapeIntersector
+    a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+    nrm = np.cross(b - a, c - a)
+    area = np.linalg.norm(nrm, axis=1) / 2
+    w = area.copy()
+    if skip is not None:
+        w[np.asarray(skip, bool)] = 0
+    if w.sum() <= 0:
+        return {"samples": 0}
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(len(T), size=n, p=w / w.sum())
+    r1, r2 = rng.random(n), rng.random(n)
+    s = np.sqrt(r1)
+    S = (1 - s)[:, None] * a[idx] + (s * (1 - r2))[:, None] * b[idx] + (s * r2)[:, None] * c[idx]
+    N = nrm[idx] / np.maximum(np.linalg.norm(nrm[idx], axis=1, keepdims=True), 1e-12)
+    it = IntCurvesFace_ShapeIntersector()
+    it.Load(shape.wrapped, 1e-4)
+    th, where = [], []
+    back = 0.5                                 # start outside the surface: the tessellation is off the B-rep by up to tol
+    for p, nv in zip(S, N):
+        d = -nv
+        start = p - d * back
+        try:
+            it.Perform(gp_Lin(gp_Pnt(*map(float, start)), gp_Dir(*map(float, d))), 0.0, 1e5)
+        except Exception:
+            continue
+        if not it.IsDone() or it.NbPnt() < 2:
+            continue
+        ws = sorted(it.WParameter(i) for i in range(1, it.NbPnt() + 1))
+        entry = next((w for w in ws if abs(w - back) < 0.4), None)     # the surface the point lies on
+        if entry is None:
+            continue
+        nxt = [w for w in ws if w > entry + 0.02]           # the same point twice (an edge between faces) is not a wall
+        if not nxt:
+            continue
+        th.append(nxt[0] - entry)
+        where.append(p)
+    if not th:
+        return {"samples": 0}
+    th = np.array(th)
+    where = np.array(where)
+    med = float(np.median(th))
+    # a ray that starts beside a sharp edge (a cut rim, a slot, the open edge of a shell) grazes the next face and
+    # reads thin; samples within 1.2 x the median wall of a sharp edge are left out (a real break-through thins the
+    # wall well before its rim, so it is still found)
+    near = _near_sharp_edges(P, T, where, 1.2 * med)
+    keep = ~near if (~near).sum() >= 50 else np.ones(len(th), bool)
+    th, where = th[keep], where[keep]
+    thin = th < 0.35 * med
+    pts = [tuple(round(float(x), 1) for x in where[i]) for i in np.nonzero(thin)[0][:6]]
+    return {"samples": int(len(th)), "near_edges_skipped": int((~keep).sum()), "min_mm": round(float(th.min()), 2),
+            "p2_mm": round(float(np.percentile(th, 2)), 2), "p5_mm": round(float(np.percentile(th, 5)), 2),
+            "median_mm": round(med, 2), "thin_fraction": round(float(thin.mean()), 3), "thin_at": pts}
+
+
+def _near_sharp_edges(P, T, S, radius, deg=50.0):
+    """For each point of S: is it within radius of a sharp edge of the mesh (adjacent triangles turn > deg)?"""
+    from scipy.spatial import cKDTree
+    _, ids = np.unique(np.round(P / 1e-4).astype(np.int64), axis=0, return_inverse=True)
+    ids = ids.reshape(-1)
+    F = ids[T]
+    a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+    n = np.cross(b - a, c - a)
+    n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
+    E = np.concatenate([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
+    tri = np.tile(np.arange(len(F)), 3)
+    E = np.sort(E, axis=1)
+    order = np.lexsort((E[:, 1], E[:, 0]))
+    E, tri = E[order], tri[order]
+    same = np.all(E[1:] == E[:-1], axis=1)
+    i = np.nonzero(same)[0]
+    cosang = np.einsum("ij,ij->i", n[tri[i]], n[tri[i + 1]])
+    sharp = i[cosang < np.cos(np.radians(deg))]
+    # edges with one triangle only (open boundaries) are sharp too
+    single = np.ones(len(E), bool)
+    single[i] = False
+    single[i + 1] = False
+    pos = np.zeros((ids.max() + 1, 3))
+    pos[ids] = P
+    sel = np.concatenate([sharp, np.nonzero(single)[0]])
+    if not len(sel):
+        return np.zeros(len(S), bool)
+    p0, p1 = pos[E[sel, 0]], pos[E[sel, 1]]
+    k = np.maximum(1, np.ceil(np.linalg.norm(p1 - p0, axis=1) / max(radius / 2, 1e-3)).astype(int))
+    k = np.minimum(k, 200)
+    rep = np.repeat(np.arange(len(sel)), k + 1)
+    t = np.concatenate([np.linspace(0, 1, m + 1) for m in k])
+    mids = p0[rep] + (p1 - p0)[rep] * t[:, None]
+    d, _ = cKDTree(mids).query(S, k=1)
+    return d < radius
+
+
+def form_views(model, P, T, product_class: str | None) -> dict:
+    """Silhouettes and depth maps (form.product_classes.views) of the design, the class assessment when the brief
+    names a product class, and the silhouette's curvature kinks and front-view mirror match in any case."""
+    from . import product_classes as pc
+    tri_feat = np.concatenate([np.full(len(f["T"]), i) for i, f in enumerate(model["faces"])])
+    names = [f["feature"].lower() for f in model["faces"]]
+    trans = pc.CLASSES.get(product_class or "", {}).get("transparent", ["visor", "lens", "glass", "shield"])
+    keep_face = np.array([not any(w in n for w in trans) for n in names])
+    V = pc.views(P, T, keep=keep_face[tri_feat])
+    out = {"front_mirror": pc.mirror_match(V["front"]["mask"]),
+           "kinks": {vn: pc.kinks(pc.profiles(V[vn]["mask"]))[:6] for vn in ("side", "front", "top")}}
+    if product_class in pc.CLASSES:
+        areas = {}
+        for f in model["faces"]:
+            areas[f["feature"]] = areas.get(f["feature"], 0.0) + f["area"]
+        out["class"] = pc.assess(product_class, V, areas)
+    return out
+
+
+def op_critique_metrics(key, recipe_id, values, tol=0.05, product_class=None):
     from . import kernel
     model = kernel._get_near(key, recipe_id, values, tol)
     shape = model["shape"]
@@ -197,7 +315,24 @@ def op_critique_metrics(key, recipe_id, values, tol=0.05):
             r = big / small
             name, val = min(RATIOS.items(), key=lambda kv: abs(math.log(r / kv[1])))
             ratios.append({"pair": label, "ratio": round(r, 3), "nearest": name, "off_pct": round(100 * abs(r / val - 1), 1)})
+    folds, wall, form = None, None, None
+    if not mesh_design:
+        from .craft.organic import loft_report
+        try:
+            folds = loft_report(shape, grid=22)
+        except Exception as e:                                   # a surface OCCT cannot evaluate is reported, not hidden
+            folds = {"error": f"{type(e).__name__}: {e}"[:160]}
+        try:
+            tex_tri = np.concatenate([np.full(len(f["T"]), f["feature"] in texture) for f in model["faces"]])
+            wall = walls(shape, P, T, skip=tex_tri)
+        except Exception as e:
+            wall = {"error": f"{type(e).__name__}: {e}"[:160]}
+    try:
+        form = form_views(model, P, T, product_class)
+    except Exception as e:
+        form = {"error": f"{type(e).__name__}: {e}"[:160]}
     return {
+        "folds": folds, "walls": wall, "form": form, "product_class": product_class,
         "smallest_fillet_mm": round(min(radii), 3) if radii else None,
         "fillet_faces": len(radii),
         "sharp_edge_fraction": None if sharp is None else round(sharp, 3),
@@ -249,7 +384,40 @@ def op_section_view(key, recipe_id, values, axis="y", tol=0.05):
             "cut_at": float(c[ax]), "axis": axis}
 
 
-KERNEL_OPS = {"critique_metrics": op_critique_metrics, "section_view": op_section_view}
+def op_texture_patch(key, recipe_id, values, center, half, tol=0.05, budget=700_000):
+    """The design's mesh textures applied at full resolution to a small patch of its surface (the triangles within
+    a box of half-size 1.15 x half round center): the whole part at view resolution is too coarse to carry a weave,
+    a patch is not. Returns {"mesh": [{feature, positions, indices}], "edges": None}."""
+    from . import kernel
+    from .craft import meshtex
+    model = kernel._get_near(key, recipe_id, values, tol)
+    specs = meshtex.declared(model["recipe"], model["values"])
+    c, h = np.asarray(center, float), float(half) * 1.15
+    P, T, tags, off = [], [], [], 0
+    for f in kernel._fine_faces(model):                          # export resolution: the patch is small
+        tri = f["P"][f["T"]]
+        sel = np.all(np.abs(tri - c) <= h, axis=(1, 2))           # whole triangles inside the box: a tight frame
+        if not sel.any():
+            continue
+        P.append(f["P"])
+        T.append(f["T"][sel] + off)
+        tags += [f["feature"]] * int(sel.sum())
+        off += len(f["P"])
+    if not T:
+        raise ValueError("No surface near the texture patch.")
+    V, F, tg, _info = meshtex.apply(np.concatenate(P), np.concatenate(T), tags, specs, budget) if specs else \
+        (np.concatenate(P), np.concatenate(T), np.asarray(tags), {})
+    mesh = []
+    for feat in dict.fromkeys(np.asarray(tg).tolist()):
+        sel = F[np.asarray(tg) == feat]
+        used, inv = np.unique(sel, return_inverse=True)
+        mesh.append({"feature": feat, "positions": kernel._b64(V[used].astype(np.float32)),
+                     "indices": kernel._b64(inv.reshape(-1, 3).astype(np.uint32))})
+    return {"mesh": mesh, "edges": None}
+
+
+KERNEL_OPS = {"critique_metrics": op_critique_metrics, "section_view": op_section_view,
+              "texture_patch": op_texture_patch}
 
 
 # ---- engine side ---------------------------------------------------------------------------------------------------
@@ -258,6 +426,44 @@ def _renders_dir(st, p) -> Path:
     d = st.dir(p["id"]) / "artifacts" / "renders"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def texture_tile_box(st, p, v, half: float = 18.0, camera=(-30.0, 20.0)):
+    """Where to zoom so a mesh texture reads: the point of a textured feature that faces the camera most squarely,
+    and a box `half` mm round it. (centre, half, camera) or None."""
+    from . import render as rendering
+    from .craft import meshtex
+    try:
+        r = st.recipe(p)
+        specs = meshtex.declared(r, r.validate(st.rev(p)["values"]))
+    except Exception:
+        return None
+    if not specs:
+        return None
+    want = set()
+    for s in specs:
+        want |= set(s.features if hasattr(s, "features") else s.get("features", ()))
+    _r, _u, fwd = rendering._camera_ae(*camera)
+    best = None
+    for m in v["mesh"]:
+        if want and m["feature"] not in want:
+            continue
+        P = rendering._arr(m["positions"], np.float32, 3).astype(np.float64)
+        T = rendering._arr(m["indices"], np.uint32, 3)
+        if not len(T):
+            continue
+        a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+        n = np.cross(b - a, c - a)
+        n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
+        facing = -(n @ fwd)                                   # 1 = faces the camera
+        toward = -((a + b + c) / 3 @ fwd)                     # nearer the camera
+        score = facing + 0.002 * toward
+        i = int(np.argmax(score))
+        if best is None or score[i] > best[0]:
+            best = (score[i], (a[i] + b[i] + c[i]) / 3)
+    if best is None:
+        return None
+    return best[1], np.array([half, half, half]), camera
 
 
 def design_views(st, pid: str) -> dict:
@@ -280,10 +486,26 @@ def design_views(st, pid: str) -> dict:
             views[-1] = "exploded"
         except ValueError:
             exploded = None
+    tile = texture_tile_box(st, p, v) if v.get("mesh_texture") else None
+    if tile is not None:                         # a texture is invisible at sheet scale: show a zoomed tile of it
+        views[views.index("bottom") if "bottom" in views else views.index("iso_back")] = "texture"
     if not sheet.exists():
-        pngs = [rendering.render_png(exploded if vw == "exploded" else v, feats, "iso" if vw == "exploded" else vw, None,
-                                     size=(560, 420), title=title + (" (exploded)" if vw == "exploded" else ""))
-                for vw in views]
+        pngs = []
+        for vw in views:
+            if vw == "texture":
+                c, half, cam = tile
+                try:                                             # the texture at full resolution on a patch
+                    patch = st._k("texture_patch", key=key, recipe_id=st.rid(p), values=st.rev(p)["values"],
+                                  center=[float(x) for x in c], half=float(half[0]), p=p, timeout=300)
+                except Exception:
+                    patch = v
+                pngs.append(rendering.render_png(patch, feats, "iso", None, size=(560, 420), camera=cam,
+                                                 frame_box=(c - half, c + half),
+                                                 title=f"{title}: texture close-up, {2 * float(half[0]):.0f} mm across"))
+            else:
+                pngs.append(rendering.render_png(exploded if vw == "exploded" else v, feats,
+                                                 "iso" if vw == "exploded" else vw, None, size=(560, 420),
+                                                 title=title + (" (exploded)" if vw == "exploded" else "")))
         sheet.write_bytes(rendering.contact_sheet(pngs, cols=3))
     out = {"sheet": sheet, "section": None, "section_error": "",
            "caption": f"{title}: six views ({', '.join(x.replace('_', ' ') for x in views)}), bounding box "
@@ -335,7 +557,7 @@ def _missing_why(m: dict) -> str:
     return "; ".join(out) + "."
 
 
-def checklist(metrics: dict, plan: dict | None, purpose: str) -> list[dict]:
+def checklist(metrics: dict, plan: dict | None, purpose: str, reads_as: str = "") -> list[dict]:
     def item(q, flag, why):
         return {"question": q, "attention": bool(flag), "why": why}
     m = metrics
@@ -366,6 +588,43 @@ def checklist(metrics: dict, plan: dict | None, purpose: str) -> list[dict]:
         item("Is the section sound: even walls, no voids, no paper-thin spots, mechanisms clear of each other?", False,
              "Look at the section picture create_design/update_design returned."),
     ]
+    fo = m.get("folds") or {}
+    if fo and "folds" in fo:
+        items.append(item("Is every lofted skin smooth (no folds, no creases inside a face)?", fo["folds"] > 0,
+                          f"{fo['faces_checked']} free-form faces sampled; {fo['folds']} neighbouring normals turn more "
+                          f"than 135 deg (worst {fo['worst_deg']} deg)" + (f" near {fo['where'][:3]}" if fo.get("where") else "")
+                          + ". A fold is sections crossing or a guide curve overshooting: ease it or add sections."))
+    wl = m.get("walls") or {}
+    if wl.get("samples"):
+        thin = wl["thin_fraction"] > 0.01 or wl["p2_mm"] < 0.35 * wl["median_mm"]
+        items.append(item("Are the walls whole and even (no break-through, no paper-thin spots)?", thin,
+                          f"Ray thickness over {wl['samples']} points: min {wl['min_mm']}, 2 % {wl['p2_mm']}, median "
+                          f"{wl['median_mm']} mm; {wl['thin_fraction'] * 100:.1f} % under 35 % of the median"
+                          + (f" at {wl['thin_at'][:3]}" if wl.get("thin_at") else "") + ". Thin spots on a shell are the "
+                          "inner surface crossing the outer (break-through): inset less there or ease the form."))
+    fm = m.get("form") or {}
+    cl = fm.get("class")
+    if cl:
+        bad_sig = [s["id"] for s in cl["signature"] if not s["ok"]]
+        bad_rat = [f"{r['ratio']} {r['value']} (range {r['range'][0]}-{r['range'][1]})" for r in cl["ratios"] if not r["ok"]]
+        items.append(item(f"Silhouette: does it have the outline of a {cl['label']} in the side, front and top views?",
+                          cl["score"] < 0.8,
+                          f"Class score {cl['score']:.2f} (outline {cl['parts']['outline']:.2f}, proportions "
+                          f"{cl['parts']['ratios']:.2f}, signature {cl['parts']['signature']:.2f}); outline deviation "
+                          + ", ".join(f"{k} {v['profile_dev'] * 100:.1f} %" for k, v in cl["views"].items())
+                          + " of the size from the class outline"
+                          + (f"; proportions off: {'; '.join(bad_rat)}" if bad_rat else "")
+                          + (f"; missing: {', '.join(bad_sig)}" if bad_sig else "") + f". Ranges: {cl['ratios_source']}."))
+        items.append(item(f"Reads as a {cl['label']}: look at the six views and the photo. Would a buyer recognise it at a "
+                          "glance? Name the three things that make it read as one and the one that most gives it away "
+                          "as a model. Answer with critique(..., reads_as=...).", not reads_as,
+                          f"Your answer: {reads_as}" if reads_as else "Not answered yet: this question has no computed "
+                          "answer; only looking does."))
+    kk = {k: v for k, v in (fm.get("kinks") or {}).items() if v}
+    if kk:
+        items.append(item("Are the silhouette's sharp turns intended (a crease line), not a loft kink?", False,
+                          "; ".join(f"{vn}: " + ", ".join(f"{e} at {u:.2f} turns {a:g} deg" for e, u, a in v[:3])
+                                    for vn, v in kk.items())))
     if plan and plan.get("mechanisms"):
         items.append(item("Do the mechanisms have their clearances and are they declared (assembly joints, Mate)?", False,
                           "Planned: " + ", ".join(str(x) for x in plan["mechanisms"])[:200]))
@@ -378,13 +637,34 @@ def checklist(metrics: dict, plan: dict | None, purpose: str) -> list[dict]:
     return items
 
 
-def run(st, pid: str, notes: str = "") -> dict:
-    """Compute metrics, render close-ups, build the checklist and record one critique pass for the head revision."""
+def product_class(p: dict, given: str | None = None) -> str | None:
+    """The product class critique compares the design with: given, the plan's product_class, or the class the brief
+    (goal, name, requirements) or the project name names (form.product_classes.detect)."""
+    from . import product_classes as pc
+    if given:
+        if given not in pc.CLASSES:
+            from .studio import StudioError
+            raise StudioError(f"Unknown product class “{given}”.", "Classes: " + ", ".join(pc.CLASSES) + ".")
+        return given
+    d = p.get("design") or {}
+    if (d.get("plan") or {}).get("product_class") in pc.CLASSES:
+        return d["plan"]["product_class"]
+    b = d.get("brief") or {}
+    text = " ".join(str(x) for x in [b.get("goal", ""), b.get("name", ""), " ".join(b.get("requirements") or []),
+                                     p.get("name", ""), p.get("brief", "") if isinstance(p.get("brief"), str) else ""])
+    return pc.detect(text)
+
+
+def run(st, pid: str, notes: str = "", reads_as: str = "", product_class_id: str | None = None) -> dict:
+    """Compute metrics, render close-ups, build the checklist and record one critique pass for the head revision.
+    reads_as: the agent's answer to "does it read as <class>?" after looking at the views (recorded with the pass)."""
     from . import purpose as purpose_mod
     from . import staged
     p = st.load(pid)
     key = st.keys(p)["geometry"]
-    metrics = st._k("critique_metrics", key=key, recipe_id=st.rid(p), values=st.rev(p)["values"], p=p, timeout=240)
+    cls = product_class(p, product_class_id)
+    metrics = st._k("critique_metrics", key=key, recipe_id=st.rid(p), values=st.rev(p)["values"], product_class=cls,
+                    p=p, timeout=300)
     plan = (p.get("design") or {}).get("plan")
     recipe_feats = {f.id for f in st.recipe(p).features}
     if plan:
@@ -400,9 +680,13 @@ def run(st, pid: str, notes: str = "") -> dict:
         f = _renders_dir(st, p) / f"{key}-closeups-v{VERSION}.png"
         f.write_bytes(png)
     purpose = purpose_mod.of(p)
-    items = checklist(metrics, plan, purpose)
+    items = checklist(metrics, plan, purpose, reads_as)
+    cl = (metrics.get("form") or {}).get("class") or {}
     summary = {"metrics": {k: metrics[k] for k in ("smallest_fillet_mm", "sharp_edge_fraction", "symmetry", "sliver_faces",
                                                     "planned_missing", "craft_notes") if k in metrics},
+               "product_class": cls, "class_score": cl.get("score"), "reads_as": reads_as or None,
+               "folds": (metrics.get("folds") or {}).get("folds"),
+               "wall_p2_mm": (metrics.get("walls") or {}).get("p2_mm"),
                "attention": [i["question"] for i in items if i["attention"]], "evidence": EVIDENCE}
     rec = staged.record_critique(st, pid, p["head"], summary, notes)
     return {"project": pid, "rev": p["head"], "metrics": metrics, "checklist": items, "closeups": str(f) if f else None,

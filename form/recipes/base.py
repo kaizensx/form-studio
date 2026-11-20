@@ -143,6 +143,12 @@ class Recipe:
         """
         return None
 
+    def appearance(self, v: dict) -> list[dict]:
+        """Material zones for photos (form/appearance.py): [{"features": [...], "finish": "smoke", "color": "#1b2026"}]
+        gives those features their own material in render_photo (a smoked visor, rubber trim, a carbon shell).
+        Features no zone names take the material asked for. An illustration choice, never evidence."""
+        return []
+
     def public(self) -> dict:
         return {
             "id": self.id, "title": self.title, "summary": self.summary,

@@ -78,7 +78,7 @@ Rules:
 | [`design_guide`](#design_guide) | read-only | Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter, holder, mechanism...). |
 | [`design_brief`](#design_brief) | changes | Stage 1 of a complex design: store the structured brief before any geometry. |
 | [`plan_design`](#plan_design) | changes | Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id). |
-| [`design_examples`](#design_examples) | read-only | Complete, high-quality example designs (build123d + form.craft) to learn construction from: a textured helmet shell, a planetary gearbox, a hinged case with a snap latch, an ergonomic handle, a knurled knob, a spiral-ribbed vase and more. |
+| [`design_examples`](#design_examples) | read-only | Complete, high-quality example designs (build123d + form.craft) to learn construction from: a carbon full-face helmet, an ergonomic mouse, a planetary gearbox, a hinged case with a snap latch, an ergonomic handle, a knurled knob, a spiral-ribbed vase and more. |
 | [`critique`](#critique) | changes | Stage 5: look closely and measure. |
 | [`read_document`](#read_document) | read-only | Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). |
 | [`create_design`](#create_design) | changes | Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass, built with build123d. |
@@ -239,6 +239,8 @@ the construction (e.g. "craft.loft_sections through 9 superellipse sections", "c
 parts: [{id, label, material?}]. key_dimensions: {name: value or {value, unit, why}}. mechanisms: each with its
 clearance and motion. textures: each with its tier (B-rep or mesh texture). risks: what could make it fail and
 how you will check it. A complex brief needs at least 3 features and named risks.
+product_class: what critique compares the silhouette with (helmet_fullface, helmet_open, mouse, bottle);
+empty: detected from the brief's words, or none. The design faces +X with Z up for the comparison.
 Then create_design(..., plan=<brief id>).
 
 | Argument | Type | Required |
@@ -252,14 +254,15 @@ Then create_design(..., plan=<brief id>).
 | `risks` | array \| null |  |
 | `approach` | string |  |
 | `references_used` | array \| null |  |
+| `product_class` | string |  |
 
 ### `design_examples`
 
 *Read-only.*
 
-Complete, high-quality example designs (build123d + form.craft) to learn construction from: a textured
-helmet shell, a planetary gearbox, a hinged case with a snap latch, an ergonomic handle, a knurled knob, a
-spiral-ribbed vase and more. query: words to search; name: one exemplar, returned with its full source.
+Complete, high-quality example designs (build123d + form.craft) to learn construction from: a carbon
+full-face helmet, an ergonomic mouse, a planetary gearbox, a hinged case with a snap latch, an ergonomic
+handle, a knurled knob, a spiral-ribbed vase and more. query: words to search; name: one exemplar, returned with its full source.
 They are references for you, never projects, and never shown to the person as designs.
 
 | Argument | Type | Required |
@@ -270,15 +273,23 @@ They are references for you, never projects, and never shown to the person as de
 ### `critique`
 
 Stage 5: look closely and measure. Returns a close-up render of each feature, computed metrics (smallest
-fillet, sharp-edge fraction, symmetry, proportions, surface mix, sliver faces, planned features missing) and
-a checklist to answer by looking. All of it is heuristic evidence: numbers to prompt a look, not a verdict.
-Records one critique pass for the head revision (with your notes: what you saw, what you will change);
-a briefed or planned design cannot be released before its head revision has one.
+fillet, sharp-edge fraction, symmetry, proportions, surface mix, sliver faces, planned features missing, folds
+in lofted skins, wall thickness by rays with break-through spots, silhouette kinks) and a checklist to answer
+by looking. When the brief names a product class (helmet_fullface, helmet_open, mouse, bottle; or pass
+product_class), the side, front and top silhouettes are compared with the class outline, the proportions
+with the class range (with sources) and its signature is checked (an eye port, a neck opening, a palm hump...);
+the design must face +X with Z up. Then look at the views and answer "does it read as a <class>?" in
+reads_as (what makes it read as one, what gives it away); the checklist keeps asking until you do.
+All of it is heuristic evidence: numbers to prompt a look, not a verdict. Records one critique pass for the
+head revision (with your notes: what you saw, what you will change); a briefed or planned design cannot be
+released before its head revision has one.
 
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
 | `notes` | string |  |
+| `reads_as` | string |  |
+| `product_class` | string |  |
 
 ### `read_document`
 
@@ -1044,7 +1055,13 @@ the slicer arranges again when it slices, and FORM's export stays one plate.
 
 A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed).
 preset: studio (soft box, light backdrop) | desk (wooden desk) | dark (graphite, rim light).
-material: matte (PLA) | petg (gloss) | silk (silk PLA). color: hex, e.g. "#3d6fb6".
+material: matte (PLA) | petg (gloss) | silk (silk PLA) | gloss (paint, clear coat) | carbon (carbon twill,
+clear coat) | smoke (smoked polycarbonate) | rubber | metal. color: hex, e.g. "#3d6fb6".
+view: iso | front | back | left | right | top | three_quarter | three_quarter_back, or azimuth/elevation in
+degrees (azimuth from +X toward +Y, as in render: "front" looks from -Y, so a product facing +X shows its face
+at azimuth 0). Render a styled product from at least three angles before you judge it.
+zones: when the design declares appearance() (material zones: a smoked visor, rubber trim, a carbon shell),
+each zone gets its own material; the rest takes material/color.
 layer_lines draws faint lines at the slicer's layer height when a process preset is selected.
 fast=True uses EEVEE instead of Cycles. Cached per geometry and settings. This is an illustration with
 invented light and material, not a photo of a print: never present it as evidence of anything.
@@ -1057,6 +1074,10 @@ invented light and material, not a photo of a print: never present it as evidenc
 | `color` | string |  |
 | `fast` | boolean |  |
 | `layer_lines` | boolean |  |
+| `view` | string |  |
+| `azimuth` | number \| null |  |
+| `elevation` | number \| null |  |
+| `zones` | boolean |  |
 
 ### `save_variant`
 

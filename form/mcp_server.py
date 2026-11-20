@@ -307,26 +307,28 @@ def build() -> MCPServer:
     async def plan_design(brief: str, features: list[dict], parts: list[dict] | None = None,
                           key_dimensions: dict[str, Any] | None = None, mechanisms: list[str] | None = None,
                           textures: list[str] | None = None, risks: list[str] | None = None, approach: str = "",
-                          references_used: list[str] | None = None) -> dict:
+                          references_used: list[str] | None = None, product_class: str = "") -> dict:
         """Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id).
         features: [{id, label, how, part?, dims?}] in build order; id becomes the Feature id in the code, how names
         the construction (e.g. "craft.loft_sections through 9 superellipse sections", "craft.pin_hinge 0.35 mm").
         parts: [{id, label, material?}]. key_dimensions: {name: value or {value, unit, why}}. mechanisms: each with its
         clearance and motion. textures: each with its tier (B-rep or mesh texture). risks: what could make it fail and
         how you will check it. A complex brief needs at least 3 features and named risks.
+        product_class: what critique compares the silhouette with (helmet_fullface, helmet_open, mouse, bottle);
+        empty: detected from the brief's words, or none. The design faces +X with Z up for the comparison.
         Then create_design(..., plan=<brief id>)."""
         st = studio()
         from . import staged
         r = await _run(staged.save_plan, st, brief, features, parts, key_dimensions, mechanisms, textures, risks,
-                       approach, references_used)
+                       approach, references_used, product_class)
         return {**r, "next": f"Write the code with these feature ids, then create_design(..., plan='{brief}') "
                              "(or update_design for an existing project). Look at the sheet and the section it returns."}
 
     @mcp.tool(annotations=RO)
     async def design_examples(query: str = "", name: str = "") -> dict:
-        """Complete, high-quality example designs (build123d + form.craft) to learn construction from: a textured
-        helmet shell, a planetary gearbox, a hinged case with a snap latch, an ergonomic handle, a knurled knob, a
-        spiral-ribbed vase and more. query: words to search; name: one exemplar, returned with its full source.
+        """Complete, high-quality example designs (build123d + form.craft) to learn construction from: a carbon
+        full-face helmet, an ergonomic mouse, a planetary gearbox, a hinged case with a snap latch, an ergonomic
+        handle, a knurled knob, a spiral-ribbed vase and more. query: words to search; name: one exemplar, returned with its full source.
         They are references for you, never projects, and never shown to the person as designs."""
         from . import exemplars
         if name:
@@ -338,15 +340,22 @@ def build() -> MCPServer:
         return {"examples": hits, "next": "design_examples(name=...) returns the full source and the lessons."}
 
     @mcp.tool(annotations=RW, structured_output=False)
-    async def critique(project: str, notes: str = "", ctx: Context = None) -> list:
+    async def critique(project: str, notes: str = "", reads_as: str = "", product_class: str = "",
+                       ctx: Context = None) -> list:
         """Stage 5: look closely and measure. Returns a close-up render of each feature, computed metrics (smallest
-        fillet, sharp-edge fraction, symmetry, proportions, surface mix, sliver faces, planned features missing) and
-        a checklist to answer by looking. All of it is heuristic evidence: numbers to prompt a look, not a verdict.
-        Records one critique pass for the head revision (with your notes: what you saw, what you will change);
-        a briefed or planned design cannot be released before its head revision has one."""
+        fillet, sharp-edge fraction, symmetry, proportions, surface mix, sliver faces, planned features missing, folds
+        in lofted skins, wall thickness by rays with break-through spots, silhouette kinks) and a checklist to answer
+        by looking. When the brief names a product class (helmet_fullface, helmet_open, mouse, bottle; or pass
+        product_class), the side, front and top silhouettes are compared with the class outline, the proportions
+        with the class range (with sources) and its signature is checked (an eye port, a neck opening, a palm hump...);
+        the design must face +X with Z up. Then look at the views and answer "does it read as a <class>?" in
+        reads_as (what makes it read as one, what gives it away); the checklist keeps asking until you do.
+        All of it is heuristic evidence: numbers to prompt a look, not a verdict. Records one critique pass for the
+        head revision (with your notes: what you saw, what you will change); a briefed or planned design cannot be
+        released before its head revision has one."""
         st = studio()
         from . import critique as crit
-        r = await _run(crit.run, st, project, notes)
+        r = await _run(crit.run, st, project, notes, reads_as, product_class or None)
         act(project, "look", "Critiquing the design: close-ups, metrics, checklist", ctx)
         out: list = []
         if r.get("closeups"):
@@ -1310,22 +1319,34 @@ def build() -> MCPServer:
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True,
                                           open_world_hint=False), structured_output=False)
     async def render_photo(project: str, preset: str = "studio", material: str = "matte", color: str = "#eeece6",
-                           fast: bool = False, layer_lines: bool = True, ctx: Context = None) -> list:
+                           fast: bool = False, layer_lines: bool = True, view: str = "iso",
+                           azimuth: float | None = None, elevation: float | None = None, zones: bool = True,
+                           ctx: Context = None) -> list:
         """A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed).
         preset: studio (soft box, light backdrop) | desk (wooden desk) | dark (graphite, rim light).
-        material: matte (PLA) | petg (gloss) | silk (silk PLA). color: hex, e.g. "#3d6fb6".
+        material: matte (PLA) | petg (gloss) | silk (silk PLA) | gloss (paint, clear coat) | carbon (carbon twill,
+        clear coat) | smoke (smoked polycarbonate) | rubber | metal. color: hex, e.g. "#3d6fb6".
+        view: iso | front | back | left | right | top | three_quarter | three_quarter_back, or azimuth/elevation in
+        degrees (azimuth from +X toward +Y, as in render: "front" looks from -Y, so a product facing +X shows its face
+        at azimuth 0). Render a styled product from at least three angles before you judge it.
+        zones: when the design declares appearance() (material zones: a smoked visor, rubber trim, a carbon shell),
+        each zone gets its own material; the rest takes material/color.
         layer_lines draws faint lines at the slicer's layer height when a process preset is selected.
         fast=True uses EEVEE instead of Cycles. Cached per geometry and settings. This is an illustration with
         invented light and material, not a photo of a print: never present it as evidence of anything."""
         st = studio()
         from . import photo
-        m = await _run(lambda: photo.render(st, st.load(project), preset, material, color, fast, layer_lines))
+        m = await _run(lambda: photo.render(st, st.load(project), preset, material, color, fast, layer_lines,
+                                            view=view, azimuth=azimuth, elevation=elevation, use_zones=zones))
         f = st.dir(project) / "artifacts" / "photo" / m["file"]
         act(project, "look", f"Rendered in Blender ({m['preset_label']}, {m['finish_label']})", ctx)
         lh = m["layer"]
         caption = (f"{m['label']}. r{m['rev']:02d}, {m['preset_label']} · {m['finish_label']} {m['color']}, "
                    f"{m['engine']} on {m['device']}, {m['samples']} samples, Blender {m['blender']}"
                    + (f", layer lines at {lh['mm']:g} mm ({lh['note']})" if lh.get("mm") else "")
+                   + f", view {m.get('view', 'iso')}"
+                   + ("; zones " + ", ".join(f"{'+'.join(z['features'][:3])}: {z['finish'] or material}"
+                                             for z in m["zones"]) if m.get("zones") else "")
                    + (" (cached)" if m.get("cached") else f", {m['seconds']:.0f} s") + f". File: {f}")
         return [Image(path=f), caption]
 

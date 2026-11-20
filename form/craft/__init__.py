@@ -7,13 +7,16 @@
 
 Modules (each also importable on its own, e.g. `from form.craft import mechanisms`):
   surfaces    superellipse / spline profiles, loft_sections, sweep_spline, revolve_profile, shell, safe_fillet,
-              variable_fillet, thicken, faces_at
+              variable_fillet, thicken, faces_at, cut and fuse (booleans with fuzzy fallbacks)
   mechanisms  pin_hinge, living_hinge, cantilever_snap, annular_snap, bayonet, dovetail, detent, ratchet, cam,
               four_bar, four_bar_pose, link, link_between, gear_train, planetary (gears via form.parts)
   fits        ISO 286 iso_fit("H7/g6", d), shaft_limits, hole_limits, bearing_fit
   structure   rib, rib_grid, gusset, boss_array, lattice
   organic     section_body, section_shell, inset_body, inflate, dome_sections, helmet_shell, helmet_sections, grip,
-              handle
+              handle; silhouette-driven forms: curve, profile_sections, check_sections, loft_report, checked_body;
+              details that follow a surface: two_view_cutter, surface_band, slot_grille; product families from
+              named proportions: head_form, helmet_fullface, helmet_open, mouse_form, bottle_profile, grip_sections
+              (tables HEADFORMS, ANSUR_HEAD, ANSUR_HAND, HELMET_LAYERS, PCO1881)
   texture     B-rep: knurl, spiral_ribbed_body, wrapped_ribs, emboss_cells (capped at MAX_INSTANCES = 2000)
   meshtex     MeshTexture for STL/GLB/renders ("mesh texture; STEP carries the smooth body")
   patterns    form.patterns re-exported (hex_vents, perforation_grid, slot_array, knurl, grip_ribs)
@@ -33,14 +36,17 @@ from .meshtex import LABEL as MESH_TEXTURE_LABEL, MeshTexture  # noqa: F401
 _LAZY = {
     "surfaces": ("superellipse", "spline_profile", "polygon_profile", "superellipse_face", "section_at", "plane_on_path",
                  "loft_sections", "sweep_spline", "revolve_profile", "faces_at", "shell", "safe_fillet",
-                 "variable_fillet", "thicken"),
+                 "variable_fillet", "thicken", "cut", "fuse"),
     "mechanisms": ("Mech", "overlap", "pin_hinge", "living_hinge", "cantilever_snap", "annular_snap", "bayonet",
                    "dovetail", "detent", "ratchet", "cam", "link", "link_between", "four_bar", "four_bar_pose",
                    "gear_train", "planetary"),
     "fits": ("iso_fit", "shaft_limits", "hole_limits", "bearing_fit"),
     "structure": ("rib", "rib_grid", "gusset", "boss_array", "lattice"),
     "organic": ("section_body", "section_shell", "inset_body", "inflate", "dome_sections", "helmet_shell",
-                "helmet_sections", "grip", "handle"),
+                "helmet_sections", "grip", "handle", "curve", "profile_sections", "check_sections", "loft_report",
+                "checked_body", "two_view_cutter", "grow_outline", "surface_band", "offset_body", "slot_grille", "head_form", "helmet_fullface",
+                "helmet_open", "mouse_form", "bottle_profile", "grip_sections", "HEADFORMS", "ANSUR_HEAD",
+                "ANSUR_HAND", "HELMET_LAYERS", "PCO1881"),
     "texture": ("knurl", "polyhedron", "spiral_ribbed_body", "wrapped_ribs", "emboss_cells", "MAX_INSTANCES"),
 }
 _WHERE = {name: mod for mod, names in _LAZY.items() for name in names}

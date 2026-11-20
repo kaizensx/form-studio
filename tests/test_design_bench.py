@@ -26,7 +26,7 @@ class DesignBench(unittest.TestCase):
 
     def test_staging_triggers_on_complex_briefs_only(self):
         for r in self.res.values():
-            self.assertEqual(r["points"]["staging"], 15, (r["id"], r["notes"]))
+            self.assertEqual(r["points"]["staging"], bench.MAX["staging"], (r["id"], r["notes"]))
 
     def test_exemplars_build_and_clear_the_bar(self):
         for b in bench.briefs():
@@ -37,8 +37,8 @@ class DesignBench(unittest.TestCase):
                 self.assertFalse(HAVE_GEARS, (b["id"], r["notes"]))
                 self.assertIn("py_gearworks", " ".join(r["notes"]))
                 continue
-            self.assertEqual(r["points"]["builds"], 30, (b["id"], r["notes"]))
-            self.assertEqual(r["points"]["features"], 25, (b["id"], r["notes"]))
+            self.assertEqual(r["points"]["builds"], bench.MAX["builds"], (b["id"], r["notes"]))
+            self.assertEqual(r["points"]["features"], bench.MAX["features"], (b["id"], r["notes"]))
             self.assertEqual(r["status"], "pass", (b["id"], r["total"], r["notes"]))
 
     def test_evaluation_briefs_have_reference_solutions(self):
@@ -49,9 +49,23 @@ class DesignBench(unittest.TestCase):
                 self.assertTrue((HERE / "design_bench" / "solutions" / f"{b['solution']}.py").is_file(), b["id"])
 
     def test_unsolved_briefs_are_reported_not_faked(self):
-        r = self.res["mouse_shell"]
+        r = self.res["phone_stand"]
         self.assertEqual(r["status"], "no solution")
-        self.assertEqual(r["total"], 15)
+        self.assertEqual(r["total"], bench.MAX["staging"])
+
+    def test_product_classes_are_scored_on_their_silhouette(self):
+        for bid in ("helmet", "eval_helmet", "mouse_shell", "eval_mouse"):
+            r = self.res[bid]
+            self.assertIn("silhouette", r["points"], bid)
+            self.assertGreaterEqual(r["metrics"]["class"]["score"], bench.CLASS_BAR, (bid, r["notes"]))
+
+    def test_the_old_blob_helmet_is_below_the_bar(self):
+        """The helmet the first design evaluation produced (a dome with a visor strip) must not pass any more."""
+        old = HERE / "design_bench" / "fixtures" / "blob_helmet.py"
+        m = bench.check(bench._load(old), "bench-blob-helmet", "helmet_fullface")
+        b = next(x for x in bench.briefs() if x["id"] == "eval_helmet")
+        r = bench.score(b, m)
+        self.assertLess(r["total"], bench.PASS, r["notes"])
 
 
 if __name__ == "__main__":

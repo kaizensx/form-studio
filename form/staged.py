@@ -162,8 +162,12 @@ REQUIRED_FEATURE_KEYS = ("id", "label", "how")
 
 
 def save_plan(st, ref: str, features: list, parts=None, key_dimensions=None, mechanisms=None, textures=None,
-              risks=None, approach: str = "", references_used=None) -> dict:
+              risks=None, approach: str = "", references_used=None, product_class: str = "") -> dict:
     b = load_brief(st, ref)
+    from . import product_classes as pc
+    if product_class and product_class not in pc.CLASSES:
+        raise StudioError(f"Unknown product class “{product_class}”.", "Classes: " + ", ".join(pc.CLASSES)
+                          + ". Leave it empty when the object is none of them.")
     feats = _clean_list(features, "features")
     if not feats:
         raise StudioError("A plan needs features.", "List every feature the design will have: {id, label, how}, where "
@@ -186,6 +190,7 @@ def save_plan(st, ref: str, features: list, parts=None, key_dimensions=None, mec
     plan = {"features": feats, "parts": _clean_list(parts, "parts"), "key_dimensions": key_dimensions or {},
             "mechanisms": _clean_list(mechanisms, "mechanisms"), "textures": _clean_list(textures, "textures"),
             "risks": rk, "approach": approach, "references_used": _clean_list(references_used, "references_used"),
+            "product_class": product_class or pc.detect(" ".join([b.get("goal", ""), b.get("name", "")])) or "",
             "ts": time.time()}
     f = _dir(st) / f"{ref}.json"
     if f.is_file():

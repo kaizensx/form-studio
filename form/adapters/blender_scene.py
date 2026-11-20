@@ -51,33 +51,89 @@ def import_stl(path):
     return obj
 
 
-def part(job):
-    obj = import_stl(job["stl"])
-    me = obj.data
-    bm = bmesh.new()
-    bm.from_mesh(me)
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)          # STL repeats every vertex per triangle
-    bmesh.ops.translate(bm, verts=bm.verts, vec=Vector(job["offset_mm"]))
-    bm.to_mesh(me)
-    bm.free()
-    obj.location = (0, 0, 0)
-    obj.rotation_euler = (0, 0, 0)
-    obj.scale = (0.001, 0.001, 0.001)        # mesh stays in millimetres, so object coordinates are millimetres
-    try:
-        bpy.ops.object.shade_smooth_by_angle(angle=math.radians(32))
-    except Exception:
-        bpy.ops.object.shade_flat()
-    f = job["finish"]
-    m, b = principled("Filament", job["color"], f["roughness"], metallic=f["metallic"], specular=f["specular"],
-                      coat=f["coat"], sheen=f["sheen"], subsurface=f["subsurface"])
-    if job.get("layer_mm"):
+def twill_image(n=256):
+    """A 2x2 twill tile (8 x 8 tows), drawn with numpy: each tow a rounded band with fibre streaks along it, the two
+    directions at different brightness so the weave reads under a clear coat. Values 0..1 in the red channel
+    (brightness), the green channel holds which way the tow runs (1 = along u)."""
+    import numpy as np
+    cells = 8
+    s = n // cells
+    u = (np.arange(n) % s) / s
+    U, V = np.meshgrid(u, u)
+    cu = np.arange(n)[None, :] // s
+    cv = np.arange(n)[:, None] // s
+    along_u = ((cu + cv) // 2 % 2 == 0)
+    across = np.where(along_u, V, U)                       # position across the tow
+    prof = np.sqrt(np.clip(np.sin(np.pi * across), 0, 1))
+    rng = np.random.default_rng(7)
+    fib = rng.random((n, n))
+    streak = np.where(along_u, np.repeat(fib[:, :1], n, 1), np.repeat(fib[:1, :], n, 0))
+    b = np.where(along_u, 0.72, 0.38) * (0.55 + 0.45 * prof) * (0.88 + 0.12 * streak)
+    img = bpy.data.images.new("Twill", n, n, alpha=False, float_buffer=True)
+    px = np.zeros((n, n, 4), np.float32)
+    px[..., 0] = b
+    px[..., 1] = along_u.astype(np.float32)
+    px[..., 2] = prof
+    px[..., 3] = 1
+    img.pixels.foreach_set(px.ravel())
+    img.pack()
+    return img
+
+
+def material(name, finish, color, layer_mm=None):
+    """A Principled material for a finish (see FINISHES in blender.py); carbon and smoke get their own node set-ups."""
+    f = finish
+    kind = f.get("id", "matte")
+    m, b = principled(name, color, f["roughness"], metallic=f["metallic"], specular=f["specular"], coat=f["coat"],
+                      sheen=f["sheen"], subsurface=f["subsurface"])
+    nt = m.node_tree
+    if "Coat Roughness" in b.inputs and f.get("coat_roughness") is not None:
+        b.inputs["Coat Roughness"].default_value = f["coat_roughness"]
+    if kind == "smoke":                                    # tinted polycarbonate: transmissive, glossy, dark
+        for k, v in (("Transmission Weight", 1.0), ("IOR", 1.58), ("Alpha", 1.0)):
+            if k in b.inputs:
+                b.inputs[k].default_value = v
+        try:
+            m.blend_method = "HASHED"
+        except (AttributeError, TypeError):
+            pass
+    if kind == "carbon":                                   # a box-projected twill: tow brightness and sheen, clear coat
+        tc = nt.nodes.new("ShaderNodeTexCoord")
+        mp = nt.nodes.new("ShaderNodeMapping")
+        tile = float(f.get("tile_mm", 24.0))               # 8 tows per tile: 3 mm tows
+        mp.inputs["Scale"].default_value = (1 / tile, 1 / tile, 1 / tile)
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.image = twill_image()
+        tex.projection = "BOX"
+        tex.projection_blend = 0.25
+        tex.interpolation = "Cubic"
+        nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
+        nt.links.new(mp.outputs["Vector"], tex.inputs["Vector"])
+        sep = nt.nodes.new("ShaderNodeSeparateColor")
+        nt.links.new(tex.outputs["Color"], sep.inputs[0])
+        base = nt.nodes.new("ShaderNodeMix")
+        base.data_type = "RGBA"
+        base.inputs["A"].default_value = (*[c * 0.12 for c in color], 1)
+        base.inputs["B"].default_value = (*[min(1.0, c * 0.75 + 0.004) for c in color], 1)
+        nt.links.new(sep.outputs[0], base.inputs["Factor"])
+        nt.links.new(base.outputs["Result"], b.inputs["Base Color"])
+        rough = nt.nodes.new("ShaderNodeMapRange")
+        rough.inputs["To Min"].default_value = 0.55
+        rough.inputs["To Max"].default_value = 0.22
+        nt.links.new(sep.outputs[0], rough.inputs["Value"])
+        nt.links.new(rough.outputs["Result"], b.inputs["Roughness"])
+        bump = nt.nodes.new("ShaderNodeBump")
+        bump.inputs["Strength"].default_value = 0.12
+        bump.inputs["Distance"].default_value = 0.0002
+        nt.links.new(sep.outputs[2], bump.inputs["Height"])
+        nt.links.new(bump.outputs["Normal"], b.inputs["Normal"])
+    if layer_mm and kind in ("matte", "petg", "silk"):
         # printed layer lines: a faint ridge every layer height, along the print's Z
-        nt = m.node_tree
         tc = nt.nodes.new("ShaderNodeTexCoord")
         sep = nt.nodes.new("ShaderNodeSeparateXYZ")
         mul = nt.nodes.new("ShaderNodeMath")
         mul.operation = "MULTIPLY"
-        mul.inputs[1].default_value = 2 * math.pi / job["layer_mm"]
+        mul.inputs[1].default_value = 2 * math.pi / layer_mm
         sine = nt.nodes.new("ShaderNodeMath")
         sine.operation = "SINE"
         bump = nt.nodes.new("ShaderNodeBump")
@@ -88,8 +144,35 @@ def part(job):
         nt.links.new(mul.outputs[0], sine.inputs[0])
         nt.links.new(sine.outputs[0], bump.inputs["Height"])
         nt.links.new(bump.outputs["Normal"], b.inputs["Normal"])
-    me.materials.append(m)
-    return obj
+    return m
+
+
+def parts(job):
+    """Every part of the job (one STL, or one per material zone), each with its own material. Returns the objects."""
+    specs = job.get("parts") or [{"stl": job["stl"], "finish": job["finish"], "color": job["color"]}]
+    objs = []
+    for i, sp in enumerate(specs):
+        obj = import_stl(sp["stl"])
+        me = obj.data
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
+        bmesh.ops.translate(bm, verts=bm.verts, vec=Vector(job["offset_mm"]))
+        bm.to_mesh(me)
+        bm.free()
+        obj.location = (0, 0, 0)
+        obj.rotation_euler = (0, 0, 0)
+        obj.scale = (0.001, 0.001, 0.001)
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        try:
+            bpy.ops.object.shade_smooth_by_angle(angle=math.radians(32))
+        except Exception:
+            bpy.ops.object.shade_flat()
+        me.materials.append(material(f"Zone{i}", sp["finish"], sp["color"], job.get("layer_mm")))
+        objs.append(obj)
+    return objs
 
 
 def sweep(name, width, depth, height, radius, rot_z, color, roughness, back=0.0, specular=0.3):
@@ -309,7 +392,7 @@ def main():
     t0 = time.time()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     step("Importing the STL")
-    obj = part(job)
+    objs = parts(job)
     step("Building the scene")
     stage(job)
     camera(job)
@@ -319,7 +402,8 @@ def main():
     bpy.app.handlers.render_stats.append(lambda stats: print("FORM_STATS " + str(stats), flush=True))
     bpy.ops.render.render(write_still=True)
     return {"ok": True, "engine": engine, "device": device, "samples": job["samples"], "blender": bpy.app.version_string,
-            "triangles": len(obj.data.polygons), "render_s": round(time.time() - t0, 2)}
+            "triangles": sum(len(o.data.polygons) for o in objs), "parts": len(objs),
+            "render_s": round(time.time() - t0, 2)}
 
 
 if __name__ == "__main__":

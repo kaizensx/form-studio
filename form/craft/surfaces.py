@@ -175,6 +175,66 @@ def revolve_profile(points, angle: float = 360.0, spline: bool = False, axis: Ax
                    "The profile must not cross itself or the axis.", ["points"])
 
 
+# ---- robust booleans ---------------------------------------------------------------------------------------------
+
+def _occt_bool(a, b, op: str, fuzzy: float):
+    from build123d import Shape
+    from OCP.BRepAlgoAPI import BRepAlgoAPI_Common, BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
+    try:
+        from OCP.TopTools import TopTools_ListOfShape
+    except ImportError:                                   # newer OCP names the template instance
+        from OCP.collections import List_TopoDS_Shape as TopTools_ListOfShape
+    mk = {"cut": BRepAlgoAPI_Cut, "fuse": BRepAlgoAPI_Fuse, "common": BRepAlgoAPI_Common}[op]()
+    la, lb = TopTools_ListOfShape(), TopTools_ListOfShape()
+    la.Append(a.wrapped)
+    lb.Append(b.wrapped)
+    mk.SetArguments(la)
+    mk.SetTools(lb)
+    if fuzzy:
+        mk.SetFuzzyValue(fuzzy)
+    mk.SetRunParallel(True)
+    mk.Build()
+    if not mk.IsDone():
+        raise ValueError("boolean not done")
+    r = Shape.cast(mk.Shape())
+    from build123d import Part
+    try:
+        r.clean()
+    except Exception:
+        pass
+    return r if r.solids() else Part()
+
+
+def cut(body, tool, min_solids: int = 1):
+    """body - tool, with the fallbacks OCCT needs on free-form shells: the plain boolean first, then fuzzy booleans
+    (1e-4 and 1e-3 mm: near-tangent faces glued instead of missed), then the tool nudged by 0.02 mm. A result is
+    accepted when it is valid and keeps at least min_solids solids (a cut that silently returns nothing, or a
+    broken shell, is the usual failure). The fallback taken is noted."""
+    from build123d import Pos
+    good = lambda r: ok(r) and len(r.solids()) >= min_solids
+    tries = [("cut", lambda: body - tool), ("fuzzy cut 1e-4", lambda: _occt_bool(body, tool, "cut", 1e-4)),
+             ("fuzzy cut 1e-3", lambda: _occt_bool(body, tool, "cut", 1e-3)),
+             ("nudged cut", lambda: body - Pos(0.013, 0.007, 0.011) * tool)]
+    return attempt("cut", tries, "The tool grazes a face of the body: move it a little, or make it cross the face "
+                   "clearly.", ["tool"], good)
+
+
+def fuse(body, other, max_solids: int | None = None, min_solids: int = 1):
+    """body + other with the same fallbacks as cut. max_solids: the count the result may have at most (usually the
+    body's own count: a pad that does not fuse leaves an extra solid). min_solids: at least (a separate part, such
+    as a visor that must stay clear of the shell, is a second solid: fuse(body, visor, 2, 2) refuses a visor that
+    touches)."""
+    from build123d import Pos
+    lim = max_solids if max_solids is not None else len(body.solids())
+    good = lambda r: ok(r) and min_solids <= len(r.solids()) <= lim
+    tries = [("fuse", lambda: body + other), ("fuzzy fuse 1e-4", lambda: _occt_bool(body, other, "fuse", 1e-4)),
+             ("fuzzy fuse 1e-3", lambda: _occt_bool(body, other, "fuse", 1e-3)),
+             ("nudged fuse", lambda: body + Pos(0.013, 0.007, 0.011) * other)]
+    hint = ("The part touches the body where it must stay clear: open the gap or move what it touches."
+            if min_solids > 1 else "The part does not overlap the body (it floats, or only touches): sink it into the body.")
+    return attempt("fuse", tries, hint, ["other"], good)
+
+
 # ---- shells, fillets, thickening -------------------------------------------------------------------------------
 
 def faces_at(shape, where: str = "top", tol: float = 0.05) -> list:
