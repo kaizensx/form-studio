@@ -140,38 +140,20 @@ Item {
 
     // ── the build-up: a new build from the agent (or a pick, or a measurement) grows in feature by feature, in build
     //    order, each one named as it arrives, so you watch the part being made. It is the real geometry of this
-    //    revision revealed stage by stage; no extra builds run, so it costs nothing on a small machine. ──
+    //    revision revealed stage by stage (Viewport's build-up, started by Store.showHead); no extra builds run. ──
     QtObject {
         id: build
-        property var hide: []
-        property var order: []
-        property int at: -1
         property string label: ""
         property string sub: ""
-        function start() {
-            var v = Store.view, d = Store.data
-            if (!v || !v.mesh || !d || Theme.reduced) return
-            var seen = ({}), ids = []
-            v.mesh.forEach(function (m) { var f = m.feature || ""; if (f && !seen[f]) { seen[f] = true; ids.push(f) } })
-            var feats = d.recipe && d.recipe.features ? d.recipe.features : []
-            var ordered = feats.map(function (f) { return f.id }).filter(function (id) { return seen[id] })
-            ids.forEach(function (id) { if (ordered.indexOf(id) < 0) ordered.push(id) })
-            if (ordered.length < 2) { label = ordered.length ? (Store.featureById(ordered[0]) || {}).label || "" : ""; at = 0; order = ordered; flash.restart(); return }
-            order = ordered; at = 0; hide = ordered.slice(1); step()
-            stepper.interval = Math.max(260, Math.min(700, 2600 / ordered.length)); stepper.restart()
+        function step(ids, at, count) {
+            var names = ids.map(function (id) { var f = Store.featureById(id); return f && f.label ? f.label : id }).filter(function (n) { return !!n })
+            label = names.length > 2 ? names.slice(0, 2).join(", ") + " and " + (names.length - 2) + " more" : names.join(", ")
+            sub = count > 1 ? (at + 1) + " of " + count : ""
+            flash.stop()
         }
-        function step() {
-            var f = Store.featureById(order[at]) || ({ label: order[at] })
-            label = f.label || order[at]; sub = (at + 1) + " of " + order.length
-        }
-        function next() {
-            if (at >= order.length - 1) { hide = []; flash.restart(); return }
-            at++; hide = order.slice(at + 1); step(); stepper.restart()
-        }
+        function done() { sub = ""; flash.restart() }
     }
-    Timer { id: stepper; onTriggered: build.next() }
     Timer { id: flash; interval: 1400; onTriggered: { build.label = ""; build.sub = "" } }
-    Connections { target: Store; function onBuildTickChanged() { Qt.callLater(build.start) } }
 
     // ── centre: the part ─────────────────────────────────────
     Item {
@@ -185,7 +167,10 @@ Item {
             visible: !Store.layers
             asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
             plateSize: ws.d && ws.d.printer ? Math.max(60, Math.max(ws.d.printer.env.envelope[0], ws.d.printer.env.envelope[1])) : 180
-            hiddenFeatures: Store.hidden.concat(build.hide)                        // design tools: quick actions; the build-up
+            hiddenFeatures: Store.hidden                                           // design tools: quick actions
+            order: ws.d && ws.d.recipe && ws.d.recipe.features ? ws.d.recipe.features.map(function (f) { return f.id }) : []
+            onRevealStep: function (ids, at, count) { build.step(ids, at, count) }
+            onRevealDone: build.done()
             // colours and materials: re-made whenever the design's appearance or the catalogue changes
             colorOf: { var a = Store.appearance, c = Store.materialCat; return function (part) { return Store.look(part).color || "" } }
             // what the HUD covers: the rail and options, the dock when it is open, the strip and the readout
