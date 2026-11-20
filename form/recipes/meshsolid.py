@@ -84,11 +84,14 @@ def load(name: str):
 
 
 def import_shape(p: Path):
-    """A STEP as its B-rep, an STL as a sewn mesh solid."""
+    """A STEP as its B-rep, an STL, OBJ or 3MF as a sewn mesh solid."""
     from build123d import import_step
     ext = p.suffix.lower()
     if ext in (".step", ".stp"):
         return import_step(str(p))
     if ext == ".stl":
         return read_stl_solid(p)
-    raise ValueError(f"Unsupported reference format {ext}; use STEP or STL.")
+    if ext in (".obj", ".3mf"):
+        from ..recon.mesh import read_triangles
+        return solid_from_triangles(read_triangles(p)[0].tolist())
+    raise ValueError(f"Unsupported reference format {ext}; use STEP, STL, OBJ or 3MF.")

@@ -13,7 +13,8 @@ from pathlib import Path
 from . import fsutil
 
 PRIOR_SIGMA = 0.15       # mm, assumed spread of an uncalibrated FDM internal width
-SIGMA_BY_SOURCE = {"measured": 0.03, "specified": 0.10, "photo": 0.60, "assumed": 0.30, "calibrated": 0.05}
+SIGMA_BY_SOURCE = {"measured": 0.03, "specified": 0.10, "photo": 0.60, "assumed": 0.30, "calibrated": 0.05,
+                   "mesh": 0.10}   # mesh: computed from an imported mesh (its chord error and the printer that made it)
 
 
 def cdf(x: float) -> float:

@@ -104,6 +104,7 @@ message, with what the design is for.
 | `form engrave <project> TEXT --at x,y,z --normal x,y,z [--up x,y,z] [--height MM] [--depth MM] [--sunk]` | Raised or sunk text on a flat face, written into the design's code as a feature and built as a new revision; `--list` and `--remove text_N` |
 | `form feature <project> boss\|snap_hook --at x,y,z --normal x,y,z [--size M3] [--hole tapped\|clearance\|insert] ...` | A screw boss or a snap-fit hook on a flat face, written into the design's code and built as a new revision |
 | `form diff <project> A [B] [--png FILE]` | What changed between two revisions on the solids: material added and removed, with volumes and regions |
+| `form reconstruct FILE [--name N] [--tolerance MM] [--layer 0\|1\|2]` | A mesh (STL, OBJ, 3MF) as a new design: the exact solid, analytic faces (beta) and a feature recipe (beta), each compared with the mesh |
 
 ## Print
 

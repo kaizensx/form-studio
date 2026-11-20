@@ -109,6 +109,7 @@ Rules:
 | [`open_bench`](#open_bench) | changes | The bench is the local web page where the user inspects the 3D model, compares revisions and approves releases. |
 | [`brief_presets`](#brief_presets) | read-only | Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure, car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a material to start from and the checks to plan for. |
 | [`import_reference`](#import_reference) | changes | Import an existing part (STEP or STL, e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's references. |
+| [`reconstruct`](#reconstruct) | changes | Turn a mesh (STL, OBJ or 3MF) into editable CAD as a new design. |
 | [`freecad_macro`](#freecad_macro) | read-only | Write a FreeCAD macro (.FCMacro) next to the current STEP export. |
 | [`analyze`](#analyze) | read-only | An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics. |
 | [`measure`](#measure) | read-only | Measure the part. Points are [x, y, z] in millimetres in the design frame. |
@@ -716,6 +717,25 @@ self.reference("<name>") for clearance cuts. path: absolute local path. Re-impor
 | `project` | string | yes |
 | `path` | string | yes |
 | `name` | string \| null |  |
+
+### `reconstruct`
+
+Turn a mesh (STL, OBJ or 3MF) into editable CAD as a new design. project_or_file: an absolute path to the
+mesh, or a project id whose imported mesh reference to use (reference: which one; default the first mesh).
+Layer 0 is always built: the mesh as an exact solid (Hausdorff at float precision). Layer 1 (beta) replaces
+facets with planes, cylinders, cones, spheres and tori where they fit within `tolerance` mm; the rest stay
+frozen facets. Layer 2 (beta) writes a build123d recipe with Params (one extrusion or revolution, holes
+snapped to standard sizes, patterns) and is used only if its rebuild is within the limit. Returns the new
+project and the verification (two-sided Hausdorff, volume delta, % parametric area). Values are computed from
+the mesh; nothing is decimated and every repair is listed. Large meshes take minutes.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project_or_file` | string | yes |
+| `tolerance` | number |  |
+| `layer` | integer |  |
+| `name` | string \| null |  |
+| `reference` | string \| null |  |
 
 ### `freecad_macro`
 

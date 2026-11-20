@@ -617,17 +617,21 @@ def op_reference(path, fmt, out):
         E = np.array(segs, dtype=np.float32) if segs else _mesh_edges(P, T)
         info = {"format": "step", "bbox": [[bb.min.X, bb.min.Y, bb.min.Z], [bb.max.X, bb.max.Y, bb.max.Z]],
                 "volume_mm3": float(shape.volume), "solids": len(shape.solids()), "faces": len(shape.faces())}
-    elif fmt == ".stl":
-        tris, _f, _sha = mesh_audit.read_stl(p)
+    elif fmt in (".stl", ".obj", ".3mf"):
+        if fmt == ".stl":
+            tris, _f, _sha = mesh_audit.read_stl(p)
+        else:
+            from .recon.mesh import read_triangles
+            tris = read_triangles(p, fmt)[0].tolist()
         if not tris:
-            raise RecipeError("The STL has no triangles.", "", "Export the part again.")
+            raise RecipeError("The mesh has no triangles.", "", "Export the part again.")
         P = np.array(tris, dtype=np.float64).reshape(-1, 3)
         T = np.arange(len(P), dtype=np.int64).reshape(-1, 3)
         a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
         vol = float(np.einsum("ij,ij->i", a, np.cross(b, c)).sum() / 6.0)
         lo, hi = P.min(axis=0), P.max(axis=0)
         E = _mesh_edges(P, T)
-        info = {"format": "stl", "bbox": [lo.tolist(), hi.tolist()], "volume_mm3": abs(vol), "solids": None}
+        info = {"format": fmt[1:], "bbox": [lo.tolist(), hi.tolist()], "volume_mm3": abs(vol), "solids": None}
     else:
         raise RecipeError(f"Unsupported format {fmt}", "", "Import a STEP (.step/.stp) or STL file.")
     if len(T) > 400_000:
@@ -673,3 +677,5 @@ from .geomdiff import KERNEL_OPS as _DIFF_OPS  # noqa: E402  (what changed betwe
 OPS.update(_DIFF_OPS)
 from .instructions import KERNEL_OPS as _INSTR_OPS  # noqa: E402  (assembly instructions)
 OPS.update(_INSTR_OPS)
+from .recon import KERNEL_OPS as _RECON_OPS  # noqa: E402  (mesh to editable CAD)
+OPS.update(_RECON_OPS)
