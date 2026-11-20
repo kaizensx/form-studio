@@ -124,7 +124,7 @@ Rectangle {
         function onChatRecallChanged() { if (Store.chatRecall) { ta.text = Store.chatRecall; ta.cursorPosition = ta.text.length } } }
 
     FileDialog { id: pick; title: "Attach files"; fileMode: FileDialog.OpenFiles
-        nameFilters: ["Images, PDFs, STEP and STL (*.png *.jpg *.jpeg *.webp *.gif *.bmp *.pdf *.step *.stp *.stl)"]
+        nameFilters: ["Images, PDFs, CAD and meshes (*.png *.jpg *.jpeg *.webp *.gif *.bmp *.pdf *.step *.stp *.stl *.3mf *.obj)"]
         onAccepted: Store.attachFiles(selectedFiles) }
     Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.rule }
 
