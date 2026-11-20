@@ -144,6 +144,19 @@ TEXT AND MARKS: form.marks   PATTERNS: form.patterns
 WORKFLOW
   design_guide -> write source -> create_design (or update_design) -> render -> get_project (checks, slice)
   -> fix -> request_release. Parameter-only changes: preview_change / commit_change, as for any project.
+
+  Anything complex (a mechanism, an organic or styled form, a texture, several parts) is staged, and the tools
+  enforce it:
+    1. design_brief: requirements, key dimensions with their source, constraints, style, and the unknowns (list
+       them; never guess a dimension that changes fit, load or safety: ask_user / ask_measurement).
+    2. design_guide(topic=...) for the topics the brief needs, and design_examples(query) for a close exemplar.
+       Read the exemplar's source: it shows the construction a top designer would use.
+    3. plan_design: every feature with HOW it is built (which form.craft helper, which sections), the parts, key
+       dimensions, mechanisms with their clearances, textures with their tier, and the risks.
+    4. create_design(..., plan=<brief id>): it returns a six-view sheet and a section. LOOK at both.
+    5. critique(project): close-ups per feature, metrics, a checklist. Fix, update_design, critique again.
+       A briefed design cannot be released until its head revision has a critique pass.
+  The helper library for all of this is form.craft (topics surfacing, mechanisms, organic, texture).
 """
 
 EXAMPLE = '''\
@@ -212,3 +225,121 @@ class Design(Recipe):
                  note="Press the lid on, plug first."),
         ])
 '''
+
+
+# ---- topics: design_guide(topic=...) ---------------------------------------------------------------------------------
+
+SURFACING = """\
+SURFACING (form.craft.surfaces)  from form import craft
+A designed object is made of sections and transitions, not of boxes. Decide the sections first, then skin them.
+  craft.superellipse(a, b, n)                 points; n = 2 ellipse, 2.5-4 product "soft square", >= 6 rounded rectangle
+  craft.superellipse_face(a, b, n, z=, center=, squash_front=)    a section Face at height z
+  craft.spline_profile(points, plane=Plane.XZ, closed=True)       smooth Face (or Wire) through points
+  craft.loft_sections([face, face, ..., Vertex(tip)])             smooth B-spline skin; ruled loft as fallback (noted)
+  craft.sweep_spline(profile_face, path_points)                   profile placed normal to the path start
+  craft.revolve_profile([(r, z), ...], spline=True)               vases, knobs, lamp bodies, wheels
+  craft.shell(solid, t, openings=craft.faces_at(solid, "top"))    hollow it; keeps the outside
+  craft.safe_fillet(solid, edges, r)          tries r, 75 %, 50 %, 25 %, then leaves the edge (noted); never crashes
+  craft.variable_fillet(solid, edges, r0, r1) a blend that grows along the edge
+  craft.thicken(face, t)                      a solid from a surface
+  craft.notes()                               what fell back, to report in derived() or your reply
+Rules:
+  * 5-12 sections for a body; the same point count and start angle on every section, or the loft twists.
+  * Make sections follow a law (an ellipse in elevation, a power curve) rather than hand-picked numbers: the
+    surface then flows. craft.dome_sections() does this.
+  * Fillet BEFORE shelling where you can (a shell follows the rounds), and big radii first, small ones last.
+  * Tangent and coincident faces break booleans: overlap cutters by 0.2 mm and avoid exactly touching surfaces.
+"""
+
+MECHANISMS = """\
+MECHANISMS (form.craft.mechanisms, form.craft.fits, form.parts)
+Each returns a Mech: .shapes {name: solid}, .dims (value, unit, provenance, source), .checks, .axis/.origin for joints.
+  craft.pin_hinge(length, outer_d, pin_d, knuckles, clearance)    print-in-place; leaf_a carries the pin
+  craft.living_hinge(width, gap, web_t, material="PP")           warns for PLA/PETG
+  craft.cantilever_snap(length, thickness, width, undercut)       strain = 1.5 t y / L^2 (computed) vs allowed
+  craft.annular_snap(d, undercut, height, wall)                   male bead + groove cutter, hoop strain y / d
+  craft.bayonet(d, height, lugs, twist)    craft.dovetail(length, width, height, angle)    craft.detent(ball_d, depth)
+  craft.ratchet(teeth, od)    craft.cam(base_r, lift, rise, dwell_top, fall, follower_r)  (pressure angle checked)
+  craft.four_bar(ground, crank, coupler, rocker)   Grashof class, swing, transmission angle; .shapes = printable links
+  craft.gear_train(module, teeth=(14, 28, 14))      craft.planetary(module, sun, planet, planets)   (via form.parts)
+  craft.iso_fit("H7/g6", d)   craft.bearing_fit("608", "shaft")   ISO 286 limits; FDM holds ~0.15 mm, say so
+Rules:
+  * Every moving pair has a clearance per side you can name (FDM: 0.2-0.35 mm sliding, 0.35-0.5 print-in-place).
+  * Declare the motion: assembly() with hinge()/slide() joints and Mate() for pins and threads, so Form Studio sweeps it.
+  * Put strain, ratio, centre distance and clearance in derived() with their source (Mech.derived(feature)).
+  * Snap hooks bend along the layers: lay the beam flat in XY. Living hinges need PP, PE, nylon or TPU.
+"""
+
+ORGANIC = """\
+ORGANIC FORMS (form.craft.organic)
+  craft.section_body([dict(z, a, b, n, cx, cy, squash), ...], tip=(x, y, z))   loft of superellipse sections
+  craft.dome_sections(length, width, height, crown_back=, squash_front=)       sections of a smooth dome
+  craft.helmet_shell(length, width, height, wall, skirt)                       outer form + hollow shell
+  craft.grip(length, d_max, d_min, flat, finger_grooves)                       revolved spline, oval section
+  craft.handle(span, rise, section_w, section_h)                               swept D-handle with feet
+Method: start from the object's real measurements (a head is about 200 x 160 mm, a helmet adds 25-35 mm a side; a
+power grip is 30-38 mm across), draw the side silhouette and the top silhouette as curves, and derive the sections
+from them. Asymmetry front to back is what makes organic things read as designed (a helmet's crown sits behind
+centre; a grip swells at the palm, not the middle). Cut openings with smooth cutters (lofted or swept), not boxes,
+and round their edges.
+"""
+
+TEXTURE = """\
+TEXTURE, two honest tiers
+  B-rep (the CAD solid carries it; STEP, STL, checks and slices all include it). Capped at about 2000 elements:
+    craft.knurl(diameter, height, pitch, depth, kind="diamond"|"straight")      exact faceted knurl, chamfered ends
+    craft.spiral_ribbed_body([(r, z), ...], ribs, rib_depth, twist)            one smooth skin with spiral ribs
+    craft.wrapped_ribs(radius, height, count, rib_w, rib_h, twist)             ribs to fuse onto a cylinder
+    craft.emboss_cells(w, d, cell, height, kind="hex"|"diamond"|"dots"|"pyramids")   raised tiles for a flat face
+    form.patterns: hex_vents, perforation_grid, slot_array, knurl, grip_ribs (cutters / adds with computed webs)
+  Mesh texture (fine surface: leather grain, stone, carbon-like cells, sand-cast): declare it on the design; the STL,
+  OBJ, GLB and the renders carry it, the STEP keeps the smooth body. Say so: "mesh texture; STEP carries the smooth body".
+    from form.craft import MeshTexture
+    def mesh_texture(self, v):
+        return [MeshTexture("cells", amplitude=0.4, scale=5, features=["shell"])]
+    kinds: noise, cells, grain, hex, knurl, ribs, heightmap (image=, projection=planar|cylindrical|spherical)
+    amplitude mm (negative presses in), scale mm, features = which feature ids, edge_falloff mm at borders and creases.
+Choose: if a person sees it from a metre away or it does work (grip, alignment), make it B-rep. If it is felt or seen
+up close, make it a mesh texture. Printed texture needs >= 2 nozzle widths in plan and >= 0.3 mm depth to survive.
+"""
+
+AESTHETICS = """\
+AESTHETICS: what separates a designed object from a crude one
+  * One idea for the whole form (a soft square, a tapered cylinder, a dome), repeated in every detail.
+  * Proportion: relate the main masses (1:1.414, 1:1.618, 1:2); avoid ratios that are almost but not quite equal.
+  * Hierarchy of radii: big radii on the big form, smaller on secondary edges, the smallest on details. Never leave an
+    edge a hand or eye meets sharp: 0.5-1 mm on printed details, 2-6 mm on hand-held forms.
+  * Continuity: surfaces flow (smooth lofts), with crisp deliberate breaks where you want a line. A face that meets
+    another at a random 10 deg reads as a mistake.
+  * Openings, vents and seams follow the form: align them to the body's lines, space them on a rhythm, inset them.
+  * Detail density: a large plain surface needs one considered detail (a parting line, a texture field, an inset).
+  * Check every view (sheet), the section and the close-ups (critique). If any view looks like a primitive, it is not done.
+"""
+
+DFM = """\
+DESIGN FOR 3D PRINTING (purpose: print)
+  * Lay the part as it prints: the biggest flat face on z = 0. Overhangs <= 45 deg, or chamfer instead of fillet on
+    bottom edges; bridges <= 20 mm; teardrop or diamond holes when horizontal and > 8 mm.
+  * Walls >= 3 perimeters (1.2 mm on a 0.4 nozzle); ribs 50-70 % of the wall they stiffen.
+  * Clearances per side: press 0.05-0.1, sliding 0.2-0.3, print-in-place 0.35-0.5 mm. Calibrate with a coupon.
+  * Layers are the weak direction: snap beams, hooks and pins in XY; screw bosses with heat-set inserts (form.parts).
+  * Texture survives only above about 2 nozzle widths in plan and 0.3 mm in depth.
+  * Large shells (a helmet) do not fit most beds in one piece: split them with alignment keys or say what bed it needs.
+"""
+
+TOPICS = {"core": None, "surfacing": SURFACING, "mechanisms": MECHANISMS, "organic": ORGANIC, "texture": TEXTURE,
+          "aesthetics": AESTHETICS, "dfm": DFM}
+
+
+def topic(name: str = "core", purpose: str | None = None) -> dict:
+    """The guide for one topic. core is the contract, the rules and an example that builds; dfm applies only to
+    designs for printing."""
+    name = (name or "core").strip().lower()
+    if name not in TOPICS:
+        raise KeyError(name)
+    if name == "core":
+        return {"topic": "core", "guide": GUIDE, "example_source": EXAMPLE, "topics": list(TOPICS)}
+    if name == "dfm" and purpose == "model":
+        return {"topic": "dfm", "guide": "Not applicable: this design is a 3D model, not for printing. Design for its "
+                "process (CNC, moulding, rendering) instead; print rules would only constrain it.", "topics": list(TOPICS)}
+    return {"topic": name, "guide": TOPICS[name], "topics": list(TOPICS)}

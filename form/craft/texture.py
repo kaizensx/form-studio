@@ -188,9 +188,10 @@ def spiral_ribbed_body(profile, ribs: int = 24, rib_depth: float = 2.0, twist: f
 
 
 def wrapped_ribs(radius: float, height: float, count: int = 12, rib_w: float = 2.0, rib_h: float = 1.0,
-                 twist: float = 0.0, z0: float = 0.0):
-    """count ribs standing on a cylinder of `radius` (fuse them onto it), each rib_w wide and rib_h proud, running
-    from z0 for `height`, optionally twisted (degrees over the height)."""
+                 twist: float = 0.0, z0: float = 0.0, core: bool = True):
+    """count ribs standing on a cylinder of `radius`, each rib_w wide and rib_h proud, running from z0 for `height`,
+    optionally twisted (degrees over the height). core=True returns them fused with the cylinder (one solid);
+    core=False the ribs alone, to fuse onto a body of your own."""
     R, H = num(radius, "radius", lo=2), num(height, "height", lo=0.5)
     n = num(count, "count", lo=1, integer=True)
     _cap(n, "wrapped_ribs", ["count"])
@@ -202,15 +203,18 @@ def wrapped_ribs(radius: float, height: float, count: int = 12, rib_w: float = 2
         f = Rot(0, 0, 360 * i / n) * sec
         r = Solid.extrude_linear_with_rotation(f, (0, 0, 0), (0, 0, H), tw) if tw else extrude(f, H)
         ribs.append(Pos(0, 0, z0) * r)
+    if core:
+        ribs.insert(0, Pos(0, 0, z0) * Cylinder(R, H, align=BOTTOM))
     out = ribs[0].fuse(*ribs[1:]) if len(ribs) > 1 else ribs[0]
     return one(out.clean() if hasattr(out, "clean") else out)
 
 
 def emboss_cells(w: float, d: float, cell: float = 6.0, height: float = 0.6, kind: str = "hex", gap: float = 0.8,
-                 margin: float = 0.0, plane: Plane = Plane.XY):
+                 margin: float = 0.0, plane: Plane = Plane.XY, base: float = 0.0):
     """Raised cells covering a w x d region centred on the plane's origin, standing `height` proud of it: kind "hex"
     (hexagon tiles), "diamond" (rotated squares), "dots" (round studs) or "pyramids" (four-sided, a grip pattern).
-    gap is the groove between cells. Fuse the result onto a flat face (or place it with plane=...)."""
+    gap is the groove between cells. Fuse the result onto a flat face (or place it with plane=...); base > 0 adds a
+    backing plate that thick under the cells (z from -base to 0), so the result is one solid (a grip pad)."""
     W, D = num(w, "w", positive=True), num(d, "d", positive=True)
     c, h, g = num(cell, "cell", lo=1), num(height, "height", lo=0.1), num(gap, "gap", lo=0.2)
     need(kind in ("hex", "diamond", "dots", "pyramids"), f"emboss_cells: unknown kind {kind!r}",
@@ -238,7 +242,7 @@ def emboss_cells(w: float, d: float, cell: float = 6.0, height: float = 0.6, kin
     _cap(len(pts), "emboss_cells", ["cell"])
     s = c - g
     if kind == "hex":
-        unit = extrude(RegularPolygon(s / 2, 6, major_radius=False), h)
+        unit = Rot(0, 0, 30) * extrude(RegularPolygon(s / 2, 6, major_radius=False), h)   # pointy-top: flats face X
     elif kind == "diamond":
         unit = Rot(0, 0, 45) * Box(s / math.sqrt(2), s / math.sqrt(2), h, align=BOTTOM)
     elif kind == "dots":
@@ -249,5 +253,7 @@ def emboss_cells(w: float, d: float, cell: float = 6.0, height: float = 0.6, kin
                                 Wire.make_polygon([Vector(-s / 10, -s / 10, h), Vector(s / 10, -s / 10, h),
                                                    Vector(s / 10, s / 10, h), Vector(-s / 10, s / 10, h)], close=True)])
     cells = [Pos(x, y, 0) * unit for x, y in pts]
+    if base > 0:
+        cells.insert(0, Pos(0, 0, -num(base, "base", positive=True)) * Box(W, D, base + 0.01, align=BOTTOM))
     out = cells[0].fuse(*cells[1:]) if len(cells) > 1 else cells[0]
     return plane * one(out)

@@ -87,8 +87,9 @@ def _polygon_face(pts, plane=Plane.XZ):
 
 def _prism_xz(pts, length):
     """A prism of an (x, z) outline, extruded along +Y by length and centred on Y."""
-    f = _polygon_face(pts, Plane.XZ)                 # Plane.XZ normal is -Y: extrude moves it toward -Y
-    return Pos(0, length / 2, 0) * extrude(f, length)
+    p = extrude(_polygon_face(pts, Plane.XZ), length)
+    bb = p.bounding_box()
+    return Pos(0, -(bb.min.Y + bb.max.Y) / 2, 0) * p
 
 
 # ---- hinges ---------------------------------------------------------------------------------------------------

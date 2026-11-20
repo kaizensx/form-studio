@@ -64,6 +64,9 @@ Rules:
   Sketches from Form Studio carry structured JSON: it is authoritative over the picture; stated dimensions override
   drawn lengths. STEP/STL: import_reference. PDF drawings: read_document. Download only files the person gave you.
 - If the message has a "Purpose:" line, respect it: "just a 3D model" means no slicing and no print talk.
+- Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
+  design_guide(topic=...) and design_examples -> plan_design -> create_design(plan=...) -> look at the sheet and
+  section -> critique -> update_design. Analyse like a top engineer and designer before writing code.
 """
 
 S: dict[str, Any] = {"studio": None, "bench": {"url": None}, "lock": threading.Lock()}
@@ -231,13 +234,97 @@ def build() -> MCPServer:
                            "form": "free design choices"}}
 
     @mcp.tool(annotations=RO)
-    async def design_guide() -> dict:
+    async def design_guide(topic: str = "core", purpose: str | None = None) -> dict:
         """Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
-        holder, mechanism...). Returns the contract for a design written as code, the rules, and a complete example
-        that builds. Then call create_design."""
-        from .design_guide import EXAMPLE, GUIDE
-        return {"guide": GUIDE, "example_source": EXAMPLE,
-                "built_in_recipes": "dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob (use create_project for these)"}
+        holder, mechanism...). topic="core" (default) returns the contract for a design written as code, the rules,
+        the staged workflow and a complete example that builds. Other topics, for complex designs: surfacing,
+        mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicable when purpose="model").
+        They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
+        textures. Then design_examples for a close exemplar, and create_design."""
+        from . import design_guide as dg
+        try:
+            out = dg.topic(topic, _purpose(purpose))
+        except KeyError:
+            raise ToolError(f"Unknown topic “{topic}”. Topics: {', '.join(dg.TOPICS)}.")
+        if out["topic"] == "core":
+            out["built_in_recipes"] = ("dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob "
+                                       "(use create_project for these)")
+        return out
+
+    @mcp.tool(annotations=RW)
+    async def design_brief(name: str, goal: str, requirements: list[str] | None = None,
+                           dimensions: dict[str, Any] | None = None, constraints: list[str] | None = None,
+                           unknowns: list[str] | None = None, style: str = "", purpose: str | None = None,
+                           references: list[str] | None = None, project: str | None = None, ctx: Context = None) -> dict:
+        """Stage 1 of a complex design: store the structured brief before any geometry. goal: what it is and does.
+        requirements: what it must do. dimensions: {name: {value, unit, source}} where source is measured, specified
+        (datasheet, standard) or assumed. constraints: limits (bed size, material, process). unknowns: what you could
+        not settle; list them, never guess them (ask_user / ask_measurement for ones that change fit, load or
+        safety). style: the design language. project: attach to an existing project instead of a new design.
+        Returns the brief id, whether it is complex (heuristic) and which design_guide topics and exemplars to read."""
+        st = studio()
+        from . import exemplars, staged
+        b = await _run(staged.save_brief, st, name, goal, requirements, dimensions, constraints, unknowns, style,
+                       _purpose(purpose), references, project)
+        a = b["assessment"]
+        act(project, "design", f"Brief: {name}", ctx)
+        return {"brief": b["id"] if not project else project, "complex": a["complex"], "reasons": a["reasons"],
+                "evidence": a["evidence"], "read_topics": staged.topics_for(a["families"]),
+                "examples": [{"name": e["name"], "title": e["title"]} for e in exemplars.search(" ".join([name, goal, style]), 3)],
+                "unknowns": b["unknowns"],
+                "next": "design_guide(topic=...) for each topic, design_examples(name=...) for the closest exemplar, then "
+                        "plan_design(brief=...)."}
+
+    @mcp.tool(annotations=RW)
+    async def plan_design(brief: str, features: list[dict], parts: list[dict] | None = None,
+                          key_dimensions: dict[str, Any] | None = None, mechanisms: list[str] | None = None,
+                          textures: list[str] | None = None, risks: list[str] | None = None, approach: str = "",
+                          references_used: list[str] | None = None) -> dict:
+        """Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id).
+        features: [{id, label, how, part?, dims?}] in build order; id becomes the Feature id in the code, how names
+        the construction (e.g. "craft.loft_sections through 9 superellipse sections", "craft.pin_hinge 0.35 mm").
+        parts: [{id, label, material?}]. key_dimensions: {name: value or {value, unit, why}}. mechanisms: each with its
+        clearance and motion. textures: each with its tier (B-rep or mesh texture). risks: what could make it fail and
+        how you will check it. A complex brief needs at least 3 features and named risks.
+        Then create_design(..., plan=<brief id>)."""
+        st = studio()
+        from . import staged
+        r = await _run(staged.save_plan, st, brief, features, parts, key_dimensions, mechanisms, textures, risks,
+                       approach, references_used)
+        return {**r, "next": f"Write the code with these feature ids, then create_design(..., plan='{brief}') "
+                             "(or update_design for an existing project). Look at the sheet and the section it returns."}
+
+    @mcp.tool(annotations=RO)
+    async def design_examples(query: str = "", name: str = "") -> dict:
+        """Complete, high-quality example designs (build123d + form.craft) to learn construction from: a textured
+        helmet shell, a planetary gearbox, a hinged case with a snap latch, an ergonomic handle, a knurled knob, a
+        spiral-ribbed vase and more. query: words to search; name: one exemplar, returned with its full source.
+        They are references for you, never projects, and never shown to the person as designs."""
+        from . import exemplars
+        if name:
+            try:
+                return exemplars.get(name)
+            except KeyError:
+                raise ToolError(f"Unknown exemplar “{name}”. Known: {', '.join(e['name'] for e in exemplars.catalogue())}.")
+        hits = exemplars.search(query, 5) if query else exemplars.catalogue()
+        return {"examples": hits, "next": "design_examples(name=...) returns the full source and the lessons."}
+
+    @mcp.tool(annotations=RW, structured_output=False)
+    async def critique(project: str, notes: str = "", ctx: Context = None) -> list:
+        """Stage 5: look closely and measure. Returns a close-up render of each feature, computed metrics (smallest
+        fillet, sharp-edge fraction, symmetry, proportions, surface mix, sliver faces, planned features missing) and
+        a checklist to answer by looking. All of it is heuristic evidence: numbers to prompt a look, not a verdict.
+        Records one critique pass for the head revision (with your notes: what you saw, what you will change);
+        a briefed or planned design cannot be released before its head revision has one."""
+        st = studio()
+        from . import critique as crit
+        r = await _run(crit.run, st, project, notes)
+        act(project, "look", "Critiquing the design: close-ups, metrics, checklist", ctx)
+        out: list = []
+        if r.get("closeups"):
+            out.append(Image(path=r["closeups"]))
+        out.append(json.dumps({k: v for k, v in r.items() if k != "closeups"}, indent=1, default=str))
+        return out
 
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True), structured_output=False)
     async def read_document(source: str, pages: str = "1") -> list:
@@ -260,10 +347,28 @@ def build() -> MCPServer:
                    + (f"\n\nText on the page:\n{r['text'][:4000]}" if r["text"] else ""))
         return out
 
-    @mcp.tool(annotations=RW)
+    async def _with_views(st, pid: str, payload: dict) -> list:
+        """The tool's result as text plus the six-view sheet and the section (form/critique.py design_views)."""
+        from . import critique as crit
+        out: list = [json.dumps(payload, indent=1, default=str)]
+        try:
+            v = await _run(crit.design_views, st, pid)
+        except Exception as e:                             # a design that built but cannot be drawn says so
+            out.append(f"Views could not be rendered: {e}")
+            return out
+        out += [Image(path=v["sheet"]), v["caption"]]
+        if v.get("section"):
+            out += [Image(path=v["section"]), "Section through the centre (cut face picked out). Check walls, voids and "
+                    "clearances."]
+        elif v.get("section_error"):
+            out.append(v["section_error"])
+        return out
+
+    @mcp.tool(annotations=RW, structured_output=False)
     async def create_design(name: str, source: str, brief: str = "", values: dict[str, float] | None = None,
                             run: bool = True, language: str = "python", references: list[str] | None = None,
-                            purpose: str | None = None, process: str | None = None, ctx: Context = None) -> dict:
+                            purpose: str | None = None, process: str | None = None, plan: str = "",
+                            ctx: Context = None) -> list:
         """Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
         built with build123d. FORM builds it, and with run=True exports, checks and slices it. Load or build errors come
         back with the line and a hint; fix and call again. Then render(view="sheet") and look at it.
@@ -275,25 +380,34 @@ def build() -> MCPServer:
         OpenSCAD output is a mesh: no STEP, no B-rep checks (reported as not available, never faked).
         references: absolute paths of STEP/STL parts to import first, so a Python design can use self.reference("name.step").
         purpose: "print" (for 3D printing) or "model" (just a 3D model; not sliced, no print checks). Omitted: the
-        person's default. process (models only): cnc, laser, injection, casting, sheet_metal, render, cad, other."""
+        person's default. process (models only): cnc, laser, injection, casting, sheet_metal, render, cad, other.
+        plan: the brief id from design_brief/plan_design. A complex brief (a mechanism, an organic or styled form, a
+        texture, several parts) is refused without one. Returns the project, a six-view sheet and a section: look."""
         st = studio()
+        from . import staged
+        if language == "python":
+            await _run(staged.require_plan, st, f"{name}. {brief}", source, plan)
         act(None, "design", f"Writing a new design: {name}", ctx)
         p = await _run(st.create_design, name, source, brief, values, language, references, _purpose(purpose), process)
         act(p["id"], "commit", f"Created {name} (r01)", ctx)
+        if plan:
+            await _run(staged.attach_pending, st, p["id"], plan)
         if run:
             jid = st.run(p["id"])
             await _wait_job(st, jid, 50)
-        return await _run(digest, st, p["id"])
+        res = await _run(digest, st, p["id"])
+        return await _with_views(st, p["id"], res)
 
-    @mcp.tool(annotations=RW)
+    @mcp.tool(annotations=RW, structured_output=False)
     async def update_design(project: str, source: str, note: str = "", values: dict[str, float] | None = None,
                             expect_head: int | None = None, run: bool = True, language: str | None = None,
-                            ctx: Context = None) -> dict:
+                            ctx: Context = None) -> list:
         """Replace a design's code as a new revision (history keeps every version). Existing parameter values carry over;
         changing a default does not change a saved value, so pass values={...} to change them. New parameters start at
         their defaults. Use preview_change/commit_change instead when only values change. language defaults to the
         project's current one ("python" or "openscad"). An unusable assembly() declaration is refused with the reason,
-        and no revision is made."""
+        and no revision is made. Returns the result with a six-view sheet and a section of the new revision: look.
+        For a briefed design, critique(project) the revision before asking for release."""
         st = studio()
         p = await _run(lambda: st.update_design(st.load(project), source, note, values, _origin(ctx), expect_head, language))
         act(project, "commit", f"r{p['head']:02d}: {note or 'design code updated'}", ctx)
@@ -302,7 +416,7 @@ def build() -> MCPServer:
             jid = st.run(project)
             res["pipeline"] = job_digest(await _wait_job(st, jid, 45))
         res["project"] = await _run(digest, st, project)
-        return res
+        return await _with_views(st, project, res)
 
     @mcp.tool(annotations=RO)
     async def get_design_source(project: str, rev: int | None = None) -> dict:
