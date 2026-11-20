@@ -64,7 +64,7 @@ Rules:
 
 ## Tools at a glance
 
-78 tools. Read-only tools never change a project.
+79 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
