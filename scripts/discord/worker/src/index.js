@@ -96,7 +96,8 @@ async function cmdHelp(env) {
     `🛟 **Stuck?** Post in ${await mention(env, "help")} with a tag; the bot answers with the right guides.\n` +
     `📘 **Learning?** ${await mention(env, "guides")}, or \`/guide\`.\n` +
     `🧩 **Building blocks?** ${await mention(env, "recipes")}, or \`/recipe\`.\n` +
-    `🖨️ **Printers and slicers:** ${await mention(env, "printers")} · 🤖 **Agents:** ${await mention(env, "agents")}\n` +
+    `🧠 **Design talk:** ${await mention(env, "design-tips")} · 🧬 **Mesh to CAD:** ${await mention(env, "mesh-to-cad")} · 🤖 **Agents:** ${await mention(env, "agents")}\n` +
+    `🖨️ **3D printing (optional):** ${await mention(env, "printers")}\n` +
     `🐞 **A bug you can reproduce?** [Open an issue](${C.repo}/issues/new/choose).` }],
     components: [row(linkBtn("Docs", C.docs, "📘"), linkBtn("Download", C.repo + "/releases/latest", "⬇️"))] });
 }
@@ -142,7 +143,7 @@ async function cmdRank(env, i) {
   return reply({ embeds: [{ color: C.colors.datum, title: `📈 Level ${level}`, footer: footer("Levels"),
     description: `<@${who}>\n\`${bar(into, next)}\` ${into} / ${next} XP\n\n` +
       `🏅 Rank **#${place || "—"}** · 💬 ${me.msgs || 0} messages · 🙏 ${me.kudos || 0} thanks` +
-      (nextRole ? `\nNext role: **${nextRole[1]}** at level ${nextRole[0]}` : "\nEvery level role earned. 🏭") }] }, false);
+      (nextRole ? `\nNext role: **${nextRole[1]}** at level ${nextRole[0]}` : "\nEvery level role earned. 🏗️") }] }, false);
 }
 
 async function cmdLeaderboard(env) {
@@ -173,10 +174,10 @@ async function cmdThanks(env, i) {
 function cmdShowcaseModal() {
   const input = (id, label, style, required, placeholder, max = 200) =>
     row({ type: 4, custom_id: id, label, style, required, placeholder, max_length: max });
-  return { type: 9, data: { custom_id: "showcase", title: "Show a part you designed", components: [
+  return { type: 9, data: { custom_id: "showcase", title: "Show something you designed", components: [
     input("title", "What is it?", 1, true, "Desk-edge cable clip", 90),
-    input("story", "What is it for, and how did you make it?", 2, true, "Holds three cables on my 22 mm desk…", 1500),
-    input("setup", "Printer, filament and slicer", 1, false, "Bambu P1S · PLA · Bambu Studio", 120),
+    input("story", "What is it for, and how did you make it?", 2, true, "A planetary gearbox: brief, plan, two critiques…", 1500),
+    input("setup", "Agent, model and what you exported", 1, false, "Claude Code · Opus · STEP and a render", 120),
     input("image", "Link to a photo or render (optional)", 1, false, "https://…png", 400),
     input("file", "Link to the .formstudio file (optional)", 1, false, "https://…", 400)] } };
 }
@@ -189,7 +190,7 @@ async function showcaseSubmit(env, i) {
   const img = /^https:\/\/\S+$/.test(v.image) ? v.image : null;
   const emb = { color: C.colors.datum, title: `🧊 ${v.title}`, description: v.story, footer: footer("Showcase"),
                 author: { name: u.global_name || u.username, icon_url: u.avatar ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png` : undefined },
-                fields: v.setup ? [{ name: "🖨️ Setup", value: v.setup, inline: false }] : [],
+                fields: v.setup ? [{ name: "🛠️ Made with", value: v.setup, inline: false }] : [],
                 ...(img ? { image: { url: img } } : {}) };
   const tags = Object.fromEntries((forum.available_tags || []).map((t) => [t.name, t.id]));
   const t = await api(env, "POST", `/channels/${forum.id}/threads`, {
@@ -275,7 +276,7 @@ async function markSolved(env, i) {
 
 async function startHere(env) {
   return reply({ embeds: [{ color: C.colors.blueprint, title: "🧭 Where do I start?", footer: footer("Start"), description:
-    `1️⃣ Say hi in ${await mention(env, "introductions")}: your printer, your agent, what you want to make.\n` +
+    `1️⃣ Say hi in ${await mention(env, "introductions")}: what you want to design and which agent you use.\n` +
     `2️⃣ Read the first guide in ${await mention(env, "guides")}, then download Form Studio.\n` +
     `3️⃣ Make something and post it in ${await mention(env, "showcase")}, or enter ${await mention(env, "challenges")}.\n` +
     `4️⃣ Stuck? ${await mention(env, "help")}. Everyone was a beginner once.` }],

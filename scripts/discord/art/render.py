@@ -60,8 +60,12 @@ def guide(i, title, tag, art):
         pic = f"<div style='position:absolute;right:70px;top:70px;width:660px;height:660px;display:grid;" \
               f"grid-template-columns:1fr 1fr;gap:20px'>{cells}</div>"
     else:
-        pic = f"<img src='{(README / (art + '-dark.svg')).as_uri()}' style='position:absolute;right:90px;top:56px;" \
-              "height:688px;border-radius:24px;box-shadow:0 30px 120px rgba(0,0,0,.55)'>"
+        # inlined, not <img>: the drawings embed their fonts, which an <img> SVG may refuse to load
+        f = README / (art + "-dark.svg")
+        svg = (f if f.exists() else README / f"feature-{art}-dark.svg").read_text(encoding="utf-8")
+        svg = svg.replace('width="414" height="436"', 'width="653" height="688"', 1)
+        pic = f"<div style='position:absolute;right:90px;top:56px;border-radius:24px;overflow:hidden;" \
+              f"box-shadow:0 30px 120px rgba(0,0,0,.55);line-height:0'>{svg}</div>"
     body = f"""{pic}
 <div style='position:absolute;left:96px;top:120px;width:{560 if art == "hero" else 700}px'>
  <div class='kicker'>Guide {i:02d} <i>·</i> {html.escape(tag)}</div>

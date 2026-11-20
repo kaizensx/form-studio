@@ -10,27 +10,28 @@
   "roles": "🎭・roles",
   "announcements": "📣・announcements",
   "releases": "🚀・releases",
+  "showcase": "🧊・showcase",
+  "design-tips": "🧠・design-and-engineering",
+  "mesh-to-cad": "🧬・mesh-to-cad",
+  "agents": "🤖・agents-and-models",
   "general": "💬・general",
   "introductions": "🙋・introductions",
-  "showcase": "🧊・showcase",
   "wins-and-fails": "🍝・wins-and-fails",
   "off-topic": "🎲・off-topic",
-  "printers": "🖨️・printers-and-slicers",
-  "agents": "🤖・agents-and-models",
-  "design-tips": "📐・design-tips",
-  "calibration": "🧪・calibration",
+  "guides": "📘・guides",
+  "recipes": "🧩・recipes",
+  "help": "🛟・help",
+  "ideas": "💡・ideas",
   "challenges": "🏁・weekly-challenge",
   "polls": "🗳️・polls",
   "events": "📅・events",
   "lounge": "🔊 Lounge",
   "live": "🎙️ Live builds",
-  "guides": "📘・guides",
-  "recipes": "🧩・recipes",
-  "help": "🛟・help",
-  "ideas": "💡・ideas",
   "contributing": "🧑‍💻・contributing",
   "github": "🐙・github",
   "ci": "🧯・ci",
+  "printers": "🖨️・printers-and-slicers",
+  "calibration": "🧪・calibration",
   "mod-log": "🔒・mod-log"
  },
  "roles": {
@@ -38,11 +39,11 @@
   "🧑‍💻 Contributor": "🧑‍💻 Contributor",
   "🧩 Recipe author": "🧩 Recipe author",
   "🏆 Challenge winner": "🏆 Challenge winner",
-  "🏭 Print Farm": "🏭 Print Farm",
+  "🏗️ Architect": "🏗️ Architect",
   "⚙️ Assembly": "⚙️ Assembly",
   "🧊 Solid": "🧊 Solid",
-  "📏 Calibrated": "📏 Calibrated",
-  "🧱 First Layer": "🧱 First Layer",
+  "🧱 Extrude": "🧱 Extrude",
+  "📐 Sketch": "📐 Sketch",
   "🍎 macOS": "🍎 macOS",
   "🪟 Windows": "🪟 Windows",
   "🐧 Linux": "🐧 Linux",
@@ -50,7 +51,7 @@
   "🟠 Prusa": "🟠 Prusa",
   "🔵 Creality": "🔵 Creality",
   "🖨️ Other printer": "🖨️ Other printer",
-  "✏️ No printer yet": "✏️ No printer yet",
+  "🎨 I don't print": "🎨 I don't print",
   "🧡 Claude Code": "🧡 Claude Code",
   "⚪ Codex": "⚪ Codex",
   "🔷 Gemini CLI": "🔷 Gemini CLI",
@@ -69,7 +70,7 @@
   "Prusa": "🟠 Prusa",
   "Creality": "🔵 Creality",
   "Other printer": "🖨️ Other printer",
-  "No printer yet": "✏️ No printer yet",
+  "No printer yet": "🎨 I don't print",
   "Claude Code": "🧡 Claude Code",
   "Codex": "⚪ Codex",
   "Gemini CLI": "🔷 Gemini CLI",
@@ -77,16 +78,20 @@
   "Local models": "🖥️ Local models",
   "Release pings": "🔔 Release pings",
   "Creality / Elegoo / other": "🖨️ Other printer",
-  "Just designing": "✏️ No printer yet"
+  "Just designing": "🎨 I don't print",
+  "✏️ No printer yet": "🎨 I don't print",
+  "🧱 First Layer": "📐 Sketch",
+  "📏 Calibrated": "🧱 Extrude",
+  "🏭 Print Farm": "🏗️ Architect"
  },
  "levels": [
   [
    3,
-   "🧱 First Layer"
+   "📐 Sketch"
   ],
   [
    8,
-   "📏 Calibrated"
+   "🧱 Extrude"
   ],
   [
    15,
@@ -98,30 +103,10 @@
   ],
   [
    40,
-   "🏭 Print Farm"
+   "🏗️ Architect"
   ]
  ],
  "picker": [
-  [
-   "system",
-   "Your system",
-   [
-    "🍎 macOS",
-    "🪟 Windows",
-    "🐧 Linux"
-   ]
-  ],
-  [
-   "printer",
-   "What you print with",
-   [
-    "🟢 Bambu Lab",
-    "🟠 Prusa",
-    "🔵 Creality",
-    "🖨️ Other printer",
-    "✏️ No printer yet"
-   ]
-  ],
   [
    "agent",
    "Your agent or model",
@@ -134,6 +119,15 @@
    ]
   ],
   [
+   "system",
+   "Your system",
+   [
+    "🍎 macOS",
+    "🪟 Windows",
+    "🐧 Linux"
+   ]
+  ],
+  [
    "pings",
    "Notifications",
    [
@@ -141,11 +135,22 @@
     "🏁 Challenge pings",
     "📅 Event pings"
    ]
+  ],
+  [
+   "printer",
+   "3D printing (optional): your printer",
+   [
+    "🟢 Bambu Lab",
+    "🟠 Prusa",
+    "🔵 Creality",
+    "🖨️ Other printer",
+    "🎨 I don't print"
+   ]
   ]
  ],
  "guides": [
   [
-   "Install and first start",
+   "Install and choose what you make",
    "Start",
    [
     [
@@ -153,8 +158,8 @@
      "https://github.com/kaizensx/form-studio/releases/latest"
     ],
     [
-     "Setup and updates",
-     "https://kaizensx.github.io/form-studio/docs/features.html#setup-settings-and-updates"
+     "Setup and settings",
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#setup-settings-and-updates"
     ],
     [
      "Try it in your browser",
@@ -168,11 +173,41 @@
    [
     [
      "Start from anything",
-     "https://kaizensx.github.io/form-studio/docs/features.html#start-from-anything"
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#start-from-anything"
     ],
     [
      "Concepts and measurements",
-     "https://kaizensx.github.io/form-studio/docs/features.html#concepts-and-measurements"
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#concepts-and-measurements"
+    ]
+   ]
+  ],
+  [
+   "Design intelligence: brief, plan, critique",
+   "Design",
+   [
+    [
+     "Design intelligence",
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#design-intelligence"
+    ]
+   ]
+  ],
+  [
+   "Mechanisms, shapes and texture",
+   "Design",
+   [
+    [
+     "Design intelligence",
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#design-intelligence"
+    ]
+   ]
+  ],
+  [
+   "Mesh to editable CAD",
+   "Design",
+   [
+    [
+     "Mesh to editable CAD",
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#mesh-to-editable-cad"
     ]
    ]
   ],
@@ -182,39 +217,35 @@
    [
     [
      "Conversations and agents",
-     "https://kaizensx.github.io/form-studio/docs/features.html#conversations-and-agents"
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#conversations-and-agents"
     ],
     [
      "Any model, any provider",
-     "https://kaizensx.github.io/form-studio/docs/features.html#any-model-any-provider"
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#any-model-any-provider"
     ]
    ]
   ],
   [
-   "How a part is proved: checks and fit",
-   "Printing",
+   "Linked conversations and forks",
+   "Agents",
+   [
+    [
+     "Conversations and agents",
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#conversations-and-agents"
+    ]
+   ]
+  ],
+  [
+   "Checks and evidence",
+   "App",
    [
     [
      "Checks and evidence",
-     "https://kaizensx.github.io/form-studio/docs/features.html#checks-and-evidence"
-    ],
-    [
-     "Fit",
-     "https://kaizensx.github.io/form-studio/docs/features.html#fit"
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#checks-and-evidence"
     ],
     [
      "Verification",
      "https://kaizensx.github.io/form-studio/docs/verification.html"
-    ]
-   ]
-  ],
-  [
-   "Your slicer, your printers",
-   "Printing",
-   [
-    [
-     "Printers, slicing and print simulation",
-     "https://kaizensx.github.io/form-studio/docs/features.html#printers-slicing-and-print-simulation"
     ]
    ]
   ],
@@ -224,7 +255,7 @@
    [
     [
      "Revisions, branches and variants",
-     "https://kaizensx.github.io/form-studio/docs/features.html#revisions-branches-and-variants"
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#revisions-branches-and-variants"
     ]
    ]
   ],
@@ -234,7 +265,7 @@
    [
     [
      "Release",
-     "https://kaizensx.github.io/form-studio/docs/features.html#release"
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#release"
     ]
    ]
   ],
@@ -244,11 +275,11 @@
    [
     [
      "Moving and sharing designs",
-     "https://kaizensx.github.io/form-studio/docs/features.html#moving-and-sharing-designs"
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#moving-and-sharing-designs"
     ],
     [
      "Pictures",
-     "https://kaizensx.github.io/form-studio/docs/features.html#pictures-renders-share-cards-animations"
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#pictures-renders-share-cards-animations"
     ]
    ]
   ],
@@ -258,11 +289,11 @@
    [
     [
      "CLI",
-     "https://kaizensx.github.io/form-studio/docs/cli.html"
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/CLI.md"
     ],
     [
      "MCP tools",
-     "https://kaizensx.github.io/form-studio/docs/mcp.html"
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/MCP.md"
     ],
     [
      "Architecture",
@@ -283,24 +314,43 @@
      "https://kaizensx.github.io/form-studio/docs/recipes.html"
     ]
    ]
+  ],
+  [
+   "3D printing (optional): slicers, printers and fit",
+   "3D printing",
+   [
+    [
+     "3D printing",
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#3d-printing-optional"
+    ],
+    [
+     "Printers and slicing",
+     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#printers-slicing-and-print-simulation"
+    ]
+   ]
   ]
  ],
  "help_guides": {
-  "Install": [
-   "Install and first start"
+  "Setup": [
+   "Install and choose what you make"
   ],
   "Agents & models": [
-   "Agents and models"
+   "Agents and models",
+   "Linked conversations and forks"
   ],
-  "Printers & slicers": [
-   "Your slicer, your printers"
+  "Designing": [
+   "Design intelligence: brief, plan, critique",
+   "Mechanisms, shapes and texture"
   ],
-  "Checks & fit": [
-   "How a part is proved: checks and fit"
+  "Mesh to CAD": [
+   "Mesh to editable CAD"
   ],
-  "Export": [
+  "Export & CAD exchange": [
    "Release a design",
    "Move and share designs"
+  ],
+  "3D printing": [
+   "3D printing (optional): slicers, printers and fit"
   ],
   "Bug": []
  },
@@ -319,77 +369,67 @@
   [
    "Desk-edge cable clip",
    "A clip that holds three cables along the edge of a desk 18–25 mm thick.",
-   "Prints without supports. Show the fit on your own desk."
+   "Show it on a desk, rendered or real, with the fit you chose."
   ],
   [
-   "A bin for your smallest tool",
-   "A Gridfinity bin shaped around the smallest tool you own.",
-   "Measure the tool and say how you measured it."
+   "A planetary gear stage",
+   "A planetary stage with a 1:4 or 1:5 ratio that a hand crank can turn.",
+   "Post the ratio, the tooth counts and the critique's numbers."
   ],
   [
-   "A hook that holds 2 kg",
-   "A wall or pegboard hook that carries 2 kg without creeping.",
-   "Show the checks, and a photo with the weight if you printed it."
+   "A textured grip",
+   "A handle or grip with a texture you would want to hold: knurl, ribs or a fine mesh texture.",
+   "Say which tier the texture is (CAD geometry or mesh texture) and why."
   ],
   [
-   "Headphone stand under 60 g",
-   "A stand for over-ear headphones that weighs less than 60 g of filament.",
-   "Post the slicer's grams. Make it lighter is allowed."
+   "A product shell",
+   "The housing of a small product: a remote, a speaker, a mouse. Lofted, not boxy.",
+   "Show the six-view sheet and the section."
+  ],
+  [
+   "Mesh to CAD",
+   "Take an STL you own and rebuild it as editable CAD with Make editable.",
+   "Post the layer reached, the Hausdorff distance and one edit you made."
+  ],
+  [
+   "A print-in-place hinge",
+   "A case or a box with a hinge that works straight out of the build.",
+   "Show it opening, rendered or real. Say the clearance you used."
   ],
   [
    "A replacement knob",
    "A knob for something you own whose knob broke or went missing.",
-   "Measure the shaft. Real fit beats pretty."
+   "Measure the shaft and say how you measured it."
   ],
   [
-   "Phone stand, two angles",
-   "A phone stand with a reading angle and a video-call angle.",
-   "One print, no glue."
+   "A camera mount",
+   "An Arca-type plate or a clamp for a camera or a phone.",
+   "Name the interface dimensions and where they come from."
   ],
   [
-   "Spool holder adapter",
-   "An adapter that lets a spool with an odd hub sit on your printer's holder.",
-   "Say the hub diameter and the printer."
+   "A lamp",
+   "A table lamp or a shade: a revolve, a loft or a lattice.",
+   "A photoreal render counts as much as a photo."
   ],
   [
-   "Self-watering planter",
-   "A planter with a water reservoir for a herb on your windowsill.",
-   "Show it with soil in it, or a render with the reservoir cut open."
+   "A four-bar mechanism",
+   "Anything that moves on a four-bar linkage: a gripper, a lid, a toy.",
+   "Post the Grashof class and the transmission angle from form.craft."
   ],
   [
-   "Battery organiser",
-   "A holder for AA and AAA cells with a place for the dead ones.",
-   "Fits a drawer you own."
+   "A helmet or visor",
+   "A shell for a head, a model or a toy: lofted from sections.",
+   "Show the critique's symmetry and fillet numbers."
   ],
   [
-   "Drawer divider from one measurement",
+   "A drawer organiser from one number",
    "Dividers for a drawer, made from its inside width alone.",
    "Say the one number you measured."
   ],
   [
-   "Print-in-place hinge",
-   "A box or case with a hinge printed in place.",
-   "Show it opening. Say the clearance you used."
-  ],
-  [
-   "SD and USB holder",
-   "A holder for SD cards and USB sticks that lives on your desk.",
-   "Every slot labelled."
-  ],
-  [
-   "Shelf bracket for a 20 mm board",
-   "A bracket that holds a 20 mm shelf to a wall.",
-   "Show where it would fail first and why it won't."
-  ],
-  [
-   "Desk grommet",
-   "A cable grommet for a 60 mm hole with a lid that closes around the cables.",
-   "Two parts, one plate."
-  ],
-  [
-   "Filament clip",
-   "A clip that keeps a spool's loose end from unwinding, without tools.",
-   "Works on two different spools."
+   "A snap-fit enclosure",
+   "An enclosure for a small board that closes with snap fits, no screws.",
+   "Post the snap's strain from form.craft."
   ],
   [
    "Something you fixed",

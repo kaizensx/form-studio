@@ -197,6 +197,9 @@ class Setup:
                 else:
                     if type_ == S.FORUM:      # keep the tags that exist (posts carry their ids), in the listed order
                         have = {t["name"]: t for t in c.get("available_tags", [])}
+                        for old, new in S.TAG_RENAMES.get(key, {}).items():      # same tag id, new name
+                            if old in have and new not in have:
+                                have[new] = {**have.pop(old), "name": new}
                         want = [tag(t) for t in tags]
                         names = {w["name"] for w in want}
                         body["available_tags"] = [{**({"id": have[w["name"]]["id"]} if w["name"] in have else {}), **w}
@@ -407,11 +410,12 @@ class Setup:
                 break
         c = self.mention
         hero = {"color": d.DATUM, "title": "Form Studio",
-                "description": ("Describe a part and get a file you can print. **Form Studio** is an open-source desktop "
-                                "app where an AI agent designs parts in a real CAD kernel. It checks every revision on "
-                                "the solid, slices it with your own slicer and plays the print back before you start it.\n\n"
-                                "Describe it, drop a photo with a coin for scale, sketch it or bring a part. "
-                                "It comes back as real CAD you can measure, prove and release.")}
+                "description": ("**Describe anything. Form Studio engineers it.** An open-source desktop studio where an "
+                                "engineer-grade agent builds what you describe as real, editable CAD: mechanical parts, "
+                                "mechanisms, product shells, organic and textured forms.\n\n"
+                                "Start from words, a photo, a sketch, a drawing or a part; bring an STL and get it back "
+                                "as editable CAD. Every revision is checked on the solid, and you export STEP, renders, "
+                                "meshes for CNC or games, or (only if you want it) a slice for your 3D printer.")}
         if files:
             hero["image"] = {"url": "attachment://" + next(iter(files))}
         where = {"color": d.PLATE, "title": "🗺️ Where things are", "fields": [
@@ -421,23 +425,25 @@ class Setup:
             {"name": "📘 Learn the app", "value": c("guides"), "inline": True},
             {"name": "🧩 Find a recipe", "value": c("recipes"), "inline": True},
             {"name": "🛟 Get help", "value": c("help"), "inline": True},
-            {"name": "🖨️ Printers & slicers", "value": c("printers"), "inline": True},
+            {"name": "🧠 Design & engineering", "value": c("design-tips"), "inline": True},
+            {"name": "🧬 Mesh to CAD", "value": c("mesh-to-cad"), "inline": True},
             {"name": "🤖 Agents & models", "value": c("agents"), "inline": True},
             {"name": "💡 Ideas", "value": c("ideas"), "inline": True},
             {"name": "🎭 Your roles", "value": c("roles"), "inline": True},
             {"name": "🚀 Releases", "value": c("releases"), "inline": True},
-            {"name": "🧑‍💻 Build it with us", "value": c("contributing"), "inline": True}]}
+            {"name": "🧑‍💻 Build it with us", "value": c("contributing"), "inline": True},
+            {"name": "🖨️ 3D printing (optional)", "value": c("printers"), "inline": True}]}
         bot = {"color": d.VIOLET, "title": "🤖 Things to try", "description":
                "`/recipe` a building block with its render · `/guide` the right guide · `/help` where to ask\n"
                "`/rank` your level · `/leaderboard` the most active makers · `/thanks @someone` say thank you (+XP)\n"
-               "`/showcase` post a part · `/challenge` this week's brief · `/poll` ask the server · `/download`\n\n"
-               "Talking, sharing and helping earn XP: 🧱 First Layer → 📏 Calibrated → 🧊 Solid → ⚙️ Assembly → 🏭 Print Farm."}
+               "`/showcase` post a design · `/challenge` this week's brief · `/poll` ask the server · `/download`\n\n"
+               "Talking, sharing and helping earn XP: " + " → ".join(n for _, n in S.LEVELS) + "."}
         how = {"color": d.BLUEPRINT, "title": "🛠️ How a design goes", "description":
-               "`1` **Start**  words, a photo, a sketch, a STEP, STL or 3MF part, a PDF or a link\n"
-               "`2` **Concepts**  three or four genuinely different designs, each real CAD\n"
-               "`3` **Shape and fit**  parameters that say how they are known, fits modelled for your printer\n"
-               "`4` **Prove**  checks on the solid, the slice from your slicer, the print played back\n"
-               "`5` **Release**  you approve; STEP, STL, 3MF and G-code frozen with SHA-256 hashes"}
+               "`1` **Describe**  words, a photo, a sketch, a drawing, a STEP part or a mesh to rebuild as CAD\n"
+               "`2` **Brief and plan**  for complex designs: requirements, key dimensions, every feature planned\n"
+               "`3` **Build and look**  real CAD in the kernel, a six-view sheet and a section after every change\n"
+               "`4` **Critique and check**  close-ups and metrics of every feature, checks on the solid\n"
+               "`5` **Release**  you approve; STEP, STL, OBJ, GLB and 3MF frozen with SHA-256 hashes (G-code if you print)"}
         buttons = [d.row({"type": 2, "style": 1, "label": "Pick my roles", "custom_id": "open:roles", "emoji": {"name": "🎭"}},
                          {"type": 2, "style": 2, "label": "Where do I start?", "custom_id": "open:start", "emoji": {"name": "🧭"}},
                          {"type": 2, "style": 2, "label": "Random recipe", "custom_id": "open:recipe", "emoji": {"name": "🎲"}}),
@@ -513,6 +519,13 @@ class Setup:
     def guides(self):
         forum = self.fresh("guides")
         threads = self.forum_threads(forum["id"])
+        for old, new in S.GUIDE_RENAMES.items():                  # a renamed guide keeps its post and replies
+            if old in threads and new not in threads:
+                t = threads.pop(old)
+                if (t.get("thread_metadata") or {}).get("archived"):
+                    self._do("PATCH", f"/channels/{t['id']}", {"archived": False}, f"#guides: reopen {old}")
+                self._do("PATCH", f"/channels/{t['id']}", {"name": new[:100]}, f"#guides: rename {old} to {new}")
+                threads[new] = {**t, "name": new}
         # newest first in the forum: post the last guide first so Guide 01 ends up on top
         for i, (title, tag, _art, text, links) in reversed(list(enumerate(S.GUIDES, 1))):
             files, emb = None, {"color": d.DATUM, "title": title, "description": text}

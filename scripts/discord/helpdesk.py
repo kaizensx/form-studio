@@ -58,7 +58,7 @@ def main():
         if not any(m["author"]["id"] == me["id"] for m in msgs):
             links = [guide_links[x] for n in names for x in S.HELP_GUIDES.get(n, []) if x in guide_links]
             checklist = ("- your system and Form Studio version (Help › About)\n"
-                         "- your printer and slicer, or that it is a 3D model\n"
+                         "- your agent and model, and what you asked for\n"
                          "- what you did, what you expected and what happened\n"
                          "- for setup: the output of `form doctor`")
             emb = {"color": d.BLUEPRINT, "title": "🛟 Thanks for the post",

@@ -120,7 +120,7 @@ def discussion(ev):
            "footer": d.footer(f"Discussion #{x['number']} · {cat.get('name', '')}"), "timestamp": x.get("created_at")}
     d.send(channel("github"), embeds=[emb], components=[d.row(d.link_button("Join the discussion", x["html_url"]))])
     if cat.get("slug") == "show-and-tell":
-        _forum(channel("showcase"), x["title"], emb, x["html_url"], "Printed")
+        _forum(channel("showcase"), x["title"], emb, x["html_url"], "3D model")
     elif cat.get("slug") == "ideas":
         _forum(channel("ideas"), x["title"], emb, x["html_url"], "Feature")
 

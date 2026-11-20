@@ -30,7 +30,7 @@ class FakeDiscord:
         self.channels = [{"id": str(10 + i), "name": S.N(n), "type": 0} for i, n in enumerate(
             ["releases", "announcements", "github", "ci", "contributing", "mod-log", "guides"])]
         self.channels.append({"id": "50", "name": S.N("help"), "type": 15, "available_tags": [
-            {"id": "t1", "name": "Install"}, {"id": "t2", "name": "Bug"}, {"id": "t9", "name": "Solved"}]})
+            {"id": "t1", "name": "Setup"}, {"id": "t2", "name": "Bug"}, {"id": "t9", "name": "Solved"}]})
         self.roles = [{"id": "r1", "name": S.R["Release pings"]}, {"id": "r2", "name": S.R["Contributor"]}]
         self.threads, self.messages = [], {}
 
@@ -137,7 +137,7 @@ class BotTest(unittest.TestCase):
                "applied_tags": ["t1"], "last_message_id": snowflake(now - timedelta(hours=7))}
         solved = {"id": snowflake(now - timedelta(days=3)), "parent_id": "50", "name": "Done", "owner_id": "u2",
                   "applied_tags": ["t9"], "last_message_id": snowflake(now - timedelta(days=2))}
-        guide = {"id": "g1", "parent_id": "16", "name": "Install and first start"}
+        guide = {"id": "g1", "parent_id": "16", "name": "Install and choose what you make"}
         self.fake.threads = [new, solved, guide]
         self.fake.messages[new["id"]] = [{"author": {"id": "u1"}}]
         with mock.patch.object(sys, "argv", ["helpdesk.py"]):
