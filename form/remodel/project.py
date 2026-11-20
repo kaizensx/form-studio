@@ -193,8 +193,9 @@ def rebuild_brief(st, p: dict, files: list | None = None) -> dict:
     rec = p.get("reconstruction") or {}
     s = rec.get("summary") or {}
     if s:
-        lines.append(f"Make editable (the deterministic route) reached Layer {s.get('layer')}: "
-                     f"{s.get('parametric_area_pct')}% of the area parametric, {s.get('frozen_area_pct')}% frozen facets, "
-                     f"{s.get('hausdorff_mm')} mm from the mesh" + ("" if s.get("recipe_verified") else
+        edit = s.get("editable_pct", s.get("driven_by_params_pct")) or 0
+        lines.append(f"Make editable (the deterministic route) reached Layer {s.get('layer')}: {edit:g}% of the surface "
+                     f"driven by Params, {s.get('hausdorff_mm')} mm from the mesh ({s.get('frozen_area_pct')}% the mesh's "
+                     "own facets)" + ("" if s.get("recipe_verified") else
                                                                   ", with no verified feature recipe") + ".")
     return {"message": "\n".join(lines), "files": files}

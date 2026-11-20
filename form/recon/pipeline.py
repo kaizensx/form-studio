@@ -1,15 +1,21 @@
 """Mesh to editable CAD, end to end. Kernel worker only (form/kernel.py runs `op_reconstruct`).
 
-    Layer 0  the mesh as an exact solid (always built)             solid.layer0
+    Layer 2  first: the program route (program.py), sketches extruded and lofted between levels read straight off
+             the mesh, the rest kept as the mesh's own slices. When it verifies and the Params drive most of the
+             surface, it is the result and the slower layers below are not built.
+    Layer 0  the mesh as an exact solid                              solid.layer0
     Layer 1  analytic faces where they fit, frozen facets elsewhere segment.segment + brep.build
-    Layer 2  a feature recipe (build123d source with Params)        features.recipe
+    Layer 2  a feature recipe on the Layer 1 solid (tree.py, features.py), compared with the program route
 
-Each layer is verified against the mesh before it is offered; the best layer that passes is the result. Nothing is
-decimated, nothing is repaired without being listed under "repairs".
+Each layer is verified against the mesh before it is offered; the result is the verified layer whose Params drive the
+most of the surface ("editable"), and every result says how far it is from the mesh and whether that is within the
+tolerance asked for. Nothing is decimated, nothing is repaired without being listed under "repairs". While it runs it
+reports progress about every second (a heartbeat repeats the last step while a long one runs).
 """
 from __future__ import annotations
 
 import json
+import threading
 import time
 from pathlib import Path
 
@@ -29,7 +35,54 @@ LIMITS = [
     "fillets and chamfers back as operations; a feature that does not verify stays in the base and is listed.",
     "A curved surface is accepted when every mesh vertex on it is within the tolerance; a freeform surface that a "
     "simple one approximates within the tolerance is reported as that simple surface.",
+    "Editable is the share of the result's surface that its Params make (sketches, extrusions, holes, fillets): "
+    "what the mesh's own facets or a kept slice of the mesh make is not editable, however exact it is.",
 ]
+
+PROGRAM_ENOUGH = 80.0      # % editable at which the program route's verified result is taken without the slower layers
+
+
+class Heartbeat:
+    """Progress at least every `every` seconds: the last message is sent again (with the time so far) while a long
+    step runs, so the app and the agent always see that work goes on. Thread-safe: one lock round every send."""
+
+    def __init__(self, progress, every: float = 1.0):
+        self.progress, self.every = progress, every
+        self.lock = threading.Lock()
+        self.last = None
+        self.t0 = self.sent = time.perf_counter()
+        self.done = threading.Event()
+        self.thread = None
+        if progress is not None:
+            self.thread = threading.Thread(target=self._run, daemon=True)
+            self.thread.start()
+
+    def say(self, d):
+        if self.progress is None:
+            return
+        with self.lock:
+            self.last = dict(d)
+            self.sent = time.perf_counter()
+            self.progress(d)
+
+    def _run(self):
+        while not self.done.wait(0.25):
+            with self.lock:
+                if self.last is None or time.perf_counter() - self.sent < self.every:
+                    continue
+                d = dict(self.last)
+                d["text"] = f"{self.last.get('text', '')} ({time.perf_counter() - self.t0:.0f} s)"
+                d["heartbeat"] = True
+                self.sent = time.perf_counter()
+                try:
+                    self.progress(d)
+                except Exception:                       # noqa: BLE001
+                    pass
+
+    def stop(self):
+        self.done.set()
+        if self.thread is not None:
+            self.thread.join(timeout=2)
 
 
 def _step(shape, path: Path) -> None:
@@ -69,8 +122,17 @@ def load(path: Path, fill: bool = True, weld_tol: float = 1e-6):
 
 def reconstruct(path, out_dir, name: str | None = None, tolerance: float = 0.02, layer: int = 2,
                 budget_s: float = 240.0, progress=None, fill_holes: bool = True) -> dict:
-    """Reconstruct a mesh file as CAD. Writes <name>.step (the best verified layer), <name>_layer0.step,
-    <name>_report.json, <name>_deviation.json and, when Layer 2 succeeds, <name>_recipe.py. Returns the report."""
+    """Reconstruct a mesh file as CAD. Writes <name>.step (the best verified layer), <name>_layer0.step (when Layer 0
+    is built), <name>_report.json, <name>_deviation.json and, when Layer 2 succeeds, <name>_recipe.py (and the kept
+    slices it reads, <name>_kept*.step). Returns the report."""
+    beat = Heartbeat(progress)
+    try:
+        return _reconstruct(path, out_dir, name, tolerance, layer, budget_s, beat.say if progress else None, fill_holes)
+    finally:
+        beat.stop()
+
+
+def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill_holes) -> dict:
     from . import solid
     t0 = time.perf_counter()
     out = Path(out_dir)
@@ -92,6 +154,18 @@ def reconstruct(path, out_dir, name: str | None = None, tolerance: float = 0.02,
                         f"{inp['topology']['non_manifold_edges']} non-manifold edges), so it does not bound a solid.")
         rep["hint"] = "Close it in the program that made it, or reconstruct with hole filling on (it is listed as a repair)."
         return _finish(rep, out, name, t0)
+
+    # Layer 2, the program route: when it verifies and drives most of the surface, it is the result
+    prog = None
+    if layer >= 2:
+        say({"stage": "layer2", "text": "Reading the part as sketches and extrusions", "fraction": 0.02})
+        prog = _program(V, F, tol, name, out, say, t0, budget_s)
+        if prog.get("verified") and prog["report"].get("editable_pct", 0.0) >= PROGRAM_ENOUGH:
+            why = (f"The program route verified first with {prog['report']['editable_pct']:g}% of the surface editable; "
+                   "the slower layers were not needed.")
+            rep["layers"]["0"] = {"skipped": why}
+            rep["layers"]["1"] = {"skipped": why}
+            return _take_program(rep, prog, V, F, mvol, out, name, t0, tol)
 
     # Layer 0
     say({"stage": "layer0", "text": "Building the exact solid", "fraction": 0.02})
@@ -148,6 +222,14 @@ def reconstruct(path, out_dir, name: str | None = None, tolerance: float = 0.02,
         if gear is not None:
             r2["report"]["also_tried"] = r2["report"].get("also_tried", []) + [
                 {k: gear["report"].get(k) for k in ("method", "base", "verified", "hausdorff_mm", "error") if gear["report"].get(k) is not None}]
+        if prog is not None and _better(prog, r2):
+            r2 = {**prog, "report": {**prog["report"], "also_tried": [
+                {k: r2["report"].get(k) for k in ("method", "base", "verified", "hausdorff_mm", "driven_by_params_pct", "error")
+                 if r2["report"].get(k) is not None}]}}
+        elif prog is not None:
+            r2["report"]["also_tried"] = r2["report"].get("also_tried", []) + [
+                {k: prog["report"].get(k) for k in ("method", "verified", "hausdorff_mm", "editable_pct", "error")
+                 if prog["report"].get(k) is not None}]
         rep["layers"]["2"] = r2["report"]
         if r2.get("source"):
             recipe = r2["source"]
@@ -157,6 +239,10 @@ def reconstruct(path, out_dir, name: str | None = None, tolerance: float = 0.02,
                 best = ("2", r2["shape"], r2["P"], r2["T"], r2["cmp"], regions)
                 refs = sorted(r2.get("refs") or [])
 
+    if prog is not None and prog.get("verified") and (best is None or best[0] != "2"):
+        rep["layers"]["2"] = {**prog["report"], **({"also_tried": rep["layers"]["2"].get("also_tried", [])}
+                                                  if isinstance(rep["layers"].get("2"), dict) else {})}
+        return _take_program(rep, prog, V, F, mvol, out, name, t0, tol)
     if best is None:
         rep["error"] = "No layer produced a valid solid."
         return _finish(rep, out, name, t0)
@@ -179,10 +265,78 @@ def reconstruct(path, out_dir, name: str | None = None, tolerance: float = 0.02,
                      "hausdorff_mm": round(cmp["hausdorff_mm"], 6), "parametric_area_pct": par, "freeform_area_pct": ff,
                      "frozen_area_pct": round(max(0.0, 100.0 - par - ff), 2),
                      "driven_by_params_pct": rep["layers"]["2"].get("driven_by_params_pct") if lay == "2" else 0.0}
+    _headline(rep, tol)
     dmap = verify.deviation_map(P, T, cmp["_rec_dev"], tol)
     (out / f"{name}_deviation.json").write_text(json.dumps(dmap), encoding="utf-8")
     rep["result"]["deviation_map"] = f"{name}_deviation.json"
     return _finish(rep, out, name, t0)
+
+
+def _program(V, F, tol, name, out, say, t0, budget_s) -> dict:
+    """The program route (program.py), within about half the budget. Never raises."""
+    from . import program
+    try:
+        return program.recipe(V, F, tol, name=name, limit=tol, out_dir=out,
+                              progress=lambda d: say({**d, "fraction": 0.02 + 0.6 * d.get("fraction", 0)}),
+                              deadline=t0 + 0.5 * float(budget_s))
+    except Exception as e:                              # noqa: BLE001
+        return {"report": {"method": "sketches and extrusions", "error": f"{type(e).__name__}: {e}"[:300]}}
+
+
+def _better(a, b) -> bool:
+    """Is recipe result a better answer than b: verified first, then the share of the surface its Params drive, then
+    the distance to the mesh."""
+    def key(r):
+        rp = r.get("report", {})
+        drv = rp.get("editable_pct", rp.get("driven_by_params_pct")) or 0.0
+        return (bool(r.get("verified")), round(float(drv), 1), -float(rp.get("hausdorff_mm") or 1e9))
+    return key(a) > key(b)
+
+
+def _take_program(rep, prog, V, F, mvol, out, name, t0, tol):
+    """Finish the report with the program route's result."""
+    from . import solid
+    r2 = prog["report"]
+    rep["layers"].setdefault("2", r2)
+    if rep["layers"]["2"] is not r2 and not rep["layers"]["2"].get("kind") == "program":
+        rep["layers"]["2"] = r2
+    (out / f"{name}_recipe.py").write_text(prog["source"], encoding="utf-8")
+    rep["layers"]["2"]["file"] = f"{name}_recipe.py"
+    shape, P, T, cmp = prog["shape"], prog["P"], prog["T"], prog["cmp"]
+    _step(shape, out / f"{name}.step")
+    vol = solid.check(shape)["volume_mm3"]
+    edit = float(r2.get("editable_pct", 0.0))
+    rep["layer_achieved"] = 2
+    rep["result"] = {"layer": 2, "step": f"{name}.step", "recipe": f"{name}_recipe.py",
+                     "recipe_references": sorted(prog.get("refs") or []), "recipe_verified": True,
+                     "method": "sketches and extrusions",
+                     "volume_mm3": round(vol, 4), "mesh_volume_mm3": round(mvol, 4),
+                     "volume_delta_mm3": round(vol - mvol, 4),
+                     "volume_delta_pct": round(100 * (vol - mvol) / mvol, 5) if mvol else None,
+                     "hausdorff_mm": round(cmp["hausdorff_mm"], 6),
+                     # the features make planes, cylinders and cones; the kept slices are the mesh's own facets
+                     "parametric_area_pct": round(edit, 2), "freeform_area_pct": 0.0,
+                     "frozen_area_pct": round(100.0 - edit, 2), "driven_by_params_pct": round(edit, 2),
+                     "params": r2.get("params")}
+    _headline(rep, tol)
+    dmap = verify.deviation_map(P, T, cmp["_rec_dev"], tol)
+    (out / f"{name}_deviation.json").write_text(json.dumps(dmap), encoding="utf-8")
+    rep["result"]["deviation_map"] = f"{name}_deviation.json"
+    return _finish(rep, out, name, t0)
+
+
+def _headline(rep, tol):
+    """Editable first, then the deviation and whether it is within the tolerance asked for."""
+    res = rep["result"]
+    edit = res.get("driven_by_params_pct") or 0.0
+    res["editable_pct"] = round(float(edit), 2)
+    h = float(res.get("hausdorff_mm") or 0.0)
+    res["within_tolerance"] = bool(h <= tol + 1e-12)
+    res["headline"] = (f"{res['editable_pct']:g}% editable (driven by Params), {h:.4g} mm from the mesh"
+                       + ("" if res["within_tolerance"] else f", outside the {tol:g} mm asked for"))
+    if not res["within_tolerance"]:
+        res["warning"] = (f"The result is {h:.4g} mm from the mesh, more than the {tol:g} mm tolerance asked for: the best "
+                          "verified layer is offered, but it is not within the tolerance.")
 
 
 def _gear(V, F, tol, name, say):
@@ -216,6 +370,28 @@ def layer2(V, F, regions, l1shape, tol, name, out, l1rep, progress=None, deadlin
                         progress=lambda d: say({**d, "fraction": 0.8 * d.get("fraction", 0)}), deadline=deadline)
     except Exception as e:                              # noqa: BLE001
         t = {"report": {"method": "feature tree", "error": f"{type(e).__name__}: {e}"[:300]}}
+    if l1rep.get("exact_edges") and t["report"].get("base") in ("embedded solid", None) and \
+            (deadline is None or time.perf_counter() < deadline):
+        # the feature search reads turned and stacked bases off the faces of the Layer 1 solid; built with the mesh's
+        # own boundaries it sometimes finds a base the exact-edged solid hides: try that solid too, keep the better
+        from . import brep
+        keep = brep.EXACT_EDGES
+        try:
+            brep.EXACT_EDGES = False
+            plain, info = brep.build(V, F, regions, tol)
+        finally:
+            brep.EXACT_EDGES = keep
+        if plain is not None and info.get("valid"):
+            try:
+                t2 = tree.recipe(V, F, plain, tol, name=name, limit=limit, out_dir=out, deadline=deadline,
+                                 progress=lambda d: say({**d, "fraction": 0.8 * d.get("fraction", 0)}))
+            except Exception:                           # noqa: BLE001
+                t2 = None
+            if t2 is not None and t2.get("verified") and (not t.get("verified") or
+                                                        (t2["report"].get("driven_by_params_pct") or 0) >
+                                                        (t["report"].get("driven_by_params_pct") or 0)):
+                t2["report"]["layer1_edges"] = "the mesh's own boundaries (the exact-edged solid hid the base)"
+                t = t2
     tried.append(t)
     if not t.get("verified") and (deadline is None or time.perf_counter() < deadline):
         try:
@@ -299,7 +475,8 @@ def _layer1(V, F, tol, budget_s, progress):
                     frozen.append(r.id)
                     if r.kind == "plane" and attempt < 3:         # a plane keeps the triangles that are on it
                         partial[r.id] = r.tris[off]
-        rounds.append({"build": {k: info[k] for k in ("faces", "valid", "edges_line", "edges_circle", "edges_arc", "edges_segment")
+        rounds.append({"build": {k: info[k] for k in ("faces", "valid", "edges_line", "edges_circle", "edges_arc", "edges_curve",
+                                                                 "edges_segment", "edges_exact", "corners_moved", "exact_edges")
                                  if k in info}, "hausdorff_mm": round(cmp["hausdorff_mm"], 6) if cmp else None,
                        "frozen_regions": [{"id": i, "kind": regions[i].kind} for i in frozen]})
         if not frozen:
@@ -307,7 +484,7 @@ def _layer1(V, F, tol, budget_s, progress):
         regions = _freeze(V, F, regions, frozen, partial)
         shape = None
     summ = segment.summary(regions)
-    rep = {**summ, "segmentation": st, "rounds": rounds,
+    rep = {**summ, "segmentation": st, "rounds": rounds, "exact_edges": bool(info.get("exact_edges")),
            "surfaces": [{"kind": r.kind, "triangles": int(len(r.tris)), "area_mm2": round(r.area, 4), **(r.prim.public() if r.prim else {})}
                         for r in sorted(regions, key=lambda r: -r.area) if r.parametric][:300]}
     if shape is None or cmp is None or not rounds or rounds[-1].get("frozen_regions"):

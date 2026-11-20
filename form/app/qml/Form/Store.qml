@@ -711,8 +711,9 @@ QtObject {
         return ppost("/reconstruct", { file: file }).then(function (r) {
             var m = r.summary || ({})
             if (m.recipe_verified)
-                toast("“" + r.name + "” is editable", "Layer " + m.layer + " · " + F.fmt(m.parametric_area_pct, 0) + "% parametric · "
-                      + F.fmt(m.hausdorff_mm, 4) + " mm from the mesh (computed)")
+                toast("“" + r.name + "” is editable", F.fmt(m.editable_pct !== undefined ? m.editable_pct : m.driven_by_params_pct, 0)
+                      + "% driven by Params · " + F.fmt(m.hausdorff_mm, 4) + " mm from the mesh"
+                      + (m.within_tolerance === false ? " (outside the tolerance)" : "") + " · Layer " + m.layer + " (computed)")
             else                                       // no verified feature recipe: the agent remodel is the next step
                 toast("“" + r.name + "” reached Layer " + m.layer, F.fmt(m.frozen_area_pct, 0) + "% frozen facets, no verified feature "
                       + "recipe. Rebuild as editable CAD has the agent model it with named features.")
