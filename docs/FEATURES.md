@@ -41,9 +41,9 @@ Home is one composer for whatever you have.
 | **Words** | Describe the part, typed or dictated. |
 | **A photo** | Drop or paste it. With a bank card, a coin or a ruler in the picture, the agent estimates sizes from it, labels them "estimated from the photo" and keeps them *assumed* until you measure. |
 | **A sketch** | Draw it on the sketch pad. The agent receives the shapes as structured geometry in millimetres, and the picture. |
-| **A part** | A STEP, STL or 3MF file to design around or start from. |
+| **A part** | A STEP, STL, OBJ or 3MF file to design around or start from, up to 2 GB. A file from your disk is cloned into the conversation, never read whole, so a 500 MB scan attaches at once. |
 | **A drawing** | A PDF datasheet or mechanical drawing, read as images so its dimensions survive. |
-| **A link** | A model page is passed to the agent as a link; a direct file link (STL, STEP, 3MF, PDF, PNG, JPEG, WebP) is downloaded once and shown on the composer. |
+| **A link** | Pasted on Home or in a chat, the engine fetches it: a file link (STL, STEP, 3MF, OBJ, PDF, PNG, JPEG, WebP) is downloaded, streamed to disk with its progress. A Printables model page has its part files downloaded with the title, author and licence, kept with each file. A MakerWorld or Thingiverse page says why its files cannot be fetched and how to get them; a signed MakerWorld download link copied from your browser is fetched at once, before it expires. Any other page is passed to the agent as a link. |
 
 Drop or paste files anywhere on Home. Under the composer, choose **For my printer** or **Just a 3D model** for what
 starts next, or **Start blank** for an empty design in the workspace with no agent. From a terminal:
@@ -100,6 +100,18 @@ each one named as it arrives.
   vents, perforations, slots, knurls and grip ribs, with web-thickness checks.
 - **Reference parts.** Import a STEP, or an STL, OBJ or 3MF mesh, of the thing your part must fit (a circuit board, a phone, a motor). It is
   drawn as a blueprint companion, and a design can cut clearance from it with `self.reference("pi5.step")`.
+- **3MF from any slicer.** 3MF files are read with lib3mf, including the production-extension layout Bambu Studio,
+  Orca Slicer and MakerWorld write (meshes in `3D/Objects/*.model`). Each object is a named part where the slicer
+  placed it, with its plate and filament colour; modifier volumes are left out of the shape. OBJ files keep their
+  named objects apart.
+- **Big meshes, checked first.** `form mesh-preflight FILE` and MCP `mesh_preflight` give a mesh's triangles, size,
+  whether it is closed, its class (light to very heavy) and estimated seconds to read and analyse it, in about a
+  second for 1.2 million triangles and instantly the second time. A heavy mesh also gets a lighter copy of about
+  200,000 triangles for the 3D view; it is for display only, and every analysis and import uses the file itself.
+- **Model links for agents.** MCP `fetch_link` downloads what a link points to from the engine, so an agent whose
+  sandbox has no network still gets the file; `resolve_model_page` says what a model page is (title, author,
+  licence, files) without downloading. Requests carry a generic Form Studio user agent and nothing about you, no
+  cookies and no sign-in.
 - **Datasheets and drawings.** The agent reads PDFs and images, from a file or an https link, as pictures, so the
   dimensions in a mechanical drawing survive (`read_document`).
 - **Every design on Home**, each a live 3D card, filtered by released and in progress; rename, duplicate, export or
@@ -420,7 +432,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 87 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 90 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
