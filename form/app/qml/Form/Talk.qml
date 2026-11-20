@@ -371,7 +371,7 @@ Rectangle {
               TalkChange { visible: !!it.m.change; width: body.width; change: it.m.change } } }
             Component { id: cErr; Column { id: ec; spacing: 6
                 // a usage limit is not a failure: a calm card that says which agent, until when, and what is kept
-                readonly property var limit: Store.usageLimit(it.m.text)
+                readonly property var limit: Store.usageLimit(it.m)
                 readonly property string who: { var a = Store.agentInfo(it.m.agent || Store.chatAgent); return a ? a.label : "The agent" }
                 property bool later: false
                 Rectangle { objectName: "usageLimitCard"; visible: !!ec.limit; width: body.width; height: visible ? lc2.implicitHeight + 26 : 0
@@ -382,7 +382,7 @@ Rectangle {
                             Txt { font.weight: Theme.wSemi; anchors.verticalCenter: parent.verticalCenter
                                 text: ec.who + " has reached its usage limit" } }
                         Txt { tone: 2; width: parent.width; wrapMode: Text.WordWrap; lineHeight: 1.35
-                            text: (ec.limit && ec.limit.until ? "It can work again " + (/^\d/.test(ec.limit.until) ? "at " : "") + ec.limit.until + ". " : "It can work again once the limit resets. ")
+                            text: (ec.limit && ec.limit.again ? "It can work again " + ec.limit.again + ". " : "It can work again once the limit resets. ")
                                 + (Store.liveDesignsHere.length ? "Everything committed so far is saved: " + Store.liveDesignsHere.map(function (d) { return d.name }).join(", ") + "."
                                                                 : "Nothing was lost; what it committed before the limit is saved.") }
                         Row { visible: !!it.m.last && !ec.later; spacing: 6; topPadding: 4

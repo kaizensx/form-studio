@@ -963,12 +963,12 @@ QtObject {
         if (ev.kind === "commit") reloadStudio()
     }
     function showElsewhere() { var a = agentElsewhere; if (a) reloadStudio().then(function () { open(a.project, "follow") }) }
-    // a usage limit, said calmly: which agent, until when; no upsell links. null when the error is something else.
-    function usageLimit(text) {
-        var t = String(text || "")
-        if (!/usage limit|hit your limit|rate.?limit|limit (was )?reached|quota|too many requests|429/i.test(t)) return null
-        var m = t.match(/(?:try again|resets?|available again|again)\s+(?:at|after|in|on)\s+([^.,;()]+?)(?:[.,;()]|$)/i)
-        return { until: m ? m[1].trim() : "" }
+    // a usage limit, said calmly: which agent, until when; no upsell links. Only an error event the engine marked
+    // kind "usage_limit" (form/agents/limits.py) is one; any other error, a 429 or a word like "quota" in it, is not.
+    function usageLimit(ev) {
+        if (!ev || ev.kind !== "usage_limit") return null
+        var u = String(ev.until || "")
+        return { until: u, again: String(ev.again || (u ? (/^\d/.test(u) ? "at " : "") + u : "")) }
     }
     // a message: every https link in it is offered to the engine first (a file is fetched and attached; a page goes
     // with the message as a link), then the message is sent. The words keep the links as written.

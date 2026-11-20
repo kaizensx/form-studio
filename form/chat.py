@@ -815,7 +815,7 @@ class Chat:
                 card = self._limit(job, str(ev.get("text", "")))   # the CLI's own words carry an upsell: replace them
                 job.error = card["message"]
                 ev = {"t": "error", "text": card["message"], "hint": card["hint"], "kind": "usage_limit",
-                      "agent": card["agent"], "until": card["until"]}
+                      "agent": card["agent"], "until": card["until"], "again": card.get("again")}
             elif t == "end":
                 job.cost = ev.get("cost_usd")
                 err = ev.pop("error", None)
@@ -835,7 +835,7 @@ class Chat:
                     job.error = card["message"]
                     if not said:
                         self._add(job, {"t": "error", "text": card["message"], "hint": card["hint"], "kind": "usage_limit",
-                                    "agent": card["agent"], "until": card["until"]})
+                                    "agent": card["agent"], "until": card["until"], "again": card.get("again")})
                 elif err:
                     job.error = str(err)
                     self._add(job, {"t": "error", "text": job.error})

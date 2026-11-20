@@ -55,6 +55,30 @@ class Limits(unittest.TestCase):
         self.assertIsNone(limits.usage_limit("Fusion failed at step 0", "Codex"))
         self.assertIsNone(limits.usage_limit("model_not_found", "Codex"))
 
+    def test_the_time_reads_right(self):
+        card = limits.usage_limit("You've hit your usage limit. Try again in 2 hours.", "Codex")
+        self.assertEqual(card["again"], "in about 2 hours")
+        self.assertIn("it can work again in about 2 hours.", card["message"])
+        self.assertIn("send the message again in about 2 hours.", card["hint"])
+        self.assertNotIn("at 2 hours", card["message"] + card["hint"])
+        self.assertEqual(limits.usage_limit(CODEX_LIMIT, "Codex")["again"], "at 9:34 PM")
+        self.assertEqual(limits.usage_limit("You've hit your 5-hour limit · resets 11pm (Europe/Zurich)", "C")["again"],
+                         "at 11pm")
+        import time
+        tomorrow = int(time.time()) + 2 * 86400
+        again = limits.usage_limit(f"Claude AI usage limit reached|{tomorrow}", "Claude")["again"]
+        self.assertRegex(again, r"^at \d\d:\d\d on \w{3} \d{1,2} \w{3}$")          # another day: the day is said
+
+    def test_a_rate_limit_or_a_quota_word_is_not_a_usage_limit(self):
+        for text in ("429 Too Many Requests", "rate limited, retrying", "Rate limit exceeded for this minute",
+                     "the quota field is missing", "HTTP 429"):
+            self.assertIsNone(limits.usage_limit(text, "Codex"), text)
+        qml = (ROOT / "form" / "app" / "qml" / "Form" / "Store.qml").read_text()
+        body = qml.split("function usageLimit(ev)", 1)[1].split("\n    }", 1)[0]
+        self.assertIn('ev.kind !== "usage_limit"', body)                            # the card reads the kind only
+        self.assertNotIn("429", body)
+        self.assertNotIn("quota", body)
+
     def test_chat_replaces_a_limit_error_event(self):
         c = chat.Chat.__new__(chat.Chat)
         c.adapters = ADAPTERS
