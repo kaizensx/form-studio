@@ -47,15 +47,17 @@ def summary(rep: dict) -> dict:
     L = rep.get("layers", {})
     out = {"layer": rep.get("layer_achieved"), "layer_requested": rep.get("layer_requested"), "tolerance_mm": rep.get("tolerance_mm"),
            "hausdorff_mm": res.get("hausdorff_mm"), "volume_delta_pct": res.get("volume_delta_pct"),
-           "parametric_area_pct": res.get("parametric_area_pct"), "frozen_area_pct": res.get("frozen_area_pct"),
+           "parametric_area_pct": res.get("parametric_area_pct"), "freeform_area_pct": res.get("freeform_area_pct"),
+           "frozen_area_pct": res.get("frozen_area_pct"), "driven_by_params_pct": res.get("driven_by_params_pct"),
            "recipe_verified": res.get("recipe_verified"), "repairs": rep.get("repairs", []), "seconds": rep.get("seconds"),
            "evidence": "computed"}
     if "1" in L:
-        out["layer1"] = {k: L["1"].get(k) for k in ("parametric_area_pct", "hausdorff_mm", "by_kind", "error") if L["1"].get(k) is not None}
+        out["layer1"] = {k: L["1"].get(k) for k in ("parametric_area_pct", "freeform_area_pct", "hausdorff_mm", "by_kind", "error",
+                                                    "skipped") if L["1"].get(k) is not None}
     if "2" in L:
         l2 = L["2"]
-        out["layer2"] = {k: l2.get(k) for k in ("kind", "verified", "hausdorff_mm", "holes", "patterns", "symmetry", "error", "params")
-                         if l2.get(k) is not None}
+        out["layer2"] = {k: l2.get(k) for k in ("method", "kind", "base", "verified", "hausdorff_mm", "features", "holes", "patterns",
+                                                "symmetry", "left_in_base", "fit", "error", "params") if l2.get(k) is not None}
     if rep.get("error"):
         out["error"] = rep["error"]
     return out
@@ -86,9 +88,13 @@ def reconstruct(st, src, name: str | None = None, tolerance: float = 0.02, layer
         summ = summary(rep)
         title = (name or f"{src.stem} (editable)").strip()
         brief = (f"Reconstructed from the mesh {src.name}: Layer {res['layer']}, two-sided Hausdorff distance "
-                 f"{res['hausdorff_mm']:.4g} mm, {res['parametric_area_pct']:g}% of the area parametric (computed).")
+                 f"{res['hausdorff_mm']:.4g} mm, {res['parametric_area_pct']:g}% of the area parametric"
+                 + (f", {res['freeform_area_pct']:g}% freeform" if res.get("freeform_area_pct") else "")
+                 + (f", {res['driven_by_params_pct']:g}% driven by Params" if res.get("recipe_verified") else "") + " (computed).")
         if res.get("recipe_verified"):
-            p = st.create_design(title, (work / res["recipe"]).read_text(encoding="utf-8"), brief=brief, purpose=purpose)
+            refs = [str(work / r) for r in res.get("recipe_references") or []]
+            p = st.create_design(title, (work / res["recipe"]).read_text(encoding="utf-8"), brief=brief, purpose=purpose,
+                                 references=refs or None)
         else:
             step = work / res["step"]
             text = WRAPPER.format(title=title, file=src.name, layer=res["layer"], step=res["step"],

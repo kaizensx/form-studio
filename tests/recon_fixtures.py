@@ -83,12 +83,90 @@ def gear(teeth: int = 18, module: float = 2.0, width: float = 8.0, bore: float =
     return body, {"holes": [bore], "prismatic": True, "teeth": z}
 
 
-FIXTURES = {"box_with_holes": box_with_holes, "turned_part": turned_part, "filleted_bracket": filleted_bracket, "gear": gear}
+def stepped_bracket():
+    """A plate with a raised block at one end, a blind pocket, holes on two axes (one counterbored), rounded corners,
+    a rounded inner step and a bevelled edge: what a machined bracket looks like."""
+    from build123d import Align, Axis, Box, Cylinder, Pos, Rot, chamfer, fillet
+    A = (Align.MIN, Align.MIN, Align.MIN)
+    body = Box(80, 50, 8, align=A) + Pos(55, 0, 0) * Box(25, 50, 22, align=A)            # plate and block
+    vert = body.edges().filter_by(Axis.Z)
+    corners = [e for e in vert if min(abs(e.center().X), abs(e.center().X - 80)) < 1e-6
+               and min(abs(e.center().Y), abs(e.center().Y - 50)) < 1e-6]
+    body = fillet(corners, 5.0)                                                          # rounded plate corners
+    step = [e for e in body.edges().filter_by(Axis.Y) if abs(e.center().X - 55) < 1e-6 and abs(e.center().Z - 8) < 1e-6]
+    body = fillet(step, 3.0)                                                             # rounded inner step
+    top = [e for e in body.edges().filter_by(Axis.Y) if abs(e.center().X - 55) < 1e-6 and abs(e.center().Z - 22) < 1e-6]
+    body = chamfer(top, 1.5)                                                             # bevelled block edge
+    body = body - Pos(20, 25, 4) * Box(24, 16, 5, align=(Align.CENTER, Align.CENTER, Align.MIN))   # blind pocket 4 deep
+    B = (Align.CENTER, Align.CENTER, Align.MIN)
+    for y in (12.0, 38.0):                                                               # Ø6.6 through the plate
+        body = body - Pos(42, y, -1) * Cylinder(3.3, 10, align=B)
+    body = body - Pos(67.5, 14, -1) * Cylinder(3.3, 24, align=B)                          # Ø6.6 through the block ...
+    body = body - Pos(67.5, 14, 22 - 6.4) * Cylinder(5.5, 7, align=B)                      # ... counterbored Ø11 x 6.4
+    body = body - Pos(54, 36, 16) * Rot(0, 90, 0) * Cylinder(4.0, 28, align=B)             # Ø8 cross hole along X
+    return body, {"holes": sorted([6.6, 6.6, 6.6, 8.0]), "prismatic": True, "fillets": [3.0, 5.0], "counterbores": [11.0],
+                  "chamfers": [1.5]}
+
+
+def flanged_shaft():
+    """A turned part: flange, shaft, bore, a fillet and a chamfer, four bolt holes in the flange and a cross hole."""
+    from build123d import Align, Axis, Cylinder, Plane, Polyline, Pos, Rot, chamfer, fillet, make_face, revolve
+    pts = [(5, 0), (25, 0), (25, 8), (12, 8), (12, 48), (5, 48)]                        # r, z: Ø50 flange, Ø24 shaft, Ø10 bore
+    part = revolve(make_face(Plane.XZ * Polyline(*pts, close=True)), Axis.Z)
+    circ = lambda r, z: [e for e in part.edges() if e.geom_type.name == "CIRCLE" and abs(e.radius - r) < 1e-6
+                         and abs(e.center().Z - z) < 1e-6]
+    part = fillet(circ(12, 8), 2.5)                                                       # shaft into the flange
+    part = chamfer(circ(12, 48), 1.0)                                                     # shaft end
+    B = (Align.CENTER, Align.CENTER, Align.MIN)
+    for k in range(4):
+        a = math.radians(45 + 90 * k)
+        part = part - Pos(19 * math.cos(a), 19 * math.sin(a), -1) * Cylinder(2.75, 10, align=B)   # 4x Ø5.5 on PCD 38
+    part = part - Pos(-13, 0, 34) * Rot(0, 90, 0) * Cylinder(3.0, 26, align=B)            # Ø6 cross hole
+    return part, {"holes": sorted([5.5] * 4 + [6.0]), "bores": [10.0], "prismatic": False, "fillets": [2.5]}
+
+
+def spur_gear_part():
+    """A spur gear made the way Form Studio makes gears (form.parts, py_gearworks): m 2, 18 teeth, 8 thick, Ø8 bore."""
+    from form.parts import spur_gear
+    g = spur_gear(module=2.0, teeth=18, thickness=8.0, bore=8.0, backlash=0.0)
+    return g.shape, {"holes": [8.0], "prismatic": True, "teeth": 18, "module": 2.0, "pressure_angle": 20.0}
+
+
+def organic_blob():
+    """A smooth blob (an ellipsoid: no plane, cylinder, cone, sphere or torus fits it) with a Ø6 hole through it."""
+    from build123d import Align, Cylinder, Pos, Sphere, scale
+    blob = scale(Sphere(10), (3.0, 2.0, 1.4))                                              # 60 x 40 x 28
+    blob = blob - Pos(0, 0, -20) * Cylinder(3.0, 40, align=(Align.CENTER, Align.CENTER, Align.MIN))
+    return blob, {"holes": [6.0], "prismatic": False, "freeform": True}
+
+
+FIXTURES = {"box_with_holes": box_with_holes, "turned_part": turned_part, "filleted_bracket": filleted_bracket, "gear": gear,
+            "stepped_bracket": stepped_bracket, "flanged_shaft": flanged_shaft, "spur_gear": spur_gear_part,
+            "organic_blob": organic_blob}
+
+
+# A smooth shape meshed finely, the way a scan or a careful export is: its facets are within 0.01 mm of the surface
+# it was made from (meshed with the surface-deflection check on for every surface; the default STL export of a
+# B-spline surface can be 0.03 mm off), so a smooth reconstruction can be within 0.02 mm of them.
+MESHED = {"organic_blob": 0.01}
 
 
 def export(name: str, folder: Path, tolerance: float = 0.01, angular: float = 0.1) -> tuple[Path, object, dict]:
     from build123d import export_stl
     solid, facts = FIXTURES[name]()
     out = Path(folder) / f"{name}.stl"
-    export_stl(solid, str(out), tolerance=tolerance, angular_tolerance=angular)
+    if name in MESHED:
+        from OCP.BRepMesh import BRepMesh_IncrementalMesh
+        from OCP.IMeshTools import IMeshTools_Parameters
+        from form.kernel import _tessellate
+        from form.recon import mesh
+        prm = IMeshTools_Parameters()
+        prm.Deflection, prm.Angle = MESHED[name], 0.35
+        prm.ControlSurfaceDeflection = prm.EnableControlSurfaceDeflectionAllSurfaces = True
+        BRepMesh_IncrementalMesh(solid.wrapped, prm)
+        P, T = _tessellate(solid, MESHED[name])
+        V, F, _ = mesh.weld(P[T])
+        mesh.write_stl(out, V, F)
+    else:
+        export_stl(solid, str(out), tolerance=tolerance, angular_tolerance=angular)
     return out, solid, facts

@@ -73,6 +73,30 @@ def sample_surface(V: np.ndarray, F: np.ndarray, spacing: float, cap: int = 400_
     return np.concatenate(pts), np.concatenate(tri), float(max(spacing, (L / k).max()))
 
 
+def _pieces(V, F, rmax):
+    """Triangles cut into pieces no wider than rmax from their centre: (a, b, c, triangle of each piece)."""
+    a, b, c = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]
+    tid = np.arange(len(F))
+    done = []
+    for _ in range(64):
+        cen = (a + b + c) / 3
+        R = np.sqrt(np.maximum(np.maximum(((a - cen) ** 2).sum(1), ((b - cen) ** 2).sum(1)), ((c - cen) ** 2).sum(1)))
+        ok = R <= rmax
+        done.append((a[ok], b[ok], c[ok], tid[ok]))
+        if ok.all():
+            break
+        a, b, c, tid = a[~ok], b[~ok], c[~ok], tid[~ok]
+        # rotate each triangle so its longest edge is a-b, then cut it at that edge's midpoint
+        lab, lbc, lca = ((a - b) ** 2).sum(1), ((b - c) ** 2).sum(1), ((c - a) ** 2).sum(1)
+        k = np.argmax(np.c_[lab, lbc, lca], axis=1)
+        T = np.stack([a, b, c], axis=1)
+        idx = np.c_[k, (k + 1) % 3, (k + 2) % 3]
+        a, b, c = (np.take_along_axis(T, idx[:, j][:, None, None].repeat(3, 2), 1)[:, 0] for j in range(3))
+        m = 0.5 * (a + b)
+        a, b, c, tid = np.r_[a, m], np.r_[m, b], np.r_[c, c], np.r_[tid, tid]
+    return tuple(np.concatenate([d[k] for d in done]) for k in range(4))
+
+
 class MeshDistance:
     """Distance from points to one triangle mesh."""
 
@@ -84,6 +108,19 @@ class MeshDistance:
         self.S, self.tri, self.spacing = sample_surface(V, F, spacing, cap=300_000)
         self.tree = cKDTree(self.S)
         self.eps = 1e-9 * max(float(np.ptp(V, axis=0).max()), 1.0)
+        # bounding spheres: a triangle closer to p than d has a piece whose centre is within d + the piece's radius
+        # of p. Long triangles are cut in pieces (halved across their longest edge, the distance to the pieces is the
+        # distance to the triangle) so one ball query of small radius finds every candidate.
+        pa, pb, pc, self.piece_of = _pieces(V, F, max(self.spacing / 2, 1e-6))
+        self.pa, self.pb, self.pc = pa, pb, pc
+        cen = (pa + pb + pc) / 3
+        R = np.sqrt(np.maximum(np.maximum(((pa - cen) ** 2).sum(1), ((pb - cen) ** 2).sum(1)), ((pc - cen) ** 2).sum(1)))
+        lvl = np.floor(np.log2(np.maximum(R, 1e-12) / max(float(R.max()), 1e-12))).astype(np.int64)
+        lvl = np.maximum(lvl, -12)
+        self.bins = []                                  # (tree of piece centres, piece indices, largest radius)
+        for L in np.unique(lvl):
+            idx = np.flatnonzero(lvl == L)
+            self.bins.append((cKDTree(cen[idx]), idx, float(R[idx].max())))
 
     def closest(self, P: np.ndarray, chunk: int = 20000) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """(distance (n,), closest point (n, 3), triangle (n,))."""
@@ -107,27 +144,29 @@ class MeshDistance:
                 d = np.linalg.norm(q - p, axis=1)
                 better = d < best
                 best[better], bq[better], bt[better] = d[better], q[better], t[better]
-            # exact: the true closest triangle has a sample within `spacing` of the closest point, so within
-            # best + spacing of p. Test every triangle with a sample in that ball.
+            # exact: a triangle closer than `best` has its bounding-sphere centre within best + its radius of p.
+            # Test every such triangle (one ball query per bin of similar radii, so each is found once).
             # Points already within 1e-9 of the size of the mesh of a triangle keep that distance (error below that).
             far = np.flatnonzero(best > self.eps)
-            balls = self.tree.query_ball_point(p[far], best[far] + self.spacing * 1.001, workers=-1) if len(far) else []
-            cnt = np.fromiter((len(b) for b in balls), dtype=np.int64, count=len(balls))
-            if cnt.sum():
-                pi = np.repeat(far, cnt)
-                ti = self.tri[np.fromiter((j for b in balls for j in b), dtype=np.int64, count=int(cnt.sum()))]
-                key = np.unique(pi * (len(F) + 1) + ti)
-                pi, ti = key // (len(F) + 1), key % (len(F) + 1)
+            PI, CI = [], []
+            for tree, idx, rb in (self.bins if len(far) else []):
+                balls = tree.query_ball_point(p[far], best[far] + rb * 1.000001 + self.eps, workers=-1)
+                cnt = np.fromiter((len(b) for b in balls), dtype=np.int64, count=len(balls))
+                if cnt.sum():
+                    PI.append(np.repeat(far, cnt))
+                    CI.append(idx[np.fromiter((j for b in balls for j in b), dtype=np.int64, count=int(cnt.sum()))])
+            if PI:
+                pi, ci = np.concatenate(PI), np.concatenate(CI)
                 for s2 in range(0, len(pi), 400_000):
-                    a_, t_ = pi[s2:s2 + 400_000], ti[s2:s2 + 400_000]
-                    q = closest_on_triangles(p[a_], V[F[t_, 0]], V[F[t_, 1]], V[F[t_, 2]])
+                    a_, c_ = pi[s2:s2 + 400_000], ci[s2:s2 + 400_000]
+                    q = closest_on_triangles(p[a_], self.pa[c_], self.pb[c_], self.pc[c_])
                     d = np.linalg.norm(q - p[a_], axis=1)
                     o = np.lexsort((d, a_))
-                    a_, d, q, t_ = a_[o], d[o], q[o], t_[o]
+                    a_, d, q, c_ = a_[o], d[o], q[o], c_[o]
                     first = np.r_[True, a_[1:] != a_[:-1]]
-                    a_, d, q, t_ = a_[first], d[first], q[first], t_[first]
+                    a_, d, q, c_ = a_[first], d[first], q[first], c_[first]
                     better = d < best[a_]
-                    best[a_[better]], bq[a_[better]], bt[a_[better]] = d[better], q[better], t_[better]
+                    best[a_[better]], bq[a_[better]], bt[a_[better]] = d[better], q[better], self.piece_of[c_[better]]
             D[s:s + chunk], Q[s:s + chunk], TI[s:s + chunk] = best, bq, bt
         return D, Q, TI
 

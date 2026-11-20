@@ -452,7 +452,7 @@ def main(argv=None):
     rc.add_argument("--name")
     rc.add_argument("--tolerance", type=float, default=0.02, help="largest deviation from the mesh for a fitted surface, mm")
     rc.add_argument("--layer", type=int, choices=(0, 1, 2), default=2,
-                    help="0: exact solid only, 1: analytic faces (beta), 2: feature recipe (beta)")
+                    help="0: exact solid only, 1: analytic and B-spline faces (beta), 2: feature tree recipe (beta)")
     ins = sub.add_parser("instructions", help="assembly instructions as a PDF from the assembly declaration: instructions <project> [--rev N] [--out FILE]")
     ins.add_argument("project")
     ins.add_argument("--rev", type=int)

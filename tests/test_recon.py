@@ -21,6 +21,7 @@ import recon_fixtures as fx  # noqa: E402
 from form.recon import distance, holes, mesh  # noqa: E402
 
 TOL = 0.02
+TESTED_AT = {"spur_gear": 0.05}       # the tolerance each fixture's full run uses (Layer 0 does not depend on it)
 _runs = {}
 
 
@@ -114,7 +115,7 @@ class Layers(unittest.TestCase):
     def test_layer0_is_the_mesh_exactly(self):
         for name in fx.FIXTURES:
             with self.subTest(name):
-                rep, out = run(name)
+                rep, out = run(name, TESTED_AT.get(name, TOL))
                 L0 = rep["layers"]["0"]
                 self.assertTrue(L0["valid"])
                 self.assertEqual(L0["solids"], 1)
@@ -140,7 +141,7 @@ class Layers(unittest.TestCase):
         L1 = rep["layers"]["1"]
         self.assertGreaterEqual(L1["parametric_area_pct"], 90.0)
         self.assertTrue({"plane", "cylinder", "cone", "torus"} <= set(L1["by_kind"]))
-        self.assertEqual([b["diameter_mm"] for b in rep["layers"]["2"]["bores_in_profile"]], facts("turned_part")["holes"])
+        self.assertEqual([b["diameter_mm"] for b in rep["layers"]["2"]["features"] if b["kind"] == "bore"], facts("turned_part")["holes"])
         self.assertTrue(any(s["kind"] == "axisymmetric" for s in rep["layers"]["2"]["symmetry"]))
 
     def test_layer2_recipe_rebuilds_within_tolerance(self):
@@ -162,27 +163,31 @@ class Layers(unittest.TestCase):
                 P, T = solid.tessellate(shape, 0.002)
                 self.assertLessEqual(verify.compare(V, F, P, T)["hausdorff_mm"], TOL)
         box = run("box_with_holes")[0]["layers"]["2"]
-        self.assertEqual([p["kind"] for p in box["patterns"]], ["single", "grid"])
+        self.assertEqual(sorted(p["kind"] for p in box["patterns"]), ["grid", "single"])
 
     def test_gear_flanks_stay_honest(self):
-        """Spline flanks are not analytic: at 0.02 mm they stay frozen facets and the extrusion recipe is written but
-        not offered, because the mesh's own facets leave it 0.04 mm from any straight extrusion."""
+        """Spline flanks: the gear is recognised (18 teeth, module 2, 20 degrees), but the mesh's own facets are
+        about 0.03 mm from the flanks it was made from, so at 0.02 mm no smooth gear can be within the tolerance and
+        the parametric gear is not offered; the feature tree keeps the toothed outline as reconstructed (frozen
+        facets) and puts the bore back as a feature. At 0.05 mm the parametric gear is within it."""
         rep, out = run("gear")
+        L2 = rep["layers"]["2"]
+        gear = next(t for t in L2["also_tried"] if t.get("method") == "spur gear")
+        self.assertFalse(gear["verified"])
+        self.assertIn("from the mesh", gear["error"])
         L1 = rep["layers"]["1"]
         self.assertTrue(L1["valid"])
-        self.assertLess(L1["parametric_area_pct"], 100.0)
         self.assertGreater(L1["by_kind"]["facet"]["area_mm2"], 0)
-        L2 = rep["layers"]["2"]
-        self.assertEqual(L2["kind"], "extrude")
-        self.assertFalse(L2["verified"])
-        self.assertIn("from the mesh", L2["error"])
-        self.assertEqual(rep["layer_achieved"], 1)
+        self.assertEqual(L2["base"], "embedded solid")
+        self.assertLess(L2["driven_by_params_pct"], 50)
         self.assertEqual([h["diameter_mm"] for h in L2["holes"]], facts("gear")["holes"])
-        self.assertIn({"kind": "rotation", "n": 18}, [{k: s[k] for k in ("kind", "n")} for s in L2["symmetry"] if "n" in s])
-        # with a looser tolerance the recipe is within it
+        # with a looser tolerance the parametric gear is within it
         rep5, _ = run("gear", tolerance=0.05)
-        self.assertTrue(rep5["layers"]["2"]["verified"])
-        self.assertLessEqual(rep5["layers"]["2"]["hausdorff_mm"], 0.05)
+        g5 = rep5["layers"]["2"]
+        self.assertTrue(g5["verified"], g5.get("error"))
+        self.assertEqual(g5["method"], "spur gear")
+        self.assertEqual(g5["fit"]["teeth"], 18)
+        self.assertLessEqual(g5["hausdorff_mm"], 0.05)
 
     def test_report_and_deviation_map(self):
         rep, out = run("box_with_holes")
@@ -194,6 +199,135 @@ class Layers(unittest.TestCase):
         self.assertEqual((dm["map"], dm["evidence"], dm["legend"]["unit"]), ("deviation", "computed", "mm"))
         self.assertTrue(dm["positions"] and dm["values"] and dm["colors"])
         self.assertLessEqual(dm["stats"]["max_mm"], TOL)
+
+
+def rebuild(name, out, **changes):
+    """Build a fixture's recipe with some Params changed. Returns (solid, check)."""
+    from form.recipes import meshsolid
+    from form.recon import solid, tree
+    src = (out / f"{name}_recipe.py").read_text()
+    meshsolid.set_paths({p.name: str(p) for p in out.glob("*_base.step")})
+    try:
+        if changes:
+            from form.recipes import SOURCE_PREFIX, load_source, source_id
+            rid = source_id(src)
+            p = Path(TMP) / f"{rid[len(SOURCE_PREFIX):]}.py"
+            p.write_text(src)
+            rec = load_source(p, rid)
+            shape = rec.build(rec.validate({**rec.defaults(), **changes}))[-1].shape
+        else:
+            shape = tree._build(src)
+    finally:
+        meshsolid.set_paths({})
+    return shape, solid.check(shape.wrapped)
+
+
+def params(out, name):
+    src = (out / f"{name}_recipe.py").read_text()
+    import re
+    return {m.group(1): float(m.group(2)) for m in re.finditer(r"Param\('([a-z0-9_]+)', '[^']*', ([-0-9.e]+)", src)} | \
+        {m.group(1): float(m.group(2)) for m in re.finditer(r'Param\("([a-z0-9_]+)", "[^"]*", ([-0-9.e]+)', src)}
+
+
+class FeatureTree(unittest.TestCase):
+    """Layer 2 on real mechanical parts, a gear and an organic shape: a recipe of features that verifies within the
+    tolerance, and whose Params change the part (a different fillet radius or hole size still builds a valid solid,
+    and the volume moves the way it should)."""
+
+    def assert_edits(self, name, out, key, delta, sign):
+        base, ck0 = rebuild(name, out)
+        v = params(out, name)[key]
+        shape, ck = rebuild(name, out, **{key: v + delta})
+        self.assertTrue(ck["valid"], f"{key} = {v + delta} gives an invalid solid")
+        self.assertEqual(ck["solids"], 1)
+        dv = ck["volume_mm3"] - ck0["volume_mm3"]
+        self.assertGreater(sign * dv, 1e-3, f"{key} {v} -> {v + delta}: volume {ck0['volume_mm3']:.3f} -> {ck['volume_mm3']:.3f}")
+
+    def test_stepped_bracket(self):
+        rep, out = run("stepped_bracket")
+        L2 = rep["layers"]["2"]
+        self.assertEqual(rep["layer_achieved"], 2, L2.get("error"))
+        self.assertEqual(L2["base"], "extrusion stack")
+        self.assertLessEqual(L2["hausdorff_mm"], TOL)
+        self.assertEqual(L2["driven_by_params_pct"], 100.0)
+        self.assertEqual(sorted(h["diameter_mm"] for h in L2["holes"]), facts("stepped_bracket")["holes"])
+        axes = {tuple(abs(round(x)) for x in h["axis"]) for h in L2["holes"]}
+        self.assertEqual(axes, {(0, 0, 1), (1, 0, 0)})                         # holes on two axes
+        cb = [h for h in L2["holes"] if len(h["steps"]) == 2]
+        self.assertEqual([h["steps"][0][1] for h in cb], facts("stepped_bracket")["counterbores"])
+        self.assertEqual(sorted({f["radius_mm"] for f in L2["features"] if f["kind"] == "fillet"}), facts("stepped_bracket")["fillets"])
+        self.assertEqual([f["distance_mm"] for f in L2["features"] if f["kind"] == "chamfer"], facts("stepped_bracket")["chamfers"])
+        src = (out / "stepped_bracket_recipe.py").read_text()
+        for word in ("pocket1_depth", "step1_h", "fillet1_r", "hole2_cbore_d", "fillet("):
+            self.assertIn(word, src)
+        # edits: a bigger fillet takes material off a convex corner, a bigger hole takes material away, a deeper
+        # pocket too
+        p = params(out, "stepped_bracket")
+        convex = "fillet2_r" if p["fillet2_r"] == 5.0 else "fillet1_r"
+        self.assert_edits("stepped_bracket", out, convex, 1.0, -1)
+        self.assert_edits("stepped_bracket", out, "hole1_d", 1.0, -1)
+        self.assert_edits("stepped_bracket", out, "pocket1_depth", 1.0, -1)
+
+    def test_flanged_shaft(self):
+        rep, out = run("flanged_shaft")
+        L2 = rep["layers"]["2"]
+        self.assertEqual(rep["layer_achieved"], 2, L2.get("error"))
+        self.assertEqual(L2["base"], "revolution")
+        self.assertLessEqual(L2["hausdorff_mm"], TOL)
+        self.assertEqual(sorted(h["diameter_mm"] for h in L2["holes"]), facts("flanged_shaft")["holes"])
+        polar = [p for p in L2["patterns"] if p["kind"] == "polar"]
+        self.assertEqual([(p["n"], p["pcd_mm"]) for p in polar], [(4, 38.0)])
+        self.assertEqual([f["diameter_mm"] for f in L2["features"] if f["kind"] == "bore"], facts("flanged_shaft")["bores"])
+        self.assertEqual([f["radius_mm"] for f in L2["features"] if f["kind"] == "fillet"], facts("flanged_shaft")["fillets"])
+        self.assert_edits("flanged_shaft", out, "fillet1_r", 1.0, 1)              # a concave round adds material
+        self.assert_edits("flanged_shaft", out, "hole1_d", 0.5, -1)
+        shape, ck = rebuild("flanged_shaft", out, hole1_pcd=42.0)          # the bolt circle moves out, still one solid
+        self.assertTrue(ck["valid"])
+        self.assertEqual(ck["solids"], 1)
+
+    def test_spur_gear(self):
+        try:
+            import py_gearworks  # noqa: F401
+        except ImportError:
+            self.skipTest("py_gearworks is not installed")
+        # The STL of a py_gearworks gear is itself 0.03 to 0.04 mm from the gear's spline flanks (measured), so it is
+        # checked against the mesh at 0.05 mm, and against the gear it was made from at 0.02 mm.
+        rep, out = run("spur_gear", tolerance=0.05)
+        L2 = rep["layers"]["2"]
+        self.assertEqual(rep["layer_achieved"], 2, L2.get("error"))
+        self.assertEqual(L2["method"], "spur gear")
+        self.assertIn("form.parts", L2["base"])
+        self.assertLessEqual(L2["hausdorff_mm"], 0.05)
+        from form.recon import solid, verify
+        part, _ = fx.FIXTURES["spur_gear"]()
+        Pp, Tp = solid.tessellate(part, 0.002)
+        shape, _ = rebuild("spur_gear", out)
+        Pr, Tr = solid.tessellate(shape, 0.002)
+        self.assertLessEqual(verify.compare(Pp, Tp, Pr, Tr)["hausdorff_mm"], TOL)
+        f = facts("spur_gear")
+        self.assertEqual((L2["fit"]["teeth"], round(L2["fit"]["module_mm"], 2)), (f["teeth"], f["module"]))
+        self.assertIn("from form.parts import spur_gear", (out / "spur_gear_recipe.py").read_text())
+        self.assertEqual(rep["result"]["driven_by_params_pct"], 100.0)
+        shape, ck = rebuild("spur_gear", out, teeth=20)                         # two more teeth: a bigger gear
+        _, ck0 = rebuild("spur_gear", out)
+        self.assertTrue(ck["valid"])
+        self.assertGreater(ck["volume_mm3"], ck0["volume_mm3"])
+
+    def test_organic_blob(self):
+        rep, out = run("organic_blob")
+        L1 = rep["layers"]["1"]
+        self.assertTrue(L1["valid"], L1.get("error"))
+        self.assertGreaterEqual(L1["freeform_area_pct"], 80.0)                 # B-spline patches, not facets
+        self.assertLessEqual(L1["frozen_area_pct"], 1.0)
+        self.assertLessEqual(L1["hausdorff_mm"], TOL)
+        L2 = rep["layers"]["2"]
+        self.assertEqual(rep["layer_achieved"], 2, L2.get("error"))
+        self.assertEqual(L2["base"], "embedded solid")
+        self.assertEqual([h["diameter_mm"] for h in L2["holes"]], facts("organic_blob")["holes"])
+        self.assertLessEqual(L2["hausdorff_mm"], TOL)
+        self.assertTrue(rep["result"]["recipe_references"])
+        self.assertGreater(rep["result"]["freeform_area_pct"], 80.0)
+        self.assert_edits("organic_blob", out, "hole1_d", 2.0, -1)
 
 
 class Surfaces(unittest.TestCase):
