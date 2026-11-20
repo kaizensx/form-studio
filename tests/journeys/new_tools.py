@@ -1,6 +1,6 @@
 """The 12.3 tools in the window: a screw boss added at a face picked in Annotate (a new revision with the boss as a
-feature of the code), the design sliced on every printer and compared in Prove, and a turntable made from the real
-mesh. Every number checked here is read back from the engine."""
+feature of the code), the design sliced on every printer and compared in Prove, opened in the slicer with settings chosen
+for it, and a turntable made from the real mesh. Every number checked here is read back from the engine."""
 from pathlib import Path
 
 from _lib import fold, open_project, open_sheet_wait, sheet, toasts_gone, wait_job, printing_on
@@ -103,6 +103,34 @@ def journey_every_printer(ui):
     ui.scroll_to(ui.item("printerCompare"), 1.0)
     ui.settle(1500)
     ui.shot("tools-every-printer")
+
+
+def journey_open_in_slicer(ui):
+    """Open in <Slicer>: settings chosen for this part, sliced, the project 3MF handed to the slicer app (recorded by
+    FORM_FAKE_LAUNCH, never opened in a test)."""
+    import json
+    import os
+    from form import slicer_open
+    toasts_gone(ui)
+    b = ui.item("openInSlicer")
+    ui.scroll_to(b, 0.5)
+    ui.check(ui.sees("Open in"), "the button names the slicer")
+    ui.click(b)
+    r = ui.wait_until(lambda: ui.js("Store.slicerOpened"), 600, "the design opened in the slicer")
+    ui.check(r["settings_in_file"], f"every setting was read back from the project: {r['plates'][0]['verified']}")
+    ui.check(all(d["evidence"] in ("computed", "heuristic") and d["why"] for d in r["decisions"]), "each choice says why and how it is known")
+    f = Path(r["file"])
+    ui.check(f.is_file() and f.suffix == ".3mf", f"a project 3MF: {f.name}")
+    got = slicer_open.read_project_settings(f)
+    ui.check(all(str(got.get(k)) == str(v) for k, v in r["overrides"].items()), f"the overrides are in the file: {r['overrides']}")
+    opened = [json.loads(x) for x in Path(os.environ["FORM_FAKE_LAUNCH"]).read_text().splitlines()]
+    ui.eq(opened[-1]["opened"], str(f), "the project was handed to the slicer app")
+    ui.wait_until(lambda: ui.find(name="slicerChoices") is not None, 5, "the choices listed in Prove")
+    ui.expect("Settings chosen for this part")
+    ui.scroll_to(ui.item("slicerChoices"), 0.3)
+    toasts_gone(ui)
+    ui.settle(600)
+    ui.shot("tools-open-in-slicer")
 
 
 def journey_turntable(ui):

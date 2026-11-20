@@ -84,20 +84,28 @@ class Journeys(unittest.TestCase):
     def test_maker_tools(self):
         self.journey("maker_tools.py")
 
-    def test_new_tools(self):              # 12.3: a boss at a face, every printer compared, a turntable
+    def test_new_tools(self):              # 12.3: a boss at a face, every printer compared, a turntable, Open in <Slicer>
         # real slicers where they are installed (macOS here); elsewhere a stand-in OrcaSlicer that copies a fixture G-code
+        # and writes the project 3MF its CLI writes. Opening the slicer app is recorded, never done (FORM_FAKE_LAUNCH).
         sys.path.insert(0, str(HERE))
         from test_plates import REAL
+        tmp = Path(tempfile.mkdtemp(prefix="form-ui-tools-"))
+        launch = {"FORM_FAKE_LAUNCH": str(tmp / "launch.jsonl")}
         if REAL:
-            return self.journey("new_tools.py")
+            return self.journey("new_tools.py", env_extra=launch)
         import stat
         from test_slicers import FIX, NOWHERE
         from form.adapters import SLICERS
-        tmp = Path(tempfile.mkdtemp(prefix="form-ui-tools-"))
         py = tmp / "stand_in.py"
-        py.write_text("import sys, shutil, os\nargs = sys.argv[1:]\nif args == ['--help']:\n    print('OrcaSlicer-2.5.1:'); sys.exit(0)\n"
+        py.write_text("import sys, shutil, os, json, zipfile\nargs = sys.argv[1:]\nif args == ['--help']:\n    print('OrcaSlicer-2.5.1:'); sys.exit(0)\n"
                       f"out = args[args.index('--outputdir') + 1]\nshutil.copyfile({str(FIX / 'orca' / 'generic_printer.gcode')!r}, "
-                      "os.path.join(out, 'plate_1.gcode'))\n", encoding="utf-8")
+                      "os.path.join(out, 'plate_1.gcode'))\n"
+                      "merged = {}\n"
+                      "for f in args[args.index('--load-settings') + 1].split(';') + [args[args.index('--load-filaments') + 1]]:\n"
+                      "    merged.update(json.load(open(f)))\n"
+                      "merged['different_settings_to_system'] = ['', '', '']\n"
+                      "with zipfile.ZipFile(os.path.join(out, 'plate.3mf'), 'w') as z:\n"
+                      "    z.writestr('Metadata/project_settings.config', json.dumps(merged))\n", encoding="utf-8")
         if os.name == "nt":
             app = tmp / "orca.cmd"
             app.write_text(f'@"{sys.executable}" "{py}" %*\r\n', encoding="utf-8")
@@ -112,7 +120,7 @@ class Journeys(unittest.TestCase):
                         encoding="utf-8")
         from unittest import mock
         with mock.patch.dict(os.environ, {"FORM_UI_STUDIO_TOML": str(toml)}):
-            self.journey("new_tools.py")
+            self.journey("new_tools.py", env_extra=launch)
 
     def test_lighter_replace(self):        # 12.3: make it lighter (real checks, real slices), replace a broken part
         self.journey("lighter_replace.py")

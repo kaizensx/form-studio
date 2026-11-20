@@ -141,6 +141,8 @@ Column {
     Row { visible: Store.printOn && root.model && !!root.ch; spacing: 8; topPadding: 6
         Btn { objectName: "makePrintable"; small: true; icon: "printer"; text: "Make it for 3D printing"; enabled: !root.busy
             tip: "Run the print checks and slice it (when a slicer is installed)"; onClicked: Store.setPurpose("print") } }
+    Txt { kind: "fine"; tone: 2; width: parent.width; visible: Store.printOn && root.model && !!root.ch
+        text: "Then “Open in " + Store.slicerName + "” opens it sliced, with settings chosen for this part." }
 
     // ── what could not be checked (mesh designs, a model with no stated process): never counted as a pass ──
     Fold { visible: root.unknown.length > 0; key: "prove.unknown"; openByDefault: true
@@ -271,6 +273,10 @@ Column {
         Txt { kind: "fine"; tone: 2; width: parent.width; visible: !!root.sl && !root.plates.length && !!root.sl.material && !!root.sl.material.text
             text: root.sl && root.sl.material ? "Filament: " + root.sl.material.text : "" }
         Flow { spacing: 8; topPadding: 2; width: parent.width
+            Btn { objectName: "openInSlicer"; kind: "primary"; icon: "external_link"; text: "Open in " + Store.slicerName
+                busyText: "Choosing settings…"; busy: Store.slicerOpenBusy; enabled: !root.busy
+                tip: "Choose settings for this part on this printer, slice it for real and open the project in " + Store.slicerName
+                onClicked: Store.openInSlicer() }
             Btn { visible: !Store.layers; icon: "play"; text: "Watch it print"; tip: "Play the slicer's toolpaths in 3D (a simulation, not a print)"
                 onClicked: Store.simulate({ at: 0, play: true }) }
             Btn { icon: Store.layers ? "arrow_left" : "layers"; text: Store.layers ? "Back to the design" : "Inspect layers"
@@ -278,6 +284,22 @@ Column {
             Btn { kind: "quiet"; icon: "download"; text: root.plates.length > 1 ? "Save plate " + Store.plateShown + " 3MF…" : "Save sliced 3MF…"
                 visible: !!root.shownSlice && !!root.shownSlice.threemf
                 onClicked: { save.selectedFile = Bridge.downloads() + "/" + (root.plates.length > 1 ? Store.pid + "_plate" + Store.plateShown + ".3mf" : root.sl.threemf); Store.ask(save) } } }
+        // what Open in <Slicer> chose, one line each, with how it is known
+        Fold { objectName: "slicerChoices"; visible: !!Store.slicerOpened; key: "prove.slicerOpen"; openByDefault: true
+            title: "Settings chosen for this part"
+            note: Store.slicerOpened ? Store.slicerOpened.printer + " · " + F.dur(Store.slicerOpened.time_s) + " · " + F.fmt(Store.slicerOpened.filament_g, 1) + " g" : ""
+            Column { width: parent.width; spacing: 6
+                Repeater { model: Store.slicerOpened ? Store.slicerOpened.decisions : []
+                    Column { required property var modelData; width: parent.width; spacing: 1
+                        Item { width: parent.width; height: 18
+                            Txt { width: parent.width - dv.width - dt.width - 16; text: parent.parent.modelData.label; font.weight: 550; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                            Txt { id: dv; mono: true; anchors.right: dt.left; anchors.rightMargin: 8; text: String(parent.parent.modelData.value); wrapMode: Text.NoWrap
+                                width: Math.min(implicitWidth, parent.width * 0.5); elide: Text.ElideLeft }
+                            Tag { id: dt; anchors.right: parent.right; y: 1; text: parent.parent.modelData.evidence } }
+                        Txt { kind: "fine"; tone: 2; width: parent.width; text: parent.modelData.why } } }
+                Txt { kind: "fine"; width: parent.width
+                    text: Store.slicerOpened ? (Store.slicerOpened.settings_in_file ? "Every setting was read back from the project file. " : "Some settings were not found in the project file. ")
+                        + "Time and grams are " + Store.slicerOpened.slicer + "'s simulation, not a print." : "" } } }
         Txt { kind: "fine"; width: parent.width
             text: "A slice shows the toolpaths " + ((root.sl && root.sl.slicer_name) || "Bambu Studio") + " would send with these presets. It is not a print: adhesion, warping and fit are only known after printing." }
         Fold { title: "Slice details"; key: "prove.slice"
@@ -343,6 +365,9 @@ Column {
             Btn { icon: "layers"; text: root.sliceFailed ? "Try again" : "Slice now"; busyText: "Slicing…"; busy: root.busy
                 enabled: !(root.sn && root.sn.unavailable)
                 onClicked: Store.run(["geometry", "exports", "checks", "slice"], root.sliceFailed) }
+            Btn { kind: "quiet"; icon: "external_link"; text: "Open in " + Store.slicerName; visible: !(root.sn && root.sn.unavailable)
+                busyText: "Choosing settings…"; busy: Store.slicerOpenBusy; enabled: !root.busy && !!root.d && !!root.d.exports && !!root.d.exports.files.stl
+                tip: "Choose settings for this part, slice it and open the project in " + Store.slicerName; onClicked: Store.openInSlicer() }
             Btn { objectName: "designOnly"; kind: "quiet"; text: "Design only"; enabled: !root.busy
                 tip: "Do not slice this design. Checks, exports and release still work; the release says it was not sliced."
                 onClicked: Store.settings({ design_only: true }) }
