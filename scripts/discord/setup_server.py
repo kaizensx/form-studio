@@ -202,12 +202,21 @@ class Setup:
                                 have[new] = {**have.pop(old), "name": new}
                         want = [tag(t) for t in tags]
                         names = {w["name"] for w in want}
+                        extra = [t for n, t in have.items() if n not in names]
+                        if extra and not self.dry:        # a tag no longer listed stays only while a post uses it
+                            used = self.used_tags(c["id"])
+                            extra = [t for t in extra if t.get("id") in used]
                         body["available_tags"] = [{**({"id": have[w["name"]]["id"]} if w["name"] in have else {}), **w}
-                                                  for w in want] + [t for n, t in have.items() if n not in names]
+                                                  for w in want] + extra
                     body.pop("type")
                     if self._differs(c, body):
                         self._do("PATCH", f"/channels/{c['id']}", body, f"update #{name}")
                         c.update(body)
+
+    def used_tags(self, forum_id) -> set:
+        active = d.call("GET", f"/guilds/{self.g}/threads/active").get("threads", [])
+        archived = d.call("GET", f"/channels/{forum_id}/threads/archived/public?limit=100").get("threads", [])
+        return {tid for t in active + archived if t.get("parent_id") == forum_id for tid in t.get("applied_tags", [])}
 
     @staticmethod
     def _differs(c, body):
