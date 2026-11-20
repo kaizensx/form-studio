@@ -1248,6 +1248,8 @@ class Studio:
                 files[kind] = {"name": f.name, "bytes": f.stat().st_size, "sha256": sha_file(f)}
         if r.get("unavailable"):
             meta["unavailable"] = r["unavailable"]
+        if r.get("mesh_texture"):                         # STL/OBJ/GLB carry the textured mesh; STEP is the smooth solid
+            meta["mesh_texture"] = r["mesh_texture"]
         (tmp / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
         fsutil.replace_dir(tmp, out)
 
@@ -1540,6 +1542,11 @@ class Studio:
                 elif c["status"] == "WARN":
                     warns.append({"id": c["id"], "label": c["label"], "value": c["value"]})
         # a coupon calibrates the printer; only a result from this part speaks for this revision
+        from . import staged                          # a briefed or planned design needs a critique pass of this revision
+        crit = staged.needs_critique(p)
+        if crit:
+            reasons.append(crit)
+            blocking.append(crit)
         physical = [e for e in p["evidence"] if e["rev"] == p["head"] and (e["kind"] == "fit" or e.get("source") == "part")]
         model = bool(off) and off.get("why") == "purpose"
         level = "Geometry computed · 3D model, not for 3D printing" if model else \

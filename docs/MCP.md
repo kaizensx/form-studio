@@ -60,11 +60,14 @@ Rules:
   Sketches from Form Studio carry structured JSON: it is authoritative over the picture; stated dimensions override
   drawn lengths. STEP/STL: import_reference. PDF drawings: read_document. Download only files the person gave you.
 - If the message has a "Purpose:" line, respect it: "just a 3D model" means no slicing and no print talk.
+- Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
+  design_guide(topic=...) and design_examples -> plan_design -> create_design(plan=...) -> look at the sheet and
+  section -> critique -> update_design. Analyse like a top engineer and designer before writing code.
 ```
 
 ## Tools at a glance
 
-79 tools. Read-only tools never change a project.
+83 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -73,6 +76,10 @@ Rules:
 | [`install_software`](#install_software) | changes | Install one thing from FORM's registry (ids come from setup_status → software), e.g. "parts", "claude", "slicer.orca". |
 | [`describe_recipe`](#describe_recipe) | read-only | Parameters (unit, range, group, the feature each one drives), features and what the recipe checks. |
 | [`design_guide`](#design_guide) | read-only | Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter, holder, mechanism...). |
+| [`design_brief`](#design_brief) | changes | Stage 1 of a complex design: store the structured brief before any geometry. |
+| [`plan_design`](#plan_design) | changes | Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id). |
+| [`design_examples`](#design_examples) | read-only | Complete, high-quality example designs (build123d + form.craft) to learn construction from: a textured helmet shell, a planetary gearbox, a hinged case with a snap latch, an ergonomic handle, a knurled knob, a spiral-ribbed vase and more. |
+| [`critique`](#critique) | changes | Stage 5: look closely and measure. |
 | [`read_document`](#read_document) | read-only | Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). |
 | [`create_design`](#create_design) | changes | Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass, built with build123d. |
 | [`update_design`](#update_design) | changes | Replace a design's code as a new revision (history keeps every version). |
@@ -190,13 +197,87 @@ Parameters (unit, range, group, the feature each one drives), features and what 
 *Read-only.*
 
 Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
-holder, mechanism...). Returns the contract for a design written as code, the rules, and a complete example
-that builds. Then call create_design. purpose: "print" or "model" (default: the person's default, see
-form_overview); the print rules (bed orientation, overhangs, nozzle walls) are only in the guide for "print".
+holder, mechanism...). topic="core" (default) returns the contract for a design written as code, the rules,
+the staged workflow and a complete example that builds. Other topics, for complex designs: surfacing,
+mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicable when purpose="model").
+They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
+textures. Then design_examples for a close exemplar, and create_design.
 
 | Argument | Type | Required |
 |---|---|---|
+| `topic` | string |  |
 | `purpose` | string \| null |  |
+
+### `design_brief`
+
+Stage 1 of a complex design: store the structured brief before any geometry. goal: what it is and does.
+requirements: what it must do. dimensions: {name: {value, unit, source}} where source is measured, specified
+(datasheet, standard) or assumed. constraints: limits (bed size, material, process). unknowns: what you could
+not settle; list them, never guess them (ask_user / ask_measurement for ones that change fit, load or
+safety). style: the design language. project: attach to an existing project instead of a new design.
+Returns the brief id, whether it is complex (heuristic) and which design_guide topics and exemplars to read.
+
+| Argument | Type | Required |
+|---|---|---|
+| `name` | string | yes |
+| `goal` | string | yes |
+| `requirements` | array \| null |  |
+| `dimensions` | object \| null |  |
+| `constraints` | array \| null |  |
+| `unknowns` | array \| null |  |
+| `style` | string |  |
+| `purpose` | string \| null |  |
+| `references` | array \| null |  |
+| `project` | string \| null |  |
+
+### `plan_design`
+
+Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id).
+features: [{id, label, how, part?, dims?}] in build order; id becomes the Feature id in the code, how names
+the construction (e.g. "craft.loft_sections through 9 superellipse sections", "craft.pin_hinge 0.35 mm").
+parts: [{id, label, material?}]. key_dimensions: {name: value or {value, unit, why}}. mechanisms: each with its
+clearance and motion. textures: each with its tier (B-rep or mesh texture). risks: what could make it fail and
+how you will check it. A complex brief needs at least 3 features and named risks.
+Then create_design(..., plan=<brief id>).
+
+| Argument | Type | Required |
+|---|---|---|
+| `brief` | string | yes |
+| `features` | array | yes |
+| `parts` | array \| null |  |
+| `key_dimensions` | object \| null |  |
+| `mechanisms` | array \| null |  |
+| `textures` | array \| null |  |
+| `risks` | array \| null |  |
+| `approach` | string |  |
+| `references_used` | array \| null |  |
+
+### `design_examples`
+
+*Read-only.*
+
+Complete, high-quality example designs (build123d + form.craft) to learn construction from: a textured
+helmet shell, a planetary gearbox, a hinged case with a snap latch, an ergonomic handle, a knurled knob, a
+spiral-ribbed vase and more. query: words to search; name: one exemplar, returned with its full source.
+They are references for you, never projects, and never shown to the person as designs.
+
+| Argument | Type | Required |
+|---|---|---|
+| `query` | string |  |
+| `name` | string |  |
+
+### `critique`
+
+Stage 5: look closely and measure. Returns a close-up render of each feature, computed metrics (smallest
+fillet, sharp-edge fraction, symmetry, proportions, surface mix, sliver faces, planned features missing) and
+a checklist to answer by looking. All of it is heuristic evidence: numbers to prompt a look, not a verdict.
+Records one critique pass for the head revision (with your notes: what you saw, what you will change);
+a briefed or planned design cannot be released before its head revision has one.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `notes` | string |  |
 
 ### `read_document`
 
@@ -225,6 +306,8 @@ OpenSCAD output is a mesh: no STEP, no B-rep checks (reported as not available, 
 references: absolute paths of STEP/STL parts to import first, so a Python design can use self.reference("name.step").
 purpose: "print" (for 3D printing) or "model" (just a 3D model; not sliced, no print checks). Omitted: the
 person's default. process (models only): cnc, laser, injection, casting, sheet_metal, render, cad, other.
+plan: the brief id from design_brief/plan_design. A complex brief (a mechanism, an organic or styled form, a
+texture, several parts) is refused without one. Returns the project, a six-view sheet and a section: look.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -237,6 +320,7 @@ person's default. process (models only): cnc, laser, injection, casting, sheet_m
 | `references` | array \| null |  |
 | `purpose` | string \| null |  |
 | `process` | string \| null |  |
+| `plan` | string |  |
 
 ### `update_design`
 
@@ -244,7 +328,8 @@ Replace a design's code as a new revision (history keeps every version). Existin
 changing a default does not change a saved value, so pass values={...} to change them. New parameters start at
 their defaults. Use preview_change/commit_change instead when only values change. language defaults to the
 project's current one ("python" or "openscad"). An unusable assembly() declaration is refused with the reason,
-and no revision is made.
+and no revision is made. Returns the result with a six-view sheet and a section of the new revision: look.
+For a briefed design, critique(project) the revision before asking for release.
 
 | Argument | Type | Required |
 |---|---|---|

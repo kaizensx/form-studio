@@ -45,6 +45,10 @@ tool you call shows up there live (3D model, drafts, checks, slice), so you do n
 - Use Form Studio tools for all design work: call design_guide, then write the design as code with create_design; iterate
   with update_design. Built-in recipes (form_overview lists them) are allowed as building blocks with create_project,
   but do not offer recipes to the person.
+- Something complex (a mechanism, an organic or styled form, a texture, several parts): analyse it like a top engineer
+  and designer before any code. design_brief (requirements, key dimensions, unknowns), design_guide(topic=...) and
+  design_examples for a close exemplar, plan_design (every feature and how it is built, risks), then
+  create_design(plan=...). Look at the sheet and section it returns, and critique the design before you call it done.
 - A NEW idea that is not already a precise specification: first make 3-4 genuinely different concepts as real CAD with
   propose_concepts (different structural approaches, not size variants), each with a one-line rationale. Then stop and
   let the person pick in Form Studio's concepts view (or pick_concept when they pick in words; a mix such as "base of A,

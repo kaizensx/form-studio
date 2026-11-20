@@ -126,6 +126,18 @@ def _build(recipe_id: str, values: dict, tol: float):
         areas = np.linalg.norm(np.cross(b - a, c - a), axis=1) / 2
         k = int(np.argmax(areas))
         probe = (a[k] + b[k] + c[k]) / 3
+        if face.geom_type.name not in ("PLANE", "CYLINDER", "CONE"):
+            # on a large free-form face a coarse triangle's centre can sit tenths of a mm off the surface: use the
+            # nearest point on the face's own surface, so the feature test below compares surfaces, not the mesh
+            try:
+                from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
+                from OCP.gp import gp_Pnt
+                pj = GeomAPI_ProjectPointOnSurf(gp_Pnt(*map(float, probe)), BRep_Tool.Surface_s(face.wrapped))
+                if pj.NbPoints():
+                    q = pj.NearestPoint()
+                    probe = np.array([q.X(), q.Y(), q.Z()])
+            except Exception:
+                pass
         feature = stages[0].feature
         pt = Vertex(*probe)
         for i in range(len(skins) - 1, -1, -1):
@@ -268,6 +280,20 @@ def op_view(key, recipe_id, values, tol=0.05, edges=True, dock_mass_g=None):
              "indices": _b64(np.concatenate(g["T"]).astype(np.uint32))} for k, g in groups.items()]
     out = _summary(model, dock_mass_g)
     out["mesh"] = mesh
+    if not getattr(model["recipe"], "mesh", False):                  # mesh textures show in the viewer and renders
+        from .craft import meshtex
+        tex = _textured(model, meshtex.VIEW_BUDGET)
+        if tex is not None:
+            V, F, tags, info = tex
+            V32 = V.astype(np.float32)
+            out["mesh"] = []
+            for feat in dict.fromkeys(tags.tolist()):
+                sel = F[tags == feat]
+                used, inv = np.unique(sel, return_inverse=True)
+                out["mesh"].append({"feature": feat, "positions": _b64(V32[used]),
+                                    "indices": _b64(inv.reshape(-1, 3).astype(np.uint32))})
+            out["mesh_texture"] = {"label": meshtex.LABEL, "triangles": info["triangles_out"]}
+            out["triangles"] = info["triangles_out"]
     from . import assembly as asm                      # parts, placements and per-part meshes when the design declares an assembly
     if asm.get(model) is not None:
         out["assembly"] = asm.view(model, _b64, _edges)
@@ -282,17 +308,34 @@ def op_summary(key, recipe_id, values, tol=0.05, dock_mass_g=None):
     return _summary(_get(key, recipe_id, values, tol), dock_mass_g)
 
 
-def _oriented(shape, orientation):
-    from build123d import Axis, Pos, Rot
+def _rotated(shape, orientation):
+    """The shape turned as the print orientation says (before it is dropped onto the plate)."""
+    from build123d import Axis, Rot
     from . import analysis
     if orientation in ORIENTATIONS:
         rx, ry = ORIENTATIONS[orientation]
-        s = Rot(rx, ry, 0) * shape if (rx or ry) else shape
-    else:                                              # "down:x,y,z": the design direction that faces the plate (form/analysis.py)
-        aa = analysis.axis_angle(orientation)
-        if aa is None:
-            raise RecipeError(f"Unknown print orientation “{orientation}”.", "", "Pick one from the orientation table.")
-        s = shape.rotate(Axis((0, 0, 0), aa[0]), aa[1]) if abs(aa[1]) > 1e-9 else shape
+        return Rot(rx, ry, 0) * shape if (rx or ry) else shape
+    aa = analysis.axis_angle(orientation)              # "down:x,y,z": the design direction that faces the plate (form/analysis.py)
+    if aa is None:
+        raise RecipeError(f"Unknown print orientation “{orientation}”.", "", "Pick one from the orientation table.")
+    return shape.rotate(Axis((0, 0, 0), aa[0]), aa[1]) if abs(aa[1]) > 1e-9 else shape
+
+
+def _rotation_matrix(orientation) -> np.ndarray:
+    """3x3 matrix of _rotated(), read off by turning the unit points (for meshes made outside the B-rep)."""
+    from build123d import Vertex
+    o = _rotated(Vertex(0, 0, 0), orientation)
+    o = np.array([o.X, o.Y, o.Z])
+    cols = []
+    for e in ((1, 0, 0), (0, 1, 0), (0, 0, 1)):
+        v = _rotated(Vertex(*e), orientation)
+        cols.append(np.array([v.X, v.Y, v.Z]) - o)
+    return np.stack(cols, axis=1)
+
+
+def _oriented(shape, orientation):
+    from build123d import Pos
+    s = _rotated(shape, orientation)
     bb = s.bounding_box()
     return Pos(-(bb.min.X + bb.max.X) / 2, -(bb.min.Y + bb.max.Y) / 2, -bb.min.Z) * s
 
@@ -342,9 +385,28 @@ def write_stl(shape, path, tol: float = 0.01, ang: float = 0.1) -> dict:
     return {"tolerance": tol, "angular_tolerance": ang, "remeshed": False, "open_edges": open_, "open_edges_first": first}
 
 
+def _textured(model, budget):
+    """The design's mesh textures applied to its tessellation (form/craft/meshtex.py), or None when it declares none.
+    Cached on the model per triangle budget: (V, F, feature per triangle, info)."""
+    from .craft import meshtex
+    cache = model.setdefault("_textured", {})
+    if budget in cache:
+        return cache[budget]
+    try:
+        specs = meshtex.declared(model["recipe"], model["values"])
+    except RecipeError:
+        raise
+    except Exception as e:
+        raise RecipeError(f"mesh_texture() raised {type(e).__name__}: {e}", "", "Fix mesh_texture() in the design source.")
+    cache[budget] = meshtex.apply_to_faces(model["faces"], specs, budget) if specs else None
+    return cache[budget]
+
+
 def op_export(key, recipe_id, values, out_dir, name, orientation="as_modelled", tol=0.01, ang=0.1):
-    """Write STEP (design frame) and STL (print frame). Returns paths and sizes."""
+    """Write STEP (design frame) and STL (print frame). Returns paths and sizes.
+    A design with mesh textures gets the textured mesh in its STL (and so its OBJ and GLB); the STEP stays smooth."""
     from build123d import export_step
+    from .craft import meshtex
     model = _get(key, recipe_id, values, 0.05)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -353,6 +415,21 @@ def op_export(key, recipe_id, values, out_dir, name, orientation="as_modelled", 
     mesh = getattr(model["recipe"], "mesh", False)
     if not mesh:
         export_step(model["shape"], str(step))
+    tex = None if mesh else _textured(model, meshtex.EXPORT_BUDGET)
+    if tex is not None:
+        V, F, _tags, info = tex
+        V = V @ _rotation_matrix(orientation).T
+        lo, hi = V.min(axis=0), V.max(axis=0)
+        V = V - np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]])
+        meshtex.write_stl(stl, V, F)
+        size = hi - lo
+        out = {"step": str(step), "stl": str(stl), "orientation": orientation, "stl_tolerance_mm": tol,
+               "print_bbox": [float(size[0]), float(size[1]), float(size[2])], "brep_volume_mm3": model["volume"],
+               "seconds": round(time.perf_counter() - t, 3),
+               "mesh_texture": {"label": meshtex.LABEL, "triangles": info["triangles_out"],
+                                "textures": [{k: x[k] for k in ("kind", "amplitude", "scale", "features")} for x in info["textures"]],
+                                **({"coarser": info["coarser"]} if info.get("coarser") else {})}}
+        return out
     oriented = _oriented(model["shape"], orientation)
     used = write_stl(oriented, stl, tol, ang)
     bb = oriented.bounding_box()
@@ -679,3 +756,5 @@ from .instructions import KERNEL_OPS as _INSTR_OPS  # noqa: E402  (assembly inst
 OPS.update(_INSTR_OPS)
 from .recon import KERNEL_OPS as _RECON_OPS  # noqa: E402  (mesh to editable CAD)
 OPS.update(_RECON_OPS)
+from .critique import KERNEL_OPS as _CRITIQUE_OPS  # noqa: E402  (design critique metrics and section views)
+OPS.update(_CRITIQUE_OPS)

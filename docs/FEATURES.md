@@ -155,6 +155,39 @@ each one named as it arrives.
 - **Every design on Home**, each a live 3D card, filtered by released and in progress; rename, duplicate, export or
   move to the trash.
 
+## Design intelligence
+
+- **Complex designs are staged.** For a mechanism, an organic or styled form, a texture or several parts, the agent
+  first writes a structured brief (requirements, key dimensions with their source, and the unknowns it could not
+  settle, listed rather than guessed), then a feature plan (every feature with how it will be built, mechanisms with
+  their clearances, textures with their tier, and the risks). Form Studio refuses to build a complex design without
+  a plan (`design_brief`, `plan_design`, `create_design(plan=...)`).
+- **The agent looks at every revision.** Creating or changing a design returns a six-view sheet and a section cut
+  through its centre, so walls, voids and clearances are seen, not assumed.
+- **Critique before release.** `critique` renders a close-up of every feature and computes metrics from the solid:
+  the smallest fillet, the share of sharp edges, mirror symmetry, proportions against classic
+  ratios, the mix of planar and free-form surface, sliver faces and planned features that are missing, with a
+  checklist to answer by looking. All of it is labelled heuristic. A briefed design cannot be released until its
+  revision has a recorded critique.
+- **A helper library for real design work.** `form.craft` gives designs lofts through superellipse and spline
+  sections, sweeps, revolves, shells (including section-inset shells for lofted domes), safe and variable fillets;
+  mechanisms with their numbers (print-in-place pin and living hinges, cantilever and annular snaps with their
+  strain, bayonets, dovetails, detents, ratchets, cams with their pressure angle, four-bar linkages with their
+  Grashof class and transmission angle, gear trains and planetary sets with their assembly conditions); ISO 286
+  limits and fits and bearing seat tolerances; ribs, gussets, boss arrays and lattices; and section-loft bodies for
+  helmets, grips and handles. Every helper checks its numbers and names the fix; fallbacks are reported.
+- **Texture in two honest tiers.** B-rep texture is real geometry in the CAD solid (an exact diamond or straight
+  knurl, spiral ribs as one smooth skin, wrapped ribs, embossed cells), capped at about 2,000 elements. Fine texture
+  (leather grain, a carbon-like twill, stone-like cells, noise, hexagons, a heightmap image) is a mesh texture: the
+  STL, OBJ, GLB and the renders carry it, labelled "mesh texture; STEP carries the smooth body".
+- **Guides by topic and worked examples.** `design_guide(topic=...)` covers surfacing, mechanisms, organic forms,
+  texture, aesthetics, and design for printing (only for designs that are printed). `design_examples` serves twelve
+  complete exemplar designs (a textured full-face helmet shell, a planetary gearbox, a hinged case with a snap latch,
+  an ergonomic handle, a quick-release clamp, a knurled knob, a spiral-ribbed vase, a belt idler, a cable-chain link,
+  an Arca-type camera plate, a drone arm and a table lamp) to the agent only; they never appear as projects.
+- **A design bench.** `tests/design_bench` holds about twenty briefs scored automatically (staging, builds, planned
+  features present, craft and form metrics); the exemplars are built and checked against it in the test suite.
+
 ## Mesh to editable CAD
 
 Bring an STL, OBJ or 3MF and Form Studio rebuilds it as CAD, then measures how close the result is to the mesh.
