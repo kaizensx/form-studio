@@ -52,7 +52,7 @@ def _dir(st, p) -> Path:
     return st.dir(p["id"]) / "artifacts" / "photo"
 
 
-def _options(st, preset, finish, color, fast, layer_lines) -> dict:
+def _options(st, preset, finish, color, fast, layer_lines, view=None, azimuth=None, elevation=None) -> dict:
     if preset not in bl.PRESETS:
         raise StudioError(f"Unknown preset “{preset}”.", "Presets: " + ", ".join(bl.PRESETS) + ".")
     if finish not in bl.FINISHES:
@@ -63,14 +63,33 @@ def _options(st, preset, finish, color, fast, layer_lines) -> dict:
     if not re.fullmatch(r"#[0-9a-f]{6}", color):
         raise StudioError(f"“{color}” is not a colour.", "Use a hex colour such as #3d6fb6.")
     layer = layer_height(st) if layer_lines else {"mm": None, "source": None, "note": "layer lines off"}
-    return {"preset": preset, "finish": finish, "color": color, "fast": bool(fast), "layer": layer}
+    try:
+        cam = bl.photo_view(view, azimuth, elevation)
+    except ValueError as e:
+        raise StudioError(str(e), "Views: " + ", ".join(bl.PHOTO_VIEWS) + "; or azimuth/elevation in degrees.")
+    return {"preset": preset, "finish": finish, "color": color, "fast": bool(fast), "layer": layer,
+            "view": list(cam), "view_name": (f"azimuth {azimuth}, elevation {elevation}" if azimuth is not None or
+                                             elevation is not None else view or "iso")}
+
+
+def zones(st, p) -> list:
+    """The design's material zones for photos (Recipe.appearance, form/appearance.py), [] when it declares none or
+    they cannot be read (the photo then uses one material, and says so)."""
+    from . import appearance
+    try:
+        r = st.recipe(p)
+        return appearance.declared(r, r.validate(st.rev(p)["values"]))
+    except Exception:
+        return []
 
 
 def key_for(st, p, o: dict) -> str:
     b = blender(st.cfg)
     keys = st.keys(p)
+    extra = () if tuple(o.get("view") or bl.APP_ISO) == tuple(bl.APP_ISO) and not o.get("zones") else \
+        (o.get("view"), json.dumps(o.get("zones") or [], sort_keys=True))
     return H("photo", keys["exports"], o["preset"], o["finish"], o["color"], o["fast"], o["layer"]["mm"],
-             bl.SCENE_VERSION, b.get("version"))
+             bl.SCENE_VERSION, b.get("version"), *extra)
 
 
 def renders(st, p) -> list:
@@ -109,12 +128,16 @@ def state(st, p) -> dict:
             "stale": len([m for m in rs if not m["current"]]), "busy": p["id"] in _busy}
 
 
-def render(st, p, preset="studio", finish="matte", color=None, fast=False, layer_lines=True, job=None) -> dict:
-    """Render the current revision. Returns the render's record (cached if this exact render exists)."""
+def render(st, p, preset="studio", finish="matte", color=None, fast=False, layer_lines=True, job=None, view=None,
+           azimuth=None, elevation=None, use_zones=True) -> dict:
+    """Render the current revision. Returns the render's record (cached if this exact render exists).
+    view: a PHOTO_VIEWS name, or azimuth/elevation in degrees (azimuth from +X toward +Y, like render()).
+    use_zones: give each material zone the design declares (Recipe.appearance) its own material."""
     b = blender(st.cfg, refresh=True)
     if not b["available"]:
         raise StudioError("Blender is not available, so Form Studio cannot render.", b["reason"], status=409)
-    o = _options(st, preset, finish, color, fast, layer_lines)
+    o = _options(st, preset, finish, color, fast, layer_lines, view, azimuth, elevation)
+    o["zones"] = zones(st, p) if use_zones else []
 
     def say(frac, text):
         if job is not None:
@@ -149,9 +172,16 @@ def render(st, p, preset="studio", finish="matte", color=None, fast=False, layer
         stl = st.apath(p, "exports", keys["exports"]) / ex["files"]["stl"]["name"]
         d.mkdir(parents=True, exist_ok=True)
         tmp = d / f"{key}.tmp.png"
+        zfiles = None
+        if o["zones"]:
+            say(None, "Writing the material zones")
+            zr = st._k("photo_zones", key=keys["geometry"], recipe_id=st.rid(p), values=st.rev(p)["values"],
+                       out_dir=str(d / f"{key}-zones"), p=p, timeout=600)
+            zfiles = zr.get("zones") or None
         try:
-            jobspec = bl.build_job(stl, tmp, o["preset"], o["finish"], o["color"], o["layer"]["mm"], o["fast"],
-                                   samples=int(st.cfg.get("blender", {}).get("samples", 128)))
+            jobspec = bl.build_job(Path(zfiles[0]["stl"]) if zfiles else stl, tmp, o["preset"], o["finish"], o["color"],
+                                   o["layer"]["mm"], o["fast"], samples=int(st.cfg.get("blender", {}).get("samples", 128)),
+                                   view=tuple(o["view"]), zones=zfiles)
         except ValueError as e:
             raise StudioError(str(e))
         timeout = float(st.cfg.get("blender", {}).get("timeout_s", 180))
@@ -171,7 +201,9 @@ def render(st, p, preset="studio", finish="matte", color=None, fast=False, layer
              "finish_label": bl.FINISHES[o["finish"]]["label"], "color": o["color"], "layer": o["layer"],
              "engine": rep.get("engine"), "device": rep.get("device"), "samples": rep.get("samples"),
              "blender": rep.get("blender") or b["version"], "seconds": rep.get("seconds"),
-             "resolution": list(bl.SIZE), "camera": jobspec["view"], "label": bl.LABEL, "evidence": "illustration",
+             "resolution": list(bl.SIZE), "camera": jobspec["view"], "view": o["view_name"],
+             "zones": [{k: z[k] for k in ("features", "finish", "color", "label")} for z in (zfiles or [])],
+             "label": bl.LABEL, "evidence": "illustration",
              "note": "Invented light and material on the exported STL. Not a photo of a print, and not evidence."}
         meta_f.write_text(json.dumps(m, indent=1), encoding="utf-8")
         m["cached"], m["current"] = False, True
@@ -184,13 +216,16 @@ def render(st, p, preset="studio", finish="matte", color=None, fast=False, layer
 def start(st, pid: str, body: dict) -> dict:
     """Start a render in the background. Returns {"job"} or, when it already exists, {"render"}."""
     p = st.load(pid)
-    args = {k: body.get(k) for k in ("preset", "finish", "color", "fast", "layer_lines") if body.get(k) is not None}
+    args = {k: body.get(k) for k in ("preset", "finish", "color", "fast", "layer_lines", "view", "azimuth", "elevation")
+            if body.get(k) is not None}
     args.setdefault("preset", "studio")
     args.setdefault("finish", "matte")
     b = blender(st.cfg)
     if not b["available"]:
         raise StudioError("Blender is not available, so Form Studio cannot render.", b["reason"], status=409)
-    o = _options(st, args["preset"], args["finish"], args.get("color"), args.get("fast", False), args.get("layer_lines", True))
+    o = _options(st, args["preset"], args["finish"], args.get("color"), args.get("fast", False), args.get("layer_lines", True),
+                 args.get("view"), args.get("azimuth"), args.get("elevation"))
+    o["zones"] = zones(st, p)
     try:
         key = key_for(st, p, o)
         f = _dir(st, p) / f"{key}.json"

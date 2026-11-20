@@ -26,7 +26,7 @@ import time
 from pathlib import Path
 
 LABEL = "Rendered in Blender — an illustration, not a photo of a print"
-SCENE_VERSION = 1
+SCENE_VERSION = 3
 SCENE_SCRIPT = Path(__file__).with_name("blender_scene.py")
 DOWNLOAD_URL = "https://www.blender.org/download/"
 SIZE = (1600, 1200)
@@ -47,7 +47,41 @@ FINISHES = {
              "subsurface": 0.08},
     "silk": {"label": "Silk PLA", "roughness": 0.3, "specular": 0.6, "coat": 0.15, "metallic": 0.55, "sheen": 0.25,
              "subsurface": 0.0},
+    # product finishes, for designs that declare material zones (Recipe.appearance) or a whole part in one of them
+    "gloss": {"label": "Gloss paint", "roughness": 0.32, "specular": 0.5, "coat": 1.0, "coat_roughness": 0.03,
+              "metallic": 0.0, "sheen": 0.0, "subsurface": 0.0},
+    "carbon": {"label": "Carbon twill, clear coat", "roughness": 0.35, "specular": 0.5, "coat": 1.0,
+               "coat_roughness": 0.02, "metallic": 0.0, "sheen": 0.0, "subsurface": 0.0, "tile_mm": 24.0},
+    "smoke": {"label": "Smoked polycarbonate", "roughness": 0.02, "specular": 0.5, "coat": 0.0, "metallic": 0.0,
+              "sheen": 0.0, "subsurface": 0.0},
+    "rubber": {"label": "Rubber", "roughness": 0.85, "specular": 0.25, "coat": 0.0, "metallic": 0.0, "sheen": 0.3,
+               "subsurface": 0.0},
+    "metal": {"label": "Brushed metal", "roughness": 0.28, "specular": 0.5, "coat": 0.0, "metallic": 1.0, "sheen": 0.0,
+              "subsurface": 0.0},
 }
+# photo cameras by name: (azimuth, elevation) in the convention of render() and the app's viewport (azimuth from +X
+# toward +Y: "front" looks from -Y). A product that faces +X shows its face in "right"; three_quarter is between.
+PHOTO_VIEWS = {"iso": None, "front": (-90.0, 6.0), "back": (90.0, 6.0), "left": (180.0, 6.0), "right": (0.0, 6.0),
+               "top": (-90.0, 80.0), "three_quarter": (-38.0, 16.0), "three_quarter_back": (-142.0, 20.0)}
+
+
+def photo_view(view=None, azimuth=None, elevation=None) -> tuple[float, float]:
+    """(az, el) for the Blender camera (its azimuth convention: 0 looks from -Y) from a view name or an explicit
+    azimuth/elevation in the render() convention. None everywhere: the app's iso camera."""
+    if azimuth is not None or elevation is not None:
+        base = PHOTO_VIEWS.get(view or "three_quarter") or (-38.0, 16.0)
+        az = float(azimuth) if azimuth is not None else base[0]
+        el = float(elevation) if elevation is not None else base[1]
+    else:
+        if view not in (None, "") and view not in PHOTO_VIEWS:
+            raise ValueError(f"Unknown view “{view}”. Views: {', '.join(PHOTO_VIEWS)}.")
+        pv = PHOTO_VIEWS.get(view or "iso")
+        if pv is None:
+            return APP_ISO
+        az, el = pv
+    if not -89.0 <= el <= 89.0:
+        raise ValueError("elevation must be between -89 and 89 degrees")
+    return ((az + 90.0 + 180.0) % 360.0 - 180.0, el)
 SWATCHES = [
     {"name": "White", "hex": "#eeece6"}, {"name": "Light grey", "hex": "#b9bcbd"}, {"name": "Charcoal", "hex": "#3a3d40"},
     {"name": "Black", "hex": "#1a1b1d"}, {"name": "Sage", "hex": "#9fb7a0"}, {"name": "Blue", "hex": "#3d6fb6"},
@@ -242,13 +276,31 @@ def stl_bounds(stl: Path) -> tuple[list[float], list[float]]:
 
 def build_job(stl: Path, out_png: Path, preset: str = "studio", finish: str = "matte", color: str = DEFAULT_COLOR,
               layer_mm: float | None = None, fast: bool = False, samples: int = 128,
-              size=SIZE, view=APP_ISO) -> dict:
-    """Everything the scene script needs, in scene units (metres; the STL is in millimetres)."""
+              size=SIZE, view=APP_ISO, zones: list | None = None) -> dict:
+    """Everything the scene script needs, in scene units (metres; the STL is in millimetres).
+    zones: [{stl, finish (or None: the asked finish), color (or None)}] renders each zone with its own material
+    (a design's appearance()); they replace stl."""
     if preset not in PRESETS:
         raise ValueError(f"Unknown preset “{preset}”. Presets: {', '.join(PRESETS)}.")
     if finish not in FINISHES:
         raise ValueError(f"Unknown material “{finish}”. Materials: {', '.join(FINISHES)}.")
-    lo, hi = stl_bounds(stl)
+    parts = None
+    if zones:
+        parts, los, his = [], [], []
+        for z in zones:
+            fz = z.get("finish") or finish
+            if fz not in FINISHES:
+                raise ValueError(f"Unknown material “{fz}”. Materials: {', '.join(FINISHES)}.")
+            cz = z.get("color") or color
+            parts.append({"stl": str(z["stl"]), "finish": dict(FINISHES[fz], id=fz), "color": hex_to_linear(cz),
+                          "color_hex": cz})
+            a, b = stl_bounds(Path(z["stl"]))
+            los.append(a)
+            his.append(b)
+        lo = [min(x[i] for x in los) for i in range(3)]
+        hi = [max(x[i] for x in his) for i in range(3)]
+    else:
+        lo, hi = stl_bounds(stl)
     span = [b - a for a, b in zip(lo, hi)]
     # the part stands on the floor at the origin; frame it in its placed position (millimetres)
     plo, phi = [-span[0] / 2, -span[1] / 2, 0.0], [span[0] / 2, span[1] / 2, span[2]]
@@ -263,7 +315,7 @@ def build_job(stl: Path, out_png: Path, preset: str = "studio", finish: str = "m
                    "lens_mm": LENS_MM, "sensor_mm": SENSOR_MM, "distance_m": cam["distance"] * s},
         "view": {"az": view[0], "el": view[1]},
         "engine": "eevee" if fast else "cycles", "samples": 32 if fast else int(samples),
-        "resolution": list(size),
+        "resolution": list(size), **({"parts": parts} if parts else {}),
     }
 
 

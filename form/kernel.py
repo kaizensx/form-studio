@@ -447,8 +447,40 @@ def _textured(model, budget):
         raise
     except Exception as e:
         raise RecipeError(f"mesh_texture() raised {type(e).__name__}: {e}", "", "Fix mesh_texture() in the design source.")
-    cache[budget] = meshtex.apply_to_faces(model["faces"], specs, budget) if specs else None
+    # an export carries the texture on a finer tessellation than the view: smooth surfaces between the texture's
+    # features must not show the view mesh's facets in a photo or a print
+    faces = _fine_faces(model) if (specs and budget >= meshtex.EXPORT_BUDGET) else model["faces"]
+    cache[budget] = meshtex.apply_to_faces(faces, specs, budget) if specs else None
     return cache[budget]
+
+
+def _fine_faces(model, tol: float = 0.02, ang: float = 0.12):
+    """The model's faces re-tessellated at an export tolerance, each keeping its feature (cached on the model)."""
+    if "_fine_faces" in model:
+        return model["_fine_faces"]
+    from OCP.BRep import BRep_Tool
+    from OCP.BRepMesh import BRepMesh_IncrementalMesh
+    from OCP.TopAbs import TopAbs_REVERSED
+    from OCP.TopLoc import TopLoc_Location
+    BRepMesh_IncrementalMesh(model["shape"].wrapped, tol, False, ang, True)
+    out = []
+    for f in model["faces"]:
+        loc = TopLoc_Location()
+        tri = BRep_Tool.Triangulation_s(f["face"].wrapped, loc)
+        if tri is None or tri.NbTriangles() == 0:
+            out.append(f)
+            continue
+        trsf = loc.Transformation()
+        P = np.empty((tri.NbNodes(), 3), dtype=np.float64)
+        for i in range(1, tri.NbNodes() + 1):
+            q = tri.Node(i).Transformed(trsf)
+            P[i - 1] = (q.X(), q.Y(), q.Z())
+        T = np.array([tri.Triangle(i).Get() for i in range(1, tri.NbTriangles() + 1)], dtype=np.uint32) - 1
+        if f["face"].wrapped.Orientation() == TopAbs_REVERSED:
+            T = T[:, [0, 2, 1]]
+        out.append({**f, "P": P, "T": T})
+    model["_fine_faces"] = out
+    return out
 
 
 def op_export(key, recipe_id, values, out_dir, name, orientation="as_modelled", tol=0.01, ang=0.1):
@@ -807,3 +839,5 @@ from .recon import KERNEL_OPS as _RECON_OPS  # noqa: E402  (mesh to editable CAD
 OPS.update(_RECON_OPS)
 from .critique import KERNEL_OPS as _CRITIQUE_OPS  # noqa: E402  (design critique metrics and section views)
 OPS.update(_CRITIQUE_OPS)
+from .appearance import KERNEL_OPS as _APPEARANCE_OPS  # noqa: E402  (material zones for photos)
+OPS.update(_APPEARANCE_OPS)
