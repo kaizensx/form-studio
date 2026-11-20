@@ -35,7 +35,7 @@ NOT_COVERED = ["No slice: print time and filament are not estimated.", "No slice
                "No print simulation: supports, bridges and the first layer are not previewed."]
 MODEL_ENVELOPE = [1e6, 1e6, 1e6]       # a 3D model is checked against no printer: nothing is too big
 STL_TOL = 0.01
-REF_FORMATS = (".step", ".stp", ".stl")
+REF_FORMATS = (".step", ".stp", ".stl", ".obj", ".3mf")
 SCHEMA = "form-project/1"
 
 
@@ -124,7 +124,7 @@ def sha_file(p: Path) -> str:
 def _initial_provenance(param) -> dict:
     """A design may declare where a default comes from (Param(..., provenance="specified", doc="Pi 5 drawing"))."""
     src = getattr(param, "provenance", "assumed")
-    out = {"source": src if src in ("assumed", "specified", "measured", "calibrated", "photo") else "assumed"}
+    out = {"source": src if src in ("assumed", "specified", "measured", "calibrated", "photo", "mesh") else "assumed"}
     if out["source"] != "assumed" and param.doc:
         out["note"] = param.doc[:200]
     return out
@@ -591,7 +591,7 @@ class Studio:
         for r in references or []:
             src = Path(r).expanduser()
             if not src.is_file() or src.suffix.lower() not in REF_FORMATS:
-                raise StudioError(f"Not a STEP or STL file: {src}", "Give the absolute path of a .step, .stp or .stl file.")
+                raise StudioError(f"Not a STEP or mesh file: {src}", "Give the absolute path of a .step, .stp, .stl, .obj or .3mf file.")
             refs[self._ref_name(src.name)] = str(src.resolve())
         self._check_assembly(rid, {**self.recipes[rid].defaults(), **(values or {})})
         self._k("summary", key="pv-" + H(rid, values or {}), recipe_id=rid, refs=refs,
@@ -1833,7 +1833,7 @@ class Studio:
             name += src.suffix.lower()          # a label ("Original base") for a .stl: keep the file's format
         name = self._ref_name(name or src.name)
         if Path(name).suffix not in REF_FORMATS:
-            raise StudioError("Only STEP (.step, .stp) and STL (.stl) parts can be imported.",
+            raise StudioError("Only STEP (.step, .stp) parts and STL, OBJ or 3MF meshes can be imported.",
                               "Export the part from its CAD program as STEP, or as STL for a mesh.")
         d = self.dir(p["id"]) / "references"
         d.mkdir(parents=True, exist_ok=True)
@@ -1854,7 +1854,7 @@ class Studio:
             tmp.unlink(missing_ok=True)
             raise StudioError(f"Could not read {name}: {e}", e.hint or "Check that the file is a valid STEP or a closed STL.")
         fsutil.replace(tmp, target)
-        rec = {"file": name, "kind": "part", "format": "step" if name.endswith((".step", ".stp")) else "stl",
+        rec = {"file": name, "kind": "part", "format": "step" if name.endswith((".step", ".stp")) else Path(name).suffix[1:],
                "ts": time.time(), "sha256": sha_file(target), "bytes": target.stat().st_size,
                "bbox": info["bbox"], "volume_mm3": info["volume_mm3"], "solids": info.get("solids"),
                "triangles": info.get("triangles"), "evidence": "computed", "imported_from": src.name if src else name}
@@ -1868,6 +1868,17 @@ class Studio:
             self.save(p)
         self.__dict__.get("_uses_refs", {}).clear()
         return rec
+
+    # ---- mesh to editable CAD (form/recon) ----------------------------
+    def reconstruct(self, src, **kw) -> dict:
+        """A new design reconstructed from an STL, OBJ or 3MF file (form/recon/project.py)."""
+        from .recon import project
+        return project.reconstruct(self, src, **kw)
+
+    def reconstruct_reference(self, p: dict, file: str, **kw) -> dict:
+        """"Make editable": a new design reconstructed from a mesh imported into project p."""
+        from .recon import project
+        return project.reconstruct_reference(self, p, file, **kw)
 
     def reference_companions(self, p: dict) -> list:
         """Imported parts as viewport companions. `size`/`origin` give older viewers a bounding box to draw."""
