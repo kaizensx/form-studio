@@ -3,13 +3,14 @@
 
 Every part, number and check in these drawings comes from a run on this machine:
 
-  1. two designs are built from their recipes in a scratch projects folder (`form new`), so the CAD kernel builds
-     the solids, the checks run on them and your slicer slices them;
+  1. four designs are built in a scratch projects folder: two from recipes (`form new`), sliced by your slicer, and
+     two written as build123d code the way an agent writes them (scripts/readme_designs/, through create_design, as
+     plain 3D models), so the CAD kernel builds the solids and the checks run on them;
   2. the triangle meshes and B-rep edges are read from the engine (`Studio.view`) and projected with the
      viewport's orbit camera (Viewport.qml: orbit angles, 26° field of view);
-  3. check names and results, the slice estimate, the assembly joint and its sweep come from the same run; layers
-     are the slicer's G-code, read by form/toolpath.py; the printer comparison is `form compare-printers`; the
-     file hashes are SHA-256 of the exported files; the terminal lines are what `form state` printed.
+  3. check names and results, derived values (gear ratios), the assembly joint and its sweep come from the same run;
+     the slicer layer is the slicer's G-code, read by form/toolpath.py; the file hashes are SHA-256 of the exported
+     files; the terminal lines are what `form state` printed. The gears turn by their own tooth counts.
 
 Colours come from Theme.qml, the mark from LogoPaths.js, and the type is Instrument Sans and Geist Mono, subset
 and embedded in each file. GitHub shows an SVG in an <img> without scripts, so all motion is CSS keyframes and
@@ -239,6 +240,12 @@ class Svg:
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 DESIGNS = {"desk-phone-stand": ("Desk phone stand", "device_stand", []),
            "hinged-box": ("Hinged box", "storage_box", ["lid=2"])}
+# designs written as build123d code, the way an agent writes them (scripts/readme_designs/), built with create_design
+# as plain 3D models: no printer, no slicing
+CODE_DESIGNS = {"planetary-gear-stage": ("Planetary gear stage", "planetary.py",
+                                         "A planetary gear stage for a 5 mm D shaft: sun, three planets, a ring in a flanged housing."),
+                "ergonomic-mouse-shell": ("Ergonomic mouse shell", "mouse_shell.py",
+                                          "An ergonomic mouse shell with a thumb scoop, split buttons and a wheel slot.")}
 
 
 def _b64f(s: str, dt="<f4") -> np.ndarray:
@@ -253,11 +260,18 @@ def engine(data_dir: Path) -> dict:
             print("building %s from the %s recipe…" % (name, recipe), flush=True)
             subprocess.run([sys.executable, "-m", "form", "new", name, recipe, *params], cwd=ROOT, check=True,
                            stdout=subprocess.DEVNULL, env={**os.environ, "FORM_DATA": str(data_dir)})
+    for pid, (name, fname, brief) in CODE_DESIGNS.items():
+        if not (data_dir / pid).exists():
+            print("building %s from its design code…" % name, flush=True)
+            args = {"name": name, "source": (ROOT / "scripts" / "readme_designs" / fname).read_text(encoding="utf-8"),
+                    "brief": brief, "purpose": "model", "process": "cad"}
+            subprocess.run([sys.executable, "-m", "form", "tool", "create_design", json.dumps(args)], cwd=ROOT, check=True,
+                           stdout=subprocess.DEVNULL, env={**os.environ, "FORM_DATA": str(data_dir)})
     from form import config, toolpath
     from form.studio import Studio
     st = Studio(config.load())
     out = {}
-    for pid in DESIGNS:
+    for pid in [*DESIGNS, *CODE_DESIGNS]:
         state = json.loads(subprocess.run([sys.executable, "-m", "form", "state", pid], cwd=ROOT, check=True,
                                           capture_output=True, text=True, env={**os.environ, "FORM_DATA": str(data_dir)}).stdout)
         p = st.load(pid)
@@ -276,12 +290,14 @@ def engine(data_dir: Path) -> dict:
             for prt in asm["parts"]:
                 part_edges[prt["id"]] = _b64f(prt["edges"]).reshape(-1, 2, 3).astype(float)
         tp = None
-        try:
-            tp = toolpath.for_project(st, p)
-        except Exception as e:  # no slicer: the print card is left out
-            print("no toolpath for %s: %s" % (pid, e))
+        if pid in DESIGNS:
+            try:
+                tp = toolpath.for_project(st, p)
+            except Exception as e:  # no slicer: the print card is left out
+                print("no toolpath for %s: %s" % (pid, e))
+        derived = {d["key"]: d for d in (st.head_summary(p).get("derived") or [])}
         out[pid] = {"state": state, "view": view, "meshes": meshes, "edges": edges, "asm": asm,
-                    "part_edges": part_edges, "toolpath": tp}
+                    "part_edges": part_edges, "toolpath": tp, "derived": derived}
     env = {**os.environ, "FORM_DATA": str(data_dir)}
 
     def cli(*args) -> str:
@@ -292,17 +308,15 @@ def engine(data_dir: Path) -> dict:
     # what the terminal card shows: the CLI's own output, verbatim
     stand["state_text"] = cli("state", "desk-phone-stand")
     out["tools"] = json.loads(cli("tool"))["tools"]
-    # every printer set up in the installed slicers, sliced for real
-    print("comparing printers…", flush=True)
-    out["compare"] = json.loads(cli("compare-printers", "desk-phone-stand", "--limit", "8"))
     # the exported files and their SHA-256
     import hashlib
-    hashes = []
-    for kind, path in stand["state"]["files"].items():
-        p = Path(path)
-        if p.exists():
-            hashes.append((kind, p.name, hashlib.sha256(p.read_bytes()).hexdigest(), p.stat().st_size))
-    stand["hashes"] = hashes
+    for pid in ("desk-phone-stand", "planetary-gear-stage"):
+        hashes = []
+        for kind, path in out[pid]["state"]["files"].items():
+            p = Path(path)
+            if p.exists():
+                hashes.append((kind, p.name, hashlib.sha256(p.read_bytes()).hexdigest(), p.stat().st_size))
+        out[pid]["hashes"] = hashes
     import importlib
     from form import adapters
     out["slicers"] = [importlib.import_module(m).LABEL for m in adapters.SLICERS.values()]
@@ -311,7 +325,7 @@ def engine(data_dir: Path) -> dict:
 
 def parse_check(s: str) -> dict:
     """'PASS  Thinnest wall: 4.86 mm  [computed]' → status, label, value, evidence"""
-    m = re.match(r"(\w+)\s+(.*?)\s+\[(\w+)\]$", s)
+    m = re.match(r"(\S+)\s+(.*?)\s+\[(\w+)\]$", s)
     status, rest, ev = m.groups()
     label, _, value = rest.partition(": ")
     return {"status": status, "label": label, "value": value, "evidence": ev}
@@ -811,102 +825,84 @@ def px_per_mm(cam: Camera, dist: float) -> float:
     return cam.s * cam.k / dist
 
 
+def model_facts(d) -> dict:
+    """A design built as a plain 3D model: name, size, the checks that apply and how many pass, derived values."""
+    s = d["state"]
+    checks = [parse_check(c) for c in s["checks"]]
+    applies = [c for c in checks if c["status"] != "N/A"]
+    v = d["view"]
+    lo, hi = np.array(v["bbox"][0]), np.array(v["bbox"][1])
+    parts = next((c["value"].split()[0] for c in checks if "valid part" in c["label"]), "1")
+    return {"name": s["name"], "rev": "r%02d" % s["head"], "checks": checks, "applies": applies,
+            "passed": sum(1 for c in applies if c["status"] == "PASS"), "size": " × ".join("%.1f" % x for x in hi - lo),
+            "derived": d.get("derived", {}), "parts": parts}
+
+
+def ratio(x: float) -> str:
+    return "1 : %s" % f1(x)
+
+
+def drawn_part(svg: Svg, p, d, box, az, el, t_draw0, t_draw1, t_fill0, t_fill1, dist=440, rings_=True):
+    """A part drawing itself: its B-rep edges plotted, then its shaded faces filling in; it rests filled."""
+    tris = all_tris(d).reshape(-1, 3)
+    edges = d["edges"]
+    lo, hi = tris.min(0), tris.max(0)
+    c = (lo + hi) / 2
+    cam = Camera(az=az, el=el, target=(c[0], c[1], (lo[2] + hi[2]) / 2), dist=dist)
+    cam.fit(tris, box)
+    rad = float(np.linalg.norm((hi - lo)[:2])) / 2
+    k_ = px_per_mm(cam, dist)
+    soft_shadow(svg, cam, (c[0], c[1], lo[2]), rad * k_ * 1.05, rad * k_ * 0.34, p["shadow"])
+    if rings_:
+        rc = svg.anim([(0, {"opacity": "0"}), (0.3, {"opacity": "0"}), (1.2, {"opacity": "1"})], dur=1.2, once=True)
+        out = []
+        for r in (rad * 1.15, rad * 1.5):
+            a = np.linspace(0, 2 * math.pi, 97)
+            xy, _ = cam.project(np.stack([c[0] + r * np.cos(a), c[1] + r * np.sin(a), np.full_like(a, lo[2])], 1))
+            out.append("M" + "L".join("%s %s" % (f1(x), f1(y)) for x, y in xy) + "Z")
+        svg.add('<path d="%s" stroke="%s" stroke-width="1" fill="none" class="%s"/>' % ("".join(out), p["grid"], rc))
+    fills, ed = draw_solid(cam, tris.reshape(-1, 3, 3), svg.w, svg.h, edges, edge_ink=p["edge"], base=p["clay"])
+    fill_in = svg.anim([(0, {"opacity": "0"}), (t_fill0, {"opacity": "0"}), (t_fill1, {"opacity": "1"})], dur=t_fill1, once=True)
+    svg.add('<g class="%s">%s%s</g>' % (fill_in, fills, ed))
+    wire_out = svg.anim([(0, {"opacity": "1"}), (t_fill0 + 0.2, {"opacity": "1"}), (t_fill1 + 0.3, {"opacity": "0"})],
+                        dur=t_fill1 + 0.3, once=True, rest={"opacity": "0"})
+    svg.add('<g class="%s">' % wire_out)
+    draw_dash(svg, wire(cam, edges), p["datum"], 1.1, t_draw0, t_draw1, t_draw1, once=True)
+    svg.add("</g>")
+    return cam
+
+
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-# The opening poster: the question, and a real part drawing itself as edges, filling, then turning
+# The opening poster: the promise, and two very different designs drawing themselves as edges, then filling in
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 def hero(data, light: bool):
     p = P(light)
-    d = data["desk-phone-stand"]
-    F = stand_facts(d)
+    gear, shell = data["planetary-gear-stage"], data["ergonomic-mouse-shell"]
+    G, M = model_facts(gear), model_facts(shell)
     W, H = 828, 660
-    period = 14.0
-    svg = Svg(W, H, period, "Form Studio")
+    svg = Svg(W, H, 8.0, "Form Studio")
     svg.rect(0, 0, W, H, 28, fill=p["panel"])
     logo(svg, 40, 52, size=22, ink=p["ink"], ink2=p["ink2"], part=p["logo_part"], datum=p["datum"])
     svg.text(W - 40, 59, "Open source  ·  macOS, Windows, Linux", 14, 520, p["ink3"], anchor="end")
     h1 = svg.anim([(0, {"opacity": "0", "transform": "translateY(14px)"}), (0.15, {"opacity": "0", "transform": "translateY(14px)"}),
                    (0.95, {"opacity": "1", "transform": "translateY(0px)"})], dur=1.0, once=True)
-    svg.text(W / 2, 166, "What are we making?", 78, 640, p["ink"], anchor="middle", ls=-2.9, cls=h1)
+    svg.text(W / 2, 162, "Describe anything.", 76, 640, p["ink"], anchor="middle", ls=-2.8, cls=h1)
     h2 = svg.anim([(0, {"opacity": "0", "transform": "translateY(10px)"}), (0.35, {"opacity": "0", "transform": "translateY(10px)"}),
                    (1.15, {"opacity": "1", "transform": "translateY(0px)"})], dur=1.2, once=True)
-    svg.text(W / 2, 212, "Describe a part. An agent designs it as real CAD while you watch.", 21, 450, p["ink2"], anchor="middle", cls=h2)
-    # the part, turned about its own vertical axis on a turntable of rings
-    tris = all_tris(d).reshape(-1, 3)
-    edges = d["edges"]
-    lo, hi = tris.min(0), tris.max(0)
-    c = (lo + hi) / 2
-    c[2] = 0.0
-    spin = spin_about(c)
-    a0, a1, step = 0.0, 60.0, 3.0
-    angles = list(np.arange(a0, a1 + 1e-6, step))
-    dist = 440
-    cam = Camera(az=-36, el=21, target=(c[0], c[1], hi[2] / 2), dist=dist)
-    cam.fit(np.concatenate([spin(tris, a) for a in (a0, (a0 + a1) / 2, a1)]), (189, 244, 450, 338))
-    t_draw0, t_draw1, t_fill0, t_fill1 = 0.5, 3.1, 2.7, 3.6
-    rad = float(np.linalg.norm((hi - lo)[:2])) / 2
-    k_ = px_per_mm(cam, dist)
-    soft_shadow(svg, cam, c, rad * k_ * 1.1, rad * k_ * 0.36, p["shadow"])
-    rc = svg.anim([(0, {"opacity": "0"}), (0.3, {"opacity": "0"}), (1.2, {"opacity": "1"})], dur=1.2, once=True)
-    rings(svg, cam, c, [rad * 1.2, rad * 1.6, rad * 2.05], p["grid"], cls=rc)
-
-    def angle_at(t):
-        u = t / period
-        if u < 0.14:
-            return a0
-        if u < 0.5:
-            v = (u - 0.14) / 0.36
-            return a0 + (a1 - a0) * (1 - math.cos(math.pi * v)) / 2
-        if u < 0.6:
-            return a1
-        v = (u - 0.6) / 0.4
-        return a1 - (a1 - a0) * (1 - math.cos(math.pi * v)) / 2
-
-    classes = window_classes(svg, frame_intervals(lambda t: int(round((angle_at(t) - a0) / step)), len(angles), period),
-                             period, delay=4.2)
-    fill_in = svg.anim([(0, {"opacity": "0"}), (t_fill0, {"opacity": "0"}), (t_fill1, {"opacity": "1"})], dur=t_fill1, once=True)
-    svg.add('<g class="%s">' % fill_in)
-    for k, a in enumerate(angles):
-        fills, ed = draw_solid(cam, spin(tris, a).reshape(-1, 3, 3), W, H, spin(edges, a).reshape(-1, 2, 3),
-                               edge_ink=p["edge"], base=p["clay"])
-        svg.add('<g class="%s">%s%s</g>' % (classes[k], fills, ed))
-    svg.add("</g>")
-    # the bounding dimensions, measured on the solid, while it rests facing you
-    dims_in = svg.anim([(0, {"opacity": "0"}), (t_fill1 + 0.1, {"opacity": "0"}), (t_fill1 + 0.6, {"opacity": "1"})], dur=t_fill1 + 0.6, once=True)
-    dims_rest = svg.anim([(0, {"opacity": "1"}), (0.11 * period, {"opacity": "1"}), (0.14 * period, {"opacity": "0"}),
-                          (0.975 * period, {"opacity": "0"}), (period, {"opacity": "1"})], dur=period, delay=4.2)
-    svg.add('<g class="%s"><g class="%s">' % (dims_in, dims_rest))
-    off = 9.0
-    size = hi - lo
-    for a3, b3, ext, val in (
-            ((lo[0], lo[1] - off, 0), (hi[0], lo[1] - off, 0), (0, off * 0.7, 0), size[0]),
-            ((lo[0] - off, lo[1], 0), (lo[0] - off, hi[1], 0), (off * 0.7, 0, 0), size[1]),
-            ((hi[0] + off, lo[1], lo[2]), (hi[0] + off, lo[1], hi[2]), (-off * 0.7, 0, 0), size[2])):
-        A, B, E = np.array(a3, float), np.array(b3, float), np.array(ext, float)
-        xy, _ = cam.project(np.array([A, B, A + E, B + E]))
-        (ax, ay), (bx, by), (aex, aey), (bex, bey) = xy
-        svg.add('<path d="M%s %sL%s %sM%s %sL%s %sM%s %sL%s %s" stroke="%s" stroke-width="1.1" stroke-linecap="round"/>'
-                % (f1(ax), f1(ay), f1(bx), f1(by), f1(ax), f1(ay), f1(aex), f1(aey), f1(bx), f1(by), f1(bex), f1(bey), p["datum"]))
-        mx, my = (ax + bx) / 2, (ay + by) / 2
-        lab = "%.1f" % val
-        tw = text_w(lab, 13, 500, "mono")
-        svg.rect(mx - tw / 2 - 6, my - 10, tw + 12, 20, 6, fill=p["panel"])
-        svg.text(mx, my + 4.6, lab, 13, 500, p["datum"], family="mono", anchor="middle")
-    svg.add("</g></g>")
-    wire_out = svg.anim([(0, {"opacity": "1"}), (t_fill0 + 0.2, {"opacity": "1"}), (t_fill1 + 0.3, {"opacity": "0"})],
-                        dur=t_fill1 + 0.3, once=True, rest={"opacity": "0"})
-    svg.add('<g class="%s">' % wire_out)
-    draw_dash(svg, wire(cam, edges), p["datum"], 1.3, t_draw0, t_draw1, t_draw1, once=True)
-    svg.add("</g>")
-    cap = svg.anim([(0, {"opacity": "0"}), (t_fill1 - 0.2, {"opacity": "0"}), (t_fill1 + 0.5, {"opacity": "1"})], dur=t_fill1 + 0.5, once=True)
+    svg.text(W / 2, 208, "An engineer-grade agent builds it as real, editable CAD.", 21, 450, p["ink2"], anchor="middle", cls=h2)
+    drawn_part(svg, p, gear, (56, 258, 400, 290), -30, 34, 0.5, 3.0, 2.7, 3.6)
+    drawn_part(svg, p, shell, (500, 290, 272, 236), -142, 24, 1.1, 3.4, 3.1, 4.0, rings_=False)
+    cap = svg.anim([(0, {"opacity": "0"}), (3.4, {"opacity": "0"}), (4.2, {"opacity": "1"})], dur=4.2, once=True)
     svg.g(cap)
-    n_pass = sum(1 for c_ in F["checks"] if c_["status"] == "PASS")
-    line = "%s  ·  %s mm  ·  %d of %d checks pass  ·  %s, %s in the slicer" % (
-        F["name"], F["size"], n_pass, len(F["checks"]), F["time"], F["grams"])
-    svg.text(W / 2, H - 40, line, 15, 450, p["ink3"], anchor="middle")
+    rc = G["derived"].get("ratio_carrier")
+    g_sub = "%s parts · %s · %s mm" % (G["parts"], ratio(rc["value"]), G["size"]) if rc else "%s parts · %s mm" % (G["parts"], G["size"])
+    for x, name, sub in ((256, G["name"], g_sub), (636, M["name"], "lofted shell · %s mm" % M["size"])):
+        svg.text(x, H - 62, name, 15, 600, p["ink"], anchor="middle")
+        svg.text(x, H - 40, sub, 13, 450, p["ink3"], anchor="middle")
     svg.end()
-    desc = ("Form Studio. What are we making? The %s, built by the CAD kernel, draws itself as its B-rep edges, fills in "
-            "as shaded faces and turns: %s mm, %d of %d checks pass, %s and %s in the slicer."
-            % (F["name"].lower(), F["size"], n_pass, len(F["checks"]), F["time"], F["grams"]))
+    desc = ("Form Studio. Describe anything. An engineer-grade agent builds it as real, editable CAD. Two designs written as "
+            "build123d code and built by the CAD kernel draw themselves as their B-rep edges and fill in: a %s (%s) and an "
+            "%s (%s mm)." % (G["name"].lower(), g_sub, M["name"].lower(), M["size"]))
     return [("hero", svg.render(desc))]
 
 
@@ -966,27 +962,6 @@ def check_mark(cx, cy, s=1.0) -> str:
     return "M%s %sl%s %sl%s %s" % (f1(cx - 4.2 * s), f1(cy + 0.2 * s), f1(2.9 * s), f1(2.9 * s), f1(5.6 * s), f1(-6.2 * s))
 
 
-def layer_paths(cam: Camera, tp, l: int, types=None, cx=0.0, cy=0.0, eps=0.25) -> dict:
-    """One G-code layer projected: {type index: path} (consecutive moves chained into polylines)."""
-    s0, s1 = tp.start[l], tp.start[l + 1]
-    z = float(tp.z[l])
-    by_type = {}
-    for (x0, y0, x1, y1), ty in zip(tp.seg[s0:s1], tp.seg_type[s0:s1]):
-        if types is None or int(ty) in types:
-            by_type.setdefault(int(ty), []).append((x0, y0, x1, y1))
-    out = {}
-    for ty, sg in by_type.items():
-        dd = []
-        for pl in chain(np.array(sg)):
-            P3 = np.array([[a - cx, b - cy, z] for a, b in pl])
-            xy, _ = cam.project(P3)
-            xy = rdp(xy, eps)
-            if len(xy) >= 2:
-                dd.append(rel_path(xy, close=False))
-        out[ty] = "".join(dd)
-    return out
-
-
 def type_ink(p: dict, light: bool) -> dict:
     if not light:
         return TYPE_INK
@@ -1001,8 +976,8 @@ def type_ink(p: dict, light: bool) -> dict:
 BEAT_LOOP = 12.0
 BEATS = [("Describe", "Words, a photo, a sketch, a part or a link."),
          ("Build", "Your agent writes real build123d CAD. It grows in front of you."),
-         ("Prove", "Every revision is checked on the solid itself."),
-         ("Slice", "Your slicer and your presets, played back layer by layer.")]
+         ("Review", "Every revision is checked on the solid itself."),
+         ("Make", "STEP for CAD and CNC, meshes for renders, your slicer if you print.")]
 
 
 def beat_window(j):
@@ -1011,7 +986,7 @@ def beat_window(j):
 
 def beat_describe(svg, p, x, y, w, h, t0, t1, t_out):
     svg.rect(x, y + 12, w, 100, 14, fill=p["well"])
-    lines = ["A stand for my phone,", "leaning back 20°"]
+    lines = ["A planetary stage,", "1:5, on a 5 mm shaft"]
     mid = t0 + (t1 - t0) * 0.5
     typing(svg, x + 13, y + 44, lines[0], 13.5, 450, p["ink"], t0 + 0.1, mid - 0.15, t_out, p["well"], p["datum"])
     typing(svg, x + 13, y + 65, lines[1], 13.5, 450, p["ink"], mid, t1 - 0.6, t_out, p["well"], p["datum"])
@@ -1038,64 +1013,51 @@ def beat_build(svg, p, d, x, y, w, h, t0, t1, t_out):
     svg.add("</g>")
 
 
-def beat_prove(svg, p, F, x, y, w, h, t0, t1, t_out):
-    fit = [c for c in F["checks"] if c["status"] == "PASS"]
-    first = ("One valid", "2 valid", "Export mesh", "Thinnest wall", "Unsupported overhangs", "Fits the build")
-    rank = lambda c: next((k for k, f in enumerate(first) if c["label"].startswith(f)), len(first))
+def beat_prove(svg, p, G, x, y, w, h, t0, t1, t_out):
+    fit = [c for c in G["applies"] if c["status"] == "PASS"]
     rows = []
-    for c in sorted(fit, key=rank):
+    for c in fit:
         full = "%s: %s" % (c["label"], c["value"])
-        for s in ((c["label"],) if c["label"].startswith(("One valid", "Export mesh", "2 valid")) else (full, c["label"])):
-            if text_w(s, 12.5, 480) <= w - 24:
-                rows.append(s)
+        for s_ in (full, c["label"]):
+            if text_w(s_, 12.5, 480) <= w - 24:
+                rows.append(s_)
                 break
         if len(rows) == 4:
             break
-    for i, s in enumerate(rows):
+    for i, s_ in enumerate(rows):
         ry = y + 16 + i * 26
         ti = t0 + 0.25 + i * (t1 - t0 - 0.8) / len(rows)
         g = cycle(svg, ti - 0.15, t_out, fade=0.25, rise=4)
         svg.g(g)
         svg.circle(x + 9, ry, 9, alpha(p["pass_"], 0.16))
-        svg.text(x + 26, ry + 4.4, s, 12.5, 480, p["ink"])
+        svg.text(x + 26, ry + 4.4, s_, 12.5, 480, p["ink"])
         svg.end()
         draw_dash(svg, check_mark(x + 9, ry, 0.95), p["pass_"], 1.8, ti, ti + 0.3, BEAT_LOOP, hold=t_out + 0.3)
-    n = len(fit)
     g = cycle(svg, t1 - 0.5, t_out, fade=0.3, rise=4)
-    svg.text(x, y + h - 4, "%d of %d checks pass" % (n, len(F["checks"])), 12.5, 520, p["pass_"], cls=g)
+    svg.text(x, y + h - 4, "%d of %d checks pass" % (G["passed"], len(G["applies"])), 12.5, 520, p["pass_"], cls=g)
 
 
-def beat_slice(svg, p, d, x, y, w, h, t0, t1, t_out):
-    tp = d["toolpath"]
-    (bx0, by0, _), (bx1, by1, zt) = tp.bbox
-    cx, cy = (bx0 + bx1) / 2, (by0 + by1) / 2
-    pts = np.array([[bx0, by0, 0], [bx1, by1, zt], [bx0, by1, zt], [bx1, by0, 0], [bx0, by0, zt], [bx1, by1, 0]], float)
-    pts[:, 0] -= cx
-    pts[:, 1] -= cy
-    cam = Camera(az=-36, el=21, target=(0, 0, zt / 2), dist=440)
-    cam.fit(pts, (x + 6, y + 4, w - 12, h - 8))
-    ow = tp.types.index("Outer wall")
-    L = tp.layers
-    pick = list(range(0, L, max(1, L // 28))) + [L - 1]
-    K = len(pick)
-    groups = [np.array([l]) for l in pick]
-    for gi, ls in enumerate(groups):
-        ti = t0 + 0.1 + (t1 - t0 - 0.5) * gi / K
-        dd = "".join(layer_paths(cam, tp, int(l), {ow}, cx, cy).get(ow, "") for l in ls)
-        cls = svg.anim([(0, {"opacity": "0"}), (ti, {"opacity": "0"}), (ti + 1e-3, {"opacity": "1"}), (t_out, {"opacity": "1"}),
-                        (t_out + 0.3, {"opacity": "0"})], ease="linear")
-        svg.add('<path class="%s" d="%s" stroke="%s" stroke-width=".8" stroke-linejoin="round"/>' % (cls, dd, alpha(p["ink2"], 0.55)))
-        nxt = t0 + 0.1 + (t1 - t0 - 0.5) * (gi + 1) / K if gi < K - 1 else t_out
-        hot = svg.anim([(0, {"opacity": "0"}), (ti, {"opacity": "0"}), (ti + 1e-3, {"opacity": "1"}), (nxt, {"opacity": "1"}),
-                        (nxt + 1e-3, {"opacity": "0"})], ease="linear", rest={"opacity": "1" if gi == K - 1 else "0"})
-        top = layer_paths(cam, tp, int(ls[-1]), {ow}, cx, cy).get(ow, "")
-        svg.add('<path class="%s" d="%s" stroke="%s" stroke-width="1.5" stroke-linejoin="round"/>' % (hot, top, p["datum"]))
+def beat_make(svg, p, d, x, y, w, h, t0, t1, t_out):
+    lab = {"step": "STEP", "stl": "STL", "3mf": "3MF", "obj": "OBJ", "glb": "GLB"}
+    use = {"step": "CAD, CNC", "stl": "meshes", "3mf": "slicers", "obj": "renders", "glb": "the web"}
+    rows = sorted([r for r in d["hashes"] if r[0] in lab], key=lambda r: list(lab).index(r[0]))[:4]
+    for i, (kind, name, hx, size) in enumerate(rows):
+        ry = y + 16 + i * 26
+        ti = t0 + 0.2 + i * (t1 - t0 - 0.8) / len(rows)
+        g = cycle(svg, ti, t_out, fade=0.25, rise=4)
+        svg.g(g)
+        svg.rect(x, ry - 11, 46, 22, 6, fill=p["panel2"])
+        svg.text(x + 23, ry + 4.4, lab[kind], 11.5, 640, p["datum"], anchor="middle", family="mono")
+        svg.text(x + 56, ry + 4.4, use[kind], 12.5, 480, p["ink"])
+        svg.end()
+    g = cycle(svg, t1 - 0.5, t_out, fade=0.3, rise=4)
+    svg.text(x, y + h - 4, "3MF and G-code if you print", 12.5, 520, p["ink3"], cls=g)
 
 
 def steps(data, light: bool):
     p = P(light)
-    d = data["desk-phone-stand"]
-    F = stand_facts(d)
+    d = data["planetary-gear-stage"]
+    G = model_facts(d)
     out = []
     for half in (0, 1):
         svg = Svg(414, 368, BEAT_LOOP, "How it works")
@@ -1115,9 +1077,9 @@ def steps(data, light: bool):
             elif j == 1:
                 beat_build(svg, p, d, mx, my, mw, mh, t0, t1, t_out)
             elif j == 2:
-                beat_prove(svg, p, F, mx, my, mw, mh, t0, t1, t_out)
+                beat_prove(svg, p, G, mx, my, mw, mh, t0, t1, t_out)
             else:
-                beat_slice(svg, p, d, mx, my, mw, mh, t0, t1, t_out)
+                beat_make(svg, p, d, mx, my, mw, mh, t0, t1, t_out)
             title, line = BEATS[j]
             svg.text(x + 20, 266, title, 26, 640, p["ink"], ls=-0.6)
             for i, ln in enumerate(wrap(line, 160, 15.5, 440)):
@@ -1134,8 +1096,8 @@ def steps(data, light: bool):
 def numbers(data, light: bool):
     p = P(light)
     n_tools = len(data["tools"])
-    n_slicers = len(data["slicers"])
-    items = [(n_slicers, "slicers it drives for real"), (n_tools, "MCP tools for any agent"),
+    n_agents = len(AGENT_APPS) + len(MODEL_APIS) + len(LOCAL)
+    items = [(n_tools, "MCP tools for any agent"), (n_agents, "agent apps, model APIs and local models"),
              (3, "platforms: macOS, Windows and Linux"), (0, "uploads. Your designs stay on your computer")]
     out = []
     for half in (0, 1):
@@ -1204,6 +1166,92 @@ def f_start(data, light):
                                                                     f1(cy - 0.5), p["mintInk"]))
     card_words(svg, p, title, "Words, a photo with a coin for scale, a sketch with real dimensions, a STEP, STL or 3MF part, a PDF drawing or a link.")
     return svg.render("%s: words, photos, sketches, STEP, STL and 3MF parts, PDF drawings and links in one composer." % title)
+
+
+def gear_split(d) -> dict:
+    """The planetary stage's triangles and B-rep edges by part, sorted by where they sit: the carrier below the gears
+    (and its pins in the planet bores), the sun at the middle, a planet around each planet centre, the ring outside."""
+    v = d["view"]["values"]
+    m, zs, zp = v["module"], v["z_sun"], v["z_planet"]
+    cd = d["derived"]["centre_distance"]["value"]
+    centres = [np.array([cd * math.cos(2 * math.pi * k / 3), cd * math.sin(2 * math.pi * k / 3)]) for k in range(3)]
+    tris = all_tris(d)
+    z_top = float(tris[:, :, 2].max())
+    z_gear = z_top - v["face"]
+
+    def owner(pts):
+        """pts (n, k, 3) → part name per row, from the centroid."""
+        c = pts.mean(1)
+        r = np.hypot(c[:, 0], c[:, 1])
+        out = np.full(len(c), "ring", dtype=object)
+        out[r < m * (zs + 2) / 2 + 0.6] = "sun"
+        for k, ce in enumerate(centres):
+            dk = np.hypot(c[:, 0] - ce[0], c[:, 1] - ce[1])
+            out[dk < m * (zp + 2) / 2 + 0.6] = "planet%d" % k
+            out[dk < v["bore"] / 2 - 0.02] = "carrier"
+        out[c[:, 2] < z_gear - 1e-3] = "carrier"
+        return out
+
+    to, eo = owner(tris), owner(d["edges"])
+    names = ["carrier", "ring", "sun", "planet0", "planet1", "planet2"]
+    return {n: (tris[to == n], d["edges"][eo == n]) for n in names}, centres, z_top
+
+
+def f_gears(data, light):
+    title = "Mechanisms that mesh"
+    d = data["planetary-gear-stage"]
+    G = model_facts(d)
+    v = d["view"]["values"]
+    zs, zp = int(v["z_sun"]), int(v["z_planet"])
+    zr = int(G["derived"]["z_ring"]["value"])
+    loop = 24.0                                   # one turn of the sun; every part looks the same again after it
+    svg, p = card(title, light, loop)
+    parts, centres, z_top = gear_split(d)
+    cam = Camera(az=0, el=89.9, target=(0, 0, z_top), dist=6000, fov=1.2)
+    every = np.concatenate([t for t, _ in parts.values()]).reshape(-1, 3)
+    cam.fit(every, (166, 24, 222, 222))
+    tone = {"carrier": mix(p["clay"], p["panel"], 0.55), "ring": p["clay"], "sun": p["mint"],
+            "planet0": mix(p["clay"], "#ffffff" if not light else "#000000", 0.08)}
+    tone["planet1"] = tone["planet2"] = tone["planet0"]
+    # carrier held: the sun turns once, each planet -zs/zp of a turn on its own pin, the ring -zs/zr
+    turns = {"carrier": 0.0, "sun": 1.0, "ring": -zs / zr, "planet0": -zs / zp, "planet1": -zs / zp, "planet2": -zs / zp}
+    for name in ("carrier", "ring", "sun", "planet0", "planet1", "planet2"):
+        tris, edges = parts[name]
+        if not len(tris):
+            continue
+        cxy = (0.0, 0.0) if not name.startswith("planet") else tuple(centres[int(name[-1])])
+        (ox, oy), = cam.project(np.array([[cxy[0], cxy[1], z_top]]))[0]
+        fills, ed = draw_solid(cam, tris, svg.w, svg.h, edges, edge_ink=p["edge"], base=tone[name])
+        deg = 360.0 * turns[name]
+        if deg:
+            k = svg.id("k")
+            svg.css.append("@keyframes %s{from{transform:rotate(0deg)}to{transform:rotate(%sdeg)}}" % (k, f1(-deg)))
+            svg.css.append(".%s{transform-box:view-box;transform-origin:%spx %spx;animation:%s %gs linear infinite}"
+                           % (k, f1(ox), f1(oy), k, loop))
+            svg.add('<g class="%s">%s%s</g>' % (k, fills, ed))
+        else:
+            svg.add("<g>%s%s</g>" % (fills, ed))
+    svg.text(27, 40, "Carrier held", 13, 600, p["ink"])
+    svg.text(27, 60, "sun %d · planets %d · ring %d" % (zs, zp, zr), 12.5, 450, p["ink3"])
+    rc, rs = G["derived"]["ratio_carrier"]["value"], G["derived"]["ratio_star"]["value"]
+    svg.text(27, 268, "%s with the ring held · %s reversed with the carrier held" % (ratio(rc), ratio(rs)), 12.5, 450, p["ink3"])
+    card_words(svg, p, title, "Involute gears from the parts library, meshed by the agent and turned here by their own tooth counts.")
+    return svg.render("%s: the %s seen from above, turning with the carrier held: sun %d, planets %d, ring %d teeth; %s with the "
+                      "ring held, %s reversed with the carrier held." % (title, G["name"].lower(), zs, zp, zr, ratio(rc), ratio(rs)))
+
+
+def f_shape(data, light):
+    title = "Shapes, not just boxes"
+    d = data["ergonomic-mouse-shell"]
+    M = model_facts(d)
+    loop = 10.0
+    svg, p = card(title, light, loop)
+    drawn_part(svg, p, d, (47, 30, 320, 222), -142, 26, 0.4, 3.2, 2.9, 3.8, rings_=False)
+    wall = d["view"]["values"].get("wall")
+    svg.text(27, 268, "%s · %s mm%s" % (M["name"], M["size"], " · %s mm wall" % f1(wall) if wall else ""), 12.5, 450, p["ink3"])
+    card_words(svg, p, title, "Lofted surfaces, scoops and splits, written as code and built as solids you can still edit.")
+    return svg.render("%s: an %s, %s mm, lofted through rounded sections and hollowed to an even wall, with a thumb scoop, "
+                      "split buttons and a wheel slot." % (title, M["name"].lower(), M["size"]))
 
 
 AGENT_APPS = ["Claude Code", "Codex", "Gemini CLI", "Cursor CLI", "OpenCode", "Qwen Code", "GitHub Copilot CLI"]
@@ -1345,7 +1393,7 @@ def f_move(data, light):
 
 
 def f_slicer(data, light):
-    title = "Your slicer, for real"
+    title = "Your slicer, if you print"
     d = data["desk-phone-stand"]
     tp = d["toolpath"]
     loop = 10.0
@@ -1404,52 +1452,15 @@ def f_slicer(data, light):
         svg.text(x + 13, 268, nm, 11.5, 450, p["ink3"])
         x += wd + 14
     sl = data["slicers"]
-    card_words(svg, p, title, "%s and %s slice every revision with your printer's own presets." % (", ".join(sl[:-1]), sl[-1]))
+    card_words(svg, p, title, "Printing is optional. %s and %s slice a print design with your printer's own presets." % (", ".join(sl[:-1]), sl[-1]))
     desc = ("%s: layer %d of %d of the %s, drawn line type by line type from the slicer's G-code; slicers: %s." %
             (title, bl + 1, L, d["state"]["name"].lower(), ", ".join(sl)))
     return svg.render(desc)
 
 
-def f_compare(data, light):
-    title = "Every printer compared"
-    cmp_ = data["compare"]
-    loop = 10.0
-    svg, p = card(title, light, loop)
-    rows, seen = [], set()
-    for r in sorted([r for r in cmp_["rows"] if r["status"] == "ok"], key=lambda r: r["time_s"]):
-        key = (r["model"], r["nozzle_mm"])
-        if key in seen:
-            continue
-        seen.add(key)
-        rows.append(r)
-    rows = rows[:5]
-    tmax = max(r["time_s"] for r in rows)
-    best = cmp_.get("best", {})
-    for i, r in enumerate(rows):
-        y = 40 + i * 46
-        nm = r["model"]
-        svg.text(27, y, nm, 14, 580, p["ink"])
-        x = 27 + text_w(nm, 14, 580) + 6
-        svg.text(x, y, "%.1f mm" % r["nozzle_mm"], 13, 450, p["ink3"])
-        tags = [lab for key, lab in (("fastest", "fastest"), ("least_filament", "least filament")) if best.get(key) == r["id"]]
-        if tags:
-            x += text_w("%.1f mm" % r["nozzle_mm"], 13, 450) + 8
-            svg.text(x, y, " · ".join(tags), 13, 560, p["datum"])
-        svg.text(387, y, "%s · %.1f g" % (fmt_min(r["time_s"] / 60), r["filament_g"]), 13.5, 500, p["ink2"], anchor="end")
-        svg.rect(27, y + 10, 360, 6, 3, fill=p["panel2"])
-        g = svg.anim([(0, {"transform": "scaleX(0)"}), (0.4 + 0.14 * i, {"transform": "scaleX(0)"}), (1.4 + 0.14 * i, {"transform": "scaleX(1)"}),
-                      (9.3, {"transform": "scaleX(1)"}), (9.7, {"transform": "scaleX(0)"})], origin="left")
-        fast = best.get("fastest") == r["id"]
-        svg.rect(27, y + 10, max(6, 360 * r["time_s"] / tmax), 6, 3, fill=p["datum"] if fast else p["ink3"], cls=g)
-    svg.text(27, 268, "Each slicer's own estimate, with that printer's presets.", 12.5, 450, p["ink3"])
-    card_words(svg, p, title, "One design, sliced for real on every printer set up in your slicers, with time and filament side by side.")
-    desc = "%s: %s; simulated by each slicer." % (title, "; ".join("%s %.1f mm nozzle, %s, %.1f g" % (r["model"], r["nozzle_mm"], fmt_min(r["time_s"] / 60), r["filament_g"]) for r in rows))
-    return svg.render(desc)
-
-
 def f_release(data, light):
     title = "Release what you approved"
-    d = data["desk-phone-stand"]
+    d = data["planetary-gear-stage"]
     loop = 10.0
     svg, p = card(title, light, loop)
     lab = {"step": "STEP", "stl": "STL", "3mf": "3MF", "obj": "OBJ", "glb": "GLB", "gcode": "G-code"}
@@ -1506,8 +1517,8 @@ def f_headless(data, light):
     return svg.render("%s: $ %s prints the design as JSON: %s." % (title, cmd, " ".join(l.strip() for _, l in shown)))
 
 
-FEATURES = [("start", f_start), ("talk", f_talk), ("proved", f_proved), ("move", f_move), ("slicer", f_slicer),
-            ("compare", f_compare), ("release", f_release), ("headless", f_headless)]
+FEATURES = [("start", f_start), ("shape", f_shape), ("gears", f_gears), ("move", f_move), ("proved", f_proved),
+            ("release", f_release), ("slicer", f_slicer), ("talk", f_talk), ("headless", f_headless)]
 
 
 def features(data, light: bool):

@@ -1,27 +1,30 @@
 # Features
 
-Everything Form Studio does, from the first idea to the released files. Each capability is available in the desktop
-app, as a `form` command ([CLI reference](CLI.md)) and as an MCP tool ([MCP reference](MCP.md)), unless noted.
+Everything Form Studio does, from the first idea to the released files: describe anything, and an agent builds it as
+real, editable CAD. Each capability is available in the desktop app, as a `form` command ([CLI reference](CLI.md)) and
+as an MCP tool ([MCP reference](MCP.md)), unless noted. 3D printing is optional and has its own section near the end.
 
 - [Start from anything](#start-from-anything)
 - [Concepts and measurements](#concepts-and-measurements)
-- [Conversations and agents](#conversations-and-agents)
-- [Any model, any provider](#any-model-any-provider)
 - [Designing](#designing)
-- [For a printer, or just a 3D model](#for-a-printer-or-just-a-3d-model)
-- [Revisions, branches and variants](#revisions-branches-and-variants)
-- [Checks and evidence](#checks-and-evidence)
-- [Fit](#fit)
-- [Analysis, measurement and annotations](#analysis-measurement-and-annotations)
-- [Colours and materials](#colours-and-materials)
-- [Printers, slicing and print simulation](#printers-slicing-and-print-simulation)
 - [Assemblies](#assemblies)
 - [Optimisation and alternatives](#optimisation-and-alternatives)
+- [Parts you already have](#parts-you-already-have)
+- [Checks and evidence](#checks-and-evidence)
+- [Analysis, measurement and annotations](#analysis-measurement-and-annotations)
+- [Revisions, branches and variants](#revisions-branches-and-variants)
+- [Colours and materials](#colours-and-materials)
 - [Pictures: renders, share cards, animations](#pictures-renders-share-cards-animations)
 - [Release](#release)
+- [Working with other software](#working-with-other-software)
+- [Conversations and agents](#conversations-and-agents)
+- [Any model, any provider](#any-model-any-provider)
 - [Moving and sharing designs](#moving-and-sharing-designs)
 - [Recipes: building blocks and the community gallery](#recipes-building-blocks-and-the-community-gallery)
-- [Working with other software](#working-with-other-software)
+- [3D printing (optional)](#3d-printing-optional)
+  - [For a printer, or just a 3D model](#for-a-printer-or-just-a-3d-model)
+  - [Fit](#fit)
+  - [Printers, slicing and print simulation](#printers-slicing-and-print-simulation)
 - [Setup, settings and updates](#setup-settings-and-updates)
 - [On GitHub](#on-github)
 
@@ -79,6 +82,282 @@ each one named as it arrives.
 
 ![Measure this: where to measure, the tolerance, and what the design assumes now](images/measure-this.webp)
 
+## Designing
+
+- **A real CAD kernel.** Every design is B-rep geometry built by [build123d](https://github.com/gumyr/build123d) on
+  OpenCascade, exported as STEP, STL, OBJ and GLB. Designs are Python (build123d) or OpenSCAD.
+- **Parameters with provenance.** Every value has a unit, a range, a group (brief, interface, form, process) and a
+  source: measured, specified, assumed, estimated from a photo, computed.
+- **Features you can click.** Each face of the solid is attributed to the feature that made it, so you can select a
+  feature on the model, change it, hide it, and see which features a change touched.
+- **Drafts with computed impact.** A change is built for real before it is saved: the features and interface
+  dimensions it moves, the change in stability and fit, and which outputs it would invalidate.
+- **Constraints that explain themselves.** An impossible combination is refused with the feature, the parameters
+  involved and a way forward.
+- **Hardware with sources.** `form.parts` provides screw clearances (ISO 273), heat-set insert pockets, nut traps,
+  magnet pockets, bearing seats, printable threads and involute gears, each dimension with its source.
+- **Text and patterns.** Embossed or debossed lettering with a shipped font, revision stamps on the underside, hex
+  vents, perforations, slots, knurls and grip ribs, with web-thickness checks.
+- **Reference parts.** Import a STEP, or an STL, OBJ or 3MF mesh, of the thing your part must fit (a circuit board, a phone, a motor). It is
+  drawn as a blueprint companion, and a design can cut clearance from it with `self.reference("pi5.step")`.
+- **Datasheets and drawings.** The agent reads PDFs and images, from a file or an https link, as pictures, so the
+  dimensions in a mechanical drawing survive (`read_document`).
+- **Every design on Home**, each a live 3D card, filtered by released and in progress; rename, duplicate, export or
+  move to the trash.
+
+<!-- optional: design helpers (WP mechanisms, surfacing, texture). Drop this item if the helper library is not in the release. -->
+- **Design helpers.** Proven building blocks for mechanisms (hinges, snap fits, bayonets, ratchets, cams, gear trains
+  and planetary sets), surfaces (lofts, sweeps, shells and variable fillets) and texture (knurls and embossed patterns
+  on the solid; finer texture as a mesh for renders, labelled as such), each with typed fallbacks and a clear error.
+<!-- /optional -->
+
+## Design intelligence
+
+- **Complex designs are staged.** For a mechanism, an organic or styled form, a texture or several parts, the agent
+  first writes a structured brief (requirements, key dimensions with their source, and the unknowns it could not
+  settle, listed rather than guessed), then a feature plan (every feature with how it will be built, mechanisms with
+  their clearances, textures with their tier, and the risks). Form Studio refuses to build a complex design without
+  a plan (`design_brief`, `plan_design`, `create_design(plan=...)`).
+- **The agent looks at every revision.** Creating or changing a design returns a six-view sheet and a section cut
+  through its centre, so walls, voids and clearances are seen, not assumed.
+- **Critique before release.** `critique` renders a close-up of every feature and computes metrics from the solid:
+  the smallest fillet, the share of sharp edges, mirror symmetry, proportions against classic
+  ratios, the mix of planar and free-form surface, sliver faces and planned features that are missing, with a
+  checklist to answer by looking. All of it is labelled heuristic. A briefed design cannot be released until its
+  revision has a recorded critique.
+- **A helper library for real design work.** `form.craft` gives designs lofts through superellipse and spline
+  sections, sweeps, revolves, shells (including section-inset shells for lofted domes), safe and variable fillets;
+  mechanisms with their numbers (print-in-place pin and living hinges, cantilever and annular snaps with their
+  strain, bayonets, dovetails, detents, ratchets, cams with their pressure angle, four-bar linkages with their
+  Grashof class and transmission angle, gear trains and planetary sets with their assembly conditions); ISO 286
+  limits and fits and bearing seat tolerances; ribs, gussets, boss arrays and lattices; and section-loft bodies for
+  helmets, grips and handles. Every helper checks its numbers and names the fix; fallbacks are reported.
+- **Texture in two honest tiers.** B-rep texture is real geometry in the CAD solid (an exact diamond or straight
+  knurl, spiral ribs as one smooth skin, wrapped ribs, embossed cells), capped at about 2,000 elements. Fine texture
+  (leather grain, a carbon-like twill, stone-like cells, noise, hexagons, a heightmap image) is a mesh texture: the
+  STL, OBJ, GLB and the renders carry it, labelled "mesh texture; STEP carries the smooth body".
+- **Guides by topic and worked examples.** `design_guide(topic=...)` covers surfacing, mechanisms, organic forms,
+  texture, aesthetics, and design for printing (only for designs that are printed). `design_examples` serves twelve
+  complete exemplar designs (a textured full-face helmet shell, a planetary gearbox, a hinged case with a snap latch,
+  an ergonomic handle, a quick-release clamp, a knurled knob, a spiral-ribbed vase, a belt idler, a cable-chain link,
+  an Arca-type camera plate, a drone arm and a table lamp) to the agent only; they never appear as projects.
+- **A design bench.** `tests/design_bench` holds about twenty briefs scored automatically (staging, builds, planned
+  features present, craft and form metrics); the exemplars are built and checked against it in the test suite.
+
+## Assemblies
+
+![An assembly with its joint sliders](images/assembly.webp)
+
+- **Assembled, Exploded and Print layout** for every design that says how its parts go together. Designs with separate
+  bodies that do not say show Assembled as unavailable, explain why and offer to ask the agent to add it.
+- **Joints that form chains.** A part can be fixed to another (`Part(attach="arm")`) or move on a joint mounted on
+  another part (`hinge(..., parent="arm")`), so turning an arm swings the cup on it and the bolt in the cup, in the
+  viewport sliders, the views and the checks. Exploded offsets are relative to the parent. Ratchet joints (`step=15`)
+  are checked at the positions they click to.
+- **Joined parts are fits.** `Mate(a, b, "pin" | "thread" | ...)` declares a pin in its hole or a thread in its thread;
+  the pair is measured against its clearance instead of being reported as a collision, and a thread's phase is
+  searched.
+- **Checks from the solids:** overlap when assembled, the smallest gap, every declared fit, each joint swept through
+  its range with everything it carries (the first contact angle when there is one), and whether a screwdriver reaches
+  every screw.
+- **Seconds, within a budget.** Parts are compared on their meshes and booleaned only where they meet; sweeps refine
+  near contact and prove motion free between positions where the clearance allows. The checks run in their own time
+  budget (`[assembly].budget_s`, 45 s) with progress, and a partial result says which range was checked.
+- **Declarations are checked** when a design is created or updated: an unknown part, a loop or a part with two parents
+  is refused with the reason.
+- **A bill of materials** for the bought hardware; a release adds `BOM.csv` and `ASSEMBLY.md`.
+- **Assembly instructions as a PDF.** A parts page with each part's computed volume, then one page per part in the
+  order the assembly attaches them, at its exploded offset with an arrow to where it seats. `form instructions`; MCP
+  `assembly_instructions`.
+
+| | |
+|---|---|
+| ![Exploded view: each part separated from its parent](images/assembly-exploded.webp) | ![A hinge swept through its range](images/assembly-joint.webp) |
+
+## Optimisation and alternatives
+
+- **Make it lighter.** Tools › Make it lighter tries thinner walls and floors, larger lightening pockets and lighter
+  slicer settings, and shows only candidates that keep every passing check passing, each with its computed mass and the
+  slicer's grams before and after. **Apply** commits the one you choose. `form lighter`; MCP `make_lighter`,
+  `apply_lighter`.
+
+- **Goal seek** (`optimize`): search parameter ranges for the lightest, smallest or strongest design that still passes
+  its constraints, for example the lightest bracket with a safety factor of at least 3. Every candidate is a real
+  kernel build.
+- **Alternatives:** a grid of real variants over one or two parameters, ranked by objectives you weight (less
+  material, harder to tip, fit yield, smaller footprint).
+
+## Parts you already have
+
+- **Design around a real part.** Import a STEP or STL of the thing your part must fit (a circuit board, a phone, a
+  motor). It is drawn as a blueprint companion, and the design cuts clearance from its real geometry with
+  `self.reference("pi5.step")`. Its dimensions are *computed* from the file. MCP `import_reference`. A mesh has
+  **Make editable** next to it (below).
+- **Replace a broken part.** A photo with a card, coin or ruler beside it gives the scale; sizes read from it stay
+  *assumed* until you measure the ones that decide the fit, and the agent designs the replacement and strengthens it
+  where it broke. `form replace`; MCP `replace_part_guide`.
+- **Meshes stay honest.** An STL, 3MF or OpenSCAD mesh brought into the kernel keeps every triangle as a face. Volume,
+  wall thickness and exports work on it; it is never written to STEP or called a CAD solid.
+
+
+## Mesh to editable CAD
+
+Bring an STL, OBJ or 3MF and Form Studio rebuilds it as CAD, then measures how close the result is to the mesh.
+**Make editable** on an imported mesh (Brief › Reference parts), `form reconstruct FILE [--name] [--tolerance MM]
+[--layer 0|1|2]`, or the MCP tool `reconstruct`. The result is a new design; the original mesh stays beside it in
+blueprint, and the report, the deviation map and every solid are kept in the design's `reconstruction` folder.
+
+- **Layer 0, always: the mesh as an exact solid.** Vertices are welded, every triangle becomes a planar face, the faces
+  are sewn into a solid and coplanar facets are merged. The two-sided Hausdorff distance to the mesh is at float
+  precision. Open boundaries and non-manifold edges are reported; holes are closed only as a listed repair.
+- **Layer 1 (beta): analytic faces.** Regions are grown over the mesh and fitted with planes, cylinders, cones,
+  spheres and tori. A region is accepted only when every vertex on it is within the tolerance (default 0.02 mm) and its
+  facets are no farther from the surface than the mesh's own chord error; the faces are trimmed along the mesh's
+  edges (lines, circles and arcs where the boundary is one) and sewn with frozen facets for the rest into one solid.
+  The report gives the share of area that is parametric.
+- **Layer 2 (beta): a feature recipe.** When the part is one extrusion or one revolution, a build123d design with
+  Params is written: the profile, holes with standard sizes (ISO 273 clearances, tap drills, drill sizes) and
+  provenance "computed from mesh", and hole grids, lines and circles as patterns. Mirror planes and rotational
+  symmetry are reported. The recipe is rebuilt and compared with the mesh, and it is used only when it is within the
+  limit.
+- **Verification, every time.** Two-sided Hausdorff distance, volume difference, parametric versus frozen area, and
+  a deviation map coloured against the tolerance.
+
+What it does not do (yet): scans, sculpted and organic shapes stay faceted: exact to the mesh but not parametric.
+Freeform surfaces (splines, lofts) are not fitted; a spline that a cylinder or torus matches within the tolerance is
+reported as that surface. Layer 2 handles one extrusion or one revolution with holes; steps, pockets, bosses on
+other axes and fillets across the extrusion leave the result at Layer 1 and the report says why. Accuracy is measured
+against the mesh, not the original object, so the mesh's own chord error and scan noise are in the input. Units are
+millimetres unless the file says otherwise (3MF does). Nothing is decimated: a mesh over 200,000 triangles shows
+progress and takes minutes.
+
+## Checks and evidence
+
+![Prove: the checks of a revision, each with its evidence](images/prove.webp)
+
+Each revision is rebuilt and checked on the solid. The standard checks for a printed part:
+
+| Check | Evidence |
+|---|---|
+| One valid solid | computed |
+| Interfaces as modelled (intended vs measured on the solid) | computed |
+| Export mesh is closed | computed |
+| STL matches the CAD solid | computed |
+| Fits the build volume | computed |
+| Thinnest wall | computed |
+| Unsupported overhangs | computed |
+| Bridged ceilings | heuristic |
+| Plate contact | heuristic |
+| Tip-over resistance (statics) | model |
+| Fit within the tolerance window | model |
+| Re-imported in FreeCAD (when installed) | computed |
+
+Recipes and assemblies add their own: a bracket's bending safety factor, a box's lid swing, the clearance of a pin in
+its hole. **Every result says how it is known** (computed, heuristic, model, simulated, measured, physical) and
+clicking a result shows where on the part it was found.
+
+**Thinnest wall measures walls.** In a design of several parts each wall is measured inside its own part, so a bolt
+resting in its nut is not a 0 mm wall, and only faces within 30° of parallel count, so a tapered edge is not a wall
+either. A real thin fin still fails.
+
+## Analysis, measurement and annotations
+
+| | |
+|---|---|
+| ![Wall-thickness map](images/app-thickness.webp) | ![Overhang map](images/app-overhang.webp) |
+| **Wall thickness**, from thousands of surface samples, with the thinnest spot marked. | **Overhangs** by angle, flat ceilings, bridges and plate contact. |
+
+- **Maps on the model:** wall thickness, overhang, layer cross-section and small features, computed from the real
+  geometry. Each legend says what the map does not tell you.
+- **Measure (M):** point-to-point distance with snapping, face area and tilt, and exact hole diameters from the solid.
+  It works on every multi-part design and in every view (print layout, assembled, exploded); clicks answer at once and
+  measurements follow the parts.
+- **Annotate (N):** pick faces, edges and points, or brush and lasso regions on the part, and see area, tilt,
+  overhang, wall thickness, curvature and height above the bed computed on the solid. Keep a selection with a name and
+  a note as a pin on its revision, ask the agent about it with the exact numbers, or cut a section through it.
+  `form select`, `form annotations`; MCP `analyze_selection`, `annotate`, `list_annotations`.
+- **Text on any flat face.** In Annotate, pick a point on a flat face and choose **Text here…**: raised or sunk,
+  cap height and depth, with stroke width and cap height checked against your nozzle as you type. **Add to design**
+  writes the lettering into the design's own code as a feature and builds a new revision. `form engrave`; MCP
+  `add_text`, `remove_text`.
+- **Screw bosses and snap-fit hooks where you click.** In Annotate, **Feature here…** on a flat face adds a screw
+  boss (M2 to M5, with the ISO tap drill, a heat-set insert hole or the ISO 273 clearance) or a cantilever snap-fit
+  hook, checked against your nozzle and written into the design's code. `form feature`; MCP `add_feature`,
+  `remove_feature`.
+- **Section (X):** a clipping plane through the solid with filled cut faces.
+- **Orientation finder:** ranks print orientations by overhang area, support, contact and height, with the numbers
+  behind the ranking, and applies the one you choose.
+- **Tip-over and statics:** where the centre of mass sits, and the push that tips the part, from the solid and the
+  slicer's mass.
+
+![Annotate: a selection on the solid with its computed numbers](images/annotate.webp)
+
+![Measure: a distance across the part, snapped to its faces](images/app-measure.webp)
+
+## Revisions, branches and variants
+
+![The revision timeline under the viewport](images/app-timeline.webp)
+
+- **Every commit is a revision.** Revisions record their origin (you, the CLI, or the agent by name) and never
+  overwrite each other: an agent that commits against an older head is refused.
+- **Timeline.** Scrub through revisions in the viewport, play them as a morph, and export the morph as GIF or WebP.
+- **Branches.** Check out any earlier revision and continue from it; nothing is deleted.
+- **Compare.** Parameters, features, interface dimensions, stability and fit between any two revisions.
+- **What changed, on the solids.** Comparing with head also compares the two solids in the kernel: material added in
+  green and removed in red, with the volume and number of regions of each, computed with booleans on the B-rep.
+  `form diff`; MCP `geometry_diff`.
+- **Variants.** Named sets of values kept next to the revisions ("Travel version", "Thick walls"), compared side by
+  side on a variants board and promoted to a revision when you choose.
+
+![Variants](images/app-variants.webp)
+
+## Colours and materials
+
+![Colours and materials per part, drawn in the viewport](images/appearance.webp)
+
+- **Per design or per part**, drawn in the viewport and exported as a 3MF with colours.
+- **Used in the checks:** heat, sunlight, warping, and flexible or fibre-filled filament.
+- **Picks the filament.** A material selects the printer's matching filament preset, one material per plate.
+  `form appearance`, `form material`; MCP `set_appearance`.
+
+## Pictures: renders, share cards, animations
+
+| | |
+|---|---|
+| ![Blender render: desk scene, matte blue PLA](images/render-desk-blue.webp) | ![Share card](images/share-card.webp) |
+| **Photoreal render** with Blender: studio, desk or dark scenes, matte, PETG or silk finishes, any colour, layer lines at the slicer's layer height. | **Share card**: the part with its dimensions, print time, filament, checks and fit, each labelled with its evidence. |
+
+- **Engine renders** in any view or as a four-view sheet, coloured by feature, for agents to look at their work.
+- **Turntable videos:** Release › Share › **Turntable…** renders the part turning once as MP4, PNG frames, WebP or GIF. `form turntable`; MCP `turntable`.
+- **Turntables and revision morphs** as GIF or WebP (`form animate`, `form history --gif`).
+- Renders are illustrations and are labelled as such; they are never evidence.
+
+## Release
+
+![Release: the gate, the frozen files with hashes, and the history](images/release.webp)
+
+- **A release gate** lists what is current, what is stale and what needs acknowledgement.
+- **One approval, by a person**, freezes STEP, STL, OBJ, GLB, 3MF and G-code with SHA-256 hashes and a report of every
+  check and its evidence. No agent can approve.
+- **Released over failed checks, on the record.** Tick each failed check and write why; the release, its manifest and
+  its report say it was released with failed checks. Missing or stale files still block.
+- **Verify at any time** that a release still matches its hashes; a later commit marks it superseded.
+- **Save files…** puts every file of a release in one .zip (STEP, STL, the sliced 3MF, G-code, report, documents and
+  manifest); **Show in Finder** opens its folder. `form release-files`.
+
+## Working with other software
+
+| Program | What Form Studio does with it |
+|---|---|
+| FreeCAD | Opens the STEP, runs a re-import check, and writes a macro with every parameter in a spreadsheet |
+| OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
+| Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
+| Your slicer | Slices, and opens the 3MF or G-code in it |
+| Any MCP client | The full engine over 83 tools ([MCP reference](MCP.md)) |
+
+When a program's version outside the supported range is why something failed, the error names the supported versions
+and what to do.
+
 ## Conversations and agents
 
 ![A conversation: the agent's steps, the view it looked at and its answer](images/app-chat.webp)
@@ -131,316 +410,6 @@ each one named as it arrives.
 
 ![Add a provider: the address, what was found, and the models it lists](images/provider-added.webp)
 
-## Designing
-
-- **A real CAD kernel.** Every design is B-rep geometry built by [build123d](https://github.com/gumyr/build123d) on
-  OpenCascade, exported as STEP, STL, OBJ and GLB. Designs are Python (build123d) or OpenSCAD.
-- **Parameters with provenance.** Every value has a unit, a range, a group (brief, interface, form, process) and a
-  source: measured, specified, assumed, estimated from a photo, computed.
-- **Features you can click.** Each face of the solid is attributed to the feature that made it, so you can select a
-  feature on the model, change it, hide it, and see which features a change touched.
-- **Drafts with computed impact.** A change is built for real before it is saved: the features and interface
-  dimensions it moves, the change in stability and fit, and which outputs it would invalidate.
-- **Constraints that explain themselves.** An impossible combination is refused with the feature, the parameters
-  involved and a way forward.
-- **Hardware with sources.** `form.parts` provides screw clearances (ISO 273), heat-set insert pockets, nut traps,
-  magnet pockets, bearing seats, printable threads and involute gears, each dimension with its source.
-- **Text and patterns.** Embossed or debossed lettering with a shipped font, revision stamps on the underside, hex
-  vents, perforations, slots, knurls and grip ribs, with web-thickness checks.
-- **Reference parts.** Import a STEP, or an STL, OBJ or 3MF mesh, of the thing your part must fit (a circuit board, a
-  phone, a motor). It is drawn as a blueprint companion, and a design can cut clearance from it with
-  `self.reference("pi5.step")`. A mesh has **Make editable** next to it (see below).
-- **Datasheets and drawings.** The agent reads PDFs and images, from a file or an https link, as pictures, so the
-  dimensions in a mechanical drawing survive (`read_document`).
-- **Every design on Home**, each a live 3D card, filtered by released and in progress; rename, duplicate, export or
-  move to the trash.
-
-## Design intelligence
-
-- **Complex designs are staged.** For a mechanism, an organic or styled form, a texture or several parts, the agent
-  first writes a structured brief (requirements, key dimensions with their source, and the unknowns it could not
-  settle, listed rather than guessed), then a feature plan (every feature with how it will be built, mechanisms with
-  their clearances, textures with their tier, and the risks). Form Studio refuses to build a complex design without
-  a plan (`design_brief`, `plan_design`, `create_design(plan=...)`).
-- **The agent looks at every revision.** Creating or changing a design returns a six-view sheet and a section cut
-  through its centre, so walls, voids and clearances are seen, not assumed.
-- **Critique before release.** `critique` renders a close-up of every feature and computes metrics from the solid:
-  the smallest fillet, the share of sharp edges, mirror symmetry, proportions against classic
-  ratios, the mix of planar and free-form surface, sliver faces and planned features that are missing, with a
-  checklist to answer by looking. All of it is labelled heuristic. A briefed design cannot be released until its
-  revision has a recorded critique.
-- **A helper library for real design work.** `form.craft` gives designs lofts through superellipse and spline
-  sections, sweeps, revolves, shells (including section-inset shells for lofted domes), safe and variable fillets;
-  mechanisms with their numbers (print-in-place pin and living hinges, cantilever and annular snaps with their
-  strain, bayonets, dovetails, detents, ratchets, cams with their pressure angle, four-bar linkages with their
-  Grashof class and transmission angle, gear trains and planetary sets with their assembly conditions); ISO 286
-  limits and fits and bearing seat tolerances; ribs, gussets, boss arrays and lattices; and section-loft bodies for
-  helmets, grips and handles. Every helper checks its numbers and names the fix; fallbacks are reported.
-- **Texture in two honest tiers.** B-rep texture is real geometry in the CAD solid (an exact diamond or straight
-  knurl, spiral ribs as one smooth skin, wrapped ribs, embossed cells), capped at about 2,000 elements. Fine texture
-  (leather grain, a carbon-like twill, stone-like cells, noise, hexagons, a heightmap image) is a mesh texture: the
-  STL, OBJ, GLB and the renders carry it, labelled "mesh texture; STEP carries the smooth body".
-- **Guides by topic and worked examples.** `design_guide(topic=...)` covers surfacing, mechanisms, organic forms,
-  texture, aesthetics, and design for printing (only for designs that are printed). `design_examples` serves twelve
-  complete exemplar designs (a textured full-face helmet shell, a planetary gearbox, a hinged case with a snap latch,
-  an ergonomic handle, a quick-release clamp, a knurled knob, a spiral-ribbed vase, a belt idler, a cable-chain link,
-  an Arca-type camera plate, a drone arm and a table lamp) to the agent only; they never appear as projects.
-- **A design bench.** `tests/design_bench` holds about twenty briefs scored automatically (staging, builds, planned
-  features present, craft and form metrics); the exemplars are built and checked against it in the test suite.
-
-## Mesh to editable CAD
-
-Bring an STL, OBJ or 3MF and Form Studio rebuilds it as CAD, then measures how close the result is to the mesh.
-**Make editable** on an imported mesh (Brief › Reference parts), `form reconstruct FILE [--name] [--tolerance MM]
-[--layer 0|1|2]`, or the MCP tool `reconstruct`. The result is a new design; the original mesh stays beside it in
-blueprint, and the report, the deviation map and every solid are kept in the design's `reconstruction` folder.
-
-- **Layer 0, always: the mesh as an exact solid.** Vertices are welded, every triangle becomes a planar face, the faces
-  are sewn into a solid and coplanar facets are merged. The two-sided Hausdorff distance to the mesh is at float
-  precision. Open boundaries and non-manifold edges are reported; holes are closed only as a listed repair.
-- **Layer 1 (beta): analytic faces.** Regions are grown over the mesh and fitted with planes, cylinders, cones,
-  spheres and tori. A region is accepted only when every vertex on it is within the tolerance (default 0.02 mm) and its
-  facets are no farther from the surface than the mesh's own chord error; the faces are trimmed along the mesh's
-  edges (lines, circles and arcs where the boundary is one) and sewn with frozen facets for the rest into one solid.
-  The report gives the share of area that is parametric.
-- **Layer 2 (beta): a feature recipe.** When the part is one extrusion or one revolution, a build123d design with
-  Params is written: the profile, holes with standard sizes (ISO 273 clearances, tap drills, drill sizes) and
-  provenance "computed from mesh", and hole grids, lines and circles as patterns. Mirror planes and rotational
-  symmetry are reported. The recipe is rebuilt and compared with the mesh, and it is used only when it is within the
-  limit.
-- **Verification, every time.** Two-sided Hausdorff distance, volume difference, parametric versus frozen area, and
-  a deviation map coloured against the tolerance.
-
-What it does not do (yet): scans, sculpted and organic shapes stay faceted: exact to the mesh but not parametric.
-Freeform surfaces (splines, lofts) are not fitted; a spline that a cylinder or torus matches within the tolerance is
-reported as that surface. Layer 2 handles one extrusion or one revolution with holes; steps, pockets, bosses on
-other axes and fillets across the extrusion leave the result at Layer 1 and the report says why. Accuracy is measured
-against the mesh, not the original object, so the mesh's own chord error and scan noise are in the input. Units are
-millimetres unless the file says otherwise (3MF does). Nothing is decimated: a mesh over 200,000 triangles shows
-progress and takes minutes.
-
-## For a printer, or just a 3D model
-
-![A 3D model in Prove: size, solid, mesh and STEP round trip, with no print checks](images/model-prove.webp)
-
-Every design has a **purpose**: *For 3D printing*, or *Just a 3D model* for rendering, CAD exchange, CNC, laser
-cutting, moulding or visualisation. New designs start from your answer on Home; change it any time in the Brief or
-from the top bar. `form new … --purpose model --process cnc`, `form purpose <project> model`.
-
-- **A 3D model is checked as a model.** Size, a valid solid, a closed mesh, the STEP round trip, loads and assembly
-  checks run; overhangs, bridges, plate contact, the build volume, nozzle walls, the printer-accuracy fit model and the
-  slice do not, and Prove says so. The thinnest feature is compared with the process you name (about 0.8 mm for CNC
-  or injection moulding, 2 mm for casting). The pipeline has no Slice step and the Fit stage is hidden.
-- **Its release** holds STEP, STL, 3MF, OBJ and GLB, a four-view sheet and an iso render, with no G-code and no print
-  report.
-- **3D printing is optional.** It is off until you turn it on in the launcher or in Settings › General › Set up
-  for. While it is off there is no printer chip, no Fit stage, no slicer install, no print rows in Prove, no Printing
-  tab and no print tools for agents (they answer "printing is off; enable it in Settings"). New designs are 3D models.
-  People who already printed before this change keep printing: a configured slicer or printer, or designs made for
-  printing, turn it on once at the first start.
-- **Design only.** Slicing is optional per design, for every design, or when no slicer is installed. Checks, exports,
-  renders and releases work without it, and the release says what it does not cover.
-
-![The release of a 3D model: STEP, STL, 3MF, OBJ, GLB and rendered views](images/model-release.webp)
-
-## Revisions, branches and variants
-
-![The revision timeline under the viewport](images/app-timeline.webp)
-
-- **Every commit is a revision.** Revisions record their origin (you, the CLI, or the agent by name) and never
-  overwrite each other: an agent that commits against an older head is refused.
-- **Timeline.** Scrub through revisions in the viewport, play them as a morph, and export the morph as GIF or WebP.
-- **Branches.** Check out any earlier revision and continue from it; nothing is deleted.
-- **Compare.** Parameters, features, interface dimensions, stability and fit between any two revisions.
-- **What changed, on the solids.** Comparing with head also compares the two solids in the kernel: material added in
-  green and removed in red, with the volume and number of regions of each, computed with booleans on the B-rep.
-  `form diff`; MCP `geometry_diff`.
-- **Variants.** Named sets of values kept next to the revisions ("Travel version", "Thick walls"), compared side by
-  side on a variants board and promoted to a revision when you choose.
-
-![Variants](images/app-variants.webp)
-
-## Checks and evidence
-
-![Prove: the checks of a revision, each with its evidence](images/prove.webp)
-
-Each revision is rebuilt and checked on the solid. The standard checks for a printed part:
-
-| Check | Evidence |
-|---|---|
-| One valid solid | computed |
-| Interfaces as modelled (intended vs measured on the solid) | computed |
-| Export mesh is closed | computed |
-| STL matches the CAD solid | computed |
-| Fits the build volume | computed |
-| Thinnest wall | computed |
-| Unsupported overhangs | computed |
-| Bridged ceilings | heuristic |
-| Plate contact | heuristic |
-| Tip-over resistance (statics) | model |
-| Fit within the tolerance window | model |
-| Re-imported in FreeCAD (when installed) | computed |
-
-Recipes and assemblies add their own: a bracket's bending safety factor, a box's lid swing, the clearance of a pin in
-its hole. **Every result says how it is known** (computed, heuristic, model, simulated, measured, physical) and
-clicking a result shows where on the part it was found.
-
-**Thinnest wall measures walls.** In a design of several parts each wall is measured inside its own part, so a bolt
-resting in its nut is not a 0 mm wall, and only faces within 30° of parallel count, so a tapered edge is not a wall
-either. A real thin fin still fails.
-
-## Fit
-
-![Fit: a section through the pocket and the modelled chance of fitting](images/app-fit.webp)
-
-The gap between a printed cavity and the object it holds is modelled from three uncertainties: the object's
-dimension (measured, specified or assumed), the printer's bias and spread for this filament, and the tolerance window
-you accept. Form Studio reports:
-
-- the **chance the gap lands in the window**, with the chance of too tight and too loose;
-- a **section** through the interface with the clearance per side;
-- the **recommended clearance** for a centred gap;
-- the **cheapest way to raise the odds**: measure the object, print the fit coupon, or print a thin test ring cut from
-  the real interface (`slice_test_piece`).
-
-Measurements from a printed coupon calibrate the printer profile and are reused by every later design.
-
-## Analysis, measurement and annotations
-
-| | |
-|---|---|
-| ![Wall-thickness map](images/app-thickness.webp) | ![Overhang map](images/app-overhang.webp) |
-| **Wall thickness**, from thousands of surface samples, with the thinnest spot marked. | **Overhangs** by angle, flat ceilings, bridges and plate contact. |
-
-- **Maps on the model:** wall thickness, overhang, layer cross-section and small features, computed from the real
-  geometry. Each legend says what the map does not tell you.
-- **Measure (M):** point-to-point distance with snapping, face area and tilt, and exact hole diameters from the solid.
-  It works on every multi-part design and in every view (print layout, assembled, exploded); clicks answer at once and
-  measurements follow the parts.
-- **Annotate (N):** pick faces, edges and points, or brush and lasso regions on the part, and see area, tilt,
-  overhang, wall thickness, curvature and height above the bed computed on the solid. Keep a selection with a name and
-  a note as a pin on its revision, ask the agent about it with the exact numbers, or cut a section through it.
-  `form select`, `form annotations`; MCP `analyze_selection`, `annotate`, `list_annotations`.
-- **Text on any flat face.** In Annotate, pick a point on a flat face and choose **Text here…**: raised or sunk,
-  cap height and depth, with stroke width and cap height checked against your nozzle as you type. **Add to design**
-  writes the lettering into the design's own code as a feature and builds a new revision. `form engrave`; MCP
-  `add_text`, `remove_text`.
-- **Screw bosses and snap-fit hooks where you click.** In Annotate, **Feature here…** on a flat face adds a screw
-  boss (M2 to M5, with the ISO tap drill, a heat-set insert hole or the ISO 273 clearance) or a cantilever snap-fit
-  hook, checked against your nozzle and written into the design's code. `form feature`; MCP `add_feature`,
-  `remove_feature`.
-- **Section (X):** a clipping plane through the solid with filled cut faces.
-- **Orientation finder:** ranks print orientations by overhang area, support, contact and height, with the numbers
-  behind the ranking, and applies the one you choose.
-- **Tip-over and statics:** where the centre of mass sits, and the push that tips the part, from the solid and the
-  slicer's mass.
-
-![Annotate: a selection on the solid with its computed numbers](images/annotate.webp)
-
-![Measure: a distance across the part, snapped to its faces](images/app-measure.webp)
-
-## Colours and materials
-
-![Colours and materials per part, drawn in the viewport](images/appearance.webp)
-
-- **Per design or per part**, drawn in the viewport and exported as a 3MF with colours.
-- **Used in the checks:** heat, sunlight, warping, and flexible or fibre-filled filament.
-- **Picks the filament.** A material selects the printer's matching filament preset, one material per plate.
-  `form appearance`, `form material`; MCP `set_appearance`.
-
-## Printers, slicing and print simulation
-
-![The print simulated from the slicer's G-code, layer by layer](images/print-sim.webp)
-
-- **Your slicer, your presets.** Bambu Studio, OrcaSlicer, PrusaSlicer, SuperSlicer, QIDISlicer, ElegooSlicer and
-  Snapmaker Orca. OrcaSlicer 2.5 packed profiles (`.opc`) are read directly; a profile never has to be exported by
-  hand.
-- **Every printer you have.** Form Studio finds every printer set up in every installed slicer and lets you choose
-  printer, filament and process per design or as the default. Slicing, the bed size and the nozzle checks follow the
-  choice, at once: Settings, the top bar, the plate and the open design's checks update without a restart.
-  `form printers`; MCP `list_printers`, `choose_printer`.
-- **Several plates.** A design whose parts do not fit one plate is laid out part by part on as many plates as needed,
-  each in its own orientation and sliced, with time, filament and cost added up. Prove and the print simulation switch
-  between plates. `form plates`; MCP `plate_plan`, `set_part_print`.
-- **Watch it print.** The G-code is read back and played in 3D with a nozzle marker, line-type filters, a per-layer time
-  chart and the slicer's own time and filament estimate. Jump to the next bridge or overhang wall.
-- **Copies on a plate:** does N fit, and how they pack.
-- **Cost:** filament, electricity and machine time from the slice and your prices. Form Studio never guesses a price.
-
-![Several plates in Prove, each sliced on its own](images/plates.webp)
-
-- **Every printer you have, compared.** Prove › Every printer slices the design for real on each printer set up in
-  each installed slicer, with its own process and filament, and shows time, filament and cost side by side with the
-  fastest, least filament and cheapest marked. `form compare-printers`; MCP `compare_printers`.
-
-## Assemblies
-
-![An assembly with its joint sliders](images/assembly.webp)
-
-- **Assembled, Exploded and Print layout** for every design that says how its parts go together. Designs with separate
-  bodies that do not say show Assembled as unavailable, explain why and offer to ask the agent to add it.
-- **Joints that form chains.** A part can be fixed to another (`Part(attach="arm")`) or move on a joint mounted on
-  another part (`hinge(..., parent="arm")`), so turning an arm swings the cup on it and the bolt in the cup, in the
-  viewport sliders, the views and the checks. Exploded offsets are relative to the parent. Ratchet joints (`step=15`)
-  are checked at the positions they click to.
-- **Joined parts are fits.** `Mate(a, b, "pin" | "thread" | ...)` declares a pin in its hole or a thread in its thread;
-  the pair is measured against its clearance instead of being reported as a collision, and a thread's phase is
-  searched.
-- **Checks from the solids:** overlap when assembled, the smallest gap, every declared fit, each joint swept through
-  its range with everything it carries (the first contact angle when there is one), and whether a screwdriver reaches
-  every screw.
-- **Seconds, within a budget.** Parts are compared on their meshes and booleaned only where they meet; sweeps refine
-  near contact and prove motion free between positions where the clearance allows. The checks run in their own time
-  budget (`[assembly].budget_s`, 45 s) with progress, and a partial result says which range was checked.
-- **Declarations are checked** when a design is created or updated: an unknown part, a loop or a part with two parents
-  is refused with the reason.
-- **A bill of materials** for the bought hardware; a release adds `BOM.csv` and `ASSEMBLY.md`.
-- **Assembly instructions as a PDF.** A parts page with each part's computed volume, then one page per part in the
-  order the assembly attaches them, at its exploded offset with an arrow to where it seats. `form instructions`; MCP
-  `assembly_instructions`.
-
-| | |
-|---|---|
-| ![Exploded view: each part separated from its parent](images/assembly-exploded.webp) | ![A hinge swept through its range](images/assembly-joint.webp) |
-
-## Optimisation and alternatives
-
-- **Make it lighter.** Tools › Make it lighter tries thinner walls and floors, larger lightening pockets and lighter
-  slicer settings, and shows only candidates that keep every passing check passing, each with its computed mass and the
-  slicer's grams before and after. **Apply** commits the one you choose. `form lighter`; MCP `make_lighter`,
-  `apply_lighter`.
-
-- **Goal seek** (`optimize`): search parameter ranges for the lightest, smallest or strongest design that still passes
-  its constraints, for example the lightest bracket with a safety factor of at least 3. Every candidate is a real
-  kernel build.
-- **Alternatives:** a grid of real variants over one or two parameters, ranked by objectives you weight (less
-  material, harder to tip, fit yield, smaller footprint).
-
-## Pictures: renders, share cards, animations
-
-| | |
-|---|---|
-| ![Blender render: desk scene, matte blue PLA](images/render-desk-blue.webp) | ![Share card](images/share-card.webp) |
-| **Photoreal render** with Blender: studio, desk or dark scenes, matte, PETG or silk finishes, any colour, layer lines at the slicer's layer height. | **Share card**: the part with its dimensions, print time, filament, checks and fit, each labelled with its evidence. |
-
-- **Engine renders** in any view or as a four-view sheet, coloured by feature, for agents to look at their work.
-- **Turntable videos:** Release › Share › **Turntable…** renders the part turning once as MP4, PNG frames, WebP or GIF. `form turntable`; MCP `turntable`.
-- **Turntables and revision morphs** as GIF or WebP (`form animate`, `form history --gif`).
-- Renders are illustrations and are labelled as such; they are never evidence.
-
-## Release
-
-![Release: the gate, the frozen files with hashes, and the history](images/release.webp)
-
-- **A release gate** lists what is current, what is stale and what needs acknowledgement.
-- **One approval, by a person**, freezes STEP, STL, OBJ, GLB, 3MF and G-code with SHA-256 hashes and a report of every
-  check and its evidence. No agent can approve.
-- **Released over failed checks, on the record.** Tick each failed check and write why; the release, its manifest and
-  its report say it was released with failed checks. Missing or stale files still block.
-- **Verify at any time** that a release still matches its hashes; a later commit marks it superseded.
-- **Save files…** puts every file of a release in one .zip (STEP, STL, the sliced 3MF, G-code, report, documents and
-  manifest); **Show in Finder** opens its folder. `form release-files`.
-
 ## Moving and sharing designs
 
 - **One file per design.** Export a design with its revisions, conversations and the code it was built from as one
@@ -467,18 +436,75 @@ with categories and tags.
 
 Writing one: [Writing a recipe](RECIPES.md) and [community recipes](../community/recipes/README.md).
 
-## Working with other software
+## 3D printing (optional)
 
-| Program | What Form Studio does with it |
-|---|---|
-| FreeCAD | Opens the STEP, runs a re-import check, and writes a macro with every parameter in a spreadsheet |
-| OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
-| Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
-| Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 78 tools ([MCP reference](MCP.md)) |
+Printing is one way out among several. Turn it on when you print and every design can be checked for your printer,
+sliced by your own slicer and played back; leave it off and none of it gets in the way.
 
-When a program's version outside the supported range is why something failed, the error names the supported versions
-and what to do.
+### For a printer, or just a 3D model
+
+![A 3D model in Prove: size, solid, mesh and STEP round trip, with no print checks](images/model-prove.webp)
+
+Every design has a **purpose**: *For 3D printing*, or *Just a 3D model* for rendering, CAD exchange, CNC, laser
+cutting, moulding or visualisation. New designs start from your answer on Home; change it any time in the Brief or
+from the top bar. `form new … --purpose model --process cnc`, `form purpose <project> model`.
+
+- **A 3D model is checked as a model.** Size, a valid solid, a closed mesh, the STEP round trip, loads and assembly
+  checks run; overhangs, bridges, plate contact, the build volume, nozzle walls, the printer-accuracy fit model and the
+  slice do not, and Prove says so. The thinnest feature is compared with the process you name (about 0.8 mm for CNC
+  or injection moulding, 2 mm for casting). The pipeline has no Slice step and the Fit stage is hidden.
+- **Its release** holds STEP, STL, 3MF, OBJ and GLB, a four-view sheet and an iso render, with no G-code and no print
+  report.
+- **3D printing is optional.** It is off until you turn it on in the launcher or in Settings › General › Set up
+  for. While it is off there is no printer chip, no Fit stage, no slicer install, no print rows in Prove, no Printing
+  tab and no print tools for agents (they answer "printing is off; enable it in Settings"). New designs are 3D models.
+  People who already printed before this change keep printing: a configured slicer or printer, or designs made for
+  printing, turn it on once at the first start.
+- **Design only.** Slicing is optional per design, for every design, or when no slicer is installed. Checks, exports,
+  renders and releases work without it, and the release says what it does not cover.
+
+![The release of a 3D model: STEP, STL, 3MF, OBJ, GLB and rendered views](images/model-release.webp)
+
+### Fit
+
+![Fit: a section through the pocket and the modelled chance of fitting](images/app-fit.webp)
+
+The gap between a printed cavity and the object it holds is modelled from three uncertainties: the object's
+dimension (measured, specified or assumed), the printer's bias and spread for this filament, and the tolerance window
+you accept. Form Studio reports:
+
+- the **chance the gap lands in the window**, with the chance of too tight and too loose;
+- a **section** through the interface with the clearance per side;
+- the **recommended clearance** for a centred gap;
+- the **cheapest way to raise the odds**: measure the object, print the fit coupon, or print a thin test ring cut from
+  the real interface (`slice_test_piece`).
+
+Measurements from a printed coupon calibrate the printer profile and are reused by every later design.
+
+### Printers, slicing and print simulation
+
+![The print simulated from the slicer's G-code, layer by layer](images/print-sim.webp)
+
+- **Your slicer, your presets.** Bambu Studio, OrcaSlicer, PrusaSlicer, SuperSlicer, QIDISlicer, ElegooSlicer and
+  Snapmaker Orca. OrcaSlicer 2.5 packed profiles (`.opc`) are read directly; a profile never has to be exported by
+  hand.
+- **Every printer you have.** Form Studio finds every printer set up in every installed slicer and lets you choose
+  printer, filament and process per design or as the default. Slicing, the bed size and the nozzle checks follow the
+  choice, at once: Settings, the top bar, the plate and the open design's checks update without a restart.
+  `form printers`; MCP `list_printers`, `choose_printer`.
+- **Several plates.** A design whose parts do not fit one plate is laid out part by part on as many plates as needed,
+  each in its own orientation and sliced, with time, filament and cost added up. Prove and the print simulation switch
+  between plates. `form plates`; MCP `plate_plan`, `set_part_print`.
+- **Watch it print.** The G-code is read back and played in 3D with a nozzle marker, line-type filters, a per-layer time
+  chart and the slicer's own time and filament estimate. Jump to the next bridge or overhang wall.
+- **Copies on a plate:** does N fit, and how they pack.
+- **Cost:** filament, electricity and machine time from the slice and your prices. Form Studio never guesses a price.
+
+![Several plates in Prove, each sliced on its own](images/plates.webp)
+
+- **Every printer you have, compared.** Prove › Every printer slices the design for real on each printer set up in
+  each installed slicer, with its own process and filament, and shows time, filament and cost side by side with the
+  fastest, least filament and cheapest marked. `form compare-printers`; MCP `compare_printers`.
 
 ## Setup, settings and updates
 

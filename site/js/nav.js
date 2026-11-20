@@ -18,6 +18,22 @@ if (nav && !nav.dataset.ready) {
   addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(draw); } }, { passive: true });
   draw();
 
+  // a group in the bar (3D printing): hover or focus opens it; a click or tap keeps it open until you leave it
+  const groups = [...nav.querySelectorAll(".grp-btn")];
+  const closeGroups = (except) => groups.forEach((b) => { if (b !== except) b.setAttribute("aria-expanded", "false"); });
+  groups.forEach((b) => b.addEventListener("click", () => {
+    const open = b.getAttribute("aria-expanded") !== "true";
+    closeGroups(b);
+    b.setAttribute("aria-expanded", String(open));
+  }));
+  document.addEventListener("click", (e) => { if (!e.target.closest(".grp")) closeGroups(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const open = groups.find((b) => b.getAttribute("aria-expanded") === "true" || b.parentElement.contains(document.activeElement));
+    closeGroups();
+    if (open) { open.focus(); open.blur(); }
+  });
+
   // the compact menu: below 900 px the links live in a sheet under the bar
   const btn = document.getElementById("menu-btn"), menu = document.getElementById("menu");
   if (btn && menu) {

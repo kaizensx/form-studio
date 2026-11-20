@@ -32,18 +32,20 @@ REPO = "https://github.com/kaizensx/form-studio"
 
 # slug, source, nav title, one line for the index
 PAGES = [
-    ("features", "docs/FEATURES.md", "Features", "Everything Form Studio does, from the first message to the release."),
+    ("features", "docs/FEATURES.md", "Features", "Everything Form Studio does, from the first idea to editable CAD and the release."),
     ("app", "docs/APP.md", "The desktop app", "Install, the window, the five stages, keys and settings."),
     ("cli", "docs/CLI.md", "Command line", "Every form command, with its arguments."),
     ("mcp", "docs/MCP.md", "MCP tools", "Every tool an agent can call, generated from the server itself."),
     ("recipes", "docs/RECIPES.md", "Writing a recipe", "Parameters, features, constraints, fit and tests."),
     ("architecture", "docs/ARCHITECTURE.md", "Architecture", "The engine, the kernel worker, adapters, staleness and the fit model."),
-    ("verification", "docs/VERIFICATION.md", "Compatibility", "Platforms, slicers, agents and programs, and what CI exercises."),
+    ("verification", "docs/VERIFICATION.md", "Compatibility", "Platforms, agents, programs and slicers, and what CI exercises."),
     ("changelog", "CHANGELOG.md", "Changelog", "What changed in each version."),
     ("releasing", "docs/RELEASING.md", "Releases", "Stable, preview and patch releases, and how versions are numbered."),
     ("history", "docs/HISTORY.md", "Development history", "The development builds before 1.0.0."),
 ]
 BY_SOURCE = {src: slug for slug, src, _, _ in PAGES}
+# the README's drawings the home page shows (What you can make), copied from docs/readme so both stay one picture
+ART = ["feature-shape", "feature-gears", "feature-proved"]
 
 PAGE = """<!doctype html>
 <html lang="en">
@@ -202,6 +204,11 @@ def main() -> int:
     sm.append("</urlset>")
     (SITE / "sitemap.xml").write_text("\n".join(sm) + "\n", encoding="utf-8")
     (SITE / "robots.txt").write_text(f"User-agent: *\nAllow: /\nSitemap: {BASE}sitemap.xml\n", encoding="utf-8")
+    art = SITE / "assets" / "art"
+    art.mkdir(parents=True, exist_ok=True)
+    for name in ART:
+        for theme in ("dark", "light"):
+            shutil.copy(ROOT / "docs" / "readme" / f"{name}-{theme}.svg", art / f"{name}-{theme}.svg")
     for page in chrome.stamp(SITE):
         print("nav and footer ->", page)
     print("wrote", OUT, "and sitemap.xml")
