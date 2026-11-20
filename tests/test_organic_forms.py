@@ -225,7 +225,8 @@ class CharacterMask(unittest.TestCase):
         self.assertGreater(brow.bounding_box().max.X, st[0].shape.bounding_box().max.X - 1e-6)
         der = {x["key"]: x["value"] for x in d.derived(v)}
         self.assertAlmostEqual(der["pocket_d"], v["magnet_d"] + 2 * v["magnet_clear"])
-        self.assertEqual(d.mesh_texture(v)[0].kind, "heightmap")
+        self.assertEqual(d.mesh_texture(v)[0].kind, "hex")
+        self.assertEqual(d.mesh_texture({**v, "pattern": 1})[0].kind, "heightmap")      # the web relief
 
 
 if __name__ == "__main__":
