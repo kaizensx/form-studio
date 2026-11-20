@@ -54,7 +54,8 @@ def not_blank(ui, what, need=6):
 
 
 def held_still_gone(ui):
-    ui.wait_until(lambda: float(ui.item("viewportStill").property("z")) < 0, 4, "the held frame to go behind the view")
+    """A geometry change is drawn in place: no held frame is ever laid over the view."""
+    ui.check(not ui.exists("viewportStill"), "no held frame over the view")
 
 
 def journey_setup(ui):
@@ -140,7 +141,7 @@ def journey_new_revision_mid_drag(ui):
     ui.release((at.x(), at.y()))
     held_still_gone(ui)
     not_blank(ui, "after a revision arrived mid-drag")
-    # and once more at rest: the change cross-fades and the held frame lets go
+    # and once more at rest: the change is drawn in place
     ui.settle(800)
     d = ui.api("/projects/" + pid)
     ui.api("/projects/" + pid + "/commit", {"values": {"wall": spec["default"]}, "provenance": {}, "note": "back",
