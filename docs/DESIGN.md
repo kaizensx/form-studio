@@ -15,7 +15,8 @@ Three tests for any screen:
 1. **One focal point.** Home's is the question and the composer. The workspace's is the part. A sheet's is its primary
    action. If two things compete, one of them is too loud.
 2. **Creation first.** The words on screen follow the work: describe, design, review, make. 3D printing is one way to
-   make and appears only when it is turned on.
+   make and appears only when it is turned on, and then only where the printer matters. Not printing is the normal
+   case and needs no label.
 3. **Honest.** Every number says how it is known, and nothing is drawn that the engine did not compute.
 
 ## Organisation
@@ -25,7 +26,8 @@ Three tests for any screen:
 | Opening | Under a second while the engine starts | The mark drawn on its origin, the name, one status line |
 | First run | Three choices, then only what was chosen is downloaded | Rail of steps, the step, the log |
 | Home | Start a design; find the ones you made | The question and composer, concepts waiting for a pick, designs (one card per family), conversations |
-| Workspace | One design | Conversation (left), the part (centre), stages (right), pipeline (bottom) |
+| Workspace | One design | Conversation (left, with a strip of its designs when it made several), the part (centre), stages (right), pipeline (bottom) |
+| Designing | A design being made, or a conversation with none yet | The empty studio floor, what the agent is doing, or "No design yet" and Continue the conversation |
 | Sheets | One task that needs the whole attention | Title, body, actions with the primary one last |
 
 **The stages** are the flow of making something, left to right: **Describe** (what it is for, what is known),
@@ -36,6 +38,20 @@ checks and their evidence), **Make** (approve, then the files). The engine, the 
 **Design families.** A design and everything that came from it (copies, saved variants, the concept that was picked)
 share `lineage.root`. Home shows one card per family: the member changed last is its face, a count opens the family
 under its row, the first design first. Conversations are grouped the same way by `thread`.
+
+**Top bar.** Logo, the design's name and revision, its release state, search, settings. It never names a printer and
+never labels a design as "not for printing". The printer chip (`PrinterChip.qml`) sits in the header of Fit, Review
+and Make of a design made for printing.
+
+**Conversations and designs.** Opening a conversation lands on its design within a second; with several, a strip
+under its title lists them; with none, Designing says "No design yet". Once the person has worked on the open design
+(selected a feature, changed a value, opened it themselves), an agent working elsewhere is named with Show and never
+jumped to.
+
+**The ground.** Every design stands on a neutral studio floor: matte, fading to the horizon, a faint origin cross and a
+scale cue (a round length at the part's distance). The viewport's `stageMode` is `studio` by default and `plate` only
+in Fit, Review and Make of a design made for printing, or on **Show build plate**: then the printer's plate, its 10 mm
+grid and its outline ease in, and leave on the way back. Home, cards and Designing are always studio.
 
 ## Appearance
 
@@ -108,6 +124,10 @@ feeds it a fraction, so it never shows one. While the lockup travels the top bar
 are never two.
 
 ## What this pass changed
+
+- Creation-first shell: no printer or purpose in the top bar; the studio floor instead of a build plate everywhere
+  but Fit, Review and Make of a print; conversations open their designs, with a strip for several and "No design yet"
+  for none; a new design is a 3D model unless printing is asked for.
 
 - The opening screen was rebuilt (it was a centred mark on banded glow rings, held for 2.3 s).
 - Home groups designs into families and puts designs before conversations; the sentence under the question shows only

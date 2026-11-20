@@ -43,9 +43,9 @@ uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizens
 
 | Area | What it holds |
 |---|---|
-| **Top bar** | The design and its revision, release state, its purpose, the printer (or "No printer · Just designing"), search (Ctrl/⌘ K) and Settings. A bar under it names any work that takes longer than 300 ms, with progress |
-| **Conversation** (left) | The agent conversation for this design: messages, the agent's steps, the views it looked at, attachments. Resizable; Ctrl/⌘ J hides it |
-| **Viewport** (centre) | The kernel's geometry, one mesh per feature, with dimensions on the plate. The tool rail on its left edge holds Select, Measure, Annotate, Section, Analyze, Assembly, History, Simulate the print and Photo render |
+| **Top bar** | The design and its revision, release state, search (Ctrl/⌘ K) and Settings. No printer and no purpose: the printer is named in Fit, Review and Make of a design made for printing (click it to choose another). A bar under it names any work that takes longer than 300 ms, with progress |
+| **Conversation** (left) | The agent conversation for this design: messages, the agent's steps, the views it looked at, attachments. A conversation that made several designs shows them in a strip under its title; click one to open it. Paste a link to attach the file it points at. Resizable; Ctrl/⌘ J hides it |
+| **Viewport** (centre) | The kernel's geometry, one mesh per feature, with its dimensions, on a neutral studio floor with an origin cross and a scale cue. The printer's build plate appears only in Fit, Review and Make of a design made for printing, or with **Show build plate** in Describe and Design. The tool rail on its left edge holds Select, Measure, Annotate, Section, Analyze, Assembly, History, Simulate the print and Photo render |
 | **Stages** (right) | Describe, Design, Fit, Review and Make. Each tab shows where it stands: measured values, features, fit yield, checks to review, release readiness |
 | **Pipeline** (bottom) | Parameters › Solid › Exports › Checks › Slice › Release. A node is current only when it describes the revision on screen. A 3D model, or a design that is not sliced, has no Slice step |
 
@@ -57,7 +57,7 @@ uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizens
 | **Design** | Features in build order and their parameters. Select a feature on the model or in the list and change it; dragging a slider rebuilds the part in place while you drag, and the draft shows its computed impact before you commit |
 | **Fit** | The fit model for each interface: a section, the clearance, the chance of fitting and how to raise it. Hidden for a 3D model |
 | **Review** | Every check with its evidence, print orientation, the plates, and the slice: time, filament, layers, Watch it print. A 3D model shows the checks that apply to it and says which do not |
-| **Make** | The release gate, approval (over failed checks only with a reason for each, on the record), the released files with their hashes, and the revision history |
+| **Make** | The release gate, approval (over failed checks only with a reason for each, on the record), the released files with their hashes, and the revision history. With 3D printing on, a 3D model is marked for printing here in one click |
 
 The stages follow the work: describe it, design it, review it, make it. Fit sits between Design and Review for a
 design made for 3D printing. They were called Brief, Shape, Prove and Release; the CLI, MCP and `--stage` keep those
@@ -73,8 +73,9 @@ Home is where a design starts. One composer takes whatever you have: words (type
 dictation), a photo (with a bank card, a coin or a ruler in it, the agent estimates sizes from it and labels them
 "estimated from the photo"), a sketch drawn on the sketch pad, a STEP, STL or 3MF part, a PDF drawing, or a link (a
 model page is passed to the agent as a link; a direct STL, STEP, 3MF, PDF or picture link is downloaded and shown on
-the composer). Drop files anywhere on Home or paste them. Under the composer: **For my printer** or **Just a 3D
-model** (no slicing, no print checks), and **Start blank** (an empty design in the workspace, no agent).
+the composer). Drop files anywhere on Home or paste them. Under the composer: **Start blank** (an empty design in the
+workspace, no agent) and, only when 3D printing is on, **Make it for: Anything / My printer**. A new design is a 3D
+model unless you pick My printer or say so in the request ("for my A1 mini").
 
 Sending opens the workspace at once in a "being designed" state with what the agent is doing; the design is attached
 the moment it exists and builds up feature by feature in the viewport, in build order, each feature fading and rising
@@ -84,7 +85,14 @@ size and volume: continue with one, or ask in words for a mix ("the base of A wi
 real number, a **Measure this** card shows where to measure on a picture or a diagram, the tolerance that matters and
 what the design assumes now; the number you type is committed with how you measured it, and the part updates.
 
-Below: concepts waiting for a pick, then your designs as live 3D cards, then recent conversations. Designs are grouped
+**Conversations lead to their designs.** Opening a conversation opens the design in front of it; one that made several
+shows a strip of them under its title, and one that made none says "No design yet" with **Continue the conversation**
+(never the Home question). A design moved to the trash is named as such. While you work on a design, an agent working
+on another one never takes the view away: a line names it, with **Show**. A usage limit is a calm card that says
+which agent, when it can work again and what is saved, with **Use another agent**.
+
+Below: concepts waiting for a pick, then your designs as live 3D cards, then recent conversations, each with the
+designs it made. Designs are grouped
 by **family**: a design with its copies, saved variants and the concept you picked is one card, showing the member
 changed last, with a count on it. Click the count to open the family under its row (the first design first, each
 member saying whether it is a copy or a variant); click the card to open the design. Families are filtered by released
@@ -146,7 +154,7 @@ In the conversation: Return sends, Shift Return adds a line, Up brings back your
 
 Settings (Ctrl/⌘ ,) edits `studio.toml` for you, with a backup of the file. A search box finds any setting, numbers
 are checked as you type, every value can be reset to its default, and changes apply at once: choosing the default
-printer updates the top bar, the plate and the open design's checks without a restart.
+printer updates the printer chip, the plate and the open design's checks without a restart.
 
 ![Settings › General](images/settings-general.webp)
 
