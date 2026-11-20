@@ -59,8 +59,26 @@ message, with what the design is for.
 
 - `--purpose print` is for 3D printing on your printer; `model` is just a 3D model: Design only is set and nothing is
   sliced. Without it, the choice you made last on Home is used, else `print` when a slicer is installed.
-- `--link`: a link to a file (STL, STEP, 3MF, PDF, PNG, JPEG, WebP) is downloaded once (up to 50 MB) and attached;
-  any other link is passed to the agent as a page and nothing is downloaded.
+- `--link`: a link to a file (STL, STEP, 3MF, OBJ, PDF, PNG, JPEG, WebP) is downloaded (streamed, up to 2 GB) and
+  attached; a Printables model page has its part files attached with title, author and licence; a MakerWorld or
+  Thingiverse page says why its files cannot be fetched; any other link is passed to the agent as a page and nothing
+  is downloaded.
+- `--file` attaches up to 2 GB. The file is cloned into the conversation (copy-on-write on APFS, Btrfs and XFS), else
+  hard-linked or streamed; it is never read whole.
+
+### Links and big meshes
+
+| Command | Does |
+|---|---|
+| `form resolve URL` | What a model link is, without downloading: site, title, author, licence, pictures, files, and whether and why not they can be fetched |
+| `form fetch URL [--conversation ID]` | Download what the link points to: into a conversation, else under `<data>/.references/links/` with a `.source.json` beside each file |
+| `form mesh-preflight FILE [--no-proxy]` | Triangles, vertices, bounds, closed or not, class, estimated seconds, and a display proxy for a heavy STL, OBJ or 3MF |
+
+- Sites: Printables (public API, no account), Thingiverse (needs `FORM_THINGIVERSE_TOKEN`, an app token sent only to
+  api.thingiverse.com; without it the page and the reason are returned), MakerWorld (files need a signed-in person:
+  the reason and how to download it; a signed download link pasted from the browser is a direct file link). Every
+  request carries the user agent `FormStudio/<version>`, no cookies and nothing about you.
+- The preflight is cached under `<data>/.cache/meshprep/` by the file's path, size and modification time.
 - `--sketch` takes Form Studio's sketch JSON (millimetres, y up; see `form/sketch.py`). The agent reads its geometry
   as exact numbers; a dimension with a stated value overrides the drawn length.
 - Concepts are made by the agent (`propose_concepts`): three or four genuinely different designs, each a real project.
