@@ -17,6 +17,9 @@ Modules (each also importable on its own, e.g. `from form.craft import mechanism
               details that follow a surface: two_view_cutter, surface_band, slot_grille; product families from
               named proportions: head_form, helmet_fullface, helmet_open, mouse_form, bottle_profile, grip_sections
               (tables HEADFORMS, ANSUR_HEAD, ANSUR_HAND, HELMET_LAYERS, PCO1881)
+  safe        operations that degrade gracefully, each fallback noted: safe_union, safe_cut, safe_intersect,
+              safe_fillet, safe_chamfer, safe_loft (re-seamed, ruled, pairwise), safe_shell, safe_sweep; repair
+              (ShapeFix + face merge), inspect (validity, faults, shortest edge), reseam (sections for a loft)
   texture     B-rep: knurl, spiral_ribbed_body, wrapped_ribs, emboss_cells (capped at MAX_INSTANCES = 2000)
   meshtex     MeshTexture for STL/GLB/renders ("mesh texture; STEP carries the smooth body")
   patterns    form.patterns re-exported (hex_vents, perforation_grid, slot_array, knurl, grip_ribs)
@@ -47,6 +50,8 @@ _LAZY = {
                 "checked_body", "two_view_cutter", "grow_outline", "surface_band", "offset_body", "slot_grille", "head_form", "helmet_fullface",
                 "helmet_open", "mouse_form", "bottle_profile", "grip_sections", "HEADFORMS", "ANSUR_HEAD",
                 "ANSUR_HAND", "HELMET_LAYERS", "PCO1881"),
+    "safe": ("safe_union", "safe_cut", "safe_intersect", "safe_chamfer", "safe_loft", "safe_shell", "safe_sweep",
+             "repair", "inspect", "reseam", "BRIDGE"),
     "texture": ("knurl", "polyhedron", "spiral_ribbed_body", "wrapped_ribs", "emboss_cells", "MAX_INSTANCES"),
 }
 _WHERE = {name: mod for mod, names in _LAZY.items() for name in names}
