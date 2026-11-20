@@ -94,7 +94,7 @@ Item {
                 Txt { mono: true; font.pixelSize: 11; text: card.count; anchors.verticalCenter: parent.verticalCenter; color: card.opened ? Theme.datumInk : Theme.ink; font.weight: Theme.wMedium }
                 Icon { name: card.opened ? "chevron_up" : "chevron_down"; size: 11; anchors.verticalCenter: parent.verticalCenter; color: card.opened ? Theme.datumInk : Theme.ink3 } }
             MouseArea { id: fm; anchors.fill: parent; hoverEnabled: true; onClicked: card.toggled() }
-            Tip { show: fm.containsMouse; text: card.opened ? "Close the family" : card.count + " designs share this origin: copies, variants and picked concepts. Click to see them." } }
+            Tip { show: fm.containsMouse; text: card.opened ? "Close the family" : card.count + " designs share this origin: made by one request, or copies, variants and picked concepts. Click to see them." } }
         Btn { id: more; objectName: "cardMore"; kind: "quiet"; icon: "ellipsis"; tip: "Rename, duplicate, export, delete"; x: parent.width - width - 8; y: 8; z: 3
             opacity: card.hot && !card.asking && !card.editing ? 1 : 0; visible: opacity > 0
             Behavior on opacity { NumberAnimation { duration: Theme.fast } }

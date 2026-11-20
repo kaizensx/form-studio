@@ -18,8 +18,7 @@ _ID = re.compile(r"thing:(\d+)")
 ENV_TOKEN = "FORM_THINGIVERSE_TOKEN"
 
 REASON = "Thingiverse gives files only to browsers and registered apps; it turns away other programs."
-HOW = ("Open the page, press Download All Files, unzip it and drop the STL or 3MF files here. Or set "
-       "FORM_THINGIVERSE_TOKEN to a Thingiverse app token and paste the link again.")
+HOW = "Open the page, press Download All Files, unzip it and drop the STL or 3MF files here."
 
 
 def model_id(url: str) -> str | None:

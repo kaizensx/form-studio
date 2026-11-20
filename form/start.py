@@ -224,8 +224,7 @@ def download(url: str, folder: Path, name: str | None = None, headers: dict | No
         raise StudioError(f"{host} answered {e.code} for that link.", hint)
     except (urllib.error.URLError, OSError, TimeoutError) as e:
         tmp.unlink(missing_ok=True)
-        reason = getattr(e, "reason", e)
-        raise StudioError(f"Could not download from {host}: {reason}.",
+        raise StudioError(net.plain_error(e, host),
                           "Check the connection and the link, or download the file and drop it here.")
     except BaseException:
         tmp.unlink(missing_ok=True)

@@ -321,6 +321,27 @@ class Fetch(Net):
         self.assertIn("not fetched", note3)
 
 
+class PlainErrors(unittest.TestCase):
+    def test_no_errno_reaches_the_person(self):
+        import socket
+        import urllib.error
+        from form import net as net_mod
+        cases = [urllib.error.URLError(socket.gaierror(8, "nodename nor servname provided, or not known")),
+                 urllib.error.URLError(ConnectionRefusedError(61, "Connection refused")),
+                 urllib.error.URLError(TimeoutError("timed out")), OSError(54, "Connection reset by peer")]
+        for e in cases:
+            text = net_mod.plain_error(e, "files.example.com")
+            self.assertNotIn("Errno", text)
+            self.assertNotIn("nodename", text)
+            self.assertIn("files.example.com", text)
+        self.assertIn("could not find", net_mod.plain_error(cases[0], "x.test"))
+        with mock.patch.object(net, "urlopen", side_effect=cases[0]):
+            with self.assertRaises(StudioError) as err:
+                start.download("https://files.example.com/a.stl", Path(tempfile.mkdtemp()))
+        self.assertNotIn("Errno", str(err.exception))
+        self.assertNotIn("FORM_THINGIVERSE_TOKEN", thingiverse.HOW)             # no environment variables to set
+
+
 class Progress(Net):
     def test_progress_is_reported_while_downloading_and_cleared(self):
         got = start.fetch(self.st, self.cid, "https://progress.test/scan.stl")

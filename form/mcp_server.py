@@ -1,9 +1,9 @@
 """FORM over the Model Context Protocol.
 
 Any MCP client (Claude Code, Codex, Gemini CLI, Cursor, ...) drives the same
-deterministic engine the bench uses. The agent proposes; FORM builds, measures,
-checks, slices and keeps the record. Release approval is deliberately not a
-tool: it needs a person, on the bench.
+deterministic engine the app uses. The agent proposes; Form Studio builds, measures,
+checks, exports (and, for a design made for printing, slices) and keeps the record. Release approval is
+deliberately not a tool: it needs a person, in the app.
 
 Run:  form-mcp            (stdio; what agents launch)
       form-mcp --no-bench (no local web page)
@@ -37,16 +37,17 @@ Form Studio is an AI CAD studio: it designs parts, products and mechanisms as re
 and keeps an honest record of what is known. 3D printing is one optional way to make a design; it is off unless the
 person turned it on (form_overview: has_printer).
 
-Workflow: form_overview -> describe_recipe -> create_project (or get_project) -> preview_change ->
-render (look at it) -> commit_change -> run_pipeline -> get_project (gate, checks, next actions) ->
-request_release (a person approves in Form Studio).
+Workflow: form_overview -> create_design from your own code (design_guide; design_brief first for a complex
+design), or create_project from a recipe (describe_recipe) -> render (look at it) -> preview_change ->
+commit_change, or update_design -> get_project (checks, next actions). Only for a design whose purpose is "print":
+run_pipeline (exports, print checks, a slice) -> request_release (a person approves in Form Studio).
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
 - Always preview_change before commit_change; pass expect_head so you never overwrite a newer revision.
 - Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number.
   Never invent physical results; record_physical_result is only for what the user reports.
-- A slice is a simulation, not a print. Fit yield is a model. Say so when you report them.
+- For a print design: a slice is a simulation, not a print, and fit yield is a model. Say so when you report them.
 - You cannot approve a release. request_release returns a link that opens the release in Form Studio for the user.
 - Nothing here starts a print or sends files anywhere.
 - Every design has a purpose: "print" (for 3D printing) or "model" (just a 3D model: rendering, CAD exchange, CNC,
@@ -549,8 +550,9 @@ def build() -> MCPServer:
                             purpose: str | None = None, process: str | None = None, plan: str = "",
                             relation: str = "", ctx: Context = None) -> list:
         """Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
-        built with build123d. FORM builds it, and with run=True exports, checks and slices it. Load or build errors come
-        back with the line and a hint; fix and call again. Then render(view="sheet") and look at it.
+        built with build123d. Form Studio builds it and returns a six-view sheet and a section to look at; with
+        run=True it also exports STEP and STL and runs the checks (and, for a design whose purpose is "print", the
+        print checks and a slice). Load or build errors come back with the line and a hint; fix and call again.
         Several parts: declare assembly() (design_guide, ASSEMBLIES): parts with attach=, joints with parent= (chains: a
         joint moves everything attached below it), Mate() for pins and threads. A declaration that cannot be used
         (unknown part, a loop, two parents) is refused with the reason; the assembly checks then run in their own time
@@ -1521,17 +1523,17 @@ def build() -> MCPServer:
         act(project, "look", "Comparing print orientations", ctx)
         return [Image(path=f), json.dumps(d, default=str, ensure_ascii=False)]
 
-    @mcp.prompt(title="Design a printable part")
+    @mcp.prompt(title="Design a part")
     def design_part(goal: str) -> str:
-        """A guided FORM session for a printable part."""
+        """A guided Form Studio session for a part or a product."""
         return (f"Goal: {goal}\n\n"
-                "Use the Form Studio tools. 1) form_overview, then describe_recipe for the closest recipe. "
-                "2) Ask me for any 'brief' dimensions you would otherwise assume, and how I measured them. "
-                "3) create_project, then render(view='sheet') and look at it. "
-                "4) For each change: preview_change, render with values=..., then commit_change with expect_head. "
-                "5) run_pipeline and read the checks, fit model and next_best_actions. Prefer cheap evidence "
-                "(measure, coupon, test piece) over guessing. 6) request_release and give me the bench link. "
-                "Report slices as simulated and fit as modelled; never claim a print succeeded.")
+                "Use the Form Studio tools. 1) form_overview; design_brief and design_guide for anything complex. "
+                "2) Ask me for any dimension you would otherwise assume, and how I measured it. "
+                "3) create_design with your own code (or create_project from a recipe), then render(view='sheet') "
+                "and look at it. 4) For each change: update_design, or preview_change then commit_change with "
+                "expect_head, and look again. 5) get_project and read the checks and next actions. "
+                "Only if I want it printed (purpose \"print\"): run_pipeline, then request_release and give me the "
+                "link; report slices as simulated and fit as modelled, and never claim a print succeeded.")
 
     # ---- print simulation, cost, plate packing -------------------------------------------------
     @mcp.tool(annotations=RO, structured_output=False)

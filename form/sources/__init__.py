@@ -63,7 +63,7 @@ def get(url: str, accept: str = "*/*", headers: dict | None = None, limit: int =
     except urllib.error.HTTPError as e:
         raise SourceError(f"{host} answered {e.code}.")
     except (urllib.error.URLError, OSError, TimeoutError) as e:
-        raise SourceError(f"Could not reach {host}: {getattr(e, 'reason', e)}.")
+        raise SourceError(net.plain_error(e, host))
 
 
 def post_json(url: str, obj: dict, timeout: float = TIMEOUT) -> dict:
@@ -76,7 +76,7 @@ def post_json(url: str, obj: dict, timeout: float = TIMEOUT) -> dict:
     except urllib.error.HTTPError as e:
         raise SourceError(f"{host} answered {e.code}.")
     except (urllib.error.URLError, OSError, TimeoutError) as e:
-        raise SourceError(f"Could not reach {host}: {getattr(e, 'reason', e)}.")
+        raise SourceError(net.plain_error(e, host))
     except ValueError:
         raise SourceError(f"{host} sent an answer Form Studio cannot read.")
 

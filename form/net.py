@@ -39,3 +39,20 @@ def urlopen(req, timeout: float = 30):
     if url.startswith("https://"):
         return urllib.request.urlopen(req, timeout=timeout, context=ssl_context())
     return urllib.request.urlopen(req, timeout=timeout)
+
+
+def plain_error(e: BaseException, host: str) -> str:
+    """Why a request failed, in words a person reads: never the OS's "[Errno 8] nodename nor servname provided"."""
+    import socket
+    r = getattr(e, "reason", e)
+    if isinstance(r, socket.gaierror) or "nodename nor servname" in str(r) or "Name or service not known" in str(r):
+        return f"Form Studio could not find {host}. Check the address, and that this computer is online."
+    if isinstance(r, (TimeoutError, socket.timeout)) or "timed out" in str(r):
+        return f"{host} did not answer in time."
+    if isinstance(r, ConnectionRefusedError):
+        return f"{host} refused the connection."
+    if isinstance(r, ssl.SSLError) or "CERTIFICATE" in str(r).upper():
+        return f"The secure connection to {host} could not be checked."
+    if isinstance(r, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)):
+        return f"The connection to {host} was cut off."
+    return f"Could not reach {host}."

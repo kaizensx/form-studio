@@ -46,7 +46,8 @@ from . import fsutil
 
 _log = logging.getLogger("form.conversations")
 
-IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
+HEIC_EXT = {".heic", ".heif"}         # iPhone photos: converted to JPEG on attach, so every agent can look at them
+IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"} | HEIC_EXT
 PDF_EXT = {".pdf"}
 CAD_EXT = {".step", ".stp", ".stl", ".3mf", ".obj"}
 MESH_EXT = {".stl", ".3mf", ".obj"}
@@ -119,6 +120,32 @@ def _now() -> float:
 
 class ConversationError(ValueError):
     pass
+
+
+def heic_to_jpeg(f: Path) -> Path:
+    """A HEIC photo (an iPhone's) as a JPEG beside it; the HEIC is removed. Uses pillow-heif when it is installed,
+    else macOS's own `sips`. Raises ConversationError (and removes the file) when neither can read it."""
+    out = f.with_suffix(".jpg")
+    try:
+        try:
+            import pillow_heif                       # optional
+            from PIL import Image
+            pillow_heif.register_heif_opener()
+            with Image.open(f) as im:
+                im.convert("RGB").save(out, "JPEG", quality=92)
+        except ImportError:
+            import subprocess
+            subprocess.run(["sips", "-s", "format", "jpeg", str(f), "--out", str(out)], capture_output=True,
+                           timeout=60, check=True)
+        if not out.is_file() or out.stat().st_size == 0:
+            raise OSError("no JPEG was written")
+    except Exception:                                # noqa: BLE001
+        out.unlink(missing_ok=True)
+        f.unlink(missing_ok=True)
+        raise ConversationError(f"{f.name[7:] or f.name} is a HEIC photo this computer could not convert. "
+                                "Export it as JPEG (in Photos: File › Export) and attach that.")
+    f.unlink(missing_ok=True)
+    return out
 
 
 def title_from(message: str, limit: int = 52) -> str:
@@ -760,7 +787,11 @@ class Conversations:
             how = "moved"
         else:
             how = place(src, target)
+        if ext in HEIC_EXT:
+            target = heic_to_jpeg(target)
         rec = {"id": aid, "name": raw, "kind": kind, "size": target.stat().st_size, "file": target.name, "placed": how}
+        if ext in HEIC_EXT:
+            rec["converted"] = "jpeg"
         if ext in MESH_EXT:
             from . import meshprep
             q = meshprep.quick(target)

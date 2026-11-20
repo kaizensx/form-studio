@@ -151,6 +151,31 @@ class Store(Base):
             s.attachment(m["id"], "../meta.json")
         self.assertEqual([a["id"] for a in s.attachments(m["id"], [rec["id"], "zzzzzz", "../.."])], [rec["id"]])
 
+    def test_an_iphone_photo_attaches_as_jpeg(self):
+        """The pickers offer *.heic; the engine takes it and converts it so any agent can look at it."""
+        import shutil as sh
+        import subprocess
+        s = Conversations(self.data)
+        m = s.create()
+        with self.assertRaises(ConversationError) as e:                         # not a photo at all
+            s.attach(m["id"], name="IMG_0001.HEIC", data=b"not an image")
+        self.assertIn("Export it as JPEG", str(e.exception))
+        self.assertEqual(list(s.files_dir(m["id"]).iterdir()), [], "nothing half-converted is left")
+        if not sh.which("sips"):
+            self.skipTest("no sips on this machine to make a HEIC photo")
+        png = Path(self.tmp.name) / "p.png"
+        from PIL import Image
+        Image.new("RGB", (32, 24), (200, 80, 40)).save(png)
+        heic = Path(self.tmp.name) / "IMG_0002.HEIC"
+        r = subprocess.run(["sips", "-s", "format", "heic", str(png), "--out", str(heic)], capture_output=True)
+        if r.returncode or not heic.is_file():
+            self.skipTest("sips cannot write HEIC here")
+        rec = s.attach(m["id"], heic)
+        self.assertEqual((rec["kind"], rec["name"], rec["converted"]), ("image", "IMG_0002.HEIC", "jpeg"))
+        self.assertTrue(rec["file"].endswith(".jpg"))
+        self.assertEqual(s.attachment(m["id"], rec["file"]).read_bytes()[:2], b"\xff\xd8")
+        self.assertTrue(heic.is_file(), "the person's own file is untouched")
+
 
 class Sending(Base):
     def test_send_saves_stream_and_resumes(self):
