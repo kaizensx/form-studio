@@ -41,11 +41,11 @@ P.MenuBar {
         P.MenuItem { text: Store.timelineOpen ? "Hide the Revision Timeline" : "Show the Revision Timeline"; enabled: mb.work
             onTriggered: { Store.timelineOpen = !Store.timelineOpen; if (!Store.timelineOpen) Store.endScrub() } }
         P.MenuSeparator {}
-        P.MenuItem { text: "Brief"; shortcut: "Ctrl+1"; enabled: mb.work; onTriggered: Store.setStage("brief") }
-        P.MenuItem { text: "Shape"; shortcut: "Ctrl+2"; enabled: mb.work; onTriggered: Store.setStage("shape") }
+        P.MenuItem { text: "Describe"; shortcut: "Ctrl+1"; enabled: mb.work; onTriggered: Store.setStage("brief") }
+        P.MenuItem { text: "Design"; shortcut: "Ctrl+2"; enabled: mb.work; onTriggered: Store.setStage("shape") }
         P.MenuItem { text: "Fit"; shortcut: "Ctrl+3"; enabled: mb.work; onTriggered: Store.setStage("fit") }
-        P.MenuItem { text: "Prove"; shortcut: "Ctrl+4"; enabled: mb.work; onTriggered: Store.setStage("prove") }
-        P.MenuItem { text: "Release"; shortcut: "Ctrl+5"; enabled: mb.work; onTriggered: Store.setStage("release") }
+        P.MenuItem { text: "Review"; shortcut: "Ctrl+4"; enabled: mb.work; onTriggered: Store.setStage("prove") }
+        P.MenuItem { text: "Make"; shortcut: "Ctrl+5"; enabled: mb.work; onTriggered: Store.setStage("release") }
         P.MenuSeparator {}
         P.MenuItem { text: "Frame the Selection  (F)"; enabled: mb.work; onTriggered: Store.frameSelection() }
         P.MenuItem { text: "Reset the View  (.)"; enabled: mb.work; onTriggered: Store.resetView() }

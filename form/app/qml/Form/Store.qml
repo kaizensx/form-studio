@@ -109,11 +109,11 @@ QtObject {
     }
     function newDesign(o) { o = o || {}; return create(o.name || "", o.recipe, o.brief || "", o.purpose, o.process) }
     readonly property var stages: [
-        { id: "brief", title: "Brief", hint: "What it is for, what is known" },
-        { id: "shape", title: "Shape", hint: "Select a feature, change it" },
+        { id: "brief", title: "Describe", hint: "The brief: what it is for, what is known" },
+        { id: "shape", title: "Design", hint: "The shape: select a feature, change it" },
         { id: "fit", title: "Fit", hint: "Clearance under uncertainty" },
-        { id: "prove", title: "Prove", hint: modelDesign ? "Checks" : "Checks and the slice" },
-        { id: "release", title: "Release", hint: "Gate, history, files" }
+        { id: "prove", title: "Review", hint: modelDesign ? "Prove it: the checks" : "Prove it: the checks and the slice" },
+        { id: "release", title: "Make", hint: "Release it: the gate, the files, the history" }
     ].filter(function (x) { return x.id !== "fit" || printUi })     // the fit model is a printer's accuracy: only for a print
     onPrintUiChanged: if (!printUi && stage === "fit") stage = "prove"
 

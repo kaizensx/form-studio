@@ -121,7 +121,7 @@ Column {
             Txt { tone: 2; anchors.horizontalCenter: parent.horizontalCenter
                 text: img.status === Image.Loading ? "Loading photo…" : "The photo could not be loaded." }
             Txt { kind: "fine"; visible: img.status !== Image.Loading; anchors.horizontalCenter: parent.horizontalCenter
-                text: ps.ref.file ? "Attach it again under Brief › Reference photos." : "Attach a photo under Brief › Reference photos, then press Measure." } }
+                text: ps.ref.file ? "Attach it again under Describe › Reference photos." : "Attach a photo under Describe › Reference photos, then press Measure." } }
         // kept measurements, counted on the photo
         Rectangle { visible: ps.photoReady && ps.list.length > 0; x: 10; y: 10; width: kept.implicitWidth + 16; height: 24; radius: Theme.rSm; color: Theme.alpha(Theme.plate, 0.78)
             Txt { id: kept; anchors.centerIn: parent; kind: "fine"; tone: 2; text: F.plural(ps.list.length, "measurement") + " kept" } }
