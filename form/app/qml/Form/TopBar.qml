@@ -24,6 +24,7 @@ Rectangle {
     readonly property bool roomy: width >= 1500
     readonly property bool tight: width < 1260
     readonly property Item logo: mark         // where the opening screen's lockup lands (Splash.qml)
+    property bool logoHeld: false             // while that lockup travels here, so there are never two logos on screen
 
     Row { id: left; x: bar.inset + (bar.inset ? 4 : 10); anchors.verticalCenter: parent.verticalCenter; spacing: 4
         // elsewhere than macOS there is no menu bar at the top of the screen: the same actions live here
@@ -51,7 +52,7 @@ Rectangle {
         Item { id: logoBox; objectName: "homeButton"; width: mark.implicitWidth + 16; height: 28; anchors.verticalCenter: parent.verticalCenter
             baselineOffset: mark.y + mark.baselineOffset          // the name, revision and tag sit on the wordmark's baseline
             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
-            Logo { id: mark; anchors.centerIn: parent; size: 14; ink: bar.work ? Theme.ink2 : Theme.ink; ink2: bar.work ? Theme.ink3 : Theme.ink2 }
+            Logo { id: mark; anchors.centerIn: parent; size: 14; opacity: bar.logoHeld ? 0 : 1; ink: bar.work ? Theme.ink2 : Theme.ink; ink2: bar.work ? Theme.ink3 : Theme.ink2 }
             MouseArea { id: hm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.home() }
             Tip { show: hm.containsMouse && bar.work; text: "All designs"; keys: "Ctrl+Shift+H" } }
         Txt { visible: !!Store.project; text: "/"; tone: 4; anchors.baseline: logoBox.baseline; leftPadding: 2; rightPadding: 6 }

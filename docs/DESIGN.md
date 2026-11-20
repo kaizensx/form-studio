@@ -99,7 +99,13 @@ asks for reduced motion, movement and scale are dropped and only opacity and col
 **The opening screen** is the one authored moment. The mark is a coordinate frame, so the app opens on its origin: two
 construction lines meet there, the mark is built on them, the name sets beside it. When the engine is ready the lockup
 travels to the top bar and lands on the logo that stays, while the plate fades to Home behind it. No cut, no flash,
-and no longer than the engine needs (it is held for about a second so the mark is always finished).
+and no longer than the engine needs (at least 0.8 s, so the mark is always finished).
+
+The lockup is complete within 0.45 s and centred in the window, with the bar and one status line centred under it.
+That line is bound to what has really happened (`Store.bootStatus`, fed by `/api/boot` and `/api/studio`): the
+engine answering, the CAD kernel answering, the designs and setup being read. The bar is indeterminate; nothing
+feeds it a fraction, so it never shows one. While the lockup travels the top bar holds its own logo back, so there
+are never two.
 
 ## What this pass changed
 

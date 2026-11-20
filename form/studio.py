@@ -372,6 +372,15 @@ class Studio:
         return {"project": pid, "printer": p.get("printer"), "source": self.printer_choice(p)[1] or "slicer",
                 "slicer": slicer.public(s), "env": self.printer_env(p)}
 
+    def boot_state(self) -> dict:
+        """What is already true while the app starts. Never waits: the kernel is "ready" only once it has answered,
+        and the designs are counted by their folders, not loaded."""
+        try:
+            designs = sum(1 for d in self.root.iterdir() if (d / "project.json").exists())
+        except OSError:
+            designs = 0
+        return {"kernel": self._kernel_id, "designs": designs}
+
     def kernel_id(self) -> str:
         if self._kernel_id is None:
             self._kernel_id = self.kernel.call("ping", timeout=120)["kernel"]

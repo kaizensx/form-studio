@@ -63,8 +63,9 @@ The stages follow the work: describe it, design it, review it, make it. Fit sits
 design made for 3D printing. They were called Brief, Shape, Prove and Release; the CLI, MCP and `--stage` keep those
 ids (`brief`, `shape`, `fit`, `prove`, `release`), and the old names still find each stage in the command palette.
 
-**Starting.** The opening screen shows for about a second while the CAD kernel starts: the mark is drawn on its
-origin, then travels to the top bar and stays there as the logo while Home appears behind it.
+**Starting.** The opening screen shows while the engine starts: the logo is drawn on its origin, and the line under
+it says what is happening (starting the engine, starting the CAD kernel, loading your designs and setup). Then the
+logo travels to the top bar and stays there while Home appears behind it.
 
 ### Home
 

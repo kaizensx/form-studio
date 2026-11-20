@@ -59,7 +59,7 @@ Window {
     // the native menu bar (macOS). Elsewhere the same actions are in the top bar's menu button and the palette.
     Loader { active: win.mac; sourceComponent: MacMenu { onFullScreen: win.visibility = win.full ? Window.Windowed : Window.FullScreen } }
 
-    TopBar { id: top; width: parent.width; inset: win.mac && !win.full ? 78 : 0; z: 10 }
+    TopBar { id: top; width: parent.width; inset: win.mac && !win.full ? 78 : 0; z: 10; logoHeld: splash.visible && splash.carrying }
 
     // collapsed: a slim rail keeps the agent's state in sight
     Rectangle {
@@ -139,9 +139,10 @@ Window {
     Loader { anchors.top: top.bottom; anchors.bottom: parent.bottom; width: parent.width; z: 30; active: Store.welcome; sourceComponent: Welcome {} }
     // the opening screen: the mark is drawn on its origin while the engine starts, then travels to the top bar's logo.
     // It stays until the mark is drawn (under a second), never longer than the engine needs.
-    Splash { anchors.fill: parent; z: 90; visible: !win.headless && !Bridge.underTest && opacity > 0; landOn: top.logo
+    Splash { id: splash; anchors.fill: parent; z: 90; visible: !win.headless && !Bridge.underTest && showing; landOn: top.logo
+        status: Store.bootStatus
         done: Store.screen !== "boot" && splashMin.ran
-        Timer { id: splashMin; property bool ran: win.headless; interval: Theme.reduced ? 300 : 950; running: true; onTriggered: ran = true } }
+        Timer { id: splashMin; property bool ran: win.headless; interval: Theme.reduced ? 300 : 800; running: true; onTriggered: ran = true } }
     MorphFrame { id: morph; anchors.fill: parent; z: 85
         to: { var p = stage.mapToItem(null, 0, 0); return Qt.rect(p.x + 8, p.y + 8, stage.width - 16, stage.height - 16) } }
     Connections { target: Store; function onMorphFrom(r) { morph.play(r) } }

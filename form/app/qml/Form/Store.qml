@@ -292,14 +292,36 @@ QtObject {
     }
 
     // ── boot / navigation ────────────────────────────────────
+    // What the opening screen says. Each value is something that has happened, never a guess:
+    //   "engine"   nothing has answered yet        "kernel"   the engine answers; the CAD kernel has not yet
+    //   "designs"  the kernel answered; /studio is being read (the designs, and the setup: slicers, agents)   "ready"   it is here
+    property string bootStep: "engine"
+    property int bootDesigns: 0                  // design folders the engine counted (0 until it answers)
+    property string bootKernel: ""               // the kernel's own name once it answered, e.g. "build123d 0.13.0 / OCP 8.0.1.1"
+    readonly property string bootStatus: bootStep === "engine" ? "Starting the engine…"
+        : bootStep === "kernel" ? "Starting the CAD kernel…"
+        : bootStep === "designs" ? (bootDesigns > 0 ? "Loading " + F.plural(bootDesigns, "design") + " and your setup…" : "Loading your setup…")
+        : "Ready"
     function boot(startProject, startStage) {
+        var load = function () { bootStep = "designs"; _bootLoad(startProject, startStage) }
+        var ask = function () {
+            get("/boot").then(function (b) {
+                bootDesigns = b.designs || 0
+                if (b.kernel) { bootKernel = b.kernel; load() }
+                else { bootStep = "kernel"; _bootPoll.next = ask; _bootPoll.restart() }
+            }, load)                             // an engine without /boot: load as before, with no step it cannot name
+        }
+        ask()
+    }
+    property Timer _bootPoll: Timer { property var next: null; interval: 120; onTriggered: if (next) next() }
+    function _bootLoad(startProject, startStage) {
         get("/studio").then(function (st) {
-            studio = st
+            studio = st; bootStep = "ready"
             var want = startProject, found = null
             for (var i = 0; i < st.projects.length; i++) if (st.projects[i].id === want && !st.projects[i].error) found = st.projects[i]
             if (found) open(found.id).then(function () { if (startStage) setStage(startStage) })
             else screen = "home"
-        }, function (e) { fatal = e; screen = "home" })
+        }, function (e) { fatal = e; bootStep = "ready"; screen = "home" })
     }
     function reloadStudio() { return get("/studio").then(function (st) { studio = st }) }
     function home() {

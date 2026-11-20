@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **A new opening screen.** The app opens on the mark's origin: two construction lines meet, the mark is built on them and the name sets beside it. When the engine is ready the logo travels to the top bar and stays there while Home appears behind it. It takes about a second (it was held for 2.3 s) and there is no flash between it and Home.
+- **A new opening screen.** The app opens on the mark's origin: two construction lines meet, the mark is built on them and the name sets beside it. The whole logo is on screen, centred, within half a second. The line under it says what is really happening (starting the engine, starting the CAD kernel, loading your designs and setup) and the bar never pretends to know how far along it is. When everything is loaded the logo travels to the top bar and stays there while Home appears behind it, with no flash; it shows for as long as the start takes, and at least 0.8 s (it was held for 2.3 s).
 - **Design families on Home.** A design with its copies, saved variants and the concept you picked is one card with a count; the count opens the family under its row, the first design first. Designs now come before conversations, and the sentence under "What do you want to make?" shows only on a first visit.
 - **Describe, Design, Fit, Review, Make.** The workspace's stages are named for what you do in them (they were Brief, Shape, Fit, Prove, Release). Shortcuts are unchanged, the old names still find each stage in the command palette, and the CLI and MCP keep their stage ids.
 - **A light appearance.** Settings › General › Appearance: Dark, Light or Match system, applied at once and remembered. The 3D bench, the cards and every sheet follow it. `FORM_APPEARANCE=light|dark` forces one for a run.
