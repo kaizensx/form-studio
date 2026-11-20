@@ -344,6 +344,30 @@ ORGANIC FORMS (form.craft.organic)
   craft.helmet_sections(length, width, height, skirt)                          its sections, for visors, pads, liners
   craft.grip(length, d_max, d_min, flat, finger_grooves)                       revolved spline, oval section
   craft.handle(span, rise, section_w, section_h)                               swept D-handle with feet
+ Silhouette-driven forms (draw three views, get sections):
+  craft.profile_sections(front, back, half_width, z_eq=, crown=(x, z), n=, squash=, cy=)   sections from guide
+      curves: front/back = the side silhouette as (z, x) knots, half_width = the front silhouette as (z, y) knots,
+      a superellipse dome above z_eq to the crown; n, squash, cy constants or (z, v) knots. C2 splines throughout.
+  craft.checked_body(secs, tip, label=)    section_body + check_sections (order, seams, steep steps) + loft_report
+      (the skin's normals: a fold is a crease inside a face that should be smooth); leaves a note when it folds
+  craft.loft_report(shape)                 {faces_checked, folds, worst_deg, where}: run it on any lofted solid
+  craft.two_view_cutter(side, front, x_range)   a cutter drawn in two views (eye ports, visor windows, wrapped vents)
+  craft.grow_outline(points, mm)           an outline moved outward (rims and gaskets round an opening)
+  craft.surface_band(secs, tip, amount, region, depth)   the surface grown by amount, clipped to region, rooted
+      depth inside the wall: pads, scoops, trim, spoilers, raised graphic panels; the region's walls are crisp lines
+  craft.slot_grille(center, normal, count, length, width, pitch, taper=)   B-rep vent grille cutter
+  craft.cut(body, tool) / craft.fuse(body, part, max_solids, min_solids)   booleans with fuzzy fallbacks; they
+      refuse a result that lost the body or fused a part that must stay separate (a visor)
+ Product families from named proportions (each returns the sections plus the outlines of its openings):
+  craft.head_form("J")                      EN 960 / ECE 22.05 headform (A 500, E 540, J 570, M 600, O 620 mm
+                                            circumference) scaled from the ANSUR II mean head: length, breadth, eye, chin
+  craft.helmet_fullface(size, chin=, tail=) full-face helmet: head + comfort 10 + EPS 34 + shell 3.5 mm a side;
+                                            keys sections, tip, edge, port_side/port_front, visor_side, pivot
+  craft.helmet_open(size, kind="cycling"|"open")   half-shell and open-face helmets
+  craft.mouse_form(length=, width=, height=, hand=, hump=, tilt=, flare=)   palm-grip mouse from the hand (ANSUR II:
+                                            0.65 x hand length long); hump behind centre, tilt toward the thumb
+  craft.grip_sections(length, hand_breadth) power grip (31-38 mm best for force), palm swell, flat across
+  craft.bottle_profile(volume_ml)           revolve profile with a PCO 1881 neck, height solved from the volume
 Method: start from the object's real measurements (a head is about 200 x 160 mm, a helmet adds 25-35 mm a side; a
 power grip is 30-38 mm across), draw the side silhouette and the top silhouette as curves, and derive the sections
 from them. Asymmetry front to back is what makes organic things read as designed (a helmet's crown sits behind
@@ -360,6 +384,11 @@ outline is what reads. A visor reaches back to its pivots; a band that stops sho
 Product shapes read from their silhouettes: a helmet's chin bar juts forward and its lower edge sweeps up behind the
 jaw to the neck; a mouse's hump sits behind centre and its thumb side is fuller. Shift and pinch sections (cx, b) to
 get there, a little at a time: large sideways shifts between close sections fold the loft.
+What makes a styled product read as the real thing is its BREAK-UP, not its dome: a smoked visor as its own body on
+pivots, rubber trim on the edges, intakes with grilles, a spoiler, split lines between buttons, a wheel. Every one is
+a surface_band or a two_view_cutter that follows the main form. A smooth body with one cut reads as a pebble.
+Face the product +X with Z up: critique compares its side, front and top silhouettes with the product class
+(helmet_fullface, helmet_open, mouse, bottle), and render_photo's views and appearance() zones assume it.
 """
 
 TEXTURE = """\
@@ -399,6 +428,19 @@ AESTHETICS: what separates a designed object from a crude one
   * Openings, vents and seams follow the form: align them to the body's lines, space them on a rhythm, inset them.
   * Detail density: a large plain surface needs one considered detail (a parting line, a texture field, an inset).
   * Check every view (sheet), the section and the close-ups (critique). If any view looks like a primitive, it is not done.
+  * Silhouette first: a product is recognised by its outline in three views before any detail. Draw them as guide
+    curves (craft.profile_sections) and compare: critique scores the outline against the product class, checks the
+    proportions against real products (with sources) and the class signature (an eye port, a palm hump).
+  * Tension: a surface that is almost flat but not quite (a slight crown on a side, a taper toward the nose) reads as
+    designed; a surface that bulges evenly everywhere reads as inflated. Put the fullness where the use is (the palm,
+    the crown) and let the rest run taut. Express it as parameters (hump, tilt, chin, crown_back).
+  * Character lines: one or two crisp lines that run the length of the form (a raised panel edge, a split line, the
+    edge of a trim band), aligned with the flow. Make them with surface_band regions, not by chance where booleans meet.
+  * Materials: real products are two or three materials. Declare appearance() zones (a smoked visor, rubber trim, a
+    carbon shell, matte vents) and render_photo from at least three angles (view="three_quarter", "right", "left",
+    "three_quarter_back") before you call it done; one colour over everything renders as a blob.
+  * Be your own harshest critic: put a photo of the real thing in your mind next to yours. Answer critique's "reads
+    as" question honestly; name what gives it away as a model and fix that first.
 """
 
 DFM = """\

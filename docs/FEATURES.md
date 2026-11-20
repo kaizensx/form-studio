@@ -123,26 +123,39 @@ each one named as it arrives.
 - **Critique before release.** `critique` renders a close-up of every feature and computes metrics from the solid:
   the smallest fillet, the share of sharp edges, mirror symmetry, proportions against classic
   ratios, the mix of planar and free-form surface, sliver faces and planned features that are missing, with a
-  checklist to answer by looking. All of it is labelled heuristic. A briefed design cannot be released until its
-  revision has a recorded critique.
+  checklist to answer by looking. It also checks every lofted skin for folds, measures wall thickness by rays (thin
+  spots and walls the inner surface breaks through are shown where they are) and lists sharp turns in the
+  silhouettes. When the brief names a product class (a full-face or cycling helmet, a computer mouse, a bottle), the
+  side, front and top silhouettes are compared with the class outline, the proportions with the range of real
+  products (with sources) and its signature is checked (an eye port and a visor, a neck opening, a palm hump, a
+  scroll wheel); the agent must then say whether it reads as one after looking (`reads_as`). All of it is labelled
+  heuristic. A briefed design cannot be released until its revision has a recorded critique.
 - **A helper library for real design work.** `form.craft` gives designs lofts through superellipse and spline
   sections, sweeps, revolves, shells (including section-inset shells for lofted domes), safe and variable fillets;
   mechanisms with their numbers (print-in-place pin and living hinges, cantilever and annular snaps with their
   strain, bayonets, dovetails, detents, ratchets, cams with their pressure angle, four-bar linkages with their
   Grashof class and transmission angle, gear trains and planetary sets with their assembly conditions); ISO 286
   limits and fits and bearing seat tolerances; ribs, gussets, boss arrays and lattices; and section-loft bodies for
-  helmets, grips and handles. Every helper checks its numbers and names the fix; fallbacks are reported.
+  helmets, grips and handles. Organic products are drawn as guide curves in three views and turned into sections
+  (`profile_sections`), with product families sized from named proportions: full-face and cycling helmets from an
+  EN 960 headform and ANSUR II head data, a palm-grip mouse from the hand, power grips, and drinks bottles with a
+  PCO 1881 neck. Pads, trim, scoops, spoilers and panels follow the surface (`surface_band`), openings are drawn in
+  two views (`two_view_cutter`), vent grilles are real geometry (`slot_grille`), and booleans on free-form shells
+  fall back to fuzzy ones. Every helper checks its numbers and names the fix; fallbacks are reported.
 - **Texture in two honest tiers.** B-rep texture is real geometry in the CAD solid (an exact diamond or straight
   knurl, spiral ribs as one smooth skin, wrapped ribs, embossed cells), capped at about 2,000 elements. Fine texture
   (leather grain, a carbon-like twill, stone-like cells, noise, hexagons, a heightmap image) is a mesh texture: the
-  STL, OBJ, GLB and the renders carry it, labelled "mesh texture; STEP carries the smooth body".
+  STL, OBJ, GLB and the renders carry it, labelled "mesh texture; STEP carries the smooth body". The six-view sheet
+  of a textured design includes a zoomed tile of the texture, where it can be seen.
 - **Guides by topic and worked examples.** `design_guide(topic=...)` covers surfacing, mechanisms, organic forms,
-  texture, aesthetics, and design for printing (only for designs that are printed). `design_examples` serves twelve
-  complete exemplar designs (a textured full-face helmet shell, a planetary gearbox, a hinged case with a snap latch,
+  texture, aesthetics, and design for printing (only for designs that are printed). `design_examples` serves thirteen
+  complete exemplar designs (a carbon full-face helmet, an ergonomic mouse, a planetary gearbox, a hinged case with a snap latch,
   an ergonomic handle, a quick-release clamp, a knurled knob, a spiral-ribbed vase, a belt idler, a cable-chain link,
   an Arca-type camera plate, a drone arm and a table lamp) to the agent only; they never appear as projects.
 - **A design bench.** `tests/design_bench` holds about twenty briefs scored automatically (staging, builds, planned
-  features present, craft and form metrics); the exemplars are built and checked against it in the test suite.
+  features present, craft and form metrics, integrity and, for product classes, the silhouette); a design that does
+  not read as its class, or has a folded skin or a broken-through wall, cannot pass. The exemplars are built and
+  checked against it in the test suite.
 
 ## Assemblies
 
@@ -325,7 +338,7 @@ either. A real thin fin still fails.
 | | |
 |---|---|
 | ![Blender render: desk scene, matte blue PLA](images/render-desk-blue.webp) | ![Share card](images/share-card.webp) |
-| **Photoreal render** with Blender: studio, desk or dark scenes, matte, PETG or silk finishes, any colour, layer lines at the slicer's layer height. | **Share card**: the part with its dimensions, print time, filament, checks and fit, each labelled with its evidence. |
+| **Photoreal render** with Blender: studio, desk or dark scenes, matte, PETG, silk, gloss paint, carbon twill, smoked polycarbonate, rubber or metal, any colour, from any angle, layer lines at the slicer's layer height. A design that declares material zones gets each its own material (a smoked visor, rubber trim, a carbon shell). | **Share card**: the part with its dimensions, print time, filament, checks and fit, each labelled with its evidence. |
 
 - **Engine renders** in any view or as a four-view sheet, coloured by feature, for agents to look at their work.
 - **Turntable videos:** Release › Share › **Turntable…** renders the part turning once as MP4, PNG frames, WebP or GIF. `form turntable`; MCP `turntable`.
