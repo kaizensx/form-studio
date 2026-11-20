@@ -44,13 +44,13 @@ jobs:
     timeout-minutes: 10
     steps:
       # pull_request_target: only the base branch's scripts run; nothing from the pull request is checked out
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: |
             scripts/discord
             form/app/assets
             site/recipes/index.json
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Post
@@ -70,7 +70,7 @@ jobs:
             *) python scripts/discord/post.py event ;;
           esac
       # the server before and after a setup (or a plain snapshot), kept 90 days: compare or roll back from it
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ always() && (github.event.inputs.task == 'setup' || github.event.inputs.task == 'snapshot') }}
         with:
           name: discord-snapshot-${{ github.run_number }}
