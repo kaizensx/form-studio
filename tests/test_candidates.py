@@ -40,6 +40,33 @@ BROKEN = PLATE.replace('return [Stage("plate", p), Stage("hole", p - Cylinder(3,
 
 
 class Pool(unittest.TestCase):
+    def test_timeouts_stretch_with_busy_workers(self):
+        """Three helmet concepts at once: 163 s alone, 268 s with four workers busy, against a 180 s timeout."""
+        from unittest import mock
+        from form import worker
+        self.assertEqual(worker.scaled_timeout(180, 1, 4, load=0.0), 180)
+        self.assertGreater(worker.scaled_timeout(180, 4, 4, load=0.0), 268)
+        self.assertEqual(worker.scaled_timeout(180, 9, 4, load=0.0), worker.scaled_timeout(180, 4, 4, load=0.0))  # capped
+        self.assertGreater(worker.scaled_timeout(180, 1, 4, load=64.0), 180)     # other programs (another pool) count
+        pool = KernelPool(size=4)
+        seen = []
+
+        class Fake:
+            restarts, last_failure = 0, None
+
+            def alive(self):
+                return True
+
+            def call(self, op, timeout=60, on_progress=None, **kw):
+                seen.append(timeout)
+                return {}
+        pool._workers = [Fake() for _ in range(4)]
+        pool._keys = [[] for _ in range(4)]
+        pool._busy = {1, 2, 3}                        # three builds already running
+        with mock.patch("os.getloadavg", return_value=(0.0, 0.0, 0.0)):
+            pool.call("summary", timeout=180)
+        self.assertEqual(seen, [worker.scaled_timeout(180, 4, 4, load=0.0)])
+
     def test_default_size_and_affinity(self):
         self.assertGreaterEqual(default_workers({}), 1)
         self.assertEqual(default_workers({"kernel": {"workers": 3}}), 3)

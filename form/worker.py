@@ -142,6 +142,26 @@ def default_workers(cfg: dict | None = None) -> int:
     return max(1, min(4, n))
 
 
+LOAD_STRETCH = 0.35        # extra share of a timeout per other busy worker: a helmet exemplar builds in 163 s alone
+                           # and 268 s with four workers busy (+21% per extra worker); 0.35 leaves a margin over that
+
+
+def scaled_timeout(timeout: float, busy: int, size: int = 4, load: float | None = None) -> float:
+    """A kernel call's timeout under load. busy: workers of this pool running now, this call included. load: the
+    machine's one-minute load average (default: read it), which also counts the other pools (each MCP server runs
+    its own) and other programs. The quiet-machine timeout is stretched by LOAD_STRETCH for every other worker that
+    competes for the cores, up to 3 others."""
+    import os
+    others = max(0, int(busy) - 1)
+    try:
+        load = os.getloadavg()[0] if load is None else float(load)
+        per = max(1.0, (os.cpu_count() or 4) / max(1, size))  # cores a worker has when the pool is full
+        others = max(others, int(load / per) - 1)
+    except (OSError, AttributeError, ValueError):
+        pass
+    return float(timeout) * (1.0 + LOAD_STRETCH * min(3, others))
+
+
 class KernelPool:
     """Several kernel workers, so independent builds run at the same time instead of queueing behind one process.
 
@@ -217,11 +237,16 @@ class KernelPool:
             self._cv.notify_all()
 
     def call(self, op: str, timeout: float = 60, on_progress=None, **kwargs):
-        """Run one kernel op on a free worker (see Kernel.call)."""
+        """Run one kernel op on a free worker (see Kernel.call). The timeout is the time the op needs on a quiet
+        machine; it is stretched by how many workers are busy at the same time (scaled_timeout), so a heavy build
+        does not time out only because three others run beside it."""
         key = kwargs.get("key") if isinstance(kwargs.get("key"), str) else None
         i = self._pick(key)
+        with self._cv:
+            busy = len(self._busy)
         try:
-            return self._workers[i].call(op, timeout=timeout, on_progress=on_progress, **kwargs)
+            return self._workers[i].call(op, timeout=scaled_timeout(timeout, busy, self.size), on_progress=on_progress,
+                                         **kwargs)
         except KernelFailure as e:
             if e.info.get("kind") in ("timeout", "crash"):
                 with self._cv:
