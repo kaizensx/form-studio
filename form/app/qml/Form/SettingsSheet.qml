@@ -120,6 +120,18 @@ Column {
         Txt { visible: !st.cfg; tone: 2; text: "Reading the settings…" }
         Txt { visible: st.searching && st.rows.length === 0 && !!st.cfg; tone: 3; text: "No setting matches “" + st.query.trim() + "”." }
         // ── General: how this person uses Form Studio; applied at once ──
+        // ── General: how it looks; applied at once and kept ──
+        Rectangle { objectName: "settingsAppearance"; visible: st.tab === "general" && !st.searching
+            width: parent.width; height: 58; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+            Column { x: 16; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 32 - look.width - 12; spacing: 2
+                Txt { text: "Appearance"; font.weight: Theme.wMedium }
+                Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
+                    text: Bridge.appearanceOverride ? "Set to " + Bridge.appearanceOverride + " for this run by FORM_APPEARANCE"
+                        : Theme.appearance === "system" ? "Follows the system: " + (Theme.dark ? "dark" : "light") + " now" : "The same bench, at night or by day" } }
+            Seg { id: look; objectName: "appearanceSeg"; anchors.right: parent.right; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter
+                enabled: !Bridge.appearanceOverride
+                value: Theme.appearance; onPicked: function (v) { Theme.setAppearance(v) }
+                model: [{ value: "dark", text: "Dark" }, { value: "light", text: "Light" }, { value: "system", text: "Match system" }] } }
         Column { visible: st.tab === "general" && !st.searching; width: parent.width; spacing: 8
             Txt { kind: "cap"; text: "Set up for" }
             Txt { kind: "fine"; tone: 2; width: parent.width

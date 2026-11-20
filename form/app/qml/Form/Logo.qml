@@ -11,7 +11,7 @@ Item {
     property int size: 12
     property bool mark: true
     property bool word: true
-    property color part: Theme.clay
+    property color part: Theme.markPart
     property color origin: Theme.datum
     property color ink: Theme.ink          // "Form"
     property color ink2: Theme.ink2        // "Studio", lighter

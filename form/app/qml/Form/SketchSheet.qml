@@ -91,12 +91,12 @@ Item {
                 var step = sk.grid * sk.k
                 for (var i = -Math.ceil(sk.ox / step); sk.ox + i * step < width; i++) {
                     var x = Math.round(sk.ox + i * step) + 0.5
-                    c.strokeStyle = i === 0 ? Theme.alpha(Theme.datum, 0.35) : i % 5 === 0 ? Qt.rgba(1, 1, 1, 0.075) : Qt.rgba(1, 1, 1, 0.03)
+                    c.strokeStyle = i === 0 ? Theme.alpha(Theme.datum, 0.35) : i % 5 === 0 ? Theme.rule : Theme.alpha(Theme.lineBase, 0.03)
                     c.beginPath(); c.moveTo(x, 0); c.lineTo(x, height); c.stroke()
                 }
                 for (var j = -Math.ceil(sk.oy / step); sk.oy + j * step < height; j++) {
                     var y = Math.round(height - sk.oy - j * step) + 0.5
-                    c.strokeStyle = j === 0 ? Theme.alpha(Theme.datum, 0.35) : j % 5 === 0 ? Qt.rgba(1, 1, 1, 0.075) : Qt.rgba(1, 1, 1, 0.03)
+                    c.strokeStyle = j === 0 ? Theme.alpha(Theme.datum, 0.35) : j % 5 === 0 ? Theme.rule : Theme.alpha(Theme.lineBase, 0.03)
                     c.beginPath(); c.moveTo(0, y); c.lineTo(width, y); c.stroke()
                 }
             }

@@ -18,7 +18,7 @@ Item {
             x: -g; y: -g + s.drop * (index + 1) / 7; width: s.width + 2 * g; height: s.height + 2 * g
             radius: s.radius + g; color: "transparent"
             border.width: s.spread / 7 + 1
-            border.color: Qt.rgba(0, 0, 0, 0.17 * s.strength * Math.pow(1 - index / 7, 2))
+            border.color: Qt.rgba(0, 0, 0, 0.17 * s.strength * Theme.shadow * Math.pow(1 - index / 7, 2))
         }
     }
 }

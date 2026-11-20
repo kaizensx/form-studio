@@ -12,7 +12,7 @@ Canvas {
         var c = getContext("2d"); c.reset()
         var W = width, H = height, s = Math.min(W, H) * 0.3, cx = W / 2, cy = H / 2 + s * 0.15
         var shape = diagram && diagram.shape ? diagram.shape : "box", axis = diagram && diagram.axis ? diagram.axis : "x"
-        var ink = Qt.rgba(0.91, 0.93, 0.92, 0.7), faint = Qt.rgba(1, 1, 1, 0.12)
+        var ink = Theme.alpha(Theme.ink, 0.7), faint = Theme.rule2
         // isometric: x to the lower right, y to the upper right, z up
         function P(x, y, z) { return [cx + (x - y) * 0.866 * s, cy + (x + y) * 0.5 * s - z * s] }
         function line(a, b, col, w) { c.strokeStyle = col; c.lineWidth = w || 1.4; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke() }

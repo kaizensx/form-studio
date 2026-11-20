@@ -80,7 +80,7 @@ Item {
         Rectangle { anchors.fill: parent; radius: Theme.rXl; color: Theme.plate2; border.color: Theme.rule2
             Shadow { radius: parent.radius; spread: 44; drop: 18; strength: 1.25 }
             // light catches the top edge
-            Rectangle { x: parent.radius; y: 1; width: parent.width - 2 * parent.radius; height: 1; color: Qt.rgba(1, 1, 1, 0.05) } }
+            Rectangle { x: parent.radius; y: 1; width: parent.width - 2 * parent.radius; height: 1; color: Theme.gleam } }
         MouseArea { anchors.fill: parent; onWheel: function (w) { w.accepted = true } }
 
         // header
@@ -108,10 +108,10 @@ Item {
         // scroll shadows: the body slides under the header and the action bar
         Rectangle { x: 1; y: flick.y; width: parent.width - 2; height: 18; opacity: flick.atYBeginning ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-            gradient: Gradient { GradientStop { position: 0; color: Qt.rgba(0, 0, 0, 0.26) } GradientStop { position: 1; color: "transparent" } } }
+            gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.shade, Theme.dark ? 0.26 : 0.07) } GradientStop { position: 1; color: "transparent" } } }
         Rectangle { x: 1; y: flick.y + flick.height - 18; width: parent.width - 2; height: 18; opacity: flick.atYEnd || flick.contentHeight <= flick.height ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-            gradient: Gradient { GradientStop { position: 0; color: "transparent" } GradientStop { position: 1; color: Qt.rgba(0, 0, 0, 0.3) } } }
+            gradient: Gradient { GradientStop { position: 0; color: "transparent" } GradientStop { position: 1; color: Theme.alpha(Theme.shade, Theme.dark ? 0.3 : 0.08) } } }
 
         // action bar: secondary left, primary right
         Item {

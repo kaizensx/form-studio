@@ -35,7 +35,7 @@ Sec {
                     color: rm.pressed ? Theme.washPress : row.editing ? Theme.plate3 : rm.containsMouse ? Theme.washHover : "transparent"
                     Behavior on color { Tint {} }
                     Rectangle { id: dot; x: 10; anchors.verticalCenter: parent.verticalCenter; width: 20; height: 20; radius: 10
-                        color: row.lk.color || "#d8d3c8"; border.width: 1; border.color: Theme.alpha("#ffffff", 0.18)
+                        color: row.lk.color || "#d8d3c8"; border.width: 1; border.color: Theme.rule3
                         Behavior on color { Tint {} }
                         Rectangle { anchors.centerIn: parent; width: 26; height: 26; radius: 13; color: "transparent"; border.width: 1
                             border.color: row.editing ? Theme.datum : "transparent" } }
@@ -65,7 +65,7 @@ Sec {
                                 required property var modelData
                                 objectName: "swatch-" + modelData
                                 readonly property bool on: (row.lk.color || "").toLowerCase() === modelData && (row.lk.own || row.modelData.id === "")
-                                width: 26; height: 26; radius: 13; color: modelData; border.width: 1; border.color: Theme.alpha("#ffffff", 0.16)
+                                width: 26; height: 26; radius: 13; color: modelData; border.width: 1; border.color: Theme.rule3
                                 scale: sm.pressed ? 0.92 : sm.containsMouse ? 1.08 : 1
                                 Behavior on scale { NumberAnimation { duration: Motion.quick; easing.type: Easing.OutCubic } }
                                 Rectangle { anchors.centerIn: parent; width: 32; height: 32; radius: 16; color: "transparent"; border.width: 1.5

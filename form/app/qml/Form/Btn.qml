@@ -85,7 +85,7 @@ Item {
         Behavior on color { Tint {} }
         // a hairline of light on the top edge of raised buttons
         Rectangle { visible: b.kind === "default" || b.kind === "primary"; x: parent.radius; width: parent.width - 2 * parent.radius; y: 1; height: 1
-            color: Qt.rgba(1, 1, 1, b.kind === "primary" ? 0.35 : 0.05) }
+            color: b.kind === "primary" ? Qt.rgba(1, 1, 1, Theme.dark ? 0.35 : 0.22) : Theme.gleam }
         // while busy, a soft sheen runs across the face: the button is visibly alive, not stuck
         Item { anchors.fill: parent; clip: true; visible: b._shown && !Theme.reduced
             Rectangle { id: sheen; width: parent.width * 0.5; height: parent.height; y: 0
