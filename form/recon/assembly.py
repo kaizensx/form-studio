@@ -15,9 +15,12 @@ share (parts exported from one assembly sit where they belong):
 recipes of the parts (program.py) as one multi-part design whose bound Params are one Param plus a clearance. The
 multi-mesh `reconstruct` entry point (outside this package) calls both after reconstructing each part.
 
+    bind_reports(items, near=1.0) -> {"bindings", "pairs", "summary", "source"}
+        items: [{"name": str, "mesh": path, "report": pipeline.reconstruct's report, "recipe": recipe text}]
+        (the entry point for several meshes: reconstruct each part, then call this once)
     bind(parts, near=1.0, tol=0.05) -> {"bindings": [...], "pairs": [...], "summary": str}
         parts: [{"name": str, "V": (n, 3), "F": (m, 3), "origin": (3,), "params": [program Param dicts]}]
-               (pipeline.reconstruct's report carries "origin" and "params" under layers["2"] for the program route)
+               (a program-route report has them as layers["2"]["origin"] and layers["2"]["param_table"])
     combined_source(parts, bindings, title) -> str
         parts: [{"name": str, "source": program recipe text}]
 """
@@ -138,6 +141,26 @@ def bind(parts: list, near: float = 1.0, tol: float = 0.05) -> dict:
             + (", ".join(f"{p['a']} and {p['b']} ({p['bindings']})" for p in pairs) if pairs else "no parts")
             + " (computed from the meshes)")
     return {"bindings": out, "pairs": pairs, "summary": summ}
+
+
+def bind_reports(items: list, near: float = 1.0) -> dict:
+    """bind() and combined_source() from what pipeline.reconstruct leaves per part: items [{"name", "mesh" (path of
+    the mesh file), "report" (the report dict), "recipe" (the recipe text)}]. Parts whose result is not the program
+    route take no part in the bindings. Returns bind()'s result plus "source" (one multi-part design, or None when
+    fewer than two parts are program recipes)."""
+    from .pipeline import load
+    parts = []
+    for it in items:
+        L2 = (it["report"].get("layers") or {}).get("2") or {}
+        if L2.get("kind") != "program" or not it.get("recipe"):
+            continue
+        V, F = load(it["mesh"])[:2]
+        parts.append({"name": it["name"], "V": V, "F": F, "origin": L2.get("origin", (0.0, 0.0, 0.0)),
+                      "params": L2.get("param_table", []), "source": it["recipe"]})
+    tol = float(items[0]["report"].get("tolerance_mm", 0.05)) if items else 0.05
+    got = bind(parts, near=near, tol=tol)
+    got["source"] = combined_source(parts, got["bindings"], " + ".join(p["name"] for p in parts)) if len(parts) > 1 else None
+    return got
 
 
 def _coaxial(A, qa, B, qb, tol):

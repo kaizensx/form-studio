@@ -40,6 +40,7 @@ CREASE_DEG = 20.0              # a horizontal edge bending more than this is a d
 MAX_LEVELS = 2500              # more distinct heights than this: not a part made of sketches along this direction
 MAX_NODES = 80                 # a loop needing more corners than this is not a sketch a person would draw
 MIN_SCORE = 0.55               # share of the area in caps and walls below which the route is not tried
+MIN_EXPLAINED = 0.4            # share of the walls read as sketches below which the route gives way to the others
 
 
 def _unit(v):
@@ -427,6 +428,7 @@ def read(V, F, tol, d=None, deadline=None, progress=None, O=None, min_score=MIN_
                     kind, why = "curved", "its walls curve along the direction (a rounded or freeform edge)"
             runs.append(Run(ti, kA, kB, za, zb, kind, chain[i][1].depth, chain[i:j + 1], why=why))
             i = j + 1
+    runs = _straighten(runs, tol)
     say({"stage": "layer2", "text": f"{len(runs)} candidate features; fitting their sketches", "fraction": 0.2})
     # sketches
     for r in runs:
@@ -486,6 +488,37 @@ def read(V, F, tol, d=None, deadline=None, progress=None, O=None, min_score=MIN_
     dl = np.array(sorted(float(reps[i]) for i in design))
     return {"frame": fr, "runs": runs, "subs": subs, "slicer": sl, "levels": reps, "design": design, "design_levels": dl, "tol": tol,
             "score": score, "size": size, "blocks": []}
+
+
+def _straighten(runs, tol):
+    """Neighbouring curved runs of one tube whose sections all lie within a third of the tolerance of the section in
+    their middle are one extrusion of that section: walls that lean or wave by less than the tolerance (a slight
+    draft, a mesh's own noise) are vertical within it, and a person would have drawn them so."""
+    out, i = [], 0
+    while i < len(runs):
+        r = runs[i]
+        if r.kind != "curved":
+            out.append(r)
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(runs) and runs[j + 1].kind == "curved" and runs[j + 1].tube == r.tube and \
+                runs[j + 1].k0 == runs[j].k1 + 1:
+            j += 1
+        span = runs[i:j + 1]
+        loops = [x for q in span for x in q.loops]
+        best = None
+        if len(loops) >= 1 and span[-1].zb - span[0].za >= tol:
+            mid = loops[len(loops) // 2][1].mid
+            if all(sk.same(lp.bot, mid, tol / 3) and sk.same(lp.top, mid, tol / 3) for _, lp in loops):
+                best = Run(r.tube, span[0].k0, span[-1].k1, span[0].za, span[-1].zb, "prism", r.depth, loops,
+                           why="its walls are vertical within a third of the tolerance")
+        if best is not None:
+            out.append(best)
+        else:
+            out += span
+        i = j + 1
+    return out
 
 
 def _round_to(x, within):
@@ -1360,6 +1393,13 @@ def recipe(V, F, tol, name="part", limit=None, out_dir=None, progress=None, dead
     rep["direction"] = [round(float(x), 6) for x in fr.d]
     rep["levels"] = len(plan["levels"])
     rep["direction_score_pct"] = round(100 * plan["score"], 2)
+    e = plan.get("explained", explained(plan))
+    rep["walls_read_as_sketches_pct"] = round(100 * e, 1)
+    if e < MIN_EXPLAINED:                              # mostly curved: the other layers do better, and sooner
+        rep["error"] = (f"Only {100 * e:.0f}% of the walls read as sketches along the best direction; this part is mostly "
+                        "curved surfaces, left to the surface fitting.")
+        rep["seconds"] = round(time.perf_counter() - t0, 2)
+        return {"report": rep}
     envelopes(plan, tol)
     out = Path(out_dir or ".")
     snap = ([(r.fate, r.why, r.block) for r in plan["runs"]], [blk["fate"] for blk in plan["blocks"]])
@@ -1410,6 +1450,8 @@ def recipe(V, F, tol, name="part", limit=None, out_dir=None, progress=None, dead
     rep.update({"kind": "program", "base": "sketches and extrusions", "valid": ck["valid"], "solids": ck["solids"],
                 "volume_mm3": round(ck["volume_mm3"], 4), "verified": bool(ok), "editable_pct": edit,
                 "driven_by_params_pct": edit, "params": len(pool.params),
+                "origin": [round(float(x), 6) for x in plan["frame"].o],
+                "param_table": [{k: v for k, v in q.items()} for q in pool.params],
                 "directions": [p.plan["frame"].names[2] for p in progs],
                 "features": feats,
                 "kept": [{"op": "add" if r.add else "cut", "from_mm": round(r.za, 4), "to_mm": round(r.zb, 4), "why": r.why,
