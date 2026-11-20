@@ -11,6 +11,8 @@ from form.recipes.base import Feature, Param, Recipe, RecipeError, Stage
 
 META = {
     "title": "Sculpted half-face mask",
+    "retrieval": False,          # kept in the repo, not offered by search: it reads as an egg; redo it first
+    "retrieval_note": "The sculpted form is too crude to learn from (it reads as an egg with eye slits).",
     "category": "organic",
     "tags": ["mask", "half mask", "face mask", "masquerade", "cosplay", "prop", "costume", "face", "sculpted",
              "organic", "eye openings", "brow", "nose", "strap", "wearable", "leather"],

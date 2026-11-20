@@ -410,7 +410,7 @@ Face the product +X with Z up: critique compares its side, front and top silhoue
       cage points smoothly; h.param(feature) makes each handle a Param ("stronger brow" is a number)
   shell = subd.sculpted_shell(C, wall)      skin + inside + ruled rim: three faces, C2 inside, fast booleans after
   subd.Cage(V, quads, levels=1).solid()     a closed Catmull-Clark cage as bicubic patches (G1 at odd vertices)
- Exact CAD on a sculpted skin (hybrid; see the character_mask exemplar):
+ Exact CAD on a sculpted skin (hybrid):
   craft.organic.magnet_boss(body, at, axis, magnet_d, magnet_t)   a boss from the inside with the pocket in it
   craft.organic.split_with_magnets(body, x, organic.split_spots(body, x, heights, d), d, t)   front/back halves
   openings from a constrained sketch: from form.sketch2d import Sketch (lines, arcs, constraints, named dimensions

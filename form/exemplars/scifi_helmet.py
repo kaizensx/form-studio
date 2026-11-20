@@ -13,6 +13,8 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Sci-fi character helmet",
+    "retrieval": False,          # kept in the repo, not offered by search: it reads as an egg; redo it first
+    "retrieval_note": "The sculpted form is too crude to learn from (the shell reads as an egg).",
     "category": "helmet",
     "product_class": "helmet_fullface",
     "tags": ["helmet", "sci-fi", "scifi", "science fiction", "cosplay", "prop", "costume", "space", "armor", "visor",

@@ -14,6 +14,10 @@ list. Categories: mechanical, consumer, organic, textured, assembly, helmet, enc
 
 A technique snippet is a block of an exemplar's build() between `# --- snippet: <title>` and `# --- end snippet`.
 
+An exemplar whose META says "retrieval": False is kept in the repo (it still builds and is tested) but search,
+snippets and the listing never offer it, so the agent does not learn from it; get(name) still returns it, with the
+reason. character_mask, prop_mask and scifi_helmet are flagged so until they are redone: they read as eggs.
+
 Reading the catalogue parses the files (ast) and imports nothing, so the MCP server stays importable without OCCT.
 The packaged app ships these files as source (packaging/form.spec); tests/test_packaging_data.py checks it.
 """
@@ -65,13 +69,24 @@ def _meta(path: Path) -> dict:
            "category": meta.get("category", ""), "product_class": meta.get("product_class"),
            "tags": list(meta.get("tags", [])), "lessons": list(meta.get("lessons", [])),
            "techniques": list(meta.get("techniques", [])), "craft": craft_calls,
+           "retrieval": bool(meta.get("retrieval", True)), "retrieval_note": meta.get("retrieval_note", ""),
            "snippets": [s["title"] for s in _snippets_of(src, path.stem)]}
     _CACHE[key] = out
     return out
 
 
 def catalogue() -> list[dict]:
+    """Every exemplar in the repo, the ones flagged not for retrieval included."""
     return [_meta(p) for p in _files()]
+
+
+def retrievable() -> list[dict]:
+    """The exemplars search, snippets and the listing offer: those not flagged "retrieval": False."""
+    return [e for e in catalogue() if e.get("retrieval", True)]
+
+
+def _hidden() -> set[str]:
+    return {e["name"] for e in catalogue() if not e.get("retrieval", True)}
 
 
 # ---- search: BM25 over weighted fields ------------------------------------------------------------------------------
@@ -134,7 +149,7 @@ def _rank(query: str, docs: list[tuple[dict, dict]], k1: float = 1.4, b: float =
 def search(query: str, limit: int = 5, category: str | None = None) -> list[dict]:
     """Exemplars ranked for the query (BM25 over name, tags, title, category, snippet titles, techniques, craft calls,
     summary and lessons). Each hit carries the technique snippets that match the query best (up to 2)."""
-    cat = [e for e in catalogue() if not category or e.get("category") == category]
+    cat = [e for e in retrievable() if not category or e.get("category") == category]
     hits = [dict(e) for _, e in _rank(query, [(e, _doc(e)) for e in cat])[:limit]]
     for h in hits:
         snips = snippets(query, limit=2, names=[h["name"]])
@@ -147,8 +162,9 @@ def snippets(query: str = "", limit: int = 4, names: list[str] | None = None) ->
     """Technique snippets ranked for the query: [{"exemplar", "title", "code"}]. The block of build() that does one
     thing well (hollow a lofted shell, cut a two-view opening, a snap fit with a named clearance)."""
     rows = []
+    hidden = _hidden()
     for p in _files():
-        if names and p.stem not in names:
+        if (names and p.stem not in names) or p.stem in hidden:
             continue
         src = p.read_text(encoding="utf-8")
         for s in _snippets_of(src, p.stem):
@@ -176,8 +192,10 @@ def get(name: str) -> dict:
     if not re.fullmatch(r"[a-z0-9_]+", name or "") or not p.is_file():
         raise KeyError(name)
     src = p.read_text(encoding="utf-8")
-    return {**_meta(p), "source": src, "snippet_code": _snippets_of(src, name),
-            "how_to_use": "Learn the construction; write your own design for the person's brief. Exemplars are "
+    meta = _meta(p)
+    return {**meta, "source": src, "snippet_code": _snippets_of(src, name),
+            "how_to_use": ("Not for learning from: " + meta["retrieval_note"]) if not meta.get("retrieval", True) else
+                          "Learn the construction; write your own design for the person's brief. Exemplars are "
                           "references, not templates to hand over."}
 
 

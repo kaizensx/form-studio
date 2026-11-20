@@ -380,9 +380,9 @@ def build() -> MCPServer:
     async def design_examples(query: str = "", name: str = "", technique: str = "", category: str = "") -> dict:
         """Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of
         them: mechanical parts (linear slide, shaft coupler, pillow block, cam follower, gearbox), consumer products
-        (mouse, earbud case, bottle and cap, game controller), organic forms (mask, horn, handle), textured parts
+        (mouse, earbud case, bottle and cap, game controller), organic forms (horn, handle), textured parts
         (knurl, hex relief, woven, fluted), assemblies (hinged case, ratchet wrench, robot head), helmets (full-face,
-        open-face, sci-fi prop) and enclosures (electronics box with bosses, sliding battery box, handheld shell).
+        open-face) and enclosures (electronics box with bosses, sliding battery box, handheld shell).
         query: words to search (ranked); name: one exemplar with its full source; technique: just the code block that
         does one thing ("hollow a lofted shell", "snap-fit lid", "two-view opening"); category: mechanical, consumer,
         organic, textured, assembly, helmet or enclosure. They are references for you, never projects, and never
@@ -392,7 +392,7 @@ def build() -> MCPServer:
             try:
                 return exemplars.get(name)
             except KeyError:
-                raise ToolError(f"Unknown exemplar “{name}”. Known: {', '.join(e['name'] for e in exemplars.catalogue())}.")
+                raise ToolError(f"Unknown exemplar “{name}”. Known: {', '.join(e['name'] for e in exemplars.retrievable())}.")
         if technique:
             return {"snippets": exemplars.snippets(technique, 4),
                     "next": "design_examples(name=...) returns the whole design a snippet comes from."}
@@ -400,7 +400,7 @@ def build() -> MCPServer:
             hits = exemplars.search(query, 5, category or None)
         else:
             keep = ("name", "title", "category", "summary", "tags", "snippets")
-            hits = [{k: e.get(k) for k in keep} for e in exemplars.catalogue() if not category or e["category"] == category]
+            hits = [{k: e.get(k) for k in keep} for e in exemplars.retrievable() if not category or e["category"] == category]
         return {"examples": hits, "next": "design_examples(name=...) returns the full source and the lessons; "
                                           "technique=... returns just the block that does one thing."}
 

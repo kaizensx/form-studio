@@ -17,6 +17,8 @@ from form.sketch2d import Sketch
 
 META = {
     "title": "Character mask with magnet eyes",
+    "retrieval": False,          # kept in the repo, not offered by search: it reads as an egg; redo it first
+    "retrieval_note": "The sculpted form is too crude to learn from (it reads as an egg with eye slits).",
     "category": "organic",
     "tags": ["mask", "cowl", "character", "cosplay", "costume", "organic", "sculpted", "subd",
              "subdivision", "nurbs", "cage", "handles", "hybrid", "magnets", "magnet", "eyes", "lenses", "split",

@@ -45,6 +45,23 @@ class Exemplars(unittest.TestCase):
         with self.assertRaises(KeyError):
             exemplars.get("../studio")
 
+    def test_crude_exemplars_are_kept_but_never_retrieved(self):
+        """character_mask, prop_mask and scifi_helmet read as eggs: kept and built, never offered to learn from."""
+        crude = {"character_mask", "prop_mask", "scifi_helmet"}
+        names = {e["name"] for e in exemplars.catalogue()}
+        self.assertLessEqual(crude, names)                                       # still in the repo
+        self.assertEqual(crude & {e["name"] for e in exemplars.retrievable()}, set())
+        for q in ("a mask for cosplay", "half face mask", "sci-fi helmet", "character mask with magnet eyes",
+                  "sculpted prop mask", "helmet"):
+            self.assertEqual(crude & {h["name"] for h in exemplars.search(q, 10)}, set(), q)
+        self.assertEqual(crude & {s["exemplar"] for s in exemplars.snippets("mask magnet eyes sculpted shell", 20)}, set())
+        got = exemplars.get("prop_mask")                                         # by name: with the reason
+        self.assertFalse(got["retrieval"])
+        self.assertTrue(got["how_to_use"].startswith("Not for learning from"))
+        guide = (Path(exemplars.__file__).parents[1] / "design_guide.py").read_text(encoding="utf-8")
+        for n in crude:
+            self.assertNotIn(n, guide, "the guide does not point the agent at it")
+
     def test_not_in_the_library(self):
         from form.recipes import RecipeBook
         ids = " ".join(RecipeBook(None).builtins())
