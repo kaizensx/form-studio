@@ -72,7 +72,12 @@ Rectangle {
                 group.steps.push({ id: ev.id, tool: ev.name, input: ev.input, ts: ev.ts || 0 })
                 continue
             }
-            if (ev.t === "start") { model = Store.modelName(ev); agent = ev.agent || ""; continue }
+            if (ev.t === "start") {
+                model = Store.modelName(ev); agent = ev.agent || ""
+                // effort raised for a hard task (form/agents/effort.py): said in the conversation, Settings turns it off
+                if (ev.effort_why) { group = null; out.push({ t: "act", k: "f" + i, by: "Form Studio", text: ev.effort_why }) }
+                continue
+            }
             if (ev.t === "answer") continue
             group = null
             if (ev.t === "ask") {

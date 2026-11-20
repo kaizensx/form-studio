@@ -84,6 +84,9 @@ SCHEMA: dict[str, dict] = {
     "chat.model": {"type": "model", "tab": "chat", "label": "Model",
                    "help": "“Default” lets the agent choose. You can also pick it per conversation."},
     "chat.effort": {"type": "effort", "tab": "chat", "label": "Effort", "help": "Empty: the agent's default."},
+    "chat.auto_effort": {"type": "bool", "tab": "chat", "label": "Raise effort for hard tasks",
+                         "help": "A mesh to make editable, a mechanism, gears, a styled form or several parts run at high "
+                                 "effort, and the conversation says so. Off: every message runs at the effort you picked."},
     "chat.web": {"type": "bool", "tab": "chat", "label": "Let the agent look things up on the web",
                  "help": "Datasheets and mechanical drawings, for agents that can search the web. Off: the agent works only from what you tell it."},
     "chat.cli": {"type": "path", "tab": "advanced", "label": "Claude Code command",

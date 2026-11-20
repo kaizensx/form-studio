@@ -99,6 +99,25 @@ class Effort(unittest.TestCase):
         self.assertEqual(effort.pick("a helmet", [], "high", lv), ("high", ""))
         self.assertEqual(effort.pick("a helmet", [], "low", []), ("low", ""))            # the agent has no levels
 
+    def test_a_raise_is_said_in_the_conversation_and_can_be_turned_off(self):
+        lv = ["low", "medium", "high"]
+        self.assertEqual(effort.pick("two gears that mesh", [], "low", lv),
+                         ("high", "Using high effort for this task: gears"))
+        self.assertEqual(effort.pick("rebuild it", ["a.stl"], "low", lv)[1], "Using high effort for this task: a mesh attached")
+        # the reply's start event carries it, and the feed shows it as a line from Form Studio
+        talk = (ROOT / "form" / "app" / "qml" / "Form" / "Talk.qml").read_text()
+        self.assertIn('if (ev.effort_why) { group = null; out.push({ t: "act"', talk)
+        # Settings › Agents has the switch, [chat] auto_effort, on by default; off keeps the person's effort
+        from form import config, config_edit
+        self.assertEqual(config_edit.SCHEMA["chat.auto_effort"]["type"], "bool")
+        self.assertEqual(config_edit.SCHEMA["chat.auto_effort"]["tab"], "chat")
+        self.assertIs(config.DEFAULTS["chat"]["auto_effort"], True)
+        c = chat.Chat.__new__(chat.Chat)
+        c.cfg = {"chat": {"auto_effort": False}}
+        job = chat.ChatJob("two gears that mesh", None, None, None, "codex")
+        job.effort = "low"
+        self.assertEqual(c._effort(job, ADAPTERS["codex"], "codex"), "low")
+
 
 if __name__ == "__main__":
     unittest.main()

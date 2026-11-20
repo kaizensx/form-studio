@@ -50,6 +50,23 @@ def pick(message: str, attachments: list | None, chosen: str, available: list[st
         return chosen, ""
     if not cur and cls == "design":                        # the CLI's own default is usually medium already
         return chosen, ""
-    why = {"hard": "a mesh to make editable, a mechanism, a styled form, a texture or several parts",
-           "design": "a new design"}[cls]
-    return want, f"effort raised to {want} for {why}"
+    return want, f"Using {want} effort for this task: {reason(message, attachments, cls)}"
+
+
+def reason(message: str, attachments: list | None, cls: str) -> str:
+    """What made the task hard, in the person's words: "gears", "make this editable", "a mesh attached"."""
+    if cls == "design":
+        return "a new design"
+    files = [str(a.get("file") if isinstance(a, dict) else a).lower() for a in attachments or []]
+    if any(f.endswith(_MESH) for f in files):
+        return "a mesh attached"
+    m = _HARD.search(message or "")
+    if m:
+        text = message or ""
+        a, b = m.start(), m.end()
+        while a > 0 and text[a - 1].isalnum():
+            a -= 1
+        while b < len(text) and text[b].isalnum():
+            b += 1
+        return text[a:b].strip().lower()
+    return "a mesh attached"

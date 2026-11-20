@@ -60,7 +60,7 @@ DEFAULTS = {
     # conversation starts with (the app's model picker writes them here); agent "" = the first one available.
     # model: an alias or id that agent accepts, or "default". effort: "" = the agent's own. cli: Claude Code's command.
     "chat": {"enabled": True, "cli": "claude", "model": "default", "web": True, "budget_usd_per_message": 3.0, "ask_timeout_s": 900,
-             "agent": "", "effort": ""},
+             "agent": "", "effort": "", "auto_effort": True},
     # Optional: Blender, run headless for illustrative renders (render_photo). Empty app = look in the usual places.
     "blender": {"app": "", "timeout_s": 180, "samples": 128},
     # Assembly checks (interference, fits, joint sweeps): seconds of work before they stop and report what they reached.
