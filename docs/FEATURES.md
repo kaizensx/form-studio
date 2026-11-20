@@ -147,12 +147,44 @@ each one named as it arrives.
   magnet pockets, bearing seats, printable threads and involute gears, each dimension with its source.
 - **Text and patterns.** Embossed or debossed lettering with a shipped font, revision stamps on the underside, hex
   vents, perforations, slots, knurls and grip ribs, with web-thickness checks.
-- **Reference parts.** Import a STEP or STL of the thing your part must fit (a circuit board, a phone, a motor). It is
-  drawn as a blueprint companion, and a design can cut clearance from it with `self.reference("pi5.step")`.
+- **Reference parts.** Import a STEP, or an STL, OBJ or 3MF mesh, of the thing your part must fit (a circuit board, a
+  phone, a motor). It is drawn as a blueprint companion, and a design can cut clearance from it with
+  `self.reference("pi5.step")`. A mesh has **Make editable** next to it (see below).
 - **Datasheets and drawings.** The agent reads PDFs and images, from a file or an https link, as pictures, so the
   dimensions in a mechanical drawing survive (`read_document`).
 - **Every design on Home**, each a live 3D card, filtered by released and in progress; rename, duplicate, export or
   move to the trash.
+
+## Mesh to editable CAD
+
+Bring an STL, OBJ or 3MF and Form Studio rebuilds it as CAD, then measures how close the result is to the mesh.
+**Make editable** on an imported mesh (Brief › Reference parts), `form reconstruct FILE [--name] [--tolerance MM]
+[--layer 0|1|2]`, or the MCP tool `reconstruct`. The result is a new design; the original mesh stays beside it in
+blueprint, and the report, the deviation map and every solid are kept in the design's `reconstruction` folder.
+
+- **Layer 0, always: the mesh as an exact solid.** Vertices are welded, every triangle becomes a planar face, the faces
+  are sewn into a solid and coplanar facets are merged. The two-sided Hausdorff distance to the mesh is at float
+  precision. Open boundaries and non-manifold edges are reported; holes are closed only as a listed repair.
+- **Layer 1 (beta): analytic faces.** Regions are grown over the mesh and fitted with planes, cylinders, cones,
+  spheres and tori. A region is accepted only when every vertex on it is within the tolerance (default 0.02 mm) and its
+  facets are no farther from the surface than the mesh's own chord error; the faces are trimmed along the mesh's
+  edges (lines, circles and arcs where the boundary is one) and sewn with frozen facets for the rest into one solid.
+  The report gives the share of area that is parametric.
+- **Layer 2 (beta): a feature recipe.** When the part is one extrusion or one revolution, a build123d design with
+  Params is written: the profile, holes with standard sizes (ISO 273 clearances, tap drills, drill sizes) and
+  provenance "computed from mesh", and hole grids, lines and circles as patterns. Mirror planes and rotational
+  symmetry are reported. The recipe is rebuilt and compared with the mesh, and it is used only when it is within the
+  limit.
+- **Verification, every time.** Two-sided Hausdorff distance, volume difference, parametric versus frozen area, and
+  a deviation map coloured against the tolerance.
+
+What it does not do (yet): scans, sculpted and organic shapes stay faceted: exact to the mesh but not parametric.
+Freeform surfaces (splines, lofts) are not fitted; a spline that a cylinder or torus matches within the tolerance is
+reported as that surface. Layer 2 handles one extrusion or one revolution with holes; steps, pockets, bosses on
+other axes and fillets across the extrusion leave the result at Layer 1 and the report says why. Accuracy is measured
+against the mesh, not the original object, so the mesh's own chord error and scan noise are in the input. Units are
+millimetres unless the file says otherwise (3MF does). Nothing is decimated: a mesh over 200,000 triangles shows
+progress and takes minutes.
 
 ## For a printer, or just a 3D model
 
@@ -408,7 +440,7 @@ Writing one: [Writing a recipe](RECIPES.md) and [community recipes](../community
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 77 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 78 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

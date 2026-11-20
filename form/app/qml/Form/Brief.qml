@@ -128,7 +128,9 @@ Column {
                     k: modelData.file
                     sub: modelData.format.toUpperCase() + (modelData.volume_mm3 ? " · " + F.fmt(modelData.volume_mm3 / 1000, 2) + " cm³" : "")
                     Txt { mono: true; tone: 2; text: root.size(pr.modelData.bbox) + " mm"; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter }
-                    Tag { text: pr.modelData.evidence || "computed"; anchors.verticalCenter: parent.verticalCenter } } } }
+                    Tag { text: pr.modelData.evidence || "computed"; anchors.verticalCenter: parent.verticalCenter }
+                    Btn { kind: "quiet"; small: true; icon: "box"; text: "Make editable"; visible: pr.modelData.format !== "step"
+                          anchors.verticalCenter: parent.verticalCenter; onClicked: Store.makeEditable(pr.modelData.file) } } } }
         Btn { text: "Import part…"; icon: "box"; onClicked: Store.ask(partDlg) } }
 
     Fold { title: "Printer context"; key: "brief.printer"; openByDefault: !root.sl.available && Store.prints
@@ -160,7 +162,7 @@ Column {
 
     FileDialog { id: dlg; title: "Attach a reference photo"; nameFilters: ["Images (*.png *.jpg *.jpeg *.webp)"]
         onAccepted: root.attach(selectedFile) }
-    FileDialog { id: partDlg; title: "Import a reference part"; nameFilters: ["STEP or STL (*.step *.stp *.stl)"]
+    FileDialog { id: partDlg; title: "Import a reference part"; nameFilters: ["STEP or mesh (*.step *.stp *.stl *.obj *.3mf)"]
         onAccepted: Store.importPart(selectedFile) }
     Connections { target: Store; function onImportPartRequested() { Ws.setOpen("brief.parts", true); Store.ask(partDlg) } }
 }

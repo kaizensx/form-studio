@@ -183,7 +183,7 @@ QtObject {
                       "/pack": "Packing the plate", "/preview": "Previewing the change", "/commit": "Saving the revision", "/checkout": "Switching revision",
                       "/run": "Starting the pipeline", "/settings": "Saving the design settings", "/render_photo": "Starting the render", "/alternatives": "Building alternatives",
                       "/variant_save": "Saving the variant", "/variant_promote": "Making the variant the design", "/variant_delete": "Deleting the variant",
-                      "/history_export": "Exporting the history", "/import_part": "Importing the part", "/open": "Opening the file", "/approve": "Recording the release",
+                      "/history_export": "Exporting the history", "/import_part": "Importing the part", "/reconstruct": "Reconstructing the mesh as CAD", "/open": "Opening the file", "/approve": "Recording the release",
                       "/evidence": "Recording the result", "/test_piece": "Making the test piece", "/measure": "Measuring", "/intent": "Reading the request",
                       "/duplicate": "Duplicating the design", "/delete": "Moving the design to the trash", "/rename": "Renaming", "/revisions": "Loading revisions",
                       "/variants": "Loading variants", "/reference": "Saving the reference" }
@@ -661,6 +661,16 @@ QtObject {
             var b = r.reference.bbox, sz = [0, 1, 2].map(function (i) { return F.fmt(b[1][i] - b[0][i], 1) }).join(" × ")
             toast("Imported " + r.reference.file, sz + " mm, computed from the file. Shown in blueprint in the 3D view.")
             return refresh(true)
+        }, fail)
+    }
+    // "Make editable": the mesh becomes a new design, rebuilt as CAD and checked against the mesh (form/recon)
+    function makeEditable(file) {
+        toast("Reconstructing " + file, "Building the solid and fitting surfaces. A large mesh takes a few minutes.")
+        return ppost("/reconstruct", { file: file }).then(function (r) {
+            var m = r.summary || ({})
+            toast("“" + r.name + "” is editable", "Layer " + m.layer + " · " + F.fmt(m.parametric_area_pct, 0) + "% parametric · "
+                  + F.fmt(m.hausdorff_mm, 4) + " mm from the mesh (computed)")
+            return reloadStudio().then(function () { open(r.project) })
         }, fail)
     }
     function openIn(what, app) {

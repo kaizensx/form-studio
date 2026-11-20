@@ -575,6 +575,16 @@ def make_handler(st: Studio):
             p = st.load(pid)
             recipe = st.recipe(p)
             auto = lambda proj: st.run(pid) if proj.get("auto_run", True) else None
+            # -- "Make editable": an imported mesh reconstructed as a new design (form/recon) --
+            if action == "reconstruct":
+                kw = {k: body[k] for k in ("name",) if body.get(k)}
+                if body.get("tolerance") is not None:
+                    kw["tolerance"] = float(body["tolerance"])
+                if body.get("layer") is not None:
+                    kw["layer"] = int(body["layer"])
+                out = st.reconstruct_reference(p, str(body.get("file") or ""), **kw)
+                st.activity(out["project"], "design", f"Made {body.get('file')} editable as “{out['name']}”.", by="you")
+                return self._json(out)
             # -- measuring (form/analysis.py) --
             if action == "probe":
                 from . import analysis

@@ -30,6 +30,7 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Offer next steps | `suggest_replies` (up to three buttons under the reply) | — |
 | Put text on a flat face (a feature in the source) | `add_text`, `remove_text` | `form engrave <p> TEXT --at x,y,z --normal x,y,z` |
 | See what changed in the solid between revisions | `geometry_diff` | `form diff <p> 1 3 --png diff.png` |
+| Turn an STL, OBJ or 3MF into editable CAD (verified against the mesh) | `reconstruct` | `form reconstruct part.stl --tolerance 0.02` |
 | Assembly instructions as a PDF | `assembly_instructions` | `form instructions <p> --out steps.pdf` |
 
 Every design has a **purpose**: `print` (for 3D printing) or `model` (just a 3D model: rendering, CAD exchange, CNC,

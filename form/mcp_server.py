@@ -850,6 +850,44 @@ def build() -> MCPServer:
                 "note": "The part is drawn where its file puts it. Model your design around those coordinates, or move "
                         "the reference inside your design code (Pos(...) * self.reference(...))."}
 
+    @mcp.tool(annotations=RW)
+    async def reconstruct(project_or_file: str, tolerance: float = 0.02, layer: int = 2, name: str | None = None,
+                          reference: str | None = None, ctx: Context = None) -> dict:
+        """Turn a mesh (STL, OBJ or 3MF) into editable CAD as a new design. project_or_file: an absolute path to the
+        mesh, or a project id whose imported mesh reference to use (reference: which one; default the first mesh).
+        Layer 0 is always built: the mesh as an exact solid (Hausdorff at float precision). Layer 1 (beta) replaces
+        facets with planes, cylinders, cones, spheres and tori where they fit within `tolerance` mm; the rest stay
+        frozen facets. Layer 2 (beta) writes a build123d recipe with Params (one extrusion or revolution, holes
+        snapped to standard sizes, patterns) and is used only if its rebuild is within the limit. Returns the new
+        project and the verification (two-sided Hausdorff, volume delta, % parametric area). Values are computed from
+        the mesh; nothing is decimated and every repair is listed. Large meshes take minutes."""
+        st = studio()
+        progress = None
+        if ctx is not None:
+            def progress(d):
+                try:
+                    anyio.from_thread.run(ctx.report_progress, float(d.get("fraction", 0)), 1.0, str(d.get("text", "")))
+                except Exception:
+                    pass
+
+        def go():
+            kw = {"tolerance": tolerance, "layer": layer, "on_progress": progress}
+            if name:
+                kw["name"] = name
+            src = Path(project_or_file).expanduser()
+            if src.suffix and src.is_file():
+                return st.reconstruct(src, **kw)
+            p = st.load(project_or_file)
+            meshes = [r["file"] for r in st.references(p) if r.get("format") != "step"]
+            if not meshes:
+                raise StudioError("This project has no imported mesh.", "Import an STL, OBJ or 3MF first (import_reference), "
+                                  "or pass the path of the mesh file.")
+            return st.reconstruct_reference(p, reference or meshes[0], **kw)
+        out = await _run(go)
+        act(out["project"], "design", f"Reconstructed a mesh as CAD (Layer {out['summary']['layer']})", ctx)
+        return {**out, "evidence": "computed (Form Studio's kernel compared the result with the mesh)",
+                "next": "get_project to read the design; get_design_source to edit the recipe or add features."}
+
     @mcp.tool(annotations=RO)
     async def freecad_macro(project: str) -> dict:
         """Write a FreeCAD macro (.FCMacro) next to the current STEP export. Run it in FreeCAD to rebuild the part
