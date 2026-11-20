@@ -308,7 +308,7 @@ Item {
                     Behavior on color { Tint {} }
                     Spinner { id: sspin; x: 9; anchors.verticalCenter: parent.verticalCenter; size: 12; visible: Store.selBusy > 0; color: Theme.annotate }
                     Txt { id: sh; x: sspin.visible ? 28 : 10; width: parent.width - x - 10; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; wrapMode: Text.NoWrap; elide: Text.ElideRight
-                        color: Store.selSay ? Qt.lighter(Theme.amber, 1.25) : Theme.ink2
+                        color: Store.selSay ? Theme.strong(Theme.amber) : Theme.ink2
                         text: Store.selSay ? Store.selSay : Store.selBusy > 0 ? "Analysing on the solid…"
                             : Store.selMode === "brush" ? (ws.compact ? "Drag to paint" : "Drag to paint a region · Alt-drag orbits · Shift adds")
                             : Store.selMode === "lasso" ? (ws.compact ? "Drag around it" : "Draw around what you see · Alt-drag orbits · Shift adds")
@@ -325,7 +325,7 @@ Item {
                     Behavior on color { Tint {} }
                     Spinner { id: mspin; x: 9; anchors.verticalCenter: parent.verticalCenter; size: 12; visible: Store.measureBusy > 0 }
                     Txt { id: mh; x: mspin.visible ? 28 : 10; width: parent.width - x - 10; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; elide: Text.ElideRight
-                        color: Store.measureSay ? Qt.lighter(Theme.amber, 1.25) : Theme.ink2
+                        color: Store.measureSay ? Theme.strong(Theme.amber) : Theme.ink2
                         text: Store.measureSay ? Store.measureSay : Store.measureBusy > 0 ? "Measuring on the solid…"
                             : Store.measureKind === "distance" ? (Store.measureFrom ? "Click the second point" : ws.compact ? "Click two points; they snap" : "Click two points. They snap to corners, midpoints and centres")
                             : Store.measureKind === "face" ? (ws.compact ? "Click a face: area and tilt" : "Click a face for its area and its tilt to the bed")
@@ -424,15 +424,15 @@ Item {
                     Btn { small: true; kind: "quiet"; text: "Back to head"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.endScrub() } } }
             Rectangle { visible: Store.hasDraft && !!Store.preview && !Store.scrub; width: b1.implicitWidth + 20; height: 26; radius: Theme.rSm
                 color: Theme.alpha(Theme.blueprint, 0.14); border.color: Theme.alpha(Theme.blueprint, 0.3)
-                Txt { id: b1; anchors.centerIn: parent; font.pixelSize: 12; color: Qt.lighter(Theme.blueprint, 1.25); wrapMode: Text.NoWrap
+                Txt { id: b1; anchors.centerIn: parent; font.pixelSize: 12; color: Theme.strong(Theme.blueprint); wrapMode: Text.NoWrap
                     text: "Draft, not committed · blue lines are " + (Store.project ? F.pad(Store.project.head) : "") } }
             Rectangle { visible: !!Store.compare; width: b2.implicitWidth + 20; height: 26; radius: Theme.rSm
                 color: Theme.alpha(Theme.blueprint, 0.14); border.color: Theme.alpha(Theme.blueprint, 0.3)
-                Txt { id: b2; anchors.centerIn: parent; font.pixelSize: 12; color: Qt.lighter(Theme.blueprint, 1.25); wrapMode: Text.NoWrap
+                Txt { id: b2; anchors.centerIn: parent; font.pixelSize: 12; color: Theme.strong(Theme.blueprint); wrapMode: Text.NoWrap
                     text: Store.compare ? "Comparing · solid is " + F.pad(Store.project.head) + " (head), blue lines are " + F.pad(Store.compare.rev) : "" } }
             Rectangle { visible: ws.mapBlocked; width: Math.min(mb.implicitWidth + 20, centre.width - 32); height: 26; radius: Theme.rSm
                 color: Theme.alpha(Theme.amber, 0.12); border.color: Theme.alpha(Theme.amber, 0.3)
-                Txt { id: mb; x: 10; width: parent.width - 20; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; color: Qt.lighter(Theme.amber, 1.3); wrapMode: Text.NoWrap; elide: Text.ElideRight
+                Txt { id: mb; x: 10; width: parent.width - 20; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; color: Theme.strong(Theme.amber); wrapMode: Text.NoWrap; elide: Text.ElideRight
                     text: "The map describes " + (Store.project ? F.pad(Store.project.head) : "the head") + ". " + (Store.hasDraft ? "Commit or discard the draft to see it." : "Stop comparing to see it.") } }
             // the readout: size, volume, and which arrangement the size belongs to
             Row { id: ro; spacing: 7; height: 18
@@ -522,7 +522,7 @@ Item {
                                 Txt { id: tl; text: tab.modelData.title; font.weight: Theme.wSemi; font.pixelSize: 13; tone: tab.on ? 1 : 2 } }
                             Txt { id: tn; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: 10; text: tab.note[0]; color: ws.noteColor(tab.note[1]); wrapMode: Text.NoWrap } }
                         MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.setStage(tab.modelData.id) }
-                        Tip { show: tm.containsMouse; text: tab.modelData.hint }
+                        Tip { show: tm.containsMouse; below: true; text: tab.modelData.hint; keys: "Ctrl+" + Store.stageKey[tab.modelData.id] }
                     }
                 }
             }

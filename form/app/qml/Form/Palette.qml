@@ -23,7 +23,7 @@ Item {
         var c = [], w = Store.screen === "work"
         function add(g, id, icon, text, hint, run, keys) { c.push({ g: g, id: id, icon: icon, text: text, hint: hint || "", run: run, keys: keys || "" }) }
         if (w) {
-            Store.stages.forEach(function (s, i) { add("Go to", "stage." + s.id, "arrow_right", s.title, s.hint, function () { Store.setStage(s.id) }, "Ctrl+" + (i + 1)) })
+            Store.stages.forEach(function (s, i) { add("Go to", "stage." + s.id, "arrow_right", s.title, s.hint, function () { Store.setStage(s.id) }, "Ctrl+" + Store.stageKey[s.id]) })
         }
         add("Go to", "home", "home", "All designs", "Home", function () { Store.home() }, "Ctrl+Shift+H")
         if (w) {

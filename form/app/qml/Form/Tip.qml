@@ -8,6 +8,7 @@ Item {
     property string text: ""
     property string keys: ""
     property bool show: false
+    property bool below: false           // under the control instead of over it (controls right under the top bar)
     anchors.fill: parent
     readonly property bool want: show && text !== ""
     onWantChanged: {
@@ -18,8 +19,8 @@ Item {
         id: tt
         property bool warm: false
         timeout: 8000; padding: 0; margins: 6
-        y: -implicitHeight - 6; x: Math.round((t.width - implicitWidth) / 2)
-        transformOrigin: Popup.Bottom
+        y: t.below ? t.height + 6 : -implicitHeight - 6; x: Math.round((t.width - implicitWidth) / 2)
+        transformOrigin: t.below ? Popup.Top : Popup.Bottom
         contentItem: Row { padding: 7; leftPadding: 9; rightPadding: 9; spacing: 8
             Text { text: t.text; color: Theme.ink; font.family: Theme.sans; font.pixelSize: 12; wrapMode: Text.WordWrap; width: Math.min(implicitWidth, 280); renderType: Text.NativeRendering; lineHeight: 1.2 }
             Kbd { visible: t.keys !== ""; keys: t.keys; quiet: true; anchors.verticalCenter: parent.verticalCenter } }

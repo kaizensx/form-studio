@@ -52,7 +52,7 @@ Item {
     readonly property var talks: { var seen = {}; return Store.convs.filter(function (c) {
         var t = c.thread || c.id; if (c.messages <= 0 || seen[t]) return false; seen[t] = true; return true }).slice(0, home.width > 1500 ? 4 : 3) }
     readonly property real cw: Math.min(width - (width < 1000 ? 48 : 96), 1200)          // content width
-    readonly property real heroH: fresh ? height : Math.max(500, Math.min(620, height * 0.7))
+    readonly property real heroH: fresh ? height : chatting ? Math.max(500, Math.min(620, height * 0.7)) : Math.max(440, Math.min(540, height * 0.6))
     // a conversation is open in the column on the left: that is where you type, so the middle does not offer a second box
     readonly property bool chatting: Store.talkOpen && (Store.chatItems.length > 0 || Store.chatBusy)
     // the composer always sits in the middle; the bench behind it stays empty (the part you made last is in the list below)
@@ -403,7 +403,7 @@ Item {
                                 Flow { width: parent.width; spacing: 12
                                     Repeater { model: fam.members
                                         DesignCard { required property var modelData; required property int index
-                                            width: fam.mw; host: home; p: modelData; member: true; photo: home.photos[modelData.id] || null } } } }
+                                            objectName: "familyMember"; width: fam.mw; host: home; p: modelData; member: true; photo: home.photos[modelData.id] || null } } } }
                         }
                     }
                 }

@@ -12,9 +12,9 @@ Item {
     property bool mark: true
     property bool word: true
     property color part: Theme.markPart
-    property color origin: Theme.datum
-    property color ink: Theme.ink          // "Form"
-    property color ink2: Theme.ink2        // "Studio", lighter
+    property color origin: Theme.markOrigin
+    property color ink: Theme.markInk      // "Form"
+    property color ink2: Theme.markInk2    // "Studio", lighter
 
     readonly property real u: size / 48                       // one unit of the 64 grid
     readonly property real cut: size >= 24 ? 2 * u : 0        // the hairline between origin and part; it would only blur below 24 px

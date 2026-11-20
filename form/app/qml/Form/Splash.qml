@@ -93,7 +93,7 @@ Item {
         y: sp.homeY + (sp.landing.y - sp.homeY) * sp.go
         scale: 1 + (sp.landingSize / sp.s - 1) * sp.go
         // the mark, built on the lines: origin, X arm and Y stem, middle arm
-        Rectangle { id: org; width: 12 * sp.u; height: width; color: Theme.datum; opacity: sp.calm ? 1 : 0; scale: sp.calm ? 1 : 0.6 }
+        Rectangle { id: org; width: 12 * sp.u; height: width; color: Theme.markOrigin; opacity: sp.calm ? 1 : 0; scale: sp.calm ? 1 : 0.6 }
         Rectangle { id: xa; x: 14 * sp.u; height: 12 * sp.u; color: Theme.markPart; width: sp.calm ? 26 * sp.u : 0 }
         Rectangle { id: ya; y: 14 * sp.u; width: 12 * sp.u; color: Theme.markPart; height: sp.calm ? 34 * sp.u : 0 }
         Rectangle { id: ma; x: 12 * sp.u; y: 20 * sp.u; height: 12 * sp.u; color: Theme.markPart; width: sp.calm ? 20 * sp.u : 0 }

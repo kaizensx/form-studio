@@ -73,6 +73,6 @@ Column {
                 + "Support is overhanging area times its height above the plate (an upper bound). Layer section is the smallest slice through "
                 + (of.res.structure_features.length ? "the structure features" : "the part") + ": geometry, not strength." : "" }
         Rectangle { width: parent.width; height: nn.implicitHeight + 14; radius: Theme.rSm; color: Theme.alpha(Theme.amber, 0.07)
-            Txt { id: nn; x: 9; y: 7; width: parent.width - 18; kind: "fine"; color: Qt.lighter(Theme.amber, 1.3); text: of.res ? of.res.not : "" } }
+            Txt { id: nn; x: 9; y: 7; width: parent.width - 18; kind: "fine"; color: Theme.strong(Theme.amber); text: of.res ? of.res.not : "" } }
     }
 }

@@ -116,6 +116,7 @@ QtObject {
         { id: "release", title: "Make", hint: "Release it: the gate, the files, the history" }
     ].filter(function (x) { return x.id !== "fit" || printUi })     // the fit model is a printer's accuracy: only for a print
     onPrintUiChanged: if (!printUi && stage === "fit") stage = "prove"
+    readonly property var stageKey: ({ brief: 1, shape: 2, fit: 3, prove: 4, release: 5 })     // Ctrl+n; the same whether Fit shows or not
 
     function revision(n) {
         if (!project) return null

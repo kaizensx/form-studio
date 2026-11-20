@@ -51,13 +51,17 @@ QtObject {
     readonly property color pass: dark ? "#86d9ad" : "#1c8553"
     readonly property color annotate: dark ? "#c7b2ff" : "#6f49cc"              // selections and annotations on the part
     readonly property color clay: "#d8d3c8"                                     // the part itself, the same in both
-    readonly property color markPart: dark ? clay : "#1d2325"                   // the mark's arms: clay at night, ink by day
+    // the mark, as brand/README.md sets it on graphite and on a light ground
+    readonly property color markPart: dark ? clay : "#0e1113"
+    readonly property color markOrigin: dark ? "#b9e8d7" : "#2f8a6c"
+    readonly property color markInk: dark ? "#e8edeb" : "#0e1113"               // "Form"
+    readonly property color markInk2: dark ? "#a8b2af" : "#5b6562"              // "Studio"
     readonly property color datumHi: dark ? "#cdf2e4" : "#1b9179"               // primary button, hovered
     readonly property color focus: alpha(datum, 0.6)                            // keyboard focus ring (datum)
     // the 3D bench (Viewport.qml): the ground to the horizon, the build plate on it, its 10 mm grid and its outline
     readonly property color benchGround: dark ? "#1d2327" : "#e6e9e7"
     readonly property color benchPlate: dark ? "#262d32" : "#c2c8c5"
-    readonly property color benchGrid: dark ? "#2e363b" : "#a9b1ad"
+    readonly property color benchGrid: dark ? "#2e363b" : "#b4bbb7"
     readonly property color benchEdge: dark ? "#55616a" : "#7f8985"
 
     readonly property string sans: "Instrument Sans"
@@ -165,6 +169,8 @@ QtObject {
     function keyText(seq) { return keyCaps(seq).join(mac ? "" : "+") }
 
     function alpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a) }
+    // a meaning colour as text on its own tint: a step brighter on graphite, a step deeper on paper
+    function strong(c) { return dark ? Qt.lighter(c, 1.25) : Qt.darker(c, 1.3) }
     // how a number is known → colour
     function evidence(kind) {
         switch (kind) {

@@ -9,7 +9,7 @@ import "F.js" as F
 // the cards and must not wipe a half-typed name.
 Item {
     id: card
-    objectName: member ? "familyMember" : "projectCard"
+    objectName: "projectCard"            // an opened family names its members "familyMember" (Home.qml)
     property Item host: null                 // Home
     property var p: ({})                     // the design (a row of /studio projects)
     property int index: 0

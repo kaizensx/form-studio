@@ -84,7 +84,7 @@ Column {
                     visible: !st.how || sg.expanded; mono: true; font.pixelSize: 11; tone: 4; elide: Text.ElideRight; wrapMode: Text.NoWrap
                     text: st.how ? st.modelData.tool : (st.modelData.input || "") }
             }
-            Txt { visible: !!st.r && !st.r.ok && !!st.r.text; x: 38; width: parent.width - 38; kind: "fine"; color: Qt.lighter(Theme.signal, 1.2)
+            Txt { visible: !!st.r && !st.r.ok && !!st.r.text; x: 38; width: parent.width - 38; kind: "fine"; color: Theme.strong(Theme.signal)
                 text: st.r && st.r.text ? st.r.text : ""; maximumLineCount: sg.expanded ? 8 : 2; elide: Text.ElideRight }
             // the picture the agent looked at
             Rectangle {

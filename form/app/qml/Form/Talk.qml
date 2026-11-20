@@ -395,7 +395,7 @@ Rectangle {
                         // "Ask about this feature…" from the viewport's context menu lands here
                         Connections { target: Store; function onChatPrefill(text) { Store.talkOpen = true; ta.text = text; ta.cursorPosition = text.length; ta.forceActiveFocus() } }
                         wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: 13
-                        placeholderText: !Store.chat.available ? "No agent is connected" : Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure" ? "Answer the question above…" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to print…"
+                        placeholderText: !Store.chat.available ? "No agent is connected" : Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure" ? "Answer the question above…" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to make…"
                         placeholderTextColor: Theme.ink4; enabled: Store.chat.available
                         selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
                         leftPadding: 12; rightPadding: 12; topPadding: 10; bottomPadding: 6; background: null; renderType: Text.NativeRendering
