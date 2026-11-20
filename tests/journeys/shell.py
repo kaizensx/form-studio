@@ -353,7 +353,9 @@ def journey_about(ui):
 def journey_palette_commands(ui):
     """Fifteen and more commands, each typed, picked with Enter, and checked by what it changed."""
     pid = S["pid"]
-    for q, text, stage in (("brief", "Brief", "brief"), ("fit", "Fit", "fit"), ("prove", "Prove", "prove"), ("release", "Release", "release"), ("shape", "Shape", "shape")):
+    # the stages by their names, and by the names they had before (kept in each stage's hint)
+    for q, text, stage in (("describe", "Describe", "brief"), ("fit", "Fit", "fit"), ("review", "Review", "prove"), ("make", "Make", "release"), ("design", "Design", "shape"),
+                           ("brief", "Describe", "brief"), ("prove", "Review", "prove"), ("shape", "Design", "shape")):
         palette(ui, q, text)
         ui.wait_until(lambda: ui.store.get("stage") == stage, 3, f"the palette to go to {text}")
     for name in ("front", "top", "under", "iso"):

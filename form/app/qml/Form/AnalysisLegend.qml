@@ -102,7 +102,7 @@ Rectangle {
             SectionChart { visible: !!lg.map && !!lg.map.chart; chart: lg.map ? lg.map.chart || null : null }
 
             // what it is not: always in sight, one or two lines
-            Txt { kind: "fine"; width: parent.width; visible: !!lg.legend; color: Qt.lighter(Theme.amber, 1.3)
+            Txt { kind: "fine"; width: parent.width; visible: !!lg.legend; color: Theme.strong(Theme.amber)
                 text: lg.legend ? String(lg.legend.not).split(". ")[0].replace(/\.$/, "") + "." : "" }
             // how it was computed, and the rest of the caveat: one click away, so the dock stays short
             Item { width: parent.width; height: 20; visible: !!lg.legend

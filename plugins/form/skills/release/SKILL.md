@@ -9,7 +9,7 @@ FORM tools: `get_project()`, `run_pipeline()`, `request_release()`, `verify_rele
 
 1. Run verify-print first. Every output must be current for the head revision; regenerate anything stale.
 2. `request_release()` checks the gate and returns a link. **You cannot approve.** The user approves in the app's
-   Release stage after reviewing the checks and acknowledging each warning.
+   Make stage (the last tab) after reviewing the checks and acknowledging each warning.
 3. Tell the user, plainly: the revision, what is measured versus assumed, the evidence stage (e.g. "sliced and
    inspected, simulated; no physical test yet"), open warnings, and for multi-part designs the parts list and
    assembly order.

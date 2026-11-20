@@ -9,6 +9,7 @@ import base64
 import http.client
 import json
 import mimetypes
+import os
 import shutil
 import subprocess
 import sys
@@ -171,6 +172,24 @@ class Bridge(QObject):
         return self._rm
 
     reducedMotion = Property(bool, _reduced, constant=True)
+
+    # -- appearance: what the system asks for (it can change while the app runs), and a one-run override ------------
+    def _system_dark(self) -> bool:
+        try:
+            from PySide6.QtCore import Qt
+            from PySide6.QtGui import QGuiApplication
+            return QGuiApplication.styleHints().colorScheme() != Qt.ColorScheme.Light
+        except Exception:
+            return True
+
+    systemDarkChanged = Signal()
+    systemDark = Property(bool, _system_dark, notify=systemDarkChanged)
+
+    def _appearance_override(self) -> str:
+        v = os.environ.get("FORM_APPEARANCE", "").strip().lower()
+        return v if v in ("light", "dark") else ""
+
+    appearanceOverride = Property(str, _appearance_override, constant=True)
 
     def _ffmpeg(self) -> bool:                  # MP4 turntables need it (form/animate.py)
         from ..animate import ffmpeg

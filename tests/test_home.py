@@ -403,6 +403,33 @@ class Archives(Tmp):
         with self.assertRaises(bundle.BundleError):
             bundle.import_conversation(self.st, {"format": "x"})
 
+    def test_conversation_export_carries_thread_ancestry(self):
+        p, c, _ = self.project_with_conversation()
+        store = Conversations(self.st.root)
+        store.rename(c["id"], "Shelf block")
+        b1 = store.fork(c["id"], at_event=2, reason="try a wider one")
+        store.rename(b1["id"], "Wider block")
+        b2 = store.fork(b1["id"], reason="rounded")
+        root = bundle.conversation_json(self.st.root, c["id"])["ancestry"]
+        self.assertEqual((root["thread"], root["parent"], root["ancestors"], root["conversations"]), (c["id"], None, [], 3))
+        self.assertEqual([(r["id"], r["fork_event"], r["fork_reason"]) for r in root["branches"]], [(b1["id"], 2, "try a wider one")])
+        leaf = bundle.conversation_json(self.st.root, b2["id"])["ancestry"]
+        self.assertEqual([r["id"] for r in leaf["ancestors"]], [c["id"], b1["id"]])          # the root first
+        self.assertEqual((leaf["parent"], leaf["fork_event"], leaf["fork_reason"], leaf["branches"]), (b1["id"], 2, "rounded", []))
+        self.assertEqual(leaf["ancestors"][1]["fork_event"], 2)
+        md = bundle.conversation_markdown(self.st.root, b2["id"])
+        self.assertIn(f"- Started as “Shelf block” (`{c['id']}`)", md)
+        self.assertIn(f"- Branched into “Wider block” (`{b1['id']}`) after event 3 (try a wider one)", md)
+        self.assertIn("- This conversation branched from “Wider block” after event 3 (rounded)", md)
+        self.assertIn(f"- Branch from here: “Wider block” (`{b1['id']}`) after event 3 (try a wider one)",
+                      bundle.conversation_markdown(self.st.root, c["id"]))
+        self.assertNotIn("**Thread**", bundle.conversation_markdown(self.st.root, self.project_with_conversation()[1]["id"]))
+        store.delete(b1["id"])                               # a deleted parent is still named, and ends the chain
+        gone = bundle.conversation_json(self.st.root, b2["id"])["ancestry"]["ancestors"]
+        self.assertEqual([(r["id"], r.get("missing")) for r in gone], [(b1["id"], True)])
+        m = bundle.import_conversation(self.st, bundle.conversation_json(self.st.root, b2["id"]))   # still imports
+        self.assertEqual(m["messages"], 1)
+
 
 # ---- What's New and the update channel ----------------------------------------------------------------------------
 

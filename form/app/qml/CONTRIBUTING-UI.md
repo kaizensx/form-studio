@@ -65,14 +65,20 @@ def run(ui):                                   # or several functions named jour
 
 ## Design tokens (`Theme.qml`)
 
+The intent behind them is in `docs/DESIGN.md`. Every colour is a pair (dark, light): `Theme.dark` says which is
+showing, and `FORM_APPEARANCE=light` (or `dark`) forces one for a run, for screenshots and journeys in both. Look at
+every screen you change in both.
+
 | Group | Tokens |
 |---|---|
 | Surfaces, low to high | `well` (inputs) `plate` (the bench) `plate1` (panels) `plate2` (cards, sheets) `plate3` (menus, buttons) `plate4` |
 | Ink | `ink` `ink2` `ink3` `ink4` (primary … muted) |
-| Edges | `rule` 7 % · `rule2` 12 % · `rule3` 20 % (hovered or raised) · `focus` (keyboard ring). Low-opacity white, never a solid grey |
+| Edges | `rule` 7 % · `rule2` 12 % · `rule3` 20 % (hovered or raised) · `focus` (keyboard ring). A low-opacity white (dark) or near-black (light), never a solid grey |
 | Washes over any plate | `washHover` `washPress` `washOn` (selected) · `scrim` behind sheets |
 | Meaning | `datum` (+ `datumHi`, `datumInk`) `blueprint` `amber` `signal` `pass` `clay`; `Theme.evidence(kind)` |
-| Type | `tCap 10` `tFine 11` `tBody 13` `tLead 15` `tH3 18` `tH2 22` `tH1 30` `tHero 44` · weights `wBody 420` `wMedium 520` `wSemi 620` `wBold 700` |
+| The mark and the bench | `markPart` (the logo's arms) · `benchGround` `benchPlate` `benchGrid` `benchEdge` (the 3D bench) · `gleam` (light on a raised top edge) · `lineBase` (what edges and washes are an alpha of) |
+| Space | `s1 4` `s2 8` `s3 12` `s4 16` `s5 20` `s6 24` `s8 32` `s10 40` `s12 48` `s16 64` |
+| Type | `tCap 10` `tFine 11` `tBody 13` `tLead 15` `tH3 18` `tH2 22` `tH1 30` `tHero 44` `tDisplay 52` · weights `wBody 420` `wMedium 520` `wSemi 620` `wBold 700` |
 | Radii | `rXs 4` `rSm 6` `rMd 9` `rLg 14` `rXl 18`. Nested radii are concentric: inner = outer − padding |
 | Control heights | `hSm 24` `hMd 28` `hLg 34` |
 | Sheet widths | `sheetS 480` `sheetM 640` `sheetL 840` `sheetXl 1080` |

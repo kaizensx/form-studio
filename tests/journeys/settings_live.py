@@ -97,3 +97,22 @@ def journey_just_design_from_settings(ui):
     ui.check("fit" in [s["id"] for s in ui.js("Store.stages")], "the Fit stage back")
     ui.settle(600)
     ui.shot("workspace-printing-on")
+
+
+def journey_appearance(ui):
+    """Settings › General › Appearance switches between the dark and the light bench at once."""
+    if ui.js("Bridge.appearanceOverride"):          # FORM_APPEARANCE forces one for this run: the control says so and is off
+        return
+    ui.run_js("Store.openSettings('general')")
+    open_sheet_wait(ui, "settings")
+    seg = ui.item("appearanceSeg")
+    ui.check(ui.js("Theme.dark") is True, "Form Studio starts dark")
+    ui.click_text("Light", within=seg)
+    ui.wait_until(lambda: ui.js("Theme.dark") is False and ui.js("Theme.appearance") == "light", 3, "the light appearance")
+    ui.check(ui.js("String(Theme.plate)") != "#0e1113", "the bench follows")
+    ui.settle(300)
+    ui.shot("settings-appearance-light")
+    ui.click_text("Dark", within=seg)
+    ui.wait_until(lambda: ui.js("Theme.dark") is True, 3, "the dark appearance again")
+    ui.key("Escape")
+    ui.wait_until(lambda: sheet(ui) is None, 4, "the sheet to close")

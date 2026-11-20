@@ -232,6 +232,29 @@ class Conversations:
         rows = self.list(thread=meta.get("thread") or meta["id"], limit=100000)
         return sorted(rows, key=lambda m: (m["id"] != m.get("thread"), m.get("created", 0)))
 
+    def ancestry(self, cid: str) -> dict:
+        """Where this conversation sits in its thread: the chain it was forked from (the root first, each with the
+        event it was forked at and why), and the conversations forked from it. An export carries this, so a branch
+        read on its own still says what it is a branch of."""
+        meta = self.meta(cid)
+        rows = {m["id"]: m for m in self.thread(cid)}
+
+        def row(m: dict) -> dict:
+            return {"id": m["id"], "title": m.get("title") or "", "created": m.get("created"), "parent": m.get("parent"),
+                    "fork_event": m.get("fork_event"), "fork_reason": m.get("fork_reason") or ""}
+        chain, seen, cur = [], {cid}, meta.get("parent")
+        while cur and cur not in seen:               # a parent that was deleted ends the chain: its id is still named
+            seen.add(cur)
+            m = rows.get(cur)
+            chain.append(row(m) if m else {"id": cur, "title": "", "created": None, "parent": None, "fork_event": None,
+                                           "fork_reason": "", "missing": True})
+            cur = m.get("parent") if m else None
+        chain.reverse()
+        branches = sorted((row(m) for m in rows.values() if m.get("parent") == cid), key=lambda r: r.get("created") or 0)
+        return {"thread": meta.get("thread") or cid, "parent": meta.get("parent"), "fork_event": meta.get("fork_event"),
+                "fork_reason": meta.get("fork_reason") or "", "ancestors": chain, "branches": branches,
+                "conversations": len(rows)}
+
     def delete(self, cid: str) -> None:
         with self._lock:
             d = self.dir(cid)

@@ -489,20 +489,20 @@ Item {
             // the bench runs to the horizon and fades into the background; the plate is a slightly lighter slab on it
             Model { source: "#Rectangle"; scale: Qt.vector3d(60, 60, 1); z: -0.09; receivesShadows: true; castsShadows: false; pickable: false
                 materials: CustomMaterial { shadingMode: CustomMaterial.Shaded; fragmentShader: "shaders/ground.frag"
-                    property color uColor: "#1d2327"; property color uFar: Theme.plate; property real uFade: Math.max(vp.plateSize * 1.6, vp.dist * 0.9) } }
+                    property color uColor: Theme.benchGround; property color uFar: Theme.plate; property real uFade: Math.max(vp.plateSize * 1.6, vp.dist * 0.9) } }
             Model { source: "#Rectangle"; scale: Qt.vector3d(vp.plateSize / 100, vp.plateSize / 100, 1); z: -0.05; receivesShadows: true; castsShadows: false; pickable: false
-                materials: PrincipledMaterial { baseColor: "#262d32"; roughness: 1; specularAmount: 0 } }
+                materials: PrincipledMaterial { baseColor: Theme.benchPlate; roughness: 1; specularAmount: 0 } }
             Model { pickable: false; castsShadows: false
                 geometry: LineGeometry { points: {
                     var p = [], h = vp.plateSize / 2
                     for (var x = -h; x <= h + 1e-6; x += 10) { p.push(x, -h, 0, x, h, 0); p.push(-h, x, 0, h, x, 0) }
                     return p } }
                 materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
-                    property color uColor: "#2e363b"; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                    property color uColor: Theme.benchGrid; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
             Model { pickable: false; castsShadows: false
                 geometry: LineGeometry { points: { var h = vp.plateSize / 2; return [-h, -h, 0, h, -h, 0, h, -h, 0, h, h, 0, h, h, 0, -h, h, 0, -h, h, 0, -h, -h, 0] } }
                 materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
-                    property color uColor: "#55616a"; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                    property color uColor: Theme.benchEdge; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
 
             Node {
                 id: design

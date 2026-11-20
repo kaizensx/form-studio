@@ -166,6 +166,41 @@ class Http(Base):
             httpd.server_close()
 
 
+class Boot(Base):
+    """What the opening screen is told: only what has already happened, and at once."""
+
+    def test_boot_state_never_waits_for_the_kernel(self):
+        self.new("Boot dock")
+        st = self.st
+        was, st._kernel_id = st._kernel_id, None
+        started = []
+        real = st.kernel.call
+        st.kernel.call = lambda *a, **k: started.append(a) or real(*a, **k)
+        try:
+            b = st.boot_state()
+            self.assertIsNone(b["kernel"])                              # not asked, so not known: no guess
+            self.assertEqual(started, [], "boot_state must not start or wait for the kernel")
+            self.assertEqual(b["designs"], len(self.ids()))
+            st._kernel_id = "build123d x / OCP y"                       # once the kernel has answered, its own name
+            self.assertEqual(st.boot_state()["kernel"], "build123d x / OCP y")
+        finally:
+            st.kernel.call = real
+            st._kernel_id = was
+
+    def test_boot_route(self):
+        from form.server import make_handler
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.st))
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{httpd.server_address[1]}/api/boot", timeout=10) as r:
+                b = json.loads(r.read())
+            self.assertEqual(set(b), {"kernel", "designs"})
+            self.assertEqual(b["designs"], len(self.ids()))
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
 class Cli(Base):
     def cli(self, *argv):
         from form.__main__ import main

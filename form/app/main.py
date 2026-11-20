@@ -112,6 +112,7 @@ def main(argv=None) -> int:
     bridge = Bridge("127.0.0.1", httpd.server_address[1], cfg["data"]["dir"], __version__)
     bridge.under_test = bool(args.uitest)
     qmlRegisterSingletonInstance(Bridge, "FormNative", 1, 0, "Bridge", bridge)
+    app.styleHints().colorSchemeChanged.connect(lambda *_: bridge.systemDarkChanged.emit())   # "Match the system" follows it live
 
     engine = QQmlApplicationEngine()
     errors: list[str] = []

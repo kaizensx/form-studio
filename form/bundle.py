@@ -281,7 +281,8 @@ def conversation_json(root, cid: str) -> dict:
     from .conversations import Conversations
     store = Conversations(root)
     meta = store.meta(cid)
-    return {"format": CONV_FORMAT, "app": _version(), "exported": _iso(), "meta": meta, "events": store.events(cid)}
+    return {"format": CONV_FORMAT, "app": _version(), "exported": _iso(), "meta": meta, "ancestry": store.ancestry(cid),
+            "events": store.events(cid)}
 
 
 def conversation_markdown(root, cid: str) -> str:
@@ -295,6 +296,21 @@ def conversation_markdown(root, cid: str) -> str:
     if m.get("agent"):
         facts.append(f"agent {m['agent']}" + (f" ({m.get('resolved_model') or m.get('model')})" if m.get("model") else ""))
     lines += ["_" + " · ".join(facts) + "_", ""]
+    anc = store.ancestry(cid)
+    if anc["ancestors"] or anc["branches"]:
+        def named(r):
+            return f"“{r['title']}”" if r.get("title") else "a conversation that is no longer here" if r.get("missing") else "an untitled conversation"
+
+        def at(r):
+            return (f" after event {r['fork_event'] + 1}" if isinstance(r.get("fork_event"), int) else "") + (f" ({r['fork_reason']})" if r.get("fork_reason") else "")
+        lines += ["**Thread**", ""]
+        for n, r in enumerate(anc["ancestors"]):
+            lines.append(f"- Started as {named(r)} (`{r['id']}`)" if n == 0 else f"- Branched into {named(r)} (`{r['id']}`){at(r)}")
+        if anc["ancestors"]:
+            lines.append(f"- This conversation branched from {named(anc['ancestors'][-1])}{at(anc)}")
+        for r in anc["branches"]:
+            lines.append(f"- Branch from here: {named(r)} (`{r['id']}`){at(r)}")
+        lines.append("")
     tools = 0
     for ev in store.events(cid):
         t = ev.get("t")

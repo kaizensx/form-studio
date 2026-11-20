@@ -168,6 +168,8 @@ def make_handler(st: Studio):
             if path == "/api/presets":
                 from . import presets
                 return self._json({"presets": presets.all_presets()})
+            if path == "/api/boot":                      # the opening screen's status line; answers at once
+                return self._json(st.boot_state())
             if path == "/api/studio":
                 return self._json({"env": st.environment(), "projects": st.list(), "chat": chat_mod.status(st.cfg),
                                    "recipes": [r.public() for r in st.recipes.builtins().values()],

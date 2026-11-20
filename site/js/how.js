@@ -18,7 +18,7 @@ export async function initHow() {
   const bar = [
     { name: "New design", rev: "", tag: ["Home", "t-ink"] },
     { name: d.name, rev: "r01", tag: ["Building", "t-datum"] },
-    { name: d.name, rev, tag: ["Prove", "t-datum"] },
+    { name: d.name, rev, tag: ["Review", "t-datum"] },
     { name: d.name, rev, tag: ["Simulated", "t-amber"] },
   ];
   const draw = [home(d), cad(d), checks(d), print(d)];

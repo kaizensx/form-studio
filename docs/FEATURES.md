@@ -203,7 +203,7 @@ each one named as it arrives.
 ## Mesh to editable CAD
 
 Bring an STL, OBJ or 3MF and Form Studio rebuilds it as CAD, then measures how close the result is to the mesh.
-**Make editable** on an imported mesh (Brief › Reference parts), `form reconstruct FILE [--name] [--tolerance MM]
+**Make editable** on an imported mesh (Describe › Reference parts), `form reconstruct FILE [--name] [--tolerance MM]
 [--layer 0|1|2]`, or the MCP tool `reconstruct`. The result is a new design; the original mesh stays beside it in
 blueprint, and the report, the deviation map and every solid are kept in the design's `reconstruction` folder.
 
@@ -233,7 +233,7 @@ progress and takes minutes.
 
 ## Checks and evidence
 
-![Prove: the checks of a revision, each with its evidence](images/prove.webp)
+![Review: the checks of a revision, each with its evidence](images/prove.webp)
 
 Each revision is rebuilt and checked on the solid. The standard checks for a printed part:
 
@@ -443,20 +443,20 @@ sliced by your own slicer and played back; leave it off and none of it gets in t
 
 ### For a printer, or just a 3D model
 
-![A 3D model in Prove: size, solid, mesh and STEP round trip, with no print checks](images/model-prove.webp)
+![A 3D model in Review: size, solid, mesh and STEP round trip, with no print checks](images/model-prove.webp)
 
 Every design has a **purpose**: *For 3D printing*, or *Just a 3D model* for rendering, CAD exchange, CNC, laser
-cutting, moulding or visualisation. New designs start from your answer on Home; change it any time in the Brief or
+cutting, moulding or visualisation. New designs start from your answer on Home; change it any time in Describe or
 from the top bar. `form new … --purpose model --process cnc`, `form purpose <project> model`.
 
 - **A 3D model is checked as a model.** Size, a valid solid, a closed mesh, the STEP round trip, loads and assembly
   checks run; overhangs, bridges, plate contact, the build volume, nozzle walls, the printer-accuracy fit model and the
-  slice do not, and Prove says so. The thinnest feature is compared with the process you name (about 0.8 mm for CNC
+  slice do not, and Review says so. The thinnest feature is compared with the process you name (about 0.8 mm for CNC
   or injection moulding, 2 mm for casting). The pipeline has no Slice step and the Fit stage is hidden.
 - **Its release** holds STEP, STL, 3MF, OBJ and GLB, a four-view sheet and an iso render, with no G-code and no print
   report.
 - **3D printing is optional.** It is off until you turn it on in the launcher or in Settings › General › Set up
-  for. While it is off there is no printer chip, no Fit stage, no slicer install, no print rows in Prove, no Printing
+  for. While it is off there is no printer chip, no Fit stage, no slicer install, no print rows in Review, no Printing
   tab and no print tools for agents (they answer "printing is off; enable it in Settings"). New designs are 3D models.
   People who already printed before this change keep printing: a configured slicer or printer, or designs made for
   printing, turn it on once at the first start.
@@ -493,16 +493,16 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
   choice, at once: Settings, the top bar, the plate and the open design's checks update without a restart.
   `form printers`; MCP `list_printers`, `choose_printer`.
 - **Several plates.** A design whose parts do not fit one plate is laid out part by part on as many plates as needed,
-  each in its own orientation and sliced, with time, filament and cost added up. Prove and the print simulation switch
+  each in its own orientation and sliced, with time, filament and cost added up. Review and the print simulation switch
   between plates. `form plates`; MCP `plate_plan`, `set_part_print`.
 - **Watch it print.** The G-code is read back and played in 3D with a nozzle marker, line-type filters, a per-layer time
   chart and the slicer's own time and filament estimate. Jump to the next bridge or overhang wall.
 - **Copies on a plate:** does N fit, and how they pack.
 - **Cost:** filament, electricity and machine time from the slice and your prices. Form Studio never guesses a price.
 
-![Several plates in Prove, each sliced on its own](images/plates.webp)
+![Several plates in Review, each sliced on its own](images/plates.webp)
 
-- **Open in your slicer, ready to print.** Prove › **Open in Bambu Studio** (or OrcaSlicer, PrusaSlicer and the other
+- **Open in your slicer, ready to print.** Review › **Open in Bambu Studio** (or OrcaSlicer, PrusaSlicer and the other
   slicers) chooses the settings for this part on this printer and says why, one line each, labelled computed or
   heuristic: the orientation finder's first choice, layer height from the nozzle and the part's slopes and size, walls
   and top and bottom layers from its load and thinnest wall, infill and pattern, supports only where overhangs need
@@ -511,7 +511,7 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
   those keys, slices for real so time and grams show first, writes a project 3MF with the plate, the oriented part,
   the settings and the filament, reads the settings back from it and opens it in the slicer. `form slicer-open`;
   MCP `open_in_slicer`.
-- **Every printer you have, compared.** Prove › Every printer slices the design for real on each printer set up in
+- **Every printer you have, compared.** Review › Every printer slices the design for real on each printer set up in
   each installed slicer, with its own process and filament, and shows time, filament and cost side by side with the
   fastest, least filament and cheapest marked. `form compare-printers`; MCP `compare_printers`.
 

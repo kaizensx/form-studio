@@ -13,7 +13,7 @@ Rectangle {
     color: Theme.alpha(tint, kind === "plain" ? 0.04 : 0.085)
     Column {
         id: col; x: 12; y: 10; width: parent.width - 24; spacing: 4
-        Txt { visible: n.title !== ""; text: n.title; width: parent.width; font.weight: 600; color: n.kind === "plain" ? Theme.ink : Qt.lighter(n.tint, 1.25) }
-        Txt { visible: n.text !== ""; text: n.text; width: parent.width; font.pixelSize: 13; color: n.kind === "plain" ? Theme.ink2 : Qt.lighter(n.tint, 1.35); lineHeight: 1.3 }
+        Txt { visible: n.title !== ""; text: n.title; width: parent.width; font.weight: 600; color: n.kind === "plain" ? Theme.ink : (Theme.dark ? Qt.lighter(n.tint, 1.25) : Qt.darker(n.tint, 1.25)) }
+        Txt { visible: n.text !== ""; text: n.text; width: parent.width; font.pixelSize: 13; color: n.kind === "plain" ? Theme.ink2 : (Theme.dark ? Qt.lighter(n.tint, 1.35) : Qt.darker(n.tint, 1.45)); lineHeight: 1.3 }
     }
 }

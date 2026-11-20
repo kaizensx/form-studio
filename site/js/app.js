@@ -39,11 +39,11 @@ export async function initHero() {
 
   // ---------- stage tabs ----------
   const STAGES = [
-    ["brief", "Brief", () => (S.built ? "0/4 measured" : "4 assumed"), ""],
-    ["shape", "Shape", () => (S.built ? `${d.features.length} features` : "—"), ""],
+    ["brief", "Describe", () => (S.built ? "0/4 measured" : "4 assumed"), ""],
+    ["shape", "Design", () => (S.built ? `${d.features.length} features` : "—"), ""],
     ["fit", "Fit", () => (S.built ? `${fitY}% modelled` : "—"), "am"],
-    ["prove", "Prove", () => (S.checked ? `${warns.length} to review` : "—"), "am"],
-    ["release", "Release", () => (S.sliced ? "Ready" : "—"), ""],
+    ["prove", "Review", () => (S.checked ? `${warns.length} to review` : "—"), "am"],
+    ["release", "Make", () => (S.sliced ? "Ready" : "—"), ""],
   ];
   const tabs = $("#tabs");
   tabs.innerHTML = STAGES.map(([id, nm], i) => `<button class="tab" role="tab" id="tab-${id}" aria-controls="panel" data-stage="${id}" aria-selected="false" tabindex="-1"><span class="t"><em>0${i + 1}</em>${nm}</span><span class="u"></span></button>`).join("");
