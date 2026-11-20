@@ -128,7 +128,8 @@ class Builder:
             return p
         p = self.V[i]
         regs = [self.regions[r] for r in self._vreg.get(i, [])]
-        if len(regs) >= 2 and all(r.parametric and r.kind != "bspline" and r.prim is not None for r in regs):
+        if len(regs) >= 2 and all(r.parametric and r.kind != "bspline" and r.prim is not None and
+                                  (EXACT_CURVED or r.kind == "plane") for r in regs):
             q = p.copy()
             for _ in range(8):
                 J = np.array([r.prim.normal(q[None])[0] for r in regs])
@@ -173,7 +174,7 @@ class Builder:
         from OCP.GeomAPI import GeomAPI_IntSS, GeomAPI_ProjectPointOnCurve
         from OCP.gp import gp_Pnt
         kinds = {self.regions[k].kind for k in (r, q)}
-        if "bspline" in kinds or "facet" in kinds:
+        if "bspline" in kinds or "facet" in kinds or (not EXACT_CURVED and kinds != {"plane"}):
             return None
         P = self.V[vs]
         if not closed:
@@ -396,6 +397,7 @@ class Builder:
 
 PERIODIC = ("cylinder", "cone", "torus")
 EXACT_EDGES = True         # boundaries between two fitted surfaces follow their intersection curve (else the mesh)
+EXACT_CURVED = False       # ... also between curved surfaces (off: the feature tree reads turned bases less well)
 
 
 def _circles_only(V, loops, tol) -> bool:

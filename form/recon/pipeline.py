@@ -370,7 +370,7 @@ def layer2(V, F, regions, l1shape, tol, name, out, l1rep, progress=None, deadlin
                         progress=lambda d: say({**d, "fraction": 0.8 * d.get("fraction", 0)}), deadline=deadline)
     except Exception as e:                              # noqa: BLE001
         t = {"report": {"method": "feature tree", "error": f"{type(e).__name__}: {e}"[:300]}}
-    if l1rep.get("exact_edges") and t["report"].get("base") in ("embedded solid", None) and \
+    if l1rep.get("exact_edges") and (not t.get("verified") or t["report"].get("base") in ("embedded solid", None)) and \
             (deadline is None or time.perf_counter() < deadline):
         # the feature search reads turned and stacked bases off the faces of the Layer 1 solid; built with the mesh's
         # own boundaries it sometimes finds a base the exact-edged solid hides: try that solid too, keep the better
