@@ -453,6 +453,26 @@ def main(argv=None):
     rc.add_argument("--tolerance", type=float, default=0.02, help="largest deviation from the mesh for a fitted surface, mm")
     rc.add_argument("--layer", type=int, choices=(0, 1, 2), default=2,
                     help="0: exact solid only, 1: analytic and B-spline faces (beta), 2: feature tree recipe (beta)")
+    ar = sub.add_parser("analyze-reference", help="an imported mesh read like an engineer: sections with dimensions, features "
+                                                  "with sizes, symmetry, walls: analyze-reference <project> <mesh> [--levels JSON]")
+    ar.add_argument("project")
+    ar.add_argument("reference")
+    ar.add_argument("--tolerance", type=float, default=0.05, help="how far a surface may be from the mesh to count as a plane, cylinder... (mm)")
+    ar.add_argument("--levels", help='extra section levels per axis, JSON: {"z": [3.2, 6.5]}')
+    aa = sub.add_parser("analyze-assembly", help="how imported meshes go together and move: analyze-assembly <project> FIXED OTHER... "
+                                                 "(mating surfaces, clearances, slide and turn ranges, couplings)")
+    aa.add_argument("project")
+    aa.add_argument("references", nargs="+")
+    aa.add_argument("--fixed", help="the part that stays still (default: the first)")
+    aa.add_argument("--near", type=float, default=1.0, help="gaps up to this count as mating (mm)")
+    cr = sub.add_parser("compare-reference", help="the design (or one part) against an imported mesh: Hausdorff, worst regions, "
+                                                  "per-feature differences: compare-reference <project> <mesh> [--part P] [--png FILE]")
+    cr.add_argument("project")
+    cr.add_argument("reference")
+    cr.add_argument("--part", help="a part id or label of the design's assembly")
+    cr.add_argument("--tolerance", type=float, default=0.1, help="the limit, mm (0.1 by default for a remodel)")
+    cr.add_argument("--rev", type=int)
+    cr.add_argument("--png", help="also copy the deviation picture here")
     ins = sub.add_parser("instructions", help="assembly instructions as a PDF from the assembly declaration: instructions <project> [--rev N] [--out FILE]")
     ins.add_argument("project")
     ins.add_argument("--rev", type=int)
@@ -519,6 +539,20 @@ def main(argv=None):
                     last[0] = _t.monotonic()
                     print(f"[{100 * float(d.get('fraction', 0)):3.0f}%] {d.get('text', '')}", file=sys.stderr, flush=True)
             _print(st.reconstruct(Path(a.file), name=a.name, tolerance=a.tolerance, layer=a.layer, on_progress=show))
+        elif a.cmd in ("analyze-reference", "analyze-assembly", "compare-reference"):
+            from .remodel import project as rp
+            p = st.load(a.project)
+            if a.cmd == "analyze-reference":
+                _print(rp.analyze_reference(st, p, a.reference, a.tolerance, json.loads(a.levels) if a.levels else None))
+            elif a.cmd == "analyze-assembly":
+                _print(rp.analyze_assembly(st, p, a.references, a.fixed, a.near))
+            else:
+                out = rp.compare_to_reference(st, p, a.reference, a.part, a.tolerance, a.rev)
+                if a.png:
+                    import shutil as _sh
+                    _sh.copyfile(out["image"], a.png)
+                    out["png"] = str(Path(a.png).resolve())
+                _print(out)
         elif a.cmd == "preview":
             p = st.load(a.project)
             pv = st.preview(p, _kv(a.values))

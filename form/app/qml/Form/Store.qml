@@ -710,10 +710,19 @@ QtObject {
         toast("Reconstructing " + file, "Building the solid and fitting surfaces. A large mesh takes a few minutes.")
         return ppost("/reconstruct", { file: file }).then(function (r) {
             var m = r.summary || ({})
-            toast("“" + r.name + "” is editable", "Layer " + m.layer + " · " + F.fmt(m.parametric_area_pct, 0) + "% parametric · "
-                  + F.fmt(m.hausdorff_mm, 4) + " mm from the mesh (computed)")
+            if (m.recipe_verified)
+                toast("“" + r.name + "” is editable", "Layer " + m.layer + " · " + F.fmt(m.parametric_area_pct, 0) + "% parametric · "
+                      + F.fmt(m.hausdorff_mm, 4) + " mm from the mesh (computed)")
+            else                                       // no verified feature recipe: the agent remodel is the next step
+                toast("“" + r.name + "” reached Layer " + m.layer, F.fmt(m.frozen_area_pct, 0) + "% frozen facets, no verified feature "
+                      + "recipe. Rebuild as editable CAD has the agent model it with named features.")
             return reloadStudio().then(function () { open(r.project) })
         }, fail)
+    }
+    // "Rebuild as editable CAD": a conversation that remodels the project's meshes as clean CAD with named features
+    // and Params, compared with the meshes until within tolerance (form/remodel, design_guide "reference_parts")
+    function rebuildAsCad(files) {
+        return ppost("/rebuild_brief", { files: files || [] }).then(function (r) { send(r.message); return r }, fail)
     }
     // Open in <Slicer>: settings chosen for this part, sliced for real, the project opened in the slicer (form/slicer_open.py)
     property bool slicerOpenBusy: false

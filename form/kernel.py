@@ -228,14 +228,124 @@ def _get_near(key: str, recipe_id: str, values: dict, tol: float):
     return _get(key, recipe_id, values, tol)
 
 
-def _edges(shape) -> np.ndarray:
+FEATURE_EDGE_DEG = 25.0     # between two facets, an edge is drawn only where the surface turns more than this
+
+
+def _facet_normals(shape) -> dict:
+    """Faces of a solid that are mesh facets (a planar triangle: three straight edges): {face hash: outward normal}.
+    A mesh brought in as a solid (Layer 0, frozen facets of Layer 1, a design that reads an STL) is made of them."""
+    from OCP.BRepAdaptor import BRepAdaptor_Surface
+    from OCP.GeomAbs import GeomAbs_Plane
+    from OCP.TopAbs import TopAbs_EDGE, TopAbs_REVERSED
+    from OCP.TopExp import TopExp_Explorer
+    out = {}
+    for f in shape.faces():
+        w = f.wrapped
+        s = BRepAdaptor_Surface(w)
+        if s.GetType() != GeomAbs_Plane:
+            continue
+        ex, k = TopExp_Explorer(w, TopAbs_EDGE), 0
+        while ex.More() and k < 4:
+            k += 1
+            ex.Next()
+        if k != 3:
+            continue
+        d = s.Plane().Axis().Direction()
+        n = np.array([d.X(), d.Y(), d.Z()])
+        if w.Orientation() == TopAbs_REVERSED:
+            n = -n
+        out[w.__hash__()] = n
+    return out
+
+
+def _edges(shape, facets: dict | None = None) -> np.ndarray:
+    """The solid's edges as line segments, for drawing. Between two mesh facets an edge is drawn only where the
+    surface turns by more than FEATURE_EDGE_DEG (a crease or a boundary), so a faceted solid reads like a part,
+    not like a wireframe of triangles; every edge of a real CAD face is drawn."""
+    if facets is None:
+        facets = _facet_normals(shape)
+    if len(facets) <= 3:
+        segs = []
+        for e in shape.edges():
+            n = 2 if e.geom_type.name == "LINE" else max(8, min(48, int(e.length / 1.2)))
+            pts = [e.position_at(i / (n - 1)) for i in range(n)]
+            for p, q in zip(pts, pts[1:]):
+                segs.append((p.X, p.Y, p.Z, q.X, q.Y, q.Z))
+        return np.array(segs, dtype=np.float32).reshape(-1, 6)
+    # a faceted solid: walk each edge once with its faces, straight edges by their two ends (fast on 10,000s of edges)
+    from OCP.BRep import BRep_Tool
+    from OCP.BRepAdaptor import BRepAdaptor_Curve
+    from OCP.GCPnts import GCPnts_AbscissaPoint
+    from OCP.GeomAbs import GeomAbs_Line
+    from OCP.TopAbs import TopAbs_EDGE
+    from OCP.TopExp import TopExp_Explorer
+    from OCP.TopoDS import TopoDS
+    cos = np.cos(np.radians(FEATURE_EDGE_DEG))
+    seen = {}                                             # edge (orientation ignored) -> [edge, normals of its facets]
+    for f in shape.faces():
+        n = facets.get(f.wrapped.__hash__())
+        ex = TopExp_Explorer(f.wrapped, TopAbs_EDGE)
+        while ex.More():
+            e = ex.Current()
+            seen.setdefault(e.__hash__(), [e]).append(n)
+            ex.Next()
     segs = []
-    for e in shape.edges():
-        n = 2 if e.geom_type.name == "LINE" else max(8, min(48, int(e.length / 1.2)))
-        pts = [e.position_at(i / (n - 1)) for i in range(n)]
+    for row in seen.values():
+        ns = row[1:]
+        if len(ns) == 2 and ns[0] is not None and ns[1] is not None and float(ns[0] @ ns[1]) > cos:
+            continue                                      # two facets meeting at a gentle angle: no line
+        e = TopoDS.Edge(row[0])
+        if BRep_Tool.Degenerated_s(e):
+            continue
+        c = BRepAdaptor_Curve(e)
+        a, b = c.FirstParameter(), c.LastParameter()
+        if c.GetType() == GeomAbs_Line:
+            n = 2
+        else:
+            n = max(8, min(48, int(GCPnts_AbscissaPoint.Length_s(c) / 1.2)))
+        pts = [c.Value(a + (b - a) * k / (n - 1)) for k in range(n)]
         for p, q in zip(pts, pts[1:]):
-            segs.append((p.X, p.Y, p.Z, q.X, q.Y, q.Z))
-    return np.array(segs, dtype=np.float32)
+            segs.append((p.X(), p.Y(), p.Z(), q.X(), q.Y(), q.Z()))
+    return np.array(segs, dtype=np.float32).reshape(-1, 6)
+
+
+def smooth_facets(P: np.ndarray, T: np.ndarray, crease_deg: float = FEATURE_EDGE_DEG) -> tuple[np.ndarray, np.ndarray]:
+    """Share vertices between triangles that meet at the same point across an edge bending less than crease_deg, so
+    a viewer's vertex normals shade a faceted surface smooth and keep creases sharp. Positions are not moved; only
+    the indexing changes (vertices already shared stay shared)."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    if len(T) < 2:
+        return P, T
+    T = np.asarray(T, dtype=np.int64)
+    q = np.round(np.asarray(P, dtype=np.float64) / 1e-5).astype(np.int64)
+    _, wid = np.unique(q, axis=0, return_inverse=True)
+    wid = wid.reshape(-1)
+    W = wid[T]
+    a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+    n = np.cross(b - a, c - a).astype(np.float64)
+    n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-300)
+    # every triangle edge as (welded a, welded b) -> (triangle, corner of a, corner of b)
+    ka = np.concatenate([W[:, 0], W[:, 1], W[:, 2]])
+    kb = np.concatenate([W[:, 1], W[:, 2], W[:, 0]])
+    va = np.concatenate([T[:, 0], T[:, 1], T[:, 2]])
+    vb = np.concatenate([T[:, 1], T[:, 2], T[:, 0]])
+    tri = np.tile(np.arange(len(T)), 3)
+    lo, hi = np.minimum(ka, kb), np.maximum(ka, kb)
+    swap = ka > kb
+    va2, vb2 = np.where(swap, vb, va), np.where(swap, va, vb)     # va2 at the lower welded id
+    o = np.lexsort((hi, lo))
+    lo, hi, va2, vb2, tri = lo[o], hi[o], va2[o], vb2[o], tri[o]
+    pair = np.flatnonzero((lo[1:] == lo[:-1]) & (hi[1:] == hi[:-1]))
+    t1, t2 = tri[pair], tri[pair + 1]
+    smooth = np.einsum("ij,ij->i", n[t1], n[t2]) > np.cos(np.radians(crease_deg))
+    i0 = np.r_[va2[pair][smooth], vb2[pair][smooth]]
+    i1 = np.r_[va2[pair + 1][smooth], vb2[pair + 1][smooth]]
+    g = coo_matrix((np.ones(len(i0)), (i0, i1)), shape=(len(P), len(P)))
+    k, lab = connected_components(g, directed=False)
+    rep = np.zeros(k, dtype=np.int64)
+    rep[lab] = np.arange(len(P))
+    return np.asarray(P)[rep], lab[T]
 
 
 def _mesh_edges(P, T, angle_deg=30.0) -> np.ndarray:
@@ -325,8 +435,13 @@ def op_view(key, recipe_id, values, tol=0.05, edges=True, dock_mass_g=None):
         g["T"].append(f["T"] + g["n"])
         g["P"].append(f["P"])
         g["n"] += len(f["P"])
-    mesh = [{"feature": k, "positions": _b64(np.concatenate(g["P"]).astype(np.float32)),
-             "indices": _b64(np.concatenate(g["T"]).astype(np.uint32))} for k, g in groups.items()]
+    facets = _model_facets(model)
+    mesh = []
+    for k, g in groups.items():
+        P, T = np.concatenate(g["P"]), np.concatenate(g["T"])
+        if facets:                                   # a faceted solid shades smooth, creases stay sharp
+            P, T = smooth_facets(P, T)
+        mesh.append({"feature": k, "positions": _b64(P.astype(np.float32)), "indices": _b64(T.astype(np.uint32))})
     out = _summary(model, dock_mass_g)
     out["mesh"] = mesh
     if not getattr(model["recipe"], "mesh", False):                  # mesh textures show in the viewer and renders
@@ -347,10 +462,18 @@ def op_view(key, recipe_id, values, tol=0.05, edges=True, dock_mass_g=None):
     if asm.get(model) is not None:
         out["assembly"] = asm.view(model, _b64, _edges)
         if not out["assembly"]["error"]:
-            out["mesh"] = asm.mesh(model, _b64)
+            out["mesh"] = asm.mesh(model, _b64, smooth_facets if facets else None)
     if edges:
-        out["edges"] = _b64(_mesh_edges(*_mesh_arrays(model)) if getattr(model["recipe"], "mesh", False) else _edges(model["shape"]))
+        out["edges"] = _b64(_mesh_edges(*_mesh_arrays(model)) if getattr(model["recipe"], "mesh", False)
+                            else _edges(model["shape"], facets))
     return out
+
+
+def _model_facets(model) -> dict:
+    """The model's mesh facets (see _facet_normals), found once per built model."""
+    if "_facets" not in model:
+        model["_facets"] = _facet_normals(model["shape"])
+    return model["_facets"]
 
 
 def op_summary(key, recipe_id, values, tol=0.05, dock_mass_g=None):
@@ -756,7 +879,8 @@ def op_reference(path, fmt, out):
         a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
         vol = float(np.einsum("ij,ij->i", a, np.cross(b, c)).sum() / 6.0)
         lo, hi = P.min(axis=0), P.max(axis=0)
-        E = _mesh_edges(P, T)
+        E = _mesh_edges(P, T, FEATURE_EDGE_DEG)
+        P, T = smooth_facets(P, T)                   # drawn smooth: no triangle edges, creases stay sharp
         info = {"format": fmt[1:], "bbox": [lo.tolist(), hi.tolist()], "volume_mm3": abs(vol), "solids": None}
     else:
         raise RecipeError(f"Unsupported format {fmt}", "", "Import a STEP (.step/.stp) or STL file.")

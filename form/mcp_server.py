@@ -64,6 +64,9 @@ Rules:
   dimensions read off a photo are "estimated from the photo (scale from <reference>)" and stay assumed until measured.
   Sketches from Form Studio carry structured JSON: it is authoritative over the picture; stated dimensions override
   drawn lengths. STEP/STL: import_reference. PDF drawings: read_document. Download only files the person gave you.
+- Meshes to make editable or understand: never embed them as the design. design_guide(topic="reference_parts"):
+  analyze_reference (and analyze_assembly for several parts) -> plan named features -> build123d with Params ->
+  compare_to_reference -> refine until within tolerance (0.1 mm by default for a remodel).
 - If the message has a "Purpose:" line, respect it: "just a 3D model" means no slicing and no print talk.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...) and design_examples -> plan_design -> create_design(plan=...) -> look at the sheet and
@@ -71,6 +74,20 @@ Rules:
 """
 
 S: dict[str, Any] = {"studio": None, "bench": {"url": None}, "lock": threading.Lock()}
+
+
+MEASURE_EXAMPLE = ('Each point is [x, y, z] in millimetres in the design frame. Examples: measure(project="p1", '
+                   'from_point=[0, -55.75, 0], to_point=[0, 55.75, 0]) for the distance between two points; '
+                   'measure(project="p1", at=[-18, -43.25, 4]) for what is at one point (face, edge, a hole\'s diameter). '
+                   'For a reference mesh, use analyze_reference instead.')
+
+
+def _measure_usage(from_point, to_point) -> str:
+    """What was wrong with a measure call, said so the next call is right."""
+    if (from_point is None) != (to_point is None):
+        given = "from_point" if from_point is not None else "to_point"
+        return f"measure got {given} but not the other point: give both from_point and to_point, or only at."
+    return "measure needs a point: at=[x, y, z] (what is there), or from_point and to_point (the distance between them)."
 
 
 def studio() -> Studio:
@@ -261,7 +278,8 @@ def build() -> MCPServer:
         """Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
         holder, mechanism...). topic="core" (default) returns the contract for a design written as code, the rules,
         the staged workflow and a complete example that builds. Other topics, for complex designs: surfacing,
-        mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicable when purpose="model").
+        mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicable when purpose="model"),
+        reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine).
         They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
         textures. Then design_examples for a close exemplar, and create_design."""
         from . import design_guide as dg
@@ -1066,6 +1084,61 @@ def build() -> MCPServer:
         return {**out, "evidence": "computed (Form Studio's kernel compared the result with the mesh)",
                 "next": "get_project to read the design; get_design_source to edit the recipe or add features."}
 
+    # ---- reference parts an agent rebuilds as clean CAD (form/remodel) ------------------------------------------
+    @mcp.tool(annotations=RO, structured_output=False)
+    async def analyze_reference(project: str, reference: str, tolerance: float = 0.05, levels: dict | None = None,
+                                ctx: Context = None) -> list:
+        """Read an imported mesh (STL, OBJ, 3MF) like an engineer before modelling it again as clean CAD
+        (design_guide topic "reference_parts"). Returns pictures of dimensioned sections in the three principal
+        planes at several levels (look at them), and JSON: principal axes, levels of the flat faces (steps), section
+        loops with sizes and vector outlines, and features with sizes: holes, bosses, openings (pockets, slots,
+        cutouts, with count and pitch when repeated), plates, walls, ribs, rails and grooves, ramps with angles,
+        draft, fillets and chamfers with radii and widths, round edges, detail areas (text, embossing, knurls),
+        symmetry and wall thicknesses. reference: the mesh's file name in the project (import_reference first).
+        tolerance (mm): how far a surface may be from the mesh to count as a plane, cylinder... levels: extra section
+        levels per axis, e.g. {"z": [3.2, 6.5], "y": [-40]}. Evidence: computed on the mesh as given. Never embed
+        the mesh as the design: plan features from this, write build123d with Params, then compare_to_reference."""
+        st = studio()
+        from .remodel import project as rp
+        out = await _run(lambda: rp.analyze_reference(st, st.load(project), reference, tolerance, levels))
+        act(project, "look", f"Analysing the reference part {out.get('reference', reference)}", ctx)
+        imgs = [Image(path=i["path"]) for i in out.get("images", [])]
+        return imgs + [json.dumps(out, default=str, ensure_ascii=False)]
+
+    @mcp.tool(annotations=RO)
+    async def analyze_assembly(project: str, references: list[str], fixed: str | None = None, near: float = 1.0,
+                               ctx: Context = None) -> dict:
+        """How several imported meshes go together and move, measured in the positions they were given. references:
+        the mesh files (the part that stays still first, or name it in fixed). Returns mating surfaces (facing,
+        area, gap, where), clearances per pair, each part's travel against the fixed one along +/-X, Y, Z and about
+        the axes of round faces they share (free distance before touching, distance past bumps such as detents and
+        flexing arms, the obstacles met and where), the joints this implies (slide axis and range, hinge axis,
+        origin and range) and couplings between moving parts (a slide meshing with a part that turns: rack and gear
+        or cam with the ratio; a slide on a leaning face: a ramp with the lift per mm), plus a one-paragraph summary.
+        Rigid parts: it does not know springs or gravity; say so. near (mm): gaps up to this count as mating."""
+        st = studio()
+        from .remodel import project as rp
+        out = await _run(lambda: rp.analyze_assembly(st, st.load(project), references, fixed, near))
+        act(project, "look", "Working out how the reference parts move together", ctx)
+        return out
+
+    @mcp.tool(annotations=RO, structured_output=False)
+    async def compare_to_reference(project: str, reference: str, part: str | None = None, tolerance: float = 0.1,
+                                   rev: int | None = None, ctx: Context = None) -> list:
+        """Compare the design (or one part of its assembly) with an imported mesh, to iterate a remodel until it is
+        within tolerance (default 0.1 mm for a remodel; say which you used). Returns a picture (the design coloured
+        by its distance to the mesh, and the mesh by its distance to the design) and JSON: two-sided Hausdorff, mean,
+        99th percentile, the worst regions by where they are (words and coordinates, the nearest feature of the
+        reference analysis, and whether the design has extra or missing material there) and per-feature
+        differences (the design's diameter or radius next to the mesh's). part: a part id or label of the design's
+        assembly, so a multi-part design is compared part by part. Run analyze_reference first for feature names.
+        Evidence: computed on the design's tessellation against the mesh."""
+        st = studio()
+        from .remodel import project as rp
+        out = await _run(lambda: rp.compare_to_reference(st, st.load(project), reference, part, tolerance, rev))
+        act(project, "look", f"Comparing the design with {out['reference']}" + (f" ({part})" if part else ""), ctx)
+        return [Image(path=out["image"]), json.dumps(out, default=str, ensure_ascii=False)]
+
     @mcp.tool(annotations=RO)
     async def freecad_macro(project: str) -> dict:
         """Write a FreeCAD macro (.FCMacro) next to the current STEP export. Run it in FreeCAD to rebuild the part
@@ -1120,7 +1193,7 @@ def build() -> MCPServer:
             if at is not None:
                 return analysis.probe(st, p, at, rev)
             if from_point is None or to_point is None:
-                raise StudioError("Give from_point and to_point, or at.", "Each is [x, y, z] in millimetres.")
+                raise StudioError(_measure_usage(from_point, to_point), MEASURE_EXAMPLE)
             return analysis.measure(st, p, from_point, to_point, rev)
         return await _run(go)
 
