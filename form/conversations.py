@@ -3,7 +3,8 @@
     <data>/.conversations/<id>/meta.json       id, title, project, agent, model, effort, session, pinned, cost,
                                                thread, parent, fork_event, fork_reason, projects, …
     <data>/.conversations/<id>/events.jsonl    one event per line: user, start, text, tool, result, act, end, error
-    <data>/.conversations/<id>/files/          attachments, copied in (the only folder the agent may read)
+    <data>/.conversations/<id>/files/          attachments, cloned or copied in (the only folder the agent may read)
+    <data>/.conversations/<id>/sources.json    where attachments fetched from a link came from (url, licence, author)
 
 Conversations are linked, never scattered. Every conversation belongs to a thread (the id of the one it all started
 from; an old conversation without one is its own thread). A fork copies a conversation's events up to a point into a
@@ -28,11 +29,51 @@ from . import fsutil
 
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 PDF_EXT = {".pdf"}
-CAD_EXT = {".step", ".stp", ".stl", ".3mf"}
+CAD_EXT = {".step", ".stp", ".stl", ".3mf", ".obj"}
+MESH_EXT = {".stl", ".3mf", ".obj"}
 SKETCH_SUFFIX = ".sketch.json"        # a sketch drawn in Form Studio (form/sketch.py): structured geometry, read as JSON
-MAX_ATTACHMENT = 60_000_000
+MAX_ATTACHMENT = 2_000_000_000      # dense scans and sculpts are often hundreds of MB; a local file is never read whole
+WARN_ATTACHMENT = 500_000_000       # above this the person is told it will be slow
 ID_RE = re.compile(r"[0-9a-f]{12}")
 EVENT_KINDS = ("user", "start", "text", "tool", "result", "act", "end", "error", "ask", "answer", "suggest")
+
+
+
+def _clone(src: Path, dst: Path) -> bool:
+    """A copy-on-write clone: instant, no extra space, and later changes to either file stay apart."""
+    import sys
+    try:
+        if sys.platform == "darwin":
+            import ctypes
+            import ctypes.util
+            libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+            return libc.clonefile(os.fsencode(src), os.fsencode(dst), 0) == 0
+        if sys.platform.startswith("linux"):
+            import fcntl
+            with open(src, "rb") as a, open(dst, "wb") as b:
+                try:
+                    fcntl.ioctl(b.fileno(), 0x40049409, a.fileno())        # FICLONE
+                    return True
+                except OSError:
+                    pass
+            dst.unlink(missing_ok=True)
+    except (OSError, AttributeError):
+        pass
+    return False
+
+
+def place(src: Path, dst: Path) -> str:
+    """Put src at dst without reading it into memory: "cloned", "linked" (a hard link on the same disk) or "copied"
+    (streamed). Returns which."""
+    if _clone(src, dst):
+        return "cloned"
+    try:
+        os.link(src, dst)
+        return "linked"
+    except OSError:
+        pass
+    shutil.copyfile(src, dst)
+    return "copied"
 
 
 _last = [0.0]
@@ -380,8 +421,14 @@ class Conversations:
         return max(ms, key=lambda m: m.get("updated", 0)) if ms else None
 
     # -- attachments ---------------------------------------------------------
-    def attach(self, cid: str, src: Path | None = None, name: str | None = None, data: bytes | None = None) -> dict:
-        """Copy a file into the conversation's folder. Returns {id, name, kind, size, file}."""
+    def attach(self, cid: str, src: Path | None = None, name: str | None = None, data: bytes | None = None,
+               source: dict | None = None, move: bool = False) -> dict:
+        """Put a file into the conversation's folder. Returns {id, name, kind, size, file} (+ mesh, warning, source).
+
+        A local file is placed without reading it into memory: a copy-on-write clone where the disk supports it
+        (APFS, Btrfs, XFS), else a hard link on the same disk, else a streamed copy. move=True takes the file over
+        (a download already in the conversation's folder). source: where it came from (url, site, licence, author),
+        kept beside the conversation so the agent and Describe can say it."""
         self.meta(cid)
         if data is None:
             if src is None:
@@ -389,10 +436,12 @@ class Conversations:
             src = Path(src).expanduser()
             if not src.is_file():
                 raise ConversationError(f"{src.name} is not a file Form Studio can read.")
-            if src.stat().st_size > MAX_ATTACHMENT:
-                raise ConversationError(f"{src.name} is larger than {MAX_ATTACHMENT // 1_000_000} MB.")
-        elif len(data) > MAX_ATTACHMENT:
-            raise ConversationError(f"That file is larger than {MAX_ATTACHMENT // 1_000_000} MB.")
+            size = src.stat().st_size
+        else:
+            size = len(data)
+        if size > MAX_ATTACHMENT:
+            what = src.name if data is None else "That file"
+            raise ConversationError(f"{what} is larger than {MAX_ATTACHMENT // 1_000_000_000} GB.")
         raw = Path(name or (src.name if src else "file")).name
         if raw.lower().endswith(SKETCH_SUFFIX):           # a double suffix: keep it whole so the kind survives
             base, ext = raw[:-len(SKETCH_SUFFIX)], SKETCH_SUFFIX
@@ -401,15 +450,48 @@ class Conversations:
         stem = re.sub(r"[^A-Za-z0-9_\-]+", "-", base).strip("-")[:60] or "file"
         kind = kind_of(stem + ext)
         if kind == "file":
-            raise ConversationError(f"{raw}: attach images, PDFs, STEP/STL/3MF parts or a sketch.",)
+            raise ConversationError(f"{raw}: attach images, PDFs, STEP/STL/3MF/OBJ parts or a sketch.",)
         d = self.files_dir(cid)
         aid = uuid.uuid4().hex[:6]
         target = d / f"{aid}-{stem}{ext}"
+        how = "written"
         if data is not None:
             target.write_bytes(data)
+        elif move:
+            os.replace(src, target)
+            how = "moved"
         else:
-            shutil.copyfile(src, target)
-        return {"id": aid, "name": raw, "kind": kind, "size": target.stat().st_size, "file": target.name}
+            how = place(src, target)
+        rec = {"id": aid, "name": raw, "kind": kind, "size": target.stat().st_size, "file": target.name, "placed": how}
+        if ext in MESH_EXT:
+            from . import meshprep
+            q = meshprep.quick(target)
+            rec["mesh"] = {k: q[k] for k in ("triangles", "class")}
+            if q.get("warning"):
+                rec["warning"] = q["warning"]
+        elif size > WARN_ATTACHMENT:
+            rec["warning"] = f"{size / 1e6:.0f} MB is a very large file; reading it will take a while."
+        if source:
+            src_rec = {k: v for k, v in source.items() if v not in (None, "", [])}
+            with self._lock:
+                f = self.dir(cid) / "sources.json"
+                try:
+                    known = json.loads(f.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    known = {}
+                known[target.name] = src_rec
+                tmp = f.with_suffix(".json.tmp")
+                tmp.write_text(json.dumps(known, indent=1, ensure_ascii=False), encoding="utf-8")
+                fsutil.replace(tmp, f)
+            rec["source"] = src_rec
+        return rec
+
+    def sources(self, cid: str) -> dict:
+        """{attachment file: {url, site, title, author, licence, ...}} for files that came from a link."""
+        try:
+            return json.loads((self.dir(cid) / "sources.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
 
     def attachment(self, cid: str, file: str) -> Path:
         d = self.files_dir(cid).resolve()
@@ -426,6 +508,10 @@ class Conversations:
             if not re.fullmatch(r"[0-9a-f]{6}", str(aid)):
                 continue
             for f in sorted(d.glob(f"{aid}-*")):
-                out.append({"id": aid, "name": f.name[7:], "kind": kind_of(f.name), "size": f.stat().st_size, "file": f.name})
+                rec = {"id": aid, "name": f.name[7:], "kind": kind_of(f.name), "size": f.stat().st_size, "file": f.name}
+                src = self.sources(cid).get(f.name)
+                if src:
+                    rec["source"] = src
+                out.append(rec)
                 break
         return out

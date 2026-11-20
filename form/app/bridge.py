@@ -10,6 +10,7 @@ import http.client
 import json
 import mimetypes
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -21,17 +22,33 @@ from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtQml import QJSValue
 
 
+# a conversation attachment: the engine takes the file by its path (cloned or linked into the conversation), so a
+# 500 MB scan is never read by the app or sent over the loopback socket
+_ATTACH = re.compile(r"/conversations/[0-9a-f]{12}/attach(\?.*)?")
+
+
 class _Call(QRunnable):
-    def __init__(self, bridge: "Bridge", rid: int, method: str, path: str, body, raw: bytes | None = None):
+    def __init__(self, bridge: "Bridge", rid: int, method: str, path: str, body, raw: bytes | None = None,
+                 raw_file: str | None = None):
         super().__init__()
         self.b, self.rid, self.method, self.path, self.body, self.raw = bridge, rid, method, path, body, raw
+        self.raw_file = raw_file              # a local file streamed as the body, read on this worker thread
 
     def run(self):
+        f = None
         try:
             conn = http.client.HTTPConnection(self.b.host, self.b.port, timeout=900)
             headers, data = {}, None
             if self.method == "POST":
-                if self.raw is not None:
+                if self.raw_file is not None:
+                    try:
+                        f = open(self.raw_file, "rb")
+                    except OSError as e:
+                        self.b.reply.emit(self.rid, False, {"message": f"Could not read that file: {e}", "status": 0})
+                        return
+                    data = f
+                    headers = {"Content-Type": "application/octet-stream", "Content-Length": str(os.fstat(f.fileno()).st_size)}
+                elif self.raw is not None:
                     data, headers = self.raw, {"Content-Type": "application/octet-stream"}
                 else:
                     data, headers = json.dumps(self.body if self.body is not None else {}).encode(), {"Content-Type": "application/json"}
@@ -56,6 +73,9 @@ class _Call(QRunnable):
                                                      "hint": f"Restart Form Studio. Your projects are saved on disk. ({e})", "status": 0})
             except RuntimeError:
                 pass
+        finally:
+            if f is not None:
+                f.close()
 
 
 def _reduced_motion() -> bool:
@@ -134,13 +154,15 @@ class Bridge(QObject):
 
     @Slot(int, str, QUrl)
     def upload(self, rid: int, path: str, file: QUrl):
-        """POST a local file's bytes (project archives)."""
-        try:
-            raw = Path(file.toLocalFile()).read_bytes()
-        except OSError as e:
-            self.reply.emit(rid, False, {"message": f"Could not read that file: {e}", "status": 0})
+        """POST a local file (attachments, project archives). Nothing is read on the interface thread: a conversation
+        attachment is handed to the engine by its path, anything else is streamed from a worker thread."""
+        local = file.toLocalFile()
+        if _ATTACH.fullmatch(path):
+            from urllib.parse import parse_qs, urlsplit
+            name = (parse_qs(urlsplit(path).query).get("name") or [""])[0]
+            self.pool.start(_Call(self, rid, "POST", path.split("?", 1)[0], {"paths": [local], "names": [name]}))
             return
-        self.pool.start(_Call(self, rid, "POST", path, None, raw))
+        self.pool.start(_Call(self, rid, "POST", path, None, raw_file=local))
 
     @Slot(QUrl, result=str)
     def dataUrl(self, file: QUrl) -> str:
