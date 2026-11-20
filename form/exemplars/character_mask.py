@@ -17,6 +17,7 @@ from form.sketch2d import Sketch
 
 META = {
     "title": "Character mask with magnet eyes",
+    "category": "organic",
     "tags": ["mask", "cowl", "character", "cosplay", "costume", "organic", "sculpted", "subd",
              "subdivision", "nurbs", "cage", "handles", "hybrid", "magnets", "magnet", "eyes", "lenses", "split",
              "texture", "textured", "web", "relief", "sketch", "constraints", "wearable", "head"],

@@ -179,7 +179,7 @@ class CreatorTools(unittest.TestCase):
     """Every MCP tool that returns a new project id links it to the conversation. A new creator tool that does not
     fails here."""
     CREATES = ("st.create(", "st.create_design", "st.duplicate_project", "st.reconstruct", "reconstruct_parts",
-               "concepts_mod.create", "concepts_mod.pick", "bundle.import_file")
+               "concepts_mod.create", "concepts_mod.pick", "bundle.import_file", "cand.run")
 
     def _tools(self) -> dict:
         tree = ast.parse((ROOT / "form" / "mcp_server.py").read_text(encoding="utf-8"))

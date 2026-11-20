@@ -1,6 +1,6 @@
 """Kernel worker process and its supervisor.
 
-The server never imports OCCT. It talks to one long-lived worker over a pipe;
+The server never imports OCCT. It talks to long-lived workers over pipes (a KernelPool of them);
 a timeout or crash kills the worker and the next call starts a fresh one.
 """
 from __future__ import annotations
@@ -115,3 +115,168 @@ class Kernel:
                     self._proc = self._conn = None
             finally:
                 self._lock.release()
+
+    def alive(self) -> bool:
+        return self._proc is not None and self._proc.is_alive()
+
+
+def default_workers(cfg: dict | None = None) -> int:
+    """How many kernel processes may run at once: FORM_KERNEL_WORKERS, or [kernel] workers in studio.toml, else one
+    per performance core up to 4 (each worker holds its own OCCT and model cache, a few hundred MB)."""
+    import os
+    for v in (os.environ.get("FORM_KERNEL_WORKERS"), ((cfg or {}).get("kernel") or {}).get("workers")):
+        try:
+            if v not in (None, "", "auto"):
+                return max(1, min(16, int(v)))
+        except (TypeError, ValueError):
+            pass
+    n = 0
+    try:                                                   # macOS: performance cores, not the efficiency ones
+        import subprocess
+        out = subprocess.run(["sysctl", "-n", "hw.perflevel0.physicalcpu"], capture_output=True, text=True, timeout=2)
+        n = int(out.stdout.strip() or 0)
+    except Exception:
+        n = 0
+    if n <= 0:
+        n = (os.cpu_count() or 2) // 2
+    return max(1, min(4, n))
+
+
+class KernelPool:
+    """Several kernel workers, so independent builds run at the same time instead of queueing behind one process.
+
+    Same interface as Kernel (call, stop, restarts, last_failure). A call goes to an idle worker; a call with a `key`
+    (a built model's cache key) prefers the worker that built that key last, because each worker keeps its own cache
+    of built models: a view followed by a summary, a selection or an export of the same design does not build it
+    twice. Workers start on demand, so one call at a time never starts more than one. A worker that times out or
+    crashes is restarted on its own; the others keep their caches."""
+
+    AFFINITY = 64                                      # keys remembered per worker
+
+    def __init__(self, size: int | None = None, cfg: dict | None = None):
+        self.size = size or default_workers(cfg)
+        self._cv = threading.Condition()
+        self._workers: list[Kernel] = []
+        self._busy: set[int] = set()
+        self._keys: list[list[str]] = []
+
+    @property
+    def restarts(self) -> int:
+        return sum(w.restarts for w in self._workers)
+
+    @property
+    def last_failure(self):
+        fails = [w.last_failure for w in self._workers if w.last_failure]
+        return max(fails, key=lambda f: f["when"]) if fails else None
+
+    def status(self) -> dict:
+        with self._cv:
+            return {"size": self.size, "started": sum(1 for w in self._workers if w.alive()), "busy": len(self._busy),
+                    "restarts": self.restarts}
+
+    def _add(self) -> int:
+        self._workers.append(Kernel())
+        self._keys.append([])
+        return len(self._workers) - 1
+
+    def _pick(self, key: str | None) -> int:
+        """Index of the worker for this call, marked busy; waits while every worker is busy."""
+        with self._cv:
+            while True:
+                idle = [i for i in range(len(self._workers)) if i not in self._busy]
+                own = [i for i, ks in enumerate(self._keys) if key and key in ks]
+                if own and own[-1] in idle:
+                    i = own[-1]
+                    break
+                if own and not idle and len(self._workers) >= self.size:
+                    self._cv.wait()                    # the worker that has it is busy, and so is every other
+                    continue
+                warm = [j for j in idle if self._workers[j].alive()]
+                if warm:                               # an idle worker that is already running
+                    i = warm[0]
+                    break
+                if len(self._workers) < self.size:
+                    i = self._add()
+                    break
+                if idle:
+                    i = idle[0]
+                    break
+                self._cv.wait()
+            self._busy.add(i)
+            if key:
+                ks = self._keys[i]
+                if key in ks:
+                    ks.remove(key)
+                ks.append(key)
+                del ks[:-self.AFFINITY]
+            return i
+
+    def _done(self, i: int) -> None:
+        with self._cv:
+            self._busy.discard(i)
+            self._cv.notify_all()
+
+    def call(self, op: str, timeout: float = 60, on_progress=None, **kwargs):
+        """Run one kernel op on a free worker (see Kernel.call)."""
+        key = kwargs.get("key") if isinstance(kwargs.get("key"), str) else None
+        i = self._pick(key)
+        try:
+            return self._workers[i].call(op, timeout=timeout, on_progress=on_progress, **kwargs)
+        except KernelFailure as e:
+            if e.info.get("kind") in ("timeout", "crash"):
+                with self._cv:
+                    self._keys[i].clear()          # the restarted worker starts with an empty cache
+            raise
+        finally:
+            self._done(i)
+
+    def warm(self, n: int | None = None, timeout: float = 120) -> int:
+        """Start up to n workers (default: all) at once, so a batch of builds does not pay for the CAD kernel's import
+        one worker after another. Returns how many are running."""
+        n = min(self.size, n or self.size)
+        with self._cv:
+            while len(self._workers) < n:
+                self._add()
+            cold = [i for i in range(n) if i not in self._busy and not self._workers[i].alive()]
+            self._busy.update(cold)
+
+        def ping(i):
+            try:
+                self._workers[i].call("ping", timeout=timeout)
+            except Exception:
+                pass
+            finally:
+                self._done(i)
+        ts = [threading.Thread(target=ping, args=(i,), daemon=True, name=f"form-kernel-warm-{i}") for i in cold]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join(timeout + 5)
+        return sum(1 for w in self._workers if w.alive())
+
+    def map(self, op: str, calls: list[dict], timeout: float = 120) -> list:
+        """Run op once per kwargs dict in calls, in parallel over the pool; results in order. A failed call's slot
+        holds its KernelFailure (returned, not raised: the caller decides what a failure means)."""
+        from concurrent.futures import ThreadPoolExecutor
+        out: list = [None] * len(calls)
+
+        def one(j):
+            try:
+                out[j] = self.call(op, timeout=timeout, **calls[j])
+            except KernelFailure as e:
+                out[j] = e
+        if calls:
+            with ThreadPoolExecutor(max_workers=max(1, min(self.size, len(calls)))) as ex:
+                list(ex.map(one, range(len(calls))))
+        return out
+
+    def stop(self):
+        """End every worker now (calls still waiting on one fail as a crash); the next call starts fresh ones."""
+        for w in list(self._workers):
+            try:
+                w.stop()
+            except Exception:
+                pass
+        with self._cv:
+            self._keys = [[] for _ in self._workers]
+            self._cv.notify_all()

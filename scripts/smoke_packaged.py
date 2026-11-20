@@ -59,6 +59,13 @@ async def mcp_steps(exe: Path, env: dict) -> None:
             res, text = await call("brief_presets", preset="bathroom mount")
             step("brief_presets by the agent's words", "FAIL" if res.is_error else "PASS", text[:80].replace("\n", " "))
 
+            res, text = await call("design_examples", query="")       # exemplars ship as source files (form.spec)
+            try:
+                n = len(json.loads(text).get("examples", []))
+            except ValueError:
+                n = 0
+            step("design_examples lists the exemplars", "PASS" if not res.is_error and n >= 40 else "FAIL", f"{n} exemplars")
+
             url = "https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf"
             import urllib.request
             try:                                             # the step tests the app over https, not that site's uptime

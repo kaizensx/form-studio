@@ -177,14 +177,40 @@ each one named as it arrives.
   STL, OBJ, GLB and the renders carry it, labelled "mesh texture; STEP carries the smooth body". The six-view sheet
   of a textured design includes a zoomed tile of the texture, where it can be seen.
 - **Guides by topic and worked examples.** `design_guide(topic=...)` covers surfacing, mechanisms, organic forms,
-  texture, aesthetics, and design for printing (only for designs that are printed). `design_examples` serves thirteen
-  complete exemplar designs (a carbon full-face helmet, an ergonomic mouse, a planetary gearbox, a hinged case with a snap latch,
-  an ergonomic handle, a quick-release clamp, a knurled knob, a spiral-ribbed vase, a belt idler, a cable-chain link,
-  an Arca-type camera plate, a drone arm and a table lamp) to the agent only; they never appear as projects.
-- **A design bench.** `tests/design_bench` holds about twenty briefs scored automatically (staging, builds, planned
-  features present, craft and form metrics, integrity and, for product classes, the silhouette); a design that does
-  not read as its class, or has a folded skin or a broken-through wall, cannot pass. The exemplars are built and
-  checked against it in the test suite.
+  texture, aesthetics, and design for printing (only for designs that are printed). `design_examples` serves 43
+  complete exemplar designs to the agent only (they never appear as projects), in seven categories: mechanical (a
+  linear slide, a shaft coupler, a pillow block, a cam follower, a gusseted bracket, a 2020 corner bracket, a belt
+  idler, a quick-release clamp, a camera plate, a drone arm, a cable-chain link, an action-camera mount), consumer
+  products (an ergonomic mouse, an earbud case, a game controller, a headphone hook, a desk organiser, a soap dish, a
+  wall hook, a lens cap, a table lamp), organic forms (a character cowl, a prop mask, a creature horn, an ergonomic
+  handle), textured parts (a knurled knob, a hex-relief planter, a perforated lampshade, a woven basket, a fluted cup,
+  a bike grip, a spiral-ribbed vase), assemblies (a planetary gearbox, a hinged case, a ratchet wrench, a bottle and
+  cap, a robot head), helmets (carbon full-face, open-face, sci-fi prop) and enclosures (an electronics box with
+  insert bosses and a seal lip, a sliding battery box, a handheld shell). Search is ranked (BM25 over names, tags,
+  techniques and lessons), filters by category, and `technique="..."` returns just the block of build() that does
+  one thing well.
+- **Robust kernel operations.** `craft.safe_union`, `safe_cut`, `safe_intersect`, `safe_loft`, `safe_fillet`,
+  `safe_chamfer`, `safe_shell` and `safe_sweep` retry the way OCCT needs (fuzzy booleans, shapes repaired with
+  ShapeFix and face merging, loft sections re-seamed and resampled, ruled and pairwise lofts, smaller fillets,
+  thinner walls) and note what they gave up; `craft.repair` and `craft.inspect` fix and report a shape. They never
+  hide a real problem: a gap is closed only under 0.05 mm, a cut that removes nothing fails, a section with a hole is
+  never filled.
+- **Build diagnosis.** A design that does not build comes back with the operation that failed, the feature and the
+  line, the likely cause read from the shapes on that line (an invalid operand and its faults, how far apart two
+  parts are, how many edges each loft section has, a fillet wider than the shortest edge, the solids per stage) and
+  ranked fixes, in plain words; the kernel's own text is kept for reference (evidence: heuristic).
+- **Candidates in parallel.** `build_candidates` builds two to six versions of a risky design or step at once, one
+  kernel worker each, scores them (valid with the declared solids, brief targets, critique quality and the product
+  class silhouette, robustness, and editability: the share of parameters that build at both ends of their range)
+  and keeps the best as the design. Concepts (`propose_concepts`) are built in parallel too, and the ones that build
+  are kept when others fail. The kernel runs as a pool of workers (`[kernel] workers`, default one per performance
+  core up to 4).
+- **A design bench.** `tests/design_bench` holds 40 briefs scored automatically (staging, builds, planned features
+  present, craft and form metrics, integrity and, for product classes, the silhouette); a design that does not read
+  as its class, or has a folded skin or a broken-through wall, cannot pass. The exemplars are built and checked
+  against it in the test suite. `scripts/design_eval.py` runs the evaluation briefs through a real agent and records
+  first-build and final-build rates and scores; `scripts/bench_timing.py` times the bench on one worker and on the
+  pool.
 
 ## Assemblies
 
@@ -478,7 +504,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 90 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 91 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
@@ -490,7 +516,13 @@ and what to do.
 - **An agent per conversation.** Each conversation picks its agent, model and reasoning effort: Claude Code, Codex,
   Gemini CLI, Cursor CLI, OpenCode, Qwen Code or GitHub Copilot CLI, a model API, a local model, or a provider you
   added. Model names carry their version ("Opus 5.5"), taken from what the agent reports, in the picker and on every
-  reply.
+  reply. Effort follows the task: a mesh to make editable, a mechanism, a styled form, a texture or several parts
+  runs at high effort, a new design at least medium; it is never lowered (`[chat] auto_effort`).
+- **Agents told their sandbox.** Each agent's instructions say what it cannot do in a Form Studio run (Codex: a
+  read-only shell with no network; Claude: no shell) and which Form Studio tools to use instead, so no steps are spent
+  on `python`, `curl` or `cat`.
+- **Usage limits, calmly.** An agent that reaches its plan's limit is named with when it can work again and what is
+  kept; the CLI's upgrade and purchase links are never shown.
 - **Many conversations.** Tied to a design or free-standing; searchable, pinnable, renamable. Opening a conversation
   opens its design. The conversation column is resizable and hides with Ctrl/⌘ J.
 - **One request, one design.** A conversation keeps every design it made or touched, in order, with its role (made,

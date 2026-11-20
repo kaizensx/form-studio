@@ -12,6 +12,8 @@ from form.recipes.base import Feature, Param, Recipe, RecipeError, Stage
 
 META = {
     "title": "Carbon full-face helmet",
+    "category": "helmet",
+    "product_class": "helmet_fullface",
     "tags": ["helmet", "motorcycle", "full-face", "shell", "organic", "texture", "textured", "carbon", "twill",
              "vents", "visor", "spoiler", "loft", "mesh texture", "styled", "wearable", "head", "trim"],
     "techniques": ["craft.helmet_fullface (head size -> guide curves -> sections)", "craft.checked_body (loft with "

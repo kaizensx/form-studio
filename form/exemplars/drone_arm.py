@@ -9,6 +9,7 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Drone arm",
+    "category": "mechanical",
     "tags": ["drone", "arm", "quadcopter", "motor mount", "loft", "taper", "lightweight", "lightening", "structure",
              "carbon", "rib", "fpv"],
     "techniques": ["craft.loft_sections along X of superellipse sections (tapered beam)", "bolt pattern from the motor "

@@ -11,6 +11,7 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Quick-release clamp",
+    "category": "mechanical",
     "tags": ["clamp", "quick-release", "cam", "lever", "tube", "collar", "bike", "seatpost", "mechanism", "split",
              "over-centre"],
     "techniques": ["split collar with a closing gap", "eccentric cam head with a cross pin and a bolt slot",

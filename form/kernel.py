@@ -85,13 +85,22 @@ def _build(recipe_id: str, values: dict, tol: float):
     v = recipe.validate(values)
     t0 = time.perf_counter()
     craft_notes = _craft_notes()                   # clear what an earlier build left
+    from . import build_diag
     try:
         stages = recipe.build(v)
-    except RecipeError:
-        raise
-    except Exception as e:
-        raise RecipeError(f"The kernel could not build this shape: {_where(e, recipe)}", "",
-                          "Step back toward the last value that built, then change one parameter at a time.") from e
+    except RecipeError as e:                       # the design's, form.craft's or parts.checked's own words + the line
+        try:
+            err = build_diag.wrap(e, recipe)
+        except Exception:
+            raise e
+        raise err from e
+    except Exception as e:                         # the kernel's text, read into a cause, the feature and fixes
+        try:
+            err = build_diag.error(e, recipe)
+        except Exception:
+            err = RecipeError(f"The kernel could not build this shape: {_where(e, recipe)}", "",
+                              "Step back toward the last value that built, then change one parameter at a time.")
+        raise err from e
     final = stages[-1].shape
     t_build = time.perf_counter() - t0
     craft_notes = _craft_notes()                   # fallbacks form.craft took (a smaller fillet, a ruled loft)
@@ -187,15 +196,26 @@ def _stage_report(stages, want: int) -> None:
     trail = ", ".join(f"{f} {n}" for f, n, _ in counts)
     for i, (f, n, vol) in enumerate(counts):
         if n == 0 or vol <= 1e-9:
-            raise RecipeError(f"The {f} step left no solid (a boolean failed and returned nothing). Solids per stage: "
+            raise _CountError(stages, want, f"The {f} step left no solid (a boolean failed and returned nothing). Solids per stage: "
                               f"{trail}", f, "Overlap the shapes by 0.2 mm instead of touching, move the cut off a loft "
                               "seam or a tangent face, or simplify the shape added in this step.")
     changed = [counts[i][0] for i in range(1, len(counts)) if counts[i][1] != counts[i - 1][1]]
     f = changed[-1] if changed else counts[0][0]
-    raise RecipeError(f"The result is {counts[-1][1]} solid(s); this design declares {want}. Solids per stage: {trail} "
+    raise _CountError(stages, want, f"The result is {counts[-1][1]} solid(s); this design declares {want}. Solids per stage: {trail} "
                       f"(read it to find the step that split or fused a part; the count last changed at {f}).", f,
                       "Parts that should stay separate touch or overlap (leave a gap), a cut split a body in two, or a "
                       "piece added does not reach the body it should join.")
+
+
+def _CountError(stages, want, message, feature, hint):
+    """A solid-count failure as a BuildError whose diagnosis lists each stage's solids, volume and validity."""
+    from . import build_diag
+    try:
+        d = build_diag.stage_counts(stages, want)
+        d["summary"] = message
+    except Exception:
+        d = {}
+    return build_diag.BuildError(message, feature, hint, [], d)
 
 
 def _craft_notes() -> list:
@@ -965,3 +985,5 @@ from .critique import KERNEL_OPS as _CRITIQUE_OPS  # noqa: E402  (design critiqu
 OPS.update(_CRITIQUE_OPS)
 from .appearance import KERNEL_OPS as _APPEARANCE_OPS  # noqa: E402  (material zones for photos)
 OPS.update(_APPEARANCE_OPS)
+from .candidates import KERNEL_OPS as _CANDIDATE_OPS  # noqa: E402  (several candidates built and scored)
+OPS.update(_CANDIDATE_OPS)

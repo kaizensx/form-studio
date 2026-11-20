@@ -78,6 +78,8 @@ class ClaudeParser(Parser):
 
 
 class Claude(Adapter):
+    sandbox = ("you have no shell and cannot write files: only Form Studio's tools, web search and web fetch where they "
+               "are on, and Read for the person's attached files.")
     id, label, cli = "claude", "Claude Code", "claude"
     install_hint = "Install Claude Code (claude) to chat here. Everything else works without it."
     verified = "run on this Form Studio version"

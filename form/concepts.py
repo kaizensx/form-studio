@@ -89,9 +89,13 @@ def create(st, name: str, concepts: list, brief: str = "", group: str | None = N
     if len(free) < len(concepts):
         raise StudioError(f"A group holds at most {MAX_TOTAL} concepts.", "Let the person pick, or start a new group.")
     built, failed = [], []
-    for c, letter in zip(concepts, free):
+    early = _prebuild(st, concepts)                 # every concept built at the same time, one kernel worker each
+    for i, (c, letter) in enumerate(zip(concepts, free)):
         c = c if isinstance(c, dict) else {}
         title, why = _clean(c.get("title"), 80) or f"Concept {letter}", _clean(c.get("rationale"), 300)
+        if i in early:                               # it did not build: report it, the others go on
+            failed.append({"letter": letter, "title": title, "error": early[i]})
+            continue
         try:
             if not str(c.get("source") or "").strip():
                 raise StudioError("This concept has no source code.")
@@ -113,13 +117,56 @@ def create(st, name: str, concepts: list, brief: str = "", group: str | None = N
         built.append({"project": p["id"], "letter": letter, "title": title, "rationale": why, "trashed": False})
     if not built:
         raise StudioError("None of the concepts built.",
-                          "; ".join(f"{f['letter']} ({f['title']}): {f['error'].get('message')}" for f in failed)[:1500],
+                          "; ".join(f"{f['letter']} ({f['title']}): {f['error'].get('message')}" for f in failed)[:1500]
+                          + " Fix the one closest to building (each error names the line and a repair) and propose "
+                            "again; the concepts are built in parallel, so a failing one costs no extra time.",
                           failed=failed)
     g["members"] += built
-    g["failed"] = g.get("failed", []) + failed
+    g["failed"] = g.get("failed", []) + [{k: v for k, v in f.items()} for f in failed]
     _write(st, g)
-    st.activity(built[0]["project"], "concepts", f"{len(built)} concepts for {g['name']}", group=g["id"], by=by)
-    return {**board(st, g["id"]), "failed": failed}
+    st.activity(built[0]["project"], "concepts", f"{len(built)} concepts for {g['name']}"
+                + (f" ({len(failed)} did not build: {', '.join(f['letter'] for f in failed)})" if failed else ""),
+                group=g["id"], by=by)
+    out = {**board(st, g["id"]), "failed": failed}
+    if failed:
+        out["next"] = (f"{len(built)} of {len(built) + len(failed)} concepts built and are on the board. The others "
+                       "failed with the diagnosis shown: fix one and add it with propose_concepts(group=\"" + g["id"]
+                       + "\", concepts=[...]), or leave the person to pick from what built.")
+    return out
+
+
+def _prebuild(st, concepts: list) -> dict:
+    """Build every concept's source in parallel over the kernel pool, before any project is made; the builds land in
+    the workers' caches, so create_design then finds them. Returns {index: error} for those that did not build."""
+    from concurrent.futures import ThreadPoolExecutor
+    from .studio import H
+    errors, jobs = {}, []
+    for i, c in enumerate(concepts):
+        c = c if isinstance(c, dict) else {}
+        if not str(c.get("source") or "").strip():
+            continue                               # reported by the loop with its own message
+        try:
+            vals = {k: float(v) for k, v in (c.get("values") or {}).items()}
+            rid = st._load_design(str(c["source"]), str(c.get("language") or "python"))
+            jobs.append((i, rid, vals))
+        except StudioError as e:
+            errors[i] = e.public()
+        except (TypeError, ValueError):
+            continue                               # bad values: the loop reports them
+
+    def one(job):
+        i, rid, vals = job
+        try:
+            full = {**st.recipes[rid].defaults(), **vals}
+            st._check_assembly(rid, full)
+            st._k("summary", key="pv-" + H(rid, vals or {}), recipe_id=rid, values=full, tol=0.1, timeout=180)
+        except StudioError as e:
+            errors[i] = e.public()
+    if hasattr(st.kernel, "warm") and len(jobs) > 1:
+        st.kernel.warm(len(jobs))
+    with ThreadPoolExecutor(max_workers=max(1, min(len(jobs), getattr(st.kernel, "size", 1)))) as ex:
+        list(ex.map(one, jobs))
+    return errors
 
 
 def _numbers(st, p: dict, compute: bool) -> dict | None:

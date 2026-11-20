@@ -9,6 +9,7 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Cable-chain link",
+    "category": "mechanical",
     "tags": ["cable chain", "drag chain", "chain", "link", "snap", "pin", "joint", "3d printer", "mechanism"],
     "techniques": ["joggled side plates (inner at the pin end, outer at the socket end)", "snap pin with a lead-in",
                    "socket with clearance", "joggle sized to clear the next link", "crossbars"],
