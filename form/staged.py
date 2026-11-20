@@ -43,7 +43,16 @@ COMPLEX = {
 
 
 def _words(text: str) -> set:
-    return set(re.findall(r"[a-z][a-z\-]+", (text or "").lower()))
+    """Words of a brief, with hyphenated words also split ("drag-chain" -> drag-chain, drag, chain) and a plural
+    "s" dropped ("snaps" -> snap)."""
+    out = set()
+    for w in re.findall(r"[a-z][a-z\-]+", (text or "").lower()):
+        for t in [w, *w.split("-")]:
+            if t:
+                out.add(t)
+                if len(t) > 3 and t.endswith("s") and not t.endswith("ss"):
+                    out.add(t[:-1])
+    return out
 
 
 def assess(brief: str = "", source: str = "") -> dict:

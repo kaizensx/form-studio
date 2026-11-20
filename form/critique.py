@@ -5,8 +5,7 @@ critique(st, project) returns
   * metrics computed from the B-rep and its tessellation:
       smallest_fillet_mm     smallest radius among blend faces (partial cylinders and tori: fillets and rounds)
       sharp_edge_fraction    share of edge length where faces meet at a crease of more than 25 deg
-      symmetry               share of the volume shared with its mirror image in X and in Y (exact booleans; a
-                             surface-sample estimate when they fail)
+      symmetry               share of the surface that lands on the surface again when mirrored in X and in Y
       proportions            bounding-box ratios and the nearest classic ratio (1, sqrt 2, golden, 2, ...)
       surface_mix            area share of planar, cylindrical/conical and free-form surfaces
       sliver_faces           faces under 0.5 mm2 (often a sign of a boolean that nearly missed)
@@ -57,7 +56,7 @@ def _surface_kind(face) -> tuple[str, float | None, bool]:
     return "free", None, False
 
 
-def _edge_angles(shape, max_edges=5000):
+def _edge_angles(shape, max_edges=1500):
     """[(length, crease angle deg)] for edges shared by two faces (sampled when there are many)."""
     from OCP.BRep import BRep_Tool
     from OCP.BRepAdaptor import BRepAdaptor_Curve
@@ -129,38 +128,27 @@ def _samples(P, T, n=4000, seed=1):
     return (1 - s)[:, None] * a[idx] + (s * (1 - r2))[:, None] * b[idx] + (s * r2)[:, None] * c[idx]
 
 
-def symmetry_brep(shape, lo, hi) -> dict | None:
-    """Volume shared by the solid and its mirror image (in the YZ plane, then the XZ plane, through the bounding-box
-    centre), as a share of its volume: 1.0 = perfectly symmetric. Exact booleans; None when they fail."""
-    from build123d import Plane, mirror
-    ctr = [(a + b) / 2 for a, b in zip(lo, hi)]
-    out = {}
-    try:
-        for name, normal in (("mirror_x", (1, 0, 0)), ("mirror_y", (0, 1, 0))):
-            m = mirror(shape, about=Plane(origin=tuple(ctr), z_dir=normal))
-            inter = shape & m
-            v = float(inter.volume) if inter is not None else 0.0
-            out[name] = round(min(1.0, v / shape.volume), 3)
-        return out
-    except Exception:
-        return None
-
-
 def symmetry(P, T, lo, hi) -> dict:
-    """Share of surface samples that land within 1 % of the diagonal of the surface when mirrored in X (YZ plane
-    through the bounding-box centre) and in Y."""
-    S = _samples(P, T, 3000)
+    """Share of the surface that lands on the surface again when mirrored in the YZ plane (mirror_x) and the XZ plane
+    (mirror_y) through the bounding-box centre. Dense area-weighted samples and a k-d tree (scipy, which build123d
+    depends on); the tolerance is 1 % of the diagonal or 2.5 sample spacings, whichever is larger. Never a boolean,
+    so it cannot stall on a heavy free-form solid."""
+    from scipy.spatial import cKDTree
+    a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+    area = float((np.linalg.norm(np.cross(b - a, c - a), axis=1) / 2).sum())
     diag = float(np.linalg.norm(np.asarray(hi) - np.asarray(lo)))
-    tol = max(0.01 * diag, 0.2)
+    n = int(min(200_000, max(20_000, area / max(diag * 0.004, 0.05) ** 2)))
+    S = _samples(P, T, n)
+    spacing = (area / n) ** 0.5
+    tol = max(0.01 * diag, 2.5 * spacing, 0.2)
+    tree = cKDTree(S)
+    probe = S[:: max(1, n // 8000)]
     ctr = (np.asarray(lo) + np.asarray(hi)) / 2
     out = {}
     for ax, name in ((0, "mirror_x"), (1, "mirror_y")):
-        M = S.copy()
+        M = probe.copy()
         M[:, ax] = 2 * ctr[ax] - M[:, ax]
-        d = np.full(len(M), np.inf)
-        for i in range(0, len(M), 500):                          # nearest sample, in blocks
-            blk = M[i:i + 500]
-            d[i:i + 500] = np.sqrt(((blk[:, None, :] - S[None, :, :]) ** 2).sum(-1)).min(1)
+        d, _ = tree.query(M, k=1)
         out[name] = round(float((d <= tol).mean()), 3)
     return out
 
@@ -207,7 +195,7 @@ def op_critique_metrics(key, recipe_id, values, tol=0.05):
         "fillet_faces": len(radii),
         "sharp_edge_fraction": None if sharp is None else round(sharp, 3),
         "edges_sampled": len(edges),
-        "symmetry": (None if mesh_design else symmetry_brep(shape, lo, hi)) or symmetry(P, T, lo, hi),
+        "symmetry": symmetry(P, T, lo, hi),
         "proportions": {"bbox_mm": [round(b - a, 2) for a, b in zip(lo, hi)], "ratios": ratios},
         "surface_mix": {k: round(v / total, 3) for k, v in kinds.items() if v} if not mesh_design else None,
         "sliver_faces": slivers,
