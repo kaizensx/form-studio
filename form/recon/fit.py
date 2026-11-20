@@ -141,12 +141,57 @@ def _circle2(x, y):
     return cx, cy, r
 
 
+def _dangles(th, ph):
+    """d a / d theta and d a / d phi for the axis a = _dir(theta, phi)."""
+    return (np.array([math.cos(th) * math.cos(ph), math.cos(th) * math.sin(ph), -math.sin(th)]),
+            np.array([-math.sin(th) * math.sin(ph), math.sin(th) * math.cos(ph), 0.0]))
+
+
+def _jacobian(kind, x, P):
+    """The analytic Jacobian of Prim.dist with respect to the packed parameters (o, theta, phi, sizes...).
+
+    Vectorised over the points; scipy's finite differences cost (n + 1) evaluations per step and made the fits the
+    slowest part of segmentation."""
+    x = np.asarray(x, dtype=np.float64)
+    o = x[:3]
+    d = P - o
+    if kind == "sphere":
+        ln = np.maximum(np.linalg.norm(d, axis=1), 1e-300)
+        return np.c_[-d / ln[:, None], -np.sign(x[3]) * np.ones(len(P))]
+    th, ph = x[3], x[4]
+    a = _dir(th, ph)
+    dth, dph = _dangles(th, ph)
+    s = d @ a
+    radial = d - s[:, None] * a
+    rho = np.maximum(np.linalg.norm(radial, axis=1), 1e-300)
+    e = radial / rho[:, None]
+    if kind == "cylinder":
+        g_a = -s[:, None] * e
+        return np.c_[-e, g_a @ dth, g_a @ dph, -np.sign(x[5]) * np.ones(len(P))]
+    if kind == "cone":
+        r, al = x[5], x[6]
+        ca, ta = math.cos(al), math.tan(al)
+        g_o = (-e + ta * a[None, :]) * ca
+        g_a = (-s[:, None] * e - ta * d) * ca
+        return np.c_[g_o, g_a @ dth, g_a @ dph, -ca * np.ones(len(P)), -(rho - r) * math.sin(al) - s * ca]
+    if kind == "torus":
+        R = abs(x[5])
+        q = np.maximum(np.hypot(rho - R, s), 1e-300)
+        cr, cs = (rho - R) / q, s / q
+        g_o = -cr[:, None] * e - cs[:, None] * a[None, :]
+        g_a = -(cr * s)[:, None] * e + cs[:, None] * d
+        return np.c_[g_o, g_a @ dth, g_a @ dph, -cr * np.sign(x[5]), -np.sign(x[6]) * np.ones(len(P))]
+    raise ValueError(kind)
+
+
 def _refine(kind, x0, P, unpack):
     from scipy.optimize import least_squares
+
     def res(x):
         return unpack(x).dist(P)
+    jac = (lambda x: _jacobian(kind, x, P)) if kind in ("cylinder", "cone", "sphere", "torus") else "2-point"
     try:
-        sol = least_squares(res, x0, method="lm", max_nfev=60 * (len(x0) + 1), xtol=1e-12, ftol=1e-12)
+        sol = least_squares(res, x0, jac=jac, method="lm", max_nfev=12 * (len(x0) + 1), xtol=1e-10, ftol=1e-10)
         return _finish(unpack(sol.x), P)
     except Exception:
         return _finish(unpack(np.asarray(x0)), P)
