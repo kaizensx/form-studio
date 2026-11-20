@@ -19,7 +19,7 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "form" / "adapters" / "blender_scene.py"), "form/adapters")]
 binaries, hidden = [], []
 for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfium2", "pypdfium2_raw",
-            "bd_warehouse", "py_gearworks"):     # parts libraries ship inside the app
+            "bd_warehouse", "py_gearworks", "manifold3d"):     # parts libraries and mesh booleans ship inside the app
     try:
         d, b, h = collect_all(pkg)
         datas += d; binaries += b; hidden += h

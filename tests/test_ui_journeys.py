@@ -134,6 +134,9 @@ class Journeys(unittest.TestCase):
     def test_assembly_chain(self):         # a joint slider moves the whole chain; exploded follows the tree
         self.journey("assembly_chain.py")
 
+    def test_drag_edit(self):               # Cmd-drag a face: the parameter behind it changes, live, with its impact
+        self.journey("drag_edit.py")
+
     def test_inspect(self):                 # measuring on parts in every view, annotations, colours and materials
         self.journey("inspection.py")
 

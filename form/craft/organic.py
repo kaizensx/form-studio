@@ -675,3 +675,129 @@ def grip_sections(length: float | None = None, hand_breadth: float | None = None
         r = D / 2 * (tp + (1 - tp) * max(0.0, bump))
         out.append({"z": Lg * u, "a": r, "b": r * f, "n": 2.15, "seam": 180.0})
     return out, None
+
+
+# ── sculpted bodies with engineered features (hybrid): cages, magnets, split lines ───────────────────────────────
+# The skin comes from a subdivision cage (form.craft.subd: dome_cage, apply_handles, sculpted_shell) or from a
+# sculpted mesh made into a surface body (form.meshbody.organic_solid). What a person fits, fastens or prints flat
+# is exact CAD on top of it: magnet pockets on bosses that grow from the inside, a split plane for printing, openings
+# from a constrained sketch (form.sketch2d).
+
+def surface_point(shape, origin, direction):
+    """Where a ray from origin along direction first meets the shape: (point (x, y, z), outward unit normal)."""
+    import numpy as np
+    from build123d import Face, Vector
+    from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
+    from OCP.gp import gp_Dir, gp_Lin, gp_Pnt
+    inter = BRepIntCurveSurface_Inter()
+    inter.Init(shape.wrapped, gp_Lin(gp_Pnt(*map(float, origin)), gp_Dir(*map(float, direction))), 1e-7)
+    best = None
+    while inter.More():
+        if inter.W() > 1e-6 and (best is None or inter.W() < best[0]):
+            p = inter.Pnt()
+            best = (inter.W(), (p.X(), p.Y(), p.Z()), inter.Face())
+        inter.Next()
+    need(best is not None, "surface_point: the ray misses the body", "Aim the ray at the body.", ["origin", "direction"])
+    _, p, f = best
+    nv = Face(f).normal_at(Vector(*p))
+    n = np.array([nv.X, nv.Y, nv.Z])
+    return tuple(p), tuple(n / (np.linalg.norm(n) or 1))
+
+
+def _cyl(at, axis, d: float, h: float, back: float = 0.0):
+    """A cylinder of diameter d from at - back along axis to at + h along axis."""
+    import numpy as np
+    from build123d import Cylinder, Plane, Pos
+    ax = np.asarray(axis, float)
+    ax = ax / (np.linalg.norm(ax) or 1)
+    base = np.asarray(at, float) - back * ax
+    pl = Plane(origin=tuple(base), z_dir=tuple(ax))
+    return pl.location * Pos(0, 0, (h + back) / 2) * Cylinder(d / 2, h + back)
+
+
+def magnet_boss(body, at, axis, magnet_d: float, magnet_t: float, wall: float = 1.6, clearance: float = 0.15,
+                floor: float = 0.6):
+    """A round boss grown from the inside of a thin skin at `at` (a point on the inside surface) along `axis` (into
+    the hollow), tall enough for a magnet pocket with `floor` mm left under it, and the pocket cut in it from the top:
+    (body with the boss fused, the pocket cut). Returns (body, top centre of the pocket)."""
+    from .surfaces import cut, fuse
+    d = num(magnet_d, "magnet_d", lo=1, hi=40)
+    t = num(magnet_t, "magnet_t", lo=0.5, hi=20)
+    h = t + floor + 0.4
+    boss = _cyl(at, axis, d + 2 * wall, h, back=1.5)
+    body = fuse(body, boss)
+    import numpy as np
+    top = np.asarray(at, float) + h * np.asarray(axis, float) / (np.linalg.norm(axis) or 1)
+    body = cut(body, magnet_pocket(top, [-x for x in axis], d, t, clearance))
+    return body, tuple(top)
+
+
+def magnet_pocket(at, axis, magnet_d: float, magnet_t: float, clearance: float = 0.15):
+    """The tool for a magnet pocket: diameter magnet_d + 2 x clearance, depth magnet_t + clearance, from the face
+    point `at` going along `axis` (into the material)."""
+    return _cyl(at, axis, magnet_d + 2 * clearance, magnet_t + clearance, back=2.0)
+
+
+def split_with_magnets(body, x: float, spots, magnet_d: float, magnet_t: float, clearance: float = 0.15,
+                       boss_wall: float = 2.0):
+    """Split a hollow body at the plane X = x into a front (x > plane) and a back, joined by magnets: at each spot
+    ((y, z) on the plane, inside the wall) a boss grows across the split from the inside surface, and both halves get
+    a pocket from the split face. Returns (front, back)."""
+    import numpy as np
+    from build123d import Box, Pos
+    from .surfaces import cut, fuse
+    d = num(magnet_d, "magnet_d", lo=1, hi=40)
+    t = num(magnet_t, "magnet_t", lo=0.5, hi=20)
+    bb = body.bounding_box()
+    big = 4 * max(bb.size.X, bb.size.Y, bb.size.Z)
+    for (y, z) in spots:
+        # a boss on the plane, reaching from the wall a little inward, as long as two pockets plus floors
+        c = np.array([x, y, z], float)
+        r = d / 2 + boss_wall
+        boss = _cyl(c, (1, 0, 0), 2 * r, (t + 1.2) * 2, back=0)
+        boss = Pos(-(t + 1.2), 0, 0) * boss
+        body = fuse(body, boss)
+    front = body & (Pos(x + big / 2, 0, 0) * Box(big, big, big))
+    back = body & (Pos(x - big / 2, 0, 0) * Box(big, big, big))
+    for (y, z) in spots:
+        front = cut(front, magnet_pocket((x, y, z), (1, 0, 0), d, t, clearance))
+        back = cut(back, magnet_pocket((x, y, z), (-1, 0, 0), d, t, clearance))
+    return one(front), one(back)
+
+
+def web_heightmap(path, spokes: int = 24, rings: int = 14, line: float = 0.010, sag: float = 0.35,
+                  size=(2048, 1024)) -> str:
+    """A grayscale heightmap of a web relief (radial spokes from a pole, rings sagging between them) for
+    MeshTexture("heightmap", projection="spherical", axis=<the pole>): u is the angle round the pole, v the angle
+    from it. Raised lines on a flat ground; written to path (PNG) once, returned."""
+    import os
+    import numpy as np
+    from PIL import Image
+    if os.path.isfile(path):
+        return str(path)
+    W, H = size
+    u = (np.arange(W) + 0.5) / W
+    v = (np.arange(H) + 0.5) / H
+    U, Vv = np.meshgrid(u, v)
+    k = U * spokes
+    du = np.abs(k - np.round(k)) / spokes                       # distance (in u) to the nearest spoke
+    frac = k - np.floor(k)
+    ring_v = Vv * rings + sag * np.sin(np.pi * frac)               # rings droop between spokes, like a web
+    dv = np.abs(ring_v - np.round(ring_v)) / rings
+    near = np.minimum(du * 2 * np.pi * np.sin(np.clip(Vv * np.pi, 0.05, np.pi)), dv * np.pi)
+    hmap = np.clip(1 - near / line, 0, 1) ** 0.6
+    hmap[Vv < 0.012] = 1.0                                       # the hub
+    Image.fromarray((hmap * 255).astype(np.uint8)).save(path)
+    return str(path)
+
+
+def split_spots(body, x: float, heights, magnet_d: float, boss_wall: float = 2.0, sink: float = 1.2):
+    """Where magnets across a split at X = x can sit on a hollow body: at each height z, on both sides (+Y and -Y),
+    just inside the wall (a boss of magnet_d + 2 x boss_wall sunk `sink` mm into it). From the body's middle the ray
+    meets the inside surface first. Returns [(y, z), ...] for split_with_magnets."""
+    out = []
+    for z in heights:
+        for sy in (1, -1):
+            at, _ = surface_point(body, (x, 0, z), (0, sy, 0))
+            out.append((at[1] - sy * (magnet_d / 2 + boss_wall - sink), z))
+    return out
