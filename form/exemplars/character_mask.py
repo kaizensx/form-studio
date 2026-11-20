@@ -17,7 +17,7 @@ from form.sketch2d import Sketch
 
 META = {
     "title": "Character mask with magnet eyes",
-    "tags": ["mask", "helmet", "cowl", "character", "cosplay", "costume", "organic", "sculpted", "subd",
+    "tags": ["mask", "cowl", "character", "cosplay", "costume", "organic", "sculpted", "subd",
              "subdivision", "nurbs", "cage", "handles", "hybrid", "magnets", "magnet", "eyes", "lenses", "split",
              "texture", "textured", "web", "relief", "sketch", "constraints", "wearable", "head"],
     "techniques": ["craft.subd.dome_cage (an analytic head form fitted as a grid cage)",
