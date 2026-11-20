@@ -6,7 +6,7 @@ purchase more credits or try again at 9:34 PM"). Form Studio shows none of that 
     from form.agents import limits
     card = limits.usage_limit("You've hit your usage limit. Upgrade to Pro (...) or try again at 9:34 PM.", "Codex")
     card == {"kind": "usage_limit", "agent": "Codex", "until": "9:34 PM",
-             "message": "Codex has reached its usage limit until 9:34 PM.", "hint": "..."}
+             "message": "Codex has reached its usage limit; it can work again at 9:34 PM. ...", "hint": "..."}
 """
 from __future__ import annotations
 
@@ -51,7 +51,8 @@ def usage_limit(text: str, agent: str, saved: list[str] | None = None, others: l
     if not is_usage_limit(text):
         return None
     when = until(text)
-    msg = f"{agent} has reached its usage limit" + (f" until {when}" if when else " for now") + "."
+    # "can work again at <time>": the app's card (Talk.qml, Store.usageLimit) reads the time from these words
+    msg = f"{agent} has reached its usage limit" + (f"; it can work again at {when}" if when else " for now") + "."
     kept = "This conversation is saved"
     if saved:
         kept += "; so are the designs made before it stopped (" + ", ".join(saved[:4]) + (", ..." if len(saved) > 4 else "") + ")"

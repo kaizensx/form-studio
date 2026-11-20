@@ -103,8 +103,16 @@ def system_prompt(cfg: dict, project: str | None, adapter=None) -> str:
     """The instructions every in-app agent gets: its sandbox (said plainly, so it does not spend steps finding out),
     the project on the page, and whether this person prints at all."""
     from . import purpose
-    note = ("This person has a 3D printer; new designs are for printing unless they say otherwise." if purpose.printing(cfg) else
-            "This person does not 3D print: new designs are 3D models (pass purpose=\"model\"), and never suggest a printer or a slicer.")
+    if not purpose.printing(cfg):
+        note = ("This person does not 3D print: new designs are 3D models (pass purpose=\"model\"), and never suggest "
+                "a printer or a slicer.")
+    elif purpose.default(cfg) == "print":
+        note = ("This person has a 3D printer and chose, in Settings, that new designs are made for printing: they "
+                "are for printing unless the request says it is just a 3D model.")
+    else:
+        note = ("New designs are 3D models (purpose=\"model\") unless the request says they are for printing (then "
+                "pass purpose=\"print\"). For context only: this person also has a 3D printer, so do not bring up "
+                "printing, slicing or filament unless they ask.")
     box = getattr(adapter, "sandbox", "") or SANDBOX
     return PROMPT.format(project=project or "none (start a new one if asked)", printing=note, sandbox=box)
 
