@@ -75,7 +75,7 @@ Rules:
 
 ## Tools at a glance
 
-90 tools. Read-only tools never change a project.
+91 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -86,7 +86,7 @@ Rules:
 | [`design_guide`](#design_guide) | read-only | Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter, holder, mechanism...). |
 | [`design_brief`](#design_brief) | changes | Stage 1 of a complex design: store the structured brief before any geometry. |
 | [`plan_design`](#plan_design) | changes | Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id). |
-| [`design_examples`](#design_examples) | read-only | Complete, high-quality example designs (build123d + form.craft) to learn construction from: a carbon full-face helmet, an ergonomic mouse, a planetary gearbox, a hinged case with a snap latch, an ergonomic handle, a knurled knob, a spiral-ribbed vase and more. |
+| [`design_examples`](#design_examples) | read-only | Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of them: mechanical parts (linear slide, shaft coupler, pillow block, cam follower, gearbox), consumer products (mouse, earbud case, bottle and cap, game controller), organic forms (mask, horn, handle), textured parts (knurl, hex relief, woven, fluted), assemblies (hinged case, ratchet wrench, robot head), helmets (full-face, open-face, sci-fi prop) and enclosures (electronics box with bosses, sliding battery box, handheld shell). |
 | [`critique`](#critique) | changes | Stage 5: look closely and measure. |
 | [`read_document`](#read_document) | read-only | Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). |
 | [`fetch_link`](#fetch_link) | changes | Download what a link the person gave points to, from Form Studio's engine (use this instead of a shell: it works where your sandbox has no network). |
@@ -94,6 +94,7 @@ Rules:
 | [`mesh_preflight`](#mesh_preflight) | read-only | Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display proxy for a heavy one. |
 | [`create_design`](#create_design) | changes | Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass, built with build123d. |
 | [`update_design`](#update_design) | changes | Replace a design's code as a new revision (history keeps every version). |
+| [`build_candidates`](#build_candidates) | changes | Build 2-6 versions of a risky design or step at the same time (one kernel worker each), verify and score every one, and keep the best. |
 | [`get_design_source`](#get_design_source) | read-only | The exact code a revision was built from (built-in recipes return their recipe file). |
 | [`create_project`](#create_project) | changes | Create a project from a built-in recipe (form_overview lists them: gridfinity_bin, storage_box, pegboard, device_stand, ...). |
 | [`get_project`](#get_project) | read-only | Current revision with every parameter and its provenance, output status (current/stale/failed/missing), checks, fit model, next best actions, simulated slice, file paths, release gate and bench link. |
@@ -275,15 +276,22 @@ Then create_design(..., plan=<brief id>).
 
 *Read-only.*
 
-Complete, high-quality example designs (build123d + form.craft) to learn construction from: a carbon
-full-face helmet, an ergonomic mouse, a planetary gearbox, a hinged case with a snap latch, an ergonomic
-handle, a knurled knob, a spiral-ribbed vase and more. query: words to search; name: one exemplar, returned with its full source.
-They are references for you, never projects, and never shown to the person as designs.
+Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of
+them: mechanical parts (linear slide, shaft coupler, pillow block, cam follower, gearbox), consumer products
+(mouse, earbud case, bottle and cap, game controller), organic forms (mask, horn, handle), textured parts
+(knurl, hex relief, woven, fluted), assemblies (hinged case, ratchet wrench, robot head), helmets (full-face,
+open-face, sci-fi prop) and enclosures (electronics box with bosses, sliding battery box, handheld shell).
+query: words to search (ranked); name: one exemplar with its full source; technique: just the code block that
+does one thing ("hollow a lofted shell", "snap-fit lid", "two-view opening"); category: mechanical, consumer,
+organic, textured, assembly, helmet or enclosure. They are references for you, never projects, and never
+shown to the person as designs.
 
 | Argument | Type | Required |
 |---|---|---|
 | `query` | string |  |
 | `name` | string |  |
+| `technique` | string |  |
+| `category` | string |  |
 
 ### `critique`
 
@@ -414,6 +422,34 @@ For a briefed design, critique(project) the revision before asking for release.
 | `expect_head` | integer \| null |  |
 | `run` | boolean |  |
 | `language` | string \| null |  |
+
+### `build_candidates`
+
+Build 2-6 versions of a risky design or step at the same time (one kernel worker each), verify and score
+every one, and keep the best. candidates: [{label, source}] or, after the first, {label, values} to try other
+values on the first one's source. Use it when there are two or three plausible constructions (a loft or a
+sweep, one shell or two halves, a thick or a thin wall) instead of trying them one by one.
+Scores (0-100, heuristic, the parts are returned): builds (a valid solid with the declared count; a failure
+carries its diagnosis), brief (targets: {"size_mm": [x, y, z], "tolerance_mm": 1, "solids": n,
+"derived": {key: value}}), quality (critique metrics; the product class silhouette with product_class),
+robust (fewer form.craft fallbacks) and editable (the share of parameters that still build at both ends of
+their range). keep="best": create the design `name` from the winner (or a new revision of `project`, with
+expect_head); keep="none": only compare. A candidate that fails never sinks the others. Returns the ranking
+and, when a design was kept, its six-view sheet: look.
+
+| Argument | Type | Required |
+|---|---|---|
+| `candidates` | array | yes |
+| `name` | string |  |
+| `project` | string |  |
+| `brief` | string |  |
+| `targets` | object \| null |  |
+| `product_class` | string |  |
+| `keep` | string |  |
+| `purpose` | string \| null |  |
+| `plan` | string |  |
+| `expect_head` | integer \| null |  |
+| `sweep` | boolean |  |
 
 ### `get_design_source`
 
