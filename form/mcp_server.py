@@ -272,8 +272,7 @@ def build() -> MCPServer:
         except KeyError:
             raise ToolError(f"Unknown topic “{topic}”. Topics: {', '.join(dg.TOPICS)}.")
         if out["topic"] == "core":
-            out["built_in_recipes"] = ("dock, gridfinity, hook, planter, coupon, enclosure, gear_pair, knob "
-                                       "(use create_project for these)")
+            out["built_in_recipes"] = ", ".join(studio().recipes.builtins()) + " (use create_project for these)"
         return out
 
     @mcp.tool(annotations=RW)
@@ -293,9 +292,13 @@ def build() -> MCPServer:
                        _purpose(purpose), references, project)
         a = b["assessment"]
         act(project, "design", f"Brief: {name}", ctx)
+        hits = exemplars.search(" ".join([name, goal, style]), 3)
+        ex = [{"name": e["name"], "title": e["title"]} for e in hits]
+        if ex:                                         # the closest one's lessons up front: they are what gets skipped
+            ex[0]["lessons"] = hits[0].get("lessons", [])
         return {"brief": b["id"] if not project else project, "complex": a["complex"], "reasons": a["reasons"],
                 "evidence": a["evidence"], "read_topics": staged.topics_for(a["families"]),
-                "examples": [{"name": e["name"], "title": e["title"]} for e in exemplars.search(" ".join([name, goal, style]), 3)],
+                "examples": ex,
                 "unknowns": b["unknowns"],
                 "next": "design_guide(topic=...) for each topic, design_examples(name=...) for the closest exemplar, then "
                         "plan_design(brief=...)."}
@@ -417,10 +420,16 @@ def build() -> MCPServer:
         act(p["id"], "commit", f"Created {name} (r01)", ctx)
         if plan:
             await _run(staged.attach_pending, st, p["id"], plan)
+        job = None
         if run:
             jid = st.run(p["id"])
-            await _wait_job(st, jid, 50)
+            job = await _wait_job(st, jid, 50)
         res = await _run(digest, st, p["id"])
+        if job is not None and job["state"] == "running":     # checks on a heavy design outlast the wait: say so
+            res = {**res, "pipeline": job_digest(job),
+                   "next": f"Exports and checks are still running: get_job(project='{p['id']}', job='{jid}') "
+                           "waits for them (or run_pipeline(project), which reuses finished outputs); look at the "
+                           "sheet meanwhile."}
         return await _with_views(st, p["id"], res)
 
     @mcp.tool(annotations=RW, structured_output=False)
@@ -440,6 +449,9 @@ def build() -> MCPServer:
         if run:
             jid = st.run(project)
             res["pipeline"] = job_digest(await _wait_job(st, jid, 45))
+            if res["pipeline"]["state"] == "running":
+                res["next"] = (f"Exports and checks are still running: get_job(project='{project}', job='{jid}') waits "
+                               "for them (or run_pipeline(project), which reuses finished outputs); look at the sheet meanwhile.")
         res["project"] = await _run(digest, st, project)
         return await _with_views(st, project, res)
 

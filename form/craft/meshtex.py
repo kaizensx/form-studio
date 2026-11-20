@@ -61,6 +61,10 @@ class MeshTexture:
     facing: str = "any"                          # "out": only triangles facing away from the region's centre (a
                                                  # shell's outside, not its inside)
     extra: dict = field(default_factory=dict)
+    region: tuple = ()                           # ((x0, y0, z0), (x1, y1, z1)): only triangles whose centre is in
+                                                 # this box (a grip band on one lofted face, a stripe); fades out at
+                                                 # the box's border like at a feature border
+    exclude: tuple = ()                          # boxes ((lo, hi), ...) left smooth (a logo field, a seal face)
 
     def validate(self) -> "MeshTexture":
         from ._common import need, num
@@ -73,6 +77,17 @@ class MeshTexture:
             need(bool(self.image) and Path(self.image).is_file(), f"MeshTexture: heightmap image not found: {self.image!r}",
                  "Give the absolute path of a grayscale PNG or JPEG.", ["image"])
         self.features = tuple(self.features or ())
+        boxes = ([self.region] if self.region else []) + list(self.exclude or ())
+        for b in boxes:
+            try:
+                lo, hi = [tuple(float(x) for x in p) for p in b]
+                ok = len(lo) == 3 and len(hi) == 3 and all(a < c for a, c in zip(lo, hi))
+            except (TypeError, ValueError):
+                ok = False
+            need(ok, f"MeshTexture: a region must be ((x0, y0, z0), (x1, y1, z1)) with x0 < x1 ... (got {b!r})",
+                 "Give the box's low and high corners in mm, in the design's coordinates.", ["region"])
+        self.region = tuple(tuple(map(float, p)) for p in self.region) if self.region else ()
+        self.exclude = tuple(tuple(tuple(map(float, p)) for p in b) for b in (self.exclude or ()))
         return self
 
     def public(self) -> dict:
@@ -343,6 +358,14 @@ def apply(P: np.ndarray, T: np.ndarray, tri_feature: list | np.ndarray, specs: l
             tc = V[F].mean(axis=1)
             c = (tc[active].min(0) + tc[active].max(0)) / 2
             active &= np.einsum("ij,ij->i", face_normals(V, F), tc - c) > 0
+        if (s.region or s.exclude) and active.any():
+            tc = V[F].mean(axis=1)
+            if s.region:
+                lo, hi = np.array(s.region[0]), np.array(s.region[1])
+                active &= np.all((tc >= lo) & (tc <= hi), axis=1)
+            for b in s.exclude:
+                lo, hi = np.array(b[0]), np.array(b[1])
+                active &= ~np.all((tc >= lo) & (tc <= hi), axis=1)
         if not active.any():
             info.setdefault("unused", []).append(s.kind)
             continue

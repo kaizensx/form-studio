@@ -30,6 +30,9 @@ META = {
         "language of raised pads with slots.",
         "Texture is a mesh texture (twill weave, outside only): the STEP stays the smooth surface for tooling; STL, "
         "GLB and renders carry the weave.",
+        "A visor is a separate body: the same sections inflated by the gap and by gap + thickness, one minus the other, "
+        "clipped by a side-profile window that reaches back to both pivots (craft.helmet_sections gives the sections). "
+        "A band clipped by a box that stops short leaves the pivot tabs as loose pieces.",
     ],
 }
 

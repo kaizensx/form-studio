@@ -10,7 +10,10 @@ Score per brief (100):
   features 25  the brief's feature groups are present as features with faces in the solid
   craft    15  rounded where it matters: a fillet exists if asked, sharp-edge fraction below 0.6
   form     15  the brief's expectations: free-form surface share, solids, symmetry, mesh texture declared
-A brief without a solution scores staging only and is reported as "no solution". Metrics come from form.critique
+A brief without a solution scores staging only and is reported as "no solution". A brief may name a reference
+"solution" (tests/design_bench/solutions/NAME.py): a design written through the MCP tools in a design evaluation,
+built and scored like an exemplar. A design that needs an optional extra that is not installed (py_gearworks for
+gears) is reported as skipped, not failed. Metrics come from form.critique
 (evidence class heuristic). Builds run in this process (build123d / OCCT), like the kernel worker.
 """
 from __future__ import annotations
@@ -61,6 +64,8 @@ def check(recipe, key: str) -> dict:
         m["mesh_texture"] = bool(meshtex.declared(recipe, model["values"]))
         return m
     except Exception as e:                                       # a failed build is a score of 0 for builds
+        if "is not installed" in str(e):                         # an optional extra (py_gearworks): not a failure
+            return {"skipped": str(e).split("\n")[0][:160], "build_s": round(time.time() - t0, 2)}
         return {"error": f"{type(e).__name__}: {e}", "build_s": round(time.time() - t0, 2)}
     finally:
         kernel.resolve = old
@@ -76,6 +81,11 @@ def score(b: dict, m: dict | None) -> dict:
         out["notes"].append(f"staging: assess() said complex={a['complex']}")
     if m is None:
         out["status"] = "no solution"
+        out["total"] = out["points"]["staging"]
+        return out
+    if m.get("skipped"):
+        out["notes"].append(m["skipped"])
+        out["status"] = "skipped (optional extra missing)"
         out["total"] = out["points"]["staging"]
         return out
     if m.get("error"):
@@ -145,6 +155,9 @@ def run(solutions: Path | None = None, only: set | None = None, exemplars_too: b
         elif exemplars_too and b.get("exemplar"):
             m = check(exemplars.load(b["exemplar"]), f"exemplar-{b['exemplar']}")
             src = f"exemplar {b['exemplar']}"
+        elif exemplars_too and b.get("solution"):
+            m = check(_load(HERE / "solutions" / f"{b['solution']}.py"), f"solution-{b['solution']}")
+            src = f"solution {b['solution']}"
         else:
             src = "-"
         r = score(b, m)

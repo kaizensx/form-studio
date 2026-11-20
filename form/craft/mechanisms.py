@@ -64,7 +64,13 @@ class Mech:
     info: dict = field(default_factory=dict)
 
     def __getitem__(self, key):
-        return self.dims[key]["value"]
+        """mech["carrier_r"] is a dimension's value; mech["sun"] (a name in .shapes) is that solid."""
+        if key in self.dims:
+            return self.dims[key]["value"]
+        if key in self.shapes:
+            return self.shapes[key]
+        raise KeyError(f"{self.name} has no dimension or shape {key!r}; dims: {', '.join(self.dims)}; "
+                       f"shapes: {', '.join(self.shapes)}")
 
     @property
     def shape(self):
@@ -142,8 +148,21 @@ def pin_hinge(length: float = 60, outer_d: float = 8, pin_d: float = 3.6, knuckl
             "knuckle_wall": _dim(round((D - pd - 2 * c) / 2, 3), source="(outer_d - pin_d - 2 c) / 2")}
     checks = [_row("hinge_clearance", "Print-in-place clearance", "PASS" if c >= 0.3 else "WARN", f"{c:g} mm",
                    "heuristic", "Below 0.3 mm per side, FDM hinges often fuse. Calibrate with a coupon.")]
+    relief_a = relief_b = None                                         # clearance around each leaf's knuckles
+    for i, x0 in enumerate(xs):
+        cut = cyl(R + c, x0 - g + 0.05, x0 + seg + g - 0.05)
+        if i % 2 == 0:
+            relief_a = cut if relief_a is None else relief_a + cut
+        else:
+            relief_b = cut if relief_b is None else relief_b + cut
     return Mech("pin_hinge", {"leaf_a": a, "leaf_b": b}, dims, checks, axis=(1, 0, 0), origin=(0, 0, R),
-                info={"swing": "leaf B turns about the axis; 0 deg = flat, open to 180 deg"})
+                info={"swing": "leaf B turns about the axis; 0 deg = flat, open to 180 deg",
+                      "knuckles": [(round(x0, 4), round(x0 + seg, 4), "a" if i % 2 == 0 else "b") for i, x0 in enumerate(xs)],
+                      "relief_a": relief_a, "relief_b": relief_b,
+                      "mounting": "Fuse leaf_a to one body and leaf_b to the other. Where a body reaches the hinge "
+                                  "axis, cut info['relief_a'] from the body leaf_b is fused to (and relief_b from the "
+                                  "other), or the knuckles fuse the two bodies. Place every shape with the same "
+                                  "transform as the leaves."})
 
 
 def living_hinge(width: float = 30, gap: float = 6, web_t: float = 0.5, panel_t: float = 3, panel_len: float = 25,
@@ -239,9 +258,13 @@ def annular_snap(d: float = 20, undercut: float = 0.4, height: float = 8, wall: 
 def bayonet(d: float = 30, height: float = 12, lugs: int = 3, lug_w: float = 6, lug_h: float = 3, lug_depth: float = 1.6,
             twist: float = 30, clearance: float = 0.3, wall: float = 2.4) -> Mech:
     """A bayonet: the male is a tube of outer diameter d with radial lugs near its top; the female cutter is the bore
-    (d + 2 c) with axial entry slots and circumferential locking slots `twist` degrees long. Subtract the cutter from a
-    collar: collar - Pos(0, 0, collar_h) * Rot(180, 0, 0)... or keep both on Z and cut directly (cutter spans
-    z = 0 to height + overshoot)."""
+    (d + 2 c) with axial entry slots and circumferential locking slots `twist` degrees long.
+    The two share one frame: the cutter's floor is z = 0 and its open end is the top (entry slots run down from it);
+    the male stands inside it, from z = clearance to z = height, already engaged at the entry angle. Place both with
+    the SAME transform, cut the cutter from the socket body, then turn the male by about twist - 2 degrees about Z to
+    show it locked. Attach the male's top end (z = height) to the other part:
+        head = head - Pos(0, 0, z) * bay["female_cutter"]
+        male = Pos(0, 0, z) * Rot(0, 0, twist - 2) * bay["male"]       # its top at z + height"""
     D = num(d, "d", lo=8)
     H = num(height, "height", lo=4)
     n = num(lugs, "lugs", lo=2, hi=8, integer=True)
@@ -254,14 +277,15 @@ def bayonet(d: float = 30, height: float = 12, lugs: int = 3, lug_w: float = 6, 
     need(n * (ang_w + tw) < 330, "bayonet: lugs and their twist do not fit around the circumference",
          "Use fewer or narrower lugs, or less twist.", ["lugs", "lug_w", "twist"])
     zl = H - lh - 1.0                                        # lug bottom
-    tube = Cylinder(r, H, align=BOTTOM) - Cylinder(r - wall, H + 1, align=BOTTOM)
+    # the male starts `c` above the cutter's floor, so the pair placed with one transform never touches
+    tube = Pos(0, 0, c) * (Cylinder(r, H - c, align=BOTTOM) - Cylinder(r - wall, H + 1, align=BOTTOM))
     male = tube
     for i in range(n):
         lug = Rot(0, 0, i * 360 / n) * Pos(r + ld / 2 - 0.2, 0, zl) * Box(ld + 0.4, lw, lh, align=BOTTOM)
         male = male + lug
     male = one(male)
     cutter = Cylinder(r + c, H + OVERSHOOT, align=BOTTOM)
-    R2 = r + ld + c
+    R2 = math.hypot(r + ld, lw / 2) + c                      # the lug's square corners reach past r + ld
     for i in range(n):
         a0 = i * 360 / n
         entry = Rot(0, 0, a0) * Pos((r + R2) / 2, 0, zl - c) * Box(R2 - r + 0.4, lw + 2 * c, H - zl + c + OVERSHOOT, align=BOTTOM)
@@ -384,7 +408,24 @@ def cam(base_r: float = 15, lift: float = 6, rise: float = 150, dwell_top: float
     plate = extrude(face, T)
     if fr:
         from build123d import offset
-        plate = one(extrude(offset(face, -fr), T))
+
+        def by_offset():
+            return one(extrude(offset(face, -fr), T))
+
+        def by_normals():
+            # the roller's inner envelope point by point: each pitch point moved inward along the curve's normal
+            # (some OCCT builds fail a negative 2D offset of a periodic spline)
+            q = []
+            for i in range(N):
+                p0, p1 = pts[i - 1], pts[(i + 1) % N]
+                tx, ty = p1.X - p0.X, p1.Y - p0.Y
+                L = math.hypot(tx, ty) or 1.0
+                nx, ny = ty / L, -tx / L                       # outward normal of a counter-clockwise curve
+                q.append(Vector(pts[i].X - fr * nx, pts[i].Y - fr * ny, 0))
+            return one(extrude(make_face(Wire([Spline(*q, periodic=True)])).faces()[0], T))
+
+        plate = attempt("cam", [("2D offset of the pitch curve", by_offset), ("offset along the normals", by_normals)],
+                        "Use a smaller follower radius than the cam's smallest radius of curvature.", ["follower_r"])
     if b:
         plate = plate - Cylinder(b / 2, T + 1, align=BOTTOM)
     dims = {"base_r": _dim(rb), "lift": _dim(h), "max_r": _dim(rb + h)}
@@ -408,6 +449,36 @@ def link(length: float, width: float = 8, thickness: float = 4, hole_d: float = 
     if hd:
         bar = bar - Cylinder(hd / 2, t + 1, align=BOTTOM) - Pos(L, 0, 0) * Cylinder(hd / 2, t + 1, align=BOTTOM)
     return one(bar)
+
+
+def link_between(p, q, width: float = 8, thickness: float = 4, hole_d: float = 3.2, z: float = 0.0) -> Solid:
+    """A link bar from point p = (x, y) to q = (x, y), holes on both, standing on z: a four-bar's crank, coupler or
+    rocker placed where four_bar_pose() puts it (pins along Z)."""
+    (x0, y0), (x1, y1) = (float(p[0]), float(p[1])), (float(q[0]), float(q[1]))
+    L = math.hypot(x1 - x0, y1 - y0)
+    need(L >= 4, f"link_between: the points are {L:.2f} mm apart", "Links need at least 4 mm between their holes.", ["p", "q"])
+    return one(Pos(x0, y0, z) * Rot(0, 0, math.degrees(math.atan2(y1 - y0, x1 - x0))) * link(L, width, thickness, hole_d))
+
+
+def four_bar_pose(ground: float, crank: float, coupler: float, rocker: float, crank_deg: float, branch: int = 1) -> dict:
+    """Where a four-bar sits at one crank angle: A = (0, 0) and D = (ground, 0) are the ground pivots, B the crank
+    end, C the rocker end (branch +1 or -1 picks the assembly mode). Returns {"A", "B", "C", "D", "coupler_deg",
+    "rocker_deg", "transmission_deg"}; build the links with link_between(A, B), (B, C), (D, C)."""
+    g, a, b, c = (num(x, n, positive=True) for x, n in ((ground, "ground"), (crank, "crank"), (coupler, "coupler"), (rocker, "rocker")))
+    th = math.radians(num(crank_deg, "crank_deg"))
+    B = (a * math.cos(th), a * math.sin(th))
+    dx, dy = g - B[0], -B[1]
+    dist = math.hypot(dx, dy)
+    need(abs(b - c) - 1e-9 <= dist <= b + c + 1e-9 and dist > 1e-9, f"four_bar_pose: the loop does not close at "
+         f"{crank_deg:g} deg", "Choose a crank angle inside the linkage's range (four_bar() lists it).", ["crank_deg"])
+    ex, ey = dx / dist, dy / dist
+    x = (b * b - c * c + dist * dist) / (2 * dist)
+    yy = math.sqrt(max(b * b - x * x, 0)) * (1 if branch >= 0 else -1)
+    C = (B[0] + ex * x - ey * yy, B[1] + ey * x + ex * yy)
+    mu = math.degrees(math.acos(max(-1, min(1, (b * b + c * c - dist * dist) / (2 * b * c)))))
+    return {"A": (0.0, 0.0), "B": B, "C": C, "D": (g, 0.0),
+            "coupler_deg": math.degrees(math.atan2(C[1] - B[1], C[0] - B[0])),
+            "rocker_deg": math.degrees(math.atan2(C[1], C[0] - g)), "transmission_deg": round(min(mu, 180 - mu), 2)}
 
 
 def four_bar(ground: float, crank: float, coupler: float, rocker: float, samples: int = 72, width: float = 8,
@@ -486,13 +557,16 @@ def gear_train(module: float = 1.5, teeth: tuple = (14, 28, 14), thickness: floa
 
 def planetary(module: float = 1.5, sun: int = 12, planet: int = 18, planets: int = 3, thickness: float = 8,
               ring_rim: float = 4, backlash: float = 0.1, sun_bore: float = 5, planet_bore: float = 3.2,
-              ring_od: float | None = None) -> Mech:
+              ring_od: float | None = None, ring_height: float | None = None) -> Mech:
     """A planetary gear set standing on z = 0: sun at the origin, `planets` planets on the carrier circle, internal
     ring around them, all in mesh. Ring teeth = sun + 2 planet. Ratio with the ring fixed, sun in, carrier out:
-    1 + Zr / Zs. Checks: equal spacing ((Zs + Zr) % N == 0) and neighbouring planets clear of each other."""
+    1 + Zr / Zs. Checks: equal spacing ((Zs + Zr) % N == 0) and neighbouring planets clear of each other.
+    ring_height (default: thickness) makes the ring taller than the gears, standing on z = 0 like them: a housing
+    that carries several stages, or a lip above the gears. Stages stacked in one ring share its tooth phase."""
     m = num(module, "module", lo=0.5)
     zs, zp, N = num(sun, "sun", lo=6, integer=True), num(planet, "planet", lo=6, integer=True), num(planets, "planets", lo=2, hi=8, integer=True)
     T, rim = num(thickness, "thickness", lo=1), num(ring_rim, "ring_rim", lo=1.2)
+    RH = T if ring_height is None else num(ring_height, "ring_height", lo=T)
     zr = zs + 2 * zp
     need((zs + zr) % N == 0, f"planetary: {N} planets cannot be spaced evenly with sun {zs} and ring {zr} "
          f"((Zs + Zr) % N = {(zs + zr) % N})", "Change the sun or planet tooth count so (sun + ring) divides by the "
@@ -516,13 +590,13 @@ def planetary(module: float = 1.5, sun: int = 12, planet: int = 18, planets: int
     ring_coef = max(1.5, (rd / 2 - m * zr / 2) / m)
 
     def ring_lib():
-        r = g.SpurRingGear(zr, height=T, module=m, backlash=backlash / 2 / m, outside_ring_coefficient=ring_coef)
+        r = g.SpurRingGear(zr, height=RH, module=m, backlash=backlash / 2 / m, outside_ring_coefficient=ring_coef)
         r.mesh_to(p_objs[0], target_dir=np.array(dirs[0], dtype=float))
         return one(r.build_part())
 
     def ring_cut():
-        cutter = parts._spur(m, zr, T + 1, -backlash, 20.0)
-        return one(Cylinder(rd / 2, T, align=BOTTOM) - Pos(0, 0, -0.5) * one(cutter.build_part()))
+        cutter = parts._spur(m, zr, RH + 1, -backlash, 20.0)
+        return one(Cylinder(rd / 2, RH, align=BOTTOM) - Pos(0, 0, -0.5) * one(cutter.build_part()))
 
     ring = attempt("planetary ring", [("internal involute ring", ring_lib), ("ring cut by an external gear", ring_cut)],
                    "Change the tooth counts slightly.", ["sun", "planet"])

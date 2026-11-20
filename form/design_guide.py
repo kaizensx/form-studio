@@ -12,7 +12,9 @@ CONTRACT
   class Design(Recipe):
       title, summary = "...", "..."
       solids = 1                               # separate bodies in the result (2 for case + lid)
-      params = [Param(key, label, default, min, max, step, unit, group, feature, doc), ...]
+      params = [Param(key, label, default, min, max, step, unit, group, feature, doc, provenance), ...]
+                                               # provenance of the default: "assumed" (yours), "specified" (a
+                                               # datasheet or standard named in doc), "measured" only from the person
       features = [Feature(id, label, role), ...]          # role: structure | interface | access | finish
       fit = None or {"cavity": derived_key, "mating": param_key, "clearance": param_key,
                      "label": "...", "per_side": True, "window": [min_gap, max_gap]}
@@ -82,7 +84,9 @@ ASSEMBLIES (for solids >= 2; without one the app can show the parts only as mode
   assembled, and checks nothing about how they meet)
   from form.recipes.base import Access, Assembly, Hardware, Mate, Part, fixed, hinge, slide
   Part(id, label, solid, move, rotate, explode, note, attach="")   solid = index of the printed body, numbered left to
-       right on the plate (bounding-box centre X, then Y). Assembled placement = Pos(*move) * Rot(*rotate) applied to the
+       right on the plate (bounding-box centre X, then Y, then Z), OR an (x, y, z) point inside that body as built: use a
+       point whenever parts share an axis (a gearbox's housing, suns and carriers), so you never count solids by hand.
+       Assembled placement = Pos(*move) * Rot(*rotate) applied to the
        part as printed. explode = offset in mm for the exploded view, RELATIVE TO ITS PARENT (a child separates with its
        parent and then by its own offset). List parts in assembly order; note is the assembly step ("Press the lid on.").
        attach="arm": the part is rigidly fixed to the arm and moves with it (a bolt in its hole, a cap on a tube).
@@ -100,6 +104,9 @@ ASSEMBLIES (for solids >= 2; without one the app can show the parts only as mode
                  hinge("cup", (1, 0, 0), pivot2, (-90, 90), parent="arm", id="cup_tilt", label="Cup tilt")]
        Moving Arm tilt swings the arm, the cup and the cup bolt together; Cup tilt swings the cup and its bolt about an
        axis that is wherever the arm put it. Never give a part both attach= and a joint, or two joints; no loops.
+       A closed linkage (a four-bar) is a loop: declare its pins as Mate(..., "pin") and put its motion in derived()
+       from craft.four_bar (swing, transmission angle), not as joints. Gears are not joints either: model them in mesh
+       with their backlash as the gap.
   Mate(a, b, kind, clearance, label): two parts that touch or interlock BY DESIGN, kind = pin | thread | slip | snap |
        press | contact. Declare one for every pin in its hole and every thread in its thread: they are then not booleaned
        (fine threads are slow and always "collide"); their gap is measured once and compared with clearance (designed
@@ -154,6 +161,20 @@ WORKFLOW
     5. critique(project): close-ups per feature, metrics, a checklist. Fix, update_design, critique again.
        A briefed design cannot be released until its head revision has a critique pass.
   The helper library for all of this is form.craft (topics surfacing, mechanisms, organic, texture).
+
+WHEN IT FAILS OR LOOKS WRONG
+  * "The result is N solid(s); this design declares M. Solids per stage: ..." Read the per-stage counts: the step
+    where the count jumps is the one that split a body (a slit that runs out of material) or fused two parts (they
+    touch: leave 0.3 mm). "The X step left no solid": a boolean failed there; overlap by 0.2 mm, keep it off a loft
+    seam, or simplify the shape.
+  * get_project's craft_fallbacks lists every helper that could not do what you asked (a fillet built smaller or edge
+    by edge, a loft in runs) and every stage that is not a valid solid. Fix them or say so; never hide them.
+  * Check a risky boolean yourself while you write: (a - b).is_valid. A smooth loft through sections that are close
+    together AND shifted sideways can fold over itself; its booleans then come back invalid and larger, not smaller.
+  * Heavy designs (a helmet, 15 gears) take a minute or more: create_design/update_design say when exports and checks
+    are still running; run_pipeline(project) finishes them and reuses what is done.
+  * Through form tool (the CLI), pictures come back as file paths under "images": open them, they are the sheet,
+    the section and the close-ups.
 """
 
 # rules 5-6 depend on what the design is for (form/purpose.py): bed orientation, overhangs and nozzle walls only for a print
@@ -261,29 +282,48 @@ A designed object is made of sections and transitions, not of boxes. Decide the 
   craft.sweep_spline(profile_face, path_points)                   profile placed normal to the path start
   craft.revolve_profile([(r, z), ...], spline=True)               vases, knobs, lamp bodies, wheels
   craft.shell(solid, t, openings=craft.faces_at(solid, "top"))    hollow it; keeps the outside
-  craft.safe_fillet(solid, edges, r)          tries r, 75 %, 50 %, 25 %, then leaves the edge (noted); never crashes
+  craft.safe_fillet(solid, edges, r)          tries r, 75 %, 50 %, 25 % on all edges, then edge by edge, then leaves
+                                              them (all noted); never crashes
   craft.variable_fillet(solid, edges, r0, r1) a blend that grows along the edge
   craft.thicken(face, t)                      a solid from a surface
-  craft.notes()                               what fell back, to report in derived() or your reply
+  craft.notes()                               what fell back; get_project shows them as craft_fallbacks
 Rules:
-  * 5-12 sections for a body; the same point count and start angle on every section, or the loft twists.
+  * 5-12 sections for a body; the same point count and start angle (seam) on every section, or the loft twists.
   * Make sections follow a law (an ellipse in elevation, a power curve) rather than hand-picked numbers: the
     surface then flows. craft.dome_sections() does this.
+  * A loft has a seam line where its sections start (seam=0: +X, the nose). Fillets and booleans fail first where
+    they cross it; keep pockets, vents and spoilers off it, or move it (section dicts take seam=180 for the back).
   * Fillet BEFORE shelling where you can (a shell follows the rounds), and big radii first, small ones last.
+  * A pocket cut into a curved dome (a hex for a bolt head) leaves an edge OCCT will not round: cut a flat land
+    (a shallow cylinder) first, then the pocket, then fillet the land's circle and the pocket mouth.
+  * Profiles: spline_profile / polygon_profile faces always face the plane's normal, so extrude(face, d) goes along
+    it whichever way the points run; extrude(face, d, both=True) for a cutter through a whole body.
   * Tangent and coincident faces break booleans: overlap cutters by 0.2 mm and avoid exactly touching surfaces.
 """
 
 MECHANISMS = """\
 MECHANISMS (form.craft.mechanisms, form.craft.fits, form.parts)
 Each returns a Mech: .shapes {name: solid}, .dims (value, unit, provenance, source), .checks, .axis/.origin for joints.
-  craft.pin_hinge(length, outer_d, pin_d, knuckles, clearance)    print-in-place; leaf_a carries the pin
+  mech["name"] is a dimension's value or, for a name in .shapes, that solid (planetary()["ring"], hinge["leaf_a"]).
+  craft.pin_hinge(length, outer_d, pin_d, knuckles, clearance)    print-in-place; leaf_a carries the pin. Lying flat,
+       axis along X at z = outer_d / 2. Standing on a wall: place = Pos(0, y_axis, z_axis) * Rot(90, 0, 0) *
+       Pos(0, 0, -outer_d / 2) puts leaf_a below the axis and leaf_b above it, both on the +Y side. Fuse each leaf to
+       its body and cut place * hinge.info["relief_a"] from the body leaf_b joins (relief_b from the other), or the
+       knuckles fuse the two bodies. Keep the axis just outside the walls and bridge leaves to walls with webs.
   craft.living_hinge(width, gap, web_t, material="PP")           warns for PLA/PETG
-  craft.cantilever_snap(length, thickness, width, undercut)       strain = 1.5 t y / L^2 (computed) vs allowed
+  craft.cantilever_snap(length, thickness, width, undercut)       strain = 1.5 t y / L^2 (computed) vs allowed. Beam
+       along +Z, lip +X. Hanging from a lid with the lip pointing -Y: Pos(...) * Rot(0, 0, -90) * Rot(180, 0, 0).
   craft.annular_snap(d, undercut, height, wall)                   male bead + groove cutter, hoop strain y / d
-  craft.bayonet(d, height, lugs, twist)    craft.dovetail(length, width, height, angle)    craft.detent(ball_d, depth)
+  craft.bayonet(d, height, lugs, twist)   male and female_cutter share ONE frame: same placement for both, cutter open
+       at its top; turn the male by twist - 2 deg about Z to show it locked; attach the male's top end (z = height).
+  craft.dovetail(length, width, height, angle)    craft.detent(ball_d, depth)
   craft.ratchet(teeth, od)    craft.cam(base_r, lift, rise, dwell_top, fall, follower_r)  (pressure angle checked)
   craft.four_bar(ground, crank, coupler, rocker)   Grashof class, swing, transmission angle; .shapes = printable links
-  craft.gear_train(module, teeth=(14, 28, 14))      craft.planetary(module, sun, planet, planets)   (via form.parts)
+  craft.four_bar_pose(ground, crank, coupler, rocker, crank_deg)  A, B, C, D where the loop sits at that crank angle;
+  craft.link_between(p, q, width, thickness, hole_d, z)           a link placed between two pivots (pins along Z)
+  craft.gear_train(module, teeth=(14, 28, 14))      craft.planetary(module, sun, planet, planets, ring_height=)
+       ring_height makes one ring for several stacked stages (a 3-stage 64:1 box: 12/12/36 three times in one ring).
+       (via form.parts)
   craft.iso_fit("H7/g6", d)   craft.bearing_fit("608", "shaft")   ISO 286 limits; FDM holds ~0.15 mm, say so
 Rules:
   * Every moving pair has a clearance per side you can name (FDM: 0.2-0.35 mm sliding, 0.35-0.5 print-in-place).
@@ -298,8 +338,10 @@ ORGANIC FORMS (form.craft.organic)
   craft.dome_sections(length, width, height, crown_back=, squash_front=)       sections of a smooth dome
   craft.section_shell(sections, wall, tip=, open_top=)                         hollow by inset sections (never fails
                                                                                where an offset of a crown point does)
+  craft.inset_body(sections, wall, tip=)                                       the inner body section_shell removes
   craft.inflate(sections, amount, tip)                                         near-offset sections, for pads/ridges
   craft.helmet_shell(length, width, height, wall, skirt)                       outer form + hollow shell
+  craft.helmet_sections(length, width, height, skirt)                          its sections, for visors, pads, liners
   craft.grip(length, d_max, d_min, flat, finger_grooves)                       revolved spline, oval section
   craft.handle(span, rise, section_w, section_h)                               swept D-handle with feet
 Method: start from the object's real measurements (a head is about 200 x 160 mm, a helmet adds 25-35 mm a side; a
@@ -307,13 +349,25 @@ power grip is 30-38 mm across), draw the side silhouette and the top silhouette 
 from them. Asymmetry front to back is what makes organic things read as designed (a helmet's crown sits behind
 centre; a grip swells at the palm, not the middle). Cut openings with smooth cutters (lofted or swept), not boxes,
 and round their edges.
+Shape the OUTSIDE first, then hollow: a scoop or a flat cut into a shell leaves a fillet the wall cannot take.
+    outer = craft.section_body(secs, tip); inner = craft.inset_body(secs, wall, tip)
+    outer = craft.safe_fillet(outer - scoop, scoop_edges, 4)      # round the outside
+    shell = outer - (inner - grown_scoop)                         # the inside follows, the wall stays even
+Layers that follow the surface (a visor 1.2 mm off a helmet, a pad, a spoiler) are inflate() bodies subtracted from
+each other and intersected with a window: skin = body(inflate(secs, g + 3)) - body(inflate(secs, g)). Shape the
+window as a side profile extruded across (spline_profile on Plane.XZ, extrude(..., both=True)), not a box: the
+outline is what reads. A visor reaches back to its pivots; a band that stops short leaves the pivot tabs floating.
+Product shapes read from their silhouettes: a helmet's chin bar juts forward and its lower edge sweeps up behind the
+jaw to the neck; a mouse's hump sits behind centre and its thumb side is fuller. Shift and pinch sections (cx, b) to
+get there, a little at a time: large sideways shifts between close sections fold the loft.
 """
 
 TEXTURE = """\
 TEXTURE, two honest tiers
   B-rep (the CAD solid carries it; STEP, STL, checks and slices all include it). Capped at about 2000 elements:
     craft.knurl(diameter, height, pitch, depth, kind="diamond"|"straight")      exact faceted knurl, chamfered ends
-    craft.spiral_ribbed_body([(r, z), ...], ribs, rib_depth, twist)            one smooth skin with spiral ribs
+    craft.spiral_ribbed_body([(r, z), ...], ribs, rib_depth, twist, fade=(0.1, 0.2))   one skin with spiral ribs;
+        fade eases the ribs into a plain foot and collar; past 80 deg of twist it lofts in runs (noted)
     craft.wrapped_ribs(radius, height, count, rib_w, rib_h, twist)             ribs to fuse onto a cylinder
     craft.emboss_cells(w, d, cell, height, kind="hex"|"diamond"|"dots"|"pyramids", base=0)   raised tiles for a flat face
     form.patterns: hex_vents, perforation_grid, slot_array, knurl, grip_ribs (cutters / adds with computed webs)
@@ -325,6 +379,11 @@ TEXTURE, two honest tiers
     kinds: noise, cells, grain, hex, weave (carbon-like twill), knurl, ribs, heightmap (image=, projection=planar|
     cylindrical|spherical). amplitude mm (negative presses in), scale mm, features = which feature ids,
     facing="out" = only the outside of a shell, edge_falloff mm at borders and creases.
+    region=((x0, y0, z0), (x1, y1, z1)) keeps it to a box (the flanks of a mouse, a band on a lofted face that is one
+    feature), exclude=(box, ...) keeps areas smooth (a logo field, a seal face).
+    Seeing it: the six-view sheet draws a 270 mm helmet at about 0.5 mm a pixel, so a 0.25 mm weave is invisible
+    there; it shows in render_photo close-ups and in the app. Do not deepen it past what the material would have
+    to make it show in the sheet.
 Choose: if a person sees it from a metre away or it does work (grip, alignment), make it B-rep. If it is felt or seen
 up close, make it a mesh texture. Printed texture needs >= 2 nozzle widths in plan and >= 0.3 mm depth to survive.
 """

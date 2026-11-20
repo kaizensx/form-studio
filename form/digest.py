@@ -63,6 +63,13 @@ def digest(st, pid: str, bench: str | None = None) -> dict:
         out["next_best_actions"] = [{"do": a["title"], "why": a["why"], "cost": a["cost"],
                                      "yield_after": f"{a['after'] * 100:.0f}%", **({"change": a["change"]} if a.get("change") else {})}
                                     for a in s["actions"][:4]]
+    try:
+        notes = (st.read(p, "geometry", st.keys(p)["geometry"]) or {}).get("craft_notes") or []   # cached only
+    except Exception:                                # a design that does not build has no summary; checks say why
+        notes = []
+    if notes:
+        out["craft_fallbacks"] = {"notes": notes, "why": "form.craft could not build these as asked and used the "
+                                  "fallback named; the solid has what the note says. Fix them or tell the person."}
     if s["slice"]:
         sl = s["slice"]
         out["slice_simulated"] = {"time_min": round(sl["time_s"] / 60) if sl.get("time_s") is not None else None, "filament_g": sl["filament_g"], "layers": sl["layers"],

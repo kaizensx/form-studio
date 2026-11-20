@@ -12,7 +12,9 @@ Frames
                      this frame.
 
 Parts are picked from the result by ``solid``: the result's solids numbered 0, 1, ... by the X of their
-bounding-box centre, then Y (left to right on the plate, as the print layout shows them).
+bounding-box centre, then Y, then Z (left to right on the plate, as the print layout shows them). ``solid`` may
+instead be an (x, y, z) point inside the part as built: the solid that holds it (else the nearest) is used, so a
+design modelled in place (a gearbox's housing, carriers and suns all centred on one axis) never counts solids.
 
 Kinematic tree
   Every part has at most one link to a parent: ``Part(attach="arm")`` (rigidly fixed to the arm), or a joint
@@ -48,7 +50,9 @@ def _vec(v, n=3) -> tuple:
 class Part:
     id: str
     label: str
-    solid: int                                  # index into the result's solids, ordered by bounding-box centre X, then Y
+    solid: int                                  # index into the result's solids, ordered by bounding-box centre X, then Y,
+                                                # then Z; or an (x, y, z) point inside the part as built (the solid
+                                                # holding it, else the nearest), which never needs counting
     move: tuple = (0.0, 0.0, 0.0)              # assembled placement: translation (mm) ...
     rotate: tuple = (0.0, 0.0, 0.0)            # ... after this rotation (degrees about X, Y, Z, build123d Rot)
     explode: tuple = (0.0, 0.0, 0.0)           # exploded-view offset (mm, assembled frame) at factor 1, relative to its parent
@@ -277,9 +281,12 @@ class Assembly:
             out.append("An assembly needs at least one part.")
         if len(set(ids)) != len(ids):
             out.append("Part ids must be unique.")
-        used = [p.solid for p in self.parts]
+        used = [tuple(p.solid) if isinstance(p.solid, (tuple, list)) else p.solid for p in self.parts]
         for p in self.parts:
-            if not 0 <= p.solid < n_solids:
+            if isinstance(p.solid, (tuple, list)):         # a point in the part: resolved against the built solids
+                if len(p.solid) != 3:
+                    out.append(f"Part {p.id}: solid as a point needs (x, y, z), got {p.solid}.")
+            elif not 0 <= p.solid < n_solids:
                 out.append(f"Part {p.id} names solid {p.solid}; the design has {n_solids} (0–{n_solids - 1}).")
             if p.attach:
                 if p.attach == p.id:

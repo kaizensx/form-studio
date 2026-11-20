@@ -84,6 +84,7 @@ def _build(recipe_id: str, values: dict, tol: float):
     recipe = resolve(recipe_id)
     v = recipe.validate(values)
     t0 = time.perf_counter()
+    craft_notes = _craft_notes()                   # clear what an earlier build left
     try:
         stages = recipe.build(v)
     except RecipeError:
@@ -93,9 +94,22 @@ def _build(recipe_id: str, values: dict, tol: float):
                           "Step back toward the last value that built, then change one parameter at a time.") from e
     final = stages[-1].shape
     t_build = time.perf_counter() - t0
+    craft_notes = _craft_notes()                   # fallbacks form.craft took (a smaller fillet, a ruled loft)
+    empty = [s.feature for i, s in enumerate(stages) if i and s.shape is stages[i - 1].shape]
+    if not getattr(recipe, "mesh", False):
+        for s in stages[:-1]:                      # a broken boolean early on can hide behind a valid-looking result
+            try:
+                bad = not s.shape.is_valid
+            except Exception:
+                bad = False
+            if bad:
+                craft_notes.append(f"stage {s.feature}: not a valid solid (a boolean failed; often a loft that "
+                                   "folds over itself or two faces that just touch); later stages may hide it")
     solids = final.solids()
     want = getattr(recipe, "solids", 1)
     mesh = getattr(recipe, "mesh", False)          # a sewn triangle mesh: OCCT validity is not meaningful for it
+    if not mesh and len(solids) != want:
+        _stage_report(stages, want)                # name the stage where the solid count first went wrong
     if (not mesh and not final.is_valid) or len(solids) != want:
         raise RecipeError(
             f"The result is {len(solids)} solid(s) (valid={final.is_valid}); this design declares {want}", stages[-1].feature,
@@ -153,9 +167,43 @@ def _build(recipe_id: str, values: dict, tol: float):
         "recipe": recipe, "values": v, "shape": final, "faces": faces, "by_feature": by_feature,
         "bbox": [[bb.min.X, bb.min.Y, bb.min.Z], [bb.max.X, bb.max.Y, bb.max.Z]],
         "volume": float(final.volume), "area": float(final.area), "com": (com.X, com.Y, com.Z),
-        "t_build": t_build, "t_total": time.perf_counter() - t0, "tol": tol,
+        "t_build": t_build, "t_total": time.perf_counter() - t0, "tol": tol, "craft_notes": craft_notes,
+        "unchanged_stages": empty,
     }
     return model
+
+
+def _stage_report(stages, want: int) -> None:
+    """A design whose result has the wrong number of solids: raise a RecipeError naming the first stage that left the
+    solid empty (a failed boolean returns nothing) or that changed the count to something the next stages never
+    repair, with each stage's count, so the agent fixes that feature instead of guessing."""
+    counts = []
+    for s in stages:
+        try:
+            n, vol = len(s.shape.solids()), float(s.shape.volume)
+        except Exception:
+            n, vol = 0, 0.0
+        counts.append((s.feature, n, vol))
+    trail = ", ".join(f"{f} {n}" for f, n, _ in counts)
+    for i, (f, n, vol) in enumerate(counts):
+        if n == 0 or vol <= 1e-9:
+            raise RecipeError(f"The {f} step left no solid (a boolean failed and returned nothing). Solids per stage: "
+                              f"{trail}", f, "Overlap the shapes by 0.2 mm instead of touching, move the cut off a loft "
+                              "seam or a tangent face, or simplify the shape added in this step.")
+    changed = [counts[i][0] for i in range(1, len(counts)) if counts[i][1] != counts[i - 1][1]]
+    f = changed[-1] if changed else counts[0][0]
+    raise RecipeError(f"The result is {counts[-1][1]} solid(s); this design declares {want}. Solids per stage: {trail} "
+                      f"(read it to find the step that split or fused a part; the count last changed at {f}).", f,
+                      "Parts that should stay separate touch or overlap (leave a gap), a cut split a body in two, or a "
+                      "piece added does not reach the body it should join.")
+
+
+def _craft_notes() -> list:
+    try:
+        from .craft import notes
+        return notes()
+    except Exception:                              # craft is optional for a design; never fail a build over its notes
+        return []
 
 
 def _get(key: str, recipe_id: str, values: dict, tol: float):
@@ -262,6 +310,7 @@ def _summary(model, extra_mass=None) -> dict:
         "faces": len(model["faces"]), "triangles": int(sum(len(f["T"]) for f in model["faces"])),
         "timing": {"build_s": round(model["t_build"], 4), "total_s": round(model["t_total"], 4)},
         "kernel": kernel_id(),
+        "craft_notes": model.get("craft_notes", []),
     }
 
 

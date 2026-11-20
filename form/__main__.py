@@ -127,12 +127,38 @@ def _tool(args) -> int:
     if structured is not None:
         _print(structured["result"] if isinstance(structured, dict) and set(structured) == {"result"} else structured)
         return 0
-    res = [b.text for b in getattr(out, "content", []) if getattr(b, "text", None) is not None]
-    try:
-        _print(json.loads(res[0]) if len(res) == 1 else {"content": res})
+    blocks = list(getattr(out, "content", []))
+    res = [b.text for b in blocks if getattr(b, "text", None) is not None]
+    images = _save_images(name, blocks)
+    try:                                           # the first block is the tool's JSON; later ones are captions
+        first = json.loads(res[0]) if res else {}
+        body = first if len(res) == 1 else ({**first, "notes": res[1:]} if isinstance(first, dict) else {"content": res})
     except ValueError:
-        _print({"content": res})
+        body = {"content": res}
+    if images:                                     # a terminal cannot show pictures: say where they are, so you can open them
+        body = {**body, "images": images} if isinstance(body, dict) else {"result": body, "images": images}
+    _print(body)
     return 0
+
+
+def _save_images(tool: str, blocks) -> list[str]:
+    """Write the tool's image blocks (sheets, sections, close-ups, renders) to PNG files and return their paths."""
+    import base64
+    import tempfile
+    import time
+    imgs = [b for b in blocks if getattr(b, "type", "") == "image" and getattr(b, "data", None)]
+    if not imgs:
+        return []
+    d = Path(tempfile.gettempdir()) / "form-tool-images"
+    d.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    out = []
+    for i, b in enumerate(imgs):
+        ext = (getattr(b, "mime_type", None) or getattr(b, "mimeType", None) or "image/png").split("/")[-1]
+        f = d / f"{tool}-{stamp}-{i + 1}.{ext}"
+        f.write_bytes(base64.b64decode(b.data))
+        out.append(str(f))
+    return out
 
 
 def main(argv=None):

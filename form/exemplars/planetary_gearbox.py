@@ -23,6 +23,9 @@ META = {
         "Print-in-place: the sun, planets and ring are separate solids in mesh with the backlash as the gap. The carrier "
         "prints beside them and its pins press into the planet bores (pin = bore - 2 x clearance).",
         "The ring is a housing, not just a gear: a flange with bolt lugs, chamfered edges, and the ratio in derived().",
+        "Several stages stack in one ring: craft.planetary(..., ring_height=all stages) and the same gear set placed "
+        "at each stage's height; each carrier carries the next stage's sun. Name the parts in assembly() by a point "
+        "inside each (Part(solid=(x, y, z))): coaxial parts cannot be told apart by counting.",
     ],
 }
 

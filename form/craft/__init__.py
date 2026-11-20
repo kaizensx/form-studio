@@ -9,10 +9,11 @@ Modules (each also importable on its own, e.g. `from form.craft import mechanism
   surfaces    superellipse / spline profiles, loft_sections, sweep_spline, revolve_profile, shell, safe_fillet,
               variable_fillet, thicken, faces_at
   mechanisms  pin_hinge, living_hinge, cantilever_snap, annular_snap, bayonet, dovetail, detent, ratchet, cam,
-              four_bar, link, gear_train, planetary (gears via form.parts)
+              four_bar, four_bar_pose, link, link_between, gear_train, planetary (gears via form.parts)
   fits        ISO 286 iso_fit("H7/g6", d), shaft_limits, hole_limits, bearing_fit
   structure   rib, rib_grid, gusset, boss_array, lattice
-  organic     section_body, section_shell, inflate, dome_sections, helmet_shell, grip, handle
+  organic     section_body, section_shell, inset_body, inflate, dome_sections, helmet_shell, helmet_sections, grip,
+              handle
   texture     B-rep: knurl, spiral_ribbed_body, wrapped_ribs, emboss_cells (capped at MAX_INSTANCES = 2000)
   meshtex     MeshTexture for STL/GLB/renders ("mesh texture; STEP carries the smooth body")
   patterns    form.patterns re-exported (hex_vents, perforation_grid, slot_array, knurl, grip_ribs)
@@ -34,10 +35,12 @@ _LAZY = {
                  "loft_sections", "sweep_spline", "revolve_profile", "faces_at", "shell", "safe_fillet",
                  "variable_fillet", "thicken"),
     "mechanisms": ("Mech", "overlap", "pin_hinge", "living_hinge", "cantilever_snap", "annular_snap", "bayonet",
-                   "dovetail", "detent", "ratchet", "cam", "link", "four_bar", "gear_train", "planetary"),
+                   "dovetail", "detent", "ratchet", "cam", "link", "link_between", "four_bar", "four_bar_pose",
+                   "gear_train", "planetary"),
     "fits": ("iso_fit", "shaft_limits", "hole_limits", "bearing_fit"),
     "structure": ("rib", "rib_grid", "gusset", "boss_array", "lattice"),
-    "organic": ("section_body", "section_shell", "inflate", "dome_sections", "helmet_shell", "grip", "handle"),
+    "organic": ("section_body", "section_shell", "inset_body", "inflate", "dome_sections", "helmet_shell",
+                "helmet_sections", "grip", "handle"),
     "texture": ("knurl", "polyhedron", "spiral_ribbed_body", "wrapped_ribs", "emboss_cells", "MAX_INSTANCES"),
 }
 _WHERE = {name: mod for mod, names in _LAZY.items() for name in names}
