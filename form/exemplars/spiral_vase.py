@@ -9,6 +9,7 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Vase with spiral ribs",
+    "category": "textured",
     "tags": ["vase", "spiral", "ribs", "ribbed", "fluted", "texture", "decor", "revolve", "loft", "brep texture", "pot"],
     "techniques": ["craft.spiral_ribbed_body (B-rep texture as one skin)", "hollow by a revolve inset from the rib roots (not an offset)",
                    "profile as a few (r, z) points through a spline", "rolled lip with safe_fillet"],

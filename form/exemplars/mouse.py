@@ -13,6 +13,8 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Ergonomic mouse",
+    "category": "consumer",
+    "product_class": "mouse",
     "tags": ["mouse", "computer mouse", "ergonomic", "palm grip", "shell", "organic", "wheel", "buttons", "grip",
              "texture", "rubber", "styled", "hand", "loft", "consumer electronics"],
     "techniques": ["craft.mouse_form (hand -> guide curves -> sections)", "craft.checked_body", "craft.inset_body",

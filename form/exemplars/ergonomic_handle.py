@@ -13,6 +13,7 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Ergonomic handle",
+    "category": "organic",
     "tags": ["handle", "grip", "ergonomic", "tool", "screwdriver", "organic", "texture", "grain", "hand", "loft",
              "mesh texture"],
     "techniques": ["craft.section_body along the axis from a diameter law", "oval sections (n ~ 2.2, a > b)",

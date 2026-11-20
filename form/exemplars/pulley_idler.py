@@ -11,6 +11,7 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Pulley and belt idler",
+    "category": "mechanical",
     "tags": ["pulley", "idler", "belt", "bearing", "608", "tensioner", "wheel", "spokes", "crown", "revolve", "mechanism"],
     "techniques": ["revolve_profile of the rim with a crowned face and flanges", "bearing seat from form.parts",
                    "spokes as cut windows with filleted corners", "ISO fit for the bearing seat (fits.bearing_fit)",

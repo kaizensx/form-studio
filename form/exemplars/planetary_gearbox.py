@@ -11,6 +11,7 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Planetary gearbox",
+    "category": "assembly",
     "tags": ["gear", "gears", "gearbox", "planetary", "reduction", "mechanism", "print-in-place", "carrier", "ring gear",
              "involute", "transmission"],
     "techniques": ["craft.planetary (py_gearworks involute profiles via form.parts)", "assembly condition checks",

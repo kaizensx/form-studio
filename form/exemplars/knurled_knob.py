@@ -11,6 +11,7 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Knurled knob",
+    "category": "textured",
     "tags": ["knob", "knurl", "knurled", "texture", "shaft", "potentiometer", "dial", "grip", "brep texture"],
     "techniques": ["craft.knurl diamond", "revolved cap with dish", "D-shaft bore", "radial set screw", "safe_fillet"],
     "lessons": [

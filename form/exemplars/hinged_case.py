@@ -9,6 +9,7 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Hinged case with snap latch",
+    "category": "assembly",
     "tags": ["case", "box", "hinge", "hinged", "clamshell", "snap", "latch", "print-in-place", "mechanism", "lid",
              "enclosure", "assembly"],
     "techniques": ["craft.pin_hinge print-in-place", "hinge axis at (base height + lid height) / 2 so the lid closes "

@@ -9,6 +9,7 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Camera mount with dovetail",
+    "category": "mechanical",
     "tags": ["camera", "mount", "arca", "arca-swiss", "dovetail", "quick-release", "plate", "tripod", "clamp", "slot",
              "1/4-20", "photography"],
     "techniques": ["dovetail cross-section from the published standard (38 mm, 45 deg)", "craft.dovetail for the "

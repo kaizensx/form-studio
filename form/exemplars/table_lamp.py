@@ -11,6 +11,7 @@ BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 
 META = {
     "title": "Lamp with lofted shade",
+    "category": "consumer",
     "tags": ["lamp", "shade", "lampshade", "light", "loft", "twist", "decor", "organic", "revolve", "e27", "styled"],
     "techniques": ["craft.section_shell with open top and bottom (a shade)", "sections that morph soft square -> circle "
                    "and rotate (a twisted loft)", "revolved base with a profile spline", "spokes from a socket ring",
