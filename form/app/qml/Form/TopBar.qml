@@ -23,6 +23,7 @@ Rectangle {
     readonly property bool work: Store.screen === "work"
     readonly property bool roomy: width >= 1500
     readonly property bool tight: width < 1260
+    readonly property Item logo: mark         // where the opening screen's lockup lands (Splash.qml)
 
     Row { id: left; x: bar.inset + (bar.inset ? 4 : 10); anchors.verticalCenter: parent.verticalCenter; spacing: 4
         // elsewhere than macOS there is no menu bar at the top of the screen: the same actions live here
@@ -92,7 +93,7 @@ Rectangle {
                     { icon: "box", text: "Just a 3D model", run: function () { Store.setPurpose("model") } },
                     { icon: "printer", text: "For 3D printing", run: function () { Store.setPurpose("print") } },
                     { sep: true },
-                    { icon: "settings", text: "Design settings in the Brief…", run: function () { Store.setStage("brief") } }] } }
+                    { icon: "settings", text: "What it is for, in Describe…", run: function () { Store.setStage("brief") } }] } }
         // what it will print on; opens the printer picker
         Item { width: chip.implicitWidth + 16; height: 26; anchors.verticalCenter: parent.verticalCenter
             objectName: "printerChip"
