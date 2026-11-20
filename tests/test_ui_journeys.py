@@ -81,6 +81,9 @@ class Journeys(unittest.TestCase):
     def test_viewport_stress(self):         # orbit, pan and zoom to extremes with panels toggling: never a black view
         self.journey("viewport_stress.py")
 
+    def test_remodel(self):                 # a faceted solid drawn smooth; Rebuild as editable CAD starts the remodel brief
+        self.journey("remodel.py")
+
     def test_viewport_calm(self):           # orbit, zoom, rebuilds and slider drags never blink; a build grows in by feature
         self.journey("viewport_calm.py")
 

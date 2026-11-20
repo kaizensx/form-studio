@@ -59,6 +59,9 @@ Rules:
   dimensions read off a photo are "estimated from the photo (scale from <reference>)" and stay assumed until measured.
   Sketches from Form Studio carry structured JSON: it is authoritative over the picture; stated dimensions override
   drawn lengths. STEP/STL: import_reference. PDF drawings: read_document. Download only files the person gave you.
+- Meshes to make editable or understand: never embed them as the design. design_guide(topic="reference_parts"):
+  analyze_reference (and analyze_assembly for several parts) -> plan named features -> build123d with Params ->
+  compare_to_reference -> refine until within tolerance (0.1 mm by default for a remodel).
 - If the message has a "Purpose:" line, respect it: "just a 3D model" means no slicing and no print talk.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...) and design_examples -> plan_design -> create_design(plan=...) -> look at the sheet and
@@ -67,7 +70,7 @@ Rules:
 
 ## Tools at a glance
 
-84 tools. Read-only tools never change a project.
+87 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -118,6 +121,9 @@ Rules:
 | [`brief_presets`](#brief_presets) | read-only | Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure, car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a material to start from and the checks to plan for. |
 | [`import_reference`](#import_reference) | changes | Import an existing part (STEP or STL, e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's references. |
 | [`reconstruct`](#reconstruct) | changes | Turn a mesh (STL, OBJ or 3MF) into editable CAD as a new design. |
+| [`analyze_reference`](#analyze_reference) | read-only | Read an imported mesh (STL, OBJ, 3MF) like an engineer before modelling it again as clean CAD (design_guide topic "reference_parts"). |
+| [`analyze_assembly`](#analyze_assembly) | read-only | How several imported meshes go together and move, measured in the positions they were given. |
+| [`compare_to_reference`](#compare_to_reference) | read-only | Compare the design (or one part of its assembly) with an imported mesh, to iterate a remodel until it is within tolerance (default 0.1 mm for a remodel; say which you used). |
 | [`freecad_macro`](#freecad_macro) | read-only | Write a FreeCAD macro (.FCMacro) next to the current STEP export. |
 | [`analyze`](#analyze) | read-only | An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics. |
 | [`measure`](#measure) | read-only | Measure the part. Points are [x, y, z] in millimetres in the design frame. |
@@ -200,7 +206,8 @@ Parameters (unit, range, group, the feature each one drives), features and what 
 Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
 holder, mechanism...). topic="core" (default) returns the contract for a design written as code, the rules,
 the staged workflow and a complete example that builds. Other topics, for complex designs: surfacing,
-mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicable when purpose="model").
+mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicable when purpose="model"),
+reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine).
 They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
 textures. Then design_examples for a close exemplar, and create_design.
 
@@ -854,6 +861,69 @@ nothing is decimated and every repair is listed. Large meshes take minutes.
 | `layer` | integer |  |
 | `name` | string \| null |  |
 | `reference` | string \| null |  |
+
+### `analyze_reference`
+
+*Read-only.*
+
+Read an imported mesh (STL, OBJ, 3MF) like an engineer before modelling it again as clean CAD
+(design_guide topic "reference_parts"). Returns pictures of dimensioned sections in the three principal
+planes at several levels (look at them), and JSON: principal axes, levels of the flat faces (steps), section
+loops with sizes and vector outlines, and features with sizes: holes, bosses, openings (pockets, slots,
+cutouts, with count and pitch when repeated), plates, walls, ribs, rails and grooves, ramps with angles,
+draft, fillets and chamfers with radii and widths, round edges, detail areas (text, embossing, knurls),
+symmetry and wall thicknesses. reference: the mesh's file name in the project (import_reference first).
+tolerance (mm): how far a surface may be from the mesh to count as a plane, cylinder... levels: extra section
+levels per axis, e.g. {"z": [3.2, 6.5], "y": [-40]}. Evidence: computed on the mesh as given. Never embed
+the mesh as the design: plan features from this, write build123d with Params, then compare_to_reference.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `reference` | string | yes |
+| `tolerance` | number |  |
+| `levels` | object \| null |  |
+
+### `analyze_assembly`
+
+*Read-only.*
+
+How several imported meshes go together and move, measured in the positions they were given. references:
+the mesh files (the part that stays still first, or name it in fixed). Returns mating surfaces (facing,
+area, gap, where), clearances per pair, each part's travel against the fixed one along +/-X, Y, Z and about
+the axes of round faces they share (free distance before touching, distance past bumps such as detents and
+flexing arms, the obstacles met and where), the joints this implies (slide axis and range, hinge axis,
+origin and range) and couplings between moving parts (a slide meshing with a part that turns: rack and gear
+or cam with the ratio; a slide on a leaning face: a ramp with the lift per mm), plus a one-paragraph summary.
+Rigid parts: it does not know springs or gravity; say so. near (mm): gaps up to this count as mating.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `references` | array | yes |
+| `fixed` | string \| null |  |
+| `near` | number |  |
+
+### `compare_to_reference`
+
+*Read-only.*
+
+Compare the design (or one part of its assembly) with an imported mesh, to iterate a remodel until it is
+within tolerance (default 0.1 mm for a remodel; say which you used). Returns a picture (the design coloured
+by its distance to the mesh, and the mesh by its distance to the design) and JSON: two-sided Hausdorff, mean,
+99th percentile, the worst regions by where they are (words and coordinates, the nearest feature of the
+reference analysis, and whether the design has extra or missing material there) and per-feature
+differences (the design's diameter or radius next to the mesh's). part: a part id or label of the design's
+assembly, so a multi-part design is compared part by part. Run analyze_reference first for feature names.
+Evidence: computed on the design's tessellation against the mesh.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `reference` | string | yes |
+| `part` | string \| null |  |
+| `tolerance` | number |  |
+| `rev` | integer \| null |  |
 
 ### `freecad_macro`
 

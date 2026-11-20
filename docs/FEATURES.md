@@ -213,6 +213,36 @@ each one named as it arrives.
   wall thickness and exports work on it; it is never written to STEP or called a CAD solid.
 
 
+## Meshes rebuilt as clean CAD by the agent
+
+When you bring meshes to make editable or to understand, the agent rebuilds them as CAD that reads like a part
+designed from scratch: named features, Params for the dimensions that matter, and edges only where the part has
+edges. The meshes stay in the design as blueprint references and are never used as the design itself. The staged
+workflow is `design_guide(topic="reference_parts")`; **Rebuild as editable CAD** in Describe › Reference parts starts it.
+
+- **Read the mesh.** `analyze_reference` (`form analyze-reference <project> <mesh> [--levels JSON]`) cuts sections in
+  the three principal planes at the levels where the part changes and returns them as pictures with dimensions and
+  as vector outlines (loops described as circles, slots, rectangles with their corner radius, or outlines, and each
+  as lines and arcs with centres and radii). It lists the features with their sizes: holes and bosses (diameter,
+  depth, through or blind), openings (pockets, slots, cutouts; repeated ones with count and pitch), plates, walls,
+  ribs, rails and grooves (opposite parallel faces with material or air between them, checked inside the solid),
+  levels of the flat faces (steps), ramps with their angle, rise and run, draft, fillets and round edges with radii,
+  chamfers with width and angles, detail areas (text, embossing, knurls), symmetry with the largest deviation from
+  the mirror image, and wall thicknesses. Results are kept with the project and returned instantly the next time.
+- **Understand how parts move.** `analyze_assembly` (`form analyze-assembly <project> FIXED OTHER...`) takes several
+  meshes in the positions they were given: mating surfaces with their area and gap, the smallest clearance per pair,
+  and for every part against the fixed one the distance it can slide along each axis and turn about the round faces
+  they share, the bumps on the way (detents, snaps or flexing arms, with how deep they press) and where it stops. It
+  names the joints (a slide along an axis with its range, a hinge with its axis and range) and couplings between
+  moving parts: a slide meeting a part that turns is a rack on a gear (or a cam) with its ratio, a slide on a leaning
+  face is a ramp with how far it pushes. Parts are rigid; springs and gravity are not simulated.
+- **Check the rebuild.** `compare_to_reference` (`form compare-reference <project> <mesh> [--part P] [--png FILE]`)
+  measures the design, or one part of its assembly, against the mesh: two-sided Hausdorff, mean and 99th percentile,
+  a picture of both coloured by deviation, the worst regions by where they are (in words and coordinates, with the
+  nearest feature) and whether the design has extra or missing material there, and per feature the largest
+  deviation and, for holes, bosses and fillets, the design's own diameter or radius next to the mesh's. The default
+  limit for a remodel is 0.1 mm.
+
 ## Mesh to editable CAD
 
 Bring an STL, OBJ or 3MF and Form Studio rebuilds it as CAD, then measures how close the result is to the mesh.
@@ -246,6 +276,8 @@ blueprint, and the report, the deviation map and every solid are kept in the des
   mirror planes and rotational symmetry are reported. The design is rebuilt and compared with the mesh; a feature that
   does not verify is left in the base and named in the report, and the recipe is used only when it is within the
   limit. The report also gives the share of the area the Params drive.
+- **Drawn like a part.** A mesh or a faceted solid is shaded smooth, and only creases sharper than 25° and
+  boundaries are drawn as edges (the 3D view, card thumbnails and render sheets).
 - **Verification, every time.** Two-sided Hausdorff distance, volume difference, parametric, freeform and frozen
   area, and a deviation map coloured against the tolerance.
 
@@ -385,7 +417,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 84 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 87 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

@@ -758,7 +758,7 @@ def _finish_source(S, G, fils, chams, report):
                 continue
             f["sharp"], f["dist"] = sp
             size = f["r"] if kind == "fillet" else float(np.mean(f["dist"]))
-            key = round(size, 3)
+            key = (round(size, 3), id(f) if f.get("solo") else 0)    # one op per edge once a shared op has failed
             groups.setdefault(key, []).append(f)
         for k, (size, grp) in enumerate(sorted(groups.items()), 1):
             vals = [f["r"] if kind == "fillet" else float(np.mean(f["dist"])) for f in grp]
@@ -1066,7 +1066,7 @@ def _choose(shape, G, feats, tol, force_embedded):
     return core, removed, kept, Gc, kind, [], frozenset()
 
 
-def recipe(V, F, shape, tol, name="part", limit=None, out_dir=None, progress=None) -> dict:
+def recipe(V, F, shape, tol, name="part", limit=None, out_dir=None, progress=None, deadline=None) -> dict:
     """The feature-tree recipe of a Layer 1 solid. Returns {"report", "source", "verified", "shape", "P", "T", "cmp"}."""
     say = progress or (lambda d: None)
     t0 = time.perf_counter()
@@ -1090,7 +1090,10 @@ def recipe(V, F, shape, tol, name="part", limit=None, out_dir=None, progress=Non
     attempts = []
     result = None
     last_src = None
-    for attempt in range(4):
+    for attempt in range(8):
+        if deadline is not None and attempt and time.perf_counter() > deadline:
+            attempts.append({"stopped": "the time budget ran out; the best attempt so far is the result"})
+            break
         say({"stage": "layer2", "text": f"Taking {len(feats)} features off the solid", "fraction": 0.1 + 0.2 * attempt})
         core, removed, kept, Gc, kind, in_profile, ignore = _choose(shape, G, feats, tol, force_embedded)
         left_in_base += [{**_brief(f), "why": "it could not be taken off the solid to find the shape under it"} for f in kept]
@@ -1138,6 +1141,14 @@ def recipe(V, F, shape, tol, name="part", limit=None, out_dir=None, progress=Non
             culprit = [f for f in removed if f.get("feature") == fid] if fid else []
             if fid == "base" or (fid and fid.startswith(("step", "pocket", "cutout"))):
                 force_embedded = True
+                continue
+            # a fillet or chamfer op on several edges failed: try its edges one by one before giving any up, so one
+            # edge that will not round does not take the others (or the whole tree) with it
+            finish = culprit if culprit else ([f for f in removed if f["kind"] in ("fillet", "chamfer")]
+                                              if any(w in str(e).lower() for w in ("fillet", "chamfer")) else [])
+            if finish and (len(finish) > 1 or not culprit) and not all(f.get("solo") for f in finish):
+                for f in finish:
+                    f["solo"] = True
                 continue
             if culprit:
                 left_in_base += [{**_brief(f), "why": f"its operation failed: {type(e).__name__}"} for f in culprit]

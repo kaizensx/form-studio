@@ -166,8 +166,9 @@ def _name_derived(spec, model, face_part):
 
 
 # ---- view payload ----------------------------------------------------------------------------------------
-def mesh(model, b64) -> list:
-    """Feature meshes split by part (print frame), each entry tagged with its part id."""
+def mesh(model, b64, smooth=None) -> list:
+    """Feature meshes split by part (print frame), each entry tagged with its part id. smooth(P, T) -> (P, T) shares
+    vertices across gentle edges of a faceted solid (kernel.smooth_facets)."""
     a = get(model)
     ids = [p.id for p in a["spec"].parts]
     groups = {}
@@ -176,9 +177,14 @@ def mesh(model, b64) -> list:
         g["T"].append(f["T"] + g["n"])
         g["P"].append(f["P"])
         g["n"] += len(f["P"])
-    return [{"feature": feat, "part": ids[k] if k >= 0 else "",
-             "positions": b64(np.concatenate(g["P"]).astype(np.float32)),
-             "indices": b64(np.concatenate(g["T"]).astype(np.uint32))} for (feat, k), g in groups.items()]
+    out = []
+    for (feat, k), g in groups.items():
+        P, T = np.concatenate(g["P"]), np.concatenate(g["T"])
+        if smooth is not None:
+            P, T = smooth(P, T)
+        out.append({"feature": feat, "part": ids[k] if k >= 0 else "",
+                    "positions": b64(P.astype(np.float32)), "indices": b64(T.astype(np.uint32))})
+    return out
 
 
 def view(model, b64, edges_fn) -> dict:

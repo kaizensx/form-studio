@@ -454,8 +454,59 @@ DESIGN FOR 3D PRINTING (purpose: print)
   * Large shells (a helmet) do not fit most beds in one piece: split them with alignment keys or say what bed it needs.
 """
 
+REFERENCE_PARTS = """\
+REFERENCE PARTS: meshes (STL, OBJ, 3MF) the person gives you to understand, make editable, or rebuild
+When someone brings meshes and wants them editable, understood or changed, rebuild them as clean CAD: named features
+and Params, like a part designed from scratch. The meshes stay blueprint references, never the design.
+
+NEVER
+  * never embed the raw meshes as the design (self.reference("part.stl") as the body): nothing is editable, every
+    triangle is a face, and the viewport is a wireframe of facets. A reference mesh is only for looking and comparing.
+  * never guess what a mechanism does from its outline: measure it (analyze_assembly) and read the sections.
+
+STAGES
+  1. Import every mesh into the project: import_reference(project, path), one per part, keeping their coordinates.
+     "Make editable" (reconstruct) is the deterministic route; when it does not reach a verified Layer 2 recipe, do
+     this workflow instead.
+  2. analyze_reference(project, reference) for each mesh: principal axes, section pictures with dimensions (look at
+     them), vector outlines, and features with sizes: holes, bosses, openings (pockets, slots, cutouts), walls, ribs,
+     rails and grooves, plates, steps (levels), ramps with angles, draft, fillets and chamfers with radii and widths,
+     detail areas (text, embossing, knurls), symmetry and wall thicknesses. Ask for sections where you need them
+     (levels={"z": [3.2, 6.5]}).
+  3. Several parts: analyze_assembly(project, references=[fixed part first, ...]) gives mating surfaces and clearances,
+     each part's travel (slide axes with their range, hinge axes with their range, bumps on the way: detents, snaps or
+     flexing arms) and couplings (a slide meshing with a part that turns: rack and gear or cam, with the ratio; a slide
+     on a leaning face: a ramp, with the lift per mm). State the mechanism in one sentence before modelling it.
+  4. Plan: the features in build order, each named after what it is ("base_plate", "side_rail", "card_slot",
+     "pivot_pin", "rack", "cascade_steps"), with the dimension that drives it as a Param (card slot width, wall
+     thickness, rail clearance, ramp angle, step height, pin diameter). Read sizes off the analysis: round to the
+     designer's evident grid (0.1 mm, 0.5 mm, whole degrees) when the mesh agrees within the tolerance.
+  5. Write clean build123d (algebra API, design_guide core): sketch the main profile from the section outlines and
+     extrude it, then cut pockets and slots, add rails and ribs, then holes, then chamfers and fillets last. One Stage
+     per feature. Model in the meshes' coordinates so the comparison lines up. For several parts: one Part per mesh
+     (solid=(x, y, z) a point inside it, move=(0, 0, 0) when modelled in place) and the joints analyze_assembly found
+     (slide(part, axis, (lo, hi)), hinge(part, axis, origin, (lo, hi))), Mate() for pins in holes; gears and racks are
+     not joints: model their teeth in mesh and put the ratio in derived().
+  6. compare_to_reference(project, reference, part=...) after every build: two-sided Hausdorff, the worst regions
+     with where they are and whether the design has too much or too little material there, and per-feature
+     differences (the design's diameters and radii next to the mesh's). Fix the worst first.
+  7. Refine until every part is within the tolerance. The default for a remodel is 0.1 mm (two-sided Hausdorff);
+     say which tolerance you used. Where you choose not to follow the mesh (scan noise, a facet artefact, text you
+     left out), say where and by how much; never hide a difference.
+
+TIPS
+  * Sections across the up axis give the plan shapes (outlines and openings); sections along it give the steps,
+    rails and chamfers in profile.
+  * A narrow strip between two planes is usually a chamfer or a fillet; equal strips around a rim are one edge
+    treatment with one Param.
+  * Repeated openings with a pitch are one feature with a count and a pitch Param.
+  * A "bump" in the travel of a slide is often a flexing detent arm: model the arm and its bump as features.
+  * measure(project, at=[x, y, z]) and measure(project, from_point=[...], to_point=[...]) check single values on
+    your design.
+"""
+
 TOPICS = {"core": None, "surfacing": SURFACING, "mechanisms": MECHANISMS, "organic": ORGANIC, "texture": TEXTURE,
-          "aesthetics": AESTHETICS, "dfm": DFM}
+          "aesthetics": AESTHETICS, "dfm": DFM, "reference_parts": REFERENCE_PARTS}
 
 
 def topic(name: str = "core", purpose: str | None = None) -> dict:

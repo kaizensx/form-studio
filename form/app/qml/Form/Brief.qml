@@ -10,6 +10,8 @@ Column {
     readonly property var brief: Store.project && Store.project.brief ? Store.project.brief : ({ text: "", references: [] })
     readonly property var refs: (brief.references || []).filter(function (r) { return r.kind !== "part" })
     readonly property var parts: (brief.references || []).filter(function (r) { return r.kind === "part" })
+    readonly property var meshes: parts.filter(function (r) { return r.format !== "step" }).map(function (r) { return r.file })
+    readonly property var recon: Store.project && Store.project.reconstruction ? (Store.project.reconstruction.summary || null) : null
     function size(b) { return [0, 1, 2].map(function (i) { return F.fmt(b[1][i] - b[0][i], 1) }).join(" × ") }
     readonly property var known: Store.recipe ? Store.recipe.params.filter(function (p) { return p.group === "brief" }) : []
     // the printer this design uses (its own choice, the default, or the slicer's selection: form/printers.py)
@@ -132,7 +134,16 @@ Column {
                     Tag { text: pr.modelData.evidence || "computed"; anchors.verticalCenter: parent.verticalCenter }
                     Btn { kind: "quiet"; small: true; icon: "box"; text: "Make editable"; visible: pr.modelData.format !== "step"
                           anchors.verticalCenter: parent.verticalCenter; onClicked: Store.makeEditable(pr.modelData.file) } } } }
-        Btn { text: "Import part…"; icon: "box"; onClicked: Store.ask(partDlg) } }
+        // the deterministic reconstruction did not reach a verified feature recipe: say so, and offer the agent remodel
+        Txt { kind: "fine"; width: parent.width; tone: 2; visible: root.recon !== null && !root.recon.recipe_verified
+              text: root.recon ? "Make editable reached Layer " + root.recon.layer + " (" + F.fmt(root.recon.frozen_area_pct, 0)
+                                 + "% frozen facets, no verified feature recipe). Rebuild as editable CAD has the agent model it again "
+                                 + "with named features and Params, compared with the mesh until it is within 0.1 mm." : "" }
+        Row { spacing: 8
+            Btn { text: "Import part…"; icon: "box"; onClicked: Store.ask(partDlg) }
+            Btn { objectName: "rebuildCad"; text: "Rebuild as editable CAD"; icon: "sparkles"; visible: root.meshes.length > 0
+                  kind: root.recon !== null && !root.recon.recipe_verified ? "primary" : "default"
+                  onClicked: Store.rebuildAsCad(root.meshes) } } }
 
     Fold { title: "Printer context"; key: "brief.printer"; openByDefault: !root.sl.available && Store.prints
         visible: Store.printUi                         // a 3D model, or printing off: no printer

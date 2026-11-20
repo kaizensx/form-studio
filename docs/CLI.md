@@ -105,6 +105,9 @@ message, with what the design is for.
 | `form feature <project> boss\|snap_hook --at x,y,z --normal x,y,z [--size M3] [--hole tapped\|clearance\|insert] ...` | A screw boss or a snap-fit hook on a flat face, written into the design's code and built as a new revision |
 | `form diff <project> A [B] [--png FILE]` | What changed between two revisions on the solids: material added and removed, with volumes and regions |
 | `form reconstruct FILE [--name N] [--tolerance MM] [--layer 0\|1\|2]` | A mesh (STL, OBJ, 3MF) as a new design: the exact solid, analytic faces (beta) and a feature recipe (beta), each compared with the mesh |
+| `form analyze-reference <project> <mesh> [--tolerance MM] [--levels JSON]` | An imported mesh read like an engineer: dimensioned sections (pictures and outlines), features with sizes, symmetry, walls |
+| `form analyze-assembly <project> FIXED OTHER... [--fixed P] [--near MM]` | How imported meshes go together and move: mating surfaces, clearances, slide and turn ranges, couplings |
+| `form compare-reference <project> <mesh> [--part P] [--tolerance MM] [--rev N] [--png FILE]` | The design, or one part, against an imported mesh: Hausdorff, worst regions by place, per-feature differences |
 
 ## Print
 

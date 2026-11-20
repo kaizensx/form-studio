@@ -599,6 +599,10 @@ def make_handler(st: Studio):
                 out = st.reconstruct_reference(p, str(body.get("file") or ""), **kw)
                 st.activity(out["project"], "design", f"Made {body.get('file')} editable as “{out['name']}”.", by="you")
                 return self._json(out)
+            # -- "Rebuild as editable CAD": the message that starts the agent remodel (form/remodel) --
+            if action == "rebuild_brief":
+                from .remodel import project as remodel
+                return self._json(remodel.rebuild_brief(st, p, body.get("files") or None))
             # -- measuring (form/analysis.py) --
             if action == "probe":
                 from . import analysis
