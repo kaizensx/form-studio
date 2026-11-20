@@ -396,7 +396,8 @@ class Builder:
 
 
 PERIODIC = ("cylinder", "cone", "torus")
-EXACT_EDGES = True         # boundaries between two fitted surfaces follow their intersection curve (else the mesh)
+EXACT_EDGES = False        # boundaries between fitted planes follow their intersection line (opt-in: the feature tree
+                           # finds holes and turned bases more reliably on the mesh-boundary solid)
 EXACT_CURVED = False       # ... also between curved surfaces (off: the feature tree reads turned bases less well)
 
 

@@ -213,7 +213,12 @@ class ExactEdges(unittest.TestCase):
         from form.recon import brep, segment
         V, F = _load("box_with_holes")
         regions, _ = segment.segment(V, F, 0.02)
-        shape, info = brep.build(V, F, regions, 0.02)
+        keep = brep.EXACT_EDGES
+        brep.EXACT_EDGES = True
+        try:
+            shape, info = brep.build(V, F, regions, 0.02)
+        finally:
+            brep.EXACT_EDGES = keep
         self.assertTrue(info["valid"])
         self.assertTrue(info["exact_edges"])
         self.assertGreater(info["edges_exact"], 0)

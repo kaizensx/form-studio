@@ -14,8 +14,6 @@ as an MCP tool ([MCP reference](MCP.md)), unless noted. 3D printing is optional 
 - [Analysis, measurement and annotations](#analysis-measurement-and-annotations)
 - [Revisions, branches and variants](#revisions-branches-and-variants)
 - [Colours and materials](#colours-and-materials)
-- [Pictures: renders, share cards, animations](#pictures-renders-share-cards-animations)
-- [Release](#release)
 - [Working with other software](#working-with-other-software)
 - [Conversations and agents](#conversations-and-agents)
 - [Any model, any provider](#any-model-any-provider)
@@ -313,11 +311,11 @@ still not editable.
   (default 0.02 mm) and its facets are no farther from the surface than the mesh's own chord error. Smooth regions
   that no simple surface explains (a sculpted handle, a scan, a blob) are fitted with bicubic B-spline patches
   instead, each through its vertices within a third of the tolerance, and reported as "freeform (B-spline fitted)".
-  Where two fitted planes meet, the edge is their exact intersection line, trimmed at corners moved onto all the
-  planes round them (the kernel's surface intersection, which can also trim curved pairs: `brep.EXACT_CURVED`); other
-  boundaries are lines, circles and arcs through the mesh's boundary points where they are one. Where that does not
-  close into a valid solid, the mesh's own boundaries are used. The faces are sewn, with frozen facets for whatever is
-  left, into one solid. The report gives the share of area that is parametric
+  Faces are trimmed along lines, circles and arcs through the mesh's boundary points where the boundary is one; as
+  an option (`brep.EXACT_EDGES`) the edge where two fitted planes meet is their exact intersection line, trimmed at
+  corners moved onto every plane round them, with the mesh's own boundaries wherever that does not close into a valid
+  solid. The faces are sewn, with frozen facets for whatever is left, into one solid. The report gives the share of
+  area that is parametric
   (analytic), freeform and frozen.
 - **Layer 2 (beta): a feature tree.** The features of the Layer 1 solid are found and taken off it: holes (plain,
   counterbored, countersunk, blind or through, on any axis), constant-radius fillets and equal-distance chamfers. What

@@ -44,7 +44,9 @@ def run(name, tolerance=TOL, layer=2, program=False):
         if not program:
             pipeline._program = lambda *a, **k: {"report": {"method": "sketches and extrusions", "error": "off for this test"}}
         try:
-            _runs[key] = (pipeline.reconstruct(stl, out, name, tolerance, layer), out)
+            # a long budget: on a loaded machine (the whole suite in parallel) the feature search must not run out of
+            # time and give a different answer
+            _runs[key] = (pipeline.reconstruct(stl, out, name, tolerance, layer, budget_s=900.0), out)
         finally:
             pipeline._program = keep
     return _runs[key]

@@ -13,10 +13,7 @@
   share of analytic area stays in the report.
 - **Faster and never silent.** Surface fitting uses analytic derivatives (segmentation is several times faster),
   and a reconstruction reports progress about every second.
-- **Exact edges.** Layer 1 trims its planes with their exact intersection lines and moves corners onto every plane
-  round them (curved pairs can be trimmed the same way), falling back to the mesh's own boundaries where that does not
-  make a valid solid. The program route's faces are exact by construction: every edge is where two sketch features
-  meet.
+- **Exact edges.** The program route's faces are exact by construction: every edge is where two sketch features meet.
 - **Parts that fit stay fitting.** `form.recon.assembly` ties the dimensions where several reconstructed parts meet
   (walls across a gap, a pin in a hole) into one Param plus a clearance and writes them as one multi-part design.
 - **A benchmark.** `scripts/recon_bench.py` writes `docs/RECON_BENCH.md`: editable share, deviation, time and a sweep of

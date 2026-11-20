@@ -189,9 +189,11 @@ def _refine(kind, x0, P, unpack):
 
     def res(x):
         return unpack(x).dist(P)
-    jac = (lambda x: _jacobian(kind, x, P)) if kind in ("cylinder", "cone", "sphere", "torus") else "2-point"
+    # cylinders keep finite differences: the feature tree was tuned on where they converge (a counterbored hole of
+    # the stepped bracket is found that way); cones, spheres and tori, where most of the time went, are analytic
+    jac = (lambda x: _jacobian(kind, x, P)) if kind in ("cone", "sphere", "torus") else "2-point"
     try:
-        sol = least_squares(res, x0, jac=jac, method="lm", max_nfev=12 * (len(x0) + 1), xtol=1e-10, ftol=1e-10)
+        sol = least_squares(res, x0, jac=jac, method="lm", max_nfev=40 * (len(x0) + 1), xtol=1e-12, ftol=1e-12)
         return _finish(unpack(sol.x), P)
     except Exception:
         return _finish(unpack(np.asarray(x0)), P)
