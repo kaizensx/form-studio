@@ -274,6 +274,9 @@ ORGANIC = """\
 ORGANIC FORMS (form.craft.organic)
   craft.section_body([dict(z, a, b, n, cx, cy, squash), ...], tip=(x, y, z))   loft of superellipse sections
   craft.dome_sections(length, width, height, crown_back=, squash_front=)       sections of a smooth dome
+  craft.section_shell(sections, wall, tip=, open_top=)                         hollow by inset sections (never fails
+                                                                               where an offset of a crown point does)
+  craft.inflate(sections, amount, tip)                                         near-offset sections, for pads/ridges
   craft.helmet_shell(length, width, height, wall, skirt)                       outer form + hollow shell
   craft.grip(length, d_max, d_min, flat, finger_grooves)                       revolved spline, oval section
   craft.handle(span, rise, section_w, section_h)                               swept D-handle with feet
@@ -290,15 +293,16 @@ TEXTURE, two honest tiers
     craft.knurl(diameter, height, pitch, depth, kind="diamond"|"straight")      exact faceted knurl, chamfered ends
     craft.spiral_ribbed_body([(r, z), ...], ribs, rib_depth, twist)            one smooth skin with spiral ribs
     craft.wrapped_ribs(radius, height, count, rib_w, rib_h, twist)             ribs to fuse onto a cylinder
-    craft.emboss_cells(w, d, cell, height, kind="hex"|"diamond"|"dots"|"pyramids")   raised tiles for a flat face
+    craft.emboss_cells(w, d, cell, height, kind="hex"|"diamond"|"dots"|"pyramids", base=0)   raised tiles for a flat face
     form.patterns: hex_vents, perforation_grid, slot_array, knurl, grip_ribs (cutters / adds with computed webs)
   Mesh texture (fine surface: leather grain, stone, carbon-like cells, sand-cast): declare it on the design; the STL,
   OBJ, GLB and the renders carry it, the STEP keeps the smooth body. Say so: "mesh texture; STEP carries the smooth body".
     from form.craft import MeshTexture
     def mesh_texture(self, v):
         return [MeshTexture("cells", amplitude=0.4, scale=5, features=["shell"])]
-    kinds: noise, cells, grain, hex, knurl, ribs, heightmap (image=, projection=planar|cylindrical|spherical)
-    amplitude mm (negative presses in), scale mm, features = which feature ids, edge_falloff mm at borders and creases.
+    kinds: noise, cells, grain, hex, weave (carbon-like twill), knurl, ribs, heightmap (image=, projection=planar|
+    cylindrical|spherical). amplitude mm (negative presses in), scale mm, features = which feature ids,
+    facing="out" = only the outside of a shell, edge_falloff mm at borders and creases.
 Choose: if a person sees it from a metre away or it does work (grip, alignment), make it B-rep. If it is felt or seen
 up close, make it a mesh texture. Printed texture needs >= 2 nozzle widths in plan and >= 0.3 mm depth to survive.
 """
