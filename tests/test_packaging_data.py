@@ -68,6 +68,18 @@ class PackagedData(unittest.TestCase):
         finally:
             shutil.rmtree(bundle, ignore_errors=True)
 
+    def test_every_exemplar_loads_as_a_design_source(self):
+        """An agent pastes an exemplar into create_design: it must pass the same checks a design source gets (one
+        Recipe, params that name real features), not only build when imported directly."""
+        import tempfile
+        from form import exemplars
+        from form.recipes import load_source, store_source
+        store = Path(tempfile.mkdtemp(prefix="form-exemplar-sources-"))
+        for e in exemplars.catalogue():
+            with self.subTest(e["name"]):
+                rid = store_source(store, exemplars.get(e["name"])["source"])
+                load_source(store / f"{rid[4:]}.py", rid)
+
     def test_exemplars_cover_every_category(self):
         from form import exemplars
         cov = exemplars.coverage()

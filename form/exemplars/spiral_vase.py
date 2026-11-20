@@ -34,9 +34,9 @@ class Design(Recipe):
         Param("height", "Height", 180, 80, 300, 1, "mm", "form", "body"),
         Param("belly_r", "Belly radius", 52, 25, 90, 0.5, "mm", "form", "body"),
         Param("neck_r", "Neck radius", 30, 15, 70, 0.5, "mm", "form", "body"),
-        Param("ribs", "Ribs", 24, 6, 48, 1, "", "form", "ribs"),
-        Param("rib_depth", "Rib depth", 3.0, 0.8, 6, 0.1, "mm", "form", "ribs"),
-        Param("twist", "Twist", 90, -240, 240, 5, "deg", "form", "ribs"),
+        Param("ribs", "Ribs", 24, 6, 48, 1, "", "form", "body"),
+        Param("rib_depth", "Rib depth", 3.0, 0.8, 6, 0.1, "mm", "form", "body"),
+        Param("twist", "Twist", 90, -240, 240, 5, "deg", "form", "body"),
         Param("wall", "Wall", 2.0, 1.2, 4, 0.1, "mm", "form", "hollow"),
         Param("base_t", "Base thickness", 4.0, 1.6, 10, 0.2, "mm", "form", "hollow"),
     ]
