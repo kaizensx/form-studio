@@ -51,10 +51,15 @@ sys.path.insert(0, str(ROOT))
 def _theme() -> dict:
     src = (QML / "Theme.qml").read_text(encoding="utf-8")
     t = {}
-    for name, hexv in re.findall(r'property color (\w+): "(#[0-9a-fA-F]{6})"', src):
+    # a token is one value, or a dark/light pair ("dark ? A : B"): the drawing uses the dark value
+    for name, hexv in re.findall(r'property color (\w+): (?:dark \? )?"(#[0-9a-fA-F]{6})"', src):
         t[name] = hexv
-    for name, r, g, b, a in re.findall(r"property color (\w+): Qt\.rgba\(([\d.]+), ([\d.]+), ([\d.]+), ([\d.]+)\)", src):
+    for name, r, g, b, a in re.findall(r"property color (\w+): (?:dark \? )?Qt\.rgba\(([\d.]+), ([\d.]+), ([\d.]+), ([\d.]+)\)", src):
         t[name] = "rgba(%d,%d,%d,%s)" % (round(float(r) * 255), round(float(g) * 255), round(float(b) * 255), a)
+    for name, base, a in re.findall(r"property color (\w+): alpha\((\w+), (?:dark \? )?([\d.]+)", src):
+        h = t.get(base)
+        if h and h.startswith("#"):
+            t[name] = "rgba(%d,%d,%d,%s)" % (int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16), a)
     return t
 
 
