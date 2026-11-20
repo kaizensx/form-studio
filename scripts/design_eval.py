@@ -25,6 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BUILDS = ("create_design", "update_design", "build_candidates", "propose_concepts")
+REFUSALS = ("brief and plan it", "Say what this code is to it", "Unknown brief")
 
 
 def _bench():
@@ -82,10 +83,13 @@ def run_brief(b: dict, agent: str, effort: str, model: str, root: Path, timeout:
     secs = time.time() - t0
     evs = _events(data)
     names = {e.get("id"): e.get("name") for e in evs if e.get("t") == "tool"}
-    builds = [e for e in evs if e.get("t") == "result" and (e.get("name") or names.get(e.get("id"))) in BUILDS]
+    calls = [e for e in evs if e.get("t") == "result" and (e.get("name") or names.get(e.get("id"))) in BUILDS]
+    # a refusal before any build (a complex brief with no plan, a missing relation) is the workflow, not the kernel
+    refused = [e for e in calls if not e.get("ok") and any(k in str(e.get("text", "")) for k in REFUSALS)]
+    builds = [e for e in calls if e not in refused]
     limit = any(e.get("t") == "error" and e.get("kind") == "usage_limit" for e in evs)
     row = {"id": b["id"], "agent": agent, "effort": effort or "default", "seconds": round(secs, 1),
-           "timed_out": timed_out, "builds_tried": len(builds), "first_build_ok": bool(builds and builds[0].get("ok")),
+           "timed_out": timed_out, "builds_tried": len(builds), "refused": len(refused), "first_build_ok": bool(builds and builds[0].get("ok")),
            "final_build_ok": False, "usage_limit": limit, "data": str(data),
            "steps": sum(1 for e in evs if e.get("t") == "tool")}
     src = _final_source(data)

@@ -20,7 +20,7 @@ _LIMIT = re.compile(
     re.I)
 _UNTIL = [
     re.compile(r"try again (?:at|after|in) ([^.,;()\n]{1,40})", re.I),
-    re.compile(r"resets? (?:at|on|in) ([^.,;()\n]{1,40})", re.I),
+    re.compile(r"resets? (?:at |on |in )?([^.,;()\n]{1,40})", re.I),      # "resets 11pm (Europe/Zurich)"
     re.compile(r"(?:available|back) (?:again )?(?:at|after) ([^.,;()\n]{1,40})", re.I),
 ]
 _EPOCH = re.compile(r"limit reached\|(\d{10})")

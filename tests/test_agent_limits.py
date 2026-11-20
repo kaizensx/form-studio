@@ -50,6 +50,8 @@ class Limits(unittest.TestCase):
 
     def test_claude_epoch_and_other_errors(self):
         self.assertIsNotNone(limits.usage_limit("Claude AI usage limit reached|1795190938", "Claude")["until"])
+        claude = limits.usage_limit("You've hit your 5-hour limit · resets 11pm (Europe/Zurich)", "Claude Code")
+        self.assertEqual(claude["until"], "11pm")                        # seen live in an evaluation run
         self.assertIsNone(limits.usage_limit("Fusion failed at step 0", "Codex"))
         self.assertIsNone(limits.usage_limit("model_not_found", "Codex"))
 
