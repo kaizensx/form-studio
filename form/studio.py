@@ -913,11 +913,11 @@ class Studio:
             raise StudioError(i.get("message", "Kernel failure"), i.get("hint", ""), status=422 if i.get("kind") == "recipe" else 500,
                               feature=i.get("feature"), params=i.get("params", []), kind=i.get("kind"))
 
-    def view(self, p: dict, n: int | None = None, tol=0.03) -> dict:
+    def view(self, p: dict, n: int | None = None, tol=0.03, timeout: float = 60) -> dict:
         r = self.rev(p, n)
         gk = self.keys(p, r["n"])["geometry"]
         v = self._k("view", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"], tol=tol, dock_mass_g=self._sliced_mass(p, r["n"]), p=p,
-                    rev=r["n"])
+                    rev=r["n"], timeout=timeout)
         v["companions"] = (v.get("companions") or []) + self.reference_companions(p)
         return v
 

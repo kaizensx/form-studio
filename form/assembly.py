@@ -82,8 +82,33 @@ def _bbox(shape):
 def _ordered_solids(shape):
     def key(s):
         b = s.bounding_box()
-        return (round((b.min.X + b.max.X) / 2, 2), round((b.min.Y + b.max.Y) / 2, 2))
+        # X, then Y, then Z: parts modelled in place on one axis (a gearbox's housing, suns and carriers) still get a
+        # stable, documented order (bottom to top)
+        return (round((b.min.X + b.max.X) / 2, 2), round((b.min.Y + b.max.Y) / 2, 2), round((b.min.Z + b.max.Z) / 2, 2))
     return sorted(shape.solids(), key=key)
+
+
+def _resolve_points(spec, solids):
+    """Parts given by a point (Part(solid=(x, y, z))) get the index of the solid that holds the point, else the
+    nearest one."""
+    if not any(isinstance(p.solid, (tuple, list)) for p in spec.parts):
+        return spec
+    from dataclasses import replace
+    from build123d import Vector
+    parts = []
+    for p in spec.parts:
+        if isinstance(p.solid, (tuple, list)) and len(p.solid) == 3:
+            pt = Vector(*map(float, p.solid))
+            inside = [i for i, s in enumerate(solids) if s.is_inside(pt)]
+            if inside:
+                idx = inside[0]
+            else:
+                from build123d import Vertex
+                v = Vertex(pt)
+                idx = min(range(len(solids)), key=lambda i: solids[i].distance_to(v))
+            p = replace(p, solid=idx)
+        parts.append(p)
+    return replace(spec, parts=parts)
 
 
 def get(model):
@@ -99,6 +124,7 @@ def get(model):
     if spec is None:
         model["_asm"] = None
         return None
+    spec = _resolve_points(spec, solids)
     problems = spec.validate(len(solids))
     if problems:
         model["_asm"] = {"spec": spec, "error": " ".join(problems)}

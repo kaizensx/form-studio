@@ -55,9 +55,16 @@ def _words(text: str) -> set:
     return out
 
 
+#: phrases whose keyword is hardware, not form: "a 31 mm bolt pattern" is not a texture, "an M6 hex head" is not a
+#: hex texture
+_NOT = re.compile(r"\b(?:bolt|hole|mounting|screw|drill|fixing)\s+patterns?\b|\bpatterns?\s+of\s+(?:holes|screws|bolts)\b"
+                  r"|\bhex(?:agon)?\s+(?:head|heads|nut|nuts|key|keys|socket|sockets|bolt|bolts|bit|bits|drive|shaft|wrench)\b", re.I)
+
+
 def assess(brief: str = "", source: str = "") -> dict:
     """Is this brief complex enough to need a plan? Heuristic, and said to be: keywords by family, a long brief, or
     source that declares several solids or an assembly."""
+    brief = _NOT.sub(" ", brief or "")
     w = _words(brief)
     low = (brief or "").lower()
     hits = {fam: sorted({k for k in kws if (k in w if " " not in k and "-" not in k else k in low)}) for fam, kws in COMPLEX.items()}

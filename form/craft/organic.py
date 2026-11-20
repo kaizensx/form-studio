@@ -21,14 +21,16 @@ from .surfaces import loft_sections, revolve_profile, superellipse_face, sweep_s
 
 
 def section_body(sections: list[dict], tip=None, count: int = 64):
-    """Loft through sections [{z, a, b, n=2.0, cx=0, cy=0, squash=0, rotate=0}, ...] in increasing z.
-    tip: (x, y, z) of a closing point above the last section (a dome's crown), or None to end flat."""
+    """Loft through sections [{z, a, b, n=2.0, cx=0, cy=0, squash=0, rotate=0, seam=0}, ...] in increasing z.
+    tip: (x, y, z) of a closing point above the last section (a dome's crown), or None to end flat.
+    seam: the angle (degrees) where each section starts; the loft's seam line runs there (180 hides it at the back).
+    Give every section the same seam, or the loft twists."""
     need(len(sections) >= 2, "section_body needs at least 2 sections", "Add sections.", ["sections"])
     zs = [num(s.get("z"), "z") for s in sections]
     need(all(b > a for a, b in zip(zs, zs[1:])), "section_body: sections must rise in z", "Sort the sections by z.",
          ["sections"])
     faces = [superellipse_face(s["a"], s["b"], s.get("n", 2.0), z=s["z"], center=(s.get("cx", 0.0), s.get("cy", 0.0)),
-                               count=count, rotate=s.get("rotate", 0.0), squash_front=s.get("squash", 0.0))
+                               count=count, rotate=s.get("rotate", 0.0), squash_front=s.get("squash", 0.0), seam=s.get("seam", 0.0))
              for s in sections]
     if tip is not None:
         faces.append(Vertex(*map(float, tip)))
@@ -42,8 +44,21 @@ def section_shell(sections: list[dict], wall: float, tip=None, open_bottom: bool
     point for offsets). The wall is `wall` measured in plan and at the crown; on steep slopes it is close to it.
     open_bottom leaves the lowest section open; open_top (no tip) the highest (a lamp shade, a sleeve).
     Returns (outer, hollow)."""
-    t = num(wall, "wall", lo=0.4)
     outer = section_body(sections, tip=tip, count=count)
+    inner = inset_body(sections, wall, tip=tip, open_bottom=open_bottom, count=count, open_top=open_top)
+    hollow = attempt("section_shell", [("outer - inset inner", lambda: one(outer - inner))],
+                     "Use a thinner wall; the inset sections cross the outer form.", ["wall"])
+    return outer, hollow
+
+
+def inset_body(sections: list[dict], wall: float, tip=None, open_bottom: bool = True, count: int = 64,
+               open_top: bool = False):
+    """The inner body section_shell subtracts: the sections inset by `wall` (and past the open ends). Use it when a
+    feature must change the outside before hollowing, so the wall follows it:
+        outer = craft.section_body(secs, tip); inner = craft.inset_body(secs, 2, tip)
+        outer = craft.safe_fillet(outer - scoop, scoop_edges, 3)      # shape and round the OUTSIDE first
+        shell = outer - (inner - grown_scoop)                         # the inside follows, the wall stays even"""
+    t = num(wall, "wall", lo=0.4)
     ins = []
     for s in sections:
         need(s["a"] - t > 1 and s["b"] - t > 1, f"section_shell: the section at z = {s['z']:g} is too small for a "
@@ -58,10 +73,7 @@ def section_shell(sections: list[dict], wall: float, tip=None, open_bottom: bool
     elif tip is None:
         ins[-1] = {**ins[-1], "z": ins[-1]["z"] - t}
     itip = None if tip is None else (tip[0], tip[1], tip[2] - t)
-    inner = section_body(ins, tip=itip, count=count)
-    hollow = attempt("section_shell", [("outer - inset inner", lambda: one(outer - inner))],
-                     "Use a thinner wall; the inset sections cross the outer form.", ["wall"])
-    return outer, hollow
+    return section_body(ins, tip=itip, count=count)
 
 
 def inflate(sections: list[dict], amount: float, tip=None):
@@ -77,10 +89,12 @@ def inflate(sections: list[dict], amount: float, tip=None):
 
 def dome_sections(length: float, width: float, height: float, levels: int = 9, crown_back: float = 0.0,
                   squash_front: float = 0.12, n_base: float = 2.15, n_top: float = 2.0, z0: float = 0.0,
-                  power: float = 2.2) -> tuple[list[dict], tuple]:
+                  power: float = 2.2, seam: float = 0.0) -> tuple[list[dict], tuple]:
     """Sections of a smooth dome (a head form, a mouse, a shell): length along X, width along Y, height above z0.
     Each level follows a superellipse in elevation, (z/h)^p + (r/R)^p = 1, so the dome meets its crown tangent.
-    crown_back moves the crown toward -X (a helmet's crown sits behind the forehead)."""
+    crown_back moves the crown toward -X (a helmet's crown sits behind the forehead). seam: where the loft's seam
+    line runs (0 = down the nose, +X; 180 = the back). Keep it away from where you cut or add features: a boolean
+    across a seam is where OCCT fails first (a spoiler fused across a seam at 180 comes back empty)."""
     L, W, H = num(length, "length", positive=True), num(width, "width", positive=True), num(height, "height", positive=True)
     n = num(levels, "levels", lo=3, hi=30, integer=True)
     p = num(power, "power", lo=1.5, hi=6)
@@ -91,7 +105,7 @@ def dome_sections(length: float, width: float, height: float, levels: int = 9, c
         k = (1 - ((z - z0) / H) ** p) ** (1 / p)
         t = (z - z0) / H
         out.append({"z": z, "a": max(L / 2 * k, 0.5), "b": max(W / 2 * k, 0.5), "n": n_base + (n_top - n_base) * t,
-                    "cx": -crown_back * t ** 1.5, "squash": squash_front * (1 - t)})
+                    "cx": -crown_back * t ** 1.5, "squash": squash_front * (1 - t), "seam": seam})
     return out, (-crown_back, 0.0, z0 + H)
 
 
@@ -100,13 +114,23 @@ def helmet_shell(length: float = 270, width: float = 215, height: float = 165, w
     """A closed helmet outer form (the dome continued down by `skirt` as a near-vertical wall) and its hollow shell.
     Returns (outer_solid, hollow_shell). Cut the eye port, neck and vents from the shell afterwards.
     The base of the skirt is at z = 0, the crown at skirt + height."""
-    L, W, H, S = (num(x, nm, positive=True) for x, nm in ((length, "length"), (width, "width"), (height, "height"), (skirt, "skirt")))
     t = num(wall, "wall", lo=0.8)
+    secs, tip = helmet_sections(length, width, height, skirt, crown_back, squash_front)
+    return section_shell(secs, t, tip=tip)
+
+
+def helmet_sections(length: float = 270, width: float = 215, height: float = 165, skirt: float = 95,
+                    crown_back: float = 14, squash_front: float = 0.1) -> tuple[list[dict], tuple]:
+    """The sections and crown tip helmet_shell lofts, for everything that must follow the same surface:
+        secs, tip = craft.helmet_sections(270, 215, 165, 95)
+        visor_out, tip2 = craft.inflate(secs, 4, tip)       # a visor band 4 mm proud of the shell
+        visor = (craft.section_body(visor_out, tip2) - craft.section_body(*craft.inflate(secs, 1.2, tip))) & window"""
+    L, W, H, S = (num(x, nm, positive=True) for x, nm in ((length, "length"), (width, "width"), (height, "height"), (skirt, "skirt")))
     secs, tip = dome_sections(L, W, H, levels=9, crown_back=crown_back, squash_front=squash_front, z0=S)
     base = dict(secs[0])
     low = [{**base, "z": 0.0, "a": base["a"] * 0.93, "b": base["b"] * 0.95, "squash": squash_front * 0.9},
            {**base, "z": S * 0.55, "a": base["a"] * 0.985, "b": base["b"] * 0.99}]
-    return section_shell(low + secs, t, tip=tip)
+    return low + secs, tip
 
 
 def grip(length: float = 110, d_max: float = 34, d_min: float = 26, flat: float = 0.85, finger_grooves: int = 0,

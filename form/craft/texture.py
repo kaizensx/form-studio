@@ -21,7 +21,7 @@ import math
 
 from build123d import Align, Box, Cylinder, Plane, Pos, RegularPolygon, Rot, Solid, Spline, Vector, Wire, extrude, make_face
 
-from ._common import attempt, need, num, one
+from ._common import attempt, fail, need, note, num, one
 from .surfaces import loft_sections
 
 MAX_INSTANCES = 2000
@@ -137,11 +137,20 @@ def knurl(diameter: float, height: float, pitch: float = 1.6, depth: float = 0.5
     return attempt("knurl", [("faceted solid", lambda: polyhedron(V, F))], "Use a coarser pitch.", ["pitch"])
 
 
+def _ease(x: float) -> float:
+    """0 -> 1 with zero slope at both ends (smoothstep)."""
+    x = min(1.0, max(0.0, x))
+    return x * x * (3 - 2 * x)
+
+
 def spiral_ribbed_body(profile, ribs: int = 24, rib_depth: float = 2.0, twist: float = 90.0, levels: int = 14,
-                       sharpness: float = 1.5, points: int = 0):
+                       sharpness: float = 1.5, points: int = 0, fade: tuple = (0.0, 0.0)):
     """A body of revolution whose surface carries `ribs` spiral ribs, as ONE smooth B-spline skin (a ribbed vase, a
     lamp, a fluted knob). profile: (r, z) pairs, rising in z, r = the radius at the rib roots. The ribs turn `twist`
     degrees from bottom to top. sharpness 1 = sinusoidal flutes, 2-4 = rounded ribs with wider valleys.
+    fade = (bottom, top): fractions of the height over which the ribs ease out to the smooth root surface, so a
+    ribbed band runs into a plain foot or collar, e.g. (0.15, 0.2), instead of ending in a cut. Use levels >= 18
+    with a fade so the easing has sections to follow.
     The result is a closed solid; shell it (craft.shell) for a vase."""
     pr = [(float(r), float(z)) for r, z in profile]
     need(len(pr) >= 2 and all(b[1] > a[1] for a, b in zip(pr, pr[1:])), "spiral_ribbed_body: profile must rise in z",
@@ -153,6 +162,10 @@ def spiral_ribbed_body(profile, ribs: int = 24, rib_depth: float = 2.0, twist: f
     sh = num(sharpness, "sharpness", lo=0.5, hi=8)
     N = num(points or min(1440, max(96, 16 * n)), "points", lo=48, hi=1440, integer=True)
     need(N >= 8 * n, "spiral_ribbed_body: too few points per rib", "Raise points to at least 8 x ribs.", ["points"])
+    try:
+        f0, f1 = num(fade[0], "fade", lo=0, hi=0.5), num(fade[1], "fade", lo=0, hi=0.5)
+    except (TypeError, IndexError):
+        raise fail("fade must be (bottom, top) fractions of the height", "Pass fade=(0.15, 0.2).", ["fade"])
     z0, z1 = pr[0][1], pr[-1][1]
     zs = [z0 + (z1 - z0) * i / (L - 1) for i in range(L)]
     rs = Spline(*[Vector(r, 0, z) for r, z in pr]) if len(pr) > 2 else None
@@ -177,14 +190,36 @@ def spiral_ribbed_body(profile, ribs: int = 24, rib_depth: float = 2.0, twist: f
         need(R > dp + 0.5, f"spiral_ribbed_body: radius {R:.1f} at z = {z:.1f} is too small for {dp:g} mm ribs",
              "Increase the radius or reduce rib_depth.", ["profile", "rib_depth"])
         ph = math.radians(tw) * (z - z0) / (z1 - z0)
+        u, k = (z - z0) / (z1 - z0), 1.0
+        if f0 > 0 and u < f0:
+            k = _ease(u / f0)
+        if f1 > 0 and u > 1 - f1:
+            k = min(k, _ease((1 - u) / f1))
         pts = []
         for i in range(N):                       # the section turns with the twist, so loft lines follow the ribs
             a = 2 * math.pi * i / N
             c = 0.5 + 0.5 * math.cos(n * a)
-            r = R + dp * c ** sh
+            r = R + dp * k * c ** sh
             pts.append(Vector(r * math.cos(a + ph), r * math.sin(a + ph), z))
         secs.append(make_face(Wire([Spline(*pts, periodic=True)])).faces()[0])
-    return loft_sections(secs)
+    if abs(tw) <= 80:
+        return loft_sections(secs)
+    # one smooth loft fails past about 100 degrees of twist (OCCT): loft runs of <= 75 degrees that share their end
+    # sections, and fuse them into one solid
+    per = max(2, int(75.0 / (abs(tw) / (L - 1))))
+    runs = [secs[i:i + per + 1] for i in range(0, L - 1, per)]
+    if len(runs) > 1 and len(runs[-1]) < 2:
+        runs[-2] = runs[-2] + runs[-1][1:]
+        runs.pop()
+    note(f"spiral_ribbed_body: {tw:g} deg of twist lofted in {len(runs)} runs of <= 75 deg (a smooth loft fails "
+         "beyond about 100 deg); the skin is smooth within each run")
+
+    def chunks():
+        parts = [one(loft_sections(r)) for r in runs]
+        out = parts[0].fuse(*parts[1:])
+        return one(out.clean() if hasattr(out, "clean") else out)
+
+    return attempt("spiral_ribbed_body", [("lofted runs", chunks)], "Use less twist or more levels.", ["twist", "levels"])
 
 
 def wrapped_ribs(radius: float, height: float, count: int = 12, rib_w: float = 2.0, rib_h: float = 1.0,

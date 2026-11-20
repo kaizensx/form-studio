@@ -30,7 +30,7 @@ EVIDENCE = "heuristic"
 RATIOS = {"1:1": 1.0, "4:5": 1.25, "sqrt2": math.sqrt(2), "3:2": 1.5, "golden": (1 + 5 ** 0.5) / 2, "2:1": 2.0,
           "3:1": 3.0}
 SECTION_ID, CUT_BODY = "_section", "_cut"
-VERSION = 1
+VERSION = 2
 
 
 # ---- kernel side ---------------------------------------------------------------------------------------------------
@@ -56,8 +56,9 @@ def _surface_kind(face) -> tuple[str, float | None, bool]:
     return "free", None, False
 
 
-def _edge_angles(shape, max_edges=1500):
-    """[(length, crease angle deg)] for edges shared by two faces (sampled when there are many)."""
+def _edge_angles(shape, max_edges=1500, skip=frozenset()):
+    """[(length, crease angle deg)] for edges shared by two faces (sampled when there are many). Edges whose faces
+    are both in skip (hashes of TopoDS faces: a texture's facets) are left out."""
     from OCP.BRep import BRep_Tool
     from OCP.BRepAdaptor import BRepAdaptor_Curve
     from OCP.BRepLProp import BRepLProp_SLProps
@@ -92,6 +93,8 @@ def _edge_angles(shape, max_edges=1500):
             if not any(f.IsSame(g) for g in uniq):
                 uniq.append(f)
         if len(uniq) != 2:
+            continue
+        if skip and all(hash(f) in skip for f in uniq):
             continue
         ns = []
         for f in uniq:
@@ -178,9 +181,13 @@ def op_critique_metrics(key, recipe_id, values, tol=0.05):
         if r is not None and (k == "torus" or (k == "cylinder" and partial)) and r < 50:
             radii.append(r)
     total = sum(kinds.values()) or 1.0
-    edges = [] if mesh_design else _edge_angles(shape)
+    # texture features (a knurl, emboss cells: many small facets) are sharp on purpose; measure the form without them
+    texture = sorted(k for k, b in feats.items() if b["faces"] >= 150 and b["area"] / b["faces"] < 6.0)
+    skip = frozenset(hash(f["face"].wrapped) for f in model["faces"] if f["feature"] in texture)
+    edges = [] if mesh_design else _edge_angles(shape, skip=skip)
     elen = sum(L for L, _ in edges) or 1.0
     sharp = sum(L for L, a in edges if a > 25.0) / elen if edges else None
+    tangent = sum(L for L, a in edges if a < 3.0) / elen if edges else None
     P, T = kernel._mesh_arrays(model)
     lo, hi = model["bbox"]
     dims = sorted([b - a for a, b in zip(lo, hi)], reverse=True)
@@ -194,6 +201,8 @@ def op_critique_metrics(key, recipe_id, values, tol=0.05):
         "smallest_fillet_mm": round(min(radii), 3) if radii else None,
         "fillet_faces": len(radii),
         "sharp_edge_fraction": None if sharp is None else round(sharp, 3),
+        "tangent_edge_fraction": None if tangent is None else round(tangent, 3),
+        "texture_features_excluded": texture,
         "edges_sampled": len(edges),
         "symmetry": symmetry(P, T, lo, hi),
         "proportions": {"bbox_mm": [round(b - a, 2) for a, b in zip(lo, hi)], "ratios": ratios},
@@ -202,6 +211,8 @@ def op_critique_metrics(key, recipe_id, values, tol=0.05):
         "features": {k: {"area": round(v["area"], 2), "faces": v["faces"], "lo": v["lo"], "hi": v["hi"]} for k, v in feats.items()},
         "volume_mm3": round(model["volume"], 2),
         "solids": len(shape.solids()),
+        "craft_notes": model.get("craft_notes", []),
+        "unchanged_stages": model.get("unchanged_stages", []),
         "evidence": EVIDENCE,
     }
 
@@ -259,20 +270,29 @@ def design_views(st, pid: str) -> dict:
     key = st.keys(p)["geometry"]
     d = _renders_dir(st, p)
     sheet = d / f"{key}-sheet6-v{rendering.VERSION}.{VERSION}.png"
-    v = st.view(p)
+    v = st.view(p, timeout=300)             # a heavy design is still building in the pipeline: wait for it
     title = f"{p['name']} - r{p['head']:02d}"
+    views = ["iso", "iso_back", "front", "right", "top", "bottom"]
+    exploded = None
+    if (v.get("assembly") or {}).get("parts") and not (v.get("assembly") or {}).get("error"):
+        try:                                     # a multi-part design: the outside hides the parts, so show them apart
+            exploded = rendering.posed(v, "exploded")
+            views[-1] = "exploded"
+        except ValueError:
+            exploded = None
     if not sheet.exists():
-        pngs = [rendering.render_png(v, feats, vw, None, size=(560, 420), title=title)
-                for vw in ("iso", "iso_back", "front", "right", "top", "bottom")]
+        pngs = [rendering.render_png(exploded if vw == "exploded" else v, feats, "iso" if vw == "exploded" else vw, None,
+                                     size=(560, 420), title=title + (" (exploded)" if vw == "exploded" else ""))
+                for vw in views]
         sheet.write_bytes(rendering.contact_sheet(pngs, cols=3))
     out = {"sheet": sheet, "section": None, "section_error": "",
-           "caption": f"{title}: six views (iso, iso back, front, right, top, bottom), bounding box "
+           "caption": f"{title}: six views ({', '.join(x.replace('_', ' ') for x in views)}), bounding box "
                       + " x ".join(f"{b - a:.1f}" for a, b in zip(*v["bbox"])) + " mm"
                       + (f"; {v['mesh_texture']['label']}" if v.get("mesh_texture") else "") + "."}
     sec = d / f"{key}-section-y-v{rendering.VERSION}.{VERSION}.png"
     if not sec.exists():
         try:
-            sv = st._k("section_view", key=key, recipe_id=st.rid(p), values=st.rev(p)["values"], axis="y", p=p, timeout=120)
+            sv = st._k("section_view", key=key, recipe_id=st.rid(p), values=st.rev(p)["values"], axis="y", p=p, timeout=300)
             sf = [{"id": CUT_BODY, "label": "Body (cut in half)"}, {"id": SECTION_ID, "label": "Section through the centre"}]
             sec.write_bytes(rendering.render_png(sv, sf, "front", SECTION_ID, size=(900, 640),
                                                  title=f"{title} - section at y = {sv['cut_at']:.1f} mm"))
@@ -303,6 +323,18 @@ def _closeups(st, p, v, metrics, limit=6) -> bytes | None:
     return rendering.contact_sheet(pngs, cols=3 if len(pngs) > 4 else 2) if len(pngs) > 1 else (pngs[0] if pngs else None)
 
 
+def _missing_why(m: dict) -> str:
+    miss, same = m.get("planned_missing") or [], m.get("unchanged_stages") or []
+    if not miss and not same:
+        return "All planned features have faces."
+    out = []
+    if miss:
+        out.append("Planned but no faces in the solid: " + ", ".join(miss))
+    if same:
+        out.append("Stages that left the solid unchanged (a fillet that did not fit, a cut that missed): " + ", ".join(same))
+    return "; ".join(out) + "."
+
+
 def checklist(metrics: dict, plan: dict | None, purpose: str) -> list[dict]:
     def item(q, flag, why):
         return {"question": q, "attention": bool(flag), "why": why}
@@ -315,10 +347,15 @@ def checklist(metrics: dict, plan: dict | None, purpose: str) -> list[dict]:
              (mix.get("plane", 0) > 0.85 and m.get("fillet_faces", 0) == 0), "Mostly flat faces and no rounds: check it is "
              "not a box standing in for a designed object."),
         item("Are edges where hands, faces or other parts touch softened?", sharp is not None and sharp > 0.5,
-             f"{(sharp or 0) * 100:.0f} % of edge length is a sharp crease; smallest fillet "
-             + (f"{fil:g} mm." if fil is not None else "none.")),
-        item("Is every planned feature visible in the close-ups, where the plan put it?", bool(m.get("planned_missing")),
-             "Missing: " + ", ".join(m.get("planned_missing") or []) if m.get("planned_missing") else "All planned features have faces."),
+             f"{(sharp or 0) * 100:.0f} % of edge length is a sharp crease"
+             + (f" (texture features {', '.join(m['texture_features_excluded'])} left out)" if m.get("texture_features_excluded") else "")
+             + "; smallest fillet " + (f"{fil:g} mm" if fil is not None else "none")
+             + (f"; {m['tangent_edge_fraction'] * 100:.0f} % of edge length is tangent (smooth spline or loft transitions "
+                "count as rounded even without fillet faces)" if m.get("tangent_edge_fraction") else "") + "."),
+        item("Is every planned feature visible in the close-ups, where the plan put it?",
+             bool(m.get("planned_missing") or m.get("unchanged_stages")), _missing_why(m)),
+        item("Did every form.craft helper build what was asked?", bool(m.get("craft_notes")),
+             ("Fallbacks taken: " + "; ".join(m["craft_notes"])) if m.get("craft_notes") else "No fallbacks."),
         item("Is the symmetry intended (and is any asymmetry deliberate)?",
              min(sym.values()) < 0.6 if sym else False, f"Mirror match X {sym.get('mirror_x', 0):.0%}, Y {sym.get('mirror_y', 0):.0%}."),
         item("Do the proportions look intentional (the main masses relate, nothing looks stretched by accident)?",
@@ -356,7 +393,7 @@ def run(st, pid: str, notes: str = "") -> dict:
         metrics["planned_not_declared"] = [f for f in planned if f not in recipe_feats]
     else:
         metrics["planned_missing"] = []
-    v = st.view(p)
+    v = st.view(p, timeout=300)
     png = _closeups(st, p, v, metrics)
     f = None
     if png:
@@ -365,7 +402,7 @@ def run(st, pid: str, notes: str = "") -> dict:
     purpose = purpose_mod.of(p)
     items = checklist(metrics, plan, purpose)
     summary = {"metrics": {k: metrics[k] for k in ("smallest_fillet_mm", "sharp_edge_fraction", "symmetry", "sliver_faces",
-                                                    "planned_missing") if k in metrics},
+                                                    "planned_missing", "craft_notes") if k in metrics},
                "attention": [i["question"] for i in items if i["attention"]], "evidence": EVIDENCE}
     rec = staged.record_critique(st, pid, p["head"], summary, notes)
     return {"project": pid, "rev": p["head"], "metrics": metrics, "checklist": items, "closeups": str(f) if f else None,

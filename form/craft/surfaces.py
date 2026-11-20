@@ -25,10 +25,12 @@ from ._common import attempt, fail, need, note, num, ok, one, pts2
 # ---- profiles ------------------------------------------------------------------------------------------------
 
 def superellipse(a: float, b: float, n: float = 2.5, count: int = 72, rotate: float = 0.0,
-                 squash_front: float = 0.0) -> list[tuple[float, float]]:
+                 squash_front: float = 0.0, seam: float = 0.0) -> list[tuple[float, float]]:
     """Points of |x/a|^n + |y/b|^n = 1 (a, b: half-widths in mm). n = 2 ellipse, 2.5-4 the soft-square of product
     design, >= 6 a rounded rectangle. squash_front (0-0.5) narrows the +x half to make an egg (a helmet's front).
-    rotate turns the points (degrees). Returned closed loop without repeating the first point."""
+    rotate turns the points (degrees). seam (degrees) is where the loop starts: a loft through such sections draws
+    its seam line there, so put it where nobody looks (180 = the back, -X). Returned closed loop without repeating
+    the first point."""
     a, b = num(a, "a", positive=True), num(b, "b", positive=True)
     n = num(n, "n", lo=0.5, hi=40)
     count = num(count, "count", lo=8, hi=720, integer=True)
@@ -36,7 +38,7 @@ def superellipse(a: float, b: float, n: float = 2.5, count: int = 72, rotate: fl
     c, s = math.cos(math.radians(rotate)), math.sin(math.radians(rotate))
     out = []
     for i in range(count):
-        t = 2 * math.pi * i / count
+        t = 2 * math.pi * i / count + math.radians(seam)
         ct, st = math.cos(t), math.sin(t)
         x = a * math.copysign(abs(ct) ** (2 / n), ct)
         y = b * math.copysign(abs(st) ** (2 / n), st)
@@ -52,6 +54,8 @@ def _on(plane: Plane, pts2d, z: float = 0.0):
 
 def spline_profile(points, plane: Plane = Plane.XY, closed: bool = True, z: float = 0.0) -> Face | Wire:
     """A smooth (B-spline through the points) profile on plane. Closed: a Face; open: a Wire.
+    A closed profile's normal is always the plane's normal, whichever way the points run, so extrude(face, d)
+    always goes along the plane's z direction (use both=True to go both ways).
     Fallback: a polyline through the same points (noted)."""
     p = pts2(points, "points", 3 if closed else 2)
     P = _on(plane, p, z)
@@ -65,8 +69,20 @@ def spline_profile(points, plane: Plane = Plane.XY, closed: bool = True, z: floa
         return make_face(w).faces()[0] if closed else (w if isinstance(w, Wire) else Wire(w.edges()))
 
     check = (lambda f: f is not None and (not closed or f.area > 1e-9))
-    return attempt("spline_profile", [("B-spline", smooth), ("polyline", poly)],
-                   "Check that the points do not cross each other and are not all on a line.", ["points"], check)
+    r = attempt("spline_profile", [("B-spline", smooth), ("polyline", poly)],
+                "Check that the points do not cross each other and are not all on a line.", ["points"], check)
+    return _facing(r, plane) if closed else r
+
+
+def _facing(face: Face, plane: Plane) -> Face:
+    """The face turned so its normal is the plane's z direction (points given clockwise would otherwise extrude
+    the wrong way and miss the body they should cut)."""
+    try:
+        if face.normal_at().dot(plane.z_dir) < 0:
+            return Face(face.wrapped.Reversed())
+    except Exception:                      # a face without a usable normal is returned as built
+        pass
+    return face
 
 
 def polygon_profile(points, plane: Plane = Plane.XY, z: float = 0.0) -> Face:
@@ -74,15 +90,15 @@ def polygon_profile(points, plane: Plane = Plane.XY, z: float = 0.0) -> Face:
     w = Wire.make_polygon(_on(plane, p, z), close=True)
     f = make_face(w).faces()[0]
     need(f.area > 1e-9, "polygon_profile: the points enclose no area", "Order the points around the outline.", ["points"])
-    return f
+    return _facing(f, plane)
 
 
 def superellipse_face(a: float, b: float, n: float = 2.5, z: float = 0.0, plane: Plane = Plane.XY,
                       center: tuple[float, float] = (0.0, 0.0), count: int = 72, rotate: float = 0.0,
-                      squash_front: float = 0.0) -> Face:
+                      squash_front: float = 0.0, seam: float = 0.0) -> Face:
     """A superellipse section as a Face on plane, at height z along the plane normal, centred at center."""
     cx, cy = float(center[0]), float(center[1])
-    p = [(x + cx, y + cy) for x, y in superellipse(a, b, n, count, rotate, squash_front)]
+    p = [(x + cx, y + cy) for x, y in superellipse(a, b, n, count, rotate, squash_front, seam)]
     return spline_profile(p, plane, True, z)
 
 
@@ -211,6 +227,26 @@ def safe_fillet(shape, edges, radius: float, min_fraction: float = 0.25):
                 return out
         except Exception:
             continue
+    if len(E) > 1:
+        # one bad edge (a seam, a tangent corner) fails the whole set: fillet edge by edge, each as large as it takes
+        out, done, sizes = shape, 0, set()
+        for c in [e.center() for e in E]:
+            cur = min(out.edges(), key=lambda e: (e.center() - c).length)
+            if (cur.center() - c).length > 1e-3:
+                continue
+            for f in fr:
+                try:
+                    o = out.fillet(r * f, [cur])
+                    if ok(o):
+                        out, done = o, done + 1
+                        sizes.add(round(r * f, 2))
+                        break
+                except Exception:
+                    continue
+        if done:
+            note(f"safe_fillet: {r:g} mm on all {len(E)} edges at once did not fit; filleted {done} edge by edge "
+                 f"({', '.join(f'{x:g}' for x in sorted(sizes))} mm)" + (f", {len(E) - done} left sharp" if done < len(E) else ""))
+            return out
     note(f"safe_fillet: {len(E)} edge(s) left sharp; even {r * min_fraction:.2g} mm did not fit")
     return shape
 

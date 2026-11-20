@@ -11,6 +11,12 @@ from form import craft
 from form.craft import fits, meshtex
 from form.recipes.base import RecipeError
 
+try:                                                                    # the [parts] extra; CI runs without it
+    import py_gearworks  # noqa: F401
+    HAVE_GEARS = True
+except ImportError:
+    HAVE_GEARS = False
+
 
 def valid(test, shape, n=1):
     test.assertIsNotNone(shape)
@@ -110,6 +116,7 @@ class Mechanisms(unittest.TestCase):
         for s in fb.shapes.values():
             valid(self, s)
 
+    @unittest.skipUnless(HAVE_GEARS, "py_gearworks is not installed (the [parts] extra)")
     def test_gears(self):
         g = craft.gear_train(teeth=(14, 28))
         valid(self, g.shapes["g0"])
@@ -240,6 +247,118 @@ class MeshTextures(unittest.TestCase):
                 return [{"kind": "cells", "amplitude": 0.3}]
         self.assertEqual(meshtex.declared(R(), {})[0].kind, "cells")
         self.assertEqual(meshtex.declared(object(), {}), [])
+
+
+class EvaluationFixes(unittest.TestCase):
+    """What a design evaluation (eight briefs through the tools) found missing or broken in form.craft."""
+
+    def test_profiles_extrude_along_the_plane_whichever_way_the_points_run(self):
+        from build123d import Plane, extrude
+        for pts in ([(0, 0), (10, 0), (10, 5), (0, 5)], [(0, 0), (0, 5), (10, 5), (10, 0)]):
+            for f in (craft.spline_profile(pts, plane=Plane.XZ), craft.polygon_profile(pts, plane=Plane.XZ)):
+                self.assertLess(extrude(f, 3).bounding_box().min.Y, -2.9)      # Plane.XZ's normal is -Y
+
+    def test_safe_fillet_goes_edge_by_edge_when_the_set_fails(self):
+        b = Box(10, 10, 1.2, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        r = craft.safe_fillet(b, b.edges().filter_by(Axis.Z), 4.9)
+        craft.notes()
+        valid(self, r)
+        self.assertLess(r.volume, b.volume)
+
+    def test_mech_indexes_shapes_and_dims(self):
+        h = craft.pin_hinge()
+        self.assertIs(h["leaf_a"], h.shapes["leaf_a"])
+        self.assertGreater(h["knuckle_wall"], 0)
+        with self.assertRaises(KeyError):
+            h["nope"]
+        self.assertEqual(len(h.info["knuckles"]), 5)
+        self.assertGreater(h.info["relief_a"].volume, 0)
+
+    def test_bayonet_pair_fits_as_placed_and_locked(self):
+        from build123d import Rot
+        b = craft.bayonet(d=26, height=7, lugs=3, lug_w=7, lug_h=2.2, lug_depth=1.8, twist=35, clearance=0.25)
+        for a in (0, 20, 33):
+            self.assertLess((Rot(0, 0, a) * b["male"] - b["female_cutter"]).volume, 1e-3, a)
+
+    def test_four_bar_pose_closes_the_loop(self):
+        P = craft.four_bar_pose(22, 45, 22, 46, 72)
+        bc = math.dist(P["B"], P["C"])
+        dc = math.dist(P["D"], P["C"])
+        self.assertAlmostEqual(bc, 22, places=6)
+        self.assertAlmostEqual(dc, 46, places=6)
+        valid(self, craft.link_between(P["B"], P["C"], 8, 4, 3.4, z=5))
+        with self.assertRaises(RecipeError):
+            craft.four_bar_pose(100, 10, 10, 10, 0)
+
+    def test_cam_without_a_2d_offset(self):
+        import build123d
+        orig = build123d.offset
+        build123d.offset = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("2D offset failed with distance -4.0"))
+        try:
+            c = craft.cam(follower_r=4)
+        finally:
+            build123d.offset = orig
+        valid(self, c.shapes["cam"])
+        self.assertTrue(any("offset along the normals" in n for n in craft.notes()))
+
+    def test_spiral_ribs_fade_and_take_a_large_twist(self):
+        b = craft.spiral_ribbed_body([(30, 0), (24, 40)], ribs=18, rib_depth=1.5, twist=150, levels=10, fade=(0.2, 0.2))
+        self.assertTrue(b.is_valid)
+        self.assertTrue(any("runs" in n for n in craft.notes()))
+        with self.assertRaises(RecipeError):
+            craft.spiral_ribbed_body([(30, 0), (24, 40)], fade=(0.9, 0))
+
+    def test_inset_body_and_helmet_sections(self):
+        secs, tip = craft.dome_sections(120, 66, 37, levels=6, z0=3)
+        inner = craft.inset_body(secs, 2, tip=tip)
+        self.assertLess(inner.volume, craft.section_body(secs, tip=tip).volume)
+        hs, ht = craft.helmet_sections(270, 215, 165, 95)
+        self.assertEqual(hs[0]["z"], 0.0)
+        self.assertAlmostEqual(ht[2], 95 + 165)
+
+    def test_mesh_texture_region(self):
+        v, t = Sphere(20).tessellate(0.1, 0.3)
+        P, T = np.array([(p.X, p.Y, p.Z) for p in v]), np.array(t)
+        tex = craft.MeshTexture("noise", 1.0, 3.0, region=((-30, -30, 5), (30, 30, 30)), edge_falloff=0.5)
+        V, F, _, _ = meshtex.apply(P, T, ["a"] * len(T), [tex])
+        low = V[V[:, 2] < -1]
+        self.assertLessEqual(np.linalg.norm(low, axis=1).max(), 20 + 1e-6)      # below the box: untouched
+        self.assertGreater(np.linalg.norm(V[V[:, 2] > 10], axis=1).max(), 20.3)
+        with self.assertRaises(RecipeError):
+            craft.MeshTexture("noise", region=((1, 1, 1), (0, 0, 0))).validate()
+
+
+class EvaluationPlumbing(unittest.TestCase):
+    def test_wrong_solid_count_names_the_stages(self):
+        from build123d import Location
+        from form import kernel
+        from form.recipes.base import Stage
+        a = Box(10, 10, 10)
+        two = a + Box(4, 4, 4).moved(Location((20, 0, 0)))
+        with self.assertRaises(RecipeError) as e:
+            kernel._stage_report([Stage("body", a), Stage("lug", two)], 1)
+        self.assertIn("body 1, lug 2", str(e.exception))
+        self.assertEqual(e.exception.feature, "lug")
+
+    def test_assembly_part_by_point(self):
+        from build123d import Location
+        from form import assembly
+        from form.recipes.base import Assembly, Part
+        solids = [Box(10, 10, 4), Box(10, 10, 4).moved(Location((0, 0, 20)))]
+        spec = Assembly(parts=[Part("top", "Top", (0, 0, 20)), Part("bottom", "Bottom", (0, 0, 0.5))])
+        self.assertEqual(spec.validate(2), [])
+        r = assembly._resolve_points(spec, solids)
+        self.assertEqual([p.solid for p in r.parts], [1, 0])
+
+    def test_cli_saves_tool_pictures(self):
+        import base64
+        from types import SimpleNamespace
+        from form.__main__ import _save_images
+        png = base64.b64encode(b"\x89PNG\r\n\x1a\nfake").decode()
+        out = _save_images("render", [SimpleNamespace(type="text", text="x"),
+                                      SimpleNamespace(type="image", data=png, mime_type="image/png")])
+        self.assertEqual(len(out), 1)
+        self.assertTrue(Path(out[0]).read_bytes().startswith(b"\x89PNG"))
 
 
 class Reexports(unittest.TestCase):
