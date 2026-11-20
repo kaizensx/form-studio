@@ -206,5 +206,27 @@ class CritiqueChecklist(unittest.TestCase):
         self.assertTrue(q)
 
 
+class CharacterMask(unittest.TestCase):
+    """The hybrid exemplar (WP-F): a sculpted cage skin, eye openings from a constrained sketch, magnet bosses,
+    a split held by magnets and two eye lenses; every solid valid, and the handles and the sketch drive it."""
+
+    def test_builds_four_valid_parts_and_parameters_drive_it(self):
+        from form import exemplars
+        d = exemplars.load("character_mask")
+        v = d.validate(d.defaults())
+        st = d.build(v)
+        self.assertEqual([s.feature for s in st], ["shell", "eyes", "magnets", "split", "lenses"])
+        final = st[-1].shape
+        self.assertEqual(len(final.solids()), 4)
+        self.assertTrue(all(s.is_valid for s in final.solids()))
+        self.assertEqual(len(st[0].shape.faces()), 3)               # the sculpted shell: skin, inside, rim
+        self.assertGreater(len(st[1].shape.faces()), 3)             # the eye openings cut it
+        brow = d.build(d.validate({**v, "brow": 10}))[0].shape
+        self.assertGreater(brow.bounding_box().max.X, st[0].shape.bounding_box().max.X - 1e-6)
+        der = {x["key"]: x["value"] for x in d.derived(v)}
+        self.assertAlmostEqual(der["pocket_d"], v["magnet_d"] + 2 * v["magnet_clear"])
+        self.assertEqual(d.mesh_texture(v)[0].kind, "heightmap")
+
+
 if __name__ == "__main__":
     unittest.main()

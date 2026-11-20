@@ -137,6 +137,13 @@ In the viewport:
 
 Drag to orbit, right-drag or Shift-drag to pan, scroll or pinch to zoom. Right-click a feature for quick actions.
 
+**Drag a face to change it.** ⌘-drag (Ctrl-drag on Windows and Linux) on a face: Form Studio finds the parameter that
+moves that face (it rebuilds the design once per parameter and measures how far the face travels along its normal, and
+how much else changes) and the drag sets it. A readout beside the pointer names the parameter, from and to, how many
+millimetres the face moves per unit and the draft's volume change; the part rebuilds as you pull. Releasing keeps the
+change as a draft: commit or discard it like any other. Pull the top of a box and its height changes, its side and
+its width does, a helmet's brow and the brow handle moves.
+
 While measuring or annotating: D distance, G face, O diameter, R edge, P point, B brush, L lasso, [ and ] brush size,
 Shift-click adds to the selection, Alt-drag orbits while painting.
 

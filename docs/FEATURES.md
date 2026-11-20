@@ -94,6 +94,25 @@ each one named as it arrives.
   dimensions it moves, the change in stability and fit, and which outputs it would invalidate.
 - **Constraints that explain themselves.** An impossible combination is refused with the feature, the parameters
   involved and a way forward.
+- **Drag a face, change the parameter behind it.** ⌘-drag (Ctrl-drag) a face in the viewport: the parameter that
+  moves that face (measured by rebuilding, one parameter at a time) follows the pointer, the part rebuilds live and
+  the draft shows its impact. Top of a box: its height; its side: its width; a sculpted brow: the brow handle.
+- **Constrained sketches.** `form.sketch2d` places lines, arcs and circles from constraints (coincident, horizontal,
+  vertical, parallel, perpendicular, tangent, equal, symmetric, midpoint, on) and named dimensions (length,
+  distance, radius, diameter, angle). Every named dimension is a parameter, so changing one re-solves the profile and
+  keeps its intent: arcs stay tangent, slots stay centred. A 30-entity, 40-constraint sketch solves in about a
+  millisecond, in plain Python.
+- **Sculpted bodies, exactly.** Organic shapes (helmets, masks, cowls, character props) are subdivision cages turned
+  into exact NURBS solids (`form.craft.subd`): a skin is one bicubic B-spline surface, C2 inside, trimmed by a circle
+  of its parameters; a shell is its skin, its inside and a ruled rim, three faces. Named handles on the cage (a brow,
+  cheekbones, a jaw, a crown) are parameters. Closed props are Catmull-Clark cages made into bicubic patches, G1 at
+  the extraordinary points and within a measured angle along their borders.
+- **Sculpted meshes as surfaces or as mesh bodies.** `form.meshbody` turns a sculpted mesh (a 200,000-triangle
+  helmet in about a minute) into a closed, three-face NURBS solid within a stated tolerance, measured both ways, with
+  its cage to edit; or keeps fine sculpted detail as a mesh and cuts exact features into it (manifold3d, optional).
+  Each body says its tier: surface body, mesh body or parametric CAD.
+- **Hybrid designs.** Exact CAD on a sculpted skin: magnet pockets on bosses grown from the inside, a split plane held
+  by magnets, openings from a constrained sketch. The character-mask exemplar shows the whole route.
 - **Hardware with sources.** `form.parts` provides screw clearances (ISO 273), heat-set insert pockets, nut traps,
   magnet pockets, bearing seats, printable threads and involute gears, each dimension with its source.
 - **Text and patterns.** Embossed or debossed lettering with a shipped font, revision stamps on the underside, hex
