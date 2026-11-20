@@ -322,7 +322,69 @@ def fetch(st, conversation_id: str, url: str) -> dict:
         except ConversationError as e:
             tmp.unlink(missing_ok=True)
             raise StudioError(str(e))
-    return fetch_into(url, store.dir(conversation_id) / ".incoming", place)
+    try:
+        out = fetch_into(url, store.dir(conversation_id) / ".incoming", place)
+    except StudioError as e:
+        _remember(store, conversation_id, url, {"error": str(e), "hint": e.hint or ""})
+        raise
+    _remember(store, conversation_id, url, {"result": out})
+    return out
+
+
+LINKS_FILE = "links.json"               # per conversation: every link fetched into it and what came of it
+ERROR_REUSE_S = 600                     # a link that failed this recently is not fetched again for the same message
+
+
+def _link_key(url: str) -> str:
+    return str(url or "").strip().rstrip(".,;:!?)]}>")
+
+
+def _remember(store, conversation_id: str, url: str, rec: dict) -> None:
+    """Keep what a fetch gave, so the message that carries the link does not fetch it a second time (a signed
+    single-use link would fail then, and the file would be attached twice)."""
+    try:
+        with store._lock:
+            f = store.dir(conversation_id) / LINKS_FILE
+            try:
+                known = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                known = {}
+            if not isinstance(known, dict):
+                known = {}
+            known[_link_key(url)] = {**rec, "ts": time.time()}
+            tmp = f.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(known, indent=1, ensure_ascii=False, default=str), encoding="utf-8")
+            os.replace(tmp, f)
+    except OSError:
+        pass
+
+
+def fetched_before(st, conversation_id: str, url: str) -> dict | None:
+    """What an earlier fetch of this link into this conversation gave: {"result": ...} (kept for good: its files are
+    attached already) or {"error", "hint"} (kept for ERROR_REUSE_S), else None."""
+    try:
+        known = json.loads((_store(st).dir(conversation_id) / LINKS_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    rec = known.get(_link_key(url)) if isinstance(known, dict) else None
+    if not isinstance(rec, dict):
+        return None
+    if "result" in rec:
+        return rec
+    if "error" in rec and time.time() - float(rec.get("ts") or 0) < ERROR_REUSE_S:
+        return rec
+    return None
+
+
+def fetch_once(st, conversation_id: str, url: str) -> dict:
+    """fetch(), unless this link was already fetched into the conversation (by the app just before it sent the
+    message): then the earlier result, with no second download."""
+    prev = fetched_before(st, conversation_id, url)
+    if prev is not None:
+        if "result" in prev:
+            return prev["result"]
+        raise StudioError(prev["error"], prev.get("hint") or "")
+    return fetch(st, conversation_id, url)
 
 
 def fetch_to_folder(url: str, folder: Path) -> dict:
@@ -371,7 +433,7 @@ def fetch_message_links(st, conversation_id: str, text: str) -> tuple[list[str],
     ids, lines = [], []
     for url in links_in(text):
         try:
-            got = fetch(st, conversation_id, url)
+            got = fetch_once(st, conversation_id, url)         # the app fetched it a moment ago: never twice
         except StudioError as e:
             lines.append(f"- {url}: not fetched. {e}" + (f" {e.hint}" if e.hint else ""))
             continue

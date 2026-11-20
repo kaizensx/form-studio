@@ -99,6 +99,10 @@ class Net(unittest.TestCase):
                     Net.mid = start.progress()
                     self.wfile.write(b"x" * (2 << 20))
                     return
+                if host == "once.test":                        # a signed single-use link: the second GET fails
+                    if any(r["host"] == "once.test" and r["path"] == "/" + rest for r in seen[:-1]):
+                        return self._reply(403, b"<Error>Already used</Error>", "application/xml")
+                    return self._reply(200, SIGNED_3MF)
                 if host == "example.com":
                     return self._reply(200, OTHER_PAGE, "text/html")
                 return self._reply(404, b"not here", "text/plain")
@@ -287,6 +291,34 @@ class Fetch(Net):
         self.assertIn("Desk hook: not downloaded. MakerWorld only gives files to a signed-in person", note)
         self.assertNotIn("example.com", note)                                    # a plain page is just a link
         self.assertNotIn("example.com", {s["host"] for s in self.seen})
+
+
+    def test_a_link_the_app_fetched_is_not_fetched_again_when_the_message_is_sent(self):
+        """The app fetches each link in a message (POST /conversations/<id>/fetch), then sends the message; the
+        engine reuses that fetch: one download, one attachment, and a single-use signed link still works."""
+        url = "https://once.test/signed/hook.3mf?exp=1763650000&sig=abc"
+        first = start.fetch(self.st, self.cid, url)                       # what Store.sendWithLinks does first
+        (a,) = first["attachments"]
+        ids, note = start.fetch_message_links(self.st, self.cid, f"make this lighter {url}.")   # what send does
+        self.assertEqual(ids, [a["id"]])
+        self.assertIn("downloaded by Form Studio and attached (hook.3mf)", note)
+        self.assertNotIn("not fetched", note)
+        self.assertEqual(len([r for r in self.seen if r["host"] == "once.test"]), 1, "downloaded once")
+        self.assertEqual(len(list(self.store.files_dir(self.cid).iterdir())), 1, "attached once")
+        # a message whose link the app did not fetch is still fetched by the engine, once
+        other = self.store.create()["id"]
+        ids2, note2 = start.fetch_message_links(self.st, other, "https://once.test/signed/other.3mf?sig=2")
+        self.assertEqual(len(ids2), 1)
+        with self.assertRaises(StudioError):                              # proof the link really is single-use
+            start.fetch(self.st, self.store.create()["id"], "https://once.test/signed/other.3mf?sig=2")
+        # a link that failed a moment ago is reported, not fetched again
+        bad = "https://makerworld.bblmw.com/expired/x.3mf?exp=1"
+        with self.assertRaises(StudioError):
+            start.fetch(self.st, self.cid, bad)
+        n = len(self.seen)
+        _, note3 = start.fetch_message_links(self.st, self.cid, bad)
+        self.assertEqual(len(self.seen), n)
+        self.assertIn("not fetched", note3)
 
 
 class Progress(Net):
