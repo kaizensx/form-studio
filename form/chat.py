@@ -263,6 +263,7 @@ class Chat:
     def conversation(self, cid: str, start: int = 0) -> dict:
         """A conversation with its events from `start`, plus what is streaming right now."""
         out = self.store.get(cid, start)
+        out["designs"] = self.store.designs(cid)        # each with its state now (live, trashed, gone) and name
         j = self.job_for(cid)
         run = bool(j and j.state == "running")
         out.update({"state": "running" if run else "idle", "live": j.live if run else None, "job": j.id if run else None,
@@ -281,9 +282,11 @@ class Chat:
             out["resolved_label"] = ad.model_label(out["resolved_model"]) if ad else out["resolved_model"]
         return out
 
-    def list(self, project: str | None = None, q: str | None = None, thread: str | None = None) -> list[dict]:
+    def list(self, project: str | None = None, q: str | None = None, thread: str | None = None,
+             involving: str | None = None) -> list[dict]:
         busy = {j.conversation: ("asking" if j.waiting else "running") for j in self.running()}
-        return [dict(m, state=busy.get(m["id"], "idle")) for m in self.store.list(project, q, thread=thread)]
+        return [dict(m, state=busy.get(m["id"], "idle"))
+                for m in self.store.list(project, q, thread=thread, involving=involving)]
 
     def delete(self, cid: str) -> None:
         for j in self.running(cid):
@@ -868,19 +871,18 @@ class Chat:
                             self.store.update(job.conversation, concepts=groups + [m.group(1)])
                     except ConversationError:
                         pass
-        if name.startswith("create_") and ev.get("ok") and job.before is not None:
-            new = self._project_ids() - job.before
-            hit = [p for p in new if f'"{p}"' in full] or (list(new) if len(new) == 1 else [])
-            if hit:
-                ev["project"] = hit[0]
-                # the conversation follows the design it just made: the next message is about that one, in this
-                # same conversation (the designs it was about before stay listed in its meta)
-                job.project = hit[0]
-                if job.conversation:
-                    try:
-                        self.store.link(job.conversation, hit[0])
-                    except ConversationError:
-                        pass
+        if job.conversation:
+            # Form Studio's MCP server records every design a tool makes, picks, copies or reconstructs in this
+            # conversation the moment it does (conversations.made, from $FORM_CONVERSATION) and puts it in front. The
+            # result that did it carries the project, and the conversation follows it: the next message is about
+            # that design (the ones before stay listed in `designs` and `projects`).
+            try:
+                front = self.store.meta(job.conversation).get("project")
+            except ConversationError:
+                front = None
+            if front and front != job.project:
+                ev["project"] = front
+                job.project = front
 
 
 # ---- command line: `form chat …`, `form conversations …` ----------------------------------------------------------
@@ -1047,15 +1049,22 @@ def _measure_terminal(chat: "Chat", job: ChatJob, q: dict) -> None:
 
 def main_conversations(argv: list[str]) -> int:
     """form conversations list [--project ID] [--thread ID] [--search TEXT] | show ID | delete ID | rename ID TITLE
-    | pin ID [--off] | fork ID [--at N] [--project ID] [--reason TEXT]"""
+    | pin ID [--off] | fork ID [--at N] [--project ID] [--reason TEXT] | designs ID | migrate [--dry-run] [--no-families]"""
     import argparse
     from . import config
     ap = argparse.ArgumentParser(prog="form conversations", description="Saved conversations (JSON).")
     sub = ap.add_subparsers(dest="cmd", required=True)
     ls = sub.add_parser("list")
     ls.add_argument("--project")
+    ls.add_argument("--involving", help="every conversation that made or touched this design")
     ls.add_argument("--search")
     ls.add_argument("--thread")
+    ds = sub.add_parser("designs", help="the designs a conversation made or touched, in order, with role and state")
+    ds.add_argument("id")
+    mg = sub.add_parser("migrate", help="rebuild `designs` for older conversations, clear empty ones, join each "
+                                        "request's designs into one family")
+    mg.add_argument("--dry-run", action="store_true", help="say what would change; write nothing")
+    mg.add_argument("--no-families", action="store_true", help="leave the designs' families as they are")
     fk = sub.add_parser("fork")
     fk.add_argument("id")
     fk.add_argument("--at", type=int)
@@ -1077,7 +1086,11 @@ def main_conversations(argv: list[str]) -> int:
         print(json.dumps(obj, indent=1, default=str, ensure_ascii=False))
     try:
         if a.cmd == "list":
-            out(store.list(a.project, a.search, thread=a.thread))
+            out(store.list(a.project, a.search, thread=a.thread, involving=a.involving))
+        elif a.cmd == "designs":
+            out({"conversation": a.id, "project": store.meta(a.id).get("project"), "designs": store.designs(a.id)})
+        elif a.cmd == "migrate":
+            out(store.migrate(dry_run=a.dry_run, families=not a.no_families))
         elif a.cmd == "fork":
             out(store.fork(a.id, a.at, a.project, a.reason))
         elif a.cmd == "show":

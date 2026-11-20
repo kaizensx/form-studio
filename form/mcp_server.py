@@ -67,6 +67,9 @@ Rules:
 - Meshes to make editable or understand: never embed them as the design. design_guide(topic="reference_parts"):
   analyze_reference (and analyze_assembly for several parts) -> plan named features -> build123d with Params ->
   compare_to_reference -> refine until within tolerance (0.1 mm by default for a remodel).
+- One request makes one design. Several files of one product are one design with several parts: reconstruct(files=[...])
+  for meshes, create_design(relation="part_of") to add a part to the design in front. A second create_design in a
+  conversation that has a design says its relation (replaces, part_of, alternative, new). One brief serves the request.
 - If the message has a "Purpose:" line, respect it: "just a 3D model" means no slicing and no print talk.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...) and design_examples -> plan_design -> create_design(plan=...) -> look at the sheet and
@@ -139,6 +142,35 @@ def act(pid, kind: str, text: str, ctx=None, **extra):
             webbrowser.open(f"{url}/#p={pid}")
         except Exception:
             pass
+
+
+def _made(pid: str | None, tool: str, role: str = "made", group: str | None = None, family: bool = True) -> None:
+    """Record a design this tool made, picked, copied or reconstructed in the conversation this server works for
+    ($FORM_CONVERSATION, set by Form Studio's chat): it is listed in the conversation's designs and put in front, and
+    the second and later designs one request makes join the first one's family. Outside Form Studio's chat (no
+    conversation) nothing is recorded. Every tool in conversations.CREATOR_TOOLS calls this."""
+    from . import conversations
+    try:
+        conversations.made(studio().root, pid, role, tool, group=group, family=family)
+    except Exception:                               # the design exists either way; linking never fails a tool
+        pass
+
+
+def _front() -> str | None:
+    """The live design in front of this server's conversation, if any."""
+    from . import conversations
+    cid = conversations.env_conversation()
+    if not cid:
+        return None
+    try:
+        meta = conversations.Conversations(studio().root).meta(cid)
+    except conversations.ConversationError:
+        return None
+    pid = meta.get("project")
+    return pid if pid and (studio().root / pid / "project.json").is_file() else None
+
+
+RELATIONS = ("replaces", "part_of", "alternative", "new")
 
 
 def _purpose(purpose: str | None) -> str | None:
@@ -423,7 +455,7 @@ def build() -> MCPServer:
     async def create_design(name: str, source: str, brief: str = "", values: dict[str, float] | None = None,
                             run: bool = True, language: str = "python", references: list[str] | None = None,
                             purpose: str | None = None, process: str | None = None, plan: str = "",
-                            ctx: Context = None) -> list:
+                            relation: str = "", ctx: Context = None) -> list:
         """Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
         built with build123d. FORM builds it, and with run=True exports, checks and slices it. Load or build errors come
         back with the line and a hint; fix and call again. Then render(view="sheet") and look at it.
@@ -437,14 +469,54 @@ def build() -> MCPServer:
         purpose: "print" (for 3D printing) or "model" (just a 3D model; not sliced, no print checks). Omitted: the
         person's default. process (models only): cnc, laser, injection, casting, sheet_metal, render, cad, other.
         plan: the brief id from design_brief/plan_design. A complex brief (a mechanism, an organic or styled form, a
-        texture, several parts) is refused without one. Returns the project, a six-view sheet and a section: look."""
+        texture, several parts) is refused without one; one brief serves every design of the request.
+        relation: in Form Studio's chat, when the conversation already has a design in front, say what this code is to
+        it: "replaces" (a new revision of that design), "part_of" (one more part of that design, e.g. the lid of a
+        box), "alternative" (a separate design in its family) or "new" (an unrelated design). One request makes one
+        design: use part_of for the parts of one product. Returns the project, a six-view sheet and a section: look."""
         st = studio()
         from . import staged
+        if relation and relation not in RELATIONS:
+            raise ToolError(f"Unknown relation “{relation}”: use {', '.join(RELATIONS)}.")
+        front = _front()
+        if front and not relation:
+            raise ToolError(f"This conversation already has a design in front: {front}. Say what this code is to it: "
+                            "relation=\"replaces\" (a new revision of it), \"part_of\" (one more part of it), "
+                            "\"alternative\" (a separate design in its family) or \"new\" (an unrelated design). "
+                            "One request makes one design: the parts of one product are part_of.")
+        if relation in ("replaces", "part_of") and not front:
+            raise ToolError(f"relation=\"{relation}\" needs a design in front of this conversation, and there is none. "
+                            "Leave relation out.")
         if language == "python":
             await _run(staged.require_plan, st, f"{name}. {brief}", source, plan)
+        if relation in ("replaces", "part_of"):
+            if relation == "replaces":
+                act(front, "design", f"Replacing the design's code: {name}", ctx)
+                p = await _run(lambda: st.update_design(st.load(front), source, f"Replaced: {name}", values,
+                                                        _origin(ctx), None, language))
+                note = f"r{p['head']:02d}: replaced with {name}"
+            else:
+                from . import multipart
+                act(front, "design", f"Adding a part: {name}", ctx)
+                r = await _run(multipart.add_part, st, front, name, source, values, _origin(ctx))
+                p = st.load(front)
+                note = f"r{p['head']:02d}: added part {r['part']} ({name})"
+            act(front, "commit", note, ctx)
+            if plan:
+                await _run(staged.attach_pending, st, front, plan)
+            _made(front, "create_design", role="continued")
+            res: dict[str, Any] = {"relation": relation, "head": p["head"]}
+            if run:
+                jid = st.run(front)
+                res["pipeline"] = job_digest(await _wait_job(st, jid, 45))
+            res["project"] = await _run(digest, st, front)
+            return await _with_views(st, front, res)
         act(None, "design", f"Writing a new design: {name}", ctx)
         p = await _run(st.create_design, name, source, brief, values, language, references, _purpose(purpose), process)
         act(p["id"], "commit", f"Created {name} (r01)", ctx)
+        if relation == "alternative" and front:
+            await _run(st.adopt, p["id"], front, "alternative")
+        _made(p["id"], "create_design", family=relation != "new")
         if plan:
             await _run(staged.attach_pending, st, p["id"], plan)
         job = None
@@ -502,6 +574,7 @@ def build() -> MCPServer:
         st = studio()
         p = await _run(lambda: st.create(name, recipe, brief, values, purpose=_purpose(purpose), process=process))
         act(p["id"], "commit", f"Created {name} from the {recipe} recipe", ctx)
+        _made(p["id"], "create_project")
         if run:
             jid = st.run(p["id"])
             await _wait_job(st, jid, 50)
@@ -1052,10 +1125,15 @@ def build() -> MCPServer:
                         "the reference inside your design code (Pos(...) * self.reference(...))."}
 
     @mcp.tool(annotations=RW)
-    async def reconstruct(project_or_file: str, tolerance: float = 0.02, layer: int = 2, name: str | None = None,
-                          reference: str | None = None, ctx: Context = None) -> dict:
+    async def reconstruct(project_or_file: str = "", tolerance: float = 0.02, layer: int = 2, name: str | None = None,
+                          reference: str | None = None, files: list[str] | None = None,
+                          references: list[str] | None = None, ctx: Context = None) -> dict:
         """Turn a mesh (STL, OBJ or 3MF) into editable CAD as a new design. project_or_file: an absolute path to the
         mesh, or a project id whose imported mesh reference to use (reference: which one; default the first mesh).
+        Several meshes of ONE product (a base, a slider and a lid): pass them all at once, as files=[absolute paths]
+        (or project_or_file=<project id> with references=[names]); they become ONE design with one part per mesh, in
+        the positions the files give (parts that fail are listed in "failed", the others are kept). Never call this
+        once per part: that makes unrelated designs.
         Layer 0 is always built: the mesh as an exact solid (Hausdorff at float precision). Layer 1 (beta) replaces
         facets with planes, cylinders, cones, spheres and tori where they fit within `tolerance` mm, and smooth
         organic regions with fitted B-spline surfaces ("freeform"); the rest stay frozen facets. Layer 2 (beta)
@@ -1067,9 +1145,15 @@ def build() -> MCPServer:
         delta, % parametric, freeform and frozen area, % driven by Params). Values are computed from the mesh;
         nothing is decimated and every repair is listed. Large meshes take minutes."""
         st = studio()
-        progress = None
-        if ctx is not None:
-            def progress(d):
+        said = [0.0]
+
+        def progress(d):
+            # the activity log is what the app and every agent read: a line at most every 3 s, so a long run is not silent
+            if time.time() - said[0] >= 3.0 and d.get("text"):
+                said[0] = time.time()
+                st.activity(None, "reconstruct", f"Reconstructing: {d.get('text')}"[:300], by="engine",
+                            fraction=round(float(d.get("fraction", 0)), 3), part=d.get("part"))
+            if ctx is not None:
                 try:
                     anyio.from_thread.run(ctx.report_progress, float(d.get("fraction", 0)), 1.0, str(d.get("text", "")))
                 except Exception:
@@ -1079,6 +1163,26 @@ def build() -> MCPServer:
             kw = {"tolerance": tolerance, "layer": layer, "on_progress": progress}
             if name:
                 kw["name"] = name
+            from . import multipart
+            many = [str(f) for f in files or [] if str(f).strip()]
+            if references:
+                p = st.load(project_or_file)
+                d = st.dir(p["id"]) / "references"
+                known = {r["file"] for r in st.references(p)}
+                bad = [r for r in references if r not in known]
+                if bad:
+                    raise StudioError(f"No reference part named {', '.join(bad)} in this project.",
+                                      "Import the meshes first (import_reference); names as get_project lists them.")
+                many += [str(d / r) for r in references]
+            elif project_or_file and Path(project_or_file).expanduser().suffix and many:
+                many.insert(0, project_or_file)
+            if len(many) >= 2:
+                return multipart.reconstruct_parts(st, many, purpose=_purpose(None), **kw)
+            if len(many) == 1:
+                return st.reconstruct(Path(many[0]).expanduser(), **kw)
+            if not project_or_file:
+                raise StudioError("Give the mesh to reconstruct.", "project_or_file=<absolute path>, or files=[paths] "
+                                  "for the parts of one product.")
             src = Path(project_or_file).expanduser()
             if src.suffix and src.is_file():
                 return st.reconstruct(src, **kw)
@@ -1089,7 +1193,12 @@ def build() -> MCPServer:
                                   "or pass the path of the mesh file.")
             return st.reconstruct_reference(p, reference or meshes[0], **kw)
         out = await _run(go)
-        act(out["project"], "design", f"Reconstructed a mesh as CAD (Layer {out['summary']['layer']})", ctx)
+        if "parts" in out:
+            act(out["project"], "design", f"Reconstructed {len(out['parts'])} meshes as one design with "
+                                          f"{len(out['parts'])} parts", ctx)
+        else:
+            act(out["project"], "design", f"Reconstructed a mesh as CAD (Layer {out['summary']['layer']})", ctx)
+        _made(out["project"], "reconstruct")
         return {**out, "evidence": "computed (Form Studio's kernel compared the result with the mesh)",
                 "next": "get_project to read the design; get_design_source to edit the recipe or add features."}
 
@@ -1477,6 +1586,7 @@ def build() -> MCPServer:
         st = studio()
         row = await _run(st.duplicate_project, project, name)
         act(row["id"], "project", f"Copied from {project} as “{row['name']}”", ctx)
+        _made(row["id"], "duplicate_project")
         return row
 
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=False, open_world_hint=False))
@@ -1664,6 +1774,10 @@ def build() -> MCPServer:
             for j in jobs:
                 await _wait_job(st, j, max(1.0, 60 - (time.time() - t0)))
             res = {**await _run(concepts_mod.board, st, res["id"]), "failed": res["failed"]}
+        _made(None, "propose_concepts", role="concept", group=res["id"])
+        for m in res.get("members") or []:              # each concept is listed, not put in front: the person picks
+            if m.get("project") and not m.get("trashed"):
+                _made(m["project"], "propose_concepts", role="concept", group=res["id"])
         res["note"] = ("Stop here and let the person pick in Form Studio's concepts view. If they pick in words, call "
                        "pick_concept(group, project). If they ask for a mix (\"the base of A with the hook of C\"), call "
                        "propose_concepts(name, [one mixed concept], group=\"" + res["id"] + "\").")
@@ -1676,7 +1790,9 @@ def build() -> MCPServer:
         Then refine the picked design with update_design. Only call this when the person said which one."""
         from . import concepts as concepts_mod
         st = studio()
-        return await _run(concepts_mod.pick, st, group, project, keep_others, _origin(ctx).replace("agent:", "") or "agent")
+        res = await _run(concepts_mod.pick, st, group, project, keep_others, _origin(ctx).replace("agent:", "") or "agent")
+        _made(project, "pick_concept", group=group)
+        return res
 
     @mcp.tool(annotations=RW)
     async def dismiss_concepts(group: str, keep: str = "all", ctx: Context = None) -> dict:
@@ -1800,6 +1916,8 @@ def build() -> MCPServer:
         res = await _run(_home, bundle.import_file, st, _P(path))
         if res.get("id"):
             act(res["id"], "project", f"Imported “{res['name']}”", ctx)
+            if (st.root / str(res["id"]) / "project.json").is_file():     # a project, not a conversation
+                _made(res["id"], "import_project")
         return res
 
     @mcp.tool(annotations=RO)

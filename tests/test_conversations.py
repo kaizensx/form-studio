@@ -38,6 +38,10 @@ class Fake(Adapter):
         self.runs.append(run)
         return [exe, str(FAKE), str(self.data), run.session or "-", run.model, run.message]
 
+    def run_env(self, run: Run):             # the stand-in plays the MCP server too: it links the designs it makes
+        c = (run.mcp.get("env") or {}).get("FORM_CONVERSATION")
+        return {"FORM_CONVERSATION": c} if c else {}
+
     def parser(self):
         return ClaudeParser()
 

@@ -1,5 +1,9 @@
 # Interface tests in CI: PrusaSlicer is installed on the runner but never opened, so the presets are pinned here
 # and FORM reads them from the bundles inside the program.
+# Printing stays off as on a new install (journeys that print turn it on), so the slicer here does not switch it on.
+[general]
+capabilities = ["core", "parts", "mesh"]
+
 [printer]
 name = "Original Prusa MINI"
 envelope_mm = [180, 180, 180]

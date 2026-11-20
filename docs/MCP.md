@@ -62,6 +62,9 @@ Rules:
 - Meshes to make editable or understand: never embed them as the design. design_guide(topic="reference_parts"):
   analyze_reference (and analyze_assembly for several parts) -> plan named features -> build123d with Params ->
   compare_to_reference -> refine until within tolerance (0.1 mm by default for a remodel).
+- One request makes one design. Several files of one product are one design with several parts: reconstruct(files=[...])
+  for meshes, create_design(relation="part_of") to add a part to the design in front. A second create_design in a
+  conversation that has a design says its relation (replaces, part_of, alternative, new). One brief serves the request.
 - If the message has a "Purpose:" line, respect it: "just a 3D model" means no slicing and no print talk.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...) and design_examples -> plan_design -> create_design(plan=...) -> look at the sheet and
@@ -326,7 +329,11 @@ references: absolute paths of STEP/STL parts to import first, so a Python design
 purpose: "print" (for 3D printing) or "model" (just a 3D model; not sliced, no print checks). Omitted: the
 person's default. process (models only): cnc, laser, injection, casting, sheet_metal, render, cad, other.
 plan: the brief id from design_brief/plan_design. A complex brief (a mechanism, an organic or styled form, a
-texture, several parts) is refused without one. Returns the project, a six-view sheet and a section: look.
+texture, several parts) is refused without one; one brief serves every design of the request.
+relation: in Form Studio's chat, when the conversation already has a design in front, say what this code is to
+it: "replaces" (a new revision of that design), "part_of" (one more part of that design, e.g. the lid of a
+box), "alternative" (a separate design in its family) or "new" (an unrelated design). One request makes one
+design: use part_of for the parts of one product. Returns the project, a six-view sheet and a section: look.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -340,6 +347,7 @@ texture, several parts) is refused without one. Returns the project, a six-view 
 | `purpose` | string \| null |  |
 | `process` | string \| null |  |
 | `plan` | string |  |
+| `relation` | string |  |
 
 ### `update_design`
 
@@ -843,6 +851,10 @@ self.reference("<name>") for clearance cuts. path: absolute local path. Re-impor
 
 Turn a mesh (STL, OBJ or 3MF) into editable CAD as a new design. project_or_file: an absolute path to the
 mesh, or a project id whose imported mesh reference to use (reference: which one; default the first mesh).
+Several meshes of ONE product (a base, a slider and a lid): pass them all at once, as files=[absolute paths]
+(or project_or_file=<project id> with references=[names]); they become ONE design with one part per mesh, in
+the positions the files give (parts that fail are listed in "failed", the others are kept). Never call this
+once per part: that makes unrelated designs.
 Layer 0 is always built: the mesh as an exact solid (Hausdorff at float precision). Layer 1 (beta) replaces
 facets with planes, cylinders, cones, spheres and tori where they fit within `tolerance` mm, and smooth
 organic regions with fitted B-spline surfaces ("freeform"); the rest stay frozen facets. Layer 2 (beta)
@@ -856,11 +868,13 @@ nothing is decimated and every repair is listed. Large meshes take minutes.
 
 | Argument | Type | Required |
 |---|---|---|
-| `project_or_file` | string | yes |
+| `project_or_file` | string |  |
 | `tolerance` | number |  |
 | `layer` | integer |  |
 | `name` | string \| null |  |
 | `reference` | string \| null |  |
+| `files` | array \| null |  |
+| `references` | array \| null |  |
 
 ### `analyze_reference`
 

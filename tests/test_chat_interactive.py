@@ -234,9 +234,9 @@ class AskFiles(unittest.TestCase):
 
 
 class AskFake(Fake):
-    def run_env(self, run):
-        d = (run.mcp.get("env") or {}).get(ask.ENV_DIR)
-        return {ask.ENV_DIR: d} if d else {}
+    def run_env(self, run):                 # the stand-in plays the MCP server too: ask_user, and linking designs
+        env = run.mcp.get("env") or {}
+        return {k: env[k] for k in (ask.ENV_DIR, "FORM_CONVERSATION") if env.get(k)}
 
 
 class AskInChat(unittest.TestCase):

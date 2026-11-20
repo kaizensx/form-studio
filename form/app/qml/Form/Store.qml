@@ -924,7 +924,7 @@ QtObject {
         function add(id, role, state, ts) {
             if (!id || seen[id]) return
             seen[id] = true
-            var row = projectRow(id), live = !!row && !row.error && state !== "trashed"
+            var row = projectRow(id), live = !!row && !row.error && (!state || state === "live")      // trashed or gone: not openable
             out.push({ project: id, role: role || "made", state: live ? "live" : "trashed", ts: ts || 0,
                        name: row ? row.name : id, head: row ? row.head : 0, live: live })
         }
@@ -932,7 +932,8 @@ QtObject {
         if (ds && ds.length) ds.forEach(function (d) { if (typeof d === "string") add(d); else if (d) add(d.project, d.role, d.state, d.ts) })
         else (c.projects || []).forEach(function (id) { add(id) })
         add(c.project)                 // the one in front is always listed
-        return out.filter(function (d) { return d.role !== "reference-study" || d.live })
+        // concepts open in their own sheet until one is picked (then it is "continued" or "made"), so they stay out of the strip
+        return out.filter(function (d) { return d.role !== "concept" && (d.role !== "reference-study" || d.live) })
     }
     readonly property var designsHere: convDesigns(conv)
     readonly property var liveDesignsHere: designsHere.filter(function (d) { return d.live })
@@ -1199,7 +1200,7 @@ QtObject {
             if (id === "") { if (!s.chatBusy && s.convId && !s.convNoDesign) s.newChat(); return }
             if (s.conv && (s.conv.project === id || s.convDesigns(s.conv).some(function (d) { return d.project === id }))) return      // one of its designs: the strip
             if (s.chatBusy) return                       // the running conversation is probably making this design
-            s.get("/conversations?project=" + id).then(function (r) {
+            s.get("/conversations?involving=" + id).then(function (r) {      // the one that made it, or touched it
                 if (s.pid !== id || s.chatBusy) return
                 var best = null
                 r.conversations.forEach(function (c) { if (c.messages && (!best || c.updated > best.updated)) best = c })
@@ -1860,7 +1861,7 @@ QtObject {
     // the conversation that files, sketches and links attach to before the first message is sent
     function ensureConv() {
         if (convId) return Promise.resolve(convId)
-        return post("/conversations", { project: pid || null, agent: chatAgent, model: chatModel, effort: chatEffort }).then(function (m) {
+        return post("/conversations", { project: pid || null, agent: chatAgent, model: chatModel, effort: chatEffort, draft: true }).then(function (m) {
             if (convId === "") { convId = m.id; conv = m }
             return convId
         })

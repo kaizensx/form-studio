@@ -97,7 +97,9 @@ class ProjectLock:
 
 def lineage(src: dict, via: str) -> dict:
     """Where a design came from: {root, parent, parent_rev, via}. root is the first design of the family, so a copy of
-    a copy still names the one it all started from."""
+    a copy still names the one it all started from. via: duplicate, variant, concept, alternative (create_design
+    relation="alternative"), reconstruct (made editable from a mesh imported into src), or request (made by the same
+    request as src: form/conversations.py stamp_request)."""
     lin = src.get("lineage") or {}
     return {"root": lin.get("root") or src["id"], "parent": src["id"], "parent_rev": src.get("head"), "via": via}
 
@@ -441,7 +443,9 @@ class Studio:
                                 "revisions": len(p["revisions"]), "updated": p.get("updated", p["created"]),
                                 "approved_rev": (p["approvals"][-1]["rev"] if p["approvals"] else None),
                                 "purpose": purpose_mod.of(p), "concept": p.get("concept"),   # concepts: form/concepts.py
-                                "lineage": p.get("lineage")})                                # where it came from
+                                "lineage": p.get("lineage"),                                 # where it came from
+                                "origin": p.get("origin"),               # the conversation and request that made it
+                                "parts": [q.get("id") for q in (p.get("multipart") or {}).get("parts") or []] or None})
                 except StudioError as e:
                     out.append({"id": d.name, "name": d.name, "error": str(e)})
         return out
@@ -1962,6 +1966,16 @@ class Studio:
             self.save(p)
         return self._summary(pid)
 
+    def adopt(self, pid: str, src_pid: str, via: str) -> dict:
+        """Put design pid into src_pid's family (lineage via `via`): an alternative to it, or a design made editable
+        from a mesh imported into it. Returns the design's summary."""
+        src = self.load(src_pid)
+        with self.lock(pid):
+            p = self.load(pid)
+            p["lineage"] = lineage(src, via)
+            self.save(p)
+        return self._summary(pid)
+
     def duplicate_project(self, p_or_id, name=None) -> dict:
         """Copy a project (revisions, variants, built artifacts) under a new id derived from the new name.
         The copy is not approved: approvals and release folders describe the original and are left out."""
@@ -2043,6 +2057,10 @@ class Studio:
                 detached += 1
             except Exception as e:
                 missed.append(f"{m['id']}: {type(e).__name__}: {e}")
+        try:                                          # the conversations that made or touched it list it as trashed
+            store.mark_trashed(pid)
+        except Exception as e:
+            missed.append(f"designs: {type(e).__name__}: {e}")
         if missed:
             self.activity(None, "warning", f"{len(missed)} conversation(s) still name the deleted design {name}.", by="Form Studio")
         return {"ok": True, "id": pid, "trash": str(dest), "conversations_detached": detached, "conversations_missed": missed}

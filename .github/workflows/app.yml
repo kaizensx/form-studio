@@ -55,7 +55,7 @@ jobs:
         shell: bash
         run: |
           PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
-          FORM_CONFIG=.github/ci-studio.toml FORM_DATA="$RUNNER_TEMP/form-data" "$PY" -m unittest discover -s tests
+          FORM_CONFIG=.github/ci-studio.toml FORM_DATA="$RUNNER_TEMP/form-data" "$PY" -X faulthandler -m unittest discover -v -s tests
       - name: Interface loads without errors
         continue-on-error: true      # CI runners have no GPU; the 3D viewport may warn there
         shell: bash
