@@ -165,19 +165,22 @@ def run(ui):
     msg = ui.wait_until(lambda: next((m for m in ui.find_all(name="replyText") if "You said: Hello there" in m.property("text")), None),
                         5, "the first reply")
     ui.scroll_to(msg)
+    ui.wait_until(lambda: not ui.js("Store.chatBusy"), 30, "the agent to finish its turn (forking waits for it)")
     fork = None
-    for _ in range(5):                    # the message actions show on hover
+    for i in range(12):                   # the message actions show on hover
+        ui.scroll_to(msg)
         ui.hover((4, 4))
         ui.settle(100)
-        ui.hover(msg, 0.5, 0.5)
-        ui.settle(250)
+        ui.hover(msg, 0.3 + 0.05 * (i % 4), 0.5)
+        ui.settle(300)
         fork = next((b for b in ui.find_all(name="msgFork") if b.property("visible")), None)
         if fork is not None:
             break
     ui.check(fork is not None, "Fork from here shows on a hovered message")
     ui.click(fork)
     ui.wait_until(lambda: ui.store.get("convId") not in ("", first_id), 5, "the branch to open")
-    branch = ui.store.get("conv")
+    branch = ui.wait_until(lambda: (lambda c: c if c and c.get("id") == ui.store.get("convId") and c.get("parent") else None)(ui.store.get("conv")),
+                           5, "the branch's conversation to load")
     ui.eq((branch["thread"], branch["parent"]), (first_id, first_id), "the branch is in the first conversation's thread")
     ui.wait_until(lambda: ui.sees("You said: Hello there") and not ui.sees("You said: make a part and render it"), 5,
                   "the branch to hold the conversation up to that message")
