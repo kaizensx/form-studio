@@ -46,18 +46,25 @@ uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizens
 | **Top bar** | The design and its revision, release state, its purpose, the printer (or "No printer · Just designing"), search (Ctrl/⌘ K) and Settings. A bar under it names any work that takes longer than 300 ms, with progress |
 | **Conversation** (left) | The agent conversation for this design: messages, the agent's steps, the views it looked at, attachments. Resizable; Ctrl/⌘ J hides it |
 | **Viewport** (centre) | The kernel's geometry, one mesh per feature, with dimensions on the plate. The tool rail on its left edge holds Select, Measure, Annotate, Section, Analyze, Assembly, History, Simulate the print and Photo render |
-| **Stages** (right) | Brief, Shape, Fit, Prove and Release. Each tab shows where it stands: measured values, features, fit yield, checks to review, release readiness |
+| **Stages** (right) | Describe, Design, Fit, Review and Make. Each tab shows where it stands: measured values, features, fit yield, checks to review, release readiness |
 | **Pipeline** (bottom) | Parameters › Solid › Exports › Checks › Slice › Release. A node is current only when it describes the revision on screen. A 3D model, or a design that is not sliced, has no Slice step |
 
 ### The five stages
 
 | Stage | What you do there |
 |---|---|
-| **Brief** | What the part is for and its purpose (for 3D printing, or just a 3D model and how it will be made), the dimensions you measured with their provenance, reference photos and imported parts |
-| **Shape** | Features in build order and their parameters. Select a feature on the model or in the list and change it; the draft shows its computed impact before you commit |
+| **Describe** | What the part is for and its purpose (for 3D printing, or just a 3D model and how it will be made), the dimensions you measured with their provenance, reference photos and imported parts |
+| **Design** | Features in build order and their parameters. Select a feature on the model or in the list and change it; the draft shows its computed impact before you commit |
 | **Fit** | The fit model for each interface: a section, the clearance, the chance of fitting and how to raise it. Hidden for a 3D model |
-| **Prove** | Every check with its evidence, print orientation, the plates, and the slice: time, filament, layers, Watch it print. A 3D model shows the checks that apply to it and says which do not |
-| **Release** | The release gate, approval (over failed checks only with a reason for each, on the record), the released files with their hashes, and the revision history |
+| **Review** | Every check with its evidence, print orientation, the plates, and the slice: time, filament, layers, Watch it print. A 3D model shows the checks that apply to it and says which do not |
+| **Make** | The release gate, approval (over failed checks only with a reason for each, on the record), the released files with their hashes, and the revision history |
+
+The stages follow the work: describe it, design it, review it, make it. Fit sits between Design and Review for a
+design made for 3D printing. They were called Brief, Shape, Prove and Release; the CLI, MCP and `--stage` keep those
+ids (`brief`, `shape`, `fit`, `prove`, `release`), and the old names still find each stage in the command palette.
+
+**Starting.** The opening screen shows for about a second while the CAD kernel starts: the mark is drawn on its
+origin, then travels to the top bar and stays there as the logo while Home appears behind it.
 
 ### Home
 
@@ -75,8 +82,11 @@ size and volume: continue with one, or ask in words for a mix ("the base of A wi
 real number, a **Measure this** card shows where to measure on a picture or a diagram, the tolerance that matters and
 what the design assumes now; the number you type is committed with how you measured it, and the part updates.
 
-Below: concepts waiting for a pick, recent conversations, and every design as a live 3D card, filtered by released and
-in progress and sorted by name or date. Right-click a card to rename, duplicate, export or move it to the trash.
+Below: concepts waiting for a pick, then your designs as live 3D cards, then recent conversations. Designs are grouped
+by **family**: a design with its copies, saved variants and the concept you picked is one card, showing the member
+changed last, with a count on it. Click the count to open the family under its row (the first design first, each
+member saying whether it is a copy or a variant); click the card to open the design. Families are filtered by released
+and in progress and sorted by name or date. Right-click a card to rename, duplicate, export or move it to the trash.
 **Import** (from Home or the command palette) opens a `.formstudio` or `.formproj` design, a conversation exported as
 JSON.
 
@@ -140,7 +150,7 @@ printer updates the top bar, the plate and the open design's checks without a re
 
 | Tab | Holds |
 |---|---|
-| General | Set up for: the same cards as the launcher. Turning one on installs only what it needs; turning one off hides it and never uninstalls anything. And the project folder |
+| General | Appearance: Dark, Light or Match system, applied at once. Set up for: the same cards as the launcher. Turning one on installs only what it needs; turning one off hides it and never uninstalls anything. And the project folder |
 | Printing | The default printer, filament and process, from every printer set up in your slicers; the slicer, and whether designs made for printing are sliced; the keep-out margin and the gap between parts on a plate; which program "Open in slicer" uses. Shown only when 3D printing is on |
 | Agents | Agent apps, model API keys, local models and providers you added, in one list; Add a provider…; the agent, model and effort for new conversations; web lookups; a spending limit per message; opening Form Studio when an outside agent starts working. Keys are stored privately and never shown again |
 | Other apps | Blender, OpenSCAD and FreeCAD: whether and where each was found, Browse as a fallback, and what each one unlocks; which programs "Open in CAD" and "Open in viewer" use |
