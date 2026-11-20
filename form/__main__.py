@@ -29,7 +29,7 @@
   form verify <project> <release>    re-hash a release against its manifest
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
                                      one message to an agent with FORM's tools; streams the reply, saves the conversation
-  form conversations list|show|delete|rename|pin    saved conversations
+  form conversations list|show|delete|rename|pin|designs|migrate    saved conversations, the designs each made
   form start --text "…" [--photo F] [--file F] [--sketch F.json] [--link URL] [--purpose print|model] [--json]
                                      start a design the way Home does (words, photos, files, a sketch, links)
   form start --blank [--name N] [--purpose print|model]   a blank design: a rounded block to shape
@@ -264,7 +264,7 @@ def main(argv=None):
     sub.add_parser("setup", help="find what is missing and fix what you choose (--check, --yes, --dry-run)")
     sub.add_parser("update", help="is there a newer Form Studio? (--check prints JSON; never installs)")
     sub.add_parser("chat", help='send one message to an agent: form chat "message" [--project ID] [--model X] [--json]')
-    sub.add_parser("conversations", help="saved conversations: list | show ID | delete ID | rename ID TITLE | pin ID")
+    sub.add_parser("conversations", help="saved conversations: list | show ID | delete ID | rename ID TITLE | pin ID | designs ID | migrate")
     sub.add_parser("start", help='start a design: --text "…" [--photo F] [--file F] [--sketch F.json] [--link URL] '
                                  '[--purpose print|model], or --blank [--name N]')
     sub.add_parser("concepts", help="concept groups: [<group-or-project>] | pick <group> <project> [--keep-others]")
@@ -447,8 +447,10 @@ def main(argv=None):
     gd.add_argument("b", type=int, nargs="?")
     gd.add_argument("--png", help="also write the picture (added green, removed red) here")
     rc = sub.add_parser("reconstruct", help="a mesh (STL, OBJ, 3MF) as editable CAD, verified against it: reconstruct FILE "
-                                            "[--name N] [--tolerance MM] [--layer 0|1|2]")
+                                            "[FILE ...] [--name N] [--tolerance MM] [--layer 0|1|2]; several files of one "
+                                            "product make one design with one part each")
     rc.add_argument("file")
+    rc.add_argument("more", nargs="*", help="more meshes of the same product: one design, one part per mesh")
     rc.add_argument("--name")
     rc.add_argument("--tolerance", type=float, default=0.02, help="largest deviation from the mesh for a fitted surface, mm")
     rc.add_argument("--layer", type=int, choices=(0, 1, 2), default=2,
@@ -538,7 +540,12 @@ def main(argv=None):
                 if _t.monotonic() - last[0] > 1.5:
                     last[0] = _t.monotonic()
                     print(f"[{100 * float(d.get('fraction', 0)):3.0f}%] {d.get('text', '')}", file=sys.stderr, flush=True)
-            _print(st.reconstruct(Path(a.file), name=a.name, tolerance=a.tolerance, layer=a.layer, on_progress=show))
+            if a.more:
+                from . import multipart
+                _print(multipart.reconstruct_parts(st, [Path(a.file), *map(Path, a.more)], name=a.name,
+                                                   tolerance=a.tolerance, layer=a.layer, on_progress=show))
+            else:
+                _print(st.reconstruct(Path(a.file), name=a.name, tolerance=a.tolerance, layer=a.layer, on_progress=show))
         elif a.cmd in ("analyze-reference", "analyze-assembly", "compare-reference"):
             from .remodel import project as rp
             p = st.load(a.project)

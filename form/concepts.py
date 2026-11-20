@@ -238,9 +238,11 @@ def pick(st, gid: str, project: str, keep_others: bool = False, by: str = "you")
     store = Conversations(st.root)
     members = {m["project"] for m in g["members"]}
     for c in store.list(limit=100000):
-        if (c.get("project") in members or gid in (c.get("concepts") or [])) and c.get("project") != project:
-            try:
-                store.link(c["id"], project)
+        if (c.get("project") in members or gid in (c.get("concepts") or [])
+                or any(e.get("group") == gid for e in c.get("designs") or [])):
+            try:                                # the picked one is what this conversation made; the group is closed
+                store.link(c["id"], project, role="made", group=gid, tool="pick_concept")
+                store.record(c["id"], None, "concept", group=gid, front=False, state="picked")
             except Exception:
                 pass
     trashed, kept = [], []
@@ -304,6 +306,14 @@ def dismiss(st, gid: str, keep: str = "all", by: str = "you") -> dict:
                 raise
     g.update(state="dismissed", dismissed=keep, dismissed_at=time.time())
     _write(st, g)
+    from .conversations import Conversations
+    store = Conversations(st.root)
+    for c in store.list(limit=100000):              # the conversations that proposed them say the group is closed
+        if any(e.get("group") == gid and not e.get("project") for e in c.get("designs") or []):
+            try:
+                store.record(c["id"], None, "concept", group=gid, front=False, state="dismissed")
+            except Exception:
+                pass
     if kept:
         st.activity(kept[0], "concepts", f"Kept {len(kept)} concepts of {g['name']} as designs", group=gid, by=by)
     return {"dismissed": gid, "keep": keep, "kept": kept, "trashed": trashed, "group": board(st, gid, compute=False)}

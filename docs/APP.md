@@ -85,7 +85,8 @@ real number, a **Measure this** card shows where to measure on a picture or a di
 what the design assumes now; the number you type is committed with how you measured it, and the part updates.
 
 Below: concepts waiting for a pick, then your designs as live 3D cards, then recent conversations. Designs are grouped
-by **family**: a design with its copies, saved variants and the concept you picked is one card, showing the member
+by **family**: a design with its copies, saved variants, the concept you picked and the other designs made by the same
+request is one card, showing the member
 changed last, with a count on it. Click the count to open the family under its row (the first design first, each
 member saying whether it is a copy or a variant); click the card to open the design. Families are filtered by released
 and in progress and sorted by name or date. Right-click a card to rename, duplicate, export or move it to the trash.
