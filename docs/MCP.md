@@ -58,7 +58,9 @@ Rules:
 - Photos: find the scale from a reference object (bank card 85.60 x 53.98 mm, a coin's official diameter, a ruler);
   dimensions read off a photo are "estimated from the photo (scale from <reference>)" and stay assumed until measured.
   Sketches from Form Studio carry structured JSON: it is authoritative over the picture; stated dimensions override
-  drawn lengths. STEP/STL: import_reference. PDF drawings: read_document. Download only files the person gave you.
+  drawn lengths. STEP/STL/3MF: import_reference. PDF drawings: read_document. Download only files the person gave you.
+- A link the person gives (a file, a Printables/MakerWorld/Thingiverse page, a signed download link): fetch_link,
+  never a shell. A large mesh: mesh_preflight before analysing it.
 - Meshes to make editable or understand: never embed them as the design. design_guide(topic="reference_parts"):
   analyze_reference (and analyze_assembly for several parts) -> plan named features -> build123d with Params ->
   compare_to_reference -> refine until within tolerance (0.1 mm by default for a remodel).
@@ -73,7 +75,7 @@ Rules:
 
 ## Tools at a glance
 
-87 tools. Read-only tools never change a project.
+90 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -87,6 +89,9 @@ Rules:
 | [`design_examples`](#design_examples) | read-only | Complete, high-quality example designs (build123d + form.craft) to learn construction from: a carbon full-face helmet, an ergonomic mouse, a planetary gearbox, a hinged case with a snap latch, an ergonomic handle, a knurled knob, a spiral-ribbed vase and more. |
 | [`critique`](#critique) | changes | Stage 5: look closely and measure. |
 | [`read_document`](#read_document) | read-only | Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). |
+| [`fetch_link`](#fetch_link) | changes | Download what a link the person gave points to, from Form Studio's engine (use this instead of a shell: it works where your sandbox has no network). |
+| [`resolve_model_page`](#resolve_model_page) | read-only | What a model link is, without downloading files: site, title, author, licence, pictures and the file list (Printables, Thingiverse with an app token), or why the files cannot be fetched and how the person gets them (MakerWorld, Thingiverse without a token). |
+| [`mesh_preflight`](#mesh_preflight) | read-only | Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display proxy for a heavy one. |
 | [`create_design`](#create_design) | changes | Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass, built with build123d. |
 | [`update_design`](#update_design) | changes | Replace a design's code as a new revision (history keeps every version). |
 | [`get_design_source`](#get_design_source) | read-only | The exact code a revision was built from (built-in recipes return their recipe file). |
@@ -313,6 +318,48 @@ pages: "1", "1-3", "2,5" (at most 4). Use this for official dimensions of boards
 |---|---|---|
 | `source` | string | yes |
 | `pages` | string |  |
+
+### `fetch_link`
+
+Download what a link the person gave points to, from Form Studio's engine (use this instead of a shell: it
+works where your sandbox has no network). A file link (STL, 3MF, OBJ, STEP, PDF, image; also a signed
+MakerWorld download link, fetched at once before it expires) is downloaded; a Printables model page has its
+part files downloaded with title, author and licence; a Thingiverse or MakerWorld page returns why its files
+cannot be fetched and what the person can do; any other page is not read (resolve_model_page reads its title).
+In a Form Studio chat the files are attached to the conversation; otherwise they are saved under the data
+folder. Each mesh comes with its preflight (triangles, size, closed or not, class). Only fetch links the
+person gave you.
+
+| Argument | Type | Required |
+|---|---|---|
+| `url` | string | yes |
+| `conversation` | string |  |
+
+### `resolve_model_page`
+
+*Read-only.*
+
+What a model link is, without downloading files: site, title, author, licence, pictures and the file list
+(Printables, Thingiverse with an app token), or why the files cannot be fetched and how the person gets them
+(MakerWorld, Thingiverse without a token). Any other page: its OpenGraph title, description and pictures as a
+visual reference. Then fetch_link(url) downloads what can be downloaded.
+
+| Argument | Type | Required |
+|---|---|---|
+| `url` | string | yes |
+
+### `mesh_preflight`
+
+*Read-only.*
+
+Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class
+(light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display
+proxy for a heavy one. The proxy is for display only; analysis and import always use the file itself.
+path: absolute local path. Cached by path, size and time, so asking again is instant.
+
+| Argument | Type | Required |
+|---|---|---|
+| `path` | string | yes |
 
 ### `create_design`
 

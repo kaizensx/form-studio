@@ -13,12 +13,16 @@ Column {
     readonly property var meshes: parts.filter(function (r) { return r.format !== "step" }).map(function (r) { return r.file })
     readonly property var recon: Store.project && Store.project.reconstruction ? (Store.project.reconstruction.summary || null) : null
     function size(b) { return [0, 1, 2].map(function (i) { return F.fmt(b[1][i] - b[0][i], 1) }).join(" × ") }
-    // where a reference came from and under which licence (stored per attachment by the engine: source, licence)
+    // where a reference came from and under which licence. The engine keeps it per attachment as `source`: a link, or
+    // { url, site, title, author, licence } (form/conversations.py sources); older rows may carry licence beside it.
     function origin(r) {
         if (!r) return ""
-        var src = r.source ? String(r.source) : "", m = src.match(/^https?:\/\/([^\/?#]+)/i), out = []
-        if (src) out.push("from " + (m ? m[1].replace(/^www\./, "") : src))
-        if (r.licence || r.license) out.push(String(r.licence || r.license))
+        var s = r.source, o = s && typeof s === "object" ? s : ({ url: s ? String(s) : "" }), out = []
+        var url = String(o.url || ""), m = url.match(/^https?:\/\/([^\/?#]+)/i)
+        var site = o.site || (m ? m[1].replace(/^www\./, "") : url)
+        if (site) out.push("from " + site + (o.author ? " by " + o.author : ""))
+        var lic = o.licence || o.license || r.licence || r.license
+        if (lic) out.push(String(lic))
         return out.join(" · ")
     }
     readonly property var known: Store.recipe ? Store.recipe.params.filter(function (p) { return p.group === "brief" }) : []

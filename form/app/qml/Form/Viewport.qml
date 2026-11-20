@@ -1039,6 +1039,8 @@ Item {
             vp.dist = Math.max(30, Math.min(3000, vp.dist * Math.exp(-d)))
         }
     }
+    // Cmd-drag (Ctrl-drag) on a face changes the parameter that drives it (FaceDrag.qml, form/dragface.py)
+    FaceDrag { id: faceDrag; vp: vp; anchors.fill: parent; enabled: vp.interactive && !vp.lite }
     PinchHandler {
         id: pinch
         enabled: vp.interactive; target: null
