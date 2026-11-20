@@ -49,7 +49,7 @@ def journey_first_run_just_designing(ui):
     else:
         ui.click_text("Open Form Studio")
     ui.wait_until(lambda: ui.store.get("screen") == "home" and ui.store.get("welcome") is False, 30, "Home")
-    ui.check(ui.find(name="purposeChip") is None, "no “just designing” chip")
+    ui.check(not ui.sees("not for printing", "topBar"), "no “just designing” chip")
     ui.check(ui.find(name="printerChip") is None, "no printer chip")
     ui.check(not ui.js("Store.setup && Store.setup.attention.some(function (i) { return i.indexOf('slicer') === 0 })"),
              "setup does not ask for a slicer")
@@ -67,7 +67,7 @@ def journey_a_3d_model(ui):
     ui.eq(d["purpose"]["purpose"], "model", "a 3D model")
     ui.eq(d["status"]["slice"]["off"]["why"], "purpose", "not sliced because it is not for printing")
     ui.check("Slice" not in ui.texts("pipeline"), "the pipeline strip has no Slice step")
-    ui.check(ui.find(name="purposeChip") is None and ui.find(name="printerChip") is None, "the top bar says nothing about printing")
+    ui.check(not ui.sees("not for printing", "topBar") and ui.find(name="printerChip") is None, "the top bar says nothing about printing")
     ui.check("fit" not in [x["id"] for x in ui.js("Store.stages")], "no Fit stage")
     ids = [c["id"] for c in d["checks"]["checks"]]
     ui.check(not {"envelope", "overhang", "adhesion", "wall"} & set(ids), f"no print checks: {ids}")
@@ -116,7 +116,7 @@ def journey_purpose_switch(ui):
     ui.key("Escape")
     ui.wait_until(lambda: ui.store.get("sheet") is None, 4, "the sheet to close")
     ui.settle(300)
-    ui.check(ui.find(name="purposeChip") is None and ui.find(name="printerChip") is None,
+    ui.check(not ui.sees("not for printing", "topBar") and ui.find(name="printerChip") is None,
              "a 3D model needs no label: the top bar stays quiet when printing turns on")
     toasts_gone(ui)
     ui.settle(600)                                     # the top bar and stage tabs settle after printing turns on
@@ -141,7 +141,7 @@ def journey_purpose_switch(ui):
     ui.shot("noprinter-switched-to-print")
     ui.click_text("Just a 3D model", within=ui.item("purposeSeg"))
     ui.wait_until(lambda: data(ui)["purpose"]["purpose"] == "model", 10, "a 3D model again")
-    ui.wait_until(lambda: ui.find(name="printerChip") is None and ui.find(name="purposeChip") is None, 5, "nothing about printing again")
+    ui.wait_until(lambda: ui.find(name="printerChip") is None and not ui.sees("not for printing", "topBar"), 5, "nothing about printing again")
     pick = ui.item("processPick")
     ui.check(pick is not None, "a model can name how it will be made")
     ui.run_js("Store.setPurpose('model', 'cnc')")

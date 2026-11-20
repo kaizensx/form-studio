@@ -14,7 +14,7 @@ def printer_name(ui):
 
 def top_bar_is_quiet(ui, where):
     ui.check(ui.find(name="printerChip", within=ui.item("topBar")) is None, f"{where}: no printer chip in the top bar")
-    ui.check(ui.find(name="purposeChip") is None, f"{where}: no purpose chip")
+    ui.check(not ui.sees("not for printing", "topBar"), f"{where}: no purpose chip")
     name = printer_name(ui) or "nozzle"
     ui.check(not ui.sees(name, "topBar"), f"{where}: the top bar names no printer ({name})")
 

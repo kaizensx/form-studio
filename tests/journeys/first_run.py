@@ -62,7 +62,7 @@ def run(ui):
     ui.shot("first-run-home-empty")
     ui.check(ui.exists("startComposer"), "the empty Home is the composer")
     ui.expect("What do you want to make?")
-    ui.check(ui.find(name="printerChip") is None and ui.find(name="purposeChip") is None, "no printer talk in the top bar")
+    ui.check(ui.find(name="printerChip") is None and not ui.sees("not for printing", "topBar"), "no printer talk in the top bar")
     # no examples: Import brings in only work made elsewhere
     ui.click_text("Import…")
     ui.wait_until(lambda: (ui.store.get("sheet") or {}).get("kind") == "import", 5, "the Import sheet")

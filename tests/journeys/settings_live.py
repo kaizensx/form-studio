@@ -76,7 +76,7 @@ def journey_just_design_from_settings(ui):
     ui.wait_until(lambda: sheet(ui) is None, 4, "the sheet to close")
     # printing off hides every print surface, even for a design made for printing; nothing was uninstalled
     ui.wait_until(lambda: ui.find(name="printerChip") is None, 5, "the printer chip to go")
-    ui.check(ui.find(name="purposeChip") is None, "no “just designing” chip either")
+    ui.check(not ui.sees("not for printing", "topBar"), "no “just designing” chip either")
     ui.check("fit" not in [s["id"] for s in ui.js("Store.stages")], "no Fit stage")
     ui.check((ui.api("/install") and any(r["id"] == "slicer.bambu" and r["status"] == "ok" for r in ui.api("/install")["software"])),
              "the slicer is still installed")

@@ -75,7 +75,8 @@ dictation), a photo (with a bank card, a coin or a ruler in it, the agent estima
 model page is passed to the agent as a link; a direct STL, STEP, 3MF, PDF or picture link is downloaded and shown on
 the composer). Drop files anywhere on Home or paste them. Under the composer: **Start blank** (an empty design in the
 workspace, no agent) and, only when 3D printing is on, **Make it for: Anything / My printer**. A new design is a 3D
-model unless you pick My printer or say so in the request ("for my A1 mini").
+model unless you pick My printer or say so in the request ("for my A1 mini"); Settings › Printing › **New designs are
+made for** can make every new design a print.
 
 Sending opens the workspace at once in a "being designed" state with what the agent is doing; the design is attached
 the moment it exists and builds up feature by feature in the viewport, in build order, each feature fading and rising

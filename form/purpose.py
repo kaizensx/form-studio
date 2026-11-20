@@ -88,8 +88,11 @@ def decided(cfg: dict) -> bool:
 def default(cfg: dict) -> str:
     """What a new design is for, when nobody says: a 3D model, for everyone. Form Studio is for making things first;
     someone who prints marks a design for printing when they say so (Home's "Make it for: my printer", the request
-    itself, or one click in Make). `cfg` is kept so callers need not change."""
-    return "model"
+    itself, or one click in Make). Someone who prints and wants every new design made for the printer says so once:
+    [general].new_designs = "print" (Settings › Printing), honoured only while printing is on."""
+    g = cfg.get("general") if isinstance(cfg, dict) else None
+    want = str((g or {}).get("new_designs") or "").strip().lower() if isinstance(g, dict) else ""
+    return "print" if want == "print" and printing(cfg) else "model"
 
 
 def of(p: dict | None) -> str:
