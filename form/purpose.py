@@ -8,7 +8,9 @@ Two answers shape the whole app:
                                       to make them. Older files with only [general].printing still read as they did.
   project["purpose"]                  "print" (made to be 3D printed) or "model" (just a 3D model: for rendering,
                                       CAD exchange, CNC, laser cutting, moulding, visualisation, ...). A new design
-                                      starts from the global answer; a design saved before purposes existed is "print".
+                                      is a model unless whoever creates it says it is for printing (the person on
+                                      Home, or the agent when the request says so); a design saved before purposes
+                                      existed is "print".
   project["process"]                  for a model: how it will be made, if the person said ("" = not stated). It sets
                                       the smallest feature worth flagging (form/checks.py).
 
@@ -84,8 +86,13 @@ def decided(cfg: dict) -> bool:
 
 
 def default(cfg: dict) -> str:
-    """What a new design is for, when nobody says: a print only for someone who turned 3D printing on, else a model."""
-    return "print" if printing(cfg) else "model"
+    """What a new design is for, when nobody says: a 3D model, for everyone. Form Studio is for making things first;
+    someone who prints marks a design for printing when they say so (Home's "Make it for: my printer", the request
+    itself, or one click in Make). Someone who prints and wants every new design made for the printer says so once:
+    [general].new_designs = "print" (Settings › Printing), honoured only while printing is on."""
+    g = cfg.get("general") if isinstance(cfg, dict) else None
+    want = str((g or {}).get("new_designs") or "").strip().lower() if isinstance(g, dict) else ""
+    return "print" if want == "print" and printing(cfg) else "model"
 
 
 def of(p: dict | None) -> str:

@@ -22,8 +22,8 @@ def box(it):
 def journey_setup(ui):
     printing_on(ui)                      # this journey is about printing: turn it on as someone who prints would
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
-    S["box"] = make(ui, "enclosure", "Tool box", open=False)
-    S["hinged"] = make(ui, "hinged_box", "Hinged box", open=False)
+    S["box"] = make(ui, "enclosure", "Tool box", open=False, purpose="print")
+    S["hinged"] = make(ui, "hinged_box", "Hinged box", open=False, purpose="print")
     # a second revision, so the history has something to play
     spec = [p for p in ui.api("/projects/" + S["box"])["recipe"]["params"] if p["key"] == "wall"][0]
     ui.api("/projects/" + S["box"] + "/commit", {"values": {"wall": spec["default"] + 0.6}, "provenance": {}, "note": "thicker wall", "origin": "user"})

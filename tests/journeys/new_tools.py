@@ -27,7 +27,7 @@ class Design(Recipe):
 def journey_setup(ui):
     printing_on(ui)                      # this journey is about printing: turn it on as someone who prints would
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
-    d = ui.studio.create_design("Mount plate", SOURCE)
+    d = ui.studio.create_design("Mount plate", SOURCE, purpose="print")      # made for printing
     S["pid"] = d["id"]
     ui.api("/projects/" + d["id"] + "/run", {"nodes": [], "force": False})
     wait_job(ui, S["pid"])

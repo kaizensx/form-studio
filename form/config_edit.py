@@ -43,6 +43,11 @@ SCHEMA: dict[str, dict] = {
                         "help": "Stable: releases only. Preview: also pre-releases from the dev branch, where new features are tested first."},
     "bench.auto_open": {"type": "bool", "tab": "chat", "label": "Open Form Studio's page when an outside agent starts working",
                         "help": "For agents that use Form Studio over MCP from their own window or a terminal."},
+    # what a new design is for when nobody says (form/purpose.py default): a 3D model unless this is "print"
+    "general.new_designs": {"type": "choice", "tab": "printer", "label": "New designs are made for",
+                            "choices": ["model", "print"],
+                            "help": "model: a new design is a 3D model unless you or the request say it is for printing. "
+                                    "print: every new design is made for your printer. Applies only while 3D printing is on."},
     "slicer.kind": {"type": "choice", "tab": "printer", "label": "Slicer",
                     "choices": ["auto", "bambu", "orca", "prusa", "superslicer", "qidi", "elegoo", "snapmaker"],
                     "help": "Automatic uses the first one installed: Bambu Studio, OrcaSlicer, PrusaSlicer. Slicers found on this computer are marked."},

@@ -5,10 +5,10 @@ import FormNative
 import "F.js" as F
 
 // Home: where a design starts, and where the work you already did waits.
-//   · the hero: the bench itself (a live build plate with your last design turning on it) and one composer that takes
-//     words, a photo, a sketch, a part or a drawing, or a link. For my printer / Just a 3D model, or Start blank.
+//   · the hero: the studio itself (a neutral floor, no plate) and one composer that takes
+//     words, a photo, a sketch, a part or a drawing, or a link. Make it for: Anything / My printer (only when 3D printing is on), or Start blank.
 //   · concepts the agent proposed and you have not picked yet
-//   · your designs as live parts on their plates, one card per design family (a design with its copies, variants and
+//   · your designs as live parts in the studio, one card per design family (a design with its copies, variants and
 //     picked concepts: they share lineage.root); a family opens under its row. Then your recent conversations.
 // Nothing pre-made: no recipes, no briefs, no example projects. Every design starts from what the person describes.
 Item {
@@ -111,7 +111,7 @@ Item {
     function openGroupMenu(g, item, x, y) { groupFor = g; gpm.openAt(item, Math.max(0, Math.min(x, item.width - gpm.width)), y) }
     function openMenu(p, item, x, y) { menuFor = p; pm.parent = item; pm.openAt(item, x, y) }
 
-    // ════ the bench: a live build plate behind the hero, your last design turning slowly on it ════
+    // ════ the bench: the studio floor behind the hero (no build plate: Home is about making, not printing) ════
     Item {
         id: bench
         width: parent.width; height: home.heroH + 40
@@ -136,7 +136,6 @@ Item {
                 NumberAnimation { from: -34; to: -8; duration: 7000; easing.type: Easing.InOutSine }
                 NumberAnimation { from: -8; to: -60; duration: 14000; easing.type: Easing.InOutSine }
                 NumberAnimation { from: -60; to: -34; duration: 7000; easing.type: Easing.InOutSine } }
-            plateSize: 260
             property string showing: ""
             function load() {
                 var id = home.latest && home.split ? home.latest.id : ""      // narrow: the bench alone; a part would sit behind the words
@@ -235,10 +234,13 @@ Item {
                     Item { visible: !home.chatting; width: 1; height: 16 }
                     // ── under the composer: what it is for, which printer, which agent and model, or a blank canvas ──
                     Row { id: opts; objectName: "startOptions"; visible: !home.chatting; anchors.horizontalCenter: parent.horizontalCenter; spacing: 6; height: 30
+                        // only for someone who prints: what the next design is made for. Anything is the default; saying
+                        // "for my A1 mini" in the request does the same as picking My printer.
+                        Txt { visible: Store.printOn; kind: "fine"; tone: 3; text: "Make it for"; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
                         Seg { id: purposeSeg; objectName: "startPurpose"; visible: Store.printOn; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 30
-                            value: Store.newPurposeEffective; onPicked: function (v) { Store.setNewPurpose(v) }
-                            model: [{ value: "print", text: "For my printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" },
-                                    { value: "model", text: "Just a 3D model", tip: "No printer: no slicing and no print checks. STEP and STL are still exported." }] }
+                            value: Store.newPurpose === "print" ? "print" : "any"; onPicked: function (v) { Store.setNewPurpose(v) }
+                            model: [{ value: "any", text: "Anything", tip: "A 3D model: STEP, STL, 3MF and more, for any way of making it. Say “for my printer” in the request, or pick My printer, to check and slice it." },
+                                    { value: "print", text: "My printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" }] }
                         Btn { id: printerChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startPrinter"; small: true; kind: "quiet"; icon: "printer"; visible: Store.printOn && Store.newPurposeEffective === "print"
                             text: Store.printerName ? Store.printerName : "Choose a printer"
                             tip: "The printer the next design is checked and sliced for. Click to change it."
@@ -260,7 +262,7 @@ Item {
                                     TalkModelPicker { id: hmp; width: parent.width; onDone: homeModelPop.close() } } } }
                         Item { width: 9; height: 30; anchors.verticalCenter: parent.verticalCenter; Rectangle { width: 1; height: 16; color: Theme.rule2; anchors.centerIn: parent } }
                         Btn { id: blank; anchors.verticalCenter: parent.verticalCenter; objectName: "startBlank"; small: true; kind: "quiet"; icon: "square_dashed"; text: "Start blank"
-                            tip: "An empty build plate and the workspace. Describe, sketch or import what goes on it."
+                            tip: "An empty studio and the workspace. Describe, sketch or import what goes in it."
                             onClicked: Store.startBlank() }
                         Btn { anchors.verticalCenter: parent.verticalCenter; objectName: "startReplace"; small: true; kind: "quiet"; icon: "wrench"; text: "Replace a broken part"
                             tip: "From a photo: the agent estimates sizes, asks you for the ones that matter, then designs the new part."
@@ -371,7 +373,7 @@ Item {
                             Repeater { model: band.modelData
                                 DesignCard { required property var modelData; required property int index
                                     width: grid.cw; host: home; p: modelData.face; count: modelData.count; photo: home.photos[modelData.face.id] || null
-                                    index: band.index * grid.columns + index
+                                    order: band.index * grid.columns + index
                                     opened: home.openFamily === modelData.root && modelData.count > 1
                                     onToggled: home.openFamily = opened ? "" : modelData.root } } }
                         // the opened family: every design that shares the origin, the first one first
@@ -422,13 +424,22 @@ Item {
                 readonly property real tw: Math.floor((width - (home.talks.length - 1) * spacing) / Math.max(1, home.talks.length))
                 Repeater { model: home.talks
                     Rectangle { id: tc; objectName: "homeConversation"; required property var modelData; required property int index
+                        readonly property string convId: modelData.id
                         width: parent.tw; height: 84; radius: Theme.rLg
                         color: tcm.pressed ? Theme.plate1 : tcm.containsMouse ? Theme.plate2 : Theme.alpha(Theme.plate1, 0.7)
                         border.color: tcm.containsMouse ? Theme.rule3 : Theme.rule
                         Behavior on color { Tint {} }
                         opacity: 0; Component.onCompleted: { if (home.entered) opacity = 1; else tcIn.start() }
                         SequentialAnimation { id: tcIn; PauseAnimation { duration: 200 + tc.index * Theme.stagger } Glide { target: tc; property: "opacity"; to: 1; duration: Theme.slow } }
-                        Column { x: 16; y: 14; width: parent.width - 32; spacing: 5
+                        // the designs it made, small, on the right (a trashed one is left out; a conversation with none shows none)
+                        readonly property var made: Store.convDesigns(tc.modelData).filter(function (d) { return d.live }).slice(-3)
+                        Row { id: tthumbs; objectName: "conversationDesigns"; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 6
+                            visible: tc.made.length > 0 && tc.width > 260
+                            Repeater { model: tc.made.slice(-2)
+                                Rectangle { required property var modelData; required property int index
+                                    width: 52; height: 52; radius: Theme.rMd; color: Theme.plate; border.color: Theme.rule2; clip: true; z: 10 - index
+                                    MiniView { anchors.fill: parent; anchors.margins: 1; projectId: parent.modelData.project } } } }
+                        Column { x: 16; y: 14; width: parent.width - 32 - (tthumbs.visible ? tthumbs.width + 12 : 0); spacing: 5
                             Row { spacing: 7; width: parent.width
                                 Rectangle { width: 6; height: 6; radius: 3; anchors.verticalCenter: parent.verticalCenter
                                     color: tc.modelData.state === "running" ? Theme.datum : tc.modelData.state === "asking" ? Theme.amber : Theme.ink4 }

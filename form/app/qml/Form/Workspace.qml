@@ -166,6 +166,7 @@ Item {
             anchors.fill: parent
             visible: !Store.layers
             asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
+            stageMode: Store.stageMode                                            // the studio floor; the build plate only where the printer matters
             plateSize: ws.d && ws.d.printer ? Math.max(60, Math.max(ws.d.printer.env.envelope[0], ws.d.printer.env.envelope[1])) : 180
             hiddenFeatures: Store.hidden                                           // design tools: quick actions
             order: ws.d && ws.d.recipe && ws.d.recipe.features ? ws.d.recipe.features.map(function (f) { return f.id }) : []
@@ -370,6 +371,29 @@ Item {
                 text: Store.viewName.charAt(0).toUpperCase() + Store.viewName.slice(1)
                 onClicked: { var o = ["iso", "front", "side", "top", "under"]; Store.setView(o[(o.indexOf(Store.viewName) + 1) % o.length]) } }
         }
+        // a design made for printing, while Describe or Design is open: the build plate on request (Fit, Review and
+        // Make show it anyway)
+        Btn { objectName: "showPlate"; z: 5; small: true; kind: "quiet"; height: 26; icon: "grid_3x3"; active: Store.showPlate
+            anchors.right: viewCtl.left; anchors.rightMargin: 6; y: viewCtl.y
+            visible: !ws.sim && !!Store.view && Store.printUi && (Store.stage === "brief" || Store.stage === "shape")
+            tip: Store.showPlate ? "Hide the build plate" : "Show the build plate" + (Store.printing.available ? ": " + Store.printing.presets.machine.name : "")
+            onClicked: Store.showPlate = !Store.showPlate }
+
+        // an agent is working on another design than this one: named, never jumped to once you are working here
+        Rectangle {
+            id: elsewhere; objectName: "agentElsewhere"; z: 6
+            anchors.horizontalCenter: parent.horizontalCenter; y: 58
+            visible: !!Store.agentElsewhere && !build.label && !ws.sim
+            width: er.implicitWidth + 20; height: 32; radius: 16; color: Theme.alpha(Theme.plate3, 0.96); border.color: Theme.rule2
+            Row { id: er; x: 14; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+                Rectangle { width: 6; height: 6; radius: 3; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter
+                    SequentialAnimation on opacity { running: elsewhere.visible && !Theme.reduced; loops: Animation.Infinite
+                        NumberAnimation { to: 0.35; duration: 700 } NumberAnimation { to: 1; duration: 700 } } }
+                Txt { anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; font.pixelSize: 12
+                    width: Math.min(implicitWidth, centre.width - 220); elide: Text.ElideRight
+                    text: Store.agentElsewhere ? Store.agentElsewhere.by + " is working on " + Store.agentElsewhere.name : "" }
+                Btn { objectName: "agentElsewhereShow"; small: true; kind: "quiet"; text: "Show"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.showElsewhere() }
+                Btn { small: true; kind: "quiet"; icon: "x"; tip: "Stay here"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.agentElsewhere = null } } }
 
         // ── the dock: legends and readouts, top right, never over the middle of the part ──
         Column {
@@ -430,8 +454,8 @@ Item {
                 Tick { font.pixelSize: 12; tone: 2; value: ro.bb ? ro.bb[1][2] - ro.bb[0][2] : 0; unit: " mm"; anchors.verticalCenter: parent.verticalCenter }
                 Txt { text: "·"; tone: 4; anchors.verticalCenter: parent.verticalCenter }
                 Tick { font.pixelSize: 12; tone: 2; value: Store.shown ? Store.shown.volume_mm3 / 1000 : 0; unit: " cm³"; anchors.verticalCenter: parent.verticalCenter }
-                Txt { text: "·"; tone: 4; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact && (Store.printUi || !!Store.assembly) }
-                Txt { font.pixelSize: 12; tone: 3; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact && (Store.printUi || !!Store.assembly); wrapMode: Text.NoWrap
+                Txt { text: "·"; tone: 4; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact && (Store.plateWanted || !!Store.assembly) }
+                Txt { font.pixelSize: 12; tone: 3; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact && (Store.plateWanted || !!Store.assembly); wrapMode: Text.NoWrap
                     text: !Store.assembly ? "plate " + ws.bed : Store.asmMode === "assembled" ? "assembled" : Store.asmMode === "exploded" ? (Store.assembly.derived ? "as modelled, shown pulled apart" : "assembled size, shown exploded")
                         : (Store.assembly.derived || !Store.printUi ? "as modelled, " : "as printed, ") + F.plural(Store.assembly.parts.length, "part") } }
         }
@@ -515,12 +539,17 @@ Item {
         // the stage's status in a sentence: stays put while the panel scrolls
         Item {
             id: stageHead
-            anchors.top: tabs.bottom; anchors.topMargin: 5; width: parent.width; height: say.implicitHeight + 24; z: 2
+            anchors.top: tabs.bottom; anchors.topMargin: 5; width: parent.width; height: say.implicitHeight + 24 + (onPrinter.visible ? onPrinter.height + 8 : 0); z: 2
             readonly property var s: ws.stageSay(Store.stage)
             Rectangle { x: 1; width: parent.width - 1; height: parent.height; color: Theme.plate1 }
             Rectangle { width: parent.width; height: 1; color: Theme.rule }
             Rectangle { x: 20; y: 17; width: 6; height: 6; radius: 3; color: ws.noteColor(stageHead.s[1]) }
             Txt { id: say; x: 36; y: 11; width: parent.width - 56; text: stageHead.s[0]; tone: 2 }
+            // where the printer matters: Fit, Review and Make of a design made for printing
+            Row { id: onPrinter; x: 36; anchors.top: say.bottom; anchors.topMargin: 8; spacing: 8; height: 26
+                visible: Store.printUi && (Store.stage === "fit" || Store.stage === "prove" || Store.stage === "release")
+                Txt { kind: "fine"; tone: 3; text: "Prints on"; anchors.verticalCenter: parent.verticalCenter }
+                PrinterChip { roomy: insp.width >= 460; anchors.verticalCenter: parent.verticalCenter } }
             Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule; opacity: scroll.contentY > 2 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Motion.quick } } }
         }

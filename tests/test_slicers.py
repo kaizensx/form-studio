@@ -35,6 +35,7 @@ def base_cfg(**tables):
             os.environ["FORM_CONFIG"] = old
     cfg = copy.deepcopy(cfg)
     cfg["general"]["capabilities"] = ["core", "parts", "mesh", "print"]   # these tests slice: printing is opt-in
+    cfg["general"]["new_designs"] = "print"                             # and their designs are made for printing
     cfg["slicer"]["app"] = NOWHERE
     for kind in SLICERS:
         if kind != "bambu":

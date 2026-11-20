@@ -40,9 +40,9 @@ def two_parts(ui):
 def journey_setup(ui):
     printing_on(ui)                      # this journey is about printing: turn it on as someone who prints would
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
-    S["hinged"] = make(ui, "hinged_box", "Hinged box", open=False)
-    S["gears"] = make(ui, "gear_pair", "Gear pair", open=False)
-    S["box"] = make(ui, "enclosure", "Enclosure", open=False)
+    S["hinged"] = make(ui, "hinged_box", "Hinged box", open=False, purpose="print")
+    S["gears"] = make(ui, "gear_pair", "Gear pair", open=False, purpose="print")
+    S["box"] = make(ui, "enclosure", "Enclosure", open=False, purpose="print")
     from form.design_guide import EXAMPLE
     d = ui.studio.create_design("Two bodies", EXAMPLE.split("    def assembly(self, v):")[0])
     S["bodies"] = d["id"]

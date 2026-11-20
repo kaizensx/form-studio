@@ -99,6 +99,11 @@ Column {
             text: root.g && root.g.not_covered ? "This release will not cover:\n" + root.g.not_covered.map(function (x) { return "· " + x }).join("\n") : "" }
         Note { objectName: "releaseModel"; visible: !root.approved && Store.modelDesign && Store.printOn; kind: "plain"; title: "A 3D model, not for printing"
             text: "This release will hold STEP, STL, 3MF, OBJ and GLB files, a four-view sheet and an iso render, the checks and a report. No slice or G-code: it is not made for 3D printing." }
+        // marking a model for printing is one click here, where it is made
+        Btn { objectName: "releaseForPrinting"; visible: !root.approved && Store.modelDesign && Store.printOn; small: true; icon: "printer"
+            text: "Make it for 3D printing"; enabled: !Store.job
+            tip: "Checks it against your printer and slices it when a slicer is installed. You can switch back in Describe."
+            onClicked: Store.setPurpose("print") }
         Note { visible: !root.approved && !!root.g && root.g.reasons.length > 0 && !root.overriding; kind: "red"; title: "Not ready"
             text: root.g ? root.g.reasons.join("\n") : "" }
         Column { width: parent.width; spacing: 6; visible: !root.approved && root.overriding
