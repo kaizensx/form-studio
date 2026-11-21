@@ -254,9 +254,16 @@ def shell(solid, thickness: float, openings: Iterable | None = None, inward: boo
     r = attempt("shell", tries, f"Make the wall thinner than the smallest inside radius of the body, or round the "
                 f"body's tight corners first (a {t:g} mm wall cannot follow a smaller radius). For a lofted dome with a "
                 f"crown point use craft.section_shell (inset sections) instead.", ["thickness"])
-    if not op and inward:
-        need(r.volume < solid.volume - 1e-6, "shell: the offset did not hollow the body", "Give openings, or a thinner wall.",
-             ["thickness"])
+    if not op:
+        # with no openings OCCT returns the offset body itself (the inner solid when inward), not a hollow:
+        # the closed hollow is the difference of the two bodies
+        from . import boolean
+        if r.volume < solid.volume - 1e-6:          # r is the inside: take it out of the body
+            r = one(boolean.run(solid, r, "cut", what="hollow the body", max_solids=1))
+        elif r.volume > solid.volume + 1e-6:        # outward: r is the grown body, the original is the cavity
+            r = one(boolean.run(r, solid, "cut", what="hollow the body", max_solids=1))
+        need(abs(r.volume) < abs(solid.volume) - 1e-6 or not inward, "shell: the offset did not hollow the body",
+             "Give openings, or a thinner wall.", ["thickness"])
     return r
 
 
