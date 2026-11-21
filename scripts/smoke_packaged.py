@@ -1,6 +1,6 @@
 """Use the BUILT app the way a person and an agent do, before it is installed or released.
 
-    python scripts/smoke_packaged.py dist/FORM.app        # macOS
+    python scripts/smoke_packaged.py "dist/Form Studio.app"        # macOS
     python scripts/smoke_packaged.py dist/FORM/FORM.exe   # Windows
     python scripts/smoke_packaged.py dist/FORM/FORM       # Linux
 

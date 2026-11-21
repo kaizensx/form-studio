@@ -73,7 +73,7 @@ jobs:
         # Runners have no GPU, so interface warnings are printed but do not fail the build; not starting does.
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = "macOS" ]; then BIN=dist/FORM.app/Contents/MacOS/FORM
+          if [ "$RUNNER_OS" = "macOS" ]; then BIN="dist/Form Studio.app/Contents/MacOS/FORM"
           elif [ "$RUNNER_OS" = "Windows" ]; then BIN=dist/FORM/FORM.exe
           else BIN=dist/FORM/FORM; fi
           RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a"
@@ -91,8 +91,8 @@ jobs:
         run: |
           cd dist
           if [ "$RUNNER_OS" = "macOS" ]; then
-            codesign --force --deep --sign - FORM.app        # ad-hoc: lets it run after "Open Anyway"; not notarized
-            ditto -c -k --keepParent FORM.app "../${{ matrix.asset }}"
+            codesign --force --deep --sign - "Form Studio.app"        # ad-hoc: lets it run after "Open Anyway"; not notarized
+            ditto -c -k --keepParent "Form Studio.app" "../${{ matrix.asset }}"
           elif [ "$RUNNER_OS" = "Windows" ]; then
             7z a -tzip "../${{ matrix.asset }}" FORM
           else

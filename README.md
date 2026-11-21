@@ -160,7 +160,7 @@ The first start asks what you want to make and installs only that: mechanical pa
 <summary><b>macOS</b> &nbsp;·&nbsp; Apple silicon and Intel</summary>
 <br>
 
-Download [`FORM-macos-arm64.zip`](https://github.com/kaizensx/form-studio/releases/latest/download/FORM-macos-arm64.zip) or [`FORM-macos-x64.zip`](https://github.com/kaizensx/form-studio/releases/latest/download/FORM-macos-x64.zip), unzip it, then right-click **FORM.app** › **Open** the first time. Or from a terminal:
+Download [`FORM-macos-arm64.zip`](https://github.com/kaizensx/form-studio/releases/latest/download/FORM-macos-arm64.zip) or [`FORM-macos-x64.zip`](https://github.com/kaizensx/form-studio/releases/latest/download/FORM-macos-x64.zip), unzip it, then right-click **Form Studio.app** › **Open** the first time. Or from a terminal:
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/kaizensx/form-studio/main/install.sh | sh

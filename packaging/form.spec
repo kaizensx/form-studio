@@ -47,7 +47,9 @@ exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="FORM", console=False,
           disable_windowed_traceback=False, argv_emulation=False, target_arch=None)
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="FORM")
 if sys.platform == "darwin":
-    app = BUNDLE(coll, name="FORM.app", icon=icon, bundle_identifier="net.form-studio.app",
-                 info_plist={"CFBundleName": "Form Studio", "CFBundleDisplayName": "Form Studio",   # the bundle file stays FORM.app
-                             "CFBundleShortVersionString": VERSION.split("-")[0], "CFBundleVersion": VERSION,   # macOS wants digits; -dev stays in the build number "NSHighResolutionCapable": True,
+    app = BUNDLE(coll, name="Form Studio.app", icon=icon, bundle_identifier="net.form-studio.app",
+                 info_plist={"CFBundleName": "Form Studio", "CFBundleDisplayName": "Form Studio",
+                             # macOS wants digits in the short version; -dev stays in the build number
+                             "CFBundleShortVersionString": VERSION.split("-")[0], "CFBundleVersion": VERSION,
+                             "NSHighResolutionCapable": True,
                              "LSMinimumSystemVersion": "12.0", "NSRequiresAquaSystemAppearance": False})

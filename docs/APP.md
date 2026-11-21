@@ -10,7 +10,7 @@ Download the bundle for your system from the [latest release](https://github.com
 
 | System | File | First launch |
 |---|---|---|
-| macOS, Apple Silicon | `FORM-macos-arm64.zip` | Unzip, then right-click **FORM.app** › **Open** |
+| macOS, Apple Silicon | `FORM-macos-arm64.zip` | Unzip, then right-click **Form Studio.app** › **Open** |
 | macOS, Intel | `FORM-macos-x64.zip` | The same |
 | Windows 10 and 11 | `FORM-windows-x64.zip` | Unzip and run `FORM.exe`; in SmartScreen choose **More info** › **Run anyway** |
 | Linux x64 | `FORM-linux-x64.tar.gz` | Unpack and run `FORM/FORM` |
