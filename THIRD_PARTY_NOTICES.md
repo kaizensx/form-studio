@@ -54,3 +54,12 @@ nothing from these projects ships with the app. Each entry names the exact commi
 - Many of CADEvolve's seed examples come from the CadQuery documentation examples (CadQuery, Apache License 2.0,
   https://github.com/CadQuery/cadquery), credited here as well.
 
+## kulibinai/cadmageddon
+
+- Source: https://github.com/kulibinai/cadmageddon @ 368fb87
+- Licence: MIT
+- Ideas taken: the residual as a work list of missing and extra bodies with angles about an axis
+  (`contrib/instruments/residual.py`), pick-best by residual (`scripts/pick_best.py`) and the stall rule
+  (`agent_run.py`).
+- Where: `form/remodel/residual.py` and the `reference_parts` topic of `form/design_guide.py`. This is new code.
+- Ideas reimplemented, no code copied.
