@@ -50,9 +50,9 @@ class PlanCheck(unittest.TestCase):
 
     def test_fake_helper_refused_with_closest_names(self):
         c = staged.check_how("craft.loft_sections, then craft.magnet_pocket and craft.fusee; parts.magnet_pocket")
-        self.assertEqual(c["helpers"], ["craft.loft_sections", "parts.magnet_pocket"])
+        self.assertEqual(c["helpers"], ["craft.loft_sections", "craft.magnet_pocket", "parts.magnet_pocket"])
         bad = {u["name"]: u["closest"] for u in c["unknown"]}
-        self.assertIn("craft.organic.magnet_pocket", bad["craft.magnet_pocket"])
+        self.assertEqual(list(bad), ["craft.fusee"])
         self.assertIn("craft.fuse", bad["craft.fusee"])
         b = staged.save_brief(self.st, "Knob", "A knurled knob for a 6 mm D-shaft")
         feats = [{"id": "skirt", "label": "Skirt", "how": "craft.revolve_profile"},
@@ -112,7 +112,7 @@ class Exemplars(unittest.TestCase):
         s = exemplars.steps("helmet")
         self.assertGreaterEqual(len(s), 4)
         self.assertEqual(s[0]["id"], "shell")
-        self.assertIn("craft.checked_body", s[0]["craft"])
+        self.assertIn("craft.skin_from_sections", s[0]["craft"])   # the helmet is built on the fitted skin
         hit = exemplars.search("knurled knob")[0]
         self.assertTrue(hit["steps"])
         self.assertEqual(exemplars.get("knurled_knob")["steps"][0]["id"], "skirt")
