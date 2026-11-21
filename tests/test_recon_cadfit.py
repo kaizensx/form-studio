@@ -96,6 +96,25 @@ class ScriptReader(unittest.TestCase):
             finally:
                 cqrun.allow(None)
 
+    def test_scratch_files_stay_in_the_work_folder(self):
+        """CADFit's volume of a candidate writes a scratch script and STL with tempfile: the driver points tempfile at
+        the work folder, so the export is allowed there and the volume is real."""
+        from form.recon.cadfit import cqrun
+        from form.recon.cadfit.vendor import cadquery_ops
+        acts = ["plane = cq.Plane(origin=(0, 0, 0), normal=(0, 0, 1), xDir=(1, 0, 0))", "sketch = cq.Workplane(plane)",
+                "sketch.moveTo(0, 0)", "sketch.circle(0.5)"]
+        keep = tempfile.tempdir
+        with tempfile.TemporaryDirectory() as d:
+            cqrun.allow(d)
+            tempfile.tempdir = d
+            try:
+                v = cadquery_ops.calculate_extrusion_volume({"insts": acts, "height": 1.0})
+            finally:
+                tempfile.tempdir = keep
+                cqrun.allow(None)
+            self.assertAlmostEqual(v, 3.14159 * 0.25, places=2)
+            self.assertEqual(list(Path(d).iterdir()), [])
+
     def test_vendored_code_runs_no_subprocess(self):
         root = Path(__file__).resolve().parents[1] / "form" / "recon" / "cadfit"
         for p in root.rglob("*.py"):

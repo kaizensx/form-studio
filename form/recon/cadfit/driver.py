@@ -24,6 +24,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import tempfile
 import time
 from pathlib import Path
 
@@ -87,8 +88,16 @@ def run(stl: Path, work: Path, emit=None, deadline: float | None = None) -> dict
     emit = emit or (lambda d: None)
     left = (lambda: deadline - time.perf_counter()) if deadline else (lambda: float("inf"))
     sink = io.StringIO()                                # CADFit prints a great deal; keep it out of the worker's output
-    with contextlib.redirect_stdout(sink):
-        _run(Path(stl), work, out, emit, left)
+    # CADFit writes some scratch scripts and STLs with tempfile (cadquery_ops.calculate_extrusion_volume): keep them
+    # in the work folder, the only place cqrun lets an export write
+    keep_tmp = tempfile.tempdir
+    (work / "tmp").mkdir(exist_ok=True)
+    tempfile.tempdir = str(work / "tmp")
+    try:
+        with contextlib.redirect_stdout(sink):
+            _run(Path(stl), work, out, emit, left)
+    finally:
+        tempfile.tempdir = keep_tmp
     if out["script"] is None:
         out["error"] = "CADFit found no operation that matches the mesh"
     out["final"] = True
