@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Twelve new design examples, ported from CADEvolve's hand-written seeds.** A bearing flange, a braille door sign,
+  a compression spring with closed and ground ends, a connector panel with D-sub cutouts, a door wedge, a fan to hose
+  adapter, a flat flask, an I-beam, a flanged pipe elbow, a pipe saddle clamp, a two-part enclosure with screw posts
+  and a hubbed spur gear with involute teeth. Each one is built one feature at a time (skeleton first), checks its
+  own numbers, and names where it came from: kulibinai/CADEvolve at e30e635, Apache-2.0, modified (rewritten for
+  build123d and Form Studio). The licence is in form/exemplars/LICENSE-CADEvolve. There are now 56 examples; each new
+  one builds in under 3 s. `scripts/exemplar_check.py` now fails a design when one of its features was skipped.
+- **An optional reference corpus for the agent.** `form install exemplars.cadevolve` downloads CADEvolve's dataset
+  (4.73 GB, Apache-2.0, both shown before anything is downloaded; never pre-ticked) and keeps only its parametric
+  CadQuery generators: nothing from the ABC or ShapeNet folders is written to disk. Design example search then adds
+  up to two of them after Form Studio's own examples, labelled "reference CadQuery, not the Form API". They never
+  rank above a Form Studio example, and without the corpus search works as before.
 - **The hero helmet exemplar, redesigned and built one feature at a time.** It is now a FeatureDesign: the skin is
   fitted once in setup(), the shell is the skeleton, and each of its eleven features is its own method, so an agent
   learns the route the design guide teaches. The design is new: rounded pill lenses tilted up in a raised bezel, a

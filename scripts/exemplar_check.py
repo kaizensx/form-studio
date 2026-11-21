@@ -6,7 +6,8 @@
 
 For each design: valid B-rep, solids against the declared count, faces, build seconds, the critique metrics that
 matter for quality (smallest fillet, sharp-edge fraction, free-form share, folds, thin walls), the product-class
-silhouette score when the design names one, and the craft fallbacks the build took. A design that fails prints the
+silhouette score when the design names one, the craft fallbacks the build took, and any feature of a FeatureDesign
+that was skipped (a skipped feature fails the check). A design that fails prints the
 structured diagnosis (form/build_diag.py). Exit code 1 when any design fails to build or is invalid.
 """
 from __future__ import annotations
@@ -57,14 +58,15 @@ def check(target: str, png_dir: Path | None = None, product_class: str | None = 
         out.update(valid=bool(shape.is_valid), solids=len(shape.solids()), declared=getattr(recipe, "solids", 1),
                    faces=len(shape.faces()), bbox=[round(b - a, 1) for a, b in zip(*model["bbox"])],
                    volume_cm3=round(model["volume"] / 1000, 2), craft_notes=model["craft_notes"],
-                   features=sorted(model["by_feature"]))
+                   features=sorted(model["by_feature"]),
+                   skipped=[{k: d.get(k) for k in ("feature", "message", "hint")} for d in model.get("skipped") or []])
         m = critique.op_critique_metrics(key, key, recipe.defaults(), 0.05, product_class=cls)
         out["metrics"] = {k: m.get(k) for k in ("smallest_fillet_mm", "sharp_edge_fraction", "surface_mix", "folds",
                                                 "walls", "symmetry")}
         cl = (m.get("form") or {}).get("class")
         if cl:
             out["class_score"] = round(cl["score"], 3)
-        out["ok"] = out["valid"] and out["solids"] == out["declared"]
+        out["ok"] = out["valid"] and out["solids"] == out["declared"] and not out["skipped"]
         if png_dir is not None:
             from form import render as rendering
             view = kernel.op_view(key, key, recipe.defaults(), tol=0.05)
@@ -108,6 +110,8 @@ def main(argv=None) -> int:
                    + (f" class {r['class_score']}" if 'class_score' in r else "")
                    if "error" not in r else json.dumps(r["error"], default=str)[:900]))
         print(line, flush=True)
+        for sk in r.get("skipped") or []:
+            print(f"    SKIPPED {sk.get('feature')}: {sk.get('message')}"[:600])
         if r.get("craft_notes"):
             print("    craft notes: " + "; ".join(r["craft_notes"])[:600])
         if r.get("metrics"):

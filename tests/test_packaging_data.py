@@ -11,12 +11,12 @@ class PackagedData(unittest.TestCase):
         spec = (ROOT / "packaging" / "form.spec").read_text(encoding="utf-8")
         self.assertIn('"form/exemplars"', spec)
         from form import exemplars
-        self.assertGreaterEqual(len(exemplars.catalogue()), 40)
+        self.assertGreaterEqual(len(exemplars.catalogue()), 56)
 
     def test_the_packaged_app_serves_every_exemplar(self):
         """Run packaging/form.spec with PyInstaller's build steps stubbed, lay out its datas the way the bundle does
         (only files listed as data exist; modules are bytecode), and read the exemplar catalogue from that layout:
-        design_examples("") in the app must list at least 40 exemplars, each with its source."""
+        design_examples("") in the app must list at least 56 exemplars, each with its source."""
         import importlib.util
         import shutil
         import sys
@@ -61,7 +61,7 @@ class PackagedData(unittest.TestCase):
             mod = importlib.util.module_from_spec(m)
             m.loader.exec_module(mod)
             cat = mod.catalogue()
-            self.assertGreaterEqual(len(cat), 40, "the packaged app would serve too few exemplars")
+            self.assertGreaterEqual(len(cat), 56, "the packaged app would serve too few exemplars")
             from form import exemplars
             self.assertEqual({e["name"] for e in cat}, {e["name"] for e in exemplars.catalogue()})
             self.assertIn("class Design(Recipe)", mod.get(cat[0]["name"])["source"])
