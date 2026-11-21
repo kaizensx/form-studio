@@ -215,11 +215,37 @@ def filleted_block():
     return body, {"holes": [8.0], "prismatic": True, "fillets": [2.0, 5.0]}
 
 
+def hollow_block():
+    """A 40 x 30 x 20 block with a sealed 24 x 16 x 10 cavity inside it (two shells: the outside and the cavity)."""
+    from build123d import Align, Box, Pos
+    A = (Align.CENTER, Align.CENTER, Align.MIN)
+    return Box(40, 30, 20, align=A) - Pos(0, 0, 5) * Box(24, 16, 10, align=A), {"cavity_mm3": 24 * 16 * 10.0}
+
+
+def cavity_filler():
+    """The loose block that exactly fills hollow_block's cavity. Beside the hollow block it makes a candidate whose
+    every face lies on the part's faces, yet which is solid where the part is hollow."""
+    from build123d import Align, Box, Pos
+    return Pos(0, 0, 5) * Box(24, 16, 10, align=(Align.CENTER, Align.CENTER, Align.MIN)), {}
+
+
+def box_with_square_hole():
+    """box_with_holes with its Ø8 centre bore modelled as an 8 x 8 square: a round hole made the wrong shape."""
+    from build123d import Align, Box, Cylinder, Pos
+    A = (Align.CENTER, Align.CENTER, Align.MIN)
+    body = Box(60, 40, 10, align=A)
+    for x, y in [(-22, -12), (22, -12), (-22, 12), (22, 12)]:
+        body = body - Pos(x, y, -1) * Cylinder(2.75, 12, align=A)
+    body = body - Pos(0, 0, -1) * Box(8, 8, 12, align=A)
+    return body, {"holes": sorted([5.5] * 4), "prismatic": True}
+
+
 FIXTURES = {"box_with_holes": box_with_holes, "turned_part": turned_part, "filleted_bracket": filleted_bracket, "gear": gear,
             "stepped_bracket": stepped_bracket, "flanged_shaft": flanged_shaft, "spur_gear": spur_gear_part,
             "organic_blob": organic_blob, "wallet_plate": wallet_plate,
             "bolt_flange": bolt_flange, "turned_shaft": turned_shaft, "enclosure_with_holes": enclosure_with_holes,
-            "filleted_block": filleted_block}
+            "filleted_block": filleted_block, "hollow_block": hollow_block, "cavity_filler": cavity_filler,
+            "box_with_square_hole": box_with_square_hole}
 
 
 # A smooth shape meshed finely, the way a scan or a careful export is: its facets are within 0.01 mm of the surface
@@ -247,3 +273,27 @@ def export(name: str, folder: Path, tolerance: float = 0.01, angular: float = 0.
     else:
         export_stl(solid, str(out), tolerance=tolerance, angular_tolerance=angular)
     return out, solid, facts
+
+
+# Scan artifacts (the bench's "scan artifacts" class): what a scanner or a coarse export does to a clean mesh. Each is
+# seeded, so a run repeats. The idea of testing a converter against this matrix (noise, quantisation, missing faces)
+# comes from pberlizov/ViminCADConverter (benchmarks/cases.json, MIT, commit dd27fa2); this code is new.
+SCAN_ARTIFACTS = {"noise": 0.01, "quantised": 0.02, "dropout": 0.01}
+
+
+def scan_artifact(V: np.ndarray, F: np.ndarray, kind: str, amount: float | None = None, seed: int = 0):
+    """(V, F) with one artifact. "noise" moves every vertex by Gaussian noise of `amount` mm (standard deviation).
+    "quantised" rounds every coordinate to a grid of `amount` mm. "dropout" removes `amount` of the triangles at
+    random, and the reconstruction must close the holes it leaves."""
+    amount = SCAN_ARTIFACTS[kind] if amount is None else amount
+    rng = np.random.default_rng(seed)
+    V, F = np.array(V, dtype=np.float64), np.array(F, dtype=np.int64)
+    if kind == "noise":
+        return V + rng.normal(0.0, amount, V.shape), F
+    if kind == "quantised":
+        return np.round(V / amount) * amount, F
+    if kind == "dropout":
+        keep = np.ones(len(F), dtype=bool)
+        keep[rng.choice(len(F), size=max(1, int(round(amount * len(F)))), replace=False)] = False
+        return V, F[keep]
+    raise ValueError(f"unknown scan artifact {kind!r}: {', '.join(SCAN_ARTIFACTS)}")
