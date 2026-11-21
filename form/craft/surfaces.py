@@ -206,33 +206,23 @@ def _occt_bool(a, b, op: str, fuzzy: float):
 
 
 def cut(body, tool, min_solids: int = 1):
-    """body - tool, with the fallbacks OCCT needs on free-form shells: the plain boolean first, then fuzzy booleans
-    (1e-4 and 1e-3 mm: near-tangent faces glued instead of missed), then the tool nudged by 0.02 mm. A result is
-    accepted when it is valid and keeps at least min_solids solids (a cut that silently returns nothing, or a
-    broken shell, is the usual failure). The fallback taken is noted."""
-    from build123d import Pos
-    good = lambda r: ok(r) and len(r.solids()) >= min_solids
-    tries = [("cut", lambda: body - tool), ("fuzzy cut 1e-4", lambda: _occt_bool(body, tool, "cut", 1e-4)),
-             ("fuzzy cut 1e-3", lambda: _occt_bool(body, tool, "cut", 1e-3)),
-             ("nudged cut", lambda: body - Pos(0.013, 0.007, 0.011) * tool)]
-    return attempt("cut", tries, "The tool grazes a face of the body: move it a little, or make it cross the face "
-                   "clearly.", ["tool"], good)
+    """body - tool through the boolean engine (form.craft.boolean): the plain cut, verified (valid, at least
+    min_solids solids, a volume the cut can give, and a mesh oracle when it removed almost nothing, so a cut that
+    silently removes nothing is caught); when it fails, the cause is measured and classified (grazing face, coincident
+    faces, invalid operand, seam...) and only that cause's rewrites are tried, within a time bound. The rewrite taken
+    is noted; a failure says what was measured."""
+    from .boolean import run
+    return run(body, tool, "cut", min_solids=min_solids, what="cut", names=("body", "tool"), params=["tool"])
 
 
 def fuse(body, other, max_solids: int | None = None, min_solids: int = 1):
-    """body + other with the same fallbacks as cut. max_solids: the count the result may have at most (usually the
-    body's own count: a pad that does not fuse leaves an extra solid). min_solids: at least (a separate part, such
+    """body + other through the boolean engine, like cut. max_solids: the count the result may have at most (default
+    the body's own count: a pad that does not fuse leaves an extra solid). min_solids: at least (a separate part, such
     as a visor that must stay clear of the shell, is a second solid: fuse(body, visor, 2, 2) refuses a visor that
-    touches)."""
-    from build123d import Pos
-    lim = max_solids if max_solids is not None else len(body.solids())
-    good = lambda r: ok(r) and min_solids <= len(r.solids()) <= lim
-    tries = [("fuse", lambda: body + other), ("fuzzy fuse 1e-4", lambda: _occt_bool(body, other, "fuse", 1e-4)),
-             ("fuzzy fuse 1e-3", lambda: _occt_bool(body, other, "fuse", 1e-3)),
-             ("nudged fuse", lambda: body + Pos(0.013, 0.007, 0.011) * other)]
-    hint = ("The part touches the body where it must stay clear: open the gap or move what it touches."
-            if min_solids > 1 else "The part does not overlap the body (it floats, or only touches): sink it into the body.")
-    return attempt("fuse", tries, hint, ["other"], good)
+    touches or overlaps the body, and says which with the measured contact or overlap)."""
+    from .boolean import run
+    return run(body, other, "fuse", min_solids=min_solids, max_solids=max_solids, what="fuse",
+               names=("body", "other"), params=["other"])
 
 
 # ---- shells, fillets, thickening -------------------------------------------------------------------------------
