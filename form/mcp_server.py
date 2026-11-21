@@ -645,7 +645,12 @@ def build() -> MCPServer:
             jid = st.run(p["id"])
             job = await _wait_job(st, jid, 50)
         res = await _run(digest, st, p["id"])
-        if part:
+        if part and not part.get("failed") and part.get("parts"):
+            res = {**res, "partial": part,
+                   "next": f"Saved: {_partial_line(part)}. Add the next part or feature with add_feature(project="
+                           f"'{p['id']}', kind=\"code\", feature=..., code=...); release waits until every part is "
+                           "there."}
+        elif part:
             res = {**res, "partial": part,
                    "next": f"Saved as a partial design: {_partial_line(part)}. Fix that feature and send it with "
                            f"update_design(project='{p['id']}', source=...) (or feature=, code= for a FeatureDesign); "
@@ -959,7 +964,7 @@ def build() -> MCPServer:
             return out
         return await _run(go)
 
-    @mcp.tool(annotations=RW)
+    @mcp.tool(annotations=RW, structured_output=False)
     async def add_feature(project: str, kind: str, at: list[float] | None = None, normal: list[float] | None = None,
                           size: str = "M3",
                           hole: str = "tapped", height: float | None = None, outer_d: float | None = None,
@@ -967,11 +972,15 @@ def build() -> MCPServer:
                           thickness: float | None = None, width: float | None = None, lip: float | None = None,
                           lip_height: float | None = None, up: list[float] | None = None, allow_strain: float | None = None,
                           expect_head: int | None = None, feature: str = "", code: str = "", label: str = "",
-                          role: str = "structure", after: str = "", partial: bool = False) -> dict:
+                          role: str = "structure", after: str = "", partial: bool = False, ctx: Context = None):
         """Add a feature to a Python design as a new revision. kind="code" (a FeatureDesign): feature = its id, code = one
         method `def <feature>(self, v, body): return body_after`, label/role for the feature list, after = the feature
-        it goes after (default: last). Only it is built: the features before it load from their checkpoints. If it
-        fails, no revision is made and the diagnosis comes back (partial=True saves it left out, release blocked).
+        it goes after (default: last). Only it is built: the features before it load from their checkpoints, and the
+        stage is shown in Form Studio as it builds. Returns the head, build_log (per feature: built, checkpoint or
+        skipped, with seconds, solids and volume change) and a six-view sheet and a section: look. A feature that adds
+        parts says so in the code (`@feature("Lenses", parts=2)`); while parts are still to come the revision is
+        saved as partial (release blocked). If it fails, no revision is made and the diagnosis comes back
+        (partial=True saves it left out, release blocked).
         Standard features: on a flat face of a Python design, written into its source as a feature block and built
         in the kernel as a new revision. kind="boss": a screw boss (size M2..M5; hole tapped = ISO tap drill, clearance =
         ISO 273, insert = a typical heat-set insert hole; height, outer_d, hole_d, hole_depth in mm). kind="snap_hook":
@@ -984,16 +993,23 @@ def build() -> MCPServer:
             if not feature or not code:
                 raise ToolError('kind="code" needs feature (its id) and code (one method).')
 
+            draft = "draft-" + uuid.uuid4().hex[:10]
+            act(project, "design", f"Building feature {feature}", ctx, draft=draft)
+
             def go_code():
                 from . import featureprog
-                p = featureprog.add_code_feature(st, st.load(project), feature, code, label, role, after, "agent",
-                                                 expect_head, partial)
+                p = featureprog.add_code_feature(st, st.load(project), feature, code, label, role, after,
+                                                 _origin(ctx), expect_head, partial, draft)
                 head = st.rev(p)
                 return {"head": p["head"], "feature": feature, "build_log": head.get("build_log", []),
                         **({"partial": head["partial"]} if head.get("partial") else {})}
             out = await _run(go_code)
-            act(project, "commit", f"r{out['head']:02d}: added feature {feature}")
-            return out
+            act(project, "commit", f"r{out['head']:02d}: added feature {feature}"
+                + (" (partial)" if out.get("partial") else ""), ctx, draft=draft)
+            if out.get("partial"):
+                out["next"] = f"Saved as a partial design: {_partial_line(out['partial'])}."
+            out["project"] = await _run(digest, st, project)
+            return await _with_views(st, project, out)
         if at is None or normal is None:
             raise ToolError(f'kind="{kind}" needs at and normal (a point on a flat face and its outward normal).')
         o = {k: v for k, v in dict(size=size, hole=hole, height=height, outer_d=outer_d, hole_d=hole_d, hole_depth=hole_depth,

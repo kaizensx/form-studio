@@ -987,7 +987,11 @@ def left_out(full: str) -> list:
     def why(x: dict) -> str:
         diag = x.get("diagnosis") if isinstance(x.get("diagnosis"), dict) else {}
         r = " ".join(str(diag.get("summary") or x.get("message") or "").split())
-        return r if len(r) <= 240 else r[:239].rstrip() + "\u2026"
+        if len(r) <= 240:
+            return r
+        cut = r[:240]                              # whole sentences: never stop mid-sentence
+        end = max(cut.rfind(". "), cut.rfind("; "))
+        return cut[:end + 1] if end > 40 else cut[:cut.rfind(" ")].rstrip(" ,;:") + "\u2026"
     rows = [{"feature": str(x.get("feature") or ""), "reason": why(x)} for x in part.get("skipped") or [] if isinstance(x, dict)]
     if not rows and part.get("failed"):
         rows = [{"feature": str(part["failed"]), "reason": why(part)}]

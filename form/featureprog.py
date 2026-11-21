@@ -28,11 +28,21 @@ Two things live here.
    skip is reported with its diagnosis (the revision is then partial and release is blocked until it builds). The
    first feature (the skeleton) must build.
 
-   Every feature's result is kept as a B-rep checkpoint (in memory and on disk) under a key made of the code of the
-   feature, the code every feature shares (the file without the feature methods), the values and the key of the
-   feature before it. Changing one feature rebuilds that feature and those after it; the ones before load from
-   their checkpoints. Features talk to each other only through the body (and setup()): a feature that loads from
-   its checkpoint does not run, so state it would have set on self is not there.
+   Every feature's result is kept as a B-rep checkpoint (in memory and on disk, with the part names of a
+   craft.parts() result) under a key made of the feature's own code, only the code it uses from the rest of the file
+   (helpers it calls, methods and attributes it reads through self, setup() when it reads self.ctx; feature_codes),
+   only the values it reads (recorded while it runs) and the key of the feature before it. So changing `solids`,
+   mesh_texture(), appearance(), a parameter no feature reads, or one feature rebuilds that feature and those after
+   it only; the ones before load from their checkpoints. Features talk to each other only through the body (and
+   setup()): a feature that loads from its checkpoint does not run, so state it would have set on self is not there.
+
+   Every feature is checked when it is made: a valid solid, its volume change, and its solid count (against the
+   running part total when features say how many parts they add, @feature(..., parts=N); otherwise no more than the
+   design declares). A design whose features have built fewer parts than it declares (skeleton first: the parts not
+   written yet) is saved as a partial revision, release blocked, never refused. Each feature has a time budget
+   (FEATURE_BUDGET, or @feature(..., budget=s)): past it an alarm stops it, and when it hangs in OCCT's C++ the
+   kernel's supervisor (form/worker.py) stops the kernel; either way the feature is written down so the next build
+   leaves it out at once, and Studio keeps the features built before it as a partial revision.
 
    update_design(feature=, code=), add_feature(kind="code") and remove_feature edit one method in the source
    (replace_feature, insert_feature, delete_feature below), so an agent sends one feature, not the whole file.
@@ -74,10 +84,21 @@ def _h(*parts) -> str:
 
 # ---- the feature decorator and the design base ---------------------------------------------------------------------
 
-def feature(label: str = "", role: str = "structure", doc: str = ""):
-    """Mark a method of a FeatureDesign as a feature: `@feature("Eye openings", role="access")`."""
+def feature(label: str = "", role: str = "structure", doc: str = "", parts: int | None = None,
+            budget: float | None = None):
+    """Mark a method of a FeatureDesign as a feature: `@feature("Eye openings", role="access")`.
+
+    parts: how many separate parts (solids) this feature adds (a lens feature that makes two lenses: parts=2; the
+    first feature: how many it makes). When any feature of a design says parts=, the solid count is checked after
+    every feature against the running total, and a feature that splits or fuses a part is skipped with the counts.
+    budget: seconds this feature may take (default FEATURE_BUDGET); past it the feature is stopped and left out."""
+    if parts is not None and (not isinstance(parts, int) or parts < 0):
+        raise TypeError("feature(parts=) is a whole number of parts the feature adds (0 or more).")
+    if budget is not None and not (isinstance(budget, (int, float)) and budget > 0):
+        raise TypeError("feature(budget=) is a number of seconds above 0.")
+
     def deco(fn):
-        fn._form_feature = {"label": label, "role": role, "doc": doc}
+        fn._form_feature = {"label": label, "role": role, "doc": doc, "parts": parts, "budget": budget}
         return fn
     return deco
 
@@ -86,6 +107,7 @@ class FeatureDesign(Recipe):
     """A design built one feature at a time (see the module docstring)."""
 
     _form_steps: list = []
+    _form_meta: dict = {}
 
     def __init_subclass__(cls, **kw):
         super().__init_subclass__(**kw)
@@ -103,6 +125,7 @@ class FeatureDesign(Recipe):
             feats.append(declared.get(n) or Feature(n, m["label"] or n.replace("_", " ").capitalize(), m["role"], m["doc"]))
         cls.features = feats
         cls._form_steps = [n for n, _f in own]
+        cls._form_meta = {n: dict(f._form_feature) for n, f in own}
         # a parameter may name a planned feature that is not written yet (skeleton first: every Param is declared
         # up front); it drives no feature until that method is added, and then links to it with no source change
         ids = {f.id for f in feats}
@@ -119,74 +142,412 @@ class FeatureDesign(Recipe):
     def ctx(self):
         c = getattr(self, "_form_ctx", None)
         if c is None or c[0] is not self._form_values:
-            c = (self._form_values, self.setup(self._form_values))
+            reads = _Reads(self._form_values)
+            c = (self._form_values, self.setup(reads))
             self._form_ctx = c
+            self._form_setup_reads = reads.used()
+        t = getattr(self, "_form_tracking", None)
+        if t is not None:                    # the running feature reads what setup() read
+            t.update(getattr(self, "_form_setup_reads", None) or {"*"})
         return c[1]
 
     def build(self, v: dict) -> list[Stage]:
-        self._form_values = v
-        self._form_ctx = None
-        steps = list(type(self)._form_steps)
-        if not steps:
-            raise RecipeError("This FeatureDesign has no features.", "", "Mark each feature method with @feature(...).")
-        codes, shared = code_map(type(self))
-        key = _h("featureprog/1", shared, v, _context_fingerprint())
-        mesh = bool(getattr(self, "mesh", False))
-        stages: list[Stage] = []
-        body = None
-        rep = _REPORT
-        for i, fid in enumerate(steps):
-            key = _h(key, fid, codes.get(fid, ""))
-            t0 = time.perf_counter()
-            got = checkpoint_get(key)
-            if got is not None:
-                body = got
-                stages.append(Stage(fid, body))
-                rep["log"].append({"feature": fid, "status": "checkpoint", "s": round(time.perf_counter() - t0, 3)})
-                continue
-            try:
-                out = getattr(self, fid)(v, body)
-                if isinstance(out, Stage):
-                    out = out.shape
-                if out is None:
-                    out = body
-                problem = _problem(out, mesh)
-                if problem:
-                    raise RecipeError(f"The {fid} feature {problem}.", fid,
-                                      "Check the operands of its last boolean: they must overlap by a few tenths of a "
-                                      "millimetre, not touch.")
-            except Exception as e:
-                if i == 0:                                   # nothing to keep: the skeleton itself did not build
-                    raise
-                d = _diagnosis(e, self, fid)
-                rep["skipped"].append(d)
-                rep["log"].append({"feature": fid, "status": "skipped", "s": round(time.perf_counter() - t0, 3)})
-                key = _h(key, "skipped")
-                continue
-            checkpoint_put(key, out)
-            body = out
+        return _build_features(self, v)
+
+
+# ---- building a FeatureDesign: one feature at a time, each checked, timed and kept --------------------------------
+
+FEATURE_BUDGET = float(os.environ.get("FORM_FEATURE_BUDGET") or 90.0)   # seconds per feature on a quiet machine
+GRACE = 10.0          # form/worker.py stops the kernel this long past a feature's budget (a hang in OCCT's C++)
+STRETCH = 1.0         # set per kernel call (form/worker.py): budgets stretch with the call's timeout under load
+
+
+_DEADLINE: list = []                  # monotonic deadline of the feature being built (form/craft/boolean.py reads it)
+
+
+def time_left() -> float | None:
+    """Seconds left in the budget of the feature being built now, or None outside a feature."""
+    return (_DEADLINE[-1] - time.monotonic()) if _DEADLINE else None
+
+
+class FeatureTimeout(Exception):
+    """A feature ran past its budget (raised in the kernel worker by an alarm, between Python steps)."""
+
+
+class _Reads(dict):
+    """The values, recording which keys are read: a feature's checkpoint is keyed on the values it reads only."""
+
+    def __init__(self, d):
+        super().__init__(d)
+        self._read: set = set()
+        self._all = False
+
+    def __getitem__(self, k):
+        self._read.add(k)
+        return super().__getitem__(k)
+
+    def get(self, k, default=None):
+        self._read.add(k)
+        return super().get(k, default)
+
+    def __contains__(self, k):
+        self._read.add(k)
+        return super().__contains__(k)
+
+    def __iter__(self):
+        self._all = True
+        return super().__iter__()
+
+    def keys(self):
+        self._all = True
+        return super().keys()
+
+    def items(self):
+        self._all = True
+        return super().items()
+
+    def values(self):
+        self._all = True
+        return super().values()
+
+    def copy(self):
+        self._all = True
+        return dict.copy(self)
+
+    def used(self) -> set:
+        return {"*"} if self._all else set(self._read)
+
+
+def _key(idx: str, v: dict, used: set) -> str:
+    if "*" in used:
+        return _h(idx, "*", v)
+    return _h(idx, sorted(((str(k), v.get(k)) for k in used), key=lambda kv: kv[0]))
+
+
+def _emit(ev: dict) -> None:
+    """A progress event for the kernel's caller (form/worker.py reads feature_start / feature_done)."""
+    k = sys.modules.get((__package__ or "form") + ".kernel")
+    cb = getattr(k, "PROGRESS", None) if k is not None else None
+    if cb is not None:
+        try:
+            cb(ev)
+        except Exception:
+            pass
+
+
+def _measure(shape) -> tuple[int, float]:
+    if shape is None or not hasattr(shape, "solids"):
+        return 0, 0.0
+    try:
+        return len(shape.solids()), float(shape.volume)
+    except Exception:
+        return 0, 0.0
+
+
+def _alarm_on(budget: float, fid: str):
+    import signal
+    import threading
+    if not budget or budget <= 0 or not hasattr(signal, "setitimer") \
+            or threading.current_thread() is not threading.main_thread():
+        return None
+
+    def ring(_sig, _frame):
+        raise FeatureTimeout(fid)
+    try:
+        old = signal.signal(signal.SIGALRM, ring)
+        signal.setitimer(signal.ITIMER_REAL, float(budget))
+    except (ValueError, OSError):
+        return None
+    return (old,)
+
+
+def _alarm_off(tok) -> None:
+    if tok is None:
+        return
+    import signal
+    try:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, tok[0] if tok[0] is not None else signal.SIG_DFL)
+    except (ValueError, OSError):
+        pass
+
+
+# the values each feature read (deps), skipped features and hangs: in memory and on disk next to the checkpoints
+_deps_mem: dict = {}
+_skip_mem: dict = {}
+
+
+def _jread(f):
+    try:
+        return json.loads(Path(f).read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def _jwrite(f, data) -> None:
+    try:
+        f = Path(f)
+        f.parent.mkdir(parents=True, exist_ok=True)
+        tmp = f.with_name(f.name + ".tmp")
+        tmp.write_text(json.dumps(data, default=str), encoding="utf-8")
+        os.replace(tmp, f)
+    except OSError:
+        pass
+
+
+def _deps_get(idx: str) -> list:
+    got = _deps_mem.get(idx)
+    if got is None:
+        d = _dir()
+        got = [set(x) for x in (_jread(d / f"{idx}.deps.json") or [])] if d else []
+        _deps_mem[idx] = got
+    return got
+
+
+def _deps_add(idx: str, used: set) -> None:
+    got = _deps_get(idx)
+    if used in got:
+        return
+    got.insert(0, set(used))
+    del got[8:]
+    d = _dir()
+    if d:
+        _jwrite(d / f"{idx}.deps.json", [sorted(map(str, x)) for x in got])
+
+
+def _skip_get(key: str):
+    hit = _skip_mem.get(key)
+    if hit is None:
+        d = _dir()
+        hit = _jread(d / f"{key}.skip.json") if d else None
+        if hit is not None:
+            _skip_mem[key] = hit
+    return hit
+
+
+def _skip_put(key: str, diag: dict) -> None:
+    _skip_mem[key] = diag
+    while len(_skip_mem) > MEMORY:
+        _skip_mem.pop(next(iter(_skip_mem)))
+    d = _dir()
+    if d:
+        _jwrite(d / f"{key}.skip.json", diag)
+
+
+def _lookup(idx: str, v: dict, skips: bool = True):
+    """(key, "body", shape) or (key, "skip", diagnosis) of a feature built before with the same code, upstream and
+    values it read; None when it must be built."""
+    for used in _deps_get(idx):
+        key = _key(idx, v, used)
+        got = checkpoint_get(key)
+        if got is not None:
+            return key, "body", got
+        if skips:
+            sk = _skip_get(key)
+            if sk is not None:
+                return key, "skip", sk
+    return None
+
+
+def hang_path(idx: str, v: dict):
+    """Where a feature that ran out of time is written down (by the alarm here, or by form/worker.py when it had to
+    stop the kernel), so the next build leaves it out at once instead of waiting for it again."""
+    d = _dir()
+    return d / f"{_h('hang/1', idx, v)}.hung.json" if d else None
+
+
+def _timeout_diag(fid: str, info: dict) -> dict:
+    s, b, kind = info.get("s"), info.get("budget"), info.get("kind", "budget")
+    s_t = f"{float(s):.1f} s" if isinstance(s, (int, float)) else "an unknown time"
+    b_t = f"{float(b):g} s" if isinstance(b, (int, float)) else "its"
+    if kind == "crash":
+        msg = f"The {fid} feature crashed the geometry kernel after {s_t}"
+        cause = "crash"
+    elif kind == "kill":
+        msg = f"The {fid} feature did not finish: the kernel was stopped after {s_t} (budget {b_t}) and restarted"
+        cause = "time"
+    else:
+        msg = f"The {fid} feature did not finish within its {b_t} budget (stopped after {s_t})"
+        cause = "time"
+    if info.get("again"):
+        msg += "; it was left out without building it again"
+    hint = ("Simplify it (fewer instances, a coarser pattern, an analytic shape instead of a loft), split it into two "
+            "features, or give it more time with @feature(..., budget=seconds). Changing its code or values builds it "
+            "again.")
+    return {"feature": fid, "message": msg + ".", "hint": hint,
+            "hung": {k: info[k] for k in ("s", "budget", "kind") if k in info},
+            "diagnosis": {"summary": msg + ".", "cause": cause, "operation": fid}}
+
+
+def _build_features(self, v: dict) -> list[Stage]:
+    cls = type(self)
+    self._form_values = v
+    self._form_ctx = None
+    self._form_setup_reads = None
+    self._form_tracking = None
+    for a in ("solids", "assembly"):                # what an earlier, incomplete build of this instance set
+        self.__dict__.pop(a, None)
+    steps = list(cls._form_steps)
+    if not steps:
+        raise RecipeError("This FeatureDesign has no features.", "", "Mark each feature method with @feature(...).")
+    codes = feature_codes(cls)
+    meta = getattr(cls, "_form_meta", {}) or {}
+    declared = max(1, int(getattr(cls, "solids", 1) or 1))
+    counted = any((meta.get(f) or {}).get("parts") is not None for f in steps)
+    mesh = bool(getattr(self, "mesh", False))
+    up = _h("featureprog/2", _context_fingerprint(), mesh)
+    stages: list[Stage] = []
+    body = None
+    expect = 0
+    rep = _REPORT
+    for i, fid in enumerate(steps):
+        m = meta.get(fid) or {}
+        idx = _h(up, fid, codes.get(fid, ""))
+        budget = float(m.get("budget") or FEATURE_BUDGET) * max(1.0, float(STRETCH or 1.0))
+        hang = hang_path(idx, v)
+        n0, v0 = _measure(body)
+        adds = m.get("parts")
+        want = (expect + adds) if adds is not None else (expect if i else None)
+        _emit({"kind": "feature_start", "feature": fid, "i": i, "of": len(steps), "budget": round(budget, 1),
+               "hang_file": str(hang) if hang else ""})
+        t0 = time.perf_counter()
+        hit = _lookup(idx, v, skips=i > 0)
+        diag = None
+        status = "built"
+        if hit is not None and hit[1] == "body":
+            up, body, status = hit[0], hit[2], "checkpoint"
             stages.append(Stage(fid, body))
-            rep["log"].append({"feature": fid, "status": "built", "s": round(time.perf_counter() - t0, 3)})
-        return stages
+        else:
+            if hit is not None:
+                diag = {**hit[2], "cached": True}
+            else:
+                old = _jread(hang) if hang else None
+                if old:
+                    diag = _timeout_diag(fid, {**old, "again": True})
+            if diag is None:
+                reads: set = set()
+                self._form_tracking = reads
+                tv = _Reads(v)
+                err = None
+                out = None
+                tok = _alarm_on(budget, fid)
+                _DEADLINE.append(time.monotonic() + budget)
+                try:
+                    try:
+                        out = getattr(self, fid)(tv, body)
+                    finally:
+                        _alarm_off(tok)
+                        _DEADLINE.pop()
+                    if isinstance(out, Stage):
+                        out = out.shape
+                    if out is None:
+                        out = body
+                    problem, hint = _problem(out, mesh, i, n0, v0, want if counted else None, declared, adds)
+                    if problem:
+                        raise RecipeError(f"The {fid} feature {problem}.", fid, hint)
+                except FeatureTimeout:
+                    info = {"feature": fid, "s": round(time.perf_counter() - t0, 1), "budget": round(budget, 1),
+                            "kind": "budget", "ts": time.time()}
+                    if hang:
+                        _jwrite(hang, info)
+                    err = ("timeout", info)
+                except Exception as e:
+                    if i == 0:                       # nothing to keep: the skeleton itself did not build
+                        self._form_tracking = None
+                        raise
+                    err = ("error", e)
+                finally:
+                    self._form_tracking = None
+                used = reads | tv.used()
+                key = _key(idx, v, used)
+                if err is None:
+                    checkpoint_put(key, out)
+                    _deps_add(idx, used)
+                    up, body = key, out
+                    stages.append(Stage(fid, body))
+                elif err[0] == "timeout":
+                    diag = _timeout_diag(fid, err[1])
+                else:
+                    diag = _diagnosis(err[1], self, fid)
+                    _skip_put(key, diag)
+                    _deps_add(idx, used)
+            if diag is not None:
+                if i == 0:
+                    raise RecipeError(diag["message"], fid, diag.get("hint", ""))
+                rep["skipped"].append(diag)
+                status = "skipped"
+        n1, v1 = _measure(body)
+        if status != "skipped":
+            expect = want if (counted and want is not None) else n1
+        e = {"feature": fid, "status": status, "s": round(time.perf_counter() - t0, 3), "solids": n1,
+             "dvol": round(v1 - v0, 3) if status != "skipped" else 0.0}
+        if diag is not None and diag.get("cached"):
+            e["cached"] = True
+        if diag is not None and diag.get("hung"):
+            e["hung"] = diag["hung"]
+        if status == "built" and i and abs(v1 - v0) <= 1e-6 * max(1.0, abs(v0)):
+            e["unchanged"] = True                    # a boolean that silently did nothing looks like this
+        rep["log"].append(e)
+        _emit({"kind": "feature_done", "feature": fid, "i": i, "status": status, "s": e["s"], "solids": n1})
+    final, _vol = _measure(body)
+    exp = expect if counted else (final if final < declared else declared)
+    if exp < declared:                               # skeleton first: parts not written yet are not missing parts
+        rep["parts"] = {"built": int(exp), "declared": declared}
+        self.solids = int(exp)
+        self.assembly = lambda _v: None
+    return stages
 
 
-def _problem(out, mesh: bool) -> str:
+def _problem(out, mesh: bool, i: int = 1, n0: int = 0, v0: float = 0.0, want: int | None = None,
+             declared: int = 1, adds: int | None = None) -> tuple[str, str]:
+    """(what is wrong with a feature's result, a hint for that measured cause), or ("", "")."""
     if not hasattr(out, "solids"):
-        return f"returned {type(out).__name__}, not a solid"
+        return (f"returned {type(out).__name__}, not a solid",
+                "Return the body after the feature (a build123d Part or Solid); the first feature returns the "
+                "skeleton itself.")
     try:
         n = len(out.solids())
         vol = float(out.volume)
     except Exception as e:
-        return f"returned a shape that cannot be measured ({type(e).__name__})"
+        return (f"returned a shape that cannot be measured ({type(e).__name__})",
+                "Return a closed solid: a Compound of faces or an open shell has no volume.")
     if n == 0 or vol <= 1e-9:
-        return "left no solid (a boolean failed and returned nothing)"
+        if i == 0:
+            return ("made no solid", "Check that the skeleton's profile is closed and that its extrude, revolve or "
+                    "loft has a non-zero length.")
+        return ("left no solid (a boolean failed and returned nothing)",
+                "Overlap the operands of its boolean by a few tenths of a millimetre instead of touching, or use "
+                "craft.safe_union / craft.safe_cut, which repair and measure the gap.")
     if not mesh:
         try:
-            if not out.is_valid:
-                return "returned a solid that is not valid (a boolean or a loft failed part-way)"
+            bad = not out.is_valid
         except Exception:
-            pass
-    return ""
+            bad = False
+        if bad:
+            if i == 0:
+                return ("made a solid that is not valid (OCCT's check fails)",
+                        "A loft or sweep folds over itself or a section crosses itself; craft.inspect(body) names "
+                        "the fault, and craft.safe_loft re-seams the sections.")
+            return ("returned a solid that is not valid (a boolean or a loft failed part-way)",
+                    "craft.inspect(body) names the fault. Use craft.safe_union / craft.safe_cut, or move the tool "
+                    "off a seam or a tangent face.")
+    if want is not None and n != want:
+        if n < want:
+            hint = ("Two parts touched or overlapped and fused: keep separate parts apart with craft.parts(..., "
+                    "clearance=) instead of a fuse.")
+        else:
+            hint = ("A cut split a part in two, or a new piece does not reach the body it should join. A feature that "
+                    "adds parts says how many with @feature(..., parts=N).")
+        return f"left {n} solid(s) where {want} are expected ({n0} before it; it adds {adds or 0} part(s))", hint
+    if n > declared:
+        return (f"left {n} solids; the design declares {declared}",
+                "A cut split the body, or a new piece does not reach the body it should join. If the design has more "
+                "parts, raise solids and say how many each feature adds with @feature(..., parts=N).")
+    if i and v0 > 0 and vol < 0.01 * v0:
+        return (f"left {100 * vol / v0:.2f} % of the volume before it ({vol:.0f} of {v0:.0f} mm³)",
+                "A cut removed nearly the whole body: check that its tool is the region to remove, not a box "
+                "around the body.")
+    return "", ""
 
 
 def _diagnosis(e: BaseException, recipe, fid: str) -> dict:
@@ -211,10 +572,14 @@ _REPORT: dict = {"log": [], "skipped": []}
 def begin() -> None:
     _REPORT["log"] = []
     _REPORT["skipped"] = []
+    _REPORT.pop("parts", None)
 
 
 def report() -> dict:
-    return {"log": list(_REPORT["log"]), "skipped": list(_REPORT["skipped"])}
+    out = {"log": list(_REPORT["log"]), "skipped": list(_REPORT["skipped"])}
+    if _REPORT.get("parts"):
+        out["parts"] = dict(_REPORT["parts"])
+    return out
 
 
 # ---- code of a FeatureDesign: per feature, and what they share -----------------------------------------------------
@@ -223,9 +588,8 @@ _codes: dict = {}
 _BLOCK = re.compile(r"^# ---- Form Studio: .*?^# ---- end of [^\n]*$", re.S | re.M)
 
 
-def code_map(cls) -> tuple[dict, str]:
-    """({feature id: its method's code}, the rest of the file) for a FeatureDesign class. Form Studio's own blocks
-    (text, standard features, partial build) are left out of the shared code: they act after the features."""
+def _class_source(cls) -> tuple[tuple, str]:
+    """(a cache key that changes with the file, the text of the file) a FeatureDesign class was compiled from."""
     mod = sys.modules.get(cls.__module__)
     path = getattr(mod, "__file__", None)
     if not path:                     # design sources are imported without a sys.modules entry (recipes.load_source):
@@ -239,8 +603,8 @@ def code_map(cls) -> tuple[dict, str]:
     except OSError:
         st = None
     ck = (cls.__module__, cls.__qualname__, path, st.st_mtime_ns if st else None, st.st_size if st else None)
-    if ck in _codes:
-        return _codes[ck]
+    if ("text", ck) in _codes:
+        return ck, _codes[("text", ck)]
     try:
         text = Path(path).read_text(encoding="utf-8") if path else ""
     except OSError:
@@ -251,14 +615,130 @@ def code_map(cls) -> tuple[dict, str]:
             text = inspect.getsource(cls)
         except (OSError, TypeError):
             text = ""
+    _codes[("text", ck)] = text
+    return ck, text
+
+
+def code_map(cls) -> tuple[dict, str]:
+    """({feature id: its method's code}, the rest of the file) for a FeatureDesign class. Form Studio's own blocks
+    (text, standard features, partial build) are left out of the shared code: they act after the features."""
+    ck, text = _class_source(cls)
+    if ("map", ck) in _codes:
+        return _codes[("map", ck)]
     spans = method_spans(text, cls.__name__) if text else {}
     lines = text.splitlines()
     codes = {n: textwrap.dedent("\n".join(lines[a - 1:b])).strip() for n, (a, b) in spans.items()}
     keep = [ln for i, ln in enumerate(lines, 1) if not any(a <= i <= b for a, b in spans.values())]
     shared = _BLOCK.sub("", "\n".join(keep))
     shared = "\n".join(ln.rstrip() for ln in shared.splitlines() if ln.strip())
-    _codes[ck] = (codes, shared)
+    _codes[("map", ck)] = (codes, shared)
     return codes, shared
+
+
+def _binds(n) -> list | None:
+    """The names a top-level (or class-level) statement binds; None for one that cannot be read that way (a star
+    import, an if or a loop at top level): such a statement is part of every feature's key."""
+    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return [n.name]
+    if isinstance(n, ast.Import):
+        return [a.asname or a.name.split(".")[0] for a in n.names]
+    if isinstance(n, ast.ImportFrom):
+        if any(a.name == "*" for a in n.names):
+            return None
+        return [a.asname or a.name for a in n.names]
+    targets = n.targets if isinstance(n, ast.Assign) else [n.target] if isinstance(n, (ast.AnnAssign, ast.AugAssign)) \
+        else None
+    if targets is None:
+        return None
+    out = []
+    for t in targets:
+        for x in ast.walk(t):
+            if isinstance(x, ast.Name):
+                out.append(x.id)
+    return out
+
+
+def _refs(n) -> tuple[set, set]:
+    """(names, self.<attributes>) a statement reads."""
+    names, attrs = set(), set()
+    for x in ast.walk(n):
+        if isinstance(x, ast.Name):
+            names.add(x.id)
+        elif isinstance(x, ast.Attribute) and isinstance(x.value, ast.Name) and x.value.id == "self":
+            attrs.add(x.attr)
+    return names, attrs
+
+
+def feature_codes(cls) -> dict:
+    """{feature id: the code its checkpoint is keyed on}: the feature's own method plus only what it uses from the
+    rest of the file (module-level helpers, imports and constants, methods and attributes of the class it reads
+    through self, setup() when it reads self.ctx), followed transitively. So a change to `solids`, to a parameter
+    list, to another feature or to a helper it does not call leaves its checkpoint valid. Statements that cannot be
+    attributed (a star import, an if at top level) are part of every feature's key."""
+    ck, text = _class_source(cls)
+    if ("deps", ck) in _codes:
+        return _codes[("deps", ck)]
+    out: dict = {}
+    clean = _BLOCK.sub("", text) if text else ""
+    try:
+        tree = ast.parse(clean) if clean else None
+    except SyntaxError:
+        tree = None
+    c = _feature_class(tree, cls.__name__) if tree is not None else None
+    if c is None:
+        codes, shared = code_map(cls)
+        out = {k: code + "\n# shared\n" + shared for k, code in codes.items()}
+        _codes[("deps", ck)] = out
+        return out
+
+    def seg(n) -> str:
+        return textwrap.dedent(ast.get_source_segment(clean, n) or ast.dump(n)).strip()
+    mod: dict = {}
+    always: list = []
+    for n in tree.body:
+        if n is c or (isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant)):
+            continue
+        names = _binds(n)
+        if names is None:
+            always.append(n)
+        for nm in names or []:
+            mod.setdefault(nm, []).append(n)
+    mem: dict = {}
+    feats: dict = {}
+    for n in c.body:
+        if isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant):
+            continue
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and _is_feature(n):
+            feats.setdefault(n.name, []).append(n)
+            continue
+        for nm in _binds(n) or []:
+            mem.setdefault(nm, []).append(n)
+    lines = clean.splitlines()
+    base = "\n".join(seg(n) for n in always)
+    for fid, nodes in feats.items():
+        own = nodes[-1]
+        a = min([d.lineno for d in own.decorator_list] + [own.lineno])
+        own_code = textwrap.dedent("\n".join(lines[a - 1:own.end_lineno])).strip()
+        seen = {id(own)}
+        deps = []
+        work = [own]
+        while work:
+            n = work.pop()
+            names, attrs = _refs(n)
+            nxt = [x for nm in names for x in mod.get(nm, [])]
+            if cls.__name__ in names:                 # the class by name: everything it holds may matter
+                nxt += [x for xs in mem.values() for x in xs]
+            for at in attrs:
+                at = "setup" if at == "ctx" else at
+                nxt += mem.get(at, []) + feats.get(at, [])
+            for x in nxt:
+                if id(x) not in seen:
+                    seen.add(id(x))
+                    deps.append(x)
+                    work.append(x)
+        out[fid] = own_code + "\n# uses\n" + "\n".join(sorted(seg(x) for x in deps)) + "\n# always\n" + base
+    _codes[("deps", ck)] = out
+    return out
 
 
 def _feature_class(tree: ast.Module, name: str | None = None):
@@ -361,11 +841,38 @@ def checkpoint_get(key: str):
             return None
         cls = getattr(build123d, meta.get("type", ""), None)
         shape = cls(raw) if isinstance(cls, type) else build123d.Shape.cast(raw)
+        _restore_names(shape, meta)
         os.utime(f)
     except Exception:
         return None
     _remember(key, shape)
     return shape
+
+
+def _names(shape) -> dict:
+    """What a B-rep file does not keep: the shape's label and, for craft.parts(), the part names and measured gaps."""
+    out = {}
+    for k in ("label", "part_names", "part_gaps"):
+        val = getattr(shape, k, None)
+        if val:
+            out[k] = val
+    return out
+
+
+def _restore_names(shape, meta: dict) -> None:
+    for k in ("label", "part_names", "part_gaps"):
+        if meta.get(k):
+            try:
+                setattr(shape, k, meta[k])
+            except Exception:
+                pass
+    names = meta.get("part_names")
+    if names:
+        try:
+            for sol, n in zip(shape.solids(), names):
+                sol.label = n
+        except Exception:
+            pass
 
 
 def checkpoint_put(key: str, shape) -> None:
@@ -378,7 +885,8 @@ def checkpoint_put(key: str, shape) -> None:
         d.mkdir(parents=True, exist_ok=True)
         tmp = d / f"{key}.tmp"
         if BinTools.Write_s(shape.wrapped, str(tmp)):
-            (d / f"{key}.json").write_text(json.dumps({"type": type(shape).__name__, "ts": time.time()}), encoding="utf-8")
+            (d / f"{key}.json").write_text(json.dumps({"type": type(shape).__name__, "ts": time.time(),
+                                                       **_names(shape)}, default=str), encoding="utf-8")
             os.replace(tmp, d / f"{key}.bin")
         files = list(d.glob("*.bin"))
         if len(files) > DISK_MAX:
@@ -407,7 +915,7 @@ P_TEMPLATE = '''
 # this block (update_design does that), and the whole design builds again.
 from form import featureprog as _form_fp
 {cls} = _form_fp.partial({cls}, keep={keep}, solids={solids}, origin={origin!r}, failed={failed!r},
-                        stages={stages!r}, valid={valid!r})
+                        stages={stages!r}, valid={valid!r}{extra})
 {end}
 '''
 
@@ -441,13 +949,16 @@ def partial_info(source: str) -> dict | None:
 
 
 def partial_source(source: str, keep: int, solids: int, origin: str, features: list, failed: str,
-                   valid: bool = True) -> str:
+                   valid: bool = True, upto: int | None = None, why: str = "failed") -> str:
+    """upto (a FeatureDesign): build only its first `upto` features (they load from their checkpoints); the ones
+    after it are left out. why: what happened to `failed` ("failed", or "did not finish" for a hang)."""
     base = strip_partial(source)
-    failed_text = f"the next one, {failed}, failed." if failed else "the result failed the final check."
+    failed_text = f"the next one, {failed}, {why}." if failed else "the result failed the final check."
     return base.rstrip() + "\n" + P_TEMPLATE.format(start=P_START, end=P_END, cls=_class_name(base), keep=int(keep),
                                                     solids=int(solids), origin=origin, failed=failed or "",
                                                     stages=list(features[:keep]), valid=bool(valid),
-                                                    built=", ".join(features[:keep]) or "none", failed_text=failed_text)
+                                                    built=", ".join(features[:keep]) or "none", failed_text=failed_text,
+                                                    extra=f", upto={int(upto)}" if upto is not None else "")
 
 
 def prefix_key(origin: str, v: dict) -> str:
@@ -466,10 +977,20 @@ class _Stop(Exception):
 
 
 def partial(cls, keep: int, solids: int, origin: str = "", failed: str = "", stages: list | None = None,
-            valid: bool = True):
-    """The design class, changed to build only its first `keep` stages (used by the partial-build block)."""
+            valid: bool = True, upto: int | None = None):
+    """The design class, changed to build only its first `keep` stages (used by the partial-build block). upto: a
+    FeatureDesign builds its first `upto` features as usual (each from its checkpoint) and leaves out the rest."""
     build = cls.build
     declared_solids = getattr(cls, "solids", 1)
+    if upto is not None and getattr(cls, "_form_steps", None):
+        cls._form_steps = list(cls._form_steps)[:max(1, int(upto))]
+        cls.solids = int(solids)
+        cls.partial = {"keep": int(keep), "failed": failed, "origin": origin, "upto": int(upto)}
+        if int(solids) != int(declared_solids):
+            cls.assembly = lambda self, v: None
+        if not valid:
+            cls.allow_invalid = True
+        return cls
 
     def partial_build(self, v):
         k = prefix_key(origin, v)

@@ -27,14 +27,17 @@ Column {
                     required property var modelData
                     objectName: "feature-" + modelData.id
                     readonly property bool touched: root.paramsOf(modelData.id).some(function (p) { return Store.draftValues[p.key] !== undefined })
-                    width: parent.width; height: 46; radius: Theme.rMd
+                    readonly property var out: Store.leftOut(modelData.id)       // left out of a partial build
+                    width: parent.width; height: Math.max(46, fcol.implicitHeight + 16); radius: Theme.rMd
                     color: fm.pressed ? Theme.washPress : fm.containsMouse ? Theme.washHover : "transparent"
                     Behavior on color { Tint {} }
-                    Rectangle { x: 8; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 22; radius: 1.5; color: Theme.evidence(fr.modelData.role); opacity: 0.8 }
-                    Column { x: 20; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 20 - tg.width - 30; spacing: 1
-                        Txt { text: fr.modelData.label + (fr.touched ? "  ●" : ""); font.weight: 550; color: fr.touched ? Theme.blueprint : Theme.ink; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
-                        Txt { kind: "fine"; visible: text !== ""; text: fr.modelData.doc || ""; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
-                    Tag { id: tg; text: fr.modelData.role; anchors.right: chev.left; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter }
+                    Rectangle { x: 8; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 22; radius: 1.5; color: fr.out ? Theme.amber : Theme.evidence(fr.modelData.role); opacity: fr.out ? 0.45 : 0.8 }
+                    Column { id: fcol; x: 20; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 20 - tg.width - 30; spacing: 1
+                        Txt { text: fr.modelData.label + (fr.touched ? "  ●" : ""); font.weight: 550; color: fr.touched ? Theme.blueprint : fr.out ? Theme.ink3 : Theme.ink; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                        Txt { kind: "fine"; visible: text !== "" && !fr.out; text: fr.modelData.doc || ""; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                        Txt { id: why; objectName: "leftOutReason"; kind: "fine"; visible: !!fr.out; tone: 2; width: parent.width; wrapMode: Text.WordWrap
+                            text: fr.out ? Store.leftOutReason(fr.out) : "" } }
+                    Tag { id: tg; text: fr.out ? "left out" : fr.modelData.role; kind: fr.out ? "left out" : text; anchors.right: chev.left; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter }
                     Icon { id: chev; name: "chevron_right"; size: 13; color: Theme.ink4; anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter }
                     MouseArea { id: fm; anchors.fill: parent; hoverEnabled: true
                         onClicked: Store.select(fr.modelData.id); onEntered: Store.hover(fr.modelData.id); onExited: Store.hover("") }

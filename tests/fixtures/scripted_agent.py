@@ -45,14 +45,23 @@ def P(key, label, default, lo, hi, step, feat, group="form", doc=""):
     return f'        Param({key!r}, {label!r}, {default}, {lo}, {hi}, {step}, "mm", {group!r}, {feat!r}, {doc!r}),'
 
 
-def method(fid, label, role, body):
+def method(fid, label, role, body, parts=None, budget=None):
     lines = body.strip("\n").splitlines()
-    return f'@feature({label!r}, role={role!r})\ndef {fid}(self, v, body):\n' + "\n".join("    " + ln for ln in lines) + "\n"
+    extra = (f", parts={parts}" if parts is not None else "") + (f", budget={budget}" if budget is not None else "")
+    return f'@feature({label!r}, role={role!r}{extra})\ndef {fid}(self, v, body):\n' + \
+        "\n".join("    " + ln for ln in lines) + "\n"
 
 
-def F(fid, label, role, how, *attempts):
-    """A planned feature: id, label, role, how (for plan_design) and its code attempts (method bodies), in order."""
-    return {"id": fid, "label": label, "role": role, "how": how, "attempts": list(attempts)}
+def F(fid, label, role, how, *attempts, parts=None, budget=None):
+    """A planned feature: id, label, role, how (for plan_design) and its code attempts (method bodies), in order.
+    parts: how many separate parts the feature adds (written as @feature(..., parts=N)); budget: its seconds."""
+    return {"id": fid, "label": label, "role": role, "how": how, "attempts": list(attempts), "parts": parts,
+            "budget": budget}
+
+
+def _budget(f: dict, attempt: int):
+    b = f.get("budget")
+    return b[attempt] if isinstance(b, (list, tuple)) else b
 
 
 S: dict = {}
@@ -525,6 +534,89 @@ S["ratchet"] = dict(
         F("pawl_pivot", "Pawl pivot", "interface", "Cylinder cut through the pawl",
           'return body - Pos(36, 50, -1) * Cylinder(1.6, v["t"] + 2, align=A)')])
 
+# ---- injected failures and a true multi-part skeleton -----------------------------------------------------------
+
+# a feature that hangs where no Python alarm reaches it (SIGALRM blocked, as in a long OCCT call): the supervisor
+# stops the kernel after its 3 s budget and the grace, and the features before it must be kept
+HANG = ('import signal\nimport time\nsignal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM})\n'
+        'time.sleep(600)\nreturn body')
+
+S["hang_injected"] = dict(
+    name="Cable tray (injected hang)", brief="A desk cable tray with cable slots, front ribs and feet; the first try "
+    "at the ribs hangs the geometry kernel (an injected hang, to measure recovery).",
+    query="cable tray slots ribs", solids=1, risks=["the rib texture hangs the kernel on its first try"],
+    params=[P("l", "Length", 160, 100, 240, 1, "tray"), P("w", "Width", 60, 40, 90, 1, "tray")],
+    features=[
+        F("tray", "Tray", "structure", "build123d Box, hollowed with a Box cut",
+          'body = Box(v["l"], v["w"], 30, align=A)\n'
+          'return body - Pos(0, 0, 2.4) * Box(v["l"] - 4.8, v["w"] - 4.8, 30, align=A)'),
+        F("slots", "Cable slots", "access", "Box cuts in the back wall",
+          'for x in (-40, 0, 40):\n'
+          '    body = body - Pos(x, v["w"] / 2, 18) * Box(12, 10, 14, align=A)\n'
+          'return body'),
+        F("ribs", "Front ribs", "finish", "craft.safe_union of ribs on the front wall",
+          HANG,
+          'for i in range(7):\n'
+          '    body = craft.safe_union(body, Pos(-60 + 20 * i, -v["w"] / 2 - 0.8, 4) * Box(3, 2, 22, align=A))\n'
+          'return body', budget=[3, None]),
+        F("feet", "Feet", "structure", "craft.safe_union of Cylinders under the floor",
+          'for x in (-60, 60):\n'
+          '    for y in (-20, 20):\n'
+          '        body = craft.safe_union(body, Pos(x, y, -2.8) * Cylinder(5, 3, align=A))\n'
+          'return body')])
+
+# skeleton first with four parts: a one-solid shell, then the faceplate split out on a magnetic lip, its windows and
+# two lenses, each added as its own feature (craft.split, craft.lens, craft.magnet_pair, craft.parts)
+POD_CLASS = '''
+    def setup(self, v):
+        secs, tip = craft.dome_sections(120, 90, 70, levels=9)
+        return {"skin": craft.skin_from_sections(secs, tip, n=16)}
+
+    def region(self, g):
+        f = Plane.YZ * (offset(Rectangle(64, 40), g).face() if g else Rectangle(64, 40))
+        return Pos(0, 0, 32) * extrude(f, 200)
+'''
+TOUCH = 'clearance=0.15, touching=[("shell", "faceplate")]'
+
+S["pod_parts"] = dict(
+    name="Speaker pod in parts", brief="An original speaker pod in four parts: a dome shell, a faceplate held on a "
+    "magnetic lip and two lenses, built skeleton first, one part at a time.",
+    query="split faceplate lip magnets lens separate parts", solids=4, extra=POD_CLASS,
+    risks=["magnet pockets must keep their floor", "lenses must clear the shell's magnet bosses"],
+    parts=[{"id": "shell", "label": "Shell"}, {"id": "faceplate", "label": "Faceplate"},
+           {"id": "lens_l", "label": "Left lens"}, {"id": "lens_r", "label": "Right lens"}],
+    clearances={"faceplate/shell": 0.2, "lens/faceplate": 0.15},
+    magnets=[{"stock": "6x2", "count": 4, "retention": "glue"}],
+    params=[P("wall", "Wall", 4.6, 4.2, 6.0, 0.1, "shell"), P("lip", "Lip", 14, 10, 18, 0.5, "faceplate")],
+    features=[
+        F("shell", "Shell", "structure", "subd.skin_from_sections of dome_sections, Skin.shell",
+          'return self.ctx["skin"].shell(v["wall"])', parts=1),
+        F("faceplate", "Faceplate on a magnetic lip", "interface", "craft.split with a lip, Split.magnets 6x2, craft.parts",
+          'sp = craft.split(body, self.ctx["skin"], v["wall"], self.region, gap=0.2, lip=v["lip"], ledge=1.0)\n'
+          'sp.magnets([((0, y, 32), (1, 0, 0)) for y in (-32 + v["lip"] / 2, 32 - v["lip"] / 2)], stock="6x2", fit="glue")\n'
+          f'return craft.parts(shell=sp.body, faceplate=sp.insert, {TOUCH})', parts=1),
+        F("windows", "Lens windows", "access", "craft.cut of two windows through the faceplate",
+          'P = craft.named_parts(body)\n'
+          'wins = [Pos(0, y, 32) * extrude(Plane.YZ * Rectangle(9, 6), 200) for y in (-12, 12)]\n'
+          f'return craft.parts(shell=P["shell"], faceplate=craft.cut(P["faceplate"], wins[0] + wins[1]), {TOUCH})',
+          parts=0),
+        F("lens_l", "Left lens", "structure", "craft.lens from the inner offset skin",
+          'win = Pos(0, 12, 32) * extrude(Plane.YZ * Rectangle(14, 12), 200)\n'
+          'lens = craft.lens(self.ctx["skin"], win, depth=v["wall"] + 0.2, thickness=3.0).solids()[0]\n'
+          f'return craft.parts(**craft.named_parts(body), lens_l=lens, {TOUCH})', parts=1),
+        F("lens_r", "Right lens", "structure", "craft.lens from the inner offset skin",
+          'win = Pos(0, -12, 32) * extrude(Plane.YZ * Rectangle(14, 12), 200)\n'
+          'lens = craft.lens(self.ctx["skin"], win, depth=v["wall"] + 0.2, thickness=3.0).solids()[0]\n'
+          f'return craft.parts(**craft.named_parts(body), lens_r=lens, {TOUCH})', parts=1),
+        F("lens_magnets", "Lens magnets", "interface", "craft.magnet_pair 6x2 per lens, coaxial pockets",
+          'P = craft.named_parts(body)\n'
+          'for name, y in (("lens_l", 12), ("lens_r", -12)):\n'
+          '    at, nrm = self.ctx["skin"].ray((0, y, 36), (1, 0, 0), -v["wall"])\n'
+          '    pr = craft.magnet_pair(at, [-c for c in nrm], "6x2", "glue", gap=0.2, room_a=v["wall"], room_b=3.0)\n'
+          '    P["faceplate"] = craft.cut(P["faceplate"], pr.pocket_a())\n'
+          '    P[name] = craft.cut(P[name], pr.pocket_b())\n'
+          f'return craft.parts(**P, {TOUCH})', parts=0)])
+
 BRIEFS = list(S)
 
 
@@ -532,11 +624,22 @@ def skeleton_source(sid: str) -> str:
     s = S[sid]
     f = s["features"][0]
     return HEADER.format(title=s["name"], summary=s["brief"], solids=s["solids"], params="\n".join(s["params"])) + \
-        "\n" + "\n".join("    " + ln if ln else "" for ln in method(f["id"], f["label"], f["role"], f["attempts"][0]).splitlines()) + "\n"
+        s.get("extra", "") + "\n" + "\n".join("    " + ln if ln else "" for ln in method(
+            f["id"], f["label"], f["role"], f["attempts"][0], f.get("parts"), _budget(f, 0)).splitlines()) + "\n"
 
 
 def feature_code(f: dict, attempt: int) -> str:
-    return method(f["id"], f["label"], f["role"], f["attempts"][attempt])
+    return method(f["id"], f["label"], f["role"], f["attempts"][attempt], f.get("parts"), _budget(f, attempt))
+
+
+def _left_out(part) -> list:
+    """The features a partial revision left out (failed, skipped or hung); [] for one only waiting for its parts."""
+    if not isinstance(part, dict):
+        return []
+    out = [x.get("feature") for x in part.get("skipped") or [] if isinstance(x, dict)]
+    if part.get("failed") and part["failed"] not in out:
+        out.append(part["failed"])
+    return [x for x in out if x]
 
 
 def _payload(res):
@@ -558,9 +661,23 @@ class ScriptedAgent:
         t0 = time.time()
         ok, out = await self.call(tool, args)
         out = _payload(out)
-        rec["calls"].append({"tool": tool, "ok": bool(ok), "t0": t0, "s": round(time.time() - t0, 3),
-                             **({"feature": args["feature"]} if args.get("feature") else {}),
-                             **({"error": (out.get("text") if isinstance(out, dict) else str(out))[:300]} if not ok else {})})
+        row = {"tool": tool, "ok": bool(ok), "t0": t0, "s": round(time.time() - t0, 3),
+               **({"feature": args["feature"]} if args.get("feature") else {}),
+               **({"error": (out.get("text") if isinstance(out, dict) else str(out))[:300]} if not ok else {})}
+        if ok and isinstance(out, dict):
+            pj = out.get("project")
+            part = out.get("partial") or (pj.get("partial") if isinstance(pj, dict) else None)
+            if part:
+                row["partial"] = True
+                row["left_out"] = _left_out(part)
+                if (part.get("hang") or {}).get("feature"):
+                    row["hang"] = {k: part["hang"].get(k) for k in ("feature", "s", "budget", "kind")}
+                if part.get("parts"):
+                    row["parts"] = part["parts"]
+            log = out.get("build_log") or []
+            if log:
+                row["log"] = {k: sum(1 for e in log if e.get("status") == k) for k in ("built", "checkpoint", "skipped")}
+        rec["calls"].append(row)
         return ok, out
 
     async def run(self, sid: str) -> dict:
@@ -585,7 +702,7 @@ class ScriptedAgent:
         if brief:
             args["plan"] = brief
         ok, out = await self._do(rec, "create_design", args)
-        rec["first_build_ok"] = bool(ok) and not out.get("partial")
+        rec["first_build_ok"] = bool(ok) and not _left_out(out.get("partial"))       # parts still to come is fine
         rec["skeleton_returned_s"] = round(rec["calls"][-1]["t0"] + rec["calls"][-1]["s"] - rec["t0"], 3) if ok else None
         if not ok:
             rec["end"] = time.time()
@@ -595,10 +712,21 @@ class ScriptedAgent:
         rec["built"].append(s["features"][0]["id"])
         for f in s["features"][1:]:
             done = False
+            in_source = False                        # a revision kept it left out (a hang): change it, do not add it
             for attempt in range(min(len(f["attempts"]), 1 + RETRIES)):
-                ok, out = await self._do(rec, "add_feature", {"project": pid, "kind": "code", "feature": f["id"],
-                                                              "code": feature_code(f, attempt), "label": f["label"],
-                                                              "role": f["role"]})
+                if in_source:
+                    ok, out = await self._do(rec, "update_design", {"project": pid, "feature": f["id"],
+                                                                    "code": feature_code(f, attempt), "run": False})
+                else:
+                    ok, out = await self._do(rec, "add_feature", {"project": pid, "kind": "code", "feature": f["id"],
+                                                                  "code": feature_code(f, attempt), "label": f["label"],
+                                                                  "role": f["role"]})
+                if ok and f["id"] in _left_out(out.get("partial")):
+                    in_source = True
+                    if rec["calls"][-1].get("hang"):            # the project must still be there after a hang
+                        gp, _ = await self._do(rec, "get_project", {"project": pid})
+                        rec["calls"][-2]["hang"]["project_exists"] = bool(gp)
+                    continue
                 if ok:
                     done = True
                     if attempt:

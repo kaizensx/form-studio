@@ -142,6 +142,34 @@ class Engine(unittest.TestCase):
         self.assertIn("mesh fallback", r.label)
         self.assertTrue(boolean.last().get("mesh_fallback"))
 
+    def test_the_plain_boolean_counts_against_the_bound(self):
+        """A plain boolean that alone uses the time bound is not followed by a pre-flight or rewrites."""
+        from form.craft import boolean
+        body, tool = bf.grazing_cut()
+        t0 = time.perf_counter()
+        with self.assertRaises(boolean.BooleanError) as cm:
+            boolean.run(body, tool, "cut", budget=0.001)
+        self.assertEqual(cm.exception.report["class"], "slow")
+        self.assertIn("time bound", str(cm.exception))
+        self.assertEqual(cm.exception.report["skipped"], ["pre-flight", "class rewrites"])
+        plain = cm.exception.report["attempts"][0]["seconds"]
+        self.assertLess(time.perf_counter() - t0, plain + 2.0)
+
+    def test_a_feature_budget_caps_the_ladder(self):
+        from form import featureprog
+        from form.craft import boolean
+        featureprog._DEADLINE.append(time.monotonic() + 3.0)
+        try:
+            body, tool = bf.grazing_cut()
+            t0 = time.perf_counter()
+            try:
+                boolean.run(body, tool, "cut")
+            except boolean.BooleanError as e:
+                self.assertIn("time bound", str(e)) if e.report.get("skipped") else None
+            self.assertLessEqual(time.perf_counter() - t0, 3.0 + 1.5)      # never past the feature's budget
+        finally:
+            featureprog._DEADLINE.clear()
+
 
 class Diagnosis(unittest.TestCase):
     def test_a_build_that_fails_in_the_engine_carries_its_measurements(self):

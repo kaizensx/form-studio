@@ -74,6 +74,12 @@ Rectangle {
                     : bar.ap.state === "approved" ? F.pad(Store.project.head) + " is released"
                     : bar.ap.state === "superseded" ? F.pad(bar.ap.rev) + " is released. " + F.pad(Store.project.head) + " is not."
                     : F.pad(Store.project.head) + " has not been approved for release" } }
+        // a partial build (features left out, a feature that hung, parts still to come): saved and shown, not released
+        Item { visible: !!Store.partial; width: 6; height: 1 }
+        Tag { objectName: "partialBadge"; visible: !!Store.project && !!Store.partial; kind: "partial"; text: "partial"
+            anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: 1
+            HoverHandler { id: pth }
+            Tip { show: pth.hovered; text: Store.project ? F.pad(Store.project.head) + " is a partial build. " + Store.partialLine : "" } }
     }
     Row { id: right; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 6
         StatusChips { anchors.verticalCenter: parent.verticalCenter; compact: bar.work ? !bar.roomy : bar.tight }      // setup / update notices

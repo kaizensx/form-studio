@@ -36,12 +36,36 @@ def _serve(conn):
             meshsolid.set_paths(kwargs.pop("_refs", None))
             from . import marks                            # label text, revision and nozzle for designs with marks
             marks.set_context(kwargs.pop("_mark", None))
-            kernel.PROGRESS = (lambda d: conn.send(("progress", d))) if kwargs.pop("_progress", False) else None
+            prog = kwargs.pop("_progress", False)            # True: stage meshes too; "events": feature events only
+            kernel.PROGRESS = (lambda d: conn.send(("progress", d))) if prog else None
+            kernel.PROGRESS_MESH = prog is True
+            from . import featureprog                     # feature budgets stretch with the call's timeout under load
+            featureprog.STRETCH = float(kwargs.pop("_stretch", 1.0) or 1.0)
             conn.send(("ok", kernel.OPS[op](**kwargs)))
         except RecipeError as e:
             conn.send(("recipe_error", e.public()))
         except Exception as e:  # report, keep serving
             conn.send(("error", {"message": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()[-1500:]}))
+
+
+FEATURE_GRACE = 10.0       # a feature still running this long past its budget is a hang in C++: stop the kernel
+
+
+def _mark_hang(running: dict | None, info: dict) -> None:
+    """Write down the feature that hung or crashed the kernel (form/featureprog.py hang_path), so its next build
+    leaves it out at once."""
+    f = (running or {}).get("hang_file")
+    if not f:
+        return
+    import json
+    import os
+    try:
+        tmp = f + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump({**{k: info[k] for k in ("feature", "s", "budget", "kind") if k in info}, "ts": time.time()}, fh)
+        os.replace(tmp, f)
+    except OSError:
+        pass
 
 
 class Kernel:
@@ -77,17 +101,44 @@ class Kernel:
                 self._start()
             try:
                 if on_progress is not None:
-                    kwargs["_progress"] = True
+                    kwargs.setdefault("_progress", True)
+                else:
+                    kwargs.pop("_progress", None)
                 self._conn.send((op, kwargs))
                 end = time.monotonic() + timeout
+                running = None                         # the feature the kernel is building now (featureprog events)
+                fdead = None                           # when that feature is past its budget and the grace
                 while True:
-                    if not self._conn.poll(max(0.0, end - time.monotonic())):
-                        self._kill(f"{op} exceeded {timeout:g} s")
-                        raise KernelFailure({"kind": "timeout", "message": f"The geometry kernel did not answer within {timeout:g} s and was restarted.",
-                                             "hint": "Nothing was saved from that attempt. Your last committed revision is intact."})
+                    lim = end if fdead is None else min(end, fdead)
+                    if not self._conn.poll(max(0.0, lim - time.monotonic())):
+                        now = time.monotonic()
+                        hang = None
+                        if running is not None:
+                            hang = {"feature": running.get("feature", ""), "s": round(now - running["t"], 1),
+                                    "budget": running.get("budget"), "i": running.get("i"), "kind": "kill"}
+                            _mark_hang(running, hang)
+                        if hang is not None and fdead is not None and fdead <= end:
+                            self._kill(f"{op}: feature {hang['feature']} ran {hang['s']:g} s, past its "
+                                       f"{hang['budget']} s budget")
+                            msg = (f"Feature {hang['feature']} did not finish: the geometry kernel was stopped after "
+                                   f"{hang['s']:g} s (its budget is {hang['budget']} s) and restarted.")
+                        else:
+                            self._kill(f"{op} exceeded {timeout:g} s")
+                            msg = f"The geometry kernel did not answer within {timeout:g} s and was restarted." + \
+                                (f" It was building {hang['feature']} ({hang['s']:g} s on it)." if hang else "")
+                        raise KernelFailure({"kind": "timeout", "message": msg,
+                                             "hint": "Nothing was saved from that attempt. Your last committed revision is intact.",
+                                             **({"feature": hang["feature"], "hang": hang} if hang else {})})
                     status, payload = self._conn.recv()
                     if status != "progress":
                         break
+                    if isinstance(payload, dict) and payload.get("kind") == "feature_start":
+                        running = {**payload, "t": time.monotonic()}
+                        b = payload.get("budget")
+                        fdead = running["t"] + float(b) + max(FEATURE_GRACE, 0.25 * float(b)) \
+                            if isinstance(b, (int, float)) and b > 0 else None
+                    elif isinstance(payload, dict) and payload.get("kind") == "feature_done":
+                        running = fdead = None
                     if on_progress is not None:
                         try:
                             on_progress(payload)
@@ -95,8 +146,16 @@ class Kernel:
                             pass
             except (EOFError, BrokenPipeError, ConnectionResetError, OSError):
                 self._kill(f"{op} crashed the kernel process")
-                raise KernelFailure({"kind": "crash", "message": "The geometry kernel stopped unexpectedly and was restarted.",
-                                     "hint": "Nothing was saved from that attempt. Your last committed revision is intact."})
+                r = locals().get("running")
+                hang = None
+                if r:
+                    hang = {"feature": r.get("feature", ""), "s": round(time.monotonic() - r["t"], 1),
+                            "budget": r.get("budget"), "i": r.get("i"), "kind": "crash"}
+                    _mark_hang(r, hang)
+                raise KernelFailure({"kind": "crash", "message": "The geometry kernel stopped unexpectedly and was restarted."
+                                     + (f" It was building {hang['feature']} ({hang['s']:g} s on it)." if hang else ""),
+                                     "hint": "Nothing was saved from that attempt. Your last committed revision is intact.",
+                                     **({"feature": hang["feature"], "hang": hang} if hang else {})})
         if status == "ok":
             return payload
         payload["kind"] = "recipe" if status == "recipe_error" else "internal"
@@ -244,9 +303,11 @@ class KernelPool:
         i = self._pick(key)
         with self._cv:
             busy = len(self._busy)
+        stretch = scaled_timeout(1.0, busy, self.size)
+        if stretch > 1.0:
+            kwargs["_stretch"] = stretch               # feature budgets in the worker stretch the same way
         try:
-            return self._workers[i].call(op, timeout=scaled_timeout(timeout, busy, self.size), on_progress=on_progress,
-                                         **kwargs)
+            return self._workers[i].call(op, timeout=timeout * stretch, on_progress=on_progress, **kwargs)
         except KernelFailure as e:
             if e.info.get("kind") in ("timeout", "crash"):
                 with self._cv:

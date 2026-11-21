@@ -176,7 +176,8 @@ QtObject {
         switch (kind) {
         case "measured": case "physical": case "calibrated": case "PASS": return pass
         case "specified": case "computed": case "interface": case "geometry": return datum
-        case "assumed": case "photo": case "WARN": case "simulated": case "modelled": case "model": return amber
+        case "assumed": case "photo": case "WARN": case "simulated": case "modelled": case "model": case "partial":
+        case "left out": return amber
         case "FAIL": case "resized": case "moved": case "added": case "removed": return signal
         case "trimmed": case "draft": return blueprint
         }

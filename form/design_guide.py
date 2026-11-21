@@ -37,7 +37,10 @@ SKELETON FIRST, ONE VALIDATED FEATURE AT A TIME (do this for every design that i
       def bore(self, v, body):
           return body - Cylinder(v["bore_d"] / 2, 20)
   (example_source_features has the complete file with fillets and slots; setup(self, v) returns values every
-  feature reads as self.ctx.)
+  feature reads as self.ctx.) Several parts: declare solids = N and start from a one-solid skeleton; each part is a
+  feature that says how many parts it adds, @feature("Lenses", parts=2), returning craft.parts(**craft.named_parts(
+  body), lens_l=a, lens_r=b); every revision is saved while parts are still to come. A slow feature gets
+  @feature(..., budget=seconds); one that hangs is stopped and left out, and the features before it are kept.
 
 A Form Studio design is one Python file that defines one subclass of Recipe. Form Studio imports it, builds it in the
 CAD kernel (build123d on OpenCascade), attributes every face to a feature, and runs the full pipeline:

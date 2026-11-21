@@ -1,4 +1,4 @@
-"""Creation bench: the twenty briefs of tests/design_bench/creation_briefs.json run through Form Studio's MCP tools
+"""Creation bench: the briefs of tests/design_bench/creation_briefs.json run through Form Studio's MCP tools
 (a real MCP stdio server, a temporary FORM_DATA), skeleton first and one feature per call, and measured.
 
     .venv/bin/python scripts/creation_bench.py --json bench.json                 # the scripted stub agent, all 20
@@ -14,6 +14,12 @@ numbers measure the engine and the tools (a real agent is scripts/design_eval.py
   features            built vs planned; retried (built on a second or third attempt); deferred (failed 3 times)
   critic score        tests/design_bench/bench.py score of the final design (heuristic), unless --no-score
   mesh-tier features  features of the final source that declare a mesh texture (MeshTexture)
+  refused / partial   design calls refused (no revision made) vs calls that saved a partial revision with a feature
+                      left out (a revision waiting only for parts still to come is neither)
+  hangs               design calls during which the kernel timed out or crashed, and of those how many still had
+                      the project afterwards (get_project), with the feature and the seconds it ran
+  checkpoint hits     features loaded from their checkpoint / features loaded or built, over every build_log
+  parts               the declared and built part count of the last revision that reported it
   total seconds       the brief from its first call to its last
 Kernel workers: FORM_KERNEL_WORKERS (default 2 here). Every number written is measured in this run; nothing is
 estimated. Nothing is printed or uploaded.
@@ -56,6 +62,26 @@ def _activity(data: Path) -> list[dict]:
             except ValueError:
                 pass
     return out
+
+
+DESIGN_CALLS = ("create_design", "update_design", "add_feature")
+
+
+def _rate(a: int, n: int):
+    return round(a / n, 3) if n else None
+
+
+def _call_metrics(calls: list) -> dict:
+    """Refused vs partial revisions, hangs (and whether the project survived them), checkpoint hits."""
+    design = [c for c in calls if c["tool"] in DESIGN_CALLS]
+    hits = sum((c.get("log") or {}).get("checkpoint", 0) for c in design)
+    built = sum((c.get("log") or {}).get("built", 0) for c in design)
+    parts = next((c["parts"] for c in reversed(design) if c.get("parts")), None)
+    return {"refused": sum(1 for c in design if not c["ok"]),
+            "partial_revisions": sum(1 for c in design if c["ok"] and c.get("left_out")),
+            "hangs": [{**c["hang"], "tool": c["tool"]} for c in design if c.get("hang")],
+            "checkpoint_hits": hits, "features_rebuilt": built, "checkpoint_hit_rate": _rate(hits, hits + built),
+            **({"parts": parts} if parts else {})}
 
 
 def _score(bench, b: dict, source: str, tmp: Path) -> dict:
@@ -121,14 +147,18 @@ async def _run(only: set | None, score: bool, workers: int) -> dict:
                    "mesh_tier_features": src.count("MeshTexture("),
                    "final_build_ok": bool(rec["project"] and src and featureprog.P_START not in src),
                    "total_s": round(rec["end"] - rec["t0"], 2),
-                   "calls": [{k: x[k] for k in ("tool", "ok", "s", "feature", "error") if k in x} for x in rec["calls"]]}
+                   **_call_metrics(rec["calls"]),
+                   "calls": [{k: x[k] for k in ("tool", "ok", "s", "feature", "error", "partial", "left_out", "hang",
+                                                "parts", "log") if k in x} for x in rec["calls"]]}
             if bench and src:
                 row["critic"] = _score(bench, b, src, data)
                 row["final_build_ok"] = row["final_build_ok"] and bool(row["critic"].get("builds"))
             out["briefs"].append(row)
             print(f"{b['id']:20s} first={'ok' if row['first_build_ok'] else 'NO':3s} final={'ok' if row['final_build_ok'] else 'NO':3s} "
                   f"visible={row['first_visible_s']}s built={row['features_built']}/{row['features_planned']} "
-                  f"deferred={len(row['deferred'])} critic={(row.get('critic') or {}).get('total', '-')} total={row['total_s']}s",
+                  f"deferred={len(row['deferred'])} refused={row['refused']} partial={row['partial_revisions']} "
+                  f"hangs={len(row['hangs'])} ckpt={row['checkpoint_hit_rate']} "
+                  f"critic={(row.get('critic') or {}).get('total', '-')} total={row['total_s']}s",
                   flush=True)
     rows = out["briefs"]
     n = max(1, len(rows))
@@ -146,6 +176,11 @@ async def _run(only: set | None, score: bool, workers: int) -> dict:
         "critic_score_mean": round(statistics.mean(crit), 1) if crit else None,
         "total_s": round(sum(r["total_s"] for r in rows), 1),
         "without_project": [r["id"] for r in rows if not r["project"]],
+        "refused": sum(r["refused"] for r in rows), "partial_revisions": sum(r["partial_revisions"] for r in rows),
+        "hangs": sum(len(r["hangs"]) for r in rows),
+        "hangs_with_project": sum(1 for r in rows for h in r["hangs"] if h.get("project_exists")),
+        "checkpoint_hit_rate": _rate(sum(r["checkpoint_hits"] for r in rows),
+                                     sum(r["checkpoint_hits"] + r["features_rebuilt"] for r in rows)),
         "evidence": "measured in this run; critic scores are the design bench's heuristic"}
     return out
 

@@ -656,8 +656,12 @@ cap height, depth how far the letters stand out or sink in. Returns the new head
 
 Add a feature to a Python design as a new revision. kind="code" (a FeatureDesign): feature = its id, code = one
 method `def <feature>(self, v, body): return body_after`, label/role for the feature list, after = the feature
-it goes after (default: last). Only it is built: the features before it load from their checkpoints. If it
-fails, no revision is made and the diagnosis comes back (partial=True saves it left out, release blocked).
+it goes after (default: last). Only it is built: the features before it load from their checkpoints, and the
+stage is shown in Form Studio as it builds. Returns the head, build_log (per feature: built, checkpoint or
+skipped, with seconds, solids and volume change) and a six-view sheet and a section: look. A feature that adds
+parts says so in the code (`@feature("Lenses", parts=2)`); while parts are still to come the revision is
+saved as partial (release blocked). If it fails, no revision is made and the diagnosis comes back
+(partial=True saves it left out, release blocked).
 Standard features: on a flat face of a Python design, written into its source as a feature block and built
 in the kernel as a new revision. kind="boss": a screw boss (size M2..M5; hole tapped = ISO tap drill, clearance =
 ISO 273, insert = a typical heat-set insert hole; height, outer_d, hole_d, hole_depth in mm). kind="snap_hook":

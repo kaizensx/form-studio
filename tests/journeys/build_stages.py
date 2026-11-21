@@ -154,6 +154,14 @@ def journey_stages_stream_then_the_saved_design(ui):
     ui.check(not any(e.get("t") == "error" for e in ui.js("Store.chatItems")), "no error in the conversation")
     ui.wait_until(lambda: ui.store.get("chatBusy") is False, 30, "the reply to end")
     shots.append(str(ui.shot("stages-new-" + ("light-" if _light(ui) else "") + "left-out-line")))
+    # the saved revision is partial: a calm badge in the header, and the feature list marks the feature left out
+    # with the whole measured reason
+    ui.wait_until(lambda: ui.exists("partialBadge"), 10, "the partial badge beside the revision in the header")
+    why = ui.js("Store.leftOutReason(Store.leftOut('rounded_top'))")
+    ui.check(why and "40 mm" in why and not why.endswith("…"), f"the feature list has the whole reason: {why!r}")
+    ui.check(ui.js("Store.leftOut('body') === null && Store.leftOut('bore') === null") is True,
+             "features that built are not marked left out")
+    shots.append(str(ui.shot("stages-new-" + ("light-" if _light(ui) else "") + "partial-badge")))
     S["pid"] = pid
     print("  screenshots: " + ", ".join(shots), flush=True)
 

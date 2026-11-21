@@ -211,6 +211,13 @@ def _stage_out(stage) -> None:
     """Send each stage over PROGRESS as it is made, so the last valid solid is on screen while later features build."""
     if PROGRESS is None:
         return
+    if not PROGRESS_MESH:                          # by name: what was made before a hang or a crash
+        try:
+            n = len(stage.shape.solids()) if hasattr(stage.shape, "solids") else 0
+            PROGRESS({"kind": "stage_made", "feature": stage.feature, "index": len(_LAST["stages"]), "solids": n})
+        except Exception:
+            pass
+        return
     try:
         if not hasattr(stage.shape, "solids") or not stage.shape.solids():
             return
@@ -547,6 +554,7 @@ def _summary(model, extra_mass=None) -> dict:
         "craft_notes": model.get("craft_notes", []),
         **({"build_log": model["log"]} if model.get("log") else {}),
         **({"skipped": model["skipped"]} if model.get("skipped") else {}),
+        **({"parts_built": model["parts"]} if model.get("parts") else {}),
     }
 
 
@@ -570,6 +578,7 @@ def op_view(key, recipe_id, values, tol=0.05, edges=True, dock_mass_g=None):
         mesh.append({"feature": k, "positions": _b64(P.astype(np.float32)), "indices": _b64(T.astype(np.uint32))})
     out = _summary(model, dock_mass_g)
     out["mesh"] = mesh
+    tex = None
     if not getattr(model["recipe"], "mesh", False):                  # mesh textures show in the viewer and renders
         from .craft import meshtex
         tex = _textured(model, meshtex.VIEW_BUDGET)
@@ -588,7 +597,10 @@ def op_view(key, recipe_id, values, tol=0.05, edges=True, dock_mass_g=None):
     if asm.get(model) is not None:
         out["assembly"] = asm.view(model, _b64, _edges)
         if not out["assembly"]["error"]:
-            out["mesh"] = asm.mesh(model, _b64, smooth_facets if facets else None)
+            a = asm.get(model)
+            tm = _textured_parts(model, a["face_part"], [p.id for p in a["spec"].parts]) if tex is not None else None
+            # per-part meshes; the parts that carry a mesh texture keep it (the viewer and the render sheets)
+            out["mesh"] = tm or asm.mesh(model, _b64, smooth_facets if facets else None)
     if edges:
         out["edges"] = _b64(_mesh_edges(*_mesh_arrays(model)) if getattr(model["recipe"], "mesh", False)
                             else _edges(model["shape"], facets))
@@ -681,6 +693,32 @@ def write_stl(shape, path, tol: float = 0.01, ang: float = 0.1) -> dict:
                     "open_edges_first": first}
     open_ = write(tol, ang)
     return {"tolerance": tol, "angular_tolerance": ang, "remeshed": False, "open_edges": open_, "open_edges_first": first}
+
+
+def _textured_parts(model, face_part: list, ids: list, budget: int | None = None) -> list | None:
+    """The view mesh split by part, with the design's mesh textures applied part by part (each part gets a share of
+    the triangle budget by its area), so a design with an assembly keeps its texture in the view. None when the
+    design declares no texture."""
+    from .craft import meshtex
+    budget = budget or meshtex.VIEW_BUDGET
+    specs = meshtex.declared(model["recipe"], model["values"])
+    if not specs:
+        return None
+    by: dict = {}
+    for f, k in zip(model["faces"], face_part):
+        by.setdefault(k, []).append(f)
+    total = sum(f["area"] for f in model["faces"]) or 1.0
+    out = []
+    for k, fs in by.items():
+        share = sum(f["area"] for f in fs) / total
+        V, F, tags, _info = meshtex.apply_to_faces(fs, specs, max(4000, int(budget * share)))
+        V32 = V.astype(np.float32)
+        for feat in dict.fromkeys(tags.tolist()):
+            sel = F[tags == feat]
+            used, inv = np.unique(sel, return_inverse=True)
+            out.append({"feature": feat, "part": ids[k] if 0 <= k < len(ids) else "", "positions": _b64(V32[used]),
+                        "indices": _b64(inv.reshape(-1, 3).astype(np.uint32))})
+    return out
 
 
 def _textured(model, budget):
@@ -1052,6 +1090,7 @@ def op_reference(path, fmt, out):
 
 
 PROGRESS = None        # set by the worker: sends ("progress", {...}) to the caller while an op runs
+PROGRESS_MESH = True   # False: report stages by name only (the caller watches the build, it does not draw it)
 
 
 def op_assembly(key, recipe_id, values, budget_s=45.0):

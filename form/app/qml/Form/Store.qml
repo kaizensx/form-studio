@@ -64,6 +64,19 @@ QtObject {
     readonly property var project: data ? data.project : null
     readonly property var recipe: data ? data.recipe : null
     readonly property var head: project ? revision(project.head) : null
+    // a partial revision (form/featureprog.py): features left out, a feature that hung, or parts still to come
+    readonly property var partial: head && head.partial ? head.partial : null
+    readonly property string partialLine: {
+        var p = partial
+        if (!p) return ""
+        var out = (p.skipped || []).filter(function (x) { return !x.not_tried }).map(function (x) { return x.feature })
+        var hang = p.hang && p.hang.feature ? p.hang : null
+        var t = hang ? hang.feature + (hang.kind === "crash" ? " crashed the geometry kernel" : " did not finish")
+                       + (hang.s ? " after " + Number(hang.s).toFixed(1) + " s" : "")
+                     : out.length ? "Left out: " + out.join(", ") : ""
+        if (p.parts) t += (t ? ". " : "") + p.parts.built + " of " + p.parts.declared + " parts built so far"
+        return (t || "Only part of the design built") + ". Release waits until every feature builds."
+    }
     readonly property bool hasDraft: F.keys(draftValues).length > 0 || F.keys(draftProv).length > 0
     readonly property var values: head ? Object.assign({}, head.values, draftValues) : ({})
     readonly property var shown: (scrub && scrub.view) || preview || view         // geometry currently on screen
@@ -127,6 +140,25 @@ QtObject {
         if (!recipe) return null
         for (var i = 0; i < recipe.params.length; i++) if (recipe.params[i].key === key) return recipe.params[i]
         return null
+    }
+    // the feature a partial revision left out, with the reason the build measured; null when it built
+    function leftOut(id) {
+        var p = partial
+        if (!p || !id) return null
+        var sk = p.skipped || []
+        for (var i = 0; i < sk.length; i++) if (sk[i].feature === id) return sk[i]
+        if (p.failed === id) return p
+        if ((p.left_out || []).indexOf(id) >= 0 || (p.dropped || []).indexOf(id) >= 0)
+            return { feature: id, message: "Not built yet: the build stopped at " + (p.failed || "an earlier feature") + ".", not_tried: true }
+        return null
+    }
+    // one or two whole sentences of a left-out reason, never cut mid-sentence
+    function leftOutReason(x) {
+        if (!x) return ""
+        var r = String((x.diagnosis && x.diagnosis.summary) || x.message || x.reason || "").replace(/\s+/g, " ").trim()
+        if (r.length <= 220) return r
+        var cut = r.slice(0, 220), end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("; "))
+        return end > 40 ? cut.slice(0, end + 1) : cut.slice(0, cut.lastIndexOf(" ")) + "\u2026"
     }
     function featureById(id) {
         if (!recipe) return null

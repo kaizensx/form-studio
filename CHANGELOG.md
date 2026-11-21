@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- **A hang or a crash never loses the work.** When the geometry kernel times out or crashes during create_design,
+  update_design or add_feature, Form Studio keeps what was built: a FeatureDesign keeps the features finished before
+  the one that hung (loaded from their checkpoints on disk, nothing built twice), any other design keeps its stages,
+  and the result is a partial revision that names the feature and the seconds it ran. Every feature has a time
+  budget (90 s by default, `@feature(..., budget=s)`): a Python loop past it is stopped by an alarm, a hang inside
+  OCCT is stopped by the kernel's supervisor, and the next build leaves that feature out at once instead of waiting
+  for it again. A boolean inside a feature never runs past the feature's budget, and a plain boolean that alone uses
+  the boolean time bound is not followed by a pre-flight or rewrites.
+- **Several parts, skeleton first.** A design that declares four parts can start from a one-solid skeleton: each
+  revision is saved while parts are still to come (flagged partial, release blocked), and add_feature(kind="code")
+  makes a revision per part. A feature says how many parts it adds with `@feature(..., parts=N)`; the solid count is
+  then checked after every feature, so a "part" that fuses into the shell is caught at that feature with the counts.
+- **Checkpoints follow what a feature reads.** A feature's checkpoint is keyed on its own code, the helpers and
+  methods it actually uses, the values it actually reads and the feature before it. Changing `solids`,
+  mesh_texture(), appearance() or a parameter that no feature reads rebuilds nothing; changing a value rebuilds
+  only the features that read it and those after them. Part names of craft.parts() results survive the disk.
+- **Every feature is checked as it is made:** its solid count and volume change are in the build log, a cut that
+  removes nearly the whole body is caught, and the hint follows the measured cause (no solid, an invalid solid, the
+  wrong part count, not a solid at all) instead of always suggesting a boolean overlap.
+- add_feature(kind="code") shows the feature's stages live in Form Studio while it builds and returns the six-view
+  sheet and the section like create_design. Old draft files (the live stages of an attempt) are cleaned up.
+- A design with an assembly keeps its mesh texture on the parts that carry it in the view and the render sheets.
+- Form Studio shows a partial revision calmly: a "partial" badge beside the revision in the header, left-out features
+  marked "left out" in the feature list with the measured reason, and the reason in the conversation in whole
+  sentences instead of cut mid-sentence.
+- Creation bench: a true multi-part skeleton-first brief (a speaker pod: shell, faceplate on a magnetic lip, two
+  lenses, added part by part) and an injected kernel hang, and the bench reports refused vs partial revisions, hangs
+  with the project still there, and the checkpoint hit rate.
+
 - **The hero helmet exemplar, redesigned and built one feature at a time.** It is now a FeatureDesign: the skin is
   fitted once in setup(), the shell is the skeleton, and each of its eleven features is its own method, so an agent
   learns the route the design guide teaches. The design is new: rounded pill lenses tilted up in a raised bezel, a

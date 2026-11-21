@@ -1,5 +1,5 @@
 {
-  "about": "Creation bench: twenty original briefs (mechanical, creative, organic, assemblies; no character or brand) run through Form Studio's MCP tools by an agent, skeleton first, one feature per call (scripts/creation_bench.py). 'features' are groups of words a good answer's feature ids or labels contain (scored by tests/design_bench/bench.py); 'complex' is whether the staged workflow should trigger. The scripted stub agent (tests/fixtures/scripted_agent.py) has one script per id.",
+  "about": "Creation bench: twenty-two original briefs (mechanical, creative, organic, assemblies, plus a true multi-part skeleton-first brief and an injected kernel hang; no character or brand) run through Form Studio's MCP tools by an agent, skeleton first, one feature per call (scripts/creation_bench.py). 'features' are groups of words a good answer's feature ids or labels contain (scored by tests/design_bench/bench.py); 'complex' is whether the staged workflow should trigger. The scripted stub agent (tests/fixtures/scripted_agent.py) has one script per id.",
   "briefs": [
     {"id": "shaft_coupler", "category": "mechanical", "brief": "A clamping shaft coupler from a 5 mm motor shaft to an 8 mm leadscrew.", "complex": true,
      "features": [["body"], ["bore"], ["slot", "clamp"], ["screw"]]},
@@ -40,6 +40,10 @@
     {"id": "magnet_organizer", "category": "assembly", "brief": "A two-part desk organizer held together by 8x3 mm magnets.", "complex": true,
      "features": [["tray"], ["compartment", "pocket"], ["magnet"]], "expect": {"solids_min": 2}},
     {"id": "ratchet", "category": "assembly", "brief": "A ratchet wrench with a pawl and a quarter-inch square drive.", "complex": true,
-     "features": [["handle"], ["bore", "head"], ["teeth", "wheel"], ["drive", "square"], ["pawl"]], "expect": {"solids_min": 3}}
+     "features": [["handle"], ["bore", "head"], ["teeth", "wheel"], ["drive", "square"], ["pawl"]], "expect": {"solids_min": 3}},
+    {"id": "pod_parts", "category": "assembly", "brief": "An original speaker pod in four parts: a dome shell, a faceplate held on a magnetic lip and two lenses, built skeleton first, one part at a time.", "complex": true,
+     "features": [["shell"], ["faceplate", "lip"], ["window"], ["lens"], ["magnet"]], "expect": {"solids_min": 4}},
+    {"id": "hang_injected", "category": "injected", "brief": "A desk cable tray with cable slots, front ribs and feet; the first try at the ribs hangs the geometry kernel (an injected hang, to measure recovery).", "complex": true,
+     "features": [["tray"], ["slot"], ["rib"], ["feet", "foot"]]}
   ]
 }

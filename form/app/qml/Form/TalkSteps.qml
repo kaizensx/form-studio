@@ -91,7 +91,8 @@ Column {
             Repeater { model: st.r && st.r.left_out ? st.r.left_out : []
                 Row { required property var modelData; objectName: "leftOut"; x: 38; width: st.width - 38; spacing: 6
                     Icon { name: "circle_dashed"; size: 12; color: Theme.ink3; y: 2 }
-                    Txt { width: parent.width - 18; kind: "fine"; tone: 2; wrapMode: Text.WordWrap; maximumLineCount: sg.expanded ? 6 : 2; elide: Text.ElideRight
+                    // the whole reason (form/chat.py left_out keeps it to whole sentences): never cut mid-sentence
+                    Txt { objectName: "leftOutReason"; width: parent.width - 18; kind: "fine"; tone: 2; wrapMode: Text.WordWrap
                         text: "Left out for now: " + parent.modelData.feature + (parent.modelData.reason ? " · " + parent.modelData.reason : "") } } }
             // the picture the agent looked at
             Rectangle {

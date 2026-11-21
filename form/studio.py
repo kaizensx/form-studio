@@ -103,6 +103,35 @@ def lineage(src: dict, via: str) -> dict:
     lin = src.get("lineage") or {}
     return {"root": lin.get("root") or src["id"], "parent": src["id"], "parent_rev": src.get("head"), "via": via}
 
+class _BuildWatch:
+    """What a build has made so far, read from the kernel's progress events: what is kept when the kernel times out
+    or crashes part-way (form/featureprog.py feature events; stage names for any other design)."""
+
+    def __init__(self, then=None):
+        self.features: list = []           # feature_done events, in order
+        self.stages: list = []             # (name, solids) of every stage made
+        self.running = None                # the feature_start event of the feature being built now
+        self.then = then
+
+    def __call__(self, ev):
+        if isinstance(ev, dict):
+            k = ev.get("kind")
+            if k == "feature_start":
+                self.running = {**ev, "t": time.monotonic()}
+            elif k == "feature_done":
+                self.features.append(ev)
+                self.running = None
+            elif k in ("stage", "stage_made"):
+                self.stages.append((ev.get("feature"), ev.get("solids")))
+        if self.then is not None:
+            self.then(ev)
+
+
+BUILD_TIMEOUT = float(os.environ.get("FORM_BUILD_TIMEOUT") or 180)   # seconds for a new design's build (quiet machine)
+DRAFT_KEEP = 40                     # draft files (the live stages of an attempt) kept; older ones go
+DRAFT_AGE_S = 6 * 3600              # and none older than this
+
+
 class StudioError(Exception):
     def __init__(self, message, hint="", status=400, **extra):
         super().__init__(message)
@@ -114,10 +143,23 @@ class StudioError(Exception):
 
 def _partial_text(info: dict) -> str:
     """One line for a partial revision: what did not build."""
+    pb = info.get("parts") or {}
+    parts = f"{pb.get('built')} of {pb.get('declared')} declared parts built so far" if pb else ""
+    hang = info.get("hang") or {}
+    if hang.get("feature"):
+        s = hang.get("s")
+        took = f" after {float(s):.1f} s" if isinstance(s, (int, float)) else ""
+        what = "crashed the geometry kernel" if hang.get("kind") == "crash" else "did not finish"
+        rest = [x for x in info.get("left_out") or [] if x != hang["feature"]]
+        return f"feature {hang['feature']} {what}{took} and is left out" + \
+            (f" (not tried after it: {', '.join(rest)})" if rest else "") + \
+            (f"; kept {', '.join(info.get('built') or [])}" if info.get("built") else "")
     sk = [x["feature"] for x in info.get("skipped") or []]
     if sk:
         return ("feature " if len(sk) == 1 else "features ") + ", ".join(sk) + " did not build and " + \
-            ("is" if len(sk) == 1 else "are") + " left out"
+            ("is" if len(sk) == 1 else "are") + " left out" + (f"; {parts}" if parts else "")
+    if parts:
+        return parts
     f = info.get("failed")
     return (f"the build stopped at {f}" if f else "the result failed the final check") + \
         (f"; kept {', '.join(info.get('built') or [])}" if info.get("built") else "") + \
@@ -627,14 +669,21 @@ class Studio:
         were built: with partial, a partial source keeping those stages (form/featureprog.py); else the error."""
         from . import featureprog
         on = self._draft_sink(draft, name) if draft else None
+        watch = _BuildWatch(on)                     # what is kept if the kernel hangs or crashes part-way
         extra = {"refs": refs} if refs else {}
-        kw = dict(recipe_id=rid, values=vals, tol=0.1, p=p, timeout=180, **extra, **({"on_progress": on} if on else {}))
+        kw = dict(recipe_id=rid, values=vals, tol=0.1, p=p, timeout=BUILD_TIMEOUT, on_progress=watch,
+                  _progress=True if on else "events", **extra)
         self._tl.last_log = None
-        if not partial:
-            s = self._k("summary", key="pv-" + H(rid, vals), **kw)
-            self._tl.last_log = s.get("build_log")
-            return rid, self._skips(s, False, prev_skipped)
-        r = self._k("try_build", key="pv-" + H(rid, vals), **kw)
+        try:
+            if not partial:
+                s = self._k("summary", key="pv-" + H(rid, vals), **kw)
+                self._tl.last_log = s.get("build_log")
+                return rid, self._skips(s, False, prev_skipped)
+            r = self._k("try_build", key="pv-" + H(rid, vals), **kw)
+        except StudioError as e:
+            if e.extra.get("kind") not in ("timeout", "crash"):
+                raise
+            return self._recover(rid, vals, kw, watch, e)
         if r["ok"]:
             self._tl.last_log = r["summary"].get("build_log")
             return rid, self._skips(r["summary"], True, prev_skipped)
@@ -647,6 +696,7 @@ class Studio:
                                          bool(r.get("valid", True)))
         rid2 = self._load_design(src, "python")
         kw.pop("on_progress", None)                 # its stages were shown as the failed build made them
+        kw.pop("_progress", None)
         self._k("summary", key="pv-" + H(rid2, vals), **{**kw, "recipe_id": rid2})
         diag = err.get("diagnosis") or {}
         info = {"failed": err.get("feature") or "", "built": list(r.get("stages", []))[:keep],
@@ -659,8 +709,12 @@ class Studio:
         return rid2, info
 
     def _skips(self, summary: dict, partial: bool, prev: set | None) -> dict | None:
+        """Partial info for a FeatureDesign that built with features left out, or with fewer parts than it declares
+        (skeleton first: the parts not written yet). A newly skipped feature is refused unless partial; a design
+        that has only built some of its parts is saved, flagged, with release blocked until they are all there."""
         sk = summary.get("skipped") or []
-        if not sk:
+        pb = summary.get("parts_built")
+        if not sk and not pb:
             return None
         new = [x for x in sk if x["feature"] not in (prev or set())]
         if new and not partial:
@@ -668,21 +722,94 @@ class Studio:
             raise StudioError(f"Feature {x['feature']} did not build: {x['message']}", x.get("hint", ""), status=422,
                               kind="recipe", feature=x["feature"], skipped=sk,
                               **({"diagnosis": x["diagnosis"]} if x.get("diagnosis") else {}))
-        return {"skipped": sk, "built": [e["feature"] for e in summary.get("build_log", []) if e["status"] != "skipped"],
-                "failed": sk[0]["feature"], "message": sk[0]["message"], "hint": sk[0].get("hint", ""),
+        info = {"skipped": sk, "built": [e["feature"] for e in summary.get("build_log", []) if e["status"] != "skipped"],
                 "evidence": "computed"}
+        if sk:
+            info.update(failed=sk[0]["feature"], message=sk[0]["message"], hint=sk[0].get("hint", ""))
+            hung = next((x for x in sk if x.get("hung")), None)
+            if hung and hung is sk[0]:
+                info["hang"] = {"feature": hung["feature"], **hung["hung"]}
+        else:
+            info.update(failed="", message=f"{pb['built']} of {pb['declared']} declared parts are built so far.",
+                        hint="Add the other parts as features (add_feature kind=\"code\"); release waits until every "
+                             "declared part is there.")
+        if pb:
+            info["parts"] = pb
+        return info
+
+    def _recover(self, rid: str, vals: dict, kw: dict, watch: "_BuildWatch", err: "StudioError") -> tuple[str, dict]:
+        """The kernel timed out or crashed while building a design: keep what it had built. A FeatureDesign keeps
+        the features finished before the one that hung (they are on disk as checkpoints, so the kept design loads
+        them without building anything); any other design keeps the stages it made (built again up to there). The
+        result is a partial revision naming the feature that hung and the time it ran. Nothing built: the error."""
+        from . import featureprog
+        recipe = self.recipes[rid]
+        hang = dict(err.extra.get("hang") or {})
+        kind = err.extra.get("kind")
+        run = watch.running or {}
+        fid = hang.get("feature") or run.get("feature") or ""
+        secs = hang.get("s")
+        if secs is None and run.get("t") is not None:
+            secs = round(time.monotonic() - run["t"], 1)
+        steps = list(getattr(type(recipe), "_form_steps", None) or [])
+        upto = None
+        if steps:
+            done = [e for e in watch.features if e.get("status") != "skipped"]
+            built = [e["feature"] for e in done]
+            solids = int(done[-1].get("solids") or 1) if done else 1
+            upto = len(watch.features)
+            left = steps[upto:]
+        else:
+            built = [n for n, _k in watch.stages if n]
+            solids = int((watch.stages[-1][1] if watch.stages else 1) or 1)
+            left = []
+        if not built:
+            raise err
+        d = featureprog._timeout_diag(fid or "next", {"s": secs, "budget": hang.get("budget") or run.get("budget"),
+                                                      "kind": "crash" if kind == "crash" else "kill"})
+        if not fid:                                 # a design that is not a FeatureDesign: the stage after the last
+            d["message"] = d["message"].replace("The next feature", f"The stage after {built[-1]}")
+        src = featureprog.partial_source(source_path(self.sources, rid).read_text(encoding="utf-8"), len(built),
+                                         solids, rid, built, fid, True, upto=upto,
+                                         why="crashed the kernel" if kind == "crash" else "did not finish")
+        rid2 = self._load_design(src, "python")
+        kw2 = {k: v for k, v in kw.items() if k not in ("on_progress", "_progress")}
+        try:
+            s = self._k("summary", key="pv-" + H(rid2, vals), **{**kw2, "recipe_id": rid2})
+        except StudioError:
+            raise err
+        self._tl.last_log = s.get("build_log")
+        rows = list(s.get("skipped") or [])
+        if fid:
+            rows.append({"feature": fid, "message": d["message"], "hint": d["hint"], "hung": d["hung"],
+                         "diagnosis": d["diagnosis"]})
+        for f in left[1:]:
+            rows.append({"feature": f, "message": f"Not built yet: the build stopped at {fid}.", "not_tried": True,
+                         "hint": f"Fix {fid} first; {f} builds after it."})
+        info = {"failed": fid, "built": built, "dropped": left[1:], "left_out": left, "skipped": rows,
+                "message": d["message"], "hint": d["hint"], "source": rid, "evidence": "computed", "valid": True,
+                "hang": {"feature": fid, "s": secs, "budget": hang.get("budget") or run.get("budget"),
+                         "kind": kind}, "diagnosis": d["diagnosis"]}
+        if s.get("parts_built"):
+            info["parts"] = s["parts_built"]
+        self.activity(None, "engine", f"Kept {', '.join(built)} after {fid or 'the build'} "
+                      + ("crashed the kernel" if kind == "crash" else "did not finish")
+                      + (f" ({float(secs):.1f} s)" if isinstance(secs, (int, float)) else ""), by="engine")
+        return rid2, info
 
     @staticmethod
     def _kernel_error(i: dict) -> "StudioError":
         return StudioError(i.get("message", "Kernel failure"), i.get("hint", ""), status=422 if i.get("kind") == "recipe" else 500,
                            feature=i.get("feature"), params=i.get("params", []), kind=i.get("kind"),
-                           **({"diagnosis": i["diagnosis"]} if i.get("diagnosis") else {}))
+                           **({"diagnosis": i["diagnosis"]} if i.get("diagnosis") else {}),
+                           **({"hang": i["hang"]} if i.get("hang") else {}))
 
     def _draft_sink(self, draft: str, name: str = ""):
         """on_progress for a build: each stage's mesh goes to .cache/drafts/<draft>.json (the last valid solid of the
         attempt) and is named in the activity log, so the build is visible before it is saved."""
         d = self.root / ".cache" / "drafts"
         f = d / f"{re.sub(r'[^A-Za-z0-9_-]', '', draft)[:64]}.json"
+        self._prune_drafts(d)
 
         def sink(ev):
             if not isinstance(ev, dict) or ev.get("kind") != "stage":
@@ -702,6 +829,21 @@ class Studio:
                           by="engine", draft=draft, stage=ev["feature"], index=ev["index"], at=ev.get("at", ev["index"]),
                           of=ev.get("of", 0), label=ev.get("label", ""), triangles=ev.get("triangles"))
         return sink
+
+    @staticmethod
+    def _prune_drafts(d: Path) -> None:
+        """Drafts are the live stages of one attempt: keep the newest DRAFT_KEEP, none older than DRAFT_AGE_S."""
+        try:
+            files = sorted(d.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)
+        except OSError:
+            return
+        now = time.time()
+        for i, x in enumerate(files):
+            try:
+                if i >= DRAFT_KEEP or now - x.stat().st_mtime > DRAFT_AGE_S:
+                    x.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def draft(self, draft: str) -> dict | None:
         """The last stage built for a draft (see _draft_sink), or None."""

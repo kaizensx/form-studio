@@ -278,6 +278,16 @@ def occt(a, b, op: str, fuzzy: float = 0.0, glue: str = ""):
     return r if r.solids() else Part()
 
 
+def _feature_time_left() -> float | None:
+    """Seconds left in the FeatureDesign feature being built (form/featureprog.py), or None outside one."""
+    import sys
+    fp = sys.modules.get(__package__.rsplit(".", 1)[0] + ".featureprog")
+    try:
+        return fp.time_left() if fp is not None else None
+    except Exception:
+        return None
+
+
 def _plain(a, b, op: str):
     return a + b if op == "fuse" else a - b if op == "cut" else a & b
 
@@ -784,6 +794,9 @@ def run(a, b, op: str, *, min_solids: int = 1, max_solids: int | None = None, br
     op = {"intersect": "common"}.get(op, op)
     what = what or VERBS[op]
     budget = budget_s() if budget is None else float(budget)
+    left = _feature_time_left()
+    if left is not None:                           # inside a FeatureDesign feature: never outlast its budget
+        budget = max(1.0, min(budget, left - 1.0))
     verify = verify or _verify_mode()
     params = list(params or [names[1]])
     t0 = time.perf_counter()
@@ -877,21 +890,25 @@ def run(a, b, op: str, *, min_solids: int = 1, max_solids: int | None = None, br
         _log(rep)
         return r
     t_plain = attempts[-1]["seconds"]
-
-    # pre-flight, measured
-    f = measure(pa, pb, op, seconds=min(8.0, max(1.0, budget - (time.perf_counter() - t0)) / 2))
-    if f.get("_oracle") and "o" not in orc_holder:
-        orc_holder["o"] = f["_oracle"]
-    wrong = any(x.get("wrong") for x in attempts)
-    cls = classify(f, min_solids, lim, bridge, wrong)
-    rep["class"], rep["facts"] = cls, f
-    if cls == "small_gap":
-        try:
-            slack["mm3"] = 2.0 * f["gap_mm"] * min(float(a.area), float(b.area))
-        except Exception:
-            pass
     skipped = []
-    labels = [x[0] for x in _rewrites(cls, f, pa, pb, op, bridge)]
+    if time.perf_counter() - t0 >= budget:         # the plain boolean alone used the bound: no pre-flight, no rewrite
+        cls, f = "slow", {"op": op, "plain_s": round(t_plain, 2), "budget_s": budget}
+        rep["class"], rep["facts"] = cls, f
+        skipped = ["pre-flight", "class rewrites"]
+    else:
+        # pre-flight, measured
+        f = measure(pa, pb, op, seconds=min(8.0, max(1.0, budget - (time.perf_counter() - t0)) / 2))
+        if f.get("_oracle") and "o" not in orc_holder:
+            orc_holder["o"] = f["_oracle"]
+        wrong = any(x.get("wrong") for x in attempts)
+        cls = classify(f, min_solids, lim, bridge, wrong)
+        rep["class"], rep["facts"] = cls, f
+        if cls == "small_gap":
+            try:
+                slack["mm3"] = 2.0 * f["gap_mm"] * min(float(a.area), float(b.area))
+            except Exception:
+                pass
+    labels = [] if cls == "slow" else [x[0] for x in _rewrites(cls, f, pa, pb, op, bridge)]
     for i, label in enumerate(labels):
         spent = time.perf_counter() - t0
         if spent + max(0.2, 0.8 * t_plain) > budget:
@@ -963,6 +980,7 @@ _CLASS_WORDS = {
     "silent_wrong": "a valid-looking wrong result",
     "not_joined": "the kernel did not join overlapping parts",
     "kernel": "the kernel could not complete it",
+    "slow": "the plain boolean alone used the time bound",
 }
 
 
@@ -1028,6 +1046,11 @@ def explain(cls: str, f: dict, names: tuple[str, str], op: str, min_solids: int 
         return ((f"{ov_txt}; " if ov_txt else "") + (wrong or "the kernel returned a valid-looking wrong result"),
                 f"Change the geometry where {na} and {nb} meet (a seam, a tangent or nearly coincident face): move "
                 f"{nb} 0.2 mm or make it cross the surface clearly.")
+    if cls == "slow":
+        return (f"the plain {VERBS[op]} of {nb} and {na} took {f.get('plain_s', 0):.1f} s and failed, which uses the "
+                f"{f.get('budget_s', 0):g} s bound, so no rewrite was tried",
+                f"Make the operands cheaper to intersect: fewer faces (a coarser loft or fewer spline points), or "
+                f"join a pattern's instances into one tool first and {VERBS[op]} it once.")
     if cls == "not_joined":
         return (f"{ov_txt}, so they should join, but the kernel left separate solids",
                 f"Overlap {nb} with {na} more deeply (0.5 mm or more), away from seams and tangent faces.")
