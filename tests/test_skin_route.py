@@ -96,11 +96,14 @@ class HeroHelmet(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         craft.notes()
+        from form import featureprog
         cls.design = exemplars.load("hero_helmet")
         cls.v = cls.design.defaults()
+        featureprog.begin()
         t0 = time.perf_counter()
         cls.stages = cls.design.build(cls.v)
         cls.seconds = time.perf_counter() - t0
+        cls.report = featureprog.report()
         if TIMES:
             with open(TIMES, "w", encoding="utf-8") as f:
                 json.dump({"hero_helmet_build_s": round(cls.seconds, 2)}, f)
@@ -111,11 +114,27 @@ class HeroHelmet(unittest.TestCase):
         self.assertTrue(out.is_valid)
         self.assertEqual(len(out.solids()), self.design.solids)
         self.assertEqual(sorted(craft.named_parts(out)), ["faceplate", "lens_l", "lens_r", "shell"])
-        self.assertLess(self.seconds, 60.0)
+        self.assertLess(self.seconds, 45.0)
+
+    def test_is_a_feature_design_built_skeleton_first(self):
+        from form.featureprog import FeatureDesign
+        self.assertIsInstance(self.design, FeatureDesign)
+        ids = [f.id for f in self.design.features]
+        self.assertEqual(ids[0], "shell")                         # the skeleton: one solid, built first
+        self.assertEqual(len(self.stages[0].shape.solids()), 1)
+        self.assertEqual([s.feature for s in self.stages], ids)  # one stage per @feature, none skipped
+        self.assertEqual(self.report["skipped"], [], self.report)
+
+    def test_lens_magnets_stay_under_the_plate(self):
+        """Measured with rays from outside along each lens pocket's axis: the faceplate keeps well over the 0.6 mm
+        floor in front of every lens magnet (the seat inside it adds 1 mm), so no pocket shows on the outside."""
+        out = craft.named_parts(self.stages[-1].shape)
+        for pr in self.design.magnet_pairs(self.v)[4:]:
+            self.assertGreater(pr.floor(out["faceplate"], "a"), 2.5)
 
     def test_magnet_pairs_are_coaxial(self):
         out = craft.named_parts(self.stages[-1].shape)
-        pairs = self.design._pairs
+        pairs = self.design.magnet_pairs(self.v)
         self.assertEqual(len(pairs), 8)
         for k, pr in enumerate(pairs):
             a, b = ("shell", "faceplate") if k < 4 else ("faceplate", "lens_l" if k < 6 else "lens_r")

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **The hero helmet exemplar, redesigned and built one feature at a time.** It is now a FeatureDesign: the skin is
+  fitted once in setup(), the shell is the skeleton, and each of its eleven features is its own method, so an agent
+  learns the route the design guide teaches. The design is new: rounded pill lenses tilted up in a raised bezel, a
+  smooth faceplate that stands 0.4 mm proud of the shell with a thin frame and one brow ridge, a crest of two stacked
+  bands with pointed ends, raked ear pods, a panel line that runs from the pods round the nape, a longer chin and a
+  lower edge raked up to the nape, and crisper hex panels on the shell only (18 mm tiles, 0.9 mm relief). The two
+  small circles that showed on the faceplate were measured with rays: no pocket broke through (1.9 mm of plate was
+  left), but the pocket floors sat within the renderer's edge tolerance. The lens magnets now sit in a 1 mm seat
+  inside the faceplate, so 3.3 mm or more of plate covers each one, and a raised tab covers the lower faceplate
+  magnets. Every magnet pair stays coaxial with its 0.6 mm floors measured, and the four parts keep their measured
+  clearance. It builds in about 25 s.
 - **Watch the design being built.** While an agent creates or rewrites a design in a conversation, the 3D view draws
   each stage the moment the kernel has built it, before anything is saved. Each new stage grows in over the one before
   with the same fade and rise as a new revision, and a quiet caption says what is being built: "Building Bore (2 of
