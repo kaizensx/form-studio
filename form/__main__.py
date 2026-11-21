@@ -462,6 +462,8 @@ def main(argv=None):
     rc.add_argument("--tolerance", type=float, default=0.02, help="largest deviation from the mesh for a fitted surface, mm")
     rc.add_argument("--layer", type=int, choices=(0, 1, 2), default=2,
                     help="0: exact solid only, 1: analytic and B-spline faces (beta), 2: feature tree recipe (beta)")
+    rc.add_argument("--budget", type=float, default=240.0,
+                    help="seconds the reconstruction may take in all; the best result found in that time is kept")
     ar = sub.add_parser("analyze-reference", help="an imported mesh read like an engineer: sections with dimensions, features "
                                                   "with sizes, symmetry, walls: analyze-reference <project> <mesh> [--levels JSON]")
     ar.add_argument("project")
@@ -552,7 +554,8 @@ def main(argv=None):
                 _print(multipart.reconstruct_parts(st, [Path(a.file), *map(Path, a.more)], name=a.name,
                                                    tolerance=a.tolerance, layer=a.layer, on_progress=show))
             else:
-                _print(st.reconstruct(Path(a.file), name=a.name, tolerance=a.tolerance, layer=a.layer, on_progress=show))
+                _print(st.reconstruct(Path(a.file), name=a.name, tolerance=a.tolerance, layer=a.layer,
+                                      budget_s=a.budget, on_progress=show))
         elif a.cmd in ("analyze-reference", "analyze-assembly", "compare-reference"):
             from .remodel import project as rp
             p = st.load(a.project)

@@ -137,6 +137,9 @@ def candidate(V, F, tol, name="part", limit=None, deadline=None, generate=None, 
             "refs": {}, "params": pool.params}
 
 
+CANDIDATE = candidate          # the real one: a test that replaces `candidate` is run in its own process
+
+
 def describe() -> dict:
     """What the installer shows before anything is downloaded."""
     return {"name": NAME, "model": f"https://huggingface.co/{REPO}", "licence": LICENCE, "licence_url": LICENCE_URL,

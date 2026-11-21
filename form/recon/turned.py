@@ -32,9 +32,17 @@ def _circle(P):
 
 
 def _radius(P, c, tol):
+    """The radius of the closed polygon P about c, or None when P is not a circle there: its corners must lie on
+    the circle within tol and the middles of its sides within 8 tol (a faceted circle's sides sag by its chord
+    error; a square's corners lie on a circle too, but the middles of its sides are far inside it)."""
+    if len(P) < 8:
+        return None
     rr = np.linalg.norm(P - c, axis=1)
     m = float(rr.mean())
-    return m if float(np.abs(rr - m).max()) <= tol else None
+    if float(np.abs(rr - m).max()) > tol:
+        return None
+    mid = (P + np.roll(P, -1, axis=0)) / 2
+    return m if float(np.abs(np.linalg.norm(mid - c, axis=1) - m).max()) <= 8 * tol else None
 
 
 def _simplify(P, eps):
