@@ -76,7 +76,7 @@ Rules:
 
 ## Tools at a glance
 
-91 tools. Read-only tools never change a project.
+93 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -134,6 +134,8 @@ Rules:
 | [`analyze_reference`](#analyze_reference) | read-only | Read an imported mesh (STL, OBJ, 3MF) like an engineer before modelling it again as clean CAD (design_guide topic "reference_parts"). |
 | [`analyze_assembly`](#analyze_assembly) | read-only | How several imported meshes go together and move, measured in the positions they were given. |
 | [`compare_to_reference`](#compare_to_reference) | read-only | Compare the design (or one part of its assembly) with an imported mesh, to iterate a remodel until it is within tolerance (default 0.1 mm for a remodel; say which you used). |
+| [`reference_residual`](#reference_residual) | read-only | What is left to build in a remodel: the volume difference between the design (or one part) and an imported mesh as a named work list. |
+| [`fit_params`](#fit_params) | changes | Tune the design's declared Params so it lies closer to an imported mesh: bounded least squares over those Params only (each inside its own min and max and at most max_change mm from its value), every evaluation a real build. |
 | [`freecad_macro`](#freecad_macro) | read-only | Write a FreeCAD macro (.FCMacro) next to the current STEP export. |
 | [`analyze`](#analyze) | read-only | An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics. |
 | [`measure`](#measure) | read-only | Measure the part. Points are [x, y, z] in millimetres in the design frame. |
@@ -1067,6 +1069,53 @@ Evidence: computed on the design's tessellation against the mesh.
 | `part` | string \| null |  |
 | `tolerance` | number |  |
 | `rev` | integer \| null |  |
+
+### `reference_residual`
+
+*Read-only.*
+
+What is left to build in a remodel: the volume difference between the design (or one part) and an imported
+mesh as a named work list. missing: bodies the mesh has and the design lacks (add them); extra: bodies the
+design has and the mesh lacks (cut them). Each body has its volume, centre, principal axis, size, shape
+(cylinder with diameter and length along an axis, box, or body), where it is in words, and its angle and
+radius about an axis, so bodies around a circle read as one polar pattern at equal angles. patterns groups
+alike bodies (polar: count, pitch, radius, start angle; linear: pitch and direction; grid: pitches).
+work_list: one line per feature to build, patterns first. residual_pct: missing plus extra volume as a share
+of the mesh's volume, the number to drive down. axis: "x", "y", "z" (default) or a direction; center: a point
+on it (default the mesh's centre of volume). voxel (mm): grid size (default about 1/240 of the part).
+Build one item, run this again, keep the change only if residual_pct drops (design_guide topic
+"reference_parts"). Evidence: computed (voxels; manifold3d's exact boolean for volumes when installed).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `reference` | string | yes |
+| `part` | string \| null |  |
+| `rev` | integer \| null |  |
+| `voxel` | number \| null |  |
+| `axis` | string \| array \| null |  |
+| `center` | array \| null |  |
+
+### `fit_params`
+
+Tune the design's declared Params so it lies closer to an imported mesh: bounded least squares over those
+Params only (each inside its own min and max and at most max_change mm from its value), every evaluation a
+real build. params: which (default every Param in mm, at most 8). The result is kept, as a new revision with
+provenance "mesh", only if the mean distance drops and the largest does not grow; otherwise nothing changes
+(kept: false), so it never makes the deviation worse. commit=false reports the fitted values without saving.
+It cannot add a missing feature: use reference_residual for what is missing or extra, then this for sizes,
+then compare_to_reference for the tolerance. Evidence: computed on the design's tessellation.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `reference` | string | yes |
+| `params` | array \| null |  |
+| `part` | string \| null |  |
+| `max_change` | number |  |
+| `commit` | boolean |  |
+| `expect_head` | integer \| null |  |
+| `max_builds` | integer |  |
 
 ### `freecad_macro`
 

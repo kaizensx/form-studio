@@ -36,7 +36,7 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Slicer adapters | `form/adapters/`, `form/printers.py`, `form/plates.py` | Find the slicer and every printer set up in it, resolve presets, lay parts out on one or more plates, slice, parse the G-code |
 | Print simulation | `form/toolpath.py`, `form/simulate.py` | Per-layer toolpaths by line type, timed by the slicer's estimate |
 | Agents | `form/agents/`, `form/chat.py`, `form/ask.py` | Run an agent CLI, or talk to a model API, a local model or a provider added by URL with Form Studio's tools (`form/agents/mcp_client.py`); questions and measurements the agent asks wait for the person's answer |
-| MCP server | `form/mcp_server.py` | 91 tools over stdio |
+| MCP server | `form/mcp_server.py` | 93 tools over stdio |
 | CLI | `form/__main__.py` | Every capability as a JSON-printing command |
 | Archives | `form/bundle.py` | `.formstudio` files: a project, its conversations and the code it was built from, checked before anything is written |
 | Installer | `form/installer.py`, `form/setup.py` | Finds and installs slicers, agents and libraries, with consent; hands-free on first start |

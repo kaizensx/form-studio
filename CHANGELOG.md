@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **The residual loop for remodels.** Two new MCP tools (93 in all) for rebuilding a mesh as clean CAD.
+  `reference_residual` lists what is left between the design and the mesh as named bodies: missing material to add,
+  extra material to cut, each with its volume, centre, axis, size and shape. Alike bodies are grouped as one pattern:
+  bolt holes around a circle read as a polar pattern at equal angles, holes on a row or a grid read with their pitch.
+  `fit_params` tunes only the Params the design declares, inside their limits, by bounded least squares, with every
+  evaluation a real build. It keeps the result only if the design gets closer to the mesh, so it never makes the
+  deviation worse. The `reference_parts` guide now teaches the loop: build one feature, check the residual, keep the
+  change only if it drops, stop after three stalled steps, and deliver the revision with the smallest residual.
+  Measured on a scripted remodel of a six-hole flange (tests/test_remodel_residual.py): 0.1 mm was reached in 6 MCP
+  calls with the residual tools (final Hausdorff 0.0099 mm), against 18 calls with compare_to_reference alone
+  (0.0142 mm). The residual idea (a work list of missing and extra bodies, angles about an axis, pick-best and the
+  stall rule) comes from kulibinai/cadmageddon (MIT); this is an independent implementation.
+
 - **Watch the design being built.** While an agent creates or rewrites a design in a conversation, the 3D view draws
   each stage the moment the kernel has built it, before anything is saved. Each new stage grows in over the one before
   with the same fade and rise as a new revision, and a quiet caption says what is being built: "Building Bore (2 of

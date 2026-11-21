@@ -1477,6 +1477,49 @@ def build() -> MCPServer:
         return [Image(path=out["image"]), json.dumps(out, default=str, ensure_ascii=False)]
 
     @mcp.tool(annotations=RO)
+    async def reference_residual(project: str, reference: str, part: str | None = None, rev: int | None = None,
+                                 voxel: float | None = None, axis: str | list[float] | None = None,
+                                 center: list[float] | None = None, ctx: Context = None) -> dict:
+        """What is left to build in a remodel: the volume difference between the design (or one part) and an imported
+        mesh as a named work list. missing: bodies the mesh has and the design lacks (add them); extra: bodies the
+        design has and the mesh lacks (cut them). Each body has its volume, centre, principal axis, size, shape
+        (cylinder with diameter and length along an axis, box, or body), where it is in words, and its angle and
+        radius about an axis, so bodies around a circle read as one polar pattern at equal angles. patterns groups
+        alike bodies (polar: count, pitch, radius, start angle; linear: pitch and direction; grid: pitches).
+        work_list: one line per feature to build, patterns first. residual_pct: missing plus extra volume as a share
+        of the mesh's volume, the number to drive down. axis: "x", "y", "z" (default) or a direction; center: a point
+        on it (default the mesh's centre of volume). voxel (mm): grid size (default about 1/240 of the part).
+        Build one item, run this again, keep the change only if residual_pct drops (design_guide topic
+        "reference_parts"). Evidence: computed (voxels; manifold3d's exact boolean for volumes when installed)."""
+        st = studio()
+        from .remodel import residual as rr
+        out = await _run(lambda: rr.reference_residual(st, st.load(project), reference, part, rev, voxel, axis, center))
+        act(project, "look", f"Listing what is left between the design and {out['reference']}", ctx)
+        return out
+
+    @mcp.tool(annotations=RW)
+    async def fit_params(project: str, reference: str, params: list[str] | None = None, part: str | None = None,
+                         max_change: float = 2.0, commit: bool = True, expect_head: int | None = None,
+                         max_builds: int = 60, ctx: Context = None) -> dict:
+        """Tune the design's declared Params so it lies closer to an imported mesh: bounded least squares over those
+        Params only (each inside its own min and max and at most max_change mm from its value), every evaluation a
+        real build. params: which (default every Param in mm, at most 8). The result is kept, as a new revision with
+        provenance "mesh", only if the mean distance drops and the largest does not grow; otherwise nothing changes
+        (kept: false), so it never makes the deviation worse. commit=false reports the fitted values without saving.
+        It cannot add a missing feature: use reference_residual for what is missing or extra, then this for sizes,
+        then compare_to_reference for the tolerance. Evidence: computed on the design's tessellation."""
+        st = studio()
+        from .remodel import fitparams as fp
+        if not (1 <= int(max_builds) <= 200):
+            raise ToolError("max_builds: between 1 and 200.")
+        out = await _run(lambda: fp.fit_design(st, st.load(project), reference, params, part, max_change, commit,
+                                               expect_head, int(max_builds)))
+        act(project, "commit" if out.get("committed") else "look",
+            f"Fitted {', '.join(out['params'])} to {out['reference']}" if out.get("committed")
+            else f"Fitting the Params to {out['reference']}: no gain, nothing changed", ctx)
+        return out
+
+    @mcp.tool(annotations=RO)
     async def freecad_macro(project: str) -> dict:
         """Write a FreeCAD macro (.FCMacro) next to the current STEP export. Run it in FreeCAD to rebuild the part
         from the STEP (hash-checked) with a spreadsheet of FORM's parameters and their provenance. Not for mesh designs."""
