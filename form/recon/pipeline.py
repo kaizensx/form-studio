@@ -45,6 +45,7 @@ PROGRAM_SHARE = 0.25       # of the budget the program route may use; the layers
 LEARNED = True             # ask the optional learned engine (learned/) for a candidate when it is installed
 PROGRAM_SLACK = 25.0       # seconds the program route may run past its share before it is stopped (bounded.py)
 LAYER1_SHARE = 0.55        # of the time left after Layer 0 that Layer 1 may use; Layer 2 has the rest
+LEARNED_SHARE = 0.3        # of the time left that the optional learned engine may use
 FINISH_S = 15.0            # seconds kept back for writing the result (STEP, deviation map, dimension check)
 
 
@@ -133,16 +134,18 @@ def reconstruct(path, out_dir, name: str | None = None, tolerance: float = 0.02,
     slices it reads, <name>_kept*.step). Returns the report."""
     beat = Heartbeat(progress)
     try:
-        return _reconstruct(path, out_dir, name, tolerance, layer, budget_s, beat.say if progress else None, fill_holes)
+        with bounded.session():                         # one warm helper for the bounded steps, started now
+            return _reconstruct(path, out_dir, name, tolerance, layer, budget_s, beat.say if progress else None,
+                                fill_holes)
     finally:
         beat.stop()
 
 
 def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill_holes) -> dict:
-    from . import solid, tree
-    tree._broken[0] = 0.0                               # a crash on an earlier part says nothing about this one
+    from . import solid
     t0 = time.perf_counter()
     hard = t0 + float(budget_s)                         # nothing runs past this: the steps that can are bounded
+    fin = min(FINISH_S, 0.15 * float(budget_s))         # kept back for writing the result
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     path = Path(path)
@@ -172,13 +175,24 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
             got = {"status": "unbounded", "value": _program(V, F, tol, name, out, say, t0, budget_s)}
         else:
             got = bounded.run(_program_child, (V, F, tol, name, out, t0, budget_s),
-                              timeout_s=min(PROGRAM_SHARE * float(budget_s) + PROGRAM_SLACK, _left(hard)),
+                              timeout_s=min(PROGRAM_SHARE * float(budget_s) + PROGRAM_SLACK,
+                                            _left(hard, fin) - _layer0_estimate(len(F))),
                               progress=lambda d: say({**d, "fraction": 0.02 + 0.6 * d.get("fraction", 0)}))
         prog = got.get("value") if got["status"] in ("ok", "unbounded") else None
         if prog is None:
             prog = {"report": {"method": "sketches and extrusions", "error": f"The program route {got.get('error')}"}}
             _cut(rep, "the program route (sketches and extrusions)", got)
-        lc = _learned(V, F, tol, name, say) if LEARNED and _left(hard) > 0 else None
+        lc = None
+        if LEARNED and _left(hard, fin) > 0 and _learned_installed():
+            from . import learned as _lm
+            if _lm.candidate is not _lm.CANDIDATE:      # replaced in this process (a test): run it here
+                got_l = {"status": "unbounded", "value": _learned(V, F, tol, name, say)}
+            else:
+                got_l = bounded.run(_learned_child, (V, F, tol, name), timeout_s=LEARNED_SHARE * _left(hard, fin),
+                                    progress=say)
+            lc = got_l.get("value") if got_l["status"] in ("ok", "unbounded") else None
+            if got_l["status"] not in ("ok", "unbounded"):
+                _cut(rep, "the learned engine", got_l)
         if lc is not None:
             rep["learned"] = {"status": "installed", **{k: lc["report"].get(k) for k in (
                 "engine", "licence", "verified", "hausdorff_mm", "params", "model_seconds", "seconds", "error")
@@ -203,7 +217,14 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     # Layer 0
     say({"stage": "layer0", "text": "Building the exact solid", "fraction": 0.02})
     P0 = T0 = c0 = None
-    sh0, i0 = solid.layer0(V, F, progress=lambda d: say({**d, "fraction": 0.02 + 0.25 * d.get("fraction", 0)}))
+    # Layer 0 is the fallback of every result: it may use all the time there is
+    run0 = bounded.run(_layer0_child, (V, F), timeout_s=hard - 1.0 - time.perf_counter(),
+                       progress=lambda d: say({**d, "fraction": 0.02 + 0.25 * d.get("fraction", 0)}))
+    if run0["status"] in ("ok", "unbounded"):
+        sh0, i0 = run0["value"]
+    else:
+        sh0, i0 = None, {"error": run0.get("error")}
+        _cut(rep, "Layer 0 (the mesh as an exact solid)", run0)
     L0 = {"built": bool(i0.get("solid")), **{k: i0[k] for k in ("valid", "faces", "solids", "volume_mm3", "seconds") if k in i0}}
     if i0.get("solid"):
         P0, T0 = solid.tessellate(sh0, max(tol / 10, 1e-4))
@@ -212,7 +233,8 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         _step(sh0, out / f"{name}_layer0.step")
         L0["step"] = f"{name}_layer0.step"
     else:
-        L0["error"] = f"Sewing left {i0.get('free_edges', 0)} free edges; the triangles do not close into a solid."
+        L0["error"] = (f"Layer 0 {i0['error']}." if i0.get("error") else
+                       f"Sewing left {i0.get('free_edges', 0)} free edges; the triangles do not close into a solid.")
     rep["layers"]["0"] = L0
     best = ("0", sh0, P0, T0, c0, None) if L0.get("valid") else None
 
@@ -228,7 +250,7 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     regions = l1shape = None
     if layer >= 1 and best is not None and not (gear and gear.get("verified")):
         say({"stage": "layer1", "text": "Finding planes, cylinders, cones, spheres and tori", "fraction": 0.3})
-        lim = LAYER1_SHARE * _left(hard)
+        lim = LAYER1_SHARE * _left(hard, fin)
         run1 = bounded.run(_layer1, (V, F, tol), {"budget_s": max(5.0, 0.4 * lim)}, timeout_s=lim,
                            progress=lambda d: say({**d, "fraction": 0.3 + 0.4 * d.get("fraction", 0)}))
         if run1["status"] in ("ok", "unbounded"):
@@ -256,7 +278,7 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         best = ("2", gear["shape"], gear["P"], gear["T"], gear["cmp"], None)
     elif layer >= 2 and regions is not None:
         say({"stage": "layer2", "text": "Looking for features: base, holes, fillets, chamfers, patterns", "fraction": 0.72})
-        lim = _left(hard)
+        lim = _left(hard, fin)
         run2 = bounded.run(layer2, (V, F, regions, l1shape, tol, name, out, rep["layers"]["1"]),
                            {"deadline": time.perf_counter() + 0.85 * lim}, timeout_s=lim,
                            progress=lambda d: say({**d, "fraction": 0.72 + 0.25 * d.get("fraction", 0)}))
@@ -321,15 +343,37 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     return _finish(rep, out, name, t0)
 
 
-def _left(hard) -> float:
-    """Seconds left before the budget's end, less what writing the result takes."""
-    return hard - FINISH_S - time.perf_counter()
+def _left(hard, fin=FINISH_S) -> float:
+    """Seconds left before the budget's end, less what writing the result takes (fin)."""
+    return hard - fin - time.perf_counter()
 
 
 def _cut(rep, what, run):
     """Note a step that the budget (or a crash) cut short: the result is the best found without it."""
     rep.setdefault("cut_short", []).append({"step": what, "status": run["status"], "seconds": run.get("seconds"),
                                             "why": run.get("error")})
+
+
+def _learned_installed() -> bool:
+    try:
+        from . import learned
+        return bool(learned.status()["installed"])
+    except Exception:                                   # noqa: BLE001
+        return False
+
+
+def _layer0_estimate(n_tris: int) -> float:
+    """Seconds Layer 0 takes for this many triangles, about (measured: 2.3 s for 9,480 in the helper)."""
+    return 2.0 + n_tris / 4000.0
+
+
+def _layer0_child(V, F, progress=None):
+    from . import solid
+    return solid.layer0(V, F, progress=progress)
+
+
+def _learned_child(V, F, tol, name, progress=None):
+    return _learned(V, F, tol, name, progress or (lambda d: None))
 
 
 def _program_child(V, F, tol, name, out, t0, budget_s, progress=None):

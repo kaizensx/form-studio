@@ -93,6 +93,45 @@ async def mcp_steps(exe: Path, env: dict) -> None:
 PID = "phone-stand"              # the design main() makes from the device_stand recipe
 
 
+def ring_stl(path: Path, r_out: float = 20.0, r_in: float = 6.0, h: float = 12.0, n: int = 96) -> None:
+    """An ASCII STL of a faceted ring (a flange blank): n sides outside, n inside, flat ends. No libraries needed."""
+    import math
+    def p(r, k, z):
+        a = 2 * math.pi * k / n
+        return (r * math.cos(a), r * math.sin(a), z)
+    tris = []
+    for k in range(n):
+        o0, o1, i0, i1 = p(r_out, k, 0), p(r_out, k + 1, 0), p(r_in, k, 0), p(r_in, k + 1, 0)
+        O0, O1, I0, I1 = p(r_out, k, h), p(r_out, k + 1, h), p(r_in, k, h), p(r_in, k + 1, h)
+        tris += [(o0, o1, O1), (o0, O1, O0), (i1, i0, I0), (i1, I0, I1),        # outer and inner walls
+                 (O0, O1, I1), (O0, I1, I0), (o1, o0, i0), (o1, i0, i1)]        # top and bottom
+    lines = ["solid ring"]
+    for t in tris:
+        lines += ["facet normal 0 0 0", "outer loop", *[f"vertex {x:.6f} {y:.6f} {z:.6f}" for x, y, z in t],
+                  "endloop", "endfacet"]
+    path.write_text("\n".join(lines + ["endsolid ring"]) + "\n", encoding="ascii")
+
+
+def recon_step(exe: Path, env: dict, tmp: Path, budget: float = 30.0) -> None:
+    """Mesh to CAD keeps its time budget in the packaged app too (its bounded steps run in spawned helpers)."""
+    stl = tmp / "ring.stl"
+    ring_stl(stl)
+    t = time.time()
+    r = cli(exe, env, "reconstruct", str(stl), "--name", "Ring", "--budget", f"{budget:g}", timeout=int(budget) + 300)
+    took = time.time() - t
+    try:
+        summ = json.loads(r.stdout or "{}").get("summary") or {}
+    except json.JSONDecodeError:
+        summ = {}
+    secs = summ.get("seconds")
+    ok = r.returncode == 0 and secs is not None and float(secs) <= budget + 1.0
+    detail = (f"{secs} s of a {budget:g} s budget ({took:.0f} s with app start), layer {summ.get('layer')}, "
+              f"editable {summ.get('editable_pct')}%" + (f", cut short: {', '.join(summ['cut_short'])}"
+                                                          if summ.get("cut_short") else "")) if secs is not None \
+        else r.stderr.strip()[-160:]
+    step("mesh to CAD within its time budget", "PASS" if ok else "FAIL", detail)
+
+
 def main(argv: list[str]) -> int:
     if not argv:
         print(__doc__)
@@ -127,6 +166,8 @@ def main(argv: list[str]) -> int:
         step("print simulation picture", "PASS" if png.exists() else "FAIL", r.stderr.strip()[-160:])
     else:
         step("slice with the installed slicer", "SKIP", "no slicer found or not configured")
+
+    recon_step(exe, env, tmp)
 
     try:
         asyncio.run(mcp_steps(exe, env))

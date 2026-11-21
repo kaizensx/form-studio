@@ -88,6 +88,8 @@ def summary(rep: dict) -> dict:
            "parametric_area_pct": res.get("parametric_area_pct"), "freeform_area_pct": res.get("freeform_area_pct"),
            "frozen_area_pct": res.get("frozen_area_pct"), "driven_by_params_pct": res.get("driven_by_params_pct"),
            "recipe_verified": res.get("recipe_verified"), "repairs": rep.get("repairs", []), "seconds": rep.get("seconds"),
+           "budget_s": rep.get("budget_s"), "brep_pct": res.get("brep_pct"),
+           **({"cut_short": res["cut_short"], "note": res.get("note")} if res.get("cut_short") else {}),
            "evidence": "computed"}
     if "1" in L:
         out["layer1"] = {k: L["1"].get(k) for k in ("parametric_area_pct", "freeform_area_pct", "hausdorff_mm", "by_kind", "error",

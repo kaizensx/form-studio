@@ -73,6 +73,11 @@
   it). The result is the best found in time, and the report lists what was cut short (`cut_short`, and a note on
   the result). The filleted block now comes back in 163 s instead of 820 s. The sketches route also skips the other
   directions when less time is left than the main direction alone took.
+- **The time budget holds in the packaged app too.** The bounded steps now run in one warm helper process started
+  the way the CAD kernel worker is (a multiprocessing spawn process, which the packaged app supports), never a fork.
+  Layer 0 and the optional learned engine are bounded as well, Layer 0 always keeps enough time to give the exact
+  copy, and `form reconstruct --budget SECONDS` sets the budget. A box with four holes no longer tries to be a
+  turned part (its corners lie on one circle, the middles of its sides do not), which had cost it about 10 s.
 - **Small rounds can grow.** A corner radius Param may now grow by at least 0.5 mm (it was 30%), so a 1 mm fillet
   on a turned shaft is a dimension you can change; whether it fits its corner is what the build checks.
 - **Mesh to CAD has critics beyond the distance to the mesh.** New gates (`form/recon/gates.py`) compare a
