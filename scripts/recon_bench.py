@@ -1,18 +1,28 @@
-"""Mesh to editable CAD, measured: editable share, deviation and time per part, before and after the program route.
+"""Mesh to editable CAD, measured per part class: two numbers, always apart.
 
-    .venv/bin/python scripts/recon_bench.py                       # the synthetic fixtures -> docs/RECON_BENCH.md
-    .venv/bin/python scripts/recon_bench.py --mesh a.stl b.stl --out /tmp/bench.md   # your own meshes, elsewhere
+    .venv/bin/python scripts/recon_bench.py                       # the part classes -> docs/RECON_BENCH.md
+    .venv/bin/python scripts/recon_bench.py --classes flange      # one class
+    .venv/bin/python scripts/recon_bench.py --mesh a.stl --out /tmp/bench.md   # your own meshes, elsewhere
 
-For each part the pipeline runs twice in this process: with the program route (sketches and extrusions read off the
-mesh, form/recon/program.py) and without it (the Layer 1 surfaces and feature tree only, what came before). For a
-program recipe every Param is swept over its range: does it change the solid, and does the part still build. Every
-number is computed by comparing with the mesh. Meshes passed with --mesh are never written into docs/ unless --out
-says so: keep private parts out of the repository.
+For every part:
+
+- **B-rep**: the share of the result's surface that is real CAD faces (planes, cylinders, cones, spheres, tori,
+  B-spline patches, or the faces a feature makes) rather than a facet-for-facet copy of the mesh, counted only when
+  the result is within the tolerance asked for (`result.brep_pct`).
+- **Editable**: the share of the result's Params that are real dimensions (lengths, diameters, radii, angles, levels,
+  pitches) and move 0.5 mm with the part still building (`result.editable_pct`, form/recon/program.py
+  movable_dimensions). The surface share the features make is shown beside it.
+
+Each part runs without the optional learned engine (form/recon/learned, CAD-Recode) and, when it is installed, with it.
+It is never downloaded by this script. The parts are synthetic build123d parts (tests/recon_fixtures.py) exported as
+STL. Meshes passed with --mesh are never written into docs/ unless --out says so: keep private parts out of the
+repository. Every number is computed against the mesh.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import statistics
 import sys
 import tempfile
 import time
@@ -22,15 +32,22 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 
-FIXTURES = {"box_with_holes": 0.02, "stepped_bracket": 0.02, "filleted_bracket": 0.02, "turned_part": 0.02,
-            "flanged_shaft": 0.02, "gear": 0.05, "organic_blob": 0.02, "wallet_plate": 0.02}
+CLASSES = {
+    "bracket": ["filleted_bracket", "stepped_bracket"],
+    "flange": ["bolt_flange"],
+    "turned shaft": ["turned_shaft", "flanged_shaft"],
+    "enclosure with holes": ["enclosure_with_holes"],
+    "filleted block": ["filleted_block"],
+}
+TOL = {"gear": 0.05}
 
 
-def run(path: Path, tol: float, program_route: bool, out: Path, budget: float) -> dict:
+def run(path: Path, tol: float, learned: bool, out: Path, budget: float, program_route: bool = True) -> dict:
     from form.recon import pipeline
-    keep = pipeline._program
+    keep_prog, keep_learned = pipeline._program, getattr(pipeline, "LEARNED", False)
     if not program_route:
         pipeline._program = lambda *a, **k: {"report": {"method": "sketches and extrusions", "error": "off for the bench"}}
+    pipeline.LEARNED = bool(learned)
     gaps, last = [], [time.perf_counter()]
 
     def prog(_d):
@@ -41,70 +58,104 @@ def run(path: Path, tol: float, program_route: bool, out: Path, budget: float) -
     try:
         rep = pipeline.reconstruct(path, out, path.stem, tol, 2, budget_s=budget, progress=prog)
     finally:
-        pipeline._program = keep
+        pipeline._program, pipeline.LEARNED = keep_prog, keep_learned
     gaps.append(time.perf_counter() - last[0])
     res = rep.get("result") or {}
     L2 = rep.get("layers", {}).get("2", {}) or {}
-    return {"seconds": round(time.perf_counter() - t, 1), "layer": res.get("layer"), "method": L2.get("method"),
-            "editable_pct": res.get("editable_pct"), "hausdorff_mm": res.get("hausdorff_mm"),
-            "within": res.get("within_tolerance"), "params": res.get("params") or (len(L2["params"]) if isinstance(L2.get("params"), list) else L2.get("params")),
+    dims = res.get("dimensions") or {}
+    return {"seconds": round(time.perf_counter() - t, 1), "layer": res.get("layer"),
+            "method": res.get("method") or L2.get("method"),
+            "brep_pct": res.get("brep_pct", brep_share(res)), "editable_pct": res.get("editable_pct"),
+            "feature_area_pct": res.get("feature_area_pct"),
+            "params": dims.get("params"), "movable": dims.get("movable"),
+            "hausdorff_mm": res.get("hausdorff_mm"), "within": res.get("within_tolerance"),
             "triangles": rep.get("input", {}).get("triangles") or rep.get("input", {}).get("weld", {}).get("triangles"),
             "max_progress_gap_s": round(max(gaps), 2), "error": rep.get("error") or L2.get("error"),
-            "recipe": (out / res["recipe"]) if res.get("recipe") else None,
-            "refs": {r: str(out / r) for r in res.get("recipe_references") or []}}
+            "learned": (rep.get("learned") or {}).get("status")}
 
 
-def swept(r: dict, budget: float) -> dict | None:
-    if not r.get("recipe") or r.get("method") != "sketches and extrusions":
-        return None
-    from form.recon import program
-    rows = program.sweep(Path(r["recipe"]).read_text(), r["refs"], deadline=time.perf_counter() + budget)
-    if not rows:
-        return None
-    good = [x for x in rows if x["changes"] and x["rebuilds_pct"] >= 80]
-    return {"params": len(rows), "change_and_rebuild_80": len(good),
-            "changes": sum(1 for x in rows if x["changes"]),
-            "rebuild_median_pct": sorted(x["rebuilds_pct"] for x in rows)[len(rows) // 2]}
+def isolated(path: Path, tol: float, learned: bool, out: Path, budget: float) -> dict:
+    """run() in its own process: a part that crashes the CAD kernel (a segmentation fault in OpenCascade) is
+    reported as crashed instead of ending the bench."""
+    import subprocess
+    args = json.dumps({"path": str(path), "tol": tol, "learned": learned, "out": str(out), "budget": budget})
+    t = time.perf_counter()
+    limit = max(600.0, 4 * budget)
+    try:
+        p = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--one", args], capture_output=True,
+                           text=True, timeout=limit)
+    except subprocess.TimeoutExpired:
+        p = None
+    for line in reversed(p.stdout.splitlines() if p else []):
+        if line.startswith("{"):
+            return json.loads(line)
+    why = f"did not finish in {limit:g} s" if p is None else f"crashed (exit code {p.returncode})"
+    return {"seconds": round(time.perf_counter() - t, 1), "layer": None, "method": None, "brep_pct": 0.0,
+            "editable_pct": 0.0, "feature_area_pct": None, "params": None, "movable": None, "hausdorff_mm": None,
+            "within": False, "triangles": None, "max_progress_gap_s": 0.0, "learned": None,
+            "error": f"the reconstruction {why}", "crashed": True}
+
+
+def brep_share(res: dict) -> float:
+    """B-rep share for a report written before `brep_pct` existed: the same rule (pipeline._headline)."""
+    if not res or not res.get("within_tolerance"):
+        return 0.0
+    return round(max(0.0, 100.0 - float(res.get("frozen_area_pct") or 0.0)), 2)
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--fixtures", nargs="*", default=None, help="fixture names (default: all)")
+    ap.add_argument("--classes", nargs="*", default=None, help=f"part classes (default: all): {', '.join(CLASSES)}")
+    ap.add_argument("--fixtures", nargs="*", default=None, help="fixture names instead of classes")
     ap.add_argument("--mesh", nargs="*", default=[], help="extra meshes (kept out of docs/ unless --out says so)")
     ap.add_argument("--tol", type=float, default=None, help="tolerance for --mesh parts (default 0.05)")
-    ap.add_argument("--out", default=None, help="Markdown report (default docs/RECON_BENCH.md for fixtures only)")
+    ap.add_argument("--out", default=None, help="Markdown report (default docs/RECON_BENCH.md for the classes)")
+    ap.add_argument("--json", default=None, help="also write the rows as JSON here")
     ap.add_argument("--budget", type=float, default=240.0)
-    ap.add_argument("--sweep-s", type=float, default=60.0, help="time for the Param sweep per part")
-    ap.add_argument("--no-before", action="store_true", help="skip the run without the program route")
+    ap.add_argument("--label", default="", help="a note on the run (shown in the report)")
+    ap.add_argument("--one", default=None, help=argparse.SUPPRESS)          # internal: one part, in its own process
     a = ap.parse_args(argv)
+    if a.one:
+        o = json.loads(a.one)
+        print(json.dumps(run(Path(o["path"]), o["tol"], o["learned"], Path(o["out"]), o["budget"]), default=str))
+        return
     import recon_fixtures as fx
+    try:
+        from form.recon import learned
+        status = learned.status()
+    except ImportError:                                 # a checkout from before the learned engine existed
+        status = {"installed": False}
     work = Path(tempfile.mkdtemp(prefix="recon-bench-"))
+    if a.fixtures is not None:
+        todo = [("fixtures", n) for n in a.fixtures]
+    else:
+        todo = [(c, n) for c in (a.classes or list(CLASSES)) for n in CLASSES.get(c, [])]
     parts = []
-    names = list(FIXTURES) if a.fixtures is None else a.fixtures
-    for n in names:
+    for c, n in todo:
         if n not in fx.FIXTURES:
             print(f"skip {n}: no such fixture")
             continue
         try:
             stl = fx.export(n, work)[0]
-        except Exception as e:                          # noqa: BLE001  (py_gearworks missing, ...)
+        except Exception as e:                          # noqa: BLE001
             print(f"skip {n}: {type(e).__name__}: {e}")
             continue
-        parts.append((n, stl, FIXTURES.get(n, 0.02)))
+        parts.append((c, n, stl, TOL.get(n, 0.02)))
     for m in a.mesh:
-        parts.append((Path(m).stem, Path(m), a.tol or 0.05))
+        parts.append(("your meshes", Path(m).stem, Path(m), a.tol or 0.05))
     if a.out is None and a.mesh:
-        ap.error("pass --out for your own meshes (docs/RECON_BENCH.md is for the synthetic fixtures)")
+        ap.error("pass --out for your own meshes (docs/RECON_BENCH.md is for the synthetic part classes)")
     out_md = Path(a.out) if a.out else ROOT / "docs" / "RECON_BENCH.md"
     rows = []
-    for n, p, tol in parts:
-        print(f"{n} ({tol:g} mm) ...", flush=True)
-        after = run(p, tol, True, work / f"{n}-after", a.budget)
-        sw = swept(after, a.sweep_s)
-        before = None if a.no_before else run(p, tol, False, work / f"{n}-before", a.budget)
-        rows.append({"part": n, "tol": tol, "after": after, "sweep": sw, "before": before})
-        print(json.dumps({k: v for k, v in after.items() if k not in ("recipe", "refs")}, default=str), flush=True)
-    write(out_md, rows)
+    for c, n, p, tol in parts:
+        print(f"{c}: {n} ({tol:g} mm) ...", flush=True)
+        base = isolated(p, tol, False, work / f"{n}-plain", a.budget)
+        print(json.dumps(base, default=str), flush=True)
+        opt = isolated(p, tol, True, work / f"{n}-learned", a.budget) if status.get("installed") else None
+        rows.append({"class": c, "part": n, "tol": tol, "without": base, "with": opt})
+    write(out_md, rows, status, a.label)
+    if a.json:
+        Path(a.json).write_text(json.dumps({"rows": rows, "learned": status, "label": a.label}, indent=1, default=str))
     print(f"wrote {out_md}")
 
 
@@ -112,27 +163,45 @@ def _f(x, nd=4):
     return "–" if x is None else (f"{x:.{nd}g}" if isinstance(x, float) else str(x))
 
 
-def write(path: Path, rows: list):
-    import statistics
-    eds = [r["after"]["editable_pct"] or 0.0 for r in rows]
+def _pct(x):
+    return "–" if x is None else f"{x:g}%"
+
+
+def write(path: Path, rows: list, status: dict, label: str = ""):
     L = ["# Mesh to editable CAD: benchmark", "",
-         "Written by `scripts/recon_bench.py` from real runs of `form/recon` on the synthetic fixtures in "
-         "`tests/recon_fixtures.py` (build123d parts exported as STL). **Editable** is the share of the result's surface "
-         "that its Params make; **deviation** is the two-sided Hausdorff distance to the mesh. *Before* is the same "
-         "pipeline without the program route (Layer 1 surfaces and the feature tree only). Computed, not assumed.", "",
-         f"Median editable after: **{statistics.median(eds) if eds else 0:g}%** over {len(rows)} parts.", "",
-         "| Part | Tol (mm) | Triangles | Before: editable, deviation, time | After: editable | After: deviation (mm) | "
-         "Within tol | After: time (s) | Method | Params | Params that change the part and rebuild over 80% of their range |",
-         "|---|---|---|---|---|---|---|---|---|---|---|"]
+         "Written by `scripts/recon_bench.py` from real runs of `form/recon` on synthetic build123d parts "
+         "(`tests/recon_fixtures.py`, exported as STL). Two numbers, never merged:", "",
+         "- **B-rep**: share of the result's surface that is real CAD faces (analytic, B-spline, or made by a feature) "
+         "rather than a facet copy of the mesh, counted only when the result is within the tolerance.",
+         "- **Editable**: share of the result's Params that are real dimensions and move 0.5 mm with the part still "
+         "building. *Feature area* is the share of the surface the parametric features make.", "",
+         "**Deviation** is the two-sided Hausdorff distance to the mesh. Computed, not assumed."
+         + (f" Run: {label}." if label else ""), ""]
+    inst = status.get("installed")
+    L.append("Optional learned engine (CAD-Recode, non-commercial licence): "
+             + ("installed; the *with* columns use it." if inst else
+                "not installed on the machine that wrote this, so only *without* is measured."))
+    L.append("")
+    L += ["| Class | Part | Tol (mm) | Triangles | B-rep | Editable | Params moving / all | Feature area | "
+          "Deviation (mm) | Within tol | Time (s) | Method | With learned engine |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
-        a, b, s = r["after"], r["before"], r["sweep"]
-        bt = "–" if b is None else f"{_f(b['editable_pct'])}%, {_f(b['hausdorff_mm'])} mm, {_f(b['seconds'])} s"
-        sw = "–" if not s else f"{s['change_and_rebuild_80']} of {s['params']}"
-        L.append(f"| {r['part']} | {r['tol']:g} | {_f(a['triangles'])} | {bt} | {_f(a['editable_pct'])}% | "
-                 f"{_f(a['hausdorff_mm'])} | {'yes' if a['within'] else 'no'} | {_f(a['seconds'])} | {a['method'] or '–'} | "
-                 f"{_f(a['params'])} | {sw} |")
-    L += ["", "Largest gap between progress events, after: " +
-          ", ".join(f"{r['part']} {r['after']['max_progress_gap_s']:g} s" for r in rows) + ".", ""]
+        a, w = r["without"], r["with"]
+        wt = "not installed" if w is None else f"B-rep {_pct(w['brep_pct'])}, editable {_pct(w['editable_pct'])}"
+        L.append(f"| {r['class']} | {r['part']} | {r['tol']:g} | {_f(a['triangles'])} | {_pct(a['brep_pct'])} | "
+                 f"{_pct(a['editable_pct'])} | {_f(a['movable'])} / {_f(a['params'])} | {_pct(a['feature_area_pct'])} | "
+                 f"{_f(a['hausdorff_mm'])} | {'yes' if a['within'] else 'no'} | {_f(a['seconds'])} | "
+                 f"{a['method'] or (a['error'] if a.get('crashed') else '–')} | {wt} |")
+    by = {}
+    for r in rows:
+        by.setdefault(r["class"], []).append(r["without"])
+    L += ["", "Per class, without the learned engine (median over its parts):", "",
+          "| Class | Parts | B-rep | Editable |", "|---|---|---|---|"]
+    for c, xs in by.items():
+        L.append(f"| {c} | {len(xs)} | {statistics.median([x['brep_pct'] or 0.0 for x in xs]):g}% | "
+                 f"{statistics.median([x['editable_pct'] or 0.0 for x in xs]):g}% |")
+    L += ["", "Largest gap between progress events: " +
+          ", ".join(f"{r['part']} {r['without']['max_progress_gap_s']:g} s" for r in rows) + ".", ""]
     path.write_text("\n".join(L), encoding="utf-8")
 
 

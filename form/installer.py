@@ -49,7 +49,8 @@ GROUPS = [("engine", "Form Studio itself"), ("ai", "Claude Code"), ("agents", "O
           ("cad", "CAD and 3D apps"), ("slicer", "3D printing (optional)")]
 # group → the capability (form/capabilities.py) a registry item belongs to, unless it names its own
 CAPABILITY_OF_GROUP = {"engine": "core", "slicer": "print", "ai": "agent", "agents": "agent", "form": "core"}
-CAPABILITY_OF_ID = {"parts": "parts", "blender": "render", "freecad": "exchange", "openscad": "exchange"}
+CAPABILITY_OF_ID = {"parts": "parts", "blender": "render", "freecad": "exchange", "openscad": "exchange",
+                    "recon.learned": "mesh"}
 
 
 # ---- model --------------------------------------------------------------------------------------------------------
@@ -96,6 +97,7 @@ class Software:
     one_of: str = ""            # a family where one installed member is enough (slicers)
     needs: tuple[str, ...] = () # registry ids that must be installed first
     capability: str = ""        # what it is for (form/capabilities.py: core, parts, render, exchange, print) or "agent"
+    licence: str = ""           # shown before anything is downloaded when it is not Form Studio's own (e.g. model weights)
 
     def __post_init__(self):
         if not self.capability:
@@ -344,6 +346,35 @@ def _m_parts(platform, ctx) -> list[Method]:
             Method("pip", "pip", commands=[f"{_q(sys.executable, platform)} -m pip install {pins}"], needs=("#pip",))]
 
 
+def _d_learned(cfg, ctx) -> Found:
+    from .recon import learned
+    st = learned.status(Path(cfg["data"]["dir"]).expanduser() / "models" / "cad-recode"
+                        if not os.environ.get("FORM_CADRECODE_DIR") else None)
+    if st["installed"]:
+        return Found("ok", f"{learned.NAME} is installed in {st['folder']} (licence {learned.LICENCE})", path=st["folder"])
+    what = []
+    if st.get("missing_libraries"):
+        what.append(" and ".join(st["missing_libraries"]) + " not installed")
+    if st.get("missing_weights"):
+        what.append("weights not downloaded")
+    return Found("missing", f"Optional. {'; '.join(what)}. Mesh to CAD works fully without it.", path=st["folder"])
+
+
+def _m_learned(platform, ctx) -> list[Method]:
+    from .recon import learned
+    if frozen():
+        return [Method("bundled", "Not available in the packaged app", kind="bundled",
+                       note="The learned engine needs PyTorch, which a packaged Form Studio cannot add to itself. "
+                            "Run Form Studio from source to use it.")]
+    py = _q(sys.executable, platform)
+    pins = " ".join(_q(x, platform) for x in learned.PIP)
+    fetch = f"{py} -m form.recon.learned download --accept-licence {learned.LICENCE_ID}"
+    note = (f"Downloads {learned.SIZE}. Licence: {learned.LICENCE} ({learned.LICENCE_URL}); by installing you accept it. "
+            f"Model: huggingface.co/{learned.REPO}. Runs offline once downloaded.")
+    return [Method("uv", "uv", commands=[f"uv pip install --python {py} {pins}", fetch], needs=("uv",), note=note),
+            Method("pip", "pip", commands=[f"{py} -m pip install {pins}", fetch], needs=("#pip",), note=note)]
+
+
 def _m_claude(platform, ctx) -> list[Method]:
     # The commands on the official setup page (CLAUDE_DOCS), unchanged.
     if platform == "windows":
@@ -536,6 +567,11 @@ REGISTRY: list[Software] = [
             "", "", "", "https://github.com/supermerill/SuperSlicer/releases", "about 120 MB", "optional"),
     _slicer("qidi", "QIDISlicer", "Slices for QIDI printers (Q1 Pro, Q2, X-Plus 4 and more).",
             "", "", "", "https://github.com/QIDITECH/QIDISlicer/releases", "about 170 MB", "optional"),
+    Software("recon.learned", "Learned mesh to CAD (CAD-Recode)",
+             "Optional, non-commercial: a learned model that proposes sketch-and-extrude programs for a mesh. Every "
+             "proposal is snapped to the mesh and kept only when it verifies; mesh to CAD works fully without it.",
+             "optional", "engine", _d_learned, _m_learned, size="3.09 GB of weights, plus about 1 GB of PyTorch and Transformers",
+             homepage="https://huggingface.co/filapro/cad-recode", licence="CC BY-NC 4.0 (non-commercial use only)"),
     Software("claude", "Claude Code", "Anthropic's agent. Chat can run it on your own Claude account. Everything else works without it.",
              "recommended", "ai", _d_claude, _m_claude, size="about 280 MB", homepage=CLAUDE_DOCS),
     Software("claude.signin", "Claude sign-in", "Claude Code answers in chat only when it is signed in to your account.",
@@ -638,7 +674,7 @@ def survey(cfg: dict, platform: str | None = None, which=None, only: list[str] |
         ms = methods_for(sw, platform, which, ctx) if f.status != "ok" else []
         chosen = next((m for m in ms if m.available and m.kind in ("command", "action", "login")), None)
         rows.append({"id": sw.id, "label": sw.label, "why": sw.why, "level": sw.level, "group": sw.group, "size": sw.size,
-                     "capability": sw.capability,
+                     "capability": sw.capability, "licence": sw.licence,
                      "status": f.status, "detail": f.detail.replace(home, "~") if len(home) > 1 else f.detail,
                      "version": f.version, "homepage": sw.homepage, "one_of": sw.one_of, "needs": list(sw.needs),
                      "methods": [m.public() for m in ms], "plan": chosen.public() if chosen else None,
@@ -1139,6 +1175,7 @@ def main(argv=None) -> int:
         print(json.dumps({"error": e.public()}, indent=1, ensure_ascii=False))
         return 2
     plan_out = [{"id": s.id, "label": s.label, "method": m.label, "commands": m.commands,
+                 **({"size": s.size} if s.size else {}), **({"licence": s.licence} if s.licence else {}),
                  **({"edits": m.note} if m.kind == "action" else {})} for s, m in pairs]
     if a.dry_run:
         print(json.dumps({"dry_run": True, "would_run": plan_out}, indent=1, ensure_ascii=False))
@@ -1146,6 +1183,10 @@ def main(argv=None) -> int:
     if not a.yes:
         for p in plan_out:
             print(f"{p['label']} ({p['method']})", file=sys.stderr)
+            if p.get("size"):
+                print(f"    size: {p['size']}", file=sys.stderr)
+            if p.get("licence"):
+                print(f"    licence: {p['licence']} (accepted by running this)", file=sys.stderr)
             for c in p["commands"]:
                 print(f"    $ {c}", file=sys.stderr)
         try:

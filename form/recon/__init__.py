@@ -7,7 +7,13 @@
              sketches extruded and lofted between levels, Params pooled, snapped and mirrored, ops.py
              what reads as no sketch kept as the mesh's slices (beta); else a feature tree tree.py, graph.py,
              (base, fillets, chamfers, holes, patterns) or a parametric spur gear          gears.py, features.py
+             turned bodies as one revolved half-section, polar patterns of holes               turned.py
+             the stepwise loop: one feature at a time, kept only when the residual drops        stepwise.py
+             optional learned engine (CAD-Recode, non-commercial, opt-in, offline)             learned/
     Parts    several meshes of one mechanism: interface dimensions tied with clearances    assembly.py
+
+Every result reports two numbers apart: brep_pct (the share of the surface that is real CAD faces, within the
+tolerance) and editable_pct (the share of its Params that are dimensions that move).
 
 Every layer is checked against the mesh (verify.py: two-sided Hausdorff, volume, deviation map). Readers and checks
 (mesh.py, distance.py, fit.py, segment.py) are numpy and scipy only; the rest runs in the kernel worker.

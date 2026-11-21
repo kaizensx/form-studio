@@ -537,10 +537,12 @@ def _round_to(x, within):
 # ---- parameters: pooled, snapped, mirrored ---------------------------------------------------------------------------
 
 GRIDS = (10.0, 5.0, 1.0, 0.5, 0.25, 0.1, 0.05, 0.01)
-KIND_LABEL = {"X": "X", "Y": "Y", "Z": "Z", "U": "U", "W": "W", "H": "Level", "r": "Radius", "d": "Diameter"}
+KIND_LABEL = {"X": "X", "Y": "Y", "Z": "Z", "U": "U", "W": "W", "H": "Level", "r": "Radius", "d": "Diameter",
+              "L": "Length", "P": "Pitch circle Ø"}
+SIZE_KINDS = ("r", "d", "L", "P")      # sizes: always positive, ranged by a share of their value
 MIRROR = ("X", "Y", "U", "W")
 USE_WORD = {"X": "corners", "Y": "corners", "Z": "corners and levels", "U": "corners", "W": "corners", "H": "levels",
-            "r": "radii", "d": "circles"}
+            "r": "radii", "d": "circles", "L": "lengths", "P": "patterns"}
 
 
 # ---- envelopes: a block of levels that does not read as sketches along this direction --------------------------------
@@ -706,7 +708,7 @@ class Pool:
                 if how is None:
                     val = float(round(m, 4))
                 users = [items[i][1] for i in members]
-                if abs(val) < 1e-9 and kind not in ("r", "d"):
+                if abs(val) < 1e-9 and kind not in SIZE_KINDS:
                     for i in members:
                         self.expr[(kind, int(i))] = "0"
                         self.items[kind][int(i)] = (0.0, items[int(i)][1])
@@ -719,7 +721,7 @@ class Pool:
                 shown = val if (mirrored or not sym) else val * float(signs[0])
                 if mirrored:
                     label = f"{KIND_LABEL[kind]} ±{_fmt(val)}"
-                elif kind in ("r", "d", "H"):
+                elif kind in SIZE_KINDS + ("H",):
                     label = f"{KIND_LABEL[kind]} {_fmt(val)}"
                 else:
                     label = f"{KIND_LABEL[kind]} {_fmt(shown)}"
@@ -735,12 +737,15 @@ class Pool:
                 if mirrored:
                     note.append("mirrored about the centre plane (both sides measured within the tolerance)")
                 others = [x for x in all_reps if abs(x - float(reps[g])) > 1e-9]
-                gap = min([abs(x - val) for x in others] + [max(abs(val), 1.0)])
-                if kind in ("r", "d"):
+                # room on each side: 0.4 of the way to the nearest other value of this kind below and above, so two
+                # neighbouring values can never be slid past each other (and a value with nothing on one side gets
+                # its own size there)
+                below = min([val - x for x in others if x < val] or [max(abs(val), 1.0)])
+                above = min([x - val for x in others if x > val] or [max(abs(val), 1.0)])
+                if kind in SIZE_KINDS:
                     lo, hi = max(0.05, val * 0.7), val * 1.3
                 else:
-                    g4 = max(0.4 * gap, self.tol)
-                    lo, hi = val - g4, val + g4
+                    lo, hi = val - max(0.4 * below, self.tol), val + max(0.4 * above, self.tol)
                     if mirrored or (kind in ("Z", "H") and val > 0):
                         lo = max(lo, 0.05 * val)
                 if sym and not mirrored and signs[0] < 0:
@@ -777,7 +782,7 @@ def _name(plan, prefix):
     cuts = sorted([r for r in acc if not r.add], key=lambda r: -_volume_loop(r.bot, r.zb - r.za))
     n = {"boss": 0, "step": 0, "hole": 0, "cut": 0}
     for i, r in enumerate(adds):
-        if i == 0 and not prefix:
+        if i == 0 and not prefix and not plan.get("revolve"):
             r.id, r.label = "base", "Base"
         elif r.bot.kind == "circle":
             n["boss"] += 1
@@ -844,12 +849,40 @@ class Program:
         _name(plan, prefix)
         kx, ky, kz = plan["frame"].names
         self.h = {}
+        self._polar = []
+        if not prefix:
+            from . import turned
+            self._polar = turned.polar([r for r in plan["runs"] if r.fate == "feature"], plan["tol"])
+        in_pattern = {id(r) for pt in self._polar for r in pt["runs"]}
         for r in plan["runs"]:
-            if r.fate != "feature":
+            if r.fate != "feature" or id(r) in in_pattern:
                 continue
             fid = owner or r.id
             self.h[r.id] = (pool.add(kz, r.za, fid), pool.add(kz, r.zb, fid), _loop_handles(pool, r.bot, fid, kx, ky),
                             _loop_handles(pool, r.top, fid, kx, ky) if r.kind == "ruled" else None)
+        # a turned body (turned.revolve): its half-section's corners are diameters and levels, its rounds radii
+        self.rv = None
+        rv = plan.get("revolve") if not prefix else None
+        if rv is not None:
+            fid = "base"
+            lp = rv["loop"]
+            eps = plan["tol"] / 10
+            nodes = [(pool.add("d", 2 * n.p[0], fid) if n.p[0] > eps else None, pool.add(kz, n.p[1], fid),
+                      pool.add("r", n.r, fid) if n.r > 0 else None) for n in lp.nodes]
+            edges = [None if e.kind == "line" else (pool.add("r", e.R, fid), e.ccw, e.large) for e in lp.edges]
+            self.rv = (pool.add(kx, rv["centre"][0], fid), pool.add(ky, rv["centre"][1], fid), nodes, edges)
+        # polar patterns of equal holes (turned.polar): one pitch circle diameter instead of a position per hole
+        self.patterns = []
+        if not prefix:
+            for i, pt in enumerate(self._polar):
+                fid = f"pattern{i + 1}"
+                r0 = pt["runs"][0]
+                pt["id"] = fid
+                pt["label"] = f"Pattern {i + 1}: {pt['n']} × Ø{_fmt(2 * r0.bot.r)} on Ø{_fmt(pt['pcd'])}"
+                pt["h"] = (pool.add(kz, r0.za, fid), pool.add(kz, r0.zb, fid), pool.add(kx, pt["centre"][0], fid),
+                           pool.add(ky, pt["centre"][1], fid), pool.add("P", pt["pcd"], fid), pool.add("d", 2 * r0.bot.r, fid))
+                self.patterns.append(pt)
+        self.in_pattern = {id(r): pt for pt in self.patterns for r in pt["runs"]}
         self.bh = {}
         for b in plan["blocks"]:
             if b["fate"] != "envelope":
@@ -867,7 +900,43 @@ class Program:
         pool, plan = self.pool, self.plan
         L, feats = [], []
         first = True
+        if self.rv is not None:
+            cx, cy, nodes, edges = self.rv
+            nd = ", ".join(f"({pool.code(d) + ' / 2' if d else 0}, {pool.code(z)}, {pool.code(rr) if rr else 0})"
+                           for d, z, rr in nodes)
+            ed = ", ".join("None" if e is None else f"({pool.code(e[0])}, {e[1]}, {e[2]})" for e in edges)
+            feats.append(("base", "Turned body", "structure",
+                          f"A half-section revolved about the {plan['frame'].names[2]} axis: its steps, chamfers, "
+                          "grooves and rounds are the section's lines, arcs and corner radii."))
+            L.append("# Turned body: the half-section revolved about the axis")
+            L.append("_f = 'base'")
+            L.append(f"{var} = turn(pl, {pool.code(cx)}, {pool.code(cy)}, [{nd}], [{ed}])")
+            if stages:
+                L.append(f"stages.append(Stage('base', {var}))")
+            first = False
         for r in self.ops():
+            pt = self.in_pattern.get(id(r))
+            if pt is not None:
+                if pt["runs"][0] is not r:
+                    continue
+                za, zb, cx, cy, ph, dh = pt["h"]
+                zac, zbc = pool.code(za), pool.code(zb)
+                lo, hi = zac, zbc
+                if _opens(plan, r, below=True):
+                    lo = f"{zac} - OVER" if zac != "0" else "-OVER"
+                if _opens(plan, r, below=False):
+                    hi = f"{zbc} + OVER"
+                feats.append((pt["id"], pt["label"], "interface",
+                              f"Cut: {pt['n']} equal holes on a pitch circle (a polar pattern), from "
+                              f"{plan['frame'].names[2]} {_fmt(r.za)} to {_fmt(r.zb)}."))
+                L.append(f"# {pt['label']}")
+                L.append(f"_f = {pt['id']!r}")
+                L.append(f"for _x, _y in polar({pool.code(cx)}, {pool.code(cy)}, {pool.code(ph)}, {pt['n']}, "
+                         f"{_fmt(pt['phase_deg'])}):")
+                L.append(f"    {var} = {var} - slab(disc({_at(lo)}, _x, _y, {pool.code(dh)}), {0 if lo == '0' else lo}, {hi})")
+                if stages:
+                    L.append(f"stages.append(Stage({pt['id']!r}, {var}))")
+                continue
             za, zb, hb, ht = self.h[r.id]
             zac, zbc = pool.code(za), pool.code(zb)
             lo, hi = zac, zbc
@@ -989,7 +1058,7 @@ def source(name, plans, tol, residual_ref=None, residual_cut_ref=None) -> tuple:
         "from build123d import Plane",
         "",
         "from form.recipes.base import Feature, Param, Recipe, Stage",
-        "from form.recon.ops import disc, profile, slab",
+        "from form.recon.ops import disc, polar, profile, slab, turn",
         "",
         f"O = ({_fmt(O[0])}, {_fmt(O[1])}, {_fmt(O[2])})          # every coordinate is measured from here",
         f"OVER = {_fmt(max(4 * tol, 0.2))}          # how far a cut runs past a face it opens through",
@@ -1408,18 +1477,49 @@ def recipe(V, F, tol, name="part", limit=None, out_dir=None, progress=None, dead
     envelopes(plan, tol)
     out = Path(out_dir or ".")
     snap = ([(r.fate, r.why, r.block) for r in plan["runs"]], [blk["fate"] for blk in plan["blocks"]])
+    blocks0 = list(plan["blocks"])
+    block_runs = [list(b["runs"]) for b in blocks0]
 
     def restore():
+        plan.pop("revolve", None)
+        plan["blocks"] = list(blocks0)
+        for blk, rs in zip(blocks0, block_runs):
+            blk["runs"] = list(rs)
         for r, (f, w, k) in zip(plan["runs"], snap[0]):
             r.fate, r.why, r.block = f, w, k
         for blk, f in zip(plan["blocks"], snap[1]):
             blk["fate"] = f
 
-    # first the main direction alone (what reads as no sketch is kept as the mesh); then, when blocks of levels did
-    # not read as sketches, again with the other directions carving them, and the better of the two is the result
-    first = _attempts(V, F, tol, limit, name, out, plan, [], say, deadline, "")
-    tries = [first]
-    if plan["blocks"] and (not first["ok"] or first["edit"] < PROGRAM_GOOD) and \
+    # a turned body first (turned.revolve: every slab one outer circle and at most one bore about one axis): its
+    # half-section is one revolved sketch, holes off the axis stay features
+    tries = []
+    from . import turned
+    rv = turned.revolve(plan, tol)
+    if rv is not None:
+        say({"stage": "layer2", "text": "A turned part: reading its half-section", "fraction": 0.3})
+        plan["revolve"] = rv
+        ids = {id(r) for r in rv["runs"]}
+        for r in rv["runs"]:
+            r.fate, r.why = "revolved", "part of the turned body"
+        for b in blocks0:
+            b["runs"] = [r for r in b["runs"] if id(r) not in ids]
+        plan["blocks"] = [b for b in blocks0 if b["runs"]]
+        t = _attempts(V, F, tol, limit, name, out, plan, [], say, deadline, "_r")
+        t["revolve"] = True
+        tries.append(t)
+        rep["turned"] = {"profile_points": rv["points"], "corners": len(rv["loop"].nodes), "verified": bool(t["ok"]),
+                         **({"hausdorff_mm": round(t["hausdorff"], 6)} if t.get("hausdorff") is not None else {})}
+        if not (t["ok"] and t["edit"] >= 100.0):
+            restore()
+
+    # then the main direction alone (what reads as no sketch is kept as the mesh); then, when blocks of levels did
+    # not read as sketches, again with the other directions carving them, and the best is the result
+    if not tries or not tries[0]["ok"] or tries[0]["edit"] < 100.0:
+        first = _attempts(V, F, tol, limit, name, out, plan, [], say, deadline, "")
+        tries.append(first)
+    else:
+        first = tries[0]
+    if not first.get("revolve") and plan["blocks"] and (not first["ok"] or first["edit"] < PROGRAM_GOOD) and \
             (deadline is None or time.perf_counter() < deadline):
         restore()
         say({"stage": "layer2", "text": "Reading the part along the other directions", "fraction": 0.6})
@@ -1429,10 +1529,50 @@ def recipe(V, F, tol, name="part", limit=None, out_dir=None, progress=None, dead
             second["others"] = True
             tries.append(second)
     best = max(tries, key=lambda t: (t["ok"], t["edit"], -t.get("hausdorff", 1e9)))
+    if best.get("revolve") and best is not tries[-1]:
+        plan["revolve"] = rv                       # the turned body was kept: the plan reports it
     if best is not tries[-1] and best["result"] is not None:
         # the plan's fates are the last try's: put back those of the one kept
         for r, f in zip(plan["runs"], best["fates"]):
             r.fate, r.why = f
+    # the stepwise loop (stepwise.py): what the batch kept as the mesh, one feature at a time, kept only when the
+    # residual drops; only for a result read along the main direction alone, as the plan now stands. It runs on a
+    # verified result only; STEPWISE_S past the route's deadline only for a result the pipeline takes alone
+    step_deadline = None if deadline is None else (max(deadline, time.perf_counter()) + STEPWISE_S if _alone(best)
+                                                   else deadline)
+    if best["result"] is not None and best["ok"] and best["edit"] < 100.0 and not best.get("others") and \
+            (best is tries[-1] or not best.get("revolve")):
+        from . import stepwise
+        got = stepwise.refine(V, F, tol, limit, name, out, plan, best, say, step_deadline)
+        rep["stepwise"] = got.get("steps", [])
+        if got is not best and got["result"] is not None and got["edit"] > best["edit"]:
+            best = got
+            tries.append(got)
+    # with other directions carving: drop each of their features that the result does not need (it still verifies,
+    # as much of its surface comes from features, with fewer Params)
+    if best["result"] is not None and best["ok"] and best.get("others") and best is tries[-1]:
+        from . import stepwise
+        got = stepwise.prune(V, F, tol, limit, name, out, plan, best, say, step_deadline)
+        rep["pruned"] = got.get("pruned", [])
+        if got is not best:
+            best = got
+            tries.append(got)
+    # more of the surface from features is not worth fewer of the Params being dimensions: the other directions'
+    # result is kept over the main direction's own verified result only when the share of its Params that are
+    # dimensions does not drop and it has at most PARAM_GROWTH times as many Params
+    if best.get("others") and first.get("ok") and first is not best and first["result"] is not None:
+        ds_b, ds_f = _dimension_share(best["result"][7]), _dimension_share(first["result"][7])
+        n_b, n_f = len(best["result"][7].params), len(first["result"][7].params)
+        if ds_b < ds_f or n_b > PARAM_GROWTH * max(n_f, 1):
+            rep["other_directions"] = {"kept": False, "feature_area_pct": best["edit"], "dimension_share_pct": ds_b,
+                                       "why": f"{n_b} Params, {ds_b:g}% of them dimensions, against {n_f} and "
+                                              f"{ds_f:g}% without it"}
+            best = first
+            for r, f in zip(plan["runs"], best["fates"]):
+                r.fate, r.why = f
+            for b in plan["blocks"]:
+                b["fate"] = "kept"
+            tries.append(first)
     rep["attempts"] = [x for t in tries for x in t["attempts"]]
     rep["seconds"] = round(time.perf_counter() - t0, 2)
     if best["result"] is None:
@@ -1443,7 +1583,17 @@ def recipe(V, F, tol, name="part", limit=None, out_dir=None, progress=None, dead
     kept = [r for r in plan["runs"] if r.fate == "kept"]
     feats = []
     for pr in progs:
+        if pr.rv is not None:
+            feats.append({"id": "base", "label": "Turned body", "direction": pr.plan["frame"].names[2], "kind": "revolve",
+                          "op": "add", "profile": f"{len(pr.rv[2])} corners"})
+        for pt in pr.patterns:
+            r0 = pt["runs"][0]
+            feats.append({"id": pt["id"], "label": pt["label"], "direction": pr.plan["frame"].names[2],
+                          "kind": "polar pattern", "op": "cut", "count": pt["n"], "pcd_mm": round(pt["pcd"], 4),
+                          "from_mm": round(r0.za, 4), "to_mm": round(r0.zb, 4)})
         for r in pr.ops():
+            if id(r) in pr.in_pattern:
+                continue
             feats.append({"id": r.id, "label": r.label, "direction": pr.plan["frame"].names[2],
                           "kind": "extrusion" if r.kind == "prism" else "ruled loft", "op": "add" if r.add else "cut",
                           "from_mm": round(r.za, 4), "to_mm": round(r.zb, 4),
@@ -1472,7 +1622,24 @@ def recipe(V, F, tol, name="part", limit=None, out_dir=None, progress=None, dead
             "params": pool.params, "plan": plan}
 
 
-PROGRAM_GOOD = 80.0      # % editable under which the other directions are tried as well
+PARAM_GROWTH = 1.5       # how many times the Params the other directions may bring (see recipe)
+
+
+def _alone(t) -> bool:
+    """Is this try a result the pipeline takes without building the slower layers (pipeline.PROGRAM_ENOUGH)?"""
+    from .pipeline import PROGRAM_ENOUGH
+    return bool(t.get("ok") and t.get("edit", 0.0) >= PROGRAM_ENOUGH)
+
+
+def _dimension_share(pool) -> float:
+    ps = pool.params
+    return round(100.0 * sum(1 for p in ps if is_dimension(p["key"], p["label"], "mm")) / len(ps), 1) if ps else 0.0
+
+
+STEPWISE_S = 60.0        # seconds past the deadline the stepwise loop may take on a verified result the pipeline
+                         # takes alone (_alone): the slower layers are then not built
+PROGRAM_GOOD = 80.0      # % of the surface from features under which the other directions are tried as well. Measured
+                         # (docs/RECON_BENCH.md): above it they gain surface but cost the share of dimension Params
 
 
 def _attempts(V, F, tol, limit, name, out, plan, others, say, deadline, tag) -> dict:
@@ -1496,7 +1663,8 @@ def _attempts(V, F, tol, limit, name, out, plan, others, say, deadline, tag) -> 
         ra = f"{name}_kept{tag}.step" if any(r.add for r in kept) else None
         rc = f"{name}_kept{tag}_cut.step" if any(not r.add for r in kept) else None
         used = [plan] + ([p for p in others] if any(b["fate"] == "envelope" for b in plan["blocks"]) else [])
-        if not any(r.fate == "feature" for r in plan["runs"]) and not any(b["fate"] == "envelope" for b in plan["blocks"]):
+        if not any(r.fate == "feature" for r in plan["runs"]) and not any(b["fate"] == "envelope" for b in plan["blocks"]) \
+                and not plan.get("revolve"):
             error = "No part of the mesh reads as a sketch."
             break
         src, pool, progs = source(name, used, tol, ra, rc)
@@ -1570,7 +1738,7 @@ def _attempts(V, F, tol, limit, name, out, plan, others, say, deadline, tag) -> 
         if not moved:
             break
     out_ = {"result": result, "attempts": attempts, "error": error, "ok": bool(result and result[-1]), "edit": 0.0,
-            "fates": [(r.fate, r.why) for r in plan["runs"]]}
+            "fates": [(r.fate, r.why) for r in plan["runs"]], "others_list": list(others)}
     if result is not None:
         src, shape, ck, P, T, cmp, refs, pool, progs, feats_only, ok = result
         say({"stage": "layer2", "text": "Measuring how much of the surface the Params drive", "fraction": 0.9})
