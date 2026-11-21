@@ -516,7 +516,7 @@ class HeroHelmet(unittest.TestCase):
             print(f"\nhero helmet view: {tris} triangles on parts (plain tessellation {plain}, textured "
                   f"{v['mesh_texture']['triangles']})")
             st.kernel.stop()                                     # fresh workers: every checkpoint comes from disk
-            src2 = src.replace("scale=18.0", "scale=16.0").replace('"color": "#2f6f86"', '"color": "#2f6f90"')
+            src2 = src.replace("scale=18.0", "scale=16.0").replace('"color": "#3f7f86"', '"color": "#3f7f90"')
             self.assertNotEqual(src2, src)
             p = st.update_design(st.load(p["id"]), src2)
             self.assertEqual(set(_log(st, p).values()), {"checkpoint"}, _log(st, p))

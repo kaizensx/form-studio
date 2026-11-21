@@ -39,7 +39,7 @@ Only the algorithm files the mesh-to-CAD search needs, fetched read-only at the 
 | `vendor/analyze_revolve_axis.py` | `analyze_revolve_axis.py` |
 | `vendor/cadquery_ops.py` | `cadquery_ops.py` |
 | `vendor/greedy_search.py` | `greedy_search.py` |
-| `vendor/pipeline_steps.py` | an excerpt of `run_pipeline.py` (`_drop_nested_entries` only) |
+| `vendor/pipeline_steps.py` | an excerpt of `run_pipeline.py`: `_drop_nested_entries`, `compute_mesh_volume`, `watertight`, `compute_difference_mesh` and `combine_cadquery_scripts` |
 
 Not included: `image_to_cad/` and anything Hunyuan3D (a separate licence), `filter_loops.py` (an optional DINOv2 loop
 filter that downloads model weights), `refine_edges.py` (the fillet/chamfer pass, off by default upstream, written

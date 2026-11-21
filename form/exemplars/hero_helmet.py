@@ -50,15 +50,16 @@ META = {
         "faceplate round each eye, so about 3 mm of plate covers each pocket, not 2.",
         "Rhythm beats ornament: one thin frame, one brow ridge, one bezel per eye, a crest of two stacked bands with "
         "pointed ends, raked pods and one panel line that runs from the pods round the nape.",
-        "Design an original character: pick the shapes yourself (here rounded pill lenses tilted up, a stacked "
-        "crest, raked ear pods, a hex panel texture) and never copy a known hero's mask, colours or emblem.",
+        "Design an original character: pick the shapes yourself (here rounded pill lenses with a slight upward tilt, a "
+        "stacked crest, raked ear pods, a hex panel texture), a neutral colour scheme (graphite and teal), and never "
+        "copy a known hero's mask, colours or emblem.",
     ],
 }
 
 STOCKS = list(craft.MAGNETS)                       # 0: 6x2, 1: 6x3, 2: 8x3, 3: 10x3
 FITS = list(craft.MAGNET_FITS)                     # 0: press, 1: glue, 2: printed
 CHIN = 1.28                                        # how far the chin bar projects (helmet_fullface)
-EYE = (46.0, 18.0, 2.6, 16.0, 54.0)                # pill lens: half length, half height, exponent, tilt (deg), centre y
+EYE = (46.0, 18.0, 2.6, 9.0, 54.0)                 # pill lens: half length, half height, exponent, tilt (deg), centre y
 SEAT = 1.0                                         # the lens seat grown inside the faceplate round each eye (mm)
 RIM = 6.0                                          # the lens reaches this far past the eye opening (mm)
 
@@ -115,7 +116,7 @@ class Design(FeatureDesign):
                                               "magnetic faceplate on a lip with a brow ridge and eye bezels, two pill "
                                               "lenses on magnets behind it, and a hex panel texture.")
     solids = 4
-    photo_color = "#262a30"
+    photo_color = "#4a5058"
     params = [
         Param("head", "Head circumference", 570, 520, 620, 10, "mm", "brief", "shell",
               "EN 960 headform sizes: E 540, J 570, M 600, O 620."),
@@ -307,10 +308,8 @@ class Design(FeatureDesign):
             if not shell.is_inside(_vec(q)):
                 raise RecipeError("A faceplate magnet is not over the ledge", "magnets",
                                   "Aim the spot at the middle of the lip.", ["lip"])
-        # a raised tab over the lower magnets: the flange there is wall - ledge - gap, so it covers the pocket
-        x, z = pairs[0].at[0], pairs[0].at[2]           # one prism through the width covers both sides
-        tab = extrude(craft.superellipse_face(9, 6, 2.6, plane=Plane.XZ, center=(x, z), rotate=8), 400, both=True)
-        plate = craft.fuse(plate, self.ctx["skin"].band(1.6, tab, depth=1.0))
+        # no tab on the plate's face: the flange (wall - ledge - gap) holds each pocket and its floor behind a
+        # flush face (constraints() checks it from the values, _check_floors on the built parts)
         # one boolean per kind of cut, not one per magnet: the parts are many faces by now
         shell = craft.fuse(shell, _union([pr.boss("a", start=0.6 * v["ledge"], wall=1.6) for pr in pairs]))
         shell = craft.cut(shell, _union([pr.pocket_a() for pr in pairs]))
@@ -393,11 +392,12 @@ class Design(FeatureDesign):
                             features=["shell", "lower_edge"], facing="out", edge_falloff=10.0)]
 
     def appearance(self, v):
-        return [{"features": ["lenses", "lens_magnets"], "finish": "smoke", "color": "#2f6f86"},
+        # graphite and teal: a neutral scheme of its own, away from any known hero's colours
+        return [{"features": ["lenses", "lens_magnets"], "finish": "smoke", "color": "#3f7f86"},
                 {"features": ["faceplate", "magnets", "eyes"], "finish": "metal", "color": "#c3c7cc"},
-                {"features": ["crest", "ear_pods"], "finish": "gloss", "color": "#d0632a"},
+                {"features": ["crest", "ear_pods"], "finish": "gloss", "color": "#2a8c86"},
                 {"features": ["shell", "lower_edge", "panel_line", "chin_vent"], "finish": "matte",
-                 "color": "#262a30"}]
+                 "color": "#4a5058"}]
 
     def derived(self, v):
         F = craft.helmet_fullface(v["head"], chin=CHIN)

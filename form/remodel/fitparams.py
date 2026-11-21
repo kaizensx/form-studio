@@ -27,12 +27,19 @@ import numpy as np
 SIDE_SAMPLES = 4000          # points drawn on the design's surface per build (fixed, so the vector has one length)
 MAX_PARAMS = 8
 NOISE_MM = 0.002          # mean distances closer than this are the same (tessellation chords), not a gain
+BUDGET_S = 120.0          # default time for a whole fit: when it is up, the best values found so far are used
 
 
-def fit(evaluate, x0, lo, hi, step, max_evals: int = 60) -> dict:
+def fit(evaluate, x0, lo, hi, step, max_evals: int = 60, budget_s: float | None = None, progress=None) -> dict:
     """Bounded least squares of evaluate(x) -> residual vector (or None when x does not build). Generic: it knows
-    nothing about CAD. Returns {"x", "evals", "history"} with the best point evaluated (never worse than x0)."""
+    nothing about CAD. Stops after max_evals evaluations or budget_s seconds, whichever comes first (an evaluation
+    already running finishes). progress(d) gets {"evals", "best_rms", "seconds"} after each evaluation. Returns
+    {"x", "evals", "history", "stopped"} with the best point evaluated (never worse than x0); stopped is "evals",
+    "time" or "" (converged)."""
     from scipy.optimize import least_squares
+    t0 = time.monotonic()
+    end = t0 + float(budget_s) if budget_s else None
+    stopped = [""]
     x0 = np.asarray(x0, dtype=np.float64)
     lo, hi, step = (np.asarray(a, dtype=np.float64) for a in (lo, hi, step))
     cache: dict = {}
@@ -54,11 +61,21 @@ def fit(evaluate, x0, lo, hi, step, max_evals: int = 60) -> dict:
         if key in cache:
             return cache[key]
         if len(cache) >= max_evals:
+            stopped[0] = "evals"
+            raise Stop()
+        if end is not None and time.monotonic() >= end:
+            stopped[0] = "time"
             raise Stop()
         r = evaluate(np.asarray(x, dtype=np.float64))
         r = np.full(m, big) if r is None or len(r) != m else np.asarray(r, dtype=np.float64)
         cache[key] = r
         hist.append((np.asarray(x, dtype=np.float64).copy(), float(np.sqrt(np.mean(r ** 2)))))
+        if progress is not None:
+            try:
+                progress({"evals": len(cache), "best_rms": min(h[1] for h in hist),
+                          "seconds": round(time.monotonic() - t0, 1)})
+            except Exception:                               # noqa: BLE001
+                pass
         return r
 
     def jac(x):
@@ -77,7 +94,8 @@ def fit(evaluate, x0, lo, hi, step, max_evals: int = 60) -> dict:
     except Stop:
         pass
     best = min(hist, key=lambda t: t[1])
-    return {"x": best[0], "evals": len(cache), "history": [(list(map(float, x)), s) for x, s in hist]}
+    return {"x": best[0], "evals": len(cache), "history": [(list(map(float, x)), s) for x, s in hist],
+            "stopped": stopped[0]}
 
 
 class Measure:
@@ -112,8 +130,10 @@ class Measure:
 
 def fit_design(st, p: dict, reference: str, params: list | None = None, part: str | None = None,
                max_change: float = 2.0, commit: bool = True, expect_head: int | None = None,
-               max_evals: int = 60) -> dict:
-    """Fit the design's declared Params to an imported mesh; commit the result as a revision only when it is closer."""
+               max_evals: int = 60, budget_s: float = BUDGET_S, progress=None) -> dict:
+    """Fit the design's declared Params to an imported mesh; commit the result as a revision only when it is closer.
+    budget_s bounds the whole fit (the search stops and keeps its best values so far; the step-rounded check still
+    runs once); progress(d) gets {"text", "fraction", "evals", "best_rms", "seconds"} as it goes."""
     from ..studio import H, StudioError
     from . import analyze as an
     from . import compare as cmp
@@ -141,6 +161,8 @@ def fit_design(st, p: dict, reference: str, params: list | None = None, part: st
                           "Name the ones the residual points at: params=[...].")
     if not (0 < float(max_change) <= 50):
         raise StudioError("max_change: between 0 and 50 mm.")
+    if not (1 <= float(budget_s) <= 3600):
+        raise StudioError("budget_s: between 1 and 3600 seconds.")
     base = dict(head["values"])
     x0 = np.array([float(base[k]) for k in keys])
     lo = np.array([max(float(specs[k].min), x0[i] - max_change) for i, k in enumerate(keys)])
@@ -171,8 +193,18 @@ def fit_design(st, p: dict, reference: str, params: list | None = None, part: st
         stats[tuple(np.round(x, 9))] = (mx, mean)
         return vec
 
+    def note(d):
+        if progress is None:
+            return
+        try:
+            progress({**d, "fraction": round(min(0.95, max(d["evals"] / max(1, max_evals),
+                                                           d["seconds"] / float(budget_s))), 3),
+                      "text": f"Fitting: build {d['evals']}, best RMS {d['best_rms']:.4f} mm, {d['seconds']:g} s"})
+        except Exception:                                   # noqa: BLE001
+            pass
+
     try:
-        res = fit(evaluate, x0, lo, hi, stp, max_evals=max_evals)
+        res = fit(evaluate, x0, lo, hi, stp, max_evals=max_evals, budget_s=budget_s, progress=note)
     except ValueError as e:
         raise StudioError(str(e), "Fix the build first (get_project shows why).") from None
     before = stats[tuple(np.round(x0, 9))]
@@ -195,7 +227,8 @@ def fit_design(st, p: dict, reference: str, params: list | None = None, part: st
            "deviation_before": {"max_mm": round(before[0], 4), "mean_mm": round(before[1], 4)},
            "deviation_after": {"max_mm": round((bst if gain else before)[0], 4),
                                "mean_mm": round((bst if gain else before)[1], 4)},
-           "builds": len(stats), "seconds": round(time.time() - t0, 1),
+           "builds": len(stats), "seconds": round(time.time() - t0, 1), "budget_s": float(budget_s),
+           "stopped": {"time": "time budget", "evals": "build limit"}.get(res.get("stopped", ""), "converged"),
            "kept": bool(gain), "method": "bounded least squares (scipy least_squares, trf) over the declared Params"}
     if not gain:
         out["verdict"] = ("No gain: no values inside the bounds bring the design closer to the mesh, so nothing "

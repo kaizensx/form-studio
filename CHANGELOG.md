@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **Feature records stay true.** A feature left out because it made more parts than the design declared is built
+  again as soon as `solids` is raised (the record follows the part count it was checked against). Only a feature that
+  ran past its own time budget is written down as hung: a whole build that runs out of time no longer blames the
+  feature it happened to be on. Hang marks expire after a day, checkpoints and records follow the Form build (its
+  version and the code that shapes solids), so a fix in a new version reaches designs checkpointed before it, and the
+  records kept next to the checkpoints are pruned with them. A feature's checkpoint now also follows the mixins its
+  class inherits, members read through `type(self)`, and every way of reading the values; anything it cannot follow
+  rebuilds instead of loading a stale checkpoint.
+- **fit_params has a time budget** (`budget_s`, 120 s by default): the search stops when it is up, keeps the best
+  values found, says why it stopped, and reports progress while it runs. Sending a step to the reconstruction helper
+  is bounded by the step's time too.
+- **CADFit runs inside the kernel worker** and keeps within the reconstruction's hard deadline (its slice is never
+  longer than the time left). The packaged app ships CADFit's hook and licence files but not its search; there it
+  says it needs form-studio[cadfit]. THIRD_PARTY_NOTICES.md has a CADFit entry.
+- **Hero helmet:** the lenses tilt 9 degrees instead of 16, the colours are graphite and teal, and the faceplate's
+  magnet tabs are gone from its face (the flange holds the pockets behind a flush face).
+
 - **Scanned meshes reconstruct.** Mesh to CAD now fills the small holes a scan leaves (the missing triangle put
   back, or the triangulation with the least area and bend, so a hole across an edge keeps the edge), lists what it
   filled, and refuses a mesh only when a hole is too large to fill without guessing. It measures the scan noise and,

@@ -164,7 +164,34 @@ class Helper:
         t0 = time.perf_counter()
         self.start()
         try:
-            self.conn.send_bytes(_dumps({"module": fn.__module__, "name": fn.__name__, "args": args, "kwargs": kwargs}))
+            data = _dumps({"module": fn.__module__, "name": fn.__name__, "args": args, "kwargs": kwargs})
+            # sending is bounded too: a large job fills the pipe, and a helper that stopped reading would block a
+            # plain send for ever. The send runs in a thread; when the budget ends first the helper is killed,
+            # which ends the blocked write.
+            sent: dict = {}
+            conn = self.conn
+
+            def send():
+                try:
+                    conn.send_bytes(data)
+                    sent["ok"] = True
+                except Exception as e:                  # noqa: BLE001
+                    sent["error"] = e
+            th = threading.Thread(target=send, daemon=True, name="form-recon-send")
+            th.start()
+            while th.is_alive():
+                left = t0 + timeout_s - time.perf_counter()
+                if left <= 0:
+                    self.kill()
+                    th.join(2)
+                    return {"status": "timeout", "seconds": round(time.perf_counter() - t0, 2),
+                            "error": f"was stopped after {timeout_s:.0f} s (the time budget) while its input was "
+                                     "being sent"}
+                th.join(min(0.25, left))
+                if th.is_alive() and not self.proc.is_alive():
+                    raise EOFError
+            if "error" in sent:
+                raise sent["error"] if isinstance(sent["error"], OSError) else EOFError()
             while True:
                 left = t0 + timeout_s - time.perf_counter()
                 if left <= 0:

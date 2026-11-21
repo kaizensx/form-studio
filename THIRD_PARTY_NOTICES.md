@@ -3,8 +3,11 @@
 Form Studio is MIT licensed (see `LICENSE`). This file credits outside projects whose ideas Form Studio's code builds on,
 and records any outside material it contains.
 
-Unless an entry says otherwise, the ideas were **reimplemented** in Form Studio's own code. **No code was copied**, and
-nothing from these projects ships with the app. Each entry names the exact commit that was read.
+Each entry says what was taken and whether any code or material was copied. Most entries are ideas
+**reimplemented** in Form Studio's own code, with no code copied ("Ideas reimplemented, no code copied"). Two entries
+contain outside material, under their own licences: kulibinai/CADEvolve (exemplars hand-ported from its seed examples,
+Apache License 2.0) and CADFit (its code included and modified, CC BY-NC 4.0, with its author's permission). Each entry
+names the exact commit that was read.
 
 ## nickpagz/stl2step
 
@@ -63,3 +66,20 @@ nothing from these projects ships with the app. Each entry names the exact commi
   (`agent_run.py`).
 - Where: `form/remodel/residual.py` and the `reference_parts` topic of `form/design_guide.py`. This is new code.
 - Ideas reimplemented, no code copied.
+
+## ghadinehme/CADFit
+
+- Source: https://github.com/ghadinehme/CADFit, commit `227a7acdc6972c646859d7e12da279e6e4ae2789`. Work: "CADFit:
+  Precise Mesh-to-CAD Program Generation with Hybrid Optimization" (ICML 2026), by Ghadi Nehme, Eamon Whalen and Faez
+  Ahmed.
+- Licence: Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0). Copy:
+  `form/recon/cadfit/LICENSE`.
+- **Code copied and modified.** CADFit's algorithm files are included in `form/recon/cadfit/vendor/` and modified for
+  Form Studio, with the author's permission, as stated by the Form Studio project owner on 2026-11-21. Every vendored
+  file keeps its attribution and names its changes; `form/recon/cadfit/PERMISSION.md` lists the files, the functions
+  taken and every change.
+- **Form Studio's MIT licence does not cover `form/recon/cadfit/`.** The whole folder (the vendored code and the files
+  written to run it) is under CADFit's terms, so it can be removed or licensed as one unit.
+- Use: an optional mesh-to-CAD candidate, off unless `[recon] cadfit = true`, needing `pip install
+  form-studio[cadfit]`. The packaged app does not include the vendored search code; it ships the hook and this
+  folder's `LICENSE` and `PERMISSION.md`, and reports that CADFit needs form-studio[cadfit].
