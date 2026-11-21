@@ -9,6 +9,11 @@ it stays readable and every number in it is a Param or a coordinate read off the
     spur_gear_profile(...)                 an involute spur gear outline (tip and root as the mesh has them)
     profile(plane, nodes, edges)           a sketch: corners (with corner radii) joined by lines and arcs, as a face
     disc(plane, x, y, d)                   a circle of diameter d as a face
+    turn(plane, x, y, nodes, edges)        a half-section revolved about the axis through (x, y): a turned body
+    rect(plane, x, y, w, h)              a w x h rectangle centred at (x, y) as a face
+    outline(plane, start, segments)        lines and three-point arcs from `start`, closed, as a face
+    polar(x, y, pcd, n, phase)             the n centres of a polar pattern on a pitch circle
+    grid(x0, y0, nx, ny, px, py)           the centres of a linear pattern
     slab(face, z0, z1, top=None)           the solid between two levels: an extrusion, or a ruled loft to `top`
 """
 from __future__ import annotations
@@ -171,3 +176,68 @@ def slab(face, z0, z1, top=None):
     if top is None:
         return extrude(face, amount=float(z1 - z0))
     return loft([face, top], ruled=True)
+
+
+def rect(plane, x, y, w, h):
+    """A w x h rectangle centred at (x, y) on `plane`, as a face."""
+    from build123d import Face, Polyline, Wire
+    if w <= 0 or h <= 0:
+        raise ValueError(f"a {w:g} x {h:g} rectangle has no area")
+    q = lambda a, b: plane.from_local_coords((float(a), float(b)))
+    pts = [q(x - w / 2, y - h / 2), q(x + w / 2, y - h / 2), q(x + w / 2, y + h / 2), q(x - w / 2, y + h / 2)]
+    return Face(Wire(Polyline(*pts, close=True).edges()))
+
+
+def outline(plane, start, segments):
+    """A face from a closed outline on `plane`: from `start` (x, y), each segment ("line", (x1, y1)) or
+    ("arc", (xm, ym), (x1, y1)) (a three-point arc through the middle point); closed back to `start` by a line when
+    the last segment does not end there."""
+    from build123d import Face, Line, ThreePointArc, Wire
+    q = lambda p: plane.from_local_coords((float(p[0]), float(p[1])))
+    edges, cur = [], tuple(start)                       # (from, middle or None, to)
+    for sg in segments:
+        if sg[0] == "line":
+            edges.append((cur, None, tuple(sg[1])))
+            cur = tuple(sg[1])
+        else:
+            edges.append((cur, tuple(sg[1]), tuple(sg[2])))
+            cur = tuple(sg[2])
+    edges.append((cur, None, tuple(start)))
+    edges = [e for e in edges if e[1] is not None or abs(e[0][0] - e[2][0]) + abs(e[0][1] - e[2][1]) > 1e-9]
+    ring = [p for a, m, _ in edges for p in ((a,) if m is None else (a, m))]
+    area = sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1]))
+    if area < 0:                                        # clockwise: drawn the other way, so the face faces +z
+        edges = [(b, m, a) for a, m, b in reversed(edges)]
+    out = [Line(q(a), q(b)) if m is None else ThreePointArc(q(a), q(m), q(b)) for a, m, b in edges]
+    face = Face(Wire(out))
+    if face.area < 1e-12:
+        raise ValueError("the outline encloses no area")
+    return face
+
+
+def turn(plane, x, y, nodes, edges=None):
+    """A turned body: the half-section sketch nodes [(radius, level, corner_radius)] (edges as in `profile`) revolved
+    about the axis through (x, y) on `plane`, along the plane's normal. Radius is measured from the axis, level along
+    the normal from the plane."""
+    from build123d import Axis, Plane, revolve
+    o = plane.from_local_coords((float(x), float(y)))
+    half = Plane(origin=o, x_dir=plane.x_dir, z_dir=plane.x_dir.cross(plane.z_dir))
+    return revolve(profile(half, nodes, edges), Axis(o, plane.z_dir))
+
+
+def polar(x, y, pcd, n, phase_deg=0.0):
+    """The n centres of a polar pattern: on a pitch circle of diameter pcd about (x, y), the first at phase_deg."""
+    n = int(round(n))
+    if n < 1 or pcd <= 0:
+        raise ValueError(f"a polar pattern of {n} on a Ø{pcd:g} pitch circle")
+    return [(x + pcd / 2 * math.cos(math.radians(phase_deg) + 2 * math.pi * k / n),
+             y + pcd / 2 * math.sin(math.radians(phase_deg) + 2 * math.pi * k / n)) for k in range(n)]
+
+
+def grid(x0, y0, nx, ny, px, py):
+    """The centres of a linear pattern: nx by ny, pitch px along the first axis and py along the second, from
+    (x0, y0)."""
+    nx, ny = int(round(nx)), int(round(ny))
+    if nx < 1 or ny < 1:
+        raise ValueError("a pattern needs at least one item")
+    return [(x0 + i * px, y0 + j * py) for j in range(ny) for i in range(nx)]

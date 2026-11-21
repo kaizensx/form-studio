@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import math
+import os
 import time
 import traceback
 from pathlib import Path
@@ -62,11 +63,78 @@ def _frame(d):
 # ---- defeaturing -----------------------------------------------------------------------------------------------------
 
 def defeature(shape, faces):
-    """The solid without these faces (their neighbours extended to close the gap), or None."""
-    from OCP.BRepAlgoAPI import BRepAlgoAPI_Defeaturing
-    from .solid import check
+    """The solid without these faces (their neighbours extended to close the gap), or None.
+
+    OpenCascade's defeaturing can crash the process outright on some blends (a segmentation fault on a block whose
+    rounded vertical and top edges meet in corner blends), so where the system can fork it runs in a child process:
+    a crash there is a feature that will not come off (None), not the end of the reconstruction."""
     if not faces:
         return shape
+    if hasattr(os, "fork") and os.environ.get("FORM_RECON_FORK", "1") != "0":
+        if time.perf_counter() < _broken[0]:          # it just crashed or hung on this part: the rest would too
+            return None
+        out = _forked(_defeature, shape, faces)
+        return out
+    return _defeature(shape, faces)
+
+
+DEFEATURE_S = 20.0         # seconds one defeaturing may take in its child before the feature is left on
+BROKEN_S = 300.0           # after a crash or a hang, defeaturing is not tried again for this long (the same part)
+_broken = [0.0]
+
+
+def _forked(fn, shape, *args):
+    """fn(shape, *args) -> shape or None, run in a forked child; the result comes back as a BRep file."""
+    import tempfile
+    from OCP.BRep import BRep_Builder
+    from OCP.BRepTools import BRepTools
+    from OCP.TopoDS import TopoDS_Shape
+    fd, path = tempfile.mkstemp(suffix=".brep", prefix="form-defeature-")
+    os.close(fd)
+    import warnings
+    try:
+        with warnings.catch_warnings():                 # the progress thread holds no lock the child needs; a child
+            warnings.simplefilter("ignore", DeprecationWarning)    # that hangs anyway is stopped after DEFEATURE_S
+            pid = os.fork()
+        if pid == 0:                                    # the child: never returns into the parent's code
+            code = 1
+            try:
+                out = fn(shape, *args)
+                if out is not None and BRepTools.Write_s(out, path):
+                    code = 0
+            except BaseException:                       # noqa: BLE001
+                code = 1
+            os._exit(code)
+        t_end = time.perf_counter() + DEFEATURE_S
+        while True:                                     # a child that runs past DEFEATURE_S is stopped
+            done, status = os.waitpid(pid, os.WNOHANG)
+            if done:
+                break
+            if time.perf_counter() > t_end:
+                os.kill(pid, 9)
+                os.waitpid(pid, 0)
+                _broken[0] = time.perf_counter() + BROKEN_S
+                return None
+            time.sleep(0.02)
+        if os.WIFSIGNALED(status):                      # a crash, not a feature that will not come off
+            _broken[0] = time.perf_counter() + BROKEN_S
+            return None
+        if not (os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0):
+            return None
+        sh = TopoDS_Shape()
+        if not BRepTools.Read_s(sh, path, BRep_Builder()):
+            return None
+        return sh
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
+def _defeature(shape, faces):
+    from OCP.BRepAlgoAPI import BRepAlgoAPI_Defeaturing
+    from .solid import check
     d = BRepAlgoAPI_Defeaturing()
     d.SetShape(shape)
     for f in faces:

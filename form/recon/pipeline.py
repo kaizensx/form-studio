@@ -41,6 +41,7 @@ LIMITS = [
 
 PROGRAM_ENOUGH = 80.0      # % of the surface from its features at which the program route's result is taken alone
 PROGRAM_SHARE = 0.25       # of the budget the program route may use; the layers below then get their own full budget
+LEARNED = True             # ask the optional learned engine (learned/) for a candidate when it is installed
 
 
 class Heartbeat:
@@ -134,7 +135,8 @@ def reconstruct(path, out_dir, name: str | None = None, tolerance: float = 0.02,
 
 
 def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill_holes) -> dict:
-    from . import solid
+    from . import solid, tree
+    tree._broken[0] = 0.0                               # a crash on an earlier part says nothing about this one
     t0 = time.perf_counter()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -161,6 +163,16 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     if layer >= 2:
         say({"stage": "layer2", "text": "Reading the part as sketches and extrusions", "fraction": 0.02})
         prog = _program(V, F, tol, name, out, say, t0, budget_s)
+        lc = _learned(V, F, tol, name, say) if LEARNED else None
+        if lc is not None:
+            rep["learned"] = {"status": "installed", **{k: lc["report"].get(k) for k in (
+                "engine", "licence", "verified", "hausdorff_mm", "params", "model_seconds", "seconds", "error")
+                if lc["report"].get(k) is not None}}
+            if lc.get("verified") and _better(lc, prog):  # verified and better, or it is never the result
+                lc["report"]["also_tried"] = [{k: prog["report"].get(k) for k in (
+                    "method", "verified", "hausdorff_mm", "editable_pct", "error") if prog["report"].get(k) is not None}]
+                prog = lc
+                rep["learned"]["chosen"] = True
         if prog.get("verified") and prog["report"].get("editable_pct", 0.0) >= PROGRAM_ENOUGH:
             why = (f"The program route verified first with {prog['report']['editable_pct']:g}% of the surface made by its "
                    "features; the slower layers were not needed.")
@@ -293,6 +305,18 @@ def _program(V, F, tol, name, out, say, t0, budget_s) -> dict:
         return {"report": {"method": "sketches and extrusions", "error": f"{type(e).__name__}: {e}"[:300]}}
 
 
+def _learned(V, F, tol, name, say):
+    """The learned engine's candidate (learned/), or None when it is not installed. Never raises."""
+    try:
+        from . import learned
+        if not learned.status()["installed"]:
+            return None
+        say({"stage": "layer2", "text": "Asking the learned engine for a sketch program", "fraction": 0.3})
+        return learned.candidate(V, F, tol, name=name, limit=tol)
+    except Exception as e:                              # noqa: BLE001
+        return {"report": {"method": "learned engine", "error": f"{type(e).__name__}: {e}"[:300]}, "verified": False}
+
+
 def _better(a, b) -> bool:
     """Is recipe result a better answer than b: verified first, then the share of the surface its Params drive, then
     the distance to the mesh."""
@@ -319,7 +343,7 @@ def _take_program(rep, prog, V, F, mvol, out, name, t0, tol, budget_s=240.0):
     rep["layer_achieved"] = 2
     rep["result"] = {"layer": 2, "step": f"{name}.step", "recipe": f"{name}_recipe.py",
                      "recipe_references": sorted(prog.get("refs") or []), "recipe_verified": True,
-                     "method": "sketches and extrusions",
+                     "method": r2.get("method") or "sketches and extrusions",
                      "volume_mm3": round(vol, 4), "mesh_volume_mm3": round(mvol, 4),
                      "volume_delta_mm3": round(vol - mvol, 4),
                      "volume_delta_pct": round(100 * (vol - mvol) / mvol, 5) if mvol else None,
@@ -369,12 +393,16 @@ def _headline(rep, tol):
     res["editable_pct"] = round(100.0 * mv / n, 1) if n else 0.0
     h = float(res.get("hausdorff_mm") or 0.0)
     res["within_tolerance"] = bool(h <= tol + 1e-12)
+    # the other number, never merged with editable: the share of the surface that is real CAD faces (analytic,
+    # B-spline, or made by a feature) rather than a facet copy of the mesh, counted only within the tolerance
+    res["brep_pct"] = round(max(0.0, 100.0 - float(res.get("frozen_area_pct") or 0.0)), 2) if res["within_tolerance"] else 0.0
     if n:
         what = (f"{res['editable_pct']:g}% editable ({mv} of {n} Params are dimensions that move "
                 f"{d.get('move', 0.5):g} mm), {h:.4g} mm from the mesh; {res['feature_area_pct']:g}% of the surface "
                 "from parametric features")
     else:
         what = f"0% editable (an exact copy of the mesh as a solid, no dimensions), {h:.4g} mm from the mesh"
+    what += f"; {res['brep_pct']:g}% of the surface is real CAD faces"
     res["headline"] = what + ("" if res["within_tolerance"] else f", outside the {tol:g} mm asked for")
     if not res["within_tolerance"]:
         res["warning"] = (f"The result is {h:.4g} mm from the mesh, more than the {tol:g} mm tolerance asked for: the best "

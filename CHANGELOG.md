@@ -60,6 +60,33 @@
   found first for "full-face helmet separate parts magnets lens texture".
 - **A neutral radial pattern.** `craft.organic.web_heightmap` is now `radial_grid_heightmap` (straight rings by
   default; the old name still works), and the hidden mask exemplar describes its hex default without any likeness.
+- **Mesh to CAD: two numbers, never merged.** Every reconstruction now reports, beside editable (the share of its
+  Params that are real dimensions and move 0.5 mm), the share of its surface that is real CAD faces rather than a
+  facet copy of the mesh (`result.brep_pct`, counted only within the tolerance). `scripts/recon_bench.py` measures
+  both per part class (bracket, flange, turned shaft, enclosure with holes, filleted block) and runs each part in
+  its own process, so a part that crashes the kernel is reported instead of ending the run.
+- **Turned parts as one revolved profile.** When every section of a part is one circle (and at most one bore) about
+  one axis, the program route reads its half-section and revolves it: steps, chamfers, grooves and rounds become
+  diameters, levels and radii. Holes off the axis stay features.
+- **Polar patterns.** Equal holes equally spaced on a circle become one pattern with a pitch-circle diameter Param
+  that moves every hole at once.
+- **A stepwise loop and a guard on other directions.** A stepwise loop (`form/recon/stepwise.py`) adds one feature
+  that the batch kept as the mesh back at a time and keeps it only when the residual against the mesh drops, and
+  drops features of the other directions the result does not need. A result carved by the other directions now
+  replaces the main direction's verified one only if it does not lower the share of its Params that are dimensions
+  and does not bring more than 1.5 times the Params: measured on the bench, reading the other directions above 80%
+  gained surface but cost editability, so they still start below 80%.
+- **Wider honest ranges.** A level or coordinate Param may now move 0.4 of the way to the nearest value on each side
+  (it was the nearest value on either side), so a 1 mm chamfer's levels can move 0.5 mm away from each other.
+- **No crash on corner blends.** Defeaturing in the feature tree runs in a forked child: a block whose rounded edges
+  meet in corner blends crashed the whole reconstruction (a segmentation fault in OpenCascade); now that feature
+  simply stays.
+- **Optional learned engine (CAD-Recode), opt-in.** `form install recon.learned` shows its size (3.09 GB of weights
+  plus PyTorch) and its non-commercial licence (CC BY-NC 4.0) before anything is downloaded; the download refuses to
+  start without `--accept-licence cc-by-nc-4.0`. It is never bundled and runs offline. Its CadQuery output is read,
+  never executed, as sketch extrusions, placed and snapped onto the mesh, and accepted only through the same verify
+  and comparison gates as every other candidate. Not installed, nothing changes.
+
 - **Make editable makes it editable.** A mesh is now read the way it was modelled: sketches of lines, arcs and rounded
   corners extruded and lofted between levels, with every coordinate, level, radius and diameter a Param (pooled,
   snapped to round numbers and standard hole sizes, mirrored about the centre, each saying where it came from). What

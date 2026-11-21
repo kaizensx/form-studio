@@ -157,9 +157,69 @@ def wallet_plate():
     return plate, {"holes": [3.4], "prismatic": True, "pins": [6.0]}
 
 
+def bolt_flange():
+    """A bolted flange: a Ø80 disc with a raised hub, a Ø20 bore, six Ø9 bolt holes on a Ø60 pitch circle and a
+    bevelled rim."""
+    from build123d import Align, Cylinder, Pos, chamfer
+    A = (Align.CENTER, Align.CENTER, Align.MIN)
+    part = Cylinder(40, 10, align=A) + Pos(0, 0, 10) * Cylinder(20, 15, align=A)
+    rim = [e for e in part.edges() if e.geom_type.name == "CIRCLE" and abs(e.radius - 40) < 1e-6
+           and abs(e.center().Z - 10) < 1e-6]
+    part = chamfer(rim, 1.0)
+    part = part - Pos(0, 0, -1) * Cylinder(10, 27, align=A)
+    for k in range(6):
+        a = math.radians(60 * k)
+        part = part - Pos(30 * math.cos(a), 30 * math.sin(a), -1) * Cylinder(4.5, 12, align=A)
+    return part, {"holes": sorted([9.0] * 6 + [20.0]), "prismatic": True, "pattern": {"count": 6, "pcd": 60.0}}
+
+
+def turned_shaft():
+    """A stepped shaft as a lathe makes it: Ø16, Ø25 and Ø20 steps, chamfered ends and a fillet at the shoulder."""
+    from build123d import Axis, Plane, Polyline, chamfer, fillet, make_face, revolve
+    pts = [(0, 0), (8, 0), (8, 25), (12.5, 25), (12.5, 65), (10, 65), (10, 95), (0, 95)]     # r, z
+    part = revolve(make_face(Plane.XZ * Polyline(*pts, close=True)), Axis.Z)
+    circ = lambda r, z: [e for e in part.edges() if e.geom_type.name == "CIRCLE" and abs(e.radius - r) < 1e-6
+                         and abs(e.center().Z - z) < 1e-6]
+    part = fillet(circ(8, 25), 1.0)
+    part = chamfer(circ(8, 0) + circ(10, 95), 1.0)
+    return part, {"diameters": [16.0, 25.0, 20.0], "prismatic": False, "chamfers": [1.0], "fillets": [1.0]}
+
+
+def enclosure_with_holes():
+    """An open enclosure: 80 x 60 x 40 with 2 mm walls and rounded vertical corners, four Ø3.4 holes in the floor,
+    two Ø6 holes through one side wall and a rectangular cut-out in the front."""
+    from build123d import Align, Axis, Box, Cylinder, Pos, Rot, fillet
+    A = (Align.CENTER, Align.CENTER, Align.MIN)
+    outer = Box(80, 60, 40, align=A)
+    outer = fillet(outer.edges().filter_by(Axis.Z), 4.0)
+    inner = Pos(0, 0, 2) * Box(76, 56, 40, align=A)
+    inner = fillet(inner.edges().filter_by(Axis.Z), 2.0)
+    body = outer - inner
+    for x, y in ((-30, -20), (30, -20), (-30, 20), (30, 20)):
+        body = body - Pos(x, y, -1) * Cylinder(1.7, 4, align=A)
+    for y in (-12.0, 12.0):
+        body = body - Pos(37, y, 20) * Rot(0, 90, 0) * Cylinder(3.0, 6, align=A)
+    body = body - Pos(0, -30, 25) * Box(30, 6, 12, align=(Align.CENTER, Align.CENTER, Align.CENTER))
+    return body, {"holes": sorted([3.4] * 4 + [6.0] * 2), "prismatic": True}
+
+
+def filleted_block():
+    """A block with rounded vertical edges, a rounded top edge all round and a Ø8 hole through it."""
+    from build123d import Align, Axis, Box, Cylinder, Pos, fillet
+    A = (Align.CENTER, Align.CENTER, Align.MIN)
+    body = Box(50, 30, 20, align=A)
+    body = fillet(body.edges().filter_by(Axis.Z), 5.0)
+    top = [e for e in body.edges() if abs(e.center().Z - 20) < 1e-6]
+    body = fillet(top, 2.0)
+    body = body - Pos(0, 0, -1) * Cylinder(4.0, 22, align=A)
+    return body, {"holes": [8.0], "prismatic": True, "fillets": [2.0, 5.0]}
+
+
 FIXTURES = {"box_with_holes": box_with_holes, "turned_part": turned_part, "filleted_bracket": filleted_bracket, "gear": gear,
             "stepped_bracket": stepped_bracket, "flanged_shaft": flanged_shaft, "spur_gear": spur_gear_part,
-            "organic_blob": organic_blob, "wallet_plate": wallet_plate}
+            "organic_blob": organic_blob, "wallet_plate": wallet_plate,
+            "bolt_flange": bolt_flange, "turned_shaft": turned_shaft, "enclosure_with_holes": enclosure_with_holes,
+            "filleted_block": filleted_block}
 
 
 # A smooth shape meshed finely, the way a scan or a careful export is: its facets are within 0.01 mm of the surface
