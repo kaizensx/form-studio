@@ -50,7 +50,7 @@ GROUPS = [("engine", "Form Studio itself"), ("ai", "Claude Code"), ("agents", "O
 # group → the capability (form/capabilities.py) a registry item belongs to, unless it names its own
 CAPABILITY_OF_GROUP = {"engine": "core", "slicer": "print", "ai": "agent", "agents": "agent", "form": "core"}
 CAPABILITY_OF_ID = {"parts": "parts", "blender": "render", "freecad": "exchange", "openscad": "exchange",
-                    "recon.learned": "mesh"}
+                    "recon.learned": "mesh", "exemplars.cadevolve": "core"}
 
 
 # ---- model --------------------------------------------------------------------------------------------------------
@@ -375,6 +375,31 @@ def _m_learned(platform, ctx) -> list[Method]:
             Method("pip", "pip", commands=[f"{py} -m pip install {pins}", fetch], needs=("#pip",), note=note)]
 
 
+def _d_corpus(cfg, ctx) -> Found:
+    from .exemplars import corpus
+    st = corpus.status(Path(cfg["data"]["dir"]).expanduser() / "corpus" / "cadevolve"
+                       if not os.environ.get("FORM_EXEMPLAR_CORPUS_DIR") else None)
+    if st["installed"]:
+        return Found("ok", f"{st.get('entries', 0)} reference generators in {st['folder']} (licence {corpus.LICENCE})",
+                     path=st["folder"])
+    return Found("missing", "Optional. Not downloaded. Design examples work fully without it.", path=st["folder"])
+
+
+def _m_corpus(platform, ctx) -> list[Method]:
+    from .exemplars import corpus
+    note = (f"Downloads {corpus.TAR_BYTES / 1e9:.2f} GB from huggingface.co/datasets/{corpus.REPO} and keeps only "
+            f"CADEvolve-G/parametric_generators.json (never the ABC-* or ShapeNet-* folders). Licence: {corpus.LICENCE} "
+            f"({corpus.LICENCE_URL}); by installing you accept it. Read as reference text, never run.")
+    if frozen():
+        def fetch() -> str:
+            info = corpus.download(corpus.corpus_dir())
+            return f"Kept {', '.join(info['kept'])} in {corpus.corpus_dir()}"
+        return [Method("download", "Download in the app", kind="action", action=fetch, note=note)]
+    py = _q(sys.executable, platform)
+    return [Method("python", "Python", commands=[f"{py} -m form.exemplars.corpus download --accept-licence "
+                                                 f"{corpus.LICENCE_ID}"], note=note)]
+
+
 def _m_claude(platform, ctx) -> list[Method]:
     # The commands on the official setup page (CLAUDE_DOCS), unchanged.
     if platform == "windows":
@@ -572,6 +597,12 @@ REGISTRY: list[Software] = [
              "proposal is snapped to the mesh and kept only when it verifies; mesh to CAD works fully without it.",
              "optional", "engine", _d_learned, _m_learned, size="3.09 GB of weights, plus about 1 GB of PyTorch and Transformers",
              homepage="https://huggingface.co/filapro/cad-recode", licence="CC BY-NC 4.0 (non-commercial use only)"),
+    Software("exemplars.cadevolve", "Reference CadQuery corpus (CADEvolve)",
+             "Optional: about 8,000 parametric CadQuery generators from CADEvolve, offered to the agent after Form "
+             "Studio's own design examples, labelled reference CadQuery, not the Form API. Read as text, never run.",
+             "optional", "engine", _d_corpus, _m_corpus,
+             size="4.73 GB download; only CADEvolve-G/parametric_generators.json is kept",
+             homepage="https://huggingface.co/datasets/kulibinai/cadevolve", licence="Apache-2.0"),
     Software("claude", "Claude Code", "Anthropic's agent. Chat can run it on your own Claude account. Everything else works without it.",
              "recommended", "ai", _d_claude, _m_claude, size="about 280 MB", homepage=CLAUDE_DOCS),
     Software("claude.signin", "Claude sign-in", "Claude Code answers in chat only when it is signed in to your account.",

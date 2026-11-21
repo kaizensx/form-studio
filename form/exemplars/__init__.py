@@ -27,6 +27,15 @@ An exemplar whose META says "retrieval": False is kept in the repo (it still bui
 snippets and the listing never offer it, so the agent does not learn from it; get(name) still returns it, with the
 reason. character_mask, prop_mask and scifi_helmet are flagged so until they are redone: they read as eggs.
 
+Ported exemplars carry META "origin": {"repo", "sha", "path", "seed", "licence", "modified"}: twelve were hand-ported
+from the seeds of kulibinai/CADEvolve (Apache-2.0, see LICENSE-CADEvolve here) to build123d and FeatureDesign.
+
+A second, lower tier (form/exemplars/corpus.py, opt in: `form install exemplars.cadevolve`): when CADEvolve's parametric
+CadQuery generators are installed, search() appends up to `reference` hits from them after every Form exemplar hit,
+each marked {"tier": "reference", "label": "reference CadQuery, not the Form API"}; get("cadevolve:<name>") returns
+one with its code. A corpus hit never outranks a Form exemplar, a category search never includes one, and without the
+corpus search() is unchanged. corpus.py is not an exemplar (_files() skips it).
+
 Reading the catalogue parses the files (ast) and imports nothing, so the MCP server stays importable without OCCT.
 The packaged app ships these files as source (packaging/form.spec); tests/test_packaging_data.py checks it.
 """
@@ -44,8 +53,11 @@ _SNIP = re.compile(r"^([ \t]*)# --- snippet:\s*(.+?)\s*$(.*?)^[ \t]*# --- end sn
 _CACHE: dict = {}
 
 
+NOT_EXEMPLARS = {"corpus"}                    # modules in this folder that are not designs
+
+
 def _files() -> list[Path]:
-    return sorted(p for p in HERE.glob("*.py") if not p.name.startswith("_"))
+    return sorted(p for p in HERE.glob("*.py") if not p.name.startswith("_") and p.stem not in NOT_EXEMPLARS)
 
 
 def _snippets_of(src: str, name: str) -> list[dict]:
@@ -81,7 +93,8 @@ def _meta(path: Path) -> dict:
            "retrieval": bool(meta.get("retrieval", True)), "retrieval_note": meta.get("retrieval_note", ""),
            "snippets": [s["title"] for s in _snippets_of(src, path.stem)],
            "steps": list(meta["steps"]) if isinstance(meta.get("steps"), list) else _steps_of(tree),
-           **({"route": meta["route"]} if isinstance(meta.get("route"), dict) else {})}
+           **({"route": meta["route"]} if isinstance(meta.get("route"), dict) else {}),
+           **({"origin": dict(meta["origin"])} if isinstance(meta.get("origin"), dict) else {})}
     _CACHE[key] = out
     return out
 
@@ -253,10 +266,13 @@ def routed(query: str, cat: list[dict] | None = None) -> list[str]:
     return out
 
 
-def search(query: str, limit: int = 5, category: str | None = None) -> list[dict]:
+def search(query: str, limit: int = 5, category: str | None = None, reference: int = 2) -> list[dict]:
     """Exemplars ranked for the query (BM25 over name, tags, title, category, snippet titles, techniques, craft calls,
     summary and lessons); a query routed to an exemplar (routed()) puts it first. Each hit carries the technique
-    snippets that match the query best (up to 2) and its decomposed steps."""
+    snippets that match the query best (up to 2) and its decomposed steps.
+
+    Then, only when the opt-in CADEvolve corpus is installed and no category is asked for, up to `reference` corpus
+    hits follow the Form hits (reference_hits()): lower tier, labelled "reference CadQuery, not the Form API"."""
     cat = [e for e in retrievable() if not category or e.get("category") == category]
     ranked = [e for _, e in _rank(query, [(e, _doc(e)) for e in cat])]
     first = routed(query, cat)
@@ -267,7 +283,39 @@ def search(query: str, limit: int = 5, category: str | None = None) -> list[dict
         snips = snippets(query, limit=2, names=[h["name"]])
         if snips:
             h["matching_snippets"] = snips
+    if reference > 0 and not category:
+        hits += reference_hits(query, reference)     # always after every Form hit: a corpus hit never outranks one
     return hits
+
+
+def _corpus():
+    """form.exemplars.corpus, or None where it cannot be imported (a copy of this file loaded on its own)."""
+    try:
+        from . import corpus
+        return corpus
+    except ImportError:
+        return None
+
+
+def reference_hits(query: str, limit: int = 2) -> list[dict]:
+    """The second tier: CADEvolve generators ranked for the query (BM25 over name, title and summary, the code a
+    little), each marked tier "reference". Empty when the opt-in corpus is not installed. Never raises."""
+    c = _corpus()
+    if c is None or limit <= 0 or not c.installed():
+        return []
+    try:
+        rows = []
+        for e in c.entries():
+            tf: dict = {}
+            for field, w in (("name", 2.0), ("title", 2.0), ("summary", 1.0)):
+                for t in _tokens(e.get(field, "").replace(c.PREFIX, "")):
+                    tf[t] = tf.get(t, 0.0) + w
+            for t in _tokens(e.get("code", "")[:4000]):
+                tf[t] = tf.get(t, 0.0) + 0.1
+            rows.append(({k: e[k] for k in ("name", "title", "summary")}, tf))
+        return [c.hit(e) for _, e in _rank(query, rows)[:limit]]
+    except Exception:                                  # noqa: BLE001  (a broken corpus must not break search)
+        return []
 
 
 def snippets(query: str = "", limit: int = 4, names: list[str] | None = None) -> list[dict]:
@@ -300,8 +348,11 @@ def coverage() -> dict:
 
 
 def get(name: str) -> dict:
+    c = _corpus()
+    if c is not None and str(name or "").startswith(c.PREFIX):        # a reference hit from the CADEvolve tier
+        return c.get(name)
     p = HERE / f"{name}.py"
-    if not re.fullmatch(r"[a-z0-9_]+", name or "") or not p.is_file():
+    if not re.fullmatch(r"[a-z0-9_]+", name or "") or name in NOT_EXEMPLARS or not p.is_file():
         raise KeyError(name)
     src = p.read_text(encoding="utf-8")
     meta = _meta(p)
@@ -313,7 +364,7 @@ def get(name: str) -> dict:
 
 def path(name: str) -> Path:
     p = HERE / f"{name}.py"
-    if not p.is_file():
+    if name in NOT_EXEMPLARS or not p.is_file():
         raise KeyError(name)
     return p
 
