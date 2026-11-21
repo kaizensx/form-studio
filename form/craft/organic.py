@@ -765,11 +765,12 @@ def split_with_magnets(body, x: float, spots, magnet_d: float, magnet_t: float, 
     return one(front), one(back)
 
 
-def web_heightmap(path, spokes: int = 24, rings: int = 14, line: float = 0.010, sag: float = 0.35,
-                  size=(2048, 1024)) -> str:
-    """A grayscale heightmap of a web relief (radial spokes from a pole, rings sagging between them) for
+def radial_grid_heightmap(path, spokes: int = 24, rings: int = 14, line: float = 0.010, sag: float = 0.0,
+                          size=(2048, 1024)) -> str:
+    """A grayscale heightmap of a polar grid relief (straight spokes from a pole crossed by rings) for
     MeshTexture("heightmap", projection="spherical", axis=<the pole>): u is the angle round the pole, v the angle
-    from it. Raised lines on a flat ground; written to path (PNG) once, returned."""
+    from it. Raised lines on a flat ground; written to path (PNG) once, returned. sag (0 by default) bows the rings
+    between spokes. A neutral, technical pattern; prefer MeshTexture("hex") for armour-like panels."""
     import os
     import numpy as np
     from PIL import Image
@@ -782,13 +783,19 @@ def web_heightmap(path, spokes: int = 24, rings: int = 14, line: float = 0.010, 
     k = U * spokes
     du = np.abs(k - np.round(k)) / spokes                       # distance (in u) to the nearest spoke
     frac = k - np.floor(k)
-    ring_v = Vv * rings + sag * np.sin(np.pi * frac)               # rings droop between spokes, like a web
+    ring_v = Vv * rings + sag * np.sin(np.pi * frac)
     dv = np.abs(ring_v - np.round(ring_v)) / rings
     near = np.minimum(du * 2 * np.pi * np.sin(np.clip(Vv * np.pi, 0.05, np.pi)), dv * np.pi)
     hmap = np.clip(1 - near / line, 0, 1) ** 0.6
     hmap[Vv < 0.012] = 1.0                                       # the hub
     Image.fromarray((hmap * 255).astype(np.uint8)).save(path)
     return str(path)
+
+
+def web_heightmap(path, spokes: int = 24, rings: int = 14, line: float = 0.010, sag: float = 0.35, size=(2048, 1024)):
+    """Deprecated name of radial_grid_heightmap (kept so existing designs still build; its old default sag)."""
+    note("web_heightmap is deprecated; use radial_grid_heightmap")
+    return radial_grid_heightmap(path, spokes, rings, line, sag, size)
 
 
 def split_spots(body, x: float, heights, magnet_d: float, boss_wall: float = 2.0, sink: float = 1.2):

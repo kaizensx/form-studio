@@ -801,3 +801,167 @@ def fit_cage(cage: Cage, targets_fn, rounds: int = 6, smooth: float = 0.02, k: i
 def note_tier(what: str) -> None:
     note(f"{what}: sculpted surface (subdivision cage to NURBS); its handles are parameters, its shape between them "
          "is the cage's")
+
+
+# ── the skin route: a section stack fitted as one B-spline grid ───────────────────────────────────────────────────
+#
+# A loft through 60-70-point periodic splines makes one heavy face per pair of sections, and "offsets" built as
+# independent lofts of nudged sections share faces with each other, so booleans between bands fail. Here the stack
+# is sampled in numpy, one bicubic grid is fitted to it (the crown at the middle of the parameter square, the lowest
+# section on the circle DISK_R), and every offset is the same grid offset along its normal: a shell is three faces
+# (outside, inside, rim), a band is three faces clipped by its region, and no two offsets share a face.
+
+def _section_points(s: dict, th: np.ndarray) -> np.ndarray:
+    """Points of one section dict ({z, a, b, n, cx, cy, squash, rotate}) at superellipse parameters th: (len(th), 3).
+    The same law as surfaces.superellipse, vectorised; every section is sampled at the same parameters, so the
+    meridians (lines of constant th) never twist."""
+    a, b, n = float(s["a"]), float(s["b"]), float(s.get("n", 2.0))
+    ct, st = np.cos(th), np.sin(th)
+    x = a * np.sign(ct) * np.abs(ct) ** (2.0 / n)
+    y = b * np.sign(st) * np.abs(st) ** (2.0 / n)
+    sq = float(s.get("squash", 0.0) or 0.0)
+    if sq:
+        y = np.where(x > 0, y * (1 - sq * (x / a) ** 2), y)
+    r = math.radians(float(s.get("rotate", 0.0) or 0.0))
+    c, si = math.cos(r), math.sin(r)
+    x, y = x * c - y * si, x * si + y * c
+    return np.stack([x + float(s.get("cx", 0.0) or 0.0), y + float(s.get("cy", 0.0) or 0.0),
+                     np.full_like(th, float(s["z"]))], axis=1)
+
+
+def _ext_weight(tau: np.ndarray, tb: float) -> np.ndarray:
+    """The integral of a smoothstep rising from 0 at tau = 0 to 1 at tau = tb (a C1 blend between two directions)."""
+    x = np.clip(tau / tb, 0, None)
+    return np.where(x <= 1, tb * (x ** 3 - x ** 4 / 2), tb * 0.5 + (tau - tb))
+
+
+@dataclass
+class Skin:
+    """An organic skin as one exact B-spline grid C (n x n poles), trimmed by the circle `radius` of its parameter
+    square. The circle is the lowest section; the middle of the square is the crown. Offsets are the same grid offset
+    along its normal (offset_grid), cached, so the outside, the inside and every band share no faces.
+
+        skin = subd.skin_from_sections(secs, tip)       # skin.deviation: how far the fit is from the sections
+        shell = skin.shell(3.0)                         # three faces
+        pad = skin.band(2.0, region, depth=1.5)         # a raised pad: the layer -1.5 .. +2 mm, clipped to region
+        lens = skin.layer(-9, -6) & window              # a lens that follows the inside, 6-9 mm in"""
+    C: np.ndarray
+    radius: float = DISK_R
+    deviation: dict | None = None
+    label: str = "skin"
+
+    def __post_init__(self):
+        self._off: dict = {}
+
+    def offset(self, d: float) -> np.ndarray:
+        """The grid of the skin offset by d mm along its outward normal (negative: inward)."""
+        k = round(float(d), 4)
+        if k == 0:
+            return self.C
+        if k not in self._off:
+            self._off[k] = offset_grid(self.C, k)
+        return self._off[k]
+
+    def ray(self, origin, direction, d: float = 0.0):
+        """Where a ray from origin along direction first meets the skin offset by d: (point, outward unit normal).
+        The surface is the whole grid (its margin past the trim included), so aim inside the trimmed skin."""
+        from build123d import Vector
+        from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
+        from OCP.gp import gp_Dir, gp_Lin, gp_Pnt
+        face = grid_face(self.offset(d))
+        inter = BRepIntCurveSurface_Inter()
+        inter.Init(face.wrapped, gp_Lin(gp_Pnt(*map(float, origin)), gp_Dir(*map(float, direction))), 1e-7)
+        best = None
+        while inter.More():
+            if inter.W() > 1e-6 and (best is None or inter.W() < best[0]):
+                p = inter.Pnt()
+                best = (inter.W(), np.array([p.X(), p.Y(), p.Z()]))
+            inter.Next()
+        need(best is not None, "Skin.ray: the ray misses the skin", "Aim the ray at the skin.", ["origin", "direction"])
+        p = best[1]
+        nv = face.normal_at(Vector(*p))
+        nrm = np.array([nv.X, nv.Y, nv.Z])
+        nrm /= np.linalg.norm(nrm) or 1.0
+        c = self.C.reshape(-1, 3).mean(0)
+        if np.dot(nrm, p - c) < 0:                                       # outward: away from the cage's middle
+            nrm = -nrm
+        return tuple(float(x) for x in p), tuple(float(x) for x in nrm)
+
+    def layer(self, lo: float, hi: float, label: str = ""):
+        """The solid between the skin offset by lo and by hi (lo < hi, mm, + outward): three faces."""
+        need(hi - lo > 0.05, f"subd.Skin.layer: hi ({hi:g}) must be above lo ({lo:g})", "Give lo < hi.", ["lo", "hi"])
+        return trimmed_shell_solid(self.offset(hi), self.offset(lo), self.radius, label=label or self.label)
+
+    def shell(self, wall: float, label: str = ""):
+        """The skin and its inside, wall mm in along the normal, joined at the rim: a closed solid of three faces."""
+        need(wall > 0, "subd.Skin.shell: the wall must be positive", "Give a wall thickness in mm.", ["wall"])
+        return self.layer(-float(wall), 0.0, label)
+
+    def band(self, amount: float, region, depth: float = 1.0):
+        """A pad, rim or trim strip that follows the skin: the layer from depth mm under the skin to amount mm over
+        it, clipped to region (a solid, or a list of solids united first, so regions with the same amount make one
+        band and never share a face). Union it with the shell; keep depth under the wall."""
+        from ._common import attempt, one
+        need(amount > 0 and depth > 0, "subd.Skin.band: amount and depth must be positive",
+             "Give the band's height over the skin and its root depth in mm.", ["amount", "depth"])
+        if isinstance(region, (list, tuple)):
+            reg = region[0]
+            for r in region[1:]:
+                reg = reg + r
+            region = reg
+        lay = self.layer(-float(depth), float(amount))
+        return attempt("Skin.band", [("clip", lambda: one(lay & region))],
+                       "The region does not reach the skin; move or enlarge it.", ["region"])
+
+
+def skin_from_sections(sections: list[dict], tip=None, n: int = 18, radius: float = DISK_R, around: int = 120,
+                       along: int = 44, smooth: float = 2e-5, label: str = "skin") -> Skin:
+    """Fit one B-spline grid (n x n poles) to a section stack (organic.profile_sections, helmet_fullface()["sections"],
+    dome_sections: [{z, a, b, n, cx, cy, squash, rotate}, ...] rising in z) closed by tip (x, y, z) above the last
+    section. The stack is sampled in numpy (around x along points on the meridians), mapped onto a disk of the grid's
+    parameter square (the crown at its middle, the lowest section on the circle `radius`), carried a little past the
+    lowest section (turning to straight down, so the trimmed skin has a smooth margin) and fitted in one sparse solve.
+
+    Returns a Skin whose .deviation is measured: {"max_mm", "mean_mm", "p95_mm", "samples"} over the sampled section
+    points inside the trim (distance from each section point to the surface at its parameters, an upper bound on the
+    true distance). It is also left as a craft note. A finer grid (n 20-24) follows tighter curvature."""
+    from scipy.interpolate import CubicSpline
+    need(len(sections) >= 3, "skin_from_sections needs at least 3 sections", "Add sections.", ["sections"])
+    zs = [float(s["z"]) for s in sections]
+    need(all(b > a for a, b in zip(zs, zs[1:])), "skin_from_sections: sections must rise in z",
+         "Sort the sections by z.", ["sections"])
+    need(tip is not None, "skin_from_sections: the stack needs a tip (a closed crown)",
+         "Give tip=(x, y, z) above the last section, as profile_sections(crown=...) returns.", ["tip"])
+    n = int(n)
+    need(8 <= n <= 40, f"skin_from_sections: n = {n} is outside 8-40", "Use n between 12 and 24.", ["n"])
+    th = np.linspace(-math.pi, math.pi, int(around), endpoint=False)
+    M = np.stack([_section_points(s, th) for s in sections] + [np.tile(np.asarray(tip, float), (len(th), 1))])
+    # M: (K + 1, around, 3), bottom to tip. Meridian parameter rho: 1 at the lowest section, 0 at the tip, by chord
+    seg = np.linalg.norm(np.diff(M, axis=0), axis=2)
+    cum = np.vstack([np.zeros((1, len(th))), np.cumsum(seg, axis=0)])
+    rho = 1.0 - cum / cum[-1]
+    corner = math.sqrt(0.5) / radius                                     # rho at the parameter square's corners
+    rr = np.r_[np.linspace(0.0, 1.0, int(along)), np.linspace(1.0, corner + 0.02, max(6, int(along) // 4))[1:]]
+    P = np.empty((len(rr), len(th), 3))
+    inside = rr <= 1.0
+    tau = rr[~inside] - 1.0
+    W = _ext_weight(tau, 0.15)[:, None]
+    for j in range(len(th)):
+        cs = CubicSpline(rho[::-1, j], M[::-1, j, :], bc_type="natural")
+        P[inside, j] = cs(rr[inside])
+        T = cs(1.0, 1)                                                   # leave along the tangent, then straight down
+        D = np.array([0.0, 0.0, -np.linalg.norm(T)])
+        P[~inside, j] = cs(1.0) + T * (tau[:, None] - W) + D * W
+    R, TH = np.meshgrid(rr, th, indexing="ij")
+    s = 0.5 + radius * R * np.cos(TH)
+    t = 0.5 + radius * R * np.sin(TH)
+    keep = (s >= 0) & (s <= 1) & (t >= 0) & (t <= 1)
+    w = np.maximum(R, 0.08)                                              # polar samples crowd at the crown
+    C = fit_grid(P[keep], s[keep], t[keep], n, n, smooth=smooth, weights=w[keep])
+    ins = keep & (R <= 1.0)
+    d = np.linalg.norm(grid_eval(C, s[ins], t[ins]) - P[ins], axis=1)
+    dev = {"max_mm": round(float(d.max()), 3), "mean_mm": round(float(d.mean()), 3),
+           "p95_mm": round(float(np.percentile(d, 95)), 3), "samples": int(d.size)}
+    note(f"skin_from_sections: the {label} is one {n} x {n} B-spline grid fitted to {len(sections)} sections; "
+         f"deviation from the sections max {dev['max_mm']:g} mm, mean {dev['mean_mm']:g} mm")
+    return Skin(C, float(radius), dev, label)

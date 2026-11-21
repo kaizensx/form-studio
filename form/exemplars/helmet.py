@@ -16,10 +16,11 @@ META = {
     "product_class": "helmet_fullface",
     "tags": ["helmet", "motorcycle", "full-face", "shell", "organic", "texture", "textured", "carbon", "twill",
              "vents", "visor", "spoiler", "loft", "mesh texture", "styled", "wearable", "head", "trim"],
-    "techniques": ["craft.helmet_fullface (head size -> guide curves -> sections)", "craft.checked_body (loft with "
-                   "fold check)", "craft.inset_body hollowing", "side-profile cutter for the lower edge",
-                   "craft.two_view_cutter for the eye port and the visor", "craft.surface_band for trim, scoops, pads, "
-                   "spoiler", "craft.slot_grille vents", "MeshTexture weave outside only", "appearance() zones for "
+    "techniques": ["craft.helmet_fullface (head size -> guide curves -> sections)", "craft.skin_from_sections (the "
+                   "sections fitted as one B-spline skin, deviation measured)", "Skin.shell hollowing along the "
+                   "normal", "side-profile cutter for the lower edge",
+                   "craft.two_view_cutter for the eye port and the visor", "Skin.band for trim, scoops, pads, "
+                   "spoiler", "craft.parts for the visor (a separate part)", "craft.slot_grille vents", "MeshTexture weave outside only", "appearance() zones for "
                    "photos: carbon shell, smoked visor, rubber trim"],
     "lessons": [
         "Size it from a head, not from a dome: craft.head_form(\"J\") gives an EN 960 headform's length, breadth, eye "
@@ -30,10 +31,14 @@ META = {
         "at the chin bar) and the plan (a narrow prow at the chin) as guide curves; profile_sections turns them into "
         "sections. Only then add details.",
         "Hollow along the normal, not in plan: an inset that only shrinks each section's half-widths leaves the flat "
-        "crown about a millimetre thick (critique's ray wall check finds it). craft.inset_body offsets "
-        "along the surface normal.",
-        "Check every loft: craft.checked_body runs check_sections (order, seams, steep steps) and loft_report (the "
-        "skin's normals; a fold is a crease inside a face that should be smooth) and leaves a note if it folds.",
+        "crown about a millimetre thick (critique's ray wall check finds it). Skin.shell offsets the fitted skin "
+        "along its normal.",
+        "Fit the sections once, then offset: craft.skin_from_sections turns them into one B-spline skin and reports "
+        "how far it is from them; the shell is three faces and every band and the visor are offsets of the same skin, "
+        "so the booleans stay fast and no two layers share a face. A band that follows an edge stands back from it "
+        "(0.6 mm here): cut with the same cutter as the shell, it would share that cut face.",
+        "A visor is a separate part: craft.parts(shell=body, visor=visor) keeps the two and measures their gap. "
+        "Never fuse(body, visor, max_solids=2, min_solids=2).",
         "The lower edge is the line people recognise: lowest under the chin, a scoop up under the jaw, then rising "
         "gently to the nape. Cut it as a side-profile prism through both walls, and round the lip.",
         "Cut the eye port in two views (two_view_cutter): the side outline says how far it wraps back toward the "
@@ -98,9 +103,10 @@ class Design(Recipe):
         L, W, H, t = F["L"], F["W"], F["H"], v["wall"]
         hl = L / 2
         secs, tip = F["sections"], F["tip"]
-        outer = craft.checked_body(secs, tip, label="shell")
-        inner = craft.inset_body(secs, t, tip=tip)
-        body = craft.cut(outer, inner)
+        # one B-spline skin fitted to the sections (its deviation is measured and noted); every other surface below
+        # (the inside, trim, pads, scoops, spoiler, visor) is that skin offset along its normal, so none share faces
+        skin = craft.skin_from_sections(secs, tip, n=22, label="shell")
+        body = skin.shell(t)                                        # outside, inside, rim: three faces
         stages = [Stage("shell", body)]
 
         # the lower edge: a side-profile cut through both walls, its lip rounded
@@ -119,11 +125,15 @@ class Design(Recipe):
         stages.append(Stage("eye_port", body))
 
         # rubber trim: a 2 mm band along the lower edge and a 1.5 mm gasket round the port (it shows through the visor)
-        edge_band = _prism_y(_shift(F["edge"], 11)) - cut
-        trim = craft.surface_band(secs, tip, 2.0, edge_band, depth=t / 2)
+        # each band stands 0.6 mm back from the edge it follows: a band cut by the same cutter as the shell would
+        # share that cut face with it, and the fuse would have to merge two coincident faces
+        edge_band = _prism_y(_shift(F["edge"], 11)) - _prism_y(_shift(F["edge"], 0.6))
+        trim = skin.band(2.0, edge_band, depth=t / 2)
         grown_port = craft.two_view_cutter(craft.grow_outline(F["port_side"], 7), craft.grow_outline(F["port_front"], 7),
                                            x_range=(0, L))
-        trim = trim + craft.surface_band(secs, tip, 1.0, grown_port - port, depth=t / 2)
+        port_clear = craft.two_view_cutter(craft.grow_outline(F["port_side"], 0.6),
+                                           craft.grow_outline(F["port_front"], 0.6), x_range=(0, L))
+        trim = trim + skin.band(1.0, grown_port - port_clear, depth=t / 2)
         body = craft.fuse(body, trim)
         stages.append(Stage("trim", body))
 
@@ -131,7 +141,7 @@ class Design(Recipe):
         px, pz = F["pivot"]
         disc = Pos(px, 0, pz) * Rot(90, 0, 0) * Cylinder(26, W + 40)
         # 1.3 mm: not the gasket's 1.0 (two bands on the same offset surface share faces where they meet)
-        body = craft.fuse(body, craft.surface_band(secs, tip, 1.3, disc, depth=t / 2.5))
+        body = craft.fuse(body, skin.band(1.3, disc, depth=t / 2.5))
         stages.append(Stage("pivots", body))
 
         # chin intake: a pad on the chin bar with a lens-shaped grille of horizontal slots
@@ -141,7 +151,7 @@ class Design(Recipe):
                                          [(0, zc - 24), (34, zc - 18), (40, zc), (34, zc + 18), (0, zc + 23),
                                           (-34, zc + 18), (-40, zc), (-34, zc - 18)], x_range=(0, L),
                                          smooth=(False, True))
-        body = craft.fuse(body, craft.surface_band(secs, tip, 3.0, chin_reg, depth=t / 2))
+        body = craft.fuse(body, skin.band(3.0, chin_reg, depth=t / 2))
         body = craft.cut(body, craft.slot_grille((hl * 1.02, 0, zc), (1, 0, 0), count=4, length=58, width=4.2, pitch=9,
                                                  depth=hl * 0.7, taper=0.35, angle=90))
         stages.append(Stage("chin_vent", body))
@@ -151,7 +161,7 @@ class Design(Recipe):
         oval = [(32 * x, zb + 7 * y) for x, y in craft.superellipse(1, 1, 3.0, count=16)]
         reg = craft.two_view_cutter([(0, zb - 9), (hl * 1.3, zb - 9), (hl * 1.3, zb + 9), (0, zb + 9)], oval,
                                     x_range=(0, L), smooth=(False, True))
-        body = craft.fuse(body, craft.surface_band(secs, tip, 2.0, reg, depth=t / 2))
+        body = craft.fuse(body, skin.band(2.0, reg, depth=t / 2))
         body = craft.cut(body, craft.slot_grille((hl, 0, zb), (1, 0, 0.45), count=3, length=12, width=3.0, pitch=16,
                                                  depth=60, angle=0))
         stages.append(Stage("brow_vents", body))
@@ -159,7 +169,7 @@ class Design(Recipe):
         # crown scoops: two raised fins on top, each with a forward-facing intake slot
         feet = [Pos(L * 0.06, sy * W * 0.11, H * 0.5) * extrude(craft.superellipse_face(40, 11, 3.2, rotate=sy * 5), H)
                 for sy in (-1, 1)]
-        scoops = craft.surface_band(secs, tip, 5.5, feet[0] + feet[1], depth=t / 2)
+        scoops = skin.band(5.5, feet[0] + feet[1], depth=t / 2)
         top = [e for e in scoops.edges() if e.center().Z > H * 0.82]          # soften the scoops' top edges
         body = craft.fuse(body, craft.safe_fillet(scoops, top, 1.6))
         slots = [craft.slot_grille((L * 0.17, sy * W * 0.11, H - 18), (0.55, 0, 1), count=1, length=20, width=5,
@@ -173,7 +183,7 @@ class Design(Recipe):
         cres = craft.spline_profile([(-hl * 0.20, zs + 60), (-hl * 0.70, zs + 42), (-hl * 1.3, zs + 10),
                                      (-hl * 1.3, zs - 12), (-hl * 0.85, zs + 8), (-hl * 0.45, zs + 38)], plane=Plane.XZ)
         reg = extrude(cres, W * 0.34, both=True)
-        spoiler = craft.surface_band(secs, tip, 3.5, reg, depth=t / 2)
+        spoiler = skin.band(3.5, reg, depth=t / 2)
         spoiler = craft.safe_fillet(spoiler, [e for e in spoiler.edges() if e.center().X > -hl * 0.9], 1.5)
         body = craft.fuse(body, spoiler)
         stages.append(Stage("spoiler", body))
@@ -188,11 +198,12 @@ class Design(Recipe):
         g = v["visor_gap"]
         window = craft.two_view_cutter(F["visor_side"], [(-W, -50), (W, -50), (W, H + 50), (-W, H + 50)],
                                        x_range=(px - 40, L), smooth=(True, False))
-        hi = craft.offset_body(secs, tip, g + 2.5)
-        visor = (hi & (window + Pos(px, 0, pz) * Rot(90, 0, 0) * Cylinder(21, W + 40))) - craft.offset_body(secs, tip, g)
+        visor = skin.layer(g, g + 2.5) & (window + Pos(px, 0, pz) * Rot(90, 0, 0) * Cylinder(21, W + 40))
         visor = visor - Pos(px, 0, pz) * Rot(90, 0, 0) * Cylinder(5, W + 40)
         visor = craft.safe_fillet(visor, [e for e in visor.edges() if e.length > 25], 0.9)
-        body = craft.fuse(body, visor, max_solids=2, min_solids=2)
+        # a separate part: never fused (a fuse that must keep two solids fails the moment they touch); parts()
+        # measures the gap instead
+        body = craft.parts(shell=body, visor=visor, clearance=0.3)
         stages.append(Stage("visor", body))
         return stages
 

@@ -32,6 +32,23 @@
   assemblies) through the MCP tools with a deterministic scripted agent. It writes measured JSON: first and final build
   rate, time to the first visible solid, features built against planned, deferred features, the critic score and the
   total time.
+- **Organic shells from one fitted skin.** `craft.skin_from_sections` samples a section stack (for example
+  `helmet_fullface`) and fits one B-spline grid to it, with its deviation from the sections measured and reported
+  (the full-face helmet: max 1.4 mm, mean 0.31 mm on a 22 x 22 grid). The shell is three faces, and every band, ledge,
+  visor and lens is the same skin offset along its normal, so no two of them share a face. The carbon helmet exemplar
+  now builds in about 27 s on this route, where the audit measured 163 s for the lofted one.
+- **Separate parts, splits and magnets.** `craft.parts(shell=..., visor=...)` returns separate parts and measures every
+  pair against a clearance, instead of `fuse(a, b, max_solids=2, min_solids=2)`, which fails as soon as parts touch
+  (the helmet exemplar no longer teaches it). `craft.split` takes a faceplate or hatch out of a skin shell with a lip
+  it rests on and the same gap all round; `craft.lens` makes a lens from the inner offset skin. A `craft.MAGNETS`
+  stock table (6x2, 6x3, 8x3, 10x3 mm) with press, glue and printed-in clearances, a 0.6 mm floor checked on the
+  built part, and pocket pairs that are coaxial by construction. The pull force stays unknown unless a datasheet
+  value is given.
+- **An original hero helmet exemplar.** `hero_helmet`: a shell with a crest, ear pods and chin grille, a magnetic
+  faceplate on a lip, two lenses on magnets and a hex panel texture, built in four parts in about 12-20 s. It is
+  found first for "full-face helmet separate parts magnets lens texture".
+- **A neutral radial pattern.** `craft.organic.web_heightmap` is now `radial_grid_heightmap` (straight rings by
+  default; the old name still works), and the hidden mask exemplar describes its hex default without any likeness.
 - **Make editable makes it editable.** A mesh is now read the way it was modelled: sketches of lines, arcs and rounded
   corners extruded and lofted between levels, with every coordinate, level, radius and diameter a Param (pooled,
   snapped to round numbers and standard hole sizes, mirrored about the centre, each saying where it came from). What

@@ -1,4 +1,4 @@
-"""Character mask with magnet eyes: a full-head cowl sculpted from a subdivision cage, with a raised web relief, two
+"""Character mask with magnet eyes: a full-head cowl sculpted from a subdivision cage, with a raised hex relief, two
 eye lenses that click in from the inside on magnets, and a front/back split for printing that is held by magnets too.
 A hybrid design: the skin is a sculpted surface (its brow, cheekbones, jaw and crown are handles you drag), the parts
 that fit are exact CAD (eye openings from a constrained sketch, magnet pockets to the magnet's size plus clearance).
@@ -22,14 +22,14 @@ META = {
     "category": "organic",
     "tags": ["mask", "cowl", "character", "cosplay", "costume", "organic", "sculpted", "subd",
              "subdivision", "nurbs", "cage", "handles", "hybrid", "magnets", "magnet", "eyes", "lenses", "split",
-             "texture", "textured", "web", "relief", "sketch", "constraints", "wearable", "head"],
+             "texture", "textured", "hex", "relief", "sketch", "constraints", "wearable", "head"],
     "techniques": ["craft.subd.dome_cage (an analytic head form fitted as a grid cage)",
                    "craft.subd.apply_handles (brow, cheekbones, jaw, crown and back as parameters)",
                    "craft.subd.sculpted_shell (skin + inside offset + ruled rim: three exact faces)",
                    "form.sketch2d (the eye outline: two tangent arcs, width, tilt and radii as parameters)",
                    "craft.organic.magnet_boss (bosses grown from the inside, pockets to magnet + clearance)",
                    "craft.organic.split_with_magnets (front/back halves joined by four magnets)",
-                   "MeshTexture heightmap, spherical round the nose (web relief on STL and renders only)"],
+                   "MeshTexture hex panels (or a radial grid heightmap) on STL and renders only"],
     "lessons": [
         "Sculpt with a cage, not with sections: a head is not a stack of ellipses. craft.subd.dome_cage fits a grid "
         "cage to a head form; handles (Handle: a centre, a radius and a direction) move its points smoothly, and each "
@@ -45,7 +45,7 @@ META = {
         "Split a print-sized head where the visible seam follows a natural line (just behind the ears), and hold "
         "the halves with magnets in bosses that span the split (split_with_magnets); both pockets come from the split "
         "face, so they line up by construction.",
-        "Detail that is texture (the web relief) is a mesh texture: STL, GLB and renders carry it, the STEP stays "
+        "Detail that is texture (the hex relief) is a mesh texture: STL, GLB and renders carry it, the STEP stays "
         "the smooth skin for tooling and further CAD.",
     ],
 }
@@ -92,7 +92,7 @@ HANDLES = [
 class Design(Recipe):
     title, summary = "Character mask with magnet eyes", (
         "Full-head cowl sculpted from a subdivision cage (brow, cheekbones, jaw, chin, crown and back are handles), "
-        "a web relief, eye lenses that fit from the inside on magnets, and a front/back split held by magnets.")
+        "a hex relief, eye lenses that fit from the inside on magnets, and a front/back split held by magnets.")
     solids = 4
     photo_color = "#2f4f5f"
     params = [
@@ -111,7 +111,7 @@ class Design(Recipe):
         Param("relief", "Relief height", 0.45, 0.0, 1.2, 0.05, "mm", "form", "shell",
               "0 = smooth. A mesh texture: STL, GLB and renders; the STEP is the smooth skin."),
         Param("pattern", "Relief pattern", 0, 0, 1, 1, "", "form", "shell",
-              "0 = hexagon panels, 1 = web lines radiating from the nose (craft.organic.web_heightmap)."),
+              "0 = hexagon panels (default), 1 = a neutral radial grid (craft.organic.radial_grid_heightmap)."),
     ]
     features = [Feature("shell", "Sculpted cowl (surface body)", "structure"),
                 Feature("eyes", "Eye openings", "access"),
@@ -190,8 +190,8 @@ class Design(Recipe):
         if v["pattern"] < 0.5:
             return [MeshTexture("hex", amplitude=v["relief"], scale=11.0, groove=0.12, features=feats, facing="out",
                                 edge_falloff=2.0)]
-        path = os.path.join(tempfile.gettempdir(), "form-web-relief-24x14.png")
-        organic.web_heightmap(path, spokes=24, rings=14)
+        path = os.path.join(tempfile.gettempdir(), "form-radial-grid-24x14.png")
+        organic.radial_grid_heightmap(path, spokes=24, rings=14)
         return [MeshTexture("heightmap", amplitude=v["relief"], image=path, projection="spherical",
                             axis=(1.0, 0.0, 0.0), center=(0.0, 0.0, H * 0.55), features=feats,
                             facing="out", edge_falloff=2.0, max_edge=0.8)]
