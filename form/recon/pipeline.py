@@ -21,6 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
+from . import bounded
 from . import mesh as meshmod
 from . import verify
 
@@ -42,6 +43,9 @@ LIMITS = [
 PROGRAM_ENOUGH = 80.0      # % of the surface from its features at which the program route's result is taken alone
 PROGRAM_SHARE = 0.25       # of the budget the program route may use; the layers below then get their own full budget
 LEARNED = True             # ask the optional learned engine (learned/) for a candidate when it is installed
+PROGRAM_SLACK = 25.0       # seconds the program route may run past its share before it is stopped (bounded.py)
+LAYER1_SHARE = 0.55        # of the time left after Layer 0 that Layer 1 may use; Layer 2 has the rest
+FINISH_S = 15.0            # seconds kept back for writing the result (STEP, deviation map, dimension check)
 
 
 class Heartbeat:
@@ -138,6 +142,7 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     from . import solid, tree
     tree._broken[0] = 0.0                               # a crash on an earlier part says nothing about this one
     t0 = time.perf_counter()
+    hard = t0 + float(budget_s)                         # nothing runs past this: the steps that can are bounded
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     path = Path(path)
@@ -150,6 +155,7 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         say({"stage": "read", "text": f"{n:,} triangles: this takes a while; nothing is decimated", "fraction": 0.01})
     tol = float(tolerance)
     rep = {"version": 1, "evidence": "computed", "input": inp, "repairs": repairs, "tolerance_mm": tol,
+           "budget_s": float(budget_s),
            "layer_requested": int(layer), "layers": {}, "limits": list(LIMITS)}
     mvol = verify.mesh_volume(V, F)
     if not inp["topology"]["closed"]:
@@ -162,8 +168,17 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     prog = None
     if layer >= 2:
         say({"stage": "layer2", "text": "Reading the part as sketches and extrusions", "fraction": 0.02})
-        prog = _program(V, F, tol, name, out, say, t0, budget_s)
-        lc = _learned(V, F, tol, name, say) if LEARNED else None
+        if _program is not _PROGRAM:                    # replaced in this process (a test, the bench's "before")
+            got = {"status": "unbounded", "value": _program(V, F, tol, name, out, say, t0, budget_s)}
+        else:
+            got = bounded.run(_program_child, (V, F, tol, name, out, t0, budget_s),
+                              timeout_s=min(PROGRAM_SHARE * float(budget_s) + PROGRAM_SLACK, _left(hard)),
+                              progress=lambda d: say({**d, "fraction": 0.02 + 0.6 * d.get("fraction", 0)}))
+        prog = got.get("value") if got["status"] in ("ok", "unbounded") else None
+        if prog is None:
+            prog = {"report": {"method": "sketches and extrusions", "error": f"The program route {got.get('error')}"}}
+            _cut(rep, "the program route (sketches and extrusions)", got)
+        lc = _learned(V, F, tol, name, say) if LEARNED and _left(hard) > 0 else None
         if lc is not None:
             rep["learned"] = {"status": "installed", **{k: lc["report"].get(k) for k in (
                 "engine", "licence", "verified", "hausdorff_mm", "params", "model_seconds", "seconds", "error")
@@ -179,8 +194,8 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
             rep["layers"]["0"] = {"skipped": why}
             rep["layers"]["1"] = {"skipped": why}
             return _take_program(rep, prog, V, F, mvol, out, name, t0, tol, budget_s)
-    # the layers below get the whole budget they had before the program route existed: their clock starts after it
-    # (the program route itself is held to PROGRAM_SHARE of the budget), so a part it gives up on is never worse off
+    # the layers below have what is left of the budget: the program route is held to PROGRAM_SHARE of it (and stopped
+    # PROGRAM_SLACK past that), and nothing runs past the budget as a whole (`hard`)
     tl = time.perf_counter() if prog is not None else t0
     if prog is not None:
         rep["program_seconds"] = round(tl - t0, 2)
@@ -213,11 +228,17 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     regions = l1shape = None
     if layer >= 1 and best is not None and not (gear and gear.get("verified")):
         say({"stage": "layer1", "text": "Finding planes, cylinders, cones, spheres and tori", "fraction": 0.3})
-        try:
-            got = _layer1(V, F, tol, budget_s=max(10.0, budget_s * 0.5 - (time.perf_counter() - tl)),
-                          progress=lambda d: say({**d, "fraction": 0.3 + 0.4 * d.get("fraction", 0)}))
-        except Exception as e:                          # noqa: BLE001
-            got = {"report": {"error": f"{type(e).__name__}: {e}"[:300]}}
+        lim = LAYER1_SHARE * _left(hard)
+        run1 = bounded.run(_layer1, (V, F, tol), {"budget_s": max(5.0, 0.4 * lim)}, timeout_s=lim,
+                           progress=lambda d: say({**d, "fraction": 0.3 + 0.4 * d.get("fraction", 0)}))
+        if run1["status"] in ("ok", "unbounded"):
+            got = run1["value"]
+            for r in got.get("regions") or []:          # surfaces cached on a fit do not cross the process boundary
+                if r.prim is not None and "_geom" in r.prim.p and r.prim.p["_geom"] is None:
+                    del r.prim.p["_geom"]
+        else:
+            got = {"report": {"error": f"Layer 1 {run1.get('error')}; Layer 0 is the result."}}
+            _cut(rep, "Layer 1 (planes, cylinders, cones, spheres, tori and B-spline patches)", run1)
         rep["layers"]["1"] = got["report"]
         if got.get("shape") is not None:
             regions = got["regions"]
@@ -235,9 +256,15 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         best = ("2", gear["shape"], gear["P"], gear["T"], gear["cmp"], None)
     elif layer >= 2 and regions is not None:
         say({"stage": "layer2", "text": "Looking for features: base, holes, fillets, chamfers, patterns", "fraction": 0.72})
-        r2 = layer2(V, F, regions, l1shape, tol, name, out, rep["layers"]["1"],
-                    progress=lambda d: say({**d, "fraction": 0.72 + 0.25 * d.get("fraction", 0)}),
-                    deadline=tl + 0.92 * float(budget_s))
+        lim = _left(hard)
+        run2 = bounded.run(layer2, (V, F, regions, l1shape, tol, name, out, rep["layers"]["1"]),
+                           {"deadline": time.perf_counter() + 0.85 * lim}, timeout_s=lim,
+                           progress=lambda d: say({**d, "fraction": 0.72 + 0.25 * d.get("fraction", 0)}))
+        if run2["status"] in ("ok", "unbounded"):
+            r2 = run2["value"]
+        else:
+            r2 = {"report": {"method": "feature tree", "error": f"The feature search {run2.get('error')}"}}
+            _cut(rep, "Layer 2's feature search (base, holes, fillets, chamfers, patterns)", run2)
         if gear is not None:
             r2["report"]["also_tried"] = r2["report"].get("also_tried", []) + [
                 {k: gear["report"].get(k) for k in ("method", "base", "verified", "hausdorff_mm", "error") if gear["report"].get(k) is not None}]
@@ -294,12 +321,30 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     return _finish(rep, out, name, t0)
 
 
-def _program(V, F, tol, name, out, say, t0, budget_s) -> dict:
+def _left(hard) -> float:
+    """Seconds left before the budget's end, less what writing the result takes."""
+    return hard - FINISH_S - time.perf_counter()
+
+
+def _cut(rep, what, run):
+    """Note a step that the budget (or a crash) cut short: the result is the best found without it."""
+    rep.setdefault("cut_short", []).append({"step": what, "status": run["status"], "seconds": run.get("seconds"),
+                                            "why": run.get("error")})
+
+
+def _program_child(V, F, tol, name, out, t0, budget_s, progress=None):
+    """_program in the bounded child: the plan (only used in this process) is not sent back."""
+    got = _program(V, F, tol, name, out, progress or (lambda d: None), t0, budget_s, raw=True)
+    got.pop("plan", None)
+    return got
+
+
+def _program(V, F, tol, name, out, say, t0, budget_s, raw=False) -> dict:
     """The program route (program.py), within PROGRAM_SHARE of the budget. Never raises."""
     from . import program
     try:
         return program.recipe(V, F, tol, name=name, limit=tol, out_dir=out,
-                              progress=lambda d: say({**d, "fraction": 0.02 + 0.6 * d.get("fraction", 0)}),
+                              progress=say if raw else lambda d: say({**d, "fraction": 0.02 + 0.6 * d.get("fraction", 0)}),
                               deadline=t0 + PROGRAM_SHARE * float(budget_s))
     except Exception as e:                              # noqa: BLE001
         return {"report": {"method": "sketches and extrusions", "error": f"{type(e).__name__}: {e}"[:300]}}
@@ -315,6 +360,9 @@ def _learned(V, F, tol, name, say):
         return learned.candidate(V, F, tol, name=name, limit=tol)
     except Exception as e:                              # noqa: BLE001
         return {"report": {"method": "learned engine", "error": f"{type(e).__name__}: {e}"[:300]}, "verified": False}
+
+
+_PROGRAM = _program
 
 
 def _better(a, b) -> bool:
@@ -368,11 +416,11 @@ DIMENSION_TIME = (5.0, 30.0)   # seconds the dimension check may take: at least,
 def _dimensions(rep, src, refs, t0, budget_s, say):
     """Which Params are real dimensions that move (program.movable_dimensions), within what is left of the budget."""
     from . import program
-    left = float(budget_s) - (time.perf_counter() - t0)
+    left = float(budget_s) - (time.perf_counter() - t0) - 3.0
     say({"stage": "layer2", "text": "Checking which dimensions can be changed", "fraction": 0.96})
     try:
         d = program.movable_dimensions(src, refs, deadline=time.perf_counter()
-                                       + min(DIMENSION_TIME[1], max(DIMENSION_TIME[0], left)))
+                                       + min(DIMENSION_TIME[1], max(min(DIMENSION_TIME[0], FINISH_S - 5.0), left)))
     except Exception as e:                              # noqa: BLE001
         d = {"error": f"{type(e).__name__}: {e}"[:300], "params": 0, "dimensions": 0, "movable": 0}
     rep["result"]["dimensions"] = d
@@ -482,6 +530,11 @@ def layer2(V, F, regions, l1shape, tol, name, out, l1rep, progress=None, deadlin
 
 def _finish(rep, out, name, t0):
     rep["seconds"] = round(time.perf_counter() - t0, 2)
+    if rep.get("cut_short") and isinstance(rep.get("result"), dict):
+        steps = "; ".join(f"{c['step']} ({c['status']} after {c.get('seconds') or 0:.0f} s)" for c in rep["cut_short"])
+        rep["result"]["cut_short"] = [c["step"] for c in rep["cut_short"]]
+        rep["result"]["note"] = (f"The time budget ({rep.get('budget_s', 0):g} s) cut short: {steps}. This is the best "
+                                 "result found within it; a larger budget may find more.")
     (out / f"{name}_report.json").write_text(json.dumps(rep, indent=1, default=str), encoding="utf-8")
     return rep
 

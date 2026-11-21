@@ -744,6 +744,10 @@ class Pool:
                 above = min([x - val for x in others if x > val] or [max(abs(val), 1.0)])
                 if kind in SIZE_KINDS:
                     lo, hi = max(0.05, val * 0.7), val * 1.3
+                    if kind == "r":
+                        # a small round (a 1 mm fillet) may grow by at least half a millimetre: whether it still
+                        # fits its corner is what the build checks (sketch.path raises, the recipe does not build)
+                        hi = max(hi, val + 0.5)
                 else:
                     lo, hi = val - max(0.4 * below, self.tol), val + max(0.4 * above, self.tol)
                     if mirrored or (kind in ("Z", "H") and val > 0):
@@ -1514,13 +1518,17 @@ def recipe(V, F, tol, name="part", limit=None, out_dir=None, progress=None, dead
 
     # then the main direction alone (what reads as no sketch is kept as the mesh); then, when blocks of levels did
     # not read as sketches, again with the other directions carving them, and the best is the result
+    t_first = time.perf_counter()
     if not tries or not tries[0]["ok"] or tries[0]["edit"] < 100.0:
         first = _attempts(V, F, tol, limit, name, out, plan, [], say, deadline, "")
         tries.append(first)
     else:
         first = tries[0]
-    if not first.get("revolve") and plan["blocks"] and (not first["ok"] or first["edit"] < PROGRAM_GOOD) and \
-            (deadline is None or time.perf_counter() < deadline):
+    t_first = time.perf_counter() - t_first
+    # the other directions build several plans at once: with a verified result in hand they are tried only when at
+    # least as much time is left as the main direction alone took, so the route keeps to its deadline
+    room = deadline is None or time.perf_counter() + (t_first if first["ok"] else 0.0) < deadline
+    if not first.get("revolve") and plan["blocks"] and (not first["ok"] or first["edit"] < PROGRAM_GOOD) and room:
         restore()
         say({"stage": "layer2", "text": "Reading the part along the other directions", "fraction": 0.6})
         others = _secondary(V, F, tol, plan, O, deadline, progress, cache)
