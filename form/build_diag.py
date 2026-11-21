@@ -655,7 +655,13 @@ def wrap(e, recipe):
         d["operation"] = {"common": "intersect"}.get(rep.get("op"), rep.get("op") or d.get("operation"))
         d["boolean"] = {**boolean._public_report(rep), "evidence": "computed"}
         d["facts"] = _dedupe(boolean.report_facts(rep) + list(d.get("facts") or []))
-        if e.hint:
+        # the engine measured the cause; the text heuristic read the line (an extrude inside the call) and must not
+        # put its guess beside the measurement
+        cls = rep.get("class") or ""
+        if cls and cls != "ok":
+            d["cause"] = boolean._CLASS_WORDS.get(cls, cls)
+            d["fixes"] = [e.hint] if e.hint else []
+        elif e.hint:
             d["fixes"] = _dedupe([e.hint] + list(d.get("fixes") or []))[:5]
         d["safe"] = _SAFE.get(d["operation"], d.get("safe", ""))
     msg = str(e)
