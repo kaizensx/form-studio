@@ -106,6 +106,11 @@ def run(path: Path, tol: float, learned: bool, out: Path, budget: float, program
             "triangles": rep.get("input", {}).get("triangles") or rep.get("input", {}).get("weld", {}).get("triangles"),
             "max_progress_gap_s": round(max(gaps), 2), "error": rep.get("error") or L2.get("error"),
             "learned": (rep.get("learned") or {}).get("status"),
+            "noise_mm": ((rep.get("input") or {}).get("noise") or {}).get("noise_mm"),
+            "noisy": bool(((rep.get("input") or {}).get("noise") or {}).get("noisy")),
+            "holes_filled": sum(int(r.get("count", 1)) for r in rep.get("repairs") or []
+                                if r.get("repair") in ("filled hole", "filled holes")),
+            "pipeline_gates": rep.get("gates"),
             **critique(Path(ref or path), Path(out), res, tol)}
 
 
@@ -269,7 +274,11 @@ def write(path: Path, rows: list, status: dict, label: str = "", before: dict | 
          "*openings* (a hole, slot or pocket missing, added, or of another shape in a plane section). The time is "
          "what the gates took.",
          "- **Scan artifacts**: `bolt_flange` with Gaussian vertex noise (0.01 mm), coordinates quantised to "
-         "0.02 mm, or 1 % of its triangles removed. Its critics are measured against the clean part.", ""]
+         "0.02 mm, or 1 % of its triangles removed. Its critics are measured against the clean part. The pipeline "
+         "fills small holes (form/recon/mesh.py fill_holes) and measures the noise; a noisy mesh is read through a "
+         "denoised copy (form/recon/denoise.py) and verified against the mesh as given.",
+         "- **Gates in the pipeline**: since this run the pipeline itself ranks its candidates by verified, then these "
+         "gates, then editable share, within 4 % of the budget (pipeline._Gates).", ""]
     inst = status.get("installed")
     L.append("Optional learned engine (CAD-Recode, non-commercial licence): "
              + ("installed; the *with* columns use it." if inst else
@@ -306,6 +315,13 @@ def write(path: Path, rows: list, status: dict, label: str = "", before: dict | 
     for c, xs in by.items():
         L.append(f"| {c} | {len(xs)} | {statistics.median([x['brep_pct'] or 0.0 for x in xs]):g}% | "
                  f"{statistics.median([x['editable_pct'] or 0.0 for x in xs]):g}% |")
+    sc = [r for r in rows if r["class"] == "scan artifacts" or r["without"].get("noisy") or r["without"].get("holes_filled")]
+    if sc:
+        L += ["", "Scan input, as the pipeline measured it: " + ", ".join(
+            f"{r['part']} noise {_f(r['without'].get('noise_mm'))} mm"
+            + (" (read through the denoised copy)" if r["without"].get("noisy") else "")
+            + (f", {r['without']['holes_filled']} holes filled" if r["without"].get("holes_filled") else "")
+            for r in sc) + "."]
     L += ["", "Largest gap between progress events: " +
           ", ".join(f"{r['part']} {r['without']['max_progress_gap_s']:g} s" for r in rows) + ".", ""]
     path.write_text("\n".join(L), encoding="utf-8")

@@ -525,42 +525,214 @@ def topology(V: np.ndarray, F: np.ndarray) -> dict:
 
 
 def boundary_loops(bE: np.ndarray, he: np.ndarray, eo: np.ndarray, cnt: np.ndarray) -> list[list[int]]:
-    """Open boundaries as vertex loops, following each boundary half-edge in its triangle's direction."""
-    bset = set(np.flatnonzero(cnt == 1).tolist())
-    nxt = {}
-    for i in np.flatnonzero(np.isin(eo, list(bset))):
-        a, b = int(he[i, 0]), int(he[i, 1])
-        nxt.setdefault(a, []).append(b)
-    loops, seen = [], set()
-    for start in list(nxt):
-        if start in seen:
-            continue
-        loop, v = [], start
-        while v not in seen and v in nxt:
-            seen.add(v)
-            loop.append(v)
-            v = nxt[v][0] if len(nxt[v]) == 1 else nxt[v].pop(0)
-        if len(loop) >= 3:
-            loops.append(loop)
+    """Open boundaries as vertex loops, following each boundary half-edge in its triangle's direction.
+
+    Every boundary half-edge is used once. Two holes that touch at one vertex (a "figure 8") are two loops: a walk that
+    comes back to a vertex already on it closes the loop there and goes on from that vertex."""
+    out_of: dict[int, list[int]] = {}
+    for i in np.flatnonzero(cnt[eo] == 1):
+        out_of.setdefault(int(he[i, 0]), []).append(int(he[i, 1]))
+    loops = []
+    for start in list(out_of):
+        while out_of.get(start):
+            path, pos = [start], {start: 0}
+            v = start
+            while out_of.get(v):
+                w = out_of[v].pop()
+                if w in pos:                            # back on the walk: what lies between is one loop
+                    i = pos[w]
+                    if len(path) - i >= 3:
+                        loops.append(path[i:])
+                    for u in path[i + 1:]:
+                        del pos[u]
+                    del path[i + 1:]
+                    v = w
+                    if w == start and not out_of.get(w):
+                        break
+                    continue
+                pos[w] = len(path)
+                path.append(w)
+                v = w
     return loops
 
 
-def fill_holes(V: np.ndarray, F: np.ndarray, loops: list[list[int]]) -> tuple[np.ndarray, np.ndarray, list[dict]]:
-    """Close each open boundary loop with a fan around its centroid. Returns the new mesh and one record per fill."""
+HOLE_SPAN_FRAC = 0.5       # a hole (of more than three edges) wider than this share of the bounding-box diagonal is
+                           # large: not filled
+HOLE_AREA_FRAC = 0.02      # nor one whose fill would be more than this share of the mesh's surface (a missing single
+                           # triangle is always put back: it is not a guess)
+HOLE_DP_MAX = 60           # loops up to this many edges get the best triangulation (dynamic programming)
+FLAT_FRAC = 1e-3           # a loop within this share of its span of its best-fit plane is planar
+
+
+def _fan(V, loop, ci):
+    k = len(loop)
+    return [[loop[(i + 1) % k], loop[i], ci] for i in range(k)]
+
+
+def _tri_area_normal(a, b, c):
+    n = np.cross(b - a, c - a)
+    ln = float(np.linalg.norm(n))
+    return 0.5 * ln, (n / ln if ln > 1e-300 else np.zeros(3))
+
+
+def _best_triangulation(V, R, nbr):
+    """Triangles over the polygon R (vertex ids, already in the fill's orientation) that make the least area, each
+    weighted by how far it bends from the existing triangles across its edges on the hole's border (so a hole across
+    a crease is filled with the crease, not cut across it). nbr[(a, b)] is the normal of the triangle on the other side
+    of the border edge a -> b. Dynamic programming over the polygon's diagonals, O(k^3): the classic hole-filling
+    triangulation (Barequet and Sharir 1995, Liepa 2003), written here from the description."""
+    m = len(R)
+    P = V[R]
+    INF = float("inf")
+    W = [[0.0] * m for _ in range(m)]
+    J = [[-1] * m for _ in range(m)]
+    for span in range(2, m):
+        for i in range(0, m - span):
+            k = i + span
+            best, bj = INF, -1
+            for j in range(i + 1, k):
+                ar, n = _tri_area_normal(P[i], P[j], P[k])
+                if ar <= 1e-18:
+                    c = 1e6 * (1.0 + float(np.linalg.norm(P[k] - P[i])))  # degenerate: only when nothing else does
+                else:
+                    bend = 0.0
+                    for x, y in ((i, j), (j, k), (k, i)):
+                        if (y - x) % m == 1:                # an edge on the hole's border
+                            nb = nbr.get((R[x], R[y]))
+                            if nb is not None:
+                                bend = max(bend, 1.0 - float(n @ nb))
+                    c = ar * (1.0 + 4.0 * bend)
+                tot = W[i][j] + W[j][k] + c
+                if tot < best:
+                    best, bj = tot, j
+            W[i][k], J[i][k] = best, bj
+    tris, stack = [], [(0, m - 1)]
+    while stack:
+        i, k = stack.pop()
+        if k - i < 2:
+            continue
+        j = J[i][k]
+        tris.append([R[i], R[j], R[k]])
+        stack += [(i, j), (j, k)]
+    return tris
+
+
+def _ear_clip(Q, R):
+    """Ear clipping of the simple 2D polygon Q (counter-clockwise) with vertex ids R. None when it is not simple."""
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    idx = list(range(len(Q)))
+    tris, guard = [], 0
+    while len(idx) > 3 and guard < 4 * len(Q) ** 2:
+        guard += 1
+        n = len(idx)
+        for t in range(n):
+            i0, i1, i2 = idx[(t - 1) % n], idx[t], idx[(t + 1) % n]
+            a, b, c = Q[i0], Q[i1], Q[i2]
+            if cross(a, b, c) <= 1e-15:
+                continue
+            if any(cross(a, b, Q[p]) >= 0 and cross(b, c, Q[p]) >= 0 and cross(c, a, Q[p]) >= 0
+                   for p in idx if p not in (i0, i1, i2)):
+                continue
+            tris.append([R[i0], R[i1], R[i2]])
+            idx.pop(t)
+            break
+        else:
+            return None
+    if len(idx) == 3:
+        tris.append([R[idx[0]], R[idx[1]], R[idx[2]]])
+    return tris
+
+
+def _simple(Q) -> bool:
+    """No two non-neighbouring edges of the closed 2D polygon Q cross."""
+    k = len(Q)
+    A, B = Q, np.roll(Q, -1, axis=0)
+    for i in range(k):
+        for j in range(i + 2, k):
+            if i == 0 and j == k - 1:
+                continue
+            p, r, q, s = A[i], B[i] - A[i], A[j], B[j] - A[j]
+            den = r[0] * s[1] - r[1] * s[0]
+            if abs(den) < 1e-18:
+                continue
+            t = ((q[0] - p[0]) * s[1] - (q[1] - p[1]) * s[0]) / den
+            u = ((q[0] - p[0]) * r[1] - (q[1] - p[1]) * r[0]) / den
+            if 0 < t < 1 and 0 < u < 1:
+                return False
+    return True
+
+
+def fill_holes(V: np.ndarray, F: np.ndarray, loops: list[list[int]],
+               max_span: float | None = None, max_area: float | None = None) -> tuple[np.ndarray, np.ndarray, list[dict]]:
+    """Close each open boundary loop. Returns the new mesh and one record per hole (filled or left open).
+
+    A loop of three edges gets the one triangle it is missing. Up to HOLE_DP_MAX edges, the triangulation with the least
+    area and the least bend away from its neighbours (so a hole across a crease keeps the crease); a larger loop that is
+    planar or near-planar is ear-clipped in its plane; anything else gets a fan around its centroid. A hole wider than
+    `max_span` mm or whose fill would cover more than `max_area` mm2 (three edges: never) is large: it is left open and listed with
+    "filled": False, so the caller can refuse the mesh and say why."""
+    V = np.asarray(V, dtype=np.float64)
+    F = np.asarray(F, dtype=np.int64)
+    he = np.concatenate([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]])
+    tri = np.tile(np.arange(len(F)), 3)
+    N, _ = tri_normals(V, F)
+    border = {int(v) for loop in loops for v in loop}
+    nbr = {}                                            # fill edge b -> a: normal of the triangle that has a -> b
+    keep = np.isin(he[:, 0], list(border)) & np.isin(he[:, 1], list(border))
+    for (a, b), t in zip(he[keep].tolist(), tri[keep].tolist()):
+        nbr[(b, a)] = N[t]
+    existing = {tuple(sorted(e)) for e in he.tolist()}
     V2, newF, rec = [V], [F], []
     n = len(V)
     for loop in loops:
         P = V[loop]
         c = P.mean(axis=0)
-        ci = n
-        n += 1
-        V2.append(c[None])
         k = len(loop)
-        # the boundary half-edges run a->b in their triangle; the patch must use b->a
-        tris = np.array([[loop[(i + 1) % k], loop[i], ci] for i in range(k)], dtype=np.int64)
-        newF.append(tris)
-        span = float(np.linalg.norm(P - c, axis=1).max())
-        rec.append({"repair": "filled hole", "edges": k, "span_mm": round(2 * span, 4), "at": [round(float(x), 4) for x in c]})
+        span = float(2 * np.linalg.norm(P - c, axis=1).max())
+        _, _, vt = np.linalg.svd(P - c, full_matrices=False)
+        nrm = vt[-1]
+        flat = float(np.abs((P - c) @ nrm).max())
+        planar = flat <= FLAT_FRAC * max(span, 1e-9)
+        R = list(loop[::-1])                            # the fill runs against the border's half-edges
+        tris, how = None, None
+        if k == 3:
+            tris, how = [R], "the one missing triangle"
+        elif k <= HOLE_DP_MAX:
+            tris, how = _best_triangulation(V, R, nbr), "least-area, least-bend triangulation"
+        else:
+            u = vt[0]
+            w = np.cross(nrm, u)
+            Q = np.c_[(V[R] - c) @ u, (V[R] - c) @ w]
+            if np.sum(Q[:, 0] * np.roll(Q[:, 1], -1) - np.roll(Q[:, 0], -1) * Q[:, 1]) < 0:
+                Q[:, 1] *= -1                           # mirrored to counter-clockwise: triangles keep R's order
+            if flat <= 0.05 * span and _simple(Q):
+                tris = _ear_clip(Q, R)
+                how = "planar ear clipping" if planar else "near-planar ear clipping"
+        if tris is not None and k > 3:                  # a diagonal the mesh already has would make a non-manifold edge
+            diag = {tuple(sorted(e)) for t in tris for e in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0]))}
+            ring = {tuple(sorted((loop[i], loop[(i + 1) % k]))) for i in range(k)}
+            if (diag - ring) & existing:
+                tris = None
+        area = 0.0
+        if tris is not None:
+            T = np.asarray(tris, dtype=np.int64)
+            area = float(0.5 * np.linalg.norm(np.cross(V[T[:, 1]] - V[T[:, 0]], V[T[:, 2]] - V[T[:, 0]]), axis=1).sum())
+        else:
+            area = float(sum(_tri_area_normal(P[i], P[(i + 1) % k], c)[0] for i in range(k)))
+        r = {"repair": "filled hole", "edges": k, "span_mm": round(span, 4), "at": [round(float(x), 4) for x in c],
+             "area_mm2": round(area, 4), "planar": bool(planar), "flatness_mm": round(flat, 6)}
+        if k > 3 and ((max_span is not None and span > max_span) or (max_area is not None and area > max_area)):
+            rec.append({**r, "repair": "hole left open (large)", "filled": False})
+            continue
+        if tris is None:
+            tris, how = _fan(V, loop, n), "fan around its centroid"
+            V2.append(c[None])
+            n += 1
+        newF.append(np.asarray(tris, dtype=np.int64))
+        for t in tris:
+            existing.update(tuple(sorted(e)) for e in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])))
+        rec.append({**r, "method": how, "filled": True})
     return np.concatenate(V2), np.concatenate(newF), rec
 
 

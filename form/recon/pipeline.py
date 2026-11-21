@@ -22,6 +22,7 @@ from pathlib import Path
 import numpy as np
 
 from . import bounded
+from . import denoise
 from . import mesh as meshmod
 from . import verify
 
@@ -29,6 +30,10 @@ LIMITS = [
     "Units are taken as millimetres unless the file says otherwise (3MF does).",
     "Accuracy is measured against the mesh, not against the object it was made from: the mesh's own chord error "
     "and any scan noise are part of the input.",
+    "Scan noise is measured (input.noise); when there is any, the sketches are read from a copy with every vertex put "
+    "back on its fitted plane, cylinder or cone, and the result is still measured against the mesh as given.",
+    "Small holes are filled (listed under repairs); a hole wider than half the part or larger than 2 % of its surface "
+    "is not guessed, and such a mesh is refused.",
     "Planes, cylinders, cones, spheres and tori are recognised as such. Smooth regions none of them explains are fitted "
     "with B-spline patches (freeform: smooth CAD within the tolerance, not a dimension you can change); what neither "
     "explains stays as frozen facets.",
@@ -47,6 +52,9 @@ PROGRAM_SLACK = 25.0       # seconds the program route may run past its share be
 LAYER1_SHARE = 0.55        # of the time left after Layer 0 that Layer 1 may use; Layer 2 has the rest
 LEARNED_SHARE = 0.3        # of the time left that the optional learned engine may use
 FINISH_S = 15.0            # seconds kept back for writing the result (STEP, deviation map, dimension check)
+GATE_SHARE = 0.04          # of the budget the critics (gates.py) may use in all, ranking the candidates
+GATE_CELLS = 2_000_000     # voxels of the critics' occupancy grid
+NOISE_SHARE = 0.05         # of the budget measuring the scan noise and snapping the vertices may use
 
 
 class Heartbeat:
@@ -112,9 +120,25 @@ def load(path: Path, fill: bool = True, weld_tol: float = 1e-6):
                         "duplicate": w["dropped_duplicate"]})
     if w["merged_near_vertices"]:
         repairs.append({"repair": "welded near vertices", "count": w["merged_near_vertices"], "within_mm": weld_tol})
+    large = []
     if top["boundary_loops"] and fill and not top["non_manifold_edges"]:
-        V, F, rec = meshmod.fill_holes(V, F, top["_loops"])
-        repairs += rec
+        diag = float(np.linalg.norm(V.max(axis=0) - V.min(axis=0)))
+        V, F, rec = meshmod.fill_holes(V, F, top["_loops"], max_span=meshmod.HOLE_SPAN_FRAC * diag,
+                                       max_area=meshmod.HOLE_AREA_FRAC * top["area_mm2"])
+        large = [r for r in rec if not r.get("filled", True)]
+        filled = [r for r in rec if r.get("filled", True)]
+        if len(filled) > 12:                            # a scan with many small holes: one summary, the largest listed
+            how = {}
+            for r in filled:
+                how[r["method"]] = how.get(r["method"], 0) + 1
+            big = sorted(filled, key=lambda r: -r["span_mm"])[:5]
+            repairs.append({"repair": "filled holes", "count": len(filled), "by_method": how,
+                            "planar": sum(1 for r in filled if r["planar"]),
+                            "area_mm2": round(sum(r["area_mm2"] for r in filled), 4),
+                            "largest_span_mm": big[0]["span_mm"], "largest": big})
+        else:
+            repairs += filled
+        repairs += large
         top2 = meshmod.topology(V, F)
         top = {**top2, "before_repair": _round({k: v for k, v in top.items() if k in ("boundary_edges", "boundary_loops")})}
     if top["volume_mm3"] < 0:                          # inside out as a whole
@@ -122,6 +146,8 @@ def load(path: Path, fill: bool = True, weld_tol: float = 1e-6):
         repairs.append({"repair": "turned the whole mesh outside in (its volume was negative)"})
         top = meshmod.topology(V, F)
     report = {**info, "weld": w, "topology": _round(top)}
+    if large:
+        report["topology"]["large_holes"] = large
     if top["_non_manifold_at"]:
         report["topology"]["non_manifold_at"] = top["_non_manifold_at"]
     return V, F, report, repairs
@@ -164,17 +190,40 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     if not inp["topology"]["closed"]:
         rep["error"] = ("The mesh is not closed (" + f"{inp['topology']['boundary_loops']} open boundaries, "
                         f"{inp['topology']['non_manifold_edges']} non-manifold edges), so it does not bound a solid.")
-        rep["hint"] = "Close it in the program that made it, or reconstruct with hole filling on (it is listed as a repair)."
+        big = inp["topology"].get("large_holes") or []
+        if big:
+            b = max(big, key=lambda r: r["span_mm"])
+            rep["error"] += (f" {len(big)} of its holes are too large to fill without guessing (the largest is "
+                             f"{b['span_mm']:g} mm across, {b['area_mm2']:g} mm2, at {b['at']}); the small ones were "
+                             "filled and are listed as repairs.")
+            rep["hint"] = "Rescan or close the large openings in the program that made the mesh."
+        else:
+            rep["hint"] = ("Close it in the program that made it, or reconstruct with hole filling on (it is listed as "
+                           "a repair).")
         return _finish(rep, out, name, t0)
+
+    # scan noise, measured: when there is any, the program route reads a copy of the mesh with every vertex put back
+    # on its fitted plane, cylinder or cone (denoise.py); what it builds is verified against the mesh as given
+    Vr = V
+    if layer >= 2:
+        try:
+            Vr, nrep = denoise.measure_and_snap(V, F, tol, deadline=time.perf_counter() + NOISE_SHARE * float(budget_s))
+        except Exception as e:                          # noqa: BLE001
+            Vr, nrep = V, {"error": f"{type(e).__name__}: {e}"[:300]}
+        rep["input"]["noise"] = nrep
+        if nrep.get("noisy"):
+            say({"stage": "read", "text": f"Scan noise about {nrep['noise_mm']:g} mm: reading the surfaces through it",
+                 "fraction": 0.02})
+    gx = _Gates(V, F, tol, budget_s)
 
     # Layer 2, the program route: when it verifies and drives most of the surface, it is the result
     prog = None
     if layer >= 2:
         say({"stage": "layer2", "text": "Reading the part as sketches and extrusions", "fraction": 0.02})
         if _program is not _PROGRAM:                    # replaced in this process (a test, the bench's "before")
-            got = {"status": "unbounded", "value": _program(V, F, tol, name, out, say, t0, budget_s)}
+            got = {"status": "unbounded", "value": _program(Vr, F, tol, name, out, say, t0, budget_s)}
         else:
-            got = bounded.run(_program_child, (V, F, tol, name, out, t0, budget_s),
+            got = bounded.run(_program_child, (Vr, F, tol, name, out, t0, budget_s),
                               timeout_s=min(PROGRAM_SHARE * float(budget_s) + PROGRAM_SLACK,
                                             _left(hard, fin) - _layer0_estimate(len(F))),
                               progress=lambda d: say({**d, "fraction": 0.02 + 0.6 * d.get("fraction", 0)}))
@@ -182,34 +231,24 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         if prog is None:
             prog = {"report": {"method": "sketches and extrusions", "error": f"The program route {got.get('error')}"}}
             _cut(rep, "the program route (sketches and extrusions)", got)
-        lc = None
-        if LEARNED and _left(hard, fin) > 0 and _learned_installed():
-            from . import learned as _lm
-            if _lm.candidate is not _lm.CANDIDATE:      # replaced in this process (a test): run it here
-                got_l = {"status": "unbounded", "value": _learned(V, F, tol, name, say)}
-            else:
-                got_l = bounded.run(_learned_child, (V, F, tol, name), timeout_s=LEARNED_SHARE * _left(hard, fin),
-                                    progress=say)
-            lc = got_l.get("value") if got_l["status"] in ("ok", "unbounded") else None
-            if got_l["status"] not in ("ok", "unbounded"):
-                _cut(rep, "the learned engine", got_l)
-        if lc is not None:
-            rep["learned"] = {"status": "installed", **{k: lc["report"].get(k) for k in (
-                "engine", "licence", "verified", "hausdorff_mm", "params", "model_seconds", "seconds", "error")
-                if lc["report"].get(k) is not None}}
-            if lc.get("verified") and _better(lc, prog):  # verified and better, or it is never the result
-                lc["report"]["also_tried"] = [{k: prog["report"].get(k) for k in (
-                    "method", "verified", "hausdorff_mm", "editable_pct", "error") if prog["report"].get(k) is not None}]
-                prog = lc
-                rep["learned"]["chosen"] = True
-        # optional CADFit candidate (cadfit/): off unless [recon] cadfit = true; its own time slice and child process
-        from . import cadfit
-        prog = cadfit.offer(prog, V, F, tol, name, say, budget_s, rep, _better)
-        if prog.get("verified") and prog["report"].get("editable_pct", 0.0) >= PROGRAM_ENOUGH:
+        if Vr is not V:
+            prog = _against_input(prog, V, F, tol)
+        # the other candidates, one after another, each through the same gates as the program route: verified against
+        # the mesh, then the critics (gates.py), then the share of the surface their Params drive (_Gates.better)
+        ctx = {"V": V, "F": F, "tol": tol, "name": name, "say": say, "budget_s": budget_s, "rep": rep, "hard": hard,
+               "fin": fin, "better": gx.better}
+        for key, offer in CANDIDATES:
+            try:
+                prog = offer(prog, ctx)
+            except Exception as e:                      # noqa: BLE001
+                rep.setdefault("candidates_failed", []).append({"candidate": key, "error": f"{type(e).__name__}: {e}"[:300]})
+        if prog.get("verified") and prog["report"].get("editable_pct", 0.0) >= PROGRAM_ENOUGH \
+                and gx.verdict(prog) is not False:
             why = (f"The program route verified first with {prog['report']['editable_pct']:g}% of the surface made by its "
                    "features; the slower layers were not needed.")
             rep["layers"]["0"] = {"skipped": why}
             rep["layers"]["1"] = {"skipped": why}
+            rep["gates"] = gx.summary()
             return _take_program(rep, prog, V, F, mvol, out, name, t0, tol, budget_s)
     # the layers below have what is left of the budget: the program route is held to PROGRAM_SHARE of it (and stopped
     # PROGRAM_SLACK past that), and nothing runs past the budget as a whole (`hard`)
@@ -293,7 +332,7 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         if gear is not None:
             r2["report"]["also_tried"] = r2["report"].get("also_tried", []) + [
                 {k: gear["report"].get(k) for k in ("method", "base", "verified", "hausdorff_mm", "error") if gear["report"].get(k) is not None}]
-        if prog is not None and _better(prog, r2):
+        if prog is not None and gx.better(prog, r2):
             r2 = {**prog, "report": {**prog["report"], "also_tried": [
                 {k: r2["report"].get(k) for k in ("method", "base", "verified", "hausdorff_mm", "driven_by_params_pct", "error")
                  if r2["report"].get(k) is not None}]}}
@@ -311,7 +350,9 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
                 refs = sorted(r2.get("refs") or [])
                 ref_paths = dict(r2["refs"]) if isinstance(r2.get("refs"), dict) else {}
 
-    if prog is not None and prog.get("verified") and (best is None or best[0] != "2"):
+    rep["gates"] = gx.summary()
+    if prog is not None and prog.get("verified") and (best is None or best[0] != "2") and \
+            (best is None or gx.verdict(prog) is not False):     # a program the critics fail never beats the mesh's faces
         rep["layers"]["2"] = {**prog["report"], **({"also_tried": rep["layers"]["2"].get("also_tried", [])}
                                                   if isinstance(rep["layers"].get("2"), dict) else {})}
         return _take_program(rep, prog, V, F, mvol, out, name, t0, tol, budget_s)
@@ -344,6 +385,115 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     (out / f"{name}_deviation.json").write_text(json.dumps(dmap), encoding="utf-8")
     rep["result"]["deviation_map"] = f"{name}_deviation.json"
     return _finish(rep, out, name, t0)
+
+
+def _offer_learned(prog, ctx):
+    """The optional learned engine's candidate (learned/), when it is installed: its own child process and time slice."""
+    rep, say, hard, fin = ctx["rep"], ctx["say"], ctx["hard"], ctx["fin"]
+    if not (LEARNED and _left(hard, fin) > 0 and _learned_installed()):
+        return prog
+    V, F, tol, name = ctx["V"], ctx["F"], ctx["tol"], ctx["name"]
+    from . import learned as _lm
+    if _lm.candidate is not _lm.CANDIDATE:              # replaced in this process (a test): run it here
+        got_l = {"status": "unbounded", "value": _learned(V, F, tol, name, say)}
+    else:
+        got_l = bounded.run(_learned_child, (V, F, tol, name), timeout_s=LEARNED_SHARE * _left(hard, fin),
+                            progress=say)
+    lc = got_l.get("value") if got_l["status"] in ("ok", "unbounded") else None
+    if got_l["status"] not in ("ok", "unbounded"):
+        _cut(rep, "the learned engine", got_l)
+    if lc is None:
+        return prog
+    rep["learned"] = {"status": "installed", **{k: lc["report"].get(k) for k in (
+        "engine", "licence", "verified", "hausdorff_mm", "params", "model_seconds", "seconds", "error")
+        if lc["report"].get(k) is not None}}
+    if lc.get("verified") and ctx["better"](lc, prog):  # verified and better, or it is never the result
+        lc["report"]["also_tried"] = [{k: prog["report"].get(k) for k in (
+            "method", "verified", "hausdorff_mm", "editable_pct", "error") if prog["report"].get(k) is not None}]
+        rep["learned"]["chosen"] = True
+        return lc
+    return prog
+
+
+def _offer_cadfit(prog, ctx):
+    """The optional CADFit candidate (cadfit/): off unless [recon] cadfit = true; its own time slice and child process."""
+    from . import cadfit
+    return cadfit.offer(prog, ctx["V"], ctx["F"], ctx["tol"], ctx["name"], ctx["say"], ctx["budget_s"], ctx["rep"],
+                        ctx["better"])
+
+
+# Candidates beside the program route, in order: each gets the best so far and returns it or its own verified, better
+# candidate. A new generator (a learned model, a search) is one entry here, and it goes through the same gates.
+CANDIDATES = [("learned", _offer_learned), ("cadfit", _offer_cadfit)]
+
+
+def _against_input(c, V, F, tol):
+    """A candidate built from the denoised copy, measured against the mesh as given: its deviation is that one, and it
+    is verified only when that is within the tolerance."""
+    if not isinstance(c, dict) or c.get("P") is None:
+        return c
+    rp = c.setdefault("report", {})
+    cmp = verify.compare(V, F, c["P"], c["T"])
+    if rp.get("hausdorff_mm") is not None:
+        rp["hausdorff_to_denoised_mm"] = rp["hausdorff_mm"]
+    rp["hausdorff_mm"] = round(cmp["hausdorff_mm"], 6)
+    rp["read_from"] = "the denoised copy of the mesh; deviation measured against the mesh as given"
+    c["cmp"] = cmp
+    if c.get("verified") and cmp["hausdorff_mm"] > tol + 1e-12:
+        c["verified"] = False
+        rp["error"] = (f"Built from the denoised mesh it is {cmp['hausdorff_mm']:.4g} mm from the mesh as given, more "
+                       f"than the {tol:g} mm tolerance.")
+    return c
+
+
+class _Gates:
+    """The critics (gates.py) as a ranking step, within GATE_SHARE of the budget in all. A candidate's verdict is
+    computed once, when it is compared with another verified one (or before the program route is taken alone), and
+    kept in its report under "gates". When the share is spent a verdict is "not run" and counts as no objection."""
+
+    def __init__(self, V, F, tol, budget_s):
+        self.V, self.F, self.tol = V, F, tol
+        self.share = GATE_SHARE * float(budget_s)
+        self.left, self.last = self.share, 0.0
+        self.runs, self.skipped = 0, 0
+
+    def verdict(self, c):
+        """True (passes), False (a gate failed) or None (not run)."""
+        if not isinstance(c, dict) or not c.get("verified") or c.get("P") is None:
+            return None
+        rp = c.setdefault("report", {})
+        if isinstance(rp.get("gates"), dict):
+            return rp["gates"].get("passed")
+        if self.left < max(0.25, 1.2 * self.last):
+            rp["gates"] = {"verdict": "not run: the gates' share of the time budget was spent", "passed": None}
+            self.skipped += 1
+            return None
+        from . import gates
+        t = time.perf_counter()
+        try:
+            g = gates.check(self.V, self.F, c["P"], c["T"], self.tol, cells=GATE_CELLS)
+            rp["gates"] = {"verdict": g["verdict"], "passed": bool(g["passed"]), "failed": g["failed"],
+                           "occupancy_iou": g["occupancy"]["iou"], "seconds": g["seconds"],
+                           "missing_void_mm3": g["occupancy"]["missing_void_mm3"],
+                           "openings": g["openings"]["mismatches"][:4]}
+        except Exception as e:                          # noqa: BLE001
+            rp["gates"] = {"verdict": f"error: {type(e).__name__}: {e}"[:200], "passed": None}
+        dt = time.perf_counter() - t
+        self.left -= dt
+        self.last = dt
+        self.runs += 1
+        return rp["gates"].get("passed")
+
+    def better(self, a, b) -> bool:
+        """_better, with the critics' verdict computed first for two verified candidates."""
+        if isinstance(a, dict) and isinstance(b, dict) and a.get("verified") and b.get("verified"):
+            self.verdict(a)
+            self.verdict(b)
+        return _better(a, b)
+
+    def summary(self) -> dict:
+        return {"share_s": round(self.share, 2), "spent_s": round(self.share - self.left, 2), "runs": self.runs,
+                "not_run": self.skipped}
 
 
 def _left(hard, fin=FINISH_S) -> float:
@@ -413,12 +563,15 @@ _PROGRAM = _program
 
 
 def _better(a, b) -> bool:
-    """Is recipe result a better answer than b: verified first, then the share of the surface its Params drive, then
-    the distance to the mesh."""
+    """Is recipe result a better answer than b: verified first, then the critics' verdict (gates.py: a candidate they
+    fail, say one that fills a cavity solid, ranks below every verified one they pass or did not run on), then the
+    share of the surface its Params drive, then the distance to the mesh."""
     def key(r):
         rp = r.get("report", {})
         drv = rp.get("editable_pct", rp.get("driven_by_params_pct")) or 0.0
-        return (bool(r.get("verified")), round(float(drv), 1), -float(rp.get("hausdorff_mm") or 1e9))
+        g = rp.get("gates") if isinstance(rp.get("gates"), dict) else {}
+        return (bool(r.get("verified")), g.get("passed") is not False, round(float(drv), 1),
+                -float(rp.get("hausdorff_mm") or 1e9))
     return key(a) > key(b)
 
 
@@ -447,6 +600,8 @@ def _take_program(rep, prog, V, F, mvol, out, name, t0, tol, budget_s=240.0):
                      "parametric_area_pct": round(edit, 2), "freeform_area_pct": 0.0,
                      "frozen_area_pct": round(100.0 - edit, 2), "driven_by_params_pct": round(edit, 2),
                      "params": r2.get("params")}
+    if isinstance(r2.get("gates"), dict):
+        rep["result"]["gates"] = r2["gates"].get("verdict")
     refs = prog.get("refs") or {}
     _dimensions(rep, prog["source"], {k: str(v) for k, v in refs.items()} if isinstance(refs, dict) else {},
                 t0, budget_s, lambda d: None)
@@ -498,6 +653,10 @@ def _headline(rep, tol):
     else:
         what = f"0% editable (an exact copy of the mesh as a solid, no dimensions), {h:.4g} mm from the mesh"
     what += f"; {res['brep_pct']:g}% of the surface is real CAD faces"
+    nz = (rep.get("input") or {}).get("noise") or {}
+    if nz.get("noisy"):
+        res["scan_noise_mm"] = nz["noise_mm"]
+        what += f"; scan noise measured at {nz['noise_mm']:g} mm"
     res["headline"] = what + ("" if res["within_tolerance"] else f", outside the {tol:g} mm asked for")
     if not res["within_tolerance"]:
         res["warning"] = (f"The result is {h:.4g} mm from the mesh, more than the {tol:g} mm tolerance asked for: the best "

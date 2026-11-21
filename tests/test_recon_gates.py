@@ -188,5 +188,157 @@ class CadenaBench(unittest.TestCase):
                          (2, 1, 0.5, 0.9, 1.0))
 
 
+class GatesRankCandidates(unittest.TestCase):
+    """The pipeline ranks candidates by verified, then the critics' verdict, then editable share (pipeline._better)."""
+
+    @classmethod
+    def setUpClass(cls):
+        tmp = Path(tempfile.mkdtemp(prefix="rank-"))
+        cls.V, cls.F = _stl("hollow_block", tmp)
+        P2, T2 = _stl("cavity_filler", tmp)
+        cls.filled = (np.vstack([cls.V, P2]), np.vstack([cls.F, T2 + len(cls.V)]))
+        cls.faithful = _tess("hollow_block")
+
+    def _cands(self):
+        # the filled one drives more of its surface and is as close to the mesh: without the critics it would win
+        filled = {"verified": True, "P": self.filled[0], "T": self.filled[1],
+                  "report": {"method": "filled", "editable_pct": 100.0, "hausdorff_mm": 0.0}}
+        faithful = {"verified": True, "P": self.faithful[0], "T": self.faithful[1],
+                    "report": {"method": "faithful", "editable_pct": 60.0, "hausdorff_mm": 0.001}}
+        return filled, faithful
+
+    def test_a_filled_cavity_candidate_loses_to_the_faithful_one(self):
+        from form.recon import pipeline
+        filled, faithful = self._cands()
+        self.assertTrue(pipeline._better(filled, faithful))              # no verdicts yet: editable share decides
+        gx = pipeline._Gates(self.V, self.F, 0.02, 240.0)
+        self.assertTrue(gx.better(faithful, filled))
+        self.assertFalse(gx.better(filled, faithful))
+        self.assertIn("voids", filled["report"]["gates"]["failed"])
+        self.assertTrue(faithful["report"]["gates"]["passed"])
+        self.assertEqual(gx.runs, 2)                                       # each verdict once, kept in the report
+        self.assertLess(gx.summary()["spent_s"], gx.share)
+
+    def test_an_unverified_candidate_never_wins_on_gates(self):
+        from form.recon import pipeline
+        filled, faithful = self._cands()
+        faithful["verified"] = False
+        gx = pipeline._Gates(self.V, self.F, 0.02, 240.0)
+        self.assertTrue(gx.better(filled, faithful))
+        self.assertEqual(gx.runs, 0)                                       # verified decides: no gate time spent
+
+    def test_the_gates_keep_to_their_slice_of_the_budget(self):
+        from form.recon import pipeline
+        filled, faithful = self._cands()
+        gx = pipeline._Gates(self.V, self.F, 0.02, 1.0)                    # 0.04 s: too little for one check
+        self.assertIsNone(gx.verdict(filled))
+        self.assertIn("not run", filled["report"]["gates"]["verdict"])
+        self.assertTrue(gx.better(filled, faithful))                       # "not run" is no objection
+
+    def test_candidates_are_a_list_through_the_same_gates(self):
+        from form.recon import pipeline
+        self.assertEqual([k for k, _ in pipeline.CANDIDATES], ["learned", "cadfit"])
+        filled, faithful = self._cands()
+        gx = pipeline._Gates(self.V, self.F, 0.02, 240.0)
+        ctx = {"better": gx.better}
+
+        def offer(prog, ctx):                                            # a new generator: one entry in the list
+            return filled if ctx["better"](filled, prog) else prog
+        keep = pipeline.CANDIDATES
+        try:
+            pipeline.CANDIDATES = keep + [("filler", offer)]
+            prog = faithful
+            for _, o in pipeline.CANDIDATES[2:]:
+                prog = o(prog, ctx)
+        finally:
+            pipeline.CANDIDATES = keep
+        self.assertIs(prog, faithful)
+
+
+class HoleFilling(unittest.TestCase):
+    def test_two_holes_touching_at_a_vertex_are_two_loops(self):
+        V, F, _ = mesh.weld(np.asarray(_box_triangles()))
+        v = 0                                           # remove two triangles that share only the vertex 0
+        ts = [i for i, f in enumerate(F.tolist()) if v in f]
+        a = ts[0]
+        b = next(t for t in ts[1:] if len(set(F[a].tolist()) & set(F[t].tolist())) == 1)
+        G = np.delete(F, [a, b], axis=0)
+        top = mesh.topology(V, G)
+        self.assertEqual(top["boundary_edges"], 6)
+        self.assertEqual(sorted(len(L) for L in top["_loops"]), [3, 3])
+        V2, F2, rec = mesh.fill_holes(V, G, top["_loops"])
+        self.assertTrue(mesh.topology(V2, F2)["closed"])
+        self.assertEqual([r["method"] for r in rec], ["the one missing triangle"] * 2)
+
+    def test_dropout_is_filled_back_exactly(self):
+        V, F = _stl("bolt_flange", Path(tempfile.mkdtemp(prefix="drop-")))
+        Vd, Fd = fx.scan_artifact(V, F, "dropout")
+        top = mesh.topology(Vd, Fd)
+        self.assertGreater(top["boundary_loops"], 10)
+        V2, F2, rec = mesh.fill_holes(Vd, Fd, top["_loops"])
+        self.assertTrue(mesh.topology(V2, F2)["closed"])
+        self.assertTrue(all(r["filled"] for r in rec))
+        self.assertLess(distance.hausdorff(V, F, V2, F2)["hausdorff_mm"], 1e-6)
+
+    def test_a_crease_is_kept_and_a_large_hole_is_refused(self):
+        V, F, _ = mesh.weld(np.asarray(_box_triangles()))
+        # the two triangles of one side: a planar 4-edge hole; one more on the next side: a hole across the edge
+        side = [i for i, f in enumerate(F.tolist()) if np.allclose(V[f][:, 1], -20)]
+        top = mesh.topology(V, np.delete(F, side, axis=0))
+        V2, F2, rec = mesh.fill_holes(V, np.delete(F, side, axis=0), top["_loops"])
+        self.assertEqual(rec[0]["edges"], 4)
+        self.assertTrue(rec[0]["planar"])
+        self.assertLess(distance.hausdorff(V, F, V2, F2)["hausdorff_mm"], 1e-9)
+        V3, F3, rec = mesh.fill_holes(V, np.delete(F, side, axis=0), top["_loops"], max_area=1.0)
+        self.assertFalse(rec[0]["filled"])
+        self.assertEqual(rec[0]["repair"], "hole left open (large)")
+        self.assertEqual(len(F3), len(F) - 2)
+
+    def test_pipeline_refuses_only_large_holes(self):
+        from form.recon import pipeline
+        tmp = Path(tempfile.mkdtemp(prefix="holes-"))
+        V, F, _ = mesh.weld(np.asarray(_box_triangles()))
+        top = [i for i, f in enumerate(F.tolist()) if np.allclose(V[f][:, 2], 10)]
+        p = tmp / "lidless.stl"
+        mesh.write_stl(p, V, np.delete(F, top, axis=0))                  # the whole top missing: 2400 mm2
+        rep = pipeline.reconstruct(p, tmp / "out", "lidless", 0.02, 0)
+        self.assertIn("too large to fill", rep["error"])
+        self.assertNotIn("result", rep)
+
+
+class ScanNoise(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.V, cls.F = _stl("bolt_flange", Path(tempfile.mkdtemp(prefix="noise-")))
+
+    def test_an_exact_mesh_is_left_alone(self):
+        from form.recon import denoise
+        Vs, rep = denoise.measure_and_snap(self.V, self.F, 0.02)
+        self.assertFalse(rep["noisy"])
+        self.assertTrue(np.array_equal(Vs, self.V))
+        Vq, _ = fx.scan_artifact(self.V, self.F, "quantised")
+        self.assertFalse(denoise.measure_and_snap(Vq, self.F, 0.05)[1]["noisy"])   # its planes are still exact
+
+    def test_noise_is_measured_and_the_vertices_go_back_on_their_surfaces(self):
+        from form.recon import denoise
+        Vn, F = fx.scan_artifact(self.V, self.F, "noise")
+        Vs, rep = denoise.measure_and_snap(Vn, F, 0.05)
+        self.assertTrue(rep["noisy"])
+        self.assertAlmostEqual(rep["noise_mm"], 0.01, delta=0.002)
+        self.assertGreater(rep["surface_share_pct"], 95)
+        self.assertLessEqual(rep["max_move_mm"], 0.05)
+        z = np.round(Vs[:, 2], 6)
+        self.assertLessEqual(len(np.unique(z)), 8)           # the caps share their heights again (noisy: thousands)
+
+    def test_the_program_route_reads_the_noisy_flange(self):
+        from form.recon import denoise, program, verify
+        Vn, F = fx.scan_artifact(self.V, self.F, "noise")
+        Vs, _ = denoise.measure_and_snap(Vn, F, 0.05)
+        r = program.recipe(Vs, F, 0.05, name="flange", limit=0.05, out_dir=Path(tempfile.mkdtemp(prefix="nprog-")))
+        self.assertTrue(r["verified"], r["report"].get("error"))
+        self.assertEqual(r["report"]["editable_pct"], 100.0)
+        self.assertLessEqual(verify.compare(Vn, F, r["P"], r["T"])["hausdorff_mm"], 0.05)   # against the noisy mesh
+
+
 if __name__ == "__main__":
     unittest.main()

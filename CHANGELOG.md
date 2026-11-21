@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **Scanned meshes reconstruct.** Mesh to CAD now fills the small holes a scan leaves (the missing triangle put
+  back, or the triangulation with the least area and bend, so a hole across an edge keeps the edge), lists what it
+  filled, and refuses a mesh only when a hole is too large to fill without guessing. It measures the scan noise and,
+  when there is any, reads the sketches from a copy with every vertex put back on its fitted plane, cylinder or cone;
+  the result is still measured against the mesh as given. On the bench, the bolt flange with 1 % of its triangles
+  removed went from refused to 100 % B-rep and 100 % editable in 14.8 s, and with 0.01 mm noise (measured: 0.0101 mm)
+  from 0 % editable in 296 s to 100 % editable in 26.6 s, 0.042 mm from the noisy mesh.
+- **Candidates are ranked by the critics too.** The learned engine, CADFit and any future generator are one list in
+  the pipeline, each through the same steps: verified against the mesh, then the occupancy, void and opening gates,
+  then the share of the surface their Params drive. A candidate that fills a cavity solid now loses to the faithful
+  one even when it is as close to the surface. The gates use at most 4 % of the time budget (about 0.5 s per part on
+  the bench).
+
 - **A hang or a crash never loses the work.** When the geometry kernel times out or crashes during create_design,
   update_design or add_feature, Form Studio keeps what was built: a FeatureDesign keeps the features finished before
   the one that hung (loaded from their checkpoints on disk, nothing built twice), any other design keeps its stages,
