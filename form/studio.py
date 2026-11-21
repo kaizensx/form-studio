@@ -1308,10 +1308,11 @@ class Studio:
                 raise StudioError(f"The design moved on: head is r{p['head']}, not r{expect_head}.",
                                   "Read the project again, check what changed, then re-apply your edit.", status=409,
                                   head=p["head"])
-            unknown = [k for k in values if k not in p["revisions"][0]["values"]]
+            head = self.rev(p)
+            # checked against the head: update_design may have added Params after the first revision
+            unknown = [k for k in values if k not in head["values"]]
             if unknown:
                 raise StudioError("Unknown parameter(s): " + ", ".join(unknown) + ".", "List valid keys with describe_recipe (MCP) or `form recipe <id>` (CLI).")
-            head = self.rev(p)
             vals = {**head["values"], **values}
             prov = {k: dict(v) for k, v in head["provenance"].items()}
             for k, v in (provenance or {}).items():
