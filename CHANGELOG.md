@@ -63,6 +63,18 @@
   directions when less time is left than the main direction alone took.
 - **Small rounds can grow.** A corner radius Param may now grow by at least 0.5 mm (it was 30%), so a 1 mm fillet
   on a turned shaft is a dimension you can change; whether it fits its corner is what the build checks.
+- **Mesh to CAD has critics beyond the distance to the mesh.** New gates (`form/recon/gates.py`) compare a
+  reconstruction with the part in three ways. Occupancy fills both on one voxel grid and gives the slice IoU on X, Y
+  and Z. Openings check that every hole, slot and pocket in a plane section has the same shape in the result. Voids
+  find a cavity filled solid. Every threshold is relative to the part's size. A round hole modelled square now fails,
+  and so does a block filling a cavity whose faces all lie on the part, though both stay close to the mesh. A
+  GMS-compatible surface score sits beside them (`form/recon/gms.py`). `scripts/recon_bench.py` reports occupancy
+  IoU, GMS and the gate verdict for every part. It adds a scan-artifact class (noise, quantised coordinates and
+  missing faces) and a before-and-after table. `scripts/cadena_bench.py` scores real parts from CADENA-Bench. It runs
+  only when you ask: it downloads nothing without `--download`, writes nothing into the repository and reports
+  aggregates only. `THIRD_PARTY_NOTICES.md` credits the projects whose ideas these build on, and the app ships it.
+  The gates do not yet choose between candidates in the pipeline.
+
 - **Watch the design being built.** While an agent creates or rewrites a design in a conversation, the 3D view draws
   each stage the moment the kernel has built it, before anything is saved. Each new stage grows in over the one before
   with the same fade and rise as a new revision, and a quiet caption says what is being built: "Building Bore (2 of

@@ -15,6 +15,8 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "form" / "presets"), "form/presets"),
          # What's New after an update reads the running version's section from here (form/whatsnew.py)
          (str(ROOT / "CHANGELOG.md"), "form"),
+         # credits for outside projects whose ideas the engine builds on
+         (str(ROOT / "THIRD_PARTY_NOTICES.md"), "form"),
          # run by Blender itself as a file (blender -b --python <path>), so it must exist on disk inside the app
          (str(ROOT / "form" / "adapters" / "blender_scene.py"), "form/adapters")]
 binaries, hidden = [], []
