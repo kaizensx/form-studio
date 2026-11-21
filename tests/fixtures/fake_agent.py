@@ -316,6 +316,10 @@ def stages(data: Path, message: str, sid: str) -> int:
     src = STAGED.replace("PAUSE", m.group(1) if m else "1.2")
     srv = mcp_server.build()
     args = {"name": "Staged block", "source": src, "run": False, "purpose": "model"}
+    if re.search(r"\banother\b", first):          # a second design of the same conversation, beside the first
+        # another width, so no feature loads from the first one's checkpoints: every stage builds (and streams) again
+        args.update(name="Staged block two", relation="alternative",
+                    source=src.replace('Param("w", "Width", 60,', 'Param("w", "Width", 66,'))
     out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t20", "name": "mcp__form__create_design",
                                                        "input": {k: v for k, v in args.items() if k != "source"}}]}})
 

@@ -791,7 +791,7 @@ QtObject {
                 if (ev.draft) s._noteDraft(ev)
                 if (ev.kind === "stage") { if (ev.draft) s.onStage(ev); continue }    // drawn, not said in the chat
                 s.noteAct(ev)
-                s.follow(ev)
+                if (!s._waitCommit(ev)) s.follow(ev)
             }
         }, function () {})
     }
@@ -815,17 +815,55 @@ QtObject {
     property real _framedDiag: 0
     function _noteDraft(ev) {
         if (ev.kind === "design") { var o = Object.assign({}, _draftOf); o[ev.draft] = ev.project || ""; _draftOf = o }
-        if (ev.kind === "commit") {
-            var dn = Object.assign({}, _draftDone); dn[ev.draft] = true; _draftDone = dn
-            if (building && building.draft === ev.draft) { _handoff = true; if (screen === "designing") calmArrive = true }
-        }
+        if (ev.kind === "stage") { var sn = Object.assign({}, _stageSeen); sn[ev.draft] = Math.max(sn[ev.draft] || 0, ev.index || 0); _stageSeen = sn }
+        // a commit for a build that is being drawn waits for _waitCommit; any other one ends its draft now
+        if (ev.kind === "commit" && !(building && building.draft === ev.draft)) _endDraft(ev.draft)
+    }
+    function _endDraft(draft) { var dn = Object.assign({}, _draftDone); dn[draft] = true; _draftDone = dn }
+    // The last stage and the commit often arrive in the same poll. The commit then waits until that stage has been
+    // fetched, drawn and has grown into place (at most 3 s), so the last feature is never skipped; then the saved
+    // design takes over in place.
+    property var _stageSeen: ({})      // draft id -> the newest stage index the activity log named
+    property var _commitWait: null     // { ev, until }: the commit of the build on screen, held until its last stage is in
+    function _waitCommit(ev) {
+        if (ev.kind !== "commit" || !ev.draft || !building || building.draft !== ev.draft) return false
+        _commitWait = { ev: ev, until: Date.now() + 3000 }
+        _commitTick()
+        if (_commitWait) _commitTimer.start()
+        return true
+    }
+    property var _commitTimer: Timer { interval: 60; repeat: true; onTriggered: s._commitTick() }
+    function _commitTick() {
+        var w = _commitWait
+        if (!w) { _commitTimer.stop(); return }
+        var vp = _stageView(), d = w.ev.draft
+        var drawn = !!building && building.draft === d && building.index >= (_stageSeen[d] || 0) && !_stageBusy
+        var settled = !vp || (!vp.revealing && !(vp.model && vp.model.stage && vp.model.mesh.length > 1))
+        if (!(drawn && settled) && Date.now() < w.until) return
+        _commitWait = null; _commitTimer.stop()
+        _endDraft(d)
+        if (building && building.draft === d) { _handoff = true; if (screen === "designing") calmArrive = true }
+        follow(w.ev)
     }
     function _stageView() { return screen === "designing" ? stageViewer : screen === "work" ? viewer : null }
+    // the agent of this conversation (or any agent, while the open design was not worked on) starts a new design while
+    // a design is open: the workspace hands over to the being-designed view, where its stages are drawn as they come
+    function _toDesigning(ts) {
+        agentElsewhere = null; convNoDesign = false; blankCanvas = false; showPlate = false
+        pid = ""; data = null; view = null; preview = null; compare = null; layers = null; section = null; scrub = null
+        draftValues = ({}); draftProv = ({}); draftNote = ""; draftOrigin = ""; draftAgent = ""; _stamp = ""
+        designingSince = ts - 0.5
+        screen = "designing"
+    }
     function onStage(ev) {
         if (_draftDone[ev.draft]) return
         var target = _draftOf[ev.draft] || ev.project || ""
+        if (screen === "work" && !target) {                    // a new design while one is open
+            if ((steered && !chatBusy) || scrub || compare || (hasDraft && !draftAgent)) return
+            _toDesigning(ev.ts)
+        }
         if (screen === "designing") { if (target || ev.ts < designingSince - 1) return }      // this conversation's new design
-        else if (screen === "work") { if (!target || target !== pid || scrub || compare || (hasDraft && !draftAgent)) return }   // a rewrite of the open one
+        else if (screen === "work") { if (target !== pid || scrub || compare || (hasDraft && !draftAgent)) return }   // a rewrite of the open one
         else return
         if (_stageBusy) { _stageAgain = ev.draft; return }    // the draft file always holds the newest stage: fetch it once more
         _stageBusy = true
@@ -864,10 +902,10 @@ QtObject {
         vp.setModel(Object.assign({}, m, { mesh: [m.mesh[m.mesh.length - 1]] }))
     }
     function _stageClear() {                      // the agent stopped without saving it: the plate is empty again
-        building = null; _handoff = false; calmArrive = false; _framedDiag = 0
+        building = null; _handoff = false; calmArrive = false; _framedDiag = 0; _commitWait = null
         if (stageViewer && stageViewer.model && stageViewer.model.stage) stageViewer.setModel(null)
     }
-    property var _stageEnd: Timer { interval: 3000; onTriggered: if (s.building && !s._handoff && !s.chatBusy) s._stageClear() }
+    property var _stageEnd: Timer { interval: 3000; onTriggered: if (s.building && !s._handoff && !s._commitWait && !s.chatBusy) s._stageClear() }
     property var _stageWatch: Connections { target: s
         function onChatBusyChanged() { if (!s.chatBusy && s.building) s._stageEnd.restart() }
         function onScreenChanged() { if (s.screen !== "designing" && s.screen !== "work") s._stageClear() }

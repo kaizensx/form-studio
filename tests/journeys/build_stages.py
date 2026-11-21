@@ -61,6 +61,76 @@ HEAD = """(function () { if (!Store.view || !Store.viewer || !Store.viewer.model
         && a.every(function (m, i) { return m.positions === b[i].positions && m.indices === b[i].indices }) })()"""
 
 
+
+def _light(ui):
+    return ui.js("Theme.dark") is False
+
+
+def _stream(ui, tag, pid_before=""):
+    """Sample the window from now until a design other than pid_before is open with its saved head drawn; a picture
+    of each stage while it grows in and once it sits. Returns (samples, shots)."""
+    samples, shots, seen, t_end = [], [], {}, time.time() + 240
+    pre = f"stages-{tag}-" + ("light-" if _light(ui) else "")
+    while time.time() < t_end:
+        st = ui.js(STATE)
+        vp, clay, clear = measure(ui)
+        now = time.time()
+        samples.append({"t": now, "screen": st[0], "stage": st[1], "caption": st[2], "pid": st[3], "staged": st[4],
+                        "revealing": st[5], "vp": vp, "clay": clay, "clear": clear})
+        if st[1] and st[1] not in seen:                 # a new stage arrived: a picture while it grows in, one when it sits
+            seen[st[1]] = now
+            ui.wait(120)
+            shots.append(str(ui.shot(f"{pre}{len(seen)}-{st[1]}-growing")))
+        for f, t0 in list(seen.items()):
+            if t0 and now - t0 > 0.7 and st[1] == f:
+                shots.append(str(ui.shot(f"{pre}{list(seen).index(f) + 1}-{f}-in-place")))
+                seen[f] = 0
+        if st[0] == "work" and st[3] and st[3] != pid_before and not st[1] and not st[4] and not st[5] and ui.js(HEAD):
+            break
+        ui.wait(30)
+    else:
+        raise AssertionError(f"the saved design did not take over: {samples[-1]}")
+    ui.settle(600)
+    shots.append(str(ui.shot(f"{pre}saved-design")))
+    return samples, shots
+
+
+def _check_stream(ui, samples, log, created):
+    """Every stage drawn in build order, the last one too; at least two before the save; no blink from the first
+    stage to the saved head; the saved head drawn exactly, with no second build-up."""
+    feats = [e["feature"] for e in log]
+    print(f"  stages drawn: {[(e['feature'], e['at'], e['of'], round(e['t'] / 1000 - created, 2)) for e in log]}", flush=True)
+    ui.eq(feats, ["body", "bore", "tower"], "every stage that built is drawn, in build order, the last one too")
+    ui.check(len([e for e in log if e["t"] / 1000 < created]) >= 2, f"at least two stages are drawn before the project is saved: {log} (saved at {created})")
+    ui.check(all(e["of"] == 4 for e in log), f"each stage knows how many features the design has: {log}")
+    captions = sorted({x["caption"] for x in samples if x["caption"]})
+    ui.check("Building Tower (4 of 4)" in captions and ("Building Bore (2 of 4)" in captions or "Building Body (1 of 4)" in captions),
+             f"a quiet caption names each stage: {captions}")
+    drawn = [x for x in samples if x["staged"] and x["screen"] == "designing"]
+    ui.check(drawn and (max(x["clay"] for x in drawn) > 40 or _light(ui)), f"the stage is on screen before the design exists")
+    last = next((i for i, x in enumerate(samples) if x["stage"] == "tower"), None)
+    ui.check(last is not None and any(x["screen"] == "designing" and x["revealing"] for x in samples[last:]),
+             "the last stage grows in on the being-designed screen before the saved design takes over")
+    first = next(i for i, x in enumerate(samples) if x["staged"])
+    run = [x for x in samples[first:] if x["vp"]]
+    print(f"  {len(run)} frames from the first stage, clay {min(x['clay'] for x in run)}..{max(x['clay'] for x in run)}, "
+          f"screens {sorted({x['screen'] for x in run})}", flush=True)
+    if not _light(ui):                                   # the pixel classes are tuned for the dark bench
+        for i, x in enumerate(run):
+            ui.check(x["clear"] <= 17 * 17 * 0.6, f"the middle of the view is never the clear colour (frame {i}: {x})")
+        for i in range(1, len(run) - 1):
+            a, x, b = run[i - 1]["clay"], run[i]["clay"], run[i + 1]["clay"]
+            ui.check(not (min(a, b) >= 20 and x < 0.4 * min(a, b)), f"no blink: clay pixels {a} -> {x} -> {b} at frame {i} ({run[i]['screen']})")
+        ui.check(min(x["clay"] for x in run[3:]) >= 12, f"the part never leaves the view: {[x['clay'] for x in run]}")
+    ui.check(ui.js(HEAD) is True, "the head model is drawn")
+    ui.check(ui.js("Store.viewer._hold.length === 0 && !Store.viewer.revealing && Store.building === null") is True,
+             "nothing is held or still building after the hand-over")
+    after = [x for x in samples if x["screen"] == "work" and x["pid"] == samples[-1]["pid"]]
+    ui.check(not any(x["revealing"] for x in after), "the saved design is not grown in a second time")
+    ui.eq(ui.js("Store.view.mesh.map(function (m) { return m.feature }).filter(function (f, i, a) { return a.indexOf(f) === i })"),
+          ["body", "bore", "tower"], "the saved design has the features that built")
+
+
 def journey_stages_stream_then_the_saved_design(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home" and ui.exists("startComposer"), 30, "Home and its composer")
     ui.wait_until(lambda: ui.js("Store.chatReady"), 20, "the stand-in agent")
@@ -70,62 +140,10 @@ def journey_stages_stream_then_the_saved_design(ui):
     ui.type("A block with a bore and a tower, built in stages pause 1.6")
     ui.key("Return")
     ui.wait_until(lambda: ui.store.get("screen") == "designing", 5, "the workspace to open in its being-designed state")
-    samples, shots, seen, t_end = [], [], {}, time.time() + 240
-    while time.time() < t_end:
-        st = ui.js(STATE)
-        vp, clay, clear = measure(ui)
-        now = time.time()
-        samples.append({"t": now, "screen": st[0], "stage": st[1], "caption": st[2], "pid": st[3], "staged": st[4],
-                        "revealing": st[5], "vp": vp, "clay": clay, "clear": clear})
-        if st[1] and st[1] not in seen:                 # a new stage arrived: a picture while it grows in, one when it sits
-            seen[st[1]] = now
-            shots.append(str(ui.shot(f"stages-{len(seen)}-{st[1]}-growing")))
-        for f, t0 in list(seen.items()):
-            if t0 and now - t0 > 0.7 and st[1] == f:
-                shots.append(str(ui.shot(f"stages-{list(seen).index(f) + 1}-{f}-in-place")))
-                seen[f] = 0
-        if st[0] == "work" and st[3] and not st[1] and not st[4] and not st[5] and ui.js(HEAD):
-            break
-        ui.wait(30)
-    else:
-        raise AssertionError(f"the saved design did not take over: {samples[-1]} "
-                             f"{ui.js('[!!Store.view, !!Store.viewer, Store.viewer && Store.viewer.model === Store.view, Store.viewer && Store.viewer.model && Store.viewer.model.rev, Store.view && Store.view.rev]')}")
-    ui.settle(600)
-    shots.append(str(ui.shot("stages-saved-design")))
+    samples, shots = _stream(ui, "new")
     pid = ui.store.get("pid")
     ui.check(pid, "the saved design is open")
-    created = ui.api("/projects/" + pid)["project"]["created"]
-    log = ui.js("Store.stageLog")
-    before = [e for e in log if e["t"] / 1000 < created]
-    print(f"  stages drawn: {[(e['feature'], e['at'], e['of'], round(e['t'] / 1000 - created, 2)) for e in log]}", flush=True)
-    ui.check(len({e["feature"] for e in before}) >= 2, f"at least two stages were drawn before the project was saved: {log} (saved at {created})")
-    ui.check([e["feature"] for e in log] == sorted({e["feature"] for e in log}, key=["body", "bore", "tower"].index),
-             f"stages are drawn in build order, each once: {[e['feature'] for e in log]}")
-    ui.check(all(e["of"] == 4 for e in log), f"each stage knows how many features the design has: {log}")
-    captions = sorted({x["caption"] for x in samples if x["caption"]})
-    ui.check("Building Bore (2 of 4)" in captions or "Building Body (1 of 4)" in captions, f"a quiet caption names the stage: {captions}")
-    drawn = [x for x in samples if x["staged"] and x["screen"] == "designing"]
-    ui.check(drawn and max(x["clay"] for x in drawn) > 40, f"the stage is on screen before the design exists: {[x['clay'] for x in drawn][-5:]}")
-    # from the first stage drawn to the saved design: the part never blinks or vanishes, across the hand-over too
-    first = next(i for i, x in enumerate(samples) if x["staged"])
-    run = [x for x in samples[first:] if x["vp"]]
-    print(f"  {len(run)} frames from the first stage, clay {min(x['clay'] for x in run)}..{max(x['clay'] for x in run)}, "
-          f"screens {sorted({x['screen'] for x in run})}", flush=True)
-    for i, x in enumerate(run):
-        ui.check(x["clear"] <= 17 * 17 * 0.6, f"the middle of the view is never the clear colour (frame {i}: {x})")
-    for i in range(1, len(run) - 1):
-        a, x, b = run[i - 1]["clay"], run[i]["clay"], run[i + 1]["clay"]
-        ui.check(not (min(a, b) >= 20 and x < 0.4 * min(a, b)), f"no blink: clay pixels {a} -> {x} -> {b} at frame {i} ({run[i]['screen']})")
-    ui.check(min(x["clay"] for x in run[3:]) >= 12, f"the part never leaves the view: {[x['clay'] for x in run]}")
-    # the saved design took over in place: its own meshes, no stage left, no second build-up afterwards
-    ui.check(ui.js("(function () { var a = Store.viewer._mesh, b = Store.view.mesh; return a.length === b.length"
-                   " && a.every(function (m, i) { return m.positions === b[i].positions }) })()") is True, "the head model is drawn")
-    ui.check(ui.js("Store.viewer._hold.length === 0 && !Store.viewer.revealing && Store.building === null") is True,
-             "nothing is held or still building after the hand-over")
-    after = [x for x in samples if x["screen"] == "work"]
-    ui.check(not any(x["revealing"] for x in after), "the saved design is not grown in a second time")
-    ui.eq(ui.js("Store.view.mesh.map(function (m) { return m.feature }).filter(function (f, i, a) { return a.indexOf(f) === i })"),
-          ["body", "bore", "tower"], "the saved design has the features that built")
+    _check_stream(ui, samples, ui.js("Store.stageLog"), ui.api("/projects/" + pid)["project"]["created"])
     # the feature left out is a calm line in the conversation with the measured reason, not an error
     tools = ui.js("Store.chatTools")
     left = [r for r in tools.values() if r.get("left_out")]
@@ -134,6 +152,28 @@ def journey_stages_stream_then_the_saved_design(ui):
     ui.check(all(r.get("ok") for r in tools.values()), "no tool step failed")
     ui.wait_until(lambda: ui.exists("leftOut"), 10, "the left-out line in the conversation")
     ui.check(not any(e.get("t") == "error" for e in ui.js("Store.chatItems")), "no error in the conversation")
-    shots.append(str(ui.shot("stages-left-out-line")))
-    S["shots"] = shots
+    ui.wait_until(lambda: ui.store.get("chatBusy") is False, 30, "the reply to end")
+    shots.append(str(ui.shot("stages-new-" + ("light-" if _light(ui) else "") + "left-out-line")))
+    S["pid"] = pid
+    print("  screenshots: " + ", ".join(shots), flush=True)
+
+
+def journey_a_new_design_while_one_is_open(ui):
+    """The person opened the saved design themselves and asks the agent, in its conversation, for another one: the
+    workspace hands over to the being-designed view and the new design's stages are drawn there too."""
+    pid = S["pid"]
+    ui.run_js("Store.open(%r)" % pid)                   # opened by the person: steered
+    ui.wait_until(lambda: ui.js("Store.screen === 'work' && Store.pid === %r && !!Store.view" % pid), 30, "the design to open")
+    ui.settle(800)
+    ui.check(ui.js("Store.steered") is True, "the person is working on the open design")
+    ui.run_js("Store.talkOpen = true")
+    n0 = len(ui.js("Store.stageLog"))
+    ui.wait_until(lambda: ui.exists("talk"), 5, "the conversation column")
+    ui.run_js("Store.send('Make another one built in stages pause 1.6')")
+    samples, shots = _stream(ui, "open", pid_before=pid)
+    pid2 = ui.store.get("pid")
+    ui.check(pid2 and pid2 != pid, f"the new design is open: {pid2}")
+    ui.check(any(x["screen"] == "designing" for x in samples), "the workspace handed over to the being-designed view")
+    log = [e for e in ui.js("Store.stageLog")[n0:]]
+    _check_stream(ui, samples, log, ui.api("/projects/" + pid2)["project"]["created"])
     print("  screenshots: " + ", ".join(shots), flush=True)
