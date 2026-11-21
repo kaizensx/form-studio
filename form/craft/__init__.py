@@ -16,8 +16,19 @@ Modules (each also importable on its own, e.g. `from form.craft import mechanism
               handle; silhouette-driven forms: curve, profile_sections, check_sections, loft_report, checked_body;
               details that follow a surface: two_view_cutter, surface_band, slot_grille; product families from
               named proportions: head_form, helmet_fullface, helmet_open, mouse_form, bottle_profile, grip_sections
-              (tables HEADFORMS, ANSUR_HEAD, ANSUR_HAND, HELMET_LAYERS, PCO1881)
-  safe        operations that degrade gracefully, each fallback noted: safe_union, safe_cut, safe_intersect,
+              (tables HEADFORMS, ANSUR_HEAD, ANSUR_HAND, HELMET_LAYERS, PCO1881); magnets and splits on sculpted
+              bodies: surface_point, magnet_boss, magnet_pocket, split_with_magnets, split_spots;
+              radial_grid_heightmap (web_heightmap is its deprecated name)
+  subd        the skin route for organic shells: skin_from_sections (a section stack fitted as one B-spline grid,
+              its deviation measured) returns a Skin: .shell(wall) (three faces), .band(amount, region, depth),
+              .layer(lo, hi), .offset(d), .ray(...); offset_grid (a true parametric offset); cages and handles
+  assemble    separate parts and their joints: parts(name=solid, ..., clearance) (every pair's gap measured; use it
+              instead of fuse(a, b, max_solids=2, min_solids=2)), named_parts, part_list (assembly Parts by a point
+              inside each), split (an insert out of a skin shell, resting on a lip), lens (a part from the inner
+              offset skin), MAGNETS stock (6x2, 6x3, 8x3, 10x3) with MAGNET_FITS (press, glue, printed) and
+              MAGNET_FLOOR (0.6 mm), magnet, magnet_pair (coaxial pockets by construction; pull force unknown unless
+              a datasheet value is given), coaxial_error
+  safe       operations that degrade gracefully, each fallback noted: safe_union, safe_cut, safe_intersect,
               safe_fillet, safe_chamfer, safe_loft (re-seamed, ruled, pairwise), safe_shell, safe_sweep; repair
               (ShapeFix + face merge), inspect (validity, faults, shortest edge), reseam (sections for a loft)
   texture     B-rep: knurl, spiral_ribbed_body, wrapped_ribs, emboss_cells (capped at MAX_INSTANCES = 2000)
@@ -49,10 +60,14 @@ _LAZY = {
                 "helmet_sections", "grip", "handle", "curve", "profile_sections", "check_sections", "loft_report",
                 "checked_body", "two_view_cutter", "grow_outline", "surface_band", "offset_body", "slot_grille", "head_form", "helmet_fullface",
                 "helmet_open", "mouse_form", "bottle_profile", "grip_sections", "HEADFORMS", "ANSUR_HEAD",
-                "ANSUR_HAND", "HELMET_LAYERS", "PCO1881"),
+                "ANSUR_HAND", "HELMET_LAYERS", "PCO1881", "surface_point", "magnet_boss", "magnet_pocket",
+                "split_with_magnets", "split_spots", "radial_grid_heightmap"),
     "safe": ("safe_union", "safe_cut", "safe_intersect", "safe_chamfer", "safe_loft", "safe_shell", "safe_sweep",
              "repair", "inspect", "reseam", "BRIDGE"),
     "texture": ("knurl", "polyhedron", "spiral_ribbed_body", "wrapped_ribs", "emboss_cells", "MAX_INSTANCES"),
+    "assemble": ("parts", "named_parts", "part_list", "inside_point", "split", "Split", "lens", "MAGNETS", "MAGNET_FITS",
+                 "MAGNET_FLOOR", "magnet", "magnet_pair", "MagnetPair", "pocket_axes", "coaxial_error"),
+    "subd": ("skin_from_sections", "Skin", "offset_grid"),
 }
 _WHERE = {name: mod for mod, names in _LAZY.items() for name in names}
 
