@@ -45,7 +45,12 @@ nothing from these projects ships with the app. Each entry names the exact commi
 
 ## kulibinai/CADEvolve
 
-- Source: https://github.com/kulibinai/CADEvolve
-- Licence: Apache License 2.0
-- Status: reserved. The exemplar corpus work will fill in this entry, with the commit, the files used, what was
-  modified and a copy of the licence, before any CADEvolve material lands in Form Studio.
+- Source: https://github.com/kulibinai/CADEvolve @ e30e6358648df661247815c67414cd42079f8b41; dataset
+  huggingface.co/datasets/kulibinai/cadevolve @ 7543a3c1103b72c71f40ec71d6cacd1a50a77a16
+- Licence: Apache License 2.0, Copyright 2025 Lomonosov Moscow State University. Copy: form/exemplars/LICENSE-CADEvolve
+- Use: twelve exemplars in form/exemplars (their META "origin" names the seed) are modified works, hand-ported from
+  its seed examples to build123d / Form Studio. The opt-in corpus (`form install exemplars.cadevolve`) downloads only
+  CADEvolve-G/parametric_generators.json and reads it as text; nothing from the ABC-* or ShapeNet-* folders is kept.
+- Many of CADEvolve's seed examples come from the CadQuery documentation examples (CadQuery, Apache License 2.0,
+  https://github.com/CadQuery/cadquery), credited here as well.
+

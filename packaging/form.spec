@@ -31,6 +31,7 @@ hidden += collect_submodules("form")
 datas += collect_data_files("form", include_py_files=False)
 # exemplar designs are read as source text by design_examples, so they ship as files too
 datas += [(str(p), "form/exemplars") for p in (ROOT / "form" / "exemplars").glob("*.py") if not p.name.startswith("_")]
+datas += [(str(ROOT / "form" / "exemplars" / "LICENSE-CADEvolve"), "form/exemplars")]   # ported exemplars carry their licence
 
 # Qt modules the interface does not use; leaving them out halves the download
 EXCLUDE = ["PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtWebEngineQuick", "PySide6.QtPdf", "PySide6.QtPdfWidgets",
