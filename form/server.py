@@ -132,6 +132,10 @@ def make_handler(st: Studio):
                 return self._static(path)
             if path == "/api/activity":
                 return self._json({"events": st.activity_since(float(q.get("since") or 0)), "now": time.time()})
+            md = re.fullmatch(r"/api/drafts/(draft-[0-9a-f]{1,32})", path)
+            if md:                                      # the last stage a build made (Studio._draft_sink)
+                d = st.draft(md.group(1))
+                return self._json(d) if d else self._json({"error": "No such draft."}, 404)
             if path == "/api/chat":
                 if q.get("refresh"):                        # agents workstream: look for providers and local servers again
                     from .agents import providers as _prov

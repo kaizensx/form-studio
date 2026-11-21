@@ -38,10 +38,45 @@ class Feature:
     doc: str = ""
 
 
+# Every Stage made while a build runs is reported to the recorders open at that moment (form/kernel.py opens one per
+# build): when a later feature raises, the stages already made are still known, so the last valid solid can be shown
+# and saved as a partial revision. Designs need no change for this.
+_RECORDERS: list = []
+
+
 @dataclass
 class Stage:
     feature: str
     shape: Any
+
+    def __post_init__(self):
+        for rec in list(_RECORDERS):
+            rec(self)
+
+
+class recording:
+    """`with recording() as stages:` collects every Stage created inside the block, in order. on_stage(stage), when
+    given, is called for each one as it is made (it may raise to stop the build there)."""
+
+    def __init__(self, on_stage: Callable | None = None):
+        self.stages: list = []
+        self._on = on_stage
+
+    def __call__(self, stage) -> None:
+        self.stages.append(stage)
+        if self._on is not None:
+            self._on(stage)
+
+    def __enter__(self):
+        _RECORDERS.append(self)
+        return self.stages
+
+    def __exit__(self, *exc):
+        try:
+            _RECORDERS.remove(self)
+        except ValueError:
+            pass
+        return False
 
 
 class RecipeError(Exception):

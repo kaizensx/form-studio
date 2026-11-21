@@ -112,6 +112,18 @@ class StudioError(Exception):
         return {"message": str(self), "hint": self.hint, **self.extra}
 
 
+def _partial_text(info: dict) -> str:
+    """One line for a partial revision: what did not build."""
+    sk = [x["feature"] for x in info.get("skipped") or []]
+    if sk:
+        return ("feature " if len(sk) == 1 else "features ") + ", ".join(sk) + " did not build and " + \
+            ("is" if len(sk) == 1 else "are") + " left out"
+    f = info.get("failed")
+    return (f"the build stopped at {f}" if f else "the result failed the final check") + \
+        (f"; kept {', '.join(info.get('built') or [])}" if info.get("built") else "") + \
+        ("; the kept solid fails OCCT's validity check" if info.get("valid") is False else "")
+
+
 def H(*parts) -> str:
     return hashlib.sha256(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
@@ -563,11 +575,18 @@ class Studio:
 
     def create_design(self, name: str, source: str, brief: str = "", values: dict | None = None,
                       language: str = "python", references: list | None = None, purpose: str | None = None,
-                      process: str | None = None) -> dict:
+                      process: str | None = None, partial: bool = False, draft: str | None = None) -> dict:
         """A new project whose geometry is defined by source: Python (one Recipe subclass) or OpenSCAD.
 
         references: STEP/STL files to import first, so the design can call self.reference(name) on its first build.
+        partial: when a feature fails, save what built before it as a partial revision (flagged, release blocked)
+        instead of refusing; the project then exists and its last valid solid is shown (form/featureprog.py).
+        draft: an id for this attempt; each stage the build makes is written to .cache/drafts/<draft>.json and
+        named in the activity log as it is made.
         """
+        if language == "python":
+            from . import featureprog
+            source = featureprog.strip_partial(source)
         rid = self._load_design(source, language)
         refs = {}
         for r in references or []:
@@ -575,19 +594,133 @@ class Studio:
             if not src.is_file() or src.suffix.lower() not in REF_FORMATS:
                 raise StudioError(f"Not a STEP or mesh file: {src}", "Give the absolute path of a .step, .stp, .stl, .obj or .3mf file.")
             refs[self._ref_name(src.name)] = str(src.resolve())
-        self._check_assembly(rid, {**self.recipes[rid].defaults(), **(values or {})})
-        self._k("summary", key="pv-" + H(rid, values or {}), recipe_id=rid, refs=refs,
-                values={**self.recipes[rid].defaults(), **(values or {})}, tol=0.1, timeout=180)   # must build before it is saved
+        vals = {**self.recipes[rid].defaults(), **(values or {})}
+        self._check_assembly(rid, vals)
+        rid, info = self._try_design(rid, vals, partial=partial and language == "python", refs=refs, draft=draft,
+                                     name=name)                    # must build before it is saved
+        if info:
+            values = {k: v for k, v in (values or {}).items() if k in {q.key for q in self.recipes[rid].params}}
+        log = self._tl.last_log
         p = self.create(name, rid, brief, values, purpose=purpose, process=process)
+        if log:
+            with self.lock(p["id"]):
+                p = self.load(p["id"])
+                p["revisions"][0]["build_log"] = log
+                self.save(p)
+        if info:
+            with self.lock(p["id"]):
+                p = self.load(p["id"])
+                p["revisions"][0]["partial"] = info
+                p["revisions"][0]["note"] = "First version of the design (partial: " + _partial_text(info) + ")"
+                self.decide(p, "partial", f"r1 is a partial build: {_partial_text(info)}.")
+                self.save(p)
         for path in refs.values():
             self.import_reference(p, Path(path))
         return self.load(p["id"])
 
+    def _try_design(self, rid: str, vals: dict, partial: bool = False, refs: dict | None = None, p: dict | None = None,
+                    draft: str | None = None, name: str = "", prev_skipped: set | None = None) -> tuple[str, dict | None]:
+        """Build a design source before it becomes a revision: (recipe id to save, partial info or None).
+
+        A FeatureDesign whose later features fail builds with them skipped: refused unless partial (or the same
+        features were already skipped in the revision it replaces). Any other design that fails after some stages
+        were built: with partial, a partial source keeping those stages (form/featureprog.py); else the error."""
+        from . import featureprog
+        on = self._draft_sink(draft, name) if draft else None
+        extra = {"refs": refs} if refs else {}
+        kw = dict(recipe_id=rid, values=vals, tol=0.1, p=p, timeout=180, **extra, **({"on_progress": on} if on else {}))
+        self._tl.last_log = None
+        if not partial:
+            s = self._k("summary", key="pv-" + H(rid, vals), **kw)
+            self._tl.last_log = s.get("build_log")
+            return rid, self._skips(s, False, prev_skipped)
+        r = self._k("try_build", key="pv-" + H(rid, vals), **kw)
+        if r["ok"]:
+            self._tl.last_log = r["summary"].get("build_log")
+            return rid, self._skips(r["summary"], True, prev_skipped)
+        err = r["error"]
+        keep = int(r.get("keep") or 0)
+        if keep < 1:
+            raise self._kernel_error({**err, "kind": "recipe"})
+        src = featureprog.partial_source(source_path(self.sources, rid).read_text(encoding="utf-8"), keep,
+                                         r.get("solids", 1), rid, r.get("stages", []), err.get("feature") or "",
+                                         bool(r.get("valid", True)))
+        rid2 = self._load_design(src, "python")
+        kw.pop("on_progress", None)                 # its stages were shown as the failed build made them
+        self._k("summary", key="pv-" + H(rid2, vals), **{**kw, "recipe_id": rid2})
+        diag = err.get("diagnosis") or {}
+        info = {"failed": err.get("feature") or "", "built": list(r.get("stages", []))[:keep],
+                "dropped": list(r.get("stages", []))[keep:],    # made, but not a solid that shows (stage_checks)
+                "message": str(err.get("message", ""))[:700], "hint": str(err.get("hint", ""))[:900],
+                "source": rid, "evidence": "computed", "valid": bool(r.get("valid", True)),
+                "stage_checks": r.get("stage_checks", []),
+                "diagnosis": {k: diag[k] for k in ("summary", "operation", "line", "code", "cause", "fixes", "safe")
+                              if k in diag}}
+        return rid2, info
+
+    def _skips(self, summary: dict, partial: bool, prev: set | None) -> dict | None:
+        sk = summary.get("skipped") or []
+        if not sk:
+            return None
+        new = [x for x in sk if x["feature"] not in (prev or set())]
+        if new and not partial:
+            x = new[0]
+            raise StudioError(f"Feature {x['feature']} did not build: {x['message']}", x.get("hint", ""), status=422,
+                              kind="recipe", feature=x["feature"], skipped=sk,
+                              **({"diagnosis": x["diagnosis"]} if x.get("diagnosis") else {}))
+        return {"skipped": sk, "built": [e["feature"] for e in summary.get("build_log", []) if e["status"] != "skipped"],
+                "failed": sk[0]["feature"], "message": sk[0]["message"], "hint": sk[0].get("hint", ""),
+                "evidence": "computed"}
+
+    @staticmethod
+    def _kernel_error(i: dict) -> "StudioError":
+        return StudioError(i.get("message", "Kernel failure"), i.get("hint", ""), status=422 if i.get("kind") == "recipe" else 500,
+                           feature=i.get("feature"), params=i.get("params", []), kind=i.get("kind"),
+                           **({"diagnosis": i["diagnosis"]} if i.get("diagnosis") else {}))
+
+    def _draft_sink(self, draft: str, name: str = ""):
+        """on_progress for a build: each stage's mesh goes to .cache/drafts/<draft>.json (the last valid solid of the
+        attempt) and is named in the activity log, so the build is visible before it is saved."""
+        d = self.root / ".cache" / "drafts"
+        f = d / f"{re.sub(r'[^A-Za-z0-9_-]', '', draft)[:64]}.json"
+
+        def sink(ev):
+            if not isinstance(ev, dict) or ev.get("kind") != "stage":
+                return
+            try:
+                d.mkdir(parents=True, exist_ok=True)
+                body = {"draft": draft, "name": name, "ts": time.time(), "feature": ev["feature"], "index": ev["index"],
+                        "bbox": ev["bbox"], "mesh": [{"feature": ev["feature"], "positions": ev["positions"],
+                                                     "indices": ev["indices"]}]}
+                tmp = f.with_suffix(".tmp")
+                tmp.write_text(json.dumps(body), encoding="utf-8")
+                fsutil.replace(tmp, f)
+            except OSError:
+                pass
+            self.activity(None, "stage", f"Built {ev['feature']} (stage {ev['index']})" + (f" of {name}" if name else ""),
+                          by="engine", draft=draft, stage=ev["feature"], index=ev["index"], triangles=ev.get("triangles"))
+        return sink
+
+    def draft(self, draft: str) -> dict | None:
+        """The last stage built for a draft (see _draft_sink), or None."""
+        f = self.root / ".cache" / "drafts" / f"{re.sub(r'[^A-Za-z0-9_-]', '', draft)[:64]}.json"
+        try:
+            return json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
     def update_design(self, p: dict, source: str, note: str = "", values: dict | None = None, origin: str = "agent",
-                      expect_head: int | None = None, language: str | None = None) -> dict:
-        """New revision with new source. Values for parameters that still exist carry over."""
+                      expect_head: int | None = None, language: str | None = None, partial: bool = False,
+                      draft: str | None = None) -> dict:
+        """New revision with new source. Values for parameters that still exist carry over.
+
+        partial: when a feature fails, save what built before it as a partial revision (release blocked) instead of
+        refusing. Without it a failing feature makes no revision, and the head stays as it was."""
         if language is None:                       # keep the project's language unless told otherwise
             language = "openscad" if self.rid(p).startswith(SCAD_PREFIX) else "python"
+        if language == "python":
+            from . import featureprog
+            source = featureprog.strip_partial(source)
         rid = self._load_design(source, language)
         new = self.recipes[rid]
         with self.lock(p["id"]):
@@ -600,7 +733,10 @@ class Studio:
             vals = {**new.defaults(), **keep, **{k: float(v) for k, v in (values or {}).items()}}
             vals = self._validate(rid, vals)
             self._check_assembly(rid, vals)
-            self._k("summary", key="pv-" + H(rid, vals), recipe_id=rid, values=vals, tol=0.1, p=p, timeout=180)
+            prev = {x["feature"] for x in (head.get("partial") or {}).get("skipped", [])}
+            rid, info = self._try_design(rid, vals, partial=partial and language == "python", p=p, draft=draft,
+                                         name=p.get("name", ""), prev_skipped=prev)
+            new = self.recipes[rid]
             prov = {q.key: (head["provenance"][q.key] if q.key in head["provenance"] and q.key in keep
                             and head["provenance"][q.key].get("source") != "assumed" else _initial_provenance(q)) for q in new.params}
             n = max(r["n"] for r in p["revisions"]) + 1
@@ -608,10 +744,17 @@ class Studio:
             added = sorted(set(vals) - old_keys)
             removed = sorted(old_keys - set(vals))
             summ = "Design source changed" + (f"; new: {', '.join(added)}" if added else "") + (f"; removed: {', '.join(removed)}" if removed else "")
-            p["revisions"].append({"n": n, "parent": head["n"], "ts": time.time(), "values": vals, "note": note.strip() or summ,
-                                   "summary": summ, "origin": origin, "provenance": prov, "recipe": rid, "touched": []})
+            rev = {"n": n, "parent": head["n"], "ts": time.time(), "values": vals, "note": note.strip() or summ,
+                   "summary": summ, "origin": origin, "provenance": prov, "recipe": rid, "touched": []}
+            if info:
+                rev["partial"] = info
+            if self._tl.last_log:                     # per feature: built, loaded from its checkpoint, or skipped
+                rev["build_log"] = self._tl.last_log
+            p["revisions"].append(rev)
             p["head"], p["recipe"] = n, rid
             self.decide(p, "source", f"r{n}: {summ}.")
+            if info:
+                self.decide(p, "partial", f"r{n} is a partial build: {_partial_text(info)}.")
             self.save(p)
             return p
 
@@ -922,9 +1065,7 @@ class Studio:
                 self._view_cache_put(cache, out)
             return out
         except KernelFailure as e:
-            i = e.info
-            raise StudioError(i.get("message", "Kernel failure"), i.get("hint", ""), status=422 if i.get("kind") == "recipe" else 500,
-                              feature=i.get("feature"), params=i.get("params", []), kind=i.get("kind"), **({"diagnosis": i["diagnosis"]} if i.get("diagnosis") else {}))
+            raise self._kernel_error(e.info)
 
     def view(self, p: dict, n: int | None = None, tol=0.03, timeout: float = 60) -> dict:
         r = self.rev(p, n)
@@ -1555,6 +1696,11 @@ class Studio:
                 elif c["status"] == "WARN":
                     warns.append({"id": c["id"], "label": c["label"], "value": c["value"]})
         # a coupon calibrates the printer; only a result from this part speaks for this revision
+        part = self.rev(p).get("partial")            # a partial build: features are missing, nothing to release
+        if part:
+            why = f"r{p['head']} is a partial build: {_partial_text(part)}. Fix the feature and build again."
+            reasons.append(why)
+            blocking.append(why)
         from . import staged                          # a briefed or planned design needs a critique pass of this revision
         crit = staged.needs_critique(p)
         if crit:

@@ -85,9 +85,14 @@ def _build(recipe_id: str, values: dict, tol: float):
     v = recipe.validate(values)
     t0 = time.perf_counter()
     craft_notes = _craft_notes()                   # clear what an earlier build left
-    from . import build_diag
+    from . import build_diag, featureprog
+    from .recipes.base import recording
+    featureprog.begin()
+    _LAST["stages"] = []
     try:
-        stages = recipe.build(v)
+        with recording(on_stage=_stage_out if PROGRESS is not None else None) as made:
+            _LAST["stages"] = made                 # what was built before a failure (op_try_build keeps it)
+            stages = recipe.build(v)
     except RecipeError as e:                       # the design's, form.craft's or parts.checked's own words + the line
         try:
             err = build_diag.wrap(e, recipe)
@@ -119,7 +124,7 @@ def _build(recipe_id: str, values: dict, tol: float):
     mesh = getattr(recipe, "mesh", False)          # a sewn triangle mesh: OCCT validity is not meaningful for it
     if not mesh and len(solids) != want:
         _stage_report(stages, want)                # name the stage where the solid count first went wrong
-    if (not mesh and not final.is_valid) or len(solids) != want:
+    if (not mesh and not final.is_valid and not getattr(recipe, "allow_invalid", False)) or len(solids) != want:  # allow_invalid: a partial build kept as it is (form/featureprog.py)
         raise RecipeError(
             f"The result is {len(solids)} solid(s) (valid={final.is_valid}); this design declares {want}", stages[-1].feature,
             "A cut has split the body, or parts touch and fused. Separate parts by a gap, or reduce the last change.")
@@ -177,9 +182,103 @@ def _build(recipe_id: str, values: dict, tol: float):
         "bbox": [[bb.min.X, bb.min.Y, bb.min.Z], [bb.max.X, bb.max.Y, bb.max.Z]],
         "volume": float(final.volume), "area": float(final.area), "com": (com.X, com.Y, com.Z),
         "t_build": t_build, "t_total": time.perf_counter() - t0, "tol": tol, "craft_notes": craft_notes,
-        "unchanged_stages": empty,
+        "unchanged_stages": empty, **featureprog.report(),
     }
     return model
+
+
+_LAST: dict = {"stages": []}     # the stages the last build made, in order (a failed build's are kept here)
+
+
+def _stage_mesh(shape):
+    """A coarse mesh of one stage, for showing the build as it grows (positions, indices, box)."""
+    from OCP.BRepTools import BRepTools
+    bb = shape.bounding_box()
+    tol = max(0.1, float(bb.diagonal) / 400)
+    try:
+        P, T = _tessellate(shape, tol)
+    finally:
+        try:
+            BRepTools.Clean_s(shape.wrapped)       # the final build meshes the solid at its own tolerance
+        except Exception:
+            pass
+    return {"positions": _b64(P.astype(np.float32)), "indices": _b64(T.astype(np.uint32)),
+            "bbox": [[bb.min.X, bb.min.Y, bb.min.Z], [bb.max.X, bb.max.Y, bb.max.Z]], "triangles": int(len(T))}
+
+
+def _stage_out(stage) -> None:
+    """Send each stage over PROGRESS as it is made, so the last valid solid is on screen while later features build."""
+    if PROGRESS is None:
+        return
+    try:
+        if not hasattr(stage.shape, "solids") or not stage.shape.solids():
+            return
+        m = _stage_mesh(stage.shape)
+        if not m["triangles"]:
+            return
+        PROGRESS({"kind": "stage", "feature": stage.feature, "index": len(_LAST["stages"]), **m})
+    except Exception:
+        pass
+
+
+def _stage_quality(s, mesh: bool) -> tuple[bool, bool]:
+    """(shows, valid) for one stage. shows: a non-empty solid whose triangle mesh encloses the volume the B-rep states
+    (within 10 %): a boolean that half-failed can leave a "valid" solid that meshes to nothing or to a sliver.
+    valid: OCCT's own check (always True for a mesh design)."""
+    from OCP.BRepTools import BRepTools
+    sh = s.shape
+    try:
+        if not hasattr(sh, "solids") or not sh.solids():
+            return False, False
+        vol = float(sh.volume)
+        if vol <= 1e-9:
+            return False, False
+        if mesh:
+            return True, True
+        bb = sh.bounding_box()
+        try:
+            P, T = _tessellate(sh, max(0.05, float(bb.diagonal) / 1000))
+        finally:
+            BRepTools.Clean_s(sh.wrapped)
+        if not len(T):
+            return False, False
+        a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+        mv = abs(float(np.einsum("ij,ij->i", a, np.cross(b, c)).sum()) / 6.0)
+        shows = abs(mv - vol) <= 0.10 * vol
+        return shows, bool(sh.is_valid)
+    except Exception:
+        return False, False
+
+
+def op_try_build(key, recipe_id, values, tol=0.1, dock_mass_g=None):
+    """Build like op_summary. When it fails: the error, and how many of the stages made before the failure can be
+    kept (they are saved as checkpoints for the partial design, form/featureprog.py): the longest run of valid
+    stages that show, else (when the first stage is already not valid by OCCT's check) the longest run that shows,
+    with valid=False."""
+    try:
+        return {"ok": True, "summary": _summary(_get(key, recipe_id, values, tol), dock_mass_g)}
+    except RecipeError as e:
+        made = list(_LAST["stages"])
+        recipe = resolve(recipe_id)
+        mesh = bool(getattr(recipe, "mesh", False))
+        q = []
+        for st in made:
+            q.append(_stage_quality(st, mesh))
+            if not q[-1][0]:
+                break
+        keep = next((i for i, (shows, ok) in enumerate(q) if not (shows and ok)), len(q))
+        valid = True
+        if keep == 0:
+            keep = next((i for i, (shows, _ok) in enumerate(q) if not shows), len(q))
+            valid = False
+        out = {"ok": False, "error": e.public(), "keep": keep, "valid": valid, "stages": [st.feature for st in made],
+               "stage_checks": [{"feature": st.feature, "shows": a, "valid": b} for st, (a, b) in zip(made, q)]}
+        if keep:
+            from . import featureprog
+            kept = made[:keep]
+            featureprog.save_prefix(recipe_id, recipe.validate(values), kept)
+            out["solids"] = len(kept[-1].shape.solids())
+        return out
 
 
 def _stage_report(stages, want: int) -> None:
@@ -441,6 +540,8 @@ def _summary(model, extra_mass=None) -> dict:
         "timing": {"build_s": round(model["t_build"], 4), "total_s": round(model["t_total"], 4)},
         "kernel": kernel_id(),
         "craft_notes": model.get("craft_notes", []),
+        **({"build_log": model["log"]} if model.get("log") else {}),
+        **({"skipped": model["skipped"]} if model.get("skipped") else {}),
     }
 
 

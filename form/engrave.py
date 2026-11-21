@@ -75,7 +75,7 @@ def split(source: str) -> tuple[str, list]:
 def design_class(source: str) -> str:
     tree = ast.parse(source)
     names = [n.name for n in tree.body if isinstance(n, ast.ClassDef)
-             and any((isinstance(b, ast.Name) and b.id == "Recipe") or (isinstance(b, ast.Attribute) and b.attr == "Recipe") for b in n.bases)]
+             and any((isinstance(b, ast.Name) and b.id in ("Recipe", "FeatureDesign")) or (isinstance(b, ast.Attribute) and b.attr in ("Recipe", "FeatureDesign")) for b in n.bases)]
     if len(names) != 1:
         raise _err("Text can be added to a design with one Recipe class; this source has " + str(len(names)) + ".")
     return names[0]

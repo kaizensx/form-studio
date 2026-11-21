@@ -17,6 +17,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 import webbrowser
 from pathlib import Path
 from typing import Any
@@ -139,12 +140,17 @@ def act(pid, kind: str, text: str, ctx=None, **extra):
     st = studio()
     st.activity(pid, kind, text, by=_origin(ctx).replace("agent:", "") or "agent", **extra)
     url = S["bench"].get("url")
-    if url and pid and not S.get("opened") and st.cfg.get("bench", {}).get("auto_open", True):
+    if url and pid and not str(pid).startswith("draft-") and not S.get("opened") and st.cfg.get("bench", {}).get("auto_open", True):
         S["opened"] = True
         try:
             webbrowser.open(f"{url}/#p={pid}")
         except Exception:
             pass
+
+
+def _partial_line(info: dict) -> str:
+    from .studio import _partial_text
+    return _partial_text(info)
 
 
 def _made(pid: str | None, tool: str, role: str = "made", group: str | None = None, family: bool = True) -> None:
@@ -548,11 +554,18 @@ def build() -> MCPServer:
     async def create_design(name: str, source: str, brief: str = "", values: dict[str, float] | None = None,
                             run: bool = True, language: str = "python", references: list[str] | None = None,
                             purpose: str | None = None, process: str | None = None, plan: str = "",
-                            relation: str = "", ctx: Context = None) -> list:
+                            relation: str = "", partial: bool = True, ctx: Context = None) -> list:
         """Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
         built with build123d. Form Studio builds it and returns a six-view sheet and a section to look at; with
         run=True it also exports STEP and STL and runs the checks (and, for a design whose purpose is "print", the
-        print checks and a slice). Load or build errors come back with the line and a hint; fix and call again.
+        print checks and a slice). Load errors come back with the line and a hint; fix and call again.
+        Skeleton first: create the main body, then add one feature per call. partial=True (default): when a later
+        feature fails, the stages that built before it are saved as a partial revision (flagged, release blocked)
+        and shown, and the result names the failed feature with its diagnosis; fix it with update_design. partial=False
+        refuses the whole design instead. Each stage is shown in Form Studio as it builds. A FeatureDesign
+        (`from form.featureprog import FeatureDesign, feature`; one `@feature("Label")` method per feature,
+        `def eyes(self, v, body): return body_after`, the first gets body=None) skips a failing feature and goes on,
+        and keeps a checkpoint per feature, so update_design(feature=, code=) rebuilds only that feature and later ones.
         Several parts: declare assembly() (design_guide, ASSEMBLIES): parts with attach=, joints with parent= (chains: a
         joint moves everything attached below it), Mate() for pins and threads. A declaration that cannot be used
         (unknown part, a loop, two parents) is refused with the reason; the assembly checks then run in their own time
@@ -605,9 +618,12 @@ def build() -> MCPServer:
                 res["pipeline"] = job_digest(await _wait_job(st, jid, 45))
             res["project"] = await _run(digest, st, front)
             return await _with_views(st, front, res)
-        act(None, "design", f"Writing a new design: {name}", ctx)
-        p = await _run(st.create_design, name, source, brief, values, language, references, _purpose(purpose), process)
-        act(p["id"], "commit", f"Created {name} (r01)", ctx)
+        draft = "draft-" + uuid.uuid4().hex[:10]
+        act(None, "design", f"Writing a new design: {name}", ctx, draft=draft)
+        p = await _run(st.create_design, name, source, brief, values, language, references, _purpose(purpose), process,
+                       partial, draft)
+        part = st.rev(p).get("partial")
+        act(p["id"], "commit", f"Created {name} (r01" + (", partial" if part else "") + ")", ctx, draft=draft)
         if relation == "alternative" and front:
             await _run(st.adopt, p["id"], front, "alternative")
         _made(p["id"], "create_design", family=relation != "new")
@@ -618,6 +634,11 @@ def build() -> MCPServer:
             jid = st.run(p["id"])
             job = await _wait_job(st, jid, 50)
         res = await _run(digest, st, p["id"])
+        if part:
+            res = {**res, "partial": part,
+                   "next": f"Saved as a partial design: {_partial_line(part)}. Fix that feature and send it with "
+                           f"update_design(project='{p['id']}', source=...) (or feature=, code= for a FeatureDesign); "
+                           "the shown solid is what built."}
         if job is not None and job["state"] == "running":     # checks on a heavy design outlast the wait: say so
             res = {**res, "pipeline": job_digest(job),
                    "next": f"Exports and checks are still running: get_job(project='{p['id']}', job='{jid}') "
@@ -626,19 +647,43 @@ def build() -> MCPServer:
         return await _with_views(st, p["id"], res)
 
     @mcp.tool(annotations=RW, structured_output=False)
-    async def update_design(project: str, source: str, note: str = "", values: dict[str, float] | None = None,
+    async def update_design(project: str, source: str = "", note: str = "", values: dict[str, float] | None = None,
                             expect_head: int | None = None, run: bool = True, language: str | None = None,
-                            ctx: Context = None) -> list:
+                            feature: str = "", code: str = "", partial: bool = False, ctx: Context = None) -> list:
         """Replace a design's code as a new revision (history keeps every version). Existing parameter values carry over;
         changing a default does not change a saved value, so pass values={...} to change them. New parameters start at
         their defaults. Use preview_change/commit_change instead when only values change. language defaults to the
         project's current one ("python" or "openscad"). An unusable assembly() declaration is refused with the reason,
         and no revision is made. Returns the result with a six-view sheet and a section of the new revision: look.
+        One feature of a FeatureDesign: feature="eyes", code="def eyes(self, v, body): ..." (no source) replaces that
+        method only; features before it load from their checkpoints. A feature that fails makes no revision (the head
+        stays) and returns its diagnosis, unless partial=True, which saves the revision with it left out (release
+        blocked). result.build_log says per feature whether it was built, loaded from its checkpoint or skipped.
         For a briefed design, critique(project) the revision before asking for release."""
         st = studio()
-        p = await _run(lambda: st.update_design(st.load(project), source, note, values, _origin(ctx), expect_head, language))
-        act(project, "commit", f"r{p['head']:02d}: {note or 'design code updated'}", ctx)
+        if bool(feature) != bool(code) or (feature and source):
+            raise ToolError("Send either source (the whole file) or feature and code (one feature method).")
+        if not feature and not source:
+            raise ToolError("Send source, or feature and code.")
+        draft = "draft-" + uuid.uuid4().hex[:10]
+        act(project, "design", f"Building {'feature ' + feature if feature else 'new code'}", ctx, draft=draft)
+
+        def go():
+            from . import featureprog
+            if feature:
+                return featureprog.update_feature(st, st.load(project), feature, code, note, values, _origin(ctx),
+                                                  expect_head, partial, draft)
+            return st.update_design(st.load(project), source, note, values, _origin(ctx), expect_head, language,
+                                    partial=partial, draft=draft)
+        p = await _run(go)
+        head = st.rev(p)
+        act(project, "commit", f"r{p['head']:02d}: {note or (('feature ' + feature) if feature else 'design code updated')}"
+            + (" (partial)" if head.get("partial") else ""), ctx, draft=draft)
         res: dict[str, Any] = {"head": p["head"]}
+        if head.get("build_log"):
+            res["build_log"] = head["build_log"]
+        if head.get("partial"):
+            res["partial"] = head["partial"]
         if run:
             jid = st.run(project)
             res["pipeline"] = job_digest(await _wait_job(st, jid, 45))
@@ -901,13 +946,19 @@ def build() -> MCPServer:
         return await _run(go)
 
     @mcp.tool(annotations=RW)
-    async def add_feature(project: str, kind: str, at: list[float], normal: list[float], size: str = "M3",
+    async def add_feature(project: str, kind: str, at: list[float] | None = None, normal: list[float] | None = None,
+                          size: str = "M3",
                           hole: str = "tapped", height: float | None = None, outer_d: float | None = None,
                           hole_d: float | None = None, hole_depth: float | None = None, length: float | None = None,
                           thickness: float | None = None, width: float | None = None, lip: float | None = None,
                           lip_height: float | None = None, up: list[float] | None = None, allow_strain: float | None = None,
-                          expect_head: int | None = None) -> dict:
-        """Add a standard feature on a flat face of a Python design, written into its source as a feature block and built
+                          expect_head: int | None = None, feature: str = "", code: str = "", label: str = "",
+                          role: str = "structure", after: str = "", partial: bool = False) -> dict:
+        """Add a feature to a Python design as a new revision. kind="code" (a FeatureDesign): feature = its id, code = one
+        method `def <feature>(self, v, body): return body_after`, label/role for the feature list, after = the feature
+        it goes after (default: last). Only it is built: the features before it load from their checkpoints. If it
+        fails, no revision is made and the diagnosis comes back (partial=True saves it left out, release blocked).
+        Standard features: on a flat face of a Python design, written into its source as a feature block and built
         in the kernel as a new revision. kind="boss": a screw boss (size M2..M5; hole tapped = ISO tap drill, clearance =
         ISO 273, insert = a typical heat-set insert hole; height, outer_d, hole_d, hole_depth in mm). kind="snap_hook":
         a cantilever snap-fit hook (length, thickness, width, lip = undercut, lip_height; up = the lip's direction).
@@ -915,6 +966,22 @@ def build() -> MCPServer:
         features and check rows: boss wall vs the nozzle; hook strain 1.5·t·y/L² vs allow_strain (a rule of thumb when
         not given). Remove one with remove_feature."""
         st = studio()
+        if kind == "code":
+            if not feature or not code:
+                raise ToolError('kind="code" needs feature (its id) and code (one method).')
+
+            def go_code():
+                from . import featureprog
+                p = featureprog.add_code_feature(st, st.load(project), feature, code, label, role, after, "agent",
+                                                 expect_head, partial)
+                head = st.rev(p)
+                return {"head": p["head"], "feature": feature, "build_log": head.get("build_log", []),
+                        **({"partial": head["partial"]} if head.get("partial") else {})}
+            out = await _run(go_code)
+            act(project, "commit", f"r{out['head']:02d}: added feature {feature}")
+            return out
+        if at is None or normal is None:
+            raise ToolError(f'kind="{kind}" needs at and normal (a point on a flat face and its outward normal).')
         o = {k: v for k, v in dict(size=size, hole=hole, height=height, outer_d=outer_d, hole_d=hole_d, hole_depth=hole_depth,
                                    length=length, thickness=thickness, width=width, lip=lip, lip_height=lip_height, up=up).items()
              if v is not None}
@@ -928,7 +995,8 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def remove_feature(project: str, feature_id: str, expect_head: int | None = None) -> dict:
-        """Remove a feature added with add_feature (feature_id like "boss_1" or "hook_1"). A new revision."""
+        """Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any
+        feature of a FeatureDesign (its method goes; the features before it load from their checkpoints)."""
         st = studio()
         def go():
             from . import feature_helpers as fh

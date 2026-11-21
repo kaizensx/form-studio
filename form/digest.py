@@ -35,6 +35,9 @@ def digest(st, pid: str, bench: str | None = None) -> dict:
         "orientation": p["orientation"],
         "purpose": s["purpose"],
     }
+    if head.get("partial"):                          # a partial build: what did not build, and why
+        pa = head["partial"]
+        out["partial"] = {k: pa[k] for k in ("failed", "built", "skipped", "message", "hint") if pa.get(k)}
     if s["purpose"]["purpose"] == "model":           # not for printing: say so, so an agent never asks for a printer
         del out["orientation"]
         out["purpose"]["note"] = ("A 3D model, not for 3D printing: no printer, slicer, orientation or filament applies. "

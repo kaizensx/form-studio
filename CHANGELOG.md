@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **A failing feature no longer loses the design.** When an agent's `create_design` fails on one feature, the stages
+  that built before it are saved as a partial revision and shown, instead of nothing being saved. The revision says
+  which feature failed and why, and release stays blocked until that feature builds. `partial=False` keeps the old
+  all-or-nothing behaviour. While a design builds, each stage is shown as soon as it exists: it is written as a draft
+  and named in the activity log.
+- **Designs built one feature at a time.** A design can be written as a `FeatureDesign` (`form.featureprog`), with one
+  `@feature` method per feature. A feature that fails is left out with its diagnosis, and the features after it still
+  build. Each feature's result is kept as a B-rep checkpoint, keyed by its code and everything before it. Fixing one
+  feature rebuilds only that feature and the ones after it. `update_design(feature=, code=)` sends a single method,
+  `add_feature(kind="code")` adds one, and `remove_feature` removes any feature of such a design. Each revision has a
+  build log that says, for every feature, whether it was built, loaded from its checkpoint or skipped.
 - **Make editable makes it editable.** A mesh is now read the way it was modelled: sketches of lines, arcs and rounded
   corners extruded and lofted between levels, with every coordinate, level, radius and diameter a Param (pooled,
   snapped to round numbers and standard hole sizes, mirrored about the centre, each saying where it came from). What

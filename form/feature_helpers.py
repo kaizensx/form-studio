@@ -249,10 +249,19 @@ def add(st, p, kind, at, normal, expect_head=None, origin="you", **o) -> dict:
 
 
 def remove(st, p, feature_id: str, expect_head=None, origin="you") -> dict:
-    specs = split(_python_source(st, p))[1]
+    """Remove a standard feature, or any feature of a FeatureDesign (form/featureprog.py)."""
+    src = _python_source(st, p)
+    specs = split(src)[1]
     left = [f for f in specs if f.get("id") != feature_id]
     if len(left) == len(specs):
-        raise _err(f"No feature “{feature_id}” on this design.", "List them with `form feature <project> --list`.")
+        from . import featureprog
+        if feature_id in featureprog.feature_ids(src):
+            p = featureprog.remove_code_feature(st, p, feature_id, origin, expect_head)
+            return {"head": p["head"], "features": featureprog.feature_ids(st.source_text(p)), "removed": feature_id}
+        ids = [f.get("id") for f in specs] + featureprog.feature_ids(src)
+        raise _err(f"No feature “{feature_id}” on this design.",
+                   ("Removable: " + ", ".join(ids) + "." if ids else "This design has no removable features.")
+                   + " A feature built inside one build() is removed by editing the source (update_design).")
     gone = next(f for f in specs if f.get("id") == feature_id)
     return _commit(st, p, left, "Removed " + label(gone), expect_head, origin)
 

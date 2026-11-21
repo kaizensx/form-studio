@@ -108,8 +108,8 @@ Rules:
 | [`compare_revisions`](#compare_revisions) | read-only | What changed between two revisions: parameters, features, interfaces, stability, fit. |
 | [`geometry_diff`](#geometry_diff) | changes | What changed in the solid between revision a and b (default the head): material added (b minus a) and removed (a minus b), each with its volume in mm³, number of separate regions and bounding box, computed with booleans on the B-rep. |
 | [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
-| [`add_feature`](#add_feature) | changes | Add a standard feature on a flat face of a Python design, written into its source as a feature block and built in the kernel as a new revision. |
-| [`remove_feature`](#remove_feature) | changes | Remove a feature added with add_feature (feature_id like "boss_1" or "hook_1"). |
+| [`add_feature`](#add_feature) | changes | Add a feature to a Python design as a new revision. |
+| [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
 | [`compare_printers`](#compare_printers) | read-only | Slice the head revision's exported model for real on every printer set up in every installed slicer (the selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and cheapest. |
 | [`make_lighter`](#make_lighter) | read-only | Make it lighter: search changes that reduce mass while every check that passes now still passes. |
 | [`apply_lighter`](#apply_lighter) | changes | Keep a make_lighter candidate: changes (parameter values) are committed as a new revision; settings ({"infill": percent, "walls": count}) become this design's print settings over the slicer's process. |
@@ -375,7 +375,14 @@ path: absolute local path. Cached by path, size and time, so asking again is ins
 Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
 built with build123d. Form Studio builds it and returns a six-view sheet and a section to look at; with
 run=True it also exports STEP and STL and runs the checks (and, for a design whose purpose is "print", the
-print checks and a slice). Load or build errors come back with the line and a hint; fix and call again.
+print checks and a slice). Load errors come back with the line and a hint; fix and call again.
+Skeleton first: create the main body, then add one feature per call. partial=True (default): when a later
+feature fails, the stages that built before it are saved as a partial revision (flagged, release blocked)
+and shown, and the result names the failed feature with its diagnosis; fix it with update_design. partial=False
+refuses the whole design instead. Each stage is shown in Form Studio as it builds. A FeatureDesign
+(`from form.featureprog import FeatureDesign, feature`; one `@feature("Label")` method per feature,
+`def eyes(self, v, body): return body_after`, the first gets body=None) skips a failing feature and goes on,
+and keeps a checkpoint per feature, so update_design(feature=, code=) rebuilds only that feature and later ones.
 Several parts: declare assembly() (design_guide, ASSEMBLIES): parts with attach=, joints with parent= (chains: a
 joint moves everything attached below it), Mate() for pins and threads. A declaration that cannot be used
 (unknown part, a loop, two parents) is refused with the reason; the assembly checks then run in their own time
@@ -405,6 +412,7 @@ design: use part_of for the parts of one product. Returns the project, a six-vie
 | `process` | string \| null |  |
 | `plan` | string |  |
 | `relation` | string |  |
+| `partial` | boolean |  |
 
 ### `update_design`
 
@@ -413,17 +421,24 @@ changing a default does not change a saved value, so pass values={...} to change
 their defaults. Use preview_change/commit_change instead when only values change. language defaults to the
 project's current one ("python" or "openscad"). An unusable assembly() declaration is refused with the reason,
 and no revision is made. Returns the result with a six-view sheet and a section of the new revision: look.
+One feature of a FeatureDesign: feature="eyes", code="def eyes(self, v, body): ..." (no source) replaces that
+method only; features before it load from their checkpoints. A feature that fails makes no revision (the head
+stays) and returns its diagnosis, unless partial=True, which saves the revision with it left out (release
+blocked). result.build_log says per feature whether it was built, loaded from its checkpoint or skipped.
 For a briefed design, critique(project) the revision before asking for release.
 
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
-| `source` | string | yes |
+| `source` | string |  |
 | `note` | string |  |
 | `values` | object \| null |  |
 | `expect_head` | integer \| null |  |
 | `run` | boolean |  |
 | `language` | string \| null |  |
+| `feature` | string |  |
+| `code` | string |  |
+| `partial` | boolean |  |
 
 ### `build_candidates`
 
@@ -625,7 +640,11 @@ cap height, depth how far the letters stand out or sink in. Returns the new head
 
 ### `add_feature`
 
-Add a standard feature on a flat face of a Python design, written into its source as a feature block and built
+Add a feature to a Python design as a new revision. kind="code" (a FeatureDesign): feature = its id, code = one
+method `def <feature>(self, v, body): return body_after`, label/role for the feature list, after = the feature
+it goes after (default: last). Only it is built: the features before it load from their checkpoints. If it
+fails, no revision is made and the diagnosis comes back (partial=True saves it left out, release blocked).
+Standard features: on a flat face of a Python design, written into its source as a feature block and built
 in the kernel as a new revision. kind="boss": a screw boss (size M2..M5; hole tapped = ISO tap drill, clearance =
 ISO 273, insert = a typical heat-set insert hole; height, outer_d, hole_d, hole_depth in mm). kind="snap_hook":
 a cantilever snap-fit hook (length, thickness, width, lip = undercut, lip_height; up = the lip's direction).
@@ -637,8 +656,8 @@ not given). Remove one with remove_feature.
 |---|---|---|
 | `project` | string | yes |
 | `kind` | string | yes |
-| `at` | array | yes |
-| `normal` | array | yes |
+| `at` | array \| null |  |
+| `normal` | array \| null |  |
 | `size` | string |  |
 | `hole` | string |  |
 | `height` | number \| null |  |
@@ -653,10 +672,17 @@ not given). Remove one with remove_feature.
 | `up` | array \| null |  |
 | `allow_strain` | number \| null |  |
 | `expect_head` | integer \| null |  |
+| `feature` | string |  |
+| `code` | string |  |
+| `label` | string |  |
+| `role` | string |  |
+| `after` | string |  |
+| `partial` | boolean |  |
 
 ### `remove_feature`
 
-Remove a feature added with add_feature (feature_id like "boss_1" or "hook_1"). A new revision.
+Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any
+feature of a FeatureDesign (its method goes; the features before it load from their checkpoints).
 
 | Argument | Type | Required |
 |---|---|---|
