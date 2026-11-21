@@ -14,10 +14,10 @@ Optional learned engine (CAD-Recode, non-commercial licence): not installed on t
 | bracket | filleted_bracket | 0.02 | 1800 | 90.89% | 75% | 6 / 8 | 90.89% | 0.001205 | yes | 41.7 | sketches and extrusions | not installed |
 | bracket | stepped_bracket | 0.02 | 3216 | 100% | 100% | 18 / 18 | 100% | 0.001711 | yes | 106 | feature tree | not installed |
 | flange | bolt_flange | 0.02 | 4812 | 100% | 100% | 9 / 9 | 100% | 0.01243 | yes | 15.9 | sketches and extrusions | not installed |
-| turned shaft | turned_shaft | 0.02 | 10328 | 100% | 90.9% | 10 / 11 | 100% | 0.008252 | yes | 35 | sketches and extrusions | not installed |
+| turned shaft | turned_shaft | 0.02 | 10328 | 100% | 100% | 11 / 11 | 100% | 0.008252 | yes | 35.9 | sketches and extrusions | not installed |
 | turned shaft | flanged_shaft | 0.02 | 13426 | 100% | 100% | 10 / 10 | 100% | 0.009965 | yes | 271.1 | feature tree | not installed |
 | enclosure with holes | enclosure_with_holes | 0.02 | 4120 | 92.38% | 94.7% | 18 / 19 | 92.38% | 0.008697 | yes | 145.2 | sketches and extrusions | not installed |
-| filleted block | filleted_block | 0.02 | 9480 | 52.71% | 100% | 4 / 4 | 66.4% | 0.001446 | yes | 819.7 | sketches and extrusions | not installed |
+| filleted block | filleted_block | 0.02 | 9480 | 66.4% | 100% | 4 / 4 | 66.4% | 0.001446 | yes | 162.8 | sketches and extrusions; Layer 1 cut short by the budget after 84 s | not installed |
 
 Per class, without the learned engine (median over its parts):
 
@@ -25,11 +25,11 @@ Per class, without the learned engine (median over its parts):
 |---|---|---|---|
 | bracket | 2 | 95.445% | 87.5% |
 | flange | 1 | 100% | 100% |
-| turned shaft | 2 | 100% | 95.45% |
+| turned shaft | 2 | 100% | 100% |
 | enclosure with holes | 1 | 92.38% | 94.7% |
-| filleted block | 1 | 52.71% | 100% |
+| filleted block | 1 | 66.4% | 100% |
 
-Before this round (the same bench on dev at 883372a, same machine, same parts):
+The turned_shaft and filleted_block rows are from a later run with the budget enforced (every step that OpenCascade cannot interrupt runs in a child process stopped in time); the others are from the run before it. Before this round (the same bench on dev at 883372a, same machine, same parts):
 
 | Part | B-rep | Editable | Params moving / all | Time (s) | Method |
 |---|---|---|---|---|---|

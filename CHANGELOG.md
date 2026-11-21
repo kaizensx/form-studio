@@ -26,6 +26,14 @@
   (0.0142 mm). The residual idea (a work list of missing and extra bodies, angles about an axis, pick-best and the
   stall rule) comes from kulibinai/cadmageddon (MIT); this is an independent implementation.
 
+- **Mesh to CAD keeps its time budget.** A reconstruction no longer runs past its budget (240 s by default): the
+  program route, Layer 1 and the feature search each run in a child process that is stopped when its time is up
+  (one OpenCascade sewing of 19 faces took about 170 s on a filleted block, and nothing in Python can interrupt
+  it). The result is the best found in time, and the report lists what was cut short (`cut_short`, and a note on
+  the result). The filleted block now comes back in 163 s instead of 820 s. The sketches route also skips the other
+  directions when less time is left than the main direction alone took.
+- **Small rounds can grow.** A corner radius Param may now grow by at least 0.5 mm (it was 30%), so a 1 mm fillet
+  on a turned shaft is a dimension you can change; whether it fits its corner is what the build checks.
 - **Watch the design being built.** While an agent creates or rewrites a design in a conversation, the 3D view draws
   each stage the moment the kernel has built it, before anything is saved. Each new stage grows in over the one before
   with the same fade and rise as a new revision, and a quiet caption says what is being built: "Building Bore (2 of

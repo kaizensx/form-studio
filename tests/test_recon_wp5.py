@@ -174,6 +174,48 @@ class Stepwise(unittest.TestCase):
         self.assertAlmostEqual(z1["hi"], 1.0 + 0.4 * 24)                   # ... and 0.4 of the way up to 25
 
 
+def _box_step(a, progress=None):
+    from build123d import Box
+    progress({"text": "building"})
+    return {"solid": Box(a, 2, 3), "raw": Box(1, 1, 1).wrapped}
+
+
+def _sleep_step(s, progress=None):
+    time.sleep(s)
+
+
+def _crash_step(progress=None):
+    os.kill(os.getpid(), 11)
+
+
+class Budget(unittest.TestCase):
+    """Nothing runs past the budget: steps OpenCascade cannot interrupt run in a child that is stopped in time."""
+
+    def test_bounded_step_ok_timeout_and_crash(self):
+        from form.recon import bounded
+        from form.recon.solid import check
+        seen = []
+        got = bounded.run(_box_step, (5,), timeout_s=60, progress=seen.append)
+        self.assertEqual(got["status"], "ok", got.get("error"))
+        self.assertAlmostEqual(got["value"]["solid"].volume, 30.0)
+        self.assertTrue(check(got["value"]["raw"])["valid"])
+        self.assertEqual(seen, [{"text": "building"}])
+        t = time.perf_counter()
+        self.assertEqual(bounded.run(_sleep_step, (30,), timeout_s=2)["status"], "timeout")
+        self.assertLess(time.perf_counter() - t, 10)
+        self.assertEqual(bounded.run(_crash_step, timeout_s=30)["status"], "crash")
+
+    def test_small_budget_is_kept_and_says_what_was_cut(self):
+        from form.recon import pipeline
+        stl, _, _ = mesh("box_with_holes")
+        t = time.perf_counter()
+        rep = pipeline.reconstruct(stl, TMP / "tight", "box", 0.02, budget_s=20)
+        self.assertLess(time.perf_counter() - t, 20 + 10)
+        self.assertTrue(rep["cut_short"])
+        self.assertIn("cut short", rep["result"]["note"])
+        self.assertEqual(rep["result"]["layer"], 0)                      # the exact copy: the best found in time
+
+
 class Installer(unittest.TestCase):
     def test_size_and_licence_are_shown_before_any_download(self):
         from form import config, installer
