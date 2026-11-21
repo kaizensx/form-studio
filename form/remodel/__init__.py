@@ -13,8 +13,13 @@ an engineer would measure before modelling, and checks the result:
                    deviation picture, the worst regions named by where they are, and per-feature differences
     sections.py    plane sections of a triangle mesh as closed loops, measured and drawn with dimensions
     occupancy.py   inside-or-outside of a closed mesh on a grid (for travel and interference)
+    residual.py    reference_residual: the voxel difference between a design and the mesh as a named work list of
+                   missing and extra bodies (volume, centre, principal axis, angle about an axis) and the patterns
+                   they form (polar at equal angles, linear, grid); manifold3d's exact boolean when installed
+    fitparams.py   fit_params: bounded least squares over the design's declared Params only, kept only if the
+                   design gets closer to the mesh (never worse)
 
-numpy, scipy and Pillow only: no OCCT, so the MCP server, the CLI and the app's engine can run it directly.
+numpy, scipy and Pillow only (manifold3d optional): no OCCT, so the MCP server, the CLI and the app's engine can run it directly.
 Evidence class: computed (measured on the mesh as given; the mesh's own chord error is part of the input).
 """
 from __future__ import annotations

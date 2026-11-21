@@ -609,3 +609,162 @@ class ScriptedAgent:
         rec["final_source"] = src.get("source") if ok else None
         rec["end"] = time.time()
         return rec
+
+
+# ---- a scripted remodel: rebuild a mesh as clean CAD until it is within 0.1 mm --------------------------------------
+#
+# The reference is a flange: a disc with a centre bore and six bolt holes on a circle, 15 degrees off the X axis. The
+# agent starts from a draft read off the analysis with one size slightly off (the thickness, 0.3 mm too thick, as a
+# rough reading would be) and no bolt holes. Two policies, the same agent otherwise:
+#
+#   without the residual  compare_to_reference after every change; fix the worst region it lists (a bolt hole from
+#                         the region's box, or a size by the region's deviation), one change per call. When one region
+#                         covers the whole part with a large peak (the thickness offset joins the holes into one), it
+#                         compares at 0.5 mm until the large differences are fixed, then at 0.1 mm again
+#   with the residual     reference_residual names the six bodies as one polar pattern; build it as one feature;
+#                         reference_residual again (keep it only if the residual dropped); fit_params for the sizes;
+#                         compare_to_reference to confirm
+#
+# Each policy stops at 0.1 mm (two-sided Hausdorff) or after MAX_REMODEL_CALLS calls. Every call is a real MCP call.
+
+FLANGE = {"r": 30.0, "t": 6.0, "bore_d": 12.0, "hole_d": 5.5, "pcd_r": 22.0, "count": 6, "start_deg": 15.0}
+DRAFT_T = 6.3
+REMODEL_TOL = 0.1
+MAX_REMODEL_CALLS = 40
+
+
+def flange_reference():
+    """The reference flange as a build123d solid (the test exports it as an STL)."""
+    from build123d import Align, Cylinder, Pos, Rot
+    A_ = (Align.CENTER, Align.CENTER, Align.MIN)
+    f = FLANGE
+    body = Cylinder(f["r"], f["t"], align=A_) - Cylinder(f["bore_d"] / 2, 4 * f["t"])
+    for i in range(f["count"]):
+        body = body - Rot(0, 0, f["start_deg"] + i * 360 / f["count"]) * Pos(f["pcd_r"], 0, -1) * \
+            Cylinder(f["hole_d"] / 2, f["t"] + 2, align=A_)
+    return body
+
+
+def flange_source(t: float, holes=(), pattern: dict | None = None) -> str:
+    """The rebuilt flange as a design: disc and bore, then bolt holes as literal holes or as one polar pattern."""
+    params = [f'        Param("t", "Thickness", {t:g}, 2, 20, 0.1, "mm", "form", "disc"),',
+              f'        Param("bore_d", "Bore", {FLANGE["bore_d"]:g}, 2, 40, 0.1, "mm", "form", "disc"),']
+    feats = ['Feature("disc", "Disc and bore", "structure")']
+    body = ['        b = Cylinder(30, v["t"], align=A) - Cylinder(v["bore_d"] / 2, 4 * v["t"])',
+            '        out = [Stage("disc", b)]']
+    if holes:
+        feats.append('Feature("holes", "Bolt holes", "interface")')
+        body += [f'        for x, y, d in {[tuple(h) for h in holes]!r}:',
+                 '            b = b - Pos(x, y, -1) * Cylinder(d / 2, v["t"] + 2, align=A)',
+                 '        out.append(Stage("holes", b))']
+    if pattern:
+        params += [f'        Param("hole_d", "Bolt hole", {pattern["d"]:g}, 1, 20, 0.1, "mm", "form", "bolt_circle"),',
+                   f'        Param("pcd_r", "Bolt circle radius", {pattern["r"]:g}, 5, 29, 0.1, "mm", "form", "bolt_circle"),']
+        feats.append('Feature("bolt_circle", "Bolt circle", "interface")')
+        body += [f'        for i in range({pattern["n"]}):',
+                 f'            b = b - Rot(0, 0, {pattern["start"]:g} + i * {pattern["pitch"]:g}) * Pos(v["pcd_r"], 0, -1) * '
+                 'Cylinder(v["hole_d"] / 2, v["t"] + 2, align=A)',
+                 '        out.append(Stage("bolt_circle", b))']
+    return ("from build123d import *\nfrom form.recipes.base import Feature, Param, Recipe, Stage\n\n"
+            "A = (Align.CENTER, Align.CENTER, Align.MIN)\n\n\nclass Design(Recipe):\n    title = \"Flange\"\n"
+            "    summary = \"A flange rebuilt from its mesh\"\n    params = [\n" + "\n".join(params) + "\n    ]\n"
+            "    features = [" + ", ".join(feats) + "]\n\n    def build(self, v):\n" + "\n".join(body) + "\n        return out\n")
+
+
+def _q(x, s=0.05):
+    return round(round(float(x) / s) * s, 3)
+
+
+class RemodelAgent:
+    """Replays the flange remodel through call(tool, args) -> (ok, payload) with or without the residual tool."""
+
+    def __init__(self, call):
+        self.call = call
+
+    async def _do(self, rec, tool, args):
+        t0 = time.time()
+        ok, out = await self.call(tool, args)
+        out = _payload(out)
+        rec["calls"].append({"tool": tool, "ok": bool(ok), "s": round(time.time() - t0, 3),
+                             **({"error": str(out)[:300]} if not ok else {})})
+        if not ok:
+            raise RuntimeError(f"{tool} failed: {str(out)[:500]}")
+        return out
+
+    async def run(self, reference_path: str, residual: bool) -> dict:
+        rec = {"policy": "residual" if residual else "compare only", "calls": [], "hausdorff": []}
+        t, holes = DRAFT_T, []
+        out = await self._do(rec, "create_design", {"name": "Flange remodel", "source": flange_source(t),
+                                                    "references": [reference_path], "run": False, "purpose": "model"})
+        pid = out["project"]["id"] if isinstance(out.get("project"), dict) else out["project"]
+        rec["project"] = pid
+        ref = "flange"
+
+        async def compare(tol=REMODEL_TOL):
+            c = await self._do(rec, "compare_to_reference", {"project": pid, "reference": ref, "tolerance": tol})
+            rec["hausdorff"].append(c["hausdorff_mm"])
+            return c
+
+        if residual:
+            last = None
+            stalled = 0
+            while len(rec["calls"]) < MAX_REMODEL_CALLS:
+                r = await self._do(rec, "reference_residual", {"project": pid, "reference": ref})
+                pct = r["residual_pct"]
+                if last is not None and pct >= last["pct"]:       # no drop: go back, count a stalled step
+                    stalled += 1
+                    await self._do(rec, "checkout_revision", {"project": pid, "rev": last["rev"]})
+                    if stalled >= 3:
+                        break
+                last = {"pct": pct, "rev": r["rev"]}
+                pol = [p for p in r["patterns"] if p["type"] == "polar" and p["kind"] == "extra"]
+                if not pol:
+                    break
+                p = pol[0]
+                pat = {"n": p["count"], "pitch": round(p["pitch_deg"], 3), "start": round(p["start_deg"], 2),
+                       "r": _q(p["radius_mm"]), "d": _q(p["diameter_mm"])}
+                await self._do(rec, "update_design", {"project": pid, "source": flange_source(t, pattern=pat),
+                                                      "run": False, "note": "bolt circle from the residual"})
+            await self._do(rec, "fit_params", {"project": pid, "reference": ref})
+            c = await compare()
+        else:
+            tol = REMODEL_TOL
+            c = await compare(tol)
+            while len(rec["calls"]) < MAX_REMODEL_CALLS:
+                if c["within_tolerance"]:
+                    if tol == REMODEL_TOL:
+                        break
+                    tol = REMODEL_TOL                               # the big ones are done: back to the real limit
+                    c = await compare(tol)
+                    continue
+                w = c["worst_regions"][0]
+                lo, hi = w["box"]
+                extra = w["design_has"].startswith("material the mesh does not have")
+                span = max(hi[0] - lo[0], hi[1] - lo[1])
+                local = span < 20
+                if not local and w["max_mm"] >= 1.0 and tol == REMODEL_TOL:
+                    # one region over the whole part with a large peak: a small offset everywhere joins the big
+                    # differences into one region. A coarser tolerance separates them.
+                    tol = 0.5
+                    c = await compare(tol)
+                    continue
+                if local and w["max_mm"] >= 1.0 and extra:          # a hole the design lacks: its box is the hole
+                    holes.append((_q((lo[0] + hi[0]) / 2), _q((lo[1] + hi[1]) / 2), _q((hi[0] - lo[0] + hi[1] - lo[1]) / 2)))
+                    await self._do(rec, "update_design", {"project": pid, "source": flange_source(t, holes),
+                                                          "run": False, "note": "a bolt hole at the worst region"})
+                elif local and holes:                               # a hole a little off: resize the nearest
+                    cx, cy = (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2
+                    k = min(range(len(holes)), key=lambda i: (holes[i][0] - cx) ** 2 + (holes[i][1] - cy) ** 2)
+                    x, y, d = holes[k]
+                    holes[k] = (x, y, round(d + (2 if extra else -2) * w["max_mm"], 3))
+                    await self._do(rec, "update_design", {"project": pid, "source": flange_source(t, holes),
+                                                          "run": False, "note": "bolt hole resized"})
+                else:                                               # a whole face off: the thickness
+                    t = round(t + (-1 if extra else 1) * w["max_mm"], 3)
+                    await self._do(rec, "commit_change", {"project": pid, "values": {"t": t}, "run": False,
+                                                          "expect_head": c["rev"]})
+                c = await compare(tol)
+        rec["final_hausdorff_mm"] = c["hausdorff_mm"]
+        rec["reached"] = bool(c["hausdorff_mm"] <= REMODEL_TOL)
+        rec["n_calls"] = len(rec["calls"])
+        return rec

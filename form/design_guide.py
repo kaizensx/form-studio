@@ -615,6 +615,23 @@ STAGES
      say which tolerance you used. Where you choose not to follow the mesh (scan noise, a facet artefact, text you
      left out), say where and by how much; never hide a difference.
 
+THE RESIDUAL LOOP (one feature at a time, kept only when it helps)
+  a. Measure first (analyze_reference), then build the main body only.
+  b. reference_residual(project, reference, part=...): the work list. missing bodies are material the mesh has and
+     the design lacks (add them); extra bodies are material the design has and the mesh lacks (cut them). Each has
+     its volume, centre, axis, size and shape; alike bodies come grouped as one pattern (polar at equal angles with
+     the radius and start angle, linear with a pitch, grid with two pitches). Write down residual_pct.
+  c. Build ONE line of the work list as one feature (a pattern is one feature with a count and a pitch Param), then
+     run reference_residual again. Keep the change only if residual_pct dropped; otherwise go back to the previous
+     revision (checkout_revision) and try the next line or a different reading of the same one.
+  d. Stop after 3 steps in a row that did not lower residual_pct (stalled): more of the same will not help. Say what
+     is left and why.
+  e. When no body is left, the difference is in the sizes: fit_params(project, reference, params=[...]) tunes only
+     the Params the design declares, inside their limits, and keeps the result only if the design gets closer. Then
+     compare_to_reference for the tolerance.
+  f. Deliver the revision with the smallest residual you reached (not simply the last one): name it, give its
+     residual_pct and its Hausdorff, and say where it still differs.
+
 TIPS
   * Sections across the up axis give the plan shapes (outlines and openings); sections along it give the steps,
     rails and chamfers in profile.
