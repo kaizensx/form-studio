@@ -310,3 +310,5 @@ Agents can also start from parametric building blocks: Gridfinity bins and basep
 ## Licence
 
 MIT. Form Studio calls build123d (Apache-2.0), OpenCascade (LGPL-2.1), your slicer and other programs as separate programs; none of them is bundled into its code. py_gearworks (Apache-2.0) draws involute gears. three.js (MIT) draws the website. Instrument Sans and Geist Mono (SIL OFL 1.1) are drawn in the app and in the pictures on this page, and Lucide icons (ISC) in the app. The Gridfinity system was created by Zack Freedman and SKÅDIS is a product of IKEA; Form Studio's building blocks follow their published dimensions and are not affiliated with either.
+
+One folder is not MIT: [`form/recon/cadfit/`](form/recon/cadfit/PERMISSION.md) holds code from CADFit (Nehme, Whalen, Ahmed), licensed CC BY-NC 4.0 and included and modified with its author's permission. It is an optional mesh-to-CAD candidate, off unless `[recon] cadfit = true`; see its [PERMISSION.md](form/recon/cadfit/PERMISSION.md) and [LICENSE](form/recon/cadfit/LICENSE).

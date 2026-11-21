@@ -202,6 +202,9 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
                     "method", "verified", "hausdorff_mm", "editable_pct", "error") if prog["report"].get(k) is not None}]
                 prog = lc
                 rep["learned"]["chosen"] = True
+        # optional CADFit candidate (cadfit/): off unless [recon] cadfit = true; its own time slice and child process
+        from . import cadfit
+        prog = cadfit.offer(prog, V, F, tol, name, say, budget_s, rep, _better)
         if prog.get("verified") and prog["report"].get("editable_pct", 0.0) >= PROGRAM_ENOUGH:
             why = (f"The program route verified first with {prog['report']['editable_pct']:g}% of the surface made by its "
                    "features; the slower layers were not needed.")
