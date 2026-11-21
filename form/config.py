@@ -65,6 +65,9 @@ DEFAULTS = {
     "blender": {"app": "", "timeout_s": 180, "samples": 128},
     # Assembly checks (interference, fits, joint sweeps): seconds of work before they stop and report what they reached.
     "assembly": {"budget_s": 45},
+    # Mesh to CAD. cadfit: also try CADFit's IoU search as a candidate (form/recon/cadfit; CC BY-NC 4.0 code included
+    # with its author's permission, needs `pip install form-studio[cadfit]`). Off by default.
+    "recon": {"cadfit": False},
     # Open the bench in your browser when an agent starts working (MCP server).
     "bench": {"auto_open": True},
     # Look for a newer FORM release on GitHub at most once a day (public release metadata only; nothing is

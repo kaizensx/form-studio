@@ -120,10 +120,12 @@ def _fmt(x):
     return f(x)
 
 
-def source(plan: cq.Solid, V, tol: float, name: str = "part") -> tuple[str, dict]:
-    """The recipe text for a plan, placed and snapped on the mesh (V). Returns (text, info)."""
+def source(plan: cq.Solid, V, tol: float, name: str = "part", place=None, engine=None) -> tuple[str, dict]:
+    """The recipe text for a plan, placed and snapped on the mesh (V). Returns (text, info). `place` (scale,
+    translation) replaces the bounding-box placement when the caller knows it exactly; `engine` (doc, summary,
+    feature note) names another engine than CAD-Recode in the recipe text."""
     from ..program import Pool
-    s, t = placement(plan, V)
+    s, t = placement(plan, V) if place is None else (float(place[0]), np.asarray(place[1], dtype=float))
     sn = Snapper(V, tol)
     pool = Pool(tol)
     exts = plan.extrusions()
@@ -231,7 +233,7 @@ def source(plan: cq.Solid, V, tol: float, name: str = "part") -> tuple[str, dict
     params = [f"        Param({p['key']!r}, {p['label']!r}, {_fmt(p['value'])}, {_fmt(p['lo'])}, {_fmt(p['hi'])}, 0.01, "
               f"'mm', 'form', 'body', {p['note']!r}, provenance='mesh'),"
               for p in pool.params]
-    doc = (f"{name}: reconstructed from a mesh by Form Studio with the optional learned engine (CAD-Recode, "
+    doc = engine[0].format(name=name, n=len(exts)) if engine else (f"{name}: reconstructed from a mesh by Form Studio with the optional learned engine (CAD-Recode, "
            f"non-commercial licence), {len(exts)} sketch extrusions placed and snapped on the mesh; every level, side "
            "and diameter is a Param.")
     text = "\n".join([
@@ -244,12 +246,12 @@ def source(plan: cq.Solid, V, tol: float, name: str = "part") -> tuple[str, dict
         "",
         "class Design(Recipe):",
         f"    title = {(name + ' (reconstructed)')!r}",
-        "    summary = 'Rebuilt from a mesh with the learned engine; sketches extruded between levels, snapped to the mesh.'",
+        f"    summary = {(engine[1] if engine else 'Rebuilt from a mesh with the learned engine; sketches extruded between levels, snapped to the mesh.')!r}",
         "    params = [",
         *params,
         "    ]",
         "    features = [",
-        "        Feature('body', 'Body', 'structure', 'Sketch extrusions read by the learned engine, snapped to the mesh.'),",
+        f"        Feature('body', 'Body', 'structure', {(engine[2] if engine else 'Sketch extrusions read by the learned engine, snapped to the mesh.')!r}),",
         "    ]",
         "",
         "    def build(self, v):",

@@ -10,6 +10,7 @@
              turned bodies as one revolved half-section, polar patterns of holes               turned.py
              the stepwise loop: one feature at a time, kept only when the residual drops        stepwise.py
              optional learned engine (CAD-Recode, non-commercial, opt-in, offline)             learned/
+             optional CADFit IoU search (CC BY-NC 4.0 with permission, opt-in, child process)  cadfit/
     Parts    several meshes of one mechanism: interface dimensions tied with clearances    assembly.py
 
 Every result reports two numbers apart: brep_pct (the share of the surface that is real CAD faces, within the

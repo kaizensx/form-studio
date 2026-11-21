@@ -31,6 +31,9 @@ app = ["PySide6>=6.9,<7"]
 all = ["form-studio[app,parts,organic]"]
 organic = ["manifold3d>=3.0"]  # form.meshbody: exact booleans on sculpted mesh bodies (wheels for macOS, Windows, Linux)
 parts = ["bd_warehouse==0.4.0", "py_gearworks==0.0.24"]  # form.parts: fasteners, threads, bearings, gears
+# form.recon.cadfit: CADFit as a mesh-to-CAD candidate ([recon] cadfit = true). Its code is CC BY-NC 4.0, included with
+# its author's permission (form/recon/cadfit/PERMISSION.md); shapely and pymeshlab are used when present, never required.
+cadfit = ["trimesh>=4", "manifold3d>=3.0", "scikit-learn>=1.3", "scipy>=1.13"]
 
 [project.urls]
 Homepage = "https://github.com/kaizensx/form-studio"

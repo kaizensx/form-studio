@@ -37,3 +37,8 @@ default = "opus"
 specialist = ""
 specialist_budget_usd = 0.50
 timeout_s = 120
+
+[recon]
+# Mesh to CAD. cadfit = true also tries CADFit's IoU search as a candidate (form/recon/cadfit: CC BY-NC 4.0 code
+# included with its author's permission; needs pip install form-studio[cadfit]). Off by default.
+cadfit = false

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **CADFit as an optional mesh-to-CAD candidate.** With `[recon] cadfit = true` (and `pip install form-studio[cadfit]`), Make editable also asks CADFit (Nehme, Whalen, Ahmed, ICML 2026) for a CAD program: sketches read from planar and axis slices, extrusion heights and revolve axes measured on the surface, a greedy IoU search with beam refinement and backward pruning, then residual cut and add passes. It runs in a child process within a quarter of the budget (20 to 120 s) and is stopped at that deadline, keeping the best program it had sent. Its program is read, never run, by a small CadQuery reader on build123d, translated into Params, built and verified against the mesh like every other candidate; one that does not verify is reported and never the result. Off, nothing changes. CADFit's code is CC BY-NC 4.0 and is included in `form/recon/cadfit/` with its author's permission; Form Studio's MIT licence does not cover that folder (PERMISSION.md lists what was changed in it).
 - **Watch the design being built.** While an agent creates or rewrites a design in a conversation, the 3D view draws
   each stage the moment the kernel has built it, before anything is saved. Each new stage grows in over the one before
   with the same fade and rise as a new revision, and a quiet caption says what is being built: "Building Bore (2 of
