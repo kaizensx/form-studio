@@ -183,7 +183,11 @@ REQUIRED_FEATURE_KEYS = ("id", "label", "how")
 
 
 def save_plan(st, ref: str, features: list, parts=None, key_dimensions=None, mechanisms=None, textures=None,
-              risks=None, approach: str = "", references_used=None, product_class: str = "") -> dict:
+              risks=None, approach: str = "", references_used=None, product_class: str = "", clearances=None,
+              magnets=None) -> dict:
+    """Store the feature plan. Refused when a `how` names a helper that does not exist (with the closest real
+    names) and when a multi-part brief does not declare its parts, clearances and magnet stock. The stored plan
+    carries its route and executable steps (advice())."""
     b = load_brief(st, ref)
     from . import product_classes as pc
     if product_class and product_class not in pc.CLASSES:
@@ -208,7 +212,11 @@ def save_plan(st, ref: str, features: list, parts=None, key_dimensions=None, mec
     if complex_ and not rk:
         raise StudioError("A complex design needs its risks named.", "What could make it fail? (a fillet that will not "
                           "fit, a shell that self-intersects, parts that collide, a texture too fine to print...)")
-    plan = {"features": feats, "parts": _clean_list(parts, "parts"), "key_dimensions": key_dimensions or {},
+    prts = _clean_list(parts, "parts")
+    cl, mags = _check_plan(b, feats, prts, clearances, magnets)
+    adv = advice(" ".join([b.get("goal", ""), b.get("name", ""), b.get("style", "") or ""]), feats)
+    plan = {"features": feats, "parts": prts, "clearances": cl, "magnets": mags,
+            "route": adv["route"], "steps": adv["steps"], "key_dimensions": key_dimensions or {},
             "mechanisms": _clean_list(mechanisms, "mechanisms"), "textures": _clean_list(textures, "textures"),
             "risks": rk, "approach": approach, "references_used": _clean_list(references_used, "references_used"),
             "product_class": product_class or pc.detect(" ".join([b.get("goal", ""), b.get("name", "")])) or "",
@@ -290,3 +298,292 @@ def needs_critique(p: dict) -> str | None:
     if any(c.get("rev") == p["head"] for c in d.get("critiques", [])):
         return None
     return f"No design critique recorded for r{p['head']:02d} (critique(project) records one)."
+
+
+# ---- route, helper registry and executable plan ------------------------------------------------------------------
+#
+# design_brief returns a route (how the skeleton is built); plan_design checks every `how` against the helpers that
+# really exist and returns the plan as ordered steps an agent can execute one call at a time: the first step is the
+# skeleton (create_design with only that feature), each later one is add_feature(kind="code"), with a risk class, a
+# fallback made of real helper names, and the retry cap.
+
+ROUTES = ("prismatic", "revolve", "skin+features", "mechanism")
+RETRIES = 2                       # tries per feature after the first fails; then it is deferred and the build goes on
+
+#: words that pick a route, strongest family first (skin, then mechanism, then revolve; prismatic otherwise)
+_ROUTE_WORDS = {
+    "skin+features": ("helmet", "mask", "mouse", "ergonomic", "organic", "sculpted", "creature", "horn", "shell",
+                      "pebble", "wearable", "controller", "figure", "character", "flowing", "aerodynamic",
+                      "streamlined", "drone", "visor", "faceplate", "boat", "car"),
+    "mechanism": ("gear", "gearbox", "planetary", "ratchet", "hinge", "hinged", "cam", "lever", "linkage", "four-bar",
+                  "slide", "slider", "sliding", "bayonet", "latch", "detent", "pivot", "articulated", "pawl", "clamp",
+                  "quick-release", "chain", "trigger"),
+    "revolve": ("vase", "pot", "planter", "bottle", "cup", "knob", "lamp", "shade", "turned", "lathe", "spindle",
+                "round", "cylindrical", "coupler", "pulley", "wheel", "handle", "cap", "bowl", "screwdriver"),
+}
+#: route -> how its skeleton is built (real helper names; checked by tests/test_creation_guidance.py)
+SKELETON = {
+    "prismatic": "Box / extrude of the plan outline (build123d), fillets and holes as later features",
+    "revolve": "craft.revolve_profile of the side outline (or a build123d revolve), grooves, flats and textures later",
+    "skin+features": "one skin first: craft.checked_body or craft.section_shell through sections (craft.subd for a "
+                     "NURBS cage), then openings, parts and details one feature at a time",
+    "mechanism": "the fixed part first as its own solid, then each moving part with its clearance; joints in "
+                 "assembly(), gears and pins with form.parts, craft.planetary or craft.pin_hinge",
+}
+#: words that make a brief multi-part: it must then declare its parts, the clearances between them and magnet stock
+MULTI_PART = ("magnet", "magnets", "magnetic", "separate", "two-part", "multi-part", "detachable", "removable", "lid",
+              "faceplate", "assembly", "assembled")
+#: standard disc magnet stock (diameter x thickness, mm); form.craft may publish its own table as MAGNETS
+MAGNET_STOCK = ("6x2", "6x3", "8x3", "10x3")
+
+#: helpers whose step is risky (skins, booleans on skins, B-rep textures, sweeps) or medium (mechanisms, shells,
+#: fillets, booleans); everything else is low
+_HIGH = ("loft_sections", "section_body", "section_shell", "inset_body", "checked_body", "helmet_shell",
+         "helmet_fullface", "helmet_open", "sweep_spline", "safe_loft", "safe_sweep", "surface_band", "offset_body",
+         "two_view_cutter", "thicken", "inflate", "knurl", "emboss_cells", "wrapped_ribs", "spiral_ribbed_body",
+         "variable_fillet", "split_with_magnets", "slot_grille", "skin_from_sections", "split", "lens")
+_MEDIUM = ("fuse", "cut", "safe_union", "safe_cut", "shell", "safe_shell", "safe_fillet", "safe_chamfer", "pin_hinge",
+           "living_hinge", "cantilever_snap", "annular_snap", "bayonet", "dovetail", "detent", "ratchet", "cam",
+           "four_bar", "gear_train", "planetary", "thread", "spur_gear", "gear_pair", "magnet_pocket", "magnet_boss",
+           "revolve_profile", "mouse_form", "grip", "handle", "magnet_pair", "parts")
+#: helper -> the real helpers to fall back to (only names that exist are offered)
+_FALLBACK = {
+    "fuse": ["craft.safe_union"], "cut": ["craft.safe_cut"], "loft_sections": ["craft.safe_loft", "craft.checked_body"],
+    "section_body": ["craft.safe_loft"], "checked_body": ["craft.safe_loft"],
+    "section_shell": ["craft.inset_body", "craft.safe_shell"], "inset_body": ["craft.safe_shell"],
+    "shell": ["craft.safe_shell", "craft.inset_body"], "safe_fillet": ["craft.safe_chamfer"],
+    "variable_fillet": ["craft.safe_fillet"], "sweep_spline": ["craft.safe_sweep"],
+    "knurl": ["craft.MeshTexture"], "emboss_cells": ["craft.MeshTexture"], "wrapped_ribs": ["craft.MeshTexture"],
+    "spiral_ribbed_body": ["craft.MeshTexture"], "surface_band": ["craft.offset_body"],
+    "two_view_cutter": ["craft.safe_cut"], "thicken": ["craft.safe_shell"],
+    "skin_from_sections": ["craft.checked_body", "craft.section_shell"], "split": ["craft.split_with_magnets"],
+}
+_REF = re.compile(r"\b(?:form\.)?(craft|parts|patterns|marks)\.([A-Za-z_][A-Za-z0-9_]*)(?:\.([A-Za-z_][A-Za-z0-9_]*))?")
+_REG: dict = {}
+
+
+def _public_names(path: Path) -> set:
+    """Top-level public names of one module, read with ast (nothing is imported, so OCCT is not needed)."""
+    import ast
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return set()
+    out = set()
+    for n in tree.body:
+        if isinstance(n, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
+            out.add(n.name)
+        elif isinstance(n, ast.Assign):
+            out |= {t.id for t in n.targets if isinstance(t, ast.Name)}
+        elif isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name):
+            out.add(n.target.id)
+        elif isinstance(n, ast.ImportFrom):
+            out |= {a.asname or a.name for a in n.names}
+    return {x for x in out if not x.startswith("_")}
+
+
+def registry() -> dict:
+    """The helpers a plan may name, read from the code as it is now: {"craft": its top-level names, "craft.<module>":
+    that module's names for every module in form/craft, "parts" / "patterns" / "marks": theirs}. Cached until a file
+    changes, so helpers added to form.craft are known without touching this list."""
+    from . import craft
+    here = Path(__file__).resolve().parent
+    files = sorted((here / "craft").glob("*.py")) + [here / f"{m}.py" for m in ("parts", "patterns", "marks",
+                                                                                 "feature_helpers")]
+    stamp = tuple((str(f), f.stat().st_mtime_ns) for f in files if f.is_file())
+    if _REG.get("stamp") == stamp:
+        return _REG["reg"]
+    mods = {f.stem: _public_names(f) for f in sorted((here / "craft").glob("*.py")) if not f.stem.startswith("_")}
+    top = {x for x in set(dir(craft)) | set(mods) if not x.startswith("_")}
+    reg = {"craft": top, **{f"craft.{m}": names for m, names in mods.items()}}
+    for m in ("parts", "patterns", "marks"):
+        reg[m] = _public_names(here / f"{m}.py")
+    reg["craft.patterns"], reg["craft.features"] = reg["patterns"], _public_names(here / "feature_helpers.py")
+    _REG.update(stamp=stamp, reg=reg)
+    return reg
+
+
+def _universe(reg: dict) -> list[str]:
+    return [f"{ns}.{n}" for ns, names in reg.items() for n in names]
+
+
+def check_how(how: str) -> dict:
+    """Every helper reference in a `how` (craft.x, craft.module.x, parts.x, patterns.x, marks.x) checked against the
+    registry: {"helpers": [real names], "unknown": [{"name", "closest": [real names]}]}."""
+    import difflib
+    reg = registry()
+    found, unknown = [], []
+    for m in _REF.finditer(how or ""):
+        ns, a, b = m.group(1), m.group(2), m.group(3)
+        if ns == "craft" and b and f"craft.{a}" in reg:          # craft.organic.magnet_pocket
+            name, ok = f"craft.{a}.{b}", b in reg[f"craft.{a}"]
+        else:
+            name, ok = f"{ns}.{a}", a in reg.get(ns, set())
+        if ok:
+            found.append(name)
+            continue
+        bare = name.rsplit(".", 1)[-1]
+        where = sorted(f"{k}.{bare}" for k, v in reg.items() if bare in v)
+        close = where + [c for c in difflib.get_close_matches(name, _universe(reg), n=4, cutoff=0.6) if c not in where]
+        unknown.append({"name": name, "closest": close[:4]})
+    return {"helpers": list(dict.fromkeys(found)), "unknown": unknown}
+
+
+def is_multi_part(text: str, parts=None) -> bool:
+    """Does this brief describe separate parts (magnets, a lid, a faceplate, "separate parts"), or does its plan
+    list two or more parts?"""
+    return bool(set(MULTI_PART) & _words(text or "")) or len(parts or []) >= 2
+
+
+def route(text: str) -> dict:
+    """The construction route for a brief: prismatic, revolve, skin+features or mechanism (heuristic, and said to be),
+    with the words that chose it and how its skeleton is built."""
+    w = _words(_NOT.sub(" ", text or ""))
+    hits = {r: sorted(k for k in kws if k in w) for r, kws in _ROUTE_WORDS.items()}
+    pick = next((r for r in ("skin+features", "mechanism", "revolve") if hits[r]), "prismatic")
+    # a turned part with one mechanism word (a knob with a pointer, a cap with a bayonet) stays revolve when its
+    # revolve words outnumber the mechanism ones; a styled skin always wins
+    if pick == "mechanism" and len(hits["revolve"]) > len(hits["mechanism"]):
+        pick = "revolve"
+    return {"route": pick, "because": hits.get(pick, []), "skeleton": SKELETON[pick], "multi_part": is_multi_part(text),
+            "evidence": "heuristic"}
+
+
+def magnet_stock() -> tuple:
+    """Magnet sizes a plan may name: form.craft's MAGNETS table when a module has one (read without importing),
+    else MAGNET_STOCK."""
+    import ast
+    for f in sorted((Path(__file__).resolve().parent / "craft").glob("*.py")):
+        try:
+            tree = ast.parse(f.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            continue
+        for n in tree.body:
+            if isinstance(n, ast.Assign) and any(getattr(t, "id", "") == "MAGNETS" for t in n.targets):
+                try:
+                    v = ast.literal_eval(n.value)
+                except ValueError:
+                    continue
+                keys = [str(k) for k in (v.keys() if isinstance(v, dict) else v)]
+                if keys:
+                    return tuple(keys)
+    return MAGNET_STOCK
+
+
+def _risk(helpers: list, how: str, i: int, route_: str) -> tuple[str, str]:
+    bare = {h.rsplit(".", 1)[-1] for h in helpers}
+    low = (how or "").lower()
+    words = ("loft", "sweep", "texture", "skin", "nurbs")
+    if bare & set(_HIGH) or any(k in low for k in words):
+        why = sorted(bare & set(_HIGH)) or [k for k in words if k in low]
+        return "high", "skin, sweep or texture work: " + ", ".join(why)
+    if bare & set(_MEDIUM) or any(k in low for k in ("fillet", "shell", "boolean", "hinge", "snap", "thread", "gear",
+                                                     "magnet", "split")):
+        return "medium", "booleans, fillets, shells or a mechanism"
+    if i > 0 and route_ == "skin+features":
+        return "medium", "a boolean on a free-form skin"
+    return "low", "primitives and flat-face operations"
+
+
+def _fallback(helpers: list, risk: str) -> list[str]:
+    reg = registry()
+    out = []
+    for h in helpers:
+        for f in _FALLBACK.get(h.rsplit(".", 1)[-1], []):
+            ns, name = f.rsplit(".", 1)
+            if name in reg.get(ns, set()) and f not in out:
+                out.append(f)
+    if risk == "high":
+        out.append("build_candidates with 2-3 feature-level versions of this step")
+    out.append(f"defer it after {RETRIES} retries and go on with the next feature")
+    return out
+
+
+def steps(features: list, route_: str = "prismatic") -> list[dict]:
+    """The plan as executable steps, in build order: the call to make, the helpers it uses, the risk class, the
+    fallback (real helper names only) and the retry cap."""
+    out = []
+    for i, f in enumerate(features):
+        how = str(f.get("how", ""))
+        c = check_how(how)
+        risk, why = _risk(c["helpers"], how, i, route_)
+        if i == 0:
+            call = {"tool": "create_design", "with": "a FeatureDesign whose only @feature method is this one (the "
+                    "skeleton); look at the sheet before adding more"}
+        else:
+            call = {"tool": "add_feature", "with": f"kind=\"code\", feature=\"{f['id']}\", "
+                    f"code=\"def {f['id']}(self, v, body): ...\""}
+            if risk == "high":
+                call["alternative"] = {"tool": "build_candidates", "with": "project=..., candidates=[{label, feature: "
+                                       f"\"{f['id']}\", code}}, ...]: built on the shared checkpoint of the features "
+                                       "before it"}
+        out.append({"step": i + 1, "id": f["id"], "label": f.get("label", f["id"]), "how": how,
+                    **({"part": f["part"]} if f.get("part") else {}), "helpers": c["helpers"], "risk": risk,
+                    "risk_why": why, "fallback": _fallback(c["helpers"], risk), "retries": RETRIES, "call": call,
+                    "then": "render(view=\"sheet\") and look" if i == 0 or risk != "low" else "next step"})
+    return out
+
+
+def advice(text: str, features: list | None = None) -> dict:
+    """What design_brief and plan_design return besides the record: the route and, given a plan, its steps."""
+    r = route(text)
+    out = {"route": r["route"], "route_because": r["because"], "skeleton": r["skeleton"], "multi_part": r["multi_part"],
+           "retries_per_feature": RETRIES,
+           "loop": "skeleton first (create_design with the main body only), then one feature per call "
+                   "(add_feature(kind=\"code\") or update_design(feature=, code=)); render and look after each; a "
+                   f"feature that still fails after {RETRIES} retries is deferred, listed at the end, and never "
+                   "blocks the design",
+           "evidence": "heuristic"}
+    if features is not None:
+        out["steps"] = steps(features, r["route"])
+    return out
+
+
+def _check_plan(b: dict, feats: list, parts: list, clearances, magnets) -> tuple[dict, list]:
+    """Refuse a plan naming helpers that do not exist; a multi-part brief must declare its parts, the clearances
+    between them and, when it has magnets, their stock. Returns (clearances, magnets) normalised."""
+    bad = []
+    for f in feats:
+        for u in check_how(str(f.get("how", "")))["unknown"]:
+            bad.append(f"{f['id']}: {u['name']}" + (f" (closest: {', '.join(u['closest'])})" if u["closest"] else
+                                                    " (no close helper)"))
+    if bad:
+        raise StudioError("The plan names helpers that do not exist: " + "; ".join(bad[:8]) + ".",
+                          "Use the real names (the closest ones are listed), or describe the construction in words. "
+                          "design_guide(topic=...) documents form.craft.", status=422, unknown=bad)
+    text = " ".join([b.get("goal", ""), b.get("name", ""), " ".join(map(str, b.get("requirements") or [])),
+                     b.get("style", "") or ""] + [str(f.get("how", "")) + " " + str(f.get("label", "")) for f in feats])
+    cl = clearances or {}
+    if not isinstance(cl, dict):
+        raise StudioError("clearances must be an object: {\"faceplate/shell\": 0.3} (mm per side).")
+    for p in parts:
+        if isinstance(p, dict) and isinstance(p.get("clearance"), (int, float)):
+            cl.setdefault(str(p.get("id")), p["clearance"])
+    try:
+        cl = {str(k): float(v) for k, v in cl.items()}
+    except (TypeError, ValueError):
+        raise StudioError("Every clearance must be a number in mm.")
+    if any(not 0 <= v <= 5 for v in cl.values()):
+        raise StudioError("A clearance is outside 0-5 mm.", "Clearances are the designed gap per side, in mm.")
+    mags = magnets or []
+    if not isinstance(mags, list):
+        raise StudioError("magnets must be a list: [{\"stock\": \"8x3\", \"count\": 4, \"retention\": \"press\"}].")
+    stock = magnet_stock()
+    for m in mags:
+        if not isinstance(m, dict) or str(m.get("stock", "")) not in stock:
+            raise StudioError(f"Unknown magnet stock {m.get('stock') if isinstance(m, dict) else m!r}.",
+                              "Stock: " + ", ".join(stock) + " (diameter x thickness, mm).")
+    if is_multi_part(text, parts):
+        missing = []
+        if len([p for p in parts if isinstance(p, dict) and p.get("id")]) < 2:
+            missing.append("parts (two or more {id, label})")
+        if not cl:
+            missing.append("clearances between them ({\"a/b\": mm per side})")
+        if ({"magnet", "magnets", "magnetic"} & _words(text)) and not mags:
+            missing.append("magnet stock ([{stock, count, retention}], stock one of " + ", ".join(stock) + ")")
+        if missing:
+            raise StudioError("This is a multi-part design; the plan must declare " + ", ".join(missing) + ".",
+                              "Separate parts are modelled as separate solids with a designed gap; magnets are bought "
+                              "stock with a pocket clearance. Pull force stays unknown without a datasheet value.",
+                              status=422)
+    return cl, mags

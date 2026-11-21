@@ -18,6 +18,13 @@ the slowest one, not N times one. Scores (0-100, heuristic; the parts are report
   robust      fewer form.craft fallbacks taken (each one is an operation that did not work as written)
   editable    the share of parameters that still build at both ends of their range (a sweep within a time budget)
 A candidate that fails is dropped without sinking the others.
+
+Feature-level candidates (a FeatureDesign, form/featureprog.py): {label, feature, code} entries are versions of ONE
+feature method on a shared base, the project's head source (project=...) or the first {source} entry. A feature id the
+base has is replaced; a new one is added after `after` (default: the last feature). Every version shares the code of
+the features before it, so they share those features' B-rep checkpoints: the first version is built alone (it builds
+or loads the upstream features once), then the others run in parallel and load the upstream from its checkpoint
+instead of building it again. Each row carries its build_log (built / checkpoint / skipped per feature).
 """
 from __future__ import annotations
 
@@ -42,7 +49,8 @@ def op_candidate(key, recipe_id, values, tol=0.1, sweep=True, sweep_budget_s=25.
     out = {"build_s": round(t_build, 3), "bbox": s["bbox"], "volume_mm3": s["volume_mm3"],
            "solids": len(model["shape"].solids()), "declared": getattr(model["recipe"], "solids", 1),
            "valid": bool(model["shape"].is_valid), "faces": len(model["shape"].faces()),
-           "craft_notes": list(model.get("craft_notes") or []), "derived": s.get("derived") or []}
+           "craft_notes": list(model.get("craft_notes") or []), "derived": s.get("derived") or [],
+           "build_log": list(model.get("log") or []), "skipped": list(model.get("skipped") or [])}
     try:
         from . import critique
         m = critique.op_critique_metrics(key, recipe_id, values, tol, product_class=product_class)
@@ -86,6 +94,8 @@ def score(m: dict, targets: dict | None = None) -> tuple[float, dict, list]:
     notes = []
     if not m.get("valid") or m.get("solids") != m.get("declared"):
         return 0.0, {"builds": 0}, ["not a valid solid with the declared count"]
+    if m.get("skipped"):                                 # a FeatureDesign that left a feature out did not build it
+        return 0.0, {"builds": 0}, ["feature(s) skipped: " + ", ".join(x.get("feature", "") for x in m["skipped"])]
     parts = {"builds": 1}
     # brief conformance
     t = targets or {}
@@ -155,15 +165,47 @@ def score(m: dict, targets: dict | None = None) -> tuple[float, dict, list]:
 
 # ---- engine side ----------------------------------------------------------------------------------------------------
 
-def _entries(cands: list) -> list[dict]:
+def _feature_source(base: str, c: dict, i: int) -> str:
+    """The base source with one feature method replaced (or added) for a feature-level candidate."""
+    from . import featureprog
+    from .studio import StudioError
+    fid, code = str(c.get("feature") or ""), str(c.get("code") or "")
+    if not code.strip():
+        raise StudioError(f"Candidate {i + 1}: a feature candidate needs code (one method `def {fid}(self, v, body)`).")
+    if not base or not featureprog.is_feature_design(base):
+        raise StudioError(f"Candidate {i + 1}: feature candidates need a FeatureDesign to build on.",
+                          "Pass project=... (its head source is the base) or a first {label, source} that is a "
+                          "FeatureDesign (form.featureprog).")
+    if fid in featureprog.feature_ids(base):
+        return featureprog.replace_feature(base, fid, code)
+    return featureprog.insert_feature(base, fid, code, str(c.get("feature_label") or ""),
+                                      str(c.get("role") or "structure"), str(c.get("after") or ""))
+
+
+def _entries(cands: list, base: str | None = None) -> list[dict]:
+    """Normalised candidates. base: the source feature candidates build on (a project's head source)."""
     from .studio import StudioError
     if not isinstance(cands, list) or not 1 <= len(cands) <= MAX:
-        raise StudioError(f"Give 1 to {MAX} candidates.", "Each is {label, source} or {label, values} (values on the "
-                          "first candidate's source).")
-    out, base = [], None
+        raise StudioError(f"Give 1 to {MAX} candidates.", "Each is {label, source}, {label, values} (values on the "
+                          "first candidate's source) or {label, feature, code} (one feature of a FeatureDesign).")
+    out, fbase = [], base
+    base = None
     for i, c in enumerate(cands):
         c = c if isinstance(c, dict) else {}
         src = str(c.get("source") or "")
+        if c.get("feature"):
+            if src.strip():
+                raise StudioError(f"Candidate {i + 1}: give source or feature and code, not both.")
+            if fbase is None:
+                fbase = next((str(x.get("source")) for x in cands if isinstance(x, dict) and x.get("source")), None)
+            src = _feature_source(fbase or "", c, i)
+            try:
+                vals = {k: float(v) for k, v in (c.get("values") or {}).items()}
+            except (TypeError, ValueError):
+                raise StudioError(f"Candidate {i + 1}: values must be numbers.")
+            out.append({"label": " ".join(str(c.get("label") or f"Candidate {chr(65 + i)}").split())[:60],
+                        "source": src, "values": vals, "language": "python", "feature": str(c["feature"])})
+            continue
         if not src.strip():
             if base is None:
                 raise StudioError("The first candidate needs its source.", "Pass {label, source} first; later "
@@ -191,8 +233,8 @@ def run(st, cands: list, name: str = "", project: str = "", brief: str = "", tar
     if keep == "best" and not (name or project):
         raise StudioError("Name the design to create (name=...) or the project to update (project=...).",
                           "Or pass keep=\"none\" to compare the candidates only.")
-    entries = _entries(cands)
     p = st.load(project) if project else None
+    entries = _entries(cands, (st.source_text(p) or "") if p is not None else None)
     t0 = time.time()
     pool = st.kernel
     if hasattr(pool, "warm"):
@@ -227,6 +269,7 @@ def run(st, cands: list, name: str = "", project: str = "", brief: str = "", tar
             row["ok"] = row["parts"].get("builds") == 1
             row.update(build_s=m["build_s"], seconds=m["seconds"], size_mm=[round(b - a, 1) for a, b in zip(*m["bbox"])],
                        solids=m["solids"], faces=m["faces"], craft_notes=m["craft_notes"],
+                       **({"feature": e["feature"], "build_log": m.get("build_log", [])} if e.get("feature") else {}),
                        **({"class_score": m["class_score"]} if "class_score" in m else {}),
                        **({"sweep": {k: m["sweep"][k] for k in ("params", "tested", "seconds")}} if m.get("sweep") else {}))
         except StudioError as err:
@@ -235,8 +278,13 @@ def run(st, cands: list, name: str = "", project: str = "", brief: str = "", tar
             if pub.get("diagnosis"):
                 row["diagnosis"] = pub["diagnosis"]
     workers = max(1, min(len(entries), getattr(pool, "size", 1)))
+    feat = [i for i, e in enumerate(entries) if e.get("feature") and e.get("rid")]
+    rest = list(range(len(entries)))
+    if len(feat) > 1:                       # the first feature version builds (or loads) the shared upstream once
+        build(feat[0])
+        rest.remove(feat[0])
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        list(ex.map(build, range(len(entries))))
+        list(ex.map(build, rest))
     t_build = time.time() - t1
     order = sorted(range(len(rows)), key=lambda i: (-rows[i]["score"], rows[i].get("build_s", 1e9)))
     ranking = [rows[i] for i in order]
@@ -248,6 +296,10 @@ def run(st, cands: list, name: str = "", project: str = "", brief: str = "", tar
            "parallel": workers, "seconds": {"warm": round(t_warm, 2), "build_and_score": round(t_build, 2),
                                             "total": round(time.time() - t0, 2)},
            "evidence": "heuristic scores from computed measurements"}
+    if any(e.get("feature") for e in entries):
+        logs = [r.get("build_log") or [] for r in rows if r.get("feature") and r.get("ok")]
+        out["upstream"] = {"shared": sorted({x["feature"] for lg in logs for x in lg if x["status"] == "checkpoint"}),
+                           "note": "features before the one under test, loaded from their checkpoint by each version"}
     if not out["best"]:
         st.activity(project or None, "candidates", f"None of {len(rows)} candidates built", by=by)
         raise StudioError("None of the candidates built.", "; ".join(

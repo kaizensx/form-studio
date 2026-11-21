@@ -318,7 +318,8 @@ def build() -> MCPServer:
     async def design_guide(topic: str = "core", purpose: str | None = None) -> dict:
         """Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
         holder, mechanism...). topic="core" (default) returns the contract for a design written as code, the rules,
-        the staged workflow and a complete example that builds. Other topics, for complex designs: surfacing,
+        the staged workflow and a complete example that builds; it leads with skeleton first, one validated feature
+        at a time (a FeatureDesign, 2 retries per feature, then defer). Other topics, for complex designs: surfacing,
         mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicable when purpose="model"),
         reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine).
         They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
@@ -344,7 +345,8 @@ def build() -> MCPServer:
         (datasheet, standard) or assumed. constraints: limits (bed size, material, process). unknowns: what you could
         not settle; list them, never guess them (ask_user / ask_measurement for ones that change fit, load or
         safety). style: the design language. project: attach to an existing project instead of a new design.
-        Returns the brief id, whether it is complex (heuristic) and which design_guide topics and exemplars to read."""
+        Returns the brief id, whether it is complex (heuristic), which design_guide topics and exemplars to read, and
+        the route (prismatic, revolve, skin+features or mechanism) with how its skeleton is built."""
         st = studio()
         from . import exemplars, staged
         b = await _run(staged.save_brief, st, name, goal, requirements, dimensions, constraints, unknowns, style,
@@ -355,9 +357,10 @@ def build() -> MCPServer:
         ex = [{"name": e["name"], "title": e["title"]} for e in hits]
         if ex:                                         # the closest one's lessons up front: they are what gets skipped
             ex[0]["lessons"] = hits[0].get("lessons", [])
+        adv = staged.advice(" ".join([name, goal, " ".join(map(str, requirements or [])), style]))
         return {"brief": b["id"] if not project else project, "complex": a["complex"], "reasons": a["reasons"],
                 "evidence": a["evidence"], "read_topics": staged.topics_for(a["families"]),
-                "examples": ex,
+                "examples": ex, **adv,
                 "unknowns": b["unknowns"],
                 "next": "design_guide(topic=...) for each topic, design_examples(name=...) for the closest exemplar, then "
                         "plan_design(brief=...)."}
@@ -366,22 +369,30 @@ def build() -> MCPServer:
     async def plan_design(brief: str, features: list[dict], parts: list[dict] | None = None,
                           key_dimensions: dict[str, Any] | None = None, mechanisms: list[str] | None = None,
                           textures: list[str] | None = None, risks: list[str] | None = None, approach: str = "",
-                          references_used: list[str] | None = None, product_class: str = "") -> dict:
+                          references_used: list[str] | None = None, product_class: str = "",
+                          clearances: dict[str, float] | None = None, magnets: list[dict] | None = None) -> dict:
         """Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id).
         features: [{id, label, how, part?, dims?}] in build order; id becomes the Feature id in the code, how names
         the construction (e.g. "craft.loft_sections through 9 superellipse sections", "craft.pin_hinge 0.35 mm").
         parts: [{id, label, material?}]. key_dimensions: {name: value or {value, unit, why}}. mechanisms: each with its
         clearance and motion. textures: each with its tier (B-rep or mesh texture). risks: what could make it fail and
-        how you will check it. A complex brief needs at least 3 features and named risks.
+        how you will check it. A complex brief needs at least 3 features and named risks. Every craft.x, parts.x and
+        patterns.x a how names must exist (an unknown one is refused with the closest real names). Several parts
+        (magnets, a lid, a faceplate, separate parts): parts, clearances ({"faceplate/shell": 0.3}, mm per side) and
+        magnets ([{stock: "8x3", count, retention: press|glue|printed}]) are required.
+        Returns the plan as ordered steps: the skeleton first (create_design with that feature only), then one
+        add_feature(kind="code") per feature, each with its risk class, a fallback and the retry cap.
         product_class: what critique compares the silhouette with (helmet_fullface, helmet_open, mouse, bottle);
         empty: detected from the brief's words, or none. The design faces +X with Z up for the comparison.
         Then create_design(..., plan=<brief id>)."""
         st = studio()
         from . import staged
         r = await _run(staged.save_plan, st, brief, features, parts, key_dimensions, mechanisms, textures, risks,
-                       approach, references_used, product_class)
-        return {**r, "next": f"Write the code with these feature ids, then create_design(..., plan='{brief}') "
-                             "(or update_design for an existing project). Look at the sheet and the section it returns."}
+                       approach, references_used, product_class, clearances, magnets)
+        return {**r, "steps": r["plan"]["steps"], "route": r["plan"]["route"],
+                "next": f"Step 1: create_design(..., plan='{brief}') with a FeatureDesign holding only the first feature "
+                        "(or update_design for an existing project); look at the sheet; then one add_feature(kind=\"code\") "
+                        "per step. Defer a feature after 2 retries and list the deferred ones at the end."}
 
     @mcp.tool(annotations=RO)
     async def design_examples(query: str = "", name: str = "", technique: str = "", category: str = "") -> dict:
@@ -702,6 +713,9 @@ def build() -> MCPServer:
         every one, and keep the best. candidates: [{label, source}] or, after the first, {label, values} to try other
         values on the first one's source. Use it when there are two or three plausible constructions (a loft or a
         sweep, one shell or two halves, a thick or a thin wall) instead of trying them one by one.
+        One risky feature of a FeatureDesign: {label, feature, code} entries are versions of that one method on the
+        project's head source (project=...) or on a first {label, source}; they share the checkpoints of the
+        features before it, so only the feature under test is built per version.
         Scores (0-100, heuristic, the parts are returned): builds (a valid solid with the declared count; a failure
         carries its diagnosis), brief (targets: {"size_mm": [x, y, z], "tolerance_mm": 1, "solids": n,
         "derived": {key: value}}), quality (critique metrics; the product class silhouette with product_class),

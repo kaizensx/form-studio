@@ -13,6 +13,25 @@
   feature rebuilds only that feature and the ones after it. `update_design(feature=, code=)` sends a single method,
   `add_feature(kind="code")` adds one, and `remove_feature` removes any feature of such a design. Each revision has a
   build log that says, for every feature, whether it was built, loaded from its checkpoint or skipped.
+- **Skeleton first, taught and planned.** `design_guide` now opens with the creation loop: write a `FeatureDesign`,
+  create the skeleton alone, look at it, then add one feature per call. A feature gets two retries; after that it is
+  deferred and listed at the end. A risky feature goes through `build_candidates`. The guide carries a complete
+  example that builds. `design_brief` returns a route (prismatic, revolve, skin+features or mechanism) and how its
+  skeleton is built. `plan_design` refuses a plan that names a helper that does not exist and lists the closest real
+  names. It returns the plan as ordered steps, each with a risk class and a fallback. A brief with magnets, a lid, a
+  faceplate or separate parts must declare its parts, the clearances between them and its magnet stock.
+- **Exemplars as steps, and better routing.** Every exemplar is also exposed as its features in build order, each with
+  the helpers it uses. A query for a full-face helmet with separate parts, magnets or lenses goes to the hero helmet
+  exemplar first.
+- **One feature, several versions.** `build_candidates` accepts `{label, feature, code}` entries: versions of one
+  feature of a `FeatureDesign`, built on the checkpoints of the features before it.
+- **Fixing a feature always rebuilds it.** A feature's checkpoint key now includes its own code for designs written
+  through the tools. Before this fix, a changed feature with the same values could load the old result. A parameter
+  may also name a feature that is not written yet.
+- **Creation bench.** `scripts/creation_bench.py` runs twenty original briefs (mechanical, creative, organic,
+  assemblies) through the MCP tools with a deterministic scripted agent. It writes measured JSON: first and final build
+  rate, time to the first visible solid, features built against planned, deferred features, the critic score and the
+  total time.
 - **Make editable makes it editable.** A mesh is now read the way it was modelled: sketches of lines, arcs and rounded
   corners extruded and lofted between levels, with every coordinate, level, radius and diameter a Param (pooled,
   snapped to round numbers and standard hole sizes, mirrored about the centre, each saying where it came from). What

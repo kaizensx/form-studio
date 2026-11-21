@@ -215,7 +215,8 @@ Parameters (unit, range, group, the feature each one drives), features and what 
 
 Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
 holder, mechanism...). topic="core" (default) returns the contract for a design written as code, the rules,
-the staged workflow and a complete example that builds. Other topics, for complex designs: surfacing,
+the staged workflow and a complete example that builds; it leads with skeleton first, one validated feature
+at a time (a FeatureDesign, 2 retries per feature, then defer). Other topics, for complex designs: surfacing,
 mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicable when purpose="model"),
 reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine).
 They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
@@ -233,7 +234,8 @@ requirements: what it must do. dimensions: {name: {value, unit, source}} where s
 (datasheet, standard) or assumed. constraints: limits (bed size, material, process). unknowns: what you could
 not settle; list them, never guess them (ask_user / ask_measurement for ones that change fit, load or
 safety). style: the design language. project: attach to an existing project instead of a new design.
-Returns the brief id, whether it is complex (heuristic) and which design_guide topics and exemplars to read.
+Returns the brief id, whether it is complex (heuristic), which design_guide topics and exemplars to read, and
+the route (prismatic, revolve, skin+features or mechanism) with how its skeleton is built.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -255,7 +257,12 @@ features: [{id, label, how, part?, dims?}] in build order; id becomes the Featur
 the construction (e.g. "craft.loft_sections through 9 superellipse sections", "craft.pin_hinge 0.35 mm").
 parts: [{id, label, material?}]. key_dimensions: {name: value or {value, unit, why}}. mechanisms: each with its
 clearance and motion. textures: each with its tier (B-rep or mesh texture). risks: what could make it fail and
-how you will check it. A complex brief needs at least 3 features and named risks.
+how you will check it. A complex brief needs at least 3 features and named risks. Every craft.x, parts.x and
+patterns.x a how names must exist (an unknown one is refused with the closest real names). Several parts
+(magnets, a lid, a faceplate, separate parts): parts, clearances ({"faceplate/shell": 0.3}, mm per side) and
+magnets ([{stock: "8x3", count, retention: press|glue|printed}]) are required.
+Returns the plan as ordered steps: the skeleton first (create_design with that feature only), then one
+add_feature(kind="code") per feature, each with its risk class, a fallback and the retry cap.
 product_class: what critique compares the silhouette with (helmet_fullface, helmet_open, mouse, bottle);
 empty: detected from the brief's words, or none. The design faces +X with Z up for the comparison.
 Then create_design(..., plan=<brief id>).
@@ -272,6 +279,8 @@ Then create_design(..., plan=<brief id>).
 | `approach` | string |  |
 | `references_used` | array \| null |  |
 | `product_class` | string |  |
+| `clearances` | object \| null |  |
+| `magnets` | array \| null |  |
 
 ### `design_examples`
 
@@ -446,6 +455,9 @@ Build 2-6 versions of a risky design or step at the same time (one kernel worker
 every one, and keep the best. candidates: [{label, source}] or, after the first, {label, values} to try other
 values on the first one's source. Use it when there are two or three plausible constructions (a loft or a
 sweep, one shell or two halves, a thick or a thin wall) instead of trying them one by one.
+One risky feature of a FeatureDesign: {label, feature, code} entries are versions of that one method on the
+project's head source (project=...) or on a first {label, source}; they share the checkpoints of the
+features before it, so only the feature under test is built per version.
 Scores (0-100, heuristic, the parts are returned): builds (a valid solid with the declared count; a failure
 carries its diagnosis), brief (targets: {"size_mm": [x, y, z], "tolerance_mm": 1, "solids": n,
 "derived": {key: value}}), quality (critique metrics; the product class silhouette with product_class),

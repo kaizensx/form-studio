@@ -1,6 +1,44 @@
 """What an agent needs to write a FORM design: the contract, the rules, and an example that builds."""
 
 _TEMPLATE = """\
+SKELETON FIRST, ONE VALIDATED FEATURE AT A TIME (do this for every design that is more than a block)
+  1. Write the design as a FeatureDesign: one @feature method per feature, in build order. The first one returns the
+     skeleton (the main body only); each later one takes the body so far and returns the body after it. Declare
+     every Param up front: one that names a feature not written yet waits for it (changing params later changes
+     the shared code and rebuilds every feature).
+  2. create_design with the skeleton feature only. It is on screen in seconds. render / look at the sheet before
+     you commit to more.
+  3. Add one feature per call: add_feature(project, kind="code", feature="bore", code="def bore(self, v, body): ...").
+     Only that feature is built; the ones before it load from their checkpoints. Fix one with
+     update_design(project, feature="bore", code=...). Look after every feature that changes the silhouette.
+  4. A feature that fails comes back with its diagnosis and the body unchanged. Retry it at most 2 times (apply the
+     diagnosis' first fix, then a simpler construction). Still failing: defer it, go on with the next feature, and
+     list every deferred feature in your final message. Never let one feature block the design.
+  5. A risky single feature (a loft, a band on a skin, a texture, a tight boolean) with two or three plausible
+     constructions: build_candidates(project=..., candidates=[{label, feature, code}, ...]). The versions share
+     the checkpoint of the features before it and are built in parallel; the best is kept.
+  6. design_brief gives the route (prismatic, revolve, skin+features, mechanism) and plan_design returns these
+     steps in order with their risk and fallback; plan helpers must exist (unknown names are refused).
+
+  from build123d import Box, Cylinder, Pos
+  from form.featureprog import FeatureDesign, feature
+  from form.recipes.base import Param
+
+  class Design(FeatureDesign):
+      title, summary = "Bracket", "A plate with a bore."
+      params = [Param("w", "Width", 60, 20, 200, 1, "mm", "form", "plate"),
+                Param("bore_d", "Bore", 8, 3, 20, 0.5, "mm", "interface", "bore")]
+
+      @feature("Plate")                                # the skeleton: create_design with only this one
+      def plate(self, v, body):
+          return Box(v["w"], 40, 6)
+
+      @feature("Bore", role="interface")              # then add_feature(kind="code", feature="bore", code=...)
+      def bore(self, v, body):
+          return body - Cylinder(v["bore_d"] / 2, 20)
+  (example_source_features has the complete file with fillets and slots; setup(self, v) returns values every
+  feature reads as self.ctx.)
+
 A Form Studio design is one Python file that defines one subclass of Recipe. Form Studio imports it, builds it in the
 CAD kernel (build123d on OpenCascade), attributes every face to a feature, and runs the full pipeline:
 {pipeline}
@@ -157,7 +195,8 @@ WORKFLOW
        Read the exemplar's source: it shows the construction a top designer would use.
     3. plan_design: every feature with HOW it is built (which form.craft helper, which sections), the parts, key
        dimensions, mechanisms with their clearances, textures with their tier, and the risks.
-    4. create_design(..., plan=<brief id>): it returns a six-view sheet and a section. LOOK at both.
+    4. create_design(..., plan=<brief id>) with the skeleton feature only: it returns a six-view sheet and a
+       section. LOOK at both. Then the plan's steps one add_feature(kind="code") at a time (SKELETON FIRST above).
     5. critique(project): close-ups per feature, metrics, a checklist. Fix, update_design, critique again.
        A briefed design cannot be released until its head revision has a critique pass.
   The helper library for all of this is form.craft (topics surfacing, mechanisms, organic, texture).
@@ -282,6 +321,58 @@ class Design(Recipe):
             Part("lid", "Lid", 1, move=(-(W + 8), 0, H + t), rotate=(180, 0, 0), explode=(0, 0, 30),
                  note="Press the lid on, plug first."),
         ])
+'''
+
+
+FEATURE_EXAMPLE = '''\
+"""Wall bracket built one feature at a time (form.featureprog). Form Studio example design."""
+from build123d import Align, Axis, Box, Cylinder, Pos, Rot
+
+from form import craft
+from form.featureprog import FeatureDesign, feature
+from form.recipes.base import Param
+
+A = (Align.CENTER, Align.CENTER, Align.MIN)
+
+
+class Design(FeatureDesign):
+    title = "Wall bracket"
+    summary = "An L bracket with a shelf bore and two screw slots, built skeleton first."
+    params = [
+        Param("w", "Width", 50, 30, 120, 1, "mm", "form", "plate"),
+        Param("reach", "Reach", 60, 30, 150, 1, "mm", "brief", "arm", "How far the shelf sits from the wall."),
+        Param("t", "Thickness", 5, 3, 10, 0.5, "mm", "form", "plate"),
+        Param("bore_d", "Shelf pin bore", 8, 4, 16, 0.5, "mm", "interface", "bore"),
+        Param("slot_w", "Screw slot width", 4.5, 3, 7, 0.1, "mm", "interface", "slots"),
+        Param("r", "Edge radius", 1.5, 0.5, 3, 0.25, "mm", "form", "edges"),
+    ]
+
+    def setup(self, v):                       # shared values, read by every feature as self.ctx
+        return {"h": v["w"] * 1.2}
+
+    @feature("Wall plate")                    # the skeleton: create_design with only this feature first
+    def plate(self, v, body):
+        return Box(v["w"], v["t"], self.ctx["h"], align=(Align.CENTER, Align.MIN, Align.MIN))
+
+    @feature("Arm")
+    def arm(self, v, body):
+        arm = Box(v["w"], v["reach"], v["t"], align=(Align.CENTER, Align.MIN, Align.MIN))
+        return craft.safe_union(body, Pos(0, v["t"] - 0.2, 0) * arm)
+
+    @feature("Shelf pin bore", role="interface")
+    def bore(self, v, body):
+        return body - Pos(0, v["t"] + v["reach"] * 0.7, -1) * Cylinder(v["bore_d"] / 2, v["t"] + 2, align=A)
+
+    @feature("Screw slots", role="interface")
+    def slots(self, v, body):
+        h = self.ctx["h"]
+        for z in (h * 0.45, h * 0.8):
+            body = body - Pos(0, v["t"] / 2, z) * Rot(90, 0, 0) * Box(v["slot_w"] * 2.2, v["slot_w"], v["t"] + 2)
+        return body
+
+    @feature("Edges", role="finish")          # fillets last; a fillet that fails is skipped, the bracket stays
+    def edges(self, v, body):
+        return craft.safe_fillet(body, body.edges().filter_by(Axis.Y), v["r"])
 '''
 
 
@@ -544,7 +635,8 @@ def topic(name: str = "core", purpose: str | None = None) -> dict:
     if name not in TOPICS:
         raise KeyError(name)
     if name == "core":
-        return {"topic": "core", "guide": guide(purpose), "purpose": purpose, "example_source": EXAMPLE, "topics": list(TOPICS)}
+        return {"topic": "core", "guide": guide(purpose), "purpose": purpose, "example_source": EXAMPLE,
+                "example_source_features": FEATURE_EXAMPLE, "retries_per_feature": 2, "topics": list(TOPICS)}
     if name == "dfm" and purpose == "model":
         return {"topic": "dfm", "guide": "Not applicable: this design is a 3D model, not for printing. Design for its "
                 "process (CNC, moulding, rendering) instead; print rules would only constrain it.", "topics": list(TOPICS)}

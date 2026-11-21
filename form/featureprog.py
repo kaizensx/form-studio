@@ -103,6 +103,13 @@ class FeatureDesign(Recipe):
             feats.append(declared.get(n) or Feature(n, m["label"] or n.replace("_", " ").capitalize(), m["role"], m["doc"]))
         cls.features = feats
         cls._form_steps = [n for n, _f in own]
+        # a parameter may name a planned feature that is not written yet (skeleton first: every Param is declared
+        # up front); it drives no feature until that method is added, and then links to it with no source change
+        ids = {f.id for f in feats}
+        if any(p.feature and p.feature not in ids for p in cls.__dict__.get("params", []) or []):
+            import dataclasses
+            cls.params = [p if not p.feature or p.feature in ids else dataclasses.replace(p, feature="")
+                          for p in cls.params]
 
     # optional: shared values for every feature, read as self.ctx
     def setup(self, v: dict):
@@ -221,6 +228,12 @@ def code_map(cls) -> tuple[dict, str]:
     (text, standard features, partial build) are left out of the shared code: they act after the features."""
     mod = sys.modules.get(cls.__module__)
     path = getattr(mod, "__file__", None)
+    if not path:                     # design sources are imported without a sys.modules entry (recipes.load_source):
+        for n in getattr(cls, "_form_steps", []) or []:      # read the file the feature methods were compiled from
+            co = getattr(getattr(cls, n, None), "__code__", None)
+            if co is not None and os.path.isfile(co.co_filename):
+                path = co.co_filename
+                break
     try:
         st = os.stat(path) if path else None
     except OSError:

@@ -14,6 +14,15 @@ list. Categories: mechanical, consumer, organic, textured, assembly, helmet, enc
 
 A technique snippet is a block of an exemplar's build() between `# --- snippet: <title>` and `# --- end snippet`.
 
+Every exemplar is also exposed as decomposed steps (steps(name), in get() and in search hits): its features in build
+order, each with the form.craft helpers it calls and its lines, so an agent can rebuild it skeleton first, one feature
+per call. For a FeatureDesign they are its @feature methods; for a plain Recipe, the Stage("id", ...) calls of build()
+in order, with the helpers called since the stage before. META "steps" overrides them.
+
+Routing: search() puts an exemplar first when the query names its product and one of its distinguishing parts
+(ROUTES, or the exemplar's own META "route": {"all": [...], "any": [...]}), e.g. a full-face helmet with separate
+parts, magnets or lenses goes to hero_helmet when that exemplar is present.
+
 An exemplar whose META says "retrieval": False is kept in the repo (it still builds and is tested) but search,
 snippets and the listing never offer it, so the agent does not learn from it; get(name) still returns it, with the
 reason. character_mask, prop_mask and scifi_helmet are flagged so until they are redone: they read as eggs.
@@ -70,9 +79,86 @@ def _meta(path: Path) -> dict:
            "tags": list(meta.get("tags", [])), "lessons": list(meta.get("lessons", [])),
            "techniques": list(meta.get("techniques", [])), "craft": craft_calls,
            "retrieval": bool(meta.get("retrieval", True)), "retrieval_note": meta.get("retrieval_note", ""),
-           "snippets": [s["title"] for s in _snippets_of(src, path.stem)]}
+           "snippets": [s["title"] for s in _snippets_of(src, path.stem)],
+           "steps": list(meta["steps"]) if isinstance(meta.get("steps"), list) else _steps_of(tree),
+           **({"route": meta["route"]} if isinstance(meta.get("route"), dict) else {})}
     _CACHE[key] = out
     return out
+
+
+def _craft_name(call) -> str:
+    """craft.x or craft.module.x when this ast Call calls a form.craft helper, else ""."""
+    f, parts = call.func, []
+    while isinstance(f, ast.Attribute):
+        parts.append(f.attr)
+        f = f.value
+    if isinstance(f, ast.Name) and f.id == "craft" and parts:
+        return "craft." + ".".join(reversed(parts))
+    return ""
+
+
+def _craft_calls(node) -> list[tuple]:
+    """(line, helper) of every form.craft call inside an ast node, in source order."""
+    out = [(n.lineno, _craft_name(n)) for n in ast.walk(node) if isinstance(n, ast.Call)]
+    return sorted(x for x in out if x[1])
+
+
+def _lit(node):
+    try:
+        return ast.literal_eval(node)
+    except (ValueError, TypeError, SyntaxError):
+        return None
+
+
+def _is_feature_deco(d) -> bool:
+    return getattr(d.func if isinstance(d, ast.Call) else d, "id", "") == "feature"
+
+
+def _steps_of(tree: ast.Module) -> list[dict]:
+    """The exemplar's features in build order with the helpers each uses (see the module docstring)."""
+    cls = next((n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "Design"), None)
+    if cls is None:
+        return []
+    labels = {}
+    for b in cls.body:                                      # features = [Feature("id", "Label", "role"), ...]
+        if isinstance(b, ast.Assign) and any(getattr(t, "id", "") == "features" for t in b.targets) \
+                and isinstance(b.value, (ast.List, ast.Tuple)):
+            for e in b.value.elts:
+                if isinstance(e, ast.Call) and e.args:
+                    a = [_lit(x) for x in e.args[:3]]
+                    if isinstance(a[0], str):
+                        labels[a[0]] = {"label": a[1] if len(a) > 1 else a[0], "role": a[2] if len(a) > 2 else ""}
+    feats = []
+    for b in cls.body:                                      # a FeatureDesign: one @feature method per feature
+        if isinstance(b, ast.FunctionDef) and any(_is_feature_deco(d) for d in b.decorator_list):
+            d = next(d for d in b.decorator_list if _is_feature_deco(d))
+            lab = _lit(d.args[0]) if isinstance(d, ast.Call) and d.args else None
+            role = next((_lit(k.value) for k in getattr(d, "keywords", []) if k.arg == "role"), "structure")
+            feats.append({"id": b.name, "label": lab or b.name.replace("_", " ").capitalize(), "role": role,
+                          "craft": list(dict.fromkeys(c for _, c in _craft_calls(b))), "lines": [b.lineno, b.end_lineno]})
+    if feats:
+        return feats
+    build = next((b for b in cls.body if isinstance(b, ast.FunctionDef) and b.name == "build"), None)
+    if build is None:
+        return [{"id": k, **v, "craft": []} for k, v in labels.items()]
+    marks = sorted((n.lineno, _lit(n.args[0])) for n in ast.walk(build) if isinstance(n, ast.Call)
+                   and getattr(n.func, "id", "") == "Stage" and n.args and isinstance(_lit(n.args[0]), str))
+    calls = _craft_calls(build)
+    out, seen, prev = [], set(), build.lineno
+    for line, fid in marks:
+        if fid not in seen:
+            seen.add(fid)
+            used = list(dict.fromkeys(c for ln, c in calls if prev < ln <= line))
+            out.append({"id": fid, "label": labels.get(fid, {}).get("label", fid),
+                        "role": labels.get(fid, {}).get("role", ""), "craft": used, "lines": [prev + 1, line]})
+        prev = line
+    out += [{"id": k, **v, "craft": []} for k, v in labels.items() if k not in seen]
+    return out
+
+
+def steps(name: str) -> list[dict]:
+    """One exemplar as decomposed steps: [{"id", "label", "role", "craft": [helpers], "lines"}] in build order."""
+    return list(get(name)["steps"])
 
 
 def catalogue() -> list[dict]:
@@ -146,11 +232,37 @@ def _rank(query: str, docs: list[tuple[dict, dict]], k1: float = 1.4, b: float =
     return out
 
 
+#: product + distinguishing parts -> the exemplars to put first, when present and retrievable. An exemplar can
+#: declare the same in its META as "route": {"all": [...], "any": [...]}.
+ROUTES = [{"all": ["helmet"], "any": ["magnet", "separate", "part", "lens", "faceplate", "split", "detachable"],
+           "prefer": ["hero_helmet"]}]
+
+
+def routed(query: str, cat: list[dict] | None = None) -> list[str]:
+    """Exemplar names the query is routed to, in order (ROUTES and META "route")."""
+    cat = retrievable() if cat is None else cat
+    q = set(_tokens(query))
+    names = {e["name"] for e in cat}
+    rules = list(ROUTES) + [{**e["route"], "prefer": [e["name"]]} for e in cat if e.get("route")]
+    out = []
+    for r in rules:
+        need = {_stem(w) for w in r.get("all", [])}
+        anyw = {_stem(w) for w in r.get("any", [])}
+        if need and need <= q and (not anyw or anyw & q):
+            out += [n for n in r["prefer"] if n in names and n not in out]
+    return out
+
+
 def search(query: str, limit: int = 5, category: str | None = None) -> list[dict]:
     """Exemplars ranked for the query (BM25 over name, tags, title, category, snippet titles, techniques, craft calls,
-    summary and lessons). Each hit carries the technique snippets that match the query best (up to 2)."""
+    summary and lessons); a query routed to an exemplar (routed()) puts it first. Each hit carries the technique
+    snippets that match the query best (up to 2) and its decomposed steps."""
     cat = [e for e in retrievable() if not category or e.get("category") == category]
-    hits = [dict(e) for _, e in _rank(query, [(e, _doc(e)) for e in cat])[:limit]]
+    ranked = [e for _, e in _rank(query, [(e, _doc(e)) for e in cat])]
+    first = routed(query, cat)
+    by = {e["name"]: e for e in cat}
+    ranked = [by[n] for n in first] + [e for e in ranked if e["name"] not in first]
+    hits = [dict(e) for e in ranked[:limit]]
     for h in hits:
         snips = snippets(query, limit=2, names=[h["name"]])
         if snips:
