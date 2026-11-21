@@ -45,6 +45,7 @@ form.craft.meshtex imports numpy only; the other modules need build123d (the ker
 from __future__ import annotations
 
 from ._common import RecipeError, attempt, need, notes, num  # noqa: F401
+from . import boolean  # noqa: F401  (craft.boolean.run / diagnose / last)
 from .meshtex import LABEL as MESH_TEXTURE_LABEL, MeshTexture  # noqa: F401
 
 _LAZY = {

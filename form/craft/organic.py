@@ -427,9 +427,11 @@ def surface_band(sections: list[dict], tip, amount: float, region, depth: float 
     a, d = num(amount, "amount", positive=True), num(depth, "depth", lo=0.2)
     grown, root = offset_body(sections, tip, a, count), offset_body(sections, tip, -d, count)
     # clip first, then take the root away: two booleans on a small piece instead of one on the whole skin
-    piece = attempt("surface_band", [("clip", lambda: one(grown & region))],
+    # through the boolean engine: it works on copies, so a failed try never damages the cached offset shells
+    from . import boolean
+    piece = attempt("surface_band", [("clip", lambda: one(boolean.run(grown, region, "common", what="clip the band")))],
                     "The region does not reach the surface; move or enlarge it.", ["region"])
-    return attempt("surface_band", [("minus root", lambda: one(piece - root))],
+    return attempt("surface_band", [("minus root", lambda: one(boolean.run(piece, root, "cut", what="take the root away")))],
                    "Use a smaller depth, or a region that reaches the surface.", ["depth", "region"])
 
 

@@ -206,9 +206,11 @@ WHEN IT FAILS OR LOOKS WRONG
     the likely cause read from the shapes on that line (an invalid operand, parts 0.01 mm apart, sections with 6 and
     14 edges, a fillet wider than the shortest edge) and ranked fixes. Apply the first fix; do not guess.
   * Write risky operations with the robust helpers; each retries the way OCCT needs and notes what it gave up:
-      craft.safe_union(a, b, ...)      fuse, fuzzy fuse, repaired shapes; closes a gap under 0.05 mm (noted); refuses
-                                       parts that are really apart
-      craft.safe_cut(body, tool)       cut, fuzzy cut, repaired shapes, nudged tool; a cut that removes nothing fails
+      craft.safe_union(a, b, ...) / craft.safe_cut(body, tool) / craft.fuse / craft.cut   one boolean engine: the plain
+                                       boolean first, verified; on failure it measures overlap, gap and shared faces,
+                                       names the cause (coincident faces, grazing tool, invalid operand, parts that
+                                       touch) and tries only that cause's repairs; the error carries the numbers.
+                                       Separate parts are never fused: use craft.parts(name=solid, ...)
       craft.safe_loft(sections)        smooth, re-seamed and resampled sections (craft.reseam), ruled, pairwise
       craft.safe_fillet / craft.safe_chamfer   smaller sizes, then edge by edge
       craft.safe_shell(solid, t, openings)     arc, intersection offset, then thinner walls
@@ -462,8 +464,8 @@ ORGANIC FORMS (form.craft.organic)
   craft.surface_band(secs, tip, amount, region, depth)   the surface grown by amount, clipped to region, rooted
       depth inside the wall: pads, scoops, trim, spoilers, raised graphic panels; the region's walls are crisp lines
   craft.slot_grille(center, normal, count, length, width, pitch, taper=)   B-rep vent grille cutter
-  craft.cut(body, tool) / craft.fuse(body, part, max_solids, min_solids)   booleans with fuzzy fallbacks; they
-      refuse a result that lost the body or fused a part that must stay separate (a visor)
+  craft.cut(body, tool) / craft.fuse(body, part)   booleans through the engine (craft.boolean); they refuse a result
+      that lost the body. Parts that must stay separate (a visor, a faceplate) go in craft.parts, not a fuse
  Product families from named proportions (each returns the sections plus the outlines of its openings):
   craft.head_form("J")                      EN 960 / ECE 22.05 headform (A 500, E 540, J 570, M 600, O 620 mm
                                             circumference) scaled from the ANSUR II mean head: length, breadth, eye, chin
