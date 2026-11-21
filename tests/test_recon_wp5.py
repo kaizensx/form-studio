@@ -209,8 +209,9 @@ class Budget(unittest.TestCase):
         from form.recon import pipeline
         stl, _, _ = mesh("box_with_holes")
         t = time.perf_counter()
-        rep = pipeline.reconstruct(stl, TMP / "tight", "box", 0.02, budget_s=20)
-        self.assertLess(time.perf_counter() - t, 20 + 10)
+        # 5 s: too short for the program route on any machine (box_with_holes takes about 13 s with room)
+        rep = pipeline.reconstruct(stl, TMP / "tight", "box", 0.02, budget_s=5)
+        self.assertLess(time.perf_counter() - t, 5 + 10)
         self.assertTrue(rep["cut_short"])
         self.assertIn("cut short", rep["result"]["note"])
         self.assertEqual(rep["result"]["layer"], 0)                      # the exact copy: the best found in time
