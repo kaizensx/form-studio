@@ -55,6 +55,8 @@ def main():
     first0 = message.splitlines()[0] if message.strip() else ""
     if re.search(r"\beditable\b", first0):
         return editable(data, message, sid)
+    if re.search(r"\bstages\b", first0):
+        return stages(data, message, sid)
     if "make" in message:
         pid = "made-" + uuid.uuid4().hex[:6]
         (data / pid).mkdir(parents=True)
@@ -260,6 +262,81 @@ def editable(data: Path, message: str, sid: str) -> int:
         except Exception:
             pass
     reply = "You said: " + first + "\n\nProjects: " + ", ".join(made) + "".join("\n\n" + x for x in notes)
+    out({"type": "assistant", "message": {"content": [{"type": "text", "text": reply}]}})
+    out({"type": "result", "total_cost_usd": 0.0, "num_turns": 1, "session_id": sid})
+    return 0
+
+
+# A FeatureDesign whose features take a moment each, so its stages stream out one by one while it builds; the third
+# (a fillet wider than the part) fails and is left out with its diagnosis, and the fourth still builds.
+STAGED = '''"""A block built in stages, for the streaming journey."""
+import time
+
+from build123d import Axis, Box, Cylinder, Pos, fillet
+from form.featureprog import FeatureDesign, feature
+from form.recipes.base import Param
+
+
+class Design(FeatureDesign):
+    title = "Staged block"
+    params = [Param("w", "Width", 60, 30, 90, 1, "mm", "form", "body")]
+
+    @feature("Body")
+    def body(self, v, body):
+        time.sleep(PAUSE)
+        return Box(v["w"], v["w"] * 0.6, 12)
+
+    @feature("Bore", role="interface")
+    def bore(self, v, body):
+        time.sleep(PAUSE)
+        return body - Cylinder(7, 40)
+
+    @feature("Rounded top")
+    def rounded_top(self, v, body):
+        time.sleep(PAUSE)
+        return fillet(body.edges().group_by(Axis.Z)[-1], radius=40)
+
+    @feature("Tower")
+    def tower(self, v, body):
+        time.sleep(PAUSE)
+        return body + Pos(v["w"] * 0.3, 0, 16) * Box(14, 14, 22)
+'''
+
+
+def stages(data: Path, message: str, sid: str) -> int:
+    """"stages": create_design through Form Studio's real MCP tool (in this process, with this conversation's
+    $FORM_CONVERSATION), with STAGED: every stage is written as a draft and logged while it builds (form/studio.py
+    _draft_sink), so the app can draw it before the project is saved. "pause N" sets the seconds per feature."""
+    import asyncio
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    os.environ["FORM_DATA"] = str(data)
+    from form import mcp_server
+    first = message.splitlines()[0]
+    m = re.search(r"\bpause ([0-9.]+)\b", first)
+    src = STAGED.replace("PAUSE", m.group(1) if m else "1.2")
+    srv = mcp_server.build()
+    args = {"name": "Staged block", "source": src, "run": False, "purpose": "model"}
+    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t20", "name": "mcp__form__create_design",
+                                                       "input": {k: v for k, v in args.items() if k != "source"}}]}})
+
+    async def run():
+        try:
+            res = await srv.call_tool("create_design", args)
+            text = "".join(getattr(c, "text", "") for c in res.content if getattr(c, "type", "") == "text")
+            return text, bool(getattr(res, "is_error", False) or getattr(res, "isError", False))
+        except Exception as e:
+            return str(e), True
+    try:
+        text, err = asyncio.run(run())
+    finally:
+        try:
+            mcp_server.studio().kernel.stop()
+        except Exception:
+            pass
+    out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t20", "is_error": err,
+                                                  "content": [{"type": "text", "text": text}]}]}})
+    hit = re.search(r'"(?:project|id)"\s*:\s*"([A-Za-z0-9_-]+)"', text)
+    reply = "You said: " + first + "\n\nProject: " + (hit.group(1) if hit and not err else "none")
     out({"type": "assistant", "message": {"content": [{"type": "text", "text": reply}]}})
     out({"type": "result", "total_cost_usd": 0.0, "num_turns": 1, "session_id": sid})
     return 0

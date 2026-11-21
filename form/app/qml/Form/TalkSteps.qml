@@ -86,6 +86,13 @@ Column {
             }
             Txt { visible: !!st.r && !st.r.ok && !!st.r.text; x: 38; width: parent.width - 38; kind: "fine"; color: Theme.strong(Theme.signal)
                 text: st.r && st.r.text ? st.r.text : ""; maximumLineCount: sg.expanded ? 8 : 2; elide: Text.ElideRight }
+            // features a partial build left out for now (form/chat.py left_out): one calm line each, with the reason
+            // the build measured; the design itself was saved
+            Repeater { model: st.r && st.r.left_out ? st.r.left_out : []
+                Row { required property var modelData; objectName: "leftOut"; x: 38; width: st.width - 38; spacing: 6
+                    Icon { name: "circle_dashed"; size: 12; color: Theme.ink3; y: 2 }
+                    Txt { width: parent.width - 18; kind: "fine"; tone: 2; wrapMode: Text.WordWrap; maximumLineCount: sg.expanded ? 6 : 2; elide: Text.ElideRight
+                        text: "Left out for now: " + parent.modelData.feature + (parent.modelData.reason ? " · " + parent.modelData.reason : "") } } }
             // the picture the agent looked at
             Rectangle {
                 visible: !!st.r && !!st.r.img; x: 38; width: Math.min(parent.width - 38, 300)

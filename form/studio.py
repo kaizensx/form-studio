@@ -690,6 +690,7 @@ class Studio:
             try:
                 d.mkdir(parents=True, exist_ok=True)
                 body = {"draft": draft, "name": name, "ts": time.time(), "feature": ev["feature"], "index": ev["index"],
+                        "at": ev.get("at", ev["index"]), "of": ev.get("of", 0), "label": ev.get("label", ""),
                         "bbox": ev["bbox"], "mesh": [{"feature": ev["feature"], "positions": ev["positions"],
                                                      "indices": ev["indices"]}]}
                 tmp = f.with_suffix(".tmp")
@@ -698,7 +699,8 @@ class Studio:
             except OSError:
                 pass
             self.activity(None, "stage", f"Built {ev['feature']} (stage {ev['index']})" + (f" of {name}" if name else ""),
-                          by="engine", draft=draft, stage=ev["feature"], index=ev["index"], triangles=ev.get("triangles"))
+                          by="engine", draft=draft, stage=ev["feature"], index=ev["index"], at=ev.get("at", ev["index"]),
+                          of=ev.get("of", 0), label=ev.get("label", ""), triangles=ev.get("triangles"))
         return sink
 
     def draft(self, draft: str) -> dict | None:

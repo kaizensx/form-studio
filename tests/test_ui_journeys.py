@@ -87,6 +87,9 @@ class Journeys(unittest.TestCase):
     def test_viewport_calm(self):           # orbit, zoom, rebuilds and slider drags never blink; a build grows in by feature
         self.journey("viewport_calm.py")
 
+    def test_build_stages(self):            # an agent's build is drawn stage by stage before it is saved, then the saved design
+        self.journey("build_stages.py")
+
     def test_maker_tools(self):
         self.journey("maker_tools.py")
 

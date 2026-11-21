@@ -89,6 +89,7 @@ def _build(recipe_id: str, values: dict, tol: float):
     from .recipes.base import recording
     featureprog.begin()
     _LAST["stages"] = []
+    _LAST["features"] = [(getattr(f, "id", ""), getattr(f, "label", "") or "") for f in getattr(recipe, "features", None) or []]
     try:
         with recording(on_stage=_stage_out if PROGRESS is not None else None) as made:
             _LAST["stages"] = made                 # what was built before a failure (op_try_build keeps it)
@@ -216,7 +217,11 @@ def _stage_out(stage) -> None:
         m = _stage_mesh(stage.shape)
         if not m["triangles"]:
             return
-        PROGRESS({"kind": "stage", "feature": stage.feature, "index": len(_LAST["stages"]), **m})
+        feats = _LAST.get("features") or []
+        ids = [f for f, _ in feats]
+        at = ids.index(stage.feature) + 1 if stage.feature in ids else len(_LAST["stages"])
+        PROGRESS({"kind": "stage", "feature": stage.feature, "index": len(_LAST["stages"]), "at": at,
+                  "of": max(len(feats), at), "label": dict(feats).get(stage.feature) or "", **m})
     except Exception:
         pass
 

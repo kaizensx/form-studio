@@ -39,15 +39,19 @@ Item {
         return "Working…"
     }
 
-    Viewport { anchors.fill: parent; lite: false; interactive: true; showDims: false; showCompanions: false
-        Component.onCompleted: { setModel(null); setView("iso", false) } }
+    // the stages of the design as they build (Store.showStage), before it is saved
+    readonly property bool staged: !!Store.building && !Store.building.project
+    Viewport { id: dvp; objectName: "designingViewport"; anchors.fill: parent; lite: false; interactive: true; showDims: false; showCompanions: false
+        Component.onCompleted: { setModel(null); setView("iso", false); Store.stageViewer = dvp }
+        Component.onDestruction: if (Store.stageViewer === dvp) Store.stageViewer = null }
     Rectangle { anchors.fill: parent
         gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.plate, 0.15) } GradientStop { position: 0.7; color: Theme.alpha(Theme.plate, 0.05) } GradientStop { position: 1; color: Theme.alpha(Theme.plate, 0.55) } } }
 
     // the part that does not exist yet: a wireframe block assembling and dissolving, quietly, until the real one arrives
     Item {
         id: ghost; width: 220; height: 220; anchors.centerIn: parent; anchors.verticalCenterOffset: -30
-        visible: !dz.done && !dz.empty
+        visible: opacity > 0.01 && !dz.done && !dz.empty
+        opacity: dz.staged ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.move(260) } }
         Repeater { model: 12
             Rectangle { required property int index
                 readonly property var e: [[0,0,1,0],[1,0,1,1],[1,1,0,1],[0,1,0,0],[0,0,0.5,-0.35],[1,0,1.5,-0.35],[1,1,1.5,0.65],[0,1,0.5,0.65],[0.5,-0.35,1.5,-0.35],[1.5,-0.35,1.5,0.65],[1.5,0.65,0.5,0.65],[0.5,0.65,0.5,-0.35]][index]
@@ -63,7 +67,8 @@ Item {
 
     // what is happening, under the part
     Column {
-        objectName: "designingState"; visible: !dz.empty
+        objectName: "designingState"; visible: !dz.empty && opacity > 0.01
+        opacity: dz.staged ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.move(260) } }
         anchors.horizontalCenter: parent.horizontalCenter; anchors.top: ghost.bottom; anchors.topMargin: dz.done ? -120 : 8; spacing: 10; width: Math.min(parent.width - 80, 560)
         Txt { kind: "cap"; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter; objectName: "designingCaption"; text: dz.done ? "No design yet" : "Being designed" }
         Txt { objectName: "designingLine"; kind: "h2"; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width; text: dz.liveLine() }
@@ -85,6 +90,24 @@ Item {
             Btn { objectName: "designingHome"; icon: "arrow_left"; text: "Back to Home"; onClicked: Store.leaveDesigning() }
             Btn { kind: Store.convId !== "" && Store.chatReady ? "quiet" : "primary"; icon: "square_dashed"; text: "Start from a block"; tip: "A rounded block with its width, depth, height and corners as sliders, no agent needed"
                 onClicked: run(function () { return Store.startBlock("") }) } }
+    }
+
+    // a quiet caption while the stages arrive: "Building Rim (3 of 5)"
+    Rectangle {
+        id: stageCap; objectName: "stageCaption"; z: 6
+        readonly property string caption: Store.buildingText
+        anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 32
+        width: scr.implicitWidth + 28; height: 32; radius: 16; color: Theme.alpha(Theme.plate3, 0.94); border.color: Theme.alpha(Theme.datum, 0.45)
+        opacity: dz.staged ? 1 : 0; visible: opacity > 0.01
+        Behavior on opacity { NumberAnimation { duration: dz.staged ? Theme.fast : 420 } }
+        Row { id: scr; anchors.centerIn: parent; spacing: 9
+            Rectangle { width: 6; height: 6; radius: 3; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter
+                SequentialAnimation on opacity { running: stageCap.visible && !Theme.reduced; loops: Animation.Infinite
+                    NumberAnimation { to: 0.35; duration: 700 } NumberAnimation { to: 1; duration: 700 } } }
+            Txt { kind: "cap"; color: Theme.datum; text: "Building"; anchors.verticalCenter: parent.verticalCenter }
+            Txt { text: Store.building ? Store.building.label : ""; font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter }
+            Txt { visible: !!Store.building && Store.building.of > 1; kind: "fine"; mono: true; tone: 3; anchors.verticalCenter: parent.verticalCenter
+                text: Store.building ? Store.building.at + " of " + Store.building.of : "" } }
     }
 
     // the blank canvas: the empty studio floor and the ways to put something on it

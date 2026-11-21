@@ -124,6 +124,8 @@ Window {
         function enter(it) {
             var prev = stage.was; stage.was = Store.screen
             if (!it || prev === "boot") return
+            // the saved design taking over from the stages drawn while it built: the part stays where it is
+            if (Store.calmArrive) { Store.calmArrive = false; arrive.stop(); it.opacity = 1; it.scale = 1; return }
             var deeper = (stage.order[Store.screen] || 0) >= (stage.order[prev] || 0)
             arrive.target = it
             arriveScale.from = Theme.from(deeper ? 0.975 : 1.025)

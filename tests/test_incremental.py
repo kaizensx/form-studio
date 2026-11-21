@@ -133,6 +133,9 @@ class Incremental(unittest.TestCase):
         self.assertTrue(d["mesh"][0]["positions"])
         ev = [e for e in st.activity_since(0) if e.get("draft") == "d-third"]
         self.assertEqual([e["stage"] for e in ev], ["body", "bore"])         # once each: the partial build loads them
+        # where each stage is in the design, for the app's "Building Bore (2 of 3)"
+        self.assertEqual([(e["at"], e["of"], e["label"]) for e in ev], [(1, 3, "Body"), (2, 3, "Bore")])
+        self.assertEqual((d["at"], d["of"], d["label"]), (2, 3, "Bore"))
         fixed = THIRD_RAISES.replace('        raise ValueError("BRep_API: command not done")      # the band\'s boolean',
                                      '        stages.append(Stage("band", body + Pos(0, 0, 12) * Box(44, 44, 4)))\n'
                                      '        return stages')
@@ -169,6 +172,23 @@ class Incremental(unittest.TestCase):
         self.assertEqual(log, {"body": "checkpoint", "bore": "checkpoint", "band": "checkpoint", "lip": "built"})
         p = featureprog.remove_code_feature(st, st.load(p["id"]), "bore")
         self.assertEqual(featureprog.feature_ids(st.source_text(p)), ["body", "band", "lip"])
+
+    def test_2b_left_out_features_read_for_the_conversation(self):
+        """The conversation shows a feature a partial build left out as one line with the measured reason
+        (form/chat.py left_out), read from the design tool's result."""
+        import json
+        from form.chat import left_out
+        st = self.st
+        p = st.create_design("Left out", FEATURES, partial=True)
+        part = st.rev(p)["partial"]
+        rows = left_out(json.dumps({"id": p["id"], "partial": part}) + " [image]")
+        self.assertEqual([r["feature"] for r in rows], ["band"])
+        self.assertTrue(rows[0]["reason"])
+        self.assertLessEqual(len(rows[0]["reason"]), 240)
+        self.assertEqual(left_out(json.dumps({"partial": {"failed": "rim", "message": "the loft sections have 6 and 14 edges"}})),
+                         [{"feature": "rim", "reason": "the loft sections have 6 and 14 edges"}])
+        self.assertEqual(left_out(json.dumps({"id": p["id"], "head": 1})), [])
+        self.assertEqual(left_out("not json"), [])
 
     def test_3_transcript_failures_leave_a_visible_shell(self):
         st = self.st

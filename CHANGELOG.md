@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Watch the design being built.** While an agent creates or rewrites a design in a conversation, the 3D view draws
+  each stage the moment the kernel has built it, before anything is saved. Each new stage grows in over the one before
+  with the same fade and rise as a new revision, and a quiet caption says what is being built: "Building Bore (2 of
+  4)". When the design is saved it takes over in place, with no blink, no screen fade and no second build-up. If the
+  partial build dropped a stage, the saved design is what stays. A feature a partial build left out is one calm line
+  in the conversation, with the reason the build measured (for example, a 40 mm fillet on a 12 mm edge), not an
+  error. Each stage event and draft now also says where the stage is in the design (`at`, `of`) and its label.
+
 - **A failing feature no longer loses the design.** When an agent's `create_design` fails on one feature, the stages
   that built before it are saved as a partial revision and shown, instead of nothing being saved. The revision says
   which feature failed and why, and release stays blocked until that feature builds. `partial=False` keeps the old

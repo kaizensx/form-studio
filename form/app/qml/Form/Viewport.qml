@@ -100,6 +100,7 @@ Item {
     readonly property bool asmOn: !!asm && asmMode !== "print"
     onAsmModeChanged: { asmTween = true; _frame(); asmTweenOff.restart(); if (interactive && model && model.assembly) setView(Store.viewName, true) }
     onExplodeChanged: _frame()
+    function glideFrame() { asmTween = true; asmTweenOff.restart() }   // the next re-centring glides (a streamed stage that grew)
     Timer { id: asmTweenOff; interval: Motion.part + 60 + Motion.stagger * (vp.asm ? Math.min(6, vp.asm.parts.length) : 0); onTriggered: vp.asmTween = false }
     function jointOf(id) {
         var js = asm ? asm.joints : []
@@ -530,12 +531,20 @@ Item {
                     Model {
                         id: pmod
                         required property var modelData
+                        required property int index
                         readonly property string feature: modelData.feature || ""
                         readonly property string part: ""
                         // the build-up: 0 while held, eased to 1 when its step comes (it fades in and rises into place)
                         property real k: vp._hold.indexOf(feature) < 0 ? 1 : 0
                         Behavior on k { NumberAnimation { duration: vp.revealMs; easing.type: Easing.OutCubic } }
-                        opacity: k; z: -(1 - k) * vp.riseMm
+                        // a streamed stage (Store.showStage) grows in over the one before; that one is drawn a hair
+                        // smaller about the part's middle until it goes, so their shared faces never fight
+                        readonly property bool under: !!vp.model && !!vp.model.stage && index < vp._mesh.length - 1
+                        readonly property vector3d mid: { var b = vp.model ? vp.model.bbox : null
+                            return b ? Qt.vector3d((b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2, (b[0][2] + b[1][2]) / 2) : Qt.vector3d(0, 0, 0) }
+                        pivot: under ? mid : Qt.vector3d(0, 0, 0)
+                        scale: under ? Qt.vector3d(0.994, 0.994, 0.994) : Qt.vector3d(1, 1, 1)
+                        opacity: k; position: under ? mid : Qt.vector3d(0, 0, -(1 - k) * vp.riseMm)
                         pickable: !vp.mapShown && k > 0.5; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0 && k > 0.001
                         geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                         materials: CustomMaterial {

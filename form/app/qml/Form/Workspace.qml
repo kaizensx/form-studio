@@ -146,12 +146,13 @@ Item {
         property string label: ""
         property string sub: ""
         function step(ids, at, count) {
+            if (Store.building) return            // a streamed stage names itself (Store.buildingText)
             var names = ids.map(function (id) { var f = Store.featureById(id); return f && f.label ? f.label : id }).filter(function (n) { return !!n })
             label = names.length > 2 ? names.slice(0, 2).join(", ") + " and " + (names.length - 2) + " more" : names.join(", ")
             sub = count > 1 ? (at + 1) + " of " + count : ""
             flash.stop()
         }
-        function done() { sub = ""; flash.restart() }
+        function done() { if (Store.building) return; sub = ""; flash.restart() }
     }
     Timer { id: flash; interval: 1400; onTriggered: { build.label = ""; build.sub = "" } }
 
@@ -214,13 +215,17 @@ Item {
             id: buildCap; objectName: "buildCaption"; z: 6
             anchors.horizontalCenter: parent.horizontalCenter; y: 58
             width: bcr.implicitWidth + 28; height: 32; radius: 16; color: Theme.alpha(Theme.plate3, 0.94); border.color: Theme.alpha(Theme.datum, 0.45)
-            opacity: build.label ? 1 : 0; visible: opacity > 0.01
-            Behavior on opacity { NumberAnimation { duration: build.label ? Theme.fast : 420 } }
+            // a stage streamed while the agent rewrites the design: "Building Rim (3 of 5)"
+            readonly property var st: Store.building && Store.building.project === Store.pid ? Store.building : null
+            readonly property string caption: st ? Store.buildingText : build.label ? (build.sub ? "Building " : "Built ") + build.label + (build.sub ? " " + build.sub : "") : ""
+            opacity: build.label || st ? 1 : 0; visible: opacity > 0.01
+            Behavior on opacity { NumberAnimation { duration: build.label || buildCap.st ? Theme.fast : 420 } }
             Row { id: bcr; anchors.centerIn: parent; spacing: 9
                 Rectangle { width: 6; height: 6; radius: 3; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
-                Txt { kind: "cap"; color: Theme.datum; text: build.sub ? "Building" : "Built"; anchors.verticalCenter: parent.verticalCenter }
-                Txt { text: build.label; font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter }
-                Txt { visible: !!build.sub; kind: "fine"; mono: true; tone: 3; text: build.sub; anchors.verticalCenter: parent.verticalCenter } } }
+                Txt { kind: "cap"; color: Theme.datum; text: buildCap.st || build.sub ? "Building" : "Built"; anchors.verticalCenter: parent.verticalCenter }
+                Txt { text: buildCap.st ? buildCap.st.label : build.label; font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter }
+                Txt { visible: buildCap.st ? buildCap.st.of > 1 : !!build.sub; kind: "fine"; mono: true; tone: 3; anchors.verticalCenter: parent.verticalCenter
+                    text: buildCap.st ? buildCap.st.at + " of " + buildCap.st.of : build.sub } } }
 
         // what is under the pointer: appears at once, no delay
         Rectangle { id: chip; property var feat: null; visible: !!feat && !Store.layers; z: 5

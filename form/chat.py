@@ -939,6 +939,10 @@ class Chat:
                     ev["img"] = {"project": rel.parts[0], "file": rel.parts[3]}
             except (OSError, ValueError):
                 pass
+        if name in ("create_design", "update_design", "build_candidates") and ev.get("ok"):
+            left = left_out(full)                   # features a partial build left out: a calm line, not an error
+            if left:
+                ev["left_out"] = left
         if name == "propose_concepts" and ev.get("ok"):         # the app opens the concepts view for this group
             m = re.search(r'"id"\s*:\s*"([0-9a-f]{10})"', full)
             if m:
@@ -962,6 +966,32 @@ class Chat:
             if front and front != job.project:
                 ev["project"] = front
                 job.project = front
+
+
+def left_out(full: str) -> list:
+    """The features a design tool's result says it left out (a partial build, form/featureprog.py), each with the
+    reason the build measured: [{"feature", "reason"}]. Read from the result's JSON; [] when there is none."""
+    i = full.find("{")
+    if i < 0 or '"partial"' not in full:
+        return []
+    try:
+        d, _ = json.JSONDecoder().raw_decode(full[i:])
+    except ValueError:
+        return []
+    part = d.get("partial") if isinstance(d, dict) else None
+    if not isinstance(part, dict) and isinstance(d, dict) and isinstance(d.get("project"), dict):
+        part = d["project"].get("partial")
+    if not isinstance(part, dict):
+        return []
+
+    def why(x: dict) -> str:
+        diag = x.get("diagnosis") if isinstance(x.get("diagnosis"), dict) else {}
+        r = " ".join(str(diag.get("summary") or x.get("message") or "").split())
+        return r if len(r) <= 240 else r[:239].rstrip() + "\u2026"
+    rows = [{"feature": str(x.get("feature") or ""), "reason": why(x)} for x in part.get("skipped") or [] if isinstance(x, dict)]
+    if not rows and part.get("failed"):
+        rows = [{"feature": str(part["failed"]), "reason": why(part)}]
+    return [r for r in rows if r["feature"]][:8]
 
 
 # ---- command line: `form chat …`, `form conversations …` ----------------------------------------------------------

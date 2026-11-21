@@ -178,7 +178,7 @@ QtObject {
     function _labelFor(m, path) {
         var p = String(path).replace(/\?.*$/, ""), r = p.replace(/^\/projects\/[a-z0-9-]+/, "")
         var proj = p !== r
-        if (/\/(job|stamp)(\/|$)|^\/activity|^\/conversations|^\/chat|^\/setup\/(job|state|step|seen)|^\/install\/job|^\/claude\/login\/|^\/starters|^\/presets|^\/start$|^\/concepts|^\/whatsnew|^\/recipes\/builtin|^\/recipes\/(mine|pending)\/|\/photo$|\/thumb/.test(p)) return ""
+        if (/\/(job|stamp)(\/|$)|^\/activity|^\/drafts\/|^\/conversations|^\/chat|^\/setup\/(job|state|step|seen)|^\/install\/job|^\/claude\/login\/|^\/starters|^\/presets|^\/start$|^\/concepts|^\/whatsnew|^\/recipes\/builtin|^\/recipes\/(mine|pending)\/|\/photo$|\/thumb/.test(p)) return ""
         if (proj) {
             var t = { "": m === "GET" ? "Loading the design" : "", "/view": "Loading the geometry", "/analysis": "Computing the analysis map", "/orient": "Ranking print orientations",
                       "/layers": "Loading the sliced layers", "/toolpath": "Loading the toolpath", "/diff": "Comparing revisions", "/cost": "Estimating the cost",
@@ -285,7 +285,12 @@ QtObject {
     }
     function showHead() {
         if (!view || !viewer || scrub) return       // while a revision is being viewed from the timeline, leave it up
-        var grow = Date.now() - _buildNext < 15000          // a new build (see _buildNext): it grows in, feature by feature
+        // the saved design takes over from the streamed stage on screen (or from the Designing screen's): in place,
+        // at once; it is the same solid, or what the partial build kept when a stage was dropped
+        var handoff = _handoff && (!viewer.model || !!viewer.model.stage)
+        if (_handoff) { _handoff = false; building = null; _buildNext = handoff ? 0 : _buildNext }
+        if (!handoff && viewer.model && viewer.model.stage) building = null
+        var grow = !handoff && Date.now() - _buildNext < 15000          // a new build (see _buildNext): it grows in, feature by feature
         if (grow) _buildNext = 0
         viewer.setModel(view, grow ? "build" : "")
         viewer.setGhost(compare ? compare.view : null)
@@ -777,17 +782,98 @@ QtObject {
         }
     }
     property var _activity: Timer {
-        interval: 1200; repeat: true; running: s.screen !== "boot"
+        interval: s.chatBusy || s.building ? 400 : 1200; repeat: true; running: s.screen !== "boot"   // quicker while a build streams
         onTriggered: s.get("/activity?since=" + s.actTs).then(function (r) {
             for (var i = 0; i < r.events.length; i++) {
                 var ev = r.events[i]
                 s.actTs = Math.max(s.actTs, ev.ts)
                 if (ev.by === "you") continue
+                if (ev.draft) s._noteDraft(ev)
+                if (ev.kind === "stage") { if (ev.draft) s.onStage(ev); continue }    // drawn, not said in the chat
                 s.noteAct(ev)
                 s.follow(ev)
             }
         }, function () {})
     }
+
+    // ── a build streamed stage by stage (form/studio.py _draft_sink) ──
+    // While an agent creates or rewrites a design, every stage the kernel builds is written as a draft and named in
+    // the activity log (kind "stage", draft=<id>). The newest one is drawn as it arrives: it grows in over the one
+    // before with the build-up animation (Viewport: fade and rise), and the one before goes once it is in place, so
+    // the part never blinks. When the design is saved its head takes over in place (showHead, _handoff), the same
+    // solid, or the one the partial build kept if a stage was dropped: the saved design wins.
+    property var building: null        // the stage on screen: { draft, project, feature, label, at, of, index }
+    readonly property string buildingText: building ? "Building " + building.label + (building.of > 1 ? " (" + building.at + " of " + building.of + ")" : "") : ""
+    property var stageLog: []          // stages drawn: { draft, feature, at, of, t (ms) } (diagnostics, tests)
+    property var stageViewer: null     // the Designing screen's viewport (the workspace's is `viewer`)
+    property var _draftOf: ({})        // draft id -> the design it rewrites ("" for a new one), from its "design" event
+    property var _draftDone: ({})      // drafts whose build was saved: their stages are history
+    property bool _handoff: false      // the next head shown replaces a drawn stage, in place, with no build-up
+    property bool calmArrive: false    // the workspace takes over from a drawn stage: it arrives without a fade (Main.qml)
+    property bool _stageBusy: false
+    property string _stageAgain: ""
+    property real _framedDiag: 0
+    function _noteDraft(ev) {
+        if (ev.kind === "design") { var o = Object.assign({}, _draftOf); o[ev.draft] = ev.project || ""; _draftOf = o }
+        if (ev.kind === "commit") {
+            var dn = Object.assign({}, _draftDone); dn[ev.draft] = true; _draftDone = dn
+            if (building && building.draft === ev.draft) { _handoff = true; if (screen === "designing") calmArrive = true }
+        }
+    }
+    function _stageView() { return screen === "designing" ? stageViewer : screen === "work" ? viewer : null }
+    function onStage(ev) {
+        if (_draftDone[ev.draft]) return
+        var target = _draftOf[ev.draft] || ev.project || ""
+        if (screen === "designing") { if (target || ev.ts < designingSince - 1) return }      // this conversation's new design
+        else if (screen === "work") { if (!target || target !== pid || scrub || compare || (hasDraft && !draftAgent)) return }   // a rewrite of the open one
+        else return
+        if (_stageBusy) { _stageAgain = ev.draft; return }    // the draft file always holds the newest stage: fetch it once more
+        _stageBusy = true
+        var again = function () {
+            s._stageBusy = false
+            var d = s._stageAgain; s._stageAgain = ""
+            if (d) s.onStage({ draft: d, project: s._draftOf[d] || "", ts: Date.now() / 1000 })
+        }
+        get("/drafts/" + ev.draft).then(function (d) { s.showStage(d); again() }, again)
+    }
+    function _human(id) { var t = String(id || "").replace(/[_-]+/g, " ").trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : "" }
+    function showStage(d) {
+        var vp = _stageView()
+        if (!d || !d.mesh || !d.mesh.length || !vp || _draftDone[d.draft]) return
+        if (building && building.draft === d.draft && building.index >= d.index) return     // not newer than what is drawn
+        var old = vp.model
+        // what stays drawn under the new stage while it grows in: the stage before (its last piece), or the design
+        // that is being rewritten
+        var under = !old || !old.mesh ? [] : old.stage ? [old.mesh[old.mesh.length - 1]] : old.mesh
+        var piece = { feature: "stage:" + d.index + ":" + d.feature, part: "", positions: d.mesh[0].positions, indices: d.mesh[0].indices }
+        var first = !building || building.draft !== d.draft
+        building = { draft: d.draft, project: _draftOf[d.draft] || "", feature: d.feature, label: d.label || _human(d.feature),
+                     at: d.at || d.index, of: d.of || 0, index: d.index }
+        stageLog = stageLog.concat([{ draft: d.draft, feature: d.feature, at: building.at, of: building.of, t: Date.now() }]).slice(-40)
+        vp.glideFrame()
+        vp.setModel({ pid: old && old.pid ? old.pid : d.draft, rev: -1, stage: true, draft: d.draft, bbox: d.bbox, mesh: under.concat([piece]) }, "build")
+        if (vp === stageViewer) {                 // the Designing screen frames the part as it grows
+            var b = d.bbox, diag = Math.hypot(b[1][0] - b[0][0], b[1][1] - b[0][1], b[1][2] - b[0][2])
+            if (first || diag > _framedDiag * 1.12) { _framedDiag = diag; vp.setView("iso", !first) }
+        }
+        if (!vp.revealing) _stageSettle(vp)
+    }
+    function _stageSettle(vp) {                   // the new stage is in place: the one under it goes
+        var m = vp ? vp.model : null
+        if (!m || !m.stage || m.mesh.length < 2 || vp.revealing) return
+        vp.setModel(Object.assign({}, m, { mesh: [m.mesh[m.mesh.length - 1]] }))
+    }
+    function _stageClear() {                      // the agent stopped without saving it: the plate is empty again
+        building = null; _handoff = false; calmArrive = false; _framedDiag = 0
+        if (stageViewer && stageViewer.model && stageViewer.model.stage) stageViewer.setModel(null)
+    }
+    property var _stageEnd: Timer { interval: 3000; onTriggered: if (s.building && !s._handoff && !s.chatBusy) s._stageClear() }
+    property var _stageWatch: Connections { target: s
+        function onChatBusyChanged() { if (!s.chatBusy && s.building) s._stageEnd.restart() }
+        function onScreenChanged() { if (s.screen !== "designing" && s.screen !== "work") s._stageClear() }
+        function onPidChanged() { if (s.building && s.building.project && s.building.project !== s.pid) s.building = null } }
+    property var _stageDone1: Connections { target: s.stageViewer; ignoreUnknownSignals: true; function onRevealDone() { s._stageSettle(s.stageViewer) } }
+    property var _stageDone2: Connections { target: s.viewer; ignoreUnknownSignals: true; function onRevealDone() { s._stageSettle(s.viewer) } }
     readonly property var _viewMap: ({ iso: "iso", sheet: "iso", front: "front", back: "back", iso_back: "back", left: "side", right: "side", top: "top", bottom: "under" })
     function follow(ev) {
         if (ev.kind === "concepts") {                  // the agent proposed concepts, or one was picked
@@ -804,7 +890,7 @@ QtObject {
             var fresh = screen === "designing"
             // once the person has worked on the open design, an agent busy elsewhere is named, never jumped to
             if (!fresh && steered && screen === "work") { _noteElsewhere(ev); return }
-            if (fresh) _buildNext = Date.now()
+            if (fresh && !_handoff) _buildNext = Date.now()     // after a streamed build the saved design takes over in place
             reloadStudio().then(function () { open(ev.project, "follow").then(function () { if (fresh) buildTick++ }) })
             if (!fresh) toast("Following " + ev.by, ev.text)
             return

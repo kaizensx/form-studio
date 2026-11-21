@@ -1,0 +1,139 @@
+"""A design streams in while the agent builds it: each stage the kernel makes is drawn in the viewport before the
+project is saved, growing in over the one before with a quiet caption ("Building Bore (2 of 4)"), and when the
+project is saved its head takes over in place, with no blink, no screen fade and no second build-up. A feature the
+partial build left out is one calm line in the conversation with the reason the build measured.
+
+The stand-in agent (tests/fixtures/fake_agent.py, "stages") calls Form Studio's real create_design MCP tool with a
+FeatureDesign whose features take a second each; its third feature (a 40 mm fillet on a 12 mm body) fails and is
+left out. While it runs, the window is grabbed over and over and the clay pixels of the part counted in the free
+area of whichever viewport is on screen (the Designing screen's, then the workspace's)."""
+import time
+
+DATA = "fresh"
+CLEAR = (0x0e, 0x11, 0x13)          # Theme.plate: the View3D's clear colour
+S = {}
+
+
+def _viewport(ui):
+    for name in ("viewport", "designingViewport"):
+        v = ui.find(name=name)
+        if v is not None:
+            return name, v
+    return "", None
+
+
+def measure(ui):
+    """(viewport name, clay pixels on a 48x32 grid over its free area, clear-colour pixels in its middle 40%)"""
+    from PySide6.QtCore import QPointF
+    name, v = _viewport(ui)
+    if v is None:
+        return "", 0, 0
+    img = ui.win.grabWindow()
+    k = img.width() / max(1, ui.win.width())
+    p = v.mapToScene(QPointF(0, 0))
+    l, t = p.x() + float(v.property("insetLeft")), p.y() + float(v.property("insetTop"))
+    r, b = p.x() + v.width() - float(v.property("insetRight")), p.y() + v.height() - float(v.property("insetBottom"))
+    r, b = max(l + 40, r), max(t + 40, b)
+    clay = 0
+    for i in range(48):
+        for j in range(32):
+            c = img.pixelColor(int((l + (r - l) * (i + 0.5) / 48) * k), int((t + (b - t) * (j + 0.5) / 32) * k))
+            if min(c.red(), c.green(), c.blue()) > 110 and abs(c.red() - c.blue()) < 60:
+                clay += 1
+    cx, cy, w, h = (l + r) / 2, (t + b) / 2, (r - l) * 0.4, (b - t) * 0.4
+    clear = 0
+    for i in range(17):
+        for j in range(17):
+            c = img.pixelColor(int((cx - w / 2 + w * i / 16) * k), int((cy - h / 2 + h * j / 16) * k))
+            if max(abs(c.red() - CLEAR[0]), abs(c.green() - CLEAR[1]), abs(c.blue() - CLEAR[2])) <= 6:
+                clear += 1
+    return name, clay, clear
+
+
+STATE = """(function () { var v = Store.screen === 'designing' ? Store.stageViewer : Store.viewer, m = v ? v.model : null
+    return [Store.screen, Store.building ? Store.building.feature : '', Store.buildingText, Store.pid,
+            !!(m && m.stage), v ? v.revealing : false] })()"""
+
+
+HEAD = """(function () { if (!Store.view || !Store.viewer || !Store.viewer.model) return false
+    var a = Store.viewer._mesh, b = Store.view.mesh
+    return !Store.viewer.model.stage && Store.viewer.model.rev === Store.view.rev && a.length === b.length
+        && a.every(function (m, i) { return m.positions === b[i].positions && m.indices === b[i].indices }) })()"""
+
+
+def journey_stages_stream_then_the_saved_design(ui):
+    ui.wait_until(lambda: ui.store.get("screen") == "home" and ui.exists("startComposer"), 30, "Home and its composer")
+    ui.wait_until(lambda: ui.js("Store.chatReady"), 20, "the stand-in agent")
+    ui.settle(400)
+    ui.click("startText")
+    ui.wait_until(lambda: ui.item("startText").property("activeFocus"), 3, "the composer to take the keyboard")
+    ui.type("A block with a bore and a tower, built in stages pause 1.6")
+    ui.key("Return")
+    ui.wait_until(lambda: ui.store.get("screen") == "designing", 5, "the workspace to open in its being-designed state")
+    samples, shots, seen, t_end = [], [], {}, time.time() + 240
+    while time.time() < t_end:
+        st = ui.js(STATE)
+        vp, clay, clear = measure(ui)
+        now = time.time()
+        samples.append({"t": now, "screen": st[0], "stage": st[1], "caption": st[2], "pid": st[3], "staged": st[4],
+                        "revealing": st[5], "vp": vp, "clay": clay, "clear": clear})
+        if st[1] and st[1] not in seen:                 # a new stage arrived: a picture while it grows in, one when it sits
+            seen[st[1]] = now
+            shots.append(str(ui.shot(f"stages-{len(seen)}-{st[1]}-growing")))
+        for f, t0 in list(seen.items()):
+            if t0 and now - t0 > 0.7 and st[1] == f:
+                shots.append(str(ui.shot(f"stages-{list(seen).index(f) + 1}-{f}-in-place")))
+                seen[f] = 0
+        if st[0] == "work" and st[3] and not st[1] and not st[4] and not st[5] and ui.js(HEAD):
+            break
+        ui.wait(30)
+    else:
+        raise AssertionError(f"the saved design did not take over: {samples[-1]} "
+                             f"{ui.js('[!!Store.view, !!Store.viewer, Store.viewer && Store.viewer.model === Store.view, Store.viewer && Store.viewer.model && Store.viewer.model.rev, Store.view && Store.view.rev]')}")
+    ui.settle(600)
+    shots.append(str(ui.shot("stages-saved-design")))
+    pid = ui.store.get("pid")
+    ui.check(pid, "the saved design is open")
+    created = ui.api("/projects/" + pid)["project"]["created"]
+    log = ui.js("Store.stageLog")
+    before = [e for e in log if e["t"] / 1000 < created]
+    print(f"  stages drawn: {[(e['feature'], e['at'], e['of'], round(e['t'] / 1000 - created, 2)) for e in log]}", flush=True)
+    ui.check(len({e["feature"] for e in before}) >= 2, f"at least two stages were drawn before the project was saved: {log} (saved at {created})")
+    ui.check([e["feature"] for e in log] == sorted({e["feature"] for e in log}, key=["body", "bore", "tower"].index),
+             f"stages are drawn in build order, each once: {[e['feature'] for e in log]}")
+    ui.check(all(e["of"] == 4 for e in log), f"each stage knows how many features the design has: {log}")
+    captions = sorted({x["caption"] for x in samples if x["caption"]})
+    ui.check("Building Bore (2 of 4)" in captions or "Building Body (1 of 4)" in captions, f"a quiet caption names the stage: {captions}")
+    drawn = [x for x in samples if x["staged"] and x["screen"] == "designing"]
+    ui.check(drawn and max(x["clay"] for x in drawn) > 40, f"the stage is on screen before the design exists: {[x['clay'] for x in drawn][-5:]}")
+    # from the first stage drawn to the saved design: the part never blinks or vanishes, across the hand-over too
+    first = next(i for i, x in enumerate(samples) if x["staged"])
+    run = [x for x in samples[first:] if x["vp"]]
+    print(f"  {len(run)} frames from the first stage, clay {min(x['clay'] for x in run)}..{max(x['clay'] for x in run)}, "
+          f"screens {sorted({x['screen'] for x in run})}", flush=True)
+    for i, x in enumerate(run):
+        ui.check(x["clear"] <= 17 * 17 * 0.6, f"the middle of the view is never the clear colour (frame {i}: {x})")
+    for i in range(1, len(run) - 1):
+        a, x, b = run[i - 1]["clay"], run[i]["clay"], run[i + 1]["clay"]
+        ui.check(not (min(a, b) >= 20 and x < 0.4 * min(a, b)), f"no blink: clay pixels {a} -> {x} -> {b} at frame {i} ({run[i]['screen']})")
+    ui.check(min(x["clay"] for x in run[3:]) >= 12, f"the part never leaves the view: {[x['clay'] for x in run]}")
+    # the saved design took over in place: its own meshes, no stage left, no second build-up afterwards
+    ui.check(ui.js("(function () { var a = Store.viewer._mesh, b = Store.view.mesh; return a.length === b.length"
+                   " && a.every(function (m, i) { return m.positions === b[i].positions }) })()") is True, "the head model is drawn")
+    ui.check(ui.js("Store.viewer._hold.length === 0 && !Store.viewer.revealing && Store.building === null") is True,
+             "nothing is held or still building after the hand-over")
+    after = [x for x in samples if x["screen"] == "work"]
+    ui.check(not any(x["revealing"] for x in after), "the saved design is not grown in a second time")
+    ui.eq(ui.js("Store.view.mesh.map(function (m) { return m.feature }).filter(function (f, i, a) { return a.indexOf(f) === i })"),
+          ["body", "bore", "tower"], "the saved design has the features that built")
+    # the feature left out is a calm line in the conversation with the measured reason, not an error
+    tools = ui.js("Store.chatTools")
+    left = [r for r in tools.values() if r.get("left_out")]
+    ui.check(left and left[0]["left_out"][0]["feature"] == "rounded_top" and "40 mm" in left[0]["left_out"][0]["reason"]
+             and "12 mm" in left[0]["left_out"][0]["reason"], f"the result names what was left out and why: {left}")
+    ui.check(all(r.get("ok") for r in tools.values()), "no tool step failed")
+    ui.wait_until(lambda: ui.exists("leftOut"), 10, "the left-out line in the conversation")
+    ui.check(not any(e.get("t") == "error" for e in ui.js("Store.chatItems")), "no error in the conversation")
+    shots.append(str(ui.shot("stages-left-out-line")))
+    S["shots"] = shots
+    print("  screenshots: " + ", ".join(shots), flush=True)
