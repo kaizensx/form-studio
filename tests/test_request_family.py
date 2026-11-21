@@ -457,6 +457,7 @@ class Migration(unittest.TestCase):
         self.assertEqual(len(done[conv_mod.MIGRATION_KEY]["skipped"]), 4)
         self.assertIsNone(conv_mod.migrate_once(self.data))
         snap = {p: p.read_bytes() for p in self.data.rglob("*") if p.is_file() and ".backups" not in p.parts}
+        time.sleep(1.1)                                # a later second: a backup now would get a folder of its own
         again = self.s.migrate()
         self.assertEqual((again["drafts"], again["rebuilt"], again["families"]), ([], [], []))
         self.assertIsNone(again["backup"])

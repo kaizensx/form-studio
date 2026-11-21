@@ -740,7 +740,7 @@ class Conversations:
                     if _would_stamp(self.data, pid, pids[0]):
                         report["families"].append({"conversation": d.name, "project": pid, "root": pids[0]})
                     continue
-                if PID_RE.fullmatch(str(pid)):
+                if PID_RE.fullmatch(str(pid)) and _would_write(self.data, pid, pids[0]):
                     backup(self.data / pid / "project.json", f"projects/{pid}/project.json")
                 if stamp_request(self.data, pid, d.name, req, pids[0]):
                     report["families"].append({"conversation": d.name, "project": pid, "root": pids[0]})
@@ -1086,6 +1086,15 @@ def _would_stamp(data: Path, project: str, root_pid: str | None) -> bool:
     except (OSError, ValueError, TypeError):
         return False
     return bool(isinstance(p, dict) and root_pid and root_pid != project and not p.get("lineage"))
+
+
+def _would_write(data: Path, project: str, root_pid: str | None) -> bool:
+    """Would stamp_request change project.json at all (its origin or its family)? Then it is backed up first."""
+    try:
+        p = json.loads((Path(data) / project / "project.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return False
+    return bool(isinstance(p, dict) and (not p.get("origin") or _would_stamp(data, project, root_pid)))
 
 
 MIGRATION_KEY = "conversation_designs"
