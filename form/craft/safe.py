@@ -3,9 +3,10 @@ and records which one worked (form.craft.notes()), so a design builds instead of
 done", and the person can see what was given up.
 
     from form import craft
-    body = craft.safe_union(base, boss, rib)              # fuse, fuzzy fuse, repaired operands, a touching gap closed
-    body = craft.safe_cut(body, pocket)                   # cut, fuzzy cut, repaired operands, nudged tool; checks that
-                                                          # material really went (a cut that removes nothing is a failure)
+    body = craft.safe_union(base, boss, rib)              # the boolean engine (form.craft.boolean): verified fuse, then
+                                                          # the measured cause's rewrites; a gap under 0.05 mm closed
+    body = craft.safe_cut(body, pocket)                   # the same for a cut; checks that material really went (a cut
+                                                          # that removes nothing, or too little, is a failure)
     skin = craft.safe_loft([s0, s1, s2])                  # smooth loft, re-seamed and resampled sections, ruled, pairwise
     body = craft.safe_fillet(body, edges, 2.0)            # 75 %, 50 %, 25 %, then edge by edge
     body = craft.safe_chamfer(body, edges, 1.0)
@@ -83,37 +84,21 @@ def _gap(a, b) -> float:
 # ---- booleans ------------------------------------------------------------------------------------------------------
 
 def safe_union(*shapes, bridge: float = BRIDGE, expect: int | None = None):
-    """Fuse shapes into one body. Tries per added shape: the plain fuse, fuzzy fuses (1e-4, 1e-3 mm), the same with
-    both operands repaired (ShapeFix), and, when the shapes are apart by less than `bridge` mm, a fuzzy fuse at that
-    gap (noted with the gap). expect: the solid count the result should have (default: the first shape's count, so
-    every added shape must join it). A shape that stays separate after every try raises a RecipeError with the gap."""
+    """Fuse shapes into one body through the boolean engine (form.craft.boolean), one added shape at a time: the plain
+    fuse, verified; when it fails, the cause is measured (overlap, gap, coincident faces, operand validity) and only
+    that cause's rewrites are tried (repaired operands, closed faces split, fuzzy at the measured gap or deviation, a
+    tool grown past a coincident face, glued faces). A gap under `bridge` mm is closed and noted with its size.
+    expect: the solid count the result should have (default: the first shape's count, so every added shape must join
+    it). A shape that stays separate raises a RecipeError with what was measured (it is 3 mm apart, it touches...)."""
+    from .boolean import run
     parts = [s for s in shapes if s is not None]
     if len(parts) == 1 and isinstance(parts[0], (list, tuple)):
         parts = list(parts[0])
     need(len(parts) >= 1, "safe_union needs at least one shape", "Pass the shapes to fuse.", ["shapes"])
     body = parts[0]
     for k, other in enumerate(parts[1:], 1):
-        lim = max(1, len(body.solids()))             # the added shape must join the body, not sit beside it
-        good = lambda r, lim=lim: ok(r) and len(r.solids()) <= lim
-        tries = [("fuse", lambda: body + other),
-                 ("fuzzy fuse 1e-4", lambda: _bool(body, other, "fuse", 1e-4)),
-                 ("fuzzy fuse 1e-3", lambda: _bool(body, other, "fuse", 1e-3)),
-                 ("fuse of repaired shapes", lambda: repair(body) + repair(other)),
-                 ("fuzzy fuse of repaired shapes", lambda: _bool(repair(body), repair(other), "fuse", 1e-3))]
-        g = _gap(body, other)
-        if 0 < g <= bridge:
-            tries.append((f"fuzzy fuse closing a {g:.3g} mm gap", lambda g=g: _bool(body, other, "fuse", g * 1.5 + 1e-4)))
-        try:
-            body = attempt("safe_union", tries, "", ["shapes"], good)
-            if g > 0 and g <= bridge:
-                note(f"safe_union: shape {k + 1} was {g:.3g} mm from the body; the gap was closed")
-        except Exception:
-            if g > bridge and g < math.inf:
-                raise fail(f"safe_union: shape {k + 1} does not reach the body ({g:.3g} mm apart)",
-                           "Move it into the body so they overlap by 0.2 mm or more.", ["shapes"])
-            raise fail(f"safe_union: shape {k + 1} could not be fused (plain, fuzzy and repaired fuses all failed)",
-                       "Overlap the shapes by 0.2 mm or more instead of letting faces just touch, and check each is "
-                       "a valid solid (craft.inspect).", ["shapes"])
+        body = run(body, other, "fuse", max_solids=max(1, len(body.solids())), bridge=bridge,
+                   what=f"safe_union: shape {k + 1}", names=("the body", f"shape {k + 1}"), params=["shapes"])
     if expect is not None and len(body.solids()) != expect:
         raise fail(f"safe_union: the result is {len(body.solids())} solids, not {expect}",
                    "A shape does not reach the body: overlap it by 0.2 mm or more.", ["shapes"])
@@ -121,41 +106,23 @@ def safe_union(*shapes, bridge: float = BRIDGE, expect: int | None = None):
 
 
 def safe_cut(body, *tools, min_solids: int = 1, must_remove: bool = True):
-    """body minus each tool. Tries: the plain cut, fuzzy cuts (1e-4, 1e-3 mm), the cut with both shapes repaired, and
-    the tool nudged by a few hundredths of a mm (noted). A cut whose tool overlaps the body but removes no material
-    (OCCT sometimes returns the body unchanged) counts as a failure unless must_remove=False."""
-    from build123d import Pos
+    """body minus each tool through the boolean engine (form.craft.boolean): the plain cut, verified, then the
+    measured cause's rewrites (repaired operands, seams split, fuzzy at the measured deviation, the tool grown past a
+    face it grazes). A cut whose tool overlaps the body but removes nothing (OCCT sometimes returns the body
+    unchanged) counts as a failure unless must_remove=False."""
+    from .boolean import run
     need(bool(tools), "safe_cut needs a tool", "Pass the shape to cut away.", ["tools"])
-    for tool in tools:
-        v0 = float(body.volume)
-        overlaps = _gap(body, tool) <= 1e-9
-
-        def good(r, v0=v0, overlaps=overlaps):
-            if not (ok(r) and len(r.solids()) >= min_solids):
-                return False
-            return not (must_remove and overlaps and float(r.volume) >= v0 - 1e-6 and _inside_volume(body, tool) > 1e-3)
-        tries = [("cut", lambda: body - tool), ("fuzzy cut 1e-4", lambda: _bool(body, tool, "cut", 1e-4)),
-                 ("fuzzy cut 1e-3", lambda: _bool(body, tool, "cut", 1e-3)),
-                 ("cut of repaired shapes", lambda: repair(body) - repair(tool)),
-                 ("nudged cut", lambda: body - Pos(0.013, 0.007, 0.011) * tool),
-                 ("nudged fuzzy cut", lambda: _bool(body, Pos(-0.011, 0.013, -0.007) * tool, "cut", 1e-3))]
-        body = attempt("safe_cut", tries, "The tool grazes a face of the body or runs along a seam: make it cross the "
-                       "face clearly (0.2 mm past it), or move it off a loft seam.", ["tools"], good)
+    for k, tool in enumerate(tools, 1):
+        body = run(body, tool, "cut", min_solids=min_solids, must_remove=must_remove,
+                   what="safe_cut" if len(tools) == 1 else f"safe_cut: tool {k}", names=("the body", "the tool"),
+                   params=["tools"])
     return body
 
 
-def _inside_volume(body, tool) -> float:
-    try:
-        return float((body & tool).volume)
-    except Exception:
-        return 1.0
-
-
 def safe_intersect(a, b):
-    """The common part of a and b, with fuzzy and repaired fallbacks."""
-    tries = [("intersect", lambda: a & b), ("fuzzy intersect 1e-3", lambda: _bool(a, b, "common", 1e-3)),
-             ("intersect of repaired shapes", lambda: repair(a) & repair(b))]
-    return attempt("safe_intersect", tries, "The shapes do not overlap, or one is not a valid solid.", ["a", "b"])
+    """The common part of a and b through the boolean engine (verified, measured rewrites)."""
+    from .boolean import run
+    return run(a, b, "common", what="safe_intersect", names=("a", "b"), params=["a", "b"])
 
 
 # ---- fillets and chamfers --------------------------------------------------------------------------------------------

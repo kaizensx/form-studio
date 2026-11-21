@@ -87,6 +87,17 @@
   never executed, as sketch extrusions, placed and snapped onto the mesh, and accepted only through the same verify
   and comparison gates as every other candidate. Not installed, nothing changes.
 
+- **One boolean engine, measured.** `craft.fuse`, `craft.cut`, `craft.safe_union`, `craft.safe_cut` and
+  `craft.safe_intersect` now share one path, `form.craft.boolean`, instead of two blind ladders. The plain boolean
+  runs first and is checked: a valid solid, the allowed solid count, a volume the operation can give, and, when it
+  looks like a silent failure (a cut that removed almost nothing), a mesh check (manifold3d) that catches the
+  valid-looking wrong result. When it fails, the engine measures overlap, gap, coincident faces and operand validity,
+  names one cause (coincident faces, a grazing tool, parts that touch, an invalid operand, a gap...), tries only the
+  repairs for that cause within 25 s, and says what it measured, with a hint for that cause. Two halves that touch
+  fail at once with "keep them as separate parts" instead of four blind retries. It no longer tells you parts do not
+  overlap when they do. The repairs run on pristine copies, because a failed OCCT boolean raises its operands'
+  tolerances in place, which left the body broken for every later try (most of the old "invalid result" ladders).
+  A mesh result is only returned when asked for, and is labelled.
 - **Make editable makes it editable.** A mesh is now read the way it was modelled: sketches of lines, arcs and rounded
   corners extruded and lofted between levels, with every coordinate, level, radius and diameter a Param (pooled,
   snapped to round numbers and standard hole sizes, mirrored about the centre, each saying where it came from). What

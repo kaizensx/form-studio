@@ -157,3 +157,80 @@ class F9(_Base):
 
 ALL = {"F1": F1, "F2": F2, "F3": F3, "F4": F4, "F5": F5, "F6": F6, "F7": F7, "F8": F8, "F9": F9}
 REPAIRABLE = ("F1", "F2", "F3", "F4", "F6", "F7", "F8", "F9")
+
+
+# ---- boolean failures of the owner's helmet conversation (d244f7900cc0) ---------------------------------------------
+# The conversation saved no sources; each pair rebuilds the recorded call's situation on a small lofted dome shell
+# (80 x 60 x 40 mm, 2 mm wall). tests/test_boolean_engine.py runs them through form.craft.boolean.
+#
+#   H1 line 99/105  craft.fuse(body, craft.surface_band(...))   a band on the same offset surface as a band already
+#                                                                fused, meeting it edge to edge   -> coincident_faces
+#   H2 line 127     craft.fuse(back, face, min_solids=2, max_solids=2)   two halves touching at the split plane
+#                                                                                                 -> parts_touch
+#   H3 line 99      craft.cut(body, cut)   a tool whose face runs 0.0005 mm outside the shell's skin -> grazing
+#                   (OCCT returns the shell unchanged and valid: a silent wrong result the oracle must catch)
+#   H4              an operand that is not a valid solid (an open shell: a box with its top face missing)
+#                                                                                                 -> invalid_operand
+
+_H: dict = {}
+
+
+def _fresh(shape):
+    """A deep copy: a plain boolean raises its operands' tolerances in place, so every pair gets its own shell."""
+    from form.craft.boolean import _copy
+    return _copy(shape)
+
+
+def helmet_shell():
+    """(sections, tip, outer, shell): the dome and its 2 mm shell, built once per process."""
+    if not _H:
+        secs, tip = craft.dome_sections(80, 60, 40, levels=6)
+        outer = craft.section_body(secs, tip=tip)
+        inner = craft.inset_body(secs, 2.0, tip=tip)
+        _H.update(secs=secs, tip=tip, outer=outer, shell=outer - inner)
+    return _H["secs"], _H["tip"], _H["outer"], _H["shell"]
+
+
+def coincident_band():
+    """H1: (body, band). body = shell + a 1 mm band; band = a second 1 mm band (the same offset surface) whose region
+    meets the first one edge to edge, its root sunk 1 mm into the wall (so the two do overlap)."""
+    if "h1" not in _H:
+        secs, tip, _o, shell = helmet_shell()
+        b1 = craft.surface_band(secs, tip, 1.0, Pos(0, 0, 30) * Box(20, 20, 30), depth=1.0)
+        b2 = craft.surface_band(secs, tip, 1.0, Pos(20, 0, 30) * Box(20, 20, 30), depth=1.0)
+        _H["h1"] = (_fresh(shell) + b1, b2)
+    return _H["h1"]
+
+
+def touching_halves():
+    """H2: (back, face): the shell split at x = 0 into two halves that touch over the split plane."""
+    if "h2" not in _H:
+        _s, _t, _o, shell = helmet_shell()
+        _H["h2"] = (_fresh(shell) & Pos(-50, 0, 0) * Box(100, 200, 200), _fresh(shell) & Pos(50, 0, 0) * Box(100, 200, 200))
+    return _H["h2"]
+
+
+def grazing_cut():
+    """H3: (shell, tool): the dome grown by 0.0005 mm, clipped to a 30 mm box at the crown; it should take a 30 mm
+    patch out of the wall."""
+    if "h3" not in _H:
+        secs, tip, _o, shell = helmet_shell()
+        _H["h3"] = (_fresh(shell), craft.offset_body(secs, tip, 0.0005) & Pos(0, 0, 30) * Box(30, 30, 30))
+    return _H["h3"]
+
+
+def invalid_operand():
+    """H4: (body, tool): body is a box with its top face missing made into a solid (not valid: an open shell)."""
+    from build123d import Shell, Solid
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
+    from OCP.TopoDS import TopoDS
+    box = Box(20, 20, 20)
+    ms = BRepBuilderAPI_MakeSolid()
+    ms.Add(TopoDS.Shell(Shell(box.faces()[:-1]).wrapped))
+    return Solid(ms.Solid()), Cylinder(3, 40)
+
+
+BOOLEAN = {"H1": ("fuse", coincident_band, {}, "coincident_faces"),
+           "H2": ("fuse", touching_halves, {"min_solids": 2, "max_solids": 2}, "parts_touch"),
+           "H3": ("cut", grazing_cut, {}, "grazing"),
+           "H4": ("cut", invalid_operand, {}, "invalid_operand")}

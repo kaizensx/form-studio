@@ -42,9 +42,12 @@ _SAFE = {
     "loft": "craft.safe_loft(sections)  (re-seams and resamples the sections, then ruled, then section by section)",
     "sweep": "craft.sweep_spline(profile, path_points)  (Frenet and right-corner fallbacks)",
     "shell": "craft.safe_shell(solid, thickness, openings)  (arc, intersection, then thinner walls, noted)",
-    "fuse": "craft.safe_union(a, b, ...)  (fuzzy booleans, shape repair, a 0.05 mm overlap where parts only touch)",
-    "cut": "craft.safe_cut(body, tool)  (fuzzy booleans, shape repair, a nudged tool)",
-    "intersect": "craft.safe_intersect(a, b)",
+    "fuse": "craft.safe_union(a, b, ...) or craft.fuse(body, part)  (the boolean engine: measures overlap, gap and "
+            "coincident faces, tries only the rewrites for that cause; a mesh check catches a fuse that silently adds nothing)",
+    "cut": "craft.safe_cut(body, tool) or craft.cut(body, tool)  (the boolean engine: measures grazing and coincident "
+           "faces and operand validity, tries only the rewrites for that cause; a mesh check catches a cut that silently "
+           "removes nothing)",
+    "intersect": "craft.safe_intersect(a, b)  (the boolean engine)",
     "revolve": "craft.revolve_profile(points)  (closes the profile along the axis)",
 }
 
@@ -78,16 +81,18 @@ _CAUSES = {
               ["Use a thinner wall, or round the body's tight corners first.",
                "Hollow a lofted body by lofting inset sections (craft.section_shell / craft.inset_body) instead of "
                "offsetting the solid.", "Use craft.safe_shell, which tries an intersection offset and thinner walls."]),
-    "fuse": ("the parts do not overlap: they only touch along a face or an edge, or one is not a valid solid, so "
-             "OCCT cannot merge them into one body",
-             ["Sink the added part into the body by 0.2 mm or more instead of letting faces just touch.",
-              "Check each part is a valid solid before fusing (shape.is_valid); fix the one that is not first.",
-              "Use craft.safe_union, which tries fuzzy booleans, repairs the shapes, and closes a touching gap."]),
+    "fuse": ("OCCT could not merge the parts into one body: they only touch along a face or an edge, they share "
+             "coincident faces, they do not reach each other, or one is not a valid solid (the measured facts say "
+             "which)",
+             ["Make the added part overlap the body by 0.2 mm or more, with its own surface where they meet (not "
+              "the same face, not just touching).",
+              "Check each part is a valid solid before fusing (craft.inspect); fix the one that is not first.",
+              "Use craft.fuse / craft.safe_union: the boolean engine measures the cause and tries only its rewrites."]),
     "cut": ("the cutting tool grazes a face of the body (coincident or tangent faces), cuts along a loft seam, or "
-            "one of the shapes is not a valid solid",
+            "one of the shapes is not a valid solid (the measured facts say which)",
             ["Make the tool cross the face clearly (0.2 mm past it), not end exactly on it.",
              "Move the cut off a loft seam or a tangent face.",
-             "Use craft.safe_cut, which tries fuzzy booleans, repairs the shapes and nudges the tool."]),
+             "Use craft.cut / craft.safe_cut: the boolean engine measures the cause and tries only its rewrites."]),
     "intersect": ("the shapes do not overlap, or one is not a valid solid",
                   ["Check the shapes overlap where you expect (print their bounding boxes).",
                    "Use craft.safe_intersect."]),
@@ -481,6 +486,11 @@ def diagnose(exc: BaseException, recipe=None) -> dict:
             facts.append(f"{o['name']} holds no solid (an earlier boolean returned nothing)")
     if rel and rel.get("note"):
         facts.append(rel["note"])
+    measured = (_boolean_facts(tb, code, op) if (tb is not None and op in ("fuse", "cut", "intersect")
+                                                 and not getattr(exc, "report", None)) else None)
+    if measured:
+        facts.append(measured["fact"])
+        fixes.insert(0, measured["hint"])
     if op == "loft" and tb is not None:
         f = _loft_sections(tb, code)
         if f:
@@ -522,7 +532,25 @@ def diagnose(exc: BaseException, recipe=None) -> dict:
          "line": line, "code": code[:200], "cause": (cause + (f"; the kernel says {kw}" if kw else "")).strip("; "),
          "facts": facts, "fixes": _dedupe(fixes)[:5], "safe": _SAFE.get(op, ""), "operands": operands[:6],
          "kernel_text": text[:400], "evidence": "heuristic"}
+    if measured:
+        d["boolean"] = {"class": measured["class"], "facts": measured["facts"], "evidence": "computed"}
     return d
+
+
+def _boolean_facts(tb, code: str, op: str) -> dict | None:
+    """The boolean engine's pre-flight on the first two solids the failing line names (form.craft.boolean.diagnose):
+    measured overlap, gap, coincident faces and validity, and the class they point to. None when it cannot run."""
+    try:
+        loc = tb.tb_frame.f_locals
+        names = [n for n in dict.fromkeys(re.findall(r"\b([A-Za-z_]\w*)\b", code)) if _is_shape(loc.get(n))]
+        shapes = [(n, loc[n]) for n in names if loc[n].solids()][:2]
+        if len(shapes) < 2:
+            return None
+        from .craft import boolean
+        return boolean.diagnose(shapes[0][1], shapes[1][1], {"intersect": "common"}.get(op, op),
+                                names=(shapes[0][0], shapes[1][0]), seconds=4.0)
+    except Exception:
+        return None
 
 
 def _dedupe(xs):
@@ -621,6 +649,15 @@ def wrap(e, recipe):
     if getattr(e, "diagnosis", None):
         return e
     d = diagnose(e, recipe)
+    rep = getattr(e, "report", None)
+    if rep:                                           # a BooleanError from form.craft.boolean: its measured facts lead
+        from .craft import boolean
+        d["operation"] = {"common": "intersect"}.get(rep.get("op"), rep.get("op") or d.get("operation"))
+        d["boolean"] = {**boolean._public_report(rep), "evidence": "computed"}
+        d["facts"] = _dedupe(boolean.report_facts(rep) + list(d.get("facts") or []))
+        if e.hint:
+            d["fixes"] = _dedupe([e.hint] + list(d.get("fixes") or []))[:5]
+        d["safe"] = _SAFE.get(d["operation"], d.get("safe", ""))
     msg = str(e)
     if d.get("line") and "line " not in msg:
         msg += f" (line {d['line']}: {d['code'][:120]})"
