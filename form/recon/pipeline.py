@@ -419,7 +419,7 @@ def _offer_cadfit(prog, ctx):
     """The optional CADFit candidate (cadfit/): off unless [recon] cadfit = true; its own time slice and child process."""
     from . import cadfit
     return cadfit.offer(prog, ctx["V"], ctx["F"], ctx["tol"], ctx["name"], ctx["say"], ctx["budget_s"], ctx["rep"],
-                        ctx["better"])
+                        ctx["better"], left_s=_left(ctx["hard"], ctx["fin"]))
 
 
 # Candidates beside the program route, in order: each gets the best so far and returns it or its own verified, better

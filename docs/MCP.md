@@ -1108,7 +1108,9 @@ real build. params: which (default every Param in mm, at most 8). The result is 
 provenance "mesh", only if the mean distance drops and the largest does not grow; otherwise nothing changes
 (kept: false), so it never makes the deviation worse. commit=false reports the fitted values without saving.
 It cannot add a missing feature: use reference_residual for what is missing or extra, then this for sizes,
-then compare_to_reference for the tolerance. Evidence: computed on the design's tessellation.
+then compare_to_reference for the tolerance. budget_s (default 120, 1 to 3600): the whole fit's time; when
+it is up the best values found so far are used (stopped says why it ended). Evidence: computed on the
+design's tessellation.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1120,6 +1122,7 @@ then compare_to_reference for the tolerance. Evidence: computed on the design's 
 | `commit` | boolean |  |
 | `expect_head` | integer \| null |  |
 | `max_builds` | integer |  |
+| `budget_s` | number |  |
 
 ### `freecad_macro`
 

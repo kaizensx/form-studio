@@ -159,6 +159,7 @@ class FeatureDesign(Recipe):
 
 FEATURE_BUDGET = float(os.environ.get("FORM_FEATURE_BUDGET") or 90.0)   # seconds per feature on a quiet machine
 GRACE = 10.0          # form/worker.py stops the kernel this long past a feature's budget (a hang in OCCT's C++)
+HANG_TTL = 24 * 3600.0   # a hang mark expires after a day (and with any new Form build: hang_path follows build_id)
 STRETCH = 1.0         # set per kernel call (form/worker.py): budgets stretch with the call's timeout under load
 
 
@@ -213,6 +214,31 @@ class _Reads(dict):
     def copy(self):
         self._all = True
         return dict.copy(self)
+
+    # every other way to look at the values reads them all (conservative: a checkpoint may rebuild, never go stale)
+    def setdefault(self, k, default=None):
+        self._read.add(k)
+        return super().setdefault(k, default)
+
+    def pop(self, k, *default):
+        self._read.add(k)
+        return super().pop(k, *default)
+
+    def _whole(name):                                        # noqa: N805 (builds methods below)
+        base = getattr(dict, name)
+
+        def m(self, *a, **kw):
+            self._all = True
+            return base(self, *a, **kw)
+        m.__name__ = name
+        return m
+
+    for _n in ("popitem", "update", "__or__", "__ror__", "__ior__", "__eq__", "__ne__", "__repr__", "__str__",
+               "__len__", "__reversed__", "__reduce__", "__reduce_ex__", "__format__", "__getstate__"):
+        if hasattr(dict, _n):
+            locals()[_n] = _whole(_n)
+    del _n, _whole
+    __hash__ = None
 
     def used(self) -> set:
         return {"*"} if self._all else set(self._read)
@@ -334,16 +360,22 @@ def _skip_put(key: str, diag: dict) -> None:
         _jwrite(d / f"{key}.skip.json", diag)
 
 
-def _lookup(idx: str, v: dict, skips: bool = True):
+def _skip_key(key: str, count) -> str:
+    """A skipped feature's record also follows the part count it was checked against (declared `solids`, the count
+    expected after it, the parts it adds): raising `solids` must build a feature that failed only on the count."""
+    return _h(key, "skip/2", count)
+
+
+def _lookup(idx: str, v: dict, skips: bool = True, count=None):
     """(key, "body", shape) or (key, "skip", diagnosis) of a feature built before with the same code, upstream and
-    values it read; None when it must be built."""
+    values it read (a skip also with the same part count); None when it must be built."""
     for used in _deps_get(idx):
         key = _key(idx, v, used)
         got = checkpoint_get(key)
         if got is not None:
             return key, "body", got
         if skips:
-            sk = _skip_get(key)
+            sk = _skip_get(_skip_key(key, count))
             if sk is not None:
                 return key, "skip", sk
     return None
@@ -354,6 +386,12 @@ def hang_path(idx: str, v: dict):
     stop the kernel), so the next build leaves it out at once instead of waiting for it again."""
     d = _dir()
     return d / f"{_h('hang/1', idx, v)}.hung.json" if d else None
+
+
+def _hang_live(info: dict) -> bool:
+    """A hang mark counts for HANG_TTL seconds: a busy machine, since quieter, may well build the feature now."""
+    ts = info.get("ts") if isinstance(info, dict) else None
+    return isinstance(ts, (int, float)) and time.time() - float(ts) <= HANG_TTL
 
 
 def _timeout_diag(fid: str, info: dict) -> dict:
@@ -411,7 +449,8 @@ def _build_features(self, v: dict) -> list[Stage]:
         _emit({"kind": "feature_start", "feature": fid, "i": i, "of": len(steps), "budget": round(budget, 1),
                "hang_file": str(hang) if hang else ""})
         t0 = time.perf_counter()
-        hit = _lookup(idx, v, skips=i > 0)
+        count = (declared, want if counted else None, adds)
+        hit = _lookup(idx, v, skips=i > 0, count=count)
         diag = None
         status = "built"
         if hit is not None and hit[1] == "body":
@@ -422,6 +461,12 @@ def _build_features(self, v: dict) -> list[Stage]:
                 diag = {**hit[2], "cached": True}
             else:
                 old = _jread(hang) if hang else None
+                if old and not _hang_live(old):
+                    old = None
+                    try:
+                        Path(hang).unlink(missing_ok=True)
+                    except OSError:
+                        pass
                 if old:
                     diag = _timeout_diag(fid, {**old, "again": True})
             if diag is None:
@@ -469,7 +514,7 @@ def _build_features(self, v: dict) -> list[Stage]:
                     diag = _timeout_diag(fid, err[1])
                 else:
                     diag = _diagnosis(err[1], self, fid)
-                    _skip_put(key, diag)
+                    _skip_put(_skip_key(key, count), diag)
                     _deps_add(idx, used)
             if diag is not None:
                 if i == 0:
@@ -658,14 +703,41 @@ def _binds(n) -> list | None:
     return out
 
 
+def _is_self(x) -> bool:
+    """self, cls, type(self) or self.__class__: an expression whose attributes are the design class's members."""
+    if isinstance(x, ast.Name):
+        return x.id in ("self", "cls")
+    if isinstance(x, ast.Call) and isinstance(x.func, ast.Name) and x.func.id == "type" and len(x.args) == 1:
+        return _is_self(x.args[0])
+    if isinstance(x, ast.Attribute) and x.attr == "__class__":
+        return _is_self(x.value)
+    return False
+
+
 def _refs(n) -> tuple[set, set]:
-    """(names, self.<attributes>) a statement reads."""
+    """(names, members of the class) a statement reads. Members are read through self, cls, type(self) or
+    self.__class__, or by getattr with a constant name; any other use of self (passed to a function, getattr with a
+    computed name, vars(self)) may read any member: "*"."""
     names, attrs = set(), set()
+    owned = set()                                     # self Names whose attribute is read (accounted for)
+    for x in ast.walk(n):
+        if isinstance(x, ast.Attribute) and _is_self(x.value):
+            attrs.add(x.attr)
+            for y in ast.walk(x.value):
+                owned.add(id(y))
+        elif isinstance(x, ast.Call) and isinstance(x.func, ast.Name) and x.func.id in ("getattr", "hasattr") \
+                and x.args and _is_self(x.args[0]):
+            if len(x.args) > 1 and isinstance(x.args[1], ast.Constant) and isinstance(x.args[1].value, str):
+                attrs.add(x.args[1].value)
+            else:
+                attrs.add("*")
+            for y in ast.walk(x.args[0]):
+                owned.add(id(y))
     for x in ast.walk(n):
         if isinstance(x, ast.Name):
             names.add(x.id)
-        elif isinstance(x, ast.Attribute) and isinstance(x.value, ast.Name) and x.value.id == "self":
-            attrs.add(x.attr)
+            if x.id in ("self", "cls") and id(x) not in owned and isinstance(x.ctx, ast.Load):
+                attrs.add("*")
     return names, attrs
 
 
@@ -713,6 +785,25 @@ def feature_codes(cls) -> dict:
             continue
         for nm in _binds(n) or []:
             mem.setdefault(nm, []).append(n)
+    # bases defined in this file (mixins): their members are the class's members too, read through self
+    todo = [b for b in c.bases]
+    seen_bases: set = set()
+    while todo:
+        b = _base_name(todo.pop())
+        if not b or b in seen_bases:
+            continue
+        seen_bases.add(b)
+        for bn in mod.get(b, []):
+            if not isinstance(bn, ast.ClassDef):
+                continue
+            todo += list(bn.bases)
+            for n in bn.body:
+                if isinstance(n, ast.Expr) and isinstance(n.value, ast.Constant):
+                    continue
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and _is_feature(n):
+                    continue
+                for nm in _binds(n) or []:
+                    mem.setdefault(nm, []).insert(0, n)     # the subclass's own definition stays last
     lines = clean.splitlines()
     base = "\n".join(seg(n) for n in always)
     for fid, nodes in feats.items():
@@ -728,6 +819,8 @@ def feature_codes(cls) -> dict:
             nxt = [x for nm in names for x in mod.get(nm, [])]
             if cls.__name__ in names:                 # the class by name: everything it holds may matter
                 nxt += [x for xs in mem.values() for x in xs]
+            if "*" in attrs:                         # self used in a way that may read any member
+                nxt += [x for xs in mem.values() for x in xs] + [x for xs in feats.values() for x in xs]
             for at in attrs:
                 at = "setup" if at == "ctx" else at
                 nxt += mem.get(at, []) + feats.get(at, [])
@@ -816,7 +909,51 @@ def _context_fingerprint() -> str:
         out.append(kernel_id())
     except Exception:
         pass
+    out.append(build_id())
     return _h(out)
+
+
+CRAFT_REV = 1        # bump on any change to how form/craft or this module builds a solid (a fix must reach old checkpoints)
+_BUILD_ID = None
+
+
+def build_id() -> str:
+    """This Form build: its version, CRAFT_REV and a hash of the code that shapes solids (form/craft and this module).
+    A checkpoint, skip record or hang mark made by another build is never reused, so a fix in a new app version
+    reaches designs that were checkpointed before it."""
+    global _BUILD_ID
+    if _BUILD_ID is not None:
+        return _BUILD_ID
+    try:
+        from . import __version__ as ver
+    except Exception:
+        ver = "?"
+    h = hashlib.sha1()
+    import importlib.util
+    import marshal
+    pkg = __package__ or "form"
+    names = [f"{pkg}.featureprog"]
+    try:
+        import pkgutil
+        from . import craft
+        names += sorted(f"{pkg}.craft.{m.name}" for m in pkgutil.iter_modules(craft.__path__))
+        names.append(f"{pkg}.craft")
+    except Exception:
+        pass
+    for n in names:
+        h.update(n.encode())
+        try:
+            spec = importlib.util.find_spec(n)
+            origin = getattr(spec, "origin", None) if spec else None
+            if origin and os.path.isfile(origin) and origin.endswith(".py"):
+                h.update(Path(origin).read_bytes())
+            elif spec is not None and spec.loader is not None and hasattr(spec.loader, "get_code"):
+                code = spec.loader.get_code(n)                    # a frozen app: no sources, the compiled code
+                h.update(marshal.dumps(code) if code is not None else b"")
+        except Exception:
+            h.update(b"?")
+    _BUILD_ID = f"{ver}/{CRAFT_REV}/{h.hexdigest()[:12]}"
+    return _BUILD_ID
 
 
 def checkpoint_get(key: str):
@@ -888,14 +1025,36 @@ def checkpoint_put(key: str, shape) -> None:
             (d / f"{key}.json").write_text(json.dumps({"type": type(shape).__name__, "ts": time.time(),
                                                        **_names(shape)}, default=str), encoding="utf-8")
             os.replace(tmp, d / f"{key}.bin")
-        files = list(d.glob("*.bin"))
-        if len(files) > DISK_MAX:
-            files.sort(key=lambda x: x.stat().st_mtime)
-            for old in files[:len(files) - DISK_MAX]:
-                old.unlink(missing_ok=True)
-                old.with_suffix(".json").unlink(missing_ok=True)
+        prune(d)
     except Exception:
         pass
+
+
+def prune(d: Path | None = None) -> None:
+    """Keep the checkpoint folder bounded: at most DISK_MAX checkpoints (*.bin with its *.json, oldest go first) and
+    at most DISK_MAX of each record kept next to them (*.skip.json, *.hung.json, *.deps.json); expired hang marks go
+    at once."""
+    d = d or _dir()
+    if d is None or not d.is_dir():
+        return
+
+    def mtime(x):
+        try:
+            return x.stat().st_mtime
+        except OSError:
+            return 0.0
+    files = sorted(d.glob("*.bin"), key=mtime)
+    for old in files[:max(0, len(files) - DISK_MAX)]:
+        old.unlink(missing_ok=True)
+        old.with_suffix(".json").unlink(missing_ok=True)
+    now = time.time()
+    for pat in ("*.skip.json", "*.hung.json", "*.deps.json"):
+        recs = sorted(d.glob(pat), key=mtime)
+        for i, old in enumerate(recs):
+            if i < len(recs) - DISK_MAX:
+                old.unlink(missing_ok=True)
+            elif pat == "*.hung.json" and now - mtime(old) > HANG_TTL:
+                old.unlink(missing_ok=True)
 
 
 def _remember(key, shape):

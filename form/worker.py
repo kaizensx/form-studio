@@ -116,8 +116,12 @@ class Kernel:
                         if running is not None:
                             hang = {"feature": running.get("feature", ""), "s": round(now - running["t"], 1),
                                     "budget": running.get("budget"), "i": running.get("i"), "kind": "kill"}
+                        feature_hung = hang is not None and fdead is not None and fdead <= now
+                        if feature_hung:
+                            # only a feature past its own budget and grace hung; a whole call that ran out of time
+                            # while an innocent feature was mid-way says nothing about that feature
                             _mark_hang(running, hang)
-                        if hang is not None and fdead is not None and fdead <= end:
+                        if feature_hung:
                             self._kill(f"{op}: feature {hang['feature']} ran {hang['s']:g} s, past its "
                                        f"{hang['budget']} s budget")
                             msg = (f"Feature {hang['feature']} did not finish: the geometry kernel was stopped after "

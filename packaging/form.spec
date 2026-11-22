@@ -27,7 +27,12 @@ for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfi
         datas += d; binaries += b; hidden += h
     except Exception:
         pass
-hidden += collect_submodules("form")
+# CADFit (form/recon/cadfit, CC BY-NC 4.0, opt-in) does not ship its search in the app: its vendored code and trimesh,
+# which only that code imports, stay out. The hook and its LICENSE / PERMISSION.md ship; in the app CADFit reports that
+# it needs form-studio[cadfit] (run from source). scipy and scikit-learn stay: the engine and build123d import them.
+CADFIT_ONLY = ("form.recon.cadfit.vendor", "form.recon.cadfit.driver", "form.recon.cadfit.cqrun",
+               "form.recon.cadfit._compat")
+hidden += [m for m in collect_submodules("form") if not m.startswith(CADFIT_ONLY)]
 datas += collect_data_files("form", include_py_files=False)
 # exemplar designs are read as source text by design_examples, so they ship as files too
 datas += [(str(p), "form/exemplars") for p in (ROOT / "form" / "exemplars").glob("*.py") if not p.name.startswith("_")]
@@ -40,7 +45,8 @@ EXCLUDE = ["PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtW
            "PySide6.QtWebSockets", "PySide6.QtWebChannel", "PySide6.QtRemoteObjects", "PySide6.QtScxml", "PySide6.QtSql", "PySide6.QtTest",
            "PySide6.QtDesigner", "PySide6.QtHelp", "PySide6.Qt3DCore", "PySide6.Qt3DRender", "PySide6.Qt3DInput", "PySide6.Qt3DExtras",
            "PySide6.QtQuick3DPhysics", "PySide6.QtSpatialAudio", "PySide6.QtTextToSpeech", "PySide6.QtHttpServer", "PySide6.QtStateMachine",
-           "tkinter", "pytest"]      # build123d imports IPython at load: keep it
+           "tkinter", "pytest",      # build123d imports IPython at load: keep it
+           "trimesh", *CADFIT_ONLY]  # only CADFit's opt-in search imports these (see CADFIT_ONLY above)
 
 a = Analysis([str(ROOT / "packaging" / "entry.py")], pathex=[str(ROOT)], binaries=binaries, datas=datas,
              hiddenimports=hidden, excludes=EXCLUDE, noarchive=False)

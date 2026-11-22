@@ -1516,20 +1516,35 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def fit_params(project: str, reference: str, params: list[str] | None = None, part: str | None = None,
                          max_change: float = 2.0, commit: bool = True, expect_head: int | None = None,
-                         max_builds: int = 60, ctx: Context = None) -> dict:
+                         max_builds: int = 60, budget_s: float = 120.0, ctx: Context = None) -> dict:
         """Tune the design's declared Params so it lies closer to an imported mesh: bounded least squares over those
         Params only (each inside its own min and max and at most max_change mm from its value), every evaluation a
         real build. params: which (default every Param in mm, at most 8). The result is kept, as a new revision with
         provenance "mesh", only if the mean distance drops and the largest does not grow; otherwise nothing changes
         (kept: false), so it never makes the deviation worse. commit=false reports the fitted values without saving.
         It cannot add a missing feature: use reference_residual for what is missing or extra, then this for sizes,
-        then compare_to_reference for the tolerance. Evidence: computed on the design's tessellation."""
+        then compare_to_reference for the tolerance. budget_s (default 120, 1 to 3600): the whole fit's time; when
+        it is up the best values found so far are used (stopped says why it ended). Evidence: computed on the
+        design's tessellation."""
         st = studio()
         from .remodel import fitparams as fp
         if not (1 <= int(max_builds) <= 200):
             raise ToolError("max_builds: between 1 and 200.")
+        if not (1 <= float(budget_s) <= 3600):
+            raise ToolError("budget_s: between 1 and 3600 seconds.")
+        said = [0.0]
+
+        def progress(d):
+            if time.time() - said[0] >= 3.0:            # the activity log: a line at most every 3 s
+                said[0] = time.time()
+                st.activity(project, "look", d["text"][:300], by="engine", fraction=d.get("fraction"))
+            if ctx is not None:
+                try:
+                    anyio.from_thread.run(ctx.report_progress, float(d.get("fraction", 0)), 1.0, d["text"])
+                except Exception:
+                    pass
         out = await _run(lambda: fp.fit_design(st, st.load(project), reference, params, part, max_change, commit,
-                                               expect_head, int(max_builds)))
+                                               expect_head, int(max_builds), float(budget_s), progress))
         act(project, "commit" if out.get("committed") else "look",
             f"Fitted {', '.join(out['params'])} to {out['reference']}" if out.get("committed")
             else f"Fitting the Params to {out['reference']}: no gain, nothing changed", ctx)

@@ -60,6 +60,25 @@ def _runner_hangs(conn, stl, work, seconds):                   # pragma: no cove
     time.sleep(120)
 
 
+def _in_daemon(conn, left_s):                                  # pragma: no cover - runs in a daemon child
+    """What the kernel worker does: a daemon process that runs the real CADFit candidate (its own child included)."""
+    from form.recon import cadfit
+    V, F = _mesh("filleted_block")
+    t = time.perf_counter()
+    c = cadfit.candidate((V, F), 240, tol=0.02, name="part", left_s=left_s)
+    conn.send({**c["report"], "_took": round(time.perf_counter() - t, 2)})
+
+
+def np_zeros():
+    import numpy as np
+    return np.zeros((3, 3))
+
+
+def np_tri():
+    import numpy as np
+    return np.array([[0, 1, 2]])
+
+
 class ScriptReader(unittest.TestCase):
     def test_reads_and_builds_the_subset(self):
         from form.recon.cadfit import cqrun
@@ -205,6 +224,45 @@ class Deadline(unittest.TestCase):
         r = cadfit._search(V, F, 6.0)
         self.assertLess(time.perf_counter() - t, 15.0)
         self.assertIn("seconds", r)
+
+    def test_runs_from_a_daemon_worker_within_the_hard_deadline(self):
+        """The real child path, started from a daemon process as the kernel worker is (no mock of the start): it
+        runs instead of failing with multiprocessing's "daemonic processes are not allowed to have children", and
+        its slice never exceeds the time left before the reconstruction's hard deadline."""
+        import multiprocessing as mp
+        from form.recon import cadfit
+        if not cadfit.status()["installed"]:
+            self.skipTest("CADFit's libraries are not installed")
+        ctx = mp.get_context("spawn")
+        for left in (4.0, 1.0):
+            a, b = ctx.Pipe(duplex=False)
+            p = ctx.Process(target=_in_daemon, args=(b, left), daemon=True)
+            p.start()
+            b.close()
+            self.assertTrue(a.poll(120), "the daemon worker did not answer")
+            rep = a.recv()
+            p.join(10)
+            self.assertNotIn("AssertionError", str(rep.get("error")), rep)
+            self.assertNotIn("did not run", str(rep.get("error")), rep)
+            self.assertLessEqual(rep["seconds_allowed"], left)
+            if left >= cadfit.MIN_RUN_S:
+                self.assertIsNotNone(rep.get("search_seconds"), rep)        # the child ran
+                self.assertLess(rep["search_seconds"], left + 3.0)
+            else:
+                self.assertIn("was not started", rep["error"])
+                self.assertIsNone(rep.get("search_seconds"))
+            print(f"\nCADFit from a daemon worker, {left:g} s left: {rep.get('search_seconds')} s searching, "
+                  f"{rep['_took']} s in all; {str(rep.get('error'))[:120]}")
+
+    def test_without_its_code_it_says_what_it_needs(self):
+        from form.recon import cadfit
+        with mock.patch.object(cadfit, "_bundled", return_value=False):
+            st = cadfit.status()
+            self.assertFalse(st["installed"])
+            self.assertEqual(st["needs"], "form-studio[cadfit]")
+            c = cadfit.candidate((np_zeros(), np_tri()), 240)
+        self.assertFalse(c["verified"])
+        self.assertIn("form-studio[cadfit]", c["report"]["error"])
 
     def test_slice_of_the_budget(self):
         from form.recon import cadfit

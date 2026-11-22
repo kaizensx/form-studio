@@ -68,6 +68,69 @@ class PackagedData(unittest.TestCase):
         finally:
             shutil.rmtree(bundle, ignore_errors=True)
 
+    def test_cadfit_search_stays_out_of_the_app(self):
+        """CADFit's opt-in search (CC BY-NC 4.0 vendored code) and trimesh, which only it imports, are not packaged;
+        its hook, LICENSE and PERMISSION.md are. scipy and scikit-learn stay: the engine and build123d need them."""
+        import sys
+        import types
+        spec_file = ROOT / "packaging" / "form.spec"
+        mods = ["form", "form.recon.cadfit", "form.recon.cadfit.vendor", "form.recon.cadfit.vendor.iou",
+                "form.recon.cadfit.driver", "form.recon.cadfit.cqrun", "form.recon.cadfit._compat", "form.recon.pipeline"]
+        hooks = types.ModuleType("PyInstaller.utils.hooks")
+        hooks.collect_all = lambda pkg: ([], [], [])
+        hooks.collect_data_files = lambda pkg, include_py_files=False: []
+        hooks.collect_submodules = lambda pkg: list(mods)
+        stub = {"PyInstaller": types.ModuleType("PyInstaller"), "PyInstaller.utils": types.ModuleType("PyInstaller.utils"),
+                "PyInstaller.utils.hooks": hooks}
+        got = {}
+
+        def Analysis(*a, **k):
+            got.update(k)
+            return types.SimpleNamespace(pure=[], scripts=[], binaries=[], datas=[])
+        ns = {"SPECPATH": str(spec_file.parent), "Analysis": Analysis, "PYZ": lambda *a, **k: None,
+              "EXE": lambda *a, **k: None, "COLLECT": lambda *a, **k: None, "BUNDLE": lambda *a, **k: None,
+              "__file__": str(spec_file)}
+        saved = {k: sys.modules.get(k) for k in stub}
+        sys.modules.update(stub)
+        try:
+            exec(compile(spec_file.read_text(encoding="utf-8"), str(spec_file), "exec"), ns)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    sys.modules.pop(k, None)
+                else:
+                    sys.modules[k] = v
+        hidden, excl = got["hiddenimports"], got["excludes"]
+        self.assertIn("form.recon.cadfit", hidden)
+        self.assertIn("form.recon.pipeline", hidden)
+        for m in ("form.recon.cadfit.vendor", "form.recon.cadfit.vendor.iou", "form.recon.cadfit.driver",
+                  "form.recon.cadfit.cqrun", "form.recon.cadfit._compat"):
+            self.assertNotIn(m, hidden)
+        for m in ("trimesh", "form.recon.cadfit.vendor", "form.recon.cadfit.driver"):
+            self.assertIn(m, excl)
+        for m in ("scipy", "sklearn"):
+            self.assertNotIn(m, excl)
+        # trimesh is imported by CADFit's vendored code only; scikit-learn by build123d itself
+        import re
+        users = sorted(str(p.relative_to(ROOT)) for p in (ROOT / "form").rglob("*.py")
+                       if re.search(r"^\s*(import trimesh|from trimesh)", p.read_text(encoding="utf-8"), re.M))
+        self.assertTrue(users and all(u.startswith("form/recon/cadfit/vendor/") for u in users), users)
+        # the folder's licence files ship as data (collect_data_files keeps non-.py files)
+        import logging
+        root = logging.getLogger()
+        keep = (root.level, list(root.handlers))
+        try:
+            try:
+                from PyInstaller.utils.hooks import collect_data_files
+            except ImportError:
+                return
+            names = {Path(src).name for src, dest in collect_data_files("form", include_py_files=False)
+                     if dest == "form/recon/cadfit"}
+        finally:                                     # PyInstaller sets up logging on import: leave it as it was
+            root.setLevel(keep[0])
+            root.handlers[:] = keep[1]
+        self.assertTrue({"LICENSE", "PERMISSION.md"} <= names, names)
+
     def test_every_exemplar_loads_as_a_design_source(self):
         """An agent pastes an exemplar into create_design: it must pass the same checks a design source gets (one
         Recipe, params that name real features), not only build when imported directly."""
