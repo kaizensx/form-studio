@@ -754,7 +754,11 @@ def _rewrites(cls: str, f: dict, a, b, op: str, bridge: float):
         out += [("fuzzy 1e-4 on the operands as they are", lambda: occt(a, b, op, 1e-4))]
         return out
     if cls == "touching":
-        out += [("fuzzy 1e-4", lambda: occt(a, b, op, 1e-4)), ("glued faces", lambda: occt(a, b, op, glue="full"))]
+        # two parts that must join meet at a face with no overlap: fuzzy and glue first, then grow the tool a few
+        # hundredths of a millimetre into the body (what the old ladder's nudge did; noted with the amount)
+        out += [("fuzzy 1e-4", lambda: occt(a, b, op, 1e-4)), ("glued faces", lambda: occt(a, b, op, glue="full")),
+                ("tool grown 0.02 mm so it overlaps the face it touches", lambda: _plain(a, grow(b, 0.02)[0], op)),
+                ("tool grown 0.05 mm so it overlaps the face it touches", lambda: _plain(a, grow(b, 0.05)[0], op))]
         return out
     d = min(0.05, max(0.01, 4 * (dev or 0.0) + 0.005))      # mm a tool moves past a face it coincides with
     fz = min(0.01, max(1e-5, 3 * dev)) if dev else 1e-4
