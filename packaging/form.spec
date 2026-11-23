@@ -27,11 +27,22 @@ for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfi
         datas += d; binaries += b; hidden += h
     except Exception:
         pass
-# CADFit (form/recon/cadfit, CC BY-NC 4.0, opt-in) does not ship its search in the app: its vendored code and trimesh,
-# which only that code imports, stay out. The hook and its LICENSE / PERMISSION.md ship; in the app CADFit reports that
-# it needs form-studio[cadfit] (run from source). scipy and scikit-learn stay: the engine and build123d import them.
-CADFIT_ONLY = ("form.recon.cadfit.vendor", "form.recon.cadfit.driver", "form.recon.cadfit.cqrun",
-               "form.recon.cadfit._compat")
+# Optional engines with libraries the app does not carry (CAD-Recode: PyTorch; CADFit: trimesh and friends) run in an
+# environment of their own that Settings > Software makes (form/engines.py), out of the app's process. That interpreter
+# imports the engine's code from these files, shipped as plain source under engine_src/ (never on the app's own path).
+# CADFit (form/recon/cadfit, CC BY-NC 4.0, included with its author's permission) ships whole, LICENSE and
+# PERMISSION.md included; no compiled file.
+ENGINE_SRC = [(ROOT / "form" / "__init__.py", "engine_src/form"),
+              (ROOT / "form" / "recon" / "__init__.py", "engine_src/form/recon")]
+ENGINE_SRC += [(p, "engine_src/form/recon/learned") for p in sorted((ROOT / "form" / "recon" / "learned").glob("*.py"))]
+for sub in ("", "vendor"):
+    d = ROOT / "form" / "recon" / "cadfit" / sub
+    ENGINE_SRC += [(p, f"engine_src/form/recon/cadfit{'/' + sub if sub else ''}") for p in sorted(d.glob("*.py"))]
+ENGINE_SRC += [(ROOT / "form" / "recon" / "cadfit" / n, "engine_src/form/recon/cadfit") for n in ("LICENSE", "PERMISSION.md")]
+datas += [(str(p), dest) for p, dest in ENGINE_SRC]
+# Inside the app itself, CADFit's search code and trimesh (which only that code imports) stay out: the search runs in
+# its own environment. Its reader (cqrun) and _compat stay in: the app reads the program CADFit sends back.
+CADFIT_ONLY = ("form.recon.cadfit.vendor", "form.recon.cadfit.driver")
 hidden += [m for m in collect_submodules("form") if not m.startswith(CADFIT_ONLY)]
 datas += collect_data_files("form", include_py_files=False)
 # exemplar designs are read as source text by design_examples, so they ship as files too

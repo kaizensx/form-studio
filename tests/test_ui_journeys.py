@@ -287,6 +287,9 @@ class Journeys(unittest.TestCase):
         self.journey("install.py", env_extra={"FORM_INSTALL_FAKE": "3", "FORM_SETUP_PRETEND_MISSING": "parts,claude.signin",
                                               "FORM_NO_AUTO_SETUP": ""})
 
+    def test_software_engines(self):        # one Install per engine row; a non-commercial licence is confirmed first
+        self.journey("software_engines.py", env_extra={"FORM_INSTALL_MOCK_DOWNLOADS": "1"})
+
     def test_smallest_window(self):
         self.journey("sizes.py", size="1120x700")
 

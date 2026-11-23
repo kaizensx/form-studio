@@ -19,6 +19,13 @@ Development switches (screenshots and tests; they install nothing):
     FORM_INSTALL_FAKE=<seconds>         every install command is replaced by a harmless stand-in that prints
                                         a few lines for that long. The log says so on its first line.
     FORM_SETUP_PRETEND_MISSING=a,b      report these registry ids as not installed (e.g. claude,slicer.bambu)
+    FORM_INSTALL_MOCK_DOWNLOADS=1       downloads Form Studio makes itself (the CADEvolve corpus) are served from a
+                                        small local stand-in instead of the network; the result says so
+
+Optional engines that need Python libraries the packaged app does not carry (CAD-Recode, CADFit) are installed as an
+environment of their own (form/engines.py): a pinned uv, checked by SHA-256, makes <data>/.engines/<id> with Python
+3.12 and pinned libraries, and the engine runs out of process with that interpreter. A failed install leaves
+nothing behind.
 """
 from __future__ import annotations
 
@@ -50,7 +57,7 @@ GROUPS = [("engine", "Form Studio itself"), ("ai", "Claude Code"), ("agents", "O
 # group → the capability (form/capabilities.py) a registry item belongs to, unless it names its own
 CAPABILITY_OF_GROUP = {"engine": "core", "slicer": "print", "ai": "agent", "agents": "agent", "form": "core"}
 CAPABILITY_OF_ID = {"parts": "parts", "blender": "render", "freecad": "exchange", "openscad": "exchange",
-                    "recon.learned": "mesh", "exemplars.cadevolve": "core"}
+                    "recon.learned": "mesh", "recon.cadfit": "mesh", "exemplars.cadevolve": "core"}
 
 
 # ---- model --------------------------------------------------------------------------------------------------------
@@ -66,7 +73,8 @@ class Method:
     needs: tuple[str, ...] = ()                           # programs that must be on PATH for this method
     elevation: bool = False                               # needs sudo/admin: never run by FORM
     note: str = ""
-    action: Callable[[], str] | None = None               # kind "action": a file edit; returns what it did
+    action: Callable[..., str] | None = None              # kind "action": a file edit or a download; returns what it did
+    streams: bool = False                                 # the action takes the job's runner (say, run, cancelled)
     available: bool = True
     reason: str = ""
 
@@ -98,6 +106,8 @@ class Software:
     needs: tuple[str, ...] = () # registry ids that must be installed first
     capability: str = ""        # what it is for (form/capabilities.py: core, parts, render, exchange, print) or "agent"
     licence: str = ""           # shown before anything is downloaded when it is not Form Studio's own (e.g. model weights)
+    licence_url: str = ""
+    noncommercial: bool = False # the app asks for the licence to be accepted (one line, then Install) before downloading
 
     def __post_init__(self):
         if not self.capability:
@@ -360,17 +370,64 @@ def _d_learned(cfg, ctx) -> Found:
     return Found("missing", f"Optional. {'; '.join(what)}. Mesh to CAD works fully without it.", path=st["folder"])
 
 
+def _weights_dir(cfg: dict) -> Path:
+    from .recon import learned
+    if os.environ.get("FORM_CADRECODE_DIR"):
+        return learned.model_dir()
+    return Path(cfg["data"]["dir"]).expanduser() / "models" / "cad-recode"
+
+
+def _learned_engine(cfg: dict):
+    """Install CAD-Recode in the packaged app: its own Python with PyTorch (form/engines.py), then its weights, both
+    into temporary folders that are moved into place only when everything worked."""
+    def run(io) -> str:
+        from . import engines
+        from .recon import learned
+        weights = _weights_dir(cfg)
+        need_weights = bool(learned.status(weights).get("missing_weights"))
+        part = weights.with_name(weights.name + f".partial-{os.getpid()}")
+        shutil.rmtree(part, ignore_errors=True)
+
+        def fetch(py) -> Callable[[], None] | None:
+            if not need_weights:
+                return None
+            io.run([str(py), "-m", "form.recon.learned", "download", "--accept-licence", learned.LICENCE_ID,
+                    "--dir", str(part)], env=engines.child_env())
+
+            def commit():
+                if weights.exists():                    # an incomplete earlier download (no marker): replaced
+                    shutil.rmtree(weights)
+                part.rename(weights)
+            return commit
+        try:
+            have = engines.python(learned.ENGINE_ID, cfg)
+            if have is not None:                        # the environment is there; only the weights are missing
+                c = fetch(have)
+                if c:
+                    c()
+                return f"Weights of {learned.NAME} downloaded to {engines._tilde(weights)}"
+            return engines.build(learned.ENGINE_ID, cfg, io, extra=lambda tmp, py, io_: fetch(py))
+        except BaseException:
+            shutil.rmtree(part, ignore_errors=True)
+            raise
+    return run
+
+
 def _m_learned(platform, ctx) -> list[Method]:
     from .recon import learned
+    note = (f"Downloads {learned.SIZE}. Licence: {learned.LICENCE} ({learned.LICENCE_URL}); by installing you accept it. "
+            f"Model: huggingface.co/{learned.REPO}. Runs offline once downloaded.")
     if frozen():
-        return [Method("bundled", "Not available in the packaged app", kind="bundled",
-                       note="The learned engine needs PyTorch, which a packaged Form Studio cannot add to itself. "
-                            "Run Form Studio from source to use it.")]
+        from . import engines
+        cfg = ctx.get("cfg") or _cfg_default()
+        fetch = (f"python -m form.recon.learned download --accept-licence {learned.LICENCE_ID}   "
+                 f"({learned.WEIGHTS_BYTES / 1e9:.2f} GB from huggingface.co/{learned.REPO})")
+        return [Method("engine", "Its own Python, set up by Form Studio", kind="action", streams=True,
+                       commands=engines.commands(learned.ENGINE_ID, cfg, [fetch]), action=_learned_engine(cfg),
+                       note=note + " PyTorch runs in that environment, never inside the app.")]
     py = _q(sys.executable, platform)
     pins = " ".join(_q(x, platform) for x in learned.PIP)
     fetch = f"{py} -m form.recon.learned download --accept-licence {learned.LICENCE_ID}"
-    note = (f"Downloads {learned.SIZE}. Licence: {learned.LICENCE} ({learned.LICENCE_URL}); by installing you accept it. "
-            f"Model: huggingface.co/{learned.REPO}. Runs offline once downloaded.")
     return [Method("uv", "uv", commands=[f"uv pip install --python {py} {pins}", fetch], needs=("uv",), note=note),
             Method("pip", "pip", commands=[f"{py} -m pip install {pins}", fetch], needs=("#pip",), note=note)]
 
@@ -385,19 +442,152 @@ def _d_corpus(cfg, ctx) -> Found:
     return Found("missing", "Optional. Not downloaded. Design examples work fully without it.", path=st["folder"])
 
 
+def _corpus_dir(cfg: dict) -> Path:
+    from .exemplars import corpus
+    if os.environ.get("FORM_EXEMPLAR_CORPUS_DIR"):
+        return corpus.corpus_dir()
+    return Path(cfg["data"]["dir"]).expanduser() / "corpus" / "cadevolve"
+
+
+def _mock_corpus():
+    """FORM_INSTALL_MOCK_DOWNLOADS: a tiny tar shaped like the dataset's, served from memory (tests, screenshots)."""
+    import hashlib
+    import io as _io
+    import tarfile
+    body = json.dumps([{"name": "stand_in_box", "code": "import cadquery as cq\nresult = cq.Workplane().box(10, 10, 10)"}])
+    buf = _io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as t:
+        data = body.encode()
+        info = tarfile.TarInfo("cadevolve/CADEvolve-G/parametric_generators.json")
+        info.size = len(data)
+        t.addfile(info, _io.BytesIO(data))
+    raw = buf.getvalue()
+    return (lambda: _io.BytesIO(raw)), hashlib.sha256(raw).hexdigest()
+
+
+def _corpus_action(cfg: dict):
+    def run(io) -> str:
+        from .exemplars import corpus
+        dest = _corpus_dir(cfg)
+        part = dest.with_name(dest.name + f".partial-{os.getpid()}")
+        shutil.rmtree(part, ignore_errors=True)
+        mock = bool(os.environ.get("FORM_INSTALL_MOCK_DOWNLOADS"))
+        opener, sha = _mock_corpus() if mock else (None, corpus.TAR_SHA256)
+        if mock:
+            io.say("FORM_INSTALL_MOCK_DOWNLOADS is set: a small local stand-in is used, nothing is downloaded.")
+        else:
+            io.say(f"Downloading {corpus.URL}")
+        try:
+            got = corpus.download(part, echo=io.say, opener=opener, sha256=sha, cancelled=io.cancelled)
+            if dest.exists():
+                shutil.rmtree(dest)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            part.rename(dest)
+        except BaseException:
+            shutil.rmtree(part, ignore_errors=True)
+            raise
+        home = str(Path.home())
+        where = str(dest).replace(home, "~") if len(home) > 1 else str(dest)
+        return f"Kept {', '.join(got['kept'])} in {where}" + (" (stand-in download)" if mock else "")
+    return run
+
+
 def _m_corpus(platform, ctx) -> list[Method]:
     from .exemplars import corpus
+    cfg = ctx.get("cfg") or _cfg_default()
     note = (f"Downloads {corpus.TAR_BYTES / 1e9:.2f} GB from huggingface.co/datasets/{corpus.REPO} and keeps only "
             f"CADEvolve-G/parametric_generators.json (never the ABC-* or ShapeNet-* folders). Licence: {corpus.LICENCE} "
             f"({corpus.LICENCE_URL}); by installing you accept it. Read as reference text, never run.")
+    return [Method("download", "Download in the app", kind="action", streams=True, action=_corpus_action(cfg), note=note,
+                   commands=[f"download {corpus.URL}", f"check SHA-256 {corpus.TAR_SHA256[:16]}…, keep only "
+                             f"{corpus.KEEP_FOLDER}/{corpus.KEEP}"])]
+
+
+# ---- CADFit (form/recon/cadfit): on in Settings, its libraries in its own environment in the packaged app -----------
+
+def _cfg_default() -> dict:
+    from . import config
+    return config.load()
+
+
+def _cadfit_ready(cfg: dict) -> str:
+    """Where CADFit's search can run ("" when nowhere yet): its own environment, or this Python with its libraries."""
+    from . import engines
+    from .recon import cadfit
+    py = engines.python(cadfit.ENGINE_ID, cfg)
+    if py is not None:
+        return "its own Python (" + engines._tilde(engines.env_dir(cadfit.ENGINE_ID, cfg)) + ")"
+    if not frozen() and importlib.util.find_spec("form.recon.cadfit.driver") is not None:
+        missing = [m for m in cadfit.LIBRARIES if importlib.util.find_spec(m) is None]
+        if not missing:
+            return "Form Studio's Python"
+    return ""
+
+
+def _cadfit_on(cfg: dict) -> bool:
+    env = os.environ.get("FORM_RECON_CADFIT")
+    if env is not None and env.strip() != "":
+        return env.strip().lower() in ("1", "true", "yes", "on")
+    return bool((cfg.get("recon") or {}).get("cadfit", False))
+
+
+def _d_cadfit(cfg, ctx) -> Found:
+    importlib.invalidate_caches()
+    where = _cadfit_ready(cfg)
+    if where and _cadfit_on(cfg):
+        return Found("ok", f"On. Runs in {where}. Licence CC BY-NC 4.0 (non-commercial), included with its author's permission.")
+    if where:
+        return Found("missing", f"Its libraries are installed ({where}), but it is off. Install turns it on.")
+    return Found("missing", "Optional. Not installed. Mesh to CAD works fully without it.")
+
+
+def _enable_cadfit(cfg: dict) -> str:
+    from . import config_edit
+    config_edit.set_values(cfg, {"recon.cadfit": True})
+    return "Turned on: [recon] cadfit = true"
+
+
+def _cadfit_engine(cfg: dict):
+    def run(io) -> str:
+        from . import engines
+        from .recon import cadfit
+        msg = engines.build(cadfit.ENGINE_ID, cfg, io)
+        return msg + ". " + _enable_cadfit(cfg)
+    return run
+
+
+def _cadfit_into_this_python(tool: str, cfg: dict):
+    def run(io) -> str:
+        from . import engines
+        pins = list(engines.SPECS["recon.cadfit"]["pins"])
+        argv = ([shutil.which("uv") or "uv", "pip", "install", "--python", sys.executable, *pins] if tool == "uv"
+                else [sys.executable, "-m", "pip", "install", *pins])
+        io.run(argv)
+        return _enable_cadfit(cfg)
+    return run
+
+
+def _m_cadfit(platform, ctx) -> list[Method]:
+    from . import engines
+    from .recon import cadfit
+    cfg = ctx.get("cfg") or _cfg_default()
+    note = ("CADFit's code is CC BY-NC 4.0 (non-commercial use only), included with its author's permission "
+            "(form/recon/cadfit/PERMISSION.md); by installing you accept that licence. Off until installed.")
+    if _cadfit_ready(cfg):
+        return [Method("enable", "Turn it on", kind="action", action=lambda: _enable_cadfit(cfg),
+                       commands=["set [recon] cadfit = true in studio.toml"], note=note)]
+    eng = Method("engine", "Its own Python, set up by Form Studio", kind="action", streams=True,
+                 commands=engines.commands(cadfit.ENGINE_ID, cfg, ["set [recon] cadfit = true in studio.toml"]),
+                 action=_cadfit_engine(cfg), note=note + " Its search runs in that environment, out of the app.")
     if frozen():
-        def fetch() -> str:
-            info = corpus.download(corpus.corpus_dir())
-            return f"Kept {', '.join(info['kept'])} in {corpus.corpus_dir()}"
-        return [Method("download", "Download in the app", kind="action", action=fetch, note=note)]
+        return [eng]
+    pins = " ".join(engines.SPECS["recon.cadfit"]["pins"])
     py = _q(sys.executable, platform)
-    return [Method("python", "Python", commands=[f"{py} -m form.exemplars.corpus download --accept-licence "
-                                                 f"{corpus.LICENCE_ID}"], note=note)]
+    return [Method("uv", "uv", kind="action", streams=True, needs=("uv",), action=_cadfit_into_this_python("uv", cfg),
+                   commands=[f"uv pip install --python {py} {pins}", "set [recon] cadfit = true in studio.toml"], note=note),
+            Method("pip", "pip", kind="action", streams=True, needs=("#pip",), action=_cadfit_into_this_python("pip", cfg),
+                   commands=[f"{py} -m pip install {pins}", "set [recon] cadfit = true in studio.toml"], note=note),
+            eng]
 
 
 def _m_claude(platform, ctx) -> list[Method]:
@@ -426,7 +616,7 @@ def _m_agent(aid: str):
     def methods(platform, ctx) -> list[Method]:
         it = _agents(ctx).get(aid)
         if it is None or it.fix is None:
-            return []
+            return [_open("https://github.com/kaizensx/form-studio/blob/main/docs/MCP.md", "How to add Form Studio's tools")]
         f = it.fix
         if f.action:
             return [Method("edit", f.summary, kind="action", action=f.action,
@@ -596,13 +786,23 @@ REGISTRY: list[Software] = [
              "Optional, non-commercial: a learned model that proposes sketch-and-extrude programs for a mesh. Every "
              "proposal is snapped to the mesh and kept only when it verifies; mesh to CAD works fully without it.",
              "optional", "engine", _d_learned, _m_learned, size="3.09 GB of weights, plus about 1 GB of PyTorch and Transformers",
-             homepage="https://huggingface.co/filapro/cad-recode", licence="CC BY-NC 4.0 (non-commercial use only)"),
+             homepage="https://huggingface.co/filapro/cad-recode", licence="CC BY-NC 4.0 (non-commercial use only)",
+             licence_url="https://creativecommons.org/licenses/by-nc/4.0/", noncommercial=True),
+    Software("recon.cadfit", "CADFit mesh to CAD search",
+             "Optional, non-commercial: CADFit's IoU search over sketch extrusions as one more mesh-to-CAD candidate "
+             "(Nehme, Whalen, Ahmed, ICML 2026). Every proposal is snapped to the mesh and kept only when it verifies.",
+             "optional", "engine", _d_cadfit, _m_cadfit,
+             size="about 0.7 GB (its own Python 3.12 with build123d, trimesh, scikit-learn, SciPy and manifold3d)",
+             homepage="https://github.com/ghadinehme/CADFit",
+             licence="CC BY-NC 4.0 (non-commercial use only; included with its author's permission)",
+             licence_url="https://creativecommons.org/licenses/by-nc/4.0/", noncommercial=True),
     Software("exemplars.cadevolve", "Reference CadQuery corpus (CADEvolve)",
              "Optional: about 8,000 parametric CadQuery generators from CADEvolve, offered to the agent after Form "
              "Studio's own design examples, labelled reference CadQuery, not the Form API. Read as text, never run.",
              "optional", "engine", _d_corpus, _m_corpus,
              size="4.73 GB download; only CADEvolve-G/parametric_generators.json is kept",
-             homepage="https://huggingface.co/datasets/kulibinai/cadevolve", licence="Apache-2.0"),
+             homepage="https://huggingface.co/datasets/kulibinai/cadevolve", licence="Apache-2.0",
+             licence_url="https://www.apache.org/licenses/LICENSE-2.0"),
     Software("claude", "Claude Code", "Anthropic's agent. Chat can run it on your own Claude account. Everything else works without it.",
              "recommended", "ai", _d_claude, _m_claude, size="about 280 MB", homepage=CLAUDE_DOCS),
     Software("claude.signin", "Claude sign-in", "Claude Code answers in chat only when it is signed in to your account.",
@@ -691,7 +891,7 @@ def manual(sw: Software, platform: str | None = None, ctx: dict | None = None) -
 
 def survey(cfg: dict, platform: str | None = None, which=None, only: list[str] | None = None) -> list[dict]:
     """Detect everything (or `only` these ids) and describe it. Read-only."""
-    ctx: dict = {}
+    ctx: dict = {"cfg": cfg}
     home = str(Path.home())
     rows = []
     for sw in REGISTRY:
@@ -705,7 +905,10 @@ def survey(cfg: dict, platform: str | None = None, which=None, only: list[str] |
         ms = methods_for(sw, platform, which, ctx) if f.status != "ok" else []
         chosen = next((m for m in ms if m.available and m.kind in ("command", "action", "login")), None)
         rows.append({"id": sw.id, "label": sw.label, "why": sw.why, "level": sw.level, "group": sw.group, "size": sw.size,
-                     "capability": sw.capability, "licence": sw.licence,
+                     "capability": sw.capability, "licence": sw.licence, "licence_url": sw.licence_url,
+                     "noncommercial": sw.noncommercial,
+                     "licence_notice": (f"{sw.label} is licensed {sw.licence}. Pressing Install accepts this licence."
+                                        if sw.noncommercial else ""),
                      "status": f.status, "detail": f.detail.replace(home, "~") if len(home) > 1 else f.detail,
                      "version": f.version, "homepage": sw.homepage, "one_of": sw.one_of, "needs": list(sw.needs),
                      "methods": [m.public() for m in ms], "plan": chosen.public() if chosen else None,
@@ -772,6 +975,31 @@ def _close(proc: subprocess.Popen) -> None:
                 f.close()
         except OSError:
             pass
+
+
+class _Runner:
+    """What a streaming action gets from its job: say a line, run a program (streamed, cancellable, timed), and
+    whether the job was cancelled."""
+
+    def __init__(self, job: "Job", sid: str, cwd: str):
+        self.job, self.sid, self.cwd = job, sid, cwd
+
+    def say(self, text: str) -> None:
+        self.job.say(self.sid, text, "out")
+
+    def cancelled(self) -> bool:
+        return self.job._cancel.is_set()
+
+    def run(self, argv: list, env: dict | None = None, timeout: float | None = None) -> None:
+        argv = [str(a) for a in argv]
+        home = str(Path.home())
+        shown = " ".join(_q(a) for a in argv)
+        self.job.say(self.sid, shown.replace(home, "~") if len(home) > 1 else shown, "cmd")
+        from . import engines
+        ok, msg = self.job._exec(self.sid, argv, self.cwd, env=env, timeout=timeout or max(self.job.timeout_s,
+                                                                                          engines.STEP_TIMEOUT_S))
+        if not ok:
+            raise RuntimeError(f"{Path(argv[0]).name} {msg}")
 
 
 def _popen(cmd, **kw) -> subprocess.Popen:
@@ -878,12 +1106,15 @@ class Job:
             if os.environ.get("FORM_INSTALL_FAKE"):
                 self.say(sw.id, "FORM_INSTALL_FAKE is set: simulated, no file was changed.", "note")
                 return True, "simulated"
+            work = tempfile.mkdtemp(prefix="form-install-")
             try:
-                msg = m.action()
+                msg = m.action(_Runner(self, sw.id, work)) if m.streams else m.action()
                 self.say(sw.id, msg, "out")
                 return True, msg
             except Exception as e:
-                return False, str(e)
+                return False, "cancelled" if self._cancel.is_set() else str(e)
+            finally:
+                shutil.rmtree(work, ignore_errors=True)
         work = tempfile.mkdtemp(prefix="form-install-")
         try:
             for cmd in m.commands:
@@ -895,8 +1126,10 @@ class Job:
         finally:
             shutil.rmtree(work, ignore_errors=True)
 
-    def _exec(self, sid: str, cmd: str, cwd: str) -> tuple[bool, str]:
+    def _exec(self, sid: str, cmd, cwd: str, env: dict | None = None, timeout: float | None = None) -> tuple[bool, str]:
+        """Run one command (a shell string, or an argument list run without a shell), streaming its output."""
         fake = os.environ.get("FORM_INSTALL_FAKE")
+        limit = timeout or self.timeout_s
         try:
             if fake:
                 self.say(sid, "FORM_INSTALL_FAKE is set: this is a stand-in, nothing is downloaded or installed.", "note")
@@ -907,7 +1140,7 @@ class Job:
                 proc = _popen([sys.executable, "-c", _FAKE, str(secs)], stdin=subprocess.DEVNULL, cwd=cwd)
             else:
                 # no terminal stdin: nothing can prompt (and Bun-based CLIs crash on /dev/tty on macOS)
-                proc = _popen(cmd, shell=True, stdin=subprocess.DEVNULL, cwd=cwd)
+                proc = _popen(cmd, shell=isinstance(cmd, str), stdin=subprocess.DEVNULL, cwd=cwd, env=env)
         except OSError as e:
             return False, str(e)
         self._proc = proc
@@ -916,7 +1149,7 @@ class Job:
         def watchdog():
             timed_out.set()
             _kill(proc)
-        timer = threading.Timer(self.timeout_s, watchdog)
+        timer = threading.Timer(limit, watchdog)
         timer.daemon = True
         timer.start()
         wants_password = False
@@ -931,8 +1164,8 @@ class Job:
             self._proc = None
             _close(proc)
         if timed_out.is_set():
-            mins = self.timeout_s / 60
-            return False, f"stopped after {mins:.0f} minutes" if mins >= 1 else f"stopped after {self.timeout_s:.0f} s"
+            mins = limit / 60
+            return False, f"stopped after {mins:.0f} minutes" if mins >= 1 else f"stopped after {limit:.0f} s"
         if self._cancel.is_set():
             return False, "cancelled"
         if proc.returncode != 0:
@@ -1052,7 +1285,7 @@ class Installer:
         """Resolve ids to (software, method), refusing anything that is not exactly what was shown."""
         if not isinstance(ids, list) or not ids or not all(isinstance(x, str) for x in ids):
             raise InstallError("Pick at least one thing to install.")
-        ctx: dict = {}
+        ctx: dict = {"cfg": self.cfg}
         known = {s.id: s for s in REGISTRY}
         rows = {r["id"]: r for r in survey(self.cfg, only=None)}
         pairs = []
@@ -1357,7 +1590,7 @@ class AutoJob(Job):
             return Found("warn", f"Could not check: {e}")
 
     def _auto_one(self, sw: Software, step: dict) -> tuple[bool, str]:
-        ctx: dict = {}
+        ctx: dict = {"cfg": self.cfg}
         if self._found(sw).status == "ok":
             return True, "already there"
         blocked = [n for n in sw.needs if get(n).detect(self.cfg, {}).status != "ok"] if not os.environ.get("FORM_INSTALL_FAKE") else []

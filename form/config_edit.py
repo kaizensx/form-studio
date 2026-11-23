@@ -34,6 +34,10 @@ SCHEMA: dict[str, dict] = {
     # the older answer; writing it sets the capability "print" instead (kept so older scripts and CLIs still work)
     "general.printing": {"type": "bool", "tab": "general", "hidden": True, "label": "3D printing",
                          "help": "true turns the 3D printing capability on, false turns it off (general.capabilities)."},
+    # CADFit as one more mesh-to-CAD candidate (form/recon/cadfit; CC BY-NC 4.0, included with its author's permission).
+    # Settings > Software turns it on when it installs it.
+    "recon.cadfit": {"type": "bool", "tab": "advanced", "hidden": True, "label": "CADFit mesh to CAD search",
+                     "help": "true also tries CADFit's IoU search when a mesh is made editable (non-commercial licence)."},
     "data.dir": {"type": "path", "tab": "general", "label": "Project folder", "restart": True,
                  "help": "Where designs, their history and releases are kept. Takes effect when Form Studio restarts; "
                          "existing projects are not moved."},

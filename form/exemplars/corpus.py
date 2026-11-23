@@ -173,11 +173,13 @@ def get(name: str, folder: Path | None = None) -> dict:
 class _Hashing:
     """A read-only stream that hashes what passes through it and reports progress."""
 
-    def __init__(self, raw, echo, total: int):
-        self.raw, self.echo, self.total = raw, echo, total
+    def __init__(self, raw, echo, total: int, cancelled=None):
+        self.raw, self.echo, self.total, self.cancelled = raw, echo, total, cancelled
         self.h, self.got, self.shown = hashlib.sha256(), 0, -1
 
     def read(self, n: int = -1) -> bytes:
+        if self.cancelled is not None and self.cancelled():
+            raise RuntimeError("cancelled")
         b = self.raw.read(n if n and n > 0 else 1 << 20)
         self.h.update(b)
         self.got += len(b)
@@ -214,20 +216,22 @@ def extract(stream, folder: Path) -> list[str]:
     return written
 
 
-def download(folder: Path, echo=print, opener=None) -> dict:
-    """Stream the dataset tar, keep only CADEvolve-G's generators, check the tar's SHA-256. Nothing else is written."""
+def download(folder: Path, echo=print, opener=None, sha256: str | None = None, cancelled=None) -> dict:
+    """Stream the dataset tar, keep only CADEvolve-G's generators, check the tar's SHA-256 (`sha256`: the pinned one,
+    unless a test serves its own tar). Nothing else is written. `cancelled()` true stops it."""
     folder.mkdir(parents=True, exist_ok=True)
     (folder / MARKER).unlink(missing_ok=True)
     opener = opener or (lambda: urllib.request.urlopen(            # noqa: S310 (https only, fixed host and revision)
         urllib.request.Request(URL, headers={"User-Agent": "form-studio"}), timeout=60))
     with opener() as r:
-        stream = _Hashing(r, echo, TAR_BYTES)
+        stream = _Hashing(r, echo, TAR_BYTES, cancelled)
         written = extract(stream, folder)
         stream.drain()                                  # hash the rest of the tar too
     digest = stream.h.hexdigest()
-    if digest != TAR_SHA256 or not written:
+    sha256 = sha256 or TAR_SHA256
+    if digest != sha256 or not written:
         (folder / KEEP).unlink(missing_ok=True)
-        why = "its SHA-256 does not match" if digest != TAR_SHA256 else f"it has no {KEEP_FOLDER}/{KEEP}"
+        why = "its SHA-256 does not match" if digest != sha256 else f"it has no {KEEP_FOLDER}/{KEEP}"
         raise RuntimeError(f"The downloaded {TAR} was not kept: {why}.")
     info = {"dataset": REPO, "revision": REVISION, "licence": LICENCE, "tar_sha256": digest, "kept": written,
             "sha256": hashlib.sha256((folder / KEEP).read_bytes()).hexdigest(),

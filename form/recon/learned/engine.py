@@ -128,3 +128,48 @@ def generate(V, F, folder: Path, deadline: float | None = None) -> dict:
     if "<|im_start|>" in code:
         code = code.split("<|im_start|>")[-1]
     return {"code": code.strip(), "seconds": round(time.perf_counter() - t0, 2), "device": dev}
+
+
+# ---- out of process: the engine's own environment (form/engines.py) ----------------------------------------------
+
+CHILD = "from form.recon.learned.engine import _main; _main()"
+
+
+def generate_in(python, V, F, folder: Path, deadline: float | None = None) -> dict:
+    """generate() run by another interpreter (the engine's own environment, which has PyTorch): the mesh goes in a
+    file, the program comes back as JSON. Killed at the deadline; the child also ends when this process ends."""
+    import json
+    import subprocess
+    import tempfile
+    from ... import engines
+    with tempfile.TemporaryDirectory(prefix="form-learned-") as tmp:
+        src, out = Path(tmp) / "mesh.npz", Path(tmp) / "out.json"
+        np.savez(src, V=np.asarray(V, dtype=float), F=np.asarray(F, dtype=np.int64))
+        wait = None if deadline is None else max(1.0, deadline - time.perf_counter())
+        try:
+            r = subprocess.run([str(python), "-c", CHILD, str(src), str(folder), str(out), str(os.getpid())],
+                               env=engines.child_env(), capture_output=True, text=True, timeout=wait,
+                               stdin=subprocess.DEVNULL, encoding="utf-8", errors="replace")
+        except subprocess.TimeoutExpired:
+            raise TimeoutError(f"the model did not finish within {wait:.0f} s") from None
+        if r.returncode != 0 or not out.is_file():
+            lines = (r.stderr or r.stdout or "").strip().splitlines()
+            raise RuntimeError((lines[-1] if lines else f"exit code {r.returncode}")[:300])
+        return json.loads(out.read_text(encoding="utf-8"))
+
+
+def _main() -> None:                                    # pragma: no cover - runs in the engine's own interpreter
+    import json
+    import sys
+    import threading
+    src, folder, out, parent = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
+
+    def watch():                                        # the process that asked is gone: so is this one
+        while True:
+            time.sleep(1.0)
+            if os.getppid() != parent:
+                os._exit(1)
+    threading.Thread(target=watch, daemon=True).start()
+    d = np.load(src)
+    got = generate(d["V"], d["F"], Path(folder))
+    Path(out).write_text(json.dumps(got), encoding="utf-8")

@@ -64,5 +64,16 @@ if command -v codex >/dev/null && codex mcp get form 2>/dev/null | grep -q "$OLD
   codex mcp remove form >/dev/null 2>&1 || true
   codex mcp add form -- "$NEW_BIN" -m form.mcp_server >/dev/null && echo "Codex now uses $DEST_APP"
 fi
+# An old copy left in the Trash is still indexed by Spotlight, which then shows two Form Studios. Only say so: the
+# Trash is the owner's, and this script never empties it or deletes anything in it.
+TRASHED=""
+for t in "$HOME/.Trash"/FORM*.app "$HOME/.Trash"/Form\ Studio*.app; do
+  if [ -d "$t" ]; then TRASHED="$TRASHED
+    $t"; fi
+done
+if [ -n "$TRASHED" ]; then
+  echo "Notice: an old Form Studio is still in the Trash, and Spotlight keeps showing it as a second app:$TRASHED"
+  echo "  Empty the Trash (Finder > Empty Trash) to remove it. Nothing in the Trash was touched."
+fi
 [ "$WAS_RUNNING" = 1 ] && open -a "$DEST_APP" && echo "Opened the new Form Studio"
 command -v uv >/dev/null && uv tool install --force --python 3.12 "form-studio[all] @ $PWD" >/dev/null 2>&1 && echo "form command updated" || true

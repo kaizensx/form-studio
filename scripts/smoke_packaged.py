@@ -132,6 +132,43 @@ def recon_step(exe: Path, env: dict, tmp: Path, budget: float = 30.0) -> None:
     step("mesh to CAD within its time budget", "PASS" if ok else "FAIL", detail)
 
 
+def engine_src_of(target: str) -> Path | None:
+    """engine_src/ inside the built app: the engine code an engine environment imports (packaging/form.spec)."""
+    p = Path(target)
+    roots = [p / "Contents" / "Frameworks", p / "Contents" / "Resources"] if p.suffix == ".app" else [p.parent, p.parent / "_internal"]
+    return next((r / "engine_src" for r in roots if (r / "engine_src" / "form" / "__init__.py").is_file()), None)
+
+
+def cadfit_engine_step(target: str) -> None:
+    """CADFit's code ships as files for its engine environment (with its LICENSE and PERMISSION.md); when that
+    environment is installed on this computer, its interpreter imports CADFit from the built app. Read-only: the
+    environment is only used, never made or changed here."""
+    src = engine_src_of(target)
+    if src is None:
+        step("CADFit ships for its engine environment", "FAIL", "no engine_src/ in the app")
+        return
+    cf = src / "form" / "recon" / "cadfit"
+    missing = [n for n in ("LICENSE", "PERMISSION.md", "__init__.py", "driver.py", "cqrun.py", "vendor/greedy_search.py")
+               if not (cf / n).is_file()]
+    compiled = [str(x.relative_to(cf)) for x in cf.rglob("*.pyc")]
+    step("CADFit ships for its engine environment", "FAIL" if missing or compiled else "PASS",
+         f"missing {', '.join(missing)}" if missing else f"compiled files {compiled[:3]}" if compiled else str(cf.relative_to(src)))
+    engines = Path(os.environ.get("SMOKE_ENGINES_DIR") or Path.home() / "FORM" / ".engines") / "recon.cadfit"
+    py = engines / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    if not ((engines / "form-engine.json").is_file() and py.exists()):
+        step("CADFit imports through its engine environment", "SKIP", "CADFit is not installed on this computer")
+        return
+    env = {k: v for k, v in os.environ.items() if k not in ("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV")}
+    env.update(PYTHONPATH=str(src), PYTHONNOUSERSITE="1", PYTHONDONTWRITEBYTECODE="1")
+    r = subprocess.run([str(py), "-c", "import form.recon.cadfit as c, form.recon.cadfit.driver, form.recon.cadfit.cqrun, "
+                        "form.recon.cadfit.vendor.greedy_search, trimesh, manifold3d, sklearn, scipy, build123d; print(c.__file__)"],
+                       env=env, capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
+    where = (r.stdout.strip().splitlines() or [""])[-1]
+    ok = r.returncode == 0 and where.startswith(str(src))
+    step("CADFit imports through its engine environment", "PASS" if ok else "FAIL",
+         where if ok else (r.stderr.strip().splitlines() or [f"exit {r.returncode}"])[-1][:160])
+
+
 def main(argv: list[str]) -> int:
     if not argv:
         print(__doc__)
@@ -168,6 +205,7 @@ def main(argv: list[str]) -> int:
         step("slice with the installed slicer", "SKIP", "no slicer found or not configured")
 
     recon_step(exe, env, tmp)
+    cadfit_engine_step(argv[0])
 
     try:
         asyncio.run(mcp_steps(exe, env))

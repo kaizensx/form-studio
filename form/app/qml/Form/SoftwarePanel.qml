@@ -11,7 +11,7 @@ Column {
     readonly property int chosen: Store.installChosen.length
     property bool actions: true              // false when the host (Settings) puts Install / Check again in its action bar
     Txt { tone: 2; width: parent.width
-        text: "What Form Studio uses on this computer. Only the CAD kernel is required; everything else is optional and unlocks one feature, and is offered again where that feature is used. Tick what you want, then press Install: each command is shown before it runs, and Form Studio never asks for a password." }
+        text: "What Form Studio uses on this computer. Only the CAD kernel is required; everything else is optional and unlocks one feature, and is offered again where that feature is used. Press Install on a row to set it up in one click, or tick several and install them together. Each step is shown before it runs, and Form Studio never asks for a password." }
     Item { width: parent.width; height: 28; visible: sp.actions || (!!sp.sw && sp.sw.packaged)
         Row { spacing: 8; visible: sp.actions
             Btn { kind: "primary"; icon: "download"; enabled: sp.chosen > 0; busy: Store.installing
