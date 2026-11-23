@@ -1,8 +1,7 @@
 import QtQuick
 
-// What a design made for printing will print on; opens the printer picker. It lives where the printer matters, in the
-// header of Fit, Review and Make, and only while Store.printUi (printing is on and the open design is for printing).
-// The top bar never names a printer: Form Studio is a creation studio first.
+// What a design made for printing will print on; opens the printer picker. It sits in the top bar in every stage, and
+// only while Store.printUi (printing is on and the open design is for printing): a 3D model never names a printer.
 Item {
     id: pc
     objectName: "printerChip"

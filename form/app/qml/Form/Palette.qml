@@ -8,8 +8,18 @@ import "F.js" as F
 Item {
     id: pal
     anchors.fill: parent; visible: Store.paletteOpen; z: 50
-    onVisibleChanged: if (visible) { q.text = ""; sel = 0; Store.loadConvs(); q.input.forceActiveFocus() }
+    onVisibleChanged: if (visible) { q.text = ""; sel = 0; rest = null; Store.loadConvs(); q.input.forceActiveFocus() }
     property int sel: 0
+    // the pointer picks a row only once it moves: a pointer resting where the list appears (or where rows slide in
+    // as you type) never takes the highlight from the keyboard
+    property var rest: null
+    function pointed(item, mouse) {
+        var g = item.mapToItem(pal, mouse.x, mouse.y)
+        if (rest === null) { rest = g; return false }
+        if (rest !== true && Math.abs(g.x - rest.x) + Math.abs(g.y - rest.y) < 3) return false
+        rest = true
+        return true
+    }
     objectName: "palette"
     readonly property string selText: rows[picks[sel]] ? rows[picks[sel]].text : ""     // the highlighted command
     property alias query: q.text
@@ -190,7 +200,8 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; tone: 3; text: row.modelData.hint || "" }
                 Kbd { id: kb; visible: !row.isHead && !!row.modelData.keys; keys: row.modelData.keys || ""; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter }
                 MouseArea { anchors.fill: parent; enabled: !row.isHead; hoverEnabled: true
-                    onPositionChanged: { var n = pal.picks.indexOf(row.index); if (n >= 0 && n !== pal.sel) pal.sel = n }
+                    onPositionChanged: function (mouse) { if (!pal.pointed(this, mouse)) return
+                        var n = pal.picks.indexOf(row.index); if (n >= 0 && n !== pal.sel) pal.sel = n }
                     onClicked: pal.go(pal.picks.indexOf(row.index)) }
             }
         }

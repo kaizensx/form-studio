@@ -128,7 +128,8 @@ def journey_purpose_switch(ui):
     ui.wait_until(lambda: data(ui)["purpose"]["purpose"] == "print", 10, "the design to be for printing")
     ui.wait_until(lambda: ui.js("Store.purpose") == "print", 10, "the app to follow")
     ui.eq(data(ui)["status"]["slice"]["off"]["why"], "no_slicer", "a print with no slicer: Design only, never an error")
-    ui.check(ui.find(name="printerChip") is None, "no printer in Describe: it is named where it matters")
+    ui.wait_until(lambda: ui.find(name="printerChip", within=ui.item("topBar")) is not None, 5,
+                  "the printer in the top bar from Describe on, for a design made for printing")
     ui.click("stage-prove")
     ui.wait_until(lambda: ui.find(name="printerChip") is not None, 5, "the printer chip in Review for a design made for printing")
     ui.wait_until(lambda: ui.js("Store.viewer && Store.viewer.plateShown") is True, 5, "the build plate in Review")

@@ -96,6 +96,9 @@ class Journeys(unittest.TestCase):
     def test_build_stages(self):            # an agent's build is drawn stage by stage before it is saved, then the saved design
         self.journey("build_stages.py")
 
+    def test_isolation(self):              # another conversation never takes over; concepts in the feed; the printer on top
+        self.journey("isolation.py")
+
     def test_maker_tools(self):
         self.journey("maker_tools.py")
 

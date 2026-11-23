@@ -4,9 +4,10 @@ import FormNative
 import "F.js" as F
 
 // The window's own title bar, one calm line. Left: the agent column's toggle, where you are, which revision and whether
-// it is released. Right: notices, search, settings. No printer and no purpose: not printing is the normal case and
-// needs no label, and the printer is named where it matters (PrinterChip in Fit, Review and Make). It gives up detail,
-// never function, as the window narrows: search becomes its icon; notices become dots.
+// it is released. Right: another conversation at work (outside the workspace, which says it over the view), the
+// printer of a design made for printing, notices, search, settings. A 3D model shows no printer and no purpose: not
+// printing is the normal case and needs no label. It gives up detail, never function, as the window narrows: search
+// becomes its icon; notices become dots.
 Rectangle {
     id: bar
     objectName: "topBar"
@@ -82,6 +83,23 @@ Rectangle {
             Tip { show: pth.hovered; text: Store.project ? F.pad(Store.project.head) + " is a partial build. " + Store.partialLine : "" } }
     }
     Row { id: right; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 6
+        // another conversation is working while Home or a design being made is in front: named, one click opens it
+        Rectangle { id: away; objectName: "agentElsewhereBar"; visible: !bar.work && !!Store.agentElsewhere && Store.screen !== "boot"
+            anchors.verticalCenter: parent.verticalCenter; height: 26; radius: 13
+            width: awt.width + 35
+            color: awm.pressed ? Theme.washPress : awm.containsMouse ? Theme.plate3 : Theme.plate2; border.color: Theme.rule2
+            Behavior on color { Tint {} }
+            Row { id: awr; x: 11; spacing: 7; anchors.verticalCenter: parent.verticalCenter
+                Rectangle { width: 6; height: 6; radius: 3; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter
+                    SequentialAnimation on opacity { running: away.visible && !Theme.reduced; loops: Animation.Infinite
+                        NumberAnimation { to: 0.35; duration: 700 } NumberAnimation { to: 1; duration: 700 } } }
+                Txt { id: awt; kind: "fine"; color: Theme.ink2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
+                    width: Math.min(implicitWidth, Math.max(130, bar.width * 0.3 - 35)); elide: Text.ElideRight
+                    text: Store.agentElsewhere ? Store.agentElsewhere.by + " is working on " + Store.agentElsewhere.name : "" } }
+            MouseArea { id: awm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.showElsewhere() }
+            Tip { show: awm.containsMouse; text: Store.agentElsewhere && Store.agentElsewhere.title ? "In “" + Store.agentElsewhere.title + "”. Click to open that conversation." : "Click to open it." } }
+        // the printer a design made for printing prints on, in every stage (a 3D model has none)
+        PrinterChip { anchors.verticalCenter: parent.verticalCenter; visible: Store.printUi && bar.work; roomy: bar.roomy }
         StatusChips { anchors.verticalCenter: parent.verticalCenter; compact: bar.work ? !bar.roomy : bar.tight }      // setup / update notices
         Rectangle { visible: !bar.tight; width: bar.roomy ? 220 : 170; height: 26; radius: Theme.rSm; anchors.verticalCenter: parent.verticalCenter
             color: sm.pressed ? Theme.plate : sm.containsMouse ? Theme.plate2 : Theme.well; border.color: sm.containsMouse ? Theme.rule2 : Theme.rule
