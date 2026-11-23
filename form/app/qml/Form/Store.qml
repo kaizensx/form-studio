@@ -379,7 +379,7 @@ QtObject {
     // "follow" (an agent's activity brought it in) or "conv" (it is the design of the conversation just opened)
     function open(id, how) {
         steered = !how
-        agentElsewhere = null; convNoDesign = false; showPlate = false
+        agentElsewhere = null; convNoDesign = false; showPlate = true
         pid = id
         draftValues = ({}); draftProv = ({}); draftNote = ""; draftOrigin = ""; draftAgent = ""
         preview = null; draftError = null; feature = ""; compare = null; instructions = null; layers = null; section = null; ack = []
@@ -822,7 +822,7 @@ QtObject {
                 if (ev.by === "you") continue
                 if (ev.draft) s._noteDraft(ev)
                 if (ev.kind === "stage") { if (ev.draft) s.onStage(ev); continue }    // drawn, not said in the chat
-                s.noteAct(ev)
+                if (s._mine(ev)) s.noteAct(ev)          // another conversation's steps are never written into this one
                 if (!s._waitCommit(ev)) s.follow(ev)
             }
         }, function () {})
@@ -858,7 +858,7 @@ QtObject {
     property var _stageSeen: ({})      // draft id -> the newest stage index the activity log named
     property var _commitWait: null     // { ev, until }: the commit of the build on screen, held until its last stage is in
     function _waitCommit(ev) {
-        if (ev.kind !== "commit" || !ev.draft || !building || building.draft !== ev.draft) return false
+        if (ev.kind !== "commit" || !ev.draft || !building || building.draft !== ev.draft || !_mine(ev)) return false
         _commitWait = { ev: ev, until: Date.now() + 3000 }
         _commitTick()
         if (_commitWait) _commitTimer.start()
@@ -881,7 +881,7 @@ QtObject {
     // the agent of this conversation (or any agent, while the open design was not worked on) starts a new design while
     // a design is open: the workspace hands over to the being-designed view, where its stages are drawn as they come
     function _toDesigning(ts) {
-        agentElsewhere = null; convNoDesign = false; blankCanvas = false; showPlate = false
+        agentElsewhere = null; convNoDesign = false; blankCanvas = false; showPlate = true
         pid = ""; data = null; view = null; preview = null; compare = null; layers = null; section = null; scrub = null
         draftValues = ({}); draftProv = ({}); draftNote = ""; draftOrigin = ""; draftAgent = ""; _stamp = ""
         designingSince = ts - 0.5
@@ -889,6 +889,7 @@ QtObject {
     }
     function onStage(ev) {
         if (_draftDone[ev.draft]) return
+        if (!_mine(ev)) { _noteElsewhere(ev); return }      // another conversation's build is never drawn here
         var target = _draftOf[ev.draft] || ev.project || ""
         if (screen === "work" && !target) {                    // a new design while one is open
             if ((steered && !chatBusy) || scrub || compare || (hasDraft && !draftAgent)) return
@@ -946,10 +947,17 @@ QtObject {
     property var _stageDone2: Connections { target: s.viewer; ignoreUnknownSignals: true; function onRevealDone() { s._stageSettle(s.viewer) } }
     readonly property var _viewMap: ({ iso: "iso", sheet: "iso", front: "front", back: "back", iso_back: "back", left: "side", right: "side", top: "top", bottom: "under" })
     function follow(ev) {
+        if (!_mine(ev)) {                              // another conversation, or an outside agent on a design one owns
+            if (ev.kind === "concepts") loadConcepts()       // its concepts wait on Home
+            if (ev.kind === "concepts" || (ev.project && ev.project !== pid && ["commit", "draft", "look", "search"].indexOf(ev.kind) >= 0))
+                _noteElsewhere(ev)
+            return
+        }
         if (ev.kind === "concepts") {                  // the agent proposed concepts, or one was picked
             loadConcepts().then(function () {
                 if (ev.picked) { if (screen === "designing") reloadStudio().then(function () { open(ev.picked, "follow") }); return }
-                if (ev.group && (screen === "designing" || screen === "home")) openSheet("concepts", { group: ev.group })
+                // the concepts this conversation asked for are shown at once, unless another sheet is up
+                if (ev.group && (screen === "designing" || screen === "home" || (screen === "work" && !sheet))) openSheet("concepts", { group: ev.group })
             })
             return
         }
@@ -957,12 +965,18 @@ QtObject {
         if (screen === "designing" && ev.ts < designingSince - 1) return
         if (ev.project !== pid) {
             if (["commit", "draft", "look", "search"].indexOf(ev.kind) < 0) return
+            if (_conceptSheetOpen()) return            // the concepts are being looked at: a render of one never takes them away
             var fresh = screen === "designing"
             // once the person has worked on the open design, an agent busy elsewhere is named, never jumped to
             if (!fresh && steered && screen === "work") { _noteElsewhere(ev); return }
-            if (fresh && !_handoff) _buildNext = Date.now()     // after a streamed build the saved design takes over in place
-            reloadStudio().then(function () { open(ev.project, "follow").then(function () { if (fresh) buildTick++ }) })
-            if (!fresh) toast("Following " + ev.by, ev.text)
+            var target = ev.project, grow = fresh && !_handoff     // after a streamed build the saved design takes over in place
+            reloadStudio().then(function () {
+                // a concept waiting for a pick lives in the concepts sheet: the agent looking at it never opens it here
+                if (s._pendingConcept(target) || s._conceptSheetOpen()) return
+                if (grow) s._buildNext = Date.now()
+                s.open(target, "follow").then(function () { if (fresh) s.buildTick++ })
+                if (!fresh) s.toast("Following " + ev.by, ev.text)
+            })
             return
         }
         var userDraft = hasDraft && !draftAgent
@@ -1118,12 +1132,62 @@ QtObject {
         if (!id || id === pid) return Promise.resolve()
         return open(id)
     }
-    function _noteElsewhere(ev) {
-        var row = projectRow(ev.project)
-        agentElsewhere = { project: ev.project, name: row ? row.name : ev.project, by: ev.by || "The agent", kind: ev.kind }
-        if (ev.kind === "commit") reloadStudio()
+    // ── whose event is it ──
+    // Every event an agent run of a conversation writes names that conversation (form/studio.py activity). Only the
+    // open conversation's agent moves what is on screen: its builds are drawn, its designs and views followed. Before
+    // the first reply names a new conversation (convId still ""), the run being started is the open one. An event
+    // with no conversation comes from an agent outside Form Studio's chat: it is followed only while no conversation
+    // here owns the open design. Everything else is named in one calm note (agentElsewhere), never jumped to.
+    function _mine(ev) {
+        var c = ev && ev.conversation ? String(ev.conversation) : ""
+        if (c) {
+            if (c === convId) return true
+            // a conversation that was already there before this message was sent is another one
+            var r = !convId && chatBusy ? _convRow(c) : null
+            return !convId && chatBusy && !(r && (r.created || 0) < _sendAt - 2)
+        }
+        return !pid || !_owned(pid)
     }
-    function showElsewhere() { var a = agentElsewhere; if (a) reloadStudio().then(function () { open(a.project, "follow") }) }
+    function _owned(id) {          // a conversation of this app made or continued this design
+        if (conv && (conv.project === id || convDesigns(conv).some(function (d) { return d.project === id }))) return true
+        return (convs || []).some(function (c) {
+            return c.project === id || (c.designs || []).some(function (d) { return (typeof d === "string" ? d : d && d.project) === id }) })
+    }
+    property real _sendAt: 0           // when the first message of a new conversation was sent (_mine)
+    function _convRow(id) { var cs = convs || []; for (var i = 0; i < cs.length; i++) if (cs[i].id === id) return cs[i]; return null }
+    function _pendingConcept(id) {  // a concept of an open group, not picked yet: it belongs to the concepts sheet
+        var row = projectRow(id)
+        if (row && row.concept && !row.concept.picked) return true
+        return (concepts || []).some(function (g) { return (g.members || []).some(function (m) { return m.project === id }) })
+    }
+    function _conceptSheetOpen() { return !!sheet && sheet.kind === "concepts" }
+    function _noteElsewhere(ev) {
+        var row = ev.project ? projectRow(ev.project) : null, c = ev.conversation ? String(ev.conversation) : ""
+        var cr = c ? _convRow(c) : null
+        var by = ev.by && ["engine", "you", "agent"].indexOf(ev.by) < 0 ? ev.by : "The agent"
+        var name = row ? row.name : ev.kind === "concepts" ? "concepts" : cr && cr.title ? "“" + cr.title + "”" : "a new design"
+        var a = agentElsewhere
+        // one calm note: it is not rewritten for every stage of the same build
+        if (!a || a.project !== (ev.project || "") || a.conversation !== c || a.name !== name || a.by !== by)
+            agentElsewhere = { project: ev.project || "", name: name, by: by, kind: ev.kind, conversation: c,
+                               title: cr && cr.title ? cr.title : "", group: ev.group || "" }
+        if (ev.kind === "commit") {          // a design just saved: its name arrives with the studio
+            var pj = ev.project || ""
+            Promise.all([reloadStudio(), loadConvs()]).then(function () {
+                var n = s.agentElsewhere, r2 = pj ? s.projectRow(pj) : null
+                if (n && r2 && n.project === pj && n.name !== r2.name) s.agentElsewhere = Object.assign({}, n, { name: r2.name })
+            })
+        }
+    }
+    // Show: the conversation that is working (it lands on its design), or for an outside agent the design itself
+    function showElsewhere() {
+        var a = agentElsewhere
+        if (!a) return
+        agentElsewhere = null
+        if (a.conversation && a.conversation !== convId) { openConv(a.conversation); return }
+        if (a.kind === "concepts" && a.group) { openConcepts(a.group); return }
+        if (a.project) reloadStudio().then(function () { open(a.project, "follow") })
+    }
     // a usage limit, said calmly: which agent, until when; no upsell links. Only an error event the engine marked
     // kind "usage_limit" (form/agents/limits.py) is one; any other error, a 429 or a word like "quota" in it, is not.
     function usageLimit(ev) {
@@ -1216,6 +1280,7 @@ QtObject {
         if (chatBusy) { chatPrefill(text); return }        // never lose a message: it waits in the box until the reply ends
         if (chatNeedsModel) { pendingSend = text; modelPickWanted(); return }
         var att = chatAttach, id = convId, links = chatLinks
+        if (!id) _sendAt = Date.now() / 1000
         links = links.filter(function (l) { return text.indexOf(l.url) < 0 })      // a link already in the words is not listed twice
         if (links.length) text += "\n\nLinks:\n" + links.map(function (l) { return "- " + l.url }).join("\n")
         chatBusy = true; talkOpen = true; chatAttach = []; chatLinks = []; chatLive = null
@@ -1455,10 +1520,10 @@ QtObject {
     property var caps: null            // GET /capabilities: { capabilities: [...], chosen, download_mb, decided, install }
     readonly property bool printOn: !!studio && !!studio.env.purpose && studio.env.purpose.printing === true
     readonly property bool printUi: printOn && purpose === "print"
-    // the ground under the part (Viewport.stageMode): a neutral studio floor for every design. The printer's build
-    // plate appears only where the printer matters, Fit, Review and Make of a design made for printing, or when the
-    // person asks for it ("Show build plate"), and leaves again on the way back.
-    property bool showPlate: false
+    // the ground under the part (Viewport.stageMode): a neutral studio floor for a 3D model. A design made for printing
+    // stands on its printer's build plate from Describe on (the person can hide it in Describe and Design with "Hide
+    // the build plate"; Fit, Review and Make always show it). A model never shows a plate.
+    property bool showPlate: true
     readonly property bool plateWanted: printUi && (showPlate || stage === "fit" || stage === "prove" || stage === "release")
     readonly property string stageMode: plateWanted ? "plate" : "studio"
     function capOn(id) { return !!caps && caps.chosen.indexOf(id) >= 0 }

@@ -905,6 +905,10 @@ class Studio:
     # ---- live activity: what agents are doing, for the bench to follow ------------------------------
     def activity(self, pid: str | None, kind: str, text: str, by: str = "agent", **extra) -> dict:
         ev = {"ts": time.time(), "project": pid, "kind": kind, "text": text[:400], "by": by, **extra}
+        # an agent run of a conversation (form/chat.py sets $FORM_CONVERSATION for its MCP server) names it, so the
+        # app moves the view only for the conversation that is open and names the others (Store.qml follow)
+        if not ev.get("conversation") and os.environ.get("FORM_CONVERSATION"):
+            ev["conversation"] = os.environ["FORM_CONVERSATION"]
         f = self.root / ".activity.jsonl"
         try:
             with open(f, "a", encoding="utf-8") as fh:

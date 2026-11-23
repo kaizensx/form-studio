@@ -1,7 +1,7 @@
-"""A creation studio, not a slicer preview. With 3D printing on: a new design is a 3D model; the top bar never names a
-printer (Home, a design being made, a model, a print); every design sits on a neutral studio floor with an origin
-cross and a scale cue; the build plate and the printer chip appear only in Fit, Review and Make of a design made for
-printing (or on "Show build plate") and leave again on the way back."""
+"""A creation studio, not a slicer preview. With 3D printing on: a new design is a 3D model; the top bar names no
+printer on Home, while a design is being made or for a 3D model, which sits on a neutral studio floor with an origin
+cross and a scale cue. A design made for printing names its printer in the top bar in every stage and stands on its
+build plate from Describe on; in Describe and Design the plate can be hidden, and Fit, Review and Make show it anyway."""
 from _lib import DOCK, make, printing_on, toasts_gone
 
 DATA = "fresh"
@@ -65,28 +65,32 @@ def journey_a_model_is_never_on_a_plate(ui):
     ui.shot("ground-model")
 
 
+def printer_on_top(ui, where):
+    ui.wait_until(lambda: ui.find(name="printerChip", within=ui.item("topBar")) is not None, 5, f"{where}: the printer in the top bar")
+
+
 def journey_the_plate_belongs_to_printing(ui):
     toasts_gone(ui)
     S["print"] = make(ui, "dock", "Hallway phone dock", DOCK, purpose="print")
     stage(ui, "shape")
-    ui.check(not plate(ui), "a print in Design: the studio floor")
-    ui.check(ui.find(name="printerChip") is None, "no printer chip in Design")
-    top_bar_is_quiet(ui, "a print in Design")
+    ui.wait_until(lambda: plate(ui), 3, "a print in Design stands on its build plate")
+    printer_on_top(ui, "a print in Design")
     ui.shot("ground-print-design")
     ui.click("showPlate")
-    ui.wait_until(lambda: plate(ui), 3, "the plate on request")
+    ui.wait_until(lambda: not plate(ui), 3, "the plate hidden on request")
     ui.click("showPlate")
-    ui.wait_until(lambda: not plate(ui), 3, "the plate gone again")
+    ui.wait_until(lambda: plate(ui), 3, "the plate back")
+    ui.click("showPlate")
+    ui.wait_until(lambda: not plate(ui), 3, "hidden again")
     for sid in ("fit", "prove", "release"):
         stage(ui, sid)
         ui.wait_until(lambda: plate(ui), 3, f"the build plate in {sid}")
-        ui.item("printerChip")
-        top_bar_is_quiet(ui, "a print in " + sid)
+        printer_on_top(ui, "a print in " + sid)
         if sid == "fit":
             ui.shot("ground-print-fit")
     stage(ui, "shape")
-    ui.wait_until(lambda: not plate(ui), 3, "the plate leaves on the way back")
-    ui.check(ui.find(name="printerChip") is None, "and the printer chip with it")
+    ui.wait_until(lambda: not plate(ui), 3, "hidden in Design, as the person asked")
+    printer_on_top(ui, "a print back in Design")
 
 
 def journey_make_marks_a_model_for_printing(ui):
@@ -97,6 +101,6 @@ def journey_make_marks_a_model_for_printing(ui):
     btn = ui.item("releaseForPrinting")
     ui.click(btn)
     ui.wait_until(lambda: ui.api("/projects/" + S["model"])["purpose"]["purpose"] == "print", 15, "marked for printing in one click")
-    ui.wait_until(lambda: plate(ui) and ui.find(name="printerChip") is not None, 10, "the plate and the printer in Make")
-    top_bar_is_quiet(ui, "after marking for printing")
+    ui.wait_until(lambda: plate(ui) and ui.find(name="printerChip", within=ui.item("topBar")) is not None, 10,
+                  "the plate and the printer in Make")
     ui.no_warnings()

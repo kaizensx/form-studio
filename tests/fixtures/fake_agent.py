@@ -11,7 +11,8 @@ waits for the answer; "suggest" offers follow-ups through suggest_replies.
 Home's start flow (form/start.py, form/concepts.py), by words in the FIRST line of the message:
   "concepts"  builds a real concept group of three tiny designs (Block, Disc, Bracket) with form.concepts.create, reports
               it as a propose_concepts tool call, and adds the line "Concepts: A Block, B Disc, C Bracket".
-              The designs get the purpose of the message's "Purpose:" line.
+              The designs get the purpose of the message's "Purpose:" line. With "look" in that line too, it then
+              looks at concept B the way render does (a "look" in the activity log, a moment later).
   "measure"   asks a measurement question (kind "measure", the files of form/ask.py) about the newest project's first
               parameter: where "Across the widest part, side to side", tolerance 0.1 mm, diagram box/x, current = its value.
               After the answer the reply has "You measured: <value> mm with <method>" (value as %g), or
@@ -370,6 +371,15 @@ def concepts(data: Path, message: str) -> str:
         link(data, m["project"], "propose_concepts", role="concept", group=board["id"])
     out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t5",
                                                   "content": [{"type": "text", "text": json.dumps(board, default=str)}]}]}})
+    if re.search(r"\blook\b", message.splitlines()[0]) and len(board["members"]) > 1:
+        time.sleep(2.5)                  # the agent renders a concept a moment after proposing them (the owner's case)
+        b = board["members"][1]["project"]
+        out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t8", "name": "mcp__form__render",
+                                                           "input": {"project": b, "view": "iso"}}]}})
+        st.activity(b, "look", "Looking at the iso view", by="fake", view="iso")      # what render's act() writes
+        out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t8",
+                                                      "content": [{"type": "text", "text": "Rendered concept B."}]}]}})
+        time.sleep(1.5)
     return "Concepts: " + ", ".join(f"{m['letter']} {m['title']}" for m in board["members"])
 
 

@@ -70,6 +70,9 @@ Rectangle {
             if (ev.t === "tool") {
                 if (!group) { group = { t: "steps", k: "s" + i, steps: [] }; out.push(group) }
                 group.steps.push({ id: ev.id, tool: ev.name, input: ev.input, ts: ev.ts || 0 })
+                // the concepts it proposed, right here in the conversation: what they look like, and a pick
+                var res = ev.name === "propose_concepts" ? Store.chatTools[ev.id] : null
+                if (res && res.concepts && res.concepts.group) { group = null; out.push({ t: "concepts", k: "c" + i, group: res.concepts.group }) }
                 continue
             }
             if (ev.t === "start") {
@@ -124,6 +127,7 @@ Rectangle {
     }
     Connections { target: Store
         function onChatItemsChanged() { talk.sync() }
+        function onChatToolsChanged() { talk.sync() }
         function onChatBusyChanged() { talk.sync() }
         function onChatAskingChanged() { talk.sync() }
         function onConvIdChanged() { talk.openGroups = ({}); feed.stick = true }
@@ -296,7 +300,8 @@ Rectangle {
             HoverHandler { id: hh }
             Loader { id: body; x: 16; width: parent.width - 32
                 sourceComponent: it.m.t === "user" ? cUser : it.m.t === "text" ? cText : it.m.t === "steps" ? cSteps : it.m.t === "act" ? cAct
-                               : it.m.t === "end" ? cEnd : it.m.t === "ask" ? cAsk : it.m.t === "suggest" ? cSuggest : cErr }
+                               : it.m.t === "end" ? cEnd : it.m.t === "ask" ? cAsk : it.m.t === "suggest" ? cSuggest
+                               : it.m.t === "concepts" ? cConcepts : cErr }
             // actions on hover: copy, fork from here, and for your own message, edit and send again
             Rectangle { readonly property bool want: (hh.hovered || cb.hovered || eb.hovered || fb.hovered) && (it.m.t === "user" || it.m.t === "text") && !it.m.local
                 opacity: want ? 1 : 0; visible: opacity > 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } }
@@ -361,6 +366,56 @@ Rectangle {
             Component { id: cSteps; TalkSteps { objectName: "stepGroup"; width: body.width; steps: it.m.steps; running: !!it.m.running
                 expanded: !!talk.openGroups[it.k]
                 onToggle: { var o = Object.assign({}, talk.openGroups); o[it.k] = !o[it.k]; talk.openGroups = o } } }
+            // concepts the agent proposed (propose_concepts): each a real design, side by side; Pick continues with one,
+            // the card opens the concepts sheet. A group already decided says which one was picked.
+            Component { id: cConcepts; Rectangle { id: cc; objectName: "chatConcepts"
+                readonly property string gid: it.m.group
+                readonly property var listed: { var l = Store.concepts; for (var i = 0; i < l.length; i++) if (l[i].id === cc.gid) return l[i]; return null }
+                property var board: null            // a group no longer open: read once, to say what became of it
+                readonly property var g: listed || board
+                readonly property bool waiting: !!listed
+                readonly property var members: g ? g.members.filter(function (m) { return !m.error && !m.trashed }) : []
+                function look() { if (!cc.listed && !cc.board) Store.get("/concepts/" + cc.gid).then(function (r) { cc.board = r }, function () {}) }
+                Component.onCompleted: look()
+                onListedChanged: if (!listed) { board = null; look() }
+                width: body.width; implicitHeight: ccol.implicitHeight + 26; radius: Theme.rLg
+                color: Theme.plate2; border.color: cch.hovered && cc.waiting ? Theme.alpha(Theme.datum, 0.5) : Theme.alpha(Theme.datum, cc.waiting ? 0.28 : 0.12)
+                Behavior on border.color { Tint {} }
+                HoverHandler { id: cch }
+                Column { id: ccol; x: 13; y: 13; width: parent.width - 26; spacing: 10
+                    Item { width: parent.width; height: 22
+                        Row { spacing: 8; anchors.verticalCenter: parent.verticalCenter
+                            Rectangle { width: 7; height: 7; radius: 3.5; color: cc.waiting ? Theme.datum : Theme.ink4; anchors.verticalCenter: parent.verticalCenter }
+                            Txt { kind: "cap"; color: cc.waiting ? Theme.datum : Theme.ink3; anchors.verticalCenter: parent.verticalCenter
+                                text: !cc.g ? "Concepts" : cc.waiting ? F.plural(cc.members.length, "concept") + " · pick one"
+                                    : cc.g.state === "picked" ? "Concept picked" : "Concepts closed" } }
+                        Btn { objectName: "chatConceptsOpen"; visible: cc.waiting; small: true; kind: "quiet"; icon: "maximize_2"; text: "Side by side"
+                            anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                            tip: "Open the concepts, turning, with their sizes"; onClicked: Store.openConcepts(cc.gid) } }
+                    Txt { visible: !!cc.g; width: parent.width; font.weight: Theme.wSemi; elide: Text.ElideRight; wrapMode: Text.NoWrap; text: cc.g ? cc.g.name : "" }
+                    Row { id: tiles; spacing: 8; width: parent.width
+                        readonly property real tw: Math.floor((width - (cc.members.length - 1) * spacing) / Math.max(1, cc.members.length))
+                        Repeater { model: cc.members
+                            Rectangle { id: tile; objectName: "chatConcept"; required property var modelData; required property int index
+                                readonly property bool picked: !!cc.g && cc.g.picked === modelData.project
+                                width: tiles.tw; height: ttc.y + ttc.implicitHeight + 10; radius: Theme.rMd + 2; clip: true
+                                color: Theme.plate1; border.color: tile.picked ? Theme.alpha(Theme.datum, 0.7) : th2.hovered && cc.waiting ? Theme.rule3 : Theme.rule
+                                opacity: cc.waiting || tile.picked ? 1 : 0.55
+                                Behavior on border.color { Tint {} }
+                                HoverHandler { id: th2 }
+                                Item { id: tv; x: 1; y: 1; width: parent.width - 2; height: Math.round(width * 0.78); clip: true
+                                    MiniView { anchors.fill: parent; projectId: tile.modelData.project; turning: th2.hovered }
+                                    Txt { x: 8; y: 6; text: tile.modelData.letter; font.weight: Theme.wBold; color: Theme.datum; font.pixelSize: 12 } }
+                                Column { id: ttc; x: 8; y: tv.height + 8; width: parent.width - 16; spacing: 6
+                                    Txt { width: parent.width; font.pixelSize: 12; font.weight: Theme.wSemi; elide: Text.ElideRight; wrapMode: Text.NoWrap; text: tile.modelData.title }
+                                    Txt { visible: !!tile.modelData.rationale; width: parent.width; kind: "fine"; tone: 3; maximumLineCount: 2; elide: Text.ElideRight
+                                        wrapMode: Text.WordWrap; text: tile.modelData.rationale || "" }
+                                    Btn { objectName: "chatConceptPick"; visible: cc.waiting; small: true; kind: "quiet"; icon: "check"; text: "Pick"
+                                        tip: "Continue with " + tile.modelData.letter + ": " + tile.modelData.title
+                                        onClicked: Store.pickConcept(cc.gid, tile.modelData.project, false) }
+                                    Txt { visible: tile.picked; kind: "fine"; color: Theme.datum; text: "Picked" } }
+                                Tip { show: th2.hovered && !!tile.modelData.rationale; text: tile.modelData.title + ". " + (tile.modelData.rationale || "") } } } }
+                } } }
             Component { id: cAct; Row { spacing: 6
                 Icon { name: "zap"; size: 12; color: Theme.blueprint; anchors.verticalCenter: parent.verticalCenter }
                 Txt { kind: "fine"; width: body.width - 20; text: it.m.by + "  " + it.m.text; color: Theme.ink2 } } }

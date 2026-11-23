@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- **One conversation on screen at a time.** Every step an agent's run takes names its conversation. Only the open
+  conversation's agent draws its build stages, opens its designs and turns the view. Another conversation at work is
+  one calm note ("The agent is working on Staged block"), over the view or in the top bar, and Show opens that
+  conversation. The open design and screen never change because of it, and its steps are not written into the open
+  conversation. An agent outside Form Studio's chat is followed only while no conversation here owns the open design.
+- **Concepts in the conversation.** When the agent proposes concepts, the conversation shows them as a card: a
+  picture of each, its rationale and Pick, plus Side by side for the full sheet. The agent rendering a concept no
+  longer closes the concepts sheet or opens that concept's workspace. Concepts proposed while a design is open now
+  open their sheet there too.
+- **A print names its printer.** A design made for printing shows its printer in the top bar in every stage, and it
+  stands on its build plate from Describe on. In Describe and Design the plate can be hidden. A 3D model still shows
+  no printer and no plate.
+- **The command palette keeps the keyboard's pick.** A pointer resting where the list opens no longer moves the
+  highlight; the pointer takes the highlight only once it moves.
+
 - **Feature records stay true.** A feature left out because it made more parts than the design declared is built
   again as soon as `solids` is raised (the record follows the part count it was checked against). Only a feature that
   ran past its own time budget is written down as hung: a whole build that runs out of time no longer blames the
