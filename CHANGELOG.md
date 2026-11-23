@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- **"Make it beautiful" now gets a design method, not one build.** Every chat message is checked for a request to
+  look special, in English, Portuguese and Spanish and with misspellings ("beautiful", "impress me", "premium",
+  "bonito", "lindo", "que impressione", "beatiful"); printing words such as "impressão" and "impressora" and plain
+  praise ("awesome, now...") do not count. On a hit the agent's instructions carry a mandatory loop: read the
+  aesthetics guide and two close exemplars, write a design-language statement (archetype, gesture, proportion, three
+  radius tiers, surface break, materials), build skeleton first, photograph from three angles, score the new
+  aesthetic rubric in critique, fix the lowest items and repeat at least twice before presenting. Rounding is never
+  dropped after a fillet fails.
+- **The aesthetics guide is an industrial designer's method** (`design_guide(topic="aesthetics")`): archetypes,
+  proportion systems, G2 continuity with superellipse plans, lofts and sections, a three-tier radius hierarchy with
+  `craft.safe_fillet` fallbacks, shadow gaps and split lines, detail rhythm, and material and colour pairing through
+  `appearance()`, each with the code that does it.
+- **critique has an aesthetic rubric:** silhouette, proportion, continuity, radius hierarchy, break-up, detail rhythm,
+  material and "would sell", each 0-5 from the agent's look at the photos (`critique(..., aesthetic={...})`), capped
+  by what the geometry and the appearance zones support (no radii caps the radius hierarchy at 1, one colour caps
+  material). It passes at a mean of 4 with nothing under 3, and every pass is recorded.
+- **Eight premium everyday exemplars**, each a FeatureDesign built skeleton first with two to four material zones:
+  cable_dock, ribbon_phone_stand, valet_tray, lamp_base, cube_speaker, slim_remote, floating_wall_hook and
+  sofa_arm_clip.
+- **Exemplar photos keep their materials.** Seven exemplars named finishes that do not exist ("satin", "clear"), so
+  their photos fell back to one colour; they now use real finishes, and a test checks every exemplar.
+- **The spending cap is said plainly.** A reply that reaches the per-message cap no longer shows
+  `error_max_budget_usd`: it says it stopped at the cap, what it kept (new designs, the revision reached) and that the
+  cap is in Settings › Chat › Spending cap per message. The default stays $3.00.
+- **Claude Code finds Form Studio's tools on the first call.** Its instructions name the tools with the `mcp__form__`
+  prefix its tool list uses (a bare `design_guide` failed with "No such tool available"), and its runs set
+  `ENABLE_TOOL_SEARCH=false` so no Form Studio tool is deferred behind a search tool.
+- **Sheet labels draw accented names** (Capacete de herói, Peça) with the app's own font instead of boxes.
+
 - **Feature records stay true.** A feature left out because it made more parts than the design declared is built
   again as soon as `solids` is raised (the record follows the part count it was checked against). Only a feature that
   ran past its own time budget is written down as hung: a whole build that runs out of time no longer blames the

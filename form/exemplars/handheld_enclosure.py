@@ -198,5 +198,5 @@ class Design(Recipe):
                                access=tuple(Access((x, y, 0.0), (0, 0, 1), 4.0, 40) for x, y in self._layout(v)["bosses"]))])
 
     def appearance(self, v):
-        return [{"features": ["window", "buttons"], "finish": "satin", "color": "#25282c"},
-                {"features": ["shell", "parting", "bosses"], "finish": "satin", "color": "#c9ccd0"}]
+        return [{"features": ["window", "buttons"], "finish": "matte", "color": "#25282c"},
+                {"features": ["shell", "parting", "bosses"], "finish": "matte", "color": "#c9ccd0"}]

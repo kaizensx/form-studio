@@ -93,9 +93,11 @@ SCHEMA: dict[str, dict] = {
                  "help": "Only for Claude Code: its command name, or its full path when it is not on the PATH."},
     "chat.ask_timeout_s": {"type": "int", "tab": "advanced", "label": "Wait for your answers", "unit": "s", "min": 30, "max": 7200,
                            "help": "How long the agent waits when it asks you a question in chat before it continues without the answer."},
-    "chat.budget_usd_per_message": {"type": "float", "tab": "chat", "label": "Spending limit per message", "unit": "USD",
+    "chat.budget_usd_per_message": {"type": "float", "tab": "chat", "label": "Spending cap per message", "unit": "USD",
                                     "min": 0.05, "max": 100,
-                                    "help": "A reply stops when it has cost this much, for agents that report cost (Claude Code, OpenRouter)."},
+                                    "help": "A reply stops when it has cost this much, for agents that report cost (Claude "
+                                            "Code, OpenRouter). What it saved is kept; send “continue” to carry on. A "
+                                            "remodel or a “make it beautiful” loop with photos can cost several dollars."},
     "blender.app": {"type": "path", "tab": "apps", "label": "Blender", "unlocks": "Photo-real renders of a design",
                     "help": "Optional. Empty: found in the usual places."},
     "cad.openscad": {"type": "path", "tab": "apps", "label": "OpenSCAD", "unlocks": "Designs written in OpenSCAD",

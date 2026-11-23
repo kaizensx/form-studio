@@ -315,6 +315,10 @@ product_class), the side, front and top silhouettes are compared with the class 
 with the class range (with sources) and its signature is checked (an eye port, a neck opening, a palm hump...);
 the design must face +X with Z up. Then look at the views and answer "does it read as a <class>?" in
 reads_as (what makes it read as one, what gives it away); the checklist keeps asking until you do.
+aesthetic: after render_photo from three angles, your 0-5 scores for silhouette, proportion, continuity,
+radius_hierarchy, break_up, detail_rhythm, material, would_sell. The rubric caps each by what the geometry and
+the appearance() zones support and reports the gate (mean >= 4, none under 3); run it on every request for
+something beautiful, at least twice.
 All of it is heuristic evidence: numbers to prompt a look, not a verdict. Records one critique pass for the
 head revision (with your notes: what you saw, what you will change); a briefed or planned design cannot be
 released before its head revision has one.
@@ -325,6 +329,7 @@ released before its head revision has one.
 | `notes` | string |  |
 | `reads_as` | string |  |
 | `product_class` | string |  |
+| `aesthetic` | object \| null |  |
 
 ### `read_document`
 

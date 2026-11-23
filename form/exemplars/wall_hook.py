@@ -124,7 +124,7 @@ class Design(Recipe):
         return parts.checked(stages)
 
     def appearance(self, v):
-        return [{"features": ["plate", "holes", "arm", "root", "ball"], "finish": "satin", "color": "#b8925a"}]
+        return [{"features": ["plate", "holes", "arm", "root", "ball"], "finish": "metal", "color": "#b8925a"}]
 
     def derived(self, v):
         return [{"key": "tip_r", "label": "Arm radius at the tip", "value": round(self._radius(v, 1.0), 2), "unit": "mm",

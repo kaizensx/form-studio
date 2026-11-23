@@ -424,7 +424,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW, structured_output=False)
     async def critique(project: str, notes: str = "", reads_as: str = "", product_class: str = "",
-                       ctx: Context = None) -> list:
+                       aesthetic: dict[str, float] | None = None, ctx: Context = None) -> list:
         """Stage 5: look closely and measure. Returns a close-up render of each feature, computed metrics (smallest
         fillet, sharp-edge fraction, symmetry, proportions, surface mix, sliver faces, planned features missing, folds
         in lofted skins, wall thickness by rays with break-through spots, silhouette kinks) and a checklist to answer
@@ -433,12 +433,16 @@ def build() -> MCPServer:
         with the class range (with sources) and its signature is checked (an eye port, a neck opening, a palm hump...);
         the design must face +X with Z up. Then look at the views and answer "does it read as a <class>?" in
         reads_as (what makes it read as one, what gives it away); the checklist keeps asking until you do.
+        aesthetic: after render_photo from three angles, your 0-5 scores for silhouette, proportion, continuity,
+        radius_hierarchy, break_up, detail_rhythm, material, would_sell. The rubric caps each by what the geometry and
+        the appearance() zones support and reports the gate (mean >= 4, none under 3); run it on every request for
+        something beautiful, at least twice.
         All of it is heuristic evidence: numbers to prompt a look, not a verdict. Records one critique pass for the
         head revision (with your notes: what you saw, what you will change); a briefed or planned design cannot be
         released before its head revision has one."""
         st = studio()
         from . import critique as crit
-        r = await _run(crit.run, st, project, notes, reads_as, product_class or None)
+        r = await _run(crit.run, st, project, notes, reads_as, product_class or None, aesthetic or None)
         act(project, "look", "Critiquing the design: close-ups, metrics, checklist", ctx)
         out: list = []
         if r.get("closeups"):

@@ -303,8 +303,10 @@ class ApiAdapter(Adapter):
                 msgs += self._results(p, results, images_ok and (p.id, model) not in _NO_IMAGES)
                 checkpoint = len(msgs)
                 if cost is not None and run.budget_usd and cost >= run.budget_usd:
-                    err = {"message": f"Stopped at the per-message budget of ${run.budget_usd:.2f}.",
-                           "hint": "Raise [chat] budget_usd_per_message in Settings, or continue in a new message."}
+                    err = {"message": f"This reply stopped at the spending cap of ${run.budget_usd:.2f} per message "
+                                      f"(it cost ${cost:.2f}). Everything it saved before that point is kept in the project.",
+                           "hint": "Send “continue” to carry on from there, or raise the cap in Settings › Chat › "
+                                   "Spending cap per message."}
                     break
             else:
                 if rounds >= MAX_ROUNDS and not control.stopped:

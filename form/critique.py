@@ -274,6 +274,16 @@ def form_views(model, P, T, product_class: str | None) -> dict:
     return out
 
 
+def radius_tiers(radii) -> int:
+    """How many distinct tiers the blend radii fall into: sorted radii start a new tier when one is at least 1.8x the
+    tier's smallest (0.6 / 0.8 / 1.2 mm is one tier; 0.8 / 2 / 6 mm are three)."""
+    tiers, base = 0, None
+    for r in sorted(x for x in radii if x and x > 0.05):
+        if base is None or r >= base * 1.8:
+            tiers, base = tiers + 1, r
+    return tiers
+
+
 def op_critique_metrics(key, recipe_id, values, tol=0.05, product_class=None):
     from . import kernel
     model = kernel._get_near(key, recipe_id, values, tol)
@@ -335,6 +345,8 @@ def op_critique_metrics(key, recipe_id, values, tol=0.05, product_class=None):
         "folds": folds, "walls": wall, "form": form, "product_class": product_class,
         "smallest_fillet_mm": round(min(radii), 3) if radii else None,
         "fillet_faces": len(radii),
+        "fillet_radii": sorted({round(r, 1) for r in radii})[:24],
+        "radius_tiers": radius_tiers(radii),
         "sharp_edge_fraction": None if sharp is None else round(sharp, 3),
         "tangent_edge_fraction": None if tangent is None else round(tangent, 3),
         "texture_features_excluded": texture,
@@ -637,6 +649,142 @@ def checklist(metrics: dict, plan: dict | None, purpose: str, reads_as: str = ""
     return items
 
 
+# ---- the aesthetic rubric ------------------------------------------------------------------------------------------
+#
+# Eight items an industrial designer would judge, scored 0-5 by the agent after looking at render_photo from three
+# angles. The geometry cannot score beauty, but it can refuse a score the solid does not support: a design with no
+# blend radii cannot have a radius hierarchy of 5, one material cannot score 5 on material. Each item's final score
+# is min(agent's score, cap). The gate: every item scored, mean >= 4, none under 3.
+
+AESTHETIC = (
+    ("silhouette", "Silhouette", "Is the outline distinctive and intentional in three views (not a box, a puck, an egg or "
+                                 "a slab)?"),
+    ("proportion", "Proportion", "Do the main masses relate on a proportion system (1:1, 1:1.414, golden, 1:2), with no "
+                                 "almost-equal ratios?"),
+    ("continuity", "Continuity", "Do surfaces flow (G1 at least, G2 on the main form) with breaks only where intended?"),
+    ("radius_hierarchy", "Radius hierarchy", "Three tiers of radii (form, secondary, detail), each about a third of the "
+                                             "one above, and no raw edge where a hand goes?"),
+    ("break_up", "Break-up", "Is there a considered surface break: a shadow gap, a split line, an inset panel, a stepped "
+                             "tier, a material change?"),
+    ("detail_rhythm", "Detail rhythm", "Are repeated details on one pitch, aligned to the form, concentrated where the "
+                                       "hand works?"),
+    ("material", "Material and colour", "Two or three materials by function (calm body, soft contact, one precise "
+                                        "accent) in a pairing that belongs together?"),
+    ("would_sell", "Would sell", "Next to a real premium product on a shelf, would a buyer pick this one up?"),
+)
+AESTHETIC_GATE = {"mean": 4.0, "min": 3}
+
+
+def _aesthetic_caps(metrics: dict, zones: list) -> dict:
+    """{item: (cap or None, why)} from what the geometry and the appearance zones can support."""
+    m = metrics or {}
+    mix = m.get("surface_mix") or {}
+    sharp, tangent = m.get("sharp_edge_fraction"), m.get("tangent_edge_fraction") or 0.0
+    tiers = m.get("radius_tiers")
+    if tiers is None:
+        tiers = radius_tiers(m.get("fillet_radii") or ([m["smallest_fillet_mm"]] if m.get("smallest_fillet_mm") else []))
+    rounded_by_form = sharp is not None and sharp < 0.15
+    primitive = mix.get("plane", 0) > 0.85 and not m.get("fillet_faces") and tangent < 0.2
+    caps = {}
+    cl = ((m.get("form") or {}).get("class")) or {}
+    if primitive:
+        caps["silhouette"] = (1, "Mostly flat faces and no rounds: the views read as a primitive.")
+    elif cl and cl.get("score", 1) < 0.6:
+        caps["silhouette"] = (3, f"Class outline score {cl['score']:.2f} (under 0.6).")
+    else:
+        caps["silhouette"] = (None, "")
+    off = [r for r in (m.get("proportions") or {}).get("ratios", []) if r.get("off_pct", 0) > 12]
+    caps["proportion"] = (4, "Bounding ratios are not near a classic ratio: " + ", ".join(
+        f"{r['pair']} {r['ratio']}" for r in off) + ".") if off else (None, "")
+    if sharp is None:
+        caps["continuity"] = (None, "")
+    elif sharp > 0.6:
+        caps["continuity"] = (2, f"{sharp * 100:.0f} % of edge length is a sharp crease.")
+    elif sharp > 0.4:
+        caps["continuity"] = (3, f"{sharp * 100:.0f} % of edge length is a sharp crease.")
+    elif sharp > 0.25:
+        caps["continuity"] = (4, f"{sharp * 100:.0f} % of edge length is a sharp crease.")
+    else:
+        caps["continuity"] = (None, "")
+    if tiers >= 3:
+        caps["radius_hierarchy"] = (None, "")
+    elif tiers == 2:
+        caps["radius_hierarchy"] = (4, "Two radius tiers among the blends; a third (detail or form) is missing.")
+    elif tiers == 1:
+        caps["radius_hierarchy"] = (3, "One radius tier: every blend is about the same size.")
+    elif rounded_by_form:
+        caps["radius_hierarchy"] = (3, "No blend faces, but the edges are soft by construction (sections or "
+                                       "profiles): add a tier of real radii where parts meet.")
+    else:
+        caps["radius_hierarchy"] = (1, "No blend radii and sharp edges: rounding was dropped. Use craft.safe_fillet "
+                                       "with smaller radii; never ship without them.")
+    looks = {(z.get("finish"), str(z.get("color", "")).lower()) for z in zones or []}
+    covered = {f for z in zones or [] for f in z.get("features", [])}
+    feats = set((m.get("features") or {}).keys())
+    n_mat = len(looks) + (1 if feats - covered else 0)
+    if n_mat <= 1:
+        caps["material"] = (1 if not zones else 2, "One material over everything: declare appearance() zones (two or "
+                                                   "three, by function).")
+    elif n_mat == 2:
+        caps["material"] = (4, "Two materials; a third (a soft contact or a precise accent) would complete it.")
+    else:
+        caps["material"] = (None, "")
+    nf = len(feats)
+    if nf <= 1 and n_mat <= 1:
+        caps["break_up"] = (2, "One feature in one material: no surface break.")
+    elif nf <= 2 and n_mat <= 1:
+        caps["break_up"] = (3, "Few features and one material.")
+    else:
+        caps["break_up"] = (None, "")
+    caps["detail_rhythm"] = (None, "")
+    return caps
+
+
+def aesthetic_rubric(metrics: dict, zones: list | None = None, scores: dict | None = None) -> dict:
+    """The rubric for this design: each item with the agent's score (0-5, from looking at the photos), the cap the
+    geometry allows and why, and the final score; the mean, whether it passes the gate, and what to fix first."""
+    caps = _aesthetic_caps(metrics, zones or [])
+    scores = {str(k): v for k, v in (scores or {}).items()}
+    unknown = sorted(set(scores) - {i for i, _, _ in AESTHETIC})
+    items = []
+    for iid, label, q in AESTHETIC:
+        raw = scores.get(iid)
+        try:
+            sc = None if raw is None else max(0.0, min(5.0, float(raw)))
+        except (TypeError, ValueError):
+            sc = None
+        cap, why = caps.get(iid, (None, ""))
+        items.append({"id": iid, "label": label, "question": q, "score": sc, "cap": cap, "why": why,
+                      "final": None if sc is None else (min(sc, cap) if cap is not None else sc)})
+    others = [i["final"] for i in items if i["id"] != "would_sell" and i["final"] is not None]
+    ws = items[-1]
+    if ws["final"] is not None and others and ws["final"] > min(others) + 1:
+        ws["cap"], ws["why"] = min(others) + 1, "Nothing sells better than its weakest item allows."
+        ws["final"] = ws["cap"]
+    done = [i["final"] for i in items if i["final"] is not None]
+    mean = round(sum(done) / len(done), 2) if len(done) == len(items) else None
+    missing = [i["id"] for i in items if i["final"] is None]
+    passed = bool(mean is not None and mean >= AESTHETIC_GATE["mean"] and min(done) >= AESTHETIC_GATE["min"]
+                  and (caps.get("silhouette", (None,))[0] or 5) > 1)
+    low = sorted((i for i in items if i["final"] is not None), key=lambda i: i["final"])
+    out = {"items": items, "mean": mean, "passed": passed,
+           "gate": f"every item scored, mean >= {AESTHETIC_GATE['mean']:g}, none under {AESTHETIC_GATE['min']}, no "
+                   "primitive view",
+           "scored_by": "the agent from render_photo (three angles), capped by what the geometry supports",
+           "evidence": EVIDENCE}
+    if missing:
+        out["next"] = ("Score every item: render_photo from three angles (three_quarter, front, three_quarter_back), "
+                       "look, then critique(project, aesthetic={" + ", ".join(f"{m}: 0-5" for m in missing) + "}).")
+    elif not passed:
+        out["next"] = ("Fix the lowest first: " + ", ".join(f"{i['label']} {i['final']:g}" + (f" ({i['why']})" if i["why"] else "")
+                                                         for i in low[:2]) + ". Then render_photo and critique again.")
+    else:
+        out["next"] = "Passes the aesthetic gate. Say which item is weakest and why when you present it."
+    if unknown:
+        out["ignored"] = unknown
+    return out
+
+
 def product_class(p: dict, given: str | None = None) -> str | None:
     """The product class critique compares the design with: given, the plan's product_class, or the class the brief
     (goal, name, requirements) or the project name names (form.product_classes.detect)."""
@@ -655,9 +803,12 @@ def product_class(p: dict, given: str | None = None) -> str | None:
     return pc.detect(text)
 
 
-def run(st, pid: str, notes: str = "", reads_as: str = "", product_class_id: str | None = None) -> dict:
+def run(st, pid: str, notes: str = "", reads_as: str = "", product_class_id: str | None = None,
+        aesthetic: dict | None = None) -> dict:
     """Compute metrics, render close-ups, build the checklist and record one critique pass for the head revision.
-    reads_as: the agent's answer to "does it read as <class>?" after looking at the views (recorded with the pass)."""
+    reads_as: the agent's answer to "does it read as <class>?" after looking at the views (recorded with the pass).
+    aesthetic: the agent's 0-5 scores for the AESTHETIC items after looking at render_photo; the rubric caps them by
+    what the geometry and the appearance zones support and reports the gate."""
     from . import purpose as purpose_mod
     from . import staged
     p = st.load(pid)
@@ -681,15 +832,26 @@ def run(st, pid: str, notes: str = "", reads_as: str = "", product_class_id: str
         f.write_bytes(png)
     purpose = purpose_mod.of(p)
     items = checklist(metrics, plan, purpose, reads_as)
+    try:
+        from . import appearance
+        zones = appearance.declared(st.recipe(p), st.rev(p)["values"])
+    except Exception:                                  # a broken appearance() counts as no zones here
+        zones = []
+    rubric = aesthetic_rubric(metrics, zones, aesthetic)
     cl = (metrics.get("form") or {}).get("class") or {}
     summary = {"metrics": {k: metrics[k] for k in ("smallest_fillet_mm", "sharp_edge_fraction", "symmetry", "sliver_faces",
                                                     "planned_missing", "craft_notes") if k in metrics},
                "product_class": cls, "class_score": cl.get("score"), "reads_as": reads_as or None,
                "folds": (metrics.get("folds") or {}).get("folds"),
                "wall_p2_mm": (metrics.get("walls") or {}).get("p2_mm"),
-               "attention": [i["question"] for i in items if i["attention"]], "evidence": EVIDENCE}
+               "attention": [i["question"] for i in items if i["attention"]], "evidence": EVIDENCE,
+               "aesthetic": {"mean": rubric["mean"], "passed": rubric["passed"],
+                             "scores": {i["id"]: i["final"] for i in rubric["items"]}}}
     rec = staged.record_critique(st, pid, p["head"], summary, notes)
-    return {"project": pid, "rev": p["head"], "metrics": metrics, "checklist": items, "closeups": str(f) if f else None,
+    passes = sum(1 for c in (st.load(pid).get("design") or {}).get("critiques", []) if c.get("aesthetic", {}).get("mean")
+                 is not None)
+    return {"project": pid, "rev": p["head"], "metrics": metrics, "checklist": items, "aesthetic": rubric,
+            "aesthetic_passes": passes, "closeups": str(f) if f else None,
             "recorded": {"rev": rec["rev"], "ts": rec["ts"]}, "evidence": EVIDENCE,
             "next": "Look at the close-ups and the section. Fix what the checklist flags with update_design, then "
                     "critique again; release needs a recorded critique of the revision you release."}

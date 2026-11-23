@@ -118,7 +118,7 @@ class Design(Recipe):
                             region=((-L, -W, 6.0), (L, W, H - 13.0)), edge_falloff=3.0)]
 
     def appearance(self, v):
-        return [{"features": ["rim", "frames", "handles"], "finish": "satin", "color": "#8a6a3e"},
+        return [{"features": ["rim", "frames", "handles"], "finish": "matte", "color": "#8a6a3e"},
                 {"features": ["body"], "finish": "matte", "color": "#b89a6a"}]
 
     def derived(self, v):

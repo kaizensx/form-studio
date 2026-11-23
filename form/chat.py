@@ -99,9 +99,54 @@ SANDBOX = ("you run headless inside Form Studio with Form Studio's tools; there 
            "except Form Studio's tools and web search where you have it, and no files except the person's attachments.")
 
 
-def system_prompt(cfg: dict, project: str | None, adapter=None) -> str:
+TOOL_NAMES = """\
+- Tool names: in your tool list every Form Studio tool carries the prefix {p} (the MCP server is named form). These
+  instructions leave the prefix out; call {p}design_guide, {p}create_design, {p}render and so on. A bare name such
+  as design_guide is not a tool in your list and fails with "No such tool available".
+"""
+
+BEAUTY = """\
+THIS MESSAGE ASKS FOR SOMETHING THAT LOOKS SPECIAL (it says: {words}). Correct and plain is a failure here. Before you
+present a design, do this loop; it is mandatory, not advice:
+  1. Read {t}design_guide(topic="aesthetics") and two exemplars close to the object ({t}design_examples(query=
+     "premium <the object>"), then {t}design_examples(name=...) for two of them). Take their gesture, radius tiers,
+     surface breaks and appearance zones, not their sizes.
+  2. Write a design-language statement of three to five lines before any code: the archetype, the one gesture, the
+     proportion system, the three radius tiers in mm, where the surface break or shadow gap runs, and the material
+     pairing (two or three appearance() zones with colours). Say it to the person in one or two sentences.
+  3. Build it skeleton first ({t}create_design, then {t}add_feature one feature at a time).
+  4. {t}render_photo from three angles: view="three_quarter", view="front" or "right", view="three_quarter_back".
+     Look at each one.
+  5. {t}critique(project, aesthetic={{silhouette, proportion, continuity, radius_hierarchy, break_up, detail_rhythm,
+     material, would_sell}} each 0-5, reads_as=...). Score honestly from the photos; the geometry caps what it cannot
+     support. The rubric passes at a mean of 4 or more with nothing under 3.
+  6. Fix the lowest items with {t}update_design, then render_photo and critique again. At least two critique passes
+     before you present it, and keep going while it does not pass (three passes at most, then say which items are
+     still under 4 and why).
+  Never drop edge rounding because a fillet failed: use craft.safe_fillet with a smaller radius, fillet the edge
+  groups one at a time, or round the profile before the boolean. A premium object without its radii is not done.
+  When the request is a new idea, propose_concepts first as usual, then run this loop on the one the person picks.
+"""
+
+
+def tool_ref(adapter, name: str) -> str:
+    """A Form Studio tool as this agent's tool list names it (mcp__form__render for Claude Code, render elsewhere)."""
+    return (getattr(adapter, "tool_prefix", "") or "") + name
+
+
+def beauty_protocol(message: str, adapter=None) -> str:
+    """The beauty loop for a message that asks for something beautiful (staged.aesthetic_intent), or ""."""
+    from . import staged
+    hit = staged.aesthetic_intent(message or "")
+    if not hit["aesthetic"]:
+        return ""
+    return BEAUTY.format(words=", ".join(f"“{w}”" for w in hit["words"][:5]), t=tool_ref(adapter, ""))
+
+
+def system_prompt(cfg: dict, project: str | None, adapter=None, message: str = "") -> str:
     """The instructions every in-app agent gets: its sandbox (said plainly, so it does not spend steps finding out),
-    the project on the page, and whether this person prints at all."""
+    the project on the page, and whether this person prints at all. Claude Code also gets the prefix its tool list
+    puts on Form Studio's tools; a message that asks for something beautiful adds the beauty protocol."""
     from . import purpose
     if not purpose.printing(cfg):
         note = ("This person does not 3D print: new designs are 3D models (pass purpose=\"model\"), and never suggest "
@@ -114,7 +159,10 @@ def system_prompt(cfg: dict, project: str | None, adapter=None) -> str:
                 "pass purpose=\"print\"). For context only: this person also has a 3D printer, so do not bring up "
                 "printing, slicing or filament unless they ask.")
     box = getattr(adapter, "sandbox", "") or SANDBOX
-    return PROMPT.format(project=project or "none (start a new one if asked)", printing=note, sandbox=box)
+    text = PROMPT.format(project=project or "none (start a new one if asked)", printing=note, sandbox=box)
+    if getattr(adapter, "tool_prefix", ""):
+        text += TOOL_NAMES.format(p=adapter.tool_prefix)
+    return text + beauty_protocol(message, adapter)
 
 
 def _adapters(cfg: dict) -> dict:
@@ -220,6 +268,34 @@ def set_defaults(cfg: dict, agent: str | None = None, model: str | None = None, 
 
 _UNAVAILABLE = re.compile(r"model_not_found|model[^.]{0,80}\b(is not supported|does not exist|not available|not found|"
                           r"no access|not have access)|unknown model|invalid model", re.I)
+
+
+_BUDGET = re.compile(r"error_max_budget_usd|max[_ -]?budget|budget[_ ]exceeded|exceeded (?:the )?(?:usd |spending )?budget", re.I)
+
+#: where the cap lives in the app (form/config_edit.py SCHEMA "chat.budget_usd_per_message")
+BUDGET_SETTING = "Settings › Chat › Spending cap per message"
+
+
+def is_budget_stop(err: str) -> bool:
+    """The agent stopped because the reply reached the per-message spending cap (Claude Code: error_max_budget_usd)."""
+    return bool(_BUDGET.search(err or ""))
+
+
+def budget_card(cap_usd: float | None, cost_usd: float | None = None, made: list | None = None,
+                change: dict | None = None) -> dict:
+    """The per-message spending cap, said plainly: what stopped, what was kept, where to change the cap."""
+    cap = f"${float(cap_usd):.2f}" if cap_usd else "the cap"
+    spent = f" (this reply cost ${float(cost_usd):.2f})" if isinstance(cost_usd, (int, float)) and cost_usd else ""
+    kept = []
+    if made:
+        kept.append(("the new design " if len(made) == 1 else "the new designs ") + ", ".join(made))
+    if change and change.get("project") and change.get("to") is not None:
+        kept.append(f"{change['project']} at revision {change['to']}")
+    what = ("Everything it saved is kept: " + " and ".join(kept) + "." if kept else
+            "Everything it saved before that point is kept in the project.")
+    return {"message": f"This reply stopped at the spending cap of {cap} per message{spent}. {what}",
+            "hint": f"Send “continue” to carry on from there, or raise the cap in {BUDGET_SETTING}.",
+            "kind": "budget"}
 
 
 def _model_unavailable(err: str) -> bool:
@@ -527,7 +603,7 @@ class Chat:
             return ask_mod.DEFAULT_TIMEOUT
 
     def _system(self, job: ChatJob) -> str:
-        return system_prompt(self.cfg, job.project, self.adapters.get(job.agent))
+        return system_prompt(self.cfg, job.project, self.adapters.get(job.agent), job.message)
 
     def _prompt(self, job: ChatJob, with_recap: bool) -> str:
         parts = []
@@ -829,6 +905,10 @@ class Chat:
                 if err and _model_unavailable(str(err)):
                     job.error = self._drop_model(job, str(err))
                     self._add(job, {"t": "error", "text": job.error})
+                elif err and is_budget_stop(str(err)):         # never the raw "error_max_budget_usd"
+                    card = self._budget(job, ev)
+                    job.error = card["message"]
+                    self._add(job, {"t": "error", "text": card["message"], "hint": card["hint"], "kind": "budget"})
                 elif err and self._limit(job, str(err)):       # a usage limit: a calm card, no upsell text
                     card = self._limit(job, str(err))
                     said = job.error == card["message"]          # the stream already said it as an error event
@@ -864,6 +944,17 @@ class Chat:
         job._effort_picked = eff
         job._effort_why = why                          # shown on the reply's start event
         return eff
+
+    def _budget(self, job: ChatJob, end: dict | None = None) -> dict:
+        try:
+            cap = float(self.cfg.get("chat", {}).get("budget_usd_per_message", 3.0))
+        except (TypeError, ValueError):
+            cap = None
+        try:
+            made = sorted(self._project_ids() - (job.before or set())) if getattr(job, "before", None) is not None else []
+        except Exception:
+            made = []
+        return budget_card(cap, job.cost, made, (end or {}).get("change"))
 
     def _limit(self, job: ChatJob, text: str) -> dict | None:
         """The agent hit its plan's usage limit: {kind, agent, until, message, hint} without the CLI's upsell text,

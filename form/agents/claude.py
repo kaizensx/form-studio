@@ -81,6 +81,9 @@ class Claude(Adapter):
     sandbox = ("you have no shell and cannot write files: only Form Studio's tools, web search and web fetch where they "
                "are on, and Read for the person's attached files.")
     id, label, cli = "claude", "Claude Code", "claude"
+    # How Claude Code names FORM's MCP tools (the server is "form" in the run's --mcp-config). The instructions name
+    # tools with this prefix for Claude: a bare "design_guide" is not a tool in its list ("No such tool available").
+    tool_prefix = "mcp__form__"
     install_hint = "Install Claude Code (claude) to chat here. Everything else works without it."
     verified = "run on this Form Studio version"
     images, cost = True, True
@@ -140,6 +143,11 @@ class Claude(Adapter):
         if run.session:
             cmd += ["--resume", run.session]
         return cmd
+
+    def run_env(self, run: Run) -> dict:
+        # Every FORM tool is loaded up front: with tool search on, Claude Code may defer MCP tools behind a search
+        # tool, and a run whose --tools list leaves that search tool out can then not reach them.
+        return {"ENABLE_TOOL_SEARCH": "false"}
 
     def parser(self) -> Parser:
         return ClaudeParser()
