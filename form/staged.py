@@ -62,13 +62,71 @@ _NOT = re.compile(r"\b(?:bolt|hole|mounting|screw|drill|fixing)\s+patterns?\b|\b
                   r"|\bhex(?:agon)?\s+(?:head|heads|nut|nuts|key|keys|socket|sockets|bolt|bolts|bit|bits|drive|shaft|wrench)\b", re.I)
 
 
+#: words that ask for an object to look special, in English, Portuguese and Spanish, without accents. A word matches
+#: when it starts with a stem (beaut-: beauty, beautiful, beautifully) or equals a whole word; a misspelling of a long
+#: word ("beatiful", "gorgous", "impresive") matches it by similarity.
+#: Generic praise ("awesome, now make the hole bigger") is left out on purpose, and so is Portuguese "impressão"
+#: (a print) and "impressora" (a printer): impress- only counts as impressi- (impressive, impressiona) or impress/ed/es.
+AESTHETIC_STEMS = ("beaut", "gorgeous", "stunning", "impressi", "exquisit", "luxur", "elegan", "sophistic", "breathtak",
+                   "jaw-drop", "eye-catch", "spectacular", "magnific", "striking",
+                   "bonit", "lind", "maravilh", "deslumbr", "sofistic", "luxuos", "espetacul", "espectacul",
+                   "caprich", "hermos", "precios", "esplend")
+AESTHETIC_WORDS = ("wow", "premium", "luxo", "belo", "bela", "belos", "belas", "chique", "chic", "sleek", "iconic",
+                   "stylish", "aesthetic", "aesthetics", "estetico", "estetica", "gorgeous", "impress", "impressed",
+                   "impresses")
+AESTHETIC_PHRASES = ("really nice", "look nice", "looks nice", "look good", "looks good", "look great", "high-end",
+                     "high end", "top notch", "top-notch", "world class", "world-class", "best looking", "best-looking",
+                     "well designed", "well-designed", "nicely designed", "design bonito", "bem desenhad", "bem feito",
+                     "de cair o queixo", "que impressione", "show de bola", "muito bom aspeto", "muito bom aspecto",
+                     "bom aspeto", "bom aspecto", "make it nice", "faz bonito", "mais bonit", "really good looking")
+_AESTHETIC_FUZZY = ("beautiful", "gorgeous", "stunning", "impressive", "premium", "elegant", "exquisite",
+                    "luxury", "luxurious", "sophisticated", "spectacular", "magnificent", "bonito", "bonita", "lindo",
+                    "linda", "lindissimo", "maravilhoso", "maravilhosa", "deslumbrante", "impressionante", "elegante",
+                    "sofisticado", "sofisticada", "espetacular", "hermoso", "precioso", "stylish", "aesthetic")
+
+
+def _plain(text: str) -> str:
+    """Lower case without accents ("lindíssimo" -> "lindissimo")."""
+    import unicodedata
+    t = unicodedata.normalize("NFKD", (text or "").lower())
+    return "".join(c for c in t if not unicodedata.combining(c))
+
+
+def aesthetic_intent(text: str) -> dict:
+    """Does this message ask for something that looks special ("make it really beautiful", "quero algo lindo que
+    impressione")? {"aesthetic": bool, "words": [the words that matched]}. Heuristic keyword and spelling match; it
+    decides whether the agent gets the beauty protocol (form/chat.py), nothing more."""
+    import difflib
+    low = _plain(text)
+    words = re.findall(r"[a-z][a-z\-']*", low)
+    found = []
+    for w in words:
+        w = w.strip("-'")
+        if not w:
+            continue
+        if w in AESTHETIC_WORDS or any(w.startswith(s) for s in AESTHETIC_STEMS):
+            found.append(w)
+        elif len(w) >= 6 and difflib.get_close_matches(w, _AESTHETIC_FUZZY, n=1, cutoff=0.84):
+            found.append(w)
+    for ph in AESTHETIC_PHRASES:
+        if ph in low:
+            found.append(ph)
+    # "impression" of a stamp, "lindane", "linden": not about looks
+    found = [f for f in found if f not in ("linden", "lindane")]
+    return {"aesthetic": bool(found), "words": sorted(dict.fromkeys(found)), "evidence": "heuristic"}
+
+
 def assess(brief: str = "", source: str = "") -> dict:
     """Is this brief complex enough to need a plan? Heuristic, and said to be: keywords by family, a long brief, or
-    source that declares several solids or an assembly."""
+    source that declares several solids or an assembly. The aesthetic family also takes aesthetic_intent()'s words
+    (Portuguese and Spanish, misspellings)."""
     brief = _NOT.sub(" ", brief or "")
     w = _words(brief)
     low = (brief or "").lower()
     hits = {fam: sorted({k for k in kws if (k in w if " " not in k and "-" not in k else k in low)}) for fam, kws in COMPLEX.items()}
+    ai = aesthetic_intent(brief)
+    if ai["aesthetic"]:
+        hits["aesthetic"] = sorted(set(hits.get("aesthetic", [])) | set(ai["words"]))
     hits = {k: v for k, v in hits.items() if v}
     reasons = [f"{fam}: {', '.join(v)}" for fam, v in hits.items()]
     if len(w) > 60:

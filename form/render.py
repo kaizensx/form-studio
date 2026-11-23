@@ -9,11 +9,12 @@ from __future__ import annotations
 import base64
 import io
 import math
+from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-VERSION = 3          # part of every cached render's name: change the drawing, change this
+VERSION = 4          # part of every cached render's name: change the drawing, change this
 
 VIEWS = {
     #            azimuth (deg, from +X toward +Y), elevation (deg)
@@ -81,11 +82,39 @@ def _camera_ae(az_deg: float, el_deg: float):
     return right, up, fwd
 
 
+#: fonts for labels, first found wins: the app's own Instrument Sans (Latin with accents: Capacete de herói, Peça,
+#: Lâmpada), then common system fonts. Pillow's built-in font has no accented letters and draws them as boxes.
+FONT_FILES = (
+    Path(__file__).resolve().parent / "app" / "assets" / "fonts" / "InstrumentSans.ttf",
+    Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
+    Path("/System/Library/Fonts/Helvetica.ttc"),
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    Path("/usr/share/fonts/TTF/DejaVuSans.ttf"),
+    Path("C:/Windows/Fonts/segoeui.ttf"),
+    Path("C:/Windows/Fonts/arial.ttf"),
+)
+_FONTS: dict = {}
+
+
 def _font(size: int):
-    try:
-        return ImageFont.load_default(size=size)
-    except TypeError:          # Pillow < 10.1
-        return ImageFont.load_default()
+    """A Unicode-capable font at size px (cached), so accented names render; Pillow's default only as a last resort."""
+    if size in _FONTS:
+        return _FONTS[size]
+    f = None
+    for p in FONT_FILES:
+        try:
+            if p.is_file():
+                f = ImageFont.truetype(str(p), size)
+                break
+        except OSError:
+            continue
+    if f is None:
+        try:
+            f = ImageFont.load_default(size=size)
+        except TypeError:          # Pillow < 10.1
+            f = ImageFont.load_default()
+    _FONTS[size] = f
+    return f
 
 
 def render_png(view_data: dict, features: list, view: str = "iso", highlight: str | None = None,

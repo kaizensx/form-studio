@@ -51,7 +51,7 @@ def journey_search(ui):
     ui.click(f)
     ui.type("bed size")
     ui.wait_until(lambda: ui.sees("Bed size when no printer is chosen"), 5, "the search to find the bed size")
-    ui.check(not ui.sees("Spending limit per message"), "other rows are filtered out")
+    ui.check(not ui.sees("Spending cap per message"), "other rows are filtered out")
     ui.shot("settings-search")
     ui.key("Ctrl+A")
     ui.key("Backspace")

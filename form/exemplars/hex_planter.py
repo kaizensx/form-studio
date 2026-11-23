@@ -177,4 +177,4 @@ class Design(Recipe):
 
     def appearance(self, v):
         return [{"features": ["saucer"], "finish": "matte", "color": "#8f8a80"},
-                {"features": ["body", "lip", "relief", "drainage"], "finish": "satin", "color": "#c9c2b4"}]
+                {"features": ["body", "lip", "relief", "drainage"], "finish": "matte", "color": "#c9c2b4"}]

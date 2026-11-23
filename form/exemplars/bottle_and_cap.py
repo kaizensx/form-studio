@@ -171,7 +171,7 @@ class Design(Recipe):
                                     origin=(0, 0, 0))])
 
     def appearance(self, v):
-        return [{"features": ["body", "grip", "hollow", "neck", "thread"], "finish": "clear", "color": "#cfe3ea"},
+        return [{"features": ["body", "grip", "hollow", "neck", "thread"], "finish": "smoke", "color": "#cfe3ea"},
                 {"features": ["cap", "cap_thread", "cap_grip"], "finish": "gloss", "color": "#1f5fa8"}]
 
     def derived(self, v):

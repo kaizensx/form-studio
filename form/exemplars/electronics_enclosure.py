@@ -186,6 +186,6 @@ class Design(Recipe):
                                access=tuple(Access((x, y, Hb + lt), (0, 0, -1), 5.5, 60) for x, y in bosses))])
 
     def appearance(self, v):
-        return [{"features": ["lid", "groove", "lid_screws"], "finish": "satin", "color": "#3a3f45"},
-                {"features": ["box", "lip", "bosses", "standoffs", "vents", "gland"], "finish": "satin",
+        return [{"features": ["lid", "groove", "lid_screws"], "finish": "matte", "color": "#3a3f45"},
+                {"features": ["box", "lip", "bosses", "standoffs", "vents", "gland"], "finish": "matte",
                  "color": "#d9d6cf"}]

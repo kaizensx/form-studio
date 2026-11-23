@@ -158,7 +158,7 @@ class Design(Recipe):
 
     def appearance(self, v):
         return [{"features": ["pad"], "finish": "rubber", "color": "#2a2c2e"},
-                {"features": ["plate", "holes", "arm", "root"], "finish": "satin", "color": "#c9c4ba"}]
+                {"features": ["plate", "holes", "arm", "root"], "finish": "matte", "color": "#c9c4ba"}]
 
     def derived(self, v):
         path, R, _ = self._path(v)

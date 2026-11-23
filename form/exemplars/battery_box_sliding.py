@@ -169,5 +169,5 @@ class Design(Recipe):
                       Hardware("AA cell", "LR6 14.5 x 50.5", 2, "IEC 60086", "Mind the floor marks.", after="box")])
 
     def appearance(self, v):
-        return [{"features": ["lid", "tongue", "grip"], "finish": "satin", "color": "#2f3439"},
-                {"features": ["box", "contacts", "rails", "detent"], "finish": "satin", "color": "#c7ccd1"}]
+        return [{"features": ["lid", "tongue", "grip"], "finish": "matte", "color": "#2f3439"},
+                {"features": ["box", "contacts", "rails", "detent"], "finish": "matte", "color": "#c7ccd1"}]
