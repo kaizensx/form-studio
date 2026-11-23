@@ -271,7 +271,7 @@ Item {
     onAzChanged: if (!isFinite(az)) { tween = false; az = -34 }
     onElChanged: if (!isFinite(el)) { tween = false; el = 28.4 }
     // the camera's last good placement: a frame whose numbers are not finite keeps the one before it
-    readonly property var _camGood: ({ pos: Qt.vector3d(0, -420, 220), aim: Qt.vector3d(0, 0, 20) })
+    readonly property var _camGood: ({ pos: Qt.vector3d(0, -420, 220), aim: Qt.vector3d(0, 0, 20), held: false })
 
     // which sides of the part face the camera (the dimension lines stand on those)
     readonly property bool camRight: Math.sin(az * Math.PI / 180) > 0.02
@@ -476,29 +476,52 @@ Item {
                 var p = zpos, a = aim, g = vp._camGood
                 if (isFinite(p.x) && isFinite(p.y) && isFinite(p.z) && isFinite(a.x) && isFinite(a.y) && isFinite(a.z) && p.minus(a).length() > 1e-3) {
                     g.pos = p; g.aim = a                     // plain fields: remembering it does not re-run this binding
+                    g.held = false
                     return { pos: p, aim: a }
                 }
+                if (!g.held)                             // once per fallback, not once per frame
+                    console.warn("Viewport: camera frame not finite (az " + vp.az + ", el " + vp.el + ", dist " + vp.dist + ", fitK " + vp.fitK
+                                 + ", target " + vp.target + "); keeping the last good one")
+                g.held = true
                 return { pos: g.pos, aim: g.aim }
             }
             position: vp.scene(place.pos)
             rotation: Quaternion.lookAt(vp.scene(place.pos), vp.scene(place.aim))
+            // the camera under the bench: the floor and the plate turn translucent, so the part reads through them
+            readonly property bool under: place.pos.z < 0
+            // how far under, as an angle: 0 at the bench (seen edge-on), 1 from about 4 degrees below it. The ground
+            // thickens in over that, so going under is a glide and not a step.
+            readonly property real belowK: under ? Math.min(1, -place.pos.z / Math.max(1e-3, far * 0.07)) : 0
+            // the floor and the plate sit a hair under the part, and under each other; the gap grows with the
+            // distance so the depth buffer always tells them apart (they fought when zoomed far out)
+            readonly property real floorGap: Math.max(0.05, far * 1e-4)
+            // shadows reach past the part at any zoom (they popped out beyond a fixed 1400 mm). The range grows in
+            // doublings, so it changes a few times over the whole zoom instead of making the shadow crawl.
+            readonly property real shadowFar: 1400 * Math.pow(2, Math.max(0, Math.ceil(Math.log(Math.max(1, (far * 1.3 + span) / 1400)) / Math.LN2)))
         }
         // key from the upper left front (casts the shadow), a warm fill, a cool rim from behind that draws the
         // far silhouette, and a little light from straight above so top faces separate from walls
         DirectionalLight { eulerRotation: Qt.vector3d(-50, -34, 0); brightness: 2.0; color: "#fffaf2"
-            castsShadow: !vp.lite; shadowFactor: 86; shadowMapQuality: Light.ShadowMapQualityVeryHigh; softShadowQuality: Light.PCF32; pcfFactor: 9; shadowMapFar: 1400; csmNumSplits: 1
+            castsShadow: !vp.lite; shadowFactor: 86; shadowMapQuality: Light.ShadowMapQualityVeryHigh; softShadowQuality: Light.PCF32; pcfFactor: 9; shadowMapFar: cam.shadowFar; csmNumSplits: 1
             lockShadowmapTexels: true }       // the shadow map's texels stay put while the camera moves: no shimmering edges
         DirectionalLight { eulerRotation: Qt.vector3d(-16, 112, 0); brightness: 0.62; color: "#ffeedd" }
         DirectionalLight { eulerRotation: Qt.vector3d(-24, 164, 0); brightness: 0.9; color: "#c4dcff" }
         DirectionalLight { eulerRotation: Qt.vector3d(-90, 0, 0); brightness: 0.22 }
+        // (four is Qt Quick 3D's limit for directional lights. The bounce from the bench that lights faces looking
+        // down is an ambient term in shaders/clay.frag.)
 
         Node {
             id: zup
             eulerRotation.x: -90                       // everything below is in Z-up millimetres
 
             // the studio floor: matte, catches the part's shadow, runs to the horizon and fades into the background
-            Model { source: "#Rectangle"; scale: Qt.vector3d(60, 60, 1); z: -0.09; receivesShadows: true; castsShadows: false; pickable: false
-                materials: CustomMaterial { shadingMode: CustomMaterial.Shaded; fragmentShader: "shaders/ground.frag"
+            // From below it is a translucent ground (ground.frag) instead of being culled away: blending is only switched on
+            // while the camera is under it, so from above it stays an opaque floor that the AO and shadows see.
+            Model { objectName: "floor"; source: "#Rectangle"; scale: Qt.vector3d(60, 60, 1); z: -1.8 * cam.floorGap; receivesShadows: true; castsShadows: false; pickable: false
+                materials: CustomMaterial { shadingMode: CustomMaterial.Shaded; fragmentShader: "shaders/ground.frag"; cullMode: Material.NoCulling
+                    sourceBlend: cam.under ? CustomMaterial.SrcAlpha : CustomMaterial.NoBlend
+                    destinationBlend: cam.under ? CustomMaterial.OneMinusSrcAlpha : CustomMaterial.NoBlend
+                    property real uBelowAlpha: 0.3 * cam.belowK
                     property color uColor: Theme.benchGround; property color uFar: Theme.plate; property real uFade: Math.max(vp.groundSpan * 1.6, vp.dist * 0.9) } }
             // studio: a faint origin cross, the one fixed point on the floor (it gives way to the plate)
             Model { objectName: "originCross"; pickable: false; castsShadows: false; visible: vp.plateK < 0.5; position: Qt.vector3d(vp.shift.x, vp.shift.y, 0)
@@ -507,9 +530,10 @@ Item {
                     property color uColor: Theme.benchGrid; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
             // the printer's build plate (stageMode "plate" only): a slightly lighter slab, a 10 mm grid, a firm outline.
             // The slab's tone eases in from the floor's, so the plate arrives and leaves instead of cutting.
-            Model { objectName: "buildPlate"; source: "#Rectangle"; scale: Qt.vector3d(vp.plateSize / 100, vp.plateSize / 100, 1); z: -0.05; receivesShadows: true; castsShadows: false; pickable: false
+            Model { objectName: "buildPlate"; source: "#Rectangle"; scale: Qt.vector3d(vp.plateSize / 100, vp.plateSize / 100, 1); z: -cam.floorGap; receivesShadows: true; castsShadows: false; pickable: false
                 visible: vp.plateShown
-                materials: PrincipledMaterial { baseColor: Qt.tint(Theme.benchGround, Theme.alpha(Theme.benchPlate, vp.plateK)); roughness: 1; specularAmount: 0 } }
+                materials: PrincipledMaterial { baseColor: Qt.tint(Theme.benchGround, Theme.alpha(Theme.benchPlate, vp.plateK)); roughness: 1; specularAmount: 0
+                    cullMode: Material.NoCulling; opacity: cam.under ? 0.3 * cam.belowK : 1 } }
             Model { pickable: false; castsShadows: false; visible: vp.plateK >= 0.5
                 geometry: LineGeometry { points: {
                     var p = [], h = vp.plateSize / 2

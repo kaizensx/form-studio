@@ -9,8 +9,14 @@ void MAIN()
     BASE_COLOR = vec4(mix(uColor.rgb, VAR_COLOR.rgb, uMap), 1.0);
     ROUGHNESS = 0.84;
     METALNESS = 0.0;
-    float edge = 1.0 - clamp(abs(dot(normalize(NORMAL), normalize(VIEW_VECTOR))), 0.0, 1.0);
-    EMISSIVE_COLOR = uGlow.rgb + uRim.rgb * pow(edge, 2.6) * (1.0 - uMap);
+    vec3 n = normalize(NORMAL);
+    float edge = 1.0 - clamp(abs(dot(n, normalize(VIEW_VECTOR))), 0.0, 1.0);
+    // studio ambient, as a white room gives it: a little from everywhere, more from the floor that bounces the key
+    // back up. The lights all come from above, so without it a face that looks down (the view from below) is black.
+    // Scene space is Y-up: n.y = -1 faces the floor.
+    float down = clamp(-n.y, 0.0, 1.0);
+    vec3 ambient = BASE_COLOR.rgb * (0.06 + 0.34 * down * down);
+    EMISSIVE_COLOR = ambient + uGlow.rgb + uRim.rgb * pow(edge, 2.6) * (1.0 - uMap);
     if (!gl_FrontFacing) {
         BASE_COLOR = vec4(0.0, 0.0, 0.0, 1.0);
         EMISSIVE_COLOR = vec3(0.36, 0.56, 0.49);

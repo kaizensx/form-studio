@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **The view from below is lit, and moving the view no longer flashes dark.** Faces that look down get the light
+  the bench bounces back up (an ambient term in the clay shader that grows toward the floor), so the Under view and
+  every elevation down to -89 degrees show shaded clay instead of a black shape: on the test enclosure the Under view
+  went from 12 % to 61 % of the iso view's brightness in the dark appearance. Seen from below, the floor and the
+  build plate are a translucent ground the part reads through instead of disappearing, and they thicken in over the
+  first few degrees under the bench, so going under is a glide. Shadows reach as far as the camera can zoom out (they
+  popped out past 1400 mm), the floor and plate keep a depth gap that grows with distance, and a camera frame that is
+  not a finite number is logged once when the last good one is kept. A new UI journey (viewport_light) checks every
+  standard view and an elevation sweep at 30, 420 and 3000 mm in both appearances.
+
 - **Feature records stay true.** A feature left out because it made more parts than the design declared is built
   again as soon as `solids` is raised (the record follows the part count it was checked against). Only a feature that
   ran past its own time budget is written down as hung: a whole build that runs out of time no longer blames the

@@ -87,6 +87,12 @@ class Journeys(unittest.TestCase):
     def test_viewport_calm(self):           # orbit, zoom, rebuilds and slider drags never blink; a build grows in by feature
         self.journey("viewport_calm.py")
 
+    def test_viewport_light(self):          # every view, elevation and zoom keeps the part lit; orbit and zoom never flash
+        self.journey("viewport_light.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_viewport_light_light(self):    # the same in the light appearance
+        self.journey("viewport_light.py", env_extra={"FORM_APPEARANCE": "light"})
+
     def test_build_stages(self):            # an agent's build is drawn stage by stage before it is saved, then the saved design
         self.journey("build_stages.py")
 
