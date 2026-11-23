@@ -30,7 +30,8 @@ Item {
     function liveLine() {
         var L = Store.chatLive
         if (Store.chatAsking) return "Waiting for your answer"
-        if (!Store.chatBusy) return dz.done ? (Store.convNoDesign ? "This conversation has not made a design yet" : "The agent answered without creating a design") : "Starting the agent…"
+        if (!Store.chatBusy) return dz.done ? ((Store.concepts && Store.concepts.length) ? "Concepts are ready: pick one in the conversation"
+                                                 : Store.convNoDesign ? "This conversation has not made a design yet" : "The agent answered without creating a design") : "Starting the agent…"
         if (!L) return "Thinking about it…"
         if (L.kind === "tool") return (L.name === "create_design" || L.name === "update_design" || L.name === "propose_concepts")
                                       ? "Writing design code · " + (L.chars / 1000).toFixed(1) + " kB" : "Working…"
