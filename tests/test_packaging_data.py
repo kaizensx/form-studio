@@ -103,9 +103,11 @@ class PackagedData(unittest.TestCase):
         hidden, excl = got["hiddenimports"], got["excludes"]
         self.assertIn("form.recon.cadfit", hidden)
         self.assertIn("form.recon.pipeline", hidden)
-        for m in ("form.recon.cadfit.vendor", "form.recon.cadfit.vendor.iou", "form.recon.cadfit.driver",
-                  "form.recon.cadfit.cqrun", "form.recon.cadfit._compat"):
+        for m in ("form.recon.cadfit.vendor", "form.recon.cadfit.vendor.iou", "form.recon.cadfit.driver"):
             self.assertNotIn(m, hidden)
+        # the app reads the program CADFit sends back from its own environment: its reader stays in
+        for m in ("form.recon.cadfit.cqrun", "form.recon.cadfit._compat"):
+            self.assertIn(m, hidden)
         for m in ("trimesh", "form.recon.cadfit.vendor", "form.recon.cadfit.driver"):
             self.assertIn(m, excl)
         for m in ("scipy", "sklearn"):
