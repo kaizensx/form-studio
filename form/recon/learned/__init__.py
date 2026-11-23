@@ -53,15 +53,29 @@ def model_dir() -> Path:
     return data / "models" / "cad-recode"
 
 
+ENGINE_ID = "recon.learned"            # its managed environment (form/engines.py): the packaged app's way to run it
+
+
+def engine_python() -> Path | None:
+    """The interpreter of the engine's own environment (<data>/.engines/recon.learned), when it is complete."""
+    try:
+        from ... import engines
+        return engines.python(ENGINE_ID)
+    except Exception:                                   # noqa: BLE001
+        return None
+
+
 def status(folder: Path | None = None) -> dict:
-    """Is the engine installed? Never downloads, never imports torch."""
+    """Is the engine installed? Never downloads, never imports torch. Its libraries count as there when this Python
+    has them or when its own environment (form/engines.py) is complete."""
     folder = Path(folder) if folder else model_dir()
-    libs = [m for m in LIBRARIES if importlib.util.find_spec(m) is None]
+    py = engine_python()
+    libs = [] if py else [m for m in LIBRARIES if importlib.util.find_spec(m) is None]
     w = folder / "model.safetensors"
     weights = (folder / MARKER).is_file() and w.is_file() and all((folder / f).is_file() for f in WEIGHT_FILES) \
         and all((folder / "tokenizer" / f).is_file() for f in TOKENIZER_FILES)
     out = {"name": NAME, "installed": not libs and weights, "folder": str(folder), "licence": LICENCE,
-           "licence_url": LICENCE_URL, "size": SIZE}
+           "licence_url": LICENCE_URL, "size": SIZE, "runs_in": str(py) if py else "this Python"}
     if libs:
         out["missing_libraries"] = libs
     if not weights:
@@ -81,9 +95,14 @@ def candidate(V, F, tol, name="part", limit=None, deadline=None, generate=None, 
     rep = {"method": f"learned engine ({NAME})", "engine": NAME, "licence": LICENCE}
     try:
         if generate is None:
-            from . import engine
             folder = Path(folder) if folder else model_dir()
-            gen = engine.generate(V, F, folder, deadline=deadline)
+            py = engine_python()
+            if py is not None:                          # its own environment: PyTorch runs in that interpreter
+                from .engine import generate_in
+                gen = generate_in(py, V, F, folder, deadline=deadline)
+            else:
+                from . import engine
+                gen = engine.generate(V, F, folder, deadline=deadline)
         else:
             gen = generate(V, F)
         code = str(gen.get("code") or "")

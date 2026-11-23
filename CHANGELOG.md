@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Every optional engine installs in one click.** Each row in Settings › Software has its own Install button (or the
+  official download page when Form Studio cannot install it here), with its size and licence always on the card. In the
+  packaged app, CAD-Recode and CADFit get a Python of their own: Form Studio downloads a pinned uv (its SHA-256 checked
+  before use), makes `<data folder>/.engines/<engine>` with Python 3.12 and pinned libraries, fetches the weights, and
+  runs the engine out of process with that interpreter. CADFit is now in the list and its code ships with the app (its
+  LICENSE and PERMISSION.md included); installing it turns it on. A non-commercial licence (CAD-Recode, CADFit) is shown
+  as one line before anything is downloaded, and pressing Install there accepts it. The CADEvolve corpus downloads in
+  the app everywhere. Progress and errors show on the row, and a failed install leaves things as they were.
+- **Deploy notices an old app in the Trash.** `scripts/deploy_mac.sh` says when an old Form Studio is still in the
+  Trash (Spotlight keeps showing it) and asks you to empty it; it never touches the Trash.
+
 - **Feature records stay true.** A feature left out because it made more parts than the design declared is built
   again as soon as `solids` is raised (the record follows the part count it was checked against). Only a feature that
   ran past its own time budget is written down as hung: a whole build that runs out of time no longer blames the

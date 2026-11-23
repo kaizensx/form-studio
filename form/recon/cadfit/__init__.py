@@ -16,6 +16,11 @@ permission (PERMISSION.md); Form Studio's MIT licence does not cover this folder
 A candidate that does not verify is reported and never returned as the result. Off, or without its libraries
 (trimesh, manifold3d, scikit-learn, scipy: `pip install form-studio[cadfit]`), nothing changes. This module imports
 none of them: they are imported only in the child process.
+
+The packaged app carries none of those libraries. There, Settings > Software installs CADFit as an engine environment
+of its own (form/engines.py: <data>/.engines/recon.cadfit, a Python 3.12 with the pinned libraries), and the child is
+that interpreter running this folder's code from the app's engine_src/ (packaging/form.spec). Once that environment is
+complete it is used in a source checkout too.
 """
 from __future__ import annotations
 
@@ -54,6 +59,18 @@ def enabled() -> bool:
         return False
 
 
+ENGINE_ID = "recon.cadfit"             # its managed environment (form/engines.py)
+
+
+def engine_python():
+    """The interpreter of CADFit's own environment, when it is complete; else None."""
+    try:
+        from ... import engines
+        return engines.python(ENGINE_ID)
+    except Exception:                                   # noqa: BLE001
+        return None
+
+
 def _bundled() -> bool:
     """Is CADFit's search code here? The packaged app leaves it out (packaging/form.spec CADFIT_ONLY)."""
     try:
@@ -63,7 +80,11 @@ def _bundled() -> bool:
 
 
 def status() -> dict:
-    """Enabled, and are its code and libraries there? Imports none of them."""
+    """Enabled, and are its code and libraries there (in this Python, or in its own environment)? Imports none of them."""
+    py = engine_python()
+    if py is not None:
+        return {"name": NAME, "enabled": enabled(), "installed": True, "bundled": True, "engine_python": str(py),
+                "licence": LICENCE, "source": SOURCE, "commit": COMMIT}
     missing = []
     for m in LIBRARIES:
         try:
@@ -132,6 +153,9 @@ def _search(V, F, seconds: float, runner=None) -> dict:
     try:
         stl = work / "part.stl"
         _write_stl(stl, V, F)
+        py = engine_python() if runner is None else None
+        if py is not None:
+            return _search_in(py, stl, work, seconds, t0, end)
         from ..bounded import _children_allowed
         ctx = mp.get_context("spawn")                   # as form/recon/bounded.py: never a fork (macOS, OCCT threads)
         a, b = ctx.Pipe(duplex=False)
@@ -171,6 +195,96 @@ def _search(V, F, seconds: float, runner=None) -> dict:
         if p is not None and p.is_alive():
             p.kill()
         shutil.rmtree(work, ignore_errors=True)
+
+
+def _search_in(py, stl, work, seconds, t0, end) -> dict:
+    """_search with CADFit's own environment: its interpreter runs _engine_main and writes each result as one JSON
+    line; it is killed at `end`, and it ends by itself when this process ends."""
+    import json
+    import subprocess
+    import threading
+    from ... import engines
+    lines: list = []
+    got = threading.Event()
+    proc = subprocess.Popen([str(py), "-c", ENGINE_CHILD, str(stl), str(work / "run"), str(float(seconds)),
+                             str(os.getpid())], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            stdin=subprocess.DEVNULL, env=engines.child_env(), text=True, encoding="utf-8",
+                            errors="replace")
+
+    def read():
+        for line in proc.stdout:
+            try:
+                msg = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(msg, dict):
+                lines.append(msg)
+                if msg.get("final"):
+                    got.set()
+        got.set()
+    th = threading.Thread(target=read, daemon=True)
+    th.start()
+    try:
+        got.wait(max(0.0, end - time.perf_counter()))
+        res = lines[-1] if lines else None
+        timed_out = proc.poll() is None and not (res or {}).get("final")
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        try:
+            proc.wait(5)
+        except subprocess.TimeoutExpired:
+            pass
+        th.join(2)
+        try:
+            proc.stdout.close()
+        except OSError:
+            pass
+    if res is None:
+        res = ({"error": f"CADFit found nothing within its {seconds:.0f} s"} if timed_out else
+               {"error": f"the CADFit process ended without a result (exit code {proc.returncode})"})
+    res = dict(res)
+    if timed_out:
+        res["timed_out"] = True
+    res["seconds"] = round(time.perf_counter() - t0, 2)
+    return res
+
+
+ENGINE_CHILD = "from form.recon.cadfit import _engine_main; _engine_main()"
+
+
+def _engine_main() -> None:                            # pragma: no cover - runs in CADFit's own interpreter
+    """The child in CADFit's own environment: every result as one JSON line on stdout, which nothing else writes to."""
+    import json
+    import sys
+    import threading
+    stl, work, seconds, parent = sys.argv[1], sys.argv[2], float(sys.argv[3]), int(sys.argv[4])
+
+    def watch():
+        while True:
+            time.sleep(1.0)
+            if os.getppid() != parent:
+                os._exit(1)
+    threading.Thread(target=watch, daemon=True).start()
+    out = os.fdopen(os.dup(1), "w", encoding="utf-8")
+    try:
+        os.dup2(2, 1)                                   # CADFit's own prints go to stderr, never into the results
+    except OSError:
+        pass
+
+    def send(d):
+        try:
+            out.write(json.dumps(d, default=lambda o: float(o) if hasattr(o, "__float__") else str(o)) + "\n")
+            out.flush()
+        except Exception:                               # noqa: BLE001
+            pass
+    try:
+        from . import driver
+        res = driver.run(Path(stl), Path(work), emit=send, deadline=time.perf_counter() + 0.9 * seconds)
+    except BaseException as e:                         # noqa: BLE001
+        res = {"error": f"{type(e).__name__}: {e}"[:300], "final": True}
+    send(res)
+    out.close()
 
 
 def _write_stl(path, V, F):
@@ -253,8 +367,8 @@ def candidate(mesh, budget_s: float, tol: float = 0.02, name: str = "part", limi
     try:
         st = status()
         if search is None and not st.get("bundled", True):
-            return done(error="CADFit is not part of this build of Form Studio: it needs form-studio[cadfit] "
-                              "(run Form Studio from source with pip install form-studio[cadfit])")
+            return done(error="CADFit is not installed: install it in Settings > Software (it gets its own Python), "
+                              "or run Form Studio from source with pip install form-studio[cadfit]")
         if search is None and not st["installed"]:
             return done(error=f"CADFit needs {', '.join(st['missing_libraries'])}: it needs form-studio[cadfit] "
                               "(pip install form-studio[cadfit])")
