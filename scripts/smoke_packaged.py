@@ -196,7 +196,7 @@ def cadfit_engine_step(target: str) -> None:
     """CADFit's code ships as files for its engine environment (with its LICENSE and PERMISSION.md); when that
     environment is installed on this computer, its interpreter imports CADFit from the built app. Read-only: the
     environment is only used, never made or changed here."""
-    src = engine_src_of(target)
+    src = engine_src_of(target).resolve()      # absolute: the import check runs from another folder
     if src is None:
         step("CADFit ships for its engine environment", "FAIL", "no engine_src/ in the app")
         return
@@ -215,7 +215,8 @@ def cadfit_engine_step(target: str) -> None:
     env.update(PYTHONPATH=str(src), PYTHONNOUSERSITE="1", PYTHONDONTWRITEBYTECODE="1")
     r = subprocess.run([str(py), "-c", "import form.recon.cadfit as c, form.recon.cadfit.driver, form.recon.cadfit.cqrun, "
                         "form.recon.cadfit.vendor.greedy_search, trimesh, manifold3d, sklearn, scipy, build123d; print(c.__file__)"],
-                       env=env, capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
+                       env=env, capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL,
+                       cwd=tempfile.gettempdir())     # never the checkout: `python -c` puts the cwd first on sys.path
     where = (r.stdout.strip().splitlines() or [""])[-1]
     ok = r.returncode == 0 and where.startswith(str(src))
     step("CADFit imports through its engine environment", "PASS" if ok else "FAIL",
