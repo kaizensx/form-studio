@@ -26,6 +26,20 @@
   them as unknowns. New design_guide topics: `hybrid` (when to use each route, how a SubD cage becomes CAD,
   editability, limits) and `game` (budgets, LODs, UVs, bakes, collision, engine presets; it says when the game
   pipeline is not in the build yet).
+- **Subdivision cages become exact CAD where the surface allows it, and say so where it does not.** A quad cage
+  (`craft.subd.Cage`) now takes creases and open borders: an infinitely sharp crease is a C0 border between patches
+  that carry the crease's B-spline exactly, a semi-sharp crease (sharpness s) is resolved by ceil(s) subdivision
+  levels, and an open border follows the B-spline boundary rules, closed by a planar cap (exact), an OCCT filling cap
+  (approximate, noted) or `close="thicken"`. Regular patches are merged into multi-span bicubic B-spline faces: the
+  test torus is 4 faces instead of 96, the cube-sphere 66 instead of 216. Named regions (`regions={"lid": [...]}`)
+  label faces (`region_faces`), give a point and normal for `craft.magnet_pair` (`region_frame`) and a slab that
+  follows the skin for cuts and `craft.parts` (`region_tool`). The new `craft.subd_report` measures every result
+  against the true Catmull-Clark limit (a level-6 limit mesh): max and RMS deviation, seam angles, BRepCheck, face
+  count and a STEP round trip. Measured on the reference cages: regular torus and open tube 4e-14 mm (exact);
+  cube-sphere 0.0046 mm on 89 mm, worst seam 0.73 degrees; genus-2 slab (3 levels) 0.027 mm on 108 mm, worst seam
+  1.84 degrees (over the 1 degree target; 1.08 at 4 levels); creased lenses about 0.003 mm, 0.58 degrees. STEP
+  re-imports valid with the same volume, and a hole cuts cleanly through all seven. Only a skin whose patches are all
+  regular is called exact; anything near an extraordinary vertex is reported as the measured approximation it is.
 - **The view from below is lit, and moving the view no longer flashes dark.** Faces that look down get the light
   the bench bounces back up (an ambient term in the clay shader that grows toward the floor), so the Under view and
   every elevation down to -89 degrees show shaded clay instead of a black shape: on the test enclosure the Under view

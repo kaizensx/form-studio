@@ -69,7 +69,8 @@ class Solids(unittest.TestCase):
         self.assertLess(rep["worst_deg"], 1.0)
         s = c.solid()
         self.assertTrue(s.is_valid)
-        self.assertEqual(len(s.faces()), len(c.F))
+        self.assertLessEqual(len(s.faces()), len(c.F) // 2)     # regular patches merged into B-spline faces
+        self.assertEqual(len(subd.patches_solid(c.patches()).faces()), len(c.F))
         self.assertAlmostEqual(s.volume, 4 / 3 * math.pi * 40 ** 3, delta=0.25 * 4 / 3 * math.pi * 40 ** 3)
 
     def test_catmull_clark_makes_quads_of_any_polygons(self):

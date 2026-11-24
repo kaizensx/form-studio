@@ -7,11 +7,16 @@ net's points (directly, or through named handles that are a design's parameters)
   clamped uniform bicubic B-spline: the Catmull-Clark limit inside, its border pinned to the cage's border. One grid is
   one exact B-spline surface, C2 everywhere inside (smoother than G1). A shell is two grids, the skin and its inside
   (the skin offset by the wall), joined at the rim by ruled faces: a closed solid of six faces.
-* A closed **quad cage** of any genus (a character prop, a sculpted grip) is subdivided by Catmull-Clark and turned
-  into one bicubic Bezier patch per quad with Loop and Schaefer's approximation (ACC, 2008): exact (C2) where the net
-  is regular, and at an extraordinary vertex (not four quads round it) the edge points round it are put in one tangent
-  plane, so the skin is G1 at the vertex and within a measured angle along the patch borders next to it
-  (seam_angles() reports the worst). The patches are sewn into a closed OCCT solid.
+* A **quad cage** of any genus, closed or open, with creases (a character prop, a sculpted grip, a lid with a sharp
+  rim) is subdivided by Catmull-Clark and turned into one bicubic Bezier patch per quad with Loop and Schaefer's
+  approximation (ACC, 2008), generalised to creases and borders: exact where the net is regular (every patch whose
+  corners are regular is the limit surface itself), and at an extraordinary vertex (not four quads round it) the edge
+  points round it are put in one tangent plane, so the skin is G1 at the vertex and within a measured angle along the
+  patch borders next to it (seam_angles() reports the worst). Infinitely sharp creases are C0 borders carrying the
+  crease's exact B-spline; semi-sharp ones are resolved by subdivision levels first; open borders follow the B-spline
+  boundary rules and are capped or thickened. Blocks of regular patches are merged into one multi-span B-spline face
+  each; the faces are sewn into a closed OCCT solid. form.craft.subd_report measures the result against the true limit
+  surface (deviation in mm, seams, BRepCheck, STEP round trip): nothing at an extraordinary vertex is called exact.
 
 Why this route (evaluated against OpenSubdiv bindings, Blender headless and OCCT plate surfaces): it is plain numpy and
 scipy plus the OCCT that build123d already ships, so it installs and packages the same way on macOS, Windows and Linux.
@@ -27,6 +32,10 @@ point on the surface and solving again.
     C = subd.dome_grid(270, 215, 165, n=12)                        # a grid cage
     C = subd.apply_handles(C, HANDLES, v)                          # named handles moved by parameters
     shell = subd.shell_solid(C, wall=3)                            # outer skin + inside + rim, one closed solid
+
+    cage = subd.Cage(V, quads, levels=1, creases=edges, regions={"lid": faces})
+    body = cage.solid()                                            # exact B-spline blocks + measured ACC patches
+    at, axis = cage.region_frame("lid")                            # where a magnet pair goes
 
 form.craft.subd needs numpy and scipy for cages and fitting; OCCT (the kernel worker) only for the *_face / *_solid
 builders.
@@ -381,19 +390,25 @@ def grid_face(C: np.ndarray):
     return Face(BRepBuilderAPI_MakeFace(grid_surface(C), 1e-7).Face())
 
 
-def _sew(faces, tol: float = 1e-3, label: str = "body"):
-    """Sew OCCT faces into a closed solid (build123d Solid), oriented outward. Raises a RecipeError if it leaks."""
-    from build123d import Solid
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid, BRepBuilderAPI_Sewing
-    from OCP.ShapeFix import ShapeFix_Solid
-    from OCP.TopAbs import TopAbs_SHELL
-    from OCP.TopExp import TopExp_Explorer
-    from OCP.TopoDS import TopoDS
+def _sew_shape(faces, tol: float = 1e-3):
+    """Sew OCCT faces (edges that meet along part of their length are cut to match). Returns (shape, free edges)."""
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_Sewing
     sew = BRepBuilderAPI_Sewing(tol)
     for f in faces:
         sew.Add(f.wrapped if hasattr(f, "wrapped") else f)
     sew.Perform()
-    shape = sew.SewedShape()
+    return sew.SewedShape(), sew.NbFreeEdges()
+
+
+def _sew(faces, tol: float = 1e-3, label: str = "body"):
+    """Sew OCCT faces into a closed solid (build123d Solid), oriented outward. Raises a RecipeError if it leaks."""
+    from build123d import Solid
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeSolid
+    from OCP.ShapeFix import ShapeFix_Solid
+    from OCP.TopAbs import TopAbs_SHELL
+    from OCP.TopExp import TopExp_Explorer
+    from OCP.TopoDS import TopoDS
+    shape, nfree = _sew_shape(faces, tol)
     ex = TopExp_Explorer(shape, TopAbs_SHELL)
     need(ex.More(), f"subd: the {label}'s faces did not sew into a shell", "Check the cage for gaps.", ["cage"])
     shell = TopoDS.Shell(ex.Current())
@@ -403,7 +418,7 @@ def _sew(faces, tol: float = 1e-3, label: str = "body"):
     s = Solid(fix.Solid())
     if s.volume < 0:
         s = Solid(s.wrapped.Reversed())
-    need(sew.NbFreeEdges() == 0, f"subd: the {label} is not closed ({sew.NbFreeEdges()} free edges after sewing)",
+    need(nfree == 0, f"subd: the {label} is not closed ({nfree} free edges after sewing)",
          "The cage has a hole or the rim faces do not meet; check the cage.", ["cage"])
     return s
 
@@ -463,101 +478,296 @@ def trimmed_shell_solid(Co: np.ndarray, Ci: np.ndarray, radius: float, center=(0
     return _sew([fo, fi, rim], tol=1e-3, label=label)
 
 
-# ── closed quad cages: Catmull-Clark and ACC bicubic patches ──────────────────────────────────────────────────────
+# ── quad cages: Catmull-Clark with creases and boundaries, ACC and exact B-spline patches ─────────────────────────
+#
+# Rules (DeRose, Kass and Truong 1998, with OpenSubdiv's "edge and corner" boundary): an edge with sharpness s >= 1
+# (and every boundary edge) is subdivided by the crease rules, its children get s - 1 (infinite stays infinite);
+# 0 < s < 1 blends the crease and smooth rules. A vertex with two sharp edges follows its crease (a + 6v + b) / 8, one
+# with three or more (or a boundary vertex with one face) is a corner and stays. Infinitely sharp creases and
+# boundaries are cubic B-spline curves of their vertices; each side of a crease is the boundary surface of its sector
+# (phantom points 2b - i), so a patch whose four corners are regular in their sector (smooth valence 4, a crease
+# vertex with two faces on this side, a corner with one) is exactly a bicubic B-spline patch. Semi-sharp creases are
+# removed by ceil(s) subdivision levels first; after that the surface is the smooth limit of the finer cage.
 
-def catmull_clark(V: np.ndarray, F: list) -> tuple[np.ndarray, np.ndarray]:
-    """One Catmull-Clark step on a closed polygon mesh (any polygons). Returns (V, quads)."""
+INF = math.inf
+
+
+def _ekey(a, b) -> tuple:
+    a, b = int(a), int(b)
+    return (a, b) if a < b else (b, a)
+
+
+def _norm_creases(creases) -> dict:
+    """{(a, b): sharpness} from a dict {(a, b): s} or a list of edges (infinitely sharp). s True or None: infinite."""
+    out: dict = {}
+    if creases is None:
+        return out
+    items = creases.items() if isinstance(creases, dict) else ((e, INF) for e in creases)
+    for e, s in items:
+        a, b = e
+        s = INF if s is True or s is None else float(s)
+        need(s >= 0, f"subd: crease ({a}, {b}) has a negative sharpness", "Give sharpness >= 0 (inf: sharp).", ["creases"])
+        if s > 0:
+            k = _ekey(a, b)
+            out[k] = max(out.get(k, 0.0), s)
+    return out
+
+
+def _sharp_arrays(sharp) -> tuple[np.ndarray, np.ndarray]:
+    if isinstance(sharp, tuple):
+        return sharp
+    if not sharp:
+        return np.zeros((0, 2), np.int64), np.zeros(0)
+    keys = np.array(list(sharp.keys()), dtype=np.int64).reshape(-1, 2)
+    return np.sort(keys, axis=1), np.array(list(sharp.values()), float)
+
+
+def _halfedges(F):
+    """Half-edge arrays of a polygon mesh: start vertex, face, next and previous half-edge, face count."""
+    if isinstance(F, np.ndarray) and F.ndim == 2:
+        m, s = F.shape
+        hv = F.reshape(-1).astype(np.int64)
+        hf = np.repeat(np.arange(m), s)
+        loc = np.tile(np.arange(s), m)
+        base = hf * s
+        return hv, hf, base + (loc + 1) % s, base + (loc - 1) % s, m
+    sizes = np.array([len(f) for f in F], dtype=np.int64)
+    hv = np.concatenate([np.asarray(f, dtype=np.int64) for f in F])
+    starts = np.r_[0, np.cumsum(sizes)[:-1]]
+    hf = np.repeat(np.arange(len(F)), sizes)
+    loc = np.arange(len(hv)) - starts[hf]
+    return hv, hf, starts[hf] + (loc + 1) % sizes[hf], starts[hf] + (loc - 1) % sizes[hf], len(F)
+
+
+def _topo(nV: int, F, sharp) -> dict:
+    """Edges, sharpness and vertex classes of a polygon mesh (vectorised)."""
+    hv, hf, nxt, prv, m = _halfedges(F)
+    a, b = hv, hv[nxt]
+    code = np.minimum(a, b) * nV + np.maximum(a, b)
+    ucode, einv = np.unique(code, return_inverse=True)
+    einv = einv.reshape(-1)
+    E = len(ucode)
+    e0, e1 = ucode // nV, ucode % nV
+    nfe = np.bincount(einv, minlength=E)
+    need(nfe.max(initial=0) <= 2, "subd: the cage is not manifold (an edge has more than two faces)",
+         "Give every edge one or two quads.", ["cage"])
+    s = np.zeros(E)
+    s[nfe == 1] = INF
+    keys, vals = _sharp_arrays(sharp)
+    if len(keys):
+        c = keys[:, 0] * nV + keys[:, 1]
+        idx = np.searchsorted(ucode, c)
+        ok = idx < E
+        ok[ok] = ucode[idx[ok]] == c[ok]
+        s[idx[ok]] = np.maximum(s[idx[ok]], vals[ok])
+    val = np.bincount(e0, minlength=nV) + np.bincount(e1, minlength=nV)
+    nfv = np.bincount(hv, minlength=nV)
+    se = s > 0
+    ns = np.bincount(e0[se], minlength=nV) + np.bincount(e1[se], minlength=nV)
+    ssum = np.bincount(e0[se], weights=s[se], minlength=nV) + np.bincount(e1[se], weights=s[se], minlength=nV)
+    bnd = np.zeros(nV, bool)
+    bnd[e0[nfe == 1]] = True
+    bnd[e1[nfe == 1]] = True
+    corner = (ns >= 3) | (bnd & (nfv == 1))
+    crease = (ns == 2) & ~corner
+    avg = np.where(ns > 0, ssum / np.maximum(ns, 1), 0.0)
+    return dict(hv=hv, hf=hf, nxt=nxt, prv=prv, m=m, einv=einv, e0=e0, e1=e1, nfe=nfe, s=s, val=val, nfv=nfv,
+                ns=ns, bnd=bnd, corner=corner, crease=crease, avg=avg)
+
+
+def _cc_step(V: np.ndarray, F, sharp):
+    """One Catmull-Clark step with creases and boundaries. Returns (V, quads, child sharpness, parent face)."""
     V = np.asarray(V, dtype=np.float64)
-    F = [list(f) for f in F]
     nV = len(V)
-    fp = np.array([V[f].mean(0) for f in F])
-    edges = {}
-    for fi, f in enumerate(F):
-        for k in range(len(f)):
-            a, b = f[k], f[(k + 1) % len(f)]
-            edges.setdefault((min(a, b), max(a, b)), []).append(fi)
-    need(all(len(x) == 2 for x in edges.values()), "subd.catmull_clark: the cage is not closed (an edge has one face)",
-         "Close the cage, or use a grid cage for an open skin.", ["cage"])
-    ekeys = list(edges)
-    eidx = {e: nV + len(F) + i for i, e in enumerate(ekeys)}
-    ep = np.array([(V[a] + V[b] + fp[edges[(a, b)][0]] + fp[edges[(a, b)][1]]) / 4 for a, b in ekeys])
-    # vertex points
-    vf = [[] for _ in range(nV)]
-    ve = [[] for _ in range(nV)]
-    for fi, f in enumerate(F):
-        for a in f:
-            vf[a].append(fi)
-    for a, b in ekeys:
-        ve[a].append((a, b))
-        ve[b].append((a, b))
-    newV = np.empty_like(V)
-    for i in range(nV):
-        n = len(vf[i])
-        Fa = fp[vf[i]].mean(0)
-        R = np.mean([(V[a] + V[b]) / 2 for a, b in ve[i]], axis=0)
-        newV[i] = (Fa + 2 * R + (n - 3) * V[i]) / n
-    Vout = np.vstack([newV, fp, ep])
-    Q = []
-    for fi, f in enumerate(F):
-        c = nV + fi
-        m = len(f)
-        for k in range(m):
-            a, b, z = f[k], f[(k + 1) % m], f[k - 1]
-            Q.append([a, eidx[(min(a, b), max(a, b))], c, eidx[(min(z, a), max(z, a))]])
-    return Vout, np.array(Q, dtype=np.int64)
+    T = _topo(nV, F, sharp)
+    hv, hf, prv, m, einv, e0, e1, s = T["hv"], T["hf"], T["prv"], T["m"], T["einv"], T["e0"], T["e1"], T["s"]
+    fp = np.zeros((m, 3))
+    np.add.at(fp, hf, V[hv])
+    fp /= np.bincount(hf, minlength=m)[:, None]
+    E = len(e0)
+    fsum = np.zeros((E, 3))
+    np.add.at(fsum, einv, fp[hf])
+    mid = (V[e0] + V[e1]) / 2
+    smooth_e = (V[e0] + V[e1] + fsum) / 4
+    w = np.clip(s, 0, 1)[:, None]
+    ep = w * mid + (1 - w) * smooth_e
+    Fsum = np.zeros((nV, 3))
+    np.add.at(Fsum, hv, fp[hf])
+    Rsum = np.zeros((nV, 3))
+    np.add.at(Rsum, e0, mid)
+    np.add.at(Rsum, e1, mid)
+    n = np.maximum(T["val"], 1).astype(float)[:, None]
+    nf = np.maximum(T["nfv"], 1)[:, None]
+    smooth_v = (Fsum / nf + 2 * Rsum / n + (n - 3) * V) / n
+    se = s > 0
+    nb = np.zeros((nV, 3))
+    np.add.at(nb, e0[se], V[e1[se]])
+    np.add.at(nb, e1[se], V[e0[se]])
+    sharp_v = np.where(T["corner"][:, None], V, (nb + 6 * V) / 8)
+    wv = np.where(T["corner"] | T["crease"], np.clip(T["avg"], 0, 1), 0.0)[:, None]
+    vp = wv * sharp_v + (1 - wv) * smooth_v
+    Vout = np.vstack([vp, fp, ep])
+    Q = np.stack([hv, nV + m + einv, nV + hf, nV + m + einv[prv]], axis=1)
+    keep = (T["nfe"] == 2) & (s > 1)
+    j = np.nonzero(keep)[0]
+    mids = nV + m + j
+    ck = np.vstack([np.stack([e0[j], mids], 1), np.stack([mids, e1[j]], 1)])
+    cv = np.r_[s[j] - 1, s[j] - 1]
+    return Vout, Q, (np.sort(ck, axis=1), cv), hf
 
 
-def acc_operator(nV: int, Q: np.ndarray):
-    """Sparse matrix M (len(Q)*16 x nV): the 16 Bezier control points of each quad's ACC patch, as linear combinations
-    of the cage points (before the tangent-plane step). Patch q, row r, column c is row q*16 + r*4 + c."""
+def catmull_clark(V: np.ndarray, F: list, creases=None) -> tuple[np.ndarray, np.ndarray]:
+    """One Catmull-Clark step on a polygon mesh (any polygons; open borders follow the B-spline boundary rules,
+    creases {(a, b): sharpness} the crease rules). Returns (V, quads)."""
+    Vout, Q, _, _ = _cc_step(V, [list(f) for f in F] if not isinstance(F, np.ndarray) else F,
+                             _norm_creases(creases))
+    return Vout, Q
+
+
+def subdivide(V, F, creases=None, levels: int = 1):
+    """`levels` Catmull-Clark steps with creases. Returns (V, quads, remaining creases {(a, b): s}, parent face of
+    every quad in the input's faces)."""
+    sh = _sharp_arrays(_norm_creases(creases))
+    V = np.asarray(V, dtype=np.float64)
+    F = F if isinstance(F, np.ndarray) else [list(f) for f in F]
+    parent = np.arange(len(F))
+    for _ in range(int(levels)):
+        V, F, sh, p = _cc_step(V, F, sh)
+        parent = parent[p]
+    keys, vals = sh
+    return V, np.asarray(F, dtype=np.int64), {_ekey(*k): float(v) for k, v in zip(keys, vals) if v > 0}, parent
+
+
+def limit_points(V: np.ndarray, Q: np.ndarray, creases=None) -> np.ndarray:
+    """Exact limit positions of a quad cage's vertices: smooth (n^2 v + 4 sum(edge) + sum(diagonal)) / (n (n + 5)),
+    crease (a + 4v + b) / 6, corner v. Edges still semi-sharp below 1 count as smooth."""
+    V = np.asarray(V, dtype=np.float64)
+    nV = len(V)
+    T = _topo(nV, Q, _sharp_arrays(_norm_creases(creases)) if not isinstance(creases, tuple) else creases)
+    hv, nxt, e0, e1, s = T["hv"], T["nxt"], T["e0"], T["e1"], T["s"]
+    nb = np.zeros((nV, 3))
+    np.add.at(nb, e0, V[e1])
+    np.add.at(nb, e1, V[e0])
+    dg = np.zeros((nV, 3))
+    np.add.at(dg, hv, V[hv[nxt[nxt]]])
+    n = np.maximum(T["val"], 1).astype(float)[:, None]
+    out = (n * n * V + 4 * nb + dg) / (n * (n + 5))
+    se = s >= 1
+    nbs = np.zeros((nV, 3))
+    np.add.at(nbs, e0[se], V[e1[se]])
+    np.add.at(nbs, e1[se], V[e0[se]])
+    sharp = T["avg"] >= 1
+    cr = T["crease"] & sharp
+    co = T["corner"] & sharp
+    out[cr] = (nbs[cr] + 4 * V[cr]) / 6
+    out[co] = V[co]
+    return out
+
+
+def _acc(nV: int, Q: np.ndarray, sharp=None):
+    """ACC operator generalised to creases and boundaries: M (len(Q)*16 x nV) maps cage points to the 16 Bezier
+    points of every quad's patch (row q*16 + r*4 + c; corner a at (0, 0), b at (0, 3), c at (3, 3), d at (3, 0)), and
+    the topology facts the patches need. Corners: exact limit points. Edge points on a crease: (2v + w) / 3 (the crease
+    B-spline, exact). Interior points: (n v + 2 e1 + 2 e2 + f) / (n + 5), n the valence of a smooth vertex, 2k for a
+    crease vertex and 4k for a corner with k faces in the patch's sector (exact where regular). Other edge points are
+    the mean of the interior points either side, as in Loop and Schaefer's ACC."""
     import scipy.sparse as sp
-    Q = np.asarray(Q)
+    Q = np.asarray(Q, dtype=np.int64)
     m = len(Q)
-    val = np.zeros(nV, dtype=np.int64)
-    nbr = [set() for _ in range(nV)]
-    diag = [[] for _ in range(nV)]
-    for f in Q:
-        for i in range(4):
-            v = f[i]
-            val[v] += 1
-            nbr[v].add(f[(i + 1) % 4])
-            nbr[v].add(f[(i - 1) % 4])
-            diag[v].append(f[(i + 2) % 4])
-    rows, cols, vals = [], [], []
-
-    def put(row, combo):
-        for c, w in combo.items():
-            rows.append(row)
-            cols.append(c)
-            vals.append(w)
-
-    def interior(f, i):
-        v = f[i]
-        n = val[v]
-        d = {}
-        for c, w in ((v, n), (f[(i + 1) % 4], 2), (f[(i - 1) % 4], 2), (f[(i + 2) % 4], 1)):
-            d[c] = d.get(c, 0) + w / (n + 5)
-        return d
-
-    def limit(v):
-        n = val[v]
-        d = {v: n * n / (n * (n + 5))}
-        for e in nbr[v]:
-            d[e] = d.get(e, 0) + 4 / (n * (n + 5))
-        for g in diag[v]:
-            d[g] = d.get(g, 0) + 1 / (n * (n + 5))
-        return d
-
-    # interior points of every (face, corner), and which faces use each directed edge
-    I = {}
-    by_edge = {}
+    T = _topo(nV, Q, _sharp_arrays(sharp or {}) if not isinstance(sharp, tuple) else sharp)
+    e0, e1, s = T["e0"], T["e1"], T["s"]
+    sharpset = {(int(a), int(b)) for a, b in zip(e0[s > 0], e1[s > 0])}
+    val, ns = T["val"], T["ns"]
+    vtype = np.zeros(nV, np.int64)
+    vtype[T["crease"]] = 1
+    vtype[T["corner"]] = 2
+    snbr = [[] for _ in range(nV)]
+    for a, b in sharpset:
+        snbr[a].append(b)
+        snbr[b].append(a)
+    he = {}
     for qi, f in enumerate(Q):
         for i in range(4):
-            I[(qi, i)] = interior(f, i)
-            by_edge.setdefault((f[i], f[(i + 1) % 4]), []).append((qi, i))
-            by_edge.setdefault((f[i], f[(i - 1) % 4]), []).append((qi, i))
+            he[(int(f[i]), int(f[(i + 1) % 4]))] = (qi, i)
+
+    def is_sharp(a, b):
+        return _ekey(a, b) in sharpset
+
+    ksec = np.ones((m, 4), np.int64)
+    for qi, f in enumerate(Q):
+        for i in range(4):
+            v = int(f[i])
+            if vtype[v] == 0:
+                ksec[qi, i] = val[v]
+                continue
+            count, q, j, closed = 1, qi, i, False
+            while True:
+                pv = int(Q[q][(j - 1) % 4])
+                nb = None if is_sharp(pv, v) else he.get((v, pv))
+                if nb is None:
+                    break
+                q, j = nb
+                if q == qi:
+                    closed = True
+                    break
+                count += 1
+            if not closed:
+                q, j = qi, i
+                while True:
+                    nx = int(Q[q][(j + 1) % 4])
+                    nb = None if is_sharp(v, nx) else he.get((nx, v))
+                    if nb is None:
+                        break
+                    q, j = nb[0], (nb[1] + 1) % 4
+                    count += 1
+            ksec[qi, i] = count
+
+    def neff(qi, i):
+        v = int(Q[qi][i])
+        return float(val[v]) if vtype[v] == 0 else (2.0 if vtype[v] == 1 else 4.0) * ksec[qi, i]
+
+    I, by_edge = {}, {}
+    for qi, f in enumerate(Q):
+        for i in range(4):
+            n = neff(qi, i)
+            d = {}
+            for c, w in ((f[i], n), (f[(i + 1) % 4], 2), (f[(i - 1) % 4], 2), (f[(i + 2) % 4], 1)):
+                d[int(c)] = d.get(int(c), 0) + w / (n + 5)
+            I[(qi, i)] = d
+            by_edge.setdefault((int(f[i]), int(f[(i + 1) % 4])), []).append((qi, i))
+            by_edge.setdefault((int(f[i]), int(f[(i - 1) % 4])), []).append((qi, i))
+    # diagonal neighbours for the smooth limit stencil
+    diag = [[] for _ in range(nV)]
+    nbr = [set() for _ in range(nV)]
+    for f in Q:
+        for i in range(4):
+            diag[f[i]].append(int(f[(i + 2) % 4]))
+            nbr[f[i]].add(int(f[(i + 1) % 4]))
+            nbr[f[i]].add(int(f[(i - 1) % 4]))
+    lim_cache = {}
+
+    def limit(v):
+        if v in lim_cache:
+            return lim_cache[v]
+        if vtype[v] == 2:
+            d = {v: 1.0}
+        elif vtype[v] == 1:
+            a, b = snbr[v][:2]
+            d = {v: 4 / 6, a: 1 / 6}
+            d[b] = d.get(b, 0) + 1 / 6
+        else:
+            n = val[v]
+            d = {v: n * n / (n * (n + 5))}
+            for e in nbr[v]:
+                d[e] = d.get(e, 0) + 4 / (n * (n + 5))
+            for g in diag[v]:
+                d[g] = d.get(g, 0) + 1 / (n * (n + 5))
+        lim_cache[v] = d
+        return d
 
     def edge_pt(v, w):
+        if vtype[v] > 0 and is_sharp(v, w):
+            return {v: 2 / 3, w: 1 / 3}
         users = by_edge[(v, w)]
         out = {}
         for key in users:
@@ -565,23 +775,46 @@ def acc_operator(nV: int, Q: np.ndarray):
                 out[c] = out.get(c, 0) + x / len(users)
         return out
 
-    lim = {}
+    rows, cols, vals = [], [], []
     for qi, f in enumerate(Q):
         a, b, c, d = (int(x) for x in f)
         base = qi * 16
-        for (r, cc), combo in (((0, 0), lim.setdefault(a, limit(a))), ((0, 3), lim.setdefault(b, limit(b))),
-                               ((3, 3), lim.setdefault(c, limit(c))), ((3, 0), lim.setdefault(d, limit(d))),
+        for (r, cc), combo in (((0, 0), limit(a)), ((0, 3), limit(b)), ((3, 3), limit(c)), ((3, 0), limit(d)),
                                ((0, 1), edge_pt(a, b)), ((0, 2), edge_pt(b, a)), ((1, 3), edge_pt(b, c)),
                                ((2, 3), edge_pt(c, b)), ((3, 2), edge_pt(c, d)), ((3, 1), edge_pt(d, c)),
                                ((2, 0), edge_pt(d, a)), ((1, 0), edge_pt(a, d)),
                                ((1, 1), I[(qi, 0)]), ((1, 2), I[(qi, 1)]), ((2, 2), I[(qi, 2)]), ((2, 1), I[(qi, 3)])):
-            put(base + r * 4 + cc, combo)
-    return sp.csr_matrix((vals, (rows, cols)), shape=(m * 16, nV)), val
+            for k, wgt in combo.items():
+                rows.append(base + r * 4 + cc)
+                cols.append(k)
+                vals.append(wgt)
+    M = sp.csr_matrix((vals, (rows, cols)), shape=(m * 16, nV))
+    corner_reg = np.zeros((m, 4), bool)
+    for qi, f in enumerate(Q):
+        for i in range(4):
+            v = int(f[i])
+            corner_reg[qi, i] = ((vtype[v] == 0 and ns[v] == 0 and val[v] == 4) or (vtype[v] == 1 and ksec[qi, i] == 2)
+                                 or (vtype[v] == 2 and ksec[qi, i] == 1))
+    smooth_ev = (vtype == 0) & (ns == 0) & (val != 4) & (T["nfv"] > 0)
+    irregular = np.zeros(nV, bool)
+    irregular[Q[~corner_reg]] = True
+    info = dict(valence=val, g1_valence=np.where(smooth_ev, val, 4), regular=corner_reg.all(1), irregular=irregular,
+                sharp=sharpset, vtype=vtype, boundary=int(np.sum(T["nfe"] == 1)), he=he)
+    return M, info
+
+
+def acc_operator(nV: int, Q: np.ndarray, creases=None):
+    """Sparse matrix M (len(Q)*16 x nV): the 16 Bezier control points of each quad's ACC patch, as linear combinations
+    of the cage points (before the tangent-plane step). Patch q, row r, column c is row q*16 + r*4 + c. Also returns
+    the valence of every cage point."""
+    M, info = _acc(nV, Q, _norm_creases(creases))
+    return M, info["valence"]
 
 
 def tangent_planes(B: np.ndarray, Q: np.ndarray, valence: np.ndarray) -> np.ndarray:
     """Put the edge points round every extraordinary vertex into one plane through its limit point (the plane that
-    fits them best), so the patches meet with one normal there (G1 at the vertex). B: (m, 4, 4, 3), changed copy."""
+    fits them best), so the patches meet with one normal there (G1 at the vertex). B: (m, 4, 4, 3), changed copy.
+    Vertices given valence 4 are left alone (crease, corner and boundary vertices are passed as 4)."""
     B = B.copy()
     corners = ((0, 0, (0, 1), (1, 0)), (0, 3, (0, 2), (1, 3)), (3, 3, (3, 2), (2, 3)), (3, 0, (3, 1), (2, 0)))
     groups = {}
@@ -605,7 +838,6 @@ def tangent_planes(B: np.ndarray, Q: np.ndarray, valence: np.ndarray) -> np.ndar
                 edges.setdefault(key, []).append((k, q, e))
         rows, rhs = [], []
         for key, sh in edges.items():
-            p = np.array(key)
             d = -np.dot(B[sh[0][1], sh[0][2][0], sh[0][2][1]] - L, n) * n
             for _, q, e in sh:
                 B[q, e[0], e[1]] = B[q, e[0], e[1]] + d
@@ -622,34 +854,92 @@ def tangent_planes(B: np.ndarray, Q: np.ndarray, valence: np.ndarray) -> np.ndar
     return B
 
 
-class Cage:
-    """A closed quad cage (any genus): points V (n, 3) and quads F (m, 4), counter-clockwise seen from outside."""
+def _rot(B: np.ndarray, r: int) -> np.ndarray:
+    """A patch's 4 x 4 (x 3) control points re-indexed for its quad's corners rolled by r (corner r becomes a)."""
+    for _ in range(r % 4):
+        B = B.transpose(1, 0, *range(2, B.ndim))[::-1]
+    return B
 
-    def __init__(self, V, F, levels: int = 0):
+
+class Cage:
+    """A quad cage (any genus, closed or open): points V (n, 3) and polygons F, counter-clockwise seen from outside.
+
+    creases: {(a, b): sharpness} or a list of edges (infinitely sharp: a C0 border between exact patches); a finite
+    sharpness s is resolved by ceil(s) subdivision levels first (the semi-sharp rules), so levels may grow. Open borders
+    follow the B-spline boundary rules (a boundary vertex with one face is a corner). regions: {name: [face indices
+    of F]}; every patch and every face of solid() keeps its region's name (region_faces, region_frame, region_tool)."""
+
+    def __init__(self, V, F, levels: int = 0, creases=None, regions: dict | None = None):
         V = np.asarray(V, dtype=np.float64)
         F = [list(f) for f in F]
-        if any(len(f) != 4 for f in F) and levels == 0:
-            levels = 1                           # one step makes any polygon mesh all quads
-        for _ in range(levels):
-            V, F = catmull_clark(V, F)
-        self.V, self.F = V, np.asarray(F, dtype=np.int64)
+        sharp = _norm_creases(creases)
+        finite = [s for s in sharp.values() if s != INF]
+        k = int(levels)
+        if finite:
+            k = max(k, int(math.ceil(max(finite))))
+        if any(len(f) != 4 for f in F) and k == 0:
+            k = 1                                # one step makes any polygon mesh all quads
+        self.region_names = list(regions or {})
+        rid = np.full(len(F), -1, np.int64)
+        for n_, (name, idx) in enumerate((regions or {}).items()):
+            idx = list(idx)
+            need(all(0 <= int(i) < len(F) for i in idx), f"subd.Cage: region {name!r} names a face that is not in the "
+                 "cage", "Give face indices of F.", ["regions"])
+            rid[idx] = n_
+        sh = _sharp_arrays(sharp)
+        Fx = F
+        for _ in range(k):
+            V, Fx, sh, parent = _cc_step(V, Fx, sh)
+            rid = rid[parent]
+        keys, vals = sh
+        self.V, self.F = V, np.asarray(Fx, dtype=np.int64)
+        self.levels = k
+        self.creases = {_ekey(*kk): float(v) for kk, v in zip(keys, vals) if v > 0}
+        self.face_region = rid
         self._M = None
+        self._faces_meta: list = []
+
+    # topology ------------------------------------------------------------------------------------------------
+    def _build(self):
+        self._M, self.info = _acc(len(self.V), self.F, self.creases)
+        self.valence = self.info["valence"]
 
     @property
     def M(self):
         if self._M is None:
-            self._M, self.valence = acc_operator(len(self.V), self.F)
+            self._build()
         return self._M
 
+    def extraordinary(self) -> int:
+        """Smooth vertices that do not have four quads round them (where ACC is an approximation)."""
+        _ = self.M
+        return int(np.sum(self.info["g1_valence"] != 4))
+
+    def irregular(self) -> int:
+        """Vertices where at least one patch is not an exact B-spline patch (extraordinary, dart, or a crease or corner
+        sector that is not regular). 0: the whole skin is exact."""
+        _ = self.M
+        return int(np.sum(self.info["irregular"]))
+
+    @property
+    def exact(self) -> bool:
+        _ = self.M
+        return bool(self.info["regular"].all())
+
+    def is_open(self) -> bool:
+        _ = self.M
+        return self.info["boundary"] > 0
+
+    def sharp_edges(self) -> set:
+        _ = self.M
+        return set(self.info["sharp"])
+
+    # patches -----------------------------------------------------------------------------------------------
     def patches(self, V=None, g1: bool = True) -> np.ndarray:
         """(m, 4, 4, 3) bicubic Bezier control points, one patch per quad."""
         M = self.M
         B = (M @ (self.V if V is None else V)).reshape(len(self.F), 4, 4, 3)
-        return tangent_planes(B, self.F, self.valence) if g1 else B
-
-    def extraordinary(self) -> int:
-        _ = self.M
-        return int(np.sum(self.valence != 4))
+        return tangent_planes(B, self.F, self.info["g1_valence"]) if g1 else B
 
     def sample_operator(self, k: int = 4):
         """Sparse W (len(F) * k * k x nV): points of the limit surface on a k x k grid per patch (no tangent step)."""
@@ -660,9 +950,314 @@ class Cage:
         blk = sp.block_diag([sp.csr_matrix(Wp)] * len(self.F), format="csr")
         return blk @ self.M
 
-    def solid(self, label: str = "body"):
-        """The cage's limit surface as a closed OCCT solid of bicubic Bezier faces."""
-        return patches_solid(self.patches(), label=label)
+    def seams(self, B=None) -> dict:
+        """seam_angles over the smooth borders (creases and open borders are C0 by design and left out)."""
+        return seam_angles(self.patches() if B is None else B, self.F, skip=self.sharp_edges())
+
+    # merging regular patches into multi-span B-spline faces --------------------------------------------------
+    def blocks(self) -> list:
+        """Rectangular blocks of regular patches (same region, no crease inside): [[(face, roll), ...] per row], rows
+        along v. A block never closes on itself (a loop of patches is split in two)."""
+        _ = self.M
+        F, reg, rid, he, sharp = self.F, self.info["regular"], self.face_region, self.info["he"], self.info["sharp"]
+        taken = np.zeros(len(F), bool)
+
+        def orient(q, r):
+            return tuple(int(F[q][(i + r) % 4]) for i in range(4))
+
+        def across(q, r, side):
+            o = orient(q, r)
+            a, b = o[side], o[(side + 1) % 4]
+            if _ekey(a, b) in sharp:
+                return None
+            nb = he.get((b, a))
+            if nb is None:
+                return None
+            g, k = nb
+            return (g, (k + 1) % 4) if side == 1 else (g, k % 4)
+
+        def ok(x, region, used):
+            return x is not None and reg[x[0]] and not taken[x[0]] and rid[x[0]] == region and x[0] not in used
+
+        out = []
+        for seed in range(len(F)):
+            if taken[seed] or not reg[seed]:
+                continue
+            region = rid[seed]
+            row, used, cyc = [(seed, 0)], {seed}, False
+            while True:
+                nb = across(*row[-1], 1)
+                if nb is not None and nb[0] == seed:
+                    cyc = True
+                    break
+                if not ok(nb, region, used):
+                    break
+                row.append(nb)
+                used.add(nb[0])
+            if cyc and len(row) > 1:
+                row = row[:(len(row) + 1) // 2]
+                used = {x[0] for x in row}
+            block, vcyc = [row], False
+            while True:
+                nxt = [across(q, r, 2) for q, r in block[-1]]
+                if nxt[0] is not None and nxt[0][0] == seed:
+                    vcyc = True
+                    break
+                if not all(ok(x, region, used) for x in nxt) or len({x[0] for x in nxt}) != len(nxt):
+                    break
+                if any(across(*nxt[j], 1) != nxt[j + 1] for j in range(len(nxt) - 1)):
+                    break
+                if any(x[0] in {y[0] for r_ in block for y in r_} for x in nxt):
+                    vcyc = True
+                    break
+                block.append(nxt)
+                used.update(x[0] for x in nxt)
+            if vcyc and len(block) > 1:
+                block = block[:(len(block) + 1) // 2]
+            for r_ in block:
+                for q, _ in r_:
+                    taken[q] = True
+            out.append(block)
+        for q in range(len(F)):
+            if not taken[q]:
+                out.append([[(q, 0)]])
+        return out
+
+    def faces(self, merge: bool = True, B=None) -> list:
+        """OCCT faces of the skin: one exact bicubic B-spline face per block of regular patches (merge=True), one
+        Bezier face per other patch. self.face_meta() says which, with region names."""
+        from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+        B = self.patches() if B is None else B
+        blocks = self.blocks() if merge else [[[(q, 0)]] for q in range(len(self.F))]
+        faces, meta = [], []
+        scale = float(np.ptp(self.V, axis=0).max() or 1.0)
+        for blk in blocks:
+            qs = [q for r_ in blk for q, _ in r_]
+            name = self.region_names[self.face_region[qs[0]]] if self.face_region[qs[0]] >= 0 else None
+            if len(qs) > 1:
+                C, res = block_grid(blk, B)
+                if res <= 1e-9 * scale + 1e-12:
+                    faces.append(BRepBuilderAPI_MakeFace(grid_surface(C), 1e-7).Face())
+                    meta.append({"kind": "bspline", "patches": qs, "spans": (len(blk[0]), len(blk)),
+                                 "region": name, "fit_residual_mm": float(res)})
+                    continue
+            for q in qs:
+                faces.append(_bezier_face(B[q]))
+                meta.append({"kind": "bezier", "patches": [q], "spans": (1, 1), "region": name,
+                             "fit_residual_mm": 0.0})
+        self._faces_meta = meta
+        return faces
+
+    def face_meta(self) -> list:
+        return list(self._faces_meta)
+
+    def surface(self, merge: bool = True, label: str = "skin"):
+        """The skin as one sewn build123d Shell (open borders stay free edges)."""
+        from build123d import Shell
+        from OCP.TopAbs import TopAbs_SHELL
+        from OCP.TopExp import TopExp_Explorer
+        from OCP.TopoDS import TopoDS
+        shape, _ = _sew_shape(self.faces(merge), tol=1e-4)
+        ex = TopExp_Explorer(shape, TopAbs_SHELL)
+        need(ex.More(), f"subd: the {label}'s faces did not sew into a shell", "Check the cage for gaps.", ["cage"])
+        return Shell(TopoDS.Shell(ex.Current()))
+
+    def solid(self, label: str = "body", merge: bool = True, close: str = "cap", thickness: float | None = None):
+        """The cage's limit surface as a closed OCCT solid: exact B-spline faces for regular blocks, ACC Bezier faces
+        elsewhere. An open cage is closed by close="cap" (a planar face per planar border: exact; otherwise an OCCT
+        filling surface, approximate and noted) or close="thicken" (the skin grown by thickness mm inward)."""
+        faces = self.faces(merge)
+        if not self.is_open():
+            return _sew(faces, tol=1e-4, label=label)
+        need(close in ("cap", "thicken"), f"subd.Cage.solid: unknown close {close!r}", "Use 'cap' or 'thicken'.",
+             ["close"])
+        if close == "thicken":
+            need(thickness is not None and thickness > 0, "subd.Cage.solid: thicken needs a thickness",
+                 "Give thickness in mm.", ["thickness"])
+            from .surfaces import thicken
+            sh = self.surface(merge, label)
+            s = thicken(sh, float(thickness))
+            note(f"subd: the open {label} was thickened by {float(thickness):g} mm (OCCT offset of the exact skin)")
+            return s
+        shape, _ = _sew_shape(faces, tol=1e-4)
+        caps, kinds = _caps(shape)
+        need(bool(caps), f"subd: the open {label} has no closed border to cap", "Close the cage or thicken it.",
+             ["close"])
+        if "filling" in kinds:
+            note(f"subd: {kinds.count('filling')} non-planar border(s) of the {label} capped with an OCCT filling "
+                 "surface (approximate, not the subdivision limit)")
+        self._caps = kinds
+        return _sew(faces + caps, tol=1e-4, label=label)
+
+    # named regions ---------------------------------------------------------------------------------------------
+    def _region_id(self, name: str) -> int:
+        need(name in self.region_names, f"subd.Cage: no region {name!r}",
+             f"Regions: {', '.join(self.region_names) or 'none'}.", ["regions"])
+        return self.region_names.index(name)
+
+    def region_patches(self, name: str) -> np.ndarray:
+        return np.nonzero(self.face_region == self._region_id(name))[0]
+
+    def region_faces(self, shape, name: str) -> list:
+        """The faces of a solid built from this cage (or cut and fused since) that lie on region `name`: each face's
+        middle point is matched to the nearest sample of the patches (within 1% of the cage size)."""
+        from scipy.spatial import cKDTree
+        rid = self._region_id(name)
+        G = patch_eval(self.patches(), 5)
+        pts = G.reshape(-1, 3)
+        owner = np.repeat(np.arange(len(self.F)), 25)
+        tree = cKDTree(pts)
+        tol = 0.01 * float(np.ptp(self.V, axis=0).max() or 1.0)
+        out = []
+        for f in shape.faces():
+            p = f.position_at(0.5, 0.5)
+            d, i = tree.query([p.X, p.Y, p.Z])
+            if d <= tol and self.face_region[owner[i]] == rid:
+                out.append(f)
+        return out
+
+    def region_frame(self, name: str) -> tuple:
+        """(point, outward unit normal) at the middle of region `name` on the limit surface: `at` and `axis` for
+        craft.magnet_pair, or where to aim a feature."""
+        B = self.patches()
+        qs = self.region_patches(name)
+        G = patch_eval(B[qs], 7).reshape(-1, 3)
+        c = G.mean(0)
+        k = int(np.argmin(np.linalg.norm(G - c, axis=1)))
+        q, rem = qs[k // 49], k % 49
+        t = np.linspace(0, 1, 7)
+        v_, u_ = t[rem // 7], t[rem % 7]
+        p, Su, Sv = _patch_point(B[q], u_, v_)
+        nrm = np.cross(Su, Sv)
+        nrm /= np.linalg.norm(nrm) or 1.0
+        return tuple(float(x) for x in p), tuple(float(x) for x in nrm)
+
+    def region_tool(self, name: str, out: float = 1.0, depth: float = 2.0, label: str = ""):
+        """A closed solid that follows region `name`: from depth mm under the skin to out mm over it (control points
+        moved along the surface normal, so it follows the skin to well under 0.1 mm for a gentle region). Intersect
+        it with a shell for the region's piece (a lid, a panel for craft.parts) or cut it away (craft.cut)."""
+        need(out >= 0 and depth > 0 and out + depth > 0.05, "subd.Cage.region_tool: out >= 0 and depth > 0",
+             "Give the slab's reach over and under the skin in mm.", ["out", "depth"])
+        B = self.patches()
+        qs = self.region_patches(name)
+        need(len(qs) > 0, f"subd.Cage.region_tool: region {name!r} has no patches", "Name some faces.", ["regions"])
+        P = B[qs]
+        # one normal per control point position (shared points get the same normal, so the slab stays closed)
+        t = np.array([0, 1 / 3, 2 / 3, 1])
+        N = np.zeros_like(P)
+        for k in range(len(qs)):
+            for r in range(4):
+                for c in range(4):
+                    _, Su, Sv = _patch_point(P[k], t[c], t[r])
+                    N[k, r, c] = np.cross(Su, Sv)
+        keys = np.round(P.reshape(-1, 3), 6)
+        _, inv = np.unique(keys, axis=0, return_inverse=True)
+        inv = inv.reshape(-1)
+        acc = np.zeros((inv.max() + 1, 3))
+        np.add.at(acc, inv, N.reshape(-1, 3) / np.maximum(np.linalg.norm(N.reshape(-1, 3), axis=1, keepdims=True), 1e-12))
+        acc /= np.maximum(np.linalg.norm(acc, axis=1, keepdims=True), 1e-12)
+        Nn = acc[inv].reshape(P.shape)
+        Po, Pi = P + out * Nn, P - depth * Nn
+        faces = [_bezier_face(p) for p in Po] + [_bezier_face(p) for p in Pi]
+        inreg = set(int(q) for q in qs)
+        he = self.info["he"]
+        sides = (((0, 0), (0, 3)), ((0, 3), (3, 3)), ((3, 3), (3, 0)), ((3, 0), (0, 0)))
+        for k, q in enumerate(qs):
+            f = self.F[q]
+            for i in range(4):
+                nb = he.get((int(f[(i + 1) % 4]), int(f[i])))
+                if nb is not None and nb[0] in inreg:
+                    continue
+                (r0, c0), (r1, c1) = sides[i]
+                idx = [(r0 + (r1 - r0) * j // 3, c0 + (c1 - c0) * j // 3) for j in range(4)]
+                co = np.array([Po[k][r, c] for r, c in idx])
+                ci = np.array([Pi[k][r, c] for r, c in idx])
+                W = np.stack([co, co + (ci - co) / 3, co + 2 * (ci - co) / 3, ci])
+                faces.append(_bezier_face(W))
+        return _sew(faces, tol=1e-4, label=label or f"{name} region")
+
+
+def block_grid(block: list, B: np.ndarray, per_span: int = 4):
+    """The clamped bicubic B-spline grid (nu, nv, 3) of a block of C2-joined patches ([[(face, roll), ...] per row]),
+    by least squares on samples of the patches (exact when they are one B-spline: the residual says how close)."""
+    a, b = len(block[0]), len(block)
+    su = np.linspace(0, 1, a * per_span + 1)
+    sv = np.linspace(0, 1, b * per_span + 1)
+    ci = np.minimum((su * a).astype(int), a - 1)
+    ri = np.minimum((sv * b).astype(int), b - 1)
+    lu, lv = su * a - ci, sv * b - ri
+    Bu_l, Bv_l = bernstein(lu), bernstein(lv)
+    P = {}
+    S = np.empty((len(su), len(sv), 3))
+    for j in range(b):
+        for i in range(a):
+            q, r = block[j][i]
+            P[(i, j)] = _rot(B[q], r)
+    for x in range(len(su)):
+        for y in range(len(sv)):
+            S[x, y] = np.einsum("r,c,rck->k", Bv_l[y], Bu_l[x], P[(ci[x], ri[y])])
+    Au = basis(su, a + 3).toarray()
+    Av = basis(sv, b + 3).toarray()
+    pu, pv = np.linalg.pinv(Au), np.linalg.pinv(Av)
+    C = np.einsum("ix,xyk,jy->ijk", pu, S, pv)
+    res = float(np.abs(np.einsum("xi,ijk,yj->xyk", Au, C, Av) - S).max())
+    return C, res
+
+
+def _patch_point(P: np.ndarray, u: float, v: float):
+    """Point and derivatives (along u: columns, along v: rows) of one bicubic Bezier patch."""
+    bu, bv = bernstein(np.array([u]))[0], bernstein(np.array([v]))[0]
+    du, dv = _dbern(u), _dbern(v)
+    return (np.einsum("r,c,rck->k", bv, bu, P), np.einsum("r,c,rck->k", bv, du, P),
+            np.einsum("r,c,rck->k", dv, bu, P))
+
+
+def _bezier_face(P: np.ndarray):
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+    from OCP.Geom import Geom_BezierSurface
+    from OCP.collections import Array2_gp_Pnt as TColgp_Array2OfPnt
+    from OCP.gp import gp_Pnt
+    arr = TColgp_Array2OfPnt(1, 4, 1, 4)
+    for r in range(4):
+        for c in range(4):
+            x, y, z = P[r, c]
+            arr.SetValue(c + 1, r + 1, gp_Pnt(float(x), float(y), float(z)))
+    return BRepBuilderAPI_MakeFace(Geom_BezierSurface(arr), 1e-7).Face()
+
+
+def _caps(shape):
+    """Faces that close every free border of a sewn shell: planar where the border is planar (exact), an OCCT
+    filling surface otherwise. Returns (faces, kinds)."""
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+    from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeFilling
+    from OCP.GeomAbs import GeomAbs_C0
+    from OCP.ShapeAnalysis import ShapeAnalysis_FreeBounds
+    from OCP.TopAbs import TopAbs_EDGE, TopAbs_WIRE
+    from OCP.TopExp import TopExp_Explorer
+    from OCP.TopoDS import TopoDS
+    fb = ShapeAnalysis_FreeBounds(shape, 1e-3, False, False)
+    wires = fb.GetClosedWires()
+    ex = TopExp_Explorer(wires, TopAbs_WIRE)
+    caps, kinds = [], []
+    while ex.More():
+        w = TopoDS.Wire(ex.Current())
+        mk = BRepBuilderAPI_MakeFace(w, True)
+        if mk.IsDone():
+            caps.append(mk.Face())
+            kinds.append("planar")
+        else:
+            fill = BRepOffsetAPI_MakeFilling()
+            ee = TopExp_Explorer(w, TopAbs_EDGE)
+            while ee.More():
+                fill.Add(TopoDS.Edge(ee.Current()), GeomAbs_C0)
+                ee.Next()
+            fill.Build()
+            need(fill.IsDone(), "subd: a border of the open cage could not be capped", "Thicken the skin instead.",
+                 ["close"])
+            caps.append(TopoDS.Face(fill.Shape()))
+            kinds.append("filling")
+        ex.Next()
+    return caps, kinds
 
 
 def bernstein(t: np.ndarray) -> np.ndarray:
@@ -679,24 +1274,13 @@ def patch_eval(B: np.ndarray, k: int = 6) -> np.ndarray:
 
 def patches_solid(B: np.ndarray, label: str = "body"):
     """Sew bicubic Bezier patches (m, 4, 4, 3) into a closed solid."""
-    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
-    from OCP.Geom import Geom_BezierSurface
-    from OCP.collections import Array2_gp_Pnt as TColgp_Array2OfPnt
-    from OCP.gp import gp_Pnt
-    faces = []
-    for P in B:
-        arr = TColgp_Array2OfPnt(1, 4, 1, 4)
-        for r in range(4):
-            for c in range(4):
-                x, y, z = P[r, c]
-                arr.SetValue(c + 1, r + 1, gp_Pnt(float(x), float(y), float(z)))
-        faces.append(BRepBuilderAPI_MakeFace(Geom_BezierSurface(arr), 1e-7).Face())
-    return _sew(faces, tol=1e-4, label=label)
+    return _sew([_bezier_face(P) for P in B], tol=1e-4, label=label)
 
 
-def seam_angles(B: np.ndarray, Q: np.ndarray, samples: int = 7) -> dict:
+def seam_angles(B: np.ndarray, Q: np.ndarray, samples: int = 7, skip=None) -> dict:
     """Normal angle (degrees) across every patch border, sampled along it: the measured smoothness of an ACC skin.
-    0 = tangent (G1). Returns worst, mean and the share of borders within 1 degree."""
+    0 = tangent (G1). Returns worst, mean and the share of borders within 1 degree. skip: undirected edges (a, b),
+    a < b, left out (creases, which are C0 on purpose)."""
     def normal(P, s, t):
         bs, bt = bernstein(np.array([s]))[0], bernstein(np.array([t]))[0]
         dbs = _dbern(s)
@@ -706,6 +1290,7 @@ def seam_angles(B: np.ndarray, Q: np.ndarray, samples: int = 7) -> dict:
         n = np.cross(Su, Sv)
         return n / (np.linalg.norm(n) or 1)
 
+    skip = skip or set()
     # border of patch q between corners i and i+1, and the (s, t) along it
     side = {0: lambda w: (w, 0.0), 1: lambda w: (1.0, w), 2: lambda w: (1 - w, 1.0), 3: lambda w: (0.0, 1 - w)}
     owner = {}
@@ -715,7 +1300,7 @@ def seam_angles(B: np.ndarray, Q: np.ndarray, samples: int = 7) -> dict:
     angles = []
     done = set()
     for (a, b), (qi, i) in owner.items():
-        if (b, a) not in owner or (b, a) in done:
+        if (b, a) not in owner or (b, a) in done or _ekey(a, b) in skip:
             continue
         done.add((a, b))
         qj, j = owner[(b, a)]
@@ -767,6 +1352,37 @@ def quad_sphere(n: int = 4, radius: float = 1.0) -> tuple[np.ndarray, np.ndarray
     return V, np.array(quads, dtype=np.int64)
 
 
+def voxel_cage(cells, size: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
+    """A closed quad cage round a set of unit cubes {(i, j, k)}: every cube face with no cube behind it, outward.
+    Any genus (a slab with two cells missing is genus 2); vertices where the surface turns are extraordinary."""
+    cells = {tuple(int(x) for x in c) for c in cells}
+    verts, index, quads = [], {}, []
+
+    def vid(p):
+        key = tuple(int(x) for x in p)
+        if key not in index:
+            index[key] = len(verts)
+            verts.append(key)
+        return index[key]
+    for c in sorted(cells):
+        for axis in range(3):
+            for sgn in (-1, 1):
+                nb = list(c)
+                nb[axis] += sgn
+                if tuple(nb) in cells:
+                    continue
+                u, w = (axis + 1) % 3, (axis + 2) % 3
+                corners = []
+                for du, dw in ((0, 0), (1, 0), (1, 1), (0, 1)):
+                    p = list(c)
+                    p[axis] += 1 if sgn > 0 else 0
+                    p[u] += du
+                    p[w] += dw
+                    corners.append(vid(p))
+                quads.append(corners if sgn > 0 else corners[::-1])
+    return np.array(verts, dtype=np.float64) * size, np.array(quads, dtype=np.int64)
+
+
 def fit_cage(cage: Cage, targets_fn, rounds: int = 6, smooth: float = 0.02, k: int = 5) -> np.ndarray:
     """Fit a closed cage's points so its limit surface follows a target surface. targets_fn(points (n, 3)) -> the
     closest points on the target. Each round: sample the limit surface, find the targets, solve the cage by least
@@ -796,6 +1412,7 @@ def fit_cage(cage: Cage, targets_fn, rounds: int = 6, smooth: float = 0.02, k: i
         V = np.column_stack([lu.solve(rhs[:, d]) for d in range(3)])
     cage.V = V
     return V
+
 
 
 def note_tier(what: str) -> None:
