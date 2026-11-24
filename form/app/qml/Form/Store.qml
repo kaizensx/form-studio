@@ -399,6 +399,7 @@ QtObject {
         return pget().then(function (d) {
             data = d
             if (d.recovered) toast("Project recovered", d.recovered)
+            loadRefine()                                   // the head's refine changes follow the head
             if (withView || !view || view.rev !== d.project.head) {
                 return pget("/view").then(function (v) {
                     v.rev = d.project.head; v.pid = d.project.id; view = v
@@ -853,6 +854,8 @@ QtObject {
                     if (last.origin && last.origin.indexOf("agent") === 0) {
                         s.toast(F.pad(st.head) + " by " + last.origin.replace("agent:", ""), last.note || "")
                         s._buildNext = Date.now()     // the agent's revision grows in, whichever of this and the activity feed sees it first
+                    } else if (last.origin === "refine" && !s.refineBusy) {
+                        s.toast(F.pad(st.head) + " · " + (last.note || "Refined").replace(/ \(.*$/, ""), "Each change is listed in the Refinement panel, with its own undo.")
                     }
                     s.refresh(true)
                 }
@@ -860,6 +863,31 @@ QtObject {
             }, function () {})
         }
     }
+    // ── design refinement (form/refine/jobs.py): the job after every build, and the head's refine changes ──
+    property var refine: null          // GET /projects/<id>/refine: { state, stage, events, changes: [{ id, label, reason, kind }] }
+    property bool refineBusy: false
+    function loadRefine() {
+        if (!pid) { refine = null; return }
+        var want = pid
+        pget("/refine").then(function (r) { if (s.pid === want && JSON.stringify(r) !== JSON.stringify(s.refine)) s.refine = r }, function () {})
+    }
+    function _refinePost(body, label) {
+        refineBusy = true
+        return act(label, ppost("/refine", body)).then(function (r) { s.refineBusy = false; s.refine = r; s.refresh(true); return r },
+                                                       function (e) { s.refineBusy = false; s.fail(e) })
+    }
+    function refineUndo(id) { return _refinePost({ action: "undo", feature: id || "", expect_head: project ? project.head : null },
+                                                 id ? "Undoing the refine change" : "Undoing the refinement") }
+    function refineAgain() { return _refinePost({ action: "rerun" }, "Starting refinement") }
+    function resetRefineLedger() {
+        return act("Resetting what refinement learned", post("/refine/ledger/reset", {})).then(function (r) {
+            s.toast("Refinement starts fresh", r.rows ? F.plural(r.rows, "learned row") + " cleared on this computer." : "Nothing was learned yet.") }, fail)
+    }
+    property var _refinePoll: Timer {
+        interval: 1500; repeat: true; running: s.screen === "work" && s.pid !== "" && !!s.refine && s.refine.state === "running"
+        onTriggered: s.loadRefine()
+    }
+    property var _refineReset: Connections { target: s; function onPidChanged() { s.refine = null; s.loadRefine() } }
     property var _activity: Timer {
         interval: s.chatBusy || s.building ? 400 : 1200; repeat: true; running: s.screen !== "boot"   // quicker while a build streams
         onTriggered: s.get("/activity?since=" + s.actTs).then(function (r) {
@@ -869,6 +897,7 @@ QtObject {
                 if (ev.by === "you") continue
                 if (ev.draft) s._noteDraft(ev)
                 if (ev.kind === "stage") { if (ev.draft) s.onStage(ev); continue }    // drawn, not said in the chat
+                if (ev.kind === "refine") { if (ev.project === s.pid) s.loadRefine(); continue }   // the dock's panel says it
                 if (s._mine(ev)) s.noteAct(ev)          // another conversation's steps are never written into this one
                 if (!s._waitCommit(ev)) s.follow(ev)
             }

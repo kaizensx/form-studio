@@ -411,7 +411,10 @@ Item {
             readonly property bool showMap: !!Store.analysisMap && !ws.mapBlocked
             readonly property bool showMeasures: Store.measures.length > 0
             readonly property bool showSel: ws.tool === "annotate" || Store.selItems.length > 0 || !!Store.annFocus
-            readonly property bool open: (showMap || showMeasures || showSel) && !folded
+            // refinement: while it runs, and while the head carries refine changes (or the last run failed)
+            readonly property bool showRefine: !!Store.refine && !Store.scrub && (Store.refine.state === "running"
+                || (Store.refine.changes || []).length > 0 || Store.refine.state === "failed")
+            readonly property bool open: (showMap || showMeasures || showSel || showRefine) && !folded
             readonly property real room: Math.max(120, strip.y - y - 46)
             function flip() { var now = folded; Ws.dockTouched = true; Ws.dockCollapsed = !now }
             AnalysisLegend { objectName: "analysisLegend"; visible: opacity > 0.01; opacity: dock.showMap ? 1 : 0
@@ -425,6 +428,11 @@ Item {
             MeasurePanel { objectName: "measurePanel"; visible: dock.showMeasures
                 collapsed: dock.folded || (dock.showMap && ws.tool !== "measure")
                 maxHeight: dock.room - (dock.showMap ? 44 : 0); onToggled: dock.flip() }
+            RefinePanel { visible: opacity > 0.01; opacity: dock.showRefine ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: Motion.ui; easing.type: Easing.OutCubic } }
+                collapsed: dock.folded || dock.showMap || dock.showMeasures || dock.showSel
+                maxHeight: dock.room - (dock.showMap ? 44 : 0) - (dock.showMeasures ? 44 : 0) - (dock.showSel ? 44 : 0)
+                onToggled: dock.flip() }
         }
 
         // ── bottom left: what you are looking at ─────────────

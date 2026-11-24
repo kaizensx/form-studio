@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import mimetypes
 import re
 import threading
@@ -203,6 +204,8 @@ def make_handler(st: Studio):
             if path == "/api/materials":                   # colours and materials (form/materials.py)
                 from . import materials
                 return self._json(materials.catalogue())
+            if path == "/api/refine/host":                 # which process runs refinement jobs (form/refine/jobs.py)
+                return self._json({"data_dir": str(st.root), "pid": os.getpid()})
             if path == "/api/photos":                      # Blender renders: newest current one per project
                 from . import photo
                 return self._json({"latest": photo.latest_all(st)})
@@ -213,6 +216,9 @@ def make_handler(st: Studio):
             if rest == "":
                 return self._json(st.state(pid))
             p = st.load(pid)
+            if rest == "/refine":                          # the refinement job and the head's refine changes
+                from .refine import jobs as refine_jobs
+                return self._json(refine_jobs.status(st, pid))
             if rest == "/stamp":
                 last = p["revisions"][-1]
                 return self._json({"head": p["head"], "updated": p.get("updated"),
@@ -596,6 +602,11 @@ def make_handler(st: Studio):
             if got is not None:
                 return self._json(got)
             # -- brief templates: save a filled-in brief, get the chat prompt that carries it --
+            if path == "/api/refine/ledger/reset":         # Settings: forget what refinement learned here
+                from .refine import jobs as refine_jobs
+                res = refine_jobs.reset_ledger()
+                st.activity(None, "refine", f"Refinement's local record was reset ({res['rows']} rows).", by="you")
+                return self._json(res)
             if path == "/api/briefs":
                 from . import presets
                 try:
@@ -649,6 +660,27 @@ def make_handler(st: Studio):
             recipe = st.recipe(p)
             auto = lambda proj: st.run(pid) if proj.get("auto_run", True) else None
             # -- the game asset (form/game/app.py): build, validate or export; reads the project, never changes it --
+            # -- design refinement (form/refine): start (an MCP server hands its job here), rerun, undo, off, on --
+            if action == "refine":
+                from .refine import engine as refine_engine, jobs as refine_jobs
+                body = body if isinstance(body, dict) else {}
+                what = body.get("action") or "status"
+                if what in ("start", "rerun"):
+                    jid = refine_jobs.start(st, pid, body.get("refine") or ("on" if what == "rerun" else None))
+                    if what == "rerun":
+                        st.activity(pid, "refine", "Refining again" if jid else "Refinement is off for this design",
+                                    by="you")
+                    return self._json({**refine_jobs.status(st, pid), "job": jid})
+                if what == "undo":
+                    refine_jobs.cancel(pid)
+                    q = refine_engine.undo(st, pid, body.get("feature") or None, body.get("expect_head"))
+                    st.activity(pid, "commit", f"r{q['head']:02d}: undid refinement"
+                                + (f" ({body['feature']})" if body.get("feature") else ""), by="you")
+                    return self._json({**refine_jobs.status(st, pid), "head": q["head"]})
+                if what in ("off", "on"):
+                    refine_jobs.set_project(st, pid, "off" if what == "off" else None)
+                    return self._json(refine_jobs.status(st, pid))
+                return self._json(refine_jobs.status(st, pid))
             if action == "game":
                 from .game import app as game_app
                 res = game_app.build(st, pid, body if isinstance(body, dict) else {})

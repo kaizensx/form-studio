@@ -68,6 +68,11 @@ DEFAULTS = {
     # Mesh to CAD. cadfit: also try CADFit's IoU search as a candidate (form/recon/cadfit; CC BY-NC 4.0 code included
     # with its author's permission, needs `pip install form-studio[cadfit]`). Off by default.
     "recon": {"cadfit": False},
+    # Design refinement (form/refine): after every build, named and reversible refine features (fillet tiers, parting
+    # lines, grip zones, materials; cage ops for game assets) kept only when the function checks hold, as one more
+    # revision. Off here, per design (refine_design action="off"), per call (create_design refine="off") or with
+    # `refine = False` on a design class.
+    "refine": {"enabled": True},
     # Open the bench in your browser when an agent starts working (MCP server).
     "bench": {"auto_open": True},
     # Look for a newer FORM release on GitHub at most once a day (public release metadata only; nothing is

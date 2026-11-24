@@ -51,7 +51,8 @@ def run_journey(script: str, size: str = "1440x900", env_extra: dict | None = No
                    FORM_SECRETS=str(Path(tmp) / "secrets.json"),          # never the user's own agent keys
                    FORM_NO_AUTO_SETUP="1",                                 # first start never installs for real in a test
                    FORM_PROVIDERS_OFFLINE="1",                             # a test key is never sent to a real model provider
-                   FORM_UITEST_OUT=os.environ.get("FORM_UI_SHOTS") or str(Path(tmp) / "shots"), FORM_REDUCED_MOTION="0")
+                   FORM_UITEST_OUT=os.environ.get("FORM_UI_SHOTS") or str(Path(tmp) / "shots"), FORM_REDUCED_MOTION="0",
+                   FORM_REFINE="off")          # design refinement only in the journeys about it (env_extra FORM_REFINE="on")
         if os.environ.get("FORM_UI_STUDIO_TOML"):      # CI: a studio.toml that pins a slicer and presets for every journey
             (Path(tmp) / "studio.toml").write_text(Path(os.environ["FORM_UI_STUDIO_TOML"]).read_text(encoding="utf-8"), encoding="utf-8")
         env.update(env_extra or {})
@@ -95,6 +96,12 @@ class Journeys(unittest.TestCase):
 
     def test_build_stages(self):            # an agent's build is drawn stage by stage before it is saved, then the saved design
         self.journey("build_stages.py")
+
+    def test_refine(self):                  # a design refined in the background: the panel, its changes, undo one, Settings
+        self.journey("refine.py", env_extra={"FORM_APPEARANCE": "dark", "FORM_REFINE": "on"})
+
+    def test_refine_light(self):            # the same in the light appearance
+        self.journey("refine.py", env_extra={"FORM_APPEARANCE": "light", "FORM_REFINE": "on"})
 
     def test_game_asset(self):              # Make it for: Game asset; build in Blender, switch LODs, export for Unreal
         self.journey("game_asset.py", env_extra={"FORM_APPEARANCE": "dark"})

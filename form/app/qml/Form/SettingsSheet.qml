@@ -139,6 +139,16 @@ Column {
             CapCards { objectName: "settingsCaps"; width: parent.width; settings: true; pick: Store.caps ? Store.caps.chosen : []
                 onToggled: function (id, on) { Store.setCap(id, on) } }
             InstallLog { width: parent.width } }
+        // ── General: what design refinement learned on this computer (form/refine/ledger.py); the on/off is a row below ──
+        Rectangle { objectName: "settingsRefineLedger"; visible: st.tab === "general" && !st.searching
+            width: parent.width; height: 58; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+            Column { x: 16; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 32 - resetLedger.width - 12; spacing: 2
+                Txt { text: "What refinement learned"; font.weight: Theme.wMedium }
+                Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
+                    text: "Which refinements helped which kinds of design, kept on this computer only" } }
+            Btn { id: resetLedger; objectName: "refineLedgerReset"; anchors.right: parent.right; anchors.rightMargin: 16
+                anchors.verticalCenter: parent.verticalCenter; small: true; icon: "rotate_ccw"; text: "Reset"
+                onClicked: Store.resetRefineLedger() } }
         // ── Printing: the default printer, picked from the printers set up in your slicers ──
         Rectangle { visible: st.tab === "printer" && !st.searching; objectName: "settingsDefaultPrinter"
             width: parent.width; height: dp.implicitHeight + 24; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule

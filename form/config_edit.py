@@ -38,6 +38,10 @@ SCHEMA: dict[str, dict] = {
     # Settings > Software turns it on when it installs it.
     "recon.cadfit": {"type": "bool", "tab": "advanced", "hidden": True, "label": "CADFit mesh to CAD search",
                      "help": "true also tries CADFit's IoU search when a mesh is made editable (non-commercial licence)."},
+    "refine.enabled": {"type": "bool", "tab": "general", "label": "Refine every design after it builds",
+                       "help": "Adds named, reversible refinements (fillet tiers, parting lines, grip zones, materials) "
+                               "as one more revision, kept only when the design's checks still pass. Each one can be "
+                               "undone in the workspace."},
     "data.dir": {"type": "path", "tab": "general", "label": "Project folder", "restart": True,
                  "help": "Where designs, their history and releases are kept. Takes effect when Form Studio restarts; "
                          "existing projects are not moved."},

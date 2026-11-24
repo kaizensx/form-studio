@@ -109,6 +109,9 @@ def main(argv=None) -> int:
         QFontDatabase.addApplicationFont(str(HERE / "assets" / "fonts" / f))
 
     st, httpd = _engine(cfg)
+    # agents this app starts (and their MCP servers) hand long background work, such as design refinement, to this
+    # engine, which outlives an agent's turn (form/refine/jobs.py)
+    os.environ["FORM_ENGINE_URL"] = f"http://127.0.0.1:{httpd.server_address[1]}"
     bridge = Bridge("127.0.0.1", httpd.server_address[1], cfg["data"]["dir"], __version__)
     bridge.under_test = bool(args.uitest)
     qmlRegisterSingletonInstance(Bridge, "FormNative", 1, 0, "Bridge", bridge)

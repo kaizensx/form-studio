@@ -65,6 +65,12 @@ tool you call shows up there live (3D model, drafts, checks, slice), so you do n
   let the person pick in Form Studio's concepts view (or pick_concept when they pick in words; a mix such as "base of A,
   hook of C" is one more concept with propose_concepts(group=...)). Refine the picked one with update_design.
 - After creating or changing a design, render(view="sheet") and look at it; fix what is wrong before replying.
+- Design refinement runs on its own after every build, for every design (you do not ask for it): Form Studio adds
+  named, reversible refine features (fillet tiers, an edge break, a parting line, a grip texture, materials) and lands
+  them as one more revision, "Refined: N changes", each kept only when the function checks still pass. Build your next
+  step on the head as it is. refine_design(project, action="status") shows what it did and why; action="undo" with
+  feature="refine_..." takes one change out. When the person wants exact geometry with nothing added, pass
+  create_design(refine="off") or call refine_design(project, action="off"); Settings turns it off everywhere.
 - Look up exact dimensions of commercial parts: find the official datasheet or mechanical drawing with web search,
   then open it with Form Studio's read_document (it shows PDF pages as images; web fetch loses a drawing's dimensions).
   Name the source. Put such numbers in params with group "brief" and the source in doc.
@@ -127,6 +133,7 @@ present a design, do this loop; it is mandatory, not advice:
   Never drop edge rounding because a fillet failed: use craft.safe_fillet with a smaller radius, fillet the edge
   groups one at a time, or round the profile before the boolean. A premium object without its radii is not done.
   When the request is a new idea, propose_concepts first as usual, then run this loop on the one the person picks.
+  Automatic refinement still runs after each build (it does not wait for this loop); critique the refined head.
 """
 
 

@@ -42,6 +42,8 @@ Workflow: form_overview -> create_design from your own code (design_guide; desig
 design), or create_project from a recipe (describe_recipe) -> render (look at it) -> preview_change ->
 commit_change, or update_design -> get_project (checks, next actions). Only for a design whose purpose is "print":
 run_pipeline (exports, print checks, a slice) -> request_release (a person approves in Form Studio).
+After every build, design refinement runs in the background and lands as one more revision, "Refined: N changes"
+(named refine features, each kept only when the checks hold; refine_design shows, undoes or turns it off).
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
@@ -151,6 +153,22 @@ def act(pid, kind: str, text: str, ctx=None, **extra):
 def _partial_line(info: dict) -> str:
     from .studio import _partial_text
     return _partial_text(info)
+
+
+def _refine_after(st, pid: str | None, ctx=None, refine: str | None = None) -> dict | None:
+    """Start the background refinement of a design that was just built (form/refine/jobs.py), and say so in the
+    result. None when it is off for this design (the reason is in refine_design(action="status"))."""
+    if not pid:
+        return None
+    from .refine import jobs
+    jid = jobs.after_design(st, pid, _origin(ctx), refine)
+    if not jid:
+        return None
+    return {"state": "running", "job": jid,
+            "note": "Refinement runs in the background: named, reversible refine features (fillet tiers, parting "
+                    "lines, grip zones, materials) kept only when the function checks hold, landing as one new "
+                    "revision \"Refined: N changes\". refine_design(project, action=\"status\") follows it; "
+                    "action=\"off\" turns it off for this design."}
 
 
 def _made(pid: str | None, tool: str, role: str = "made", group: str | None = None, family: bool = True) -> None:
@@ -575,7 +593,7 @@ def build() -> MCPServer:
     async def create_design(name: str, source: str, brief: str = "", values: dict[str, float] | None = None,
                             run: bool = True, language: str = "python", references: list[str] | None = None,
                             purpose: str | None = None, process: str | None = None, plan: str = "",
-                            relation: str = "", partial: bool = True, ctx: Context = None) -> list:
+                            relation: str = "", partial: bool = True, refine: str = "auto", ctx: Context = None) -> list:
         """Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
         built with build123d. Form Studio builds it and returns a six-view sheet and a section to look at; with
         run=True it also exports STEP and STL and runs the checks (and, for a design whose purpose is "print", the
@@ -601,9 +619,14 @@ def build() -> MCPServer:
         relation: in Form Studio's chat, when the conversation already has a design in front, say what this code is to
         it: "replaces" (a new revision of that design), "part_of" (one more part of that design, e.g. the lid of a
         box), "alternative" (a separate design in its family) or "new" (an unrelated design). One request makes one
-        design: use part_of for the parts of one product. Returns the project, a six-view sheet and a section: look."""
+        design: use part_of for the parts of one product.
+        refine: "auto" (default): after the build, design refinement runs in the background and lands as one more
+        revision, "Refined: N changes", each change a named refine feature you can undo (refine_design); "off": not
+        for this design. Returns the project, a six-view sheet and a section: look."""
         st = studio()
         from . import staged
+        if refine not in ("auto", "off", "on", ""):
+            raise ToolError("refine is \"auto\" or \"off\".")
         if relation and relation not in RELATIONS:
             raise ToolError(f"Unknown relation “{relation}”: use {', '.join(RELATIONS)}.")
         front = _front()
@@ -634,6 +657,12 @@ def build() -> MCPServer:
                 await _run(staged.attach_pending, st, front, plan)
             _made(front, "create_design", role="continued")
             res: dict[str, Any] = {"relation": relation, "head": p["head"]}
+            if refine == "off":
+                from .refine import jobs
+                await _run(jobs.set_project, st, front, "off")
+            rf = _refine_after(st, front, ctx)
+            if rf:
+                res["refinement"] = rf
             if run:
                 jid = st.run(front)
                 res["pipeline"] = job_digest(await _wait_job(st, jid, 45))
@@ -650,11 +679,17 @@ def build() -> MCPServer:
         _made(p["id"], "create_design", family=relation != "new")
         if plan:
             await _run(staged.attach_pending, st, p["id"], plan)
+        if refine == "off":
+            from .refine import jobs
+            await _run(jobs.set_project, st, p["id"], "off")
+        rf = _refine_after(st, p["id"], ctx)
         job = None
         if run:
             jid = st.run(p["id"])
             job = await _wait_job(st, jid, 50)
         res = await _run(digest, st, p["id"])
+        if rf:
+            res = {**res, "refinement": rf}
         if part and not part.get("failed") and part.get("parts"):
             res = {**res, "partial": part,
                    "next": f"Saved: {_partial_line(part)}. Add the next part or feature with add_feature(project="
@@ -710,6 +745,9 @@ def build() -> MCPServer:
             res["build_log"] = head["build_log"]
         if head.get("partial"):
             res["partial"] = head["partial"]
+        rf = _refine_after(st, project, ctx)
+        if rf:
+            res["refinement"] = rf
         if run:
             jid = st.run(project)
             res["pipeline"] = job_digest(await _wait_job(st, jid, 45))
@@ -754,8 +792,47 @@ def build() -> MCPServer:
             if plan:
                 await _run(staged.attach_pending, st, pid, plan)
         act(pid, "commit", f"r{r['head']:02d}: best of {len(candidates)} candidates ({r['best']})", ctx)
+        rf = _refine_after(st, pid, ctx)
+        if rf:
+            r["refinement"] = rf
         r["project"] = await _run(digest, st, pid)
         return await _with_views(st, pid, r)
+
+    @mcp.tool(annotations=RW)
+    async def refine_design(project: str, action: str = "status", feature: str = "", wait: float = 0,
+                            expect_head: int | None = None, ctx: Context = None) -> dict:
+        """Design refinement of a project. It runs on its own after every build (create_design, update_design,
+        add_feature, a kept candidate): named, reversible refine features (fillet tiers, an edge break, a parting
+        line, a grip texture, a recessed panel, button pads, ribs; materials and contrast; for game assets cage ops
+        such as support loops, panel lines and silhouette breakers), each kept only when the function checks still
+        pass, the faces of fit, access, mechanism and interface features are unchanged and the walls hold. What it
+        keeps lands as one new revision, "Refined: N changes", each change with its reason and measured change.
+        action: "status" (the job's stage and events, and the refine changes the head carries; wait=s waits up to s
+        seconds for a running job), "rerun" (refine the head again now), "undo" (feature="refine_..." takes one change
+        out, no feature takes all of them out, as a new revision; expect_head guards it), "off" (no automatic
+        refinement for this design from now on; "on" turns it back on). Measures are computed heuristics
+        (form/refine/analyze.py); the checks are the kernel's."""
+        st = studio()
+        from .refine import engine, jobs
+        if action not in ("status", "rerun", "undo", "off", "on"):
+            raise ToolError("action is status, rerun, undo, off or on.")
+        if action == "status":
+            if wait and wait > 0:
+                return await _run(jobs.wait, st, project, min(float(wait), 300.0))
+            return await _run(jobs.status, st, project)
+        if action == "rerun":
+            jid = await _run(jobs.start, st, project, "on")
+            act(project, "refine", "Refining again" if jid else "Refinement is off for this design", ctx)
+            return {**(await _run(jobs.status, st, project)), "job": jid}
+        if action == "undo":
+            jobs.cancel(project)
+            p = await _run(engine.undo, st, project, feature or None, expect_head)
+            act(project, "commit", f"r{p['head']:02d}: undid refinement" + (f" ({feature})" if feature else ""), ctx)
+            return {"head": p["head"], "changes": await _run(engine.changes, st, p)}
+        await _run(jobs.set_project, st, project, "off" if action == "off" else None)
+        if action == "off":
+            jobs.cancel(project)
+        return await _run(jobs.status, st, project)
 
     @mcp.tool(annotations=RO)
     async def get_design_source(project: str, rev: int | None = None) -> dict:
@@ -1018,6 +1095,9 @@ def build() -> MCPServer:
                 + (" (partial)" if out.get("partial") else ""), ctx, draft=draft)
             if out.get("partial"):
                 out["next"] = f"Saved as a partial design: {_partial_line(out['partial'])}."
+            rf = _refine_after(st, project, ctx)
+            if rf:
+                out["refinement"] = rf
             out["project"] = await _run(digest, st, project)
             return await _with_views(st, project, out)
         if at is None or normal is None:
@@ -1031,7 +1111,11 @@ def build() -> MCPServer:
             out = fh.add(st, p, kind, at, normal, expect_head, "agent", **o)
             out["checks"] = fh.checks(out["features"][-1], st.slicer_info(p=p).get("nozzle_mm"), allow_strain)
             return out
-        return await _run(go)
+        out = await _run(go)
+        rf = _refine_after(st, project, ctx)
+        if rf and isinstance(out, dict):
+            out["refinement"] = rf
+        return out
 
     @mcp.tool(annotations=RW)
     async def remove_feature(project: str, feature_id: str, expect_head: int | None = None) -> dict:

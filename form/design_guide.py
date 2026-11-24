@@ -234,6 +234,15 @@ WHEN IT FAILS OR LOOKS WRONG
     are still running; run_pipeline(project) finishes them and reuses what is done.
   * Through form tool (the CLI), pictures come back as file paths under "images": open them, they are the sheet,
     the section and the close-ups.
+
+AFTER THE BUILD: REFINEMENT (automatic)
+  * Every build is refined in the background: named refine features (role="refine": fillet tiers, an edge break, a
+    parting line, a grip texture, a recessed panel, button pads, ribs; materials and contrast) land as one more
+    revision, "Refined: N changes", each kept only when the checks still pass, the faces of fit, access, mechanism
+    and interface features are unchanged and the walls hold. Give your interfaces those roles and they stay exact.
+  * A plain Recipe is refined too: its build() becomes the skeleton feature of a FeatureDesign and the refine
+    features follow it. refine = False on the design class, create_design(refine="off") or
+    refine_design(action="off") turn it off; refine_design(action="undo", feature=...) takes one change out.
 """
 
 # rules 5-6 depend on what the design is for (form/purpose.py): bed orientation, overhangs and nozzle walls only for a print
