@@ -366,6 +366,19 @@ def make_handler(st: Studio):
             if m4:
                 from . import photo
                 return self._send(200, photo.file(st, p, m4.group(1)).read_bytes(), "image/png")
+            # -- the game asset (form/game/app.py): state, LODs for the viewport, baked maps, the files as a zip --
+            if rest == "/game":
+                from .game import app as game_app
+                return self._json(game_app.state(st, p))
+            mg = re.fullmatch(r"/game/([0-9a-f]{16})(?:/lod/([0-3])|/tex/([a-z_]+)\.png|(\.zip))", rest)
+            if mg:
+                from .game import app as game_app
+                if mg.group(2) is not None:
+                    return self._json(game_app.lod(st, mg.group(1), int(mg.group(2))))
+                if mg.group(3):
+                    return self._send(200, game_app.texture(st, mg.group(1), mg.group(3)), "image/png")
+                data, name = game_app.archive(st, mg.group(1))
+                return self._send(200, data, "application/zip", {"Content-Disposition": _attachment(name)})
             raise StudioError("Not found.", status=404)
 
         # -- conversations: saved chats, attachments, the agent/model choice (chat workstream) ----------------
@@ -635,6 +648,14 @@ def make_handler(st: Studio):
             p = st.load(pid)
             recipe = st.recipe(p)
             auto = lambda proj: st.run(pid) if proj.get("auto_run", True) else None
+            # -- the game asset (form/game/app.py): build, validate or export; reads the project, never changes it --
+            if action == "game":
+                from .game import app as game_app
+                res = game_app.build(st, pid, body if isinstance(body, dict) else {})
+                st.activity(pid, "export", f"Game asset ({res['preset']['label']}): "
+                            + ("every check passed" if res["validation"]["ok"] else
+                               f"{len(res['validation']['failed'])} check(s) failed"), by="you")
+                return self._json(res)
             # -- "Make editable": an imported mesh reconstructed as a new design (form/recon) --
             if action == "reconstruct":
                 kw = {k: body[k] for k in ("name",) if body.get(k)}

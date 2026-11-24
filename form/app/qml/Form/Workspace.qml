@@ -268,6 +268,8 @@ Item {
                 RailBtn { icon: "layers"; label: "Simulate the print"; hint: ws.d && ws.d.slice ? "Play the slicer’s toolpaths. Simulated, not a print." : "Needs a current slice of this revision."
                     enabled: !!ws.d && !!ws.d.slice; active: ws.sim
                     onClicked: { if (ws.sim) Store.showLayers(false); else Store.simulate({ at: 0, play: true }) } }
+                RailBtn { objectName: "railGame"; icon: "gamepad_2"; label: "Game asset"; hint: Store.hasDraft ? "Commit or discard the draft first." : "LODs at triangle budgets, UVs, baked maps and collision, for Godot, Unity or Unreal (built in Blender)."
+                    visible: Store.gameDesign; enabled: !Store.hasDraft; onClicked: Store.openSheet("game") }
                 RailBtn { icon: "camera"; label: "Photo render"; hint: Store.hasDraft ? "Commit or discard the draft first." : "Render the current revision in Blender (an illustration)."
                     enabled: !Store.hasDraft; onClicked: Store.openSheet("render") }
                 Item { width: 32; height: 9; Rectangle { x: 6; y: 4; width: 20; height: 1; color: Theme.rule2 } }

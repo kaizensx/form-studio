@@ -61,3 +61,5 @@ ActivityBar 1.0 ActivityBar.qml
 Splash 1.0 Splash.qml
 MorphFrame 1.0 MorphFrame.qml
 DesignCard 1.0 DesignCard.qml
+GameSheet 1.0 GameSheet.qml
+LodBar 1.0 LodBar.qml

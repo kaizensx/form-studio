@@ -38,6 +38,11 @@ Item {
     property real sectionT: 0.5
     signal picked(string feature)
     property var hiddenFeatures: []          // feature ids not drawn (their edges stay, so the part still reads)
+    // a game asset's LOD instead of the design (GameSheet): { positions, indices, uvs } from form/game/app.py lod()
+    property var game: null
+    property string gameMode: "shaded"       // shaded | checker | channel
+    property string gameChannel: "base_color"   // channel: base_color | normal | orm | ao
+    property var gameTex: ({})               // map → texture URL
     signal contextRequested(string feature, real x, real y)     // right-click or long-press without dragging
     signal hoveredFeature(string feature, real x, real y)
 
@@ -638,6 +643,18 @@ Item {
                     geometry: LineGeometry { segments: vp.model && vp.model.edges ? vp.model.edges : "" }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
                         property color uColor: vp.edgeColor(""); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
+                // a game asset's LOD (form/game/app.py lod()), drawn by shaders/game.frag: shaded with its baked base
+                // colour and ORM, a UV checker, or one baked map as it is stored. Its wireframe is the model's edges.
+                Model { objectName: "gameLod"; visible: !!vp.game; pickable: false; castsShadows: true; receivesShadows: true
+                    geometry: GameGeometry { source: vp.game || ({}) }
+                    materials: CustomMaterial { shadingMode: CustomMaterial.Shaded; fragmentShader: "shaders/game.frag"; cullMode: Material.BackFaceCulling
+                        property real uMode: vp.gameMode === "checker" ? 1 : vp.gameMode === "channel" ? 2 : 0
+                        property real uHasTex: vp.gameTex && vp.gameTex.base_color ? 1 : 0
+                        property real uHasOrm: vp.gameTex && vp.gameTex.orm ? 1 : 0
+                        property color uColor: Theme.clay
+                        property TextureInput uBase: TextureInput { texture: Texture { source: vp.gameTex && vp.gameTex.base_color ? vp.gameTex.base_color : "" } }
+                        property TextureInput uOrm: TextureInput { texture: Texture { source: vp.gameTex && vp.gameTex.orm ? vp.gameTex.orm : "" } }
+                        property TextureInput uShow: TextureInput { texture: Texture { source: vp.gameTex && vp.gameTex[vp.gameChannel] ? vp.gameTex[vp.gameChannel] : "" } } } }
                 Model { visible: !!(vp.ghost && vp.ghost.edges) && !vp.asmOn; pickable: false; castsShadows: false
                     geometry: LineGeometry { segments: vp.ghost && vp.ghost.edges ? vp.ghost.edges : "" }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"; depthDrawMode: Material.NeverDepthDraw

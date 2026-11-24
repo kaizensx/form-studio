@@ -148,6 +148,52 @@ class MeshGeometry(QQuick3DGeometry):
 
 
 @QmlElement
+class GameGeometry(QQuick3DGeometry):
+    """One LOD of a game asset (form/game/app.py lod()): positions, triangles and UVs, set at once through `source`.
+    Normals are smoothed across UV seams (the corners are split there, the surface is not), so a seam never shows
+    as a crease; UVs go to TEXCOORD0 for the checker and the baked maps (shaders/game.frag)."""
+    changed = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._tris = 0
+
+    def _get_src(self): return None
+    def _set_src(self, v):
+        if hasattr(v, "toVariant"):
+            v = v.toVariant()
+        v = v if isinstance(v, dict) else {}
+        self.clear()
+        pos = _b64(v.get("positions") or "", np.float32).reshape(-1, 3)
+        tri = _b64(v.get("indices") or "", np.uint32).reshape(-1, 3)
+        uv = _b64(v.get("uvs") or "", np.float32).reshape(-1, 2)
+        self._tris = int(len(tri))
+        if len(pos) and len(tri):
+            _, weld = np.unique(np.round(pos, 4), axis=0, return_inverse=True)
+            weld = weld.reshape(-1)
+            P = np.zeros((int(weld.max()) + 1, 3), dtype=np.float32)
+            P[weld] = pos
+            nrm = smooth_normals(P, weld[tri])[weld]
+            if len(uv) != len(pos):
+                uv = np.zeros((len(pos), 2), dtype=np.float32)
+            buf = np.hstack([pos, nrm, uv]).astype(np.float32)
+            self.setStride(32)
+            self.setVertexData(QByteArray(buf.tobytes()))
+            self.setIndexData(QByteArray(tri.astype(np.uint32).tobytes()))
+            self.setPrimitiveType(QQuick3DGeometry.PrimitiveType.Triangles)
+            self.addAttribute(A.PositionSemantic, 0, A.F32Type)
+            self.addAttribute(A.NormalSemantic, 12, A.F32Type)
+            self.addAttribute(A.TexCoord0Semantic, 24, A.F32Type)
+            self.addAttribute(A.IndexSemantic, 0, A.U32Type)
+            self.setBounds(QVector3D(*map(float, pos.min(axis=0))), QVector3D(*map(float, pos.max(axis=0))))
+        self.update()
+        self.changed.emit()
+
+    source = Property("QVariant", _get_src, _set_src, notify=changed)
+    triangles = Property(int, lambda self: self._tris, notify=changed)
+
+
+@QmlElement
 class LineGeometry(QQuick3DGeometry):
     """Line segments: either the engine's base64 edge array (`segments`) or a flat list of xyz pairs (`points`)."""
     changed = Signal()

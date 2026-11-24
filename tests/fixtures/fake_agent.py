@@ -58,6 +58,8 @@ def main():
         return editable(data, message, sid)
     if re.search(r"\bstages\b", first0):
         return stages(data, message, sid)
+    if re.search(r"\bgame crate\b", first0):
+        return game_crate(data, message, sid)
     if "make" in message:
         pid = "made-" + uuid.uuid4().hex[:6]
         (data / pid).mkdir(parents=True)
@@ -347,9 +349,66 @@ def stages(data: Path, message: str, sid: str) -> int:
     return 0
 
 
+def game_crate(data: Path, message: str, sid: str) -> int:
+    """"game crate": create_design through Form Studio's real MCP tool with a small subdivision cage (a box cage, 3
+    quads a side, written by form/game/pipeline.py cage_design_source), with the purpose of the message's "Purpose:"
+    line (Home's "Make it for: Game asset" gives "game")."""
+    import asyncio
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    os.environ["FORM_DATA"] = str(data)
+    import numpy as np
+    from form import mcp_server, meshsource
+    from form.game import pipeline
+    n, lo, hi = 3, np.array([0.0, 0.0, 0.0]), np.array([60.0, 40.0, 36.0])
+    V, F, ids = [], [], {}
+
+    def pid(i, j, k):
+        if (i, j, k) not in ids:
+            ids[(i, j, k)] = len(V)
+            V.append(lo + (hi - lo) * np.array([i, j, k]) / n)
+        return ids[(i, j, k)]
+    for a in range(n):
+        for b in range(n):
+            F += [[pid(a, b, 0), pid(a, b + 1, 0), pid(a + 1, b + 1, 0), pid(a + 1, b, 0)],
+                  [pid(a, b, n), pid(a + 1, b, n), pid(a + 1, b + 1, n), pid(a, b + 1, n)],
+                  [pid(a, 0, b), pid(a + 1, 0, b), pid(a + 1, 0, b + 1), pid(a, 0, b + 1)],
+                  [pid(a, n, b), pid(a, n, b + 1), pid(a + 1, n, b + 1), pid(a + 1, n, b)],
+                  [pid(0, a, b), pid(0, a, b + 1), pid(0, a + 1, b + 1), pid(0, a + 1, b)],
+                  [pid(n, a, b), pid(n, a + 1, b), pid(n, a + 1, b + 1), pid(n, a, b + 1)]]
+    src = pipeline.cage_design_source(meshsource.cage(np.array(V), F, [], {}), "Game crate")
+    args = {"name": "Game crate", "source": src, "run": True}
+    if _purpose(message):
+        args["purpose"] = _purpose(message)
+    srv = mcp_server.build()
+    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t30", "name": "mcp__form__create_design",
+                                                       "input": {k: v for k, v in args.items() if k != "source"}}]}})
+
+    async def run():
+        try:
+            res = await srv.call_tool("create_design", args)
+            text = "".join(getattr(c, "text", "") for c in res.content if getattr(c, "type", "") == "text")
+            return text, bool(getattr(res, "is_error", False) or getattr(res, "isError", False))
+        except Exception as e:
+            return str(e), True
+    try:
+        text, err = asyncio.run(run())
+    finally:
+        try:
+            mcp_server.studio().kernel.stop()
+        except Exception:
+            pass
+    out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t30", "is_error": err,
+                                                  "content": [{"type": "text", "text": text}]}]}})
+    hit = re.search(r'"(?:project|id)"\s*:\s*"([A-Za-z0-9_-]+)"', text)
+    reply = "You said: " + message.splitlines()[0] + "\n\nProject: " + (hit.group(1) if hit and not err else "none")
+    out({"type": "assistant", "message": {"content": [{"type": "text", "text": reply}]}})
+    out({"type": "result", "total_cost_usd": 0.0, "num_turns": 1, "session_id": sid})
+    return 0
+
+
 def _purpose(message: str):
     line = next((ln for ln in message.splitlines() if ln.startswith("Purpose:")), "")
-    return "model" if "just a 3D model" in line else "print" if "3D printing" in line else None
+    return "game" if "game asset" in line else "model" if "just a 3D model" in line else "print" if "3D printing" in line else None
 
 
 def concepts(data: Path, message: str) -> str:

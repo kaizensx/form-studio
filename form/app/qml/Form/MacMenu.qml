@@ -26,6 +26,7 @@ P.MenuBar {
         P.MenuItem { text: "Make It Lighter…"; enabled: mb.work; onTriggered: Store.openSheet("lighter") }
         P.MenuItem { text: "Turntable Video…"; enabled: mb.work; onTriggered: Store.openSheet("turntable") }
         P.MenuItem { text: "Render in Blender…"; enabled: mb.work; onTriggered: Store.openSheet("render") }
+        P.MenuItem { text: "Game Asset…"; enabled: mb.work; onTriggered: Store.openSheet("game") }
         P.MenuSeparator {}
         P.MenuItem { text: "Settings…"; role: P.MenuItem.PreferencesRole; shortcut: "Ctrl+,"; onTriggered: Store.openSettings("general") }
         P.MenuItem { text: "About Form Studio"; role: P.MenuItem.AboutRole; onTriggered: Store.openSheet("about") }

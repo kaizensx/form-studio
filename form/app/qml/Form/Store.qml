@@ -89,9 +89,10 @@ QtObject {
     readonly property var purposeInfo: studio && studio.env.purpose ? studio.env.purpose : ({ printing: true, decided: true, "default": "model", purposes: [], processes: [] })
     readonly property bool prints: purposeInfo.printing !== false
     readonly property bool printingDecided: !!purposeInfo.decided
-    // the open design: "print" | "model"; a model is never sliced and never checked against a printer
+    // the open design: "print" | "model" | "game"; a model or a game asset is never sliced or checked against a printer
     readonly property string purpose: data && data.purpose ? data.purpose.purpose : ""
-    readonly property bool modelDesign: purpose === "model"
+    readonly property bool modelDesign: purpose === "model" || purpose === "game"
+    readonly property bool gameDesign: purpose === "game"
     // what the next new design is for: "" = the default (purposeInfo.default). The new-design flow sets it.
     property string newPurpose: ""
     property string newProcess: ""
@@ -106,7 +107,7 @@ QtObject {
             if (r) { checkSoftware(); checkSetup() }
             return r })
     }
-    function setPurpose(purpose, process) {   // the open design: "print" | "model", and for a model how it is made
+    function setPurpose(purpose, process) {   // the open design: "print" | "model" | "game", and for a model how it is made
         var b = { purpose: purpose }
         if (process !== undefined) b.process = process
         return settings(b)
@@ -720,6 +721,52 @@ QtObject {
         dlg.accepted()
     }
     function openSheet(kind, props) { sheet = kind ? { kind: kind, props: props || ({}) } : null }
+
+    // ── the game asset of the open design (form/game/app.py; GameSheet) ──
+    // game: GET /game (engines, budgets, software, the last asset built); gameLod: the LOD drawn; gameLods: their meshes
+    property var game: null
+    property bool gameBusy: false
+    property string gameError: ""
+    property int gameLod: 0
+    property var gameLods: ({})
+    readonly property var gameAsset: game && game.last ? game.last : null
+    function loadGame() {
+        if (!pid) return Promise.resolve(null)
+        var at = pid
+        return get("/projects/" + pid + "/game").then(function (r) {
+            if (at !== pid) return null
+            game = r; gameError = ""
+            if (r.last) showGameLod(gameLod)
+            return r }, function (e) { gameError = e && e.message ? e.message : String(e); return null })
+    }
+    // build (or export) with an engine preset: { preset, texture_px, bake, budgets?, action? }
+    function buildGame(opts) {
+        if (!pid || gameBusy) return Promise.resolve(null)
+        var at = pid, body = Object.assign({ action: "build", preset: "gltf", texture_px: 1024, bake: "fast" }, opts || ({}))
+        gameBusy = true; gameError = ""
+        return post("/projects/" + pid + "/game", body).then(function (r) {
+            gameBusy = false
+            if (at !== pid) return null
+            gameLods = ({})
+            game = Object.assign({}, game || ({}), { last: r })
+            showGameLod(Math.min(gameLod, (r.lods || []).length - 1))
+            return r
+        }, function (e) { gameBusy = false; gameError = e && e.message ? e.message : String(e); return null })
+    }
+    function showGameLod(i) {
+        var a = gameAsset
+        if (!a || !a.lods || i < 0 || i >= a.lods.length) return
+        gameLod = i
+        var k = a.key + ":" + i
+        if (gameLods[k]) return
+        get("/projects/" + pid + "/game/" + a.key + "/lod/" + i).then(function (m) {
+            var c = Object.assign({}, gameLods); c[k] = m; gameLods = c })
+    }
+    function gameTexUrl(map) {
+        var a = gameAsset
+        // a local file: Qt Quick 3D's Texture reads files, not http (the engine also serves them at /game/<key>/tex/)
+        return a && a.textures && a.textures[map] ? String(Bridge.fileUrl(a.textures[map])) : ""
+    }
 
     function create(name, recipeId, brief, purpose, process) {
         var b = { name: name, recipe: recipeId, brief: brief || "", purpose: purpose || newPurpose || "" }
@@ -1911,6 +1958,7 @@ QtObject {
         return ppost("/appearance", body).then(function () { return s.refresh(false) }, fail)
     }
     property var _matLoad: Connections { target: s; function onPidChanged() { if (s.pid) s.loadMaterials() } }
+    property var _gameReset: Connections { target: s; function onPidChanged() { s.game = null; s.gameLods = ({}); s.gameLod = 0; s.gameError = "" } }
 
     // print orientation finder (GET /orient): candidates ranked by a score whose terms are shown
     property var orient: null
@@ -2085,7 +2133,7 @@ QtObject {
     }
     // what the next design is for, chosen on Home: Store.newPurpose (form/purpose.py's default until one is picked)
     // "any" (Home's "Make it for: Anything") leaves it unsaid: a 3D model unless the request says it is for printing
-    function setNewPurpose(p) { if (p === "print" || p === "model") newPurpose = p; else if (p === "any" || p === "") newPurpose = "" }
+    function setNewPurpose(p) { if (p === "print" || p === "model" || p === "game") newPurpose = p; else if (p === "any" || p === "") newPurpose = "" }
     readonly property string printerName: startInfo && startInfo.printer && startInfo.printer.name ? startInfo.printer.name : ""
     // Start blank: the workspace with an empty build plate and nothing on it. No design exists until something is
     // described, sketched or imported; what it is for (newPurpose) waits for that first message.

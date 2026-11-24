@@ -58,6 +58,7 @@ Item {
             add("Tools", "share", "share_2", "Share card", "A 1600 × 900 image of this design", function () { Store.openSheet("share") })
             add("Tools", "turntable", "film", "Turntable video", "The part turning, as MP4, PNG frames, WebP or GIF", function () { Store.openSheet("turntable") })
             add("Tools", "render", "camera", "Render in Blender", "An illustration of the current revision", function () { Store.openSheet("render") })
+            add("Tools", "game", "gamepad_2", "Game asset", "LODs, UVs, baked maps and collision for Godot, Unity or Unreal", function () { Store.openSheet("game") })
             add("Tools", "timeline", "history", (Store.timelineOpen ? "Hide" : "Show") + " the revision timeline", "Scrub through revisions", function () { Store.timelineOpen = !Store.timelineOpen; if (!Store.timelineOpen) Store.endScrub() })
             add("Tools", "morph", "play", "Play the revision history", "Morph through every revision", function () { Store.timelineOpen = true; Store.playMorph() })
             if (Store.hidden.length) add("Tools", "showall", "eye", "Show all features", F.plural(Store.hidden.length, "feature") + " hidden", function () { Store.showAll() }, "Shift+H")

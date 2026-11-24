@@ -159,6 +159,7 @@ Column {
         Row { spacing: 6
             Btn { icon: "share_2"; text: "Share card…"; enabled: !Store.hasDraft; onClicked: Store.openSheet("share") }
             Btn { objectName: "openTurntable"; kind: "quiet"; icon: "film"; text: "Turntable…"; enabled: !Store.hasDraft; onClicked: Store.openSheet("turntable") }
+            Btn { objectName: "openGame"; kind: Store.gameDesign ? "default" : "quiet"; icon: "gamepad_2"; text: "Game asset…"; enabled: !Store.hasDraft; onClicked: Store.openSheet("game") }
             Btn { kind: "quiet"; icon: "layout_grid"; text: "Variants"; onClicked: Store.openSheet("variants") }
             Btn { kind: "quiet"; icon: "history"; text: "Timeline"; active: Store.timelineOpen; onClicked: Store.timelineOpen = !Store.timelineOpen } }
     }

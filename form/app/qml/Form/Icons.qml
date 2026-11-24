@@ -5,6 +5,8 @@ import QtQuick
 QtObject {
     readonly property var map: ({
         "link": "\ue102",
+        "gamepad_2": "\ue0df",
+        "triangle": "\ue192",
         "mic": "\ue118",
         "pen_tool": "\ue131",
         "pencil_line": "\ue4f0",

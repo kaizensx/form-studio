@@ -116,13 +116,29 @@ class CageData:
         kw = {}
         sig = inspect.signature(subd.Cage.__init__).parameters
         if "creases" in sig:
-            kw["creases"] = self.creases
+            kw["creases"] = subd_creases(self.creases)
         if "regions" in sig:
             kw["regions"] = self.regions
         c = subd.Cage(self.V, self.F, levels=levels, **kw)
         if not kw:
             c.creases, c.regions = self.creases, self.regions
+        elif not hasattr(c, "regions"):              # subd.Cage keeps them as region_names / face_region
+            c.regions = self.regions
         return c
+
+
+def subd_creases(creases) -> dict:
+    """Blender's crease weights (0..1, per edge) as form.craft.subd sharpness: weight 1 is infinitely sharp (a C0
+    border between exact patches); a weight w < 1 is the semi-sharp sharpness 10 w² that Blender's own OpenSubdiv
+    evaluation uses, so the CAD limit surface follows the cage as Blender shows it. 0 is smooth (left out)."""
+    out: dict = {}
+    for a, b, w in creases or []:
+        w = float(w)
+        if w <= 0:
+            continue
+        k = (min(int(a), int(b)), max(int(a), int(b)))
+        out[k] = max(out.get(k, 0.0), float("inf") if w >= 1.0 else 10.0 * w * w)
+    return out
 
 
 def cage(V, F, creases=None, regions=None) -> CageData:

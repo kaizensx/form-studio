@@ -221,6 +221,7 @@ Item {
                         width: Math.min(parent.width, 600); x: home.split ? 0 : (parent.width - width) / 2; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
                         tone: 2; font.pixelSize: Theme.tLead; lineHeight: 1.4
                         text: home.chatting ? "You are talking with " + Store.chatAgentLabel + " in the column on the left. Open one of your designs to work on it together, or start a new design."
+                            : Store.newPurpose === "game" ? "Describe it. Form Studio models it as real CAD, then makes it a game asset: levels of detail, UVs, baked textures and collision for your engine."
                             : Store.printOn && Store.newPurposeEffective === "print" ? "Describe it. Form Studio engineers it: real, editable CAD, checked and sliced for your printer. Drop a photo, a part or a sketch too."
                                                          : "Describe it. Form Studio engineers it: real, editable CAD you can check, render and export. Drop a photo, a part or a sketch too." }
                     Item { width: 1; height: 30 }
@@ -236,11 +237,12 @@ Item {
                     Row { id: opts; objectName: "startOptions"; visible: !home.chatting; anchors.horizontalCenter: parent.horizontalCenter; spacing: 6; height: 30
                         // only for someone who prints: what the next design is made for. Anything is the default; saying
                         // "for my A1 mini" in the request does the same as picking My printer.
-                        Txt { visible: Store.printOn; kind: "fine"; tone: 3; text: "Make it for"; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
-                        Seg { id: purposeSeg; objectName: "startPurpose"; visible: Store.printOn; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 30
-                            value: Store.newPurpose === "print" ? "print" : "any"; onPicked: function (v) { Store.setNewPurpose(v) }
-                            model: [{ value: "any", text: "Anything", tip: "A 3D model: STEP, STL, 3MF and more, for any way of making it. Say “for my printer” in the request, or pick My printer, to check and slice it." },
-                                    { value: "print", text: "My printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" }] }
+                        Txt { kind: "fine"; tone: 3; text: "Make it for"; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
+                        Seg { id: purposeSeg; objectName: "startPurpose"; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 30
+                            value: Store.newPurpose === "print" || Store.newPurpose === "game" ? Store.newPurpose : "any"; onPicked: function (v) { Store.setNewPurpose(v) }
+                            model: [{ value: "any", text: "Anything", tip: "A 3D model: STEP, STL, 3MF and more, for any way of making it." + (Store.printOn ? " Say “for my printer” in the request, or pick My printer, to check and slice it." : "") }]
+                                   .concat(Store.printOn ? [{ value: "print", text: "My printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" }] : [])
+                                   .concat([{ value: "game", text: "Game asset", tip: "For a game engine: LODs at triangle budgets, UVs, baked textures and collision, for Godot, Unity or Unreal" }]) }
                         Btn { id: printerChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startPrinter"; small: true; kind: "quiet"; icon: "printer"; visible: Store.printOn && Store.newPurposeEffective === "print"
                             text: Store.printerName ? Store.printerName : "Choose a printer"
                             tip: "The printer the next design is checked and sliced for. Click to change it."

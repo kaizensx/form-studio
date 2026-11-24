@@ -86,15 +86,19 @@ Column {
 
     // what the design is for (form/purpose.py): a print is checked against a printer and sliced; a model is not
     // with 3D printing off every design is a 3D model: only how it will be made is asked
-    Sec { id: purposeSec; title: Store.printOn ? "Purpose" : "Made by"; objectName: "briefPurpose"
+    Sec { id: purposeSec; title: "Purpose"; objectName: "briefPurpose"
         readonly property var pu: Store.data && Store.data.purpose ? Store.data.purpose : ({ purpose: "print" })
-        Seg { objectName: "purposeSeg"; visible: Store.printOn; value: purposeSec.pu.purpose; enabled: !Store.job
-            model: [{ value: "print", text: "For 3D printing" }, { value: "model", text: "Just a 3D model" }]
+        Seg { objectName: "purposeSeg"; value: purposeSec.pu.purpose; enabled: !Store.job
+            model: (Store.printOn || purposeSec.pu.purpose === "print" ? [{ value: "print", text: "For 3D printing" }] : [])
+                   .concat([{ value: "model", text: "Just a 3D model" }, { value: "game", text: "Game asset" }])
             onPicked: function (v) { if (v !== Store.purpose) Store.setPurpose(v) } }
-        Txt { kind: "fine"; width: parent.width; visible: Store.printOn
-            text: purposeSec.pu.purpose === "model"
+        Txt { kind: "fine"; width: parent.width
+            text: purposeSec.pu.purpose === "game"
+                ? "For a game engine: levels of detail at triangle budgets, UVs, baked base colour, normal, ORM and AO maps, and collision, exported for Godot, Unity or Unreal. Not sliced; print checks do not apply. The design stays the CAD it is made from."
+                : purposeSec.pu.purpose === "model"
                 ? "For rendering, CAD exchange, CNC, laser cutting, moulding or visualisation. No printer or slicer is used; print checks such as overhangs, plate contact and the build volume do not apply. Releases carry STEP, STL, 3MF, OBJ, GLB and rendered views."
                 : "Checked against your printer (build volume, walls for the nozzle, overhangs, plate contact) and sliced when a slicer is installed." }
+        Btn { objectName: "briefGame"; visible: purposeSec.pu.purpose === "game"; small: true; icon: "gamepad_2"; text: "Game asset…"; onClicked: Store.openSheet("game") }
         Row { visible: purposeSec.pu.purpose === "model"; spacing: 10
             Txt { text: "Made by"; tone: 2; anchors.verticalCenter: parent.verticalCenter }
             Pick { objectName: "processPick"; width: 260; value: purposeSec.pu.process || ""
