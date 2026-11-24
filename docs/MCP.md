@@ -36,6 +36,8 @@ Workflow: form_overview -> create_design from your own code (design_guide; desig
 design), or create_project from a recipe (describe_recipe) -> render (look at it) -> preview_change ->
 commit_change, or update_design -> get_project (checks, next actions). Only for a design whose purpose is "print":
 run_pipeline (exports, print checks, a slice) -> request_release (a person approves in Form Studio).
+After every build, design refinement runs in the background and lands as one more revision, "Refined: N changes"
+(named refine features, each kept only when the checks hold; refine_design shows, undoes or turns it off).
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
@@ -76,7 +78,7 @@ Rules:
 
 ## Tools at a glance
 
-95 tools. Read-only tools never change a project.
+96 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -96,6 +98,7 @@ Rules:
 | [`create_design`](#create_design) | changes | Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass, built with build123d. |
 | [`update_design`](#update_design) | changes | Replace a design's code as a new revision (history keeps every version). |
 | [`build_candidates`](#build_candidates) | changes | Build 2-6 versions of a risky design or step at the same time (one kernel worker each), verify and score every one, and keep the best. |
+| [`refine_design`](#refine_design) | changes | Design refinement of a project. |
 | [`get_design_source`](#get_design_source) | read-only | The exact code a revision was built from (built-in recipes return their recipe file). |
 | [`create_project`](#create_project) | changes | Create a project from a built-in recipe (form_overview lists them: gridfinity_bin, storage_box, pegboard, device_stand, ...). |
 | [`get_project`](#get_project) | read-only | Current revision with every parameter and its provenance, output status (current/stale/failed/missing), checks, fit model, next best actions, simulated slice, file paths, release gate and bench link. |
@@ -421,7 +424,10 @@ texture, several parts) is refused without one; one brief serves every design of
 relation: in Form Studio's chat, when the conversation already has a design in front, say what this code is to
 it: "replaces" (a new revision of that design), "part_of" (one more part of that design, e.g. the lid of a
 box), "alternative" (a separate design in its family) or "new" (an unrelated design). One request makes one
-design: use part_of for the parts of one product. Returns the project, a six-view sheet and a section: look.
+design: use part_of for the parts of one product.
+refine: "auto" (default): after the build, design refinement runs in the background and lands as one more
+revision, "Refined: N changes", each change a named refine feature you can undo (refine_design); "off": not
+for this design. Returns the project, a six-view sheet and a section: look.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -437,6 +443,7 @@ design: use part_of for the parts of one product. Returns the project, a six-vie
 | `plan` | string |  |
 | `relation` | string |  |
 | `partial` | boolean |  |
+| `refine` | string |  |
 
 ### `update_design`
 
@@ -494,6 +501,28 @@ and, when a design was kept, its six-view sheet: look.
 | `plan` | string |  |
 | `expect_head` | integer \| null |  |
 | `sweep` | boolean |  |
+
+### `refine_design`
+
+Design refinement of a project. It runs on its own after every build (create_design, update_design,
+add_feature, a kept candidate): named, reversible refine features (fillet tiers, an edge break, a parting
+line, a grip texture, a recessed panel, button pads, ribs; materials and contrast; for game assets cage ops
+such as support loops, panel lines and silhouette breakers), each kept only when the function checks still
+pass, the faces of fit, access, mechanism and interface features are unchanged and the walls hold. What it
+keeps lands as one new revision, "Refined: N changes", each change with its reason and measured change.
+action: "status" (the job's stage and events, and the refine changes the head carries; wait=s waits up to s
+seconds for a running job), "rerun" (refine the head again now), "undo" (feature="refine_..." takes one change
+out, no feature takes all of them out, as a new revision; expect_head guards it), "off" (no automatic
+refinement for this design from now on; "on" turns it back on). Measures are computed heuristics
+(form/refine/analyze.py); the checks are the kernel's.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `action` | string |  |
+| `feature` | string |  |
+| `wait` | number |  |
+| `expect_head` | integer \| null |  |
 
 ### `get_design_source`
 
@@ -1696,7 +1725,11 @@ preset: gltf | godot (GLB, metres, +Y up) | unity (FBX metres) | unreal (FBX cm,
 UCX_<asset>_LOD0_NN, named after the LOD0 render mesh as Unreal pairs them).
 formats: extra fbx/usd. action: build | validate (re-check the GLB) | export (list every file).
 budgets: four triangle ceilings, LOD0 first (default 12000, 6000, 2500, 800).
-materials (cage designs): {region name | "default": {finish, color "#rrggbb", pattern none|wood|noise|brushed}}.
+materials: {region or zone name | "default": {material, tint "#rrggbb", grain_mm, wear 0..1, roughness,
+emission}}; material is one of wood, bare_metal, brushed_metal, painted_metal, leather, plastic, rubber, stone,
+fabric, emissive (each with a baked height pattern; edge wear, cavity dirt and roughness breakup from the high
+poly's curvature, AO and thickness). The older {finish, color, pattern} form is still read. Left out, the
+design's own materials() method is used (a literal dict in its source, read without running it).
 Reads the project, never changes it. Every check is computed from the written GLB. Needs Blender 4.2+.
 
 | Argument | Type | Required |

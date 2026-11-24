@@ -120,7 +120,7 @@ class GameEvaluator(Evaluator):
     purpose = "game"
 
     def __init__(self, st, p: dict, product_class: str | None = None, frozen: set | None = None,
-                 budgets: list | None = None, preset: str = "gltf", texture_px: int = 512, bake: str = "fast"):
+                 budgets: list | None = None, preset: str = "gltf", texture_px: int = 1024, bake: str = "fast"):
         self.st, self.p = st, p
         self.product_class = product_class
         self.frozen = set(frozen or ())
@@ -200,13 +200,16 @@ class GameEvaluator(Evaluator):
         from ..game import materials as matlib
         from ..game import pipeline
         from .analyze import Measurement, analyze
-        cage = self._cage(source)
-        mats, _n = matlib.materials_in_source(source)
-        out = Path(tempfile.mkdtemp(prefix="form-refine-bake-"))
-        with _sem:
-            rep = pipeline.build({"cage": cage, "materials": mats}, out / "asset", asset="refine", preset=self.preset,
-                                 budgets=self.budgets, texture_px=self.texture_px, bake=self.bake,
-                                 cfg=getattr(self.st, "cfg", None))
+        try:
+            cage = self._cage(source)
+            mats, _n = matlib.materials_in_source(source)
+            out = Path(tempfile.mkdtemp(prefix="form-refine-bake-"))
+            with _sem:
+                rep = pipeline.build({"cage": cage, "materials": mats}, out / "asset", asset="refine",
+                                     preset=self.preset, budgets=self.budgets, texture_px=self.texture_px,
+                                     bake=self.bake, cfg=getattr(self.st, "cfg", None))
+        except Exception as e:                                  # noqa: BLE001 - a result that does not bake fails
+            return Evaluation(ok=False, error=f"the bake failed: {type(e).__name__}: {e}"[:300])
         gdir = out / "asset"
         ev = critique.game_evidence(gdir)
         base = self._measure(source)
