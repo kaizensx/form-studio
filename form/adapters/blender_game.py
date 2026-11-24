@@ -37,8 +37,9 @@ import bmesh
 import bpy
 import numpy as np
 
-RUNNER_VERSION = 3
+RUNNER_VERSION = 4
 CREASE = "crease_edge"
+BOARD = "form_board"          # a face attribute: one value 0..1 per board (wood plank, stone block), see boards()
 KINDS = ("wood", "bare_metal", "brushed_metal", "painted_metal", "leather", "plastic", "rubber", "stone", "fabric",
          "emissive")
 EXTRA_MAPS = ("emissive", "curvature", "thickness")      # written whenever they are baked (with the base colour)
@@ -247,13 +248,47 @@ def base_from_cage(z, mats):
                 e.seam = True
             elif e[lay] >= 0.999:
                 e.seam = True
-    me = bpy.data.meshes.new("FormBase")
     bm.normal_update()
+    boards(bm, lay, reg)
+    me = bpy.data.meshes.new("FormBase")
     bm.to_mesh(me)
     bm.free()
     for m in mats:
         me.materials.append(m)
     return link(bpy.data.objects.new("FormBase", me))
+
+
+def boards(bm, crease_layer, reg, max_faces=400_000, turn_deg=35.0):
+    """A face attribute (BOARD) that tells one board from the next: faces joined by edges that are smooth (no full
+    crease, no region border, a turn under turn_deg) share a board, and every board takes its own value 0..1 (the
+    golden-ratio sequence, so neighbours differ). Planks split by creased grooves, or box sides that meet at creased
+    corners, get one value per plank face; the wood and stone materials offset their grain and vary their tint by
+    it. The subdivision carries face attributes to the faces it makes."""
+    n = len(bm.faces)
+    if n == 0 or n > max_faces:
+        return 0
+    cos_t = math.cos(math.radians(turn_deg))
+    lab = [-1] * n
+    k = 0
+    for f0 in bm.faces:
+        if lab[f0.index] >= 0:
+            continue
+        lab[f0.index] = k
+        stack = [f0]
+        while stack:
+            f = stack.pop()
+            for e in f.edges:
+                if e[crease_layer] >= 0.999 or (e.seam and len(reg)):
+                    continue
+                for g in e.link_faces:
+                    if lab[g.index] < 0 and f.normal.dot(g.normal) >= cos_t:
+                        lab[g.index] = k
+                        stack.append(g)
+        k += 1
+    lay = bm.faces.layers.float.get(BOARD) or bm.faces.layers.float.new(BOARD)
+    for f in bm.faces:
+        f[lay] = (lab[f.index] * 0.6180339887 + 0.137) % 1.0
+    return k
 
 
 def base_from_mesh(z, mats):
@@ -422,6 +457,19 @@ def principled(mat):
 
 CONTRAST = {"wood": 0.55, "stone": 0.4, "leather": 0.3, "fabric": 0.3, "rubber": 0.15, "bare_metal": 0.15,
             "brushed_metal": 0.12, "painted_metal": 0.12, "plastic": 0.08, "emissive": 0.0}
+BOARD_TINT = {"wood": 0.22, "stone": 0.08}          # tint spread between boards (planks, blocks), +- share
+
+# Edge wear: the raw score (a wide convex-edge mask x breakup noise, 0..1.25) wears through above a threshold that
+# falls as the material's wear rises. Calibrated on the six game bench assets (scripts/game_bench.py) by baking the
+# raw score and measuring the worn share at each threshold: raw over 0.63 - 0.35 x wear (the ramp's middle) leaves
+# about 2-9 % of their surface worn at wear 0.3-0.75, measured on the baked mask (wear_measure()). The first runner's
+# threshold, 1 - 0.75 x wear, left about 1 % worn on the same assets.
+WEAR_RAMP = 0.12
+WEAR_REACH = 3.0              # the wear's rounding radius, in edge-mask radii
+
+
+def wear_threshold(wear):
+    return 0.57 - 0.35 * wear
 
 
 def node(nt, kind, **props):
@@ -491,17 +539,59 @@ def noise(nt, v, scale, detail=6.0, rough=0.55):
     return n.outputs["Fac"]
 
 
-def pattern(nt, kind, vec):
+def vadd(nt, a, b):
+    n = node(nt, "ShaderNodeVectorMath", operation="ADD")
+    feed(nt, n.inputs[0], a)
+    feed(nt, n.inputs[1], b)
+    return n.outputs["Vector"]
+
+
+def vscale(nt, a, s):
+    n = node(nt, "ShaderNodeVectorMath", operation="SCALE")
+    feed(nt, n.inputs[0], a)
+    feed(nt, sock(n, "Scale"), s)
+    return n.outputs["Vector"]
+
+
+def wood(nt, vec, board):
+    """Wood: (height, albedo variation, end grain 0..1). The growth rings are cylinders around the grain axis (X),
+    so long faces show flat-sawn streaks and end faces (normal along X) show ring arcs; the rings are warped by a
+    noise field so they wander and pinch, and every board (BOARD) shifts the log centre and the warp, so no two
+    planks show the same figure. Ring pitch is about grain_mm / 4.6."""
+    off = node(nt, "ShaderNodeCombineXYZ")              # a per-board shift: a different cut of the log
+    feed(nt, off.inputs["X"], mth(nt, "MULTIPLY", board, 173.0))
+    feed(nt, off.inputs["Y"], mth(nt, "MULTIPLY", board, 7.31))
+    feed(nt, off.inputs["Z"], mth(nt, "MULTIPLY", board, -5.17))
+    p = vadd(nt, vec, off.outputs["Vector"])
+    wn = node(nt, "ShaderNodeTexNoise")                 # the warp: slow along the grain, faster across it
+    feed(nt, wn.inputs["Vector"], scaled(nt, p, 0.08, 0.55, 0.55))
+    wn.inputs["Scale"].default_value = 1.0
+    wn.inputs["Detail"].default_value = 3.0
+    wn.inputs["Roughness"].default_value = 0.5
+    warp = vscale(nt, vadd(nt, wn.outputs["Color"], (-0.5, -0.5, -0.5)), 0.9)
+    q = scaled(nt, vadd(nt, p, warp), 0.0, 1.0, 1.0)    # x dropped: cylindrical rings around X
+    w = node(nt, "ShaderNodeTexWave", wave_type="RINGS")
+    feed(nt, w.inputs["Vector"], q)
+    w.inputs["Scale"].default_value = 1.45
+    w.inputs["Distortion"].default_value = 2.5
+    w.inputs["Detail"].default_value = 2.0
+    w.inputs["Detail Scale"].default_value = 1.5
+    ring = ramp(nt, sock(w, "Fac"), 0.15, 0.95)        # late wood: thin dark bands, not a sine
+    fine = noise(nt, scaled(nt, p, 0.25, 14.0, 14.0), 1.0, 4.0)     # pores along the grain
+    h = mth(nt, "ADD", mth(nt, "MULTIPLY", ring, 0.7), mth(nt, "MULTIPLY", fine, 0.3))
+    var = mth(nt, "ADD", mth(nt, "MULTIPLY", ring, 0.8), mth(nt, "MULTIPLY", fine, 0.2))
+    tc = node(nt, "ShaderNodeTexCoord")
+    sep = node(nt, "ShaderNodeSeparateXYZ")
+    nt.links.new(tc.outputs["Normal"], sep.inputs["Vector"])
+    end = ramp(nt, mth(nt, "ABSOLUTE", sep.outputs["X"]), 0.6, 0.85)
+    return h, var, end
+
+
+def pattern(nt, kind, vec, board=0.0):
     """(height 0..1, albedo variation 0..1) for a kind, from object coordinates in units of its grain."""
     if kind == "wood":
-        w = node(nt, "ShaderNodeTexWave", wave_type="RINGS")
-        feed(nt, w.inputs["Vector"], scaled(nt, vec, 0.12, 1.0, 1.0))           # the grain runs along X
-        w.inputs["Scale"].default_value = 1.0
-        w.inputs["Distortion"].default_value = 5.0
-        w.inputs["Detail"].default_value = 3.0
-        fine = noise(nt, scaled(nt, vec, 0.3, 12.0, 12.0), 1.0, 4.0)
-        h = mth(nt, "ADD", mth(nt, "MULTIPLY", sock(w, "Fac"), 0.75), mth(nt, "MULTIPLY", fine, 0.25))
-        return h, sock(w, "Fac")
+        h, var, _end = wood(nt, vec, board)
+        return h, var
     if kind == "brushed_metal":
         n = noise(nt, scaled(nt, vec, 0.03, 6.0, 6.0), 4.0, 8.0, 0.6)             # fine lines along X
         return n, n
@@ -553,7 +643,12 @@ def make_material(spec, masks):
     e_mm, c_mm, t_mm = (num(masks[k], 1e-4, 1e5) for k in ("edge_mm", "cavity_mm", "thick_mm"))
     tc = node(nt, "ShaderNodeTexCoord")
     vec = scaled(nt, tc.outputs["Object"], 1.0 / grain, 1.0 / grain, 1.0 / grain)
-    h, var = pattern(nt, kind, vec)
+    board = node(nt, "ShaderNodeAttribute", attribute_type="GEOMETRY", attribute_name=BOARD).outputs["Fac"]
+    end = None
+    if kind == "wood":
+        h, var, end = wood(nt, vec, board)
+    else:
+        h, var = pattern(nt, kind, vec)
     # masks, read from the high poly as it is shaded
     geo = node(nt, "ShaderNodeNewGeometry")
     bev = node(nt, "ShaderNodeBevel", samples=8)
@@ -571,22 +666,45 @@ def make_material(spec, masks):
     thick = th.outputs["AO"]
     convex = mth(nt, "MULTIPLY", edge, mth(nt, "SUBTRACT", 1.0, cavity, clamp=True))   # a creased valley is no edge
     breakup = noise(nt, scaled(nt, tc.outputs["Object"], *(1.0 / (e_mm * 12.0),) * 3), 1.0, 8.0, 0.65)
-    thin = mth(nt, "MULTIPLY", mth(nt, "SUBTRACT", 1.0, thick, clamp=True), 0.35)
-    raw = mth(nt, "ADD", mth(nt, "MULTIPLY", convex, mth(nt, "ADD", mth(nt, "MULTIPLY", breakup, 1.2), 0.2)), thin)
-    lo_w = 1.0 - 0.75 * wear
-    worn = ramp(nt, raw, lo_w, lo_w + 0.18) if wear > 0 else 0.0
+    # wear reads a wider rounding than the edge mask (a worn band is wider than the highlight), only on convex
+    # ground: raw = convex_wide x (breakup + a base); nothing wears off the edges. The rounding shrinks where the
+    # part is thin (thickness AO low): a blade thinner than the radius would read as all edge.
+    bw = node(nt, "ShaderNodeBevel", samples=8)
+    feed(nt, bw.inputs["Radius"], mth(nt, "MULTIPLY", mth(nt, "ADD", mth(nt, "MULTIPLY", thick, WEAR_REACH - 0.6),
+                                                          0.6), e_mm))
+    dw = node(nt, "ShaderNodeVectorMath", operation="DOT_PRODUCT")
+    nt.links.new(bw.outputs["Normal"], dw.inputs[0])
+    nt.links.new(geo.outputs["Normal"], dw.inputs[1])
+    tw = mth(nt, "SQRT", mth(nt, "MULTIPLY", mth(nt, "SUBTRACT", 1.0, sock(dw, "Value")), 2.0, clamp=False))
+    convex_w = mth(nt, "MULTIPLY", ramp(nt, tw, 0.03, 0.3), mth(nt, "SUBTRACT", 1.0, cavity, clamp=True))
+    raw = mth(nt, "MULTIPLY", convex_w, mth(nt, "ADD", mth(nt, "MULTIPLY", breakup, 1.1), 0.15))
+    lo_w = wear_threshold(wear)
+    worn = ramp(nt, raw, lo_w, lo_w + WEAR_RAMP) if wear > 0 else 0.0
     dirt = mth(nt, "MULTIPLY", mth(nt, "MULTIPLY", cavity, mth(nt, "ADD", mth(nt, "MULTIPLY", breakup, 0.8), 0.4)),
                0.25 + 0.6 * wear, clamp=True)
     mk = node(nt, "ShaderNodeCombineColor")
-    mk.name = "FormMasks"
+    mk.name = "FormMasks"                          # R convex edge, G worn (what the bake measures), B thickness
     feed(nt, mk.inputs["Red"], convex)
-    feed(nt, mk.inputs["Green"], cavity)
+    feed(nt, mk.inputs["Green"], worn)
     feed(nt, mk.inputs["Blue"], thick)
-    # albedo: the tint varied by the pattern, dirt in cavities, the edge colour where worn
+    # albedo: the tint varied by the pattern and per board, dirt in cavities, the edge colour where worn
     c = CONTRAST[kind]
     dark = [x * (1 - c) for x in col[:3]] + [1.0]
     light = [min(x * (1 + c * 0.6), 1.0) for x in col[:3]] + [1.0]
     albedo = mix_col(nt, var, dark, light)
+    bv = BOARD_TINT.get(kind, 0.0)
+    if bv > 0:                                     # each board a little lighter or darker, warmer or cooler
+        lo = [x * (1 - bv) for x in (1.04, 1.0, 0.92)] + [1.0]
+        hi = [x * (1 + bv) for x in (0.97, 1.0, 1.05)] + [1.0]
+        f = mix_col(nt, board, lo, hi)
+        mul = node(nt, "ShaderNodeMix", data_type="RGBA", blend_type="MULTIPLY", clamp_result=True)
+        sock(mul, "Factor_Float").default_value = 1.0
+        nt.links.new(albedo, sock(mul, "A_Color"))
+        nt.links.new(f, sock(mul, "B_Color"))
+        albedo = sock(mul, "Result_Color")
+    if end is not None:                            # end grain drinks finish: darker and rougher
+        albedo = mix_col(nt, mth(nt, "MULTIPLY", end, 0.45), albedo, [x * 0.45 for x in col[:3]] + [1.0])
+        rough = mth(nt, "ADD", rough, mth(nt, "MULTIPLY", end, 0.12))
     albedo = mix_col(nt, dirt, albedo, dirt_col)
     albedo = mix_col(nt, worn, albedo, edge_col)
     nt.links.new(albedo, bs.inputs["Base Color"])
@@ -939,6 +1057,7 @@ def bake_all(high, low, job, work):
             emit_bake("metallic", "Non-Color", input_of("Metallic"))
     finally:
         restore()
+    wear = wear_measure(low, arrays["masks"]) if "masks" in arrays else None
     hidden = [h for h in hidden if h[0] is not cage]
     bpy.data.objects.remove(cage)
 
@@ -975,9 +1094,39 @@ def bake_all(high, low, job, work):
     return {"seconds": times, "total_seconds": round(sum(times.values()), 3), "files": files,
             "px": px, "samples": b["samples"], "ao_samples": b["ao_samples"], "device": sc.cycles.device,
             "cage_extrusion": round(float(ext.max()) if len(ext) else 0.0, 4), "max_ray_distance": round(ray, 4),
-            "rays": rays, "exploded_parts": moved, "parts": nparts,
+            "rays": rays, "exploded_parts": moved, "parts": nparts, "wear": wear,
             "ray_note": "a cage per exploded part (extrusion p99 x 1.2 of its low-to-high distance); one bake call "
                         "takes one ray length, the largest part's (2 x its extrusion)"}, imgs
+
+
+def wear_measure(low, masks, n=200_000):
+    """How much of LOD0's surface the baked wear mask (masks G) covers, by area: surface samples (a fixed seed)
+    looked up in the mask through LOD0's UVs. worn_share is the share worn (mask over 0.5), convex_share the share
+    on a convex edge (R over 0.5), worn_on_convex the share of the convex edges that is worn and convex_of_worn the
+    share of the worn surface that lies on a convex edge. Measured, not judged."""
+    a = lod_arrays(low)
+    P, UV, T = a["P"], a["UV"], a["T"]
+    if not len(T):
+        return None
+    A = 0.5 * np.linalg.norm(np.cross(P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]]), axis=1)
+    if A.sum() <= 0:
+        return None
+    rng = np.random.default_rng(5)
+    k = rng.choice(len(T), size=n, p=A / A.sum())
+    u, v = rng.random(n), rng.random(n)
+    flip = u + v > 1
+    u[flip], v[flip] = 1 - u[flip], 1 - v[flip]
+    uv = UV[T[k, 0]] * (1 - u - v)[:, None] + UV[T[k, 1]] * u[:, None] + UV[T[k, 2]] * v[:, None]
+    px = masks.shape[0]
+    x = np.clip((uv[:, 0] * px).astype(int), 0, px - 1)
+    y = np.clip((uv[:, 1] * px).astype(int), 0, px - 1)       # Blender's pixel rows run bottom-up, like v
+    s = masks[y, x]
+    convex, worn = s[:, 0] > 0.5, s[:, 1] > 0.5
+    out = {"worn_share": round(float(worn.mean()), 4), "convex_share": round(float(convex.mean()), 4),
+           "worn_on_convex": round(float((worn & convex).sum() / max(int(convex.sum()), 1)), 4),
+           "convex_of_worn": round(float((worn & convex).sum() / max(int(worn.sum()), 1)), 4),
+           "samples": n, "threshold": 0.5}
+    return out
 
 
 # ---- reading LODs back -------------------------------------------------------------------------------------------

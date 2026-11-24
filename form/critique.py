@@ -752,6 +752,8 @@ GAME_HARD_DEG = 50.0          # an edge of LOD0 sharper than this is a hard edge
 GAME_FEATURE_DEG = 25.0       # an edge sharper than this turns the form (a bevel's own edges count here)
 GAME_BAKED_DEG = 12.0         # a hard edge is baked when the normal map leans at least this much just inside it
 GAME_VIEWS = {"front": (0.0, 0.0), "side": (90.0, 0.0), "top": (0.0, 90.0), "three_quarter": (35.0, 25.0)}
+WEAR_BAND = (0.02, 0.12)      # worn share of the surface that reads as use: under it no wear shows, over it damage
+                              # (the same band as form/refine/analyze.WEAR_BAND)
 
 
 def _score(raw):
@@ -956,8 +958,13 @@ def game_evidence(asset_dir) -> dict:
                        (forms smaller than the masses: LOD0 has feature edges, bevels, panels, trims, of at least 3
                        diagonals in all, or 3 or more parts), tertiary (the normal map carries surface detail: blue std >=
                        0.006 or red/green std >= 0.03)
-      silhouette       solidity (area over convex hull) of LOD0 in four views; complexity = 1 - their mean
-      wear             a material with wear >= 0.15 and the curvature mask lit on >= 0.5 % of LOD0's surface
+      silhouette       solidity (area over convex hull) of LOD0 in four views; complexity = 1 - their mean; and the
+                       read at a glance (form/refine/analyze.py): convexity_64, the convexity deficit of the outline
+                       at 64 px in six views, and interior_regions, value regions of >= 12 px in a 64 px lit render
+      wear             worn_share: the share of LOD0's surface the baked wear mask covers (measured in the bake,
+                       report bake.wear), with worn_on_convex and convex_of_worn; present when it is >= 2 %, in_band
+                       when it is 2-12 %. An older bake without the mask falls back to a worn material and a lit
+                       curvature mask (worn_share None)
     All computed (no judgement); the thresholds are proposals."""
     d = Path(asset_dir)
     f = _game_files(d)
@@ -996,6 +1003,20 @@ def game_evidence(asset_dir) -> dict:
     sols = {v: round(solidity(m), 4) for v, m in sil.items()}
     wear_max = max([float(m.get("wear") or 0) for m in used] or [0.0])
     edge_lit = round(float((_lookup(curv, uv)[:, 0] > 0.5).mean()), 4) if curv is not None else 0.0
+    wear = {"max_wear": wear_max, "edge_mask_share": edge_lit}
+    wm = ((rep.get("bake") or {}).get("wear")) or {}
+    if wm.get("worn_share") is not None:          # measured on the baked wear mask (runner 4 and later)
+        s = float(wm["worn_share"])
+        lo, hi = WEAR_BAND
+        wear.update(worn_share=s, worn_on_convex=wm.get("worn_on_convex"), convex_of_worn=wm.get("convex_of_worn"),
+                    present=bool(s >= lo), in_band=bool(lo <= s <= hi), measured="baked wear mask over LOD0")
+    else:                                          # an older bake: no wear mask, only the material and edge mask
+        wear.update(worn_share=None, present=bool(wear_max >= 0.15 and edge_lit >= 0.005), in_band=None,
+                    measured="not measured (an older bake has no wear mask): a worn material and a lit edge mask")
+    from .refine import analyze as ra
+    s64 = ra.silhouette(P, T)
+    s64.pop("masks", None)
+    read = ra.interior_read(P, T)
     return {"asset": rep.get("asset"), "dir": str(d), "diagonal_mm": round(diag, 2),
             "lod0_triangles": int(len(T)), "edges": edges,
             "materials": {"count": len(kinds), "list": [f"{a} {b}" for a, b in kinds]},
@@ -1005,9 +1026,10 @@ def game_evidence(asset_dir) -> dict:
                        "lod0_parts": comps0, "feature_edge_diagonals": round(edges["feature_edges_mm"] / diag, 2),
                        "lod3_min_solidity": round(sol3, 4), "lod0_far_from_lod3": round(far, 4),
                        "normal_blue_std": nd.get("blue_std"), "normal_rg_std": nd.get("rg_std")},
-            "silhouette": {"solidity": sols, "complexity": round(1 - float(np.mean(list(sols.values()))), 4)},
-            "wear": {"present": bool(wear_max >= 0.15 and edge_lit >= 0.005), "max_wear": wear_max,
-                     "edge_mask_share": edge_lit},
+            "silhouette": {"solidity": sols, "complexity": round(1 - float(np.mean(list(sols.values()))), 4),
+                           "convexity_64": s64["convexity_deficit"], "solidity_64": s64["solidity"],
+                           "interior_regions": read["regions"]},
+            "wear": wear,
             "evidence": "computed (thresholds proposed)"}
 
 
@@ -1094,15 +1116,44 @@ def _game_caps(metrics: dict, ev: dict | None) -> dict:
         mcap, mwhy = min(mcap or 5, 2), mwhy + [f"value contrast {vc:.2f} (under 0.08: it reads as one flat tone)"]
     elif vc is not None and vc < 0.15:
         mcap, mwhy = min(mcap or 5, 3), mwhy + [f"value contrast {vc:.2f} (under 0.15)"]
-    if not ev["wear"]["present"]:
-        mcap, mwhy = min(mcap or 5, 4), mwhy + ["no edge wear"]
+    w = ev["wear"]
+    ws = w.get("worn_share")
+    if ws is not None and ws > WEAR_BAND[1]:
+        mcap, mwhy = min(mcap or 5, 4), mwhy + [f"wear covers {ws:.1%} of the surface (over {WEAR_BAND[1]:.0%}: it "
+                                                 "reads as damage, not use)"]
+    elif not w.get("present"):
+        mcap, mwhy = min(mcap or 5, 4), mwhy + ["no edge wear" + (f" ({ws:.1%} of the surface worn, under "
+                                                                   f"{WEAR_BAND[0]:.0%})" if ws is not None else "")]
     caps["material"] = (mcap, ("; ".join(mwhy).capitalize() + ".") if mcap is not None else "")
-    cx = ev["silhouette"]["complexity"]
-    if cx < 0.005 and sc["count"] <= 1:
-        caps["silhouette"] = (2, f"A convex outline in every view (complexity {cx:.3f}) and no detail: a blob.")
-    elif cx < 0.005:
-        caps["silhouette"] = (4, f"A convex outline in every view (complexity {cx:.3f}).")
+    caps["silhouette"] = _silhouette_cap(ev["silhouette"], sc["count"])
     return caps
+
+
+def _silhouette_cap(s: dict, scales: int) -> tuple:
+    """The silhouette cap. With the 64 px read (convexity_64, interior_regions from form/refine/analyze.py): an
+    outline whose convexity deficit at 64 px is under SIL_BLOB reads as a blob at game distance: cap 2 with one
+    detail scale or none, 3 when the lit render shows fewer than READ_REGIONS value regions inside it, else 4; an
+    outline over SIL_SHRED is shredded: cap 4. Without it (older evidence), the four-view complexity: under 0.005
+    cap 2 with no detail, else 4."""
+    from .refine import analyze as ra
+    cx64, reg = s.get("convexity_64"), s.get("interior_regions")
+    if cx64 is not None:
+        if cx64 < ra.SIL_BLOB:
+            head = f"The outline at 64 px is nearly convex (convexity deficit {cx64:.3f}, under {ra.SIL_BLOB:g})"
+            if scales <= 1:
+                return 2, head + " and there is no detail: a blob."
+            if reg is not None and reg < ra.READ_REGIONS:
+                return 3, head + f" and only {reg} value region(s) read inside it (of {ra.READ_REGIONS})."
+            return 4, head + f"; {reg} value regions inside it carry the read."
+        if cx64 > ra.SIL_SHRED:
+            return 4, f"The outline at 64 px is shredded (convexity deficit {cx64:.3f}, over {ra.SIL_SHRED:g})."
+        return None, ""
+    cx = s["complexity"]
+    if cx < 0.005 and scales <= 1:
+        return 2, f"A convex outline in every view (complexity {cx:.3f}) and no detail: a blob."
+    if cx < 0.005:
+        return 4, f"A convex outline in every view (complexity {cx:.3f})."
+    return None, ""
 
 
 def aesthetic_rubric(metrics: dict, zones: list | None = None, scores=None, purpose: str | None = None,
