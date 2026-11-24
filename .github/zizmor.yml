@@ -1,0 +1,22 @@
+# zizmor (workflow security analysis, .github/workflows/zizmor.yml) settings.
+# Every ignore below was reviewed by hand; each says why the flagged pattern is safe in this repository.
+rules:
+  dangerous-triggers:
+    ignore:
+      # pull_request_target: labels and a welcome note; runs only base-branch scripts on the event's own fields and
+      # never checks out or executes the pull request.
+      - triage.yml
+      # pull_request_target and workflow_run: posts to Discord from base-branch scripts; nothing from the pull
+      # request is checked out (sparse checkout of the default branch only).
+      - discord.yml
+      # workflow_run: rebuilds the site from main after the compatibility matrix or benchmarks finish.
+      - pages.yml
+      # workflow_run: the privileged half of the split PR preview; reads the other run's artifacts as data only.
+      - pr-preview-comment.yml
+  artipacked:
+    ignore:
+      # the second checkout keeps its token on purpose to push the recipe branch; the job uploads no artifacts.
+      - recipe-accept.yml
+  self-repository:
+    # Local actions use the long-standing `./.github/actions/...` form, which actionlint also checks.
+    disable: true

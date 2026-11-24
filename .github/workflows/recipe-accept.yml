@@ -30,10 +30,13 @@ jobs:
       pull-requests: write
       issues: write
     steps:
-      - uses: actions/checkout@v7          # the automation's own scripts, from the default branch
+      # the automation's own scripts, from the default branch
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/checkout@v7          # the branch the pull request goes to
+      # the branch the pull request goes to; keeps its token, since the next step pushes a branch from it.
+      # No artifact is uploaded from this job, so the stored credential never leaves the runner.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: dev
           path: dev-tree

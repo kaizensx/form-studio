@@ -81,7 +81,7 @@ jobs:
     env:
       FORM_CONFIG: .github/ci-${{ matrix.kind }}.toml
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-form
@@ -97,7 +97,7 @@ jobs:
             libgtk-3-0 libwebkit2gtk-4.1-0 libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 xvfb ${APT:+"$APT"}
       - name: Cached slicer download
         if: matrix.url
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/slicer-dl
           key: slicer-${{ matrix.kind }}-${{ matrix.sha256 }}
@@ -129,7 +129,7 @@ jobs:
         run: |
           xvfb-run -a python3 scripts/ci/compat.py run --kind "$KIND" --name "$NAME" --version "$VERSION" \
             --runner "$RUNNER_IMAGE" --python "$PY" --out "$RUNNER_TEMP/compat"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: compat-${{ matrix.kind }}
@@ -145,10 +145,10 @@ jobs:
     permissions:
       contents: write          # the ci-assets branch
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: compat-*
           path: ${{ runner.temp }}/in

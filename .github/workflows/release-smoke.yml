@@ -38,11 +38,11 @@ jobs:
           - { name: Windows x64, os: windows-latest, asset: FORM-windows-x64.zip, app: FORM/FORM.exe }
           - { name: Linux x64, os: ubuntu-22.04, asset: FORM-linux-x64.tar.gz, app: FORM/FORM }
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: scripts
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           enable-cache: false
       - name: Linux libraries for Qt
@@ -88,7 +88,7 @@ jobs:
           RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a"
           $RUN uv run --no-project --python 3.12 --with "mcp>=2.3,<3" python scripts/smoke_packaged.py "$RUNNER_TEMP/rel/$APP" \
             | tee "$RUNNER_TEMP/smoke.txt"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: smoke-${{ matrix.asset }}
