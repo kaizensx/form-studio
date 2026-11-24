@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- **LODs that keep their shape, measured against LOD0.** Decimation now dissolves flat areas first, then tries an
+  even collapse and collapses that hold borders, UV seams, sharp and creased edges, material boundaries, the
+  silhouette from 8 views and curvature, and keeps the most held one that stays about as close to the source.
+  LOD1 to LOD3 come from LOD0's own cage level at most, decimated from a level with room to spare, and the bare
+  cage (whose points lie off the surface) is never a LOD. Two new checks measure every LOD against LOD0 from the
+  GLB: the worst of 8 silhouettes (IoU at least 0.985, 0.96, 0.90 for LOD1 to LOD3) and the Hausdorff distance
+  (at most 0.5 %, 1 %, 2.5 % of the diagonal); both thresholds are proposed. On the six bench assets every LOD
+  passes both; the worst were the remote's LOD3 (IoU 0.957) and the wheel's LOD3 (1.90 %). The wheel's LOD1 tyre
+  dips 0.43 % under its outer radius, rounder than a 24-sided one (0.86 %).
+- **The baked normal map in the shaded view.** The Game asset sheet's shaded view applies the tangent-space normal
+  map (with a switch to compare without it) and adds an emissive map when the asset has one.
+- **One bake per click, and none left behind.** The app now waits for a game build as long as the pipeline lets
+  Blender run, so a slow 4k bake no longer shows a false error; a second identical Build or Export while one runs
+  joins it instead of starting another Blender; and quitting the app stops any Blender bake it started.
+
 - **Game assets in the app, and two new agent tools.** "Game asset" is now a purpose on Home ("Make it for") and in
   the brief. A design for a game opens the Game asset sheet from the rail: build it in Blender, switch between LOD0
   and LOD3 with each one's triangle count against its budget, and look at it shaded with its baked maps, as a UV

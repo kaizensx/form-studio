@@ -158,7 +158,8 @@ class Presets(unittest.TestCase):
         _V, F = box_cage((0, 0, 0), (1, 1, 1))     # 6 quads -> 24 quads at level 1
         self.assertEqual([lod.level_tris(F, L) for L in range(4)], [12, 48, 192, 768])
         plan = lod.plan_lods(F, [768, 200, 100, 12])
-        self.assertEqual([(p["level"], p["decimate"]) for p in plan], [(3, False), (2, False), (2, True), (0, False)])
+        # 100: decimated from a level with at least 4 x the budget; 12: the bare cage (level 0) is never a LOD
+        self.assertEqual([(p["level"], p["decimate"]) for p in plan], [(3, False), (2, False), (3, True), (1, True)])
         self.assertIn("automatic retopology", plan[2]["source"])
         self.assertIn("clean quads", plan[0]["source"])
 

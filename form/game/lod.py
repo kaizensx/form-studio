@@ -3,8 +3,12 @@
 LODs from a cage come from its subdivision levels first: level L of a cage with Q quads (after the first level every
 face is a quad) has 2 * Q * 4^(L-1) triangles, clean quads at no cost. When no level is close enough under a budget,
 the next finer level is decimated to it, and the report says so ("automatic retopology": an edge-collapse decimation
-is not hand topology). CAD bodies and sculpts have no levels: their LODs are always decimated (or QuadriFlow
-remeshed, when asked).
+is not hand topology). Level 0, the bare cage, is never a LOD: its points lie off the limit surface (outside it on
+round parts), so a budget under level 1 decimates level 1, whose points the runner puts on the limit surface. The
+decimation itself (form/adapters/blender_lod.py, run in Blender) keeps borders, seams, sharp edges, material
+boundaries, the silhouette and curvature, and dissolves flat areas first; validate.py measures each LOD against LOD0
+(silhouette IoU from 8 views, Hausdorff distance). CAD bodies and sculpts have no levels: their LODs are always
+decimated (or QuadriFlow remeshed, when asked).
 
 Collision is a convex hull per part by default (scipy's Qhull, at most HULL_POINTS points per hull, so every engine
 takes it: PhysX caps a convex mesh at 255). CoACD (approximate convex decomposition, MIT) is optional, in its own
@@ -23,6 +27,8 @@ import numpy as np
 
 LEVEL_FILL = 0.6           # a cage level is used as is when it fills at least 60% of the budget (and is under it)
 MAX_LEVEL = 6
+DECIMATE_FROM = 4          # a decimated LOD starts from a level with at least 4 x its budget...
+DECIMATE_CAP_TRIS = 400_000   # ...and at most this many triangles
 HULL_POINTS = 64
 COACD_ENGINE = "game.coacd"
 COACD_TIMEOUT_S = 600
@@ -43,24 +49,35 @@ def level_tris(F: list, level: int) -> int:
 def plan_lods(F: list, budgets: list[int], tolerance: float = 0.02, max_level: int = MAX_LEVEL) -> list[dict]:
     """For each budget: {"lod", "budget", "level", "decimate": bool, "source", "expected_tris"}.
 
-    The finest level at or under budget x (1 + tolerance) is used as is when it fills at least LEVEL_FILL of the
-    budget; otherwise the next finer level is decimated to the budget."""
+    LOD0: the finest level at or under budget x (1 + tolerance) is used as is when it fills at least LEVEL_FILL of
+    the budget; otherwise the next finer level is decimated to it. LOD1 and up are measured against LOD0 (validate.py),
+    so they come from LOD0's own level at most: a level used as is must be level 2 or finer (level 1 of a coarse cage
+    shrinks tapers and tips visibly), else the densest level up to LOD0's with at least DECIMATE_FROM x the budget
+    (at most DECIMATE_CAP_TRIS triangles) is decimated to the budget. Level 0, the bare cage, is never a LOD."""
     out = []
+    top = max_level
     for i, b in enumerate(budgets):
         cap = b * (1 + tolerance)
-        under = [L for L in range(0, max_level + 1) if level_tris(F, L) <= cap]
+        under = [L for L in range(1, top + 1) if level_tris(F, L) <= cap]
         L = max(under) if under else None
-        if L is not None and level_tris(F, L) >= LEVEL_FILL * b:
+        as_is = L is not None and level_tris(F, L) >= LEVEL_FILL * b and (i == 0 or L >= 2)
+        if as_is:
             out.append({"lod": i, "budget": b, "level": L, "decimate": False, "expected_tris": level_tris(F, L),
                         "source": f"cage level {L} (clean quads)"})
         else:
-            src = 0 if L is None else min(L + 1, max_level)
+            src = 1 if L is None else min(L + 1, top)
+            if i > 0:                              # a denser source: the collapse has room to keep the shape
+                while (src < top and level_tris(F, src) < DECIMATE_FROM * b
+                       and level_tris(F, src + 1) <= DECIMATE_CAP_TRIS):
+                    src += 1
             if level_tris(F, src) <= cap:          # even the finest level is under budget: use it
                 out.append({"lod": i, "budget": b, "level": src, "decimate": False,
                             "expected_tris": level_tris(F, src), "source": f"cage level {src} (clean quads)"})
             else:
                 out.append({"lod": i, "budget": b, "level": src, "decimate": True, "expected_tris": b,
                             "source": f"cage level {src}, decimated to the budget (automatic retopology)"})
+        if i == 0:
+            top = out[0]["level"]
     return out
 
 

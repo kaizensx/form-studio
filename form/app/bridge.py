@@ -25,26 +25,99 @@ from PySide6.QtQml import QJSValue
 # a conversation attachment: the engine takes the file by its path (cloned or linked into the conversation), so a
 # 500 MB scan is never read by the app or sent over the loopback socket
 _ATTACH = re.compile(r"/conversations/[0-9a-f]{12}/attach(\?.*)?")
+# a game asset build or export: Blender may bake for up to form/game/pipeline.py's TIMEOUT_S, so the request waits
+# longer than that (the pipeline's watchdog stops Blender first, and its error is what the sheet shows)
+_GAME_BUILD = re.compile(r"/projects/[^/?]+/game")
+HTTP_TIMEOUT_S = 900.0
+
+
+def _game_timeout() -> float:
+    try:
+        from ..game.pipeline import TIMEOUT_S
+    except Exception:                         # noqa: BLE001 - the game pipeline missing never breaks a request
+        TIMEOUT_S = 1800.0
+    return float(TIMEOUT_S) + 120.0
+
+
+def _flight_key(method: str, path: str, body) -> str | None:
+    """Requests that must never run twice at once (single flight): a game asset build or export of one project with
+    the same options. A second identical request while the first runs waits for its answer instead of starting a
+    second Blender."""
+    if method != "POST" or not _GAME_BUILD.fullmatch(path):
+        return None
+    try:
+        return method + " " + path + " " + json.dumps(body if body is not None else {}, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        return method + " " + path
+
+
+def blender_children(pid: int | None = None) -> list[int]:
+    """Process ids of Blender processes this process started (direct children whose command names blender). The
+    game pipeline starts Blender in its own session (form/game/pipeline.py), so quitting the app does not stop it."""
+    pid = os.getpid() if pid is None else pid
+    out = []
+    try:
+        if os.name == "nt":
+            r = subprocess.run(["wmic", "process", "where", f"ParentProcessId={pid}", "get", "ProcessId,CommandLine",
+                                "/format:csv"], capture_output=True, text=True, timeout=10)
+            for line in r.stdout.splitlines():
+                parts = line.strip().split(",")
+                if len(parts) >= 3 and "blender" in ",".join(parts[1:-1]).lower() and parts[-1].isdigit():
+                    out.append(int(parts[-1]))
+            return out
+        r = subprocess.run(["ps", "-A", "-o", "pid=,ppid=,command="], capture_output=True, text=True, timeout=10)
+        for line in r.stdout.splitlines():
+            f = line.split(None, 2)
+            if len(f) == 3 and f[1] == str(pid) and "blender" in f[2].lower() and f[0].isdigit():
+                out.append(int(f[0]))
+    except (OSError, subprocess.SubprocessError, ValueError):
+        pass
+    return out
+
+
+def kill_blender_children() -> list[int]:
+    """Stop every Blender this app started, with its process group (Blender's own children too). Returns the ids."""
+    import signal
+    killed = []
+    for p in blender_children():
+        try:
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/T", "/F", "/PID", str(p)], capture_output=True, timeout=10)
+            else:
+                try:
+                    os.killpg(p, signal.SIGKILL)       # the pipeline makes Blender a session (and group) leader
+                except OSError:
+                    os.kill(p, signal.SIGKILL)
+            killed.append(p)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return killed
 
 
 class _Call(QRunnable):
     def __init__(self, bridge: "Bridge", rid: int, method: str, path: str, body, raw: bytes | None = None,
-                 raw_file: str | None = None):
+                 raw_file: str | None = None, flight: str | None = None):
         super().__init__()
         self.b, self.rid, self.method, self.path, self.body, self.raw = bridge, rid, method, path, body, raw
         self.raw_file = raw_file              # a local file streamed as the body, read on this worker thread
+        self.flight = flight                  # single flight: every request id waiting on this one gets its reply
+        self.timeout = _game_timeout() if _GAME_BUILD.fullmatch(path) and method == "POST" else HTTP_TIMEOUT_S
+
+    def emit(self, ok: bool, obj):
+        for rid in self.b._land(self.flight, self.rid):
+            self.b.reply.emit(rid, ok, obj)
 
     def run(self):
         f = None
         try:
-            conn = http.client.HTTPConnection(self.b.host, self.b.port, timeout=900)
+            conn = http.client.HTTPConnection(self.b.host, self.b.port, timeout=self.timeout)
             headers, data = {}, None
             if self.method == "POST":
                 if self.raw_file is not None:
                     try:
                         f = open(self.raw_file, "rb")
                     except OSError as e:
-                        self.b.reply.emit(self.rid, False, {"message": f"Could not read that file: {e}", "status": 0})
+                        self.emit(False, {"message": f"Could not read that file: {e}", "status": 0})
                         return
                     data = f
                     headers = {"Content-Type": "application/octet-stream", "Content-Length": str(os.fstat(f.fileno()).st_size)}
@@ -62,14 +135,14 @@ class _Call(QRunnable):
                 obj = {"error": {"message": f"Unexpected response ({res.status})"}}
             if res.status >= 400 or (isinstance(obj, dict) and obj.get("error")):
                 err = obj.get("error") if isinstance(obj, dict) else None
-                self.b.reply.emit(self.rid, False, {**(err or {"message": res.reason}), "status": res.status})
+                self.emit(False, {**(err or {"message": res.reason}), "status": res.status})
             else:
-                self.b.reply.emit(self.rid, True, obj)
+                self.emit(True, obj)
         except RuntimeError:        # the app is quitting and the bridge is gone; nobody is waiting for this reply
             return
         except Exception as e:      # the engine thread died or the socket closed
             try:
-                self.b.reply.emit(self.rid, False, {"message": "The Form Studio engine is not answering.",
+                self.emit(False, {"message": "The Form Studio engine is not answering.",
                                                      "hint": f"Restart Form Studio. Your projects are saved on disk. ({e})", "status": 0})
             except RuntimeError:
                 pass
@@ -109,6 +182,35 @@ class Bridge(QObject):
         self.host, self.port, self._data, self._version = host, port, data_dir, version
         self.pool = QThreadPool.globalInstance()
         self.pool.setMaxThreadCount(max(8, self.pool.maxThreadCount()))
+        import threading
+        self._flights: dict[str, list[int]] = {}      # single-flight key -> request ids waiting on it
+        self._flock = threading.Lock()
+        app = QGuiApplication.instance()
+        if app is not None:                            # quitting stops the Blender bakes this app started
+            app.aboutToQuit.connect(self.stopChildren)
+
+    @Slot(result=int)
+    def stopChildren(self) -> int:
+        """Stop the Blender processes this app started (a bake in progress when the app quits). Returns how many."""
+        return len(kill_blender_children())
+
+    def _join(self, key: str | None, rid: int) -> bool:
+        """True when this request starts its flight (or has none); False when it joined one already running."""
+        if key is None:
+            return True
+        with self._flock:
+            if key in self._flights:
+                self._flights[key].append(rid)
+                return False
+            self._flights[key] = [rid]
+            return True
+
+    def _land(self, key: str | None, rid: int) -> list[int]:
+        """The request ids a finished request answers: its own, or everyone in its flight."""
+        if key is None:
+            return [rid]
+        with self._flock:
+            return self._flights.pop(key, None) or [rid]
 
     @Slot(QObject, float, result=bool)
     def centerWindowButtons(self, window, bar_height: float) -> bool:
@@ -150,7 +252,9 @@ class Bridge(QObject):
     def request(self, rid: int, method: str, path: str, body):
         if isinstance(body, QJSValue):
             body = body.toVariant()
-        self.pool.start(_Call(self, rid, method, path, body))
+        key = _flight_key(method, path, body)
+        if self._join(key, rid):
+            self.pool.start(_Call(self, rid, method, path, body, flight=key))
 
     @Slot(int, str, QUrl)
     def upload(self, rid: int, path: str, file: QUrl):

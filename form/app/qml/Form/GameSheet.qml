@@ -17,6 +17,7 @@ Column {
     property string preset: "gltf"
     property int texturePx: 1024
     property bool wire: false
+    property bool normalMap: true            // shaded: the baked normal map on (off shows the LOD's own normals)
     property string mode: "shaded"           // shaded | checker | channel
     property string channel: "base_color"
     readonly property var g: Store.game
@@ -87,8 +88,8 @@ Column {
     // ── the asset: one LOD at a time ──
     Rectangle { width: parent.width; height: 380; radius: Theme.rMd; color: Theme.well; clip: true; border.color: Theme.rule2
         Viewport { id: view; objectName: "gameViewport"; anchors.fill: parent; anchors.margins: 1; showDims: false; showCompanions: false
-            visible: !!gs.lod; gameMode: gs.mode; gameChannel: gs.channel
-            gameTex: gs.a ? { base_color: Store.gameTexUrl("base_color"), normal: Store.gameTexUrl("normal"), orm: Store.gameTexUrl("orm"), ao: Store.gameTexUrl("ao") } : ({}) }
+            visible: !!gs.lod; gameMode: gs.mode; gameChannel: gs.channel; gameNormalMap: gs.normalMap
+            gameTex: gs.a ? { base_color: Store.gameTexUrl("base_color"), normal: Store.gameTexUrl("normal"), orm: Store.gameTexUrl("orm"), ao: Store.gameTexUrl("ao"), emissive: Store.gameTexUrl("emissive") } : ({}) }
         Spinner { anchors.centerIn: parent; size: 28; visible: Store.gameBusy }
         Txt { anchors.centerIn: parent; width: parent.width - 80; horizontalAlignment: Text.AlignHCenter; kind: "fine"; tone: 3
             visible: !Store.gameBusy && !gs.a
@@ -96,10 +97,13 @@ Column {
         LodBar { x: 10; y: 10; visible: !!gs.a; lods: gs.a && gs.a.lods ? gs.a.lods : []; value: Store.gameLod; onPicked: function (i) { Store.showGameLod(i) } }
         Column { anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 10; spacing: 6; visible: !!gs.a
             Seg { objectName: "gameView"; anchors.right: parent.right; value: gs.mode; onPicked: function (v) { gs.mode = v }
-                model: [{ value: "shaded", text: "Shaded", tip: "The baked base colour and ORM" }, { value: "checker", text: "UV checker", tip: "Even squares mean even texel density; a stretched or mirrored square is a UV problem" },
+                model: [{ value: "shaded", text: "Shaded", tip: "The baked base colour, ORM, normal and emissive maps" }, { value: "checker", text: "UV checker", tip: "Even squares mean even texel density; a stretched or mirrored square is a UV problem" },
                         { value: "channel", text: "Maps", tip: "One baked map, as it is stored" }] }
             Seg { objectName: "gameChannel"; anchors.right: parent.right; visible: gs.mode === "channel"; value: gs.channel; onPicked: function (v) { gs.channel = v }
                 model: [{ value: "base_color", text: "Base" }, { value: "normal", text: "Normal" }, { value: "orm", text: "ORM" }, { value: "ao", text: "AO" }] }
+            Btn { objectName: "gameNormalMap"; anchors.right: parent.right; small: true; kind: "quiet"; icon: "layers"; active: gs.normalMap
+                visible: gs.mode === "shaded" && !!(gs.a && gs.a.textures && gs.a.textures.normal)
+                text: gs.normalMap ? "Normal map on" : "Normal map off"; onClicked: gs.normalMap = !gs.normalMap }
             Btn { objectName: "gameWire"; anchors.right: parent.right; small: true; kind: "quiet"; icon: "grid_3x3"; active: gs.wire
                 text: gs.wire ? "Hide wireframe" : "Wireframe"; onClicked: gs.wire = !gs.wire } }
         Txt { anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 12; kind: "fine"; tone: 3; visible: !!gs.lod
