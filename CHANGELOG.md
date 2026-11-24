@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **The design refinement engine (engine and analysis).** `form/refine` measures what a built design lacks as a
+  deficit vector from 0 to 1 (the outline at 64 px from six views, value regions of a small lit render, proportion,
+  balance over the support, detail scales, edge hierarchy, the largest unbroken surface, material zones and contrast,
+  edge wear for game assets, and sharp edges where the hand goes), all computed and deterministic. A beam search
+  (width 3, depth up to 4, six candidates a round, built in parallel through `candidates.run`) tries refinement
+  operators ranked by deficit, style and a local ledger, and keeps a step only when the function checks are not
+  worse, the faces of fit, access, mechanism and interface features are identical, the walls stay above the
+  minimum and, for game assets, the validator and budgets pass. Each kept step is one `@feature(role="refine")` with
+  its reason and measured change, and `delete_feature` takes it out again. Budgets are 20 s for CAD and 90 s for
+  game assets. Five style tables (clean consumer, rugged tool, sci-fi hard surface, stylised fantasy, organic) are
+  picked from the brief. The ledger (`refine_ledger.json` in the data folder) is never uploaded and can be reset.
+  Refinement is off per design (`refine = False`), per call (`refine="off"`) or in `studio.toml` (`[refine]
+  enabled = false`). The operator interface is in `form/refine/__init__.py`; the operators themselves and the app
+  wiring come next.
 - **UI journeys keep the keyboard.** Qt Quick shortcuts fire only in the focus window, so when another app or window
   took the focus during a run, journeys that press keys (E, 1-5, T, Esc, Ctrl+3, Ctrl+K) timed out while clicks
   still worked. A journey's key press now makes the app window active again first, and fails with a clear message
