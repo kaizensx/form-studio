@@ -57,7 +57,8 @@ GROUPS = [("engine", "Form Studio itself"), ("ai", "Claude Code"), ("agents", "O
 # group → the capability (form/capabilities.py) a registry item belongs to, unless it names its own
 CAPABILITY_OF_GROUP = {"engine": "core", "slicer": "print", "ai": "agent", "agents": "agent", "form": "core"}
 CAPABILITY_OF_ID = {"parts": "parts", "blender": "render", "freecad": "exchange", "openscad": "exchange",
-                    "recon.learned": "mesh", "recon.cadfit": "mesh", "exemplars.cadevolve": "core"}
+                    "recon.learned": "mesh", "recon.cadfit": "mesh", "exemplars.cadevolve": "core",
+                    "game.coacd": "render"}
 
 
 # ---- model --------------------------------------------------------------------------------------------------------
@@ -590,6 +591,41 @@ def _m_cadfit(platform, ctx) -> list[Method]:
             eng]
 
 
+# ---- CoACD (form/game/lod.py): optional convex decomposition for game collision, in its own environment -------------
+
+def _coacd_ready(cfg: dict) -> str:
+    from . import engines
+    from .game import lod
+    if engines.python(lod.COACD_ENGINE, cfg) is not None:
+        return "its own Python (" + engines._tilde(engines.env_dir(lod.COACD_ENGINE, cfg)) + ")"
+    return ""
+
+
+def _d_coacd(cfg, ctx) -> Found:
+    where = _coacd_ready(cfg)
+    if where:
+        return Found("ok", f"Installed in {where}. Game assets can ask for collision=\"coacd\".")
+    return Found("missing", "Optional. Not installed. Game assets get a convex hull per part without it.")
+
+
+def _coacd_engine(cfg: dict):
+    def run(io) -> str:
+        from . import engines
+        from .game import lod
+        return engines.build(lod.COACD_ENGINE, cfg, io)
+    return run
+
+
+def _m_coacd(platform, ctx) -> list[Method]:
+    from . import engines
+    from .game import lod
+    cfg = ctx.get("cfg") or _cfg_default()
+    note = ("CoACD is MIT licensed (SarahWeiii/CoACD). It runs out of the app, in a Python of its own; nothing else "
+            "changes. Off until a game asset asks for collision=\"coacd\".")
+    return [Method("engine", "Its own Python, set up by Form Studio", kind="action", streams=True,
+                   commands=engines.commands(lod.COACD_ENGINE, cfg), action=_coacd_engine(cfg), note=note)]
+
+
 def _m_claude(platform, ctx) -> list[Method]:
     # The commands on the official setup page (CLAUDE_DOCS), unchanged.
     if platform == "windows":
@@ -796,6 +832,13 @@ REGISTRY: list[Software] = [
              homepage="https://github.com/ghadinehme/CADFit",
              licence="CC BY-NC 4.0 (non-commercial use only; included with its author's permission)",
              licence_url="https://creativecommons.org/licenses/by-nc/4.0/", noncommercial=True),
+    Software("game.coacd", "CoACD collision for game assets",
+             "Optional: approximate convex decomposition (CoACD) for tighter game collision than one convex hull per "
+             "part. Runs in its own Python, out of the app.",
+             "optional", "engine", _d_coacd, _m_coacd,
+             size="about 60 MB (its own Python 3.12 with CoACD and NumPy)",
+             homepage="https://github.com/SarahWeiii/CoACD", licence="MIT",
+             licence_url="https://github.com/SarahWeiii/CoACD/blob/main/LICENSE"),
     Software("exemplars.cadevolve", "Reference CadQuery corpus (CADEvolve)",
              "Optional: about 8,000 parametric CadQuery generators from CADEvolve, offered to the agent after Form "
              "Studio's own design examples, labelled reference CadQuery, not the Form API. Read as text, never run.",

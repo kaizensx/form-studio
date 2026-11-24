@@ -6,16 +6,18 @@ Two answers shape the whole app:
                                       capability "print": off unless they turn it on in the launcher or in Settings ›
                                       Set up for. Form Studio is for making things first; printing is one optional way
                                       to make them. Older files with only [general].printing still read as they did.
-  project["purpose"]                  "print" (made to be 3D printed) or "model" (just a 3D model: for rendering,
-                                      CAD exchange, CNC, laser cutting, moulding, visualisation, ...). A new design
+  project["purpose"]                  "print" (made to be 3D printed), "model" (just a 3D model: for rendering,
+                                      CAD exchange, CNC, laser cutting, moulding, visualisation, ...) or "game" (a
+                                      real-time asset for a game engine: LODs, UVs, baked textures, collision;
+                                      form/game/). A new design
                                       is a model unless whoever creates it says it is for printing (the person on
                                       Home, or the agent when the request says so); a design saved before purposes
                                       existed is "print".
   project["process"]                  for a model: how it will be made, if the person said ("" = not stated). It sets
                                       the smallest feature worth flagging (form/checks.py).
 
-A model is never sliced and never checked against a printer: overhangs, bridges, plate contact, the build volume,
-nozzle-based wall rules, the printer-accuracy fit model and the slice are not applicable, and say so.
+A model or a game asset is never sliced and never checked against a printer: overhangs, bridges, plate contact, the
+build volume, nozzle-based wall rules, the printer-accuracy fit model and the slice are not applicable, and say so.
 """
 from __future__ import annotations
 
@@ -25,7 +27,12 @@ PURPOSES = {
     "model": {"label": "Just a 3D model", "short": "3D model",
               "text": "For rendering, CAD exchange, CNC, laser cutting, moulding or visualisation. Not sliced, and no "
                       "printer is needed."},
+    "game": {"label": "Game asset", "short": "Game asset",
+             "text": "For a game engine: levels of detail at triangle budgets, UVs, baked textures and collision, "
+                     "exported as GLB (FBX and USD through Blender). Not sliced, and no printer is needed."},
 }
+# purposes that are not printed: print checks and slicing do not apply to them (is_model is true for each)
+NOT_PRINTED = ("model", "game")
 
 # how a model will be made; min_feature_mm is the thinnest wall or feature that process usually holds (a rule of
 # thumb, stated as such in the check)
@@ -60,7 +67,15 @@ def normalise(v) -> str | None:
         return "print"
     if s in ("model", "3d_model", "just_a_3d_model", "not_for_printing", "no_print"):
         return "model"
+    if s in GAME_ALIASES:
+        return "game"
     return None
+
+
+GAME_ALIASES = ("game", "game_asset", "game_model", "game_ready", "for_a_game", "for_games", "real_time", "realtime",
+                "game_engine", "unity", "unreal", "godot", "asset_de_jogo", "ativo_de_jogo", "modelo_de_jogo",
+                "para_jogo", "jogo", "activo_de_juego", "recurso_de_juego", "asset_de_juego", "juego", "spiel_asset",
+                "asset_de_jeu", "jeu")
 
 
 def normalise_process(v) -> str | None:
@@ -103,7 +118,12 @@ def of(p: dict | None) -> str:
 
 
 def is_model(p: dict | None) -> bool:
-    return of(p) == "model"
+    """Not for printing: a 3D model or a game asset (print checks, the printer and slicing do not apply)."""
+    return of(p) in NOT_PRINTED
+
+
+def is_game(p: dict | None) -> bool:
+    return of(p) == "game"
 
 
 def process(p: dict | None) -> str:
@@ -118,6 +138,8 @@ def describe(p: dict | None) -> dict:
     if pur == "model":
         out.update(process=pr, process_label=PROCESSES[pr]["label"], min_feature_mm=PROCESSES[pr]["min_feature_mm"],
                    not_applicable=[label for _, label in PRINT_ONLY])
+    elif pur == "game":
+        out.update(not_applicable=[label for _, label in PRINT_ONLY], pipeline="form/game (game_asset)")
     return out
 
 

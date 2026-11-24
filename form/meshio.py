@@ -6,6 +6,10 @@ from Z-up (CAD) to Y-up (glTF); a viewer shows the part the right size and the r
 
     obj_bytes(stl_path, name)    Wavefront OBJ (text)
     glb_bytes(stl_path, name)    binary glTF 2.0, one mesh with normals
+    glb_scene(nodes, materials, images)
+                                 binary glTF 2.0 with several named nodes, UVs (TEXCOORD_0), PBR materials and
+                                 embedded PNG textures: the game asset writer (form/game). Positions go in as given
+                                 (the caller converts to metres, Y up); node extras carry LOD and collision labels.
 """
 from __future__ import annotations
 
@@ -84,6 +88,97 @@ def glb_bytes(stl_path: Path, name: str = "part") -> bytes:
     }
     js = pad(json.dumps(gltf, separators=(",", ":")).encode("utf-8"), b" ")
     body = struct.pack("<II", len(js), 0x4E4F534A) + js + struct.pack("<II", len(blob), 0x004E4942) + blob
+    return struct.pack("<III", 0x46546C67, 2, 12 + len(body)) + body
+
+
+def _pad(b: bytes, c: bytes = b"\x00") -> bytes:
+    return b + c * ((4 - len(b) % 4) % 4)
+
+
+def glb_scene(nodes: list[dict], materials: list[dict] | None = None, images: list[bytes] | None = None,
+              generator: str = "Form Studio", extras: dict | None = None) -> bytes:
+    """A binary glTF 2.0 file of several meshes.
+
+    nodes: [{"name", "P" (n, 3) float, "idx" (t, 3) int, optional "N" (n, 3), "UV" (n, 2) (glTF convention: v down,
+    so pass 1 - v of a Blender UV), "material" (index into materials), "extras" (dict)}]. Each node has one mesh with
+    one primitive.
+    materials: [{"name", "base_color" [r,g,b,a], "metallic", "roughness", optional "base_color_tex", "orm_tex",
+    "normal_tex" (indices into images; the ORM image serves as occlusion and metallicRoughness, as glTF intends)}].
+    images: PNG bytes, embedded in the binary chunk."""
+    materials, images = list(materials or []), list(images or [])
+    blob = bytearray()
+    views, accessors = [], []
+
+    def view(data: bytes, target=None) -> int:
+        off = len(blob)
+        blob.extend(_pad(data))
+        v = {"buffer": 0, "byteOffset": off, "byteLength": len(data)}
+        if target:
+            v["target"] = target
+        views.append(v)
+        return len(views) - 1
+
+    def acc(arr: np.ndarray, kind: str, comp: int, target=34962, minmax=False) -> int:
+        a = np.ascontiguousarray(arr, dtype="<u4" if comp == 5125 else "<f4")
+        d = {"bufferView": view(a.tobytes(), target), "componentType": comp, "count": int(len(a) if a.ndim > 1 else a.size),
+             "type": kind}
+        if minmax:
+            d["min"] = [float(x) for x in a.min(axis=0)]
+            d["max"] = [float(x) for x in a.max(axis=0)]
+        accessors.append(d)
+        return len(accessors) - 1
+
+    gnodes, meshes = [], []
+    for nd in nodes:
+        P = np.asarray(nd["P"], dtype=np.float64).reshape(-1, 3)
+        T = np.asarray(nd["idx"], dtype=np.int64).reshape(-1, 3)
+        if len(T) and (T.min() < 0 or T.max() >= len(P)):
+            raise ValueError(f"node {nd.get('name')}: an index points past its {len(P)} points")
+        attrs = {"POSITION": acc(P, "VEC3", 5126, minmax=True)}
+        if nd.get("N") is not None:
+            N = np.asarray(nd["N"], dtype=np.float64).reshape(-1, 3)
+            ln = np.linalg.norm(N, axis=1, keepdims=True)
+            ln[ln == 0] = 1.0
+            attrs["NORMAL"] = acc(N / ln, "VEC3", 5126)
+        if nd.get("UV") is not None:
+            attrs["TEXCOORD_0"] = acc(np.asarray(nd["UV"], dtype=np.float64).reshape(-1, 2), "VEC2", 5126)
+        prim = {"attributes": attrs, "indices": acc(T.reshape(-1), "SCALAR", 5125, target=34963), "mode": 4}
+        if nd.get("material") is not None:
+            prim["material"] = int(nd["material"])
+        meshes.append({"name": nd.get("name", "mesh"), "primitives": [prim]})
+        g = {"name": nd.get("name", "node"), "mesh": len(meshes) - 1}
+        if nd.get("extras"):
+            g["extras"] = nd["extras"]
+        gnodes.append(g)
+    gimages, textures = [], []
+    for im in images:
+        gimages.append({"bufferView": view(bytes(im)), "mimeType": "image/png"})
+        textures.append({"source": len(gimages) - 1, "sampler": 0})
+    gmats = []
+    for m in materials:
+        pbr = {"baseColorFactor": [float(x) for x in (m.get("base_color") or [1, 1, 1, 1])],
+               "metallicFactor": float(m.get("metallic", 0.0)), "roughnessFactor": float(m.get("roughness", 0.5))}
+        g = {"name": m.get("name", "material"), "pbrMetallicRoughness": pbr}
+        if m.get("base_color_tex") is not None:
+            pbr["baseColorTexture"] = {"index": int(m["base_color_tex"])}
+        if m.get("orm_tex") is not None:
+            pbr["metallicRoughnessTexture"] = {"index": int(m["orm_tex"])}
+            g["occlusionTexture"] = {"index": int(m["orm_tex"])}
+        if m.get("normal_tex") is not None:
+            g["normalTexture"] = {"index": int(m["normal_tex"])}
+        gmats.append(g)
+    gltf = {"asset": {"version": "2.0", "generator": generator}, "scene": 0,
+            "scenes": [{"nodes": list(range(len(gnodes)))}], "nodes": gnodes, "meshes": meshes,
+            "buffers": [{"byteLength": len(blob)}], "bufferViews": views, "accessors": accessors}
+    if gmats:
+        gltf["materials"] = gmats
+    if gimages:
+        gltf.update(images=gimages, textures=textures,
+                    samplers=[{"magFilter": 9729, "minFilter": 9987, "wrapS": 10497, "wrapT": 10497}])
+    if extras:
+        gltf["asset"]["extras"] = extras
+    js = _pad(json.dumps(gltf, separators=(",", ":")).encode("utf-8"), b" ")
+    body = struct.pack("<II", len(js), 0x4E4F534A) + js + struct.pack("<II", len(blob), 0x004E4942) + bytes(blob)
     return struct.pack("<III", 0x46546C67, 2, 12 + len(body)) + body
 
 

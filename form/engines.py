@@ -6,6 +6,7 @@ of its own, made with one click from Settings > Software, and runs out of proces
         .python/                    the Python 3.12 that uv installs for the engines (uv's managed CPython builds)
         recon.learned/              CAD-Recode: torch, transformers, safetensors (pinned)
         recon.cadfit/               CADFit: build123d, trimesh, scikit-learn, SciPy, manifold3d (pinned)
+        game.coacd/                 CoACD: approximate convex decomposition for game collision (pinned)
 
 An environment is built in a temporary folder next to its final place and moved there only when every step worked
 (uv venv, uv pip install, an import check, the engine's own extra step such as its weights). A failed or cancelled
@@ -60,6 +61,12 @@ SPECS: dict[str, dict] = {
                  "manifold3d==3.5.5"),
         "check": ("import trimesh, manifold3d, sklearn, scipy, build123d; "
                   "import form.recon.cadfit.driver, form.recon.cadfit.cqrun, form.recon.cadfit.vendor.greedy_search"),
+    },
+    "game.coacd": {
+        "label": "CoACD",
+        # CoACD 1.0.14 (MIT) ships abi3 wheels for macOS arm64, Linux x86_64/arm64 and Windows x86_64
+        "pins": ("coacd==1.0.14", "numpy==2.5.4"),
+        "check": "import coacd, numpy; import form.game.lod",
     },
 }
 

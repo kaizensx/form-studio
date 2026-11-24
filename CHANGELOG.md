@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **Game assets: a design made ready for a game engine.** A new purpose, "game" (also "game asset", "asset de jogo",
+  "Unity", "Unreal", "Godot"), is never sliced or checked against a printer. The game pipeline (`form/game/`) takes a
+  design's subdivision cage, or its CAD tessellation, and makes LOD0 to LOD3 at triangle budgets (cage subdivision
+  levels first, as clean quads; a level decimated to the budget only when no level fits, labelled automatic
+  retopology; Decimate or QuadriFlow for CAD bodies), UVs (seams on region borders when every region is a disc, else
+  Smart UV Project, then packed at one texel density), a Principled material per zone with fixed procedural wood,
+  noise and brushed patterns, and Cycles bakes of base colour, normal, ORM and AO at 1k, 2k or 4k. Collision is a
+  convex hull per part (at most 64 points each); CoACD is an optional one-click engine with its own Python. Presets:
+  glTF and Godot (GLB, metres, +Y up, Godot's `-convcolonly` hulls), Unity (FBX, metres) and Unreal (FBX,
+  centimetres, Z up, `UCX_` hulls); GLB is written by Form Studio itself, FBX and USD by Blender's exporters and read
+  back in to measure their size. A pure-numpy validator checks every GLB (budgets, closed and manifold, flipped
+  faces, UVs inside 0..1, UV overlap by rasterising, texel density spread, scale, the file itself) and caught 7 of 7
+  seeded defects. Measured on this Mac (Blender 5.2.3, Cycles on the CPU, fast preset) with an original stylised
+  treasure chest cage (502 quads): LODs of 11,940, 4,016, 2,486 and 796 triangles for budgets of 12,000, 6,000,
+  2,500 and 800, no UV overlap, every UV inside 0..1, texel spread 1.08, the GLB, FBX and USD at the design's size
+  to 0.000 %, and all bakes in 2.8 s at 1k, 11.5 s at 2k and 52.3 s at 4k. The fixed runner gets a JSON job and numpy
+  arrays, never code; Blender runs as the modelling bridge runs it, and network access is not isolated by the
+  operating system. The MCP tool `game_asset` is ready to register; it is not in the tool list yet.
 - **Blender as a modelling editor, driven by ops instead of code.** An agent can model a subdivision cage in Blender
   with a declarative op list (new cage from a primitive or quads, extrude a region, loop cut, move, crease, name a
   region, mirror, Geometry Nodes array and scatter, bounded sculpt brushes, voxel or QuadriFlow remesh). Every op is
