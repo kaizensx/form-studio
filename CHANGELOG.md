@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **A construction route per feature.** A plan now says how each feature is built: kernel (exact build123d with
+  form.craft), subd_cage (a quad cage whose limit surface becomes CAD patches), sculpt_recon (sculpted mesh detail
+  fitted back to a surface) or procedural (form.patterns in the kernel, MeshTexture or Geometry Nodes on the mesh).
+  The new router (`form/router.py`) reads the route from the feature's words in English and Portuguese, or the helpers
+  its how names, and returns the words that chose it with evidence "heuristic". A plan can also state `route` on a
+  feature. A feature it cannot read is built in the kernel and added to the brief's unknowns. plan_design warns when a
+  hole, thread, magnet pocket, snap, bearing seat or mating face sits on a mesh-only route. Every step lists the real
+  helpers for its route; model_mesh is named only as "when available". On a labelled set of 97 phrases the router
+  agrees with the labels on 99.0 %. That set was written alongside the vocabulary. On a held-out set of 36 phrases,
+  never used to tune it, it agrees on 88.9 %; its four misses are sculpt phrases it does not recognise, and it reports
+  them as unknowns. New design_guide topics: `hybrid` (when to use each route, how a SubD cage becomes CAD,
+  editability, limits) and `game` (budgets, LODs, UVs, bakes, collision, engine presets; it says when the game
+  pipeline is not in the build yet).
 - **The view from below is lit, and moving the view no longer flashes dark.** Faces that look down get the light
   the bench bounces back up (an ambient term in the clay shader that grows toward the floor), so the Under view and
   every elevation down to -89 degrees show shaded clay instead of a black shape: on the test enclosure the Under view
