@@ -249,6 +249,9 @@ class Bake(unittest.TestCase):
         self.assertEqual([m["kind"] for m in rep["materials"]], ["painted_metal", "emissive"])
         self.assertEqual(sorted(rep["bake"]["files"]), ["ao", "base_color", "curvature", "emissive", "normal", "orm",
                                                         "thickness"])
+        w = rep["bake"]["wear"]                       # the worn share, measured on the baked wear mask over LOD0
+        self.assertTrue(0.0 <= w["worn_share"] < 0.5, w)   # an uncreased cage subdivides smooth: no edge to wear
+        self.assertEqual(set(w) >= {"worn_share", "convex_share", "worn_on_convex", "convex_of_worn"}, True)
         for r in rep["bake"]["rays"]:
             self.assertAlmostEqual(r["ray_mm"], 2 * r["extrusion_mm"], places=3)
             self.assertGreaterEqual(r["extrusion_mm"], r["p99_mm"] * 1.2 - 1e-3)

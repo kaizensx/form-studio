@@ -31,6 +31,25 @@
   Geometry Nodes (pitch spread 0 %, was 50 % on the centre row); the remote has a parting line and a wider, deeper
   battery-door shadow gap; the chest's boards each stand proud or sit back by their own 1-3.4 mm. LOD budgets and
   every game validation check still pass (game bench, Blender 5.2.3).
+- **Visible edge wear, measured; a stricter silhouette read; better wood; material refinement.** Game materials wore
+  through only above `1 - 0.75 x wear`, which left about 1 % of an asset's surface worn at the usual wear, while the
+  critic said "wear yes" from a material setting. The runner now wears a wider band of the convex edges (narrower
+  where a part is thin) from `0.63 - 0.35 x wear`, calibrated on the six bench assets, bakes the wear mask itself and
+  measures the worn share of LOD0's surface in the bake (`bake.wear` in the report). The critic reads that share:
+  under 2 % is "no edge wear", over 12 % reads as damage, both cap the material at 4. On the game bench the worn
+  share is now 3.2 % (helmet) to 7.0 % (wall) on five assets and 12.05 % on the sword, whose thin blade is nearly all
+  edge (just over the band, so it is capped); the control blob has none. The silhouette cap now uses the
+  outline at 64 px from six views and the value regions inside a 64 px lit render (`form/refine/analyze.py`): a
+  nearly convex outline caps the silhouette at 4, at 3 when fewer than six value regions read inside it, at 2 with no
+  detail; the old floor (complexity under 0.005) never caught the control blob. Print and model critiques are
+  unchanged. Wood has cylindrical growth rings warped by noise, so long faces show streaks and end faces show ring
+  arcs (darker and rougher), with a ring pitch of about a fifth of the grain size; every plank (faces between creased
+  grooves and corners, a `form_board` face attribute the subdivision keeps) gets its own cut of the log and its own
+  tint, and stone blocks vary a little too. The game runner is version 4, so earlier assets rebuild. New refinement
+  operators in `form/refine/ops_material.py`: `material_zones` (zones by region: the body, trims and grips, and the
+  fit, access, mechanism and interface parts take the style's looks), `contrast_pair` (the lightest and darkest zone
+  pushed apart to a value contrast of 0.15) and `edge_wear` (game materials' wear moved toward the 2-12 % band). They
+  edit `appearance()` or `materials()` as literals and change no geometry.
 - **The design refinement engine (engine and analysis).** `form/refine` measures what a built design lacks as a
   deficit vector from 0 to 1 (the outline at 64 px from six views, value regions of a small lit render, proportion,
   balance over the support, detail scales, edge hierarchy, the largest unbroken surface, material zones and contrast,

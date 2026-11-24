@@ -149,6 +149,172 @@ class Measures(unittest.TestCase):
         self.assertEqual(caps["material"][0], 1)
 
 
+class WearAndReadAtAGlance(unittest.TestCase):
+    """The measured worn share (the baked wear mask) and the 64 px silhouette read (form/refine/analyze.py)."""
+
+    def caps(self, **kw):
+        return {i["id"]: (i["cap"], i["why"]) for i in
+                critique.aesthetic_rubric({}, None, ALL5, purpose="game", game=evidence(**kw))["items"]}
+
+    def test_worn_share_in_band_is_not_capped(self):
+        c = self.caps(wear={"present": True, "worn_share": 0.05, "in_band": True})
+        self.assertIsNone(c["material"][0])
+
+    def test_too_little_or_too_much_wear_caps_the_material(self):
+        c = self.caps(wear={"present": False, "worn_share": 0.004, "in_band": False})
+        self.assertEqual(c["material"][0], 4)
+        self.assertIn("0.4%", c["material"][1])
+        c = self.caps(wear={"present": True, "worn_share": 0.3, "in_band": False})
+        self.assertEqual(c["material"][0], 4)
+        self.assertIn("damage", c["material"][1])
+
+    def test_a_convex_64px_outline_is_capped_by_its_interior_read(self):
+        c = self.caps(silhouette={"complexity": 0.028, "convexity_64": 0.049, "interior_regions": 11})
+        self.assertEqual(c["silhouette"][0], 4)                  # the helmet: a blob outline, a rich interior
+        c = self.caps(silhouette={"complexity": 0.028, "convexity_64": 0.047, "interior_regions": 5})
+        self.assertEqual(c["silhouette"][0], 3)
+        c = self.caps(silhouette={"complexity": 0.2, "convexity_64": 0.2, "interior_regions": 9})
+        self.assertIsNone(c["silhouette"][0])
+        c = self.caps(silhouette={"complexity": 0.6, "convexity_64": 0.6, "interior_regions": 9})
+        self.assertEqual(c["silhouette"][0], 4)
+
+    def test_the_control_blob_still_fails_with_the_64px_read(self):
+        """The bench's control measured 0.0094 four-view complexity (over the old 0.005 floor, so it was never
+        capped) and 0.027 convexity at 64 px with 4 value regions."""
+        blob = evidence(edges={"coverage": 1.0, "feature_edges_mm": 0.0, "hard_edges_mm": 0.0, "hard_baked_mm": 0.0,
+                               "raw_share": 0.0},
+                        materials={"count": 1}, value_contrast=0.008,
+                        scales={"primary": False, "secondary": False, "tertiary": False, "count": 0},
+                        silhouette={"complexity": 0.0094, "convexity_64": 0.027, "interior_regions": 4},
+                        wear={"present": False, "worn_share": 0.0, "in_band": False})
+        r = critique.aesthetic_rubric({}, None, ALL5, purpose="game", game=blob)
+        self.assertFalse(r["passed"])
+        self.assertEqual({i["id"]: i["cap"] for i in r["items"]}["silhouette"], 2)
+
+    def test_evidence_reads_the_baked_wear_measure_and_the_64px_read(self):
+        V, T = Measures().cube(200.0)
+        P, TT = V[T].reshape(-1, 3), np.arange(len(T) * 3).reshape(-1, 3)
+        UV = np.tile([[0.1, 0.1], [0.9, 0.1], [0.9, 0.9]], (len(T), 1))
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            (d / "lods").mkdir()
+            (d / "textures").mkdir()
+            for k in (0, 1):
+                np.savez(d / "lods" / f"lod{k}.npz", P=P, N=P * 0, UV=UV, T=TT)
+            (d / "report.json").write_text(json.dumps({"asset": "A", "texture_px": 32, "materials": [
+                {"name": "default", "kind": "wood", "hex": "#8a5a32", "wear": 0.6}],
+                "bake": {"wear": {"worn_share": 0.061, "worn_on_convex": 0.4, "convex_of_worn": 0.8}}}),
+                encoding="utf-8")
+            ev = critique.game_evidence(d)
+        self.assertEqual(ev["wear"]["worn_share"], 0.061)
+        self.assertTrue(ev["wear"]["present"] and ev["wear"]["in_band"])
+        self.assertIn("baked wear mask", ev["wear"]["measured"])
+        self.assertLess(ev["silhouette"]["convexity_64"], 0.06)   # a cube is convex
+        self.assertIn("interior_regions", ev["silhouette"])
+
+    def test_the_wear_deficit_reads_the_worn_share(self):
+        from form.refine import analyze
+        self.assertEqual(analyze.wear({"wear": {"worn_share": 0.06, "edge_mask_share": 0.0}})["deficit"], 0.0)
+        self.assertGreater(analyze.wear({"wear": {"worn_share": 0.002, "edge_mask_share": 0.3}})["deficit"], 0.8)
+
+
+class MaterialOperators(unittest.TestCase):
+    """form/refine/ops_material.py: zone assignment by region, the contrast pair and edge wear, as source edits."""
+
+    CAD = ('from form.recipes.base import Feature, Recipe, Stage\n\n\nclass Design(Recipe):\n'
+           '    features = [Feature("shell", "Shell", "structure"), Feature("grip", "Grip", "finish"),\n'
+           '                Feature("clip", "Clip", "fit")]\n\n    def build(self, v):\n        return []\n')
+
+    def analysis(self, **d):
+        from form.refine import Analysis
+        return Analysis(deficits=d, measures={"wear": {"share": d.pop("share", None)}} if "share" in d else {})
+
+    def design(self, source, purpose="model", **kw):
+        from form.refine import Design
+        return Design(source=source, purpose=purpose, **kw)
+
+    def test_the_operators_are_collected(self):
+        from form.refine import operators
+        self.assertEqual({o.name for o in operators("material")} >= {"material_zones", "contrast_pair", "edge_wear"},
+                         True)
+
+    def test_zones_by_region_for_a_cad_design(self):
+        from form import appearance
+        from form.adapters.blender import FINISHES
+        from form.refine import ops_material as om
+        p = om.MaterialZones().apply(self.design(self.CAD), self.analysis(material_zones=1.0), {})
+        src = p.edit(self.CAD)
+        zones = appearance.validate(om.appearance_in_source(src), {"shell", "grip", "clip"}, FINISHES)
+        by = {f: z["label"] for z in zones for f in z["features"]}
+        self.assertEqual(by, {"shell": "body", "grip": "accent", "clip": "function"})
+        lums = [om.lum(z["color"]) for z in zones]
+        self.assertGreaterEqual(max(lums) - min(lums), 0.15)
+        self.assertEqual(p.edit(self.CAD), src)                  # deterministic
+        self.assertFalse(om.MaterialZones().check(self.design(src), self.analysis(material_zones=0.0))[0])
+        self.assertIsNone(om.MaterialZones().apply(self.design(src), self.analysis(material_zones=1.0), {}))
+
+    def test_contrast_pair_reaches_the_minimum(self):
+        from form.refine import ops_material as om
+        src = om.write_appearance(self.CAD, [{"features": ["shell"], "finish": "matte", "color": "#777777"},
+                                             {"features": ["grip"], "finish": "rubber", "color": "#707070"}])
+        p = om.ContrastPair().apply(self.design(src), self.analysis(material_contrast=0.9), {"min_contrast": 0.15})
+        zones = om.appearance_in_source(p.edit(src))
+        lums = [om.lum(z["color"]) for z in zones]
+        self.assertGreaterEqual(max(lums) - min(lums), 0.15)
+        self.assertEqual([z["features"] for z in zones], [["shell"], ["grip"]])
+        ok = om.push_apart({"a": "#ffffff", "b": "#000000"}, 0.15)
+        self.assertEqual(ok, {"a": "#ffffff", "b": "#000000"})
+        white = om.push_apart({"a": "#fafafa", "b": "#f0f0f0"}, 0.15)       # no room above: the dark one goes down
+        self.assertGreaterEqual(om.lum(white["a"]) - om.lum(white["b"]), 0.15)
+
+    def test_game_zones_and_wear_edit_materials(self):
+        from form.game import materials as matlib
+        from form.refine import ops_material as om
+        a, c = base.box([0, 10], [0, 10], [0, 10]), base.box([20, 30], [0, 10], [0, 10])
+        from form import meshsource
+        V = np.concatenate([a.V, c.V])
+        F = a.F + [[i + len(a.V) for i in f] for f in c.F]
+        cage = meshsource.cage(V, F, [], {"strap": list(range(6, 12))})
+        src = base.design_source(cage, "Two blocks", {"default": {"material": "wood", "wear": 0.2}})
+        d = self.design(src, "game", style="stylised_fantasy")
+        p = om.MaterialZones().apply(d, self.analysis(material_zones=1.0), {})
+        mats, note = matlib.materials_in_source(p.edit(src))
+        self.assertEqual(note, "")
+        self.assertEqual(mats["strap"]["material"], "bare_metal")   # a strap is an accent: the style's iron
+        p = om.EdgeWear().apply(d, self.analysis(wear=0.9, share=0.003), {"amount": 0.5})
+        self.assertEqual(matlib.materials_in_source(p.edit(src))[0]["default"]["wear"], 0.5)
+        p = om.EdgeWear().apply(d, self.analysis(wear=0.9, share=0.3), {"amount": 0.5})
+        self.assertAlmostEqual(matlib.materials_in_source(p.edit(src))[0]["default"]["wear"], 0.14)
+        self.assertFalse(om.EdgeWear().check(self.design(self.CAD), self.analysis(wear=1.0))[0])
+
+    def test_a_module_level_materials_literal_is_rewritten_in_place(self):
+        from form.game import materials as matlib
+        from form.refine import ops_material as om
+        src = 'MATERIALS = {"default": {"material": "stone"}}\n\n\nclass Design:\n    pass\n'
+        out = om.write_materials(src, {"default": {"material": "stone", "wear": 0.4}})
+        self.assertEqual(matlib.materials_in_source(out)[0], {"default": {"material": "stone", "wear": 0.4}})
+        self.assertNotIn("def materials", out)
+
+
+class RunnerWear(unittest.TestCase):
+    def test_runner_version_and_wear_threshold(self):
+        import ast as _ast
+        from form.game import pipeline
+        src = Path(pipeline.RUNNER).read_text(encoding="utf-8")
+        tree = _ast.parse(src)
+        ver = next(n.value.value for n in tree.body if isinstance(n, _ast.Assign)
+                   and getattr(n.targets[0], "id", "") == "RUNNER_VERSION")
+        self.assertEqual(ver, pipeline.RUNNER_VERSION)
+        ns: dict = {}
+        fn = next(n for n in tree.body if isinstance(n, _ast.FunctionDef) and n.name == "wear_threshold")
+        consts = [n for n in tree.body if isinstance(n, _ast.Assign) and getattr(n.targets[0], "id", "") in
+                  ("WEAR_RAMP",)]
+        exec(compile(_ast.Module(body=consts + [fn], type_ignores=[]), "runner", "exec"), ns)
+        th = [ns["wear_threshold"](w) for w in (0.0, 0.3, 0.5, 0.75, 1.0)]
+        self.assertEqual(th, sorted(th, reverse=True))           # more wear, a lower threshold
+        self.assertTrue('mk.inputs["Green"], worn)' in src)     # the mask the bake measures is the wear itself
+
+
 class Exemplars(unittest.TestCase):
     def test_six_and_a_control_with_notes(self):
         self.assertEqual(len(gex.EXEMPLARS), 6)
