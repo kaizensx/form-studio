@@ -8,6 +8,17 @@
   if it cannot. The Home check for printing off now expects "Make it for: Anything / Game asset" with no My printer
   choice, as the game asset purpose made that control always shown. The kernel's alarm test reads the budget it
   reports (stretched under load) instead of expecting exactly 1 s.
+- **A game critic, and six game exemplars rebuilt with it.** `critique` judges a design for a game by what the built
+  game asset shows instead of CAD blend faces and appearance() zones, which held every cage-built asset at 1: bevel
+  coverage (the share of LOD0's feature edges that is bevelled in the mesh or baked into the normal map), materials,
+  value contrast, three detail scales, silhouette complexity against the convex hull, and edge wear, all measured from
+  the asset's LODs and maps. The rubric takes several blind scoring passes and uses each item's median. Print and model
+  designs are judged as before. Six original exemplars in `form/exemplars/game/` (a helmet with a recessed visor and
+  cheek plates, a boarded chest with strap iron, a sword with a real fuller, a tiling brick wall, a spoked wheel with a
+  baked tread, a remote with raised buttons) are built from the cage vocabulary, the kit and the material library,
+  with bake-only detail kept high_only, and a deliberately bad control asset that must fail. The game bench renders
+  each asset from four lit views and a 64 px outline for blind review and publishes every number in
+  [docs/GAME_BENCH.md](docs/GAME_BENCH.md).
 - **A detail vocabulary for cages, and a kit of original parts.** `model_mesh` has eight new ops, checked like the
   others before Blender starts: `bevel`, `support_loops`, `inset`, `panel_line` (a V groove along an edge path),
   `trim_strip` (a raised band), `solidify`, `bridge` (a tunnel or handle between two face sets) and `kit_place`.

@@ -1,21 +1,269 @@
 {
-  "about": "Aesthetic rubric scores (form/critique.py AESTHETIC, 0-5) for the game bench, given after looking at the first run's renders (LOD0 and LOD3 textured, the LOD0 wireframe, the baked normal map). They are a reviewer's judgement, not a measurement; the geometry caps each one. Scored by an AI agent (the one that built the bench), not by a person: a person should look and replace them.",
-  "scored_by": "the bench's AI agent, from the renders of the first run (not a person)",
-  "date": "2026-11-24",
-  "notes": {
-    "scifi_helmet": "Reads as a rounded helmet with a wide visor; the ear pods are plain spheres and the crest floats a little high. No blend radii between parts.",
-    "treasure_chest": "The strongest: clear masses, banded lid, wood and iron read at LOD3. Edges are hard creases with no bevel.",
-    "fantasy_sword": "A clean but generic silhouette; the blade is thin for its length and the guard and pommel are plain.",
-    "wall_kit": "The bricks cover only the lower part of the face, so the piece reads unfinished; the slab is a plain box.",
-    "vehicle_wheel": "The tyre reads; the rim disc and spokes are crude, and LOD1 turns the tyre visibly polygonal.",
-    "tv_remote": "A tidy CAD body, but at game scale the button holes vanish and the baked normal map has an inverted patch (the normal_map check fails)."
-  },
-  "scores": {
-    "scifi_helmet": {"silhouette": 3, "proportion": 3, "continuity": 4, "radius_hierarchy": 2, "break_up": 3, "detail_rhythm": 2, "material": 3, "would_sell": 2},
-    "treasure_chest": {"silhouette": 4, "proportion": 4, "continuity": 3, "radius_hierarchy": 2, "break_up": 4, "detail_rhythm": 3, "material": 4, "would_sell": 3},
-    "fantasy_sword": {"silhouette": 3, "proportion": 3, "continuity": 3, "radius_hierarchy": 2, "break_up": 3, "detail_rhythm": 2, "material": 3, "would_sell": 2},
-    "wall_kit": {"silhouette": 2, "proportion": 3, "continuity": 3, "radius_hierarchy": 1, "break_up": 3, "detail_rhythm": 2, "material": 2, "would_sell": 1},
-    "vehicle_wheel": {"silhouette": 3, "proportion": 3, "continuity": 3, "radius_hierarchy": 2, "break_up": 3, "detail_rhythm": 3, "material": 3, "would_sell": 2},
-    "tv_remote": {"silhouette": 3, "proportion": 3, "continuity": 4, "radius_hierarchy": 4, "break_up": 2, "detail_rhythm": 3, "material": 1, "would_sell": 2}
-  }
+ "about": "Aesthetic rubric scores (form/critique.py AESTHETIC, 0-5) for the game bench: three blind passes. Each pass looked only at the anonymous review sheets scripts/game_bench.py writes (review/<letter>.png: LOD0 lit from four views and its 64 px outline; seven assets shuffled with a fixed seed, the control among them) and scored every item. The bench takes each item's median and caps it by the asset's game evidence. These are a model's judgement, not a measurement, and not a person's: a person should look and replace them.",
+ "scored_by": "three blind passes by Claude subagents (an AI model), not a person",
+ "method": "Each pass saw only the seven anonymous review sheets (no names, briefs or numbers), in its own order; the letters were mapped back to briefs afterwards.",
+ "date": "2026-11-24",
+ "passes": {
+  "vehicle_wheel": [
+   {
+    "silhouette": 3,
+    "proportion": 4,
+    "continuity": 3.5,
+    "radius_hierarchy": 3.5,
+    "break_up": 3,
+    "detail_rhythm": 3,
+    "material": 3,
+    "would_sell": 3
+   },
+   {
+    "silhouette": 3,
+    "proportion": 3.5,
+    "continuity": 2.5,
+    "radius_hierarchy": 3,
+    "break_up": 3,
+    "detail_rhythm": 2.5,
+    "material": 2.5,
+    "would_sell": 2
+   },
+   {
+    "silhouette": 3,
+    "proportion": 3.5,
+    "continuity": 3,
+    "radius_hierarchy": 3,
+    "break_up": 3,
+    "detail_rhythm": 2.5,
+    "material": 2.5,
+    "would_sell": 2.5
+   }
+  ],
+  "treasure_chest": [
+   {
+    "silhouette": 3.5,
+    "proportion": 4,
+    "continuity": 3.5,
+    "radius_hierarchy": 3,
+    "break_up": 3.5,
+    "detail_rhythm": 3,
+    "material": 3,
+    "would_sell": 3
+   },
+   {
+    "silhouette": 3.5,
+    "proportion": 3.5,
+    "continuity": 3.5,
+    "radius_hierarchy": 3,
+    "break_up": 4,
+    "detail_rhythm": 3.5,
+    "material": 3.5,
+    "would_sell": 3.5
+   },
+   {
+    "silhouette": 3.5,
+    "proportion": 3.5,
+    "continuity": 3.5,
+    "radius_hierarchy": 3,
+    "break_up": 4,
+    "detail_rhythm": 3.5,
+    "material": 3,
+    "would_sell": 3
+   }
+  ],
+  "scifi_helmet": [
+   {
+    "silhouette": 3,
+    "proportion": 3,
+    "continuity": 3,
+    "radius_hierarchy": 3.5,
+    "break_up": 3,
+    "detail_rhythm": 2.5,
+    "material": 3,
+    "would_sell": 2.5
+   },
+   {
+    "silhouette": 3,
+    "proportion": 3,
+    "continuity": 3,
+    "radius_hierarchy": 3,
+    "break_up": 3.5,
+    "detail_rhythm": 3,
+    "material": 3,
+    "would_sell": 2.5
+   },
+   {
+    "silhouette": 2.5,
+    "proportion": 3,
+    "continuity": 3,
+    "radius_hierarchy": 3,
+    "break_up": 3.5,
+    "detail_rhythm": 3,
+    "material": 3,
+    "would_sell": 2.5
+   }
+  ],
+  "tv_remote": [
+   {
+    "silhouette": 2.5,
+    "proportion": 3.5,
+    "continuity": 3.5,
+    "radius_hierarchy": 3.5,
+    "break_up": 3,
+    "detail_rhythm": 3,
+    "material": 2.5,
+    "would_sell": 2.5
+   },
+   {
+    "silhouette": 2,
+    "proportion": 3.5,
+    "continuity": 3.5,
+    "radius_hierarchy": 3.5,
+    "break_up": 3,
+    "detail_rhythm": 3,
+    "material": 3,
+    "would_sell": 2.5
+   },
+   {
+    "silhouette": 2,
+    "proportion": 3.5,
+    "continuity": 3.5,
+    "radius_hierarchy": 3.5,
+    "break_up": 3,
+    "detail_rhythm": 3,
+    "material": 2.5,
+    "would_sell": 2.5
+   }
+  ],
+  "control_blob": [
+   {
+    "silhouette": 0.5,
+    "proportion": 1,
+    "continuity": 2.5,
+    "radius_hierarchy": 1,
+    "break_up": 0,
+    "detail_rhythm": 0,
+    "material": 0.5,
+    "would_sell": 0
+   },
+   {
+    "silhouette": 0.5,
+    "proportion": 2,
+    "continuity": 3,
+    "radius_hierarchy": 2,
+    "break_up": 0,
+    "detail_rhythm": 0,
+    "material": 1,
+    "would_sell": 0.5
+   },
+   {
+    "silhouette": 1,
+    "proportion": 2,
+    "continuity": 3.5,
+    "radius_hierarchy": 2,
+    "break_up": 0.5,
+    "detail_rhythm": 0.5,
+    "material": 1,
+    "would_sell": 0.5
+   }
+  ],
+  "fantasy_sword": [
+   {
+    "silhouette": 4,
+    "proportion": 3,
+    "continuity": 3,
+    "radius_hierarchy": 2.5,
+    "break_up": 3,
+    "detail_rhythm": 3,
+    "material": 3,
+    "would_sell": 2.5
+   },
+   {
+    "silhouette": 4,
+    "proportion": 3.5,
+    "continuity": 3.5,
+    "radius_hierarchy": 3,
+    "break_up": 3,
+    "detail_rhythm": 3,
+    "material": 3,
+    "would_sell": 3
+   },
+   {
+    "silhouette": 4,
+    "proportion": 4,
+    "continuity": 3.5,
+    "radius_hierarchy": 3,
+    "break_up": 3.5,
+    "detail_rhythm": 3.5,
+    "material": 3,
+    "would_sell": 3.5
+   }
+  ],
+  "wall_kit": [
+   {
+    "silhouette": 1.5,
+    "proportion": 3,
+    "continuity": 2.5,
+    "radius_hierarchy": 2,
+    "break_up": 2.5,
+    "detail_rhythm": 2,
+    "material": 2,
+    "would_sell": 1.5
+   },
+   {
+    "silhouette": 1.5,
+    "proportion": 3,
+    "continuity": 2.5,
+    "radius_hierarchy": 1.5,
+    "break_up": 2.5,
+    "detail_rhythm": 2,
+    "material": 2,
+    "would_sell": 1.5
+   },
+   {
+    "silhouette": 1.5,
+    "proportion": 2.5,
+    "continuity": 2.5,
+    "radius_hierarchy": 2,
+    "break_up": 2.5,
+    "detail_rhythm": 2,
+    "material": 2,
+    "would_sell": 1.5
+   }
+  ]
+ },
+ "notes": {
+  "vehicle_wheel": [
+   "Wheel with tyre and five-spoke rim: it reads clearly, but the tread is scattered square blocks instead of a patterned rhythm, and the rim and hub are plain flat grey.",
+   "Car wheel with a five-spoke rim and hub; the tread blocks are scattered, artifact-like tiles with no consistent pattern, and the rim and tire materials are flat.",
+   "Five-spoke wheel and tyre with a solid rim and hub; the tread blocks are crude, noisy rectangles that also bleed onto the sidewall, and the rubber and metal are flat with no wear."
+  ],
+  "treasure_chest": [
+   "Domed treasure chest with metal bands, base trim and lock plate: the silhouette is classic, but the wood grain is a noisy procedural swirl, the back and sides have no detail, and the lock is crude.",
+   "Banded wooden treasure chest with plank seams, riveted iron straps, a lock plate and a base trim; it is solid, but the wood grain is a busy stylised pattern and the planks and edges are too clean, with no wear.",
+   "Domed treasure chest with riveted iron bands, a lock plate, plank seams and a metal base trim; the wood grain is a noisy procedural ring pattern that reads synthetic, and the hard edges carry little bevel or wear."
+  ],
+  "scifi_helmet": [
+   "Sci-fi helmet with visor, crest fin and orange vent pods: the main mass is a blobby rounded cube, the visor edges are jagged, and the crest fin floats loosely on top.",
+   "Sci-fi helmet with a visor, orange cheek vents and a top fin; the shell is a lumpy box-egg, the visor and window cuts have jagged edges, and it reads as a blob at 64 px.",
+   "Retro sci-fi helmet with a visor, orange vented side plates and a crest fin; the boxy shell collapses to a blob at 64 px, and the visor and window edges are jagged and noisy."
+  ],
+  "tv_remote": [
+   "TV remote with buttons, D-pad and red power key: it is a generic rounded slab with a flat, low-contrast material, and one end cap shows white stretched shading.",
+   "TV remote with a button grid, D-pad and red power key; the body is a generic rounded bar, buttons are uniform blobs, and the plastic material is plain.",
+   "TV remote with a clean, softly rounded body and a believable button layout; it reads as a plain slab at 64 px, the top texture shifts from dark plastic to brushed silver between views, and it shows no wear."
+  ],
+  "control_blob": [
+   "A featureless grey egg or pebble blob: it has no recognisable function, no surface breaks, no detail and no material definition.",
+   "Featureless grey pebble or egg blob with no surface breaks, detail or material definition, so it does not read as a designed prop.",
+   "Featureless smooth pebble or egg blob with no surface detail, no material definition and no identifiable function."
+  ],
+  "fantasy_sword": [
+   "Longsword with fuller, curved brass guard, wrapped grip and round pommel: the blade is very long against a short grip, edges and fuller are simple, and the guard texture is flat.",
+   "Longsword with a fuller, brass crossguard, wrapped grip and pommel; the silhouette is clear, but materials are flat and clean with no wear, and the guard and pommel lack secondary detail.",
+   "Classic longsword with a strong, readable silhouette, a fuller, a brass crossguard, a wrapped grip and a pommel; the guard and pommel are simple primitives, and the materials are clean with no wear or edge character."
+  ],
+  "wall_kit": [
+   "Brick wall panel with stone caps: it is a flat slab whose bricks are uniform painted ovals, the back is blank, and the side shows gaps.",
+   "Brick wall segment with stone caps; it reads as a flat slab, with cartoony pill-shaped bricks painted on the front only, a blank untextured back and raw unbevelled edges.",
+   "Brick wall panel with stone cap and base trims; the bricks are puffy cartoon blobs with uniform rhythm, the back is a blank flat slab, and the outline is just a rectangle."
+  ]
+ }
 }

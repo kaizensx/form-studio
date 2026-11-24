@@ -1,28 +1,28 @@
-"""The game bench: six original game-asset briefs (tests/design_bench/game_briefs.json) made end to end by a scripted
-agent, measured, and written to docs/GAME_BENCH.md.
+"""The game bench: six original game-asset briefs (tests/design_bench/game_briefs.json) and one deliberately bad
+control, made end to end, measured, rendered for review and written to docs/GAME_BENCH.md.
 
-    python scripts/game_bench.py                       # every brief; Blender from the usual places
-    python scripts/game_bench.py --only scifi_helmet   # one brief
-    python scripts/game_bench.py --out DIR             # renders and the contact sheet go there (default: a temp dir)
+    python scripts/game_bench.py                       # every brief and the control; Blender from the usual places
+    python scripts/game_bench.py --only treasure_chest # one brief (no report is written)
+    python scripts/game_bench.py --out DIR             # renders, review sheets and the contact sheet go there
 
-The scripted agent does what an agent does through the MCP tools, in this process: it reads each feature's route
-(form/router.py, a heuristic, said so), models the object (a subdivision cage for the smooth and repeated routes,
-build123d for the kernel route; the cage builders are below and are the agent's modelling, written by hand), creates
-the design with the purpose "game" (Studio.create_design), exports STEP, measures the SubD-to-CAD deviation per cage
-part against the Catmull-Clark limit surface (form/craft/subd_report.py), makes the game asset (form/game:
-game_asset, 1k textures, the fast bake, the brief's preset and budgets) and runs the critique.
+Each brief names a game exemplar (form/exemplars/game/): a cage made by model_mesh ops (blocks, bevel, inset,
+panel_line, kit_place; bake-only detail high_only) or a kernel design. The bench creates the design with the purpose
+"game" (Studio.create_design), exports STEP, measures the SubD-to-CAD deviation per cage part, makes the game asset
+(form/game: the brief's preset and budgets, the exemplar's materials) and measures it for the game critic
+(form/critique.game_evidence: bevel coverage, materials, value contrast, detail scales, silhouette, wear).
 
-The aesthetic rubric (form/critique.py) needs eyes: its scores come from tests/design_bench/game_scores.json, written
-by whoever looked at this run's renders (it says who and when); without it a brief is "not scored". The geometry still
-caps every score. Nothing is invented: every number in the report is from this run, failures included. Budgets and
-thresholds are proposals the first run confirms or changes.
+Review: for every asset it renders LOD0 lit from four views and a 64 px silhouette into a review sheet with no name
+on it (review/<letter>.png, letters shuffled with a fixed seed, the control among them). Scores come from
+tests/design_bench/game_scores.json: three blind passes over those sheets, written by whoever scored them (the file
+says who); each item takes the median of the passes, capped by the asset's game evidence. Without that file a brief
+is "not scored". Nothing is invented: every number in the report is from this run, failures included.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
+import random
 import shutil
 import subprocess
 import sys
@@ -30,206 +30,12 @@ import tempfile
 import time
 from pathlib import Path
 
-import numpy as np
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 BRIEFS = ROOT / "tests" / "design_bench" / "game_briefs.json"
 SCORES = ROOT / "tests" / "design_bench" / "game_scores.json"
 DOC = ROOT / "docs" / "GAME_BENCH.md"
-EXPECTED_ROUTE = {"helmet": "subd_cage", "chest": "subd_cage", "sword": "subd_cage", "wall": "procedural",
-                  "wheel": "subd_cage", "remote": "kernel"}
-
-
-# ---- the scripted agent's modelling: cages by hand -------------------------------------------------------------------
-
-def box(lo, hi, n=(1, 1, 1), sharp=True, profile=None):
-    """A closed box cage with n quads along each axis, counter-clockwise from outside; its 12 border edges sharp
-    (crease weight 1: a C0 border between exact patches). profile(x, y, z_top) -> z reshapes the top."""
-    lo, hi = np.asarray(lo, float), np.asarray(hi, float)
-    nx, ny, nz = n
-    pts, V = {}, []
-
-    def pid(i, j, k):
-        key = (i, j, k)
-        if key not in pts:
-            p = lo + (hi - lo) * np.array([i / nx, j / ny, k / nz])
-            if profile is not None and k > 0:
-                top = profile(p[0], p[1], hi[2])
-                p[2] = lo[2] + (top - lo[2]) * k / nz
-            pts[key] = len(V)
-            V.append(p)
-        return pts[key]
-    F = []
-    for i in range(nx):
-        for j in range(ny):
-            F.append([pid(i, j, 0), pid(i, j + 1, 0), pid(i + 1, j + 1, 0), pid(i + 1, j, 0)])
-            F.append([pid(i, j, nz), pid(i + 1, j, nz), pid(i + 1, j + 1, nz), pid(i, j + 1, nz)])
-    for i in range(nx):
-        for k in range(nz):
-            F.append([pid(i, 0, k), pid(i + 1, 0, k), pid(i + 1, 0, k + 1), pid(i, 0, k + 1)])
-            F.append([pid(i, ny, k), pid(i, ny, k + 1), pid(i + 1, ny, k + 1), pid(i + 1, ny, k)])
-    for j in range(ny):
-        for k in range(nz):
-            F.append([pid(0, j, k), pid(0, j, k + 1), pid(0, j + 1, k + 1), pid(0, j + 1, k)])
-            F.append([pid(nx, j, k), pid(nx, j + 1, k), pid(nx, j + 1, k + 1), pid(nx, j, k + 1)])
-    C = []
-    if sharp:
-        inv = {v: k for k, v in pts.items()}
-        border = lambda k: sum((k[0] in (0, nx), k[1] in (0, ny), k[2] in (0, nz))) >= 2
-        seen = set()
-        for f in F:
-            for a, b in zip(f, f[1:] + f[:1]):
-                e = (min(a, b), max(a, b))
-                if e not in seen and border(inv[a]) and border(inv[b]):
-                    seen.add(e)
-                    C.append([a, b, 1.0])
-    return np.array(V), F, C
-
-
-def sphere(n, scale, at=(0, 0, 0)):
-    from form.craft import subd
-    V, F = subd.quad_sphere(n, 1.0)
-    return V * np.asarray(scale, float) + np.asarray(at, float), [list(map(int, f)) for f in F], []
-
-
-def rot(V, axis, deg, about=(0, 0, 0)):
-    a = math.radians(deg)
-    c, s = math.cos(a), math.sin(a)
-    R = {"x": [[1, 0, 0], [0, c, -s], [0, s, c]], "y": [[c, 0, s], [0, 1, 0], [-s, 0, c]],
-         "z": [[c, -s, 0], [s, c, 0], [0, 0, 1]]}[axis]
-    o = np.asarray(about, float)
-    return (np.asarray(V, float) - o) @ np.array(R).T + o
-
-
-def assemble(parts):
-    """[(V, F, creases, region)] -> one CageData (each part keeps its own points; regions name faces)."""
-    from form import meshsource
-    V, F, C, R, off = [], [], [], {}, 0
-    for v, f, c, reg in parts:
-        if reg:
-            R.setdefault(reg, []).extend(range(len(F), len(F) + len(f)))
-        V.append(np.asarray(v, float))
-        F += [[int(i) + off for i in q] for q in f]
-        C += [[int(a) + off, int(b) + off, float(s)] for a, b, s in c]
-        off += len(v)
-    return meshsource.cage(np.concatenate(V), F, C, R)
-
-
-def helmet():
-    V, F, _ = sphere(4, (115, 100, 120), (0, 0, 120))
-    V[:, 2] = np.where(V[:, 2] < 60, 60 + (V[:, 2] - 60) * 0.35, V[:, 2])        # a flat-ish neck opening line
-    cen = np.array([np.mean(V[f], axis=0) for f in F])
-    visor = [i for i, c in enumerate(cen) if c[0] > 55 and 95 < c[2] < 175 and abs(c[1]) < 80]
-    shell = [i for i in range(len(F)) if i not in set(visor)]
-    parts = [(V, [F[i] for i in shell] + [F[i] for i in visor], [], None)]
-    pods = [(*sphere(2, (30, 22, 38), (-5, s * 98, 125))[:3], "pod") for s in (-1, 1)]
-    crest = (*box((-95, -9, 200), (70, 9, 248), (4, 1, 1),
-                  profile=lambda x, y, z: z - 0.0016 * (x + 10) ** 2), "crest")
-    cage = assemble(parts + pods + [crest])
-    regions = dict(cage.regions)
-    regions["visor"] = list(range(len(shell), len(shell) + len(visor)))
-    from form import meshsource
-    return meshsource.cage(cage.V, cage.F, cage.creases, regions)
-
-
-def chest():
-    W, D, H, LID = 600.0, 380.0, 300.0, 110.0
-    arch = lambda r: (lambda x, y, z: z + LID * 0.85 * math.sqrt(max(1 - (y / r) ** 2, 0)))
-    parts = [(*box((-W / 2, -D / 2, 0), (W / 2, D / 2, H), (6, 4, 3)), None),
-             (*box((-W / 2 - 6, -D / 2 - 6, H + 4), (W / 2 + 6, D / 2 + 6, H + 30), (6, 6, 2), profile=arch(D / 2 + 6)), None)]
-    for x in (-205.0, 205.0):
-        parts.append((*box((x - 22, -D / 2 - 8, -6), (x + 22, D / 2 + 8, H + 2), (2, 4, 3)), "iron"))
-        parts.append((*box((x - 24, -D / 2 - 12, H + 2), (x + 24, D / 2 + 12, H + 36), (2, 6, 1), profile=arch(D / 2 + 14)), "iron"))
-    parts.append((*box((-W / 2 - 8, -D / 2 - 8, -8), (W / 2 + 8, D / 2 + 8, 26), (6, 4, 1)), "iron"))
-    parts.append((*box((-46, -D / 2 - 26, 210), (46, -D / 2 + 4, 330), (2, 1, 3)), "gold"))
-    return assemble(parts)
-
-
-def sword():
-    V, F, C = box((-30, -4, 80), (30, 4, 860), (2, 1, 8))
-    t = (V[:, 2] - 80) / 780.0
-    V[:, 0] *= 1 - 0.55 * t ** 1.5 - np.where(t > 0.97, 0.4, 0.0)
-    V[:, 1] *= 1 - 0.5 * t
-    parts = [(V, F, C, "blade")]
-    parts.append((*box((-120, -16, 56), (120, 16, 84), (4, 1, 1), profile=lambda x, y, z: z + 0.0009 * x * x), "guard"))
-    parts.append((*box((-17, -17, -110), (17, 17, 60), (2, 2, 5), sharp=False), "grip"))
-    parts.append((*sphere(2, (32, 32, 32), (0, 0, -130)), None))
-    return assemble(parts)
-
-
-def wall():
-    parts = [(*box((-1000, -125, 120), (1000, 125, 2400), (4, 1, 4)), None),
-             (*box((-1010, -150, 0), (1010, 150, 140), (4, 1, 1)), None)]
-    bw, bh, gap = 380.0, 150.0, 20.0
-    for r in range(6):
-        z0 = 300 + r * (bh + gap)
-        shift = 0.0 if r % 2 == 0 else (bw + gap) / 2
-        for c in range(5):
-            x0 = -980 + shift + c * (bw + gap)
-            x1 = min(x0 + bw, 980)
-            if x1 - x0 < 120:
-                continue
-            parts.append((*box((x0, -150, z0), (x1, -115, z0 + bh), (2, 1, 1)), "brick"))
-    return assemble(parts)
-
-
-def wheel():
-    from form.craft import subd_report
-    tv, tf = subd_report.torus_cage(24, 10, 300.0, 95.0)
-    tyre = (rot(tv, "x", 90), [list(map(int, f)) for f in tf], [], "tyre")
-    rim = (*sphere(3, (225, 40, 225)), "rim")
-    parts = [tyre, rim]
-    for k in range(5):
-        v, f, c = box((-22, -26, 50), (22, 26, 215), (1, 1, 2))
-        parts.append((rot(v, "y", 72 * k), f, c, "rim"))
-    parts.append((*sphere(2, (60, 62, 60)), None))
-    return assemble(parts)
-
-
-REMOTE = '''"""A generic TV remote control: a rounded body, button holes on the top, a battery cover split line underneath."""
-from build123d import Align, Axis, Box, Cylinder, Pos, fillet
-
-from form.recipes.base import Feature, Param, Recipe, Stage
-
-A = (Align.CENTER, Align.CENTER, Align.MIN)
-
-
-class Design(Recipe):
-    title = "Remote control"
-    summary = "A rounded remote body with button holes and a battery cover."
-    solids = 1
-    params = [Param("length", "Length", 180, 120, 240, 1, "mm", "form", "body"),
-              Param("width", "Width", 48, 36, 70, 1, "mm", "form", "body"),
-              Param("thickness", "Thickness", 20, 12, 30, 0.5, "mm", "form", "body")]
-    features = [Feature("body", "Body", "structure"), Feature("buttons", "Button holes", "detail"),
-                Feature("battery_cover", "Battery cover", "detail")]
-
-    def build(self, v):
-        L, W, T = v["length"], v["width"], v["thickness"]
-        body = Box(L, W, T, align=A)
-        body = fillet(body.edges().filter_by(Axis.Z), min(W, L) * 0.22)
-        body = fillet(body.edges().group_by(Axis.Z)[-1], T * 0.22)
-        body = fillet(body.edges().group_by(Axis.Z)[0], T * 0.12)
-        out = [Stage("body", body)]
-        holes = Pos(L * 0.36, 0, T - 2.5) * Cylinder(5.5, 4, align=A)
-        for i in range(4):
-            for j in (-1, 0, 1):
-                holes += Pos(L * 0.16 - i * 15, j * 13, T - 1.6) * Cylinder(3.6, 4, align=A)
-        body = body - holes
-        out.append(Stage("buttons", body))
-        cut = Pos(-L * 0.22, 0, -0.01) * Box(L * 0.42, W * 0.72, 1.0, align=A)
-        inner = Pos(-L * 0.22, 0, -0.02) * Box(L * 0.42 - 1.2, W * 0.72 - 1.2, 1.2, align=A)
-        latch = Pos(-L * 0.01, 0, -0.02) * Box(4, 10, 1.6, align=A)
-        body = body - (cut - inner) - latch
-        out.append(Stage("battery_cover", body))
-        return out
-
-    def appearance(self, v):
-        return [{"features": ["buttons"], "finish": "rubber", "color": "#5a5f66", "label": "buttons"}]
-'''
-
-GENERATORS = {"helmet": helmet, "chest": chest, "sword": sword, "wall": wall, "wheel": wheel}
+REVIEW_SEED = 20261124
 
 RENDER = r'''
 import math, sys
@@ -241,43 +47,58 @@ for o in list(bpy.data.objects):
 bpy.ops.import_scene.gltf(filepath=glb)
 meshes = [o for o in bpy.data.objects if o.type == "MESH"]
 sc = bpy.context.scene
-sc.render.resolution_x = sc.render.resolution_y = 560
-world = bpy.data.worlds.new("w"); sc.world = world; world.use_nodes = True
-world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.8, 0.8, 0.78, 1)
-world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.9
-cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam")); sc.collection.objects.link(cam); sc.camera = cam
-sun = bpy.data.objects.new("sun", bpy.data.lights.new("sun", "SUN")); sun.data.energy = 3.0
-sun.rotation_euler = (math.radians(50), math.radians(10), math.radians(35)); sc.collection.objects.link(sun)
+sc.render.resolution_x = sc.render.resolution_y = 600
 names = [e.identifier for e in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items]
 sc.render.engine = "BLENDER_EEVEE" if "BLENDER_EEVEE" in names else "BLENDER_EEVEE_NEXT"
+world = bpy.data.worlds.new("w"); sc.world = world; world.use_nodes = True
+world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.62, 0.63, 0.65, 1)
+world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.55
+def sun(name, energy, rx, rz, col=(1, 1, 1)):
+    s = bpy.data.objects.new(name, bpy.data.lights.new(name, "SUN")); s.data.energy = energy; s.data.color = col
+    s.data.angle = math.radians(8)
+    s.rotation_euler = (math.radians(rx), 0, math.radians(rz)); sc.collection.objects.link(s)
+sun("key", 3.2, 48, 32, (1.0, 0.96, 0.9))
+sun("fill", 0.9, 65, -120, (0.85, 0.9, 1.0))
+sun("rim", 1.6, 115, 160)
+cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam")); sc.collection.objects.link(cam); sc.camera = cam
+cam.data.type = "PERSP"; cam.data.lens = 70
 lods = sorted([o for o in meshes if "_LOD" in o.name], key=lambda o: o.name)
 lod0 = lods[0]
 pts = [lod0.matrix_world @ Vector(c) for c in lod0.bound_box]
 c = sum(pts, Vector()) / 8
 r = max((p - c).length for p in pts)
-cam.data.lens = 50
-d = r * 3.0
-cam.location = c + Vector((d * 0.75, -d * 0.95, d * 0.55))
-cam.rotation_euler = (c - cam.location).to_track_quat("-Z", "Y").to_euler()
+VIEWS = {"three_quarter": (35, 20), "front": (0, 8), "side": (90, 8), "back": (215, 25)}
+def look(az, el, dist):
+    a, e = math.radians(az), math.radians(el)
+    cam.location = c + Vector((math.sin(a) * math.cos(e), -math.cos(a) * math.cos(e), math.sin(e))) * dist
+    cam.rotation_euler = (c - cam.location).to_track_quat("-Z", "Y").to_euler()
+dist = r / math.tan(math.atan(18 / 70)) * 1.12
+for o in meshes:
+    o.hide_render = True
+lod0.hide_render = False
+for name, (az, el) in VIEWS.items():
+    look(az, el, dist)
+    sc.render.filepath = f"{out}/lod0_{name}.png"
+    bpy.ops.render.render(write_still=True)
+look(35, 20, dist)
+lod0.hide_render = True
+last = lods[-1]
+last.hide_render = False
+sc.render.filepath = f"{out}/lod{len(lods) - 1}_three_quarter.png"
+bpy.ops.render.render(write_still=True)
+last.hide_render = True
 wire = bpy.data.materials.new("wire"); wire.use_nodes = True
 wire.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.05, 0.05, 0.06, 1)
 clay = bpy.data.materials.new("clay"); clay.use_nodes = True
 clay.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.75, 0.74, 0.7, 1)
-for o in meshes:
-    o.hide_render = True
-for o in (lods[0], lods[-1]):
-    o.hide_render = False
-    sc.render.filepath = f"{out}/{o.name}_tex.png"
-    bpy.ops.render.render(write_still=True)
-    w = o.copy(); w.data = o.data.copy(); sc.collection.objects.link(w)
-    w.data.materials.clear(); w.data.materials.append(wire)
-    m = w.modifiers.new("wf", "WIREFRAME"); m.thickness = r * 0.002; m.use_replace = True
-    k = o.copy(); k.data = o.data.copy(); sc.collection.objects.link(k)
-    k.data.materials.clear(); k.data.materials.append(clay)
-    o.hide_render = True
-    sc.render.filepath = f"{out}/{o.name}_wire.png"
-    bpy.ops.render.render(write_still=True)
-    bpy.data.objects.remove(w); bpy.data.objects.remove(k)
+w = lod0.copy(); w.data = lod0.data.copy(); sc.collection.objects.link(w)
+w.data.materials.clear(); w.data.materials.append(wire)
+m = w.modifiers.new("wf", "WIREFRAME"); m.thickness = r * 0.0018; m.use_replace = True
+k = lod0.copy(); k.data = lod0.data.copy(); sc.collection.objects.link(k)
+k.data.materials.clear(); k.data.materials.append(clay)
+w.hide_render = k.hide_render = False
+sc.render.filepath = f"{out}/lod0_wire.png"
+bpy.ops.render.render(write_still=True)
 print("RENDERED")
 '''
 
@@ -292,8 +113,7 @@ def routes(brief: dict) -> dict:
     for r in rows:
         counts[r["route"]] = counts.get(r["route"], 0) + 1
     main = max(counts, key=lambda k: (counts[k], k != "kernel"))
-    return {"features": rows, "main": main, "expected": EXPECTED_ROUTE[brief["generator"]],
-            "agrees": main == EXPECTED_ROUTE[brief["generator"]]}
+    return {"features": rows, "main": main, "expected": brief["route"], "agrees": main == brief["route"]}
 
 
 def deviation(cage) -> dict:
@@ -320,102 +140,182 @@ def step_check(path: Path) -> dict:
             "faces": len(back.faces())}
 
 
-def render(glb: Path, out: Path, blender: str) -> list:
+def render(glb: Path, out: Path, blender: str) -> dict:
     script = out / "_render.py"
     script.write_text(RENDER, encoding="utf-8")
     r = subprocess.run([blender, "-b", "--factory-startup", "-noaudio", "--python", str(script), "--", str(glb), str(out)],
                        capture_output=True, text=True, timeout=900)
-    return sorted(str(p) for p in out.glob("*.png")) if "RENDERED" in r.stdout else []
+    if "RENDERED" not in r.stdout:
+        return {}
+    return {p.stem: str(p) for p in out.glob("*.png")}
+
+
+def silhouette_png(asset_dir: Path, path: Path, px: int = 64) -> None:
+    """LOD0's outline from three quarters, at 64 px: the read at a glance."""
+    import numpy as np
+    from PIL import Image
+
+    from form import critique
+    z = np.load(asset_dir / "lods" / "lod0.npz")
+    m = critique.silhouettes(z["P"], z["T"], px, {"three_quarter": critique.GAME_VIEWS["three_quarter"]})
+    Image.fromarray(np.where(m["three_quarter"], 20, 235).astype("uint8")).save(path)
+
+
+def review_sheet(renders: dict, sil: Path, path: Path) -> None:
+    """Four lit views of LOD0 and the 64 px silhouette, with no name: what a blind pass looks at."""
+    from PIL import Image, ImageDraw
+    T, pad = 420, 8
+    sheet = Image.new("RGB", (pad + 2 * (T + pad) + 140, pad + 2 * (T + pad)), (236, 235, 231))
+    for k, v in enumerate(("three_quarter", "front", "side", "back")):
+        im = Image.open(renders[f"lod0_{v}"]).convert("RGB")
+        im.thumbnail((T, T))
+        sheet.paste(im, (pad + (k % 2) * (T + pad), pad + (k // 2) * (T + pad)))
+    s = Image.open(sil).convert("RGB")
+    sheet.paste(s.resize((128, 128), Image.NEAREST), (pad + 2 * (T + pad), pad + 20))
+    sheet.paste(s, (pad + 2 * (T + pad), pad + 160))
+    ImageDraw.Draw(sheet).text((pad + 2 * (T + pad), pad + 4), "64 px outline", fill=(40, 40, 40))
+    sheet.save(path)
 
 
 def run_brief(st, b: dict, cfg: dict, out: Path, scores: dict, blender: str | None) -> dict:
     from form import critique, game
-    from form.game import pipeline
-    row = {"id": b["id"], "title": b["title"], "preset": b["preset"], "budgets": b["budgets"]}
+    from form.exemplars import game as gex
+    row = {"id": b["id"], "title": b["title"], "preset": b["preset"], "budgets": b["budgets"],
+           "control": bool(b.get("control"))}
     t0 = time.time()
-    row["route"] = routes(b)
-    gen = b["generator"]
-    cage = None
-    if gen == "remote":
-        src = REMOTE
-    else:
-        cage = GENERATORS[gen]()
-        row["cage"] = {"points": int(len(cage.V)), "quads": int(len(cage.F)), "creases": len(cage.creases),
-                       "regions": sorted(cage.regions)}
-        src = pipeline.cage_design_source(cage, b["title"])
+    row["route"] = routes(b) if b.get("features") else None
+    try:
+        ex = gex.make(b["exemplar"], st.cfg)
+    except Exception as e:                                   # noqa: BLE001 - a failed model is a result
+        row["model"] = {"ok": False, "error": f"{type(e).__name__}: {e}"[:400]}
+        row["seconds"] = round(time.time() - t0, 1)
+        return row
+    cage = ex["cage"]
+    row["model"] = {"ok": True, "seconds": ex["seconds"], "ops": len(ex["ops"] or []),
+                    "high_only_ops": sum(1 for o in ex["ops"] or [] if o.get("high_only"))}
+    row["originality"] = ex["originality"]
+    if cage is not None:
+        row["cage"] = {"points": int(len(cage.V)), "faces": int(len(cage.F)), "creases": len(cage.creases),
+                       "regions": sorted(cage.regions),
+                       "high_faces": int(len(cage.high.F)) if cage.high is not None else 0}
     try:
         t = time.time()
-        p = st.create_design(b["title"], src, b["brief"], purpose="game")
+        p = st.create_design(b["title"], ex["source"], b["brief"], purpose="game")
         j = st.run_sync(p["id"], ["geometry", "exports"])
         row["build"] = {"ok": j["state"] == "done", "seconds": round(time.time() - t, 2)}
+        if j["state"] != "done":
+            row["build"]["error"] = str(j.get("error") or j)[:300]
         p = st.load(p["id"])
-    except Exception as e:                                   # noqa: BLE001 - a failed build is a result
+    except Exception as e:                                   # noqa: BLE001
         row["build"] = {"ok": False, "error": f"{type(e).__name__}: {e}"[:300], "seconds": round(time.time() - t, 2)}
         row["seconds"] = round(time.time() - t0, 1)
         return row
     row["pid"] = p["id"]
     keys = st.keys(p)
-    ex = st.read(p, "exports", keys["exports"]) or {}
-    stp = ex.get("files", {}).get("step")
+    exr = st.read(p, "exports", keys["exports"]) or {}
+    stp = exr.get("files", {}).get("step")
     try:
-        row["step"] = step_check(st.apath(p, "exports", keys["exports"]) / stp["name"]) if stp else {"valid": False,
-                                                                                                     "error": "no STEP"}
+        row["step"] = step_check(st.apath(p, "exports", keys["exports"]) / stp["name"]) if stp else {
+            "valid": False, "error": "no STEP"}
     except Exception as e:                                   # noqa: BLE001
         row["step"] = {"valid": False, "error": str(e)[:200]}
-    row["deviation"] = deviation(cage) if cage is not None else None
+    try:
+        row["deviation"] = deviation(cage) if cage is not None else None
+    except Exception as e:                                   # noqa: BLE001
+        row["deviation"] = {"error": str(e)[:200]}
+    gdir = None
     try:
         t = time.time()
         res = game.game_asset(st, p["id"], preset=b["preset"], budgets=b["budgets"], texture_px=cfg["texture_px"],
-                              bake=cfg["bake"], materials=b["materials"])
+                              bake=cfg["bake"], materials=ex["materials"])
+        gdir = Path(res["dir"])
+        rep = json.loads((gdir / "report.json").read_text(encoding="utf-8"))
         row["game"] = {"ok": True, "seconds": round(time.time() - t, 1), "validation": res["validation"],
                        "lods": [{k: r[k] for k in ("lod", "triangles", "budget", "source")} for r in res["lods"]],
                        "bake_seconds": (res.get("bake") or {}).get("total_seconds"), "uv": res["uv"],
-                       "collision": res["collision"], "dir": res["dir"], "notes": res.get("notes", [])}
-        rep = json.loads((Path(res["dir"]) / "report.json").read_text(encoding="utf-8"))
-        row["game"]["checks"] = [{k: c.get(k) for k in ("id", "lod", "status", "value")} for c in rep["validation"]["checks"]]
+                       "collision": res["collision"], "dir": res["dir"], "notes": res.get("notes", []),
+                       "size_mm": rep["size_mm"], "high_source": rep.get("high_source"),
+                       "checks": [{k: c.get(k) for k in ("id", "lod", "status", "value")}
+                                  for c in rep["validation"]["checks"]]}
+    except Exception as e:                                   # noqa: BLE001
+        row["game"] = {"ok": False, "error": f"{type(e).__name__}: {e}"[:400]}
+    if gdir is not None:
+        try:
+            row["evidence"] = critique.game_evidence(gdir)
+        except Exception as e:                               # noqa: BLE001
+            row["evidence"] = {"error": f"{type(e).__name__}: {e}"[:300]}
         if blender:
             d = out / b["id"]
             d.mkdir(parents=True, exist_ok=True)
-            row["renders"] = render(Path(res["dir"]) / f"{rep['asset']}.glb", d, blender)
-            nm = Path(res["dir"]) / "textures" / f"{rep['asset']}_normal.png"
+            row["renders"] = render(gdir / f"{rep['asset']}.glb", d, blender)
+            nm = gdir / "textures" / f"{rep['asset']}_normal.png"
             if nm.is_file():
                 shutil.copy2(nm, d / "normal.png")
-                row["renders"].append(str(d / "normal.png"))
-    except Exception as e:                                   # noqa: BLE001
-        row["game"] = {"ok": False, "error": f"{type(e).__name__}: {e}"[:400]}
+                row["renders"]["normal"] = str(d / "normal.png")
+            silhouette_png(gdir, d / "silhouette64.png")
+            row["renders"]["silhouette64"] = str(d / "silhouette64.png")
     try:
-        sc = (scores.get("scores") or {}).get(b["id"])
-        c = critique.run(st, p["id"], aesthetic=sc)
+        sc = (scores.get("passes") or {}).get(b["id"])
+        c = critique.run(st, p["id"], aesthetic={"passes": sc} if sc else None, game_dir=str(gdir) if gdir else None)
         a = c["aesthetic"]
-        row["aesthetic"] = {"mean": a["mean"], "passed": a["passed"], "scored": sc is not None,
-                            "items": {i["id"]: {"score": i["score"], "cap": i["cap"], "final": i["final"], "why": i["why"]}
-                                      for i in a["items"]}}
+        row["aesthetic"] = {"mean": a["mean"], "passed": a["passed"], "scored": bool(sc), "passes": len(sc or []),
+                            "items": {i["id"]: {"score": i["score"], "cap": i["cap"], "final": i["final"],
+                                                "why": i["why"], "passes": i.get("passes")} for i in a["items"]}}
     except Exception as e:                                   # noqa: BLE001
-        row["aesthetic"] = {"error": str(e)[:200]}
+        row["aesthetic"] = {"error": f"{type(e).__name__}: {e}"[:300]}
     row["seconds"] = round(time.time() - t0, 1)
     return row
 
 
+def review_letters(ids: list[str]) -> dict:
+    """{brief id: letter}: a fixed shuffle, so a blind pass cannot tell the briefs (or the control) by order."""
+    ids = sorted(ids)
+    random.Random(REVIEW_SEED).shuffle(ids)
+    return {i: chr(ord("A") + k) for k, i in enumerate(ids)}
+
+
+def write_reviews(rows: list, out: Path) -> dict:
+    letters = review_letters([r["id"] for r in rows if (r.get("renders") or {}).get("lod0_back")])
+    rd = out / "review"
+    rd.mkdir(parents=True, exist_ok=True)
+    for r in rows:
+        if r["id"] in letters:
+            review_sheet(r["renders"], Path(r["renders"]["silhouette64"]), rd / f"{letters[r['id']]}.png")
+    (out / "review_key.json").write_text(json.dumps(letters, indent=1), encoding="utf-8")
+    return letters
+
+
 def contact_sheet(rows: list, path: Path) -> None:
     from PIL import Image, ImageDraw
-    tiles = []
-    for r in rows:
-        files = r.get("renders") or []
-        pick = [f for f in files if f.endswith("LOD0_tex.png")] + [f for f in files if f.endswith("LOD3_tex.png")] + \
-               [f for f in files if f.endswith("LOD0_wire.png")] + [f for f in files if f.endswith("normal.png")]
-        tiles.append((r, pick))
-    W, H, pad, head = 300, 300, 10, 26
-    sheet = Image.new("RGB", (pad + 4 * (W + pad), pad + len(tiles) * (H + head + pad)), (244, 243, 239))
+    cols = ("lod0_three_quarter", "lod0_front", "lod0_back", "lod3_three_quarter", "lod0_wire", "normal", "silhouette64")
+    W, pad, head = 250, 8, 40
+    sheet = Image.new("RGB", (pad + len(cols) * (W + pad), pad + len(rows) * (W + head + pad)), (244, 243, 239))
     dr = ImageDraw.Draw(sheet)
-    for i, (r, pick) in enumerate(tiles):
-        y = pad + i * (H + head + pad)
+    for i, r in enumerate(rows):
+        y = pad + i * (W + head + pad)
         g = r.get("game") or {}
-        lods = g.get("lods") or []
-        dr.text((pad, y + 6), f"{r['title']} · {r['preset']} · LOD tris {[l['triangles'] for l in lods]} · "
-                f"validation {'PASS' if (g.get('validation') or {}).get('ok') else 'FAIL'}", fill=(30, 30, 30))
-        for k, f in enumerate(pick[:4]):
+        a = r.get("aesthetic") or {}
+        ev = r.get("evidence") or {}
+        val = (g.get("validation") or {})
+        fails = sorted({c["id"] for c in val.get("failed", [])})
+        line1 = (f"{r['title']}{'  (CONTROL)' if r.get('control') else ''}  ·  {r['preset']}  ·  LOD tris "
+                 f"{[l['triangles'] for l in g.get('lods') or []]}  ·  checks "
+                 f"{'PASS' if val.get('ok') else 'FAIL ' + ', '.join(fails) if g.get('ok') else 'not built'}")
+        line2 = (f"rubric {a.get('mean') if a.get('mean') is not None else 'not scored'}"
+                 f" {'(passes gate)' if a.get('passed') else '(below gate)' if a.get('mean') is not None else ''}  ·  "
+                 + (f"bevel {ev['edges']['coverage']:.0%}  materials {ev['materials']['count']}  contrast "
+                    f"{ev['value_contrast']}  scales {ev['scales']['count']}/3  silhouette "
+                    f"{ev['silhouette']['complexity']:.3f}  wear {'yes' if ev['wear']['present'] else 'no'}"
+                    if ev.get("edges") else "no game evidence"))
+        dr.text((pad, y + 4), line1, fill=(30, 30, 30))
+        dr.text((pad, y + 20), line2, fill=(30, 30, 30) if a.get("passed") or r.get("control") else (150, 30, 20))
+        for k, c in enumerate(cols):
+            f = (r.get("renders") or {}).get(c)
+            if not f:
+                continue
             im = Image.open(f).convert("RGB")
-            im.thumbnail((W, H))
+            im = im.resize((W, W), Image.NEAREST) if c == "silhouette64" else im
+            im.thumbnail((W, W))
             sheet.paste(im, (pad + k * (W + pad), y + head))
     sheet.save(path)
 
@@ -424,105 +324,177 @@ def fmt(v, d=2):
     return "—" if v is None else f"{v:.{d}f}" if isinstance(v, float) else str(v)
 
 
+def _ok(r):
+    g = r.get("game") or {}
+    return bool(r.get("build", {}).get("ok") and g.get("ok") and (g.get("validation") or {}).get("ok")
+                and (r.get("step") or {}).get("valid"))
+
+
 def write_doc(rows: list, cfg: dict, meta: dict, scores: dict) -> None:
+    real = [r for r in rows if not r.get("control")]
+    ctrl = [r for r in rows if r.get("control")]
+    scored = [r for r in real if (r.get("aesthetic") or {}).get("mean") is not None]
+    ge4 = [r for r in scored if r["aesthetic"]["mean"] >= 4.0]
+    lt3 = [r for r in scored if r["aesthetic"]["mean"] < 3.0]
     L = ["# Game bench", "",
-         f"Six original game-asset briefs ({BRIEFS.relative_to(ROOT)}) made end to end by a scripted agent "
-         f"(`python scripts/game_bench.py`), run {meta['date']} on {meta['machine']} with Blender {meta['blender']}. "
-         f"Textures {cfg['texture_px']} px, the {cfg['bake']} bake. Every number below is from that run; failures "
-         "are published as they came out. Budgets and thresholds are proposed values, not engine rules.", "",
-         "How it is measured:", "",
-         "- **Route**: form/router.py reads each feature's words (a heuristic, and labelled one); the main route is the "
-         "most common one, compared with the route the brief was written for.",
-         "- **Build**: the design created with the purpose \"game\" and built by the kernel, with STEP exported.",
-         "- **SubD to CAD**: per connected cage part, the CAD patches against the Catmull-Clark limit surface "
-         "(form/craft/subd_report.py); the worst part's max deviation per 100 mm of its size. Exact only where every "
-         "patch is a regular B-spline patch; ACC elsewhere.",
-         "- **STEP**: the exported STEP read back with OCCT: valid, solids.",
-         "- **Game asset**: form/game (Blender bakes, the GLB is written and checked here): every validation check, "
-         "LOD triangles against budgets (2% over passes), bake seconds.",
-         "- **Aesthetic**: form/critique.py's rubric (heuristic). Scores come from " +
-         (f"{SCORES.relative_to(ROOT)} ({scores.get('scored_by', 'unknown')}, {scores.get('date', 'undated')})"
-          if scores.get("scores") else "nobody yet: no scores file") +
-         ", capped by what the geometry supports. Gate: mean ≥ 4.0 and none under 3 (proposed).", "",
-         "| Brief | Route (expected) | Build | SubD→CAD max / 100 mm | STEP | Validation | LOD0..LOD3 tris / budget | Bake s | Aesthetic |",
-         "|---|---|---|---|---|---|---|---|---|"]
+         f"Six original game-asset briefs ({BRIEFS.relative_to(ROOT)}) and one deliberately bad control, made end to "
+         f"end (`python scripts/game_bench.py`) from the game exemplars in form/exemplars/game/, run {meta['date']} "
+         f"on {meta['machine']} with Blender {meta['blender']}. Textures {cfg['texture_px']} px, the {cfg['bake']} "
+         "bake. Every number below is from that run; failures are published as they came out. Budgets and "
+         "thresholds are proposed values, not engine rules.", "",
+         "## Result", ""]
+    L.append(f"- Rubric (median of three blind passes, capped by the game evidence): "
+             + (f"{len(ge4)} of {len(real)} at 4.0 or more; {len(lt3)} under 3.0; " if scored else "not scored; ")
+             + f"technical checks pass on {sum(_ok(r) for r in real)} of {len(real)}.")
+    for r in ctrl:
+        a = r.get("aesthetic") or {}
+        L.append(f"- Control ({r['title']}): rubric {fmt(a.get('mean'))}, "
+                 f"{'passes the gate (the critic is miscalibrated)' if a.get('passed') else 'fails the gate, as it must'}.")
+    who = scores.get("scored_by")
+    L += [f"- Scored by: {who} ({scores.get('date', 'undated')}). {scores.get('method', '')}" if who else
+          "- Scored by: nobody yet (no scores file).", ""]
+    L += ["How it is measured:", "",
+          "- **Model**: the exemplar's model_mesh op list run in Blender's fixed runner (blocks, bevel, inset, "
+          "panel_line, trim_strip, kit_place); ops tagged high_only build the bake source only. The remote is a kernel "
+          "design (build123d).",
+          "- **Build**: the design created with the purpose \"game\" and built by the kernel; STEP exported and read "
+          "back with OCCT.",
+          "- **SubD to CAD**: per connected cage part, the CAD patches against the Catmull-Clark limit surface "
+          "(form/craft/subd_report.py); the worst part's max deviation per 100 mm of its size.",
+          "- **Game asset**: form/game (Blender bakes; the GLB is written and checked here): every validation check, "
+          "LOD triangles against budgets (2% over passes).",
+          "- **Game evidence** (form/critique.game_evidence, computed; thresholds proposed): *bevel* coverage (share "
+          "of LOD0's feature-edge length that is not a raw hard edge: bevelled in the mesh, or baked: the normal map "
+          "leans >= 12 deg just inside it); *materials* (distinct kind and tint); *contrast* (base colour luminance "
+          "p95 - p5 over LOD0); *scales* (primary: LOD3 shows more than one mass; secondary: LOD0 holds forms LOD3 "
+          "drops; tertiary: the normal map carries surface detail); *silhouette* complexity (1 - mean solidity of "
+          "LOD0's outline in four views); *wear* (a worn material and a lit curvature mask).",
+          "- **Rubric**: form/critique.py's eight items, 0-5. Three blind passes, each over the anonymous review "
+          "sheets (four lit views of LOD0 and a 64 px outline, the seven assets shuffled, the control among them); "
+          "each item is the median of the passes, capped by the game evidence. Gate: mean >= 4.0 and none under 3 "
+          "(proposed).", "",
+          "| Brief | Route (expected) | Build | SubD→CAD max / 100 mm | Validation | LOD0..LOD3 tris / budget | "
+          "Bevel | Mat. | Contrast | Scales | Silh. | Wear | Rubric |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
-        ro = r.get("route", {})
+        ro = r.get("route") or {}
         b = r.get("build", {})
         dv = r.get("deviation")
-        st = r.get("step") or {}
         g = r.get("game") or {}
         val = g.get("validation") or {}
         lods = g.get("lods") or []
         a = r.get("aesthetic") or {}
+        ev = r.get("evidence") or {}
+        e_ok = bool(ev.get("edges"))
         L.append("| " + " | ".join([
-            r["title"],
-            f"{ro.get('main')} ({ro.get('expected')}){'' if ro.get('agrees') else ' ✗'}",
+            r["title"] + (" (control)" if r.get("control") else ""),
+            (f"{ro.get('main')} ({ro.get('expected')}){'' if ro.get('agrees') else ' ✗'}" if ro else "—"),
             ("ok" if b.get("ok") else "FAILED") + f" {fmt(b.get('seconds'), 1)} s",
-            ("n/a (kernel)" if dv is None else f"{dv['max_per_100mm']:.3g} mm ({dv['exact_parts']}/{dv['parts']} parts exact)"),
-            ("valid" if st.get("valid") else "INVALID") + (f", {st.get('solids')} solid(s)" if st.get("solids") is not None else ""),
-            ("PASS" if val.get("ok") else ("FAIL: " + ", ".join(sorted({c['id'] for c in val.get('failed', [])})) if g.get("ok") else "not built")),
+            ("n/a (kernel)" if dv is None else f"{dv['max_per_100mm']:.3g} mm ({dv['exact_parts']}/{dv['parts']} exact)"
+             if "max_per_100mm" in dv else "error"),
+            ("PASS" if val.get("ok") else ("FAIL: " + ", ".join(sorted({c['id'] for c in val.get('failed', [])}))
+                                           if g.get("ok") else "not built")),
             " · ".join(f"{l['triangles']}/{l['budget']}" for l in lods) or "—",
-            fmt(g.get("bake_seconds"), 1),
-            (f"{a['mean']:.2f} {'pass' if a.get('passed') else 'below gate'}" if a.get("mean") is not None
+            f"{ev['edges']['coverage']:.0%}" if e_ok else "—",
+            str(ev["materials"]["count"]) if e_ok else "—",
+            fmt(ev.get("value_contrast")) if e_ok else "—",
+            f"{ev['scales']['count']}/3" if e_ok else "—",
+            f"{ev['silhouette']['complexity']:.3f}" if e_ok else "—",
+            ("yes" if ev["wear"]["present"] else "no") if e_ok else "—",
+            (f"{a['mean']:.2f} {'pass' if a.get('passed') else 'FAIL'}" if a.get("mean") is not None
              else "not scored" if "error" not in a else "error")]) + " |")
     L += ["", "## Per brief", ""]
     for r in rows:
-        L.append(f"### {r['title']}")
+        L.append(f"### {r['title']}" + (" (control)" if r.get("control") else ""))
         L.append("")
-        ro = r.get("route", {})
-        L.append("- Routes: " + "; ".join(f"{f['feature']} → {f['route']}" + (f" ({', '.join(f['because'][:3])})" if f.get("because") else "")
-                                          + ("" if f.get("confident", True) else ", not confident") for f in ro.get("features", [])))
+        if r.get("originality"):
+            L.append(f"- Originality: {r['originality']}")
+        ro = r.get("route") or {}
+        if ro:
+            L.append("- Routes: " + "; ".join(f"{f['feature']} → {f['route']}" for f in ro.get("features", [])))
+        m = r.get("model") or {}
+        if not m.get("ok"):
+            L.append(f"- **Model failed**: {m.get('error')}")
+        elif m.get("ops"):
+            L.append(f"- Model: {m['ops']} model_mesh ops ({m['high_only_ops']} high_only) in {m['seconds']} s.")
         if r.get("cage"):
             c = r["cage"]
-            L.append(f"- Cage: {c['points']} points, {c['quads']} quads, {c['creases']} sharp crease edges, regions {', '.join(c['regions']) or 'none'}.")
+            L.append(f"- Cage: {c['points']} points, {c['faces']} faces, {c['creases']} creased edges, regions "
+                     f"{', '.join(c['regions']) or 'none'}; bake source {c['high_faces'] or 'none (the cage itself)'}"
+                     + (" faces." if c["high_faces"] else "."))
         b = r.get("build", {})
-        if not b.get("ok"):
+        if b and not b.get("ok"):
             L.append(f"- **Build failed**: {b.get('error', 'the kernel build did not finish')}")
         dv = r.get("deviation")
-        if dv:
+        if dv and "max_mm" in dv:
             L.append(f"- SubD→CAD: {dv['parts']} part(s), worst max {dv['max_mm']:.3g} mm, RMS {dv['rms_mm']:.3g} mm, "
                      f"{dv['max_per_100mm']:.3g} mm per 100 mm; {dv['irregular_points']} irregular point(s).")
         st = r.get("step") or {}
         if st:
-            L.append(f"- STEP: {'valid' if st.get('valid') else 'invalid'}" + (f", {st.get('solids')} solid(s), {st.get('faces')} faces, "
-                     f"{st.get('bytes', 0) / 1024:.0f} kB" if st.get("solids") is not None else f" ({st.get('error', '')})"))
+            L.append(f"- STEP: {'valid' if st.get('valid') else 'invalid'}" + (
+                f", {st.get('solids')} solid(s), {st.get('faces')} faces, {st.get('bytes', 0) / 1024:.0f} kB"
+                if st.get("solids") is not None else f" ({st.get('error', '')})"))
         g = r.get("game") or {}
         if g.get("ok"):
             fails = [c for c in g.get("checks", []) if c["status"] != "PASS"]
-            L.append(f"- Game asset ({r['preset']}): built in {g['seconds']} s, bake {fmt(g.get('bake_seconds'), 1)} s, UVs {g['uv']['method']}, "
-                     f"collision {g['collision']['parts']} hull(s) ({', '.join(g['collision']['names'][:2])}{', …' if g['collision']['parts'] > 2 else ''}).")
-            L.append("- Checks: " + ("all PASS" if not fails else "; ".join(f"{c['id']}{'' if c.get('lod') is None else ' LOD' + str(c['lod'])} {c['status']} ({c['value']})" for c in fails)))
-            for l in g.get("lods", []):
-                L.append(f"  - LOD{l['lod']}: {l['triangles']} / {l['budget']} triangles, {l['source']}")
+            L.append(f"- Game asset ({r['preset']}): {g['seconds']} s, bake {fmt(g.get('bake_seconds'), 1)} s, size "
+                     f"{' x '.join(f'{x:.0f}' for x in g['size_mm'])} mm, UVs {g['uv']['method']}, "
+                     f"{g['collision']['parts']} collision hull(s).")
+            L.append("- Checks: " + ("all PASS" if not fails else "; ".join(
+                f"{c['id']}{'' if c.get('lod') is None else ' LOD' + str(c['lod'])} {c['status']} ({c['value']})"
+                for c in fails)))
+            for lv in g.get("lods", []):
+                L.append(f"  - LOD{lv['lod']}: {lv['triangles']} / {lv['budget']} triangles, {lv['source']}")
         elif g:
             L.append(f"- **Game asset failed**: {g.get('error')}")
+        ev = r.get("evidence") or {}
+        if ev.get("edges"):
+            e, s = ev["edges"], ev["scales"]
+            L.append(f"- Game evidence: bevel coverage {e['coverage']:.0%} ({e['hard_edges_mm'] - e['hard_baked_mm']:.0f} "
+                     f"mm raw hard edge of {e['feature_edges_mm']:.0f} mm feature edge, {e['hard_baked_mm']:.0f} mm "
+                     f"baked); materials {ev['materials']['count']} ({', '.join(ev['materials']['list'])}); value "
+                     f"contrast {ev['value_contrast']}; scales primary {'yes' if s['primary'] else 'no'} "
+                     f"({s['lod3_parts']} LOD3 part(s), min solidity {s['lod3_min_solidity']}), secondary "
+                     f"{'yes' if s['secondary'] else 'no'} ({s['lod0_far_from_lod3']:.1%} of LOD0 off LOD3), tertiary "
+                     f"{'yes' if s['tertiary'] else 'no'} (normal blue std {s['normal_blue_std']}, rg std "
+                     f"{s['normal_rg_std']}); silhouette complexity {ev['silhouette']['complexity']} "
+                     f"({', '.join(f'{k} {v}' for k, v in ev['silhouette']['solidity'].items())}); wear "
+                     f"{'yes' if ev['wear']['present'] else 'no'} (max {ev['wear']['max_wear']}, edge mask "
+                     f"{ev['wear']['edge_mask_share']:.1%}).")
+        elif ev:
+            L.append(f"- Game evidence failed: {ev.get('error')}")
         a = r.get("aesthetic") or {}
         if a.get("items"):
-            L.append("- Aesthetic rubric (heuristic): " + ", ".join(
-                f"{k} {fmt(v['final'], 1) if v['final'] is not None else '—'}" + (f" (cap {v['cap']}: {v['why']})" if v.get("cap") is not None else "")
-                for k, v in a["items"].items()) + (f"; mean {a['mean']:.2f}" if a.get("mean") is not None else "; not scored"))
-        note = (scores.get("notes") or {}).get(r["id"])
-        if note:
-            L.append(f"- Looked at ({scores.get('scored_by', 'reviewer')}): {note}")
+            L.append("- Rubric: " + ", ".join(
+                f"{k} {fmt(v['final'], 1) if v['final'] is not None else '—'}"
+                + (f" (passes {'/'.join(fmt(x, 0) for x in v['passes'])})" if v.get("passes") else "")
+                + (f" [cap {v['cap']}: {v['why']}]" if v.get("cap") is not None else "")
+                for k, v in a["items"].items()) + (f"; mean {a['mean']:.2f}" if a.get("mean") is not None else
+                                                   "; not scored"))
+        for k, note in enumerate((scores.get("notes") or {}).get(r["id"]) or []):
+            L.append(f"- Blind pass {k + 1} said: {note}")
         L.append(f"- Wall time {r.get('seconds')} s.")
         L.append("")
-    fails = [r["title"] for r in rows if not (r.get("build", {}).get("ok") and (r.get("game") or {}).get("ok")
-                                              and ((r.get("game") or {}).get("validation") or {}).get("ok"))]
-    L += ["## What failed", "", ("Nothing failed in this run." if not fails else
-          "Published as they came out: " + ", ".join(fails) + ". See each brief above for the measured reason."), ""]
+    fails = [r["title"] for r in real if not _ok(r)]
+    below = [r["title"] for r in real if (r.get("aesthetic") or {}).get("mean") is not None
+             and not r["aesthetic"].get("passed")]
+    L += ["## What failed", "",
+          ("Technical: nothing failed." if not fails else "Technical: " + ", ".join(fails) + "."),
+          ("Rubric: every brief passes the gate." if scored and not below else
+           "Rubric: below the gate: " + ", ".join(below) + "." if below else "Rubric: not scored."),
+          "See each brief above for the measured reason.", ""]
     DOC.write_text("\n".join(L), encoding="utf-8")
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--only", help="comma-separated brief ids")
-    ap.add_argument("--out", help="folder for renders and the contact sheet")
+    ap.add_argument("--out", help="folder for renders, review sheets and the contact sheet")
     ap.add_argument("--json", help="also write the raw results here")
+    ap.add_argument("--no-doc", action="store_true", help="do not write docs/GAME_BENCH.md")
     a = ap.parse_args()
     data = Path(tempfile.mkdtemp(prefix="form-game-bench-"))
     os.environ["FORM_DATA"] = str(data)
-    os.environ.pop("FORM_CONFIG", None)
     os.environ["FORM_CONFIG"] = str(data / "studio.toml")
     from form import config
     from form.adapters.blender import resolve
@@ -533,7 +505,7 @@ def main() -> int:
     st = Studio(config.load())
     bl = resolve(st.cfg)
     if not bl.get("available"):
-        print("Blender is not installed: the game bench needs it (it bakes the assets).", file=sys.stderr)
+        print("Blender is not installed: the game bench needs it (it models and bakes the assets).", file=sys.stderr)
         return 2
     out = Path(a.out) if a.out else data / "renders"
     out.mkdir(parents=True, exist_ok=True)
@@ -545,8 +517,11 @@ def main() -> int:
             print(f"… {b['id']}", flush=True)
             r = run_brief(st, b, cfg, out, scores, bl["app"])
             g = r.get("game") or {}
-            print(f"  build {r.get('build', {}).get('ok')} · game {g.get('ok')} · validation "
-                  f"{(g.get('validation') or {}).get('ok')} · {r.get('seconds')} s", flush=True)
+            ev = r.get("evidence") or {}
+            print(f"  model {r.get('model', {}).get('ok')} · build {r.get('build', {}).get('ok')} · game {g.get('ok')} "
+                  f"· validation {(g.get('validation') or {}).get('ok')} · bevel "
+                  f"{(ev.get('edges') or {}).get('coverage')} · rubric {(r.get('aesthetic') or {}).get('mean')} · "
+                  f"{r.get('seconds')} s", flush=True)
             rows.append(r)
     finally:
         st.kernel.stop()
@@ -554,11 +529,13 @@ def main() -> int:
     meta = {"date": time.strftime("%Y-%m-%d"), "machine": f"{platform.system()} {platform.machine()}",
             "blender": bl.get("version")}
     contact_sheet(rows, out / "contact_sheet.png")
-    if not a.only:
+    write_reviews(rows, out)
+    if not a.only and not a.no_doc:
         write_doc(rows, cfg, meta, scores)
     if a.json:
         Path(a.json).write_text(json.dumps({"meta": meta, "rows": rows}, indent=1, default=float), encoding="utf-8")
-    print(f"contact sheet: {out / 'contact_sheet.png'}" + ("" if a.only else f"\nreport: {DOC}"))
+    print(f"contact sheet: {out / 'contact_sheet.png'}\nreview sheets: {out / 'review'}"
+          + ("" if a.only or a.no_doc else f"\nreport: {DOC}"))
     return 0
 
 
