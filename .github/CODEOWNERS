@@ -1,0 +1,18 @@
+# Who reviews what. GitHub requests a review from the owners of the paths a pull request touches.
+# Later lines take precedence over earlier ones.
+
+*                       @kaizensx
+
+# Automation, release and security settings
+/.github/               @kaizensx
+/scripts/ci/            @kaizensx
+/packaging/             @kaizensx
+/SECURITY.md            @kaizensx
+/docs/RELEASING.md      @kaizensx
+
+# The CAD engine and the desktop app
+/form/                  @kaizensx
+/form/app/              @kaizensx
+
+# Community recipes
+/community/             @kaizensx

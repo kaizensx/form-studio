@@ -16,6 +16,16 @@
   <sub><b>Version 1.0.0</b>, the first public release &nbsp;·&nbsp; <a href="CHANGELOG.md">What is in it</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/#try">Try it in your browser</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/docs/">Docs</a> &nbsp;·&nbsp; <a href="https://discord.gg/b6ZgyndkmS">Discord</a></sub>
 </p>
 
+<p align="center">
+  <a href="https://github.com/kaizensx/form-studio/actions/workflows/ci.yml?query=branch%3Amain"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/kaizensx/form-studio/ci.yml?branch=main&label=CI&style=flat-square"></a>
+  <a href="https://github.com/kaizensx/form-studio/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://img.shields.io/github/actions/workflow/status/kaizensx/form-studio/codeql.yml?branch=main&label=CodeQL&style=flat-square"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/kaizensx/form-studio"><img alt="OpenSSF Scorecard" src="https://img.shields.io/ossf-scorecard/github.com/kaizensx/form-studio?label=OpenSSF%20Scorecard&style=flat-square"></a>
+  <a href="https://github.com/kaizensx/form-studio/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/kaizensx/form-studio?label=release&style=flat-square"></a>
+  <a href="https://github.com/kaizensx/form-studio/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/kaizensx/form-studio/total?style=flat-square"></a>
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/kaizensx/form-studio?label=licence&style=flat-square"></a>
+  <a href="https://github.com/kaizensx/form-studio/discussions"><img alt="Discussions" src="https://img.shields.io/github/discussions/kaizensx/form-studio?style=flat-square"></a>
+</p>
+
 <br>
 
 **Form Studio is the open-source AI CAD studio: describe anything, and an engineer-grade agent builds it as real, editable CAD.** Type what you need, drop a photo or a sketch, or bring a part. The agent of your choice writes a parametric design in [build123d](https://github.com/gumyr/build123d), and the OpenCascade kernel builds it as a B-rep solid while you watch: features you can click, parameters you can change, and every revision checked on the solid itself. Take it out as STEP for your CAD program or a CNC shop, as meshes for renders and the web, or to your own slicer if you print. Everything runs on your computer.

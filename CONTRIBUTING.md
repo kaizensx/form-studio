@@ -80,8 +80,29 @@ python -m http.server -d site 8000
 1. Open or find an issue for anything larger than a small fix, so the approach can be agreed first.
 2. Keep each pull request to one change. Include tests, and screenshots for interface changes.
 3. Add a line to `CHANGELOG.md` under the next version.
-4. CI runs the test suite on Linux and macOS, checks that `docs/MCP.md` is current, and builds the website. A pull
-   request that touches recipes or the interface gets before and after pictures in a comment.
+4. Run the checks before you push (below). CI runs the test suite on Linux and macOS, checks that `docs/MCP.md` is
+   current, and builds the website. A pull request that touches recipes or the interface gets before and after
+   pictures in a comment.
+
+## Checks on every pull request
+
+| Check | What it does | Run it yourself |
+|---|---|---|
+| **CI** | The test suite on Linux and macOS (with a coverage summary on Linux), the MCP reference, actionlint and the automation's own tests | `.venv/bin/python -m unittest discover -s tests` |
+| **Code quality** | ruff lint on the whole tree; the pre-commit hooks on the files you changed; ruff format on changed Python files, as advice | `pre-commit run --from-ref origin/dev --to-ref HEAD` |
+| **Dependency review** | Fails on a new dependency with a high or critical vulnerability, or a licence that cannot ship in an MIT app | — |
+| **CodeQL** | Security analysis of the Python, the website's JavaScript and the workflows | — |
+| **Workflow security** | zizmor, when `.github/` changes | `pre-commit run zizmor --all-files` |
+| **Dependency audit** | pip-audit on `requirements.lock`, when it changes | `uvx pip-audit -r requirements.lock --no-deps` |
+
+The hooks live in [`.pre-commit-config.yaml`](.pre-commit-config.yaml). To run them on every commit:
+
+```bash
+uv tool install pre-commit      # or: pipx install pre-commit
+pre-commit install
+```
+
+`@kaizensx` reviews every pull request ([CODEOWNERS](.github/CODEOWNERS)); an automated review may also comment.
 
 By contributing you agree that your work is released under the [MIT licence](LICENSE), and to follow the
 [Code of Conduct](CODE_OF_CONDUCT.md).
