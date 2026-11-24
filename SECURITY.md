@@ -41,9 +41,11 @@ shasum -a 256 -c SHA256SUMS --ignore-missing
 
 - Every GitHub Action is pinned to a full commit SHA, updated weekly by Dependabot after a cooling-off week.
 - Workflows run with read-only tokens by default; write access is granted per job, only where a job needs it.
-  Pull requests from forks never run with a write token.
-- CodeQL (`security-extended`), [zizmor](https://docs.zizmor.sh/) for the workflows, OpenSSF Scorecard, Dependency
-  review on pull requests and pip-audit on `requirements.lock` report to Security › Code scanning.
+  Code from a fork's pull request never runs with a write token: the few jobs that need one for a fork (labels,
+  preview comments) run only the base branch's own scripts and read the pull request as data.
+- CodeQL (`security-extended`), [zizmor](https://docs.zizmor.sh/) for the workflows and OpenSSF Scorecard report to
+  Security › Code scanning. Dependency review checks every pull request and comments when it fails; pip-audit checks
+  `requirements.lock` and writes its findings to the workflow's job summary.
 - Dependabot alerts and security updates, secret scanning and push protection are on.
 
 ## Security model

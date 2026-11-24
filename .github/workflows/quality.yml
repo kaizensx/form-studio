@@ -59,7 +59,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          mapfile -t files < <(git diff --name-only --diff-filter=AM "$BASE" "$HEAD" -- '*.py')
+          mapfile -t files < <(git diff --name-only --diff-filter=AM "$BASE...$HEAD" -- '*.py')
           if [ "${#files[@]}" -eq 0 ]; then echo "No Python files changed."; exit 0; fi
           if pre-commit run ruff-format --files "${files[@]}"; then
             echo "The changed Python files are formatted." >> "$GITHUB_STEP_SUMMARY"
