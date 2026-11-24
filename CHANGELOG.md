@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- **Cage refinement operators, and the game exemplars' art fixed with them.** `form/refine/ops_cage.py` adds the
+  subdivision-cage operators of the refinement engine (support loops, panel line, trim strip, inset, kit detail and
+  silhouette breakers) and the planners the exemplars are written with. New model_mesh options, every one off by
+  default so existing op lists replay unchanged: `crease` and `support_loops` take `pin_corners` (where a creased loop
+  turns a corner, the point gets a third creased edge, so it subdivides as a true corner instead of the round "pill"
+  a creased quad becomes); `extrude_region` takes `sides: "region"` (the side walls take the extruded faces' regions;
+  by default bmesh copies a neighbour's, which is not even mirror-symmetric); a face selection by region or normal can
+  add a `box` (faces whose centre is inside); `geonodes_array` can turn a kit part round an axis in equal steps
+  (Geometry Nodes). `kit_line` places kit parts at a constant pitch in three sizes (1 : 0.38 : 0.15) and never inside
+  a frozen feature; the silhouette breakers (brow, crest, vent) are ranked by the 64 px convexity deficit of the
+  views each one changes. A new kit part, `tread_block`, is a tapered chevron tyre lug. The exemplars, still
+  original: the wall's bricks are blocks with true corners (corner fillet 0 mm, was about 66 mm on a 201 mm brick
+  face), its coping is cut into stones, four brick corners are knocked back and the back is ashlar; its brick insets
+  no longer catch slivers of the edge bevels, so the share of its normal map that points inward fell from 0.42 % to
+  0.32 %. The helmet has a brow, a chin bar, a flared nape and vent pods, and its visor is one unbroken band (64 px
+  convexity deficit of LOD0 0.101, was 0.049); the wheel's tread is two rows of chevron lugs at one pitch made by
+  Geometry Nodes (pitch spread 0 %, was 50 % on the centre row); the remote has a parting line and a wider, deeper
+  battery-door shadow gap; the chest's boards each stand proud or sit back by their own 1-3.4 mm. LOD budgets and
+  every game validation check still pass (game bench, Blender 5.2.3).
 - **The design refinement engine (engine and analysis).** `form/refine` measures what a built design lacks as a
   deficit vector from 0 to 1 (the outline at 64 px from six views, value regions of a small lit render, proportion,
   balance over the support, detail scales, edge hierarchy, the largest unbroken surface, material zones and contrast,

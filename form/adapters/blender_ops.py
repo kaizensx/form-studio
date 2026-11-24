@@ -150,6 +150,9 @@ def select_faces(bm, sel):
         out = [f for f in bm.faces if f.normal.dot(d) >= c - 1e-9]
     else:
         raise OpError("a face selection needs all, region, indices or normal")
+    if "box" in sel:                               # only faces whose centre is inside the box
+        lo, hi = vec(sel["box"][0]), vec(sel["box"][1])
+        out = [f for f in out if all(lo[k] - 1e-9 <= f.calc_center_median()[k] <= hi[k] + 1e-9 for k in range(3))]
     if not out:
         raise OpError("the face selection is empty")
     return out
@@ -163,7 +166,7 @@ def select_verts(bm, sel):
         if bad:
             raise OpError(f"vertex index {bad[0]} out of range (the cage has {n} points)")
         out = [bm.verts[i] for i in sel["indices"]]
-    elif "box" in sel:
+    elif "box" in sel and len(sel) == 1:           # a point box (with region or normal it narrows a face selection)
         lo, hi = vec(sel["box"][0]), vec(sel["box"][1])
         out = [v for v in bm.verts if all(lo[k] - 1e-9 <= v.co[k] <= hi[k] + 1e-9 for k in range(3))]
     else:
@@ -248,6 +251,20 @@ def op_extrude_region(ob, o):
     left = [f for f in faces if f.is_valid]        # the region's old faces are inside the solid now
     if left:
         bmesh.ops.delete(bm, geom=left, context="FACES_ONLY")
+    if o.get("sides") != "region":
+        store_bm(ob, bm)
+        return
+    # sides "region": the side walls belong to the extruded part, each takes the regions of the face it rises to
+    # (by default bmesh copies them from either neighbour, which is not even mirror-symmetric)
+    top = {g for g in res["geom"] if isinstance(g, bmesh.types.BMFace) and g.is_valid}
+    sides = {f for v in verts for f in v.link_faces if f not in top}
+    layers = list(region_layers(bm).values())
+    bm.faces.index_update()
+    for f in sorted(sides, key=lambda x: x.index):
+        src = next((g for e in f.edges for g in e.link_faces if g in top), None)
+        if src is not None:
+            for lay in layers:
+                f[lay] = src[lay]
     store_bm(ob, bm)
 
 
@@ -307,6 +324,8 @@ def op_crease(ob, o):
             raise OpError(f"region {o['region_boundary']} has no boundary")
     for e in edges:
         e[lay] = val
+    if o.get("pin_corners") and val > 0:
+        _pin_corners(bm, lay, {v for e in edges for v in e.verts})
     store_bm(ob, bm)
 
 
@@ -362,6 +381,8 @@ def _apply_modifier(ob, mod):
 
 
 def op_geonodes_array(ob, o):
+    if "part" in o:
+        return _ring_array(ob, o)
     ng, gi, go = _gn_group("FormArray")
     line = ng.nodes.new("GeometryNodeMeshLine")
     line.mode = "OFFSET"
@@ -377,6 +398,99 @@ def op_geonodes_array(ob, o):
     mod.node_group = ng
     _apply_modifier(ob, mod)
     bpy.data.node_groups.remove(ng)
+
+
+def _ring_array(ob, o):
+    """A ring of kit-part copies at a constant pitch: the part placed at each seed point (+Z on the normal, as
+    kit_place), then Geometry Nodes instances that seed set count times round the axis through center, each copy
+    turned by 360 / count degrees more than the last, and realises them. The copies join the cage as closed shells."""
+    count = int(o["count"])
+    if count * len(o["at"]) > MAX_PLACE:
+        raise OpError(f"geonodes_array: {count * len(o['at'])} copies; the limit is {MAX_PLACE}")
+    k = AXES[o["axis"]]
+    ctr = vec(o.get("center", [0, 0, 0]))
+    mesh = o["mesh"]
+    PV = [vec(p) for p in mesh["V"]]
+    off = num(o.get("offset", 0.0))
+    n = vec(o["normal"])
+    if n.length < 1e-9:
+        raise OpError("geonodes_array: the normal must not be zero")
+    x, y, z = _frame(n)
+    V, F, C = [], [], []
+    for p in o["at"]:
+        c = vec(p) - ctr
+        base = len(V)
+        V += [c + x * q.x + y * q.y + z * (q.z + off) for q in PV]
+        F += [[base + i for i in f] for f in mesh["F"]]
+        C += [(base + a, base + b, num(w, 0, 1)) for a, b, w in mesh["C"]]
+    seed = bpy.data.meshes.new("FormRingSeed")
+    seed.from_pydata([tuple(v) for v in V], [], F)
+    seed.update()
+    sb = bmesh.new()
+    sb.from_mesh(seed)
+    lay = crease_layer(sb)
+    sb.verts.ensure_lookup_table()
+    for a, b, w in C:
+        e = sb.edges.get((sb.verts[a], sb.verts[b]))
+        if e is not None:
+            e[lay] = w
+    sb.to_mesh(seed)
+    sb.free()
+    tmp = bpy.data.objects.new("FormRingSeed", seed)
+    bpy.context.scene.collection.objects.link(tmp)
+    ng, gi, go = _gn_group("FormRing")
+    line = ng.nodes.new("GeometryNodeMeshLine")
+    line.mode = "OFFSET"
+    line.inputs["Count"].default_value = count
+    line.inputs["Offset"].default_value = Vector((0.0, 0.0, 0.0))     # every point at the ring's centre
+    idx = ng.nodes.new("GeometryNodeInputIndex")
+    mul = ng.nodes.new("ShaderNodeMath")
+    mul.operation = "MULTIPLY"
+    mul.inputs[1].default_value = math.radians(num(o.get("angle", 360.0), 1e-3, 360.0)) / count
+    cmb = ng.nodes.new("ShaderNodeCombineXYZ")
+    ng.links.new(idx.outputs[0], mul.inputs[0])
+    ng.links.new(mul.outputs[0], cmb.inputs["XYZ"[k]])
+    inst = ng.nodes.new("GeometryNodeInstanceOnPoints")
+    real = ng.nodes.new("GeometryNodeRealizeInstances")
+    ng.links.new(line.outputs["Mesh"], inst.inputs["Points"])
+    ng.links.new(gi.outputs[0], inst.inputs["Instance"])
+    ng.links.new(cmb.outputs[0], inst.inputs["Rotation"])
+    ng.links.new(inst.outputs["Instances"], real.inputs[0])
+    ng.links.new(real.outputs[0], go.inputs[0])
+    mod = tmp.modifiers.new("FormRing", "NODES")
+    mod.node_group = ng
+    _apply_modifier(tmp, mod)
+    bpy.data.node_groups.remove(ng)
+    rm = tmp.data
+    nv = len(rm.vertices)
+    co = [0.0] * (nv * 3)
+    rm.vertices.foreach_get("co", co)
+    polys = [list(p.vertices) for p in rm.polygons]
+    rc = {}
+    a = rm.attributes.get(CREASE)
+    if a is not None and a.domain == "EDGE":
+        vals = [0.0] * len(rm.edges)
+        a.data.foreach_get("value", vals)
+        rc = {tuple(sorted(e.vertices)): float(v) for e, v in zip(rm.edges, vals) if v > 0}
+    bpy.data.objects.remove(tmp)
+    bpy.data.meshes.remove(rm)
+    bm = load_bm(ob)
+    ensure_region(bm, o.get("name"))
+    lay = crease_layer(bm)
+    vs = [bm.verts.new(Vector(co[i * 3:i * 3 + 3]) + ctr) for i in range(nv)]
+    added = []
+    for f in polys:
+        try:
+            added.append(bm.faces.new([vs[i] for i in f]))
+        except ValueError as e:
+            raise OpError(f"geonodes_array: ring face {f}: {e}")
+    for (a2, b2), w in rc.items():
+        e = bm.edges.get((vs[a2], vs[b2]))
+        if e is not None:
+            e[lay] = w
+    if o.get("name"):
+        tag_region(bm, added, o["name"])
+    store_bm(ob, bm)
 
 
 def op_geonodes_scatter(ob, o):
@@ -579,7 +693,28 @@ def op_support_loops(ob, o):
             for a, b, w in segs:
                 if w > 0 and _dist_seg(mid, a, b) < 1e-5 * max((b - a).length, 1e-6) + 1e-7:
                     e[lay] = w
+    if o.get("pin_corners"):
+        _pin_corners(bm, lay, {v for f in faces for v in f.verts})
     store_bm(ob, bm)
+
+
+def _pin_corners(bm, lay, verts, turn_deg=30.0):
+    """Corner points of a creased loop: a point with two creased edges that turn by more than turn_deg gets every
+    other edge creased too. Catmull-Clark treats a point with three or more creased edges as a corner and keeps it
+    where it is; with two, it rounds the loop through it (a creased quad becomes a pill)."""
+    lim = math.cos(math.radians(180.0 - turn_deg))
+    for v in sorted(verts, key=lambda x: x.index):
+        cr = [e for e in v.link_edges if e[lay] > 0]
+        if len(cr) != 2:
+            continue
+        d0 = (cr[0].other_vert(v).co - v.co)
+        d1 = (cr[1].other_vert(v).co - v.co)
+        if d0.length < 1e-9 or d1.length < 1e-9 or d0.normalized().dot(d1.normalized()) <= lim:
+            continue                                # a straight run, not a corner
+        w = min(cr[0][lay], cr[1][lay])
+        for e in v.link_edges:
+            if e[lay] <= 0:
+                e[lay] = w
 
 
 def _dist_seg(p, a, b):

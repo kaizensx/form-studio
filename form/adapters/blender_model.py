@@ -72,14 +72,21 @@ OP_SCHEMA = {
     "cage_new": "First op, exactly once. {primitive: cube|quad_sphere|plane|cylinder, size [x,y,z] (cube, plane), "
                 "radius, height, segments 1..64, center [x,y,z]} or {quads: {V: [[x,y,z]...], F: [[i,j,k,l]...]}} "
                 "(polygons of 3..64 points; quads give the cleanest surface).",
-    "extrude_region": "{faces: <faces>, offset: mm along the region's normal} or {faces, vector: [x,y,z]}.",
+    "extrude_region": "{faces: <faces>, offset: mm along the region's normal} or {faces, vector: [x,y,z]}; sides: "
+                      "neighbour (the side walls copy a neighbour's regions) | region (they take the extruded "
+                      "faces' regions).",
     "loop_cut": "{edge: [a, b] (two joined points), cuts: 1..32}: cuts the ring of quads across that edge.",
     "move": "{verts: <points>, by: [dx,dy,dz]} and/or {scale: [sx,sy,sz]} about the selection's centre.",
-    "crease": "{edges: [[a,b], ...]} or {region_boundary: name}, value 0..1 (1 = sharp).",
+    "crease": "{edges: [[a,b], ...]} or {region_boundary: name}, value 0..1 (1 = sharp), pin_corners: false "
+              "(where the creased loop turns a corner, the point gets a third creased edge: a true corner, no pill).",
     "name_region": "{name: [a-z][a-z0-9_]*, faces: <faces>}: a named face set that later ops, creases and CAD "
                    "features (split, cut) can target.",
     "mirror": "{axis: x|y|z, clip: true (cut away the negative half first), merge: mm weld distance}.",
-    "geonodes_array": "{count: 2..256, offset: [x,y,z]}: copies of the whole cage (Geometry Nodes).",
+    "geonodes_array": "{count: 2..256, offset: [x,y,z]}: copies of the whole cage (Geometry Nodes). Or a ring of kit "
+                      "parts at a constant pitch: {count, part, params, at: [[x,y,z], ...] (the first copies), normal: "
+                      "[x,y,z], axis: x|y|z, center: [x,y,z], angle: degrees (360), scale, rotation, offset, name}: "
+                      "the part placed at each point (+Z on the normal, as kit_place), then turned round the axis "
+                      "through center in count equal steps.",
     "geonodes_scatter": f"{{count: 1..{2000}, seed: int, item_size: mm, scale: [min, max]}}: small cubes scattered "
                         "on the faces (Geometry Nodes, random by seed; the count is an expectation).",
     "sculpt_ops": f"{{strokes: [{{brush: {'|'.join(BRUSHES)}, center: [x,y,z], radius: mm, strength: -1..1, "
@@ -89,8 +96,9 @@ OP_SCHEMA = {
               "Automatic retopology: regions and creases do not survive it.",
     "bevel": "{edges: <edges>, width: mm, segments: 1..8, profile: 0.05..1 (0.5 round), crease: 0..1 (on the bevel's "
              "borders), name: region for the bevel faces}: chamfers or rounds edges in the cage.",
-    "support_loops": "{edges: <edges>, distance: mm}: a holding loop on each side of the edges, the corner kept, so "
-                     "they stay tight after subdivision.",
+    "support_loops": "{edges: <edges>, distance: mm, pin_corners: false}: a holding loop on each side of the edges, "
+                     "the corner kept, so they stay tight after subdivision; pin_corners: where the creased loop turns "
+                     "a corner, the point gets a third creased edge, so it subdivides as a true corner (no pill).",
     "inset": "{faces: <faces>, thickness: mm, depth: mm (negative = recess), individual: false, crease: 0..1, "
              "name: region for the inner faces}: a border inside the faces, then in or out.",
     "panel_line": "{edges: <edges>, width: mm, depth: mm into the surface, crease: 0..1 (the lips), name}: a V groove "
@@ -106,7 +114,8 @@ OP_SCHEMA = {
                  "offset: mm along it, name}: copies of an original parametric detail part (form.game.kit), +Z on "
                  "the surface normal; each copy is its own closed shell.",
 }
-SELECTORS = ("<faces>: {all: true} | {region: name} | {indices: [face, ...]} | {normal: [x,y,z], within_deg: 0..180}. "
+SELECTORS = ("<faces>: {all: true} | {region: name} | {indices: [face, ...]} | {normal: [x,y,z], within_deg: 0..180}; "
+             "region or normal may add box: [[x0,y0,z0], [x1,y1,z1]] (only faces whose centre is inside). "
              "<points>: any <faces> (its points) | {indices: [point, ...]} | {box: [[x0,y0,z0], [x1,y1,z1]]}. "
              "<edges>: [[a, b], ...] | {pairs: [[a, b], ...]} | {path: [p0, p1, ...], closed: false} | "
              "{region_boundary: name} | {box: [[x0,y0,z0], [x1,y1,z1]]} (edges with both ends inside) | "
@@ -156,6 +165,10 @@ def _faces(s, where):
         raise OpError(f"{where} must be a face selection. {SELECTORS}")
     if s.get("all") is True and len(s) == 1:
         return {"all": True}
+    if "box" in s and ("region" in s or "normal" in s):
+        out = _faces({k: v for k, v in s.items() if k != "box"}, where)
+        out["box"] = _points({"box": s["box"]}, f"{where}.box")["box"]
+        return out
     if "region" in s and len(s) == 1:
         return {"region": _name(s["region"], f"{where}.region")}
     if "indices" in s and len(s) == 1:
@@ -227,8 +240,12 @@ def _check_one(i, o) -> dict:
             out["center"] = _vec(o["center"], f"{w}.center")
         return out
     if k == "extrude_region":
-        _keys(o, ("faces", "offset", "vector"), w)
+        _keys(o, ("faces", "offset", "vector", "sides"), w)
         out = {"op": k, "faces": _faces(o.get("faces"), f"{w}.faces")}
+        if o.get("sides", "neighbour") not in ("neighbour", "region"):
+            raise OpError(f"{w}.sides must be neighbour or region.")
+        if o.get("sides") == "region":
+            out["sides"] = "region"
         if ("offset" in o) == ("vector" in o):
             raise OpError(f"{w} needs offset (mm along the normal) or vector, not both.")
         if "offset" in o:
@@ -251,8 +268,13 @@ def _check_one(i, o) -> dict:
             out["scale"] = _vec(o["scale"], f"{w}.scale", -1e3, 1e3)
         return out
     if k == "crease":
-        _keys(o, ("edges", "region_boundary", "value"), w)
+        _keys(o, ("edges", "region_boundary", "value", "pin_corners"), w)
         out = {"op": k, "value": _num(o.get("value", 1.0), f"{w}.value", 0, 1)}
+        if "pin_corners" in o:
+            if not isinstance(o["pin_corners"], bool):
+                raise OpError(f"{w}.pin_corners must be true or false.")
+            if o["pin_corners"]:
+                out["pin_corners"] = True
         if ("edges" in o) == ("region_boundary" in o):
             raise OpError(f"{w} needs edges or region_boundary.")
         if "edges" in o:
@@ -273,6 +295,8 @@ def _check_one(i, o) -> dict:
             raise OpError(f"{w}.clip must be true or false.")
         return {"op": k, "axis": o["axis"], "clip": o.get("clip", True),
                 "merge": _num(o.get("merge", 1e-4), f"{w}.merge", 0, 10)}
+    if k == "geonodes_array" and "part" in o:
+        return _check_ring(o, w)
     if k == "geonodes_array":
         _keys(o, ("count", "offset"), w)
         return {"op": k, "count": _num(o.get("count"), f"{w}.count", 2, 256, integer=True),
@@ -376,9 +400,15 @@ def _check_detail(k, o, w):
             out["crease"] = _num(o["crease"], f"{w}.crease", 0, 1)
         return _opt_name(o, out, w)
     if k == "support_loops":
-        _keys(o, ("edges", "distance"), w)
-        return {"op": k, "edges": _edges(o.get("edges"), f"{w}.edges"),
-                "distance": _num(o.get("distance"), f"{w}.distance", 1e-3, 1e4)}
+        _keys(o, ("edges", "distance", "pin_corners"), w)
+        out = {"op": k, "edges": _edges(o.get("edges"), f"{w}.edges"),
+               "distance": _num(o.get("distance"), f"{w}.distance", 1e-3, 1e4)}
+        if "pin_corners" in o:
+            if not isinstance(o["pin_corners"], bool):
+                raise OpError(f"{w}.pin_corners must be true or false.")
+            if o["pin_corners"]:
+                out["pin_corners"] = True
+        return out
     if k == "inset":
         _keys(o, ("faces", "thickness", "depth", "individual", "crease", "name"), w)
         if not isinstance(o.get("individual", False), bool):
@@ -469,10 +499,51 @@ def _check_kit(o, w):
     return _opt_name(o, out, w)
 
 
+def _check_ring(o, w):
+    """geonodes_array as a ring of kit parts (see OP_SCHEMA)."""
+    from ..game import kit
+    _keys(o, ("count", "part", "params", "at", "normal", "axis", "center", "angle", "scale", "rotation", "offset",
+              "name", "kit"), w)
+    try:
+        params = kit.check_params(o.get("part"), o.get("params"))
+        part = kit.build(o["part"], params)
+    except kit.KitError as e:
+        raise OpError(f"{w}: {e}", "Kit parts: " + ", ".join(kit.names()))
+    out = {"op": "geonodes_array", "count": _num(o.get("count"), f"{w}.count", 2, 256, integer=True),
+           "part": o["part"], "params": params, "kit": kit.KIT_VERSION}
+    at = o.get("at")
+    if not isinstance(at, list) or not 1 <= len(at) <= 16:
+        raise OpError(f"{w}.at must list 1..16 seed points [x, y, z].")
+    out["at"] = [_vec(p, f"{w}.at[{j}]") for j, p in enumerate(at)]
+    n = _vec(o.get("normal"), f"{w}.normal")
+    if math.hypot(*n) < 1e-9:
+        raise OpError(f"{w}.normal must not be zero.")
+    out["normal"] = n
+    if o.get("axis") not in ("x", "y", "z"):
+        raise OpError(f"{w}.axis must be x, y or z.")
+    out["axis"] = o["axis"]
+    out["center"] = _vec(o.get("center", [0, 0, 0]), f"{w}.center")
+    out["angle"] = _num(o.get("angle", 360.0), f"{w}.angle", 1, 360)
+    copies = out["count"] * len(out["at"])
+    if copies > MAX_PLACE:
+        raise OpError(f"{w}: {copies} copies; the limit is {MAX_PLACE}.")
+    sc = o.get("scale", 1.0)
+    if isinstance(sc, list):
+        out["scale"] = _vec(sc, f"{w}.scale", 0.01, 100)
+    else:
+        s = _num(sc, f"{w}.scale", 0.01, 100)
+        out["scale"] = [s, s, s]
+    out["rotation"] = _num(o.get("rotation", 0.0), f"{w}.rotation", -360, 360)
+    out["offset"] = _num(o.get("offset", 0.0), f"{w}.offset", -1e3, 1e3)
+    if len(part.V) * copies > MAX_POINTS:
+        raise OpError(f"{w}: {copies} copies of {o['part']} ({len(part.V)} points each) exceed {MAX_POINTS} points.")
+    return _opt_name(o, out, w)
+
+
 def expand(o: dict) -> dict:
     """The op as the runner gets it: a kit_place op carries its part's geometry (scaled, turned about +Z), built here
     from the checked numbers; every other op goes as it is."""
-    if o["op"] != "kit_place":
+    if o["op"] not in ("kit_place", "geonodes_array") or "part" not in o:
         return o
     from ..game import kit
     s = kit.build(o["part"], o["params"])
