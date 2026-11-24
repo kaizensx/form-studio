@@ -444,7 +444,7 @@ class EndToEnd(unittest.TestCase):
             self.assertLessEqual(li["uv_overlap"], 0.005)
             self.assertEqual(li["uv_outside"], 0.0)
         self.assertGreater(rep["bake"]["total_seconds"], 0)
-        self.assertEqual(sorted(rep["bake"]["files"]), ["ao", "base_color", "normal", "orm"])
+        self.assertEqual(sorted(rep["bake"]["files"]), ["ao", "base_color", "curvature", "normal", "orm", "thickness"])
         self.assertTrue((out / "Crate.glb").is_file() and (out / "Crate.fbx").is_file() and (out / "Crate.usd").is_file())
         self.assertTrue(rep["collision"]["names"][0].startswith("UCX_Crate_"))
         again = pipeline.revalidate(out)
