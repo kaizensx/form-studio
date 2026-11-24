@@ -1,0 +1,40 @@
+name: Workflow security
+
+# zizmor checks the workflows for security problems (template injection, credentials left in checkouts, unpinned
+# actions, over-broad tokens, risky triggers). Findings appear under Security > Code scanning; settings and the
+# reviewed exceptions are in .github/zizmor.yml.
+on:
+  push:
+    branches: [main, dev]
+    paths: [".github/**"]
+  pull_request:
+    paths: [".github/**"]
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: zizmor-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      security-events: write   # upload the findings to code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@bd12b495c90993a4301c73398142281a61499af3 # v0.9.0
+        with:
+          version: 1.33.1
+          # a pull request from a fork cannot upload to code scanning; it gets annotations on the diff instead
+          advanced-security: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          annotations: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}

@@ -1,0 +1,76 @@
+name: Code quality
+
+# ruff lints the whole tree with the rules in pyproject.toml (today: only what is always a bug, so it is clean).
+# On a pull request, the pre-commit hooks (.pre-commit-config.yaml) run on the files it changes; the ruff format
+# check is advice for now, because most of the tree predates it: it is reported, not enforced.
+on:
+  push:
+    branches: [main, dev]
+    paths: ["**/*.py", "pyproject.toml", ".pre-commit-config.yaml", ".github/workflows/quality.yml"]
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruff:
+    name: Ruff lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0
+        with:
+          version: 0.17.6
+          args: check --output-format=github
+
+  pre-commit:
+    name: pre-commit (changed files)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Hooks on the changed files
+        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+        env:
+          SKIP: ruff-format,zizmor   # format: advice, below; zizmor: its own workflow
+        with:
+          extra_args: --from-ref ${{ github.event.pull_request.base.sha }} --to-ref ${{ github.event.pull_request.head.sha }} --show-diff-on-failure
+      - name: Format of the changed Python files (advice)
+        continue-on-error: true
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mapfile -t files < <(git diff --name-only --diff-filter=AM "$BASE" "$HEAD" -- '*.py')
+          if [ "${#files[@]}" -eq 0 ]; then echo "No Python files changed."; exit 0; fi
+          if pre-commit run ruff-format --files "${files[@]}"; then
+            echo "The changed Python files are formatted." >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### ruff format would change these files"
+              echo
+              git diff --name-only | sed 's/^/- /'
+              echo
+              echo "Run \`pre-commit run ruff-format --files <file>\` (or \`ruff format <file>\`) to apply it. This is advice for now."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::ruff format would change some of the changed Python files; see the job summary."
+            exit 1
+          fi

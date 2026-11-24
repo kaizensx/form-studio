@@ -1,0 +1,39 @@
+name: Dependency audit
+
+# pip-audit checks every pinned package in requirements.lock against the Python Packaging Advisory Database and OSV.
+# Runs when the lock or pyproject.toml changes, and every week, since new advisories appear for old versions.
+on:
+  push:
+    branches: [main, dev]
+    paths: ["requirements.lock", "pyproject.toml", ".github/workflows/pip-audit.yml"]
+  pull_request:
+    paths: ["requirements.lock", "pyproject.toml", ".github/workflows/pip-audit.yml"]
+  schedule:
+    - cron: "11 6 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pip-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
+        with:
+          inputs: requirements.lock
+          no-deps: true          # the lock already lists every package, pinned
+          vulnerability-service: osv
