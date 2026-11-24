@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **CAD refinement operators.** `form/refine/ops_cad.py` gives the refinement engine its first operators for
+  build123d designs, each one a named `refine` feature: a three-tier fillet hierarchy (plan corners large, perimeters
+  medium, footprint and details small, scaled to the part), a 0.3 mm break on the edges the hierarchy left, a
+  0.4-0.6 mm parting-line groove on a split plane, a draft for moulded or cast briefs, a knurled or diamond-cell grip
+  zone, a recessed panel, raised button pads for devices, and a ribbed pocket that lightens a thick floor. They
+  never touch fit, access, mechanism or interface features: edges near those features are left alone, and every
+  round is checked against the faces inside their boxes, because OCCT carries a fillet along tangent edges. A round
+  that does not fit is tried on smaller sets and at smaller radii down to 0.2 mm instead of being dropped, and large
+  sets are split so one fillet call cannot crash the kernel. Measured on the creation bench with only these
+  operators, the deficit total went down on 15 of 21 designs with no check regression and identical frozen faces.
 - **The design refinement engine (engine and analysis).** `form/refine` measures what a built design lacks as a
   deficit vector from 0 to 1 (the outline at 64 px from six views, value regions of a small lit render, proportion,
   balance over the support, detail scales, edge hierarchy, the largest unbroken surface, material zones and contrast,
