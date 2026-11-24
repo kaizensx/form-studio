@@ -162,6 +162,8 @@ def decimate_to(src, name, budget, keep_seams=False):
     have = tris(src)
     if have <= budget:
         return copy_object(src, name), 0
+    sys.path.insert(0, os.path.dirname(os.path.realpath(__file__))); import blender_lod  # noqa: E401,E702 WP8 hook
+    return blender_lod.decimate_to(src, name, budget, globals())  # WP8 hook: silhouette-preserving LODs (blender_lod.py)
     target = budget * 0.995
     ratio = target / have
     best = None

@@ -2,8 +2,9 @@
 agent (tests/fixtures/fake_agent.py, "game crate") makes a subdivision cage design through the real create_design
 tool, and the design opens with the purpose "game". From the rail they open Game asset, build it (in the real
 Blender, 1k textures, the fast bake), switch between the four LODs (each with its triangle count against its budget),
-look at the UV checker, the baked normal map and the wireframe, pick the Unreal preset and export: the zip holds the
-FBX in centimetres and collision hulls named after the LOD0 render mesh (UCX_<asset>_LOD0_NN).
+look at the shaded view with and without its baked normal map, the UV checker, the normal map itself and the
+wireframe, pick the Unreal preset and export: the zip holds the FBX in centimetres and collision hulls named after the
+LOD0 render mesh (UCX_<asset>_LOD0_NN).
 
 Without Blender the sheet shows the one-click install card instead, and the build steps are skipped (said so).
 Run in both appearances (FORM_APPEARANCE=dark, light); screenshots go to $FORM_UI_SHOTS."""
@@ -62,6 +63,15 @@ def journey_build_switch_lods_and_look(ui):
     ui.wait_until(lambda: ui.js("!!Store.gameLods[Store.gameAsset.key + ':0']"), 30, "LOD0 to be drawn")
     ui.settle(900)
     ui.shot(f"game-{_tag(ui)}-3-lod0-shaded")
+    # the baked normal map in the shaded view (tangent space), then without it: the LOD's own normals
+    ui.check(ui.item("gameViewport").property("gameNormalMap") is True, "the shaded view applies the normal map")
+    ui.click("gameNormalMap")
+    ui.wait_until(lambda: ui.item("gameViewport").property("gameNormalMap") is False, 5, "the normal map to be off")
+    ui.settle(700)
+    ui.shot(f"game-{_tag(ui)}-3b-lod0-shaded-no-normal-map")
+    ui.click("gameNormalMap")
+    ui.wait_until(lambda: ui.item("gameViewport").property("gameNormalMap") is True, 5, "the normal map to be on again")
+    ui.settle(300)
     for i in (1, 3):
         ui.click(f"lod{i}")
         ui.wait_until(lambda: ui.js(f"Store.gameLod === {i} && !!Store.gameLods[Store.gameAsset.key + ':{i}']"), 30, f"LOD{i}")

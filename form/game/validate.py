@@ -15,6 +15,15 @@ Checks, per LOD (every value is computed from the file, evidence "computed"; the
     uv_overlap   UV islands overlap on at most 0.5% of the covered texels (the UV triangles rasterised at 1024 x 1024)
     texel        texel density spread (95th / 5th area-weighted percentile of texture px per metre) at most 2.0
     scale        (when the expected size is given) the GLB's bounding box is 0.001 x the design's millimetres
+
+and, for LOD1 and up, how faithful the LOD is to LOD0 (lod_fidelity, pure numpy as well):
+
+    lod_silhouette  the LOD's silhouette against LOD0's from 8 fixed views (orthographic, rasterised at 512 x 512 on
+                 LOD0's frame): the worst view's intersection over union at least 0.985 / 0.96 / 0.90 (LOD1 / 2 / 3)
+    lod_distance the symmetric Hausdorff distance between the LOD's surface and LOD0's, as a share of LOD0's bounding
+                 box diagonal: at most 0.5% / 1% / 2.5% (LOD1 / 2 / 3). Measured from every point and area samples of
+                 each surface to the other's triangles (exact point-to-triangle distances), so it can miss a deviation
+                 between samples but never reports less than one it found
 """
 from __future__ import annotations
 
@@ -30,6 +39,10 @@ FLIPPED_MAX = 0.001              # fraction of faces that point against their st
 SCALE_TOL = 0.005                # relative bounding-box error
 RASTER = 1024
 NORMAL_INWARD_MAX = 0.005        # LOD0 area whose baked tangent normal points into the surface (proposed)
+LOD_IOU_MIN = (1.0, 0.985, 0.96, 0.90)          # worst-view silhouette IoU against LOD0, LOD0..LOD3 (proposed)
+LOD_HAUSDORFF_MAX = (0.0, 0.005, 0.01, 0.025)   # Hausdorff distance to LOD0 over LOD0's diagonal (proposed)
+SILHOUETTE_PX = 512
+HAUSDORFF_SAMPLES = 12000
 LOD_RE = re.compile(r"_LOD(\d+)$")
 COLLISION_RE = re.compile(r"^UCX_|-convcolonly$|-colonly$|_collider$|_collision_\d+$")
 COMP = {5126: ("<f4", 4), 5125: ("<u4", 4), 5123: ("<u2", 2), 5121: ("u1", 1), 5122: ("<i2", 2), 5120: ("i1", 1)}
@@ -263,6 +276,207 @@ def texel_density(P_m: np.ndarray, UV: np.ndarray, T: np.ndarray, px: int) -> di
             "spread": round(p95 / p5, 3) if p5 > 0 else float("inf")}
 
 
+# ---- LOD fidelity: silhouettes and surface distance against LOD0 ---------------------------------------------------
+
+def silhouette_views(up: int = 1) -> list[tuple[str, np.ndarray]]:
+    """The 8 fixed view directions (unit vectors; up is axis `up`, glTF's Y): four around the side (0, 45, 90, 135
+    degrees: an orthographic silhouette is the same from the opposite side), three from 40 degrees above (30, 150, 270)
+    and one from straight above."""
+    out = []
+    for az, el in ((0, 0), (45, 0), (90, 0), (135, 0), (30, 40), (150, 40), (270, 40), (0, 90)):
+        a, e = np.radians(az), np.radians(el)
+        h = [np.cos(e) * np.cos(a), np.cos(e) * np.sin(a)]
+        d = np.zeros(3)
+        d[up] = np.sin(e)
+        d[[k for k in range(3) if k != up]] = h
+        out.append((f"az {az} el {el}", d / np.linalg.norm(d)))
+    return out
+
+
+def _basis(d: np.ndarray, up: int = 1) -> tuple[np.ndarray, np.ndarray]:
+    a = np.zeros(3)
+    a[up] = 1.0
+    if abs(float(d @ a)) > 0.9:
+        a = np.zeros(3)
+        a[(up + 1) % 3] = 1.0
+    e1 = np.cross(a, d)
+    e1 /= np.linalg.norm(e1)
+    return e1, np.cross(d, e1)
+
+
+def rasterise(Q: np.ndarray, T: np.ndarray, res: int) -> np.ndarray:
+    """Triangles in pixel coordinates (Q: n x 2) filled into a res x res mask (a pixel is in when its centre is inside
+    or on a triangle). Vectorised in batches of triangles with bounding boxes of the same size class."""
+    mask = np.zeros(res * res, dtype=bool)
+    if not len(T):
+        return mask.reshape(res, res)
+    t = Q[T]
+    a, b, c = t[:, 0], t[:, 1], t[:, 2]
+    area = (b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (b[:, 1] - a[:, 1]) * (c[:, 0] - a[:, 0])
+    lo = np.clip(np.floor(t.min(1)), 0, res).astype(np.int64)
+    hi = np.clip(np.ceil(t.max(1)), 0, res).astype(np.int64)
+    span = (hi - lo).max(1)
+    ok = (np.abs(area) > 1e-12) & ((hi - lo).min(1) > 0)
+    prev = 0
+    size = 2
+    while prev < res:
+        sel = np.nonzero(ok & (span > prev) & (span <= size))[0]
+        oy, ox = np.divmod(np.arange(size * size), size)
+        step = max(1, 1_500_000 // (size * size))
+        for s0 in range(0, len(sel), step):
+            i = sel[s0:s0 + step]
+            px = lo[i, 0][:, None] + ox[None, :]
+            py = lo[i, 1][:, None] + oy[None, :]
+            x, y = px + 0.5, py + 0.5
+            sg = np.sign(area[i])[:, None]
+            A, B, C = a[i], b[i], c[i]
+
+            def edge(p, q):
+                return ((q[:, 0] - p[:, 0])[:, None] * (y - p[:, 1][:, None])
+                        - (q[:, 1] - p[:, 1])[:, None] * (x - p[:, 0][:, None])) * sg
+            inside = (edge(A, B) >= 0) & (edge(B, C) >= 0) & (edge(C, A) >= 0)
+            inside &= (px < hi[i, 0][:, None]) & (py < hi[i, 1][:, None])
+            mask[(py * res + px)[inside]] = True
+        prev, size = size, size * 2
+    return mask.reshape(res, res)
+
+
+def silhouette_iou(P0: np.ndarray, T0: np.ndarray, P1: np.ndarray, T1: np.ndarray, res: int = SILHOUETTE_PX,
+                   up: int = 1, cache: dict | None = None) -> list[dict]:
+    """Per view: the intersection over union of the two silhouettes, both drawn on LOD0's frame (its projected
+    bounding square plus 2%). cache keeps LOD0's masks between LODs."""
+    out = []
+    for name, d in silhouette_views(up):
+        e1, e2 = _basis(d, up)
+        u0 = np.c_[P0 @ e1, P0 @ e2]
+        mn, mx = u0.min(0), u0.max(0)
+        half = float((mx - mn).max()) / 2 * 1.04 or 1.0
+        mid = (mn + mx) / 2
+
+        def px(P):
+            return (np.c_[P @ e1, P @ e2] - mid + half) / (2 * half) * res
+        key = (name, res)
+        if cache is not None and key in cache:
+            m0 = cache[key]
+        else:
+            m0 = rasterise(px(P0), T0, res)
+            if cache is not None:
+                cache[key] = m0
+        m1 = rasterise(px(P1), T1, res)
+        union = int((m0 | m1).sum())
+        out.append({"view": name, "iou": float((m0 & m1).sum()) / union if union else 1.0})
+    return out
+
+
+def point_triangle_distance(p: np.ndarray, a: np.ndarray, b: np.ndarray, c: np.ndarray) -> np.ndarray:
+    """Distance from each point p[i] to the triangle (a[i], b[i], c[i]) (closest point by Voronoi region, Ericson)."""
+    ab, ac, ap = b - a, c - a, p - a
+    d1, d2 = np.einsum("ij,ij->i", ab, ap), np.einsum("ij,ij->i", ac, ap)
+    bp = p - b
+    d3, d4 = np.einsum("ij,ij->i", ab, bp), np.einsum("ij,ij->i", ac, bp)
+    cp = p - c
+    d5, d6 = np.einsum("ij,ij->i", ab, cp), np.einsum("ij,ij->i", ac, cp)
+    va, vb, vc = d3 * d6 - d5 * d4, d5 * d2 - d1 * d6, d1 * d4 - d3 * d2
+    with np.errstate(divide="ignore", invalid="ignore"):
+        v_ab = np.nan_to_num(d1 / (d1 - d3))
+        w_ac = np.nan_to_num(d2 / (d2 - d6))
+        w_bc = np.nan_to_num((d4 - d3) / ((d4 - d3) + (d5 - d6)))
+        den = va + vb + vc
+        den = np.where(np.abs(den) > 1e-300, den, 1.0)
+        v, w = vb / den, vc / den
+    conds = [(d1 <= 0) & (d2 <= 0), (d3 >= 0) & (d4 <= d3), (vc <= 0) & (d1 >= 0) & (d3 <= 0),
+             (d6 >= 0) & (d5 <= d6), (vb <= 0) & (d2 >= 0) & (d6 <= 0),
+             (va <= 0) & ((d4 - d3) >= 0) & ((d5 - d6) >= 0)]
+    choices = [a, b, a + v_ab[:, None] * ab, c, a + w_ac[:, None] * ac, b + w_bc[:, None] * (c - b)]
+    q = a + v[:, None] * ab + w[:, None] * ac
+    for cnd, ch in reversed(list(zip(conds, choices))):
+        q = np.where(cnd[:, None], ch, q)
+    return np.linalg.norm(p - q, axis=1)
+
+
+def distance_to_mesh(Q: np.ndarray, P: np.ndarray, T: np.ndarray, reach: float) -> np.ndarray:
+    """Each query point's distance to the triangle mesh (P, T), exact up to `reach`: triangles are bucketed in a grid
+    of cells `reach` wide and each point is measured against the triangles in its own and the 26 neighbouring cells.
+    A point farther than `reach` from every triangle reads inf (or a distance above `reach`)."""
+    out = np.full(len(Q), np.inf)
+    if not len(T) or not len(Q):
+        return out
+    origin = np.minimum(P.min(0), Q.min(0)) - reach
+    dims = np.floor((np.maximum(P.max(0), Q.max(0)) - origin) / reach).astype(np.int64) + 3
+
+    def key(ijk):
+        return (ijk[..., 0] * dims[1] + ijk[..., 1]) * dims[2] + ijk[..., 2]
+    tri = P[T]
+    lo = np.floor((tri.min(1) - origin) / reach).astype(np.int64)
+    hi = np.floor((tri.max(1) - origin) / reach).astype(np.int64)
+    n = np.prod(hi - lo + 1, axis=1)
+    owner = np.repeat(np.arange(len(T)), n)
+    local = np.arange(int(n.sum())) - np.repeat(np.cumsum(n) - n, n)
+    ext = (hi - lo + 1)[owner]
+    k2 = local % ext[:, 2]
+    k1 = (local // ext[:, 2]) % ext[:, 1]
+    k0 = local // (ext[:, 2] * ext[:, 1])
+    cells = key(lo[owner] + np.c_[k0, k1, k2])
+    order = np.argsort(cells, kind="stable")
+    cells, owner = cells[order], owner[order]
+    nb = np.array([[i, j, k] for i in (-1, 0, 1) for j in (-1, 0, 1) for k in (-1, 0, 1)])
+    qc = np.floor((Q - origin) / reach).astype(np.int64)
+    chunk = 1500
+    for s in range(0, len(Q), chunk):
+        qk = key(qc[s:s + chunk, None, :] + nb[None, :, :])
+        st = np.searchsorted(cells, qk, "left").reshape(-1)
+        cnt = np.searchsorted(cells, qk, "right").reshape(-1) - st
+        if not cnt.sum():
+            continue
+        qi = np.repeat(np.repeat(np.arange(len(qk)), 27), cnt)
+        idx = np.repeat(st, cnt) + (np.arange(int(cnt.sum())) - np.repeat(np.cumsum(cnt) - cnt, cnt))
+        ti = T[owner[idx]]
+        d = point_triangle_distance(Q[s + qi], P[ti[:, 0]], P[ti[:, 1]], P[ti[:, 2]])
+        res = np.full(len(qk), np.inf)
+        np.minimum.at(res, qi, d)
+        out[s:s + chunk] = res
+    return out
+
+
+def surface_samples(P: np.ndarray, T: np.ndarray, n: int = HAUSDORFF_SAMPLES, seed: int = 0) -> np.ndarray:
+    """Every point a triangle uses, and n points spread over the surface by area (a fixed seed: the same mesh gives
+    the same samples)."""
+    if not len(T):
+        return P[:0]
+    a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+    ar = 0.5 * np.linalg.norm(np.cross(b - a, c - a), axis=1)
+    rng = np.random.default_rng(seed)
+    if ar.sum() <= 0:
+        return P[np.unique(T)]
+    k = rng.choice(len(T), size=n, p=ar / ar.sum())
+    r1, r2 = np.sqrt(rng.random(n)), rng.random(n)
+    s = (1 - r1)[:, None] * a[k] + (r1 * (1 - r2))[:, None] * b[k] + (r1 * r2)[:, None] * c[k]
+    return np.concatenate([P[np.unique(T)], s])
+
+
+def hausdorff(P0: np.ndarray, T0: np.ndarray, P1: np.ndarray, T1: np.ndarray, reach: float) -> dict:
+    """The symmetric Hausdorff distance between two surfaces, measured from samples of each (surface_samples) to the
+    other's triangles. Distances beyond `reach` read inf."""
+    d01 = distance_to_mesh(surface_samples(P0, T0), P1, T1, reach)
+    d10 = distance_to_mesh(surface_samples(P1, T1), P0, T0, reach)
+    return {"lod0_to_lod": float(d01.max()) if len(d01) else 0.0, "lod_to_lod0": float(d10.max()) if len(d10) else 0.0,
+            "max": float(max(d01.max() if len(d01) else 0.0, d10.max() if len(d10) else 0.0))}
+
+
+def lod_fidelity(P0: np.ndarray, T0: np.ndarray, P: np.ndarray, T: np.ndarray, up: int = 1,
+                 cache: dict | None = None) -> dict:
+    """{"iou_min", "worst_view", "views": [...], "hausdorff": distance, "hausdorff_rel": share of LOD0's diagonal}."""
+    P0, P = np.asarray(P0, np.float64), np.asarray(P, np.float64)
+    T0, T = np.asarray(T0, np.int64), np.asarray(T, np.int64)
+    diag = float(np.linalg.norm(P0.max(0) - P0.min(0))) or 1.0
+    views = silhouette_iou(P0, T0, P, T, up=up, cache=cache)
+    worst = min(views, key=lambda v: v["iou"])
+    h = hausdorff(P0, T0, P, T, reach=diag * 0.03)
+    return {"iou_min": round(worst["iou"], 5), "worst_view": worst["view"],
+            "views": [{"view": v["view"], "iou": round(v["iou"], 5)} for v in views],
+            "hausdorff": h["max"], "hausdorff_rel": h["max"] / diag, "diagonal": diag}
+
+
 # ---- the report ------------------------------------------------------------------------------------------------
 
 def _lod_index(nd: dict) -> int | None:
@@ -301,6 +515,7 @@ def validate(data: bytes, budgets: list[int] | None = None, texture_px: int = 10
         k = _lod_index(n)
         by_lod.setdefault(0 if k is None else k, []).append(n)
     lods = []
+    geo: dict = {}
     for k in sorted(by_lod):
         ns = by_lod[k]
         P = np.concatenate([n["P"] for n in ns])
@@ -363,6 +578,27 @@ def validate(data: bytes, budgets: list[int] | None = None, texture_px: int = 10
                 f"{' x '.join(f'{x:.4g}' for x in size)} (expected {' x '.join(f'{x:.4g}' for x in want)}), "
                 f"error {err * 100:.3f}%", f"{unit_scale:g} x millimetres, {up} up.", 0)
         lods.append(info)
+        geo[k] = (Pw, Tw)
+    if 0 in geo and len(geo) > 1:
+        cache: dict = {}
+        P0, T0 = geo[0]
+        for info in lods:
+            k = info["lod"]
+            if k == 0:
+                continue
+            f = lod_fidelity(P0, T0, *geo[k], up=1 if up == "Y" else 2, cache=cache)
+            j = min(k, len(LOD_IOU_MIN) - 1)
+            info["fidelity"] = {"iou_min": f["iou_min"], "worst_view": f["worst_view"], "views": f["views"],
+                                "hausdorff_rel": round(f["hausdorff_rel"], 6)}
+            add("lod_silhouette", f"LOD{k} keeps LOD0's silhouette", f["iou_min"] >= LOD_IOU_MIN[j],
+                f"IoU {f['iou_min']:.4f} at worst ({f['worst_view']})",
+                f"Silhouettes from 8 views, {SILHOUETTE_PX} px on LOD0's frame; the worst view at least "
+                f"{LOD_IOU_MIN[j]:g} (proposed).", k)
+            hr = f["hausdorff_rel"]
+            add("lod_distance", f"LOD{k} stays close to LOD0's surface", hr <= LOD_HAUSDORFF_MAX[j],
+                (f"{hr * 100:.3f}%" if np.isfinite(hr) else "over 3%") + " of the diagonal (Hausdorff)",
+                f"Symmetric Hausdorff distance from points and area samples of each surface to the other's "
+                f"triangles; at most {LOD_HAUSDORFF_MAX[j] * 100:g}% of LOD0's diagonal (proposed).", k)
     if budgets:
         for k in range(len(budgets)):
             if k not in by_lod:

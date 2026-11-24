@@ -43,6 +43,7 @@ Item {
     property string gameMode: "shaded"       // shaded | checker | channel
     property string gameChannel: "base_color"   // channel: base_color | normal | orm | ao
     property var gameTex: ({})               // map → texture URL
+    property bool gameNormalMap: true        // shaded: apply the baked tangent-space normal map
     signal contextRequested(string feature, real x, real y)     // right-click or long-press without dragging
     signal hoveredFeature(string feature, real x, real y)
 
@@ -644,16 +645,22 @@ Item {
                     materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
                         property color uColor: vp.edgeColor(""); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
                 // a game asset's LOD (form/game/app.py lod()), drawn by shaders/game.frag: shaded with its baked base
-                // colour and ORM, a UV checker, or one baked map as it is stored. Its wireframe is the model's edges.
+                // colour, ORM, tangent-space normal map (gameNormalMap) and emissive map, a UV checker, or one baked
+                // map as it is stored. Its wireframe is the model's edges.
                 Model { objectName: "gameLod"; visible: !!vp.game; pickable: false; castsShadows: true; receivesShadows: true
                     geometry: GameGeometry { source: vp.game || ({}) }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Shaded; fragmentShader: "shaders/game.frag"; cullMode: Material.BackFaceCulling
                         property real uMode: vp.gameMode === "checker" ? 1 : vp.gameMode === "channel" ? 2 : 0
                         property real uHasTex: vp.gameTex && vp.gameTex.base_color ? 1 : 0
                         property real uHasOrm: vp.gameTex && vp.gameTex.orm ? 1 : 0
+                        property real uHasNrm: vp.gameTex && vp.gameTex.normal ? 1 : 0
+                        property real uNrmOn: vp.gameNormalMap ? 1 : 0
+                        property real uHasEmi: vp.gameTex && vp.gameTex.emissive ? 1 : 0
                         property color uColor: Theme.clay
                         property TextureInput uBase: TextureInput { texture: Texture { source: vp.gameTex && vp.gameTex.base_color ? vp.gameTex.base_color : "" } }
                         property TextureInput uOrm: TextureInput { texture: Texture { source: vp.gameTex && vp.gameTex.orm ? vp.gameTex.orm : "" } }
+                        property TextureInput uNormal: TextureInput { texture: Texture { source: vp.gameTex && vp.gameTex.normal ? vp.gameTex.normal : "" } }
+                        property TextureInput uEmissive: TextureInput { texture: Texture { source: vp.gameTex && vp.gameTex.emissive ? vp.gameTex.emissive : "" } }
                         property TextureInput uShow: TextureInput { texture: Texture { source: vp.gameTex && vp.gameTex[vp.gameChannel] ? vp.gameTex[vp.gameChannel] : "" } } } }
                 Model { visible: !!(vp.ghost && vp.ghost.edges) && !vp.asmOn; pickable: false; castsShadows: false
                     geometry: LineGeometry { segments: vp.ghost && vp.ghost.edges ? vp.ghost.edges : "" }

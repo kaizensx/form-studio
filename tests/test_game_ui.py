@@ -89,6 +89,13 @@ CHECK = textwrap.dedent("""
                 if (!Store.gameAsset || Store.gameAsset.lods.length !== 4) throw new Error("GAMEUI the last asset was not loaded")
                 if (!Store.gameAsset.validation.ok) throw new Error("GAMEUI the built asset failed a check")
                 var sheet = find(win.contentItem, "gameSheet")
+                need(["gameNormalMap"])
+                var nb = find(win.contentItem, "gameNormalMap")
+                var vp0 = find(win.contentItem, "gameViewport")
+                if (!nb.visible || !vp0.gameNormalMap || !vp0.gameTex.normal) throw new Error("GAMEUI the normal map is not on in the shaded view")
+                sheet.normalMap = false
+                if (vp0.gameNormalMap) throw new Error("GAMEUI the normal map toggle does not reach the viewport")
+                if (!("emissive" in vp0.gameTex)) throw new Error("GAMEUI the viewport is not handed an emissive map slot")
                 sheet.mode = "channel"; sheet.wire = true
                 Store.showGameLod(2)
             } else {
@@ -99,6 +106,7 @@ CHECK = textwrap.dedent("""
         later(5000, function () {
             if (!BUILT) { console.warn("GAMEUI done"); return }
             need(["gameChannel"])
+            if (find(win.contentItem, "gameNormalMap").visible) throw new Error("GAMEUI the normal map toggle shows outside the shaded view")
             if (Store.gameLod !== 2 || !Store.gameLods[Store.gameAsset.key + ":2"]) throw new Error("GAMEUI LOD2 was not loaded")
             var m = Store.gameLods[Store.gameAsset.key + ":2"]
             if (!(m.triangles <= 200 * 1.02) || !m.wire || !m.uvs) throw new Error("GAMEUI LOD2 payload " + JSON.stringify(Object.keys(m)))

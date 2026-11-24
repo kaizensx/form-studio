@@ -18,11 +18,13 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          # credits for outside projects whose ideas the engine builds on
          (str(ROOT / "THIRD_PARTY_NOTICES.md"), "form"),
          # run by Blender itself as files (blender -b --python <path>), so they must exist on disk inside the app:
-         # the scene runner, the modelling runner (model_mesh) and the game-asset runner (game_asset)
+         # the scene runner, the modelling runner (model_mesh) and the game-asset runner (game_asset) with its LOD module
          (str(ROOT / "form" / "adapters" / "blender_scene.py"), "form/adapters"),
          (str(ROOT / "form" / "adapters" / "blender_ops.py"), "form/adapters"),
          (str(ROOT / "form" / "adapters" / "blender_model.py"), "form/adapters"),
-         (str(ROOT / "form" / "adapters" / "blender_game.py"), "form/adapters")]
+         (str(ROOT / "form" / "adapters" / "blender_game.py"), "form/adapters"),
+         # the game runner's LOD decimation, imported by it from its own folder
+         (str(ROOT / "form" / "adapters" / "blender_lod.py"), "form/adapters")]
 # the game pipeline as files too (form/game): its runner path is resolved from them on disk
 datas += [(str(p), "form/game") for p in sorted((ROOT / "form" / "game").glob("*.py"))]
 binaries, hidden = [], []
