@@ -4,6 +4,8 @@ control, made end to end, measured, rendered for review and written to docs/GAME
     python scripts/game_bench.py                       # every brief and the control; Blender from the usual places
     python scripts/game_bench.py --only treasure_chest # one brief (no report is written)
     python scripts/game_bench.py --out DIR             # renders, review sheets and the contact sheet go there
+    python scripts/game_bench.py --refine on --scores tests/design_bench/game_scores_refine.json --json on.json
+    python scripts/game_bench.py --compare on.json off.json          # docs/GAME_BENCH.md with both runs
 
 Each brief names a game exemplar (form/exemplars/game/): a cage made by model_mesh ops (blocks, bevel, inset,
 panel_line, kit_place; bake-only detail high_only) or a kernel design. The bench creates the design with the purpose
@@ -16,6 +18,11 @@ on it (review/<letter>.png, letters shuffled with a fixed seed, the control amon
 tests/design_bench/game_scores.json: three blind passes over those sheets, written by whoever scored them (the file
 says who); each item takes the median of the passes, capped by the asset's game evidence. Without that file a brief
 is "not scored". Nothing is invented: every number in the report is from this run, failures included.
+
+--refine on: after the design is created, the refinement engine (form/refine/engine.py) refines it as it would in
+the app (cage and material operators for a cage, material operators for a kernel design; candidates judged on the
+cage geometry and materials, one bake at the end checked by the validator and the budgets), and the game asset is
+made from the refined head: the game pipeline replays REFINE_OPS on the low cage and keeps the bake source.
 """
 from __future__ import annotations
 
@@ -177,7 +184,27 @@ def review_sheet(renders: dict, sil: Path, path: Path) -> None:
     sheet.save(path)
 
 
-def run_brief(st, b: dict, cfg: dict, out: Path, scores: dict, blender: str | None) -> dict:
+def refine_brief(st, pid: str, b: dict, row: dict) -> None:
+    from form.refine import engine
+    from form.refine.ledger import Ledger
+    t = time.time()
+    try:
+        r = engine.refine(st, pid, ledger=Ledger.memory(),
+                          game={"budgets": b["budgets"], "preset": b["preset"]})
+        row["refine"] = {"seconds": round(time.time() - t, 1), "skipped": r.get("skipped"),
+                         "stopped": r.get("stopped"), "base": (r.get("base") or {}).get("total"),
+                         "final": (r.get("final") or {}).get("total"), "head": r.get("head"),
+                         "final_check": r.get("final_check"), "measure": r.get("measure"),
+                         "applied": [{"operator": a["operator"], "label": a["label"], "kind": a.get("kind"),
+                                      "reason": a.get("reason"), "deltas": a.get("deltas")} for a in r.get("applied", [])],
+                         "rejected": [{"operator": x["operator"], "why": (x.get("why") or [""])[0][:200]}
+                                      for x in r.get("rejected", [])][:12],
+                         "commit_error": r.get("commit_error")}
+    except Exception as e:                                   # noqa: BLE001 - a failure is a result
+        row["refine"] = {"error": f"{type(e).__name__}: {e}"[:400], "seconds": round(time.time() - t, 1)}
+
+
+def run_brief(st, b: dict, cfg: dict, out: Path, scores: dict, blender: str | None, refine: bool = False) -> dict:
     from form import critique, game
     from form.exemplars import game as gex
     row = {"id": b["id"], "title": b["title"], "preset": b["preset"], "budgets": b["budgets"],
@@ -206,6 +233,10 @@ def run_brief(st, b: dict, cfg: dict, out: Path, scores: dict, blender: str | No
         if j["state"] != "done":
             row["build"]["error"] = str(j.get("error") or j)[:300]
         p = st.load(p["id"])
+        if refine and row["build"]["ok"]:
+            refine_brief(st, p["id"], b, row)
+            j = st.run_sync(p["id"], ["geometry", "exports"])
+            p = st.load(p["id"])
     except Exception as e:                                   # noqa: BLE001
         row["build"] = {"ok": False, "error": f"{type(e).__name__}: {e}"[:300], "seconds": round(time.time() - t, 2)}
         row["seconds"] = round(time.time() - t0, 1)
@@ -486,13 +517,150 @@ def write_doc(rows: list, cfg: dict, meta: dict, scores: dict) -> None:
     DOC.write_text("\n".join(L), encoding="utf-8")
 
 
+def _rubric(r):
+    a = r.get("aesthetic") or {}
+    return a.get("mean"), a.get("passed")
+
+
+def write_compare(on: dict, off: dict) -> None:
+    """docs/GAME_BENCH.md for two runs: refinement off (the baseline) and on, with the gates of the refinement plan.
+    The per-brief detail of the on run follows (write_doc), so the page keeps everything it said before."""
+    import io
+    rows_on, rows_off = on["rows"], {r["id"]: r for r in off["rows"]}
+    real = [r for r in rows_on if not r.get("control")]
+    ctrl = [r for r in rows_on if r.get("control")]
+    scored = [r for r in real if _rubric(r)[0] is not None]
+    ge4 = [r for r in scored if _rubric(r)[0] >= 4.0]
+    m_on, m_off = on["meta"], off["meta"]
+    so = m_on.get("scores_meta") or {}
+    gate_rubric = len(ge4) >= 5 and len(scored) == len(real)
+    gate_ctrl = all(not _rubric(r)[1] for r in ctrl)
+    tech_on = sum(_ok(r) for r in real)
+    L = ["# Game bench", "",
+         f"Six original game-asset briefs ({BRIEFS.relative_to(ROOT)}) and one deliberately bad control, made end to "
+         f"end from the game exemplars in form/exemplars/game/, twice: with design refinement off (the exemplar as "
+         f"written) and on (form/refine: cage and material operators, one bake checked at the end, the asset made "
+         f"from the refined head). Run {m_on['date']} on {m_on['machine']} with Blender {m_on['blender']}. Every number "
+         "below is from those runs; failures are published as they came out. Budgets and thresholds are proposed "
+         "values, not engine rules.", "",
+         "## Result", "",
+         f"- Rubric with refinement on (median of three new blind passes, capped by the game evidence): {len(ge4)} of "
+         f"{len(real)} at 4.0 or more (gate: at least 5 of 6): **{'pass' if gate_rubric else 'FAIL'}**.",
+         f"- Control: {'fails the gate, as it must' if gate_ctrl else 'PASSES the gate (the critic is miscalibrated)'}"
+         f": **{'pass' if gate_ctrl else 'FAIL'}**.",
+         f"- Technical checks pass on {tech_on} of {len(real)} with refinement on, "
+         f"{sum(_ok(r) for r in off['rows'] if not r.get('control'))} of {len(real)} off.",
+         f"- Scored by: {so.get('scored_by') or 'nobody'} ({so.get('date', 'undated')}). {so.get('method') or ''} "
+         "The rubric is a model's judgement of rendered sheets, not a person's and not a measurement.",
+         f"- The off column's rubric is the earlier scores file ({Path(m_off.get('scores') or SCORES).name}), "
+         "scored on the sheets of the run it came with.", "",
+         "| Brief | Validation off / on | LOD0 tris off / on | Bevel off / on | Contrast off / on | Wear off / on | "
+         "Rubric off | Rubric on | Refinement (kept) |",
+         "|---|---|---|---|---|---|---|---|---|"]
+
+    def ev(r, f):
+        e = r.get("evidence") or {}
+        try:
+            return f(e)
+        except Exception:                                   # noqa: BLE001
+            return "—"
+    for r in rows_on:
+        o = rows_off.get(r["id"]) or {}
+        g_on, g_off = (r.get("game") or {}), (o.get("game") or {})
+        val = lambda g: ("PASS" if (g.get("validation") or {}).get("ok") else "FAIL") if g.get("ok") else "not built"
+        tri = lambda g: str(((g.get("lods") or [{}])[0]).get("triangles", "—"))
+        rf = r.get("refine") or {}
+        kept = ", ".join(a["label"] for a in rf.get("applied") or []) or (rf.get("error") or rf.get("skipped")
+                                                                         or rf.get("stopped") or "none")
+        if rf.get("commit_error"):
+            kept = f"{kept}, not kept: {(rf['commit_error'] or {}).get('message', rf['commit_error'])}"
+        mo, po = _rubric(o)
+        mn, pn = _rubric(r)
+        L.append("| " + " | ".join([
+            r["title"] + (" (control)" if r.get("control") else ""), f"{val(g_off)} / {val(g_on)}",
+            f"{tri(g_off)} / {tri(g_on)}",
+            f"{ev(o, lambda e: format(e['edges']['coverage'], '.0%'))} / {ev(r, lambda e: format(e['edges']['coverage'], '.0%'))}",
+            f"{ev(o, lambda e: e['value_contrast'])} / {ev(r, lambda e: e['value_contrast'])}",
+            f"{ev(o, lambda e: format(e['wear'].get('worn_share', e['wear'].get('edge_mask_share', 0)), '.1%'))} / "
+            f"{ev(r, lambda e: format(e['wear'].get('worn_share', e['wear'].get('edge_mask_share', 0)), '.1%'))}",
+            "—" if mo is None else f"{mo:.2f} {'pass' if po else 'FAIL'}",
+            "—" if mn is None else f"{mn:.2f} {'pass' if pn else 'FAIL'}",
+            f"{rf.get('seconds', '—')} s: {kept}"]) + " |")
+    L += ["", "## Refinement per brief", ""]
+    for r in rows_on:
+        rf = r.get("refine") or {}
+        L.append(f"- **{r['title']}**: " + (f"failed: {rf['error']}" if rf.get("error") else
+                 f"deficit {rf.get('base')} → {rf.get('final')}, {rf.get('seconds')} s, stopped: {rf.get('stopped')}"
+                 + (f", final check: {rf['final_check']}" if rf.get("final_check") else "")
+                 + (f", NOT COMMITTED: {(rf['commit_error'] or {}).get('message')}" if rf.get("commit_error") else "")
+                 + "; kept: " + ("; ".join(f"{a['label']} ({a.get('reason') or ''})" for a in rf.get("applied") or [])
+                                 or "nothing")
+                 + ("; rejected: " + "; ".join(f"{x['operator']} ({x['why']})" for x in rf.get("rejected") or [])
+                    if rf.get("rejected") else "")))
+    L += [""]
+    buf = io.StringIO()
+    tmp = DOC.with_name(".game_bench_on.md")
+    old = DOC.read_text(encoding="utf-8") if DOC.is_file() else None
+    sc = json.loads(Path(m_on["scores"]).read_text(encoding="utf-8")) if m_on.get("scores") and Path(m_on["scores"]).is_file() else {}
+    write_doc(rows_on, {"texture_px": on.get("cfg", {}).get("texture_px", 1024), "bake": on.get("cfg", {}).get("bake", "fast")},
+              m_on, sc)
+    detail = DOC.read_text(encoding="utf-8")
+    cut = detail.find("How it is measured:")
+    L.append("## Refinement on: every number" + "\n\n" + (detail[cut:] if cut >= 0 else detail))
+    DOC.write_text("\n".join(L), encoding="utf-8")
+    del buf, tmp, old
+
+
+def rescore(path: Path, scores_file: Path) -> int:
+    """Blind passes scored after a run (they look at the run's review sheets): the rubric of every asset again, from
+    the same projects and game assets, with the new scores file. The rest of the run is unchanged."""
+    run = json.loads(path.read_text(encoding="utf-8"))
+    os.environ["FORM_DATA"] = run["meta"]["form_data"]
+    os.environ["FORM_CONFIG"] = str(Path(run["meta"]["form_data"]) / "studio.toml")
+    os.environ["FORM_REFINE"] = "off"
+    from form import config, critique
+    from form.studio import Studio
+    scores = json.loads(scores_file.read_text(encoding="utf-8"))
+    st = Studio(config.load())
+    try:
+        for r in run["rows"]:
+            sc = (scores.get("passes") or {}).get(r["id"])
+            if not r.get("pid"):
+                continue
+            gdir = (r.get("game") or {}).get("dir")
+            c = critique.run(st, r["pid"], aesthetic={"passes": sc} if sc else None, game_dir=gdir)
+            a = c["aesthetic"]
+            r["aesthetic"] = {"mean": a["mean"], "passed": a["passed"], "scored": bool(sc), "passes": len(sc or []),
+                              "items": {i["id"]: {"score": i["score"], "cap": i["cap"], "final": i["final"],
+                                                  "why": i["why"], "passes": i.get("passes")} for i in a["items"]}}
+            print(f"{r['id']:16s} rubric {a['mean']} {'pass' if a['passed'] else 'FAIL'}", flush=True)
+    finally:
+        st.kernel.stop()
+    run["meta"].update(scores=str(scores_file), scores_meta={k: scores.get(k) for k in ("scored_by", "method", "date",
+                                                                                     "about")})
+    path.write_text(json.dumps(run, indent=1, default=float), encoding="utf-8")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--only", help="comma-separated brief ids")
     ap.add_argument("--out", help="folder for renders, review sheets and the contact sheet")
     ap.add_argument("--json", help="also write the raw results here")
     ap.add_argument("--no-doc", action="store_true", help="do not write docs/GAME_BENCH.md")
+    ap.add_argument("--refine", choices=("on", "off"), default="off", help="refine each design before its asset")
+    ap.add_argument("--scores", help="the blind-pass scores file (default tests/design_bench/game_scores.json)")
+    ap.add_argument("--compare", nargs=2, metavar=("ON_JSON", "OFF_JSON"),
+                    help="write docs/GAME_BENCH.md from a --refine on and a --refine off run (with --json)")
+    ap.add_argument("--rescore", help="a run's JSON: apply --scores to its assets again (the run's data folder is kept)")
     a = ap.parse_args()
+    if a.rescore:
+        return rescore(Path(a.rescore), Path(a.scores) if a.scores else SCORES)
+    if a.compare:
+        on, off = (json.loads(Path(x).read_text(encoding="utf-8")) for x in a.compare)
+        write_compare(on, off)
+        print(f"report: {DOC}")
+        return 0
     data = Path(tempfile.mkdtemp(prefix="form-game-bench-"))
     os.environ["FORM_DATA"] = str(data)
     os.environ["FORM_CONFIG"] = str(data / "studio.toml")
@@ -500,7 +668,9 @@ def main() -> int:
     from form.adapters.blender import resolve
     from form.studio import Studio
     spec = json.loads(BRIEFS.read_text(encoding="utf-8"))
-    scores = json.loads(SCORES.read_text(encoding="utf-8")) if SCORES.is_file() else {}
+    sf = Path(a.scores) if a.scores else SCORES
+    scores = json.loads(sf.read_text(encoding="utf-8")) if sf.is_file() else {}
+    os.environ["FORM_REFINE"] = "on" if a.refine == "on" else "off"
     cfg = {"texture_px": spec["texture_px"], "bake": spec["bake"]}
     st = Studio(config.load())
     bl = resolve(st.cfg)
@@ -515,7 +685,7 @@ def main() -> int:
             if a.only and b["id"] not in a.only.split(","):
                 continue
             print(f"… {b['id']}", flush=True)
-            r = run_brief(st, b, cfg, out, scores, bl["app"])
+            r = run_brief(st, b, cfg, out, scores, bl["app"], refine=a.refine == "on")
             g = r.get("game") or {}
             ev = r.get("evidence") or {}
             print(f"  model {r.get('model', {}).get('ok')} · build {r.get('build', {}).get('ok')} · game {g.get('ok')} "
@@ -527,13 +697,15 @@ def main() -> int:
         st.kernel.stop()
     import platform
     meta = {"date": time.strftime("%Y-%m-%d"), "machine": f"{platform.system()} {platform.machine()}",
-            "blender": bl.get("version")}
+            "blender": bl.get("version"), "refine": a.refine, "scores": str(sf), "form_data": str(data), "scores_meta":
+            {k: scores.get(k) for k in ("scored_by", "method", "date", "about")}, "out": str(out)}
     contact_sheet(rows, out / "contact_sheet.png")
     write_reviews(rows, out)
-    if not a.only and not a.no_doc:
+    if not a.only and not a.no_doc and a.refine == "off":
         write_doc(rows, cfg, meta, scores)
     if a.json:
-        Path(a.json).write_text(json.dumps({"meta": meta, "rows": rows}, indent=1, default=float), encoding="utf-8")
+        Path(a.json).write_text(json.dumps({"meta": meta, "cfg": cfg, "rows": rows}, indent=1, default=float),
+                                encoding="utf-8")
     print(f"contact sheet: {out / 'contact_sheet.png'}\nreview sheets: {out / 'review'}"
           + ("" if a.only or a.no_doc else f"\nreport: {DOC}"))
     return 0

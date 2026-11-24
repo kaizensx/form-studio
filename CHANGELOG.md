@@ -2,6 +2,56 @@
 
 ## Unreleased
 
+- **Every design is refined after it builds.** create_design, update_design, add_feature (code and standard
+  features) and a kept candidate now start design refinement in the background once the revision is saved and on
+  screen, so the first picture comes as fast as before. What the engine keeps lands as one more revision, "Refined: N
+  changes", each change a named `refine` feature with its reason and measured change, streamed to the activity log
+  stage by stage and kept in `<project>/refine.json`. The next edit cancels a job that is still running, and its
+  commit is guarded by the head it started from. When the app's engine serves the same data folder, an agent's MCP
+  server hands the job to it, so it does not end with the agent's turn. Off per call (`create_design(refine="off")`),
+  per design (`refine = False` on the class, or `refine_design(action="off")`), everywhere (Settings › General,
+  `[refine] enabled = false`) or with `FORM_REFINE=off`. New MCP tool `refine_design` (status, rerun, undo, off; 96
+  tools). The workspace's dock has a Refinement panel: the stage while it runs, then one row per change with its own
+  undo, undo all and refine again. Settings › General has the on/off row and a reset of what refinement learned on
+  this computer.
+- **Plain Recipes are refined too.** A design that is not a FeatureDesign is wrapped (`form/refine/adapter.py`): its
+  build() becomes the skeleton feature (`@feature(stages=True)`), whose stages keep their own declared features, so a
+  bore stays the interface it was and its faces stay frozen; refine features follow it, and undoing the last one
+  gives back the Recipe as it was written. The wrapped skeleton is built once and its stages are checkpoints, so
+  candidates build only their own feature.
+- **Refinement engine fixes.** Frozen faces are compared by their B-rep faces (surface type, exact area and centre)
+  instead of tessellation boxes at 0.001 mm, which rejected the pillow block's fillets for a re-split mesh. A
+  candidate whose solid equals one already measured reuses those measures (only its materials and the analysis are
+  computed again), the base is measured from the head's own build, and each candidate is built on its own so a quick
+  one lands while a slow fillet still builds. Operators get the base build's check ids: the ribbed lightening needs a
+  statics check to show the part still holds its load. Refine features measure the frozen features' boxes in the
+  build itself (`frozen_boxes(self, literal)`), so they follow a parameter change. A candidate feature's alarm is a
+  fixed 10 s instead of a share of the time left, so the same design gives the same source on any machine. The
+  largest-unbroken-surface measure is taken of the bounding box's surface when that is larger, so fillets no longer
+  count against it, and the edges of grip textures and grooves no longer count as sharp touch points. Styles:
+  organic designs get no parting line, clean consumer knurls at 1.2 mm. The fillet hierarchy skips a free-form shell
+  cut by planes (75 % free-form, 10 % planar or more): OCCT's rounds faceted on the hero helmet's crest and crashed
+  the kernel on the twisted shade; the edge break rounds or chamfers those edges instead.
+- **Game assets: refinement checked by a bake.** A cage design's candidates are replayed in Blender's fixed runner
+  (REFINE_OPS on the low cage, at most two Blender processes) and judged on the level-2 limit surface and the
+  materials() zones, so material operators show their gain; the result gets one bake, the validator and the
+  triangle budgets, with the worn share from the baked mask, and the path is shortened until it passes. The game
+  pipeline builds a refined design's asset from the low cage with REFINE_OPS replayed and the design's own bake source.
+- **geometry_diff no longer changes the shapes the kernel keeps.** OCCT's booleans grow their arguments' tolerances
+  in place, and the diff's tessellation wrote into them, so viewing a revision after diffing it could fail with
+  valid=False (drag chain, hex planter). The diff now works on copies.
+- **Benches with refinement on and off.** `scripts/creation_bench.py --refine on|off` waits for the last refinement
+  of each brief, scores the refined head and runs the final design's checks; `--compare on.json off.json --doc ...`
+  writes the gates. `scripts/game_bench.py --refine on|off --scores ...` refines each design before its asset,
+  `--rescore` applies blind passes scored afterwards, and `--compare` writes docs/GAME_BENCH.md with both runs.
+  Measured (docs/CREATION_BENCH.md): on the 22 creation briefs, function checks identical on and off, the design
+  bench's critic up by 1.27 on average (+7 on four briefs, none lower), first stage on screen 0.0445 s median on vs
+  0.0425 s off (4.7 %), 21 of 22 refinements within 20 s (the longest 20.02 s). Game bench (docs/GAME_BENCH.md):
+  refinement kept nothing on five assets and its one kept change on the chest was not committed (the source would
+  pass 200 kB); trim_strip and panel_line fail in Blender on the replayed cages (empty edge selection). With three
+  new blind passes, scored by a model and not a person, no asset reaches a rubric of 4 (2.56-3.38); the control
+  fails, as it must. The game gate is not met.
+
 - **CAD refinement operators.** `form/refine/ops_cad.py` gives the refinement engine its first operators for
   build123d designs, each one a named `refine` feature: a three-tier fillet hierarchy (plan corners large, perimeters
   medium, footprint and details small, scaled to the part), a 0.3 mm break on the edges the hierarchy left, a
