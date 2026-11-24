@@ -85,20 +85,23 @@ def _h(*parts) -> str:
 # ---- the feature decorator and the design base ---------------------------------------------------------------------
 
 def feature(label: str = "", role: str = "structure", doc: str = "", parts: int | None = None,
-            budget: float | None = None):
+            budget: float | None = None, stages: bool = False):
     """Mark a method of a FeatureDesign as a feature: `@feature("Eye openings", role="access")`.
 
     parts: how many separate parts (solids) this feature adds (a lens feature that makes two lenses: parts=2; the
     first feature: how many it makes). When any feature of a design says parts=, the solid count is checked after
     every feature against the running total, and a feature that splits or fuses a part is skipped with the counts.
-    budget: seconds this feature may take (default FEATURE_BUDGET); past it the feature is stopped and left out."""
+    budget: seconds this feature may take (default FEATURE_BUDGET); past it the feature is stopped and left out.
+    stages: the method returns a list of Stages (a plain Recipe's build(), wrapped by form/refine/adapter.py): each
+    stage keeps its own feature (the class's declared features), and the body is the last stage's shape."""
     if parts is not None and (not isinstance(parts, int) or parts < 0):
         raise TypeError("feature(parts=) is a whole number of parts the feature adds (0 or more).")
     if budget is not None and not (isinstance(budget, (int, float)) and budget > 0):
         raise TypeError("feature(budget=) is a number of seconds above 0.")
 
     def deco(fn):
-        fn._form_feature = {"label": label, "role": role, "doc": doc, "parts": parts, "budget": budget}
+        fn._form_feature = {"label": label, "role": role, "doc": doc, "parts": parts, "budget": budget,
+                            "stages": bool(stages)}
         return fn
     return deco
 
@@ -120,8 +123,12 @@ class FeatureDesign(Recipe):
                                 f"Name it after the feature, for example “{n}_feature”.")
         declared = {f.id: f for f in cls.__dict__.get("features", []) or []}
         feats = []
+        names = {n for n, _f in own}
         for n, f in own:
             m = f._form_feature
+            if m.get("stages"):                    # its stages carry the declared features (a wrapped Recipe)
+                feats += [d for k, d in declared.items() if k not in names and d not in feats]
+                continue
             feats.append(declared.get(n) or Feature(n, m["label"] or n.replace("_", " ").capitalize(), m["role"], m["doc"]))
         cls.features = feats
         cls._form_steps = [n for n, _f in own]
@@ -417,13 +424,54 @@ def _timeout_diag(fid: str, info: dict) -> dict:
             "diagnosis": {"summary": msg + ".", "cause": cause, "operation": fid}}
 
 
+FROZEN_ROLES = ("fit", "access", "mechanism", "interface")    # form.refine.FROZEN_ROLES
+MADE_BOX_FACES = 3000          # past this many faces (a texture) no box is measured: the written literal is used
+
+
+def made_box(before, after):
+    """((x0, y0, z0), (x1, y1, z1)) of the faces a feature made: faces of `after` that are not carried over from
+    `before` and do not lie on its surface (a face a cut only trimmed stays the earlier feature's), the rule the
+    kernel attributes faces to features by (form/kernel.py _Skin). None when nothing new is found or the solid is too
+    large to measure quickly. Runs in the kernel worker."""
+    if after is None or not hasattr(after, "faces"):
+        return None
+    try:
+        faces = after.faces()
+        if len(faces) > MADE_BOX_FACES:
+            return None
+        from build123d import Vertex
+        skin = None
+        if before is not None and hasattr(before, "faces"):
+            if len(before.faces()) > MADE_BOX_FACES:
+                return None
+            from .kernel import _Skin
+            skin = _Skin(before)
+        lo, hi, n = [1e18] * 3, [-1e18] * 3, 0
+        for f in faces:
+            if skin is not None:
+                if hash(f) in skin.ids:
+                    continue
+                c = f.center()
+                if skin.holds(f, (c.X, c.Y, c.Z), Vertex(c.X, c.Y, c.Z), 0.01):
+                    continue
+            bb = f.bounding_box()
+            lo = [min(a, b) for a, b in zip(lo, (bb.min.X, bb.min.Y, bb.min.Z))]
+            hi = [max(a, b) for a, b in zip(hi, (bb.max.X, bb.max.Y, bb.max.Z))]
+            n += 1
+        if not n:
+            return None
+        return tuple(round(x, 4) for x in lo), tuple(round(x, 4) for x in hi)
+    except Exception:                                   # a box is a help to refine features, never a build failure
+        return None
+
+
 def _build_features(self, v: dict) -> list[Stage]:
     cls = type(self)
     self._form_values = v
     self._form_ctx = None
     self._form_setup_reads = None
     self._form_tracking = None
-    for a in ("solids", "assembly"):                # what an earlier, incomplete build of this instance set
+    for a in ("solids", "assembly", "_form_frozen_boxes"):   # what an earlier, incomplete build of this instance set
         self.__dict__.pop(a, None)
     steps = list(cls._form_steps)
     if not steps:
@@ -444,6 +492,7 @@ def _build_features(self, v: dict) -> list[Stage]:
         budget = float(m.get("budget") or FEATURE_BUDGET) * max(1.0, float(STRETCH or 1.0))
         hang = hang_path(idx, v)
         n0, v0 = _measure(body)
+        before = body
         adds = m.get("parts")
         want = (expect + adds) if adds is not None else (expect if i else None)
         _emit({"kind": "feature_start", "feature": fid, "i": i, "of": len(steps), "budget": round(budget, 1),
@@ -453,9 +502,14 @@ def _build_features(self, v: dict) -> list[Stage]:
         hit = _lookup(idx, v, skips=i > 0, count=count)
         diag = None
         status = "built"
+        staged = None
+        if hit is not None and hit[1] == "body" and m.get("stages"):
+            staged = _stages_get(hit[0])
+            if staged is None:                       # the stages of a wrapped Recipe are not all kept: build again
+                hit = None
         if hit is not None and hit[1] == "body":
             up, body, status = hit[0], hit[2], "checkpoint"
-            stages.append(Stage(fid, body))
+            stages.extend(staged) if staged is not None else stages.append(Stage(fid, body))
         else:
             if hit is not None:
                 diag = {**hit[2], "cached": True}
@@ -485,6 +539,9 @@ def _build_features(self, v: dict) -> list[Stage]:
                         _DEADLINE.pop()
                     if isinstance(out, Stage):
                         out = out.shape
+                    if m.get("stages") and isinstance(out, (list, tuple)) and out and all(isinstance(x, Stage) for x in out):
+                        staged = list(out)
+                        out = staged[-1].shape
                     if out is None:
                         out = body
                     problem, hint = _problem(out, mesh, i, n0, v0, want if counted else None, declared, adds)
@@ -507,9 +564,11 @@ def _build_features(self, v: dict) -> list[Stage]:
                 key = _key(idx, v, used)
                 if err is None:
                     checkpoint_put(key, out)
+                    if staged is not None:
+                        _stages_put(key, staged)
                     _deps_add(idx, used)
                     up, body = key, out
-                    stages.append(Stage(fid, body))
+                    stages.extend(staged) if staged is not None else stages.append(Stage(fid, body))
                 elif err[0] == "timeout":
                     diag = _timeout_diag(fid, err[1])
                 else:
@@ -522,6 +581,19 @@ def _build_features(self, v: dict) -> list[Stage]:
                 rep["skipped"].append(diag)
                 status = "skipped"
         n1, v1 = _measure(body)
+        if status != "skipped" and m.get("role") in FROZEN_ROLES:
+            box = made_box(before, body)               # the faces this frozen feature made, for refine features
+            if box is not None:
+                self.__dict__.setdefault("_form_frozen_boxes", {})[fid] = box
+        if status != "skipped" and staged:             # a wrapped Recipe: its frozen stages, one by one
+            roles = {f.id: f.role for f in getattr(cls, "features", None) or []}
+            prev = before
+            for stg in staged:
+                if roles.get(stg.feature) in FROZEN_ROLES:
+                    box = made_box(prev, stg.shape)
+                    if box is not None:
+                        self.__dict__.setdefault("_form_frozen_boxes", {})[stg.feature] = box
+                prev = stg.shape
         if status != "skipped":
             expect = want if (counted and want is not None) else n1
         e = {"feature": fid, "status": status, "s": round(time.perf_counter() - t0, 3), "solids": n1,
@@ -956,6 +1028,38 @@ def build_id() -> str:
     return _BUILD_ID
 
 
+def _stages_put(key: str, staged: list) -> None:
+    """The stages of a stage-returning feature (feature(stages=True)): each shape as its own checkpoint, and the
+    list of their feature names next to them."""
+    names = [st.feature for st in staged]
+    for i, st in enumerate(staged[:-1]):
+        checkpoint_put(f"{key}s{i}", st.shape)
+    _stages_mem[key] = names
+    d = _dir()
+    if d is not None:
+        _jwrite(d / f"{key}.stages.json", names)
+
+
+def _stages_get(key: str):
+    """[Stage, ...] kept by _stages_put for key (the last one's shape is the feature's own checkpoint), or None."""
+    names = _stages_mem.get(key)
+    if names is None:
+        d = _dir()
+        names = _jread(d / f"{key}.stages.json") if d else None
+    if not isinstance(names, list) or not names:
+        return None
+    out = []
+    for i, n in enumerate(names):
+        shape = checkpoint_get(key if i == len(names) - 1 else f"{key}s{i}")
+        if shape is None:
+            return None
+        out.append(Stage(n, shape))
+    return out
+
+
+_stages_mem: dict = {}
+
+
 def checkpoint_get(key: str):
     hit = _mem.get(key)
     if hit is not None:
@@ -1025,9 +1129,16 @@ def checkpoint_put(key: str, shape) -> None:
             (d / f"{key}.json").write_text(json.dumps({"type": type(shape).__name__, "ts": time.time(),
                                                        **_names(shape)}, default=str), encoding="utf-8")
             os.replace(tmp, d / f"{key}.bin")
-        prune(d)
+        global _pruned
+        if time.monotonic() - _pruned >= PRUNE_EVERY_S:   # listing hundreds of files on every feature costs the build
+            _pruned = time.monotonic()
+            prune(d)
     except Exception:
         pass
+
+
+PRUNE_EVERY_S = 20.0             # a worker prunes the checkpoint folder at most this often (DISK_MAX is a soft bound)
+_pruned = -1e9
 
 
 def prune(d: Path | None = None) -> None:

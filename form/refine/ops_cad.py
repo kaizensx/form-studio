@@ -895,10 +895,25 @@ def _has(d, words) -> bool:
 
 
 def _call(fn: str, design, **kw) -> str:
-    args = ", ".join([f"frozen={design.frozen_boxes_literal()}"] + [f"{k}={_lit(v)}" for k, v in kw.items()])
+    # the frozen boxes are measured when the design builds (the faces the frozen features made in this build, so they
+    # follow a parameter change); the literal, measured when the feature was written, is the fallback
+    args = ", ".join([f"frozen=frozen_boxes(self, {design.frozen_boxes_literal()})"]
+                     + [f"{k}={_lit(v)}" for k, v in kw.items()])
     return (f"def {fn}(self, v, body):\n"
-            f"    from form.refine import ops_cad\n"
+            f"    from form.refine import frozen_boxes, ops_cad\n"
             f"    return ops_cad.{fn}(body, {args})\n")
+
+
+CUT_SHELL = (0.75, 0.10)    # free-form share at least, plane share at least: a free-form shell cut by planes
+CUT_SHELL_WHY = ("a free-form shell cut by planes (a crest, a rim, a visor opening): OCCT's rounds where the planes meet "
+                 "the shell facet (measured on the hero helmet's crest) or crash the kernel (the twisted shade), so "
+                 "the edge break rounds or chamfers its edges instead")
+
+
+def cut_shell(analysis) -> bool:
+    """True for a free-form shell cut by planes (analysis.measures["surface_mix"], critique's surface kinds)."""
+    mix = (analysis.measures or {}).get("surface_mix") or {}
+    return float(mix.get("free", 0)) >= CUT_SHELL[0] and float(mix.get("plane", 0)) >= CUT_SHELL[1]
 
 
 class _CadOp(Operator):
@@ -926,6 +941,8 @@ class FilletHierarchy(_CadOp):
         m = (analysis.measures or {}).get("edge_hierarchy") or {}
         if m.get("tiers", 0) >= 3 and analysis.deficits.get("edge_hierarchy", 0) < 0.15:
             return False, "the edges already have three radius tiers"
+        if cut_shell(analysis):
+            return False, CUT_SHELL_WHY
         return analysis.deficits.get("edge_hierarchy", 0) > 0.1, "the edges already have a hierarchy"
 
     def apply(self, design, analysis, params):
@@ -955,7 +972,7 @@ class EdgeBreak(_CadOp):
         # its own three radius tiers, or when only a few sharp edges remain. Run first, it would round every edge at
         # 0.3 mm and leave the hierarchy nothing to shape.
         if not (any(f.startswith("refine_fillet_hierarchy") for f in design.refined) or m.get("tiers", 0) >= 3
-                or sharp <= 0.3):
+                or sharp <= 0.3 or cut_shell(analysis)):
             return False, "the fillet hierarchy comes first"
         return True, ""
 
@@ -1107,6 +1124,10 @@ class RibLightening(_CadOp):
         sz = design.size()
         if sz is not None and min(sz[0], sz[1]) < 30:
             return False, "too small a floor for a rib grid"
+        # material comes out of the part: only where a strength or load check (the design's statics model) is there
+        # to say it still holds; a wall-thickness gate alone does not show the part still carries its load
+        if not design.has_check("statics."):
+            return False, "no statics check on this design to show the lightened part still holds its load"
         return analysis.deficits.get("detail_scales", 0) > 0 or analysis.deficits.get("interior_read", 0) > 0.3, \
             "the design already reads at three scales"
 

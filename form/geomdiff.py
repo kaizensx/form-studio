@@ -48,11 +48,24 @@ def _region(shape, tol):
     return out
 
 
+def own_copy(shape):
+    """A deep copy of a build123d shape (BRepBuilderAPI_Copy: its own geometry, tolerances and triangulation)."""
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_Copy
+    c = BRepBuilderAPI_Copy(shape.wrapped, True, False)       # copy geometry, not the mesh
+    try:
+        return type(shape)(c.Shape())
+    except Exception:                                          # a class that does not take a raw shape
+        from build123d import Shape
+        return Shape.cast(c.Shape())
+
+
 def op_geomdiff(key, recipe_id, values, key_b, recipe_b, values_b, tol=0.08):
     """Added (b - a) and removed (a - b) material between two built designs, with meshes for drawing."""
     from .kernel import _get, _tessellate
-    A = _get(key, recipe_id, values, 0.05)["shape"]
-    B = _get(key_b, recipe_b, values_b, 0.05)["shape"]
+    # copies: the booleans (OCCT's default mode grows the tolerances of their arguments in place) and the
+    # tessellation below would otherwise change the shapes the kernel keeps for every later view of these revisions
+    A = own_copy(_get(key, recipe_id, values, 0.05)["shape"])
+    B = own_copy(_get(key_b, recipe_b, values_b, 0.05)["shape"])
     added, removed = B - A, A - B
     P, T = _tessellate(B, tol)
     return {"volume_a_mm3": round(float(A.volume), 3), "volume_b_mm3": round(float(B.volume), 3),

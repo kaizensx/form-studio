@@ -35,6 +35,13 @@ def _source_for(st, p: dict, materials, progress=None) -> tuple[dict, str, list]
     if cages:
         if len(cages) > 1:
             notes.append(f"The source holds {len(cages)} cages; they are used together, as written.")
+        from ..refine import game_eval
+        from ..refine.ops_cage import refine_ops_of
+        if refine_ops_of(text):                  # refinement's cage ops: replayed on the low cage, the bake source kept
+            cage = game_eval.refined_cage(text, getattr(st, "cfg", None), Path(st.root) / ".cache" / "refine_cage")
+            notes.append(f"{len(refine_ops_of(text))} refinement op(s) replayed on the cage (REFINE_OPS); the bake "
+                         "source is the design's own.")
+            return {"cage": cage, "materials": materials}, keys["geometry"], notes
         return {"cage": pipeline.merge_cages(cages), "materials": materials}, keys["geometry"], notes
     if st.read(p, "exports", keys["exports"]) is None:
         j = st.run_sync(p["id"], ["geometry", "exports"])

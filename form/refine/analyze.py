@@ -21,12 +21,13 @@ fixed seeds, no clock. Every threshold is a proposal (evidence class "heuristic"
                      the design's diagonal: primary >= 25 %, secondary 4-25 %, tertiary < 4 %.
   edge_hierarchy     radius tiers (critique.radius_tiers) and the sharp-crease share of edge length; for a game
                      asset the bevel coverage of LOD0 (critique.edge_treatment).
-  surface_breaks     the largest patch of triangles whose neighbours turn by under 2 degrees, as a share of the area.
+  surface_breaks     the largest patch of triangles whose neighbours turn by under 2 degrees, as a share of the area
+                     (or of the bounding box's surface when that is larger, so a fillet does not count against it).
   material_zones     distinct looks (appearance zones, or the game asset's materials).
   material_contrast  luminance spread between the zones' colours (or the baked base colour's value contrast).
   wear               (game) worn share on convex edges, from the baked mask; 2-12 % is the target band.
   touch_points       share of surface samples in the grip zone (the product class's, else the whole part) that lie
-                     within reach of a sharp edge.
+                     within reach of a sharp edge; the edges of grip textures and grooves do not count.
 """
 from __future__ import annotations
 
@@ -291,7 +292,11 @@ def surface_breaks(P, T) -> dict:
     keep = ang < FLAT_DEG
     g = coo_matrix((np.ones(int(keep.sum())), (a[keep], b[keep])), shape=(len(T), len(T)))
     _n, lab = connected_components(g, directed=False)
-    share = float(np.bincount(lab, weights=area).max() / max(area.sum(), 1e-12))
+    # the share is of the larger of the surface area and the bounding box's surface: a fillet replaces flat area with
+    # a blend (a break in its own right), so on the actual area alone the faces left would seem to grow
+    ext = P.max(0) - P.min(0)
+    box = 2 * float(ext[0] * ext[1] + ext[1] * ext[2] + ext[0] * ext[2])
+    share = float(np.bincount(lab, weights=area).max() / max(area.sum(), box, 1e-12))
     return {"deficit": _clip((share - 0.15) / 0.35), "largest_share": round(share, 4)}
 
 
@@ -334,11 +339,36 @@ def wear(game=None) -> dict | None:
     return {"deficit": d, "share": round(s, 4)}
 
 
-def touch_points(P, T, product_class=None) -> dict | None:
+TEXTURE_WORDS = ("knurl", "grip", "textur", "groove", "flute", "parting", "shadow_gap", "shadow gap", "ridge",
+                 "emboss", "engrave", "rib")
+
+
+def texture_features(features: dict) -> set:
+    """Feature ids whose id or label names a grip texture or a groove (knurl, grip, texture, groove, flute, parting
+    line, shadow gap, ridge, emboss, engrave, rib); features: {id: {"label", ...}}."""
+    out = set()
+    for k, f in (features or {}).items():
+        text = (str(k) + " " + str((f or {}).get("label", ""))).lower()
+        if any(w in text for w in TEXTURE_WORDS):
+            out.add(k)
+    return out
+
+
+def _texture_tris(tri_feature, T, features) -> np.ndarray | None:
+    if tri_feature is None or len(tri_feature) != len(T) or not features:
+        return None
+    tf = np.asarray(tri_feature)
+    hit = [f for f in set(tf.tolist()) if f in features]
+    return np.isin(tf, hit) if hit else None
+
+
+def touch_points(P, T, product_class=None, tri_feature=None, texture=None) -> dict | None:
+    """texture: feature ids whose edges are made to be felt (a knurl, a groove): their triangles' edges do not count."""
     from ..critique import _near_sharp_edges, _samples
     if product_class in GRIP and GRIP[product_class] is None:
         return None                                       # worn, not held: no grip zone
     P, T = np.asarray(P, float), np.asarray(T, np.int64)
+    ignore = _texture_tris(tri_feature, T, texture)
     S = _samples(P, T, 3000, seed=4)
     z0, z1 = float(P[:, 2].min()), float(P[:, 2].max())
     band = GRIP.get(product_class or "", (0.0, 1.0))
@@ -347,7 +377,7 @@ def touch_points(P, T, product_class=None) -> dict | None:
     if not len(S):
         return {"deficit": 0.0, "share": 0.0, "zone": band}
     diag = float(np.linalg.norm(P.max(0) - P.min(0)))
-    near = _near_sharp_edges(P, T, S, max(0.6, 0.01 * diag), deg=50.0)
+    near = _near_sharp_edges(P, T, S, max(0.6, 0.01 * diag), deg=50.0, ignore=ignore)
     share = float(near.mean())
     return {"deficit": _clip(share / 0.25), "share": round(share, 4), "zone": band}
 
@@ -367,7 +397,7 @@ def analyze(m: Measurement, weights: dict | None = None) -> Analysis:
         w = wear(m.game)
         if w is not None:
             parts["wear"] = w
-    tp = touch_points(P, T, m.product_class)
+    tp = touch_points(P, T, m.product_class, m.tri_feature, (m.extra or {}).get("texture_features"))
     if tp is not None:
         parts["touch_points"] = tp
     W = {**WEIGHTS, **(weights or {})}

@@ -37,8 +37,8 @@ Writing an operator (form/refine/ops_cad.py, form/refine/ops_cage.py)
                 code=f'''
     def edge_break(self, v, body):
         from form import craft
-        from form.refine import keep_clear
-        edges = keep_clear(body.edges(), {boxes}, margin=0.5)
+        from form.refine import frozen_boxes, keep_clear
+        edges = keep_clear(body.edges(), frozen_boxes(self, {boxes}), margin=0.5)
         return craft.safe_fillet(body, edges, {params["r"]!r})
     ''',
                 reason=f"Break the remaining sharp edges with a {params['r']} mm radius so they catch light.")
@@ -53,7 +53,8 @@ The contract
     role="refine" and doc = the patch's reason plus the measured change.
   * Frozen geometry: features whose role is in FROZEN_ROLES (fit, access, mechanism, interface) and the faces they
     made must not change. design.frozen lists their ids and design.frozen_boxes their bounding boxes; keep_clear()
-    drops edges and faces whose centre lies in one of those boxes. The engine does not trust the operator: a
+    drops edges and faces whose centre lies in one of those boxes. frozen_boxes(self, literal) gives the boxes
+    measured in the build itself (they follow a parameter change), the literal when the build has none. The engine does not trust the operator: a
     candidate whose frozen faces moved (area, face count or bounding box) is rejected whatever its score.
   * An operator never reads files, the network or the clock, and never imports OCCT at module level: the module is
     imported by the engine, which runs without a kernel. The code it returns runs in the kernel worker.
@@ -105,6 +106,7 @@ class Design:
     features: dict = field(default_factory=dict)         # {feature id: {"role", "label", "doc"}} in build order
     frozen_boxes: dict = field(default_factory=dict)     # {frozen feature id: ((x0, y0, z0), (x1, y1, z1))}
     bbox: tuple | None = None                            # ((x0, y0, z0), (x1, y1, z1)) of the whole design
+    checks: dict = field(default_factory=dict)           # {check id: status} of the base build (form/checks.py)
 
     @property
     def feature_ids(self) -> list[str]:
@@ -118,6 +120,10 @@ class Design:
     def refined(self) -> list[str]:
         """Features the refinement already added (role="refine"), in order."""
         return [k for k, f in self.features.items() if f.get("role") == REFINE_ROLE]
+
+    def has_check(self, *prefixes: str, status: str | None = "PASS") -> bool:
+        """True when the base build has a check whose id starts with one of prefixes (with that status)."""
+        return any(k.startswith(prefixes) and (status is None or v == status) for k, v in (self.checks or {}).items())
 
     def frozen_boxes_literal(self) -> str:
         """The frozen boxes as a Python literal to paste into generated code."""
@@ -187,6 +193,16 @@ class Operator:
         return f"<Operator {self.name} ({self.domain})>"
 
 
+def frozen_boxes(design_self, fallback=()) -> list:
+    """The frozen features' boxes measured in this build (form/featureprog.made_box: the faces each fit, access,
+    mechanism or interface feature made, so they follow a parameter change), else `fallback` (the boxes measured when
+    the refine feature was written). Generated refine code calls it: frozen_boxes(self, [((x0, y0, z0), ...)])."""
+    got = getattr(design_self, "_form_frozen_boxes", None) or {}
+    if got and len(got) >= len(fallback or ()):
+        return [got[k] for k in sorted(got)]
+    return list(fallback or ())
+
+
 def keep_clear(items, boxes, margin: float = 0.5) -> list:
     """The edges or faces of `items` whose centre lies outside every box (boxes: [((x0, y0, z0), (x1, y1, z1))],
     each grown by margin mm). Generated refine code calls it so it never touches a frozen feature."""
@@ -225,6 +241,7 @@ def parse_features(source: str) -> dict:
     if not classes:
         return {}
     out = {}
+    declared = declared_features(classes[-1])
     for n in classes[-1].body:
         if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -234,14 +251,41 @@ def parse_features(source: str) -> dict:
             if nm != "feature":
                 continue
             meta = {"role": "structure", "label": "", "doc": ""}
+            stages = False
             if isinstance(d, ast.Call):
                 if d.args:
                     meta["label"] = _const(d.args[0]) or ""
                 for kw in d.keywords:
                     if kw.arg in ("role", "label", "doc"):
                         meta[kw.arg] = _const(kw.value) or meta[kw.arg]
-            out[n.name] = meta
+                    if kw.arg == "stages":
+                        stages = bool(_const(kw.value))
+            if stages:                                  # a wrapped Recipe (form/refine/adapter.py): its own features
+                for k, f in declared.items():
+                    out.setdefault(k, {**f, "stage_of": n.name})
+            else:
+                out[n.name] = meta
             break
+    return out
+
+
+def declared_features(cls: ast.ClassDef) -> dict:
+    """{id: {"role", "label", "doc"}} of a class's literal `features = [Feature("id", "Label", "role"), ...]`."""
+    out = {}
+    for s in cls.body:
+        if not (isinstance(s, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "features" for t in s.targets)
+                and isinstance(s.value, (ast.List, ast.Tuple))):
+            continue
+        for e in s.value.elts:
+            if not (isinstance(e, ast.Call) and (getattr(e.func, "id", "") or getattr(e.func, "attr", "")) == "Feature"):
+                continue
+            args = [_const(a) for a in e.args]
+            kw = {k.arg: _const(k.value) for k in e.keywords if k.arg}
+            fid = args[0] if args else kw.get("id")
+            if isinstance(fid, str):
+                out[fid] = {"label": (args[1] if len(args) > 1 else kw.get("label")) or fid,
+                            "role": (args[2] if len(args) > 2 else kw.get("role")) or "structure",
+                            "doc": (args[3] if len(args) > 3 else kw.get("doc")) or ""}
     return out
 
 
@@ -311,12 +355,12 @@ class ExampleEdgeBreak(Operator):
         return Patch(code=(
             "def edge_break(self, v, body):\n"
             "    from form import craft\n"
-            "    from form.refine import keep_clear\n"
-            f"    edges = keep_clear(body.edges(), {design.frozen_boxes_literal()}, margin=0.5)\n"
+            "    from form.refine import frozen_boxes, keep_clear\n"
+            f"    edges = keep_clear(body.edges(), frozen_boxes(self, {design.frozen_boxes_literal()}), margin=0.5)\n"
             f"    return craft.safe_fillet(body, edges, {r!r}, min_fraction=0.5)\n"),
             reason=f"Break the remaining sharp edges with a {r:g} mm radius so they catch light.", params={"r": r})
 
 
 __all__ = ["API_VERSION", "Analysis", "DEFICITS", "DOMAINS", "Design", "ExampleEdgeBreak", "FROZEN_ROLES",
-           "Operator", "Patch", "REFINE_ROLE", "keep_clear", "operators", "parse_features", "register",
+           "Operator", "Patch", "REFINE_ROLE", "frozen_boxes", "keep_clear", "operators", "parse_features", "register",
            "rename_method", "unregister"]

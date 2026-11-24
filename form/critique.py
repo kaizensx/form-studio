@@ -219,8 +219,9 @@ def walls(shape, P, T, n: int = 500, seed: int = 5, skip=None) -> dict:
             "median_mm": round(med, 2), "thin_fraction": round(float(thin.mean()), 3), "thin_at": pts}
 
 
-def _near_sharp_edges(P, T, S, radius, deg=50.0):
-    """For each point of S: is it within radius of a sharp edge of the mesh (adjacent triangles turn > deg)?"""
+def _near_sharp_edges(P, T, S, radius, deg=50.0, ignore=None):
+    """For each point of S: is it within radius of a sharp edge of the mesh (adjacent triangles turn > deg)?
+    ignore: a bool per triangle; edges of those triangles never count (a grip texture's ridges are meant to be felt)."""
     from scipy.spatial import cKDTree
     _, ids = np.unique(np.round(P / 1e-4).astype(np.int64), axis=0, return_inverse=True)
     ids = ids.reshape(-1)
@@ -241,6 +242,10 @@ def _near_sharp_edges(P, T, S, radius, deg=50.0):
     single = np.ones(len(E), bool)
     single[i] = False
     single[i + 1] = False
+    if ignore is not None:
+        ig = np.asarray(ignore, bool)
+        sharp = sharp[~(ig[tri[sharp]] | ig[tri[sharp + 1]])]
+        single &= ~ig[tri]
     pos = np.zeros((ids.max() + 1, 3))
     pos[ids] = P
     sel = np.concatenate([sharp, np.nonzero(single)[0]])

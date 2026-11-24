@@ -533,7 +533,33 @@ def _signature(model) -> dict:
         s["area"] = round(s["area"], 3)
         s["lo"] = [round(x, 3) for x in s["lo"]]
         s["hi"] = [round(x, 3) for x in s["hi"]]
+    # features whose faces must not move (fit, access, mechanism, interface): their B-rep faces too, so a comparison
+    # does not depend on how the tessellation of a neighbouring face changed (form/refine/engine.gate)
+    roles = {f.id: getattr(f, "role", "") for f in getattr(model["recipe"], "features", None) or []}
+    for fid, s in out.items():
+        if roles.get(fid) in FROZEN_ROLES:
+            s["brep"] = _brep_faces([f["face"] for f in model["faces"] if f["feature"] == fid and f.get("face") is not None])
     return out
+
+
+FROZEN_ROLES = ("fit", "access", "mechanism", "interface")    # form.refine.FROZEN_ROLES (no import: kernel side)
+BREP_FACES_MAX = 400
+
+
+def _brep_faces(faces) -> list | None:
+    """[[surface type, area mm2, centre x, y, z], ...] of B-rep faces, sorted; exact (GProp), not tessellated. None
+    for more than BREP_FACES_MAX faces (a texture: the tessellation signature is used)."""
+    if len(faces) > BREP_FACES_MAX:
+        return None
+    rows = []
+    try:
+        for f in faces:
+            c = f.center()
+            rows.append([f.geom_type.name, round(float(f.area), 4), round(float(c.X), 4), round(float(c.Y), 4),
+                         round(float(c.Z), 4)])
+    except Exception:                                  # a face OCCT cannot measure: no exact signature
+        return None
+    return sorted(rows)
 
 
 def _summary(model, extra_mass=None) -> dict:

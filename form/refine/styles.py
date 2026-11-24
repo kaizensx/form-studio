@@ -25,7 +25,8 @@ STYLES = {
                     "contrast_pair": 1.0, "edge_wear": 0.0, "silhouette_breaker": 0.6, "kit_place": 0.4,
                     "support_loops": 1.2, "panel_line": 0.8, "trim_strip": 0.7, "inset": 1.0},
         "params": {"fillet_hierarchy": {"tiers": [0.4, 1.5, 5.0]}, "parting_line": {"width": 0.5, "depth": 0.4},
-                   "edge_break": {"r": 0.3}, "contrast_pair": {"min_contrast": 0.15}},
+                   "edge_break": {"r": 0.3}, "contrast_pair": {"min_contrast": 0.15},
+                   "knurl_zone": {"pitch": 1.2}},          # a fine knurl reads as a consumer finish, a coarse one as a tool
         "deficits": {"edge_hierarchy": 1.4, "surface_breaks": 1.1, "wear": 0.0},
     },
     "rugged_tool": {
@@ -67,7 +68,7 @@ STYLES = {
         "label": "Organic",
         "keywords": ["organic", "natural", "flowing", "soft", "ergonomic", "sculpted", "biomorphic", "creature",
                      "plant", "vase", "pebble", "shell", "wave", "curved", "smooth"],
-        "weights": {"fillet_hierarchy": 1.6, "edge_break": 1.2, "parting_line": 0.7, "recessed_panel": 0.5,
+        "weights": {"fillet_hierarchy": 1.6, "edge_break": 1.2, "parting_line": 0.0, "recessed_panel": 0.5,
                     "button_pads": 0.6, "knurl_zone": 0.5, "rib_lightening": 0.4, "panel_line": 0.4,
                     "kit_place": 0.2, "trim_strip": 0.4, "inset": 0.6, "silhouette_breaker": 1.0,
                     "support_loops": 1.4, "material_zones": 1.1, "contrast_pair": 0.9, "edge_wear": 0.6},
