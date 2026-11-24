@@ -1672,8 +1672,12 @@ Model a subdivision cage in Blender with declarative ops (never code), e.g.
 [{"op":"cage_new","primitive":"cube","size":[40,30,20]}, {"op":"name_region","name":"top",
 "faces":{"normal":[0,0,1],"within_deg":10}}, {"op":"extrude_region","faces":{"region":"top"},"offset":8}].
 Ops: cage_new, extrude_region, loop_cut, move, crease, name_region, mirror, geonodes_array,
-geonodes_scatter, sculpt_ops, remesh. Each op streams a level-2 preview to the app. Returns the cage
-(points, quads, creases, named regions) as design source for update_design; the project is not changed.
+geonodes_scatter, sculpt_ops, remesh, and the detail vocabulary bevel, support_loops, inset, panel_line,
+trim_strip, solidify, bridge, kit_place (original parametric parts: bolts, rivets, vents, hinges, straps,
+buckles, grips, pommels, greebles; a refused call lists them). Any op but cage_new may say high_only: true
+(last in the list): it details only the bake source, returned as the cage's `high`, never the LODs.
+Each op streams a level-2 preview to the app. Returns the cage (points, quads, creases, named regions) as
+design source for update_design; the project is not changed.
 Needs Blender 4.2+. Blender is not network-isolated by the OS.
 
 | Argument | Type | Required |

@@ -87,9 +87,34 @@ OP_SCHEMA = {
                   "deterministic brushes on the cage points.",
     "remesh": "{mode: voxel, voxel_size: mm} or {mode: quad, target_faces: 6..200000, seed: int} (QuadriFlow). "
               "Automatic retopology: regions and creases do not survive it.",
+    "bevel": "{edges: <edges>, width: mm, segments: 1..8, profile: 0.05..1 (0.5 round), crease: 0..1 (on the bevel's "
+             "borders), name: region for the bevel faces}: chamfers or rounds edges in the cage.",
+    "support_loops": "{edges: <edges>, distance: mm}: a holding loop on each side of the edges, the corner kept, so "
+                     "they stay tight after subdivision.",
+    "inset": "{faces: <faces>, thickness: mm, depth: mm (negative = recess), individual: false, crease: 0..1, "
+             "name: region for the inner faces}: a border inside the faces, then in or out.",
+    "panel_line": "{edges: <edges>, width: mm, depth: mm into the surface, crease: 0..1 (the lips), name}: a V groove "
+                  "along an edge path, sharp at the bottom.",
+    "trim_strip": "{edges: <edges>, width: mm, height: mm out of the surface, crease: 0..1, name}: a raised band "
+                  "along an edge path (edge guards, metal trim).",
+    "solidify": "{thickness: mm, offset: -1..1 (-1 inward), rim_crease: 0..1}: gives a skin thickness; an open "
+                "skin gets a closed rim.",
+    "bridge": "{faces_a: <faces>, faces_b: <faces>, cuts: 0..32, twist: int, name}: removes two disc-shaped face "
+              "sets and joins their borders with a tube (a handle or a tunnel).",
+    "kit_place": "{part: a kit part, params: {..}, faces: <faces> with mode each|center, or at: [[x,y,z], ...] with "
+                 "normal: [x,y,z] or snap: true; scale: number or [sx,sy,sz], rotation: degrees about the normal, "
+                 "offset: mm along it, name}: copies of an original parametric detail part (form.game.kit), +Z on "
+                 "the surface normal; each copy is its own closed shell.",
 }
 SELECTORS = ("<faces>: {all: true} | {region: name} | {indices: [face, ...]} | {normal: [x,y,z], within_deg: 0..180}. "
-             "<points>: any <faces> (its points) | {indices: [point, ...]} | {box: [[x0,y0,z0], [x1,y1,z1]]}.")
+             "<points>: any <faces> (its points) | {indices: [point, ...]} | {box: [[x0,y0,z0], [x1,y1,z1]]}. "
+             "<edges>: [[a, b], ...] | {pairs: [[a, b], ...]} | {path: [p0, p1, ...], closed: false} | "
+             "{region_boundary: name} | {box: [[x0,y0,z0], [x1,y1,z1]]} (edges with both ends inside) | "
+             "{angle_deg: 1..179} (edges sharper than that) | {creased: true}. "
+             "Any op but cage_new takes high_only: true: it changes only the bake source (the high-poly cage), "
+             "never the low-poly LODs; once one op is high_only, every later op must be too.")
+HIGH_ONLY_RULE = "Put the high_only ops last: detail for the bake goes on top of the finished low-poly cage."
+MAX_PLACE = 512                       # kit copies per kit_place op
 
 
 def _num(v, where, lo=-COORD, hi=COORD, integer=False):
@@ -299,7 +324,165 @@ def _check_one(i, o) -> dict:
                                                                   200_000, integer=True),
                     "seed": _num(o.get("seed", 0), f"{w}.seed", 0, 2**31 - 1, integer=True)}
         raise OpError(f"{w}.mode must be voxel or quad.")
-    raise AssertionError(k)
+    out = _check_detail(k, o, w)
+    if out is None:
+        raise AssertionError(k)
+    return out
+
+
+def _edges(s, where):
+    """An edge selection, normalised (see SELECTORS)."""
+    if isinstance(s, list):
+        s = {"pairs": s}
+    if not isinstance(s, dict) or len(s) == 0:
+        raise OpError(f"{where} must be an edge selection. {SELECTORS}")
+    if "pairs" in s and len(s) == 1:
+        if not isinstance(s["pairs"], list) or not 1 <= len(s["pairs"]) <= MAX_POINTS:
+            raise OpError(f"{where}.pairs must list 1..{MAX_POINTS} edges.")
+        return {"pairs": [_edge(e, f"{where}.pairs[{j}]") for j, e in enumerate(s["pairs"])]}
+    if "path" in s and set(s) <= {"path", "closed"}:
+        pts = _ints(s["path"], f"{where}.path")
+        if len(pts) < 2:
+            raise OpError(f"{where}.path needs at least two points.")
+        if not isinstance(s.get("closed", False), bool):
+            raise OpError(f"{where}.closed must be true or false.")
+        return {"path": pts, "closed": s.get("closed", False)}
+    if "region_boundary" in s and len(s) == 1:
+        return {"region_boundary": _name(s["region_boundary"], f"{where}.region_boundary")}
+    if "box" in s and len(s) == 1:
+        return {"box": _points(s, where)["box"]}
+    if "angle_deg" in s and len(s) == 1:
+        return {"angle_deg": _num(s["angle_deg"], f"{where}.angle_deg", 1, 179)}
+    if s.get("creased") is True and len(s) == 1:
+        return {"creased": True}
+    raise OpError(f"{where} is not an edge selection. {SELECTORS}")
+
+
+def _opt_name(o, out, w):
+    if "name" in o:
+        out["name"] = _name(o["name"], f"{w}.name")
+    return out
+
+
+def _check_detail(k, o, w):
+    """The cage vocabulary: bevel, support loops, inset, panel lines, trim, solidify, bridge, kit parts."""
+    if k == "bevel":
+        _keys(o, ("edges", "width", "segments", "profile", "crease", "name"), w)
+        out = {"op": k, "edges": _edges(o.get("edges"), f"{w}.edges"),
+               "width": _num(o.get("width"), f"{w}.width", 1e-3, 1e4),
+               "segments": _num(o.get("segments", 1), f"{w}.segments", 1, 8, integer=True),
+               "profile": _num(o.get("profile", 0.5), f"{w}.profile", 0.05, 1.0)}
+        if "crease" in o:
+            out["crease"] = _num(o["crease"], f"{w}.crease", 0, 1)
+        return _opt_name(o, out, w)
+    if k == "support_loops":
+        _keys(o, ("edges", "distance"), w)
+        return {"op": k, "edges": _edges(o.get("edges"), f"{w}.edges"),
+                "distance": _num(o.get("distance"), f"{w}.distance", 1e-3, 1e4)}
+    if k == "inset":
+        _keys(o, ("faces", "thickness", "depth", "individual", "crease", "name"), w)
+        if not isinstance(o.get("individual", False), bool):
+            raise OpError(f"{w}.individual must be true or false.")
+        out = {"op": k, "faces": _faces(o.get("faces"), f"{w}.faces"),
+               "thickness": _num(o.get("thickness"), f"{w}.thickness", 1e-3, 1e4),
+               "depth": _num(o.get("depth", 0.0), f"{w}.depth", -1e4, 1e4), "individual": o.get("individual", False)}
+        if "crease" in o:
+            out["crease"] = _num(o["crease"], f"{w}.crease", 0, 1)
+        return _opt_name(o, out, w)
+    if k in ("panel_line", "trim_strip"):
+        third = "depth" if k == "panel_line" else "height"
+        _keys(o, ("edges", "width", third, "crease", "name"), w)
+        out = {"op": k, "edges": _edges(o.get("edges"), f"{w}.edges"),
+               "width": _num(o.get("width"), f"{w}.width", 1e-3, 1e4),
+               third: _num(o.get(third), f"{w}.{third}", 1e-3, 1e4),
+               "crease": _num(o.get("crease", 1.0), f"{w}.crease", 0, 1)}
+        return _opt_name(o, out, w)
+    if k == "solidify":
+        _keys(o, ("thickness", "offset", "rim_crease"), w)
+        t = _num(o.get("thickness"), f"{w}.thickness", -1e4, 1e4)
+        if abs(t) < 1e-3:
+            raise OpError(f"{w}.thickness must not be zero.")
+        return {"op": k, "thickness": t, "offset": _num(o.get("offset", -1.0), f"{w}.offset", -1, 1),
+                "rim_crease": _num(o.get("rim_crease", 0.0), f"{w}.rim_crease", 0, 1)}
+    if k == "bridge":
+        _keys(o, ("faces_a", "faces_b", "cuts", "twist", "name"), w)
+        out = {"op": k, "faces_a": _faces(o.get("faces_a"), f"{w}.faces_a"),
+               "faces_b": _faces(o.get("faces_b"), f"{w}.faces_b"),
+               "cuts": _num(o.get("cuts", 0), f"{w}.cuts", 0, 32, integer=True),
+               "twist": _num(o.get("twist", 0), f"{w}.twist", -64, 64, integer=True)}
+        return _opt_name(o, out, w)
+    if k == "kit_place":
+        return _check_kit(o, w)
+    return None
+
+
+def _check_kit(o, w):
+    from ..game import kit
+    _keys(o, ("part", "params", "faces", "mode", "at", "normal", "snap", "scale", "rotation", "offset", "name",
+              "kit"), w)                       # kit: the version a normalised op carries (replaced by the current one)
+    try:
+        params = kit.check_params(o.get("part"), o.get("params"))
+        part = kit.build(o["part"], params)
+    except kit.KitError as e:
+        raise OpError(f"{w}: {e}", "Kit parts: " + ", ".join(kit.names()))
+    out = {"op": "kit_place", "part": o["part"], "params": params, "kit": kit.KIT_VERSION}
+    if ("faces" in o) == ("at" in o):
+        raise OpError(f"{w} needs faces (with mode each or center) or at (points), not both.")
+    if "faces" in o:
+        _keys(o, ("part", "params", "faces", "mode", "scale", "rotation", "offset", "name", "kit"), w)
+        if o.get("mode", "each") not in ("each", "center"):
+            raise OpError(f"{w}.mode must be each (one per face) or center (one at the selection's centre).")
+        out["faces"] = _faces(o["faces"], f"{w}.faces")
+        out["mode"] = o.get("mode", "each")
+        count = 1
+    else:
+        if "mode" in o:
+            raise OpError(f"{w}.mode is only for faces; at places one copy per point.")
+        at = o["at"]
+        if not isinstance(at, list) or not 1 <= len(at) <= MAX_PLACE:
+            raise OpError(f"{w}.at must list 1..{MAX_PLACE} points [x, y, z].")
+        out["at"] = [_vec(p, f"{w}.at[{j}]") for j, p in enumerate(at)]
+        snap = o.get("snap", False)
+        if not isinstance(snap, bool):
+            raise OpError(f"{w}.snap must be true or false.")
+        if snap == ("normal" in o):
+            raise OpError(f"{w} with at needs normal: [x,y,z] or snap: true (the nearest surface point and its "
+                          "normal), not both.")
+        if snap:
+            out["snap"] = True
+        else:
+            n = _vec(o["normal"], f"{w}.normal")
+            if math.hypot(*n) < 1e-9:
+                raise OpError(f"{w}.normal must not be zero.")
+            out["normal"] = n
+        count = len(at)
+    sc = o.get("scale", 1.0)
+    if isinstance(sc, list):
+        out["scale"] = _vec(sc, f"{w}.scale", 0.01, 100)
+    else:
+        s = _num(sc, f"{w}.scale", 0.01, 100)
+        out["scale"] = [s, s, s]
+    out["rotation"] = _num(o.get("rotation", 0.0), f"{w}.rotation", -360, 360)
+    out["offset"] = _num(o.get("offset", 0.0), f"{w}.offset", -1e3, 1e3)
+    if len(part.V) * count > MAX_POINTS:
+        raise OpError(f"{w}: {count} copies of {o['part']} ({len(part.V)} points each) exceed {MAX_POINTS} points.")
+    return _opt_name(o, out, w)
+
+
+def expand(o: dict) -> dict:
+    """The op as the runner gets it: a kit_place op carries its part's geometry (scaled, turned about +Z), built here
+    from the checked numbers; every other op goes as it is."""
+    if o["op"] != "kit_place":
+        return o
+    from ..game import kit
+    s = kit.build(o["part"], o["params"])
+    t = math.radians(o["rotation"])
+    c, sn = math.cos(t), math.sin(t)
+    V = []
+    for x, y, z in s.V.tolist():
+        x, y, z = x * o["scale"][0], y * o["scale"][1], z * o["scale"][2]
+        V.append([round(c * x - sn * y, 6), round(sn * x + c * y, 6), round(z, 6)])
+    return dict(o, mesh={"V": V, "F": s.F, "C": s.C})
 
 
 def validate_ops(ops) -> list[dict]:
@@ -318,9 +501,21 @@ def validate_ops(ops) -> list[dict]:
     if size > MAX_JSON:
         raise OpError(f"The op list is {size} bytes; the limit is {MAX_JSON}.")
     out = []
+    high = False
     for i, o in enumerate(ops):
         if not isinstance(o, dict) or not isinstance(o.get("op"), str):
             raise OpError(f"op {i} must be an object with an \"op\" name.", index=i)
+        if "high_only" in o:
+            if not isinstance(o["high_only"], bool) or o["op"] == "cage_new":
+                raise OpError(f"op {i}: high_only must be true or false, and cage_new does not take it.", index=i)
+            ho = o["high_only"]
+            o = {k: v for k, v in o.items() if k != "high_only"}
+        else:
+            ho = False
+        if high and not ho:
+            raise OpError(f"op {i} ({o['op']}) follows a high_only op, so it must be high_only too.", HIGH_ONLY_RULE,
+                          index=i)
+        high = high or ho
         if o["op"] not in OP_SCHEMA:
             raise OpError(f"op {i}: unknown op “{o['op'][:40]}”.", "Ops: " + ", ".join(OP_SCHEMA), index=i)
         if (o["op"] == "cage_new") != (i == 0):
@@ -332,6 +527,8 @@ def validate_ops(ops) -> list[dict]:
             if not e.hint:
                 e.hint = f"{o['op']}: {OP_SCHEMA[o['op']]}"
             raise
+        if ho:
+            n["high_only"] = True
         out.append(n)
     return out
 
@@ -392,7 +589,7 @@ def run_ops(ops, cfg: dict | None = None, timeout: float = TIMEOUT_S, on_stage=N
     try:
         (work / "blender-user").mkdir()
         (work / "stages").mkdir()
-        job = {"runner": RUNNER_VERSION, "ops": norm, "out": str(work / "result.json"),
+        job = {"runner": RUNNER_VERSION, "ops": [expand(o) for o in norm], "out": str(work / "result.json"),
                "stage_dir": str(work / "stages"), "preview_levels": PREVIEW_LEVELS}
         if export_subdiv:
             job["export_subdiv"] = {"levels": int(export_subdiv)}
@@ -540,8 +737,12 @@ def register(mcp, get_studio=None, run=None) -> None:
         [{"op":"cage_new","primitive":"cube","size":[40,30,20]}, {"op":"name_region","name":"top",
         "faces":{"normal":[0,0,1],"within_deg":10}}, {"op":"extrude_region","faces":{"region":"top"},"offset":8}].
         Ops: cage_new, extrude_region, loop_cut, move, crease, name_region, mirror, geonodes_array,
-        geonodes_scatter, sculpt_ops, remesh. Each op streams a level-2 preview to the app. Returns the cage
-        (points, quads, creases, named regions) as design source for update_design; the project is not changed.
+        geonodes_scatter, sculpt_ops, remesh, and the detail vocabulary bevel, support_loops, inset, panel_line,
+        trim_strip, solidify, bridge, kit_place (original parametric parts: bolts, rivets, vents, hinges, straps,
+        buckles, grips, pommels, greebles; a refused call lists them). Any op but cage_new may say high_only: true
+        (last in the list): it details only the bake source, returned as the cage's `high`, never the LODs.
+        Each op streams a level-2 preview to the app. Returns the cage (points, quads, creases, named regions) as
+        design source for update_design; the project is not changed.
         Needs Blender 4.2+. Blender is not network-isolated by the OS."""
         st = (get_studio or _default_studio)()
 
@@ -549,7 +750,9 @@ def register(mcp, get_studio=None, run=None) -> None:
             try:
                 return model_mesh(st, project, ops, expect_head)
             except OpError as e:
-                return {"refused": True, "error": e.public(), "schema": OP_SCHEMA, "selectors": SELECTORS}
+                from ..game import kit
+                return {"refused": True, "error": e.public(), "schema": OP_SCHEMA, "selectors": SELECTORS,
+                        "kit": kit.describe()}
             except (BlenderMissing, BlenderFailed) as e:
                 return {"ok": False, "error": str(e), "hint": getattr(e, "hint", ""), "log_tail": getattr(e, "log", "")[-3000:],
                         "project_unchanged": True}

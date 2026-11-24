@@ -41,6 +41,9 @@ class CageData:
     F: list
     creases: list = field(default_factory=list)       # [[a, b, sharpness], ...]
     regions: dict = field(default_factory=dict)       # {name: [face index, ...]}
+    # optional: the bake source when ops were tagged high_only (model_mesh): the whole high-poly cage (this cage plus
+    # the detail that goes only into the baked maps, never into the LODs). None for every cage without such ops.
+    high: "CageData | None" = None
 
     def __post_init__(self):
         # points are kept to 1e-6 mm, so a cage saved, written into source and read back hashes the same
@@ -48,6 +51,8 @@ class CageData:
         self.F = [[int(i) for i in f] for f in self.F]
         self.creases = [[int(a), int(b), float(s)] for a, b, s in self.creases]
         self.regions = {str(k): sorted(int(i) for i in v) for k, v in (self.regions or {}).items()}
+        if isinstance(self.high, dict):
+            self.high = CageData.from_dict(self.high)
 
     # ---- identity ----
     def hash(self) -> str:
@@ -55,10 +60,12 @@ class CageData:
         return cage_hash(self.V, self.F)
 
     def full_hash(self) -> str:
-        """hash() plus creases and regions."""
+        """hash() plus creases, regions and the high-poly cage (when there is one)."""
         h = hashlib.sha256(self.hash().encode())
         h.update(json.dumps([sorted(map(tuple, ((min(a, b), max(a, b), round(s, 6)) for a, b, s in self.creases))),
                              self.regions], sort_keys=True).encode())
+        if self.high is not None:
+            h.update(b"high" + self.high.full_hash().encode())
         return h.hexdigest()
 
     # ---- checks ----
@@ -77,18 +84,24 @@ class CageData:
 
     def summary(self) -> dict:
         lo, hi = (self.V.min(0), self.V.max(0)) if len(self.V) else (np.zeros(3), np.zeros(3))
-        return {"points": len(self.V), "faces": len(self.F), "quads": sum(len(f) == 4 for f in self.F),
-                "open_edges": self.open_edges(), "creases": len(self.creases),
-                "regions": {k: len(v) for k, v in self.regions.items()},
-                "bbox_mm": [np.round(lo, 4).tolist(), np.round(hi, 4).tolist()], "hash": self.hash()}
+        out = {"points": len(self.V), "faces": len(self.F), "quads": sum(len(f) == 4 for f in self.F),
+               "open_edges": self.open_edges(), "creases": len(self.creases),
+               "regions": {k: len(v) for k, v in self.regions.items()},
+               "bbox_mm": [np.round(lo, 4).tolist(), np.round(hi, 4).tolist()], "hash": self.hash()}
+        if self.high is not None:
+            out["high"] = self.high.summary()
+        return out
 
     # ---- conversion ----
     def to_dict(self) -> dict:
-        return {"V": self.V.tolist(), "F": self.F, "creases": self.creases, "regions": self.regions}
+        d = {"V": self.V.tolist(), "F": self.F, "creases": self.creases, "regions": self.regions}
+        if self.high is not None:
+            d["high"] = self.high.to_dict()
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "CageData":
-        return cls(d["V"], d["F"], d.get("creases") or [], d.get("regions") or {})
+        return cls(d["V"], d["F"], d.get("creases") or [], d.get("regions") or {}, d.get("high"))
 
     def save(self, path) -> Path:
         path = Path(path)
@@ -104,8 +117,9 @@ class CageData:
     def literal(self, name: str = "CAGE") -> str:
         """Python source that rebuilds this cage, for a design's source (the design stays the geometry authority)."""
         d = self.to_dict()
+        high = f",\n    high={json.dumps(d['high'])}" if "high" in d else ""
         return (f"{name} = meshsource.cage(\n    V={json.dumps(d['V'])},\n    F={json.dumps(d['F'])},\n"
-                f"    creases={json.dumps(d['creases'])},\n    regions={json.dumps(d['regions'])})\n")
+                f"    creases={json.dumps(d['creases'])},\n    regions={json.dumps(d['regions'])}{high})\n")
 
     def to_subd(self, levels: int = 0):
         """A form.craft.subd.Cage of this cage (closed cages; non-quads get one Catmull-Clark step there). Creases and
@@ -141,9 +155,10 @@ def subd_creases(creases) -> dict:
     return out
 
 
-def cage(V, F, creases=None, regions=None) -> CageData:
-    """The cage a design's source holds (see literal())."""
-    return CageData(V, F, creases or [], regions or {})
+def cage(V, F, creases=None, regions=None, high=None) -> CageData:
+    """The cage a design's source holds (see literal()). high: the bake source ({V, F, creases, regions}) when the
+    cage was modelled with high_only ops."""
+    return CageData(V, F, creases or [], regions or {}, high)
 
 
 def cage_hash(V, F, decimals: int = HASH_DECIMALS) -> str:

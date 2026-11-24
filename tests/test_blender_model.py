@@ -103,7 +103,27 @@ class Schema(unittest.TestCase):
         self.assertNotEqual(bm.op_key(MODEL, "5.2.3"), bm.op_key(MODEL, "5.1.0"))
         self.assertNotEqual(bm.op_key(MODEL, "5.2.3"), bm.op_key(MODEL[:-1], "5.2.3"))
         self.assertEqual(set(bm.OP_SCHEMA), {"cage_new", "extrude_region", "loop_cut", "move", "crease", "name_region",
-                                             "mirror", "geonodes_array", "geonodes_scatter", "sculpt_ops", "remesh"})
+                                             "mirror", "geonodes_array", "geonodes_scatter", "sculpt_ops", "remesh",
+                                             # the detail vocabulary (tests/test_cage_ops.py)
+                                             "bevel", "support_loops", "inset", "panel_line", "trim_strip",
+                                             "solidify", "bridge", "kit_place"})
+
+    def test_every_runner_op_is_in_the_schema(self):
+        """The runner maps exactly the schema's op names, each to its own function (read from its syntax tree)."""
+        t = ast.parse(bm.RUNNER.read_text(encoding="utf-8"))
+        ops = next(n.value for n in t.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "OPS")
+        self.assertEqual({k.value for k in ops.keys}, set(bm.OP_SCHEMA))
+        self.assertEqual({v.id for v in ops.values}, {f"op_{k}" for k in bm.OP_SCHEMA})
+
+    def test_high_only_and_kit_reach_the_job_but_not_the_key(self):
+        ops = MODEL + [{"op": "kit_place", "part": "rivet_dome", "faces": {"region": "top"}, "high_only": True}]
+        n = bm.validate_ops(ops)
+        job = [bm.expand(o) for o in n]
+        self.assertEqual(job[:-1], n[:-1])
+        self.assertTrue(job[-1]["high_only"])
+        self.assertIn("mesh", job[-1])
+        self.assertNotIn("mesh", n[-1])
+        self.assertEqual(bm.op_key(n, "5.2.3"), bm.op_key(ops, "5.2.3"))
 
 
 class Safety(unittest.TestCase):
@@ -228,6 +248,10 @@ class Register(unittest.TestCase):
         self.assertTrue(out["refused"])
         self.assertEqual(out["error"]["op"], 0)
         self.assertIn("cage_new", out["schema"])
+        self.assertIn("kit_place", out["schema"])
+        self.assertIn("bolt_hex", out["kit"])                  # a refusal lists the kit parts and their numbers
+        self.assertIn("params", out["kit"]["bolt_hex"])
+        self.assertIn("high_only", fn.__doc__)
 
 
 class MeshSource(unittest.TestCase):

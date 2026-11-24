@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **A detail vocabulary for cages, and a kit of original parts.** `model_mesh` has eight new ops, checked like the
+  others before Blender starts: `bevel`, `support_loops`, `inset`, `panel_line` (a V groove along an edge path),
+  `trim_strip` (a raised band), `solidify`, `bridge` (a tunnel or handle between two face sets) and `kit_place`.
+  Edges can be picked by pairs, a path, a region's border, a box, an angle or their crease. `kit_place` puts copies
+  of 33 parametric parts made by code (bolts, rivets, nuts, washers, studs, vents, grilles, hinges, straps, a buckle,
+  a latch, handles, a cable clamp, a grip wrap, pommels, fuller shoulders, a spine ridge, lugs, corner caps, panels,
+  a knob and seeded greebles; `form/game/kit`, nothing downloaded) on faces or snapped to points. Any op can say
+  `high_only`: it details only the bake source, which comes back as the cage's optional `high` field, and never the
+  LODs. Every op keeps the cage closed and consistently oriented (tested in Blender 5.2.3); existing op lists keep
+  their keys and cages, and the SubD deviation report is unchanged for the reference cages.
 - **Game assets in the app, and two new agent tools.** "Game asset" is now a purpose on Home ("Make it for") and in
   the brief. A design for a game opens the Game asset sheet from the rail: build it in Blender, switch between LOD0
   and LOD3 with each one's triangle count against its budget, and look at it shaded with its baked maps, as a UV

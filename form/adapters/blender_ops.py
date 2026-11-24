@@ -14,6 +14,11 @@ A stage file is little-endian: b"FMS1", uint32 op index, uint32 vertex count n, 
 float32[n*3] positions (mm), uint32[t*3] indices.
 
 Units are millimetres throughout; Blender's scene units are not used.
+
+Ops marked high_only (always the last ones in a list) work on a copy of the cage made when the first of them runs:
+the bake source. The result's cage then carries it as "high" ({V, F, creases, regions}); the cage itself stays the
+low-poly one the LODs are made from. A kit_place op arrives with its part's geometry ("mesh"), built by
+blender_model.py from form.game.kit; the runner only places copies of it.
 """
 import json
 import math
@@ -24,9 +29,11 @@ import time
 import bmesh
 import bpy
 from mathutils import Matrix, Vector
+from mathutils.bvhtree import BVHTree
 
 RUNNER_VERSION = 1
 MAX_SCATTER = 2000
+MAX_PLACE = 512
 CREASE = "crease_edge"
 REGION = "form_region_"
 AXES = {"x": 0, "y": 1, "z": 2}
@@ -64,6 +71,16 @@ def cage_object():
         ob = bpy.data.objects.new("FormCage", me)
         bpy.context.scene.collection.objects.link(ob)
     return ob
+
+
+def high_object(ob):
+    """The bake source: a copy of the cage as it stands when the first high_only op runs."""
+    hi = ob.copy()
+    hi.data = ob.data.copy()
+    hi.name = "FormHigh"
+    hi.data.name = "FormHigh"
+    bpy.context.scene.collection.objects.link(hi)
+    return hi
 
 
 def load_bm(ob):
@@ -340,7 +357,7 @@ def _apply_modifier(ob, mod):
     ob.data = me
     bpy.data.meshes.remove(old)
     name = me.name
-    me.name = "FormCage"
+    me.name = ob.name
     return name
 
 
@@ -462,9 +479,334 @@ def op_remesh(ob, o):
             raise OpError(f"QuadriFlow did not finish ({r})")
 
 
+# ---- the detail vocabulary: bevel, support loops, inset, panel lines, trim, solidify, bridge, kit parts ------------
+
+def select_edges(bm, sel):
+    """Edges from an edge selection (blender_model.SELECTORS), in index order, each once."""
+    bm.edges.ensure_lookup_table()
+    if "pairs" in sel:
+        out = [find_edge(bm, a, b) for a, b in sel["pairs"]]
+    elif "path" in sel:
+        p = list(sel["path"])
+        if sel.get("closed"):
+            p.append(p[0])
+        out = [find_edge(bm, a, b) for a, b in zip(p, p[1:])]
+    elif "region_boundary" in sel:
+        faces = set(select_faces(bm, {"region": sel["region_boundary"]}))
+        out = [e for f in faces for e in f.edges if sum(g in faces for g in e.link_faces) == 1]
+    elif "box" in sel:
+        lo, hi = vec(sel["box"][0]), vec(sel["box"][1])
+
+        def inside(v):
+            return all(lo[k] - 1e-9 <= v.co[k] <= hi[k] + 1e-9 for k in range(3))
+        out = [e for e in bm.edges if inside(e.verts[0]) and inside(e.verts[1])]
+    elif "angle_deg" in sel:
+        lim = math.radians(num(sel["angle_deg"], 0, 180))
+        bm.normal_update()
+        out = [e for e in bm.edges if len(e.link_faces) == 2 and e.calc_face_angle(0.0) > lim]
+    elif sel.get("creased"):
+        lay = crease_layer(bm)
+        out = [e for e in bm.edges if e[lay] >= 0.5]
+    else:
+        raise OpError("an edge selection needs pairs, path, region_boundary, angle_deg or creased")
+    out = sorted({e.index: e for e in out}.values(), key=lambda e: e.index)
+    if not out:
+        raise OpError("the edge selection is empty")
+    return out
+
+
+def tag_region(bm, faces, name):
+    key = REGION + name
+    if bm.faces.layers.int.get(key) is None:
+        raise OpError("internal: region layer missing")
+    lay = bm.faces.layers.int.get(key)
+    for f in faces:
+        if f.is_valid:
+            f[lay] = 1
+
+
+def ensure_region(bm, name):
+    """Make the region's layer before any face is held: a new layer re-allocates the faces."""
+    if name:
+        key = REGION + name
+        if bm.faces.layers.int.get(key) is None:
+            bm.faces.layers.int.new(key)
+        bm.faces.ensure_lookup_table()
+
+
+def border_edges(faces):
+    fs = set(faces)
+    return sorted({e.index: e for f in fs for e in f.edges if sum(g in fs for g in e.link_faces) == 1}.values(),
+                  key=lambda e: e.index)
+
+
+def _bevel(bm, edges, width, segments, profile):
+    return bmesh.ops.bevel(bm, geom=list(edges), offset=width, offset_type="OFFSET", segments=segments,
+                           profile=profile, affect="EDGES", clamp_overlap=True, loop_slide=True)
+
+
+def op_bevel(ob, o):
+    bm = load_bm(ob)
+    ensure_region(bm, o.get("name"))
+    lay = crease_layer(bm)
+    edges = select_edges(bm, o["edges"])
+    res = _bevel(bm, edges, num(o["width"], 1e-6), int(o["segments"]), num(o["profile"], 0.0, 1.0))
+    faces = [f for f in res["faces"] if f.is_valid]
+    inner = {e for f in faces for e in f.edges}
+    for e in inner:                                # the bevel's own edges start smooth
+        e[lay] = 0.0
+    if "crease" in o:
+        for e in border_edges(faces):
+            e[lay] = num(o["crease"], 0, 1)
+    if o.get("name"):
+        tag_region(bm, faces, o["name"])
+    store_bm(ob, bm)
+
+
+def op_support_loops(ob, o):
+    """A two-segment bevel with a square profile: a loop either side, the middle loop on the old edge."""
+    bm = load_bm(ob)
+    lay = crease_layer(bm)
+    edges = select_edges(bm, o["edges"])
+    keep = {e.index: e[lay] for e in edges}
+    segs = [(e.verts[0].co.copy(), e.verts[1].co.copy(), keep[e.index]) for e in edges]
+    res = _bevel(bm, edges, num(o["distance"], 1e-6), 2, 1.0)
+    faces = [f for f in res["faces"] if f.is_valid]
+    for f in faces:                                # a creased edge stays creased along its middle loop
+        for e in f.edges:
+            e[lay] = 0.0
+            mid = (e.verts[0].co + e.verts[1].co) / 2
+            for a, b, w in segs:
+                if w > 0 and _dist_seg(mid, a, b) < 1e-5 * max((b - a).length, 1e-6) + 1e-7:
+                    e[lay] = w
+    store_bm(ob, bm)
+
+
+def _dist_seg(p, a, b):
+    ab = b - a
+    t = 0.0 if ab.length_squared < 1e-18 else max(0.0, min(1.0, (p - a).dot(ab) / ab.length_squared))
+    return (p - (a + ab * t)).length
+
+
+def offset_dir(normals):
+    """The move that puts a point `1` away from every plane whose normal is given (their mean over its squared
+    length; exact for two or three orthogonal planes), so a corner moves as far from each side as a flat point does.
+    Held to 3x the plain normal at sharp corners."""
+    n = sum(normals, Vector()) / len(normals)
+    return n / max(n.length_squared, 1.0 / 9.0) if n.length > 1e-9 else Vector()
+
+
+def op_inset(ob, o):
+    bm = load_bm(ob)
+    ensure_region(bm, o.get("name"))
+    lay = crease_layer(bm)
+    faces = select_faces(bm, o["faces"])
+    fn = bmesh.ops.inset_individual if o.get("individual") else bmesh.ops.inset_region
+    kw = dict(faces=faces, thickness=num(o["thickness"], 1e-6), depth=num(o.get("depth", 0.0)),
+              use_even_offset=True, use_interpolate=True)
+    if not o.get("individual"):
+        kw["use_boundary"] = True
+    fn(bm, **kw)
+    if "crease" in o:
+        for e in border_edges(faces):
+            e[lay] = num(o["crease"], 0, 1)
+    if o.get("name"):
+        tag_region(bm, faces, o["name"])
+    store_bm(ob, bm)
+
+
+def op_panel_line(ob, o):
+    """A V groove: support loops at half the width either side of the path, the middle loop pushed in."""
+    bm = load_bm(ob)
+    ensure_region(bm, o.get("name"))
+    lay = crease_layer(bm)
+    bm.normal_update()
+    edges = select_edges(bm, o["edges"])
+    segs = []
+    for e in edges:
+        n = Vector()
+        for f in e.link_faces:
+            n += f.normal
+        segs.append((e.verts[0].co.copy(), e.verts[1].co.copy(), n.normalized() if n.length > 1e-12 else Vector()))
+    size = max(max((b - a).length for a, b, _n in segs), 1e-6)
+    res = _bevel(bm, edges, num(o["width"], 1e-6) / 2, 2, 1.0)
+    faces = [f for f in res["faces"] if f.is_valid]
+    verts = {v for f in faces for v in f.verts}
+    mid = {}
+    tol = 1e-5 * size + 1e-7
+    for v in verts:
+        ns = {tuple(round(x, 4) for x in s[2]): s[2] for s in segs if _dist_seg(v.co, s[0], s[1]) < tol}
+        if ns:
+            mid[v] = offset_dir(list(ns.values()))
+    if not mid:
+        raise OpError("panel_line: the groove's middle loop was not found")
+    d = num(o["depth"], 1e-6)
+    for v in mid:
+        v.co = v.co - mid[v] * d
+    w = num(o.get("crease", 1.0), 0, 1)
+    for f in faces:
+        for e in f.edges:
+            e[lay] = 1.0 if (e.verts[0] in mid and e.verts[1] in mid) else 0.0
+    for e in border_edges(faces):
+        e[lay] = w
+    if o.get("name"):
+        tag_region(bm, faces, o["name"])
+    store_bm(ob, bm)
+
+
+def op_trim_strip(ob, o):
+    """A raised band: a one-segment bevel along the path gives the strip, which is pushed out of the surface."""
+    bm = load_bm(ob)
+    ensure_region(bm, o.get("name"))
+    lay = crease_layer(bm)
+    edges = select_edges(bm, o["edges"])
+    res = _bevel(bm, edges, num(o["width"], 1e-6) / 2, 1, 0.5)
+    strip = [f for f in res["faces"] if f.is_valid]
+    bm.normal_update()
+    vn = {}
+    for f in strip:
+        for v in f.verts:
+            vn.setdefault(v, {})[tuple(round(x, 4) for x in f.normal)] = f.normal.copy()
+    ext = bmesh.ops.extrude_face_region(bm, geom=strip, use_keep_orig=False)
+    new_faces = [g for g in ext["geom"] if isinstance(g, bmesh.types.BMFace)]
+    new_verts = [g for g in ext["geom"] if isinstance(g, bmesh.types.BMVert)]
+    h = num(o["height"], 1e-6)
+    # each new point is the copy of an old one; it moves along the strip's normal at the old point
+    old_of, newset = {}, set(new_verts)
+    for v in new_verts:
+        for e in v.link_edges:
+            u = e.other_vert(v)
+            if u in vn and u not in newset:
+                old_of[v] = u
+    for v in new_verts:
+        n = offset_dir(list(vn.get(old_of.get(v), {}).values()) or [Vector((0, 0, 1))])
+        v.co = v.co + n * h
+    left = [f for f in strip if f.is_valid]
+    if left:
+        bmesh.ops.delete(bm, geom=left, context="FACES_ONLY")
+    top = [f for f in new_faces if f.is_valid and all(v in old_of for v in f.verts)]
+    w = num(o.get("crease", 1.0), 0, 1)
+    for e in border_edges(top):
+        e[lay] = w
+    for u in old_of.values():                      # the band's foot
+        for e in u.link_edges:
+            if e.other_vert(u) in old_of.values():
+                e[lay] = w
+    if o.get("name"):
+        tag_region(bm, [f for f in new_faces if f.is_valid], o["name"])
+    store_bm(ob, bm)
+
+
+def op_solidify(ob, o):
+    mod = ob.modifiers.new("FormSolidify", "SOLIDIFY")
+    mod.thickness = num(o["thickness"])
+    mod.offset = num(o.get("offset", -1.0), -1, 1)
+    mod.use_rim = True
+    mod.use_even_offset = True
+    mod.use_quality_normals = True
+    mod.edge_crease_rim = num(o.get("rim_crease", 0.0), 0, 1)
+    _apply_modifier(ob, mod)
+    bm = load_bm(ob)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    store_bm(ob, bm)
+
+
+def op_bridge(ob, o):
+    bm = load_bm(ob)
+    ensure_region(bm, o.get("name"))
+    fa, fb = select_faces(bm, o["faces_a"]), select_faces(bm, o["faces_b"])
+    if set(fa) & set(fb):
+        raise OpError("bridge: faces_a and faces_b overlap")
+    la, lb = border_edges(fa), border_edges(fb)
+    for name, loop in (("faces_a", la), ("faces_b", lb)):
+        vs = {v for e in loop for v in e.verts}
+        if not loop or len(vs) != len(loop):
+            raise OpError(f"bridge: {name} must be one disc of faces with a single border loop")
+    # the discs go with their inner edges and points; their borders stay (other faces use them)
+    bmesh.ops.delete(bm, geom=list(fa) + list(fb), context="FACES")
+    loops = [e for e in la + lb if e.is_valid]
+    res = bmesh.ops.bridge_loops(bm, edges=loops, use_pairs=False, use_cyclic=False, use_merge=False,
+                                 merge_factor=0.5, twist_offset=int(o.get("twist", 0)))
+    faces = list(res["faces"])
+    if not faces:
+        raise OpError("bridge: Blender could not join the two borders")
+    loopset = set(loops)
+    ring = [e for e in res["edges"] if e not in loopset]
+    if o.get("name"):                              # tagged first: subdivision copies face data to the pieces
+        tag_region(bm, faces, o["name"])
+    cuts = int(o.get("cuts", 0))
+    if cuts and ring:
+        bmesh.ops.subdivide_edges(bm, edges=[e for e in ring if e.is_valid], cuts=cuts, use_grid_fill=False,
+                                  use_only_quads=True)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    store_bm(ob, bm)
+
+
+def _frame(n):
+    """A tangent frame for a surface normal: x level (in the world X-Y plane) where it can be."""
+    n = n.normalized()
+    x = Vector((0, 0, 1)).cross(n)
+    if x.length < 1e-6:
+        x = Vector((1, 0, 0)) if n.z > 0 else Vector((-1, 0, 0))
+    x.normalize()
+    return x, n.cross(x), n
+
+
+def op_kit_place(ob, o):
+    """Copies of a kit part (its geometry built by blender_model from form.game.kit), each its own closed shell."""
+
+    bm = load_bm(ob)
+    ensure_region(bm, o.get("name"))
+    bm.normal_update()
+    frames = []
+    if "faces" in o:
+        faces = sorted(select_faces(bm, o["faces"]), key=lambda f: f.index)
+        if o.get("mode", "each") == "each":
+            frames = [(f.calc_center_median(), f.normal.copy()) for f in faces]
+        else:
+            a = sum(f.calc_area() for f in faces) or 1.0
+            c = sum((f.calc_center_median() * f.calc_area() for f in faces), Vector()) / a
+            n = sum((f.normal * f.calc_area() for f in faces), Vector())
+            frames = [(c, n if n.length > 1e-12 else Vector((0, 0, 1)))]
+    elif o.get("snap"):
+        tree = BVHTree.FromBMesh(bm)
+        for p in o["at"]:
+            loc, _nrm, idx, _d = tree.find_nearest(vec(p))
+            if loc is None:
+                raise OpError("kit_place: no surface to snap to")
+            frames.append((loc, bm.faces[idx].normal.copy()))
+    else:
+        frames = [(vec(p), vec(o["normal"])) for p in o["at"]]
+    if len(frames) > MAX_PLACE:
+        raise OpError(f"kit_place: {len(frames)} copies; the limit is {MAX_PLACE}")
+    mesh = o["mesh"]
+    PV = [vec(p) for p in mesh["V"]]
+    lay = crease_layer(bm)
+    rkey = REGION + o["name"] if o.get("name") else None
+    off = num(o.get("offset", 0.0))
+    added = []
+    for c, n in frames:
+        x, y, z = _frame(n)
+        vs = [bm.verts.new(c + x * p.x + y * p.y + z * (p.z + off)) for p in PV]
+        for f in mesh["F"]:
+            try:
+                added.append(bm.faces.new([vs[i] for i in f]))
+            except ValueError as e:
+                raise OpError(f"kit_place: part face {f}: {e}")
+        for a, b, w in mesh["C"]:
+            e = bm.edges.get((vs[a], vs[b]))
+            if e is not None:
+                e[lay] = num(w, 0, 1)
+    if rkey:
+        tag_region(bm, added, o["name"])
+    store_bm(ob, bm)
+
+
 OPS = {"cage_new": op_cage_new, "extrude_region": op_extrude_region, "loop_cut": op_loop_cut, "move": op_move,
        "crease": op_crease, "name_region": op_name_region, "mirror": op_mirror, "geonodes_array": op_geonodes_array,
-       "geonodes_scatter": op_geonodes_scatter, "sculpt_ops": op_sculpt_ops, "remesh": op_remesh}
+       "geonodes_scatter": op_geonodes_scatter, "sculpt_ops": op_sculpt_ops, "remesh": op_remesh,
+       "bevel": op_bevel, "support_loops": op_support_loops, "inset": op_inset, "panel_line": op_panel_line,
+       "trim_strip": op_trim_strip, "solidify": op_solidify, "bridge": op_bridge, "kit_place": op_kit_place}
 
 
 # ---- reading the cage back -----------------------------------------------------------------------------------------
@@ -535,6 +877,7 @@ def main():
     for ob in list(bpy.data.objects):              # an empty scene: the factory cube, camera and light go
         bpy.data.objects.remove(ob)
     ob = cage_object()
+    high = None
     times, stage_dir, levels = [], job.get("stage_dir"), int(job.get("preview_levels", 2))
     i = -1
     try:
@@ -544,17 +887,26 @@ def main():
                 raise OpError(f"unknown op {o.get('op')!r}")
             say("FORM_STEP", f"{i + 1}/{len(job['ops'])} {o['op']}")
             t0 = time.perf_counter()
-            fn(ob, o)
-            canonical(ob)
+            if o.get("high_only"):                 # detail for the bake source: a copy of the finished cage takes it
+                if high is None:
+                    high = high_object(ob)
+                target = high
+            else:
+                target = ob
+            fn(target, o)
+            canonical(target)
             dt = time.perf_counter() - t0
-            if not len(ob.data.polygons):
+            if not len(target.data.polygons):
                 raise OpError("the cage has no faces left")
             ts = time.perf_counter()
             if stage_dir:
-                write_stage(ob, f"{stage_dir}/stage_{i:03d}.bin", i, levels)
-            times.append({"op": o["op"], "seconds": round(dt, 4), "stage_seconds": round(time.perf_counter() - ts, 4)})
+                write_stage(target, f"{stage_dir}/stage_{i:03d}.bin", i, levels)
+            times.append({"op": o["op"], "seconds": round(dt, 4), "stage_seconds": round(time.perf_counter() - ts, 4),
+                          **({"high_only": True} if o.get("high_only") else {})})
         out = {"ok": True, "runner": RUNNER_VERSION, "blender": bpy.app.version_string, "ops": times,
                "cage": cage_data(ob)}
+        if high is not None:
+            out["cage"]["high"] = cage_data(high)
         chk = job.get("export_subdiv")
         if chk:                                    # verification: the cage subdivided by Blender (no limit projection)
             co, _tri, n = subdivided(ob, int(chk["levels"]), limit=False, creases=False)
