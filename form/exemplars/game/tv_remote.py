@@ -2,9 +2,10 @@
 
 How it is made: build123d. A rounded body (plan, top and bottom fillets of three sizes); a shallow well cut round every
 button and the buttons raised out of them as real geometry with rounded tops (a power button, a round pad with a centre
-key, two rocker pills, a 3 x 4 number grid); a dark window recessed in the top at the front tip; a battery cover split
-line and a thumb latch underneath. Its appearance() zones are the game materials' regions. The wells, the split line and
-the latch are too small for LOD0's budget: the bake carries them from the full tessellation.
+key, two rocker pills, a 3 x 4 number grid); a dark window recessed in the top at the front tip; a battery door
+underneath with a 0.8 mm shadow gap round it and a thumb latch; a parting line (a 0.6 mm groove) round the side wall
+where the top shell meets the bottom one. Its appearance() zones are the game materials' regions. The wells, the
+grooves and the latch are too small for LOD0's budget: the bake carries them from the full tessellation.
 """
 from __future__ import annotations
 
@@ -17,8 +18,9 @@ MATERIALS = {"default": {"material": "plastic", "tint": "#2b2e33", "grain_mm": 5
              "power": {"material": "rubber", "tint": "#c23a2b", "grain_mm": 2, "wear": 0.3},
              "window": {"material": "plastic", "tint": "#0b0d10", "roughness": 0.08, "wear": 0.1}}
 
-SOURCE = '''"""A generic TV remote: a rounded body, raised buttons in shallow wells, a front window, a battery cover split
-line and latch underneath. Form Studio game exemplar (form/exemplars/game/tv_remote.py)."""
+SOURCE = '''"""A generic TV remote: a rounded body, raised buttons in shallow wells, a front window, a battery door with
+a shadow gap and a latch underneath, a parting line round the side. Form Studio game exemplar
+(form/exemplars/game/tv_remote.py)."""
 from build123d import Align, Axis, Box, Cylinder, Pos, Rot, fillet
 
 from form.recipes.base import Feature, Param, Recipe, Stage
@@ -48,7 +50,8 @@ class Design(Recipe):
     features = [Feature("body", "Body", "structure"), Feature("wells", "Button wells", "detail"),
                 Feature("buttons", "Buttons", "detail"), Feature("pad", "Navigation pad", "detail"),
                 Feature("power", "Power button", "detail"), Feature("window", "Front window", "detail"),
-                Feature("battery_cover", "Battery cover", "detail")]
+                Feature("battery_cover", "Battery cover", "detail"),
+                Feature("parting_line", "Parting line", "detail")]
 
     def keys(self, v):
         L, W, T = v["length"], v["width"], v["thickness"]
@@ -97,11 +100,19 @@ class Design(Recipe):
         win = Pos(L / 2 - 17.0, 0, T - 1.2) * Box(13.0, W * 0.42, 4.0, align=A)
         body = body - win
         out.append(Stage("window", body))
-        cut = Pos(-L * 0.24, 0, -0.01) * Box(L * 0.4, W * 0.7, 1.0, align=A)
-        inner = Pos(-L * 0.24, 0, -0.02) * Box(L * 0.4 - 1.2, W * 0.7 - 1.2, 1.2, align=A)
+        # the battery door: a 0.8 mm shadow gap 1.6 mm deep round it, and a thumb latch
+        cut = Pos(-L * 0.24, 0, -0.01) * Box(L * 0.4, W * 0.7, 1.6, align=A)
+        inner = Pos(-L * 0.24, 0, -0.02) * Box(L * 0.4 - 1.6, W * 0.7 - 1.6, 1.8, align=A)
         latch = Pos(-L * 0.035, 0, -0.02) * Box(4, 12, 1.6, align=A)
         body = body - (cut - inner) - latch
         out.append(Stage("battery_cover", body))
+        # the parting line where the top shell meets the bottom one: a 0.6 mm groove, 0.5 mm deep, round the side wall
+        zp = T * 0.4
+        slab = Pos(0, 0, zp - 0.3) * Box(L + 4, W + 4, 0.6, align=A)
+        core = Pos(0, 0, zp - 0.5) * Box(L - 1.0, W - 1.0, 1.6, align=A)
+        core = fillet(core.edges().filter_by(Axis.Z), W * 0.3 - 0.5)
+        body = body - (slab - core)
+        out.append(Stage("parting_line", body))
         return out
 
     def appearance(self, v):

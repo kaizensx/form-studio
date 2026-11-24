@@ -88,6 +88,19 @@ def stud_round(p):
                   ring_crease={1: 0.6})
 
 
+def tread_block(p):
+    """A tyre tread lug: a block width (X, across the tread) by length (Y, round the tyre), its top drawn in by
+    taper, its front edge bent into a chevron (the point leads along +Y)."""
+    w, L, h, k = p["width"], p["length"], p["height"], p["taper"]
+    c = p["chevron"] * L
+    poly = [(-w / 2, -L / 2), (0.0, -L / 2 + c), (w / 2, -L / 2), (w / 2, L / 2), (0.0, L / 2 + c), (-w / 2, L / 2)]
+    s = prism(poly, -EMBED, h, rim_crease=0.9, side_crease=0.6)
+    V = np.asarray(s.V, float)
+    top = V[:, 2] > 0
+    V[top, :2] *= 1.0 - k
+    return Shell(V, s.F, s.C)
+
+
 def stud_pyramid(p):
     R = p["width"] / 2 * math.sqrt(2)
     h = p["height"]
@@ -421,6 +434,11 @@ PARTS = {
                "Flat washer: a ring with softened rims."),
     "stud_round": (stud_round, "surface", {"diameter": (8.0, 1, 40, F), "height": (3.0, 0.5, 20, F)},
                    "Domed decorative stud (leather and armour)."),
+    "tread_block": (tread_block, "surface", {"width": (40.0, 4, 400, F), "length": (24.0, 3, 400, F),
+                                             "height": (10.0, 1, 100, F), "taper": (0.12, 0.0, 0.4, F),
+                                             "chevron": (0.25, 0.0, 0.6, F)},
+                    "Tyre tread lug: a tapered block, width across the tread (X), length round the tyre (Y), its "
+                    "leading edge bent into a chevron."),
     "stud_pyramid": (stud_pyramid, "surface", {"width": (8.0, 1, 40, F), "height": (3.5, 0.5, 20, F)},
                      "Square pyramid stud with sharp facets."),
     "vent_louver": (vent_louver, "surface", {"width": (40.0, 8, 400, F), "height": (24.0, 6, 400, F),

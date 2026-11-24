@@ -3,7 +3,8 @@
 How it is made: wood blocks (body, arched lid) and iron plates on their surface (straps front and back, bands over the
 lid and down its front and back, a foot frame, a lock plate) as numpy boxes, so no face is buried in the wood; their
 outer edges bevelled in the cage (the big blocks wide, the iron narrow, chosen by the angle left after the first bevel);
-the lock plate's face inset as a recess. Bake-only (high_only): the plank seams as V grooves, dome rivets on every strap
+the lock plate's face inset as a recess. Bake-only (high_only): every board stood proud or set back by its own
+1-3.4 mm, so the boards read as separate pieces of wood; the plank seams as V grooves, dome rivets on every strap
 and band, and a draw latch from the kit on the lock plate.
 
 Creases in the low cage are 1 (sharp) or none: a semi-sharp crease costs the CAD limit surface a subdivision level per
@@ -26,6 +27,9 @@ MATERIALS = {"default": {"material": "wood", "tint": "#8a5a32", "grain_mm": 28, 
 W, D, H, LID = 600.0, 380.0, 300.0, 120.0
 PLANKS_Z = [0.0, 62.0, 122.0, 182.0, 242.0, 300.0]
 STRAP_X = (-205.0, 205.0)
+LID_PLANKS = 4
+BOARD_MM = (2.8, -1.8, 3.4, -1.0, 2.0)        # each body board proud (+) or back (-) of the plane, bottom up
+LID_BOARD_MM = (-2.2, 3.0, -1.2, 2.0)         # each lid board, front to back
 
 
 def _arch(r):
@@ -36,6 +40,12 @@ def ops() -> list[dict]:
     body = box(span(-W / 2, W / 2, 6), span(-D / 2, D / 2, 4), PLANKS_Z)
     lid = box(span(-W / 2 - 6, W / 2 + 6, 6), span(-D / 2 - 6, D / 2 + 6, 8), [H - 2, H + 30])
     ar = _arch(D / 2 + 6)
+    for i in range(len(PLANKS_Z) - 1):                 # each board of the body, round all four sides
+        body.region(f"plank_{i}", body.faces_where(lambda c, i=i: PLANKS_Z[i] < c[2] < PLANKS_Z[i + 1]))
+    lw = (D + 12) / LID_PLANKS
+    for i in range(LID_PLANKS):                        # each board of the lid's top
+        lid.region(f"lidplank_{i}", lid.faces_where(
+            lambda c, i=i: c[2] > H + 29 and -D / 2 - 6 + i * lw < c[1] < -D / 2 - 6 + (i + 1) * lw))
     lid.map(lambda V: _lift(V, H - 2, ar))
     blocks = [body, lid]
     yb = D / 2 + 8
@@ -69,6 +79,13 @@ def ops() -> list[dict]:
     # bake-only detail ----------------------------------------------------------------------------------------------
     o.append({"op": "kit_place", "part": "latch_draw", "params": {"width": 46.0, "length": 120.0},
               "at": [[0.0, yf + 3.0, 262.0]], "normal": [0, -1, 0], "name": "iron", "high_only": True})
+    # boards that are not all one plane: each one stands proud or sits back by its own few millimetres, so the seams
+    # read as edges between separate boards (geometry in the bake source, not a painted line)
+    for i, d in enumerate(BOARD_MM):
+        o.append({"op": "inset", "faces": {"region": f"plank_{i}"}, "thickness": 1.2, "depth": d, "high_only": True})
+    for i, d in enumerate(LID_BOARD_MM):
+        o.append({"op": "inset", "faces": {"region": f"lidplank_{i}"}, "thickness": 1.2, "depth": d,
+                  "high_only": True})
     for z in PLANKS_Z[1:-1]:
         o.append({"op": "panel_line", "edges": {"box": [[-W, -D, z - 0.4], [W, D, z + 0.4]]}, "width": 7.0,
                   "depth": 4.0, "crease": 1.0, "high_only": True})
