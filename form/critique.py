@@ -21,6 +21,7 @@ cut face picked out), the pictures create_design and update_design return.
 """
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 
@@ -740,22 +741,392 @@ def _aesthetic_caps(metrics: dict, zones: list) -> dict:
     return caps
 
 
-def aesthetic_rubric(metrics: dict, zones: list | None = None, scores: dict | None = None) -> dict:
+# ---- the game critic: caps from the built game asset ---------------------------------------------------------------
+#
+# A game asset is judged on what a game shows: its LOD0 mesh, its baked maps and its materials, not on CAD blend
+# faces (a subdivision cage has none) or appearance() zones (a game asset has materials() instead). game_evidence()
+# measures the asset Blender built (form/game, <data>/.cache/game/<key>/); _game_caps() turns that into caps. Every
+# number is computed; every threshold is a proposal (heuristic), stated with the cap it sets.
+
+GAME_HARD_DEG = 50.0          # an edge of LOD0 sharper than this is a hard edge: bevelled in the mesh or baked, or raw
+GAME_FEATURE_DEG = 25.0       # an edge sharper than this turns the form (a bevel's own edges count here)
+GAME_BAKED_DEG = 12.0         # a hard edge is baked when the normal map leans at least this much just inside it
+GAME_VIEWS = {"front": (0.0, 0.0), "side": (90.0, 0.0), "top": (0.0, 90.0), "three_quarter": (35.0, 25.0)}
+
+
+def _score(raw):
+    try:
+        return None if raw is None else max(0.0, min(5.0, float(raw)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _passes(scores) -> list[dict]:
+    """The scoring passes: one dict of item scores, {"passes": [dict, ...]} or a list of dicts."""
+    if isinstance(scores, dict) and isinstance(scores.get("passes"), list):
+        scores = scores["passes"]
+    if isinstance(scores, list):
+        return [{str(k): v for k, v in p.items()} for p in scores if isinstance(p, dict)]
+    return [{str(k): v for k, v in (scores or {}).items()}]
+
+
+def _game_files(d: Path) -> dict:
+    rep = json.loads((d / "report.json").read_text(encoding="utf-8"))
+    tex = d / "textures"
+    a = rep.get("asset", "")
+    return {"report": rep, **{k: tex / f"{a}_{k}.png" for k in ("base_color", "normal", "curvature")}}
+
+
+def _image(path: Path):
+    if not path.is_file():
+        return None
+    from PIL import Image
+    return np.asarray(Image.open(path).convert("RGB"), dtype=np.float64) / 255.0
+
+
+def _lookup(img, uv):
+    h, w = img.shape[:2]
+    x = np.clip((uv[:, 0] * w).astype(int), 0, w - 1)
+    y = np.clip(((1 - uv[:, 1]) * h).astype(int), 0, h - 1)
+    return img[y, x]
+
+
+def _area_samples(P, T, n, seed=0):
+    """(barycentric (n, 3), triangle index (n,)) spread over the mesh by 3D area."""
+    e1, e2 = P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]]
+    area = np.linalg.norm(np.cross(e1, e2), axis=1) / 2
+    rng = np.random.default_rng(seed)
+    k = rng.choice(len(T), size=n, p=area / area.sum())
+    a, b = rng.random(n), rng.random(n)
+    flip = a + b > 1
+    a[flip], b[flip] = 1 - a[flip], 1 - b[flip]
+    return np.c_[1 - a - b, a, b], k
+
+
+def _rotation(az: float, el: float) -> np.ndarray:
+    """World (Z up) to a view frame whose x is screen right, y screen up: looking from azimuth az (0 = from -Y, the
+    front), elevation el (degrees)."""
+    a, e = math.radians(az), math.radians(el)
+    right = np.array([math.cos(a), math.sin(a), 0.0])
+    fwd = np.array([-math.sin(a) * math.cos(e), math.cos(a) * math.cos(e), -math.sin(e)])   # into the screen
+    up = np.cross(right, fwd)
+    return np.array([right, up])
+
+
+def silhouettes(P, T, px: int = 256, views=None) -> dict:
+    """{view: boolean mask (px, px)} of a mesh seen orthographically from each view, all at one scale."""
+    from PIL import Image, ImageDraw
+    views = views or GAME_VIEWS
+    P = np.asarray(P, float)
+    c = (P.max(0) + P.min(0)) / 2
+    r = float(np.linalg.norm(P - c, axis=1).max()) or 1.0
+    out = {}
+    for name, (az, el) in views.items():
+        q = (P - c) @ _rotation(az, el).T
+        s = (q / (2.1 * r) + 0.5) * px
+        img = Image.new("L", (px, px), 0)
+        dr = ImageDraw.Draw(img)
+        for t in np.asarray(T):
+            dr.polygon([(s[i, 0], px - s[i, 1]) for i in t], fill=255)
+        out[name] = np.asarray(img) > 127
+    return out
+
+
+def solidity(mask) -> float:
+    """Mask area over its convex hull's area (1 for a convex outline; holes and notches lower it)."""
+    ys, xs = np.nonzero(mask)
+    if len(xs) < 4:
+        return 1.0
+    from scipy.spatial import ConvexHull
+    pts = np.c_[np.r_[xs, xs + 1, xs, xs + 1], np.r_[ys, ys, ys + 1, ys + 1]]
+    try:
+        hull = ConvexHull(pts)
+    except Exception:                                    # noqa: BLE001 - a degenerate (flat) outline
+        return 1.0
+    return float(min(1.0, len(xs) / hull.volume))
+
+
+def _weld(P, T, tol=1e-3):
+    key = np.round(np.asarray(P) / tol).astype(np.int64)
+    _u, inv = np.unique(key, axis=0, return_inverse=True)
+    return inv.reshape(-1)[T]
+
+
+def _point_to_mesh(Q, P, T, k=8):
+    """Distance from each point of Q to a triangle mesh: exact to the triangles that own the k surface samples
+    nearest each point (dense samples by area, so a large triangle is found however far its centroid is)."""
+    from scipy.spatial import cKDTree
+    A, B, C = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+    bary, own = _area_samples(P, T, 120_000, seed=7)
+    S = (P[T[own]] * bary[:, :, None]).sum(1)
+    S, own = np.r_[S, (A + B + C) / 3], np.r_[own, np.arange(len(T))]
+    _d, nn = cKDTree(S).query(Q, k=k)
+    idx = own[nn.reshape(len(Q), k)]
+    best = np.full(len(Q), np.inf)
+    for j in range(k):
+        a, b, c = A[idx[:, j]], B[idx[:, j]], C[idx[:, j]]
+        best = np.minimum(best, np.linalg.norm(Q - _closest_on_tri(Q, a, b, c), axis=1))
+    return best
+
+
+def _closest_on_tri(p, a, b, c):
+    """Closest points on triangles (a, b, c) to points p, vectorised (Ericson, Real-Time Collision Detection)."""
+    ab, ac, ap = b - a, c - a, p - a
+    d1, d2 = (ab * ap).sum(1), (ac * ap).sum(1)
+    bp = p - b
+    d3, d4 = (ab * bp).sum(1), (ac * bp).sum(1)
+    cp = p - c
+    d5, d6 = (ab * cp).sum(1), (ac * cp).sum(1)
+    va, vb, vc = d3 * d6 - d5 * d4, d5 * d2 - d1 * d6, d1 * d4 - d3 * d2
+    den = np.where(np.abs(va + vb + vc) < 1e-30, 1e-30, va + vb + vc)
+    v, w = vb / den, vc / den
+    out = a + ab * v[:, None] + ac * w[:, None]
+    m = (va <= 0) & (d4 - d3 >= 0) & (d5 - d6 >= 0)
+    t = np.clip((d4 - d3) / np.where((d4 - d3) + (d5 - d6) == 0, 1e-30, (d4 - d3) + (d5 - d6)), 0, 1)
+    out[m] = (b + (c - b) * t[:, None])[m]
+    m = (vb <= 0) & (d2 >= 0) & (d6 <= 0)
+    t = np.clip(d2 / np.where(d2 - d6 == 0, 1e-30, d2 - d6), 0, 1)
+    out[m] = (a + ac * t[:, None])[m]
+    m = (vc <= 0) & (d1 >= 0) & (d3 <= 0)
+    t = np.clip(d1 / np.where(d1 - d3 == 0, 1e-30, d1 - d3), 0, 1)
+    out[m] = (a + ab * t[:, None])[m]
+    out[(d3 >= 0) & (d4 <= d3)] = b[(d3 >= 0) & (d4 <= d3)]
+    out[(d6 >= 0) & (d5 <= d6)] = c[(d6 >= 0) & (d5 <= d6)]
+    out[(d1 <= 0) & (d2 <= 0)] = a[(d1 <= 0) & (d2 <= 0)]
+    return out
+
+
+def edge_treatment(P, UV, T, normal_map=None, px: int = 1024) -> dict:
+    """Bevel coverage of a LOD0 mesh: of its feature edges (> GAME_FEATURE_DEG), the length share that is not a raw
+    hard edge. A hard edge (> GAME_HARD_DEG) counts as treated when the baked normal map leans by GAME_BAKED_DEG or
+    more just inside it on both sides (a bevel baked from the high poly); edges a bevel split into gentler ones count
+    as treated by the mesh itself. 1.0 when the mesh has no feature edges at all."""
+    P, UV, T = np.asarray(P, float), np.asarray(UV, float), np.asarray(T, np.int64)
+    W = _weld(P, T)
+    n = np.cross(P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]])
+    ln = np.linalg.norm(n, axis=1)
+    ok = ln > 1e-12
+    n = n / np.where(ln > 1e-12, ln, 1.0)[:, None]
+    edges: dict = {}
+    for ti in np.nonzero(ok)[0]:
+        for k in range(3):
+            a, b = int(W[ti, k]), int(W[ti, (k + 1) % 3])
+            edges.setdefault((min(a, b), max(a, b)), []).append((int(ti), k))
+    feat = hard = baked = 0.0
+    lean_vals = []
+    for (_a, _b), fs in edges.items():
+        if len(fs) != 2:
+            continue
+        (t0, k0), (t1, _k1) = fs
+        ang = math.degrees(math.acos(float(np.clip(np.dot(n[t0], n[t1]), -1, 1))))
+        if ang < GAME_FEATURE_DEG:
+            continue
+        L = float(np.linalg.norm(P[T[t0, k0]] - P[T[t0, (k0 + 1) % 3]]))
+        feat += L
+        if ang < GAME_HARD_DEG:
+            continue
+        hard += L
+        if normal_map is None:
+            continue
+        leans = []
+        for ti, k in fs:
+            u0, u1, u2 = UV[T[ti, k]], UV[T[ti, (k + 1) % 3]], UV[T[ti, (k + 2) % 3]]
+            mid = (u0 + u1) / 2
+            span = float(np.linalg.norm((u2 - mid) * px))
+            s = min(0.25, 2.5 / span) if span > 1e-9 else 0.0
+            nm = _lookup(normal_map, (mid + (u2 - mid) * s)[None, :])[0] * 2 - 1
+            leans.append(math.degrees(math.acos(float(np.clip(nm[2] / (np.linalg.norm(nm) or 1), -1, 1)))))
+        lean_vals.append(min(leans))
+        if min(leans) >= GAME_BAKED_DEG:
+            baked += L
+    raw = hard - baked
+    return {"coverage": round(1.0 - raw / feat, 3) if feat > 0 else 1.0, "feature_edges_mm": round(feat, 1),
+            "hard_edges_mm": round(hard, 1), "hard_baked_mm": round(baked, 1),
+            "raw_share": round(raw / feat, 3) if feat > 0 else 0.0,
+            "median_lean_deg": round(float(np.median(lean_vals)), 1) if lean_vals else None}
+
+
+def game_evidence(asset_dir) -> dict:
+    """What a built game asset shows, measured from its folder (report.json, lods/*.npz, textures/*.png):
+
+      edges            edge_treatment() of LOD0 with its baked normal map: bevel coverage
+      materials        distinct materials (kind and tint) the asset declares, and their tints
+      value_contrast   luminance spread of the base colour over LOD0's surface (95th minus 5th percentile, 0..1)
+      scales           primary (LOD3 alone shows more than one mass: several parts or a concave outline), secondary
+                       (forms smaller than the masses: LOD0 has feature edges, bevels, panels, trims, of at least 3
+                       diagonals in all, or 3 or more parts), tertiary (the normal map carries surface detail: blue std >=
+                       0.006 or red/green std >= 0.03)
+      silhouette       solidity (area over convex hull) of LOD0 in four views; complexity = 1 - their mean
+      wear             a material with wear >= 0.15 and the curvature mask lit on >= 0.5 % of LOD0's surface
+    All computed (no judgement); the thresholds are proposals."""
+    d = Path(asset_dir)
+    f = _game_files(d)
+    rep = f["report"]
+    z0 = np.load(d / "lods" / "lod0.npz")
+    lods = sorted((d / "lods").glob("lod*.npz"))
+    zl = np.load(lods[-1])
+    P, UV, T = z0["P"].astype(float), z0["UV"].astype(float), z0["T"].astype(np.int64)
+    px = int(rep.get("texture_px") or 1024)
+    diag = float(np.linalg.norm(P.max(0) - P.min(0))) or 1.0
+    nmap, base, curv = (_image(f[k]) for k in ("normal", "base_color", "curvature"))
+    edges = edge_treatment(P, UV, T, nmap, px)
+    mats = rep.get("materials") or []
+    used = [m for m in mats if not (m.get("name") == "default" and str(m.get("hex", "")).lower() == "#b8b2a7"
+                                    and len(mats) > 1)]
+    kinds = sorted({(m.get("kind"), str(m.get("hex", "")).lower()) for m in used})
+    bary, k = _area_samples(P, T, 40_000, seed=3)
+    uv = (UV[T[k]] * bary[:, :, None]).sum(1)
+    contrast = None
+    if base is not None:
+        lum = _lookup(base, uv) @ np.array([0.2126, 0.7152, 0.0722])
+        contrast = round(float(np.percentile(lum, 95) - np.percentile(lum, 5)), 3)
+    # detail scales
+    Pl, Tl = zl["P"].astype(float), zl["T"].astype(np.int64)
+    comps = _components(_weld(Pl, Tl), len(Pl))
+    sil3 = silhouettes(Pl, Tl, 160)
+    sol3 = min(solidity(m) for m in sil3.values())
+    primary = comps >= 2 or sol3 < 0.93
+    q = (P[T[k[:6000]]] * bary[:6000, :, None]).sum(1)
+    far = float((_point_to_mesh(q, Pl, Tl) > 0.004 * diag).mean())
+    comps0 = _components(_weld(P, T), len(P))
+    secondary = edges["feature_edges_mm"] >= 3 * diag or comps0 >= 3
+    nd = ((rep.get("bake") or {}).get("normal_detail")) or {}
+    tertiary = (nd.get("blue_std") or 0) >= 0.006 or (nd.get("rg_std") or 0) >= 0.03
+    sil = silhouettes(P, T, 256)
+    sols = {v: round(solidity(m), 4) for v, m in sil.items()}
+    wear_max = max([float(m.get("wear") or 0) for m in used] or [0.0])
+    edge_lit = round(float((_lookup(curv, uv)[:, 0] > 0.5).mean()), 4) if curv is not None else 0.0
+    return {"asset": rep.get("asset"), "dir": str(d), "diagonal_mm": round(diag, 2),
+            "lod0_triangles": int(len(T)), "edges": edges,
+            "materials": {"count": len(kinds), "list": [f"{a} {b}" for a, b in kinds]},
+            "value_contrast": contrast,
+            "scales": {"primary": bool(primary), "secondary": bool(secondary), "tertiary": bool(tertiary),
+                       "count": int(primary) + int(secondary) + int(tertiary), "lod3_parts": comps,
+                       "lod0_parts": comps0, "feature_edge_diagonals": round(edges["feature_edges_mm"] / diag, 2),
+                       "lod3_min_solidity": round(sol3, 4), "lod0_far_from_lod3": round(far, 4),
+                       "normal_blue_std": nd.get("blue_std"), "normal_rg_std": nd.get("rg_std")},
+            "silhouette": {"solidity": sols, "complexity": round(1 - float(np.mean(list(sols.values()))), 4)},
+            "wear": {"present": bool(wear_max >= 0.15 and edge_lit >= 0.005), "max_wear": wear_max,
+                     "edge_mask_share": edge_lit},
+            "evidence": "computed (thresholds proposed)"}
+
+
+def _components(T, n) -> int:
+    parent = list(range(n))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    for t in np.asarray(T):
+        r0 = find(int(t[0]))
+        for v in t[1:]:
+            r = find(int(v))
+            if r != r0:
+                parent[max(r, r0)] = min(r, r0)
+                r0 = min(r, r0)
+    return len({find(int(v)) for v in np.unique(np.asarray(T))})
+
+
+def find_game_asset(st, p: dict) -> Path | None:
+    """The newest game asset built from this design's cage (its report's source hash is the merged cage's)."""
+    try:
+        from .game import pipeline
+        cages = pipeline.cages_in_source(st.source_text(p) or "")
+        if not cages:
+            return None
+        h = pipeline.merge_cages(cages).hash()
+    except Exception:                                    # noqa: BLE001 - no cage, no asset to find
+        return None
+    best = None
+    for r in (Path(st.root) / ".cache" / "game").glob("*/report.json"):
+        try:
+            if json.loads(r.read_text(encoding="utf-8")).get("source", {}).get("hash") == h:
+                if best is None or r.stat().st_mtime > best.stat().st_mtime:
+                    best = r
+        except (OSError, ValueError):
+            continue
+    return best.parent if best else None
+
+
+def _game_caps(metrics: dict, ev: dict | None) -> dict:
+    """{item: (cap or None, why)} for a game asset, from game_evidence(). Proportion keeps the solid's bounding-ratio
+    cap; continuity, radius hierarchy (edge treatment), break-up, detail rhythm, material and silhouette read the
+    asset. Without a built asset, the items it would decide are held at 2."""
+    caps = {k: (None, "") for k, _, _ in AESTHETIC}
+    off = [r for r in (metrics or {}).get("proportions", {}).get("ratios", []) if r.get("off_pct", 0) > 12]
+    if off:
+        caps["proportion"] = (4, "Bounding ratios are not near a classic ratio: " + ", ".join(
+            f"{r['pair']} {r['ratio']}" for r in off) + ".")
+    if not ev:
+        why = "No game asset built yet: build it (game_asset), then critique reads its LOD0 and baked maps."
+        for k in ("radius_hierarchy", "break_up", "detail_rhythm", "material"):
+            caps[k] = (2, why)
+        return caps
+    e = ev["edges"]
+    cov = e["coverage"]
+    lvl = next((c for t, c in ((0.75, None), (0.5, 4), (0.3, 3), (0.15, 2)) if cov >= t), 1)
+    caps["radius_hierarchy"] = (lvl, "" if lvl is None else
+                                f"Bevel coverage {cov:.0%}: {e['hard_edges_mm'] - e['hard_baked_mm']:.0f} mm of raw hard "
+                                f"edge in LOD0 of {e['feature_edges_mm']:.0f} mm of feature edge (bevel it, or bevel it "
+                                "high_only so the bake rounds it).")
+    if e["raw_share"] > 0.7:
+        caps["continuity"] = (3, f"{e['raw_share']:.0%} of the feature edge length is a raw hard edge.")
+    sc = ev["scales"]
+    names = [n for n in ("primary", "secondary", "tertiary") if sc[n]]
+    miss = [n for n in ("primary", "secondary", "tertiary") if not sc[n]]
+    if sc["count"] <= 1:
+        caps["detail_rhythm"] = (2, f"One detail scale or none ({', '.join(names) or 'none'}): missing "
+                                    f"{', '.join(miss)}.")
+    elif sc["count"] == 2:
+        caps["detail_rhythm"] = (4, f"Two detail scales; {miss[0]} is missing.")
+    if not sc["secondary"]:
+        caps["break_up"] = (3, "No secondary forms: LOD0 has no panel, bevel, trim or part that LOD3 drops.")
+    n = ev["materials"]["count"]
+    vc = ev.get("value_contrast")
+    mcap, mwhy = None, []
+    if n <= 1:
+        mcap, mwhy = 1, ["one material over everything"]
+    elif n == 2:
+        mcap, mwhy = 4, ["two materials"]
+    if vc is not None and vc < 0.08:
+        mcap, mwhy = min(mcap or 5, 2), mwhy + [f"value contrast {vc:.2f} (under 0.08: it reads as one flat tone)"]
+    elif vc is not None and vc < 0.15:
+        mcap, mwhy = min(mcap or 5, 3), mwhy + [f"value contrast {vc:.2f} (under 0.15)"]
+    if not ev["wear"]["present"]:
+        mcap, mwhy = min(mcap or 5, 4), mwhy + ["no edge wear"]
+    caps["material"] = (mcap, ("; ".join(mwhy).capitalize() + ".") if mcap is not None else "")
+    cx = ev["silhouette"]["complexity"]
+    if cx < 0.005 and sc["count"] <= 1:
+        caps["silhouette"] = (2, f"A convex outline in every view (complexity {cx:.3f}) and no detail: a blob.")
+    elif cx < 0.005:
+        caps["silhouette"] = (4, f"A convex outline in every view (complexity {cx:.3f}).")
+    return caps
+
+
+def aesthetic_rubric(metrics: dict, zones: list | None = None, scores=None, purpose: str | None = None,
+                     game: dict | None = None) -> dict:
     """The rubric for this design: each item with the agent's score (0-5, from looking at the photos), the cap the
-    geometry allows and why, and the final score; the mean, whether it passes the gate, and what to fix first."""
-    caps = _aesthetic_caps(metrics, zones or [])
-    scores = {str(k): v for k, v in (scores or {}).items()}
-    unknown = sorted(set(scores) - {i for i, _, _ in AESTHETIC})
+    geometry allows and why, and the final score; the mean, whether it passes the gate, and what to fix first.
+
+    scores: one pass {item: 0-5}, or several blind passes ({"passes": [...]} or a list of dicts): each item then
+    takes the median of the passes that scored it, and the passes are kept with it.
+    purpose "game": the caps come from the built game asset (game: game_evidence()), not from CAD blend faces and
+    appearance() zones. Print and model designs are judged exactly as before."""
+    caps = _game_caps(metrics, game) if purpose == "game" else _aesthetic_caps(metrics, zones or [])
+    passes = _passes(scores)
+    unknown = sorted({k for p in passes for k in p} - {i for i, _, _ in AESTHETIC})
     items = []
     for iid, label, q in AESTHETIC:
-        raw = scores.get(iid)
-        try:
-            sc = None if raw is None else max(0.0, min(5.0, float(raw)))
-        except (TypeError, ValueError):
-            sc = None
+        got = [s for s in (_score(p.get(iid)) for p in passes) if s is not None]
+        sc = float(np.median(got)) if got else None
         cap, why = caps.get(iid, (None, ""))
-        items.append({"id": iid, "label": label, "question": q, "score": sc, "cap": cap, "why": why,
-                      "final": None if sc is None else (min(sc, cap) if cap is not None else sc)})
+        it = {"id": iid, "label": label, "question": q, "score": sc, "cap": cap, "why": why,
+              "final": None if sc is None else (min(sc, cap) if cap is not None else sc)}
+        if len(passes) > 1:
+            it["passes"] = [_score(p.get(iid)) for p in passes]
+        items.append(it)
     others = [i["final"] for i in items if i["id"] != "would_sell" and i["final"] is not None]
     ws = items[-1]
     if ws["final"] is not None and others and ws["final"] > min(others) + 1:
@@ -770,8 +1141,14 @@ def aesthetic_rubric(metrics: dict, zones: list | None = None, scores: dict | No
     out = {"items": items, "mean": mean, "passed": passed,
            "gate": f"every item scored, mean >= {AESTHETIC_GATE['mean']:g}, none under {AESTHETIC_GATE['min']}, no "
                    "primitive view",
-           "scored_by": "the agent from render_photo (three angles), capped by what the geometry supports",
+           "scored_by": ("blind passes from 4-view lit renders and a 64 px silhouette (the median), capped by what "
+                         "the built game asset measures" if purpose == "game" else
+                         "the agent from render_photo (three angles), capped by what the geometry supports"),
            "evidence": EVIDENCE}
+    if len(passes) > 1:
+        out["passes"] = len(passes)
+    if purpose == "game":
+        out["game"] = game
     if missing:
         out["next"] = ("Score every item: render_photo from three angles (three_quarter, front, three_quarter_back), "
                        "look, then critique(project, aesthetic={" + ", ".join(f"{m}: 0-5" for m in missing) + "}).")
@@ -804,8 +1181,10 @@ def product_class(p: dict, given: str | None = None) -> str | None:
 
 
 def run(st, pid: str, notes: str = "", reads_as: str = "", product_class_id: str | None = None,
-        aesthetic: dict | None = None) -> dict:
+        aesthetic=None, game_dir: str | None = None) -> dict:
     """Compute metrics, render close-ups, build the checklist and record one critique pass for the head revision.
+    A game design (purpose "game") is capped by its built game asset: game_dir, else the newest asset built from its
+    cage (find_game_asset); aesthetic may then hold several blind passes ({"passes": [...]}), whose median counts.
     reads_as: the agent's answer to "does it read as <class>?" after looking at the views (recorded with the pass).
     aesthetic: the agent's 0-5 scores for the AESTHETIC items after looking at render_photo; the rubric caps them by
     what the geometry and the appearance zones support and reports the gate."""
@@ -837,7 +1216,12 @@ def run(st, pid: str, notes: str = "", reads_as: str = "", product_class_id: str
         zones = appearance.declared(st.recipe(p), st.rev(p)["values"])
     except Exception:                                  # a broken appearance() counts as no zones here
         zones = []
-    rubric = aesthetic_rubric(metrics, zones, aesthetic)
+    game = None
+    if purpose == "game":
+        gd = Path(game_dir) if game_dir else find_game_asset(st, p)
+        if gd is not None and (gd / "report.json").is_file():
+            game = game_evidence(gd)
+    rubric = aesthetic_rubric(metrics, zones, aesthetic, purpose=purpose, game=game)
     cl = (metrics.get("form") or {}).get("class") or {}
     summary = {"metrics": {k: metrics[k] for k in ("smallest_fillet_mm", "sharp_edge_fraction", "symmetry", "sliver_faces",
                                                     "planned_missing", "craft_notes") if k in metrics},
