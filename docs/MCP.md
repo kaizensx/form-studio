@@ -1688,7 +1688,8 @@ Make a design a game asset: LOD0-LOD3 at triangle budgets (from subdivision cage
 LODs are automatic retopology), UVs (region seams or Smart UV, packed), materials from the design's zones,
 Cycles-baked base colour, normal, ORM and AO maps (texture_px 1024|2048|4096; bake fast|quality), convex-hull
 collision per part (collision="coacd" when CoACD is installed), pivot and scale.
-preset: gltf | godot (GLB, metres, +Y up) | unity (FBX metres) | unreal (FBX cm, Z up, UCX_ collision).
+preset: gltf | godot (GLB, metres, +Y up) | unity (FBX metres) | unreal (FBX cm, Z up; collision hulls
+UCX_<asset>_LOD0_NN, named after the LOD0 render mesh as Unreal pairs them).
 formats: extra fbx/usd. action: build | validate (re-check the GLB) | export (list every file).
 budgets: four triangle ceilings, LOD0 first (default 12000, 6000, 2500, 800).
 materials (cage designs): {region name | "default": {finish, color "#rrggbb", pattern none|wood|noise|brushed}}.

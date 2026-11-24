@@ -486,6 +486,22 @@ either. A real thin fin still fails.
 - **Turntables and revision morphs** as GIF or WebP (`form animate`, `form history --gif`).
 - Renders are illustrations and are labelled as such; they are never evidence.
 
+## Game assets
+
+- **Make it for: Game asset.** On Home, in the brief, or by saying so: a design whose purpose is "game" is never sliced
+  or checked against a printer. It stays real CAD (STEP exports as always).
+- **The Game asset sheet** builds the asset in Blender: LOD0 to LOD3 at triangle budgets (subdivision cage levels
+  first; decimated LODs are automatic retopology and say so), UVs, baked base colour, normal, ORM and AO maps at 1k,
+  2k or 4k, and convex-hull collision (CoACD as an optional one-click engine). The viewport switches LODs with each
+  one's triangle count against its budget, and shows the asset shaded with its maps, as a UV checker, one map as it
+  is stored, or as a wireframe.
+- **Engine presets**: glTF and Godot (GLB, metres, +Y up), Unity (FBX, metres) and Unreal (FBX, centimetres, Z up,
+  collision hulls `UCX_<asset>_LOD0_NN` named after the LOD0 mesh). Export saves every file as one zip.
+- **Checked from the written files**: budgets, closed and manifold, flipped faces, UVs inside 0..1, UV overlap,
+  texel density, scale, the baked normal map facing out of the surface, and FBX/USD read back at the design's size.
+  Agents use `model_mesh` (a cage modelled in Blender by declarative ops, streamed into the app) and `game_asset`.
+  Measured on six original briefs: [Game bench](GAME_BENCH.md).
+
 ## Release
 
 ![Release: the gate, the frozen files with hashes, and the history](images/release.webp)

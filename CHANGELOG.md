@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- **Game assets in the app, and two new agent tools.** "Game asset" is now a purpose on Home ("Make it for") and in
+  the brief. A design for a game opens the Game asset sheet from the rail: build it in Blender, switch between LOD0
+  and LOD3 with each one's triangle count against its budget, and look at it shaded with its baked maps, as a UV
+  checker, one baked map as stored (base colour, normal, ORM, AO) or as a wireframe. Pick glTF/Godot, Unity or
+  Unreal and Export saves every file as one zip. Without Blender the sheet shows the one-click install card; CoACD
+  has its own optional card. Agents get `model_mesh` (a subdivision cage modelled in Blender by declarative ops; each
+  op's preview streams into the app like a build's stages) and `game_asset`: 95 MCP tools. `design_guide` lists the
+  hybrid and game topics, and `plan_design` takes a route per feature.
+- **A cleaner normal bake, and Unreal collision names that match.** Parts that touch or nest (a lid on a box, a band
+  round a body) used to trade surfaces in the bake: a treasure chest's 1k normal map had flat olive patches, 16.8 % of
+  LOD0's UV area pointing into the surface. Surface maps are now baked with the parts moved apart (ambient occlusion
+  stays in place), and the same chest measures 0.000 %. A new check fails any asset whose baked normals point inward
+  on more than 0.5 % of LOD0 (proposed). Unreal hulls stay `UCX_<asset>_LOD0_NN`, named after the exported LOD0 mesh as
+  Unreal pairs them; the guide and the tool now say so, and the name is built from the LOD name so they cannot drift.
+- **Game bench.** Six original briefs (a sci-fi helmet prop, a stylised treasure chest, a fantasy sword, a modular
+  wall piece, a vehicle wheel, a remote as CAD plus asset) made end to end by a scripted agent
+  (`scripts/game_bench.py`, [docs/GAME_BENCH.md](docs/GAME_BENCH.md)). On this Mac with Blender 5.2.3 every design
+  built, every STEP read back valid, the SubD-to-CAD deviation was at most 0.28 mm per 100 mm, every LOD met its
+  budget and bakes took 1.0 to 2.2 s at 1k. Five of six assets passed every check; the remote failed the new normal
+  map check (an inverted patch over its small button holes). None reached the aesthetic gate (means 1.62 to 2.62,
+  scored by an AI agent from the renders, not by a person). Design sources made from a cage now carry Blender crease
+  weights as exact or semi-sharp creases, and the packaged app ships the Blender runners and `form/game`, with a
+  smoke step that builds a small cage asset.
+
 - **Game assets: a design made ready for a game engine.** A new purpose, "game" (also "game asset", "asset de jogo",
   "Unity", "Unreal", "Godot"), is never sliced or checked against a printer. The game pipeline (`form/game/`) takes a
   design's subdivision cage, or its CAD tessellation, and makes LOD0 to LOD3 at triangle budgets (cage subdivision
@@ -11,7 +35,7 @@
   noise and brushed patterns, and Cycles bakes of base colour, normal, ORM and AO at 1k, 2k or 4k. Collision is a
   convex hull per part (at most 64 points each); CoACD is an optional one-click engine with its own Python. Presets:
   glTF and Godot (GLB, metres, +Y up, Godot's `-convcolonly` hulls), Unity (FBX, metres) and Unreal (FBX,
-  centimetres, Z up, `UCX_` hulls); GLB is written by Form Studio itself, FBX and USD by Blender's exporters and read
+  centimetres, Z up, `UCX_<asset>_LOD0_NN` hulls); GLB is written by Form Studio itself, FBX and USD by Blender's exporters and read
   back in to measure their size. A pure-numpy validator checks every GLB (budgets, closed and manifold, flipped
   faces, UVs inside 0..1, UV overlap by rasterising, texel density spread, scale, the file itself) and caught 7 of 7
   seeded defects. Measured on this Mac (Blender 5.2.3, Cycles on the CPU, fast preset) with an original stylised
@@ -19,7 +43,7 @@
   2,500 and 800, no UV overlap, every UV inside 0..1, texel spread 1.08, the GLB, FBX and USD at the design's size
   to 0.000 %, and all bakes in 2.8 s at 1k, 11.5 s at 2k and 52.3 s at 4k. The fixed runner gets a JSON job and numpy
   arrays, never code; Blender runs as the modelling bridge runs it, and network access is not isolated by the
-  operating system. The MCP tool `game_asset` is ready to register; it is not in the tool list yet.
+  operating system. The MCP tool is `game_asset`.
 - **Blender as a modelling editor, driven by ops instead of code.** An agent can model a subdivision cage in Blender
   with a declarative op list (new cage from a primitive or quads, extrude a region, loop cut, move, crease, name a
   region, mirror, Geometry Nodes array and scatter, bounded sculpt brushes, voxel or QuadriFlow remesh). Every op is
@@ -30,7 +54,7 @@
   scatter 3 ms, voxel remesh 29 ms and QuadriFlow 0.33 s on a 2000-face target; Form's Catmull-Clark matches
   Blender's level-3 subdivision to 1e-7 of the part's size. Blender runs with factory settings, offline mode, no
   auto-run scripts, a scrubbed environment, a temporary folder and a time limit; network access is not isolated by
-  the operating system. The MCP tool `model_mesh` is ready to register; it is not in the tool list yet.
+  the operating system. The MCP tool is `model_mesh`.
 - **A construction route per feature.** A plan now says how each feature is built: kernel (exact build123d with
   form.craft), subd_cage (a quad cage whose limit surface becomes CAD patches), sculpt_recon (sculpted mesh detail
   fitted back to a surface) or procedural (form.patterns in the kernel, MeshTexture or Geometry Nodes on the mesh).

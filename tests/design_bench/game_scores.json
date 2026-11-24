@@ -1,0 +1,21 @@
+{
+  "about": "Aesthetic rubric scores (form/critique.py AESTHETIC, 0-5) for the game bench, given after looking at the first run's renders (LOD0 and LOD3 textured, the LOD0 wireframe, the baked normal map). They are a reviewer's judgement, not a measurement; the geometry caps each one. Scored by an AI agent (the one that built the bench), not by a person: a person should look and replace them.",
+  "scored_by": "the bench's AI agent, from the renders of the first run (not a person)",
+  "date": "2026-11-24",
+  "notes": {
+    "scifi_helmet": "Reads as a rounded helmet with a wide visor; the ear pods are plain spheres and the crest floats a little high. No blend radii between parts.",
+    "treasure_chest": "The strongest: clear masses, banded lid, wood and iron read at LOD3. Edges are hard creases with no bevel.",
+    "fantasy_sword": "A clean but generic silhouette; the blade is thin for its length and the guard and pommel are plain.",
+    "wall_kit": "The bricks cover only the lower part of the face, so the piece reads unfinished; the slab is a plain box.",
+    "vehicle_wheel": "The tyre reads; the rim disc and spokes are crude, and LOD1 turns the tyre visibly polygonal.",
+    "tv_remote": "A tidy CAD body, but at game scale the button holes vanish and the baked normal map has an inverted patch (the normal_map check fails)."
+  },
+  "scores": {
+    "scifi_helmet": {"silhouette": 3, "proportion": 3, "continuity": 4, "radius_hierarchy": 2, "break_up": 3, "detail_rhythm": 2, "material": 3, "would_sell": 2},
+    "treasure_chest": {"silhouette": 4, "proportion": 4, "continuity": 3, "radius_hierarchy": 2, "break_up": 4, "detail_rhythm": 3, "material": 4, "would_sell": 3},
+    "fantasy_sword": {"silhouette": 3, "proportion": 3, "continuity": 3, "radius_hierarchy": 2, "break_up": 3, "detail_rhythm": 2, "material": 3, "would_sell": 2},
+    "wall_kit": {"silhouette": 2, "proportion": 3, "continuity": 3, "radius_hierarchy": 1, "break_up": 3, "detail_rhythm": 2, "material": 2, "would_sell": 1},
+    "vehicle_wheel": {"silhouette": 3, "proportion": 3, "continuity": 3, "radius_hierarchy": 2, "break_up": 3, "detail_rhythm": 3, "material": 3, "would_sell": 2},
+    "tv_remote": {"silhouette": 3, "proportion": 3, "continuity": 4, "radius_hierarchy": 4, "break_up": 2, "detail_rhythm": 3, "material": 1, "would_sell": 2}
+  }
+}
