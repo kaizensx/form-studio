@@ -103,7 +103,8 @@ def glb_scene(nodes: list[dict], materials: list[dict] | None = None, images: li
     so pass 1 - v of a Blender UV), "material" (index into materials), "extras" (dict)}]. Each node has one mesh with
     one primitive.
     materials: [{"name", "base_color" [r,g,b,a], "metallic", "roughness", optional "base_color_tex", "orm_tex",
-    "normal_tex" (indices into images; the ORM image serves as occlusion and metallicRoughness, as glTF intends)}].
+    "normal_tex", "emissive_tex" (indices into images; the ORM image serves as occlusion and metallicRoughness, as
+    glTF intends; an emissive texture is read with emissiveFactor 1)}].
     images: PNG bytes, embedded in the binary chunk."""
     materials, images = list(materials or []), list(images or [])
     blob = bytearray()
@@ -166,6 +167,9 @@ def glb_scene(nodes: list[dict], materials: list[dict] | None = None, images: li
             g["occlusionTexture"] = {"index": int(m["orm_tex"])}
         if m.get("normal_tex") is not None:
             g["normalTexture"] = {"index": int(m["normal_tex"])}
+        if m.get("emissive_tex") is not None:
+            g["emissiveTexture"] = {"index": int(m["emissive_tex"])}
+            g["emissiveFactor"] = [1.0, 1.0, 1.0]
         gmats.append(g)
     gltf = {"asset": {"version": "2.0", "generator": generator}, "scene": 0,
             "scenes": [{"nodes": list(range(len(gnodes)))}], "nodes": gnodes, "meshes": meshes,

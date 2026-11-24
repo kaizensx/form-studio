@@ -224,6 +224,9 @@ class Design(Recipe):
         body = body - (cut - inner) - latch
         out.append(Stage("battery_cover", body))
         return out
+
+    def appearance(self, v):
+        return [{"features": ["buttons"], "finish": "rubber", "color": "#5a5f66", "label": "buttons"}]
 '''
 
 GENERATORS = {"helmet": helmet, "chest": chest, "sword": sword, "wall": wall, "wheel": wheel}

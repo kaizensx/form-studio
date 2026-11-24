@@ -2,6 +2,7 @@
 
     presets.py    engine presets (glTF, Godot, Unity, Unreal), budgets, texture sizes, bake presets
     lod.py        LOD plan from cage levels, convex hulls per part, optional CoACD (its own environment)
+    materials.py  the procedural material library and a design's materials() (read from source, never run)
     pipeline.py   the build: here, then Blender's fixed runner (form/adapters/blender_game.py), then the GLB here
     validate.py   pure numpy checks of a GLB (budgets, manifold, normals, UV bounds and overlap, texel density, scale)
 
@@ -53,7 +54,8 @@ def _source_for(st, p: dict, materials, progress=None) -> tuple[dict, str, list]
     except Exception as e:                                       # noqa: BLE001 - zones are a nicety
         notes.append(f"Material zones were not read ({e}); one material is used.")
     import numpy as np
-    if zones and not materials:
+    by_name = materials if isinstance(materials, dict) else {}
+    if zones:
         Vs, Ts, fm, mats = [], [], [], []
         off = 0
         for i, z in enumerate(zones):
@@ -62,15 +64,28 @@ def _source_for(st, p: dict, materials, progress=None) -> tuple[dict, str, list]
             Ts.append(f + off)
             fm.append(np.full(len(f), i))
             off += len(v)
-            mats.append({"finish": z.get("finish") or "matte", "color": z.get("color") or "#b8b2a7",
-                         "label": z.get("label") or f"zone{i}"})
+            label = z.get("label") or f"zone{i}"
+            # a zone takes the material named for its label or one of its features, else its appearance() finish
+            pick = next((by_name[k] for k in [label] + list(z.get("features") or []) if k in by_name), None)
+            if pick is None and label == "rest":
+                pick = by_name.get("default")
+            if pick is None:
+                pick = {"finish": z.get("finish") or "matte", "color": z.get("color") or "#b8b2a7"}
+            mats.append({**pick, "label": label})
         V = np.concatenate(Vs)
         T = np.concatenate(Ts)
         u, inv = np.unique(np.round(V, 6), axis=0, return_inverse=True)   # weld across zone borders
         return {"mesh": (u, inv.reshape(-1)[T]), "face_material": np.concatenate(fm), "materials": mats}, \
             keys["geometry"], notes
     V, T = meshio.read_stl(stl)
-    mats = [materials.get("default")] if isinstance(materials, dict) and materials.get("default") else None
+    if isinstance(materials, list):
+        mats = materials[:1] or None
+    else:
+        mats = [by_name["default"]] if by_name.get("default") else None
+    named = sorted(k for k in by_name if k != "default")
+    if named:
+        notes.append(f"Materials for {', '.join(named)} were not used: this CAD design declares no appearance() "
+                     "zones, so its mesh is one material zone.")
     return {"mesh": (V, T), "materials": mats}, keys["geometry"], notes
 
 
@@ -88,12 +103,23 @@ def game_asset(st, project: str, action: str = "build", preset: str = "gltf", bu
         opts = pipeline.check_options(preset, budgets, texture_px, bake, pivot, uv, retopo, collision, formats)
     except pipeline.GameError as e:
         raise StudioError(str(e), e.hint)
-    if materials is not None and not isinstance(materials, (dict, list)):
-        raise StudioError("materials must map region names (or \"default\") to {finish, color, pattern}.")
+    from . import materials as matlib
+    if materials is not None:
+        try:
+            if isinstance(materials, list):
+                for i, m in enumerate(materials):
+                    matlib.spec(f"zone{i}", m)
+            else:
+                matlib.check_map(materials)
+        except matlib.MaterialError as e:
+            raise StudioError(str(e), e.hint)
     p = st.load(project)
     from ..studio import H
     base = Path(st.root) / ".cache" / "game"
     keys = st.keys(p)
+    source_note = ""
+    if materials is None:                        # the design's own materials() (read, never run), as the app builds
+        materials, source_note = matlib.materials_in_source(st.source_text(p) or "")
     key = H("game", keys["geometry"], pipeline.options_key(opts, materials))
     out = base / key
     if action == "validate":
@@ -120,7 +146,7 @@ def game_asset(st, project: str, action: str = "build", preset: str = "gltf", bu
                               status=424)
         except BlenderFailed as e:
             raise StudioError(str(e), getattr(e, "hint", ""), status=422, log=getattr(e, "log", "")[-3000:])
-        rep["notes"] = notes + rep.get("notes", [])
+        rep["notes"] = ([source_note] if source_note else []) + notes + rep.get("notes", [])
         rep.update(cached=False)
     files = {f: str(out / f) for f in rep.get("files", [])}
     res = {"project": project, "rev": p["head"], "key": key, "dir": str(out), "cached": rep["cached"],
@@ -128,7 +154,8 @@ def game_asset(st, project: str, action: str = "build", preset: str = "gltf", bu
            "collision": rep["collision"], "validation": {"ok": rep["validation"]["ok"],
                                                          "failed": [c for c in rep["validation"]["checks"]
                                                                     if c["status"] != "PASS"]},
-           "size_mm": rep["size_mm"], "notes": rep.get("notes", []), "retopology_note": rep["retopology_note"]}
+           "size_mm": rep["size_mm"], "notes": rep.get("notes", []), "retopology_note": rep["retopology_note"],
+           "materials": rep.get("materials", [])}
     if action == "export":
         res["files"] = files
     else:
@@ -151,7 +178,11 @@ def register(mcp, get_studio=None, run=None) -> None:
         UCX_<asset>_LOD0_NN, named after the LOD0 render mesh as Unreal pairs them).
         formats: extra fbx/usd. action: build | validate (re-check the GLB) | export (list every file).
         budgets: four triangle ceilings, LOD0 first (default 12000, 6000, 2500, 800).
-        materials (cage designs): {region name | "default": {finish, color "#rrggbb", pattern none|wood|noise|brushed}}.
+        materials: {region or zone name | "default": {material, tint "#rrggbb", grain_mm, wear 0..1, roughness,
+        emission}}; material is one of wood, bare_metal, brushed_metal, painted_metal, leather, plastic, rubber, stone,
+        fabric, emissive (each with a baked height pattern; edge wear, cavity dirt and roughness breakup from the high
+        poly's curvature, AO and thickness). The older {finish, color, pattern} form is still read. Left out, the
+        design's own materials() method is used (a literal dict in its source, read without running it).
         Reads the project, never changes it. Every check is computed from the written GLB. Needs Blender 4.2+."""
         st = (get_studio or _default_studio)()
 

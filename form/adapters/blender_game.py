@@ -6,10 +6,15 @@ arrays next to it (input.npz, collision.npz: numpy files read with allow_pickle=
     1. the base mesh: a subdivision cage (points, polygons, creases, named regions, a material per face) or a mesh
        (a CAD tessellation, a material per face)
     2. UVs: angle-based unwrap with seams on region borders and sharp creases, or Smart UV Project; then packed
-    3. the high-poly: the cage at subdivision level N (or the mesh as it is)
-    4. LOD0..LOD3: cage levels, or Decimate (edge collapse) / QuadriFlow to the triangle budgets
-    5. a Principled BSDF per material (colour, roughness, metallic, a fixed procedural pattern: wood, noise, brushed)
-    6. Cycles bakes from the high-poly onto LOD0: base colour, tangent-space normal, roughness, metallic, AO;
+    3. the high-poly: the cage at subdivision level N, or the cage's high-only mesh (detail only the bake source
+       has) subdivided, or the mesh as it is
+    4. LOD0..LOD3: cage levels, or Decimate (edge collapse) / QuadriFlow to the triangle budgets; every UV island
+       brought to one texel density measured on the subdivided surface
+    5. a Principled BSDF per material from the library (form/game/materials.py): wood, bare/brushed/painted metal,
+       leather, plastic, rubber, stone, fabric, emissive, each a height pattern bumped into the normal; edge wear,
+       cavity dirt and roughness breakup driven by masks read from the high poly (curvature, AO, thickness)
+    6. Cycles bakes from the high-poly onto LOD0 through a cage per part (extrusion from the sampled low-to-high
+       distance): base colour, tangent-space normal, roughness, metallic, AO, the masks, emission;
        ORM packed (R AO, G roughness, B metallic) with numpy
     7. LOD arrays written back (lod<i>.npz: positions mm, corner normals, UVs, triangles); FBX and USD exported with
        Blender's own exporters when asked, and read back in to measure their size
@@ -25,15 +30,18 @@ import json
 import math
 import os
 import sys
+import threading
 import time
 
 import bmesh
 import bpy
 import numpy as np
 
-RUNNER_VERSION = 2
+RUNNER_VERSION = 3
 CREASE = "crease_edge"
-PATTERNS = ("none", "wood", "noise", "brushed")
+KINDS = ("wood", "bare_metal", "brushed_metal", "painted_metal", "leather", "plastic", "rubber", "stone", "fabric",
+         "emissive")
+EXTRA_MAPS = ("emissive", "curvature", "thickness")      # written whenever they are baked (with the base colour)
 FORMATS = ("fbx", "usd")
 
 
@@ -131,21 +139,45 @@ def triangulate(ob):
     return apply_modifiers(ob)
 
 
-def decimate_to(src, name, budget):
+def uv_seam_vertices(ob):
+    """Vertices on a UV seam (their corners carry more than one UV)."""
+    me = ob.data
+    if me.uv_layers.active is None:
+        return []
+    nl = len(me.loops)
+    vi = np.empty(nl, dtype=np.int64)
+    me.loops.foreach_get("vertex_index", vi)
+    uv = np.empty(nl * 2)
+    me.uv_layers.active.data.foreach_get("uv", uv)
+    key = np.unique(np.c_[vi, np.round(uv.reshape(-1, 2) * 1e6)], axis=0)
+    v, n = np.unique(key[:, 0].astype(np.int64), return_counts=True)
+    return v[n > 1].tolist()
+
+
+def decimate_to(src, name, budget, keep_seams=False):
     """A copy of src decimated (edge collapse, UVs kept) to at most budget triangles, as close under it as a few
-    corrections of the ratio get. Returns (object, iterations)."""
+    corrections of the ratio get. keep_seams: UV seam vertices collapse last (a collapse across a seam moves an
+    island's border in 3D but not in UV, and a small island then has another texel density than the rest).
+    Returns (object, iterations)."""
     have = tris(src)
     if have <= budget:
         return copy_object(src, name), 0
     target = budget * 0.995
     ratio = target / have
     best = None
+    seams = uv_seam_vertices(src) if keep_seams else []
     for it in range(1, 7):
         ob = copy_object(src, name + "_try")
         m = ob.modifiers.new("FormDecimate", "DECIMATE")
         m.decimate_type = "COLLAPSE"
         m.ratio = max(min(ratio, 1.0), 1e-5)
         m.use_collapse_triangulate = True
+        if seams:
+            g = ob.vertex_groups.new(name="FormSeams")
+            g.add(seams, 1.0, "REPLACE")
+            m.vertex_group = g.name
+            m.invert_vertex_group = True           # weight 1 collapses first, so the seams are inverted
+            m.vertex_group_factor = 1.0
         apply_modifiers(ob)
         got = tris(ob)
         if got <= budget and (best is None or got > tris(best)):
@@ -279,61 +311,303 @@ def unwrap(ob, method, margin, at_limit=False):
         ob.data.update()
 
 
+def uv_island_stats(ob):
+    """Per UV island of a mesh: (island per polygon, texel density sqrt(UV area / surface area), UV centroid,
+    surface area). Polygons are in one island when they share an edge whose two corners have the same UVs."""
+    me = ob.data
+    nl, npoly = len(me.loops), len(me.polygons)
+    vi = np.empty(nl, dtype=np.int64)
+    me.loops.foreach_get("vertex_index", vi)
+    uv = np.empty(nl * 2)
+    me.uv_layers.active.data.foreach_get("uv", uv)
+    uv = uv.reshape(-1, 2)
+    ls = np.empty(npoly, dtype=np.int64)
+    lt = np.empty(npoly, dtype=np.int64)
+    me.polygons.foreach_get("loop_start", ls)
+    me.polygons.foreach_get("loop_total", lt)
+    poly_of = np.repeat(np.arange(npoly), lt)
+    nxt = np.arange(nl) + 1
+    last = ls + lt - 1
+    nxt[last] = ls
+    _, wid = np.unique(np.c_[vi, np.round(uv * 1e6)], axis=0, return_inverse=True)
+    wid = wid.reshape(-1)
+    E = np.sort(np.c_[wid, wid[nxt]], axis=1)
+    o = np.lexsort((E[:, 1], E[:, 0]))
+    same = np.all(E[o][1:] == E[o][:-1], axis=1)
+    parent = np.arange(npoly)
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    for a, b in zip(poly_of[o][:-1][same].tolist(), poly_of[o][1:][same].tolist()):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[max(ra, rb)] = min(ra, rb)
+    lab = np.unique([find(i) for i in range(npoly)], return_inverse=True)[1].reshape(-1)
+    n = int(lab.max()) + 1 if npoly else 0
+    me.calc_loop_triangles()
+    tl = np.empty(len(me.loop_triangles) * 3, dtype=np.int64)
+    me.loop_triangles.foreach_get("loops", tl)
+    tl = tl.reshape(-1, 3)
+    co = coords(ob)
+    P, U = co[vi[tl]], uv[tl]
+    a3 = 0.5 * np.linalg.norm(np.cross(P[:, 1] - P[:, 0], P[:, 2] - P[:, 0]), axis=1)
+    e1, e2 = U[:, 1] - U[:, 0], U[:, 2] - U[:, 0]
+    a2 = 0.5 * np.abs(e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0])
+    tlab = lab[poly_of[tl[:, 0]]]
+    S3, S2 = np.bincount(tlab, a3, n), np.bincount(tlab, a2, n)
+    cu = np.stack([np.bincount(tlab, a2 * U[:, :, k].mean(1), n) for k in (0, 1)], 1) / np.maximum(S2, 1e-30)[:, None]
+    dens = np.sqrt(S2 / np.maximum(S3, 1e-30))
+    return lab, dens, cu, S3
+
+
+def even_texel(base, margin, level=2, rounds=3):
+    """Every UV island at the median island's texel density, measured on the surface the LODs really have (the
+    cage subdivided `level` times, so a coarse cage's flat faces do not undercount a curved part's area), then the
+    islands repacked. Average Islands Scale alone works on the cage's own faces, which put the wheel hub and tyre
+    at half the density of the flat parts. Returns {"rounds", "worst_before", "worst_after"}."""
+    out = {"rounds": 0}
+    for r in range(rounds + 1):
+        tmp = subdivide(copy_object(base, "FormTexel"), level)
+        _, dt, ct, at = uv_island_stats(tmp)
+        bpy.data.objects.remove(tmp)
+        keep = at > 0
+        if not keep.any():
+            return out
+        med = float(np.median(dt[keep]))
+        worst = float(np.max(np.abs(dt[keep] / med - 1)))
+        out["worst_before" if r == 0 else "worst_after"] = round(worst, 4)
+        if worst <= 0.05 or r == rounds:
+            break
+        lab, _db, cb, _ab = uv_island_stats(base)
+        match = np.argmin(np.linalg.norm(cb[:, None, :] - ct[None, :, :], axis=2), axis=1)
+        f = np.clip(med / np.maximum(dt[match], 1e-12), 0.25, 4.0)
+        me = base.data
+        nl = len(me.loops)
+        uv = np.empty(nl * 2)
+        me.uv_layers.active.data.foreach_get("uv", uv)
+        uv = uv.reshape(-1, 2)
+        lt = np.empty(len(me.polygons), dtype=np.int64)
+        me.polygons.foreach_get("loop_total", lt)
+        li = np.repeat(lab, lt)
+        uv = cb[li] + (uv - cb[li]) * f[li][:, None]
+        me.uv_layers.active.data.foreach_set("uv", uv.reshape(-1))
+
+        def pack():
+            try:
+                bpy.ops.uv.pack_islands(rotate=True, margin_method="FRACTION", margin=margin)
+            except TypeError:
+                bpy.ops.uv.pack_islands(rotate=True, margin=margin)
+        in_edit(base, pack)
+        out["rounds"] = r + 1
+    out.setdefault("worst_after", out.get("worst_before"))
+    return out
+
+
 # ---- materials ------------------------------------------------------------------------------------------------------
 
 def principled(mat):
     return next(n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
 
 
-def make_material(spec):
+# The material library (form/game/materials.py) as Cycles node graphs, built here from a fixed table of kinds. Every
+# material has a height pattern (bumped into the shading normal, so the NORMAL bake carries it) and masks read from
+# the high poly while it is baked: edge (a Bevel normal against the shading normal: curvature), cavity (ambient
+# occlusion over a short distance) and thickness (ambient occlusion inside the surface). Edge wear, cavity dirt and
+# roughness breakup are driven from them, and the masks are baked as maps too (curvature, thickness).
+
+CONTRAST = {"wood": 0.55, "stone": 0.4, "leather": 0.3, "fabric": 0.3, "rubber": 0.15, "bare_metal": 0.15,
+            "brushed_metal": 0.12, "painted_metal": 0.12, "plastic": 0.08, "emissive": 0.0}
+
+
+def node(nt, kind, **props):
+    n = nt.nodes.new(kind)
+    for k, v in props.items():
+        setattr(n, k, v)
+    return n
+
+
+def sock(n, ident):
+    return next(s for s in list(n.inputs) + list(n.outputs) if s.identifier == ident)
+
+
+def feed(nt, dst, src):
+    """Connect src (a socket) into dst, or set a constant."""
+    if hasattr(src, "is_output"):
+        nt.links.new(src, dst)
+    else:
+        dst.default_value = src
+
+
+def mth(nt, op, a, b=0.0, clamp=False):
+    n = node(nt, "ShaderNodeMath", operation=op, use_clamp=clamp)
+    feed(nt, n.inputs[0], a)
+    feed(nt, n.inputs[1], b)
+    return n.outputs[0]
+
+
+def mix_col(nt, fac, a, b):
+    n = node(nt, "ShaderNodeMix", data_type="RGBA", clamp_factor=True)
+    feed(nt, sock(n, "Factor_Float"), fac)
+    feed(nt, sock(n, "A_Color"), a)
+    feed(nt, sock(n, "B_Color"), b)
+    return sock(n, "Result_Color")
+
+
+def mix_val(nt, fac, a, b):
+    n = node(nt, "ShaderNodeMix", data_type="FLOAT", clamp_factor=True)
+    feed(nt, sock(n, "Factor_Float"), fac)
+    feed(nt, sock(n, "A_Float"), a)
+    feed(nt, sock(n, "B_Float"), b)
+    return sock(n, "Result_Float")
+
+
+def ramp(nt, x, lo, hi):
+    """A smooth 0..1 step of x from lo to hi, clamped."""
+    n = node(nt, "ShaderNodeMapRange", interpolation_type="SMOOTHSTEP", clamp=True)
+    feed(nt, n.inputs["Value"], x)
+    n.inputs["From Min"].default_value = lo
+    n.inputs["From Max"].default_value = hi
+    return n.outputs["Result"]
+
+
+def scaled(nt, v, sx, sy, sz):
+    n = node(nt, "ShaderNodeMapping")
+    feed(nt, n.inputs["Vector"], v)
+    n.inputs["Scale"].default_value = (sx, sy, sz)
+    return n.outputs["Vector"]
+
+
+def noise(nt, v, scale, detail=6.0, rough=0.55):
+    n = node(nt, "ShaderNodeTexNoise")
+    feed(nt, n.inputs["Vector"], v)
+    n.inputs["Scale"].default_value = scale
+    n.inputs["Detail"].default_value = detail
+    n.inputs["Roughness"].default_value = rough
+    return n.outputs["Fac"]
+
+
+def pattern(nt, kind, vec):
+    """(height 0..1, albedo variation 0..1) for a kind, from object coordinates in units of its grain."""
+    if kind == "wood":
+        w = node(nt, "ShaderNodeTexWave", wave_type="RINGS")
+        feed(nt, w.inputs["Vector"], scaled(nt, vec, 0.12, 1.0, 1.0))           # the grain runs along X
+        w.inputs["Scale"].default_value = 1.0
+        w.inputs["Distortion"].default_value = 5.0
+        w.inputs["Detail"].default_value = 3.0
+        fine = noise(nt, scaled(nt, vec, 0.3, 12.0, 12.0), 1.0, 4.0)
+        h = mth(nt, "ADD", mth(nt, "MULTIPLY", sock(w, "Fac"), 0.75), mth(nt, "MULTIPLY", fine, 0.25))
+        return h, sock(w, "Fac")
+    if kind == "brushed_metal":
+        n = noise(nt, scaled(nt, vec, 0.03, 6.0, 6.0), 4.0, 8.0, 0.6)             # fine lines along X
+        return n, n
+    if kind == "leather":
+        v = node(nt, "ShaderNodeTexVoronoi", feature="F1")
+        feed(nt, v.inputs["Vector"], vec)
+        v.inputs["Scale"].default_value = 1.0
+        dome = mth(nt, "SUBTRACT", 1.0, mth(nt, "MULTIPLY", v.outputs["Distance"], 1.4), clamp=True)
+        n = noise(nt, vec, 0.4, 4.0)
+        return mth(nt, "ADD", mth(nt, "MULTIPLY", dome, 0.8), mth(nt, "MULTIPLY", n, 0.2)), n
+    if kind == "stone":
+        v = node(nt, "ShaderNodeTexVoronoi", feature="DISTANCE_TO_EDGE")
+        feed(nt, v.inputs["Vector"], vec)
+        v.inputs["Scale"].default_value = 1.0
+        crack = ramp(nt, v.outputs["Distance"], 0.0, 0.08)
+        n = noise(nt, vec, 3.0, 8.0, 0.6)
+        return mth(nt, "MULTIPLY", crack, mth(nt, "ADD", mth(nt, "MULTIPLY", n, 0.5), 0.5)), n
+    if kind == "fabric":
+        a = node(nt, "ShaderNodeTexWave", wave_type="BANDS", bands_direction="X")
+        b = node(nt, "ShaderNodeTexWave", wave_type="BANDS", bands_direction="Y")
+        for w in (a, b):
+            feed(nt, w.inputs["Vector"], vec)
+            w.inputs["Scale"].default_value = 1.0
+        return mth(nt, "MULTIPLY", sock(a, "Fac"), sock(b, "Fac")), noise(nt, vec, 0.3, 3.0)
+    if kind == "painted_metal":
+        return noise(nt, vec, 2.0, 4.0, 0.5), noise(nt, vec, 0.25, 3.0)          # orange peel
+    if kind in ("bare_metal", "rubber"):
+        n = noise(nt, vec, 3.0 if kind == "bare_metal" else 2.0, 10.0, 0.65)
+        return n, n
+    return noise(nt, vec, 2.0, 5.0, 0.5), noise(nt, vec, 0.2, 3.0)               # plastic, emissive
+
+
+def make_material(spec, masks):
+    kind = spec["kind"]
+    if kind not in KINDS:
+        raise JobError(f"unknown material kind {kind!r}")
     mat = bpy.data.materials.new(spec["name"])
     mat.use_nodes = True
     nt = mat.node_tree
     bs = principled(mat)
     col = [num(c, 0, 1) for c in spec["color"]] + [1.0]
+    edge_col = [num(c, 0, 1) for c in spec["edge_color"]] + [1.0]
+    dirt_col = [num(c, 0, 1) for c in spec["dirt_color"]] + [1.0]
     rough, metal = num(spec["roughness"], 0, 1), num(spec["metallic"], 0, 1)
-    bs.inputs["Base Color"].default_value = col
-    bs.inputs["Roughness"].default_value = rough
-    bs.inputs["Metallic"].default_value = metal
-    pat = spec.get("pattern", "none")
-    if pat not in PATTERNS:
-        raise JobError(f"unknown pattern {pat!r}")
-    if pat == "none":
-        return mat
-    scale = 1.0 / num(spec.get("pattern_mm", 20.0), 0.01, 1e5)
-    tc = nt.nodes.new("ShaderNodeTexCoord")
-    mp = nt.nodes.new("ShaderNodeMapping")
-    mp.inputs["Scale"].default_value = (scale, scale, scale)
-    nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
-    ramp = nt.nodes.new("ShaderNodeValToRGB")
-    dark = [c * 0.55 for c in col[:3]] + [1.0]
-    light = [min(c * 1.15, 1.0) for c in col[:3]] + [1.0]
-    ramp.color_ramp.elements[0].color = dark
-    ramp.color_ramp.elements[1].color = light
-    if pat == "wood":
-        tex = nt.nodes.new("ShaderNodeTexWave")
-        tex.wave_type = "RINGS"
-        tex.inputs["Scale"].default_value = 1.2
-        tex.inputs["Distortion"].default_value = 6.0
-        tex.inputs["Detail"].default_value = 3.0
-        mp.inputs["Scale"].default_value = (scale * 0.15, scale, scale)    # grain runs along X
-        nt.links.new(mp.outputs["Vector"], tex.inputs["Vector"])
-        nt.links.new(tex.outputs["Fac"], ramp.inputs["Fac"])
-    else:
-        tex = nt.nodes.new("ShaderNodeTexNoise")
-        tex.inputs["Scale"].default_value = 4.0
-        tex.inputs["Detail"].default_value = 6.0
-        if pat == "brushed":
-            mp.inputs["Scale"].default_value = (scale * 0.05, scale * 4, scale * 4)
-            ramp.color_ramp.elements[0].color = [c * 0.85 for c in col[:3]] + [1.0]
-        nt.links.new(mp.outputs["Vector"], tex.inputs["Vector"])
-        nt.links.new(tex.outputs["Fac"], ramp.inputs["Fac"])
-    nt.links.new(ramp.outputs["Color"], bs.inputs["Base Color"])
-    rr = nt.nodes.new("ShaderNodeMapRange")                                 # roughness varies a little with it
-    rr.inputs["To Min"].default_value = max(rough - 0.12, 0.0)
-    rr.inputs["To Max"].default_value = min(rough + 0.12, 1.0)
-    nt.links.new(tex.outputs["Fac"], rr.inputs["Value"])
-    nt.links.new(rr.outputs["Result"], bs.inputs["Roughness"])
+    wear = num(spec["wear"], 0, 1)
+    grain = num(spec["grain_mm"], 0.05, 1e5)
+    height = num(spec["height_mm"], 0, 100)
+    emis = num(spec["emission"], 0, 50)
+    e_mm, c_mm, t_mm = (num(masks[k], 1e-4, 1e5) for k in ("edge_mm", "cavity_mm", "thick_mm"))
+    tc = node(nt, "ShaderNodeTexCoord")
+    vec = scaled(nt, tc.outputs["Object"], 1.0 / grain, 1.0 / grain, 1.0 / grain)
+    h, var = pattern(nt, kind, vec)
+    # masks, read from the high poly as it is shaded
+    geo = node(nt, "ShaderNodeNewGeometry")
+    bev = node(nt, "ShaderNodeBevel", samples=8)
+    bev.inputs["Radius"].default_value = e_mm
+    dot = node(nt, "ShaderNodeVectorMath", operation="DOT_PRODUCT")
+    nt.links.new(bev.outputs["Normal"], dot.inputs[0])
+    nt.links.new(geo.outputs["Normal"], dot.inputs[1])
+    tilt = mth(nt, "SQRT", mth(nt, "MULTIPLY", mth(nt, "SUBTRACT", 1.0, sock(dot, "Value")), 2.0, clamp=False))
+    edge = ramp(nt, tilt, 0.04, 0.35)              # the angle (radians) the rounded-edge normal turns away
+    ao = node(nt, "ShaderNodeAmbientOcclusion", samples=8, only_local=True)
+    ao.inputs["Distance"].default_value = c_mm
+    cavity = ramp(nt, mth(nt, "SUBTRACT", 1.0, ao.outputs["AO"]), 0.08, 0.6)
+    th = node(nt, "ShaderNodeAmbientOcclusion", samples=8, inside=True, only_local=True)
+    th.inputs["Distance"].default_value = t_mm
+    thick = th.outputs["AO"]
+    convex = mth(nt, "MULTIPLY", edge, mth(nt, "SUBTRACT", 1.0, cavity, clamp=True))   # a creased valley is no edge
+    breakup = noise(nt, scaled(nt, tc.outputs["Object"], *(1.0 / (e_mm * 12.0),) * 3), 1.0, 8.0, 0.65)
+    thin = mth(nt, "MULTIPLY", mth(nt, "SUBTRACT", 1.0, thick, clamp=True), 0.35)
+    raw = mth(nt, "ADD", mth(nt, "MULTIPLY", convex, mth(nt, "ADD", mth(nt, "MULTIPLY", breakup, 1.2), 0.2)), thin)
+    lo_w = 1.0 - 0.75 * wear
+    worn = ramp(nt, raw, lo_w, lo_w + 0.18) if wear > 0 else 0.0
+    dirt = mth(nt, "MULTIPLY", mth(nt, "MULTIPLY", cavity, mth(nt, "ADD", mth(nt, "MULTIPLY", breakup, 0.8), 0.4)),
+               0.25 + 0.6 * wear, clamp=True)
+    mk = node(nt, "ShaderNodeCombineColor")
+    mk.name = "FormMasks"
+    feed(nt, mk.inputs["Red"], convex)
+    feed(nt, mk.inputs["Green"], cavity)
+    feed(nt, mk.inputs["Blue"], thick)
+    # albedo: the tint varied by the pattern, dirt in cavities, the edge colour where worn
+    c = CONTRAST[kind]
+    dark = [x * (1 - c) for x in col[:3]] + [1.0]
+    light = [min(x * (1 + c * 0.6), 1.0) for x in col[:3]] + [1.0]
+    albedo = mix_col(nt, var, dark, light)
+    albedo = mix_col(nt, dirt, albedo, dirt_col)
+    albedo = mix_col(nt, worn, albedo, edge_col)
+    nt.links.new(albedo, bs.inputs["Base Color"])
+    r = mth(nt, "ADD", rough, mth(nt, "MULTIPLY", mth(nt, "SUBTRACT", breakup, 0.5), 0.22))
+    r = mth(nt, "ADD", r, mth(nt, "MULTIPLY", mth(nt, "SUBTRACT", var, 0.5), 0.1))
+    r = mth(nt, "ADD", r, mth(nt, "MULTIPLY", dirt, 0.2), clamp=True)
+    nt.links.new(mix_val(nt, worn, r, num(spec["edge_roughness"], 0, 1)), bs.inputs["Roughness"])
+    m = mth(nt, "MULTIPLY", metal, mth(nt, "SUBTRACT", 1.0, mth(nt, "MULTIPLY", dirt, 0.6)))
+    nt.links.new(mix_val(nt, worn, m, num(spec["edge_metallic"], 0, 1)), bs.inputs["Metallic"])
+    # height: the pattern, minus a chip where paint wears through
+    hh = h if kind != "painted_metal" else mth(nt, "SUBTRACT", h, mth(nt, "MULTIPLY", worn, 1.5))
+    bump = node(nt, "ShaderNodeBump")
+    bump.inputs["Distance"].default_value = height
+    bump.inputs["Strength"].default_value = 1.0
+    feed(nt, bump.inputs["Height"], hh)
+    nt.links.new(bev.outputs["Normal"], bump.inputs["Normal"])    # edges baked round, as a bevel would shade them
+    nt.links.new(bump.outputs["Normal"], bs.inputs["Normal"])
+    em = node(nt, "ShaderNodeRGB")
+    em.name = "FormEmission"
+    em.outputs[0].default_value = col if emis > 0 else (0.0, 0.0, 0.0, 1.0)
+    nt.links.new(em.outputs[0], bs.inputs["Emission Color"])
+    bs.inputs["Emission Strength"].default_value = emis
+    mat["form_emissive"] = bool(emis > 0)
     return mat
 
 
@@ -358,6 +632,9 @@ def final_material(name, imgs):
         nm = nt.nodes.new("ShaderNodeNormalMap")
         nt.links.new(tex(imgs["normal"]).outputs["Color"], nm.inputs["Color"])
         nt.links.new(nm.outputs["Normal"], bs.inputs["Normal"])
+    if "emissive" in imgs:
+        nt.links.new(tex(imgs["emissive"]).outputs["Color"], bs.inputs["Emission Color"])
+        bs.inputs["Emission Strength"].default_value = 1.0
     return mat
 
 
@@ -398,8 +675,8 @@ def explode(high, low, spacing):
     (restore function, number of parts moved)."""
     lo_lab, nl = islands(low)
     hi_lab, nh = islands(high)
-    if nl < 2 or nh < 2:
-        return (lambda: None), 0
+    if nl < 2:
+        return (lambda: None), 0, lo_lab
     lo_co, hi_co = coords(low), coords(high)
 
     def boxes(co, lab, n):
@@ -418,11 +695,22 @@ def explode(high, low, spacing):
         used_l.add(i)
         used_h.add(j)
         pairs.append((i, j))
+    # high-poly parts left over (detail that exists only on the high poly: a bolt, a strap) go with the low part whose
+    # box is nearest their centre (the smaller box on a tie: a bolt on a band, not the body under it)
+    owner = {j: i for i, j in pairs}
+    for j in range(nh):
+        if j in owner:
+            continue
+        c = bh[j, :3]
+        gap = np.linalg.norm(np.maximum(np.abs(c[None, :] - bl[:, :3]) - bl[:, 3:] / 2, 0.0), axis=1)
+        vol = np.prod(np.maximum(bl[:, 3:], 1e-9), axis=1)
+        owner[j] = int(np.lexsort((vol, np.round(gap, 6)))[0])
+    order = {i: k for k, i in enumerate(sorted({i for i, _ in pairs} | set(owner.values())))}
     lo_new, hi_new = lo_co.copy(), hi_co.copy()
-    for k, (i, j) in enumerate(sorted(pairs)):
-        d = np.array([spacing * (k + 1), 0.0, 0.0])
-        lo_new[lo_lab == i] += d
-        hi_new[hi_lab == j] += d
+    for i, k in order.items():
+        lo_new[lo_lab == i] += np.array([spacing * (k + 1), 0.0, 0.0])
+    for j, i in owner.items():
+        hi_new[hi_lab == j] += np.array([spacing * (order[i] + 1), 0.0, 0.0])
     low.data.vertices.foreach_set("co", lo_new.reshape(-1))
     high.data.vertices.foreach_set("co", hi_new.reshape(-1))
     low.data.update()
@@ -433,8 +721,94 @@ def explode(high, low, spacing):
         high.data.vertices.foreach_set("co", hi_co.reshape(-1))
         low.data.update()
         high.data.update()
-    return restore, len(pairs)
+    return restore, len(order), lo_lab
 
+
+def ray_plan(high, low, lab, n):
+    """The bake ray per exploded part, from the low-to-high distance (A5: a fixed share of the diagonal either
+    stops short of the high poly, so a ray starts inside it and lands on its far side from behind, or reaches another
+    surface). From each LOD0 point and face centre, the distance to the high poly along the normal (out or in, the
+    nearer hit; the nearest point when neither hits) is sampled; the part's cage extrusion is its 99th percentile
+    x 1.2 (at least 0.2% of the part's size) and its ray 2x that. Returns (extrusion per part, rows for the report)."""
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+    hc = coords(high)
+    bvh = BVHTree.FromPolygons([tuple(v) for v in hc.tolist()], [tuple(p.vertices) for p in high.data.polygons])
+    me = low.data
+    lc = coords(low)
+    ln = np.empty(len(lc) * 3)
+    me.vertices.foreach_get("normal", ln)
+    ln = ln.reshape(-1, 3)
+    pc = np.empty(len(me.polygons) * 3)
+    pn = np.empty(len(me.polygons) * 3)
+    me.polygons.foreach_get("center", pc)
+    me.polygons.foreach_get("normal", pn)
+    pc, pn = pc.reshape(-1, 3), pn.reshape(-1, 3)
+    pv = np.empty(len(me.polygons), dtype=np.int64)
+    me.polygons.foreach_get("loop_start", pv)
+    lv = np.empty(len(me.loops), dtype=np.int64)
+    me.loops.foreach_get("vertex_index", lv)
+    plab = lab[lv[pv]]
+    ext = np.zeros(n)
+    rows = []
+    for k in range(n):
+        pts = np.concatenate([lc[lab == k], pc[plab == k]])
+        nrm = np.concatenate([ln[lab == k], pn[plab == k]])
+        if not len(pts):
+            continue
+        size = float(np.linalg.norm(pts.max(0) - pts.min(0)))
+        lim = max(size * 0.25, 1e-3)
+        if len(pts) > 6000:
+            pick = np.linspace(0, len(pts) - 1, 6000).astype(int)
+            pts, nrm = pts[pick], nrm[pick]
+        d = np.empty(len(pts))
+        for i, (p, q) in enumerate(zip(pts.tolist(), nrm.tolist())):
+            p, q = Vector(p), Vector(q)
+            best = None
+            for dirn in (q, -q):
+                hit = bvh.ray_cast(p, dirn, lim)
+                if hit[0] is not None:
+                    best = hit[3] if best is None else min(best, hit[3])
+            if best is None:
+                f = bvh.find_nearest(p, lim)
+                best = f[3] if f[0] is not None else lim
+            d[i] = best
+        p99 = float(np.percentile(d, 99))
+        ext[k] = max(p99 * 1.2, size * 0.002, 1e-3)
+        rows.append({"part": k, "samples": int(len(d)), "p99_mm": round(p99, 4), "max_mm": round(float(d.max()), 4),
+                     "extrusion_mm": round(float(ext[k]), 4), "ray_mm": round(float(ext[k] * 2), 4)})
+    return ext, rows
+
+
+def detail_reach(high, low, lab, ext, rows):
+    """High-only detail (a bolt, a strap, a raised panel) is a small share of the surface, so the 99th percentile of
+    the low-to-high distance misses it and the bake ray would start inside it. With a high-only mesh, each part's
+    extrusion also covers the farthest high-poly point outside its LOD0 surface (x 1.05)."""
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+    me = low.data
+    bvh = BVHTree.FromPolygons([tuple(v) for v in coords(low).tolist()], [tuple(p.vertices) for p in me.polygons])
+    pv = np.empty(len(me.polygons), dtype=np.int64)
+    me.polygons.foreach_get("loop_start", pv)
+    lv = np.empty(len(me.loops), dtype=np.int64)
+    me.loops.foreach_get("vertex_index", lv)
+    plab = lab[lv[pv]]
+    hc = coords(high)
+    if len(hc) > 40000:
+        hc = hc[np.linspace(0, len(hc) - 1, 40000).astype(int)]
+    out = np.zeros(len(ext))
+    for p in hc.tolist():
+        loc, nrm, idx, dist = bvh.find_nearest(Vector(p))
+        if loc is None or (Vector(p) - loc).dot(nrm) <= 0:
+            continue
+        k = int(plab[idx])
+        out[k] = max(out[k], dist)
+    ext = np.maximum(ext, out * 1.05)
+    for r in rows:
+        r["detail_mm"] = round(float(out[r["part"]]), 4)
+        r["extrusion_mm"] = round(float(ext[r["part"]]), 4)
+        r["ray_mm"] = round(float(ext[r["part"]] * 2), 4)
+    return ext
 
 
 def bake_all(high, low, job, work):
@@ -449,25 +823,47 @@ def bake_all(high, low, job, work):
     except (AttributeError, TypeError):
         pass
     diag = float(np.linalg.norm(np.array(low.dimensions)))
-    extrusion, ray = diag * 0.01, diag * 0.03
     target = bpy.data.materials.new("FormBakeTarget")
     target.use_nodes = True
-    node = target.node_tree.nodes.new("ShaderNodeTexImage")
-    target.node_tree.nodes.active = node
+    tnode = target.node_tree.nodes.new("ShaderNodeTexImage")
+    target.node_tree.nodes.active = tnode
     low.data.materials.clear()
     low.data.materials.append(target)
     for p in low.data.polygons:
         p.material_index = 0
-    activate(low, others=[high])
     times, imgs, arrays = {}, {}, {}
+    # the cage: LOD0 pushed out along its normals by its part's extrusion (measured exploded, see ray_plan)
+    undo, _parts, lab = explode(high, low, diag * 3.0)          # exploded only to measure, then put back
+    nparts = int(lab.max()) + 1 if len(lab) else 0
+    ext, rays = ray_plan(high, low, lab, nparts)
+    if job.get("high_input"):
+        ext = detail_reach(high, low, lab, ext, rays)
+    undo()
+    ray = float(ext.max() * 2) if len(ext) else diag * 0.03
+    vn = np.empty(len(low.data.vertices) * 3)
+    low.data.vertices.foreach_get("normal", vn)
+    push = vn.reshape(-1, 3) * ext[lab][:, None]
+    cage = copy_object(low, "FormBakeCage")
+
+    def place_cage():
+        cage.data.vertices.foreach_set("co", (coords(low) + push).reshape(-1))
+        cage.data.update()
+    hidden = []                                    # the LODs lie on the surface: they must not shade it (AO)
+    for o in bpy.context.scene.objects:
+        if o is not high:
+            hidden.append((o, o.visible_camera, o.visible_diffuse, o.visible_glossy, o.visible_transmission,
+                           o.visible_volume_scatter, o.visible_shadow))
+            o.visible_camera = o.visible_diffuse = o.visible_glossy = False
+            o.visible_transmission = o.visible_volume_scatter = o.visible_shadow = False
+    activate(low, others=[high])
 
     def bake(key, btype, color_space, samples, **kw):
         img = bpy.data.images.new(f"{job['asset']}_{key}", px, px, alpha=False)
         img.colorspace_settings.name = color_space
-        node.image = img
+        tnode.image = img
         sc.cycles.samples = int(samples)
         t0 = time.perf_counter()
-        bpy.ops.object.bake(type=btype, use_selected_to_active=True, cage_extrusion=extrusion,
+        bpy.ops.object.bake(type=btype, use_selected_to_active=True, use_cage=True, cage_object=cage.name,
                             max_ray_distance=ray, margin=int(b["margin_px"]), target="IMAGE_TEXTURES", **kw)
         times[key] = round(time.perf_counter() - t0, 3)
         a = np.empty(px * px * 4, dtype=np.float32)
@@ -476,53 +872,84 @@ def bake_all(high, low, job, work):
         imgs[key] = img
         say("FORM_STEP", f"baked {key} in {times[key]} s")
 
-    def through_emission(key, socket, color_space):
-        """Bake a Principled input as it is shaded (linked pattern or plain value) by routing it to emission: the
-        DIFFUSE colour pass would give black for metals (their diffuse is zero), and metallic has no bake type."""
-        saved, added = [], []
+    def emit_bake(key, color_space, source):
+        """Bake a value as it is shaded on the high poly (a Principled input, a mask, the emission colour) by routing
+        it to emission: the DIFFUSE colour pass would give black for metals (their diffuse is zero), and metallic and
+        the masks have no bake type. Every material's own emission link is put back afterwards."""
+        saved = []
         for m in high.data.materials:
             bs = principled(m)
             ec, es = bs.inputs["Emission Color"], bs.inputs["Emission Strength"]
-            saved.append((ec, tuple(ec.default_value), es, es.default_value))
-            src = bs.inputs[socket]
-            if src.is_linked:
-                added.append((m, m.node_tree.links.new(src.links[0].from_socket, ec)))
+            old = ec.links[0].from_socket if ec.is_linked else None
+            saved.append((m, ec, old, tuple(ec.default_value), es, es.default_value))
+            for ln in list(ec.links):
+                m.node_tree.links.remove(ln)
+            src = source(m)
+            if hasattr(src, "is_output"):
+                m.node_tree.links.new(src, ec)
             else:
-                v = src.default_value
-                ec.default_value = tuple(v) if hasattr(v, "__len__") else (float(v), float(v), float(v), 1.0)
+                ec.default_value = src
             es.default_value = 1.0
         try:
             bake(key, "EMIT", color_space, b["samples"])
         finally:
-            for m, ln in added:
-                m.node_tree.links.remove(ln)
-            for ec, c, es, v in saved:
+            for m, ec, old, c, es, v in saved:
+                for ln in list(ec.links):
+                    m.node_tree.links.remove(ln)
+                if old is not None:
+                    m.node_tree.links.new(old, ec)
                 ec.default_value = c
                 es.default_value = v
 
-    hidden = []                                    # the LODs lie on the surface: they must not shade it (AO)
-    for o in bpy.context.scene.objects:
-        if o is not high:
-            hidden.append((o, o.visible_camera, o.visible_diffuse, o.visible_glossy, o.visible_transmission,
-                           o.visible_volume_scatter, o.visible_shadow))
-            o.visible_camera = o.visible_diffuse = o.visible_glossy = False
-            o.visible_transmission = o.visible_volume_scatter = o.visible_shadow = False
+    def input_of(name):
+        def get(m):
+            s = principled(m).inputs[name]
+            if s.is_linked:
+                return s.links[0].from_socket
+            v = s.default_value
+            return tuple(v) if hasattr(v, "__len__") else (float(v), float(v), float(v), 1.0)
+        return get
+
+    def named(node_name):
+        def get(m):
+            nd = m.node_tree.nodes.get(node_name)
+            return nd.outputs[0] if nd is not None else (0.0, 0.0, 0.0, 1.0)
+        return get
     maps = set(b["maps"])
     # AO is baked with the parts in place (a lid does shade the box under it); every surface map is baked exploded,
     # so each part only ever sees its own high poly (see explode())
+    place_cage()
     if "orm" in maps or "ao" in maps:
         bake("ao", "AO", "Non-Color", b["ao_samples"])
-    restore, moved = explode(high, low, diag * 3.0)
+    restore, moved = explode(high, low, diag * 3.0)[:2]
+    place_cage()
+    emissive = any(bool(m.get("form_emissive")) for m in high.data.materials)
     try:
         if "base_color" in maps:
-            through_emission("base_color", "Base Color", "sRGB")
+            emit_bake("base_color", "sRGB", input_of("Base Color"))
+            emit_bake("masks", "Non-Color", named("FormMasks"))
+            if emissive:
+                emit_bake("emissive", "sRGB", named("FormEmission"))
         if "normal" in maps:
             bake("normal", "NORMAL", "Non-Color", b["samples"], normal_space="TANGENT")
         if "orm" in maps:
-            through_emission("roughness", "Roughness", "Non-Color")
-            through_emission("metallic", "Metallic", "Non-Color")
+            emit_bake("roughness", "Non-Color", input_of("Roughness"))
+            emit_bake("metallic", "Non-Color", input_of("Metallic"))
     finally:
         restore()
+    hidden = [h for h in hidden if h[0] is not cage]
+    bpy.data.objects.remove(cage)
+
+    def gray(key, channel, src):
+        a = np.ones((px, px, 4), dtype=np.float32)
+        a[..., 0] = a[..., 1] = a[..., 2] = arrays[src][..., channel]
+        img = bpy.data.images.new(f"{job['asset']}_{key}", px, px, alpha=False)
+        img.colorspace_settings.name = "Non-Color"
+        img.pixels.foreach_set(a.reshape(-1))
+        imgs[key] = img
+    if "masks" in arrays:
+        gray("curvature", 0, "masks")
+        gray("thickness", 2, "masks")
     if "orm" in maps:
         orm = np.ones((px, px, 4), dtype=np.float32)
         orm[..., 0] = arrays["ao"][..., 0]
@@ -536,8 +963,8 @@ def bake_all(high, low, job, work):
         (o.visible_camera, o.visible_diffuse, o.visible_glossy, o.visible_transmission, o.visible_volume_scatter,
          o.visible_shadow) = vis
     files = {}
-    for key in ("base_color", "normal", "orm", "ao"):
-        if key in imgs and key in maps:
+    for key in ("base_color", "normal", "orm", "ao", "emissive", "curvature", "thickness"):
+        if key in imgs and (key in maps or key in EXTRA_MAPS):
             path = inside(work, f"{key}.png")
             imgs[key].filepath_raw = path
             imgs[key].file_format = "PNG"
@@ -545,7 +972,10 @@ def bake_all(high, low, job, work):
             files[key] = os.path.basename(path)
     return {"seconds": times, "total_seconds": round(sum(times.values()), 3), "files": files,
             "px": px, "samples": b["samples"], "ao_samples": b["ao_samples"], "device": sc.cycles.device,
-            "cage_extrusion": round(extrusion, 4), "max_ray_distance": round(ray, 4), "exploded_parts": moved}, imgs
+            "cage_extrusion": round(float(ext.max()) if len(ext) else 0.0, 4), "max_ray_distance": round(ray, 4),
+            "rays": rays, "exploded_parts": moved, "parts": nparts,
+            "ray_note": "a cage per exploded part (extrusion p99 x 1.2 of its low-to-high distance); one bake call "
+                        "takes one ray length, the largest part's (2 x its extrusion)"}, imgs
 
 
 # ---- reading LODs back -------------------------------------------------------------------------------------------
@@ -662,17 +1092,28 @@ def run(job):
     timing = {}
     t = time.perf_counter()
     z = np.load(inside(work, job["input"]), allow_pickle=False)
-    mats = [make_material(m) for m in job["materials"]]
+    mats = [make_material(m, job["masks"]) for m in job["materials"]]
     margin = num(job["uv"]["margin_px"], 0, 64) / int(job["texture_px"])
     lods, report = [], []
+    texel = None
+    high_src = "the cage subdivided"
     if job["source"] == "cage":
         say("FORM_STEP", "cage")
         base = base_from_cage(z, mats)
         say("FORM_STEP", f"UVs ({job['uv']['method']})")
         unwrap(base, job["uv"]["method"], margin, at_limit=True)
+        texel = even_texel(base, margin)
         timing["uv"] = round(time.perf_counter() - t, 3)
         t = time.perf_counter()
-        high = subdivide(copy_object(base, "FormHigh"), int(job["high_level"]))
+        if job.get("high_input"):                  # detail that exists only on the high poly (high_only cage ops)
+            zh = np.load(inside(work, job["high_input"]), allow_pickle=False)
+            hb = base_from_cage(zh, mats)
+            hb.name = hb.data.name = "FormHighCage"
+            high = subdivide(hb, int(job["high_input_level"]))
+            high_src = "the high-only cage subdivided"
+        else:
+            high = subdivide(copy_object(base, "FormHigh"), int(job["high_level"]))
+        high.name = high.data.name = "FormHigh"
         timing["high"] = round(time.perf_counter() - t, 3)
         for spec in job["lods"]:
             t = time.perf_counter()
@@ -681,7 +1122,7 @@ def run(job):
             it = 0
             if spec["decimate"]:
                 triangulate(ob)
-                dec, it = decimate_to(ob, name, int(spec["budget"]))
+                dec, it = decimate_to(ob, name, int(spec["budget"]), keep_seams=spec["lod"] == 0)
                 bpy.data.objects.remove(ob)
                 ob = dec
             else:
@@ -775,12 +1216,26 @@ def run(job):
         say("FORM_STEP", f"export {spec['format']}")
         exports.append(export(spec, lods + cols, work))
     return {"ok": True, "runner": RUNNER_VERSION, "blender": bpy.app.version_string, "lods": report,
-            "high_triangles": tris(high), "bake": bake, "timing": timing, "exports": exports,
-            "collision_objects": [o.name for o in cols]}
+            "high_triangles": tris(high), "high_source": high_src, "bake": bake, "timing": timing,
+            "exports": exports, "collision_objects": [o.name for o in cols], "texel": texel}
+
+
+def watch_parent():
+    """Blender runs in its own process group, so it would outlive a Form Studio that was killed mid-bake. A thread
+    (Cycles bakes leave Python threads running) ends this process when its parent is gone (it is re-parented)."""
+    parent = os.getppid()
+
+    def loop():
+        while True:
+            time.sleep(1.0)
+            if os.getppid() != parent:
+                os._exit(5)
+    threading.Thread(target=loop, name="form-parent-watch", daemon=True).start()
 
 
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    watch_parent()
     try:
         job = json.loads(open(argv[0], encoding="utf-8").read())
         if job.get("runner") != RUNNER_VERSION:
