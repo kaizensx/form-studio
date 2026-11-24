@@ -523,7 +523,16 @@ class StudioEvaluator(Evaluator):
                           extra={"signature": sig})
 
     def evaluate(self, sources, timeout=None):
+        """Build and measure the batch. With timeout, the engine waits that long (wall clock) and counts what has
+        not finished as over budget; that work runs on in its kernel workers and its results are dropped."""
         self.timeout = max(15.0, float(timeout)) if timeout else 180.0
+        results: list = [None] * len(sources)
+        th = threading.Thread(target=self._batch, args=(sources, results), daemon=True, name="refine-batch")
+        th.start()
+        th.join(None if timeout is None else max(1.0, float(timeout)))
+        return [r if r is not None else Evaluation(ok=False, error="over the time budget") for r in results]
+
+    def _batch(self, sources, results):
         from concurrent.futures import ThreadPoolExecutor
         from .. import candidates
         from ..studio import StudioError
@@ -540,15 +549,16 @@ class StudioEvaluator(Evaluator):
             row = by.get(labels[i]) or {}
             if not row.get("ok"):
                 err = row.get("error") or {}
-                return Evaluation(ok=False, error=(err.get("message") if isinstance(err, dict) else str(err))
-                                  or "; ".join(row.get("notes") or []) or "did not build")
+                results[i] = Evaluation(ok=False, error=(err.get("message") if isinstance(err, dict) else str(err))
+                                        or "; ".join(row.get("notes") or []) or "did not build")
+                return
             try:
-                return self._measure(sources[i], row)
+                results[i] = self._measure(sources[i], row)
             except Exception as e:                               # noqa: BLE001 - a candidate that cannot be measured
-                return Evaluation(ok=False, error=f"{type(e).__name__}: {e}"[:300])
+                results[i] = Evaluation(ok=False, error=f"{type(e).__name__}: {e}"[:300])
         pool = getattr(self.st.kernel, "size", 1)
         with ThreadPoolExecutor(max_workers=max(1, min(len(sources), pool))) as ex:
-            return list(ex.map(one, range(len(sources))))
+            list(ex.map(one, range(len(sources))))
 
 
 def prepare(st, pid: str, refine=None, style: str | None = None) -> tuple[Design | None, StudioEvaluator | None, str]:
