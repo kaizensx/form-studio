@@ -153,6 +153,8 @@ def topics_for(families) -> list[str]:
             out.append(t)
     if "organic" in families and "surfacing" not in out:
         out.insert(1, "surfacing")
+    if {"organic", "texture"} & set(families):          # a construction route per feature (kernel, subd, sculpt...)
+        out.append("hybrid")
     return out
 
 
@@ -245,7 +247,10 @@ def save_plan(st, ref: str, features: list, parts=None, key_dimensions=None, mec
               magnets=None) -> dict:
     """Store the feature plan. Refused when a `how` names a helper that does not exist (with the closest real
     names) and when a multi-part brief does not declare its parts, clearances and magnet stock. The stored plan
-    carries its route and executable steps (advice())."""
+    carries its route and executable steps (advice()). A feature may state its construction route (`route`: kernel,
+    subd_cage, sculpt_recon or procedural); otherwise form/router.py reads it from the feature's words (heuristic).
+    plan["feature_routes"] holds each route with the words that chose it, plan["route_warnings"] each mechanical
+    interface on a mesh-only route, and a feature whose route could not be read is added to the brief's unknowns."""
     b = load_brief(st, ref)
     from . import product_classes as pc
     if product_class and product_class not in pc.CLASSES:
@@ -271,10 +276,16 @@ def save_plan(st, ref: str, features: list, parts=None, key_dimensions=None, mec
         raise StudioError("A complex design needs its risks named.", "What could make it fail? (a fillet that will not "
                           "fit, a shell that self-intersects, parts that collide, a texture too fine to print...)")
     prts = _clean_list(parts, "parts")
-    cl, mags = _check_plan(b, feats, prts, clearances, magnets)
+    cl, mags, warns = _check_plan(b, feats, prts, clearances, magnets)
     adv = advice(" ".join([b.get("goal", ""), b.get("name", ""), b.get("style", "") or ""]), feats)
+    from . import router
+    froutes = {f["id"]: router.feature_route(f) for f in feats}
+    unread = [u for u in router.unknowns(feats) if u not in (b.get("unknowns") or [])]
+    if unread:                                  # what the router could not read goes back into the brief
+        b["unknowns"] = list(b.get("unknowns") or []) + unread
     plan = {"features": feats, "parts": prts, "clearances": cl, "magnets": mags,
-            "route": adv["route"], "steps": adv["steps"], "key_dimensions": key_dimensions or {},
+            "route": adv["route"], "feature_routes": froutes, "route_warnings": warns, "steps": adv["steps"],
+            "key_dimensions": key_dimensions or {},
             "mechanisms": _clean_list(mechanisms, "mechanisms"), "textures": _clean_list(textures, "textures"),
             "risks": rk, "approach": approach, "references_used": _clean_list(references_used, "references_used"),
             "product_class": product_class or pc.detect(" ".join([b.get("goal", ""), b.get("name", "")])) or "",
@@ -283,6 +294,8 @@ def save_plan(st, ref: str, features: list, parts=None, key_dimensions=None, mec
     if f.is_file():
         b["plan"] = plan
         f.write_text(json.dumps(b, indent=1), encoding="utf-8")
+    elif unread:
+        attach(st, ref, brief={**b, "plan": plan})
     else:
         attach(st, ref, plan=plan)
     return {"brief": b["id"], "plan": plan}
@@ -558,8 +571,10 @@ def _fallback(helpers: list, risk: str) -> list[str]:
 
 
 def steps(features: list, route_: str = "prismatic") -> list[dict]:
-    """The plan as executable steps, in build order: the call to make, the helpers it uses, the risk class, the
-    fallback (real helper names only) and the retry cap."""
+    """The plan as executable steps, in build order: the call to make, the feature's construction route (router:
+    kernel, subd_cage, sculpt_recon or procedural) with the real helpers and tools for it, the helpers its how uses,
+    the risk class, the fallback (real helper names only) and the retry cap."""
+    from . import router
     out = []
     for i, f in enumerate(features):
         how = str(f.get("how", ""))
@@ -575,8 +590,14 @@ def steps(features: list, route_: str = "prismatic") -> list[dict]:
                 call["alternative"] = {"tool": "build_candidates", "with": "project=..., candidates=[{label, feature: "
                                        f"\"{f['id']}\", code}}, ...]: built on the shared checkpoint of the features "
                                        "before it"}
+        fr = router.feature_route(f)
+        rp = router.plan_for(fr["route"])
+        if fr["route"] != "kernel" and any(t["available"] for t in rp["tools"]):
+            call["mesh"] = {"tool": "model_mesh", "with": f"the {fr['route']} ops for {f['id']}; the result is "
+                            "written back into the design source"}
         out.append({"step": i + 1, "id": f["id"], "label": f.get("label", f["id"]), "how": how,
-                    **({"part": f["part"]} if f.get("part") else {}), "helpers": c["helpers"], "risk": risk,
+                    **({"part": f["part"]} if f.get("part") else {}), "route": fr, "route_plan": rp,
+                    "helpers": c["helpers"], "risk": risk,
                     "risk_why": why, "fallback": _fallback(c["helpers"], risk), "retries": RETRIES, "call": call,
                     "then": "render(view=\"sheet\") and look" if i == 0 or risk != "low" else "next step"})
     return out
@@ -597,9 +618,17 @@ def advice(text: str, features: list | None = None) -> dict:
     return out
 
 
-def _check_plan(b: dict, feats: list, parts: list, clearances, magnets) -> tuple[dict, list]:
-    """Refuse a plan naming helpers that do not exist; a multi-part brief must declare its parts, the clearances
-    between them and, when it has magnets, their stock. Returns (clearances, magnets) normalised."""
+def _check_plan(b: dict, feats: list, parts: list, clearances, magnets) -> tuple[dict, list, list]:
+    """Refuse a plan naming helpers that do not exist or a route that is not one of router.ROUTES; a multi-part brief
+    must declare its parts, the clearances between them and, when it has magnets, their stock. Warn (not refuse)
+    when a mechanical interface (hole, thread, magnet pocket, snap, bearing seat, mating face) sits on a mesh-only
+    route. Returns (clearances, magnets) normalised and the warnings."""
+    from . import router
+    badr = router.validate(feats)
+    if badr:
+        raise StudioError("Unknown construction route: " + "; ".join(badr) + ".",
+                          "route is one of " + ", ".join(router.ROUTES) + ", or leave it out to have it read from "
+                          "the feature's words (design_guide topic \"hybrid\").", status=422)
     bad = []
     for f in feats:
         for u in check_how(str(f.get("how", "")))["unknown"]:
@@ -644,4 +673,4 @@ def _check_plan(b: dict, feats: list, parts: list, clearances, magnets) -> tuple
                               "Separate parts are modelled as separate solids with a designed gap; magnets are bought "
                               "stock with a pocket clearance. Pull force stays unknown without a datasheet value.",
                               status=422)
-    return cl, mags
+    return cl, mags, router.warnings(feats)
