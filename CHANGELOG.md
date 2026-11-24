@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Blender as a modelling editor, driven by ops instead of code.** An agent can model a subdivision cage in Blender
+  with a declarative op list (new cage from a primitive or quads, extrude a region, loop cut, move, crease, name a
+  region, mirror, Geometry Nodes array and scatter, bounded sculpt brushes, voxel or QuadriFlow remesh). Every op is
+  checked before Blender starts, a fixed runner executes it, each op streams a level-2 subdivision preview into the
+  same live stage view a build uses, and the result comes back as cage data (points, quads, creases, named regions)
+  for a design's source and `form/craft/subd.py`. Replaying an op list gives the same cage. Measured on this Mac
+  (Blender 5.2.3): a run is about 0.5 to 1.1 s, most of it Blender starting; modelling ops take under 1 ms each,
+  scatter 3 ms, voxel remesh 29 ms and QuadriFlow 0.33 s on a 2000-face target; Form's Catmull-Clark matches
+  Blender's level-3 subdivision to 1e-7 of the part's size. Blender runs with factory settings, offline mode, no
+  auto-run scripts, a scrubbed environment, a temporary folder and a time limit; network access is not isolated by
+  the operating system. The MCP tool `model_mesh` is ready to register; it is not in the tool list yet.
 - **The view from below is lit, and moving the view no longer flashes dark.** Faces that look down get the light
   the bench bounces back up (an ambient term in the clay shader that grows toward the floor), so the Under view and
   every elevation down to -89 degrees show shaded clay instead of a black shape: on the test enclosure the Under view

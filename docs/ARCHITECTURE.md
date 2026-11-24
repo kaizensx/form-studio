@@ -36,6 +36,7 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Slicer adapters | `form/adapters/`, `form/printers.py`, `form/plates.py` | Find the slicer and every printer set up in it, resolve presets, lay parts out on one or more plates, slice, parse the G-code |
 | Print simulation | `form/toolpath.py`, `form/simulate.py` | Per-layer toolpaths by line type, timed by the slicer's estimate |
 | Agents | `form/agents/`, `form/chat.py`, `form/ask.py` | Run an agent CLI, or talk to a model API, a local model or a provider added by URL with Form Studio's tools (`form/agents/mcp_client.py`); questions and measurements the agent asks wait for the person's answer |
+| Blender modelling bridge | `form/adapters/blender_model.py`, `form/adapters/blender_ops.py`, `form/meshsource.py` | An agent's declarative op list, schema-checked, run in Blender by a fixed runner; streams a preview per op; returns cage data (points, quads, creases, named regions) for a design's source |
 | MCP server | `form/mcp_server.py` | 93 tools over stdio |
 | CLI | `form/__main__.py` | Every capability as a JSON-printing command |
 | Archives | `form/bundle.py` | `.formstudio` files: a project, its conversations and the code it was built from, checked before anything is written |
@@ -90,6 +91,30 @@ time budget (`[assembly].budget_s`); a partial result names the range that was c
 *model* (statistics or statics with stated assumptions), *simulated* (from the slicer), *physical* (entered from a real
 print). Coupon measurements calibrate the printer profile; only a result from the part itself is physical evidence for
 a revision.
+
+## Blender modelling bridge
+
+An agent models a subdivision cage in Blender by sending ops, never code: `cage_new`, `extrude_region`, `loop_cut`,
+`move`, `crease`, `name_region`, `mirror`, `geonodes_array`, `geonodes_scatter`, `sculpt_ops` (Form's own bounded,
+deterministic brushes) and `remesh` (voxel or QuadriFlow). `form/adapters/blender_model.py` checks every op, field,
+type and range before Blender starts and refuses anything else. `form/adapters/blender_ops.py` is the fixed script
+Blender runs: it maps each op name to its own function, imports nothing that opens a network connection or starts a
+process (a test reads its syntax tree), and puts points and faces in a geometry-only order after every op, so a replay
+of the same op list gives the same cage (the hash of its rounded points and faces).
+
+After each op the runner writes the cage at subdivision level 2 to a stage file and prints `FORM_STAGE <path.bin>`.
+The bridge turns it into the same stage event a kernel build streams (`form/meshsource.py`, `stage_event`), so
+`Studio._draft_sink` puts it in `.cache/drafts/<draft>.json`, where `/api/drafts` and `Store.showStage` show it.
+
+The result is cage data, kept in the design's source (`meshsource.cage(...)`) and built by a `FeatureDesign` feature
+with `form/craft/subd.py`; Blender edits, the design source stays the geometry authority. Op lists and their cages are
+cached under `.cache/model_mesh/<key>`, keyed by the canonical ops, the runner version and Blender's major.minor.
+
+Blender runs as `blender -b --factory-startup -noaudio -Y` (scripts inside .blend files never run automatically), with
+`--offline-mode` from Blender 4.2, a scrubbed environment, a temporary working directory and a watchdog that kills its
+whole process group at the time limit. Nothing is written until Blender has finished, so a failed or stopped run leaves
+the project as it was. **Network access is not isolated by the operating system:** `--offline-mode` is Blender's own
+switch and the runner has no network code, but nothing outside Blender stops a Blender process from connecting.
 
 ## Fit model
 
