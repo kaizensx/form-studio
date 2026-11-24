@@ -43,7 +43,9 @@ def journey_blank(ui):
     ui.shot("start-home-empty")
     # printing is opt-in: a new person's next design is a 3D model and Home says nothing about printers
     ui.eq(ui.js("Store.newPurposeEffective"), "model", "a new design is a 3D model")
-    ui.check(ui.find(name="startPurpose") is None or not ui.item("startPurpose").isVisible(), "no print choice while printing is off")
+    # "Make it for" always offers Anything and Game asset; My printer only once printing is on
+    ui.check(ui.sees("Anything", "startPurpose") and ui.sees("Game asset", "startPurpose"), "Make it for: Anything / Game asset")
+    ui.check(not ui.sees("My printer", "startPurpose"), "no print choice while printing is off")
     ui.check(not ui.sees("not for printing", "topBar") and ui.find(name="printerChip") is None, "no printer talk in the top bar")
     # the printer and the agent are chosen right under the composer
     ui.check(ui.exists("startModel"), "the agent and model chip is under the composer")

@@ -431,7 +431,15 @@ class Hangs(unittest.TestCase):
         p = st.create_design("Spins", SPINS, partial=True)
         sk = st.rev(p)["partial"]["skipped"]
         self.assertEqual([x["feature"] for x in sk], ["texture"])
-        self.assertIn("1 s budget", sk[0]["message"])
+        # the 1 s budget stretches with the kernel call's timeout under load (featureprog.STRETCH): the message names
+        # the budget that was applied, which is never less than the 1 s the feature asked for
+        import re
+        m = re.search(r"within its ([0-9.]+) s budget", sk[0]["message"])
+        self.assertIsNotNone(m, sk[0]["message"])
+        self.assertGreaterEqual(float(m.group(1)), 1.0)
+        hung = sk[0].get("hung") or {}
+        if "budget" in hung:
+            self.assertAlmostEqual(float(hung["budget"]), float(m.group(1)), places=3)
         self.assertIn(_log(st, p)["cap"], ("built", "checkpoint"))      # cap sits on bore, as in the hang test
 
     def test_a_crash_keeps_the_features_before_it(self):

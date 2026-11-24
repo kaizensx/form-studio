@@ -430,6 +430,24 @@ class UI:
         self._pump(20)
 
     # -- keyboard ------------------------------------------------------------
+    def _activate(self, limit: float = 5.0):
+        """Make the app window the focus window again. Qt Quick's Shortcuts (single keys, Ctrl+K, Ctrl+1..5, Esc)
+        fire only in the focus window, and a real window on a shared desktop loses it whenever another app or another
+        journey's window is activated; clicks still land, so only the keys would fail. A window that cannot get the
+        focus back fails here, saying so, instead of as a shortcut that did nothing."""
+        if self.win.isActive():
+            return
+        t0 = time.time()
+        while time.time() - t0 < limit:
+            self.win.raise_()
+            self.win.requestActivate()
+            self._pump(100)
+            if self.win.isActive():
+                self.log.append("window re-activated")
+                return
+        raise UIError(f"the app window is not active (another window has the keyboard: {self.app.focusWindow()!r}),"
+                      " so its keyboard shortcuts cannot fire")
+
     def key(self, seq: str, n: int = 1):
         """Press a key or chord written the Qt way: "Ctrl+K", "Escape", "Tab", "Shift+Tab", "V", "Ctrl+Return"."""
         from PySide6.QtCore import Qt
@@ -441,6 +459,7 @@ class UI:
         k, mods = kc.key(), kc.keyboardModifiers()
         if seq.lower().endswith("shift+tab"):
             k = Qt.Key.Key_Backtab
+        self._activate()
         for _ in range(n):
             self.T.keyClick(self.win, k, mods)
             self._pump(20)

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **UI journeys keep the keyboard.** Qt Quick shortcuts fire only in the focus window, so when another app or window
+  took the focus during a run, journeys that press keys (E, 1-5, T, Esc, Ctrl+3, Ctrl+K) timed out while clicks
+  still worked. A journey's key press now makes the app window active again first, and fails with a clear message
+  if it cannot. The Home check for printing off now expects "Make it for: Anything / Game asset" with no My printer
+  choice, as the game asset purpose made that control always shown. The kernel's alarm test reads the budget it
+  reports (stretched under load) instead of expecting exactly 1 s.
 - **A detail vocabulary for cages, and a kit of original parts.** `model_mesh` has eight new ops, checked like the
   others before Blender starts: `bevel`, `support_loops`, `inset`, `panel_line` (a V groove along an edge path),
   `trim_strip` (a raised band), `solidify`, `bridge` (a tunnel or handle between two face sets) and `kit_place`.
