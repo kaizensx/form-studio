@@ -17,8 +17,14 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "CHANGELOG.md"), "form"),
          # credits for outside projects whose ideas the engine builds on
          (str(ROOT / "THIRD_PARTY_NOTICES.md"), "form"),
-         # run by Blender itself as a file (blender -b --python <path>), so it must exist on disk inside the app
-         (str(ROOT / "form" / "adapters" / "blender_scene.py"), "form/adapters")]
+         # run by Blender itself as files (blender -b --python <path>), so they must exist on disk inside the app:
+         # the scene runner, the modelling runner (model_mesh) and the game-asset runner (game_asset)
+         (str(ROOT / "form" / "adapters" / "blender_scene.py"), "form/adapters"),
+         (str(ROOT / "form" / "adapters" / "blender_ops.py"), "form/adapters"),
+         (str(ROOT / "form" / "adapters" / "blender_model.py"), "form/adapters"),
+         (str(ROOT / "form" / "adapters" / "blender_game.py"), "form/adapters")]
+# the game pipeline as files too (form/game): its runner path is resolved from them on disk
+datas += [(str(p), "form/game") for p in sorted((ROOT / "form" / "game").glob("*.py"))]
 binaries, hidden = [], []
 for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfium2", "pypdfium2_raw",
             "bd_warehouse", "py_gearworks", "manifold3d"):     # parts libraries and mesh booleans ship inside the app
@@ -39,6 +45,8 @@ for sub in ("", "vendor"):
     d = ROOT / "form" / "recon" / "cadfit" / sub
     ENGINE_SRC += [(p, f"engine_src/form/recon/cadfit{'/' + sub if sub else ''}") for p in sorted(d.glob("*.py"))]
 ENGINE_SRC += [(ROOT / "form" / "recon" / "cadfit" / n, "engine_src/form/recon/cadfit") for n in ("LICENSE", "PERMISSION.md")]
+# CoACD (game collision, form/engines.py "game.coacd") runs `python -m form.game.lod coacd ...` in its environment
+ENGINE_SRC += [(p, "engine_src/form/game") for p in sorted((ROOT / "form" / "game").glob("*.py"))]
 datas += [(str(p), dest) for p, dest in ENGINE_SRC]
 # Inside the app itself, CADFit's search code and trimesh (which only that code imports) stay out: the search runs in
 # its own environment. Its reader (cqrun) and _compat stay in: the app reads the program CADFit sends back.

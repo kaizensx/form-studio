@@ -51,8 +51,8 @@ async def mcp_steps(exe: Path, env: dict) -> None:
             tools = {t.name for t in (await s.list_tools()).tools}
             step("MCP server is the app itself", "PASS" if len(tools) >= 40 else "FAIL", f"{len(tools)} tools")
 
-            async def call(name, **kw):
-                res = await s.call_tool(name, kw)
+            async def call(tool, **kw):
+                res = await s.call_tool(tool, kw)
                 text = " ".join(getattr(c, "text", "") or "" for c in res.content)
                 return res, text
 
@@ -88,9 +88,62 @@ async def mcp_steps(exe: Path, env: dict) -> None:
                 else:
                     imgs = sum(1 for c in res.content if getattr(c, "type", "") == "image")
                     step("Blender render", "FAIL" if res.is_error or not imgs else "PASS", text[:160].replace("\n", " "))
+                await game_step(call)
 
 
-PID = "phone-stand"              # the design main() makes from the device_stand recipe
+def cage_source() -> str:
+    """A small subdivision cage design (a box cage, 3 quads a side) as a design source: form/game/pipeline.py writes
+    it, so the smoke test sends exactly what an agent would."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    import numpy as np
+    from form import meshsource
+    from form.game import pipeline
+    n, lo, hi = 3, np.array([0.0, 0.0, 0.0]), np.array([40.0, 30.0, 20.0])
+    V, F, ids = [], [], {}
+
+    def pid(i, j, k):
+        if (i, j, k) not in ids:
+            ids[(i, j, k)] = len(V)
+            V.append(lo + (hi - lo) * np.array([i, j, k]) / n)
+        return ids[(i, j, k)]
+    for a in range(n):
+        for b in range(n):
+            F += [[pid(a, b, 0), pid(a, b + 1, 0), pid(a + 1, b + 1, 0), pid(a + 1, b, 0)],
+                  [pid(a, b, n), pid(a + 1, b, n), pid(a + 1, b + 1, n), pid(a, b + 1, n)],
+                  [pid(a, 0, b), pid(a + 1, 0, b), pid(a + 1, 0, b + 1), pid(a, 0, b + 1)],
+                  [pid(a, n, b), pid(a, n, b + 1), pid(a + 1, n, b + 1), pid(a + 1, n, b)],
+                  [pid(0, a, b), pid(0, a, b + 1), pid(0, a + 1, b + 1), pid(0, a + 1, b)],
+                  [pid(n, a, b), pid(n, a + 1, b), pid(n, a + 1, b + 1), pid(n, a, b + 1)]]
+    return pipeline.cage_design_source(meshsource.cage(np.array(V), F, [], {}), "Smoke cage")
+
+
+async def game_step(call) -> None:
+    """A small cage design made a game asset in the packaged app: Blender's game runner and form/game ship as files
+    (packaging/form.spec). 1k textures, the fast bake, the Unreal preset; every check must pass. SKIP when Blender is
+    not installed."""
+    import re
+    res, text = await call("create_design", name="Smoke cage", source=cage_source(), purpose="game", run=False)
+    m = None if res.is_error else re.search(r'"(?:project|id)":\s*"([a-z0-9-]+)"', text)
+    if m is None:
+        step("game asset from a cage (1k, fast bake)", "FAIL", text[:160].replace("\n", " ") or "no project id")
+        return
+    res, text = await call("game_asset", project=m.group(1), preset="unreal", budgets=[800, 400, 200, 60],
+                           texture_px=1024, bake="fast")
+    low = text.lower()
+    if res.is_error and "blender" in low and ("install" in low or "not found" in low):
+        step("game asset from a cage (1k, fast bake)", "SKIP", "Blender is not installed")
+        return
+    try:
+        out = json.loads(text)
+    except ValueError:
+        out = {}
+    ok = not res.is_error and (out.get("validation") or {}).get("ok") is True
+    detail = (f"LOD triangles {[x['triangles'] for x in out.get('lods', [])]}, bake "
+              f"{(out.get('bake') or {}).get('total_seconds')} s, every check PASS") if ok else text[:200].replace("\n", " ")
+    step("game asset from a cage (1k, fast bake)", "PASS" if ok else "FAIL", detail)
+
+
+PID ="phone-stand"              # the design main() makes from the device_stand recipe
 
 
 def ring_stl(path: Path, r_out: float = 20.0, r_in: float = 6.0, h: float = 12.0, n: int = 96) -> None:

@@ -6,7 +6,8 @@ A design is modelled in millimetres, Z up (CAD). Each preset says how the asset 
     godot    GLB, metres, +Y up. Collision nodes end in "-convcolonly" (Godot's import hint: a convex shape only).
     unity    FBX in metres (Unity's import scale 1), plus the GLB. Collision objects end in "_collider".
     unreal   FBX in centimetres, Z up, plus the GLB. Collision hulls are named UCX_<asset>_LOD0_NN (Unreal's
-             convention: UCX_ plus the render mesh's name).
+             convention: UCX_ plus the render mesh's name, and the render mesh exported is the LOD0 node
+             <asset>_LOD0; collision_name builds it from lod_name, so the two cannot drift apart).
 
 GLB is always written (form/meshio.py, pure numpy, so a GLB never depends on Blender's exporter). FBX and USD come
 from Blender's own exporters. LODs are separate nodes named <asset>_LOD0 .. <asset>_LOD3 (Unity and Unreal read the
@@ -27,7 +28,7 @@ PRESETS = {
     "unity": {"label": "Unity (FBX, metres)", "unit": "m", "scale": 0.001, "up": "Y", "formats": ("glb", "fbx"),
               "collision": "{asset}_{i:02d}_collider", "collision_extras": False},
     "unreal": {"label": "Unreal Engine (FBX, centimetres, Z up)", "unit": "cm", "scale": 0.1, "up": "Z",
-               "formats": ("glb", "fbx"), "collision": "UCX_{asset}_LOD0_{i:02d}", "collision_extras": False},
+               "formats": ("glb", "fbx"), "collision": "UCX_{lod0}_{i:02d}", "collision_extras": False},
 }
 EXTRA_FORMATS = ("fbx", "usd")             # any preset may ask for these as well (Blender's exporters)
 LOD_NAME = "{asset}_LOD{i}"
@@ -112,7 +113,9 @@ def pivot_offset(P_mm: np.ndarray, pivot: str) -> np.ndarray:
 
 
 def collision_name(pre: dict, asset: str, i: int) -> str:
-    return pre["collision"].format(asset=asset, i=i)
+    """A collision hull's name. Unreal pairs a UCX_ hull with the render mesh it names (UCX_<mesh>_NN), and the
+    mesh exported is the LOD0 node, so its hulls are UCX_<asset>_LOD0_NN: always built from lod_name, never typed."""
+    return pre["collision"].format(asset=asset, lod0=lod_name(asset, 0), i=i)
 
 
 def lod_name(asset: str, i: int) -> str:

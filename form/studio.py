@@ -331,6 +331,9 @@ class Studio:
     # ---- Design only: slicing is optional (per design, for every design, or because no slicer is installed) ----
     def slice_mode(self, p: dict | None = None) -> dict:
         """{"on": bool, "why": "" | "purpose" | "settings" | "project" | "no_slicer", "text", "how"}."""
+        if purpose_mod.is_game(p):
+            return {"on": False, "why": "purpose", "text": "This design is a game asset, not made for 3D printing, so it is not sliced.",
+                    "how": "To print it, set its purpose to “For 3D printing” in the design's settings."}
         if purpose_mod.is_model(p):
             return {"on": False, "why": "purpose", "text": "This design is a 3D model, not made for 3D printing, so it is not sliced.",
                     "how": "To print it, set its purpose to “For 3D printing” in the design's settings."}
@@ -945,7 +948,7 @@ class Studio:
     def _purpose_args(self, purpose, process) -> tuple[str, str]:
         pur = purpose_mod.normalise(purpose) if purpose not in (None, "") else purpose_mod.default(self.cfg)
         if pur is None:
-            raise StudioError(f"Unknown purpose “{purpose}”.", "Use “print” (for 3D printing) or “model” (just a 3D model).")
+            raise StudioError(f"Unknown purpose “{purpose}”.", "Use “print” (for 3D printing), “model” (just a 3D model) or “game” (a game asset).")
         pr = purpose_mod.normalise_process(process) if process not in (None, "") else ""
         if pr is None:
             raise StudioError(f"Unknown process “{process}”.", "Known: " + ", ".join(k for k in purpose_mod.PROCESSES if k) + ".")
@@ -982,6 +985,8 @@ class Studio:
         if pur == "model":
             p["decisions"].append({"ts": now, "rev": 1, "kind": "purpose", "text": "Purpose: just a 3D model, not for 3D printing"
                                    + (f" ({purpose_mod.PROCESSES[proc]['label']})." if proc else ".")})
+        elif pur == "game":
+            p["decisions"].append({"ts": now, "rev": 1, "kind": "purpose", "text": "Purpose: a game asset, not for 3D printing."})
         self.save(p)
         return p
 
@@ -1013,7 +1018,7 @@ class Studio:
         if recipe.fit:
             fit_in = [p["fit"], self.calibration.fingerprint(self.profile(p)), r["provenance"].get(recipe.fit["mating"])]
         if purpose_mod.is_model(p):                    # a 3D model: no printer, nozzle or fit model enters its checks
-            ck = H("checks", ek, "model", purpose_mod.process(p), checks_mod.CHECKS_VERSION)
+            ck = H("checks", ek, purpose_mod.of(p), purpose_mod.process(p), checks_mod.CHECKS_VERSION)   # model | game
         else:
             pe = self.printer_env(p)
             ck = H("checks", ek, pe["envelope"], pe["margin"],
@@ -1395,13 +1400,14 @@ class Studio:
             if "purpose" in body or "process" in body:  # what the design is for (form/purpose.py)
                 pur = purpose_mod.normalise(body["purpose"]) if "purpose" in body else purpose_mod.of(p)
                 if pur is None:
-                    raise StudioError(f"Unknown purpose “{body['purpose']}”.", "Use “print” (for 3D printing) or “model” (just a 3D model).")
+                    raise StudioError(f"Unknown purpose “{body['purpose']}”.", "Use “print” (for 3D printing), “model” (just a 3D model) or “game” (a game asset).")
                 proc = purpose_mod.normalise_process(body["process"]) if "process" in body else purpose_mod.process(p)
                 if proc is None:
                     raise StudioError(f"Unknown process “{body['process']}”.", "Known: " + ", ".join(k for k in purpose_mod.PROCESSES if k) + ".")
                 proc = proc if pur == "model" else ""
                 if pur != purpose_mod.of(p) or proc != purpose_mod.process(p):
                     self.decide(p, "purpose", "Purpose: for 3D printing." if pur == "print" else
+                                "Purpose: a game asset, not for 3D printing." if pur == "game" else
                                 "Purpose: just a 3D model, not for 3D printing"
                                 + (f" ({purpose_mod.PROCESSES[proc]['label']})." if proc else "."))
                 p["purpose"] = pur
@@ -1857,7 +1863,8 @@ class Studio:
             blocking.append(crit)
         physical = [e for e in p["evidence"] if e["rev"] == p["head"] and (e["kind"] == "fit" or e.get("source") == "part")]
         model = bool(off) and off.get("why") == "purpose"
-        level = "Geometry computed · 3D model, not for 3D printing" if model else \
+        level = ("Geometry computed · game asset, not for 3D printing" if purpose_mod.is_game(p) else
+                 "Geometry computed · 3D model, not for 3D printing") if model else \
             ("Geometry computed · not sliced (Design only) · " if off else "Geometry computed · slice simulated · ") \
             + ("physical result recorded for this revision" if physical else "not physically validated")
         # a person may still release over failed checks: each one acknowledged and a reason written, and the release

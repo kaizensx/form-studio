@@ -789,7 +789,8 @@ WHAT A GAME ASSET NEEDS
 ENGINE PRESETS
   * glTF / Godot: GLB, metres, +Y up (glTF is the primary format).
   * Unity: FBX, metres.
-  * Unreal: FBX, centimetres, Z up, collision meshes named UCX_<asset>.
+  * Unreal: FBX, centimetres, Z up, collision hulls named UCX_<render mesh>_NN, the render mesh being the exported
+    LOD0 node, so UCX_<asset>_LOD0_00, UCX_<asset>_LOD0_01... (Unreal pairs UCX_ hulls with the mesh they name).
 
 ROUTES FOR GAME ASSETS (design_guide topic "hybrid")
   Styled hard surface: subd_cage, so LODs come from the cage. Creatures and rocks: sculpt_recon, baked down to a low

@@ -90,7 +90,8 @@ tool you call shows up there live (3D model, drafts, checks, slice), so you do n
   Slices are simulations and fit yields are models; say so. You cannot approve releases; point to the Make tab (the last stage, where a release is approved).
 - Every design has a purpose (get_project reports it). For a "model" (not for 3D printing) never ask about a
   printer, slicer, filament or print orientation, and do not talk about printing; pass purpose="model" to
-  create_project/create_design when the person says it is not for printing. {printing}
+  create_project/create_design when the person says it is not for printing. A "game" design is a game asset: no
+  printing either; read design_guide(topic="game") and make the asset with game_asset. {printing}
 Current project on the page: {project}.
 """
 
@@ -325,7 +326,7 @@ class ChatJob:
         self.unread = 0                        # output lines that were not the CLI's event format
         self.model_id: str | None = None       # the model the CLI reported for this run
         self.head0: int | None = None          # the project's head revision when the message was sent
-        self.purpose: str | None = None        # "print" | "model": what the design is for (form/start.py)
+        self.purpose: str | None = None        # "print" | "model" | "game": what the design is for (form/start.py)
 
     def public(self, start: int = 0) -> dict:
         return {"id": self.id, "state": self.state, "session": self.session, "cost_usd": self.cost,
@@ -399,14 +400,14 @@ class Chat:
              model: str | None = None, effort: str | None = None, attachments: list[str] | None = None,
              ask: bool = True, purpose: str | None = None, note: str = "") -> ChatJob:
         """ask: a person can answer the agent's questions (the app; `form chat` in a terminal).
-        purpose: "print" or "model" (form/start.py); kept in the conversation, so later messages keep it.
+        purpose: "print", "model" or "game" (form/start.py); kept in the conversation, so later messages keep it.
         note: for the agent only, not shown as part of the person's message (what the engine fetched from links)."""
         message = (message or "").strip()
         if not message:
             raise RuntimeError("Write a message first.")
         from .start import PURPOSES
         if purpose is not None and purpose not in PURPOSES:
-            raise RuntimeError(f"Unknown purpose “{purpose}”: use print or model.")
+            raise RuntimeError(f"Unknown purpose “{purpose}”: use print, model or game.")
         st = self.status()
         if not self.cfg.get("chat", {}).get("enabled", True):
             raise RuntimeError(st["note"])

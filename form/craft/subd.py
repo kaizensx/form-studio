@@ -1352,6 +1352,16 @@ def quad_sphere(n: int = 4, radius: float = 1.0) -> tuple[np.ndarray, np.ndarray
     return V, np.array(quads, dtype=np.int64)
 
 
+def region_frame(cage: "Cage", name: str) -> tuple:
+    """(point, outward unit normal) at the middle of a cage's named region (Cage.region_frame): craft.region_frame."""
+    return cage.region_frame(name)
+
+
+def region_tool(cage: "Cage", name: str, out: float = 1.0, depth: float = 2.0, label: str = ""):
+    """A closed solid that follows a cage's named region (Cage.region_tool): craft.region_tool."""
+    return cage.region_tool(name, out=out, depth=depth, label=label)
+
+
 def voxel_cage(cells, size: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
     """A closed quad cage round a set of unit cubes {(i, j, k)}: every cube face with no cube behind it, outward.
     Any genus (a slab with two cells missing is genus 2); vertices where the surface turns are extraordinary."""

@@ -29,6 +29,7 @@ TEXEL_SPREAD_MAX = 2.0           # p95 / p5 of texel density
 FLIPPED_MAX = 0.001              # fraction of faces that point against their stored normals
 SCALE_TOL = 0.005                # relative bounding-box error
 RASTER = 1024
+NORMAL_INWARD_MAX = 0.005        # LOD0 area whose baked tangent normal points into the surface (proposed)
 LOD_RE = re.compile(r"_LOD(\d+)$")
 COLLISION_RE = re.compile(r"^UCX_|-convcolonly$|-colonly$|_collider$|_collision_\d+$")
 COMP = {5126: ("<f4", 4), 5125: ("<u4", 4), 5123: ("<u2", 2), 5121: ("u1", 1), 5122: ("<i2", 2), 5120: ("i1", 1)}
@@ -368,6 +369,39 @@ def validate(data: bytes, budgets: list[int] | None = None, texture_px: int = 10
                 add("budget", f"LOD{k} is present", False, "missing", f"No node named *_LOD{k}.", k)
     col = [{"name": n["name"], "triangles": int(len(n["T"])), "points": int(len(n["P"]))} for n in coll]
     return {"ok": all(c["status"] == "PASS" for c in checks), "checks": checks, "lods": lods, "collision": col}
+
+
+def normal_map_inward(rgb: np.ndarray, UV: np.ndarray, T: np.ndarray, samples: int = 4) -> dict:
+    """Share of a LOD's area whose tangent-space normal map points into the surface (blue below 0.5, so z < 0).
+    A sound bake never does that: such texels come from a bake ray that hit another surface from behind (a lid
+    resting on a box, a part nested in another) or a flipped high poly. rgb: the map, H x W x 3 in 0..1, row 0 at the
+    top; UV: Blender's convention (v up). Each triangle is sampled at `samples` interior points, area-weighted."""
+    rgb = np.asarray(rgb, dtype=np.float64)
+    h, w = rgb.shape[:2]
+    U = np.asarray(UV, dtype=np.float64)[np.asarray(T)]
+    bary = np.array([[1 / 3, 1 / 3, 1 / 3], [2 / 3, 1 / 6, 1 / 6], [1 / 6, 2 / 3, 1 / 6], [1 / 6, 1 / 6, 2 / 3]])[:samples]
+    pts = np.einsum("sk,tkd->tsd", bary, U)
+    x = np.clip((pts[..., 0] * w).astype(int), 0, w - 1)
+    y = np.clip(((1 - pts[..., 1]) * h).astype(int), 0, h - 1)
+    inward = (rgb[y, x, 2] < 0.5).mean(axis=1)
+    e1, e2 = U[:, 1] - U[:, 0], U[:, 2] - U[:, 0]
+    area = np.abs(e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0]) / 2
+    tot = float(area.sum()) or 1.0
+    return {"fraction": round(float((inward * area).sum() / tot), 6), "triangles": int((inward > 0.5).sum())}
+
+
+def normal_map_check(png, UV: np.ndarray, T: np.ndarray) -> dict:
+    """The check for a baked normal map (PNG bytes or a path; Pillow decodes it)."""
+    import io
+    from PIL import Image
+    src = io.BytesIO(png) if isinstance(png, (bytes, bytearray)) else png
+    rgb = np.asarray(Image.open(src).convert("RGB"), dtype=np.float64) / 255.0
+    r = normal_map_inward(rgb, UV, T)
+    return {"id": "normal_map", "label": "LOD0's baked normals face out of the surface",
+            "status": "PASS" if r["fraction"] <= NORMAL_INWARD_MAX else "FAIL",
+            "value": f"{r['fraction'] * 100:.3f}% of LOD0's UV area points inward ({r['triangles']} triangles)",
+            "detail": f"Tangent-space blue below 0.5 means a bake ray hit another surface from behind; at most "
+                      f"{NORMAL_INWARD_MAX * 100:g}% (proposed).", "evidence": "computed", "lod": 0}
 
 
 def failed(report: dict) -> list[str]:

@@ -31,7 +31,7 @@ import bmesh
 import bpy
 import numpy as np
 
-RUNNER_VERSION = 1
+RUNNER_VERSION = 2
 CREASE = "crease_edge"
 PATTERNS = ("none", "wood", "noise", "brushed")
 FORMATS = ("fbx", "usd")
@@ -363,6 +363,80 @@ def final_material(name, imgs):
 
 # ---- baking ---------------------------------------------------------------------------------------------------------
 
+def islands(ob):
+    """Connected parts of a mesh (by shared vertices): (label per vertex, number of parts)."""
+    n = len(ob.data.vertices)
+    e = np.empty(len(ob.data.edges) * 2, dtype=np.int64)
+    ob.data.edges.foreach_get("vertices", e)
+    parent = list(range(n))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    for a, b in e.reshape(-1, 2).tolist():
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[max(ra, rb)] = min(ra, rb)
+    roots = np.array([find(i) for i in range(n)], dtype=np.int64)
+    _, lab = np.unique(roots, return_inverse=True)
+    return lab.reshape(-1), int(lab.max()) + 1 if n else 0
+
+
+def coords(ob):
+    co = np.empty(len(ob.data.vertices) * 3)
+    ob.data.vertices.foreach_get("co", co)
+    return co.reshape(-1, 3)
+
+
+def explode(high, low, spacing):
+    """Move each part of the low poly, and the high-poly part it was made from, apart by `spacing` (the exploded
+    bake): a bake ray from one part can then never land on another part. Parts that touch or nest (a lid resting on
+    a box, a band round a body) otherwise trade surfaces, and a face takes a neighbour's colour or an inverted normal
+    (the tangent normal points into the surface). Parts are matched by bounding box (centre and size). Returns
+    (restore function, number of parts moved)."""
+    lo_lab, nl = islands(low)
+    hi_lab, nh = islands(high)
+    if nl < 2 or nh < 2:
+        return (lambda: None), 0
+    lo_co, hi_co = coords(low), coords(high)
+
+    def boxes(co, lab, n):
+        lo = np.full((n, 3), np.inf)
+        hi = np.full((n, 3), -np.inf)
+        np.minimum.at(lo, lab, co)
+        np.maximum.at(hi, lab, co)
+        return np.concatenate([(lo + hi) / 2, hi - lo], axis=1)
+    bl, bh = boxes(lo_co, lo_lab, nl), boxes(hi_co, hi_lab, nh)
+    cost = np.linalg.norm(bl[:, None, :] - bh[None, :, :], axis=2)
+    pairs, used_l, used_h = [], set(), set()
+    for k in np.argsort(cost, axis=None):
+        i, j = divmod(int(k), nh)
+        if i in used_l or j in used_h:
+            continue
+        used_l.add(i)
+        used_h.add(j)
+        pairs.append((i, j))
+    lo_new, hi_new = lo_co.copy(), hi_co.copy()
+    for k, (i, j) in enumerate(sorted(pairs)):
+        d = np.array([spacing * (k + 1), 0.0, 0.0])
+        lo_new[lo_lab == i] += d
+        hi_new[hi_lab == j] += d
+    low.data.vertices.foreach_set("co", lo_new.reshape(-1))
+    high.data.vertices.foreach_set("co", hi_new.reshape(-1))
+    low.data.update()
+    high.data.update()
+
+    def restore():
+        low.data.vertices.foreach_set("co", lo_co.reshape(-1))
+        high.data.vertices.foreach_set("co", hi_co.reshape(-1))
+        low.data.update()
+        high.data.update()
+    return restore, len(pairs)
+
+
+
 def bake_all(high, low, job, work):
     b = job["bake"]
     px = int(job["texture_px"])
@@ -434,15 +508,22 @@ def bake_all(high, low, job, work):
             o.visible_camera = o.visible_diffuse = o.visible_glossy = False
             o.visible_transmission = o.visible_volume_scatter = o.visible_shadow = False
     maps = set(b["maps"])
-    if "base_color" in maps:
-        through_emission("base_color", "Base Color", "sRGB")
-    if "normal" in maps:
-        bake("normal", "NORMAL", "Non-Color", b["samples"], normal_space="TANGENT")
+    # AO is baked with the parts in place (a lid does shade the box under it); every surface map is baked exploded,
+    # so each part only ever sees its own high poly (see explode())
     if "orm" in maps or "ao" in maps:
         bake("ao", "AO", "Non-Color", b["ao_samples"])
+    restore, moved = explode(high, low, diag * 3.0)
+    try:
+        if "base_color" in maps:
+            through_emission("base_color", "Base Color", "sRGB")
+        if "normal" in maps:
+            bake("normal", "NORMAL", "Non-Color", b["samples"], normal_space="TANGENT")
+        if "orm" in maps:
+            through_emission("roughness", "Roughness", "Non-Color")
+            through_emission("metallic", "Metallic", "Non-Color")
+    finally:
+        restore()
     if "orm" in maps:
-        through_emission("roughness", "Roughness", "Non-Color")
-        through_emission("metallic", "Metallic", "Non-Color")
         orm = np.ones((px, px, 4), dtype=np.float32)
         orm[..., 0] = arrays["ao"][..., 0]
         orm[..., 1] = arrays["roughness"][..., 0]
@@ -464,7 +545,7 @@ def bake_all(high, low, job, work):
             files[key] = os.path.basename(path)
     return {"seconds": times, "total_seconds": round(sum(times.values()), 3), "files": files,
             "px": px, "samples": b["samples"], "ao_samples": b["ao_samples"], "device": sc.cycles.device,
-            "cage_extrusion": round(extrusion, 4), "max_ray_distance": round(ray, 4)}, imgs
+            "cage_extrusion": round(extrusion, 4), "max_ray_distance": round(ray, 4), "exploded_parts": moved}, imgs
 
 
 # ---- reading LODs back -------------------------------------------------------------------------------------------

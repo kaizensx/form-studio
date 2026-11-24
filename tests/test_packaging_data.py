@@ -133,6 +133,45 @@ class PackagedData(unittest.TestCase):
             root.handlers[:] = keep[1]
         self.assertTrue({"LICENSE", "PERMISSION.md"} <= names, names)
 
+    def test_blender_runners_and_the_game_pipeline_ship_as_files(self):
+        """Blender runs its runners as files (blender -b --python <path>), and CoACD's environment runs
+        `python -m form.game.lod`: the spec ships them on disk, in the app and under engine_src/."""
+        import sys
+        import types
+        spec_file = ROOT / "packaging" / "form.spec"
+        hooks = types.ModuleType("PyInstaller.utils.hooks")
+        hooks.collect_all = lambda pkg: ([], [], [])
+        hooks.collect_data_files = lambda pkg, include_py_files=False: []
+        hooks.collect_submodules = lambda pkg: []
+        stub = {"PyInstaller": types.ModuleType("PyInstaller"), "PyInstaller.utils": types.ModuleType("PyInstaller.utils"),
+                "PyInstaller.utils.hooks": hooks}
+        got = {}
+
+        def Analysis(*a, **k):
+            got.update(k)
+            return types.SimpleNamespace(pure=[], scripts=[], binaries=[], datas=[])
+        ns = {"SPECPATH": str(spec_file.parent), "Analysis": Analysis, "PYZ": lambda *a, **k: None,
+              "EXE": lambda *a, **k: None, "COLLECT": lambda *a, **k: None, "BUNDLE": lambda *a, **k: None,
+              "__file__": str(spec_file)}
+        saved = {k: sys.modules.get(k) for k in stub}
+        sys.modules.update(stub)
+        try:
+            exec(compile(spec_file.read_text(encoding="utf-8"), str(spec_file), "exec"), ns)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    sys.modules.pop(k, None)
+                else:
+                    sys.modules[k] = v
+        shipped = {(Path(src).name, dest) for src, dest in got["datas"]}
+        for f in ("blender_scene.py", "blender_ops.py", "blender_model.py", "blender_game.py"):
+            self.assertIn((f, "form/adapters"), shipped)
+        game = sorted(p.name for p in (ROOT / "form" / "game").glob("*.py"))
+        self.assertIn("lod.py", game)
+        for f in game:
+            self.assertIn((f, "form/game"), shipped)
+            self.assertIn((f, "engine_src/form/game"), shipped)
+
     def test_every_exemplar_loads_as_a_design_source(self):
         """An agent pastes an exemplar into create_design: it must pass the same checks a design source gets (one
         Recipe, params that name real features), not only build when imported directly."""

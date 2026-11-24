@@ -40,7 +40,7 @@ from . import presets as pz
 from . import validate as vmod
 
 RUNNER = Path(__file__).resolve().parent.parent / "adapters" / "blender_game.py"
-RUNNER_VERSION = 1
+RUNNER_VERSION = 2
 TIMEOUT_S = 1800.0
 PATTERNS = ("none", "wood", "noise", "brushed")
 UV_METHODS = ("auto", "regions", "smart")
@@ -203,6 +203,79 @@ def merge_cages(cages: list[meshsource.CageData]) -> meshsource.CageData:
         off += len(c.V)
         foff += len(c.F)
     return meshsource.cage(np.concatenate(V), F, C, R)
+
+
+def split_cage(cage: meshsource.CageData) -> list[meshsource.CageData]:
+    """A cage's connected parts (faces that share points), each a cage of its own with its creases and regions."""
+    F = [list(f) for f in cage.F]
+    parent = list(range(len(cage.V)))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+    for f in F:
+        for a in f[1:]:
+            ra, rb = find(f[0]), find(a)
+            if ra != rb:
+                parent[max(ra, rb)] = min(ra, rb)
+    groups: dict = {}
+    for i, f in enumerate(F):
+        groups.setdefault(find(f[0]), []).append(i)
+    if len(groups) <= 1:
+        return [cage]
+    face_region = {}
+    for name, fs in cage.regions.items():
+        for i in fs:
+            face_region.setdefault(int(i), []).append(name)
+    out = []
+    for root in sorted(groups):
+        fids = groups[root]
+        used = sorted({v for i in fids for v in F[i]})
+        remap = {v: k for k, v in enumerate(used)}
+        regions: dict = {}
+        for k, i in enumerate(fids):
+            for name in face_region.get(i, []):
+                regions.setdefault(name, []).append(k)
+        creases = [[remap[a], remap[b], w] for a, b, w in cage.creases if a in remap and b in remap]
+        out.append(meshsource.cage(np.asarray(cage.V)[used], [[remap[v] for v in F[i]] for i in fids], creases,
+                                   regions))
+    return out
+
+
+def cage_design_source(cage: meshsource.CageData, title: str = "Cage design") -> str:
+    """A design source (one Recipe) whose solid is the cage's limit surface as exact CAD (form/craft/subd.py), one
+    cage literal per connected part, fused. The cage stays data in the source, so game_asset reads it back
+    (cages_in_source) and builds LODs from its levels, while STEP comes from the same cage."""
+    parts = split_cage(cage)
+    lits = "".join(c.literal(f"CAGE_{i}") for i, c in enumerate(parts))
+    names = ", ".join(f"CAGE_{i}" for i in range(len(parts)))
+    t = json.dumps(str(title or "Cage design"))
+    return f'''"""{str(title or "Cage design").replace('"', "'")}: a subdivision cage as exact CAD. Form Studio."""
+from form import meshsource
+from form.recipes.base import Feature, Param, Recipe, Stage
+
+{lits}
+CAGES = [{names}]
+
+
+class Design(Recipe):
+    title = {t}
+    summary = "A subdivision cage; its limit surface is the solid (exact B-spline patches, ACC at extraordinary points)."
+    solids = 1
+    params = [Param("merge_faces", "Merge B-spline faces", 1, 0, 1, 1, "", "form", "body",
+                    "1: regular patch blocks become multi-span B-spline faces (a lighter STEP); 0: one face per patch. "
+                    "The surface is the same either way.")]
+    features = [Feature("body", "Body", "structure")]
+
+    def build(self, v):
+        body = None
+        for c in CAGES:
+            s = c.to_subd().solid(merge=bool(round(v["merge_faces"])))
+            body = s if body is None else body + s
+        return [Stage("body", body)]
+'''
 
 
 # ---- running Blender -------------------------------------------------------------------------------------------------
@@ -472,6 +545,7 @@ def build(source: dict, out_dir, asset: str = "asset", preset="gltf", budgets=No
                                    "detail": "Re-imported into Blender and measured in metres (axes compared as "
                                              "sorted extents)."})
         val["checks"] += exp_checks
+        val["checks"] += _normal_checks(stage, asset)
         val["ok"] = all(c["status"] == "PASS" for c in val["checks"])
         report = {"asset": asset, "preset": {k: pre[k] for k in ("id", "label", "unit", "up")},
                   "budgets": B, "texture_px": px, "bake_preset": opts["bake"], "pivot": pivot,
@@ -517,10 +591,23 @@ def _face_region(cage: meshsource.CageData) -> np.ndarray:
     return r if cage.regions else np.zeros(0, np.int64)
 
 
+def _normal_checks(stage: Path, asset: str) -> list[dict]:
+    """The baked normal map against LOD0's UVs (validate.normal_map_check), when both are there."""
+    png, lod0 = stage / "textures" / f"{asset}_normal.png", stage / "lods" / "lod0.npz"
+    if not (png.is_file() and lod0.is_file()):
+        return []
+    z = np.load(lod0, allow_pickle=False)
+    return [vmod.normal_map_check(png.read_bytes(), z["UV"], z["T"])]
+
+
 def revalidate(out_dir) -> dict:
-    """validate.validate on a built asset's GLB again, with the budgets and texture size it was built with."""
+    """validate.validate on a built asset's GLB again, with the budgets and texture size it was built with, and the
+    baked normal map against LOD0's UVs."""
     out_dir = Path(out_dir)
     rep = json.loads((out_dir / "report.json").read_text(encoding="utf-8"))
-    return vmod.validate((out_dir / f"{rep['asset']}.glb").read_bytes(), rep["budgets"], rep["texture_px"],
-                         expect_size_mm=rep["size_mm"])
+    v = vmod.validate((out_dir / f"{rep['asset']}.glb").read_bytes(), rep["budgets"], rep["texture_px"],
+                      expect_size_mm=rep["size_mm"])
+    v["checks"] += _normal_checks(out_dir, rep["asset"])
+    v["ok"] = all(c["status"] == "PASS" for c in v["checks"])
+    return v
 

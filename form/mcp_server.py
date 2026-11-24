@@ -321,7 +321,10 @@ def build() -> MCPServer:
         the staged workflow and a complete example that builds; it leads with skeleton first, one validated feature
         at a time (a FeatureDesign, 2 retries per feature, then defer). Other topics, for complex designs: surfacing,
         mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicable when purpose="model"),
-        reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine).
+        reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine),
+        hybrid (a construction route per feature: kernel, subd_cage, sculpt_recon or procedural, and when to model a
+        cage in Blender with model_mesh), game (purpose "game": budgets, LODs, UVs, bakes, collision and engine
+        presets, built with game_asset).
         They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
         textures. Then design_examples for a close exemplar, and create_design."""
         from . import design_guide as dg
@@ -382,6 +385,9 @@ def build() -> MCPServer:
         magnets ([{stock: "8x3", count, retention: press|glue|printed}]) are required.
         Returns the plan as ordered steps: the skeleton first (create_design with that feature only), then one
         add_feature(kind="code") per feature, each with its risk class, a fallback and the retry cap.
+        Each feature may name its construction route (route: kernel | subd_cage | sculpt_recon | procedural); without
+        one it is read from the feature's words (heuristic, said so). feature_routes gives each with the words that
+        chose it; a mechanical interface on a mesh-only route is warned about; mesh routes point at model_mesh.
         product_class: what critique compares the silhouette with (helmet_fullface, helmet_open, mouse, bottle);
         empty: detected from the brief's words, or none. The design faces +X with Z up for the comparison.
         Then create_design(..., plan=<brief id>)."""
@@ -2226,6 +2232,12 @@ def build() -> MCPServer:
             return await _run(_home, bundle.conversation_json, st.root, conversation)
         return {"markdown": await _run(_home, bundle.conversation_markdown, st.root, conversation)}
 
+    # Blender as an editor and a baker (never the geometry authority): model_mesh streams each op's level-2 preview
+    # into the app as a draft (Studio._draft_sink), game_asset derives LODs, UVs, bakes and collision from a design.
+    from .adapters import blender_model
+    from . import game
+    blender_model.register(mcp, studio, _run)
+    game.register(mcp, studio, _run)
     return mcp
 
 

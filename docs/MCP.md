@@ -76,7 +76,7 @@ Rules:
 
 ## Tools at a glance
 
-93 tools. Read-only tools never change a project.
+95 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -173,6 +173,8 @@ Rules:
 | [`export_project`](#export_project) | changes | Write the project, its conversations and the code its revisions were built from to one .formstudio file (default: <projects folder>/<project>.formstudio). |
 | [`import_project`](#import_project) | changes | Import a .formstudio or .formproj archive (or a conversation .json) from an absolute path. |
 | [`export_conversation`](#export_conversation) | read-only | A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again). |
+| [`model_mesh`](#model_mesh) | changes | Model a subdivision cage in Blender with declarative ops (never code), e.g. [{"op":"cage_new","primitive":"cube","size":[40,30,20]}, {"op":"name_region","name":"top", "faces":{"normal":[0,0,1],"within_deg":10}}, {"op":"extrude_region","faces":{"region":"top"},"offset":8}]. |
+| [`game_asset`](#game_asset) | changes | Make a design a game asset: LOD0-LOD3 at triangle budgets (from subdivision cage levels first; decimated LODs are automatic retopology), UVs (region seams or Smart UV, packed), materials from the design's zones, Cycles-baked base colour, normal, ORM and AO maps (texture_px 1024\|2048\|4096; bake fast\|quality), convex-hull collision per part (collision="coacd" when CoACD is installed), pivot and scale. |
 
 ## Tools
 
@@ -220,7 +222,10 @@ holder, mechanism...). topic="core" (default) returns the contract for a design 
 the staged workflow and a complete example that builds; it leads with skeleton first, one validated feature
 at a time (a FeatureDesign, 2 retries per feature, then defer). Other topics, for complex designs: surfacing,
 mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicable when purpose="model"),
-reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine).
+reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine),
+hybrid (a construction route per feature: kernel, subd_cage, sculpt_recon or procedural, and when to model a
+cage in Blender with model_mesh), game (purpose "game": budgets, LODs, UVs, bakes, collision and engine
+presets, built with game_asset).
 They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
 textures. Then design_examples for a close exemplar, and create_design.
 
@@ -265,6 +270,9 @@ patterns.x a how names must exist (an unknown one is refused with the closest re
 magnets ([{stock: "8x3", count, retention: press|glue|printed}]) are required.
 Returns the plan as ordered steps: the skeleton first (create_design with that feature only), then one
 add_feature(kind="code") per feature, each with its risk class, a fallback and the retry cap.
+Each feature may name its construction route (route: kernel | subd_cage | sculpt_recon | procedural); without
+one it is read from the feature's words (heuristic, said so). feature_routes gives each with the words that
+chose it; a mechanical interface on a mesh-only route is warned about; mesh routes point at model_mesh.
 product_class: what critique compares the silhouette with (helmet_fullface, helmet_open, mouse, bottle);
 empty: detected from the brief's words, or none. The design faces +X with Z up for the comparison.
 Then create_design(..., plan=<brief id>).
@@ -1657,6 +1665,49 @@ A saved conversation as Markdown (format="md", to read or share) or JSON (format
 |---|---|---|
 | `conversation` | string | yes |
 | `format` | string |  |
+
+### `model_mesh`
+
+Model a subdivision cage in Blender with declarative ops (never code), e.g.
+[{"op":"cage_new","primitive":"cube","size":[40,30,20]}, {"op":"name_region","name":"top",
+"faces":{"normal":[0,0,1],"within_deg":10}}, {"op":"extrude_region","faces":{"region":"top"},"offset":8}].
+Ops: cage_new, extrude_region, loop_cut, move, crease, name_region, mirror, geonodes_array,
+geonodes_scatter, sculpt_ops, remesh. Each op streams a level-2 preview to the app. Returns the cage
+(points, quads, creases, named regions) as design source for update_design; the project is not changed.
+Needs Blender 4.2+. Blender is not network-isolated by the OS.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `ops` | array | yes |
+| `expect_head` | integer | yes |
+
+### `game_asset`
+
+Make a design a game asset: LOD0-LOD3 at triangle budgets (from subdivision cage levels first; decimated
+LODs are automatic retopology), UVs (region seams or Smart UV, packed), materials from the design's zones,
+Cycles-baked base colour, normal, ORM and AO maps (texture_px 1024|2048|4096; bake fast|quality), convex-hull
+collision per part (collision="coacd" when CoACD is installed), pivot and scale.
+preset: gltf | godot (GLB, metres, +Y up) | unity (FBX metres) | unreal (FBX cm, Z up, UCX_ collision).
+formats: extra fbx/usd. action: build | validate (re-check the GLB) | export (list every file).
+budgets: four triangle ceilings, LOD0 first (default 12000, 6000, 2500, 800).
+materials (cage designs): {region name | "default": {finish, color "#rrggbb", pattern none|wood|noise|brushed}}.
+Reads the project, never changes it. Every check is computed from the written GLB. Needs Blender 4.2+.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `action` | string |  |
+| `preset` | string |  |
+| `budgets` | array \| null |  |
+| `texture_px` | integer |  |
+| `bake` | string |  |
+| `pivot` | string |  |
+| `uv` | string |  |
+| `collision` | string |  |
+| `retopo` | string |  |
+| `formats` | array \| null |  |
+| `materials` | object \| null |  |
 
 ## Prompts
 

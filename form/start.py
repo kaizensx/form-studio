@@ -3,7 +3,8 @@
 Home takes words, photos, sketches, files and links in one place and offers three ways to begin: Blank (a plain block
 to shape), For my printer, or Just a 3D model. This module is the engine side of that:
 
-- purpose: "print" (for 3D printing on the person's printer) or "model" (a 3D model only, never sliced). The engine
+- purpose: "print" (for 3D printing on the person's printer), "model" (a 3D model only, never sliced) or "game" (a
+  real-time asset for a game engine: LODs, UVs, baked textures, collision; form/game). The engine
   owns it (form/purpose.py: the design's purpose, and the default from the 3D printing capability); Home only says which
   one the next design gets.
 - blank(): a clean, minimal design written as code that builds in the real kernel.
@@ -33,7 +34,7 @@ from urllib.parse import unquote, urlparse
 from . import ask as ask_mod
 from .studio import StudioError
 
-PURPOSES = ("print", "model")
+PURPOSES = ("print", "model", "game")
 ENV_PURPOSE = "FORM_PURPOSE"          # given to the MCP server of one chat run: designs it creates get this purpose
 MAX_FETCH = 2_000_000_000             # the attachment limit (form/conversations.py); streamed to disk, never held
 FETCH_TIMEOUT = 30
@@ -43,7 +44,8 @@ METHOD_SIGMA = {"calipers": 0.05, "ruler": 0.5, "tape": 1.0}     # mm, one stand
 def _purpose(purpose) -> str:
     p = str(purpose or "").strip().lower()
     if p not in PURPOSES:
-        raise StudioError(f"Unknown purpose “{purpose}”.", "Use \"print\" (for my printer) or \"model\" (just a 3D model).")
+        raise StudioError(f"Unknown purpose “{purpose}”.", "Use \"print\" (for my printer), \"model\" (just a 3D model) "
+                          "or \"game\" (a game asset).")
     return p
 
 
@@ -92,6 +94,10 @@ def purpose_line(purpose: str | None, printer: str | None) -> str:
         return "Purpose: for 3D printing" + (f" on {printer}" if printer else "")
     if purpose == "model":
         return "Purpose: just a 3D model, no printer: do not slice; print checks do not apply."
+    if purpose == "game":
+        return ("Purpose: a game asset (purpose \"game\"), no printer: do not slice; print checks do not apply. "
+                "Read design_guide(topic=\"game\"); when the design is built, make the asset with game_asset "
+                "(LODs at triangle budgets, UVs, baked maps, collision, an engine preset).")
     return ""
 
 
@@ -567,8 +573,8 @@ def route_post(st, path: str, body):
 # ---- command line: form start ------------------------------------------------------------------------------------
 
 def main(argv: list[str]) -> int:
-    """form start --text "…" [--photo F]... [--file F]... [--sketch F.json] [--link URL]... [--purpose print|model]
-    [--agent A] [--model M] [--json]   |   form start --blank [--name N] [--purpose print|model]"""
+    """form start --text "…" [--photo F]... [--file F]... [--sketch F.json] [--link URL]... [--purpose print|model|game]
+    [--agent A] [--model M] [--json]   |   form start --blank [--name N] [--purpose print|model|game]"""
     import argparse
     import sys
 
@@ -584,7 +590,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--file", action="append", default=[], metavar="FILE", help="a STEP, STL, 3MF or PDF (repeat)")
     ap.add_argument("--sketch", metavar="F.json", help="a sketch as Form Studio's sketch JSON (see form/sketch.py)")
     ap.add_argument("--link", action="append", default=[], metavar="URL", help="a link: a file is downloaded, a page is passed on (repeat)")
-    ap.add_argument("--purpose", choices=PURPOSES, help="print: for my printer; model: just a 3D model (default: whether you said you have a 3D printer)")
+    ap.add_argument("--purpose", choices=PURPOSES, help="print: for my printer; model: just a 3D model; game: a game asset (default: whether you said you have a 3D printer)")
     ap.add_argument("--blank", action="store_true", help="create a blank design instead of sending a message")
     ap.add_argument("--name", default="Untitled design", help="with --blank: the design's name")
     ap.add_argument("--agent")

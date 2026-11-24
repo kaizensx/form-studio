@@ -22,6 +22,12 @@ WEB = Path(__file__).resolve().parent / "web"
 _HEADER_CTL = re.compile(r"[\x00-\x1f\x7f]")
 
 
+def start_purposes() -> tuple:
+    """The purposes a new conversation or design may ask for (form/start.py: print, model, game)."""
+    from .start import PURPOSES
+    return PURPOSES
+
+
 def _attachment(name: str) -> str:
     """A Content-Disposition value for a download: an ASCII fallback name plus the exact name, percent-encoded."""
     name = _HEADER_CTL.sub("", str(name))
@@ -499,9 +505,9 @@ def make_handler(st: Studio):
             msg = str(body.get("message", "")).strip()[:16000]
             if not msg:
                 raise StudioError("Write a message first.")
-            purpose = body.get("purpose") or None          # "print" | "model" (form/start.py), kept on the conversation
-            if purpose is not None and purpose not in ("print", "model"):
-                raise StudioError(f"Unknown purpose “{purpose}”.", "Use \"print\" or \"model\".")
+            purpose = body.get("purpose") or None          # "print" | "model" | "game" (form/start.py), kept on the conversation
+            if purpose is not None and purpose not in start_purposes():
+                raise StudioError(f"Unknown purpose “{purpose}”.", "Use \"print\", \"model\" or \"game\".")
             attach_ids = list(body.get("attachments") or [])
             from . import start as start_mod              # links pasted in the message: the engine fetches them now
             if start_mod.links_in(msg):
