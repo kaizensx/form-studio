@@ -58,7 +58,9 @@ class Exemplars(unittest.TestCase):
         got = exemplars.get("prop_mask")                                         # by name: with the reason
         self.assertFalse(got["retrieval"])
         self.assertTrue(got["how_to_use"].startswith("Not for learning from"))
-        guide = (Path(exemplars.__file__).parents[1] / "design_guide.py").read_text(encoding="utf-8")
+        form_dir = Path(exemplars.__file__).parents[1]
+        guide = (form_dir / "design_guide.py").read_text(encoding="utf-8") + "".join(
+            f.read_text(encoding="utf-8") for f in sorted((form_dir / "guidance").rglob("*.md")))
         for n in crude:
             self.assertNotIn(n, guide, "the guide does not point the agent at it")
 

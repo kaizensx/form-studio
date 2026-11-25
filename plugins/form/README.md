@@ -33,5 +33,14 @@ Keep one: remove the old registration with `claude mcp remove --scope user form`
 | `verify-print` | before saying a part is ready to print |
 | `print-feedback` | a real print came back: failed, tight, loose |
 | `release` | handing a revision to the user for approval |
+| `cad-core` | writing a design as code: the contract, the rules, worked examples |
+| `staged-design` | a complex design: brief, plan, skeleton, one feature at a time, critique |
+| `surfacing-organic` | curved, styled or organic bodies: sections, lofts, shells |
+| `texture` | grip, knurl, ribs and surface texture, B-rep or mesh |
+| `remodel-from-mesh` | making an STL, OBJ, 3MF or STEP editable as clean CAD |
+| `game-asset` | a model for a game engine: budgets, LODs, UVs, bakes |
 
 Any other agent (Codex, Gemini CLI, Cursor, OpenCode, …) can read the same files: `AGENTS.md` at the repository root points here.
+
+These files are generated from `form/guidance` by `scripts/gen_skills.py`; edit them there. The `form-mcp` server
+serves the same skills over MCP (the `io.modelcontextprotocol/skills` extension).

@@ -5,7 +5,8 @@ description: Develop the form and appearance of a FORM part — concepts, propor
 
 # Industrial design that can be evaluated
 
-FORM tools: `render()`, `preview_change()`, `explore_alternatives()`, `commit_change()`, `update_design()`.
+FORM tools: `render()`, `render_photo()`, `critique()`, `set_appearance()`, `preview_change()`, `explore_alternatives()`,
+`commit_change()`, `update_design()`, `refine_design()`.
 
 Adjectives such as "premium" are not acceptance criteria. Translate intent into observable geometry.
 
@@ -21,6 +22,15 @@ Adjectives such as "premium" are not acceptance criteria. Translate intent into 
    can stand; seam and support scars away from the main visible face; text and logos optional, off by default.
 5. Judge the real filament surface, not a metallic render. Avoid grooves or text below a printable scale. Prefer a
    chamfer to a bottom fillet that would print unsupported.
+
+The method, step by step (design language, proportion system, continuity, radius hierarchy, surface breaks and
+shadow gaps, detail rhythm, material and colour, then look, score, fix): `references/aesthetics.md`, the same text as
+`design_guide(topic="aesthetics")`. For a "make it beautiful" request, score the photos with `critique()` and fix the
+lowest item, at least two passes.
+
+The refinement engine runs after every build (fillet tiers, an edge break, a parting line, grip, materials and
+contrast) and keeps each change only when the checks pass and interface faces are unchanged. Read what it did with
+`refine_design()` and take out a change that fights the design language.
 
 Never improve looks by shrinking a required clearance or thinning a load-bearing root. Stop when the requirements are
 met and no visible or manufacturing defect remains; do not iterate on cosmetics forever. Ask the user for a photo of
