@@ -68,6 +68,18 @@ class PackagedData(unittest.TestCase):
         finally:
             shutil.rmtree(bundle, ignore_errors=True)
 
+    def test_deploy_clears_the_app_it_builds(self):
+        """scripts/deploy_mac.sh removes the previous build of the app the spec makes before building, so the smoke
+        test never checks a stale bundle."""
+        import re
+        script = (ROOT / "scripts" / "deploy_mac.sh").read_text(encoding="utf-8")
+        spec = (ROOT / "packaging" / "form.spec").read_text(encoding="utf-8")
+        app = re.search(r'BUNDLE\(coll, name="([^"]+)"', spec).group(1)
+        self.assertIn(f'APP="{app}"', script)
+        build = script.index("-m PyInstaller")
+        self.assertIn('rm -rf "dist/$APP"', script[:build])
+        self.assertIn('scripts/smoke_packaged.py "dist/$APP"', script)
+
     def test_cadfit_search_stays_out_of_the_app(self):
         """CADFit's opt-in search (CC BY-NC 4.0 vendored code) and trimesh, which only it imports, are not packaged;
         its hook, LICENSE and PERMISSION.md are. scipy and scikit-learn stay: the engine and build123d need them."""

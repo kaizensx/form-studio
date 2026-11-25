@@ -19,7 +19,7 @@ OLD_APP=/Applications/FORM.app
 "$PY" -c "import PyInstaller" 2>/dev/null || uv pip install --python "$PY" pyinstaller
 VER=$("$PY" -c "import form; print(form.__version__)")
 echo "Building Form Studio $VER"
-rm -rf dist/FORM.app
+rm -rf "dist/$APP"
 "$PY" -m PyInstaller packaging/form.spec --noconfirm >.dev/deploy-build.log 2>&1 || { tail -40 .dev/deploy-build.log; exit 1; }
 echo "Checking the built app"
 "$PY" scripts/smoke_packaged.py "dist/$APP"
