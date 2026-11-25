@@ -42,6 +42,8 @@ PX = 64
 VIEWS6 = {"front": (0.0, 0.0), "back": (180.0, 0.0), "left": (-90.0, 0.0), "right": (90.0, 0.0),
           "top": (0.0, 90.0), "three_quarter": (35.0, 25.0)}
 SIL_BLOB, SIL_SHRED = 0.06, 0.45
+SIL_FLAT_VIEW = 0.02              # a view whose convexity deficit is under this reads as a plain slab or disc
+DETAIL_DENSITY = 8.0              # game: feature-edge length (in diagonals of the asset) for a full secondary breakup
 READ_REGIONS, READ_MIN_PX, READ_BANDS = 6, 12, 5
 FLAT_DEG = 2.0
 SHARP_DEG = 25.0
@@ -98,13 +100,19 @@ def masks(P, T, px: int = PX, views=None) -> dict:
     return out
 
 
-def silhouette(P, T) -> dict:
+def silhouette(P, T, worst_view: bool = False) -> dict:
     from ..critique import solidity
     M = masks(P, T)
     sol = {k: round(solidity(m), 4) for k, m in M.items()}
     cx = float(np.mean([1 - s for s in sol.values()]))
     d = _clip(1 - cx / SIL_BLOB) if cx < SIL_BLOB else _clip((cx - SIL_SHRED) / 0.3)
-    return {"deficit": d, "solidity": sol, "convexity_deficit": round(cx, 4), "masks": M}
+    # the worst view counts too: a slab or a disc reads as a plain shape from the side it is seen most, however
+    # broken the other views are (half weight: a part may have one plain view by nature)
+    worst = float(min(1 - s for s in sol.values()))
+    if worst_view and worst < SIL_FLAT_VIEW and cx < SIL_SHRED:
+        d = max(d, 0.5 * _clip(1 - worst / SIL_FLAT_VIEW))
+    return {"deficit": d, "solidity": sol, "convexity_deficit": round(cx, 4), "worst_view": round(worst, 4),
+            "masks": M}
 
 
 def _tri_normals(P, T):
@@ -113,8 +121,10 @@ def _tri_normals(P, T):
     return n / np.maximum(ln, 1e-12)[:, None], ln / 2
 
 
-def interior_read(P, T, px: int = PX) -> dict:
-    """Value regions of a small lit render (three-quarter view), by z-buffered surface samples."""
+def interior_read(P, T, px: int = PX, albedo=None) -> dict:
+    """Value regions of a small lit render (three-quarter view), by z-buffered surface samples. albedo(k, bary): the
+    surface's own value (0..1) at samples on triangles k (a baked base colour); without it the surface is one grey,
+    so only the shading reads."""
     from scipy import ndimage
     from ..critique import _area_samples
     P, T = np.asarray(P, float), np.asarray(T, np.int64)
@@ -138,6 +148,10 @@ def interior_read(P, T, px: int = PX) -> dict:
     view = -R[2]
     nrm = np.where((nrm @ view)[:, None] < 0, -nrm, nrm)    # the side that faces the eye
     shade = 0.25 + 0.75 * np.clip(nrm @ light, 0, 1)
+    if albedo is not None:                                 # value = albedo x light, stretched back to 0..1
+        alb = np.clip(np.asarray(albedo(k[win], bary[win]), float), 0.0, 1.0)
+        shade = shade * (0.15 + 0.85 * alb)
+        shade = shade / max(float(shade.max()), 1e-6)
     img = np.full(px * px, np.nan)
     img[pix[win]] = shade
     img = img.reshape(px, px)
@@ -223,7 +237,11 @@ def balance(P, T, M: dict | None = None) -> dict:
 def detail_scales(P, T, tri_feature=None, metrics=None, game=None) -> dict:
     if game and (game.get("scales") or {}).get("count") is not None:
         n = int(game["scales"]["count"])
-        return {"deficit": _clip((3 - n) / 2), "bands": n, "from": "game asset"}
+        d = _clip((3 - n) / 2)
+        fed = game["scales"].get("feature_edge_diagonals")
+        if fed is not None:          # the secondary breakup's density: a few panel lines on a big shell read as sparse
+            d = max(d, 0.6 * _clip(1 - float(fed) / DETAIL_DENSITY))
+        return {"deficit": d, "bands": n, "density": fed, "from": "game asset"}
     P = np.asarray(P, float)
     diag = float(np.linalg.norm(P.max(0) - P.min(0))) or 1.0
     sizes = []
@@ -387,9 +405,14 @@ def analyze(m: Measurement, weights: dict | None = None) -> Analysis:
     P, T = np.asarray(m.P, float), np.asarray(m.T, np.int64)
     if not len(T):
         raise ValueError("analyze: the mesh has no triangles")
-    sil = silhouette(P, T)
+    sil = silhouette(P, T, worst_view=m.purpose == "game")
     M = sil.pop("masks")
-    parts = {"silhouette": sil, "interior_read": interior_read(P, T), "proportion": proportion(P),
+    lit = ((m.game or {}).get("silhouette") or {}).get("interior_regions_lit")
+    if lit is not None:                     # a baked asset: the read of its lit render with the base colour on it
+        read = {"deficit": _clip(1 - (int(lit) - 1) / (READ_REGIONS - 1)), "regions": int(lit), "from": "game asset"}
+    else:
+        read = interior_read(P, T)
+    parts = {"silhouette": sil, "interior_read": read, "proportion": proportion(P),
              "balance": balance(P, T, M), "detail_scales": detail_scales(P, T, m.tri_feature, m.metrics, m.game),
              "edge_hierarchy": edge_hierarchy(P, T, m.metrics, m.game), "surface_breaks": surface_breaks(P, T)}
     parts["material_zones"], parts["material_contrast"] = materials(m.zones, m.metrics, m.game)

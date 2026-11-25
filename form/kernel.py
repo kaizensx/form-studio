@@ -676,16 +676,47 @@ def _oriented(shape, orientation):
     return Pos(-(bb.min.X + bb.max.X) / 2, -(bb.min.Y + bb.max.Y) / 2, -bb.min.Z) * s
 
 
-def _open_edges(path) -> int:
-    """Edges of a binary STL used by one triangle only (vertices welded at 1e-6 mm): 0 for a closed mesh."""
+def _stl_ids(path):
+    """(records (n, 50) uint8, welded vertex ids (n, 3)) of a binary STL; vertices welded at 1e-6 mm."""
     raw = np.fromfile(str(path), dtype=np.uint8)
     n = int(raw[80:84].view(np.uint32)[0]) if raw.size >= 84 else 0
     if n == 0:
-        return 0
+        return raw[:0].reshape(0, 50), np.zeros((0, 3), np.int64)
     rec = raw[84:84 + 50 * n].reshape(n, 50)
     V = np.ascontiguousarray(rec[:, 12:48]).view(np.float32).reshape(n, 3, 3).astype(np.float64)
     _, ids = np.unique(np.round(V.reshape(-1, 3) / 1e-6).astype(np.int64), axis=0, return_inverse=True)
-    ids = ids.reshape(n, 3)
+    return rec, ids.reshape(n, 3)
+
+
+def drop_degenerate(path) -> int:
+    """Remove the triangles of a binary STL whose corners weld to fewer than three points (zero-area slivers) and
+    return how many went. OCCT's mesher leaves them where a fillet's vertex blend has a collapsed edge (three or more
+    fillets meeting at a corner): the triangle (a, a, b) has no area, but its edge (a, a) is used once and a-b three
+    times, so the mesh audit reads a closed solid as open and non-manifold. Dropping them changes no surface."""
+    rec, ids = _stl_ids(path)
+    if not len(ids):
+        return 0
+    bad = (ids[:, 0] == ids[:, 1]) | (ids[:, 1] == ids[:, 2]) | (ids[:, 2] == ids[:, 0])
+    k = int(bad.sum())
+    if k:
+        raw = np.fromfile(str(path), dtype=np.uint8)
+        keep = rec[~bad]
+        head = raw[:80].copy()
+        with open(path, "wb") as fh:
+            fh.write(head.tobytes())
+            fh.write(np.uint32(len(keep)).tobytes())
+            fh.write(np.ascontiguousarray(keep).tobytes())
+    return k
+
+
+def _open_edges(path) -> int:
+    """Edges of a binary STL used by one triangle only (vertices welded at 1e-6 mm, zero-area triangles left out):
+    0 for a closed mesh."""
+    _rec, ids = _stl_ids(path)
+    if not len(ids):
+        return 0
+    ok = (ids[:, 0] != ids[:, 1]) & (ids[:, 1] != ids[:, 2]) & (ids[:, 2] != ids[:, 0])
+    ids = ids[ok]
     E = np.sort(np.concatenate([ids[:, [0, 1]], ids[:, [1, 2]], ids[:, [2, 0]]]), axis=1)
     _, counts = np.unique(E, axis=0, return_counts=True)
     return int((counts == 1).sum())
@@ -707,7 +738,10 @@ def write_stl(shape, path, tol: float = 0.01, ang: float = 0.1) -> dict:
         w = StlAPI_Writer()
         w.ASCIIMode = False                                    # binary, as build123d's export_stl writes
         w.Write(shape.wrapped, str(path))
+        dropped[0] = drop_degenerate(path)
         return _open_edges(path)
+
+    dropped = [0]
 
     tries = [(tol, ang), (tol, ang * 2), (tol / 2, ang * 2), (tol * 2, ang * 2), (tol / 10, ang), (tol * 5, max(ang * 2, 0.25))]
     first = None
@@ -716,9 +750,10 @@ def write_stl(shape, path, tol: float = 0.01, ang: float = 0.1) -> dict:
         first = open_ if first is None else first
         if not open_:
             return {"tolerance": t, "angular_tolerance": a, "remeshed": (t, a) != (tol, ang), "open_edges": 0,
-                    "open_edges_first": first}
+                    "open_edges_first": first, "degenerate_dropped": dropped[0]}
     open_ = write(tol, ang)
-    return {"tolerance": tol, "angular_tolerance": ang, "remeshed": False, "open_edges": open_, "open_edges_first": first}
+    return {"tolerance": tol, "angular_tolerance": ang, "remeshed": False, "open_edges": open_, "open_edges_first": first,
+            "degenerate_dropped": dropped[0]}
 
 
 def _textured_parts(model, face_part: list, ids: list, budget: int | None = None) -> list | None:

@@ -187,6 +187,47 @@ class Kernel(unittest.TestCase):
         self.assertEqual(len(ops_cad.sharp_edges(out, self.frozen)), 0)
         self.assertEqual(self.bore(out), self.bore(self.block))
 
+    def test_the_exported_stl_of_a_rounded_corner_is_closed(self):
+        """Where three rounds meet, OCCT's mesher leaves zero-area triangles (a, a, b) in the vertex blend: the mesh
+        audit read the solid's STL as open and the final check took the rounds out. write_stl drops them."""
+        import tempfile
+        from pathlib import Path
+        from form import kernel
+        for out in (ops_cad.edge_break(self.block, self.frozen, 0.3),
+                    ops_cad.edge_break(ops_cad.parting_line(self.block, self.frozen, 0.5, 0.4), self.frozen, 0.3)):
+            f = Path(tempfile.mkdtemp()) / "r.stl"
+            r = kernel.write_stl(out, f, 0.01, 0.1)
+            self.assertEqual(r["open_edges"], 0, r)
+            self.assertEqual(kernel._open_edges(f), 0)
+            _rec, ids = kernel._stl_ids(f)
+            self.assertFalse(((ids[:, 0] == ids[:, 1]) | (ids[:, 1] == ids[:, 2]) | (ids[:, 0] == ids[:, 2])).any())
+
+    def test_drop_degenerate_keeps_every_real_triangle(self):
+        import tempfile
+        import numpy as np
+        from pathlib import Path
+        from form import kernel
+        from form.craft import meshtex
+        V = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], float)
+        F = np.array([[0, 2, 1], [0, 1, 3], [1, 2, 3], [0, 3, 2], [1, 1, 3]])      # a tetrahedron and a sliver
+        f = Path(tempfile.mkdtemp()) / "t.stl"
+        meshtex.write_stl(f, V, F)
+        self.assertEqual(kernel.drop_degenerate(f), 1)
+        self.assertEqual(len(kernel._stl_ids(f)[1]), 4)
+        self.assertEqual(kernel._open_edges(f), 0)
+
+    def test_edge_break_leaves_slivers_alone(self):
+        """The guard: no break on an edge shorter than 3 r or along a face narrower than 2.2 r (a parting line's
+        groove walls); the result is one valid solid."""
+        grooved = ops_cad.parting_line(self.block, self.frozen, 0.5, 0.4)
+        out = ops_cad.edge_break(grooved, self.frozen, 0.3)
+        self.assertTrue(out.is_valid)
+        self.assertEqual(len(out.solids()), 1)
+        narrow = [x for x in ops_cad.sharp_edges(grooved, self.frozen) if x[4] / max(x[2], 1e-6) < 0.66]
+        self.assertTrue(narrow)                                   # the groove walls are there to skip
+        left = {ops_cad._pt(x[0]) for x in ops_cad.sharp_edges(out, self.frozen)}
+        self.assertTrue(left)                                     # and they stayed sharp
+
     def test_nothing_to_do_returns_the_body(self):
         from build123d import Box
         b = Box(20, 20, 20).solids()[0]

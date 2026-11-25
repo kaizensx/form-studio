@@ -252,15 +252,25 @@ def _points(V) -> list:
     return [[float(f"{a:.2f}") + 0.0 for a in p] for p in np.asarray(V, float)]
 
 
+PACK_LOW_OVER = 24_000               # a low cage literal longer than this is packed too (meshsource.pack)
+
+
 def literal(c: meshsource.CageData, name: str, high: meshsource.CageData | None = None) -> str:
-    """CageData.literal(), compact: points to 0.01 mm, no spaces (a design source is at most 200 kB)."""
-    def body(k):
-        return f"V={_dumps(_points(k.V))},F={_dumps(k.F)},creases={_dumps(k.creases)},regions={_dumps(k.regions)}"
+    """CageData.literal(), compact: points to 0.01 mm, no spaces (a design source is at most 200 kB). The bake source
+    (high) is written packed (meshsource.pack: deterministic JSON, zlib, base64); so is a large low cage. Regions stay
+    readable either way."""
+    def fields(k):
+        return {"V": _points(k.V), "F": [list(map(int, f)) for f in k.F],
+                "creases": [[int(a), int(b), float(w)] for a, b, w in k.creases], "regions": k.regions}
+    lo = fields(c)
+    body = f"V={_dumps(lo['V'])},F={_dumps(lo['F'])},creases={_dumps(lo['creases'])}"
+    if len(body) > PACK_LOW_OVER:
+        body = f"packed={json.dumps(meshsource.pack({k: lo[k] for k in ('V', 'F', 'creases')}))}"
+    body += f",regions={_dumps(lo['regions'])}"
     hi = ""
     if high is not None:
-        hi = (",\n    high={" + f'"V":{_dumps(_points(high.V))},"F":{_dumps(high.F)},"creases":{_dumps(high.creases)},'
-              f'"regions":{_dumps(high.regions)}' + "}")
-    return f"{name} = meshsource.cage(\n    {body(c)}{hi})\n"
+        hi = ",\n    high=" + json.dumps(meshsource.pack(fields(high)))
+    return f"{name} = meshsource.cage(\n    {body}{hi})\n"
 
 
 def design_source(cage: meshsource.CageData, title: str, materials: dict | None = None, note: str = "") -> str:

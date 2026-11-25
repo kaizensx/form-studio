@@ -128,6 +128,68 @@ class Operators(unittest.TestCase):
             bm.validate_ops(ops_cage.replay(out))
             self.assertTrue(p1.reason, op.name)
 
+    def test_border_ops_pick_a_region_that_has_a_border(self):
+        """A region that covers a whole closed part has no border, so region_boundary selects nothing on it (the
+        runner's "the edge selection is empty"). Panel lines and trims take the largest region that has one."""
+        from form.exemplars.game.base import box, design_source, start  # noqa: F401
+        from form.game import pipeline
+        big = box([0, 30, 60, 90], [0, 30, 60], [0, 30]).region("shell")           # the whole part
+        small = box([200, 220, 240], [0, 20], [0, 10]).region("panel", [0, 1])
+        cages = [meshsource.cage(b.V, b.F, [[a, c2, w] for a, c2, w in b.creases], b.regions) for b in (big, small)]
+        src = design_source(pipeline.merge_cages(cages), "Two blocks")
+        borders = ops_cage.region_borders(src)
+        self.assertNotIn("shell", borders)
+        self.assertGreater(borders["panel"], 0)
+        d = Design.from_source(src, purpose="game", bbox=((0, 0, 0), (240, 60, 30)))
+        for op in (ops_cage.PanelLine(), ops_cage.TrimStrip()):
+            self.assertEqual(op._region(d), "panel", op.name)
+        self.assertEqual(ops_cage.Inset()._region(d), "shell")               # an inset needs no border
+
+    def test_packed_literals_read_back_the_same(self):
+        """Large cages and op lists are written packed (meshsource.pack: deterministic JSON, zlib, base64), so a
+        design source stays under its size limit; every reader unpacks them, and the same data packs the same."""
+        from form.game import pipeline
+        b = box_block()
+        c = meshsource.cage(b.V, b.F, [[a, c2, w] for a, c2, w in b.creases], b.regions)
+        packed = meshsource.pack({"V": c.V.tolist(), "F": c.F, "creases": [list(x) for x in c.creases]})
+        self.assertEqual(packed, meshsource.pack({"V": c.V.tolist(), "F": c.F,
+                                                  "creases": [list(x) for x in c.creases]}))
+        src = (f"from form import meshsource\nCAGE_0 = meshsource.cage(packed={packed!r}, regions={b.regions!r})\n"
+               "CAGES = [CAGE_0]\n")
+        back = pipeline.cages_in_source(src)[0]
+        self.assertTrue(np.allclose(back.V, c.V))
+        self.assertEqual(back.F, c.F)
+        self.assertEqual(ops_cage.cages_of(src)["CAGE_0"]["regions"], b.regions)
+        ns: dict = {}
+        exec(compile(src, "<src>", "exec"), ns)                              # the build runs the same call
+        self.assertEqual(len(ns["CAGE_0"].F), len(c.F))
+        many = [{"op": "crease", "edges": [[0, 1]], "value": 1.0, "note": "x" * 40}] * 600
+        s2 = ops_cage.with_refine_ops(src, many)
+        self.assertLess(len(s2), len(src) + ops_cage.PACK_OVER)
+        self.assertEqual(ops_cage.refine_ops_of(s2), many)
+
+    def test_refinement_replays_on_the_bake_source(self):
+        """The bake carries the refinement: high_ops rebuilds the high cage with the same REFINE_OPS, so a groove
+        cut in the low cage is in the high one too (otherwise the normal map bakes it flat)."""
+        from form.exemplars.game.base import design_source
+        from form.refine import game_eval
+        b = box_block()
+        hi = {"V": (b.V * 1.001).tolist(), "F": b.F, "creases": [list(x) for x in b.creases], "regions": b.regions}
+        c = meshsource.cage(b.V, b.F, [[a, c2, w] for a, c2, w in b.creases], b.regions, high=hi)
+        src = design_source(c, "Block with a bake source")
+        self.assertIsNone(game_eval.high_ops(_source()))                      # no bake source: nothing to replay
+        op = {"op": "panel_line", "edges": {"region_boundary": "panel"}, "width": 1.0, "depth": 0.5, "crease": 1.0}
+        s2 = ops_cage.with_refine_ops(src, [op])
+        hops = game_eval.high_ops(s2)
+        self.assertEqual(hops[0]["op"], "cage_new")
+        self.assertEqual(hops[-1], op)
+        bm.validate_ops(hops)
+
+
+def box_block():
+    from form.exemplars.game.base import box
+    return box([0, 20, 40], [0, 20], [0, 10]).region("panel", [0, 1])
+
 
 @unittest.skipUnless(HAS_BLENDER, "Blender is not installed")
 class InBlender(unittest.TestCase):

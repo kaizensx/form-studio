@@ -41,6 +41,11 @@ BAKE = {
     "fast": {"samples": 8, "ao_samples": 16, "margin_px": 8, "device": "CPU"},
     "quality": {"samples": 32, "ao_samples": 128, "margin_px": 16, "device": "AUTO"},
 }
+# preview: the refinement engine's quick bake of a candidate (form/refine/game_eval.py), never offered for an asset
+# someone ships: few samples on 256 or 512 px maps, enough for the game evidence (bevel coverage, value contrast,
+# detail scales, wear) to see what a candidate's panels, trims and kit parts do once baked
+PREVIEW_BAKE = {"samples": 2, "ao_samples": 4, "margin_px": 2, "device": "CPU"}
+PREVIEW_PX = (256, 512)
 MAPS = ("base_color", "normal", "orm", "ao")    # ORM: R ambient occlusion, G roughness, B metallic (glTF reads G/B)
 PIVOTS = ("bottom_center", "center", "origin")
 

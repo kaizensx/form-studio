@@ -1022,6 +1022,10 @@ def game_evidence(asset_dir) -> dict:
     s64 = ra.silhouette(P, T)
     s64.pop("masks", None)
     read = ra.interior_read(P, T)
+    lit = None
+    if base is not None:                           # the same render with the baked base colour: what the eye reads
+        w = np.array([0.2126, 0.7152, 0.0722])
+        lit = ra.interior_read(P, T, albedo=lambda kk, bb: _lookup(base, (UV[T[kk]] * bb[:, :, None]).sum(1)) @ w)
     return {"asset": rep.get("asset"), "dir": str(d), "diagonal_mm": round(diag, 2),
             "lod0_triangles": int(len(T)), "edges": edges,
             "materials": {"count": len(kinds), "list": [f"{a} {b}" for a, b in kinds]},
@@ -1033,7 +1037,8 @@ def game_evidence(asset_dir) -> dict:
                        "normal_blue_std": nd.get("blue_std"), "normal_rg_std": nd.get("rg_std")},
             "silhouette": {"solidity": sols, "complexity": round(1 - float(np.mean(list(sols.values()))), 4),
                            "convexity_64": s64["convexity_deficit"], "solidity_64": s64["solidity"],
-                           "interior_regions": read["regions"]},
+                           "interior_regions": read["regions"],
+                           "interior_regions_lit": None if lit is None else lit["regions"]},
             "wear": wear,
             "evidence": "computed (thresholds proposed)"}
 

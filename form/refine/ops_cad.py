@@ -532,6 +532,10 @@ def edge_break(body, frozen=(), r: float = 0.3, deg: float = DEG_SHARP, max_edge
     """A small round on every sharp edge that is left (a chamfer of the same size where a round does not fit)."""
     def one(solid):
         rows = _texture_filter(solid, sharp_edges(solid, frozen, deg, margin=0.5))
+        # the guard: no round on an edge shorter than 3 r or along a face narrower than 2.2 r (a groove wall or a
+        # sliver a parting line or a recess left). OCCT's fillet on those builds self-touching blends or takes the
+        # kernel down; a break that small would not show there anyway.
+        rows = [x for x in rows if x[2] >= 3.0 * r and (x[4] if len(x) > 4 else x[3]) / max(x[2], 1e-6) >= 2.2 * r]
         if not rows:
             return None
         centers = [_pt(r[0]) for r in sorted(rows, key=lambda x: -x[2])[:min(max_edges, 2 * _edge_cap(solid))]]

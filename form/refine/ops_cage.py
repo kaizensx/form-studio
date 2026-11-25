@@ -250,6 +250,11 @@ def cages_of(source: str) -> dict:
                 kw[k.arg] = ast.literal_eval(k.value)
             except ValueError:
                 kw[k.arg] = None
+        try:
+            from .. import meshsource
+            kw = meshsource.cage_fields(kw)
+        except (ValueError, TypeError):
+            continue
         if kw.get("V") is not None and kw.get("F") is not None:
             out[n.targets[0].id] = {"V": kw["V"], "F": kw["F"], "creases": kw.get("creases") or [],
                                     "regions": kw.get("regions") or {}, "high": kw.get("high")}
@@ -260,19 +265,51 @@ def regions_of(source: str) -> set:
     return {r for c in cages_of(source).values() for r, fs in (c["regions"] or {}).items() if fs}
 
 
+def region_borders(source: str) -> dict:
+    """{region: number of border edges} over every cage of the source: edges with a face of the region on one side
+    only. A region that covers whole closed parts has none, so region_boundary selects nothing on it (the runner
+    refuses an empty edge selection); operators that work on a region's border pick only regions listed here."""
+    out: dict = {}
+    for c in cages_of(source).values():
+        F = c["F"]
+        for r, fs in (c["regions"] or {}).items():
+            cnt: dict = {}
+            for i in set(fs or ()):
+                if not 0 <= int(i) < len(F):
+                    continue
+                f = F[int(i)]
+                for a, b in zip(f, f[1:] + f[:1]):
+                    e = (min(a, b), max(a, b))
+                    cnt[e] = cnt.get(e, 0) + 1
+            n = sum(1 for v in cnt.values() if v == 1)
+            if n:
+                out[r] = out.get(r, 0) + n
+    return out
+
+
 def refine_ops_of(source: str) -> list:
     m = re.search(rf"^{HOOK}\s*=\s*(.*)$", source or "", re.M)
     if not m:
         return []
     try:
-        return json.loads(m.group(1))
+        from .. import meshsource
+        out = meshsource.unpack(json.loads(m.group(1)))
+        return out if isinstance(out, list) else []
     except ValueError:
         return []
 
 
+PACK_OVER = 16_000                   # an op list longer than this (as JSON) is written packed (meshsource.pack)
+
+
 def with_refine_ops(source: str, ops: list) -> str:
-    """The source with REFINE_OPS set to ops (one JSON line after the CAGES list, or replacing the one there)."""
-    line = f"{HOOK} = {json.dumps(ops, separators=(',', ':'))}"
+    """The source with REFINE_OPS set to ops (one JSON line after the CAGES list, or replacing the one there). A long
+    list is written as one packed string literal (meshsource.pack), so kit detail never runs into the source limit."""
+    text = json.dumps(ops, separators=(',', ':'))
+    if len(text) > PACK_OVER:
+        from .. import meshsource
+        text = json.dumps(meshsource.pack(ops))
+    line = f"{HOOK} = {text}"
     if re.search(rf"^{HOOK}\s*=", source, re.M):
         return re.sub(rf"^{HOOK}\s*=.*$", lambda _m: line, source, count=1, flags=re.M)
     m = re.search(r"^CAGES\s*=.*$", source, re.M)
@@ -344,12 +381,15 @@ class SupportLoops(Operator):
 class _RegionOp(Operator):
     """Shared: picks the largest unfrozen region of the cage (deterministic: by face count, then name)."""
 
+    border = True                                   # the op works on the region's border (region_boundary)
+
     def _region(self, design):
         frozen = _frozen_regions(design)
+        borders = region_borders(design.source) if self.border else None
         counts: dict = {}
         for c in cages_of(design.source).values():
             for r, fs in (c["regions"] or {}).items():
-                if r not in frozen and fs:
+                if r not in frozen and fs and (borders is None or r in borders):
                     counts[r] = counts.get(r, 0) + len(fs)
         if not counts:
             return None
@@ -360,7 +400,8 @@ class _RegionOp(Operator):
         if not ok:
             return ok, why
         if self._region(design) is None:
-            return False, "no named region to work on"
+            return False, ("no named region with a border to work on" if self.border else
+                           "no named region to work on")
         if any(o.get("op") == self.name for o in refine_ops_of(design.source)):
             return False, f"{self.name} already added"
         return True, ""
@@ -408,6 +449,7 @@ class Inset(_RegionOp):
     cost = 0.75
     label = "Inset panel"
     params = {"depth": -0.5}
+    border = False
 
     def apply(self, design, analysis, params):
         r = self._region(design)
@@ -425,6 +467,7 @@ class KitPlace(_RegionOp):
     targets = ("detail_scales", "interior_read")
     cost = 1.5
     label = "Kit detail"
+    border = False
     params = {"ratios": list(RATIOS), "pitch": "constant", "part": "rivet_dome", "count": 9}
 
     def preconditions(self, design, analysis):

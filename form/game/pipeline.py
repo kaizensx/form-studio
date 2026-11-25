@@ -172,7 +172,7 @@ def cages_in_source(text: str) -> list[meshsource.CageData]:
         try:
             args = [ast.literal_eval(a) for a in node.args]
             kw = {k.arg: ast.literal_eval(k.value) for k in node.keywords if k.arg}
-            fields = dict(zip(("V", "F", "creases", "regions"), args), **kw)
+            fields = meshsource.cage_fields(dict(zip(("V", "F", "creases", "regions"), args), **kw))
             c = meshsource.cage(fields["V"], fields["F"], fields.get("creases"), fields.get("regions"))
             hi = fields.get("high")
             if hi is not None:                   # detail only the high poly has (high_only cage ops), as data
@@ -391,11 +391,16 @@ def check_options(preset="gltf", budgets=None, texture_px=1024, bake="fast", piv
     try:
         pre = pz.preset(preset)
         b = pz.budgets(budgets)
-        px = pz.texture_px(texture_px)
+        if bake == "preview":
+            px = int(texture_px or 256)
+            if px not in pz.PREVIEW_PX:
+                raise ValueError(f"a preview bake takes texture_px {' or '.join(map(str, pz.PREVIEW_PX))}.")
+        else:
+            px = pz.texture_px(texture_px)
         pz.pivot_offset(np.zeros((1, 3)), pivot)
     except ValueError as e:
         raise GameError(str(e))
-    if bake not in pz.BAKE:
+    if bake not in pz.BAKE and bake != "preview":
         raise GameError(f"bake must be one of {', '.join(pz.BAKE)}.")
     if uv not in UV_METHODS:
         raise GameError(f"uv must be one of {', '.join(UV_METHODS)}.")
@@ -540,7 +545,7 @@ def build(source: dict, out_dir, asset: str = "asset", preset="gltf", budgets=No
             ex_pre = pre if f == "fbx" else pz.preset("gltf")
             exports.append({"format": f, "file": f"{asset}.{f}", "unit": ex_pre["unit"], "up": ex_pre["up"],
                             "scale": ex_pre["scale"], "names": {}, "lod0": pz.lod_name(asset, 0)})
-        bk = pz.BAKE[opts["bake"]]
+        bk = pz.PREVIEW_BAKE if opts["bake"] == "preview" else pz.BAKE[opts["bake"]]
         job = {"runner": RUNNER_VERSION, "asset": asset, "source": "cage" if "cage" in source else "mesh",
                "input": "input.npz", "materials": [matlib.for_runner(m) for m in mats],
                "masks": mask_sizes(V),

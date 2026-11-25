@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **Game refinement sees what a candidate looks like baked.** Each game candidate now gets a quick bake (256 px
+  maps, few samples: a new internal `preview` bake of form/game) and is scored on that asset's game evidence: bevel
+  coverage, value contrast, detail scales and their density, wear, and the interior read of a lit render with the
+  baked base colour. Before, candidates were measured on the bare cage, so a panel line, a trim or an inset made a
+  stand-in edge measure worse and the engine kept nothing on five of the six bench assets. REFINE_OPS now replay on
+  the bake source too, so a groove cut in the low cage is in the high one and the normal map no longer bakes it
+  flat. The game time budget is 300 s (every candidate bakes; at most two Blender processes).
+- **Fixes in refinement.** Panel lines and trims pick a region that has a border (a region that is a whole part
+  has none, which failed in Blender with "the edge selection is empty"). Large cage literals and long REFINE_OPS
+  lists are written packed (`meshsource.pack`: deterministic JSON, zlib, base64; regions stay readable), so the
+  bench chest's kit detail no longer hits the 200 kB source limit. The exported STL drops the zero-area triangles
+  OCCT's mesher leaves where three rounds meet, which made a closed solid read as open and took fillets out of
+  refined designs (magnet organizer, the test block). Edge break skips edges shorter than 3 r and faces narrower
+  than 2.2 r (groove walls, slivers), where OCCT's fillet could take the kernel down.
+- **Stricter game deficits.** A game asset's silhouette deficit also counts its plainest view (a slab or a disc
+  from the side), and its detail scales count how dense the secondary breakup is (feature-edge length per diagonal),
+  so the engine has something to do on assets the old measures called finished.
+
 - **Every design is refined after it builds.** create_design, update_design, add_feature (code and standard
   features) and a kept candidate now start design refinement in the background once the revision is saved and on
   screen, so the first picture comes as fast as before. What the engine keeps lands as one more revision, "Refined: N

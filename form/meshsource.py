@@ -155,10 +155,50 @@ def subd_creases(creases) -> dict:
     return out
 
 
-def cage(V, F, creases=None, regions=None, high=None) -> CageData:
+PACK_PREFIX = "zb64:"
+
+
+def pack(obj) -> str:
+    """Data as a compact, deterministic string literal: JSON (sorted keys, no spaces), zlib level 9, base64. The same
+    data always packs to the same text, so a design source that holds it hashes the same way every time."""
+    import base64
+    import zlib
+    raw = json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()
+    return PACK_PREFIX + base64.b64encode(zlib.compress(raw, 9)).decode("ascii")
+
+
+def unpack(text):
+    """pack()'s inverse; anything that is not a packed string comes back as it is."""
+    if not (isinstance(text, str) and text.startswith(PACK_PREFIX)):
+        return text
+    import base64
+    import zlib
+    return json.loads(zlib.decompress(base64.b64decode(text[len(PACK_PREFIX):])).decode())
+
+
+def cage_fields(kw: dict) -> dict:
+    """A meshsource.cage(...) call's keyword values with packed ones unpacked: packed= (a dict of the fields) and any
+    single field given as a packed string (V, F, creases, regions, high)."""
+    out = dict(kw)
+    pk = out.pop("packed", None)
+    if pk is not None:
+        d = unpack(pk)
+        if not isinstance(d, dict):
+            raise ValueError("packed= must hold a dict of cage fields")
+        for k, v in d.items():
+            if out.get(k) is None:
+                out[k] = v
+    return {k: unpack(v) for k, v in out.items()}
+
+
+def cage(V=None, F=None, creases=None, regions=None, high=None, packed=None) -> CageData:
     """The cage a design's source holds (see literal()). high: the bake source ({V, F, creases, regions}) when the
-    cage was modelled with high_only ops."""
-    return CageData(V, F, creases or [], regions or {}, high)
+    cage was modelled with high_only ops. Any field may be a pack() string, and packed= a pack() of a dict of fields:
+    large cages stay under the design source limit and the call stays a literal (read with ast, never run)."""
+    f = cage_fields({"V": V, "F": F, "creases": creases, "regions": regions, "high": high, "packed": packed})
+    if f.get("V") is None or f.get("F") is None:
+        raise ValueError("a cage needs V and F")
+    return CageData(f["V"], f["F"], f.get("creases") or [], f.get("regions") or {}, f.get("high"))
 
 
 def cage_hash(V, F, decimals: int = HASH_DECIMALS) -> str:

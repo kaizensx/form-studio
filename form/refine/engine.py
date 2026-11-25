@@ -19,9 +19,10 @@ and operators, so tests drive it with stubs and Studio drives it with StudioEval
     mechanism, interface) are identical (per-feature area, face count and bounding box); the walls stay above the
     minimum; for a game asset, the validator and the triangle budgets pass. A candidate that fails a gate is never
     kept, whatever its score. An operator that fails gates twice is dropped for the rest of the run.
-  * Stops when no step gains 2 %, the time budget is spent (CAD 20 s, game 90 s; never past featureprog.time_left()
+  * Stops when no step gains 2 %, the time budget is spent (CAD 20 s, game 300 s; never past featureprog.time_left()
     when called inside a feature), or no operator is left.
-  * Game candidates are judged on geometry only; final_check (one bake and form.game.validate) runs on the result,
+  * Game candidates are judged on a quick bake each (form/refine/game_eval.py: the game evidence of 256 px maps);
+    final_check (one full bake and form.game.validate) runs on the result,
     and the path is shortened one step at a time until it passes.
 
 Opt-out at three levels: `refine = False` on the design class, refine="off" from the caller, `[refine] enabled =
@@ -52,7 +53,7 @@ GATE_STRIKES = 2
 # source (and so its checkpoints and its result) is then the same on a fast and a slow machine
 FEATURE_BUDGET_S = 10.0
 FEATURE_MIN_S = 2.0
-BUDGET_S = {"cad": 20.0, "game": 90.0}
+BUDGET_S = {"cad": 20.0, "game": 300.0}      # game: every candidate gets a quick bake (game_eval)
 FINAL_RESERVE_S = 5.0             # CAD: of the budget, kept for the final check (STL export and mesh audit, twice)
 WALL_FLOOR = {"print": 0.8, "model": 0.5, "game": 0.0}     # mm; print: two perimeters of a 0.4 mm nozzle
 WALL_KEEP = 0.8                   # a candidate's thinnest wall stays at least this share of the base's
@@ -277,7 +278,7 @@ def _apply(state: State, op: Operator, style: str, budget: float | None = None) 
 
 
 def engine_budget(purpose: str) -> float:
-    """Seconds for one refinement run (the base measurement included): CAD 20 s, game 90 s."""
+    """Seconds for one refinement run (the base measurement included): CAD 20 s, game 300 s."""
     return BUDGET_S["game" if purpose == "game" else "cad"]
 
 
