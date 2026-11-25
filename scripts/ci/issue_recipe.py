@@ -1,9 +1,9 @@
-"""Find the recipe in a recipe issue: the "Recipe source" field, a link to the file, or an attached file.
+"""Find the design in a Show and tell post (show-and-tell.yml): pasted code, a link to the file, or an attached archive.
 
     python scripts/ci/issue_recipe.py extract --event "$GITHUB_EVENT_PATH" --out DIR [--no-download]
-    python scripts/ci/issue_recipe.py extract --issue 42 --out DIR          # reads the issue through the API
+    python scripts/ci/issue_recipe.py extract --issue 42 --out DIR          # reads an issue through the API
 
-The same works for a discussion event (show-and-tell.yml): a pasted recipe or an attached archive is found the same way.
+The community recipe issue form is gone; its field labels below are still read, so an older post parses the same way.
 
 The issue body is data. It is parsed here and never reaches a shell. Downloads are limited to GitHub's own hosts
 (issue attachments, raw.githubusercontent.com, gists, github.com blob links), follow redirects only to GitHub's
@@ -32,7 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import GitHub, log, set_output  # noqa: E402
 
-# Issue form labels (.github/ISSUE_TEMPLATE/3-recipe.yml). The body renders each field as "### <label>".
+# Field labels of the retired recipe issue form. A form body renders each field as "### <label>".
 F_KIND = "This is"
 F_ID = "Recipe id"
 F_TAGS = "Tags"

@@ -57,7 +57,6 @@ If you added Form Studio to an agent by the old Mac app's path (FORM.app), add i
 
 - **See what exists:** `form_overview`.
 - **Start a design from its own code:** `design_guide`, then `create_design`. For a complex design, `design_brief` first.
-- **Start from a building block:** `describe_recipe`, then `create_project`.
 - **Offer concepts for a new idea:** `propose_concepts`, then you pick (`pick_concept`).
 - **Look at it:** `render` (`view="sheet"` gives four views).
 - **Try a change without saving:** `preview_change`.

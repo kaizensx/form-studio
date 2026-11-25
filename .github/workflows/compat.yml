@@ -1,6 +1,6 @@
 name: Compatibility matrix
 
-# Every recipe (built-in and community) sliced by every slicer CI can install, every night: PrusaSlicer, OrcaSlicer,
+# Every built-in recipe sliced by every slicer CI can install, every night: PrusaSlicer, OrcaSlicer,
 # Bambu Studio, SuperSlicer, QIDISlicer, ElegooSlicer and Snapmaker Orca, the official Linux builds pinned in
 # slicers.yml (keep the two lists in step). Each cell records whether the recipe built, sliced and passed its checks,
 # with print time, filament and layers.

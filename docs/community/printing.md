@@ -64,7 +64,7 @@ A release of a design made for printing freezes STEP, STL, OBJ, GLB, 3MF and the
 
 ## Which slicers are tested
 
-The official build of each slicer is installed in continuous integration and a design is sliced through Form Studio, on Linux and Windows. The versions and platforms are in [Compatibility and testing](https://github.com/kaizensx/form-studio/blob/main/docs/VERIFICATION.md), and a nightly matrix runs every recipe through every slicer: [compatibility](https://kaizensx.github.io/form-studio/compat/).
+The official build of each slicer is installed in continuous integration and a design is sliced through Form Studio, on Linux and Windows. The versions and platforms are in [Compatibility and testing](https://github.com/kaizensx/form-studio/blob/main/docs/VERIFICATION.md), and a nightly matrix runs the sample designs through every slicer: [compatibility](https://kaizensx.github.io/form-studio/compat/).
 
 ## Tips
 

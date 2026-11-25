@@ -56,13 +56,11 @@ jobs:
           issue_message: |
             Thank you for opening your first issue in Form Studio. A maintainer reads every new issue; if it is about a
             print, the printer, nozzle, filament, slicer preset and any measured numbers help most.
-            For a recipe you wrote, choose "build and check it here" in the recipe form and the automation will build,
-            check and slice it for you.
 
             — Form Studio automation
           pr_message: |
             Thank you for your first pull request to Form Studio. The tests run on the real CAD kernel; pull requests that
-            change recipes or the interface get a preview comment with before and after pictures. Please make sure it
+            change the engine or the interface get a preview comment with before and after pictures. Please make sure it
             targets `dev` and adds a line to `CHANGELOG.md` (see [CONTRIBUTING.md](https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md)).
 
             — Form Studio automation

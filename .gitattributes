@@ -1,2 +1,1 @@
-community/recipes/** -text
-tests/fixtures/community/** -text
+tests/fixtures/recipes/** -text

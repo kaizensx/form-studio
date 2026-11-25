@@ -24,7 +24,6 @@ import common  # noqa: E402
 import compat  # noqa: E402
 import issue_recipe  # noqa: E402
 import pr_preview  # noqa: E402
-import recipe_report  # noqa: E402
 import release_notes  # noqa: E402
 import test_shards  # noqa: E402
 import triage  # noqa: E402
@@ -91,31 +90,12 @@ class IssueParsing(unittest.TestCase):
         import zipfile
         b = io.BytesIO()
         with zipfile.ZipFile(b, "w") as z:
-            z.writestr("../../recipe.py", (FIX.parent.parent.parent / "community/recipes/cable-clip/recipe.py").read_text())
+            z.writestr("../../recipe.py", (FIX.parent.parent.parent / "tests/fixtures/recipes/cable_clip.py").read_text())
         r = issue_recipe.from_bytes("x.zip", b.getvalue())
         self.assertEqual(r.get("mode"), "source")
 
 
 class Reports(unittest.TestCase):
-    def test_recipe_comment(self):
-        tmp = Path(tempfile.mkdtemp())
-        shutil.copytree(FIX / "recipe-result", tmp / "res")
-        png(tmp / "res" / "out" / "preview.png")
-        text = run(recipe_report.main, "--issue", "101", "--result", str(tmp / "res"), "--dry-run",
-                   "--event", str(FIX / "issue-recipe-source.json"))
-        self.assertIn("Builds and passes its checks", text)
-        self.assertIn("recipe:accept", text)
-        self.assertIn("verdict: valid", text)
-
-    def test_taken_id_needs_changes(self):
-        ev = json.loads((FIX / "issue-recipe-source.json").read_text())
-        ev["issue"]["body"] = ev["issue"]["body"].replace("cable-clip-mini", "cable-clip")
-        tmp = Path(tempfile.mkdtemp())
-        (tmp / "ev.json").write_text(json.dumps(ev))
-        text = run(recipe_report.main, "--issue", "101", "--result", str(FIX / "recipe-result"), "--dry-run", "--event", str(tmp / "ev.json"))
-        self.assertIn("already taken", text)
-        self.assertIn("verdict: needs-changes", text)
-
     def test_pr_comment(self):
         tmp = Path(tempfile.mkdtemp())
         shutil.copytree(FIX / "pr-preview", tmp / "p")
@@ -128,9 +108,8 @@ class Reports(unittest.TestCase):
             run(pr_preview.main, "comment", "--dir", str(tmp / "p"), "--head-sha", "not-the-run", "--dry-run")
 
     def test_affected(self):
-        a = pr_preview.affected(["form/recipes/hook.py", "community/recipes/cable-clip/recipe.py", "form/app/qml/Main.qml"],
-                                FIX.parent.parent.parent)
-        self.assertEqual((a["recipes"], a["community"], a["ui"]), (["hook"], ["cable-clip"], True))
+        a = pr_preview.affected(["form/recipes/hook.py", "form/app/qml/Main.qml"], FIX.parent.parent.parent)
+        self.assertEqual((a["recipes"], a["ui"]), (["hook"], True))
         a = pr_preview.affected(["form/checks.py"], FIX.parent.parent.parent)
         self.assertGreaterEqual(len(a["recipes"]), 9)
 
@@ -204,7 +183,7 @@ class Shards(unittest.TestCase):
 
     def test_scope(self):
         light = ["README.md", "docs/RELEASING.md", "site/index.html", "brand/logo.svg", ".github/workflows/links.yml",
-                 "scripts/gen_mcp_docs.py", "community/recipes/x.json"]
+                 "scripts/gen_mcp_docs.py"]
         self.assertEqual(test_shards.scope(light), "light")
         for p in ("form/recon/pipeline.py", "tests/test_recon.py", ".github/workflows/ci.yml", "requirements.lock",
                   "scripts/ci/test_shards.py", ".github/ci-studio.toml", "pyproject.toml", "docs/../form/x.py"):

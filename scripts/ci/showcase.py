@@ -2,7 +2,7 @@
 
     python scripts/ci/showcase.py --discussion-id NODE_ID --number 12 --result DIR [--dry-run]
 
-Runs in the privileged job of show-and-tell.yml after the design was built in the sandbox. Like recipe_report.py it
+Runs in the privileged job of show-and-tell.yml after the design was built in the sandbox. It
 reads DIR as untrusted data (JSON limits, real PNG/GIF files only, escaped text) and takes the discussion from the
 workflow's event, not from DIR. One reply per discussion, edited in place when the post is edited.
 """
@@ -16,9 +16,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import (SIGNATURE, GitHub, gif_info, load_json, log, md, num, png_info, run_url,  # noqa: E402
-                    summary)
-from recipe_report import checks_table, fmt_time  # noqa: E402
+from common import (SIGNATURE, GitHub, checks_table, fmt_time, gif_info, load_json, log, md, num, png_info,  # noqa: E402
+                    run_url, summary)
 
 MARKER = "form-studio:showcase"
 

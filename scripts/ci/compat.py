@@ -3,7 +3,7 @@
     python scripts/ci/compat.py run --kind orca --python .venv/bin/python --out OUT     # one slicer, every recipe
     python scripts/ci/compat.py merge --in DIR --out SITE_DATA [--history history.json] # all slicers, one matrix
 
-`run` builds each built-in recipe and each community recipe at its defaults with build_recipe.py and slices it with
+`run` builds each built-in recipe at its defaults with build_recipe.py and slices it with
 the slicer FORM_CONFIG selects, then writes OUT/compat-<kind>.json:
 
     {"kind", "slicer": {"name", "version"}, "runner", "results": {"<recipe>": {"title", "builtin", "state": "ok" |
@@ -36,11 +36,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def recipes(root: Path) -> list[tuple[str, str]]:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from pr_preview import builtin_ids
-    out = [("builtin", rid) for rid in builtin_ids(root).values()]
-    for d in sorted((root / "community" / "recipes").glob("*/")):
-        if (d / "recipe.py").exists():
-            out.append(("community", d.name))
-    return out
+    return [("builtin", rid) for rid in builtin_ids(root).values()]
 
 
 def cmd_run(a) -> int:
@@ -53,7 +49,7 @@ def cmd_run(a) -> int:
             continue
         d = out / f"{kind}-{rid}"
         args = [a.python, str(ROOT / "scripts" / "ci" / "build_recipe.py"), "--out", str(d), "--slice"]
-        args += ["--builtin", rid] if kind == "builtin" else ["--community", str(ROOT / "community" / "recipes" / rid)]
+        args += ["--builtin", rid]
         env = {**os.environ, "FORM_DATA": tempfile.mkdtemp(prefix=f"compat-{rid}-")}
         log(f"{a.kind}: {rid}")
         try:
