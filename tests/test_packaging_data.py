@@ -141,7 +141,7 @@ class PackagedData(unittest.TestCase):
             except ImportError:
                 return
             names = {Path(src).name for src, dest in collect_data_files("form", include_py_files=False)
-                     if dest == "form/recon/cadfit"}
+                     if Path(dest).as_posix() == "form/recon/cadfit"}      # Windows gives form\\recon\\cadfit
         finally:                                     # PyInstaller sets up logging on import: leave it as it was
             root.setLevel(keep[0])
             root.handlers[:] = keep[1]
