@@ -124,6 +124,10 @@ class Claude(Adapter):
         mcp_file = Path(run.scratch) / "mcp.json"
         mcp_file.write_text(json.dumps({"mcpServers": {"form": run.mcp}}), encoding="utf-8")
         tools = (["WebSearch", "WebFetch"] if run.web else []) + (["Read"] if run.files else [])
+        if self.tool_search(run) != "false":
+            # with tool search on, Claude Code defers most MCP tools behind ToolSearch; without it in --tools the
+            # deferred tools cannot be reached (the agent then called bare names: "No such tool available")
+            tools.append("ToolSearch")
         allowed = ["mcp__form__*"] + [t for t in tools if t != "Read"]
         if run.files:
             # absolute paths in permission rules start with a double slash
@@ -144,10 +148,16 @@ class Claude(Adapter):
             cmd += ["--resume", run.session]
         return cmd
 
+    @staticmethod
+    def tool_search(run: Run) -> str:
+        """"auto" (the default: Form Studio's tools marked anthropic/alwaysLoad load up front, the rest are found
+        with ToolSearch) or "false" (every tool up front, as before 1.1.0): [chat] tool_search, or
+        FORM_TOOL_SEARCH=false for one run."""
+        v = (os.environ.get("FORM_TOOL_SEARCH") or getattr(run, "tool_search", "") or "auto").strip().lower()
+        return "false" if v in ("false", "off", "0", "no") else "auto"
+
     def run_env(self, run: Run) -> dict:
-        # Every FORM tool is loaded up front: with tool search on, Claude Code may defer MCP tools behind a search
-        # tool, and a run whose --tools list leaves that search tool out can then not reach them.
-        return {"ENABLE_TOOL_SEARCH": "false"}
+        return {"ENABLE_TOOL_SEARCH": self.tool_search(run)}
 
     def parser(self) -> Parser:
         return ClaudeParser()

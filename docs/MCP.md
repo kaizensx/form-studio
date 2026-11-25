@@ -29,15 +29,15 @@ Every client receives these instructions when it connects:
 
 ```
 Form Studio is an AI CAD studio: it designs parts, products and mechanisms as real, editable CAD (a parametric kernel)
-and keeps an honest record of what is known. 3D printing is one optional way to make a design; it is off unless the
-person turned it on (form_overview: has_printer).
+and keeps an honest record of what is known. 3D printing is optional and off unless the person turned it on
+(form_overview: has_printer).
 
 Workflow: form_overview -> create_design from your own code (design_guide; design_brief first for a complex
 design), or create_project from a recipe (describe_recipe) -> render (look at it) -> preview_change ->
 commit_change, or update_design -> get_project (checks, next actions). Only for a design whose purpose is "print":
 run_pipeline (exports, print checks, a slice) -> request_release (a person approves in Form Studio).
-After every build, design refinement runs in the background and lands as one more revision, "Refined: N changes"
-(named refine features, each kept only when the checks hold; refine_design shows, undoes or turns it off).
+After every build, refinement runs in the background and lands as one more revision (refine_design shows, undoes
+or turns it off). Long work answers with a job: get_job.
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
@@ -47,34 +47,66 @@ Rules:
 - For a print design: a slice is a simulation, not a print, and fit yield is a model. Say so when you report them.
 - You cannot approve a release. request_release returns a link that opens the release in Form Studio for the user.
 - Nothing here starts a print or sends files anywhere.
-- Every design has a purpose: "print" (for 3D printing) or "model" (just a 3D model: rendering, CAD exchange, CNC,
-  laser cutting, moulding). get_project reports it. For a model never ask about a printer, slicer, filament or
-  orientation; print checks and slicing do not apply. Pass purpose to create_project/create_design when the person
-  says what it is for; otherwise Form Studio uses their default (form_overview: purpose_default).
+- Every design has a purpose: "print" or "model" (just a 3D model: rendering, CAD exchange, CNC, laser cutting,
+  moulding). get_project reports it. For a model never ask about a printer, slicer, filament or orientation. Pass
+  purpose to create_project/create_design when the person says what it is for (default: form_overview
+  purpose_default). A "Purpose:" line in the message is binding: "just a 3D model" means no print talk.
 - Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time,
-  at most three per task. Outside Form Studio's chat it tells you to ask in your own interface. For a dimension the
-  person can measure, use ask_measurement (where to measure, tolerance, a diagram); it updates the design with how
-  it was measured.
-- A new idea that is not already a precise specification: propose_concepts with 3-4 genuinely different structural
-  approaches as real designs (not size variants), a one-line rationale each; then stop and let the person pick.
-  Refine the picked one with update_design. Recipes may be used as building blocks; do not offer them to the person.
-- Photos: find the scale from a reference object (bank card 85.60 x 53.98 mm, a coin's official diameter, a ruler);
-  dimensions read off a photo are "estimated from the photo (scale from <reference>)" and stay assumed until measured.
-  Sketches from Form Studio carry structured JSON: it is authoritative over the picture; stated dimensions override
-  drawn lengths. STEP/STL/3MF: import_reference. PDF drawings: read_document. Download only files the person gave you.
-- A link the person gives (a file, a Printables/MakerWorld/Thingiverse page, a signed download link): fetch_link,
-  never a shell. A large mesh: mesh_preflight before analysing it.
-- Meshes to make editable or understand: never embed them as the design. design_guide(topic="reference_parts"):
-  analyze_reference (and analyze_assembly for several parts) -> plan named features -> build123d with Params ->
-  compare_to_reference -> refine until within tolerance (0.1 mm by default for a remodel).
-- One request makes one design. Several files of one product are one design with several parts: reconstruct(files=[...])
-  for meshes, create_design(relation="part_of") to add a part to the design in front. A second create_design in a
-  conversation that has a design says its relation (replaces, part_of, alternative, new). One brief serves the request.
-- If the message has a "Purpose:" line, respect it: "just a 3D model" means no slicing and no print talk.
+  at most three per task; ask_measurement for a dimension they can measure. Where Form Studio's chat or your
+  client's form cannot reach the person, the result tells you to ask in your own interface.
+- A new idea that is not a precise specification: propose_concepts with 3-4 genuinely different structural
+  approaches as real designs, a one-line rationale each; then stop and let the person pick. Do not offer recipes.
+- Photos: scale from a reference object (bank card 85.60 x 53.98 mm, a coin, a ruler); photo dimensions stay
+  assumed until measured. Form Studio sketches carry JSON that is authoritative over the picture. STEP/STL/3MF:
+  import_reference. PDF drawings: read_document. Links the person gives: fetch_link, never a shell; a large mesh:
+  mesh_preflight first. Download only what the person gave you.
+- Meshes to make editable: never embed them as the design. design_guide(topic="reference_parts"): analyze_reference
+  (analyze_assembly for several parts) -> named features -> build123d with Params -> compare_to_reference until
+  within tolerance (0.1 mm by default).
+- One request makes one design. Several files of one product are one design with several parts (reconstruct
+  files=[...], create_design relation="part_of"). A second create_design in a conversation says its relation
+  (replaces, part_of, alternative, new).
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
-  design_guide(topic=...) and design_examples -> plan_design -> create_design(plan=...) -> look at the sheet and
-  section -> critique -> update_design. Analyse like a top engineer and designer before writing code.
+  design_guide(topic=...) and design_examples -> plan_design -> create_design(plan=...) -> look at the sheet ->
+  critique -> update_design. The design_guide topics (and this server's skills, where your client lists them)
+  hold the full workflow for each kind of design.
 ```
+
+## Skills
+
+Form Studio's design and engineering practice is also served as MCP skills (the `io.modelcontextprotocol/skills`
+extension, MCP 2026-07-28): `skills/list` names each skill with a digest of every file it holds, and the files are
+read with `resources/read` at `skill://<name>/SKILL.md`. Claude Code lists them as `form:<skill>`. Skills are not
+available in headless runs (`claude -p`, the Agent SDK) or to clients without the extension, so the same guidance
+stays reachable through the `design_guide` tool.
+
+## Questions to the person
+
+A tool that needs the person asks, in this order: Form Studio's own chat (when the agent runs inside it); the
+client's own form, when the client declared MCP elicitation (form mode); otherwise the result says so, as before.
+Through the client's form:
+
+| Tool | The form asks | Declined or dismissed |
+|---|---|---|
+| `ask_user` | the question, its choices (one, or several with `multi_select`) and a free answer | `{answered: false, reason}` |
+| `ask_measurement` | the value (within the parameter's range), how it was got (calipers, ruler, datasheet), or skip | `{answered: false, reason}`, nothing committed |
+| `delete_project` | to confirm, with the trash path | `{ok: false, refused}`, nothing moved |
+| `install_software` | to install, with the commands and the licence (always for a non-commercial licence) | `{installed: false, refused}` |
+| `fetch_link` | to download, for more than 100 MB | `{fetched: false, refused}` |
+
+On MCP 2026-07-28 the tool answers with an `InputRequiredResult` holding one `elicitation/create` and a sealed
+`requestState`, and the client calls it again with `inputResponses`; an answer without that state is not taken.
+Earlier protocol versions get `elicitation/create` on the session. A client without elicitation, and
+`install_software(confirm=True)` for a licence that needs no acceptance, work exactly as before.
+
+## Tool search
+
+Claude Code can defer MCP tools and find them with its ToolSearch tool. These tools carry
+`_meta["anthropic/alwaysLoad"]: true` and are always loaded: `form_overview`, `get_project`, `create_design`, `update_design`, `render`, `preview_change`, `commit_change`, `design_guide`, `ask_user`, `get_job`. Every tool's description opens with what it
+does (a verb and its object), so a search finds it; descriptions and the instructions above stay within the 4,096
+characters Claude Code reads. Form Studio's own chat runs Claude Code with `ENABLE_TOOL_SEARCH=auto` and ToolSearch
+in its tools; `[chat] tool_search = "false"` in studio.toml (or `FORM_TOOL_SEARCH=false`) loads every tool up front
+instead.
 
 ## Tools at a glance
 
@@ -82,100 +114,100 @@ Rules:
 
 | Tool | Access | What it does |
 |---|---|---|
-| [`form_overview`](#form_overview) | read-only | Start here. Engine, slicer, printer, available recipes, existing projects and the bench URL. |
-| [`setup_status`](#setup_status) | read-only | What FORM can use on this machine (kernel, slicer, printer, agents) and the exact command that fixes each gap. |
+| [`form_overview`](#form_overview) | read-only | Get an overview of Form Studio: engine, slicer, printer, available recipes, existing projects and the bench URL. |
+| [`setup_status`](#setup_status) | read-only | Check this machine's setup. What FORM can use on this machine (kernel, slicer, printer, agents) and the exact command that fixes each gap. |
 | [`install_software`](#install_software) | changes | Install one thing from FORM's registry (ids come from setup_status → software), e.g. "parts", "claude", "slicer.orca". |
-| [`describe_recipe`](#describe_recipe) | read-only | Parameters (unit, range, group, the feature each one drives), features and what the recipe checks. |
-| [`design_guide`](#design_guide) | read-only | Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter, holder, mechanism...). |
-| [`design_brief`](#design_brief) | changes | Stage 1 of a complex design: store the structured brief before any geometry. |
-| [`plan_design`](#plan_design) | changes | Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id). |
-| [`design_examples`](#design_examples) | read-only | Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of them: mechanical parts (linear slide, shaft coupler, pillow block, cam follower, gearbox), consumer products (mouse, earbud case, bottle and cap, game controller), organic forms (horn, handle), textured parts (knurl, hex relief, woven, fluted), assemblies (hinged case, ratchet wrench, robot head), helmets (full-face, open-face) and enclosures (electronics box with bosses, sliding battery box, handheld shell). |
-| [`critique`](#critique) | changes | Stage 5: look closely and measure. |
-| [`read_document`](#read_document) | read-only | Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). |
+| [`describe_recipe`](#describe_recipe) | read-only | Describe a recipe's parameters. |
+| [`design_guide`](#design_guide) | read-only | Read the design guide for code designs. |
+| [`design_brief`](#design_brief) | changes | Write a design brief. Stage 1 of a complex design: store the structured brief before any geometry. |
+| [`plan_design`](#plan_design) | changes | Plan a design's features. Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id). |
+| [`design_examples`](#design_examples) | read-only | Search example designs and their code. |
+| [`critique`](#critique) | changes | Critique a design with close-ups and metrics. |
+| [`read_document`](#read_document) | read-only | Read a document such as a datasheet or drawing. |
 | [`fetch_link`](#fetch_link) | changes | Download what a link the person gave points to, from Form Studio's engine (use this instead of a shell: it works where your sandbox has no network). |
-| [`resolve_model_page`](#resolve_model_page) | read-only | What a model link is, without downloading files: site, title, author, licence, pictures and the file list (Printables, Thingiverse with an app token), or why the files cannot be fetched and how the person gets them (MakerWorld, Thingiverse without a token). |
-| [`mesh_preflight`](#mesh_preflight) | read-only | Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display proxy for a heavy one. |
+| [`resolve_model_page`](#resolve_model_page) | read-only | Resolve a model page link. What a model link is, without downloading files: site, title, author, licence, pictures and the file list (Printables, Thingiverse with an app token), or why the files cannot be fetched and how the person gets them (MakerWorld, Thingiverse without a token). |
+| [`mesh_preflight`](#mesh_preflight) | read-only | Preflight a mesh file. Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display proxy for a heavy one. |
 | [`create_design`](#create_design) | changes | Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass, built with build123d. |
 | [`update_design`](#update_design) | changes | Replace a design's code as a new revision (history keeps every version). |
 | [`build_candidates`](#build_candidates) | changes | Build 2-6 versions of a risky design or step at the same time (one kernel worker each), verify and score every one, and keep the best. |
-| [`refine_design`](#refine_design) | changes | Design refinement of a project. |
-| [`get_design_source`](#get_design_source) | read-only | The exact code a revision was built from (built-in recipes return their recipe file). |
+| [`refine_design`](#refine_design) | changes | Show, rerun, undo or turn off design refinement of a project. |
+| [`get_design_source`](#get_design_source) | read-only | Get a design's source code: the exact code a revision was built from (built-in recipes return their recipe file). |
 | [`create_project`](#create_project) | changes | Create a project from a built-in recipe (form_overview lists them: gridfinity_bin, storage_box, pegboard, device_stand, ...). |
-| [`get_project`](#get_project) | read-only | Current revision with every parameter and its provenance, output status (current/stale/failed/missing), checks, fit model, next best actions, simulated slice, file paths, release gate and bench link. |
+| [`get_project`](#get_project) | read-only | Get a project's state: current revision with every parameter and its provenance, output status (current/stale/failed/missing), checks, fit model, next best actions, simulated slice, file paths, release gate and bench link. |
 | [`preview_change`](#preview_change) | read-only | Build a candidate change for real and report what it would touch, without saving anything: changed features, interface dimensions, stability, fit yield, which outputs it would invalidate. |
 | [`commit_change`](#commit_change) | changes | Save a change as a new revision (history is never rewritten). |
 | [`run_pipeline`](#run_pipeline) | changes | Regenerate whatever is not current: solid -> STEP+STL -> checks -> slice. |
-| [`get_job`](#get_job) | read-only | Status of a pipeline job started by run_pipeline/commit_change; waits up to wait_s for it to finish. |
-| [`render`](#render) | read-only | Look at the part. Returns a PNG rendered from the real kernel geometry, coloured by feature. |
-| [`animate`](#animate) | read-only | Make motion from real geometry. |
-| [`compare_revisions`](#compare_revisions) | read-only | What changed between two revisions: parameters, features, interfaces, stability, fit. |
-| [`geometry_diff`](#geometry_diff) | changes | What changed in the solid between revision a and b (default the head): material added (b minus a) and removed (a minus b), each with its volume in mm³, number of separate regions and bounding box, computed with booleans on the B-rep. |
+| [`get_job`](#get_job) | read-only | Get a job's status: a pipeline job started by run_pipeline/commit_change; waits up to wait_s for it to finish. |
+| [`render`](#render) | read-only | Render the part as an image. Look at the part. |
+| [`animate`](#animate) | read-only | Animate a design. Make motion from real geometry. |
+| [`compare_revisions`](#compare_revisions) | read-only | Compare two revisions. What changed between two revisions: parameters, features, interfaces, stability, fit. |
+| [`geometry_diff`](#geometry_diff) | changes | Diff the geometry of two revisions. |
 | [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
 | [`add_feature`](#add_feature) | changes | Add a feature to a Python design as a new revision. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
 | [`compare_printers`](#compare_printers) | read-only | Slice the head revision's exported model for real on every printer set up in every installed slicer (the selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and cheapest. |
 | [`make_lighter`](#make_lighter) | read-only | Make it lighter: search changes that reduce mass while every check that passes now still passes. |
 | [`apply_lighter`](#apply_lighter) | changes | Keep a make_lighter candidate: changes (parameter values) are committed as a new revision; settings ({"infill": percent, "walls": count}) become this design's print settings over the slicer's process. |
-| [`replace_part_guide`](#replace_part_guide) | read-only | How to design a replacement for a broken part from the person's photo: find the scale from a reference object in the photo and estimate sizes (assumed), ask_measurement for each fit-critical size (at most three), then create_design with the measured values and strengthen where it broke. |
+| [`replace_part_guide`](#replace_part_guide) | read-only | Guide a replacement part from a photo. |
 | [`turntable`](#turntable) | read-only | Render a turntable of the head revision from the kernel's mesh. |
 | [`remove_text`](#remove_text) | changes | Remove lettering added with add_text (mark_id like "text_1"; get_design_source shows the block). |
-| [`assembly_instructions`](#assembly_instructions) | changes | Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then one page per part going on (in the declaration's parent order, at its explode offset, with arrows). |
+| [`assembly_instructions`](#assembly_instructions) | changes | Write assembly instructions. Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then one page per part going on (in the declaration's parent order, at its explode offset, with arrows). |
 | [`checkout_revision`](#checkout_revision) | changes | Make an earlier revision the head again (nothing is deleted). |
-| [`set_print_setup`](#set_print_setup) | changes | Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from suggest_orientation), the acceptable total fit gap window, and whether the pipeline slices automatically. |
+| [`set_print_setup`](#set_print_setup) | changes | Set the print setup. Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from suggest_orientation), the acceptable total fit gap window, and whether the pipeline slices automatically. |
 | [`explore_alternatives`](#explore_alternatives) | read-only | Build a small grid of real variants (1-2 parameters, up to 5 values each) and rank them. |
-| [`optimize`](#optimize) | read-only | Goal seek: search parameter ranges for the best design that meets constraints. |
+| [`optimize`](#optimize) | read-only | Optimize a design. Goal seek: search parameter ranges for the best design that meets constraints. |
 | [`slice_test_piece`](#slice_test_piece) | changes | Cut a thin ring through the fit interface of this revision and slice it, so a cheap test print can check the fit before the whole part. |
 | [`record_physical_result`](#record_physical_result) | changes | Record what the USER observed after a real print. |
 | [`request_release`](#request_release) | read-only | Check whether the head revision can be released and hand the decision to the user. |
 | [`verify_release`](#verify_release) | read-only | Re-hash every file of a release against its manifest and say whether it still matches the head revision. |
 | [`open_in`](#open_in) | changes | Open a current output in the user's own software: what = step \| stl \| 3mf \| gcode \| folder. |
 | [`open_in_slicer`](#open_in_slicer) | changes | Open the design in the user's slicer, sliced with settings chosen for this part on this printer: orientation (the orientation finder's first choice), layer height, walls, top/bottom layers, infill and pattern, supports (only where overhangs need them), brim, seam, filament for the design's material and the speed profile (one of the printer's own process presets). |
-| [`open_bench`](#open_bench) | changes | The bench is the local web page where the user inspects the 3D model, compares revisions and approves releases. |
-| [`brief_presets`](#brief_presets) | read-only | Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure, car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a material to start from and the checks to plan for. |
+| [`open_bench`](#open_bench) | changes | Open the bench web page. The bench is the local web page where the user inspects the 3D model, compares revisions and approves releases. |
+| [`brief_presets`](#brief_presets) | read-only | List brief presets. Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure, car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a material to start from and the checks to plan for. |
 | [`import_reference`](#import_reference) | changes | Import an existing part (STEP or STL, e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's references. |
 | [`reconstruct`](#reconstruct) | changes | Turn a mesh (STL, OBJ or 3MF) into editable CAD as a new design. |
 | [`analyze_reference`](#analyze_reference) | read-only | Read an imported mesh (STL, OBJ, 3MF) like an engineer before modelling it again as clean CAD (design_guide topic "reference_parts"). |
-| [`analyze_assembly`](#analyze_assembly) | read-only | How several imported meshes go together and move, measured in the positions they were given. |
+| [`analyze_assembly`](#analyze_assembly) | read-only | Analyze an assembly of meshes. |
 | [`compare_to_reference`](#compare_to_reference) | read-only | Compare the design (or one part of its assembly) with an imported mesh, to iterate a remodel until it is within tolerance (default 0.1 mm for a remodel; say which you used). |
-| [`reference_residual`](#reference_residual) | read-only | What is left to build in a remodel: the volume difference between the design (or one part) and an imported mesh as a named work list. |
+| [`reference_residual`](#reference_residual) | read-only | List what remains of a remodel. |
 | [`fit_params`](#fit_params) | changes | Tune the design's declared Params so it lies closer to an imported mesh: bounded least squares over those Params only (each inside its own min and max and at most max_change mm from its value), every evaluation a real build. |
 | [`freecad_macro`](#freecad_macro) | read-only | Write a FreeCAD macro (.FCMacro) next to the current STEP export. |
-| [`analyze`](#analyze) | read-only | An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics. |
-| [`measure`](#measure) | read-only | Measure the part. Points are [x, y, z] in millimetres in the design frame. |
+| [`analyze`](#analyze) | read-only | Analyze the part as a map. An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics. |
+| [`measure`](#measure) | read-only | Measure distances and features of the part. |
 | [`analyze_selection`](#analyze_selection) | read-only | Analyse a selection on the CAD solid without saving it. |
-| [`list_annotations`](#list_annotations) | read-only | The selections the person named and kept on this design (annotations): name, note, the revision they were made on, the picked items and their computed analysis, and `text` describing each. |
+| [`list_annotations`](#list_annotations) | read-only | List annotations. The selections the person named and kept on this design (annotations): name, note, the revision they were made on, the picked items and their computed analysis, and `text` describing each. |
 | [`annotate`](#annotate) | changes | Keep a selection on the head revision with a name and a note (for example a place you want the person to look at, or one you changed). |
-| [`set_appearance`](#set_appearance) | changes | Colour (#rrggbb) and material of the whole design (part="") or of one part (an assembly part id from get_project / render). |
+| [`set_appearance`](#set_appearance) | changes | Set the colour and material of a design. |
 | [`suggest_orientation`](#suggest_orientation) | read-only | Rank the ways the part can lie on the plate: the six axis orientations plus every flat face on its convex hull. |
-| [`print_simulation`](#print_simulation) | read-only | Look at the sliced print as it would stand at the end of `layer` (1-based; default: finished). |
-| [`estimate_cost`](#estimate_cost) | read-only | Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same volume in the other materials the slicer has presets for. |
-| [`plate_plan`](#plate_plan) | read-only | How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material), the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts too big for the plate, and per plate the slicer's time and filament when it has been sliced. |
-| [`set_part_print`](#set_part_print) | changes | Print settings for one printed part of a multi-part design (part ids from plate_plan): orientation (a named one, a "down:x,y,z" id, or "auto" for the best-ranked way for that part alone), material (PLA, PETG, TPU, ...; parts in different materials go on different plates, each sliced with its own filament), color ("#rrggbb"). |
-| [`pack_plate`](#pack_plate) | read-only | Do `copies` of this design fit on one plate? |
-| [`render_photo`](#render_photo) | changes | A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed). |
+| [`print_simulation`](#print_simulation) | read-only | Simulate the print layer by layer. |
+| [`estimate_cost`](#estimate_cost) | read-only | Estimate the print cost. Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same volume in the other materials the slicer has presets for. |
+| [`plate_plan`](#plate_plan) | read-only | Plan the plates. How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material), the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts too big for the plate, and per plate the slicer's time and filament when it has been sliced. |
+| [`set_part_print`](#set_part_print) | changes | Set one part's print settings. |
+| [`pack_plate`](#pack_plate) | read-only | Pack copies on a plate. Do `copies` of this design fit on one plate? |
+| [`render_photo`](#render_photo) | changes | Render a photo-real image. A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed). |
 | [`save_variant`](#save_variant) | changes | Save a named variant of the design ("Travel version", "Thick walls"): a complete set of parameter values kept in the project next to the revisions. |
-| [`list_variants`](#list_variants) | read-only | The head and every saved variant side by side: size and volume (computed), print time and grams (simulated, only when the variant is a revision with a current slice), fit yield (modelled), checks, and each variant's differences from the head. |
-| [`share_card`](#share_card) | read-only | A 1600 x 900 share image of the head revision: the part with dimension lines, its name, size and volume (computed), print time and grams (simulated; only if the slice is current), checks, the revision and "Designed with FORM". |
+| [`list_variants`](#list_variants) | read-only | List variants. The head and every saved variant side by side: size and volume (computed), print time and grams (simulated, only when the variant is a revision with a current slice), fit yield (modelled), checks, and each variant's differences from the head. |
+| [`share_card`](#share_card) | read-only | Make a share card image. A 1600 x 900 share image of the head revision: the part with dimension lines, its name, size and volume (computed), print time and grams (simulated; only if the slice is current), checks, the revision and "Designed with FORM". |
 | [`rename_project`](#rename_project) | changes | Change a project's display name (up to 80 characters). |
 | [`duplicate_project`](#duplicate_project) | changes | Copy a project with its revisions, variants and built outputs under a new id (from the new name; default "<old name> copy"). |
 | [`delete_project`](#delete_project) | changes | Delete a project by moving its whole folder to the trash folder inside the projects folder (<projects folder>/.trash/<id>-<UTC time>). |
-| [`list_printers`](#list_printers) | read-only | Every printer set up in every installed slicer (the user's own presets and the system printers they enabled), with slicer, bed size and nozzle, plus the default printer. |
+| [`list_printers`](#list_printers) | read-only | List printers. Every printer set up in every installed slicer (the user's own presets and the system printers they enabled), with slicer, bed size and nozzle, plus the default printer. |
 | [`choose_printer`](#choose_printer) | changes | Use a printer for one design (`project`) or as the default for designs without their own choice (`default=True`, written to studio.toml after a backup). |
 | [`ask_user`](#ask_user) | read-only | Ask the person one question and wait for the answer. |
 | [`ask_measurement`](#ask_measurement) | changes | Ask the person to measure one dimension of the design, and wait. |
-| [`propose_concepts`](#propose_concepts) | changes | For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one. |
-| [`pick_concept`](#pick_concept) | changes | The person picked a concept (in words; in the app they pick on the board). |
-| [`dismiss_concepts`](#dismiss_concepts) | changes | The person wants none of the concepts picked: close the group without a pick. |
-| [`list_concepts`](#list_concepts) | read-only | Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>. |
+| [`propose_concepts`](#propose_concepts) | changes | Propose concepts. For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one. |
+| [`pick_concept`](#pick_concept) | changes | Pick a concept. The person picked a concept (in words; in the app they pick on the board). |
+| [`dismiss_concepts`](#dismiss_concepts) | changes | Dismiss concepts. The person wants none of the concepts picked: close the group without a pick. |
+| [`list_concepts`](#list_concepts) | read-only | List concepts. Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>. |
 | [`suggest_replies`](#suggest_replies) | read-only | Offer up to 3 short follow-up messages the person might send next (each under 80 characters, written as the person would say it, e.g. "Make the walls 2 mm"). |
-| [`list_starters`](#list_starters) | read-only | Ideas for what this person might design next, ranked from what they already design (the building blocks and kinds of part in their projects, their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}. |
+| [`list_starters`](#list_starters) | read-only | List starter ideas. Ideas for what this person might design next, ranked from what they already design (the building blocks and kinds of part in their projects, their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}. |
 | [`recipe_library`](#recipe_library) | read-only | Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index on the project website, to find a building block to start a design from. |
 | [`export_recipe`](#export_recipe) | changes | Write an installed ("mine") recipe as one .formrecipe file: its code, meta.json (parameters, author, tags, the code's SHA-256) and preview.png drawn from a real build at its defaults. |
 | [`prepare_recipe_submission`](#prepare_recipe_submission) | changes | Prepare an installed recipe for the community gallery: the community/recipes/<id>/ folder (written into `folder` when given), what the gallery's checks would refuse, and the link to GitHub's recipe issue form with the fields filled in. |
 | [`design_as_recipe`](#design_as_recipe) | changes | Turn a design's current code into a recipe whose defaults are the design's values; ranges narrow a parameter's range ({key: [min, max]}, never wider than the code's own). |
 | [`export_project`](#export_project) | changes | Write the project, its conversations and the code its revisions were built from to one .formstudio file (default: <projects folder>/<project>.formstudio). |
 | [`import_project`](#import_project) | changes | Import a .formstudio or .formproj archive (or a conversation .json) from an absolute path. |
-| [`export_conversation`](#export_conversation) | read-only | A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again). |
+| [`export_conversation`](#export_conversation) | read-only | Export a conversation. A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again). |
 | [`model_mesh`](#model_mesh) | changes | Model a subdivision cage in Blender with declarative ops (never code), e.g. [{"op":"cage_new","primitive":"cube","size":[40,30,20]}, {"op":"name_region","name":"top", "faces":{"normal":[0,0,1],"within_deg":10}}, {"op":"extrude_region","faces":{"region":"top"},"offset":8}]. |
 | [`game_asset`](#game_asset) | changes | Make a design a game asset: LOD0-LOD3 at triangle budgets (from subdivision cage levels first; decimated LODs are automatic retopology), UVs (region seams or Smart UV, packed), materials from the design's zones, Cycles-baked base colour, normal, ORM and AO maps (texture_px 1024\|2048\|4096; bake fast\|quality), convex-hull collision per part (collision="coacd" when CoACD is installed), pivot and scale. |
 
@@ -185,13 +217,14 @@ Rules:
 
 *Read-only.*
 
-Start here. Engine, slicer, printer, available recipes, existing projects and the bench URL.
+Get an overview of Form Studio: engine, slicer, printer, available recipes, existing projects and the bench
+URL. Start here.
 
 ### `setup_status`
 
 *Read-only.*
 
-What FORM can use on this machine (kernel, slicer, printer, agents) and the exact command that fixes each gap.
+Check this machine's setup. What FORM can use on this machine (kernel, slicer, printer, agents) and the exact command that fixes each gap.
 Never run a fix without asking the user; the simplest path is to ask them to run `form setup` in a terminal.
 
 ### `install_software`
@@ -199,6 +232,8 @@ Never run a fix without asking the user; the simplest path is to ask them to run
 Install one thing from FORM's registry (ids come from setup_status → software), e.g. "parts", "claude",
 "slicer.orca". Without confirm=True nothing runs: you get the exact commands to show the user. Ask the user
 first, then call again with confirm=True. Never asks for a password; sign-in is not an install.
+Outside Form Studio's chat, a client with its own forms (MCP elicitation) shows the command and the licence
+and asks the person instead (always for a non-commercial licence, even with confirm=True).
 
 | Argument | Type | Required |
 |---|---|---|
@@ -210,7 +245,7 @@ first, then call again with confirm=True. Never asks for a password; sign-in is 
 
 *Read-only.*
 
-Parameters (unit, range, group, the feature each one drives), features and what the recipe checks.
+Describe a recipe's parameters. Parameters (unit, range, group, the feature each one drives), features and what the recipe checks.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -220,7 +255,7 @@ Parameters (unit, range, group, the feature each one drives), features and what 
 
 *Read-only.*
 
-Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
+Read the design guide for code designs. Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
 holder, mechanism...). topic="core" (default) returns the contract for a design written as code, the rules,
 the staged workflow and a complete example that builds; it leads with skeleton first, one validated feature
 at a time (a FeatureDesign, 2 retries per feature, then defer). Other topics, for complex designs: surfacing,
@@ -239,7 +274,7 @@ textures. Then design_examples for a close exemplar, and create_design.
 
 ### `design_brief`
 
-Stage 1 of a complex design: store the structured brief before any geometry. goal: what it is and does.
+Write a design brief. Stage 1 of a complex design: store the structured brief before any geometry. goal: what it is and does.
 requirements: what it must do. dimensions: {name: {value, unit, source}} where source is measured, specified
 (datasheet, standard) or assumed. constraints: limits (bed size, material, process). unknowns: what you could
 not settle; list them, never guess them (ask_user / ask_measurement for ones that change fit, load or
@@ -262,7 +297,7 @@ the route (prismatic, revolve, skin+features or mechanism) with how its skeleton
 
 ### `plan_design`
 
-Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id).
+Plan a design's features. Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id).
 features: [{id, label, how, part?, dims?}] in build order; id becomes the Feature id in the code, how names
 the construction (e.g. "craft.loft_sections through 9 superellipse sections", "craft.pin_hinge 0.35 mm").
 parts: [{id, label, material?}]. key_dimensions: {name: value or {value, unit, why}}. mechanisms: each with its
@@ -299,7 +334,7 @@ Then create_design(..., plan=<brief id>).
 
 *Read-only.*
 
-Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of
+Search example designs and their code. Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of
 them: mechanical parts (linear slide, shaft coupler, pillow block, cam follower, gearbox), consumer products
 (mouse, earbud case, bottle and cap, game controller), organic forms (horn, handle), textured parts
 (knurl, hex relief, woven, fluted), assemblies (hinged case, ratchet wrench, robot head), helmets (full-face,
@@ -318,7 +353,7 @@ shown to the person as designs.
 
 ### `critique`
 
-Stage 5: look closely and measure. Returns a close-up render of each feature, computed metrics (smallest
+Critique a design with close-ups and metrics. Stage 5: look closely and measure. Returns a close-up render of each feature, computed metrics (smallest
 fillet, sharp-edge fraction, symmetry, proportions, surface mix, sliver faces, planned features missing, folds
 in lofted skins, wall thickness by rays with break-through spots, silhouette kinks) and a checklist to answer
 by looking. When the brief names a product class (helmet_fullface, helmet_open, mouse, bottle; or pass
@@ -346,7 +381,7 @@ released before its head revision has one.
 
 *Read-only.*
 
-Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). PDF pages come
+Read a document such as a datasheet or drawing. Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). PDF pages come
 back as images, because a drawing's dimensions are graphics that text extraction loses, plus any text on the page.
 pages: "1", "1-3", "2,5" (at most 4). Use this for official dimensions of boards, devices and hardware.
 
@@ -364,7 +399,8 @@ part files downloaded with title, author and licence; a Thingiverse or MakerWorl
 cannot be fetched and what the person can do; any other page is not read (resolve_model_page reads its title).
 In a Form Studio chat the files are attached to the conversation; otherwise they are saved under the data
 folder. Each mesh comes with its preflight (triangles, size, closed or not, class). Only fetch links the
-person gave you.
+person gave you. Outside Form Studio's chat, a client with its own forms (MCP elicitation) asks the person
+before a download over 100 MB; declined: {fetched: false, refused}.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -375,7 +411,7 @@ person gave you.
 
 *Read-only.*
 
-What a model link is, without downloading files: site, title, author, licence, pictures and the file list
+Resolve a model page link. What a model link is, without downloading files: site, title, author, licence, pictures and the file list
 (Printables, Thingiverse with an app token), or why the files cannot be fetched and how the person gets them
 (MakerWorld, Thingiverse without a token). Any other page: its OpenGraph title, description and pictures as a
 visual reference. Then fetch_link(url) downloads what can be downloaded.
@@ -388,7 +424,7 @@ visual reference. Then fetch_link(url) downloads what can be downloaded.
 
 *Read-only.*
 
-Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class
+Preflight a mesh file. Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class
 (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display
 proxy for a heavy one. The proxy is for display only; analysis and import always use the file itself.
 path: absolute local path. Cached by path, size and time, so asking again is instant.
@@ -504,7 +540,7 @@ and, when a design was kept, its six-view sheet: look.
 
 ### `refine_design`
 
-Design refinement of a project. It runs on its own after every build (create_design, update_design,
+Show, rerun, undo or turn off design refinement of a project. It runs on its own after every build (create_design, update_design,
 add_feature, a kept candidate): named, reversible refine features (fillet tiers, an edge break, a parting
 line, a grip texture, a recessed panel, button pads, ribs; materials and contrast; for game assets cage ops
 such as support loops, panel lines and silhouette breakers), each kept only when the function checks still
@@ -528,7 +564,7 @@ refinement for this design from now on; "on" turns it back on). Measures are com
 
 *Read-only.*
 
-The exact code a revision was built from (built-in recipes return their recipe file).
+Get a design's source code: the exact code a revision was built from (built-in recipes return their recipe file).
 
 | Argument | Type | Required |
 |---|---|---|
@@ -556,7 +592,7 @@ purpose: "print" or "model" (just a 3D model); omitted: the person's default. pr
 
 *Read-only.*
 
-Current revision with every parameter and its provenance, output status (current/stale/failed/missing),
+Get a project's state: current revision with every parameter and its provenance, output status (current/stale/failed/missing),
 checks, fit model, next best actions, simulated slice, file paths, release gate and bench link.
 
 | Argument | Type | Required |
@@ -607,7 +643,7 @@ force=True. Returns when done or after wait_s; then poll get_job.
 
 *Read-only.*
 
-Status of a pipeline job started by run_pipeline/commit_change; waits up to wait_s for it to finish.
+Get a job's status: a pipeline job started by run_pipeline/commit_change; waits up to wait_s for it to finish.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -619,7 +655,7 @@ Status of a pipeline job started by run_pipeline/commit_change; waits up to wait
 
 *Read-only.*
 
-Look at the part. Returns a PNG rendered from the real kernel geometry, coloured by feature.
+Render the part as an image. Look at the part. Returns a PNG rendered from the real kernel geometry, coloured by feature.
 view: iso, iso_back, front, back, left, right, top, bottom, "sheet" (four views at once), or for a design with
 several parts "assembled" (put together) and "exploded" (pulled apart along its explode offsets).
 highlight: a feature id to pick out. values: render an uncommitted candidate (same as preview_change).
@@ -636,7 +672,7 @@ highlight: a feature id to pick out. values: render an uncommitted candidate (sa
 
 *Read-only.*
 
-Make motion from real geometry. kind="turntable" spins the head revision. kind="morph" builds every in-between
+Animate a design. Make motion from real geometry. kind="turntable" spins the head revision. kind="morph" builds every in-between
 design from from_rev (default: head) to to_rev or to_values, so you can show how a change transforms the part.
 Returns the file path and a still. fmt: gif or webp.
 
@@ -654,7 +690,7 @@ Returns the file path and a still. fmt: gif or webp.
 
 *Read-only.*
 
-What changed between two revisions: parameters, features, interfaces, stability, fit.
+Compare two revisions. What changed between two revisions: parameters, features, interfaces, stability, fit.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -664,7 +700,7 @@ What changed between two revisions: parameters, features, interfaces, stability,
 
 ### `geometry_diff`
 
-What changed in the solid between revision a and b (default the head): material added (b minus a) and removed
+Diff the geometry of two revisions. What changed in the solid between revision a and b (default the head): material added (b minus a) and removed
 (a minus b), each with its volume in mm³, number of separate regions and bounding box, computed with booleans on
 the B-rep. Also writes a picture (added green, removed red, the rest grey); look at it with the returned path.
 
@@ -799,7 +835,7 @@ candidate's own changes and settings exactly. Then run_pipeline.
 
 *Read-only.*
 
-How to design a replacement for a broken part from the person's photo: find the scale from a reference
+Guide a replacement part from a photo. How to design a replacement for a broken part from the person's photo: find the scale from a reference
 object in the photo and estimate sizes (assumed), ask_measurement for each fit-critical size (at most three),
 then create_design with the measured values and strengthen where it broke. In Form Studio this flow starts from
 Home › Replace a broken part.
@@ -831,7 +867,7 @@ Remove lettering added with add_text (mark_id like "text_1"; get_design_source s
 
 ### `assembly_instructions`
 
-Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then
+Write assembly instructions. Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then
 one page per part going on (in the declaration's parent order, at its explode offset, with arrows). Step text is
 the part's note, or what the declaration says. Returns the PDF path, page images and the steps. A design without
 an assembly() has none.
@@ -852,7 +888,7 @@ Make an earlier revision the head again (nothing is deleted). Outputs for it are
 
 ### `set_print_setup`
 
-Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from
+Set the print setup. Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from
 suggest_orientation), the acceptable total fit gap
 window, and whether the pipeline slices automatically. The checks include an orientation comparison table.
 design_only=True: the design is not sliced (checks, exports and release still work; the release says it was
@@ -891,7 +927,7 @@ Nothing is saved; commit the one you choose.
 
 *Read-only.*
 
-Goal seek: search parameter ranges for the best design that meets constraints. Every candidate is built by the kernel.
+Optimize a design. Goal seek: search parameter ranges for the best design that meets constraints. Every candidate is built by the kernel.
 vary: [{"key": "arm_t", "min": 4, "max": 20}] (1-4 parameters).
 objective: {"minimize": "solid_mass_g"} or {"maximize": "statics.safety_factor"}.
 constraints: ["statics.safety_factor >= 3", "overhang_mm2 <= 1", "derived.usable_depth >= 30", "fit_yield >= 0.9"].
@@ -985,7 +1021,7 @@ checks the settings are in that file, and opens it in the slicer's app. printer:
 
 ### `open_bench`
 
-The bench is the local web page where the user inspects the 3D model, compares revisions and approves releases.
+Open the bench web page. The bench is the local web page where the user inspects the 3D model, compares revisions and approves releases.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -996,7 +1032,7 @@ The bench is the local web page where the user inspects the 3D model, compares r
 
 *Read-only.*
 
-Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure,
+List brief presets. Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure,
 car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a
 material to start from and the checks to plan for. Use it while gathering requirements; the defaults are
 assumptions to confirm with the person, never measurements.
@@ -1079,7 +1115,7 @@ the mesh as the design: plan features from this, write build123d with Params, th
 
 *Read-only.*
 
-How several imported meshes go together and move, measured in the positions they were given. references:
+Analyze an assembly of meshes. How several imported meshes go together and move, measured in the positions they were given. references:
 the mesh files (the part that stays still first, or name it in fixed). Returns mating surfaces (facing,
 area, gap, where), clearances per pair, each part's travel against the fixed one along +/-X, Y, Z and about
 the axes of round faces they share (free distance before touching, distance past bumps such as detents and
@@ -1120,7 +1156,7 @@ Evidence: computed on the design's tessellation against the mesh.
 
 *Read-only.*
 
-What is left to build in a remodel: the volume difference between the design (or one part) and an imported
+List what remains of a remodel. What is left to build in a remodel: the volume difference between the design (or one part) and an imported
 mesh as a named work list. missing: bodies the mesh has and the design lacks (add them); extra: bodies the
 design has and the mesh lacks (cut them). Each body has its volume, centre, principal axis, size, shape
 (cylinder with diameter and length along an axis, box, or body), where it is in words, and its angle and
@@ -1181,7 +1217,7 @@ from the STEP (hash-checked) with a spreadsheet of FORM's parameters and their p
 
 *Read-only.*
 
-An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics.
+Analyze the part as a map. An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics.
 map: thickness (opposing-wall distance by ray, the same ray as the Thinnest-wall check; colours follow the nozzle),
 overhang (angle past vertical in the print orientation; plate contact and bridged ceilings are separate classes),
 section (area of each layer's slice by height, with the weakest neck: computed geometry, NOT a strength analysis),
@@ -1199,7 +1235,7 @@ Every result is `computed` on the stated tessellation and says what it does not 
 
 *Read-only.*
 
-Measure the part. Points are [x, y, z] in millimetres in the design frame.
+Measure distances and features of the part. Points are [x, y, z] in millimetres in the design frame.
 from_point + to_point: straight-line distance with dX/dY/dZ, and how far each point is from the surface.
 at: what is at that point: the nearest face (type, area, tilt to the bed), the nearest edge, and for a hole or
 round boss the diameter: exact from the CAD solid, or "fitted" to mesh edges for a mesh design (with its residual).
@@ -1234,7 +1270,7 @@ Evidence class: computed.
 
 *Read-only.*
 
-The selections the person named and kept on this design (annotations): name, note, the revision they were
+List annotations. The selections the person named and kept on this design (annotations): name, note, the revision they were
 made on, the picked items and their computed analysis, and `text` describing each. An annotation from an older
 revision describes that revision; reanalyse it with analyze_selection(items=...) to see the head.
 
@@ -1257,7 +1293,7 @@ its Annotations panel.
 
 ### `set_appearance`
 
-Colour (#rrggbb) and material of the whole design (part="") or of one part (an assembly part id from
+Set the colour and material of a design. Colour (#rrggbb) and material of the whole design (part="") or of one part (an assembly part id from
 get_project / render). Materials: PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF. Form Studio draws the
 colour, writes it into its 3MF and adds material notes to the checks (heat, sunlight, warping, flexible, fibre-filled);
 stored in the same fields set_part_print uses (project material, parts.<id>.material), so the slicer picks the matching filament. Leave an argument out to keep it; clear=True removes both.
@@ -1288,7 +1324,7 @@ print success. Apply one with set_print_setup(project, orientation=<id>).
 
 *Read-only.*
 
-Look at the sliced print as it would stand at the end of `layer` (1-based; default: finished). Returns a
+Simulate the print layer by layer. Look at the sliced print as it would stand at the end of `layer` (1-based; default: finished). Returns a
 picture drawn from the slicer's G-code toolpaths, coloured by line type, plus statistics: z, line types in
 that layer, whether it has bridges or overhang walls, slicer time elapsed and remaining, and the list of
 bridge and overhang layers. only: draw just these line types (e.g. ["Bridge", "Overhang wall"]).
@@ -1306,7 +1342,7 @@ plate: which plate (1-based) when the design was sliced on several (plate_plan).
 
 *Read-only.*
 
-Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same
+Estimate the print cost. Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same
 volume in the other materials the slicer has presets for. Grams and hours are the slicer's simulation; prices
 are the user's (saved ones are used when you pass none). Never invent a price: when a cost is null, "needs"
 says which number to ask the user for. No currency is assumed.
@@ -1324,7 +1360,7 @@ says which number to ask the user for. No currency is assumed.
 
 *Read-only.*
 
-How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material),
+Plan the plates. How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material),
 the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts
 too big for the plate, and per plate the slicer's time and filament when it has been sliced. Computed by FORM from
 bounding boxes; each plate is sliced on its own. Needs current checks (run_pipeline).
@@ -1335,7 +1371,7 @@ bounding boxes; each plate is sliced on its own. Needs current checks (run_pipel
 
 ### `set_part_print`
 
-Print settings for one printed part of a multi-part design (part ids from plate_plan): orientation (a named
+Set one part's print settings. Print settings for one printed part of a multi-part design (part ids from plate_plan): orientation (a named
 one, a "down:x,y,z" id, or "auto" for the best-ranked way for that part alone), material (PLA, PETG, TPU, ...;
 parts in different materials go on different plates, each sliced with its own filament), color ("#rrggbb").
 "" clears a setting. Checks and slice go stale; the pipeline runs again.
@@ -1352,7 +1388,7 @@ parts in different materials go on different plates, each sliced with its own fi
 
 *Read-only.*
 
-Do `copies` of this design fit on one plate? Bounding-box packing with a gap (default 6 mm) and 90° turns,
+Pack copies on a plate. Do `copies` of this design fit on one plate? Bounding-box packing with a gap (default 6 mm) and 90° turns,
 on the selected printer's bed. Returns the layout and the most copies this packer can place. Computed by FORM;
 the slicer arranges again when it slices, and FORM's export stays one plate.
 
@@ -1364,7 +1400,7 @@ the slicer arranges again when it slices, and FORM's export stays one plate.
 
 ### `render_photo`
 
-A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed).
+Render a photo-real image. A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed).
 preset: studio (soft box, light backdrop) | desk (wooden desk) | dark (graphite, rim light).
 material: matte (PLA) | petg (gloss) | silk (silk PLA) | gloss (paint, clear coat) | carbon (carbon twill,
 clear coat) | smoke (smoked polycarbonate) | rubber | metal. color: hex, e.g. "#3d6fb6".
@@ -1409,7 +1445,7 @@ is committed: promote a variant in Form Studio or with `form variants promote`.
 
 *Read-only.*
 
-The head and every saved variant side by side: size and volume (computed), print time and grams (simulated,
+List variants. The head and every saved variant side by side: size and volume (computed), print time and grams (simulated,
 only when the variant is a revision with a current slice), fit yield (modelled), checks, and each variant's
 differences from the head.
 
@@ -1421,7 +1457,7 @@ differences from the head.
 
 *Read-only.*
 
-A 1600 x 900 share image of the head revision: the part with dimension lines, its name, size and volume
+Make a share card image. A 1600 x 900 share image of the head revision: the part with dimension lines, its name, size and volume
 (computed), print time and grams (simulated; only if the slice is current), checks, the revision and
 "Designed with FORM". picture: "model" (kernel geometry) or "photo" (the newest current Blender render, an
 illustration). The card states only what FORM knows; it is not evidence of a print.
@@ -1457,7 +1493,8 @@ copied. Returns the new project's summary; use its id from then on.
 Delete a project by moving its whole folder to the trash folder inside the projects folder
 (<projects folder>/.trash/<id>-<UTC time>). Nothing is erased, and moving the folder back restores it, but the
 project disappears from FORM. Ask the user first and only call this after they said yes to deleting this
-project. Returns {ok, id, trash}: tell the user the trash path.
+project. Returns {ok, id, trash}: tell the user the trash path. Outside Form Studio's chat, a client with
+its own forms (MCP elicitation) asks the person to confirm first; declined: {ok: false, refused}.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1467,7 +1504,7 @@ project. Returns {ok, id, trash}: tell the user the trash path.
 
 *Read-only.*
 
-Every printer set up in every installed slicer (the user's own presets and the system printers they enabled),
+List printers. Every printer set up in every installed slicer (the user's own presets and the system printers they enabled),
 with slicer, bed size and nozzle, plus the default printer. With `project`: which printer that design uses and
 why (its own choice, the default, or the slicer's selection). With `printer` ("<kind>:<printer name>", the id from
 this list): the filaments and processes that printer can use.
@@ -1504,8 +1541,9 @@ choices: up to 8 short options shown as buttons (multi_select lets the person pi
 allow_text lets them type their own answer; why: one line on what the answer changes.
 kind="confirm" shows an approval card (choices default to Yes / No) before an action the person
 should agree to. Returns {answered, answer, choices, text} or, when nobody answered, {answered: false,
-reason, note}: then continue with safe assumptions marked assumed. Outside Form Studio's chat nobody
-can answer here and the result tells you to ask in your own interface.
+reason, note}: then continue with safe assumptions marked assumed. Outside Form Studio's chat the question
+is shown in your client's own form when it supports one (MCP elicitation); otherwise nobody can answer
+here and the result tells you to ask in your own interface.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1526,7 +1564,9 @@ the person's photo) with mark = [x0, y0, x1, y1] (0..1) outlining where to measu
 number and says how they measured it (calipers, ruler, tape, or estimate). The answer becomes a new revision
 of the design with provenance measured (calipers sigma 0.05 mm, ruler 0.5, tape 1.0) or, for an estimate,
 assumed. One question at a time. Returns {answered, value, unit, method, source, rev}; when nobody answered,
-{answered: false, reason, note}. Outside Form Studio's chat it tells you to ask in your own interface.
+{answered: false, reason, note}. Outside Form Studio's chat it is asked in your client's own form when it
+supports one (value, calipers / ruler / datasheet, or skipped; a datasheet value is recorded as specified);
+otherwise it tells you to ask in your own interface.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1542,7 +1582,7 @@ assumed. One question at a time. Returns {answered, value, unit, method, source,
 
 ### `propose_concepts`
 
-For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one.
+Propose concepts. For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one.
 concepts: [{"title": short name, "rationale": one line on the approach, "source": design code as for
 create_design (see design_guide), "language": "python", "values": {...} or null}]. Make them different
 structural approaches (how it holds, mounts, opens), not size variants. Each becomes its own project
@@ -1561,7 +1601,7 @@ Returns the board: {id, name, state, members: [{project, letter, title, rational
 
 ### `pick_concept`
 
-The person picked a concept (in words; in the app they pick on the board). The picked project takes the
+Pick a concept. The person picked a concept (in words; in the app they pick on the board). The picked project takes the
 group's name and records the choice; the other concepts move to the trash (recoverable) unless keep_others.
 Then refine the picked design with update_design. Only call this when the person said which one.
 
@@ -1573,7 +1613,7 @@ Then refine the picked design with update_design. Only call this when the person
 
 ### `dismiss_concepts`
 
-The person wants none of the concepts picked: close the group without a pick. keep="all" keeps every
+Dismiss concepts. The person wants none of the concepts picked: close the group without a pick. keep="all" keeps every
 concept as an ordinary design; keep="none" moves them all to the trash (recoverable). Only call this when
 the person said so.
 
@@ -1586,7 +1626,7 @@ the person said so.
 
 *Read-only.*
 
-Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>.
+List concepts. Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1608,7 +1648,7 @@ your reply. Call it at most once, at the end of a reply, and only with useful ne
 
 *Read-only.*
 
-Ideas for what this person might design next, ranked from what they already design (the building blocks
+List starter ideas. Ideas for what this person might design next, ranked from what they already design (the building blocks
 and kinds of part in their projects, their printer and material, what they pinned or used):
 {prompts: [{id, text, source, pinned}], briefs: [...]}. Offer them as suggestions when the person asks what to
 make; they edit the list with `form starters`.
@@ -1688,7 +1728,7 @@ checked first; a project or conversation id that already exists gets a new one. 
 
 *Read-only.*
 
-A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again).
+Export a conversation. A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again).
 
 | Argument | Type | Required |
 |---|---|---|

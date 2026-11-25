@@ -714,7 +714,7 @@ class Chat:
                 run = Run(message=self._prompt(job, with_recap=had_history and not job.session),
                           system=self._system(job),
                           model=job.model, effort=self._effort(job, adapter, exe), session=job.session, cwd=cwd, scratch=tmp, mcp=self._mcp(job),
-                          tool_timeout_s=self._ask_timeout() + 300,
+                          tool_timeout_s=self._ask_timeout() + 300, tool_search=str(c.get("tool_search", "auto")),
                           web=bool(c.get("web", True)), budget_usd=float(c.get("budget_usd_per_message", 3.0)),
                           images=[f for f, a in zip(files, job.attachments) if a["kind"] == "image"], files=files)
                 job.parser = adapter.parser()

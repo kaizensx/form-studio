@@ -402,7 +402,7 @@ class Adapters(unittest.TestCase):
                       mcp={"command": "/a b/form-mcp", "args": ["--no-bench"], "env": {}}, web=True, files=[Path(d) / "conv/files/x.png"])
             cmd = Claude().command(run, "/x/claude")
             self.assertEqual(cmd[:3], ["/x/claude", "-p", "hi"])
-            for flag, val in (("--model", "sonnet"), ("--effort", "high"), ("--resume", "s-1"), ("--tools", "WebSearch,WebFetch,Read")):
+            for flag, val in (("--model", "sonnet"), ("--effort", "high"), ("--resume", "s-1"), ("--tools", "WebSearch,WebFetch,Read,ToolSearch")):
                 self.assertEqual(cmd[cmd.index(flag) + 1], val)
             allowed = cmd[cmd.index("--allowedTools") + 1].split(",")
             self.assertIn("mcp__form__*", allowed)
@@ -413,7 +413,7 @@ class Adapters(unittest.TestCase):
             run.model, run.effort, run.session, run.files = "default", "", None, []
             cmd = Claude().command(run, "/x/claude")
             self.assertTrue("--model" not in cmd and "--effort" not in cmd and "--resume" not in cmd)
-            self.assertEqual(cmd[cmd.index("--tools") + 1], "WebSearch,WebFetch")
+            self.assertEqual(cmd[cmd.index("--tools") + 1], "WebSearch,WebFetch,ToolSearch")
 
     def test_codex_command_and_stream(self):
         run = Run(message="hi", system="SYS", model="some-model", effort="high", session=None, cwd=Path("."), scratch=Path("."),

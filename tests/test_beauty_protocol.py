@@ -101,12 +101,13 @@ class ClaudeToolNames(unittest.TestCase):
         self.assertIn("No such tool available", sp)
         self.assertNotIn("mcp__form__", chat.system_prompt({}, None, None))      # other agents name tools bare
 
-    def test_run_env_turns_tool_search_off_and_the_command_allows_form_tools(self):
+    def test_run_env_turns_tool_search_on_and_the_command_allows_form_tools(self):
         with tempfile.TemporaryDirectory() as tmp:
             run = self._run(tmp)
             ad = Claude()
-            self.assertEqual(ad.run_env(run).get("ENABLE_TOOL_SEARCH"), "false")
+            self.assertEqual(ad.run_env(run).get("ENABLE_TOOL_SEARCH"), "auto")
             cmd = ad.command(run, sys.executable)              # help text of python: no --restricted, still a command
+            self.assertIn("ToolSearch", cmd[cmd.index("--tools") + 1].split(","))   # deferred tools stay reachable
             self.assertIn("mcp__form__*", cmd[cmd.index("--allowedTools") + 1])
             self.assertIn("mcp__form__design_guide", cmd[cmd.index("--append-system-prompt") + 1])
             mcp = json.loads((Path(tmp) / "mcp.json").read_text())
@@ -116,8 +117,8 @@ class ClaudeToolNames(unittest.TestCase):
         """chat._run builds the process env as os.environ + adapter.env + secrets + run_env: run_env wins."""
         import os
         with tempfile.TemporaryDirectory() as tmp:
-            env = {**os.environ, "ENABLE_TOOL_SEARCH": "auto", **Claude().run_env(self._run(tmp))}
-            self.assertEqual(env["ENABLE_TOOL_SEARCH"], "false")
+            env = {**os.environ, "ENABLE_TOOL_SEARCH": "false", **Claude().run_env(self._run(tmp))}
+            self.assertEqual(env["ENABLE_TOOL_SEARCH"], "auto")
 
 
 class AestheticTrigger(unittest.TestCase):
