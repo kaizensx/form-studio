@@ -12,7 +12,7 @@ and a motion check's pose names the joint position where it was found.
 """
 from __future__ import annotations
 
-CHECKS_VERSION = 4
+CHECKS_VERSION = 5          # 5: the wall check measures every vertex and lists every thin region (form/thickness.py)
 NA = "N/A"           # a check that cannot run for this kind of design; never counted as a pass
 
 
@@ -108,8 +108,9 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
             f"Smallest opposing-wall distance over {analysis['thickness_samples']:,} surface samples"
             + (" of the mesh. " if mesh else ". ") +
             f"Under {2*nz:.1f} mm cannot hold two perimeters on a {nz:g} mm nozzle"
-            + (" (nozzle size assumed)." if ctx.get("nozzle_assumed") else "."),
-            "computed", feature=thin.get("feature"), at=thin.get("at"), to=thin.get("to"))
+            + (" (nozzle size assumed)." if ctx.get("nozzle_assumed") else ".") + _regions_line(analysis),
+            "computed", feature=thin.get("feature"), at=thin.get("at"), to=thin.get("to"),
+            regions=(analysis.get("thin_regions") or {}).get("regions", []))
 
     steep = row["steep_mm2"]
     add("overhang", "Unsupported overhangs", "PASS" if steep < 1 else "WARN", f"{steep:.0f} mm²",
@@ -179,6 +180,12 @@ def _model_checks(add, summary, analysis, ctx, mesh):
                 f"{where} No manufacturing process is stated for this model, so there is no minimum to compare it with. "
                 "Name one in the design's purpose to check it.", "computed",
                 feature=thin.get("feature"), at=thin.get("at"), to=thin.get("to"))
+
+
+def _regions_line(analysis) -> str:
+    """Every thin region in the wall check's detail (form/thickness.py), so one answer lists them all."""
+    from . import thickness
+    return thickness.sentence(analysis.get("thin_regions") or {})
 
 
 def _fit_feature(recipe):
