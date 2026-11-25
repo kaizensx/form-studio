@@ -297,7 +297,8 @@ class FeatureTree(unittest.TestCase):
         t = time.perf_counter()
         rep = pipeline.reconstruct(stl, Path(TMP) / "out-shipped-stepped_bracket", "stepped_bracket", TOL, 2)
         took = time.perf_counter() - t
-        self.assertLessEqual(rep["program_seconds"], pipeline.PROGRAM_SHARE * 240 + 30, "the program route keeps to its share")
+        slack = 60 if "coverage" in sys.modules else 30   # the step running at the deadline finishes; slower under coverage
+        self.assertLessEqual(rep["program_seconds"], pipeline.PROGRAM_SHARE * 240 + slack, "the program route keeps to its share")
         L1, L2 = rep["layers"]["1"], rep["layers"]["2"]
         self.assertNotIn("error", L1)
         self.assertEqual(rep["layer_achieved"], 2, L2.get("error"))
