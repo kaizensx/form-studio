@@ -49,9 +49,11 @@ class MeshGeometry(QQuick3DGeometry):
         self._lo, self._hi = QVector3D(), QVector3D()
 
     def _rebuild(self):
-        self.clear()
         pos = _b64(self._pos, np.float32).reshape(-1, 3)
         tri = _b64(self._idx, np.uint32).reshape(-1, 3)
+        if len(tri) and len(pos) and int(tri.max()) >= len(pos):
+            return       # new positions with the old triangles (one property set before the other): keep what is drawn
+        self.clear()
         self._P = self._T = self._V = self._C = None
         if not len(pos) or not len(tri):
             self.update()

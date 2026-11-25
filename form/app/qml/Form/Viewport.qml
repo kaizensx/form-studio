@@ -329,12 +329,41 @@ Item {
         if (how === "build" && v && interactive && !lite) grow = _planReveal(old, v)
         else if (!same) _endReveal()          // the same geometry again (a reload) lets a build-up carry on
         if (!same || grow) _mesh = v && v.mesh ? v.mesh : []     // held features are created hidden: they never fade out first
+        _syncAsm(v, !same || grow)
         model = v
         if (v) _frame()
         if (grow) { _stepAt = 0; stepper.interval = 16; stepper.restart() }
     }
     // the meshes drawn by the parts repeaters: replaced only when the geometry really changed
     property var _mesh: []
+    // An assembly's part nodes stay while the design has the same parts, and each part's meshes stay the same array
+    // while its geometry is the same. Every new model object (a draft while a slider moves, a reload of the same
+    // revision, a job's refresh) used to hand the repeaters new arrays: every part node was destroyed and made again,
+    // and the meshes inside a new node are created a frame or more later (nested delegates incubate asynchronously),
+    // so the whole design could vanish for those frames: the flicker, and the black view, of a design in several
+    // parts. A part node now reads its placement, edges and bounding box from the current model by its id.
+    property var _asmIds: []
+    property var _meshByPart: ({})
+    property int _nodesMade: 0              // part nodes and part meshes created so far (tests/journeys/viewport_parts_calm.py)
+    property int _meshesMade: 0
+    function _syncAsm(v, meshChanged) {
+        var a = v && v.assembly && !v.assembly.error ? v.assembly : null, ps = a ? a.parts : []
+        var ids = ps.map(function (q) { return q.id })
+        var sameIds = ids.join("\n") === _asmIds.join("\n")
+        if (!sameIds) _asmIds = ids
+        if (!meshChanged && sameIds) return
+        // each part keeps its own array while its meshes are the same ones: only a part whose geometry changed is redrawn
+        var by = ({}), ms = v && v.mesh ? v.mesh : [], old = _meshByPart, changed = !sameIds
+        for (var k = 0; k < ids.length; k++) by[ids[k]] = []
+        for (var j = 0; j < ms.length; j++) if (by[ms[j].part]) by[ms[j].part].push(ms[j])
+        for (var id in by) {
+            var o = old[id], n = by[id], keep = !!o && o.length === n.length
+            for (var m = 0; keep && m < n.length; m++)
+                keep = o[m].feature === n[m].feature && o[m].positions === n[m].positions && o[m].indices === n[m].indices
+            if (keep) by[id] = o; else changed = true
+        }
+        if (changed) _meshByPart = by
+    }
     function _sameMesh(a, b) {
         if (!a || !b || !a.mesh || !b.mesh || a.mesh.length !== b.mesh.length) return false
         for (var i = 0; i < a.mesh.length; i++) {
@@ -593,13 +622,16 @@ Item {
                 // assembly: one node per part, placed (and swung about its joint) in the scene
                 Repeater3D {
                     id: asmParts
-                    model: vp.asm ? vp.asm.parts : []
+                    model: vp.asm ? vp._asmIds : []
                     Node {
                         id: pn
-                        required property var modelData
+                        required property var modelData           // the part's id
                         required property int index
-                        readonly property var xf: vp.partXf(modelData)
+                        readonly property string pid: modelData
+                        readonly property var part: vp.partById(pid) || ({ id: pid, edges: "", placement: { t: [0, 0, 0], q: [1, 0, 0, 0] }, explode: [0, 0, 0] })
+                        readonly property var xf: vp.partXf(part)
                         readonly property alias meshes: pm
+                        Component.onCompleted: vp._nodesMade++
                         position: xf.pos
                         rotation: xf.rot
                         Behavior on position { enabled: vp.asmTween; SequentialAnimation {
@@ -610,12 +642,13 @@ Item {
                             QuaternionAnimation { duration: Motion.part; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }
                         Repeater3D {
                             id: pm
-                            model: vp.model ? vp._mesh.filter(function (m) { return m.part === pn.modelData.id }) : []
+                            model: vp.model ? (vp._meshByPart[pn.pid] || []) : []
                             Model {
                                 id: amod
+                                Component.onCompleted: vp._meshesMade++
                                 required property var modelData
                                 readonly property string feature: modelData.feature || ""
-                                readonly property string part: pn.modelData.id
+                                readonly property string part: pn.pid
                                 property real k: vp._hold.indexOf(feature) < 0 ? 1 : 0
                                 Behavior on k { NumberAnimation { duration: vp.revealMs; easing.type: Easing.OutCubic } }
                                 opacity: k; z: -(1 - k) * vp.riseMm
@@ -624,7 +657,7 @@ Item {
                                 materials: CustomMaterial {
                                     shadingMode: CustomMaterial.Shaded; cullMode: amod.k < 1 ? Material.BackFaceCulling : Material.NoCulling; fragmentShader: "shaders/clay.frag"
                                     property real uMap: 0
-                                    property color uColor: vp.partColor(feature, pn.modelData.id)
+                                    property color uColor: vp.partColor(feature, pn.pid)
                                     property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
                                     property color uRim: vp.rimColor(feature)
                                     property vector3d uClipN: vp.clipN
@@ -635,9 +668,9 @@ Item {
                             }
                         }
                         Model { pickable: false; castsShadows: false; depthBias: -2
-                            geometry: LineGeometry { segments: pn.modelData.edges || "" }
+                            geometry: LineGeometry { segments: pn.part.edges || "" }
                             materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
-                                property color uColor: vp.edgeColor(pn.modelData.id); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
+                                property color uColor: vp.edgeColor(pn.pid); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
                     }
                 }
                 Model { visible: !!(vp.model && vp.model.edges) && !vp.asm; pickable: false; castsShadows: false; depthBias: -2

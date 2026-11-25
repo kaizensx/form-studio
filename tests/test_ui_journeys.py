@@ -88,6 +88,9 @@ class Journeys(unittest.TestCase):
     def test_viewport_calm(self):           # orbit, zoom, rebuilds and slider drags never blink; a build grows in by feature
         self.journey("viewport_calm.py")
 
+    def test_viewport_parts_calm(self):     # eight assembled parts: slider drags and orbits never blink; drafts keep the part nodes
+        self.journey("viewport_parts_calm.py", env_extra={"FORM_APPEARANCE": "dark"})
+
     def test_viewport_light(self):          # every view, elevation and zoom keeps the part lit; orbit and zoom never flash
         self.journey("viewport_light.py", env_extra={"FORM_APPEARANCE": "dark"})
 
