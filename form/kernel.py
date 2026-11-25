@@ -7,13 +7,12 @@ from __future__ import annotations
 
 import base64
 import os
-import math
 import time
 from pathlib import Path
 
 import numpy as np
 
-from .recipes import RecipeError, registry, resolve
+from .recipes import RecipeError, resolve
 
 KERNEL_ID = None
 _cache: dict = {}     # geometry key -> built model (kept small)
