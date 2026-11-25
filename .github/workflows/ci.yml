@@ -13,68 +13,150 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
+  # The unit suite runs in SHARDS parallel jobs per OS, split by tests/ci_timings.json (seconds per module, measured
+  # on these runners; refresh it from the times-* artifacts with scripts/ci/test_shards.py merge). The two
+  # "test (<os>)" jobs below gather the shards; they are the checks the rulesets require.
+  shard:
+    name: shard (${{ matrix.os }}, ${{ matrix.shard }}/4)
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        shard: [1, 2, 3, 4]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 40
+    env:
+      SHARDS: 4
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          enable-cache: false
+      - id: uv-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/uv
+          key: uv-lock-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('requirements.lock') }}
+          restore-keys: uv-lock-${{ runner.os }}-${{ runner.arch }}-
       - name: Environment
         env:
           UV_HTTP_TIMEOUT: "120"
+          UV_LINK_MODE: copy
         run: |
+          export UV_CACHE_DIR="$HOME/.cache/uv"
           uv venv --python 3.12 .venv
           # retried: a large wheel (cadquery-ocp) sometimes times out on the runner's network
           for i in 1 2 3; do uv pip install --python .venv/bin/python -r requirements.lock && break
             [ "$i" = 3 ] && exit 1; echo "Install failed; retrying in 20 s."; sleep 20; done
           uv pip install --python .venv/bin/python --no-deps -e .
+          uv pip install --python .venv/bin/python "coverage==7.17.4"
+      - if: steps.uv-cache.outputs.cache-hit != 'true' && matrix.shard == 1
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/uv
+          key: uv-lock-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('requirements.lock') }}
       - name: Tests (no slicer on CI runners; slicing tests skip)
         env:
           FORM_CONFIG: ${{ github.workspace }}/.github/ci-studio.toml
           COVERAGE_CORE: sysmon      # Python 3.12's low-overhead monitoring
+          FORM_TEST_TIMEOUT: "900"   # a single test running longer prints every thread's stack and ends the shard
           OS: ${{ matrix.os }}
+          SHARD: ${{ matrix.shard }}
         run: |
+          .venv/bin/python scripts/ci/test_shards.py plan --shards "$SHARDS"
           # Linux measures line coverage of the engine (settings in pyproject.toml); macOS runs the tests plainly.
           if [ "$OS" = "ubuntu-latest" ]; then
-            uv pip install --python .venv/bin/python "coverage==7.17.4"
-            .venv/bin/python -m coverage run -m unittest discover -s tests -v
+            .venv/bin/python -X faulthandler -m coverage run scripts/ci/test_shards.py run --shards "$SHARDS" --index "$SHARD" --times "times-$SHARD.json"
           else
-            .venv/bin/python -m unittest discover -s tests -v
+            .venv/bin/python -X faulthandler scripts/ci/test_shards.py run --shards "$SHARDS" --index "$SHARD" --times "times-$SHARD.json"
           fi
-      - name: Coverage summary
-        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}
-        run: |
-          .venv/bin/python -m coverage combine -q || true
-          [ -f .coverage ] || { echo "No coverage data (the tests did not get far enough)."; exit 0; }
-          {
-            echo "### Test coverage (engine, line coverage)"
-            echo
-            .venv/bin/python -m coverage report --format=total | sed 's/^/**Total: /; s/$/%**/'
-            echo
-            echo "<details><summary>Per file</summary>"
-            echo
-            .venv/bin/python -m coverage report --format=markdown --sort=cover
-            echo
-            echo "</details>"
-          } >> "$GITHUB_STEP_SUMMARY"
-          .venv/bin/python -m coverage xml -q -o coverage.xml
-      - name: Keep the coverage report
-        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' && hashFiles('coverage.xml') != '' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage
-          path: coverage.xml
-          retention-days: 14
       - name: MCP reference is up to date
+        if: matrix.shard == 1
         run: |
           .venv/bin/python scripts/gen_mcp_docs.py
           git diff --exit-code docs/MCP.md
+      - name: Keep the module times and coverage data
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: times-${{ matrix.os }}-${{ matrix.shard }}
+          path: |
+            times-*.json
+            .coverage.*
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
+
+  test:
+    name: test (${{ matrix.os }})
+    needs: shard
+    if: ${{ !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read            # read the shard jobs' results
+    steps:
+      - name: Every shard for this OS passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.run_id }}
+          ATTEMPT: ${{ github.run_attempt }}
+          OS: ${{ matrix.os }}
+        run: |
+          gh api --paginate "repos/$REPO/actions/runs/$RUN/attempts/$ATTEMPT/jobs?per_page=100" \
+            --jq ".jobs[] | select(.name | startswith(\"shard ($OS, \")) | \"\(.name)\t\(.conclusion)\"" > shards.tsv
+          cat shards.tsv
+          test "$(wc -l < shards.tsv)" -eq 4 || { echo "Expected 4 shards for $OS."; exit 1; }
+          if grep -qv $'\tsuccess$' shards.tsv; then echo "A shard for $OS did not pass."; exit 1; fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}
+        with:
+          pattern: times-*
+          merge-multiple: true
+      - name: Module times and coverage summary
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}
+        run: |
+          if ls times-*.json >/dev/null 2>&1; then
+            python3 scripts/ci/test_shards.py merge times-*.json > measured-timings.json
+            python3 scripts/ci/test_shards.py summary measured-timings.json >> "$GITHUB_STEP_SUMMARY"
+          fi
+          ls .coverage.* >/dev/null 2>&1 || { echo "No coverage data (the tests did not get far enough)."; exit 0; }
+          python3 -m pip install -q "coverage==7.17.4"
+          python3 -m coverage combine -q
+          {
+            echo "### Test coverage (engine, line coverage)"
+            echo
+            python3 -m coverage report --format=total | sed 's/^/**Total: /; s/$/%**/'
+            echo
+            echo "<details><summary>Per file</summary>"
+            echo
+            python3 -m coverage report --format=markdown --sort=cover
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+          python3 -m coverage xml -q -o coverage.xml
+      - name: Keep the coverage report and the measured timings
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: |
+            coverage.xml
+            measured-timings.json
+          if-no-files-found: ignore
+          retention-days: 14
 
   automation:
     name: Workflows and automation scripts

@@ -26,6 +26,7 @@ import issue_recipe  # noqa: E402
 import pr_preview  # noqa: E402
 import recipe_report  # noqa: E402
 import release_notes  # noqa: E402
+import test_shards  # noqa: E402
 import triage  # noqa: E402
 
 
@@ -156,6 +157,19 @@ class Data(unittest.TestCase):
         p = triage.plan({"title": "fix(slicer): presets", "additions": 5, "deletions": 1, "labels": [],
                          "author_association": "CONTRIBUTOR", "user": {"login": "x"}, "assignees": []})
         self.assertEqual((p["add"], p["assign"]), (["size/XS", "type:bug"], []))
+
+
+class Shards(unittest.TestCase):
+    def test_every_module_once_longest_first_into_the_lightest_shard(self):
+        times = {"a": 100, "b": 60, "c": 50, "d": 10}
+        got = test_shards.plan(2, ["a", "b", "c", "d", "e"], times)            # e is unlisted: DEFAULT seconds
+        self.assertEqual(got, [["a", "d", "e"], ["b", "c"]])                 # 120 s and 110 s
+        self.assertEqual(sorted(sum(got, [])), ["a", "b", "c", "d", "e"])
+
+    def test_the_real_suite_splits_into_four_with_nothing_lost(self):
+        got = test_shards.plan(4)
+        self.assertEqual(sorted(sum(got, [])), test_shards.modules())
+        self.assertTrue(all(got))
 
 
 if __name__ == "__main__":
