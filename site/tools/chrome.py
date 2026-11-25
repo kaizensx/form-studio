@@ -108,7 +108,7 @@ def foot(prefix: str) -> str:
       <nav aria-label="Docs"><span class="cap">Docs</span><a href="{prefix}docs/features.html">Features</a><a href="{prefix}docs/app.html">The app</a><a href="{prefix}docs/cli.html">Command line</a><a href="{prefix}docs/mcp.html">MCP tools</a><a href="{prefix}docs/changelog.html">Changelog</a></nav>
       <nav aria-label="Community"><span class="cap">Community</span><a href="https://discord.gg/b6ZgyndkmS">Discord</a><a href="{REPO}/discussions">Discussions</a><a href="{REPO}/issues/new?template=3-recipe.yml">Share a recipe</a><a href="{REPO}/issues/new/choose">Report an issue</a><a href="{REPO}/blob/main/CONTRIBUTING.md">Contributing</a></nav>
     </div>
-    <p class="foot-note">No cookies, trackers or third-party requests. Form Studio runs on your computer; it never uploads a design and never sends a file to a machine.</p>
+    <p class="foot-note">No cookies, trackers or third-party requests. Form Studio runs on your computer and never uploads your files or sends them to a machine on its own.</p>
   </div>
 </footer>
 <!--/foot-->"""

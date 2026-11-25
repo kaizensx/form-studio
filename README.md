@@ -43,7 +43,7 @@
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-2-dark.svg">
-    <img src="docs/readme/numbers-2-light.svg" width="414" alt="3 platforms: macOS, Windows and Linux. 0 uploads: your designs stay on your computer.">
+    <img src="docs/readme/numbers-2-light.svg" width="414" alt="3 platforms: macOS, Windows and Linux. 0 uploads of your files by Form Studio on its own.">
   </picture>
 </p>
 
@@ -82,7 +82,7 @@ flowchart LR
 
 | Principle | What it means |
 |---|---|
-| **Local** | Designs are never uploaded and nothing is sent to a machine. |
+| **Local** | Form Studio never uploads your files on its own. With a cloud AI agent, the conversation and the renders you share go to that agent's provider. |
 | **A person releases** | Agents propose and build; only you approve the files. |
 | **Every number says how it is known** | Computed, heuristic, modelled, simulated, measured or assumed. |
 | **Nothing exists only in the window** | Every action is also a `form` command and an MCP tool. |

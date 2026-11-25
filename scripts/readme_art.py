@@ -1152,7 +1152,7 @@ def numbers(data, light: bool):
     n_tools = len(data["tools"])
     n_agents = len(AGENT_APPS) + len(MODEL_APIS) + len(LOCAL)
     items = [(n_tools, "MCP tools for any agent"), (n_agents, "agent apps, model APIs and local models"),
-             (3, "platforms: macOS, Windows and Linux"), (0, "uploads. Your designs stay on your computer")]
+             (3, "platforms: macOS, Windows and Linux"), (0, "uploads of your files by Form Studio on its own")]
     out = []
     for half in (0, 1):
         svg = Svg(414, 178, 4.0, "Form Studio in numbers")

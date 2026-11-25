@@ -47,5 +47,23 @@ class ToolCounts(unittest.TestCase):
         self.assertGreaterEqual(seen, 12)
 
 
+class UploadClaim(unittest.TestCase):
+    """"0 uploads" is about Form Studio itself: the site and the README say that a cloud agent's provider sees the
+    conversation and the renders shared with it."""
+    def test_the_claim_names_what_a_cloud_agent_sees(self):
+        site = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("<span>uploads by Form Studio</span>", site)
+        self.assertNotIn("<span>uploads</span>", site)
+        for text in (site, readme):
+            self.assertIn("never uploads your files on its own", text)
+            self.assertIn("the conversation and the renders you share go to that agent's provider", text)
+        for pic in ("numbers-2-light.svg", "numbers-2-dark.svg"):
+            svg = (ROOT / "docs" / "readme" / pic).read_text(encoding="utf-8")
+            self.assertIn("0 uploads of your files by Form Studio on its own", svg)
+        chrome = (ROOT / "site" / "tools" / "chrome.py").read_text(encoding="utf-8")
+        self.assertNotIn("never uploads a design", chrome)
+
+
 if __name__ == "__main__":
     unittest.main()
