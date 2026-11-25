@@ -30,6 +30,20 @@ class PackageLicences(unittest.TestCase):
         self.assertIn('("LICENSE", "PERMISSION.md")', self.spec)            # CADFit's folder, in engine_src
         self.assertIn('"LICENSE-CADEvolve"', self.spec)
 
+    def test_threejs_materials_ships_its_licence(self):
+        self.assertIn('copy_metadata("threejs_materials")', self.spec)
+
+    def test_notices_cover_the_installable_engines(self):
+        from form import engines
+        notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+        self.assertIn("threejs-materials", notices)
+        self.assertIn(f"uv** {engines.UV_VERSION}", notices)
+        for eid, spec in engines.SPECS.items():
+            self.assertIn(spec["label"], notices, eid)
+            for pin in spec["pins"]:
+                name, version = pin.split("==")
+                self.assertIn(version, notices, pin)
+
 
 if __name__ == "__main__":
     unittest.main()

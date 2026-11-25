@@ -7,7 +7,8 @@ Each entry says what was taken and whether any code or material was copied. Most
 **reimplemented** in Form Studio's own code, with no code copied ("Ideas reimplemented, no code copied"). Two entries
 contain outside material, under their own licences: kulibinai/CADEvolve (exemplars hand-ported from its seed examples,
 Apache License 2.0) and CADFit (its code included and modified, CC BY-NC 4.0, with its author's permission). Each entry
-names the exact commit that was read.
+names the exact commit that was read. The last two sections list the libraries the app ships and the optional engines
+that Settings › Software installs only when you ask.
 
 ## nickpagz/stl2step
 
@@ -110,3 +111,25 @@ tables against the library.
   cannot share an environment with build123d here. bd_warehouse covers its fasteners, threads, bearings and
   sprockets; its `Chain` (a chain wrapped over sprockets at any positions) has no build123d port, and Form Studio's
   two-sprocket `chain_drive` uses the standard chain-length formula instead. Nothing copied.
+
+## Optional engines, installed only when you ask
+
+None of these is bundled. Settings › Software (or `form install`) installs each one into an environment of its own
+under the data folder (`form/engines.py`), showing its size and licence first. The versions are the pins in
+`form/engines.py`; licences are from each package's published metadata or the project's own licence file.
+
+- **CAD-Recode** (learned mesh-to-CAD, `recon.learned`). Weights: https://huggingface.co/filapro/cad-recode, licence
+  Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0), **non-commercial use only**; the
+  download refuses to start until that licence is accepted. Its code (https://github.com/filaPro/cad-recode) is
+  CC BY-NC 4.0 too (`LICENSE.md`). The model is built on Qwen2-1.5B (https://huggingface.co/Qwen/Qwen2-1.5B,
+  Apache License 2.0), whose tokenizer files are downloaded with the weights. Form Studio ships neither the weights nor
+  CAD-Recode's code. Libraries in its environment: PyTorch 2.11.0 (BSD-3-Clause), transformers 4.57.6, safetensors
+  0.8.0, tokenizers 0.22.2 and huggingface-hub 0.36.2 (Apache License 2.0), NumPy 2.5.5 (BSD-3-Clause, with parts
+  under 0BSD, MIT, Zlib and CC0-1.0).
+- **CADFit** (`recon.cadfit`): its code is in this repository (see ghadinehme/CADFit above). Libraries in its
+  environment: build123d 0.13.0 (Apache License 2.0), NumPy 2.5.4, SciPy 1.18.1 and scikit-learn 1.9.1
+  (BSD-3-Clause), trimesh 5.2.1 (MIT), manifold3d 3.5.5 (Apache License 2.0).
+- **CoACD** 1.0.14 (game collision, `game.coacd`; https://github.com/SarahWeiii/CoACD). Licence: MIT. With NumPy 2.5.4.
+- **uv** 0.13.7 (https://github.com/astral-sh/uv), downloaded from its GitHub release and checked against a pinned
+  SHA-256 before use, makes these environments. Licence: MIT OR Apache-2.0. The Python 3.12 it installs for them is
+  CPython (Python Software Foundation License) from uv's managed builds.

@@ -3,7 +3,7 @@ import re
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules, copy_metadata
 
 ROOT = Path(SPECPATH).parent
 VERSION = re.search(r'__version__ = "([^"]+)"', (ROOT / "form" / "__init__.py").read_text(encoding="utf-8")).group(1)
@@ -40,6 +40,7 @@ for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfi
 try:
     hidden += [m for m in collect_submodules("threejs_materials") if m.startswith("threejs_materials")]
     datas += [d for d in collect_data_files("threejs_materials") if "_assets" not in d[0].replace("\\", "/")]
+    datas += copy_metadata("threejs_materials")     # its dist-info, with its licence (Apache-2.0) in licenses/LICENSE
 except Exception:
     pass
 # Optional engines with libraries the app does not carry (CAD-Recode: PyTorch; CADFit: trimesh and friends) run in an
