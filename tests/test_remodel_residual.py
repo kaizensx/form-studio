@@ -160,6 +160,7 @@ class FitParams(unittest.TestCase):
     def setUpClass(cls):
         from build123d import export_stl
         os.environ["FORM_DATA"] = str(Path(TMP) / "data")
+        os.environ["FORM_REFINE"] = "off"     # automatic refinement would move the head under fit_params
         cls.stl = Path(TMP) / "flange.stl"
         export_stl(flange(), str(cls.stl), tolerance=0.005, angular_tolerance=0.1)
         from form import config
@@ -219,7 +220,7 @@ class ScriptedRemodel(unittest.TestCase):
         ref = Path(TMP) / "replay" / "flange.stl"
         ref.parent.mkdir(parents=True, exist_ok=True)
         export_stl(flange_reference(), str(ref), tolerance=0.005, angular_tolerance=0.1)
-        env = {**os.environ, "FORM_DATA": str(Path(TMP) / "replay-data"), "PYTHONPATH": str(ROOT), "FORM_SKIP_UI": "1"}
+        env = {**os.environ, "FORM_DATA": str(Path(TMP) / "replay-data"), "FORM_REFINE": "off", "PYTHONPATH": str(ROOT), "FORM_SKIP_UI": "1"}
         params = StdioServerParameters(command=sys.executable, args=["-m", "form.mcp_server", "--no-bench"], env=env,
                                        cwd=str(ROOT))
 

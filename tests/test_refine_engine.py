@@ -328,6 +328,8 @@ class TestOptOutsStylesLedger(unittest.TestCase):
         self.assertEqual(styles.params("rugged_tool", refine.ExampleEdgeBreak())["r"], 0.3)
 
     def test_ledger_file_is_local_and_resets(self):
+        # another test module may have pointed FORM_DATA elsewhere in a combined run: pin it for this test
+        os.environ["FORM_DATA"] = TMP
         led = ledger.Ledger.open()
         self.assertEqual(led.path, Path(TMP) / ledger.FILE)
         led.record("mouse", "clean_consumer", "parting_line", accepted=True, gain=0.05)
