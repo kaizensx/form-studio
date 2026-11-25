@@ -6,6 +6,7 @@ through the Studio (kernel worker) for the project, CLI and "Make editable" rout
 pipeline without its program route (sketches and extrusions read off the mesh, tested in test_recon_program.py), so
 Layers 0, 1 and the feature tree are always exercised.
 """
+import importlib.util
 import json
 import os
 import subprocess
@@ -26,10 +27,6 @@ from form.recon import distance, holes, mesh  # noqa: E402
 TOL = 0.02
 TESTED_AT = {"spur_gear": 0.05}       # the tolerance each fixture's full run uses (Layer 0 does not depend on it)
 _runs = {}
-
-
-LAYERED = ("box_with_holes", "turned_part", "filleted_bracket", "gear", "stepped_bracket", "flanged_shaft", "spur_gear",
-           "organic_blob")
 
 
 def run(name, tolerance=TOL, layer=2, program=False):
@@ -124,34 +121,93 @@ class Readers(unittest.TestCase):
         self.assertIsNone(holes.snap(7.77, 0.01)["standard"])
 
 
-class Layers(unittest.TestCase):
-    """Accuracy on each fixture. The numbers are computed by comparing with the mesh, never assumed."""
+# Accuracy on each fixture; the numbers are computed by comparing with the mesh, never assumed. The checks are grouped
+# by fixture, one test class each, so a fixture's pipeline run (minutes on a CI runner) happens once per process and the
+# classes can run in parallel (scripts/ci/test_shards.py splits this module by class).
 
+def check_layer0(t, name):
+    """Layer 0 is the mesh exactly: one valid solid, at most 0.1 um from the mesh, the same volume, a STEP file."""
+    if name == "spur_gear" and importlib.util.find_spec("py_gearworks") is None:
+        t.skipTest("py_gearworks is not installed (the [parts] extra)")
+    rep, out = run(name, TESTED_AT.get(name, TOL))
+    L0 = rep["layers"]["0"]
+    t.assertTrue(L0["valid"])
+    t.assertEqual(L0["solids"], 1)
+    t.assertLessEqual(L0["hausdorff_mm"], 1e-4)
+    mv = rep["result"]["mesh_volume_mm3"]
+    t.assertAlmostEqual(L0["volume_mm3"], mv, delta=1e-6 * abs(mv))
+    t.assertTrue((out / f"{name}_layer0.step").is_file())
+
+
+def check_mostly_parametric_with_the_right_holes(t, name):
+    rep, _ = run(name)
+    L1 = rep["layers"]["1"]
+    t.assertTrue(L1["valid"])
+    t.assertGreaterEqual(L1["parametric_area_pct"], 90.0)
+    t.assertLessEqual(L1["hausdorff_mm"], TOL)
+    got = sorted(h["diameter_mm"] for h in rep["layers"]["2"]["holes"])
+    t.assertEqual(got, sorted(facts(name)["holes"]))
+    t.assertTrue(all(h["provenance"] == "computed from mesh" for h in rep["layers"]["2"]["holes"]))
+
+
+def check_layer2_recipe_rebuilds_within_tolerance(t, name):
+    rep, out = run(name)
+    L2 = rep["layers"]["2"]
+    t.assertTrue(L2["verified"], L2.get("error"))
+    t.assertLessEqual(L2["hausdorff_mm"], TOL)
+    t.assertEqual(rep["layer_achieved"], 2)
+    t.assertTrue(rep["result"]["recipe_verified"])
+    src = (out / f"{name}_recipe.py").read_text()
+    t.assertIn('provenance="mesh"', src)
+    # the recipe is a real design: rebuild it here and compare again
+    from form.recon import features, solid, verify
+    from form.recon.pipeline import load
+    V, F, _, _ = load(Path(TMP) / f"{name}.stl")
+    shape = features.build_source(src)
+    P, T = solid.tessellate(shape, 0.002)
+    t.assertLessEqual(verify.compare(V, F, P, T)["hausdorff_mm"], TOL)
+
+
+class BoxWithHoles(unittest.TestCase):
     def test_layer0_is_the_mesh_exactly(self):
-        for name in LAYERED:
-            with self.subTest(name):
-                rep, out = run(name, TESTED_AT.get(name, TOL))
-                L0 = rep["layers"]["0"]
-                self.assertTrue(L0["valid"])
-                self.assertEqual(L0["solids"], 1)
-                self.assertLessEqual(L0["hausdorff_mm"], 1e-4)
-                mv = rep["result"]["mesh_volume_mm3"]
-                self.assertAlmostEqual(L0["volume_mm3"], mv, delta=1e-6 * abs(mv))
-                self.assertTrue((out / f"{name}_layer0.step").is_file())
+        check_layer0(self, "box_with_holes")
 
-    def test_prismatic_parts_are_mostly_parametric_with_the_right_holes(self):
-        for name in ("box_with_holes", "filleted_bracket"):
-            with self.subTest(name):
-                rep, _ = run(name)
-                L1 = rep["layers"]["1"]
-                self.assertTrue(L1["valid"])
-                self.assertGreaterEqual(L1["parametric_area_pct"], 90.0)
-                self.assertLessEqual(L1["hausdorff_mm"], TOL)
-                got = sorted(h["diameter_mm"] for h in rep["layers"]["2"]["holes"])
-                self.assertEqual(got, sorted(facts(name)["holes"]))
-                self.assertTrue(all(h["provenance"] == "computed from mesh" for h in rep["layers"]["2"]["holes"]))
+    def test_mostly_parametric_with_the_right_holes(self):
+        check_mostly_parametric_with_the_right_holes(self, "box_with_holes")
 
-    def test_turned_part_finds_its_cone_and_torus(self):
+    def test_layer2_recipe_rebuilds_within_tolerance(self):
+        check_layer2_recipe_rebuilds_within_tolerance(self, "box_with_holes")
+        box = run("box_with_holes")[0]["layers"]["2"]
+        self.assertEqual(sorted(p["kind"] for p in box["patterns"]), ["grid", "single"])
+
+    def test_report_and_deviation_map(self):
+        rep, out = run("box_with_holes")
+        on_disk = json.loads((out / "box_with_holes_report.json").read_text())
+        self.assertEqual(on_disk["result"], rep["result"])
+        for k in ("hausdorff_mm", "volume_delta_mm3", "volume_delta_pct", "parametric_area_pct", "frozen_area_pct"):
+            self.assertIn(k, rep["result"])
+        dm = json.loads((out / "box_with_holes_deviation.json").read_text())
+        self.assertEqual((dm["map"], dm["evidence"], dm["legend"]["unit"]), ("deviation", "computed", "mm"))
+        self.assertTrue(dm["positions"] and dm["values"] and dm["colors"])
+        self.assertLessEqual(dm["stats"]["max_mm"], TOL)
+
+
+class FilletedBracket(unittest.TestCase):
+    def test_layer0_is_the_mesh_exactly(self):
+        check_layer0(self, "filleted_bracket")
+
+    def test_mostly_parametric_with_the_right_holes(self):
+        check_mostly_parametric_with_the_right_holes(self, "filleted_bracket")
+
+    def test_layer2_recipe_rebuilds_within_tolerance(self):
+        check_layer2_recipe_rebuilds_within_tolerance(self, "filleted_bracket")
+
+
+class TurnedPart(unittest.TestCase):
+    def test_layer0_is_the_mesh_exactly(self):
+        check_layer0(self, "turned_part")
+
+    def test_finds_its_cone_and_torus(self):
         rep, _ = run("turned_part")
         L1 = rep["layers"]["1"]
         self.assertGreaterEqual(L1["parametric_area_pct"], 90.0)
@@ -160,27 +216,14 @@ class Layers(unittest.TestCase):
         self.assertTrue(any(s["kind"] == "axisymmetric" for s in rep["layers"]["2"]["symmetry"]))
 
     def test_layer2_recipe_rebuilds_within_tolerance(self):
-        for name in ("box_with_holes", "filleted_bracket", "turned_part"):
-            with self.subTest(name):
-                rep, out = run(name)
-                L2 = rep["layers"]["2"]
-                self.assertTrue(L2["verified"], L2.get("error"))
-                self.assertLessEqual(L2["hausdorff_mm"], TOL)
-                self.assertEqual(rep["layer_achieved"], 2)
-                self.assertTrue(rep["result"]["recipe_verified"])
-                src = (out / f"{name}_recipe.py").read_text()
-                self.assertIn('provenance="mesh"', src)
-                # the recipe is a real design: rebuild it here and compare again
-                from form.recon import features, solid, verify
-                from form.recon.pipeline import load
-                V, F, _, _ = load(Path(TMP) / f"{name}.stl")
-                shape = features.build_source(src)
-                P, T = solid.tessellate(shape, 0.002)
-                self.assertLessEqual(verify.compare(V, F, P, T)["hausdorff_mm"], TOL)
-        box = run("box_with_holes")[0]["layers"]["2"]
-        self.assertEqual(sorted(p["kind"] for p in box["patterns"]), ["grid", "single"])
+        check_layer2_recipe_rebuilds_within_tolerance(self, "turned_part")
 
-    def test_gear_flanks_stay_honest(self):
+
+class Gear(unittest.TestCase):
+    def test_layer0_is_the_mesh_exactly(self):
+        check_layer0(self, "gear")
+
+    def test_flanks_stay_honest(self):
         """Spline flanks: the gear is recognised (18 teeth, module 2, 20 degrees), but the mesh's own facets are
         about 0.03 mm from the flanks it was made from, so at 0.02 mm no smooth gear can be within the tolerance and
         the parametric gear is not offered; the feature tree keeps the toothed outline as reconstructed (frozen
@@ -203,17 +246,6 @@ class Layers(unittest.TestCase):
         self.assertEqual(g5["method"], "spur gear")
         self.assertEqual(g5["fit"]["teeth"], 18)
         self.assertLessEqual(g5["hausdorff_mm"], 0.05)
-
-    def test_report_and_deviation_map(self):
-        rep, out = run("box_with_holes")
-        on_disk = json.loads((out / "box_with_holes_report.json").read_text())
-        self.assertEqual(on_disk["result"], rep["result"])
-        for k in ("hausdorff_mm", "volume_delta_mm3", "volume_delta_pct", "parametric_area_pct", "frozen_area_pct"):
-            self.assertIn(k, rep["result"])
-        dm = json.loads((out / "box_with_holes_deviation.json").read_text())
-        self.assertEqual((dm["map"], dm["evidence"], dm["legend"]["unit"]), ("deviation", "computed", "mm"))
-        self.assertTrue(dm["positions"] and dm["values"] and dm["colors"])
-        self.assertLessEqual(dm["stats"]["max_mm"], TOL)
 
 
 def rebuild(name, out, **changes):
@@ -244,7 +276,7 @@ def params(out, name):
         {m.group(1): float(m.group(2)) for m in re.finditer(r'Param\("([a-z0-9_]+)", "[^"]*", ([-0-9.e]+)', src)}
 
 
-class FeatureTree(unittest.TestCase):
+class _Edits:
     """Layer 2 on real mechanical parts, a gear and an organic shape: a recipe of features that verifies within the
     tolerance, and whose Params change the part (a different fillet radius or hole size still builds a valid solid,
     and the volume moves the way it should)."""
@@ -258,7 +290,12 @@ class FeatureTree(unittest.TestCase):
         dv = ck["volume_mm3"] - ck0["volume_mm3"]
         self.assertGreater(sign * dv, 1e-3, f"{key} {v} -> {v + delta}: volume {ck0['volume_mm3']:.3f} -> {ck['volume_mm3']:.3f}")
 
-    def test_stepped_bracket(self):
+
+class SteppedBracket(_Edits, unittest.TestCase):
+    def test_layer0_is_the_mesh_exactly(self):
+        check_layer0(self, "stepped_bracket")
+
+    def test_feature_tree(self):
         rep, out = run("stepped_bracket")
         L2 = rep["layers"]["2"]
         self.assertEqual(rep["layer_achieved"], 2, L2.get("error"))
@@ -283,6 +320,8 @@ class FeatureTree(unittest.TestCase):
         self.assert_edits("stepped_bracket", out, "hole1_d", 1.0, -1)
         self.assert_edits("stepped_bracket", out, "pocket1_depth", 1.0, -1)
 
+
+class ShippedConfiguration(unittest.TestCase):
     def test_shipped_configuration_keeps_layer1_its_time(self):
         """The pipeline as the app runs it: the program route ON (no stub) and the default 240 s budget. The program
         route is held to its share of the budget and the layers below start their own clock after it, so the
@@ -294,7 +333,8 @@ class FeatureTree(unittest.TestCase):
         t = time.perf_counter()
         rep = pipeline.reconstruct(stl, Path(TMP) / "out-shipped-stepped_bracket", "stepped_bracket", TOL, 2)
         took = time.perf_counter() - t
-        self.assertLessEqual(rep["program_seconds"], pipeline.PROGRAM_SHARE * 240 + 30, "the program route keeps to its share")
+        slack = 60 if "coverage" in sys.modules else 30   # the step running at the deadline finishes; slower under coverage
+        self.assertLessEqual(rep["program_seconds"], pipeline.PROGRAM_SHARE * 240 + slack, "the program route keeps to its share")
         L1, L2 = rep["layers"]["1"], rep["layers"]["2"]
         self.assertNotIn("error", L1)
         self.assertEqual(rep["layer_achieved"], 2, L2.get("error"))
@@ -304,7 +344,12 @@ class FeatureTree(unittest.TestCase):
         self.assertGreater(rep["result"]["editable_pct"], 0.0)
         self.assertLess(took, 240 * 1.5, f"{took:.0f} s")
 
-    def test_flanged_shaft(self):
+
+class FlangedShaft(_Edits, unittest.TestCase):
+    def test_layer0_is_the_mesh_exactly(self):
+        check_layer0(self, "flanged_shaft")
+
+    def test_feature_tree(self):
         rep, out = run("flanged_shaft")
         L2 = rep["layers"]["2"]
         self.assertEqual(rep["layer_achieved"], 2, L2.get("error"))
@@ -321,7 +366,12 @@ class FeatureTree(unittest.TestCase):
         self.assertTrue(ck["valid"])
         self.assertEqual(ck["solids"], 1)
 
-    def test_spur_gear(self):
+
+class SpurGear(_Edits, unittest.TestCase):
+    def test_layer0_is_the_mesh_exactly(self):
+        check_layer0(self, "spur_gear")
+
+    def test_feature_tree(self):
         try:
             import py_gearworks  # noqa: F401
         except ImportError:
@@ -349,7 +399,12 @@ class FeatureTree(unittest.TestCase):
         self.assertTrue(ck["valid"])
         self.assertGreater(ck["volume_mm3"], ck0["volume_mm3"])
 
-    def test_organic_blob(self):
+
+class OrganicBlob(_Edits, unittest.TestCase):
+    def test_layer0_is_the_mesh_exactly(self):
+        check_layer0(self, "organic_blob")
+
+    def test_feature_tree(self):
         rep, out = run("organic_blob")
         L1 = rep["layers"]["1"]
         self.assertTrue(L1["valid"], L1.get("error"))

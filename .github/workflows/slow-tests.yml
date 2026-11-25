@@ -1,0 +1,59 @@
+name: Slow tests
+
+# The tests that are too slow for every pull request, run every night on dev and by hand, on Linux and macOS:
+#   FORM_SLOW_TESTS=1  the design bench's product-class exemplars (helmets and mice, several minutes each on a
+#                      runner: tests/test_design_bench.py) and the 250 MB STL preflight (tests/test_meshprep.py)
+#   FORM_SLOW=1        the 200k-triangle helmet acceptance run (tests/test_meshbody.py)
+# CI (ci.yml) runs the same modules without these flags, so the quick part of each still runs on every change.
+on:
+  schedule:
+    - cron: "41 2 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: slow-tests
+  cancel-in-progress: false
+
+jobs:
+  slow:
+    name: slow tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: dev
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          enable-cache: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/uv
+          key: uv-lock-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('requirements.lock') }}
+          restore-keys: uv-lock-${{ runner.os }}-${{ runner.arch }}-
+      - name: Environment
+        env:
+          UV_HTTP_TIMEOUT: "120"
+          UV_LINK_MODE: copy
+        run: |
+          export UV_CACHE_DIR="$HOME/.cache/uv"
+          uv venv --python 3.12 .venv
+          for i in 1 2 3; do uv pip install --python .venv/bin/python -r requirements.lock && break
+            [ "$i" = 3 ] && exit 1; echo "Install failed; retrying in 20 s."; sleep 20; done
+          uv pip install --python .venv/bin/python --no-deps -e .
+      - name: Slow tests
+        env:
+          FORM_CONFIG: ${{ github.workspace }}/.github/ci-studio.toml
+          FORM_SLOW_TESTS: "1"
+          FORM_SLOW: "1"
+        run: '"$GITHUB_WORKSPACE/.venv/bin/python" -X faulthandler -m unittest -v test_design_bench test_meshprep test_meshbody'
+        working-directory: tests

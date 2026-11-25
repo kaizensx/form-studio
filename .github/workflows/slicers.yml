@@ -145,8 +145,10 @@ jobs:
       FORM_CONFIG: .github/ci-${{ matrix.kind }}.toml
       FORM_NO_UPDATE_CHECK: 1
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       - name: Linux libraries (Qt for FORM, a virtual screen and GTK/GL for the slicer)
         if: runner.os == 'Linux'
         run: |
@@ -221,7 +223,7 @@ jobs:
         run: |
           find "$RUNNER_TEMP/form-slice" -name slicer.log 2>/dev/null | while read -r f; do echo "=== $f"; tail -n 60 "$f"; done
           find "$RUNNER_TEMP/form-slice" -name '*.gcode' 2>/dev/null | while read -r f; do echo "=== $f"; head -c 300 "$f" | head -n 6; grep -a -m 24 -iE "^; ?(generated|estimated|total|filament used|model printing|max_z)" "$f" | cut -c1-200; done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: slice-${{ matrix.kind }}-${{ matrix.on }}

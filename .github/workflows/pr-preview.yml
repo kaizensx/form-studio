@@ -48,7 +48,7 @@ jobs:
       recipes: ${{ steps.affected.outputs.recipes }}
       ui: ${{ steps.affected.outputs.ui }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -62,7 +62,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/pr"
           python3 scripts/ci/pr_preview.py affected --base "$BASE" --head "$HEAD" --out "$RUNNER_TEMP/pr/affected.json"
           python3 -c "import json,os,sys; json.dump({'number': int(os.environ['NUMBER']), 'head_sha': os.environ['HEAD'], 'base_sha': os.environ['BASE']}, open(sys.argv[1], 'w'))" "$RUNNER_TEMP/pr/pr.json"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pr
           path: ${{ runner.temp }}/pr
@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -87,7 +87,7 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: pr
           path: ${{ runner.temp }}/pr
@@ -98,7 +98,7 @@ jobs:
         run: |
           python3 scripts/ci/pr_preview.py recipes --affected "$RUNNER_TEMP/pr/affected.json" \
             --base-root "$RUNNER_TEMP/base" --head-root . --python "$PY" --out "$RUNNER_TEMP/recipes"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: recipes
           path: ${{ runner.temp }}/recipes
@@ -110,7 +110,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Linux libraries for Qt, and PrusaSlicer
@@ -147,7 +147,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ui-shots"
           "$PY" scripts/ci/pr_preview.py ui --shots "$RUNNER_TEMP/ui-shots" --baseline "$RUNNER_TEMP/baseline" \
             --out "$RUNNER_TEMP/ui" --journeys "$J"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ui
           path: ${{ runner.temp }}/ui

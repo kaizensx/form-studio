@@ -300,7 +300,7 @@ Run against the real programs for the first time, and fixed what that showed.
 - Change impact and alternatives no longer assume the dock's tip-over model.
 - The renderer wraps long legends and supports fixed framing and free cameras.
 - The repository's media, gallery, social card and animated session replay are all generated from real builds (`scripts/make_media.py`).
-- Added CI workflow, issue and PR templates, `CONTRIBUTING.md`, `SECURITY.md` and [docs/RECIPES.md](docs/RECIPES.md).
+- Added CI workflow, issue and PR templates, `CONTRIBUTING.md`, `SECURITY.md` and [docs/RECIPES.md](RECIPES.md).
 
 ### 6.0.0
 

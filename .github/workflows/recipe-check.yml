@@ -44,7 +44,7 @@ jobs:
       found: ${{ steps.find.outputs.found }}
       wants_check: ${{ steps.find.outputs.wants_check }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Find the recipe in the issue
@@ -101,7 +101,7 @@ jobs:
             -size -8M -exec cp {} "$RUNNER_TEMP/result/out/" \;
           sudo chown -R "$(id -u)" "$RUNNER_TEMP/result"
           ls -la "$RUNNER_TEMP/result/out"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always() && steps.find.outputs.found == 'true'
         with:
           name: recipe-result
@@ -121,10 +121,10 @@ jobs:
       contents: write          # pictures and the validated bundle go to the ci-assets branch
       issues: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: needs.build.outputs.found == 'true'
         continue-on-error: true
         with:

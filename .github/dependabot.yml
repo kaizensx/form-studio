@@ -7,9 +7,14 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    cooldown:
+      default-days: 7          # let a new release settle for a week before it is proposed
     groups:
+      # minor and patch releases of actions together, in one pull request that can merge itself once CI passes
+      # (dependabot-auto-merge.yml); a major release comes on its own, for a person to read
       actions:
         patterns: ["*"]
+        update-types: [minor, patch]
     commit-message:
       prefix: "CI:"
   - package-ecosystem: pip
@@ -18,6 +23,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    cooldown:
+      default-days: 7          # let a new release settle for a week before it is proposed
     open-pull-requests-limit: 5
     groups:
       python:

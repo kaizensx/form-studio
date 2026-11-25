@@ -15,6 +15,7 @@
 ## Checklist
 
 - [ ] `python -m unittest discover -s tests` passes
+- [ ] `pre-commit run --from-ref origin/dev --to-ref HEAD` passes (lint, YAML/TOML, whitespace)
 - [ ] MCP tools changed: `python scripts/gen_mcp_docs.py` was run and `docs/MCP.md` is committed
 - [ ] Interface changed: screenshots of the app before and after are attached
 - [ ] New recipe: it builds with its defaults, its constraints name a feature and a fix, and `measure()` reads its interfaces off the solid

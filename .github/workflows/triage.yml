@@ -30,10 +30,11 @@ jobs:
       pull-requests: write
       issues: write              # creating the size labels the first time
     steps:
-      - uses: actions/labeler@v7
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
         with:
           sync-labels: false
-      - uses: actions/checkout@v7          # the base branch: the automation's own script, never the pull request
+      # the base branch: the automation's own script, never the pull request
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: scripts/ci
@@ -50,7 +51,7 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/first-interaction@v3
+      - uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d # v3.1.0
         with:
           issue_message: |
             Thank you for opening your first issue in Form Studio. A maintainer reads every new issue; if it is about a

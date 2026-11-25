@@ -1,0 +1,28 @@
+name: Dependabot auto-merge
+
+# Minor and patch updates of GitHub Actions (one grouped pull request a week, .github/dependabot.yml) are set to merge
+# themselves once the required checks pass on dev. Major updates, and every Python package update, wait for a person.
+on:
+  pull_request:
+    branches: [dev]
+
+permissions: {}
+
+jobs:
+  auto-merge:
+    name: Enable auto-merge
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'kaizensx/form-studio'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write          # merge
+      pull-requests: write     # turn on auto-merge
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+      - name: Auto-merge minor and patch updates of actions
+        if: steps.meta.outputs.package-ecosystem == 'github_actions' && steps.meta.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR"

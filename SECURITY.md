@@ -2,14 +2,52 @@
 
 ## Reporting a vulnerability
 
-Please report vulnerabilities privately through
-[GitHub's private security advisories](https://github.com/kaizensx/form-studio/security/advisories/new), not in a
-public issue. Include the version, your platform and the steps to reproduce. You will get a reply within a few days,
-and credit in the release notes if you would like it.
+Please report vulnerabilities privately, not in a public issue, discussion or Discord channel:
+
+1. Open [**Report a vulnerability**](https://github.com/kaizensx/form-studio/security/advisories/new) (the
+   repository's Security tab). Private vulnerability reporting is on, so only the maintainers see the report.
+2. Include the Form Studio version (About in the app, or `form doctor`), your platform, what an attacker could do, and the
+   steps to reproduce. A proof of concept helps, but is not required.
+
+What happens next:
+
+| When | What |
+|---|---|
+| Within 3 working days | A reply that confirms the report was received and read |
+| Within 10 working days | An assessment: accepted or declined, with the reasons, and the planned fix |
+| With the fix | A patch release (see [RELEASING.md](docs/RELEASING.md)), a published GitHub security advisory with a CVE when one applies, and credit in the advisory and release notes if you would like it |
+
+Please give us a reasonable time to ship a fix before you disclose the issue publicly; we will agree a date with you.
 
 ## Supported versions
 
-Security fixes are made on the latest release.
+| Version | Security fixes |
+|---|---|
+| Latest stable release | Yes, as a patch release |
+| Latest preview | Yes, in the next preview |
+| Older releases | No; please update |
+
+## Verifying a download
+
+Every release is built by GitHub Actions from a tagged commit ([`app.yml`](.github/workflows/app.yml)). Each release
+lists `SHA256SUMS` and an SPDX SBOM, and every download carries signed build provenance and SBOM attestations:
+
+```bash
+gh attestation verify FORM-macos-arm64.zip --repo kaizensx/form-studio
+shasum -a 256 -c SHA256SUMS --ignore-missing
+```
+
+## How the repository is kept safe
+
+- Every GitHub Action is pinned to a full commit SHA, updated weekly by Dependabot after a cooling-off week.
+- Workflows run with read-only tokens by default; write access is granted per job, only where a job needs it.
+  Code from a fork's pull request never runs with a write token: the few jobs that need one for a fork (labels,
+  preview comments) run only the base branch's own scripts and read the pull request as data.
+- CodeQL (`security-extended`), [zizmor](https://docs.zizmor.sh/) for the workflows and OpenSSF Scorecard report to
+  Security › Code scanning. Dependency review checks every pull request and comments when it fails
+  (on a fork's pull request, whose token cannot comment, the findings are in the job summary); pip-audit checks
+  `requirements.lock` and writes its findings to the workflow's job summary.
+- Dependabot alerts and security updates, secret scanning and push protection are on.
 
 ## Security model
 

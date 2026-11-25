@@ -63,3 +63,30 @@ packages = ["form"]
 
 [tool.hatch.build.targets.sdist]
 exclude = ["projects", ".venv", "docs/screenshots"]
+
+# Lint and format settings for ruff (run by .pre-commit-config.yaml and .github/workflows/quality.yml).
+# The rule set starts with what is always a bug (syntax errors, undefined names, misused comparisons) so the tree is
+# clean today; more rules are switched on one at a time, each in its own change, as the code is brought up to them.
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = ["site/vendor", "tests/fixtures", "projects"]
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.ruff.format]
+# Not yet applied to the whole tree: CI checks the format of the Python files a pull request changes, as advice.
+docstring-code-format = true
+
+[tool.coverage.run]
+source = ["form"]
+parallel = true
+concurrency = ["thread", "multiprocessing"]
+patch = ["subprocess"]
+omit = ["form/app/*"]
+
+[tool.coverage.report]
+skip_empty = true
+precision = 1
+show_missing = false

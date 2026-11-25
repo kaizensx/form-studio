@@ -11,3 +11,9 @@ projects/
 .dev/
 .claude/worktrees/
 .venv-x64/
+
+# test coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
