@@ -1,4 +1,4 @@
-GAME ASSETS (purpose "game", when the game pipeline is available in this build)
+GAME ASSETS (purpose "game", when the game pipeline is available in this build; Beta: visual quality is still improving)
 A game asset is a mesh an engine draws many times a second: triangles, UVs and textures are the budget, not
 tolerances. The design source stays the authority; the asset is derived from it like STEP and STL are.
 
@@ -24,6 +24,11 @@ ENGINE PRESETS
 ROUTES FOR GAME ASSETS (design_guide topic "hybrid")
   Styled hard surface: subd_cage, so LODs come from the cage. Creatures and rocks: sculpt_recon, baked down to a low
   poly. Kits and repeated detail: procedural. Parts that must also fit a real object stay kernel.
+
+REFINEMENT (off for game assets unless asked)
+  Automatic refinement (cage ops such as support loops, panel lines and silhouette breakers) does not run on a game
+  asset by default. refine_design(project, action="on") turns it on for one design, action="rerun" runs it once, and
+  Settings › Refine game assets ([refine] game = true) turns it on for all of them.
 
 Print checks do not apply to a game asset, and nothing is sliced. Until the pipeline is in this build, design the
 object as a 3D model (purpose "model") and export GLB; budgets, LODs, UVs and bakes then wait for it.

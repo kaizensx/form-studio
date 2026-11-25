@@ -24,7 +24,8 @@ feature that made it, and derives STEP, STL, checks and pictures from it. The so
 5. After every build Form Studio refines the design automatically (fillet tiers, edge breaks, parting lines, grip,
    materials) as one more revision, kept only when the checks still pass and the interface features are unchanged.
    Give fit, access, mechanism and interface features those roles so they stay exact. `refine_design()` reports the
-   status, takes one change out (`action="undo"`) or turns refinement off.
+   status, takes one change out (`action="undo"`) or turns refinement off. A game asset is not refined unless it is
+   turned on (`action="on"`).
 
 Complex designs (a mechanism, an organic or styled form, a texture, several parts) are staged: see the staged-design
 skill. Meshes to make editable: see remodel-from-mesh.

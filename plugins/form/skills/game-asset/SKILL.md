@@ -16,4 +16,8 @@ FORM tools: `design_guide()`, `create_design()`, `render_photo()`, `get_project(
 4. Where this build has no asset step yet, design the object as a 3D model (purpose "model") and export GLB; say that
    budgets, LODs, UVs and bakes wait for the game pipeline.
 
+5. Game assets are in Beta: visual quality is still improving. Refinement does not run on a game asset unless it is
+   asked for: `refine_design(project, action="on")` for this design (or `"rerun"` once), or Settings › Refine game
+   assets for every one. Turn it on only when the person asks for it.
+
 Textures are procedural or baked here, never downloaded.

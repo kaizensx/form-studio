@@ -260,3 +260,5 @@ AFTER THE BUILD: REFINEMENT (automatic)
   * A plain Recipe is refined too: its build() becomes the skeleton feature of a FeatureDesign and the refine
     features follow it. refine = False on the design class, create_design(refine="off") or
     refine_design(action="off") turn it off; refine_design(action="undo", feature=...) takes one change out.
+  * A game asset (purpose "game") is not refined unless it is asked for: refine_design(action="on") for one design,
+    or Settings › Refine game assets ([refine] game = true) for all.

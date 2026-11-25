@@ -30,7 +30,8 @@ lowest item, at least two passes.
 
 The refinement engine runs after every build (fillet tiers, an edge break, a parting line, grip, materials and
 contrast) and keeps each change only when the checks pass and interface faces are unchanged. Read what it did with
-`refine_design()` and take out a change that fights the design language.
+`refine_design()` and take out a change that fights the design language. Game assets are refined only when turned
+on (`refine_design(action="on")`).
 
 Never improve looks by shrinking a required clearance or thinning a load-bearing root. Stop when the requirements are
 met and no visible or manufacturing defect remains; do not iterate on cosmetics forever. Ask the user for a photo of

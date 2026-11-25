@@ -14,7 +14,8 @@ Progress is written to <project>/refine.json (any process can read it: the app s
 made the design runs the job) and to the activity log (kind "refine"), stage by stage. When the app's engine for the
 same data folder is running in another process, the job runs there instead (POST /api/projects/<id>/refine), so it
 does not end with an agent's MCP server. Off: refine="off" on the call, `refine = False` on the design class,
-[refine] enabled = false (Settings), or FORM_REFINE=off.
+[refine] enabled = false (Settings), or FORM_REFINE=off. A game asset is refined only when asked: refine="on",
+the design turned on (set_project "on"), or [refine] game = true (Settings › Refine game assets).
 """
 from __future__ import annotations
 
@@ -78,7 +79,9 @@ def status(st, pid: str) -> dict:
 def enabled_text(st, pid: str) -> dict:
     from . import engine
     try:
-        on, why = engine.enabled(getattr(st, "cfg", {}), st.source_text(st.load(pid)) or "", None)
+        p = st.load(pid)
+        src = st.source_text(p) or ""
+        on, why = engine.enabled(getattr(st, "cfg", {}), src, engine.asked(p, None), engine.is_game(p, src))
     except Exception as e:                               # noqa: BLE001
         on, why = False, str(e)
     return {"on": on, "why": why}
@@ -160,9 +163,10 @@ def start(st, pid: str, refine=None, **kw) -> str | None:
     (the reason goes to refine.json as state "off")."""
     from . import engine
     p = st.load(pid)
-    on, why = engine.enabled(getattr(st, "cfg", {}), st.source_text(p) or "", refine)
-    if on and p.get("refine") == "off" and refine in (None, "auto", ""):
-        on, why = False, "refinement is off for this design (refine_design action=\"off\", or create_design refine=\"off\")"
+    src = st.source_text(p) or ""
+    on, why = engine.enabled(getattr(st, "cfg", {}), src, engine.asked(p, refine), engine.is_game(p, src))
+    if not on and p.get("refine") == "off" and refine in (None, "auto", ""):
+        why = "refinement is off for this design (refine_design action=\"off\", or create_design refine=\"off\")"
     cancel(pid)
     if not on:
         _write(st, pid, {"state": "off", "why": why, "rev": p["head"], "finished": time.time()})
@@ -244,7 +248,8 @@ def task_id(pid: str, jid: str) -> str:
 
 
 def set_project(st, pid: str, value: str | None) -> dict:
-    """Turn automatic refinement off ("off") or back on (None) for one design (the project's "refine" field)."""
+    """Turn automatic refinement off ("off"), on ("on": also for a game asset, which is not refined unless asked) or
+    back to the default (None) for one design (the project's "refine" field)."""
     with st.lock(pid):
         p = st.load(pid)
         if value is None:

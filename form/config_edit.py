@@ -42,6 +42,10 @@ SCHEMA: dict[str, dict] = {
                        "help": "Adds named, reversible refinements (fillet tiers, parting lines, grip zones, materials) "
                                "as one more revision, kept only when the design's checks still pass. Each one can be "
                                "undone in the workspace."},
+    "refine.game": {"type": "bool", "tab": "general", "label": "Refine game assets",
+                    "help": "Off by default while game assets are in Beta: a game asset is refined only when you ask "
+                            "for it (Refine again in the workspace). On: every game asset is refined after it builds, "
+                            "like a CAD design."},
     "data.dir": {"type": "path", "tab": "general", "label": "Project folder", "restart": True,
                  "help": "Where designs, their history and releases are kept. Takes effect when Form Studio restarts; "
                          "existing projects are not moved."},

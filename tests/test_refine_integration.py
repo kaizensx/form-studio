@@ -96,6 +96,24 @@ class OptOuts(unittest.TestCase):
                 os.environ["FORM_REFINE"] = old
         self.assertFalse(engine.enabled({}, "")[0])
 
+    def test_game_assets_only_when_asked(self):
+        # a game asset (purpose "game" or a cage source) is not refined unless asked; CAD designs are
+        off = engine.enabled({}, FEATURES, None, True)
+        self.assertFalse(off[0])
+        self.assertIn("Refine game assets", off[1])
+        self.assertFalse(engine.enabled({}, "CAGES = []\n")[0])                    # a cage source is a game asset
+        self.assertFalse(engine.enabled({}, FEATURES, "auto", True)[0])
+        self.assertTrue(engine.enabled({}, FEATURES, "on", True)[0])               # refine_design on / rerun
+        self.assertTrue(engine.enabled({"refine": {"game": True}}, FEATURES, None, True)[0])   # Settings
+        self.assertFalse(engine.enabled({"refine": {"game": True, "enabled": False}}, FEATURES, None, True)[0])
+        self.assertTrue(engine.enabled({}, FEATURES, None, False)[0])              # CAD stays on
+        from form import config
+        self.assertIs(config.DEFAULTS["refine"]["game"], False)
+        self.assertTrue(engine.is_game({"purpose": "game"}))
+        self.assertFalse(engine.is_game({"purpose": "model"}, FEATURES))
+        self.assertEqual(engine.asked({"refine": "on"}), "on")
+        self.assertEqual(engine.asked({"refine": "on"}, "off"), "off")
+
 
 class Edits(unittest.TestCase):
     def test_text_edit_undoes_alone(self):
@@ -237,6 +255,20 @@ class StudioRefine(unittest.TestCase):
         self.assertIsNone(jobs.start(st, p["id"]))
         self.assertEqual(jobs.status(st, p["id"])["state"], "off")
         self.assertEqual(st.load(p["id"])["head"], 1)
+
+    def test_a_game_asset_waits_until_turned_on(self):
+        st = self.st
+        p = st.create_design("Block", FEATURES, purpose="game")
+        self.assertIsNone(jobs.start(st, p["id"]))
+        rec = jobs.status(st, p["id"])
+        self.assertEqual(rec["state"], "off")
+        self.assertFalse(rec["enabled"]["on"])
+        self.assertIn("game assets", rec["why"])
+        jobs.set_project(st, p["id"], "on")                    # refine_design(action="on")
+        self.assertEqual(st.load(p["id"])["refine"], "on")
+        self.assertTrue(jobs.status(st, p["id"])["enabled"]["on"])
+        jobs.set_project(st, p["id"], "off")
+        self.assertFalse(jobs.status(st, p["id"])["enabled"]["on"])
 
     def test_a_plain_recipe_is_wrapped_and_refined(self):
         from form.refine import ops_cad

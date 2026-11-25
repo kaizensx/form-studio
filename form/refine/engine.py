@@ -26,7 +26,8 @@ and operators, so tests drive it with stubs and Studio drives it with StudioEval
     and the path is shortened one step at a time until it passes.
 
 Opt-out at three levels: `refine = False` on the design class, refine="off" from the caller, `[refine] enabled =
-false` in studio.toml. Learning: form/refine/ledger.py records every try (local file, never uploaded).
+false` in studio.toml. Game assets are opt-in: refine="on", the design turned on (refine_design action="on"), or
+`[refine] game = true` (Settings › Refine game assets). Learning: form/refine/ledger.py records every try (local file, never uploaded).
 """
 from __future__ import annotations
 
@@ -565,9 +566,21 @@ def kind_of(source: str) -> tuple[str | None, str]:
     return "recipe", ""
 
 
-def enabled(cfg: dict | None, source: str, refine=None) -> tuple[bool, str]:
+ASKED_ON = (True, "on", "yes", 1, "force")
+
+
+def is_game(p: dict | None, source: str = "") -> bool:
+    """True for a game asset: a design made for a game engine (purpose "game") or a game cage source."""
+    if (p or {}).get("purpose") == "game":
+        return True
+    return bool(re.search(r"^CAGES\s*=", source or "", re.M))
+
+
+def enabled(cfg: dict | None, source: str, refine=None, game: bool | None = None) -> tuple[bool, str]:
     """(on, why not) from the opt-outs, in order: the caller, FORM_REFINE=off, the config, the design class; then
-    whether the source can take refinement at all (kind_of)."""
+    whether the source can take refinement at all (kind_of). A game asset (game=True, or a cage source when game is
+    None) is refined only when it is asked for: refine="on" (refine_design action="on" or "rerun") or
+    [refine] game = true (Settings › Refine game assets). CAD designs are refined unless turned off."""
     import os
     if refine in (False, "off", "no", 0):
         return False, "refine=\"off\" was asked for"
@@ -576,12 +589,27 @@ def enabled(cfg: dict | None, source: str, refine=None) -> tuple[bool, str]:
     rc = (cfg or {}).get("refine") or {}
     if rc.get("enabled", True) in (False, "off", 0, "false"):
         return False, "refinement is turned off in Settings ([refine] enabled = false)"
+    if game is None:
+        game = is_game(None, source)
+    if game and refine not in ASKED_ON and rc.get("game", False) in (False, "off", 0, "false", None):
+        return False, ("refinement of game assets is off unless you turn it on (Settings › Refine game assets, or "
+                       "refine_design action=\"on\" for this design)")
     if class_opt_out(source):
         return False, "the design class says refine = False"
     kind, why = kind_of(source)
     if kind is None:
         return False, why
     return True, ""
+
+
+def asked(p: dict | None, refine=None):
+    """The refine request for a project: the caller's, or "on" when the design was turned on (refine_design
+    action="on"), or "off" when it was turned off."""
+    if refine in (None, "auto", ""):
+        v = (p or {}).get("refine")
+        if v in ("on", "off"):
+            return v
+    return refine
 
 
 # ---- Studio: the evaluator and the entry points ----------------------------------------------------------------------
@@ -849,7 +877,7 @@ def prepare(st, pid: str, refine=None, style: str | None = None,
     from .analyze import texture_features
     p = st.load(pid)
     src = st.source_text(p) or ""
-    on, why = enabled(getattr(st, "cfg", {}), src, refine)
+    on, why = enabled(getattr(st, "cfg", {}), src, asked(p, refine), is_game(p, src))
     if not on:
         return None, None, why
     kind, _why = kind_of(src)

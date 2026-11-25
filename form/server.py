@@ -678,7 +678,7 @@ def make_handler(st: Studio):
                                 + (f" ({body['feature']})" if body.get("feature") else ""), by="you")
                     return self._json({**refine_jobs.status(st, pid), "head": q["head"]})
                 if what in ("off", "on"):
-                    refine_jobs.set_project(st, pid, "off" if what == "off" else None)
+                    refine_jobs.set_project(st, pid, "off" if what == "off" else "on")
                     return self._json(refine_jobs.status(st, pid))
                 return self._json(refine_jobs.status(st, pid))
             if action == "game":

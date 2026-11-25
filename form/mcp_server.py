@@ -43,7 +43,7 @@ design), or create_project from a recipe (describe_recipe) -> render (look at it
 commit_change, or update_design -> get_project (checks, next actions). Only for a design whose purpose is "print":
 run_pipeline (exports, print checks, a slice) -> request_release (a person approves in Form Studio).
 After every build, refinement runs in the background and lands as one more revision (refine_design shows, undoes
-or turns it off). Long work answers with a job: get_job.
+or turns it off; game assets only when turned on). Long work answers with a job: get_job.
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
@@ -700,7 +700,7 @@ def build() -> MCPServer:
         design: use part_of for the parts of one product.
         refine: "auto" (default): after the build, design refinement runs in the background and lands as one more
         revision, "Refined: N changes", each change a named refine feature you can undo (refine_design); "off": not
-        for this design. Returns the project, a six-view sheet and a section: look."""
+        for this design; "on": also for a game asset, which is not refined unless asked. Returns the project, a six-view sheet and a section: look."""
         st = studio()
         from . import staged
         if refine not in ("auto", "off", "on", ""):
@@ -888,8 +888,9 @@ def build() -> MCPServer:
         action: "status" (the job's stage and events, and the refine changes the head carries; wait=s waits up to s
         seconds for a running job), "rerun" (refine the head again now), "undo" (feature="refine_..." takes one change
         out, no feature takes all of them out, as a new revision; expect_head guards it), "off" (no automatic
-        refinement for this design from now on; "on" turns it back on). Measures are computed heuristics
-        (form/refine/analyze.py); the checks are the kernel's."""
+        refinement for this design from now on; "on" turns it back on). Game assets (Beta) are not refined unless
+        asked: "on" or "rerun" for this design, or Settings › Refine game assets for all. Measures are computed
+        heuristics (form/refine/analyze.py); the checks are the kernel's."""
         st = studio()
         from .refine import engine, jobs
         if action not in ("status", "rerun", "undo", "off", "on"):
@@ -907,7 +908,7 @@ def build() -> MCPServer:
             p = await _run(engine.undo, st, project, feature or None, expect_head)
             act(project, "commit", f"r{p['head']:02d}: undid refinement" + (f" ({feature})" if feature else ""), ctx)
             return {"head": p["head"], "changes": await _run(engine.changes, st, p)}
-        await _run(jobs.set_project, st, project, "off" if action == "off" else None)
+        await _run(jobs.set_project, st, project, "off" if action == "off" else "on")
         if action == "off":
             jobs.cancel(project)
         return await _run(jobs.status, st, project)
