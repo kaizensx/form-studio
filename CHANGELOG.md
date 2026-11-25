@@ -42,6 +42,36 @@
 
 ### Details
 
+- **A design in several parts stays calm while you slide a parameter or orbit it.** Every draft (each step of a
+  slider) used to destroy and re-make every part node of an assembled design, its edge lines and its meshes, some of
+  them twice: 272 part nodes during one slide and orbit of an eight-part figure, all on the GUI thread. Part nodes
+  now stay while the design has the same parts and read their placement from the current model, and each part
+  keeps its meshes while its geometry is the same, so a head-size draft re-makes only the head and the hat. A mesh
+  whose new positions arrive before its new triangles keeps what it draws instead of reading triangles that do not
+  fit. A new journey (viewport_parts_calm) slides and orbits an eight-part figure while its pipeline runs and samples
+  every frame.
+- **Home: the "Make it for" row no longer moves.** Every item is one height on one centre line; the purpose and the
+  printer sit on the left under the composer, the agent on the right, and the printer chip's place is kept whenever
+  printing is on, so picking My printer only shows it. Start blank and Replace a broken part are a quiet line below.
+  The segmented control centres its segments at any height.
+- **Settings › Software says what each thing does.** Every optional engine, Blender, FreeCAD, OpenSCAD, the slicers,
+  the CAD kernel and the parts libraries say in plain words what they do and when you would want them, and one line
+  says what each gives you (CAD-Recode: a learned point-cloud to sketch-and-extrude model, non-commercial; CADFit: an
+  extrude and revolve search, slower, non-commercial; CoACD: convex decomposition for game collision, MIT; CADEvolve:
+  reference programs, never run). What Form Studio downloaded itself (an engine's own Python, CAD-Recode's weights,
+  the CADEvolve corpus) can be removed from its card, after one question (`POST /api/install/remove`); nothing
+  outside Form Studio's folders is ever removed.
+- **Settings: calmer grouping.** General reads Appearance, Set up for, then Preferences, with what refinement learned
+  after the refinement settings; section headings have the same rhythm on every tab, and Set up for says it is
+  reading instead of showing nothing.
+- **The feature panel says what shapes a feature.** A feature with no parameters of its own no longer reads "0
+  parameters": it says its size and place come from the values it uses, the general parameters or the features
+  built before it, with those one click away. A feature without a description no longer leaves a gap.
+- **Game asset: a calm start and readable errors.** Before the first build the preview is a card on the sheet's own
+  surface with one line about what a build makes and the Build button, never a black box; while it bakes, a spinner
+  and one line. A build that fails is a note that says what happened and what to do, with Build again and Settings ›
+  Software.
+
 - **Game assets are marked Beta.** Home's "Make it for", the design's Purpose and the Game asset sheet carry a small
   "Beta" tag (BetaTag.qml, Theme tokens, light and dark); the website's game section, How we measure and the README
   say it once, with one line: every asset passes its technical checks, and its visual quality is still improving.

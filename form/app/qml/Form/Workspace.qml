@@ -44,7 +44,7 @@ Item {
         if (id === "shape") {
             var ft = Store.featureById(Store.feature), n = F.keys(Store.draftValues).length
             if (Store.hasDraft) return ["Draft open: " + F.plural(n, "parameter") + " changed, not committed.", "draft"]
-            return ft ? ["Editing one feature of " + head + ". Changes rebuild the solid as a draft.", ""]
+            return ft ? ["A change here opens a draft of " + head + ". Nothing is kept until you commit it.", ""]
                 : [F.plural(d.recipe.features.length, "feature") + " in build order. Select one here or on the model to change it.", ""]
         }
         if (id === "fit") return d.fit ? [Math.round(d.fit.yield * 100) + "% of prints are modelled to fit, from what is known today.", d.fit.yield >= 0.95 ? "ok" : "warn"]

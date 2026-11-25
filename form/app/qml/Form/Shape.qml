@@ -67,10 +67,32 @@ Column {
         Row { spacing: 8
             Txt { kind: "h2"; text: root.f ? root.f.label : "" }
             Tag { text: root.f ? root.f.role : ""; anchors.verticalCenter: parent.verticalCenter } }
-        Txt { tone: 2; width: parent.width; topPadding: 4; text: root.f ? (root.f.doc || "") : "" }
-        Sec { title: "Drives this feature"; note: root.f ? F.plural(root.paramsOf(root.f.id).length, "parameter") : ""
-            Txt { kind: "fine"; width: parent.width; visible: !!root.f && root.paramsOf(root.f.id).length === 0
-                text: "This feature has no parameters of its own; it follows the features around it." }
+        Txt { tone: 2; width: parent.width; topPadding: 4; visible: text !== ""; text: root.f ? (root.f.doc || "") : "" }
+        // its own parameters; a feature without any says what shapes it instead: values that follow from standards
+        // (below), the design's general parameters and the features built before it (each one click away)
+        Sec { id: drives; objectName: "featureDrives"
+            readonly property int n: root.f ? root.paramsOf(root.f.id).length : 0
+            readonly property var before: {
+                var fs = Store.recipe ? Store.recipe.features : [], out = []
+                for (var i = 0; root.f && i < fs.length && fs[i].id !== root.f.id; i++) out.push(fs[i])
+                return out }
+            readonly property int general: root.params.filter(function (p) { return p.group !== "brief" && !Store.featureById(p.feature) }).length
+            readonly property int derived: root.f && Store.shown && Store.shown.derived ? Store.shown.derived.filter(function (x) { return x.feature === root.f.id }).length : 0
+            title: n > 0 ? "Parameters" : "What shapes it"; note: n > 1 ? String(n) : ""
+            Txt { objectName: "featureNoParams"; tone: 2; width: parent.width; visible: !!root.f && drives.n === 0
+                text: {
+                    var from = []
+                    if (drives.derived) from.push("the values below")
+                    if (drives.general) from.push("the design's general parameters")
+                    if (drives.before.length) from.push("the features built before it")
+                    return from.length ? "No settings of its own. Its size and place come from " + from.slice(0, -1).join(", ") + (from.length > 1 ? " and " : "") + from[from.length - 1] + "."
+                                       : "No settings of its own. To change it, describe what you want in the conversation." } }
+            Flow { width: parent.width; spacing: Theme.s1; visible: !!root.f && drives.n === 0 && (drives.before.length > 0 || drives.general > 0)
+                Repeater { model: drives.n === 0 ? drives.before.slice(-3) : []
+                    Btn { required property var modelData; small: true; kind: "quiet"; icon: "box"; text: modelData.label
+                        tip: "Open " + modelData.label; onClicked: Store.select(modelData.id) } }
+                Btn { visible: drives.general > 0; small: true; kind: "quiet"; icon: "sliders_horizontal"; text: "General parameters"
+                    tip: "All features, with the design's general parameters"; onClicked: Store.select("") } }
             Column { width: parent.width
                 Repeater { model: root.f ? root.paramsOf(root.f.id) : []
                     ParamRow { required property var modelData; p: modelData; prov: modelData.group === "brief" } } } }
@@ -84,7 +106,7 @@ Column {
                     Store.settings({ mark_text: t }).then(function () { Store.refresh(true); if (Store.hasDraft) Store.runPreview() }) } }
             Txt { kind: "fine"; width: parent.width
                 text: "Press Enter to apply. Lettering uses Form Studio’s bundled font; the checks measure its stroke width against the nozzle. The revision stamp reads like “r04 a3f1”: revision, then a short hash of its values." } }
-        Sec { title: "Follows from them"; note: "not editable"
+        Sec { title: drives.n > 0 ? "Follows from them" : "Values it uses"; note: "not editable"
             readonly property var rows: root.f && Store.shown ? Store.shown.derived.filter(function (x) { return x.feature === root.f.id }) : []
             visible: rows.length > 0
             Column { width: parent.width

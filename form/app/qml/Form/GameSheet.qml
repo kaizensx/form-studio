@@ -61,9 +61,10 @@ Column {
 
     property Component footer: Row { spacing: 8
         Btn { kind: "quiet"; text: "Close"; onClicked: Store.openSheet(null) }
-        Btn { objectName: "gameBuild"; kind: gs.a ? "quiet" : "primary"; icon: "gamepad_2"; enabled: gs.canBuild
-            text: gs.a ? "Build again" : "Build game asset"; busy: Store.gameBusy; busyText: "Baking in Blender…"; onClicked: gs.build() }
-        Btn { objectName: "gameExport"; kind: "primary"; icon: "download"; enabled: gs.canBuild && !Store.gameBusy
+        // before the first build the Build button sits in the preview's empty state; afterwards it is here
+        Btn { objectName: "gameBuild"; visible: !!gs.a; kind: "quiet"; icon: "gamepad_2"; enabled: gs.canBuild
+            text: "Build again"; busy: Store.gameBusy; busyText: "Baking in Blender…"; onClicked: gs.build() }
+        Btn { objectName: "gameExport"; kind: gs.a ? "primary" : "quiet"; icon: "download"; enabled: gs.canBuild && !Store.gameBusy
             text: "Export for " + (gs.presetLabel[gs.preset] || gs.preset) + "…"; onClicked: gs.exportNow() } }
 
     // ── no Blender: the install card (Settings › Software's row, one click) ──
@@ -88,14 +89,32 @@ Column {
             Txt { mono: true; tone: 2; text: (gs.a && gs.a.lods ? gs.a.lods.map(function (r) { return r.budget }) : (gs.g ? gs.g.budgets : [])).join(" · ") } } }
 
     // ── the asset: one LOD at a time ──
-    Rectangle { width: parent.width; height: 380; radius: Theme.rMd; color: Theme.well; clip: true; border.color: Theme.rule2
+    // Before the first build it is a calm card on the sheet's own surface (never a black box): what one build makes,
+    // and the Build button. While it bakes, a spinner and one line; then the LOD in the viewport.
+    Rectangle { objectName: "gamePreview"; width: parent.width; height: gs.a || Store.gameBusy ? 380 : 300; radius: Theme.rMd; clip: true
+        color: gs.a ? Theme.well : Theme.plate1; border.color: gs.a ? Theme.rule2 : Theme.rule
+        Behavior on color { Tint {} }
         Viewport { id: view; objectName: "gameViewport"; anchors.fill: parent; anchors.margins: 1; showDims: false; showCompanions: false
             visible: !!gs.lod; gameMode: gs.mode; gameChannel: gs.channel; gameNormalMap: gs.normalMap
             gameTex: gs.a ? { base_color: Store.gameTexUrl("base_color"), normal: Store.gameTexUrl("normal"), orm: Store.gameTexUrl("orm"), ao: Store.gameTexUrl("ao"), emissive: Store.gameTexUrl("emissive") } : ({}) }
-        Spinner { anchors.centerIn: parent; size: 28; visible: Store.gameBusy }
-        Txt { anchors.centerIn: parent; width: parent.width - 80; horizontalAlignment: Text.AlignHCenter; kind: "fine"; tone: 3
+        Column { anchors.centerIn: parent; spacing: Theme.s3; visible: Store.gameBusy && !gs.lod
+            Spinner { anchors.horizontalCenter: parent.horizontalCenter; size: 22 }
+            Txt { anchors.horizontalCenter: parent.horizontalCenter; kind: "fine"; tone: 2
+                text: "Baking in Blender: levels of detail, UVs, maps and collision" } }
+        Spinner { anchors.centerIn: parent; size: 28; visible: Store.gameBusy && !!gs.lod }
+        Column { objectName: "gameEmpty"; anchors.centerIn: parent; width: Math.min(parent.width - 80, 440); spacing: Theme.s2
             visible: !Store.gameBusy && !gs.a
-            text: gs.canBuild ? "Build the asset: four LODs at their budgets, UVs, baked base colour, normal, ORM and AO maps, and collision." : "Install Blender above to build the asset." }
+            Rectangle { anchors.horizontalCenter: parent.horizontalCenter; width: 44; height: 44; radius: 22; color: Theme.washHover
+                Icon { anchors.centerIn: parent; name: "gamepad_2"; size: 20; color: Theme.ink3 } }
+            Item { width: 1; height: Theme.s1 }
+            Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; kind: "lead"; font.weight: Theme.wMedium
+                text: "No game asset yet" }
+            Txt { width: parent.width; horizontalAlignment: Text.AlignHCenter; kind: "fine"; tone: 2
+                text: gs.canBuild ? "One build makes four levels of detail at their triangle budgets, UVs, baked base colour, normal, ORM and AO maps, and collision."
+                                  : "Blender bakes the asset. Install it above, then build here." }
+            Item { width: 1; height: Theme.s2; visible: gs.canBuild }
+            Btn { objectName: "gameBuild"; visible: gs.canBuild; anchors.horizontalCenter: parent.horizontalCenter; kind: "primary"; icon: "gamepad_2"
+                text: "Build game asset"; busy: Store.gameBusy; onClicked: gs.build() } }
         LodBar { x: 10; y: 10; visible: !!gs.a; lods: gs.a && gs.a.lods ? gs.a.lods : []; value: Store.gameLod; onPicked: function (i) { Store.showGameLod(i) } }
         Column { anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 10; spacing: 6; visible: !!gs.a
             Seg { objectName: "gameView"; anchors.right: parent.right; value: gs.mode; onPicked: function (v) { gs.mode = v }
@@ -112,10 +131,17 @@ Column {
             text: gs.lod ? "LOD" + gs.lod.lod + " · " + F.trim(gs.lod.triangles) + " triangles · " + F.trim(gs.lod.edges) + " edges · " + gs.lod.source : "" } }
 
     // ── what was measured ──
-    Txt { objectName: "gameStatus"; width: parent.width; visible: !!gs.a || !!Store.gameError
-        color: Store.gameError ? Theme.signal : gs.a && gs.a.validation.ok ? Theme.pass : Theme.amber
-        text: Store.gameError ? Store.gameError
-              : gs.a ? (gs.a.validation.ok ? "Every check passed" : gs.a.validation.failed.length + " check(s) failed: " + gs.a.validation.failed.map(function (c) { return c.label + " (" + c.value + ")" }).join("; "))
+    // a build that did not work: what happened, in a calm note, and what to do next
+    Note { objectName: "gameProblem"; width: parent.width; visible: !!Store.gameError; kind: "amber"
+        title: "The game asset was not built"
+        text: Store.gameError ? Store.gameError.trim() + (/[.!?]$/.test(Store.gameError.trim()) ? "" : ".") + "\n"
+              + (Store.gameErrorHint || "Nothing was changed. Build again; if it stops in the same place, check Blender under Settings › Software.") : ""
+        Row { spacing: Theme.s2; topPadding: Theme.s1
+            Btn { objectName: "gameRetry"; visible: !!gs.a; small: true; icon: "refresh_cw"; text: "Build again"; enabled: gs.canBuild && !Store.gameBusy; onClicked: gs.build() }
+            Btn { small: true; kind: "quiet"; icon: "settings"; text: "Settings › Software"; onClicked: Store.openSettings("software") } } }
+    Txt { objectName: "gameStatus"; width: parent.width; visible: !!gs.a && !Store.gameError
+        color: gs.a && gs.a.validation.ok ? Theme.pass : Theme.amber
+        text: gs.a ? (gs.a.validation.ok ? "Every check passed" : gs.a.validation.failed.length + " check(s) failed: " + gs.a.validation.failed.map(function (c) { return c.label + " (" + c.value + ")" }).join("; "))
                        + " · " + gs.a.preset.label + (gs.a.current === false ? " · built from an older revision: build again" : "") : "" }
     Txt { kind: "fine"; width: parent.width; visible: !!gs.a
         text: gs.a ? "Bake " + (gs.a.bake ? F.fmt(gs.a.bake.total_seconds, 1) + " s on " + gs.a.bake.device + " at " + gs.a.bake.px + " px" : "skipped")

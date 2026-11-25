@@ -72,7 +72,7 @@ Column {
         if (v && e.indexOf(v) < 0) out.push({ value: v, text: v })
         return out }
     spacing: 14
-    Component.onCompleted: { if (!Store.config) Store.loadConfig(); if (!Store.software) Store.checkSoftware(); st.loadKeys(); st.loadProviders()
+    Component.onCompleted: { if (!Store.config) Store.loadConfig(); if (!Store.software) Store.checkSoftware(); if (!Store.caps) Store.loadCaps(); st.loadKeys(); st.loadProviders()
         if (props.addProvider) st.editingProvider = null }
 
     // API keys: kept by Form Studio in a private file, never shown back; only "set" or "not set" comes from the engine
@@ -133,22 +133,13 @@ Column {
                 value: Theme.appearance; onPicked: function (v) { Theme.setAppearance(v) }
                 model: [{ value: "dark", text: "Dark" }, { value: "light", text: "Light" }, { value: "system", text: "Match system" }] } }
         Column { visible: st.tab === "general" && !st.searching; width: parent.width; spacing: 8
-            Txt { kind: "cap"; text: "Set up for" }
+            Txt { kind: "cap"; text: "Set up for"; topPadding: 10 }
             Txt { kind: "fine"; tone: 2; width: parent.width
                 text: "What Form Studio is set up for. Turning one on installs only what it needs, with every command in the log. Turning one off hides it; nothing is uninstalled." }
+            Txt { visible: !Store.caps; kind: "fine"; tone: 3; text: "Reading what Form Studio is set up for…" }
             CapCards { objectName: "settingsCaps"; width: parent.width; settings: true; pick: Store.caps ? Store.caps.chosen : []
                 onToggled: function (id, on) { Store.setCap(id, on) } }
             InstallLog { width: parent.width } }
-        // ── General: what design refinement learned on this computer (form/refine/ledger.py); the on/off is a row below ──
-        Rectangle { objectName: "settingsRefineLedger"; visible: st.tab === "general" && !st.searching
-            width: parent.width; height: 58; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
-            Column { x: 16; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 32 - resetLedger.width - 12; spacing: 2
-                Txt { text: "What refinement learned"; font.weight: Theme.wMedium }
-                Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
-                    text: "Which refinements helped which kinds of design, kept on this computer only" } }
-            Btn { id: resetLedger; objectName: "refineLedgerReset"; anchors.right: parent.right; anchors.rightMargin: 16
-                anchors.verticalCenter: parent.verticalCenter; small: true; icon: "rotate_ccw"; text: "Reset"
-                onClicked: Store.resetRefineLedger() } }
         // ── Printing: the default printer, picked from the printers set up in your slicers ──
         Rectangle { visible: st.tab === "printer" && !st.searching; objectName: "settingsDefaultPrinter"
             width: parent.width; height: dp.implicitHeight + 24; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
@@ -193,7 +184,7 @@ Column {
                         onInstall: st.tab = "software" }
                 }
             } }
-        Txt { visible: st.tab === "chat" && !st.searching; kind: "cap"; text: "Model provider APIs"; topPadding: 6 }
+        Txt { visible: st.tab === "chat" && !st.searching; kind: "cap"; text: "Model provider APIs"; topPadding: 10 }
         Txt { visible: st.tab === "chat" && !st.searching; kind: "fine"; width: parent.width
             text: "Form Studio talks to the provider directly, with its own tools; no other app is needed. A key set in your environment is found by itself. Keys you add are kept in a private file on this computer and sent only to their provider." }
         Rectangle { visible: st.tab === "chat" && !st.searching && st.apiAgents.length > 0; width: parent.width; height: apList.implicitHeight; radius: Theme.rMd
@@ -248,6 +239,7 @@ Column {
                         required property int index }
                 }
             } }
+        Txt { visible: st.tab === "general" && !st.searching && st.rows.length > 0; kind: "cap"; text: "Preferences"; topPadding: 10 }
         Txt { visible: st.tab === "chat" && !st.searching && st.rows.length > 0; kind: "cap"; text: "Defaults for new conversations" }
         Rectangle { visible: st.rows.length > 0; width: parent.width; height: list.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
             Column { id: list; width: parent.width
@@ -315,6 +307,16 @@ Column {
                     }
                 }
             } }
+        // ── General: what design refinement learned on this computer (form/refine/ledger.py); the on/off is a row below ──
+        Rectangle { objectName: "settingsRefineLedger"; visible: st.tab === "general" && !st.searching
+            width: parent.width; height: 58; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+            Column { x: 16; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 32 - resetLedger.width - 12; spacing: 2
+                Txt { text: "What refinement learned"; font.weight: Theme.wMedium }
+                Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
+                    text: "Which refinements helped which kinds of design, kept on this computer only" } }
+            Btn { id: resetLedger; objectName: "refineLedgerReset"; anchors.right: parent.right; anchors.rightMargin: 16
+                anchors.verticalCenter: parent.verticalCenter; small: true; icon: "rotate_ccw"; text: "Reset"
+                onClicked: Store.resetRefineLedger() } }
         Row { visible: st.tab === "printer" && !st.searching; spacing: 8
             Btn { small: true; icon: "printer"; text: "Compare slicers…"; onClicked: Store.openSheet("slicer") }
             Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; text: "Shows every slicer Form Studio knows and the presets each would use." } }
