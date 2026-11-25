@@ -61,7 +61,7 @@ Rectangle {
         Txt { id: pname; visible: !!Store.project; text: Store.project ? Store.project.name : ""; font.weight: Theme.wSemi; anchors.baseline: logoBox.baseline
             width: Math.min(implicitWidth, Math.max(120, bar.width - left.x - right.width - 420)); elide: Text.ElideRight; wrapMode: Text.NoWrap
             HoverHandler { id: ph }
-            Tip { show: ph.hovered && !!Store.recipe; text: Store.recipe && Store.project ? (String(Store.project.recipe).indexOf("src:") === 0 ? "Designed by an agent" : "Recipe: " + Store.recipe.title) : "" } }
+            Tip { show: ph.hovered && !!Store.recipe; text: Store.recipe && Store.project ? (String(Store.project.recipe).indexOf("src:") === 0 ? "Designed by an agent" : "Started from: " + Store.recipe.title) : "" } }
         Item { width: 6; height: 1 }
         Txt { visible: !!Store.project; mono: true; font.pixelSize: 12; tone: 2; text: Store.project ? F.pad(Store.project.head) : ""; anchors.baseline: logoBox.baseline }
         Item { width: 6; height: 1 }

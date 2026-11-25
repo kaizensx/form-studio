@@ -224,11 +224,8 @@ QtObject {
                       "/variants": "Loading variants", "/reference": "Saving the reference" }
             return t[r] !== undefined ? t[r] : ""
         }
-        var g = [[/^\/projects$/, "Creating the design"], [/^\/recipes\/create$/, "Creating the design"], [/^\/recipes\/library/, "Loading recipes"],
-                 [/^\/recipes\/community\/preview/, "Downloading and checking the recipe"], [/^\/recipes\/(community\/|package\/|derive\/)?install/, "Installing the recipe"],
-                 [/^\/recipes\/(package\/)?inspect/, "Reading the recipe"], [/^\/recipes\/share\/prepare/, "Preparing the recipe to share"],
-                 [/^\/recipes\/share\/submission/, "Saving the submission folder"], [/^\/recipes\/derive$/, "Building the recipe from the design"],
-                 [/^\/recipes\/uninstall/, "Uninstalling the recipe"], [/^\/(archive\/)?import/, "Importing"], [/^\/capabilities$/, m === "POST" ? "Saving what Form Studio is set up for" : ""],
+        var g = [[/^\/projects$/, "Creating the design"], [/^\/recipes\/create$/, "Creating the design"],
+                 [/^\/(archive\/)?import/, "Importing"], [/^\/capabilities$/, m === "POST" ? "Saving what Form Studio is set up for" : ""],
                  [/^\/setup$/, "Checking this computer"], [/^\/install$/, m === "GET" ? "Checking software" : "Starting the install"], [/^\/install\/remove$/, "Removing"], [/^\/updates/, "Checking for updates"],
                  [/^\/studio\/slicers/, "Finding slicers"], [/^\/studio\/slicer$/, "Switching slicer"], [/^\/printers/, "Reading printers"], [/^\/briefs/, "Writing the brief"],
                  [/^\/config$/, m === "POST" ? "Saving settings" : ""]]
@@ -813,7 +810,7 @@ QtObject {
                       + "positions, not dimensions. Rebuild as editable CAD has the agent model it with named features.")
             else                                       // no verified feature recipe: the agent remodel is the next step
                 toast("“" + r.name + "” reached Layer " + m.layer, F.fmt(m.frozen_area_pct, 0) + "% frozen facets, no verified feature "
-                      + "recipe. Rebuild as editable CAD has the agent model it with named features.")
+                      + "model. Rebuild as editable CAD has the agent model it with named features.")
             return reloadStudio().then(function () { open(r.project) })
         }, fail)
     }
