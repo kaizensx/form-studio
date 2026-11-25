@@ -120,9 +120,8 @@ def hull(P: np.ndarray, max_points: int = HULL_POINTS) -> tuple[np.ndarray, np.n
     V = P[h.vertices]
     if len(V) > max_points:
         V = _farthest(V, max_points)
-        h = ConvexHull(V)
-        V = V[h.vertices]
-        h = ConvexHull(V)
+        V = V[ConvexHull(V).vertices]
+    h = ConvexHull(V)          # the triangles must index V itself, not the points V was taken from
     T = h.simplices.copy()
     c = V.mean(0)
     n = np.cross(V[T[:, 1]] - V[T[:, 0]], V[T[:, 2]] - V[T[:, 0]])

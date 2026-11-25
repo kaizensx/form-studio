@@ -233,3 +233,19 @@ class BridgeGameBuild(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HullIndices(unittest.TestCase):
+    def test_hull_triangles_index_the_hull_points(self):
+        """Regression: with fewer hull points than the cap, the triangles indexed the input points (IndexError)."""
+        import numpy as np
+        from form.game import lod
+        rng = np.random.default_rng(3)
+        P = np.vstack([rng.normal(size=(200, 3)) * [30, 20, 10], [[0, 0, 0]]])
+        V, T = lod.hull(P)
+        self.assertLess(int(T.max()), len(V))
+        T2 = np.array([[0, 1, 2], [0, 2, 3], [0, 3, 1], [1, 3, 2]])
+        P2 = np.vstack([rng.normal(size=(40, 3)), [[5, 5, 5]]])
+        parts = lod.convex_parts(P2, np.vstack([T2, T2 + 4, T2 + 8]))
+        for p in parts:
+            self.assertLess(int(p["T"].max()), len(p["V"]))
