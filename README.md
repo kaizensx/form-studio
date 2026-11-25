@@ -1,9 +1,11 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.svg">
-    <img src="docs/readme/hero-light.svg" width="828" alt="Form Studio. Describe anything. An engineer-grade agent builds it as real, editable CAD. Two designs written as build123d code and built by the CAD kernel draw themselves as their edges and fill in: a planetary gear stage, 6 parts, 1 : 5, 91.5 × 91.5 × 22.0 mm, and an ergonomic mouse shell, 64.1 × 118.6 × 38.0 mm.">
-  </picture>
+  <a href="https://kaizensx.github.io/form-studio/"><img src="docs/readme/hero-render.jpg" width="828" alt="An original full-face helmet built by Form Studio, pulled apart to show its four parts: a hex-textured shell, a brushed faceplate that sits on magnets, and two smoked lenses that clip in behind it."></a>
 </p>
+
+<h1 align="center">Form Studio</h1>
+
+<p align="center"><b>Describe anything. An engineer-grade agent builds it as real, editable CAD.</b><br>
+<sub>The helmet above is one parametric design in four parts, built by the CAD kernel and photographed in the app.</sub></p>
 
 <p align="center">
   <a href="https://github.com/kaizensx/form-studio/releases/latest/download/FORM-macos-arm64.zip"><img src="docs/readme/download-macos-arm64.svg" width="168" height="56" alt="Download for macOS, Apple silicon"></a>
@@ -17,6 +19,20 @@
 </p>
 
 <br>
+
+<p align="center">
+  <img src="docs/readme/made-planetary.jpg" width="204" alt="A planetary gear stage: a steel sun gear, three teal planets and a graphite ring gear.">
+  <img src="docs/readme/made-ratchet.jpg" width="204" alt="A ratchet wrench pulled apart into its handle, wheel, pawl and cover.">
+  <img src="docs/readme/made-vase.jpg" width="204" alt="A copper vase with spiral flutes.">
+  <img src="docs/readme/made-game-chest.jpg" width="204" alt="A stylised treasure chest as a textured game asset.">
+  <br>
+  <img src="docs/readme/made-cam.jpg" width="204" alt="A cam and follower mechanism on a base plate.">
+  <img src="docs/readme/made-helmet.jpg" width="204" alt="The hero helmet, assembled.">
+  <img src="docs/readme/made-speaker.jpg" width="204" alt="A cube speaker with a perforated grille.">
+  <img src="docs/readme/made-controller.jpg" width="204" alt="A game controller shell.">
+  <br>
+  <sub>Mechanisms, assemblies, organic shells, products and game assets: every picture is a real build, an original design written as parametric code. <a href="https://kaizensx.github.io/form-studio/#make">See what it makes</a> · <a href="https://kaizensx.github.io/form-studio/measure/">How we measure</a></sub>
+</p>
 
 **Form Studio is the open-source AI CAD studio: describe anything, and an engineer-grade agent builds it as real, editable CAD.** Type what you need, drop a photo or a sketch, or bring a part. The agent of your choice writes a parametric design in [build123d](https://github.com/gumyr/build123d), and the OpenCascade kernel builds it as a B-rep solid while you watch: features you can click, parameters you can change, and every revision checked on the solid itself. Take it out as STEP for your CAD program or a CNC shop, as meshes for renders and the web, or to your own slicer if you print. Everything runs on your computer.
 

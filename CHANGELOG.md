@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Website and README: real builds up front.** The home page opens on a photograph of the hero helmet pulled apart
+  into its four parts, followed by a gallery of original designs built by the engine (planetary gear stage, ratchet
+  wrench, cam and follower, spiral vase, perforated lampshade, cube speaker, game controller, woven basket, a
+  treasure chest game asset), then how it works, the app drawn live, mesh to editable CAD (a synthetic bracket:
+  3,216 triangles to 18 dimensions, 0.0017 mm from the mesh), automatic refinement before and after, game assets
+  with their four levels of detail, assemblies, and "your agent, your computer". The navigation is What it makes,
+  How it works, Your agent, Recipes, Docs; the "3D printing" menu is gone. A new page, How we measure
+  (site/measure/), states what the three benches measure and their numbers, with the full reports as docs pages;
+  build timings and slicer compatibility are linked from the footer. The drawn app loads when it comes near, so the
+  first view is about 0.25 MB uncompressed where it was about 1.4 MB. The README opens with the same photograph and a strip of
+  builds. Product pictures are Blender renders of the designs' own geometry with the app's scene and materials.
 - **Cage operators keep every LOD closed and manifold.** Refinement replays a cage in a strict mode: the cage
   literal's zero-length edges are collapsed before the first refinement op (the helmet had two beside its visor,
   and Blender's bevel clamps the whole bevel to its tightest spot, so a panel line there folded into coincident

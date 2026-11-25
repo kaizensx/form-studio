@@ -26,9 +26,7 @@
 <link rel="preload" href="fonts/InstrumentSans.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/GeistMono.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/lucide-form.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/data/site.json" as="fetch" type="application/json" crossorigin>
-<link rel="preload" href="assets/data/dock.glb" as="fetch" crossorigin>
-<link rel="modulepreload" href="vendor/three.module.js">
+<link rel="preload" as="image" href="assets/shots/hero.webp" imagesrcset="assets/shots/hero-1200.webp 1200w, assets/shots/hero.webp 2112w" imagesizes="(max-width: 1280px) 100vw, 1240px" fetchpriority="high">
 <link rel="stylesheet" href="css/site.css">
 <script>document.documentElement.classList.add("js");if(/[?&]reduce/.test(location.search))document.documentElement.classList.add("reduce");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
@@ -47,7 +45,7 @@
 <header class="nav" id="nav">
   <div class="wrap">
     <a class="brand" href="./"><img class="lk-d" src="assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="assets/lockup-light.svg" alt="" width="143" height="22"></a>
-    <nav class="nav-links" aria-label="Site"><ul><li><a href="./#how">How it works</a></li><li><a href="./#make">What you can make</a></li><li><a href="recipes/">Recipes</a></li><li class="grp"><button type="button" class="grp-btn" aria-expanded="false" aria-controls="grp-print">3D printing<svg class="ic chev" aria-hidden="true"><use href="#ic-chev"/></svg></button><ul class="grp-menu" id="grp-print"><li><a href="compat/">Slicer compatibility</a></li><li><a href="bench/">Benchmarks</a></li></ul></li><li><a href="docs/">Docs</a></li></ul></nav>
+    <nav class="nav-links" aria-label="Site"><ul><li><a href="./#make">What it makes</a></li><li><a href="./#how">How it works</a></li><li><a href="./#agent">Your agent</a></li><li><a href="recipes/">Recipes</a></li><li><a href="docs/">Docs</a></li></ul></nav>
     <div class="end">
       <button class="theme" type="button" id="theme" aria-label="Switch between light and dark"><svg class="ic sun" aria-hidden="true"><use href="#ic-sun"/></svg><svg class="ic moon" aria-hidden="true"><use href="#ic-moon"/></svg></button>
       <a class="gh" href="https://discord.gg/b6ZgyndkmS"><svg class="ic" aria-hidden="true"><use href="#ic-dc"/></svg><span>Discord</span></a>
@@ -57,7 +55,7 @@
     </div>
   </div>
   <div class="menu" id="menu" hidden>
-    <ul><li><a href="./#how">How it works</a></li><li><a href="./#make">What you can make</a></li><li><a href="recipes/">Recipes</a></li><li class="grp-cap"><span>3D printing</span><ul><li><a href="compat/">Slicer compatibility</a></li><li><a href="bench/">Benchmarks</a></li></ul></li><li><a href="docs/">Docs</a></li><li><a href="https://discord.gg/b6ZgyndkmS">Discord</a></li><li><a href="https://github.com/kaizensx/form-studio">GitHub</a></li></ul>
+    <ul><li><a href="./#make">What it makes</a></li><li><a href="./#how">How it works</a></li><li><a href="./#agent">Your agent</a></li><li><a href="recipes/">Recipes</a></li><li><a href="docs/">Docs</a></li><li><a href="https://discord.gg/b6ZgyndkmS">Discord</a></li><li><a href="https://github.com/kaizensx/form-studio">GitHub</a></li></ul>
   </div>
   <span class="scrolled-bar" id="scroll-bar" aria-hidden="true"></span>
 </header>
@@ -78,10 +76,91 @@
     <p class="lead in-2">An engineer-grade agent builds it as real, editable CAD: a parametric design in a real CAD kernel, checked on the solid, ready for your CAD program, a CNC shop, a render or your slicer.</p>
     <div class="cta in-3">
       <a class="btn primary big" id="cta-dl" href="#download"><span class="i" aria-hidden="true">&#xe0b2;</span><span>Download</span></a>
-      <a class="btn big ghost" href="#how"><span>See how it works</span><span class="i" aria-hidden="true">&#xe06d;</span></a>
+      <a class="btn big ghost" href="#make"><span>See what it makes</span><span class="i" aria-hidden="true">&#xe06d;</span></a>
     </div>
   </div>
 
+  <figure class="hero-shot" id="hero-shot">
+    <div class="hero-shot-in"><img src="assets/shots/hero.webp" srcset="assets/shots/hero-1200.webp 1200w, assets/shots/hero.webp 2112w" sizes="(max-width: 1280px) 100vw, 1240px" width="2112" height="1188" alt="An original full-face helmet built by Form Studio, pulled apart to show its four parts: a hex-textured shell, a brushed faceplate that sits on magnets, and two smoked lenses that clip in behind it." fetchpriority="high" decoding="async"></div>
+    <figcaption><b>Hero helmet</b><span>Four parts, a magnetic faceplate, two clip-in lenses and a hex panel texture: one parametric design, built by the CAD kernel and photographed in the app.</span></figcaption>
+  </figure>
+</section>
+
+
+<section class="make" id="make" aria-labelledby="make-title">
+  <div class="wrap">
+    <div class="make-head">
+      <p class="eyebrow rv">What it makes</p>
+      <h2 id="make-title" class="rv">Mechanisms, products,<br class="br"> shells and game assets.</h2>
+      <p class="rv">Every picture is a real build: an original design written as parametric code, built by the CAD kernel and rendered from its own geometry.</p>
+    </div>
+    <div class="gx">
+      <figure class="gx-t w7 rv"><img src="assets/shots/planetary.webp" width="1200" height="900" alt="A planetary gear stage: a steel sun gear, three teal planet gears and a graphite ring gear, meshed." loading="lazy" decoding="async"><figcaption><span class="k">Mechanism</span><b>Planetary gear stage</b><span>Six parts. Sun 12, planets 18, ring 48 teeth: 1 : 5.</span></figcaption></figure>
+      <figure class="gx-t w5 rv"><img src="assets/shots/ratchet.webp" width="1200" height="900" alt="A ratchet wrench pulled apart: a red handle, a toothed wheel with a square drive, a pawl and a cover." loading="lazy" decoding="async"><figcaption><span class="k">Assembly</span><b>Ratchet wrench</b><span>Handle, wheel, pawl and cover, with an exploded view.</span></figcaption></figure>
+      <figure class="gx-t w4 rv"><img src="assets/shots/vase.webp" width="960" height="960" alt="A copper vase with spiral flutes twisting up its body." loading="lazy" decoding="async"><figcaption><span class="k">Organic</span><b>Spiral vase</b><span>A twisted, fluted loft.</span></figcaption></figure>
+      <figure class="gx-t w4 rv"><img src="assets/shots/helmet.webp" width="1400" height="1050" alt="The hero helmet assembled: a graphite shell with a hex texture, a brushed faceplate and teal accents." loading="lazy" decoding="async"><figcaption><span class="k">Shell</span><b>Hero helmet</b><span>One B-spline skin, split into four parts.</span></figcaption></figure>
+      <figure class="gx-t w4 p2 rv"><img src="assets/shots/shade.webp" width="1000" height="838" alt="A domed lampshade perforated with rows of holes that grow towards the rim." loading="lazy" decoding="async"><figcaption><span class="k">Pattern</span><b>Perforated lampshade</b><span>A graded hole pattern on a dome.</span></figcaption></figure>
+      <figure class="gx-t w5 rv"><img src="assets/shots/cam.webp" width="1200" height="857" alt="A cam and follower mechanism on a base plate: a steel cam, a blue follower arm and a rubber roller." loading="lazy" decoding="async"><figcaption><span class="k">Mechanism</span><b>Cam and follower</b><span>Four parts, each with its own material.</span></figcaption></figure>
+      <figure class="gx-t w7 rv"><img src="assets/shots/game-chest.webp" width="1200" height="900" alt="A stylised treasure chest with wooden planks, iron bands, rivets and a brass lock, textured and lit." loading="lazy" decoding="async"><figcaption><span class="k">Game asset</span><b>Treasure chest</b><span>11,952 triangles at LOD0, with baked textures.</span></figcaption></figure>
+      <figure class="gx-t w4 rv"><img src="assets/shots/speaker.webp" width="1000" height="882" alt="A small cube speaker with a perforated graphite grille and three keys on top." loading="lazy" decoding="async"><figcaption><span class="k">Product</span><b>Cube speaker</b><span>A perforated grille and rubber keys.</span></figcaption></figure>
+      <figure class="gx-t w4 rv"><img src="assets/shots/controller.webp" width="1200" height="900" alt="A white game controller shell with openings for sticks, a d-pad and buttons." loading="lazy" decoding="async"><figcaption><span class="k">Product</span><b>Game controller</b><span>Two shells that close on a lip.</span></figcaption></figure>
+      <figure class="gx-t w4 p2 rv"><img src="assets/shots/basket.webp" width="1000" height="789" alt="A sand-coloured basket with a woven texture and two handles." loading="lazy" decoding="async"><figcaption><span class="k">Texture</span><b>Woven basket</b><span>A weave pressed into the wall.</span></figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="how" id="how" aria-labelledby="how-title">
+  <div class="wrap how-head">
+    <p class="eyebrow rv">How it works</p>
+    <h2 id="how-title" class="rv">From a sentence to a part<br class="br"> you can trust.</h2>
+  </div>
+  <div class="how-track" id="how-track">
+    <div class="how-pin">
+      <div class="wrap how-grid">
+        <ol class="how-steps" id="how-steps">
+          <li class="on"><span class="n">01</span><h3>Describe it</h3><p>Words, a photo with a coin for scale, a sketch, a part or a link. A 3D model, or something to print.</p></li>
+          <li><span class="n">02</span><h3>It is built as real CAD</h3><p>An agent writes a parametric design; build123d on OpenCascade builds the solid, feature by feature.</p></li>
+          <li><span class="n">03</span><h3>Every revision is checked</h3><p>A valid solid, a closed mesh, the STEP round trip, fits and joints; walls and overhangs when you print. Each result says how it is known.</p></li>
+          <li><span class="n">04</span><h3>Made the way you need</h3><p>STEP for CAD and CNC, OBJ and GLB for renders. If you print, your slicer writes the G-code and every layer plays back first.</p></li>
+        </ol>
+        <div class="how-win island" id="how-win" aria-hidden="true">
+          <div class="mtb"><span class="lights"><i></i><i></i><i></i></span><img src="assets/lockup.svg" alt="" width="98" height="15"><span class="slash">/</span><span class="pn" id="hw-name">New design</span><span class="rv-chip mono" id="hw-rev"></span><span class="sp"></span><span class="tag t-ink" id="hw-stage">Home</span></div>
+          <div class="scenes">
+            <div class="scene s-home" data-s="0">
+              <span class="greet">Good afternoon</span>
+              <b class="ht">What are we making?</b>
+              <div class="hc"><p id="hw-type"><span class="ph">A knob like the one in my photo…</span></p><div class="hr"><span class="hq"><span class="i">&#xe12d;</span>Photo or file</span><span class="hq"><span class="i">&#xe131;</span>Sketch</span><span class="hq"><span class="i">&#xe102;</span>Link</span><span class="hgo" id="hw-go">Design it<span class="i">&#xe049;</span></span></div></div>
+              <div class="hchips"><span class="on">For my printer</span><span>Just a 3D model</span><span class="ch"><span class="i">&#xe141;</span><em id="hw-printer"></em></span></div>
+            </div>
+            <div class="scene s-cad" data-s="1">
+              <canvas id="hw-gl"></canvas>
+              <ul class="feats" id="hw-feats"></ul>
+              <p class="cad-hud mono" id="hw-cad"></p>
+            </div>
+            <div class="scene s-checks" data-s="2">
+              <div class="ck-sum"><div><b id="hw-pass">0</b><span>Pass</span></div><div class="w"><b id="hw-warn">0</b><span>To review</span></div><div class="f"><b>0</b><span>Failed</span></div></div>
+              <ul class="ck-list" id="hw-checks"></ul>
+            </div>
+            <div class="scene s-print" data-s="3">
+              <canvas id="hw-pc"></canvas>
+              <div class="pr-hud"><b id="hw-layer"></b><span class="mono" id="hw-z"></span><span class="tag t-amber">Simulated</span></div>
+              <div class="pr-bar"><i id="hw-pbar"></i></div>
+              <p class="pr-read mono" id="hw-read"></p>
+            </div>
+          </div>
+          <div class="win-prog"><i></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="try" aria-labelledby="try-title">
+  <div class="wrap try-head">
+    <p class="eyebrow rv">The app</p>
+    <h2 id="try-title" class="rv">Try it right here.</h2>
+    <p class="rv">This is Form Studio's window, drawn live in the page from a sample project's real data. Type on Home, orbit the part, open the stages.</p>
+  </div>
   <div class="stage" id="try">
     <div class="stage-tilt" id="stage-tilt">
     <div class="app-frame island" id="app-frame">
@@ -193,85 +272,68 @@
   </div>
 </section>
 
-<section class="how" id="how" aria-labelledby="how-title">
-  <div class="wrap how-head">
-    <p class="eyebrow rv">How it works</p>
-    <h2 id="how-title" class="rv">From a sentence to CAD<br class="br"> you can trust.</h2>
-  </div>
-  <div class="how-track" id="how-track">
-    <div class="how-pin">
-      <div class="wrap how-grid">
-        <ol class="how-steps" id="how-steps">
-          <li class="on"><span class="n">01</span><h3>Describe it</h3><p>Words, a photo with a coin for scale, a sketch, a part or a link. A 3D model, or something to print.</p></li>
-          <li><span class="n">02</span><h3>It is built as real CAD</h3><p>An agent writes a parametric design; build123d on OpenCascade builds the solid, feature by feature.</p></li>
-          <li><span class="n">03</span><h3>Every revision is checked</h3><p>A valid solid, a closed mesh, the STEP round trip, fits and joints; walls and overhangs when you print. Each result says how it is known.</p></li>
-          <li><span class="n">04</span><h3>Made the way you need</h3><p>STEP for CAD and CNC, OBJ and GLB for renders. If you print, your slicer writes the G-code and every layer plays back first.</p></li>
-        </ol>
-        <div class="how-win island" id="how-win" aria-hidden="true">
-          <div class="mtb"><span class="lights"><i></i><i></i><i></i></span><img src="assets/lockup.svg" alt="" width="98" height="15"><span class="slash">/</span><span class="pn" id="hw-name">New design</span><span class="rv-chip mono" id="hw-rev"></span><span class="sp"></span><span class="tag t-ink" id="hw-stage">Home</span></div>
-          <div class="scenes">
-            <div class="scene s-home" data-s="0">
-              <span class="greet">Good afternoon</span>
-              <b class="ht">What are we making?</b>
-              <div class="hc"><p id="hw-type"><span class="ph">A knob like the one in my photo…</span></p><div class="hr"><span class="hq"><span class="i">&#xe12d;</span>Photo or file</span><span class="hq"><span class="i">&#xe131;</span>Sketch</span><span class="hq"><span class="i">&#xe102;</span>Link</span><span class="hgo" id="hw-go">Design it<span class="i">&#xe049;</span></span></div></div>
-              <div class="hchips"><span class="on">For my printer</span><span>Just a 3D model</span><span class="ch"><span class="i">&#xe141;</span><em id="hw-printer"></em></span></div>
-            </div>
-            <div class="scene s-cad" data-s="1">
-              <canvas id="hw-gl"></canvas>
-              <ul class="feats" id="hw-feats"></ul>
-              <p class="cad-hud mono" id="hw-cad"></p>
-            </div>
-            <div class="scene s-checks" data-s="2">
-              <div class="ck-sum"><div><b id="hw-pass">0</b><span>Pass</span></div><div class="w"><b id="hw-warn">0</b><span>To review</span></div><div class="f"><b>0</b><span>Failed</span></div></div>
-              <ul class="ck-list" id="hw-checks"></ul>
-            </div>
-            <div class="scene s-print" data-s="3">
-              <canvas id="hw-pc"></canvas>
-              <div class="pr-hud"><b id="hw-layer"></b><span class="mono" id="hw-z"></span><span class="tag t-amber">Simulated</span></div>
-              <div class="pr-bar"><i id="hw-pbar"></i></div>
-              <p class="pr-read mono" id="hw-read"></p>
-            </div>
-          </div>
-          <div class="win-prog"><i></i><i></i><i></i><i></i></div>
-        </div>
-      </div>
+<section class="fx wide" id="recon" aria-labelledby="recon-title">
+  <div class="wrap fx-grid">
+    <div class="fx-copy">
+      <p class="eyebrow rv">Mesh to editable CAD</p>
+      <h2 id="recon-title" class="rv">Bring an STL.<br class="br"> Leave with CAD.</h2>
+      <p class="rv">Make editable turns a mesh into a parametric design: real faces, named features and dimensions you can change, verified against the mesh it came from.</p>
+      <dl class="readout rv">
+        <div><dt>Triangles in</dt><dd class="mono">3,216</dd></div>
+        <div><dt>Dimensions out</dt><dd class="mono">18 of 18</dd></div>
+        <div><dt>From the mesh</dt><dd class="mono">0.0017 mm</dd></div>
+      </dl>
+      <p class="rv"><a class="more" href="measure/#recon">How this is measured <span aria-hidden="true">→</span></a></p>
+    </div>
+    <div class="pair island rv">
+      <figure><img src="assets/shots/recon-mesh.webp" width="1100" height="693" alt="A stepped bracket as a triangle mesh: long thin triangles fan across every face." loading="lazy" decoding="async"><figcaption><span class="tag t-ink">Mesh</span>3,216 triangles, nothing to edit</figcaption></figure>
+      <span class="pair-arrow i" aria-hidden="true">&#xe049;</span>
+      <figure><img src="assets/shots/recon-cad.webp" width="1100" height="693" alt="The same bracket as CAD: clean faces, a pocket, a counterbored hole and fillets, each with its edges." loading="lazy" decoding="async"><figcaption><span class="tag t-datum">CAD</span>25 faces, 18 dimensions that move</figcaption></figure>
     </div>
   </div>
 </section>
 
-<section class="make" id="make" aria-labelledby="make-title">
+<section class="fx flip" id="refine" aria-labelledby="refine-title">
+  <div class="wrap fx-grid">
+    <div class="fx-copy">
+      <p class="eyebrow rv">Automatic refinement</p>
+      <h2 id="refine-title" class="rv">Every build gets<br class="br"> a second pass.</h2>
+      <p class="rv">After a design builds, Form Studio measures it against what a good product looks like and keeps only the changes that help: material zones, a fillet hierarchy, broken edges. It runs in the background, and the checks that prove function stay exactly as they were.</p>
+      <dl class="readout rv">
+        <div><dt>Briefs that build</dt><dd class="mono">22 of 22</dd></div>
+        <div><dt>Scores lowered</dt><dd class="mono">0</dd></div>
+        <div><dt>Median time</dt><dd class="mono">13.6 s</dd></div>
+      </dl>
+      <p class="rv"><a class="more" href="measure/#refine">How this is measured <span aria-hidden="true">→</span></a></p>
+    </div>
+    <figure class="ba island rv" id="ba-refine">
+      <div class="ba-frame">
+        <img src="assets/shots/refine-after.webp" width="1200" height="900" alt="The enclosure after refinement: a warm white body with a silk grey lid and screw posts." loading="lazy" decoding="async">
+        <div class="ba-top"><img src="assets/shots/refine-before.webp" width="1200" height="900" alt="The enclosure as first built, in one plain material." loading="lazy" decoding="async"></div>
+        <span class="ba-line" aria-hidden="true"></span>
+        <span class="tag t-ink ba-l">Built</span><span class="tag t-datum ba-r">Refined</span>
+        <input type="range" min="0" max="100" value="50" aria-label="Compare the enclosure before and after refinement">
+      </div>
+      <figcaption>A screw-post enclosure. Refinement kept one change in 15 s: material zones for the body and the working parts.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="fx game" id="game" aria-labelledby="game-title">
   <div class="wrap">
-    <div class="make-head">
-      <p class="eyebrow rv">What you can make</p>
-      <h2 id="make-title" class="rv">One studio, from the idea<br class="br"> to the part.</h2>
-      <p class="rv">Every picture here is drawn from a real run of the engine: the designs are build123d code, built by the CAD kernel, and the gears turn by their own tooth counts.</p>
+    <div class="fx-grid">
+      <div class="fx-copy">
+        <p class="eyebrow rv">Game assets</p>
+        <h2 id="game-title" class="rv">Make it<br class="br"> a game asset.</h2>
+        <p class="rv">The same design goes on to an engine-ready asset: four levels of detail inside your triangle budgets, UVs, baked textures, a collision hull and a GLB that is read back and validated. Presets for Unreal, Unity, Godot and glTF.</p>
+        <p class="rv"><a class="more" href="measure/#game">How this is measured <span aria-hidden="true">→</span></a></p>
+      </div>
+      <figure class="shot island rv"><img src="assets/shots/game-wheel.webp" width="1000" height="750" alt="A vehicle wheel as a game asset: a treaded tyre on a five-spoke rim." loading="lazy" decoding="async"><figcaption>Vehicle wheel · 5,970 triangles at LOD0</figcaption></figure>
     </div>
-    <div class="mk-rows">
-      <article class="mk rv">
-        <div class="mk-copy"><span class="n">Design</span><h3>Shapes, not just boxes.</h3><p>Start from words, a photo with a coin for scale, a sketch with real dimensions, a part or a link. For a new idea the agent proposes genuinely different concepts as real CAD, and you pick one. Lofts, scoops and splits are written as code and built as solids you can still edit.</p></div>
-        <div class="art-crop"><img class="art-d" src="assets/art/feature-shape-dark.svg" width="414" height="436" alt="An ergonomic mouse shell, 64.1 by 118.6 by 38.0 mm, lofted and hollowed to an even 1.8 mm wall, drawing itself as edges and filling in." loading="lazy" decoding="async"><img class="art-l" src="assets/art/feature-shape-light.svg" width="414" height="436" alt="" loading="lazy" decoding="async"></div>
-      </article>
-      <article class="mk rv">
-        <div class="mk-copy"><span class="n">Engineer</span><h3>Mechanisms that mesh.</h3><p>Screw clearances, inserts, bearing seats, threads and involute gears come with their sources. Assemblies are parts, joints and mates; every joint is swept through its range and checked for collisions, and constraints refuse what cannot work, with a way forward.</p></div>
-        <div class="art-crop"><img class="art-d" src="assets/art/feature-gears-dark.svg" width="414" height="436" alt="A planetary gear stage seen from above, turning with the carrier held: sun 12, planets 18, ring 48 teeth; 1 : 5 with the ring held." loading="lazy" decoding="async"><img class="art-l" src="assets/art/feature-gears-light.svg" width="414" height="436" alt="" loading="lazy" decoding="async"></div>
-      </article>
-      <article class="mk mk-text rv">
-        <div class="mk-copy"><span class="n">Reconstruct</span><h3>Start from the part you have.</h3><p>A STEP or STL of a board, a phone or a motor becomes the reference a design is built around, with clearance cut from its real geometry. A photo of a broken part with a card beside it starts a replacement: sizes from the photo stay assumed until you measure the ones that decide the fit.</p>
-        <!-- optional: mesh to editable CAD (WP reconstruction). Drop this paragraph if the feature is not in the release. -->
-        <p>Make editable turns a mesh into CAD you can change: an exact solid first, then planes, cylinders, cones, spheres and tori fitted where the surface allows, with a report of the deviation and how much became parametric.</p>
-        <!-- /optional -->
-        </div>
-        <ul class="mk-list"><li><b>STEP or STL</b><span>a reference to design around</span></li><li><b>A photo</b><span>scale from a card, coin or ruler</span></li><li><b>A drawing</b><span>PDF datasheets read as pictures</span></li><li><b>Measure this</b><span>the numbers that decide the fit</span></li></ul>
-      </article>
-      <article class="mk rv">
-        <div class="mk-copy"><span class="n">Review</span><h3>Proved on the solid.</h3><p>Every revision is checked on the B-rep and its mesh, and every number says how it is known: computed, heuristic, modelled or measured. Compare revisions on the solids themselves. Only a person approves a release, and its files are frozen with SHA-256 hashes.</p></div>
-        <div class="art-crop"><img class="art-d" src="assets/art/feature-proved-dark.svg" width="414" height="436" alt="Eleven checks pass on the desk phone stand: 8 computed, 1 heuristic and 2 model." loading="lazy" decoding="async"><img class="art-l" src="assets/art/feature-proved-light.svg" width="414" height="436" alt="" loading="lazy" decoding="async"></div>
-      </article>
-      <article class="mk mk-text rv">
-        <div class="mk-copy"><span class="n">Make</span><h3>The output you need.</h3><p>One design, taken where it is going next. Printing is one option among several: turn it on when you print, and it stays out of the way when you do not.</p></div>
-        <ul class="mk-list"><li><b>CAD exchange</b><span>STEP from the B-rep, re-imported in FreeCAD as a check</span></li><li><b>CNC, laser, moulding</b><span>the thinnest feature checked against the process</span></li><li><b>Renders and the web</b><span>OBJ, GLB, sheets, turntables, Blender renders</span></li><li><b>3D printing</b><span>your slicer and presets, every layer played back · <a href="compat/">compatibility</a> · <a href="bench/">benchmarks</a></span></li></ul>
-      </article>
-    </div>
+    <figure class="lods island rv">
+      <img src="assets/shots/game-lods.webp" width="2000" height="583" alt="The treasure chest at four levels of detail, each with its triangle mesh drawn over the texture, from dense to sparse." loading="lazy" decoding="async">
+      <figcaption><span><b class="mono">11,952</b>LOD0</span><span><b class="mono">5,970</b>LOD1</span><span><b class="mono">2,486</b>LOD2</span><span><b class="mono">796</b>LOD3</span></figcaption>
+    </figure>
   </div>
 </section>
 
@@ -299,28 +361,29 @@
   </div>
 </section>
 
-<section class="why" id="why" aria-labelledby="why-title">
+
+<section class="why" id="agent" aria-labelledby="why-title">
   <div class="wrap">
-    <p class="eyebrow rv">Why Form Studio</p>
-    <h2 id="why-title" class="rv">Real geometry. Honest numbers.<br class="br"> The tools you already use.</h2>
+    <p class="eyebrow rv">Your agent, your computer</p>
+    <h2 id="why-title" class="rv">Works with the agent you use.<br class="br"> Runs where your files are.</h2>
     <div class="why-grid">
-      <article class="rv">
-        <svg class="ic" aria-hidden="true"><use href="#ic-cube"/></svg>
-        <p class="num"><b data-count="0" id="why-faces">0</b><span>faces</span></p>
-        <h3>A real CAD kernel</h3>
-        <p>Boundary-representation solids, not meshes: the sample dock is <span id="why-faces2">a solid</span> built in <span id="why-ms">milliseconds</span>. Out come STEP, STL, 3MF, OBJ and GLB.</p>
-      </article>
-      <article class="rv">
-        <svg class="ic" aria-hidden="true"><use href="#ic-seal"/></svg>
-        <p class="num"><b data-count="0" id="why-checks">0</b><span>checks</span></p>
-        <h3>Honest by design</h3>
-        <p>Every revision is checked, and every number says how it is known: computed, heuristic, modelled, simulated or measured. Only you approve a release.</p>
-      </article>
       <article class="rv">
         <svg class="ic" aria-hidden="true"><use href="#ic-plug"/></svg>
         <p class="num"><b data-count="96" id="why-tools">96</b><span>MCP tools</span></p>
-        <h3>Your agent, your tools</h3>
-        <p>Claude Code, Codex, Gemini CLI and four more, model APIs or local models. FreeCAD, Blender and OpenSCAD, and seven slicers if you print. Every action is also a command.</p>
+        <h3>Any agent can drive it</h3>
+        <p>Claude Code, Codex, Gemini CLI, Cursor CLI and more, model APIs or local models. Everything the window does is an MCP tool and a <code>form</code> command.</p>
+      </article>
+      <article class="rv">
+        <svg class="ic" aria-hidden="true"><use href="#ic-cube"/></svg>
+        <p class="num"><b data-count="19" id="why-skills">19</b><span>skills</span></p>
+        <h3>Design practice, written down</h3>
+        <p>Intake, parametric design, mechanisms, surfacing, textures, remodelling from a mesh, game assets: each a skill your agent loads. Long jobs run as tasks while it keeps working.</p>
+      </article>
+      <article class="rv">
+        <svg class="ic" aria-hidden="true"><use href="#ic-seal"/></svg>
+        <p class="num"><b>0</b><span>uploads</span></p>
+        <h3>Your designs stay local</h3>
+        <p>Form Studio runs on your Mac, Windows or Linux computer. It never uploads a design and never sends a file to a machine. Only you approve a release.</p>
       </article>
     </div>
     <p class="why-more rv"><a class="more" href="docs/features.html">Every feature, in the docs <span aria-hidden="true">→</span></a></p>
@@ -361,8 +424,8 @@
         <a class="brand" href="./"><img class="lk-d" src="assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="assets/lockup-light.svg" alt="" width="143" height="22"></a>
         <p>Describe anything. The open-source AI CAD studio, MIT licence.</p>
       </div>
-      <nav aria-label="Product"><span class="cap">Product</span><a href="./#how">How it works</a><a href="./#make">What you can make</a><a href="recipes/">Recipes</a><a href="./#download">Download</a></nav>
-      <nav aria-label="3D printing"><span class="cap">3D printing</span><a href="compat/">Slicer compatibility</a><a href="bench/">Benchmarks</a><a href="docs/features.html#3d-printing-optional">Printing features</a></nav>
+      <nav aria-label="Product"><span class="cap">Product</span><a href="./#make">What it makes</a><a href="./#how">How it works</a><a href="./#agent">Your agent</a><a href="recipes/">Recipes</a><a href="./#download">Download</a></nav>
+      <nav aria-label="Measured"><span class="cap">Measured</span><a href="measure/">How we measure</a><a href="bench/">Build timings</a><a href="compat/">Slicer compatibility</a></nav>
       <nav aria-label="Docs"><span class="cap">Docs</span><a href="docs/features.html">Features</a><a href="docs/app.html">The app</a><a href="docs/cli.html">Command line</a><a href="docs/mcp.html">MCP tools</a><a href="docs/changelog.html">Changelog</a></nav>
       <nav aria-label="Community"><span class="cap">Community</span><a href="https://discord.gg/b6ZgyndkmS">Discord</a><a href="https://github.com/kaizensx/form-studio/discussions">Discussions</a><a href="https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml">Share a recipe</a><a href="https://github.com/kaizensx/form-studio/issues/new/choose">Report an issue</a><a href="https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md">Contributing</a></nav>
     </div>

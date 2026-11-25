@@ -24,11 +24,14 @@ from urllib.parse import unquote, urlparse
 SITE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import chrome  # noqa: E402  the shared nav and footer, and what counts as moving media
-BUDGET_FIRST_VIEW = 2_500_000        # bytes, uncompressed: page, CSS, fonts, scripts, three.js, the dock and its toolpath
+BUDGET_FIRST_VIEW = 900_000          # bytes, uncompressed: page, CSS, fonts, scripts and the hero picture
 FIRST_VIEW = ["index.html", "css/site.css", "fonts/InstrumentSans.woff2", "fonts/GeistMono.woff2", "fonts/lucide-form.woff2",
-              "assets/lockup.svg", "js/main.js", "js/nav.js", "js/theme.js", "js/motion.js", "js/data.js", "js/app.js", "js/scene.js",
-              "vendor/three.module.js", "vendor/OrbitControls.js",
-              "assets/data/site.json", "assets/data/dock.glb", "assets/data/toolpath.bin"]
+              "assets/lockup.svg", "js/main.js", "js/nav.js", "js/theme.js", "js/motion.js", "js/data.js",
+              "assets/shots/hero.webp"]
+# the drawn app loads when it comes near: three.js, the sample project and its toolpath
+BUDGET_APP = 2_500_000
+APP_VIEW = ["js/app.js", "js/scene.js", "vendor/three.module.js", "vendor/OrbitControls.js",
+            "assets/data/site.json", "assets/data/dock.glb", "assets/data/toolpath.bin"]
 
 
 class Page(HTMLParser):
@@ -56,7 +59,7 @@ class Page(HTMLParser):
 def main() -> int:
     errors: list[str] = []
     pages = sorted(SITE.glob("*.html")) + sorted((SITE / "docs").glob("*.html")) + sorted((SITE / "recipes").glob("*.html"))
-    pages += sorted((SITE / "compat").glob("*.html")) + sorted((SITE / "bench").glob("*.html"))
+    pages += sorted((SITE / "compat").glob("*.html")) + sorted((SITE / "bench").glob("*.html")) + sorted((SITE / "measure").glob("*.html"))
     if not (SITE / "docs" / "index.html").exists():
         errors.append("site/docs is missing: run python site/build.py first")
     # the number of MCP tools on the home page is the one docs/MCP.md states (scripts/gen_mcp_docs.py writes it)
@@ -146,6 +149,9 @@ def main() -> int:
     weight = sum((SITE / f).stat().st_size for f in FIRST_VIEW)
     if weight > BUDGET_FIRST_VIEW:
         errors.append(f"first view is {weight:,} bytes, over the {BUDGET_FIRST_VIEW:,} budget")
+    app = sum((SITE / f).stat().st_size for f in APP_VIEW)
+    if app > BUDGET_APP:
+        errors.append(f"the drawn app is {app:,} bytes, over the {BUDGET_APP:,} budget")
 
     for e in errors:
         print("FAIL", e)

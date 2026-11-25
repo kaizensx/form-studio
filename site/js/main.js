@@ -5,34 +5,41 @@ import { scrub, reveals, countUp, easeOut, reduced } from "./motion.js";
 
 const $ = (s) => document.querySelector(s);
 
-// ---------- hero: the drawn window lies back on the bench, then stands up as the page scrolls ----------
+// ---------- hero: the photograph settles as the page scrolls; the drawn window stands up as it arrives ----------
 {
-  const tilt = $("#stage-tilt"), copy = $("#hero-copy"), par = [...document.querySelectorAll("[data-par]")];
-  if (tilt && !reduced) {
-    const narrow = () => innerWidth < 900;
+  const shot = $("#hero-shot img"), copy = $("#hero-copy"), par = [...document.querySelectorAll("[data-par]")];
+  if (shot && !reduced) {
     scrub(null, (q) => {
-      const e = easeOut(q), t = narrow() ? 9 : 16;
+      const e = easeOut(q), y = scrollY;
+      shot.style.setProperty("--hs", (1.08 - 0.08 * e).toFixed(4));
+      shot.style.setProperty("--hy", `${(18 * e).toFixed(2)}px`);
+      copy.style.transform = `translateY(${(y * 0.2).toFixed(1)}px)`;
+      copy.style.opacity = String(Math.max(0, 1 - y / (innerHeight * 0.8)).toFixed(3));
+      par.forEach((el) => { el.style.translate = `0 ${(y * +el.dataset.par).toFixed(1)}px`; });
+    }, { mode: "page", smooth: 12, over: () => innerHeight * 0.9 });
+  } else if (shot) shot.style.setProperty("--hs", "1");
+  const tilt = $("#stage-tilt");
+  if (tilt && !reduced) {
+    scrub($("#try"), (q) => {
+      const e = easeOut(Math.min(1, q / 0.42)), t = innerWidth < 900 ? 8 : 14;
       tilt.style.setProperty("--tilt", `${(t * (1 - e)).toFixed(3)}deg`);
       tilt.style.setProperty("--sc", (0.94 + 0.06 * e).toFixed(4));
-      tilt.style.setProperty("--ty", `${(-24 * e).toFixed(2)}px`);
-      const y = scrollY;
-      copy.style.transform = `translateY(${(y * 0.28).toFixed(1)}px)`;
-      copy.style.opacity = String(Math.max(0, 1 - y / (innerHeight * 0.75)).toFixed(3));
-      par.forEach((el) => { el.style.translate = `0 ${(y * +el.dataset.par).toFixed(1)}px`; });
-    }, { mode: "page", smooth: 12, over: () => innerHeight * 0.7 });
+    }, { mode: "pass", smooth: 12 });
   }
 }
 
+// ---------- before and after: a range input moves the divider ----------
+document.querySelectorAll(".ba-frame").forEach((f) => {
+  const r = f.querySelector("input");
+  const set = () => f.style.setProperty("--p", `${r.value}%`);
+  r.addEventListener("input", set); set();
+});
+
 reveals();
 
-// ---------- why: the numbers are the sample project's, counted up as they arrive ----------
-siteData().then(({ dock: d }) => {
-  countUp($("#why-faces"), d.faces);
-  countUp($("#why-checks"), d.checks.length);
-  $("#why-faces2").textContent = `a ${d.faces}-face solid`;
-  $("#why-ms").textContent = `${d.build_ms} ms`;
-});
+// ---------- your agent: the numbers count up as they arrive ----------
 countUp($("#why-tools"), +$("#why-tools").dataset.count);     // docs/MCP.md: N tools (site/tools/check_site.py keeps it in step)
+countUp($("#why-skills"), +$("#why-skills").dataset.count);   // plugins/form/skills: one folder per skill
 
 // a soft light follows the pointer over the cards
 document.addEventListener("pointermove", (e) => {
@@ -69,8 +76,7 @@ const near = (el, fn) => {
   io.observe(el);
 };
 (async () => {
-  const { initHero } = await import("./app.js");
-  try { await initHero(); } catch (e) { console.error(e); }
+  near($("#try"), () => import("./app.js").then((m) => m.initHero()).catch(console.error));
   near($("#how-track"), () => import("./how.js").then((m) => m.initHow()).catch(console.error));
   near($("#moves-track"), () => import("./moves.js").then((m) => m.initMoves()).catch(console.error));
 })();

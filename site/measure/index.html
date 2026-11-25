@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How we measure · Form Studio</title>
+<meta name="description" content="The numbers behind Form Studio: mesh to editable CAD, automatic design refinement and game assets, each from a script in the repository that writes its own report.">
+<meta name="theme-color" content="#0e1113" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
+<link rel="canonical" href="https://kaizensx.github.io/form-studio/measure/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Form Studio">
+<meta property="og:title" content="How we measure · Form Studio">
+<meta property="og:description" content="Every number on this site comes from a run you can repeat.">
+<meta property="og:image" content="https://kaizensx.github.io/form-studio/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../favicon.ico" sizes="48x48">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="preload" href="../fonts/InstrumentSans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../css/site.css">
+<script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<script type="module" src="../js/nav.js"></script>
+</head>
+<body>
+<!--nav-->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="ic-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></symbol>
+<symbol id="ic-chev" viewBox="0 0 24 24"><path d="M6.5 9.5l5.5 5.5 5.5-5.5"/></symbol>
+<symbol id="ic-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 019.5 4.5a8 8 0 1010 10z"/></symbol>
+<symbol id="ic-gh" viewBox="0 0 24 24"><path d="M9 19c-4 1.3-4-2-6-2.5m12 4.5v-3.4a3 3 0 00-.8-2.3c2.7-.3 5.5-1.3 5.5-6a4.6 4.6 0 00-1.3-3.2 4.3 4.3 0 00-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 00-6 0C6.5 2.6 5.5 2.9 5.5 2.9a4.3 4.3 0 00-.1 3.2A4.6 4.6 0 004 9.3c0 4.6 2.8 5.6 5.5 6a3 3 0 00-.8 2.3V21"/></symbol>
+<symbol id="ic-dc" viewBox="0 0 24 24"><path d="M8.5 7.5a12 12 0 017 0M7 17c3 1.3 7 1.3 10 0M8.6 4.8A16 16 0 004.5 6.5C2.8 9.4 2 12.5 2.3 16.2a15.6 15.6 0 004.8 2.3l1.1-1.9M15.4 4.8a16 16 0 014.1 1.7c1.7 2.9 2.5 6 2.2 9.7a15.6 15.6 0 01-4.8 2.3l-1.1-1.9"/><circle cx="9" cy="12.5" r="1.2"/><circle cx="15" cy="12.5" r="1.2"/></symbol>
+</defs></svg>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a class="brand" href="../"><img class="lk-d" src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="../assets/lockup-light.svg" alt="" width="143" height="22"></a>
+    <nav class="nav-links" aria-label="Site"><ul><li><a href="../#make">What it makes</a></li><li><a href="../#how">How it works</a></li><li><a href="../#agent">Your agent</a></li><li><a href="../recipes/">Recipes</a></li><li><a href="../docs/">Docs</a></li></ul></nav>
+    <div class="end">
+      <button class="theme" type="button" id="theme" aria-label="Switch between light and dark"><svg class="ic sun" aria-hidden="true"><use href="#ic-sun"/></svg><svg class="ic moon" aria-hidden="true"><use href="#ic-moon"/></svg></button>
+      <a class="gh" href="https://discord.gg/b6ZgyndkmS"><svg class="ic" aria-hidden="true"><use href="#ic-dc"/></svg><span>Discord</span></a>
+      <a class="gh" href="https://github.com/kaizensx/form-studio"><svg class="ic" aria-hidden="true"><use href="#ic-gh"/></svg><span>GitHub</span></a>
+      <a class="btn primary small dl-btn" href="../#download">Download</a>
+      <button class="menu-btn" type="button" id="menu-btn" aria-expanded="false" aria-controls="menu" aria-label="Menu"><i></i><i></i></button>
+    </div>
+  </div>
+  <div class="menu" id="menu" hidden>
+    <ul><li><a href="../#make">What it makes</a></li><li><a href="../#how">How it works</a></li><li><a href="../#agent">Your agent</a></li><li><a href="../recipes/">Recipes</a></li><li><a href="../docs/">Docs</a></li><li><a href="https://discord.gg/b6ZgyndkmS">Discord</a></li><li><a href="https://github.com/kaizensx/form-studio">GitHub</a></li></ul>
+  </div>
+  <span class="scrolled-bar" id="scroll-bar" aria-hidden="true"></span>
+</header>
+<!--/nav-->
+
+<div class="wrap measure">
+<main id="main" class="prose">
+<h1>How we measure</h1>
+<p class="lede">Every number on this site comes from a run you can repeat. Three benches live in the repository; each is a script that builds real designs with the engine, measures the result and writes its own report. The figures below are from the runs of 25 November 2026.</p>
+
+<h2 id="recon">Mesh to editable CAD</h2>
+<p>Seven synthetic parts are built with build123d, exported as STL and handed to <strong>Make editable</strong>, plus three copies of one part with scan artifacts (vertex noise, quantised coordinates, missing triangles). The result is compared with the mesh it came from. <strong>B-rep</strong> is the share of the surface that became real CAD faces instead of a facet copy. <strong>Editable</strong> is the share of the parameters that are real dimensions: each one is moved 0.5 mm and the part must still build. <strong>Deviation</strong> is the two-sided Hausdorff distance to the mesh.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Part</th><th>Triangles</th><th>B-rep</th><th>Editable</th><th>Parameters</th><th>Deviation</th><th>Time</th></tr></thead>
+<tbody>
+<tr><td>Filleted bracket</td><td>1,800</td><td>90.9 %</td><td>75 %</td><td>6 of 8</td><td>0.0012 mm</td><td>39.8 s</td></tr>
+<tr><td>Stepped bracket</td><td>3,216</td><td>100 %</td><td>100 %</td><td>18 of 18</td><td>0.0017 mm</td><td>112.5 s</td></tr>
+<tr><td>Bolt flange</td><td>4,812</td><td>100 %</td><td>100 %</td><td>9 of 9</td><td>0.0124 mm</td><td>16.9 s</td></tr>
+<tr><td>Turned shaft</td><td>10,328</td><td>100 %</td><td>100 %</td><td>11 of 11</td><td>0.0083 mm</td><td>35.3 s</td></tr>
+<tr><td>Flanged shaft</td><td>13,426</td><td>100 %</td><td>100 %</td><td>10 of 10</td><td>0.0100 mm</td><td>145 s</td></tr>
+<tr><td>Enclosure with holes</td><td>4,120</td><td>100 %</td><td>100 %</td><td>19 of 19</td><td>0.0012 mm</td><td>153.9 s</td></tr>
+<tr><td>Filleted block</td><td>9,480</td><td>66.4 %</td><td>100 %</td><td>4 of 4</td><td>0.0014 mm</td><td>162.6 s</td></tr>
+<tr><td>Bolt flange, 0.01 mm noise</td><td>4,812</td><td>100 %</td><td>100 %</td><td>9 of 9</td><td>0.0419 mm</td><td>26.6 s</td></tr>
+<tr><td>Bolt flange, quantised</td><td>4,812</td><td>100 %</td><td>100 %</td><td>9 of 9</td><td>0.0170 mm</td><td>15 s</td></tr>
+<tr><td>Bolt flange, 1 % of triangles missing</td><td>4,764</td><td>100 %</td><td>100 %</td><td>9 of 9</td><td>0.0124 mm</td><td>14.8 s</td></tr>
+</tbody></table></div>
+<p>All ten results are within tolerance (0.02 mm for the clean parts, 0.05 mm for the scan artifacts) and pass the occupancy, void and opening gates. The parts are synthetic and mostly prismatic or turned; an organic scan keeps more of its surface as an exact facet copy. <a href="../docs/bench-recon.html">The full report</a> has every column, and <code>scripts/recon_bench.py</code> writes it.</p>
+
+<h2 id="refine">Automatic design refinement</h2>
+<p>Twenty-two creation briefs, from a shaft coupler to a helmet in four parts, are run twice through the MCP server by a scripted agent (deterministic, no model): once with refinement on, once with it off. The critic is the design bench's score out of 100.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Measure</th><th>Refinement off</th><th>Refinement on</th></tr></thead>
+<tbody>
+<tr><td>Final build succeeds</td><td>22 of 22</td><td>22 of 22</td></tr>
+<tr><td>Critic, mean of 22</td><td>90.1</td><td>92.0</td></tr>
+<tr><td>Briefs that score higher</td><td></td><td>6 (each +7)</td></tr>
+<tr><td>Briefs that score lower</td><td></td><td>0</td></tr>
+<tr><td>Function checks</td><td colspan="2">Identical on and off, on every brief</td></tr>
+<tr><td>First shape visible, median</td><td>0.043 s</td><td>0.044 s</td></tr>
+<tr><td>Refinement time</td><td></td><td>13.55 s median, 21.05 s longest</td></tr>
+</tbody></table></div>
+<p>Refinement kept 30 changes across 21 of the 22 designs: material zones, a fillet hierarchy, an edge break. It runs in the background after the build, so the first shape arrives as fast as without it. Sixteen briefs score the same on and off: material zones change what the photo shows, not the critic. <a href="../docs/bench-creation.html">The full report</a> lists every brief; <code>scripts/creation_bench.py</code> writes it.</p>
+
+<h2 id="game">Game assets</h2>
+<p>Six original game-asset briefs and one deliberately plain control go the whole way: a model, levels of detail, UVs, baked textures and a GLB that is read back and validated.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Asset</th><th>Validation</th><th>LOD0 to LOD3, triangles</th><th>Bevel coverage</th><th>Visual rubric, of 5</th></tr></thead>
+<tbody>
+<tr><td>Sci-fi helmet prop</td><td class="r-pass">Pass</td><td>9,950 · 4,974 · 1,990 · 596</td><td>85 %</td><td>2.81</td></tr>
+<tr><td>Stylised treasure chest</td><td class="r-pass">Pass</td><td>11,952 · 5,970 · 2,486 · 796</td><td>95 %</td><td>3.31</td></tr>
+<tr><td>Fantasy sword</td><td class="r-pass">Pass</td><td>3,980 · 1,990 · 796 · 298</td><td>99 %</td><td>3.19</td></tr>
+<tr><td>Modular wall kit piece</td><td class="r-pass">Pass</td><td>3,520 · 3,520 · 1,592 · 496</td><td>90 %</td><td>2.94</td></tr>
+<tr><td>Vehicle wheel</td><td class="r-pass">Pass</td><td>5,970 · 2,984 · 1,194 · 496</td><td>97 %</td><td>3.31</td></tr>
+</tbody></table></div>
+<p>Technical validation passes on six of six, and every level of detail is inside its triangle budget. The visual rubric is a harder test: three blind passes by an AI model over anonymous review sheets, with the control mixed in. The assets score 2.8 to 3.3 of 5 against a gate of 4.0, so the gate is not met yet; the control scores 0.62, as it must. The sixth asset, a remote control built as CAD first, is in <a href="../docs/bench-game.html">the full report</a>, written by <code>scripts/game_bench.py</code>.</p>
+
+<h2 id="ci">Measured on every change</h2>
+<p>Two more pages are kept by the project's automation. <a href="../bench/">Build timings</a> records how long each recipe takes to build, check and slice and how fast the app starts, on every change to the development branch. <a href="../compat/">Slicer compatibility</a> runs each supported slicer for real and shows which versions slice the sample designs.</p>
+</main>
+</div>
+
+<!--foot-->
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <a class="brand" href="../"><img class="lk-d" src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="../assets/lockup-light.svg" alt="" width="143" height="22"></a>
+        <p>Describe anything. The open-source AI CAD studio, MIT licence.</p>
+      </div>
+      <nav aria-label="Product"><span class="cap">Product</span><a href="../#make">What it makes</a><a href="../#how">How it works</a><a href="../#agent">Your agent</a><a href="../recipes/">Recipes</a><a href="../#download">Download</a></nav>
+      <nav aria-label="Measured"><span class="cap">Measured</span><a href="../measure/">How we measure</a><a href="../bench/">Build timings</a><a href="../compat/">Slicer compatibility</a></nav>
+      <nav aria-label="Docs"><span class="cap">Docs</span><a href="../docs/features.html">Features</a><a href="../docs/app.html">The app</a><a href="../docs/cli.html">Command line</a><a href="../docs/mcp.html">MCP tools</a><a href="../docs/changelog.html">Changelog</a></nav>
+      <nav aria-label="Community"><span class="cap">Community</span><a href="https://discord.gg/b6ZgyndkmS">Discord</a><a href="https://github.com/kaizensx/form-studio/discussions">Discussions</a><a href="https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml">Share a recipe</a><a href="https://github.com/kaizensx/form-studio/issues/new/choose">Report an issue</a><a href="https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md">Contributing</a></nav>
+    </div>
+    <p class="foot-note">No cookies, trackers or third-party requests. Form Studio runs on your computer; it never uploads a design and never sends a file to a machine.</p>
+  </div>
+</footer>
+<!--/foot-->
+</body>
+</html>

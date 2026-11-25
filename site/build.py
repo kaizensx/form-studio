@@ -3,7 +3,7 @@
     python site/build.py            (needs the `markdown` package: pip install markdown)
 
 Reads the markdown listed in PAGES and writes site/docs/*.html, site/sitemap.xml and site/robots.txt. The home
-page and the recipe gallery are hand-written and are not touched. The GitHub Pages workflow runs this before it
+page, the recipe gallery and How we measure are hand-written; only their shared nav and footer are stamped. The GitHub Pages workflow runs this before it
 uploads site/.
 """
 from __future__ import annotations
@@ -42,11 +42,11 @@ PAGES = [
     ("changelog", "CHANGELOG.md", "Changelog", "What changed in each version."),
     ("releasing", "docs/RELEASING.md", "Releases", "Stable, preview and patch releases, and how versions are numbered."),
     ("history", "docs/HISTORY.md", "Development history", "The development builds before 1.0.0."),
+    ("bench-recon", "docs/RECON_BENCH.md", "Bench: mesh to CAD", "Mesh to editable CAD on synthetic parts: B-rep share, editable share, deviation and time."),
+    ("bench-creation", "docs/CREATION_BENCH.md", "Bench: refinement", "Twenty-two creation briefs with design refinement on and off."),
+    ("bench-game", "docs/GAME_BENCH.md", "Bench: game assets", "Six game-asset briefs and a control: validation, levels of detail and the visual rubric."),
 ]
 BY_SOURCE = {src: slug for slug, src, _, _ in PAGES}
-# the README's drawings the home page shows (What you can make), copied from docs/readme so both stay one picture
-ART = ["feature-shape", "feature-gears", "feature-proved"]
-
 PAGE = """<!doctype html>
 <html lang="en">
 <head>
@@ -179,7 +179,7 @@ def main() -> int:
     if OUT.exists():
         shutil.rmtree(OUT)
     OUT.mkdir(parents=True)
-    urls = ["", "docs/", "recipes/"]
+    urls = ["", "docs/", "recipes/", "measure/"]
     for slug, source, title, desc in PAGES:
         text = (ROOT / source).read_text(encoding="utf-8")
         body = rewrite(render(text), source)
@@ -204,11 +204,6 @@ def main() -> int:
     sm.append("</urlset>")
     (SITE / "sitemap.xml").write_text("\n".join(sm) + "\n", encoding="utf-8")
     (SITE / "robots.txt").write_text(f"User-agent: *\nAllow: /\nSitemap: {BASE}sitemap.xml\n", encoding="utf-8")
-    art = SITE / "assets" / "art"
-    art.mkdir(parents=True, exist_ok=True)
-    for name in ART:
-        for theme in ("dark", "light"):
-            shutil.copy(ROOT / "docs" / "readme" / f"{name}-{theme}.svg", art / f"{name}-{theme}.svg")
     for page in chrome.stamp(SITE):
         print("nav and footer ->", page)
     print("wrote", OUT, "and sitemap.xml")
