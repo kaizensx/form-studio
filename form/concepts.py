@@ -266,6 +266,9 @@ def pick(st, gid: str, project: str, keep_others: bool = False, by: str = "you")
     concepts go to the trash (recoverable from <data>/.trash) unless keep_others."""
     g = _read(st, gid)
     if g["state"] != "open":
+        if g.get("picked") == project:            # picking the one already picked again: the same answer, no error
+            return {"picked": project, "trashed": [], "kept": [], "already": True,
+                    "group": board(st, gid, compute=False)}
         raise StudioError("A concept has already been picked from this group.", status=409, picked=g.get("picked"))
     mem = next((m for m in g["members"] if m["project"] == project and not m.get("trashed")), None)
     if mem is None:
