@@ -1,5 +1,5 @@
 // The hero: Form Studio's workspace recreated 1:1 (Workspace.qml, Talk.qml, Pipeline.qml, the five stages,
-// PrintSimBar.qml), driven by the sample project's real data, playing a short story the visitor can take over.
+// PrintSimBar.qml), driven by the sample project's real data (site/tools/export_site_data.py), playing a short story the visitor can take over.
 import { siteData, loadGLB, toolpath, fmtDur, INKS, reducedMotion } from "./data.js";
 import { Viewport } from "./scene.js";
 
@@ -12,7 +12,7 @@ const I = { check: "e06c", spin: "e10a", cube: "e524", eye: "e0ba", commit: "e0e
 
 export async function initHero() {
   const app = $("#app"), frame = $("#app-frame");
-  const d = (await siteData()).dock;
+  const d = (await siteData()).sample;
   const compact = { matches: false };   // the window is always drawn at its real 1440 x 880 layout, then scaled
 
   // ---------- scale the 1440 x 880 window to the column, like a picture of the real window ----------
@@ -24,27 +24,35 @@ export async function initHero() {
 
   // ---------- 3D ----------
   const vp = new Viewport($("#gl"), $("#labels"), { onInteract: () => story.takeover(), touchPanY: true });
-  const parts = await loadGLB("assets/data/dock.glb");
+  const parts = await loadGLB("assets/data/sample.glb");
   vp.setPart(parts, d);
   vp.view("iso", false);
 
   // ---------- state ----------
-  const S = { built: false, checked: false, sliced: false, stage: "prove", map: false, sim: false, simP: 127, playing: false, speed: 64, hidden: new Set(), acks: [false, false], dims: true, device: true };
+  const S = { built: false, checked: false, sliced: false, stage: "prove", map: false, sim: false, simP: 127, playing: false, speed: 64, hidden: new Set(), acks: [], dims: true, device: true };
   const checks = d.checks;
   const warns = checks.filter((c) => c.status === "WARN"), passes = checks.filter((c) => c.status === "PASS");
   const evCount = checks.reduce((m, c) => ((m[c.evidence] = (m[c.evidence] || 0) + 1), m), {});
-  const sliceH = fmtDur(d.slice_meta.time_s);
   const hm = (s) => { const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? `${h} h ${m} min` : `${m} min`; };
-  const fitY = Math.round(d.fit.yield * 100);
+  const SL = d.slice_meta || null;                    // only a print design that really was sliced has one
+  const PRINT = d.purpose === "print";
+  const REV = `r${String(d.head).padStart(2, "0")}`;
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const passEv = Object.entries(passes.reduce((m, c) => ((m[c.evidence] = (m[c.evidence] || 0) + 1), m), {})).map(([k, n]) => `${n} ${k}`).join(" · ");
+  const evLine = Object.entries(evCount).map(([k, n]) => `${n} ${k}`).join(" · ");
+  const briefKeys = d.params.filter((p) => p.group === "brief");
+  const measured = briefKeys.filter((p) => d.provenance[p.key] === "measured").length;
+  const fitY = d.fit ? Math.round(d.fit.yield * 100) : null;
+  S.acks = warns.map(() => false);
 
   // ---------- stage tabs ----------
   const STAGES = [
-    ["brief", "Describe", () => (S.built ? "0/4 measured" : "4 assumed"), ""],
-    ["shape", "Design", () => (S.built ? `${d.features.length} features` : "—"), ""],
-    ["fit", "Fit", () => (S.built ? `${fitY}% modelled` : "—"), "am"],
-    ["prove", "Review", () => (S.checked ? `${warns.length} to review` : "—"), "am"],
+    ["brief", "Describe", () => (briefKeys.length ? `${measured}/${briefKeys.length} measured` : ""), ""],
+    ["shape", "Design", () => (S.built ? plural(d.features.length, "feature") : "—"), ""],
+    ["fit", "Fit", () => (fitY === null ? "Calibration" : S.built ? `${fitY}% modelled` : "—"), fitY === null ? "" : "am"],
+    ["prove", "Review", () => (!S.checked ? "—" : warns.length ? `${warns.length} to review` : "All pass"), "am"],
     ["release", "Make", () => (S.sliced ? "Ready" : "—"), ""],
-  ];
+  ].filter(([id]) => id !== "fit" || PRINT);          // the fit model is a printer's accuracy: only for a print
   const tabs = $("#tabs");
   tabs.innerHTML = STAGES.map(([id, nm], i) => `<button class="tab" role="tab" id="tab-${id}" aria-controls="panel" data-stage="${id}" aria-selected="false" tabindex="-1"><span class="t"><em>0${i + 1}</em>${nm}</span><span class="u"></span></button>`).join("");
   const renderTabs = () => STAGES.forEach(([id, , sub, tone]) => {
@@ -55,7 +63,7 @@ export async function initHero() {
   tabs.addEventListener("click", (e) => { const b = e.target.closest(".tab"); if (b) { story.takeover(); setStage(b.dataset.stage); } });
   tabs.addEventListener("keydown", (e) => {
     const i = STAGES.findIndex(([id]) => id === S.stage);
-    const j = e.key === "ArrowRight" ? (i + 1) % 5 : e.key === "ArrowLeft" ? (i + 4) % 5 : -1;
+    const n = STAGES.length, j = e.key === "ArrowRight" ? (i + 1) % n : e.key === "ArrowLeft" ? (i + n - 1) % n : -1;
     if (j >= 0) { e.preventDefault(); story.takeover(); setStage(STAGES[j][0]); $("#tab-" + STAGES[j][0]).focus(); }
   });
 
@@ -79,14 +87,12 @@ export async function initHero() {
       <text x="${X(hi)}" y="${h - 4}" fill="#b9e8d7" font-family="Geist Mono" font-size="10" text-anchor="middle">${hi.toFixed(2)}</text></svg>`;
   };
   const P = {
-    brief: () => {
-      const keys = ["device_width", "device_thickness", "device_height", "device_mass"];
-      return `${note("Anything not measured is carried as an assumption, all the way to release.")}
-      <div class="sec"><div class="bigq"><b>0/4</b><span>dimensions of the object measured<br><small class="small">4 assumed</small></span></div><div class="segbars"><i></i><i></i><i></i><i></i></div></div>
+    brief: () => `${note(briefKeys.length ? "Anything not measured is carried as an assumption, all the way to release." : "What it is for, and what is known about the things it must fit.", briefKeys.length ? "amber" : "ink3")}
       <div class="sec"><span class="cap">Intent</span><div class="intent">${esc(d.brief)}</div></div>
-      <div class="sec"><div class="sec-h"><span class="cap">Known about the object</span><small>value · source · ±1σ</small></div>
-      ${keys.map((k) => { const p = d.params[k], v = d.values[k], pc = ((v - p.min) / (p.max - p.min)) * 100; return `<div class="prm"><div class="r"><b>${esc(p.label)}</b><span class="box">${v}<small>${esc(p.unit)}</small></span></div><div class="trk"><i style="left:${pc.toFixed(1)}%"></i></div><div class="dc">${esc(p.doc)}</div><div class="r" style="justify-content:flex-start;gap:8px">${tag("Assumed")}<span class="small">±${k === "device_mass" ? "0.3 g" : "0.3 mm"}</span></div></div>`; }).join("")}</div>`;
-    },
+      <div class="sec"><span class="cap">What the design is for</span><div class="pbtns"><span class="pbtn">${PRINT ? "For 3D printing" : "Just a 3D model"}</span></div>
+      ${SL ? `<p class="small">${esc(SL.profile)}</p>` : ""}</div>
+      <div class="sec"><div class="sec-h"><span class="cap">Worked out from the design</span><small>value · formula</small></div>
+      ${d.derived.map((x) => `<div class="src"><div><b>${esc(x.label)}</b><span>${esc(x.formula)}</span></div><span class="tag t-datum">${esc(String(x.value))}${x.unit ? " " + esc(x.unit) : ""}</span></div>`).join("")}</div>`,
     shape: () => S.built ? `${note(`${d.features.length} features in build order. Select one here or on the model to change it.`, "ink3")}
       <div class="sec"><div class="sec-h"><span class="cap">Features</span><small>build order</small></div>
       <div>${d.features.map((f, i) => `<div class="feat" data-f="${f.id}" style="animation-delay:${i * 45}ms"><i></i><span class="nm">${esc(f.label)}</span><span class="tag ${f.role === "interface" ? "ifc" : ""}">${esc(f.role)}</span><span class="i chev" aria-hidden="true">&#x${I.chevR};</span><span class="dc">${esc(f.doc)}</span></div>`).join("")}</div></div>
@@ -94,27 +100,26 @@ export async function initHero() {
       : `<p class="empty-insp">Nothing is built yet. Describe the part in the conversation.</p>`,
     fit: () => {
       const f = d.fit;
+      if (!f) return `${note("How accurate this printer is on this profile.", "ink3")}
+      <div class="sec"><h4 style="margin:0;font-size:20px;font-weight:620;letter-spacing:-.01em">Calibrate</h4><p style="font-size:13px;color:var(--ink2)">Print this coupon on the profile below, measure each slot with caliper inside jaws, and enter what you read.</p></div>
+      <div class="sec"><div class="sec-h"><span class="cap">Measured slot widths</span>${tag("Physical", "t-pass")}</div><p class="small">Leave blank any slot you did not measure. Only enter numbers read from a real print.</p>
+      ${SL ? `<p class="small">${esc(SL.profile)}</p>` : ""}</div>`;
       return `${note(`${fitY}% of prints are modelled to fit, from what is known today.`)}
       <div class="sec"><h4 style="margin:0;font-size:20px;font-weight:620;letter-spacing:-.01em">${esc(f.label)}</h4><p style="font-size:13px;color:var(--ink2)">Will it slide in without rattling? A model built from stated inputs, shown with where each came from.</p></div>
       <div class="fitbig"><b>${fitY}%</b><span>modelled chance the gap lands in your window</span><span></span>${tag("Modelled")}</div>
       <div>${bell(360, 120, f)}</div>
-      <div class="fit3"><div><b style="color:var(--signal)">${Math.round(f.p_tight * 100)}%</b><span>too tight</span></div><div><b>${f.expected_gap.toFixed(2)} mm</b><span>expected gap ±${(2 * f.sd).toFixed(2)}</span></div><div><b style="color:var(--amber)">${Math.round(f.p_loose * 100)}%</b><span>too loose</span></div></div>
-      <div class="sec"><span class="cap">Where the uncertainty comes from</span>
-      <div class="src"><div><b>${esc(f.mating_label)}</b><span>${f.mating.toFixed(2)} mm ±${f.sources.mating.sigma.toFixed(2)} · ${Math.round(f.sources.mating.share * 100)}% of variance</span></div>${tag("Assumed")}</div>
-      <div class="src"><div><b>Printed pocket</b><span>${f.cavity_nominal.toFixed(2)} mm +${f.sources.printer.bias.toFixed(3)} bias ±${f.sources.printer.sigma.toFixed(2)} · ${Math.round(f.sources.printer.share * 100)}% of variance</span></div>${tag("Assumed")}</div></div>
-      <div class="sec"><div class="sec-h"><span class="cap">Most useful next step</span><small>by modelled yield gained</small></div>
-      ${d.next_actions.slice(0, 2).map((a, i) => `<div class="nx"><em>0${i + 1}</em><b>${esc(a.do)}</b><p>${esc(a.why)} ${fitY}% → ${esc(a.yield_after)}, ${esc(a.cost)}.</p></div>`).join("")}</div>`;
+      <div class="fit3"><div><b style="color:var(--signal)">${Math.round(f.p_tight * 100)}%</b><span>too tight</span></div><div><b>${f.expected_gap.toFixed(2)} mm</b><span>expected gap ±${(2 * f.sd).toFixed(2)}</span></div><div><b style="color:var(--amber)">${Math.round(f.p_loose * 100)}%</b><span>too loose</span></div></div>`;
     },
     prove: () => {
       if (!S.checked) return `<p class="empty-insp">Checks run when the solid is built.</p>`;
-      return `${note(`${warns.length} checks of ${checks.length} need a look for r04. None failed.`)}
+      return `${warns.length ? note(`${plural(warns.length, "check")} of ${checks.length} ${warns.length === 1 ? "needs" : "need"} a look for ${REV}. None failed.`) : note(`All ${checks.length} checks pass for ${REV}.`, "pass")}
       <div class="sec"><div class="big3"><div class="p"><b data-count="${passes.length}">${passes.length}</b><span class="cap">Pass</span></div><div class="w"><b data-count="${warns.length}">${warns.length}</b><span class="cap">To review</span></div><div class="f"><b>0</b><span class="cap">Failed</span></div></div>
       <div class="bars"><i style="flex:${passes.length};background:var(--pass)"></i><i style="flex:${warns.length};background:var(--amber)"></i></div>
-      <p class="small">Checks for r04 · ${evCount.computed} computed · ${evCount.heuristic} heuristic · ${evCount.model} model. Each says how it is known.</p></div>
+      <p class="small">Checks for ${REV} · ${evLine}. Each says how it is known.</p></div>
       <div class="sec"><span class="cap">To review</span>${warns.map((c, i) => `<div class="chk" style="animation-delay:${i * 45}ms">${tag("Warn", "t-amber")}<span class="nm">${esc(c.label)}</span><span class="v">${esc(c.value)}</span><span class="tg2">${tag(c.evidence)}</span><span class="dt">${esc(brandName(c.detail))}</span></div>`).join("")}</div>
-      <div><div class="fold"><span class="cap">${icon(I.chevD)}Passed</span><small>${passes.length} · ${evCount.computed} computed · ${evCount.heuristic} heuristic</small></div>
+      <div><div class="fold"><span class="cap">${icon(I.chevD)}Passed</span><small>${passes.length} · ${passEv}</small></div>
       ${passes.map((c, i) => `<div class="chk mini" style="animation-delay:${80 + i * 30}ms">${icon(I.check)}<span class="nm">${esc(c.label)}</span><span class="v">${esc(c.value)}</span></div>`).join("")}</div>
-      ${S.sliced ? `<div class="sec"><div class="sec-h"><span class="cap">Slice of r04</span>${tag("Simulated")}</div>
+      ${S.sliced && SL ? `<div class="sec"><div class="sec-h"><span class="cap">Slice of ${REV}</span>${tag("Simulated")}</div>
       <div class="k3"><div><b>${hm(d.slice_meta.time_s)}</b><span>estimated print time</span></div><div><b>${d.slice_meta.filament_g.toFixed(1)} g</b><span>PLA</span></div><div><b>${d.toolpath.z.length}</b><span>layers to ${d.toolpath.z.at(-1).toFixed(1)} mm</span></div></div>
       <div class="pbtns"><button class="pbtn" type="button" id="watch">${icon(I.play)}Watch it print</button><span class="pbtn quiet">${icon(I.dl)}Save sliced 3MF…</span></div>
       <p class="small">A slice shows the toolpaths Bambu Studio would send with these presets. It is not a print: adhesion, warping and fit are only known after printing.</p></div>` : ""}`;
@@ -122,15 +127,15 @@ export async function initHero() {
     release: () => {
       if (!S.sliced) return `<p class="empty-insp">The gate opens when the slice is current.</p>`;
       const ok = S.acks.every(Boolean);
-      return `${note(`r04 is ready to approve. ${warns.length} warnings to acknowledge first.`, "ink3")}
-      <div class="gate"><span class="sh">${icon(I.shield)}</span><div><h4>Ready, with warnings</h4><p>Gate for r04 · ${esc(d.gate.evidence.replace(/; /g, " · "))}</p></div></div>
+      return `${note(`${REV} is ready to approve.${warns.length ? ` ${plural(warns.length, "warning")} to acknowledge first.` : ""}`, "ink3")}
+      <div class="gate"><span class="sh">${icon(I.shield)}</span><div><h4>${warns.length ? "Ready, with warnings" : "Ready"}</h4><p>Gate for ${REV} · ${esc(d.gate.evidence.replace(/; /g, " · "))}</p></div></div>
       <p class="small">A release is a frozen copy of files whose hashes match the revision they claim to be. Acknowledge each warning to release with it.</p>
       <div>${warns.map((c, i) => `<button type="button" class="ack ${S.acks[i] ? "on" : ""}" data-ack="${i}" aria-pressed="${S.acks[i]}" style="text-align:left;width:100%"><span class="bx">${icon(I.check)}</span><b>${esc(c.label)}</b><span>${esc(c.value)}</span></button>`).join("")}</div>
       <div class="fieldx">Release note (optional)</div>
-      <div class="pbtns"><button class="pbtn primary" type="button" id="approve" ${ok ? "" : "disabled"}>${icon(I.shield)}Approve and release r04</button></div>
+      <div class="pbtns"><button class="pbtn primary" type="button" id="approve" ${ok ? "" : "disabled"}>${icon(I.shield)}Approve and release ${REV}</button></div>
       <p class="small" id="approve-note">${ok ? "Only a person can approve. Agents can do everything else." : ""}</p>
-      <div class="sec"><div class="sec-h"><span class="cap">Revisions</span><small>${d.revisions.length} · head r04</small></div>
-      ${[...d.revisions].reverse().map((r) => `<div class="revrow ${r.n === d.head ? "head" : ""}"><span class="n">r0${r.n}</span><b>${esc(r.summary || r.note)}</b><small>${new Date(r.ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</small><span>${r.n > 1 ? "from r0" + (r.n - 1) : "from the building block"}${r.origin.startsWith("proposal") ? " · by an agent" : ""}</span></div>`).join("")}</div>`;
+      <div class="sec"><div class="sec-h"><span class="cap">Revisions</span><small>${d.revisions.length} · head ${REV}</small></div>
+      ${[...d.revisions].reverse().map((r) => `<div class="revrow ${r.n === d.head ? "head" : ""}"><span class="n">r0${r.n}</span><b>${esc(r.summary || r.note)}</b><small>${new Date(r.ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</small><span>${r.n > 1 ? "from r0" + (r.n - 1) : "written as code"}${r.origin.startsWith("proposal") ? " · by an agent" : ""}</span></div>`).join("")}</div>`;
     },
   };
   let panelEl = null;
@@ -162,16 +167,16 @@ export async function initHero() {
     story.takeover();
     if (t.id === "watch") setSim(true, true);
     else if (t.dataset.ack) { S.acks[+t.dataset.ack] = !S.acks[+t.dataset.ack]; renderPanel(false); }
-    else if (t.id === "approve") $("#approve-note").textContent = "In the app this freezes r04 and its files as a release. Here it does nothing: only a person approves, on their own computer.";
+    else if (t.id === "approve") $("#approve-note").textContent = `In the app this freezes ${REV} and its files as a release. Here it does nothing: only a person approves, on their own computer.`;
   });
   wrap.addEventListener("pointerover", (e) => { const f = e.target.closest(".feat"); vp.highlight(f ? f.dataset.f : null); if (f) wrap.querySelectorAll(".feat").forEach((x) => x.classList.toggle("on", x === f)); });
   wrap.addEventListener("pointerleave", () => { vp.highlight(null); wrap.querySelectorAll(".feat.on").forEach((x) => x.classList.remove("on")); });
 
   // ---------- pipeline strip ----------
-  const NODES = [["params", "Parameters"], ["geometry", "Solid"], ["exports", "Exports"], ["checks", "Checks"], ["slice", "Slice"], ["release", "Release"]];
+  const NODES = [["params", "Parameters"], ["geometry", "Solid"], ["exports", "Exports"], ["checks", "Checks"], ["slice", "Slice"], ["release", "Release"]].filter(([id]) => id !== "slice" || SL);   // a design that was not sliced has no Slice step
   const pipe = $("#pipe");
   pipe.innerHTML = NODES.map(([id, l]) => `<button type="button" class="pn" role="listitem" data-n="${id}" data-s="missing"><span class="l"><span class="d"></span>${l}</span><span class="s"></span></button>`).join("") + `<div class="auto"><span class="cap">Auto</span><span class="tgl"></span></div>`;
-  const SAY = { params: "r04", geometry: `${d.faces} faces`, exports: ".step .stl .3mf", checks: `${passes.length} pass · ${warns.length} review`, slice: hm(d.slice_meta.time_s), release: "ready" };
+  const SAY = { params: REV, geometry: `${d.faces} faces`, exports: ".step .stl .3mf", checks: `${passes.length} pass · ${warns.length} review`, slice: SL ? hm(SL.time_s) : "", release: "ready" };
   function node(id, s) {
     const b = pipe.querySelector(`[data-n="${id}"]`), was = b.dataset.s;
     b.dataset.s = s;
@@ -188,7 +193,7 @@ export async function initHero() {
 
   // ---------- readout under the part ----------
   const sz = d.size;
-  $("#dims-read").innerHTML = `${sz[0].toFixed(1)} <span class="x">×</span> ${sz[1].toFixed(1)} <span class="x">×</span> ${sz[2].toFixed(1)} mm <span class="x">·</span> ${d.volume_cm3.toFixed(1)} cm³ <span class="x">·</span> <span class="pl">plate 180 × 180</span>`;
+  $("#dims-read").innerHTML = `${sz[0].toFixed(1)} <span class="x">×</span> ${sz[1].toFixed(1)} <span class="x">×</span> ${sz[2].toFixed(1)} mm <span class="x">·</span> ${d.volume_cm3.toFixed(1)} cm³ <span class="x">·</span> <span class="pl">${d.parts.length > 1 ? `${d.parts.length} parts${SL ? ` · ${plural(SL.plates, "plate")}` : ""}` : "plate 180 × 180"}</span>`;
 
   // ---------- rail and view switcher ----------
   const rail = $(".rail");
@@ -233,7 +238,7 @@ export async function initHero() {
   let TP = null;
   const simbar = $("#simbar"), typesHud = $("#types-hud");
   async function ensureTP() {
-    if (TP) return TP;
+    if (TP || !SL) return TP;
     TP = await toolpath();
     vp.setToolpath(TP);
     const m = TP.meta;
@@ -292,6 +297,7 @@ export async function initHero() {
     vp.kick();
   }
   async function setSim(on, fromUser) {
+    if (on && !SL) return;
     if (on) {
       await ensureTP();
       if (S.map) setMap(false);
@@ -311,16 +317,20 @@ export async function initHero() {
   const scroll = $("#talk-scroll"), field = $("#composer-field"), send = $("#send");
   const emptyState = () => `<div class="empty"><h3>Ask about this design,<br>or describe a change.</h3><p>The agent works on the design with Form Studio’s tools. Changes arrive as a draft or a new revision you can compare and undo.</p></div>`;
   const STEPS = [
-    { tool: "create_project", text: "Started from the dock building block", icon: I.cube, rich: true },
+    { tool: "create_design", text: "Wrote the design as code", icon: I.cube, rich: true },
     { tool: "render", text: "Looked at the iso view", icon: I.eye, rich: true, img: true },
-    { tool: "preview_change", text: "depth=92", rich: false },
+    { tool: "preview_change", text: Object.entries(d.values).filter(([k]) => /backlash/.test(k)).map(([k, v]) => `${k}=${v}`).join(" "), rich: false },
     { tool: "commit_change", text: "Committed a revision", icon: I.commit, rich: true },
-    { tool: "run_pipeline", text: "solid, exports, checks, slice", rich: false },
+    { tool: "run_pipeline", text: SL ? "solid, exports, checks, slice" : "solid, exports, checks", rich: false },
   ];
+  const der = (k) => (d.derived.find((x) => x.key === k) || {}).value;
+  const wall = checks.find((c) => c.id === "wall");
+  const change = d.revisions.find((r) => r.n === d.head) || {};
   const ANSWER = [
-    `I started from the dock building block and sized the pocket for a ${d.values.device_width} × ${d.values.device_thickness} mm phone with ${d.values.clearance} mm of clearance per side. At 78 mm deep the dock tipped backwards when the screen was tapped, so the base is now ${d.values.depth} mm deep. The cable leaves through a bridged channel at the back.`,
-    `${passes.length} checks pass and ${warns.length} need a look. Tip-over resistance is ${warns[0].value}, a model that assumes the infill mass. The fit is ${fitY}% modelled because the phone’s width is assumed: measure it with calipers and the model gives ${d.next_actions[0].yield_after}. The slice is simulated: ${hm(d.slice_meta.time_s)} and ${d.slice_meta.filament_g.toFixed(1)} g of PLA on your A1 mini.`,
+    `I wrote it as a parametric design: a ${d.values.sun}-tooth sun, three ${d.values.planet}-tooth planets and a ${der("ring_teeth")}-tooth ring housing with bolt lugs, module ${d.values.module}. With the ring held that is a 1 : ${der("ratio")} reduction. The gears print in place, already in mesh; the carrier prints beside them and its pins press into the planets. Then one change, ${change.summary}: ${change.note.charAt(0).toLowerCase()}${change.note.slice(1)}.`,
+    `${plural(passes.length, "check")} pass and ${warns.length} ${warns.length === 1 ? "needs" : "need"} a look${warns.length ? `: ${warns[0].label.toLowerCase()}, ${warns[0].value}` : ""}. The thinnest wall is ${wall ? wall.value : "checked"}.${SL ? ` The slice is simulated: ${hm(SL.time_s)} and ${SL.filament_g.toFixed(1)} g of PLA on the ${SL.presets.machine.name}, ${plural(d.parts.length, "part")} on ${plural(SL.plates, "plate")}. It is not a print.` : ""} Only you can approve the release.`,
   ];
+  const TITLE = d.brief.split(":")[0];
   let stepsEl = null;
   function addUser(text) {
     const el = document.createElement("div"); el.className = "msg-user"; el.textContent = text;
@@ -393,12 +403,12 @@ export async function initHero() {
 
   // ---------- reset and the finished state ----------
   function reset() {
-    S.built = S.checked = S.sliced = false; S.acks = [false, false];
+    S.built = S.checked = S.sliced = false; S.acks = warns.map(() => false);
     if (S.sim) setSim(false); if (S.map) setMap(false);
     NODES.forEach(([id]) => node(id, "missing"));
     vp.hideFeatures(); vp.setDims(false); vp.setDevice(false);
     scroll.innerHTML = emptyState(); scroll.style.transform = "";
-    field.textContent = "Ask about Hallway phone dock, or describe a change…"; field.className = "field ph"; send.classList.remove("on");
+    field.textContent = `Ask about ${d.name}, or describe a change…`; field.className = "field ph"; send.classList.remove("on");
     $("#talk-title").textContent = "New conversation"; $("#tb-state").textContent = "Unreleased";
     $("#dims-read").style.opacity = "0";
     setView("iso", false); vp.orbitBy(-0.5);
@@ -414,7 +424,7 @@ export async function initHero() {
     STEPS.forEach((s, i) => { const el = addStep(s, i); doneStep(el, s); });
     stepsEl.querySelector(".f").textContent = "";
     const box = document.createElement("div"); box.className = "answer"; box.innerHTML = ANSWER.map((p) => `<p>${esc(p)}</p>`).join(""); scroll.appendChild(box);
-    $("#talk-title").textContent = "A dock for my phone on the hallway shelf";
+    $("#talk-title").textContent = TITLE;
     requestAnimationFrame(keepBottom);
     setView("iso", false);
     S.stage = "prove"; renderTabs(); renderPanel(false);
@@ -453,11 +463,11 @@ export async function initHero() {
     document.querySelectorAll(".hseg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     $("#home-lead").textContent = LEAD[b.dataset.p]; $("#home-printer").style.display = b.dataset.p === "print" ? "" : "none";
   });
-  const openDock = () => { story.takeover(); app.classList.remove("blank"); finished(); setScreen("work"); };
-  $("#home-cont").addEventListener("click", openDock);
+  const openSample = () => { story.takeover(); app.classList.remove("blank"); finished(); setScreen("work"); };
+  $("#home-cont").addEventListener("click", openSample);
   $("#home-scr").addEventListener("click", (e) => {
     const c = e.target.closest(".hcard"); if (!c) return;
-    if (c.dataset.open === "dock") openDock();
+    if (c.dataset.open === "sample") openSample();
     else { story.takeover(); document.getElementById("assemblies")?.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth" }); }
   });
   $("#home-blank").addEventListener("click", () => { story.takeover(); reset(); app.classList.add("blank"); $("#talk-title").textContent = "New conversation"; setScreen("work"); });
@@ -528,7 +538,7 @@ export async function initHero() {
     skipHome = false;
     setScreen("work");
     scroll.innerHTML = ""; addUser(d.brief);
-    $("#talk-title").textContent = "A dock for my phone on the hallway shelf";
+    $("#talk-title").textContent = TITLE;
     ptr.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: "forwards" }); setTimeout(() => ptr.classList.remove("on"), 300); ptr.getAnimations().forEach((a) => a.id === "f" && a.cancel());
     await wait(500);
     stepsGroup();
@@ -544,31 +554,34 @@ export async function initHero() {
     await wait(900);
     // 2: it looks at what it made
     el = addStep(STEPS[1], 1); await wait(650); doneStep(el, STEPS[1]); keepBottom(); await wait(700);
-    // 3: a deeper base so a tap does not tip it; previewed, then committed
-    el = addStep(STEPS[2], 2); setView("side"); await wait(1100); doneStep(el, STEPS[2]);
+    // 3: the one change after the first build; previewed from above, then committed
+    el = addStep(STEPS[2], 2); setView("top"); await wait(1100); doneStep(el, STEPS[2]);
     el = addStep(STEPS[3], 3); await wait(600); doneStep(el, STEPS[3]); setView("iso"); keepBottom();
     // 4: the pipeline: exports, checks, slice
     el = addStep(STEPS[4], 4); node("exports", "running"); await wait(600); node("exports", "current");
     node("checks", "running"); await wait(800); node("checks", "current"); S.checked = true;
     await pointTo($("#tab-prove"), wait); await click(wait); setStage("prove");
-    node("slice", "running"); await wait(1500); node("slice", "current"); S.sliced = true; node("release", "current");
+    if (SL) { node("slice", "running"); await wait(1500); node("slice", "current"); }
+    S.sliced = true; node("release", "current");
     doneStep(el, STEPS[4]); stepsEl.querySelector(".f").textContent = "2 folded"; renderTabs(); renderPanel(false);
     await wait(300);
     await streamAnswer(wait);
     await wait(1200);
-    // the print, layer by layer
-    await pointTo($("#watch"), wait); await click(wait);
-    await setSim(true); setP(0); await wait(400);
-    S.speedOverride = 640; setPlaying(true);
-    await new Promise((res) => { S.onSimEnd = res; });
-    S.onSimEnd = null; S.speedOverride = 0;
-    await wait(1600);
-    await pointTo($("#sim-back"), wait); await click(wait); setSim(false);
-    await wait(600);
+    // the print, layer by layer: only for a design that was sliced
+    if (SL) {
+      await pointTo($("#watch"), wait); await click(wait);
+      await setSim(true); setP(0); await wait(400);
+      S.speedOverride = 640; setPlaying(true);
+      await new Promise((res) => { S.onSimEnd = res; });
+      S.onSimEnd = null; S.speedOverride = 0;
+      await wait(1600);
+      await pointTo($("#sim-back"), wait); await click(wait); setSim(false);
+      await wait(600);
+    }
     // fit, then the release gate: acknowledged by a person, approved by a person
-    await pointTo($("#tab-fit"), wait); await click(wait); setStage("fit"); await wait(2600);
+    if (d.fit) { await pointTo($("#tab-fit"), wait); await click(wait); setStage("fit"); await wait(2600); }
     await pointTo($("#tab-release"), wait); await click(wait); setStage("release"); await wait(900);
-    for (const i of [0, 1]) { await pointTo(wrap.querySelector(`[data-ack="${i}"] .bx`), wait); await click(wait); S.acks[i] = true; renderPanel(false); await wait(350); }
+    for (let i = 0; i < warns.length; i++) { await pointTo(wrap.querySelector(`[data-ack="${i}"] .bx`), wait); await click(wait); S.acks[i] = true; renderPanel(false); await wait(350); }
     await pointTo($("#approve"), wait, 0.4, 0.5);
     await wait(3600);
     ptr.classList.remove("on");

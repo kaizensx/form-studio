@@ -3,9 +3,10 @@
 
 Every part, number and check in these drawings comes from a run on this machine:
 
-  1. four designs are built in a scratch projects folder: two from recipes (`form new`), sliced by your slicer, and
-     two written as build123d code the way an agent writes them (scripts/readme_designs/, through create_design, as
-     plain 3D models), so the CAD kernel builds the solids and the checks run on them;
+  1. four designs are built in a scratch projects folder: one from a recipe (`form new`), one from an exemplar's
+     design code as a print design (form/exemplars/planetary_gearbox.py, sliced by your slicer), and two written as
+     build123d code the way an agent writes them (scripts/readme_designs/, through create_design, as plain 3D
+     models), so the CAD kernel builds the solids and the checks run on them;
   2. the triangle meshes and B-rep edges are read from the engine (`Studio.view`) and projected with the
      viewport's orbit camera (Viewport.qml: orbit angles, 26° field of view);
   3. check names and results, derived values (gear ratios), the assembly joint and its sweep come from the same run;
@@ -243,8 +244,18 @@ class Svg:
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 # The engine: two real designs, built, checked and sliced
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-DESIGNS = {"desk-phone-stand": ("Desk phone stand", "device_stand", ["--purpose", "print"]),   # the slicer card: made for printing
-           "hinged-box": ("Hinged box", "storage_box", ["lid=2"])}
+DESIGNS = {"hinged-box": ("Hinged box", "storage_box", ["lid=2"])}
+# the print design (the checks, slicer and terminal cards): an exemplar's design code, created for printing and sliced
+PRINT_ID = "planetary-gearbox"
+PRINT_DESIGN = ("Planetary gearbox", "planetary_gearbox",
+                "A planetary gearbox to print in one go: a sun, three planets and a ring housing, with a pinned carrier.")
+PRINT_PLAN = {"features": [{"id": "ring", "label": "Ring housing", "how": "craft.planetary ring gear with a chamfered rim"},
+                           {"id": "flange", "label": "Bolt flange", "how": "three tapered lugs with M4 clearance holes"},
+                           {"id": "sun", "label": "Sun gear", "how": "involute gear from the same planetary set"},
+                           {"id": "planets", "label": "Planets", "how": "three involute gears in mesh, the backlash as the gap"},
+                           {"id": "carrier", "label": "Carrier", "how": "a plate with three pins sized from the planet bores"}],
+              "mechanisms": ["sun, planets and ring print in place, in mesh; the carrier prints beside them"],
+              "risks": ["three planets need sun + ring teeth divisible by 3"]}
 # designs written as build123d code, the way an agent writes them (scripts/readme_designs/), built with create_design
 # as plain 3D models: no printer, no slicing
 CODE_DESIGNS = {"planetary-gear-stage": ("Planetary gear stage", "planetary.py",
@@ -295,11 +306,26 @@ def engine(data_dir: Path) -> dict:
                     "brief": brief, "purpose": "model", "process": "cad", "plan": bid}
             subprocess.run([sys.executable, "-m", "form", "tool", "create_design", json.dumps(args)], cwd=ROOT, check=True,
                            stdout=subprocess.DEVNULL, env={**os.environ, "FORM_DATA": str(data_dir)})
+    if not (data_dir / PRINT_ID).exists():
+        from form import exemplars
+        name, exemplar, brief = PRINT_DESIGN
+        print("building %s from its design code, for printing…" % name, flush=True)
+        env = {**os.environ, "FORM_DATA": str(data_dir)}
+
+        def ptool(t, a):
+            r = subprocess.run([sys.executable, "-m", "form", "tool", t, json.dumps(a)], cwd=ROOT, check=True,
+                               capture_output=True, text=True, env=env)
+            return json.loads(r.stdout)
+        bid = ptool("design_brief", {"name": name, "goal": brief, "purpose": "print"})["brief"]
+        ptool("plan_design", {"brief": bid, **PRINT_PLAN})
+        ptool("create_design", {"name": name, "source": exemplars.get(exemplar)["source"], "brief": brief, "purpose": "print",
+                                "plan": bid})
+        subprocess.run([sys.executable, "-m", "form", "run", PRINT_ID], cwd=ROOT, check=True, stdout=subprocess.DEVNULL, env=env)
     from form import config, toolpath
     from form.studio import Studio
     st = Studio(config.load())
     out = {}
-    for pid in [*DESIGNS, *CODE_DESIGNS]:
+    for pid in [*DESIGNS, PRINT_ID, *CODE_DESIGNS]:
         state = json.loads(subprocess.run([sys.executable, "-m", "form", "state", pid], cwd=ROOT, check=True,
                                           capture_output=True, text=True, env={**os.environ, "FORM_DATA": str(data_dir)}).stdout)
         p = st.load(pid)
@@ -318,9 +344,10 @@ def engine(data_dir: Path) -> dict:
             for prt in asm["parts"]:
                 part_edges[prt["id"]] = _b64f(prt["edges"]).reshape(-1, 2, 3).astype(float)
         tp = None
-        if pid in DESIGNS:
+        if pid == PRINT_ID:
             try:
-                tp = toolpath.for_project(st, p)
+                sl = st.read(p, "slice", st.keys(p)["slice"]) or {}
+                tp = toolpath.for_project(st, p, 1 if sl.get("plates") else None)
             except Exception as e:  # no slicer: the print card is left out
                 print("no toolpath for %s: %s" % (pid, e))
         derived = {d["key"]: d for d in (st.head_summary(p).get("derived") or [])}
@@ -332,13 +359,12 @@ def engine(data_dir: Path) -> dict:
         return subprocess.run([sys.executable, "-m", "form", *args], cwd=ROOT, check=True, capture_output=True,
                               text=True, env=env).stdout
 
-    stand = out["desk-phone-stand"]
     # what the terminal card shows: the CLI's own output, verbatim
-    stand["state_text"] = cli("state", "desk-phone-stand")
+    out[PRINT_ID]["state_text"] = cli("state", PRINT_ID)
     out["tools"] = json.loads(cli("tool"))["tools"]
     # the exported files and their SHA-256
     import hashlib
-    for pid in ("desk-phone-stand", "planetary-gear-stage"):
+    for pid in (PRINT_ID, "planetary-gear-stage"):
         hashes = []
         for kind, path in out[pid]["state"]["files"].items():
             p = Path(path)
@@ -1319,7 +1345,7 @@ def arc_path(cx, cy, r, a0, a1) -> str:
 
 def f_proved(data, light):
     title = "Proved on the solid"
-    d = data["desk-phone-stand"]
+    d = data[PRINT_ID]
     F = stand_facts(d)
     loop = 10.0
     svg, p = card(title, light, loop)
@@ -1422,7 +1448,7 @@ def f_move(data, light):
 
 def f_slicer(data, light):
     title = "Your slicer, if you print"
-    d = data["desk-phone-stand"]
+    d = data[PRINT_ID]
     tp = d["toolpath"]
     loop = 10.0
     svg, p = card(title, light, loop)
@@ -1510,13 +1536,13 @@ def f_release(data, light):
 
 def f_headless(data, light):
     title = "Everything headless"
-    d = data["desk-phone-stand"]
+    d = data[PRINT_ID]
     loop = 10.0
     svg, p = card(title, light, loop)
     svg.rect(27, 20, 360, 258, 16, fill=p["well"])
-    cmd = "form state desk-phone-stand"
+    cmd = "form state " + PRINT_ID
     lines = d["state_text"].splitlines()
-    want = ['"name": ', '"lean": ', "Thinnest wall", '"time_min": ', '"filament_g": ']
+    want = ['"name": ', '"module": ', "Thinnest wall", '"time_min": ', '"filament_g": ']
     shown, last = [], None
     for i, ln in enumerate(lines):
         if any(w_ in ln for w_ in want) and not (want[0] in ln and shown and '"name"' in shown[0][1]):

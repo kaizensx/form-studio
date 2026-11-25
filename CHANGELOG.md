@@ -2,9 +2,20 @@
 
 ## Unreleased
 
+- **The drawn app on the website shows a planetary gearbox, not the phone dock.** The sample project behind the
+  live replica and "How it works" is the planetary gearbox exemplar, created for printing, with one committed change
+  (backlash 0.15 to 0.2 mm), then built, checked and sliced: 6 parts, 1027 faces, 7 checks pass and one asks for a
+  look, 55 min and 23.4 g on one plate. site/tools/export_site_data.py makes the project itself in a scratch data
+  folder, so the data is reproducible; the replica reads the design's purpose and draws a Fit tab, a Slice step, the
+  print simulation and the toolpath only for a print design that was sliced (site/tools/check_site.py fails
+  otherwise). Parts that are wider than one plate as modelled show the plate only with the sliced toolpath. The
+  layer chart of the print simulation keeps its height. README: the checks, slicer and terminal cards are drawn from
+  the same gearbox (scripts/readme_art.py builds it as a print design through the staged workflow); the social card
+  (site/assets/og.png) shows the hero helmet; the gallery's game controller gave way to a bottle and cap. The
+  scripts that make the product pictures are in scripts/media/showcase/, with a README.
 - **Website and README: real builds up front.** The home page opens on a photograph of the hero helmet pulled apart
   into its four parts, followed by a gallery of original designs built by the engine (planetary gear stage, ratchet
-  wrench, cam and follower, spiral vase, perforated lampshade, cube speaker, game controller, woven basket, a
+  wrench, cam and follower, spiral vase, perforated lampshade, cube speaker, bottle and cap, woven basket, a
   treasure chest game asset), then how it works, the app drawn live, mesh to editable CAD (a synthetic bracket:
   3,216 triangles to 18 dimensions, 0.0017 mm from the mesh), automatic refinement before and after, game assets
   with their four levels of detail, assemblies, and "your agent, your computer". The navigation is What it makes,

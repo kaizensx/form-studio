@@ -1,5 +1,5 @@
 // How it works: a Form Studio window pinned while four beats scroll past. Each beat is a screen of the app drawn in
-// code from the sample project's real data: the brief typed on Home, the solid the CAD kernel built (dock.glb),
+// code from the sample project's real data: the brief typed on Home, the solid the CAD kernel built (sample.glb),
 // the checks Form Studio's engine ran, and the toolpath Bambu Studio wrote (toolpath.bin). The scroll is the clock.
 import { siteData, loadGLB, toolpath, fmtDur, INKS } from "./data.js";
 import { scrub, span, clamp, easeOut, easeInOut } from "./motion.js";
@@ -10,7 +10,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 export async function initHow() {
   const track = $("#how-track");
   if (!track) return;
-  const d = (await siteData()).dock;
+  const d = (await siteData()).sample;
   const steps = [...document.querySelectorAll("#how-steps li")];
   const scenes = [...document.querySelectorAll("#how-win .scene")];
   const prog = [...document.querySelectorAll("#how-win .win-prog i")];
@@ -45,7 +45,7 @@ export async function initHow() {
 // ---------- 1. Home: the brief typed into the composer, then Design it ----------
 function home(d) {
   const out = $("#hw-type"), go = $("#hw-go");
-  $("#hw-printer").textContent = d.slice_meta.presets.machine.name;
+  $("#hw-printer").textContent = d.slice_meta ? d.slice_meta.presets.machine.name : "";
   const h = new Date().getHours();
   $("#how-win .greet").textContent = h < 5 ? "Working late" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
   let shown = -1;
@@ -63,11 +63,11 @@ function home(d) {
 // ---------- 2. CAD: the kernel's solid, feature by feature, turning as you scroll ----------
 function cad(d) {
   const canvas = $("#hw-gl"), list = $("#hw-feats");
-  $("#hw-cad").textContent = `${d.size.map((v) => v.toFixed(1)).join(" × ")} mm · ${d.faces} faces · ${d.volume_cm3} cm³ · built in ${d.build_ms} ms · ${d.kernel}`;
+  $("#hw-cad").textContent = `${d.size.map((v) => v.toFixed(1)).join(" × ")} mm · ${d.faces} faces · ${d.volume_cm3} cm³ · built in ${d.build_ms >= 1000 ? (d.build_ms / 1000).toFixed(1) + " s" : d.build_ms + " ms"} · ${d.kernel}`;
   let ready = null, three = null, last = -1;
   const boot = () => (ready ||= (async () => {
     const THREE = await import("three");
-    const parts = await loadGLB("assets/data/dock.glb");
+    const parts = await loadGLB("assets/data/sample.glb");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setClearColor(0, 0); renderer.outputColorSpace = THREE.SRGBColorSpace;
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(28, 1, 5, 3000);
@@ -110,7 +110,7 @@ function cad(d) {
   return (g) => { last = g; if (three) three(g); else boot().then(() => three && three(last)); };
 }
 
-// ---------- 3. Checks: the twelve the engine ran on revision 4, ticking in ----------
+// ---------- 3. Checks: the ones the engine ran on the head revision, ticking in ----------
 function checks(d) {
   const list = $("#hw-checks"), cs = d.checks;
   const ev = { computed: "t-datum", heuristic: "t-ink", model: "t-amber", modelled: "t-amber" };
@@ -131,6 +131,7 @@ function checks(d) {
 function print(d) {
   const c = $("#hw-pc");
   const sm = d.slice_meta;
+  if (!sm) return () => {};                             // a design that was not sliced has no print to play
   let tp = null, loading = null, layers = null, last = 0;
   const load = () => (loading ||= toolpath().then((t) => { tp = t; build(); draw(last); }));
   const ISO = (x, y, z) => [(x - y) * 0.866, (x + y) * 0.5 - z * 1.15];

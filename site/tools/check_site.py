@@ -5,7 +5,7 @@
 Fails (exit 1) when:
 - a page links to a local file that does not exist, or to an #anchor that is not on the page
 - an <img> has no alt text, or no width and height (layout shift)
-- the exported data (site.json, toolpath.bin) does not match its own layout
+- the exported data (site.json, toolpath.bin) does not match its own layout, or shows a slice the sample does not have
 - a page asks another host for a script, a stylesheet, a font or an image
 - the first view is heavier than the budget
 - recipes/index.json is missing, or names a preview that is not published
@@ -30,8 +30,8 @@ FIRST_VIEW = ["index.html", "css/site.css", "fonts/InstrumentSans.woff2", "fonts
               "assets/shots/hero.webp"]
 # the drawn app loads when it comes near: three.js, the sample project and its toolpath
 BUDGET_APP = 2_500_000
-APP_VIEW = ["js/app.js", "js/scene.js", "vendor/three.module.js", "vendor/OrbitControls.js",
-            "assets/data/site.json", "assets/data/dock.glb", "assets/data/toolpath.bin"]
+APP_VIEW = [f for f in ["js/app.js", "js/scene.js", "vendor/three.module.js", "vendor/OrbitControls.js",
+            "assets/data/site.json", "assets/data/sample.glb", "assets/data/toolpath.bin"] if (SITE / f).exists()]
 
 
 class Page(HTMLParser):
@@ -98,15 +98,21 @@ def main() -> int:
 
     data = SITE / "assets" / "data"
     site = json.loads((data / "site.json").read_text(encoding="utf-8"))
-    tp = site["dock"]["toolpath"]
-    size = (data / "toolpath.bin").stat().st_size
-    if size != tp["bytes"]:
-        errors.append(f"toolpath.bin: {size} bytes, site.json says {tp['bytes']}")
-    widths = {"points": 2, "run_count": 2, "run_type": 1, "layer_runs": 4}
-    for name, (off, count) in tp["layout"].items():
-        if off + count * widths[name] > size:
-            errors.append(f"toolpath.bin: {name} reads past the end of the file")
-    for glb in ("dock.glb", "box.glb"):
+    sample = site["sample"]
+    tp = sample.get("toolpath")
+    if bool(tp) != bool(sample.get("slice_meta")) or bool(tp) != (data / "toolpath.bin").exists():
+        errors.append("site.json: a toolpath is published only with a slice, and toolpath.bin only with both")
+    if tp and sample.get("purpose") != "print":
+        errors.append("site.json: the sample has a slice but is not a print design")
+    if tp:
+        size = (data / "toolpath.bin").stat().st_size
+        if size != tp["bytes"]:
+            errors.append(f"toolpath.bin: {size} bytes, site.json says {tp['bytes']}")
+        widths = {"points": 2, "run_count": 2, "run_type": 1, "layer_runs": 4}
+        for name, (off, count) in tp["layout"].items():
+            if off + count * widths[name] > size:
+                errors.append(f"toolpath.bin: {name} reads past the end of the file")
+    for glb in ("sample.glb", "box.glb"):
         head = (data / glb).read_bytes()[:12]
         if head[:4] != b"glTF":
             errors.append(f"{glb}: not a binary glTF file")
