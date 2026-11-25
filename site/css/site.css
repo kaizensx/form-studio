@@ -1063,8 +1063,8 @@ figure { margin: 0; }
 /* ---------- what it makes: a bento of real builds ---------- */
 .gx { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; margin-top: 48px; }
 .gx-t { position: relative; border-radius: var(--r-xl); overflow: hidden; background: #0b0d0f; min-height: 300px; isolation: isolate; }
-.gx-t.w7 { grid-column: span 7; } .gx-t.w5 { grid-column: span 5; } .gx-t.w4 { grid-column: span 4; }
-.gx-t.w7, .gx-t.w5 { aspect-ratio: auto; height: clamp(320px, 36vw, 460px); }
+.gx-t.w7 { grid-column: span 7; } .gx-t.w6 { grid-column: span 6; } .gx-t.w5 { grid-column: span 5; } .gx-t.w4 { grid-column: span 4; }
+.gx-t.w7, .gx-t.w6, .gx-t.w5 { aspect-ratio: auto; height: clamp(320px, 36vw, 460px); }
 .gx-t.w4 { height: clamp(300px, 30vw, 400px); }
 .gx-t img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 1200ms var(--ease-expo); }
 .gx-t:hover img { transform: scale(1.035); }
@@ -1074,7 +1074,7 @@ figure { margin: 0; }
 .gx-t .k { font-size: 11px; font-weight: 620; letter-spacing: .09em; text-transform: uppercase; color: #b9e8d7; }
 @media (max-width: 899px) {
   .gx { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 32px; }
-  .gx-t.w7, .gx-t.w5 { grid-column: span 2; height: 62vw; min-height: 0; }
+  .gx-t.w7, .gx-t.w6, .gx-t.w5 { grid-column: span 2; height: 62vw; min-height: 0; }
   .gx-t.w4 { grid-column: span 1; height: 58vw; min-height: 0; }
   .gx-t.w4 figcaption { padding: 12px 12px 14px; font-size: 12.5px; }
   .gx-t.w4 figcaption > span:last-child { display: none; }
