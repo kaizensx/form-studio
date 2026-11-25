@@ -11,6 +11,12 @@
   the head asked for when its recess leaves at least 0.4 mm of lid under it, and otherwise the next that fits
   (countersunk, then socket in a counterbore, then a pan head on the surface); the derived values and the BOM name
   the head used and why. A test builds every lid thickness edge with every head and screw size.
+- **Engineering materials for models.** A design that is not printed (CNC, casting, rendering) can be aluminium
+  6061 or 7075, mild or stainless steel, brass, copper, titanium, oak, walnut, maple, pine, POM, PTFE, PEEK or
+  acrylic: `set_appearance` and Colour and material in the workspace take them, with bd_materials' typical density
+  and look (form/material_library.py), and the design's mass is shown and reported by `get_project` (computed:
+  modelled volume x typical density). A design's `appearance()` zone may name one too (`"material": "brass"`).
+  Printing filaments are unchanged, and a print design keeps to them.
 - **The drawn app on the website shows a planetary gearbox, not the phone dock.** The sample project behind the
   live replica and "How it works" is the planetary gearbox exemplar, created for printing, with one committed change
   (backlash 0.15 to 0.2 mm), then built, checked and sliced: 6 parts, 1027 faces, 7 checks pass and one asks for a

@@ -78,6 +78,31 @@ class MaterialRules(unittest.TestCase):
         self.assertEqual(materials.mass_g(10000, "PLA"), 12.4)
         self.assertIsNone(materials.mass_g(10000, None))
 
+    def test_engineering_materials(self):
+        eng = materials.engineering()
+        for k in ("AL-6061", "AL-7075", "STEEL", "STAINLESS", "BRASS", "TITANIUM", "OAK", "WALNUT", "POM"):
+            self.assertIn(k, eng)
+        self.assertEqual(eng["AL-6061"]["density_g_cm3"], 2.7)            # bd_materials typical value
+        self.assertEqual(eng["BRASS"]["finish"], "metal")
+        self.assertEqual(materials.clean_material("aluminium 7075"), "AL-7075")
+        self.assertEqual(materials.clean_material("delrin"), "POM")
+        self.assertEqual(materials.clean_material("petg"), "PETG")             # filaments unchanged
+        self.assertNotIn("AL-6061", materials.MATERIALS)
+        self.assertEqual(materials.mass_g(10000, "AL-6061"), 27.0)              # 10 cm³ x 2.7 g/cm³
+        p = {"purpose": "model", "material": "BRASS"}
+        m = materials.mass(p, 10000)
+        self.assertEqual((m["grams"], m["evidence"]), (85.0, "computed"))
+        self.assertEqual(materials.resolved(p)["color"], eng["BRASS"]["color"])
+        self.assertEqual(materials.check_items(p, {}, {}), [])                  # no filament notes for brass
+        kinds = {x["id"]: x["kind"] for x in materials.catalogue()["materials"]}
+        self.assertEqual((kinds["PLA"], kinds["TITANIUM"]), ("filament", "engineering"))
+        # a design's appearance() zone can name one: its finish and colour, and its density
+        from form import appearance
+        z = appearance.validate([{"features": ["body"], "material": "aluminium"}], {"body"}, ["matte", "metal"])[0]
+        self.assertEqual((z["finish"], z["material"], z["density_g_cm3"]), ("metal", "aluminum", 2.7))
+        with self.assertRaises(ValueError):
+            appearance.validate([{"features": ["body"], "material": "cheese"}], {"body"}, ["matte", "metal"])
+
 
 class SelectionRules(unittest.TestCase):
     def test_clean_items(self):
@@ -234,6 +259,17 @@ class OnTheSolid(unittest.TestCase):
             materials.set_appearance(self.st, pid, "", material="cheese")
         materials.set_appearance(self.st, pid, "lid", color=None, material=None)
         self.assertNotIn("lid", self.st.load(pid).get("parts") or {})
+        with self.assertRaises(StudioError):                    # a print design takes a filament, not aluminium
+            materials.set_appearance(self.st, pid, "", material="aluminium")
+
+    def test_a_model_in_aluminium_reports_its_mass(self):
+        from form.digest import digest
+        d = self.st.create("Machined box", "hinged_box", purpose="model")
+        materials.set_appearance(self.st, d["id"], "", material="AL-7075")
+        p = self.st.load(d["id"])
+        self.assertEqual(p["material"], "AL-7075")
+        vol = self.st.head_summary(p)["volume_mm3"]
+        self.assertIn(f"{round(vol / 1000 * 2.81, 2):g} g in Aluminium 7075-T6", digest(self.st, d["id"])["mass"])
 
     def test_a_design_with_two_bodies_and_no_declaration(self):
         d = self.st.create_design("Two bodies", NO_ASSEMBLY)

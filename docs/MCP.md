@@ -37,7 +37,7 @@ design), or create_project from a recipe (describe_recipe) -> render (look at it
 commit_change, or update_design -> get_project (checks, next actions). Only for a design whose purpose is "print":
 run_pipeline (exports, print checks, a slice) -> request_release (a person approves in Form Studio).
 After every build, refinement runs in the background and lands as one more revision (refine_design shows, undoes
-or turns it off). Long work answers with a job: get_job.
+or turns it off; game assets only when turned on). Long work answers with a job: get_job.
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
@@ -80,7 +80,7 @@ read with `resources/read` at `skill://<name>/SKILL.md`. Claude Code lists them 
 available in headless runs (`claude -p`, the Agent SDK) or to clients without the extension, so the same guidance
 stays reachable through the `design_guide` tool.
 
-This build of the server offers the extensions `io.modelcontextprotocol/skills`.
+This build of the server offers the extensions `io.modelcontextprotocol/skills`, `io.modelcontextprotocol/tasks`.
 
 ## Questions to the person
 
@@ -465,7 +465,7 @@ box), "alternative" (a separate design in its family) or "new" (an unrelated des
 design: use part_of for the parts of one product.
 refine: "auto" (default): after the build, design refinement runs in the background and lands as one more
 revision, "Refined: N changes", each change a named refine feature you can undo (refine_design); "off": not
-for this design. Returns the project, a six-view sheet and a section: look.
+for this design; "on": also for a game asset, which is not refined unless asked. Returns the project, a six-view sheet and a section: look.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -551,8 +551,9 @@ keeps lands as one new revision, "Refined: N changes", each change with its reas
 action: "status" (the job's stage and events, and the refine changes the head carries; wait=s waits up to s
 seconds for a running job), "rerun" (refine the head again now), "undo" (feature="refine_..." takes one change
 out, no feature takes all of them out, as a new revision; expect_head guards it), "off" (no automatic
-refinement for this design from now on; "on" turns it back on). Measures are computed heuristics
-(form/refine/analyze.py); the checks are the kernel's.
+refinement for this design from now on; "on" turns it back on). Game assets (Beta) are not refined unless
+asked: "on" or "rerun" for this design, or Settings › Refine game assets for all. Measures are computed
+heuristics (form/refine/analyze.py); the checks are the kernel's.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1296,9 +1297,12 @@ its Annotations panel.
 ### `set_appearance`
 
 Set the colour and material of a design. Colour (#rrggbb) and material of the whole design (part="") or of one part (an assembly part id from
-get_project / render). Materials: PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF. Form Studio draws the
-colour, writes it into its 3MF and adds material notes to the checks (heat, sunlight, warping, flexible, fibre-filled);
-stored in the same fields set_part_print uses (project material, parts.<id>.material), so the slicer picks the matching filament. Leave an argument out to keep it; clear=True removes both.
+get_project / render). Filaments (a print design): PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF; Form Studio
+adds their notes to the checks (heat, sunlight, warping, flexible, fibre-filled) and the slicer picks the matching filament.
+Engineering materials (a model design: CNC, casting, rendering): AL-6061, AL-7075, STEEL, STAINLESS, BRASS, COPPER, TITANIUM,
+OAK, WALNUT, MAPLE, PINE, POM, PTFE, PEEK, PMMA ("aluminium 7075", "delrin" also work), with bd_materials' typical density and
+look; get_project then reports the computed mass (volume x typical density). The colour is drawn and written into the 3MF;
+stored in the project's material fields (parts.<id>.material). Leave an argument out to keep it; clear=True removes both.
 
 | Argument | Type | Required |
 |---|---|---|

@@ -6,6 +6,11 @@
                     {"features": ["trim"], "finish": "rubber", "color": "#151617"},
                     {"features": ["shell", "spoiler"], "finish": "carbon", "color": "#2a2c30"}]
 
+A zone may name an engineering material instead of a finish and colour: {"features": ["body"], "material":
+"aluminium 6061"} takes the material's finish and colour from form/material_library.py (bd_materials' typical look:
+aluminium 6061/7075, steel, stainless, brass, copper, titanium, oak, walnut, POM, PTFE, ...); a finish or colour
+given beside it wins. The zone keeps the material id and its density (g/cm³), so a part's mass can be computed.
+
 Features no zone names take the material and colour asked for in render_photo. Finishes are the Blender adapter's
 (form/adapters/blender.py FINISHES): matte, petg, silk, gloss, carbon, smoke, rubber, metal. A zone is an
 illustration choice, like the photo itself: it is not evidence of any material property.
@@ -35,13 +40,24 @@ def validate(zones, features: set, finishes) -> list[dict]:
         unknown = [f for f in fs if f not in features]
         if unknown:
             raise ValueError(f"appearance()[{i}] names unknown features: {', '.join(unknown)}")
-        fin = str(z.get("finish", "matte"))
+        mat = None
+        if z.get("material"):
+            from . import material_library
+            try:
+                mat = material_library.get(str(z["material"]))
+            except KeyError as e:
+                raise ValueError(f"appearance()[{i}]: {e.args[0] if e.args else e}")
+        fin = str(z.get("finish") or (mat["finish"] if mat else "matte"))
         if fin not in finishes:
             raise ValueError(f"appearance()[{i}]: unknown finish {fin!r} (finishes: {', '.join(finishes)})")
-        col = str(z.get("color", "#eeece6"))
+        col = str(z.get("color") or (mat["color"] if mat else "#eeece6"))
         if not HEX.fullmatch(col):
             raise ValueError(f"appearance()[{i}]: colour {col!r} is not #rrggbb")
-        out.append({"features": fs, "finish": fin, "color": col.lower(), "label": str(z.get("label", fin))})
+        row = {"features": fs, "finish": fin, "color": col.lower(),
+               "label": str(z.get("label") or (mat["name"] if mat else fin))}
+        if mat:
+            row.update(material=mat["id"], density_g_cm3=round(mat["density_kg_m3"] / 1000.0, 3))
+        out.append(row)
     return out
 
 

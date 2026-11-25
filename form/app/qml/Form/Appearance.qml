@@ -3,7 +3,9 @@ import "F.js" as F
 
 // Colour and material: for the whole design, and for each part of a design that prints several. A row shows the
 // colour, the name and the material; opened, it offers the swatches and the materials. The viewport draws the
-// colour; the material adds its notes to the checks and gives the solid-mass estimate (form/materials.py).
+// colour; the material adds its notes to the checks and gives the solid-mass estimate (form/materials.py). A print
+// design offers the printing filaments; a model (CNC, casting, rendering) offers the engineering materials too
+// (aluminium, steel, brass, titanium, woods, engineering plastics), with their computed mass.
 Sec {
     id: ap
     objectName: "appearance"
@@ -13,7 +15,9 @@ Sec {
     readonly property var parts: Store.assembly ? Store.assembly.parts : []
     readonly property var rows: [{ id: "", label: parts.length ? "Whole design" : "Design", volume: Store.shown ? Store.shown.volume_mm3 : 0 }]
         .concat(parts.map(function (x) { return { id: x.id, label: x.label, volume: x.volume_mm3 } }))
-    readonly property var matModel: [{ value: "", text: "Not chosen" }].concat((Store.materialCat ? Store.materialCat.materials : []).map(function (m) { return { value: m.id, text: m.label } }))
+    readonly property var matModel: [{ value: "", text: "Not chosen" }].concat((Store.materialCat ? Store.materialCat.materials : [])
+        .filter(function (m) { return Store.modelDesign ? true : m.kind !== "engineering" })
+        .map(function (m) { return { value: m.id, text: m.label + (m.kind === "engineering" ? " · " + F.fmt(m.density_g_cm3, 2) + " g/cm³" : "") } }))
     Component.onCompleted: Store.loadMaterials()
 
     Column {
@@ -44,7 +48,8 @@ Sec {
                         Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
                             text: (row.mat ? row.mat.label : "No material chosen")
                                 + (row.inherits ? " · as the design" : "")
-                                + (row.mat && row.modelData.volume ? " · " + F.fmt(row.modelData.volume / 1000 * row.mat.density_g_cm3, 1) + " g if solid" : "") } }
+                                + (row.mat && row.modelData.volume ? " · " + F.fmt(row.modelData.volume / 1000 * row.mat.density_g_cm3, 1)
+                                   + (row.mat.kind === "engineering" ? " g" : " g if solid") : "") } }
                     Icon { name: "chevron_down"; size: 12; color: Theme.ink4; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                         rotation: row.editing ? 0 : -90
                         Behavior on rotation { NumberAnimation { duration: Motion.move(140); easing.type: Easing.OutCubic } } }
@@ -88,14 +93,16 @@ Sec {
                             onPicked: function (v) { Store.setLook(row.modelData.id, undefined, v || null) } }
                     }
                     Txt { kind: "fine"; tone: 2; width: parent.width - 20; visible: !!row.mat
-                        text: row.mat ? row.mat.note + " Softens from about " + row.mat.heat_c + " °C" + (row.mat.nozzle_c ? "; nozzle " + row.mat.nozzle_c[0] + "–" + row.mat.nozzle_c[1] + " °C." : ".") : "" }
+                        text: !row.mat ? "" : row.mat.kind === "engineering"
+                              ? row.mat.note + " " + F.fmt(row.mat.density_g_cm3, 2) + " g/cm³; the mass is computed from the modelled volume (typical values, " + row.mat.source + ")."
+                              : row.mat.note + " Softens from about " + row.mat.heat_c + " °C" + (row.mat.nozzle_c ? "; nozzle " + row.mat.nozzle_c[0] + "–" + row.mat.nozzle_c[1] + " °C." : ".") }
                 }
             }
         }
     }
     Txt { kind: "fine"; width: parent.width
         text: Store.printUi ? "The colour is drawn here and written into the 3MF. A material adds its notes to the checks (heat, sunlight, warping, flexible, fibre-filled) and picks the slicer’s filament; typical datasheet values, brands differ."
-            : "The colour is drawn here, in renders and in the 3MF. A material adds its notes to the checks (heat, sunlight, flexible); typical datasheet values, brands differ." }
+            : "The colour is drawn here, in renders and in the 3MF. An engineering material (aluminium, steel, brass, wood, POM…) gives the design its look and a computed mass; typical values, grades differ." }
     Btn { objectName: "save3mf"; small: true; icon: "download"; text: "Save 3MF with colours…"; enabled: !Store.hasDraft
         tip: Store.hasDraft ? "Commit or discard the draft first." : "The current revision as printed, one object per part, each in its colour."
         onClicked: Store.exportRequested("colour3mf", Store.pid, "3mf") }

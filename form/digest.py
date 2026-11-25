@@ -42,6 +42,15 @@ def digest(st, pid: str, bench: str | None = None) -> dict:
         del out["orientation"]
         out["purpose"]["note"] = ("A 3D model, not for 3D printing: no printer, slicer, orientation or filament applies. "
                                   "Do not ask the person about a printer. Print checks are not run.")
+    if s["purpose"]["purpose"] != "print" and p.get("material"):   # a model in a material: its computed mass
+        from . import materials
+        try:
+            m = materials.mass(p, (st.head_summary(p) or {}).get("volume_mm3"))
+        except Exception:                            # noqa: BLE001 - the mass is a convenience; the record stands
+            m = None
+        if m:
+            out["mass"] = (f"{m['grams']:g} g in {m['label']} ({m['density_g_cm3']:g} g/cm³; computed: "
+                           f"{m['source']})")
     if getattr(recipe, "mesh", False):
         out["mesh_design"] = recipe.public().get("notes", [])
     parts = [r for r in p["brief"].get("references", []) if r.get("kind") == "part"]

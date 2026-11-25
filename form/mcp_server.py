@@ -1826,9 +1826,12 @@ def build() -> MCPServer:
     async def set_appearance(project: str, part: str = "", color: str | None = None, material: str | None = None,
                              clear: bool = False, ctx: Context = None) -> dict:
         """Set the colour and material of a design. Colour (#rrggbb) and material of the whole design (part="") or of one part (an assembly part id from
-        get_project / render). Materials: PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF. Form Studio draws the
-        colour, writes it into its 3MF and adds material notes to the checks (heat, sunlight, warping, flexible, fibre-filled);
-        stored in the same fields set_part_print uses (project material, parts.<id>.material), so the slicer picks the matching filament. Leave an argument out to keep it; clear=True removes both."""
+        get_project / render). Filaments (a print design): PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF; Form Studio
+        adds their notes to the checks (heat, sunlight, warping, flexible, fibre-filled) and the slicer picks the matching filament.
+        Engineering materials (a model design: CNC, casting, rendering): AL-6061, AL-7075, STEEL, STAINLESS, BRASS, COPPER, TITANIUM,
+        OAK, WALNUT, MAPLE, PINE, POM, PTFE, PEEK, PMMA ("aluminium 7075", "delrin" also work), with bd_materials' typical density and
+        look; get_project then reports the computed mass (volume x typical density). The colour is drawn and written into the 3MF;
+        stored in the project's material fields (parts.<id>.material). Leave an argument out to keep it; clear=True removes both."""
         st = studio()
         from . import materials
         def go():
@@ -1837,7 +1840,19 @@ def build() -> MCPServer:
                                            None if clear else (material if material is not None else "keep"), by=_origin(ctx))
             if materials.fingerprint(st.load(project)) != had and st.load(project).get("auto_run", True):
                 st.run(project)
-            return {"appearance": out, "materials": [{"id": k, "label": v["label"], "heat_c": v["heat_c"]} for k, v in materials.MATERIALS.items()]}
+            p = st.load(project)
+            res = {"appearance": out, "materials": [{"id": k, "label": v["label"], "heat_c": v["heat_c"]} for k, v in materials.MATERIALS.items()]}
+            from . import purpose as purpose_mod
+            if purpose_mod.is_model(p):
+                res["engineering_materials"] = [{"id": k, "label": v["label"], "density_g_cm3": v["density_g_cm3"]}
+                                                for k, v in materials.engineering().items()]
+                try:
+                    m = materials.mass(p, (st.head_summary(p) or {}).get("volume_mm3"), part)
+                except Exception:                    # noqa: BLE001 - the mass is a convenience
+                    m = None
+                if m:
+                    res["mass"] = m
+            return res
         return await _run(go)
 
     @mcp.tool(annotations=RO, structured_output=False)
