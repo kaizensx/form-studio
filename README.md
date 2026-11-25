@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <sub><b>Version 1.0.0</b> &nbsp;·&nbsp; <a href="https://github.com/kaizensx/form-studio/releases/tag/v1.1.0-preview.3"><b>Preview 1.1</b>: refinement, mesh to editable CAD, game assets</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">What is in it</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/#try">Try it in your browser</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/docs/">Docs</a> &nbsp;·&nbsp; <a href="https://discord.gg/b6ZgyndkmS">Discord</a></sub>
+  <sub><b>Version 1.0.0</b> &nbsp;·&nbsp; <a href="https://github.com/kaizensx/form-studio/releases/tag/v1.1.0-preview.4"><b>Preview 1.1</b>: refinement, mesh to editable CAD, game assets</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">What is in it</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/#try">Try it in your browser</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/docs/">Docs</a> &nbsp;·&nbsp; <a href="https://discord.gg/b6ZgyndkmS">Discord</a></sub>
 </p>
 
 <p align="center">
