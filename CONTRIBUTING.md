@@ -1,13 +1,12 @@
 # Contributing to Form Studio
 
-Thank you for helping. Form Studio gets better fastest when people who print things bring what they know: a recipe,
-a slicer that behaves differently, a measured result, a sharper check.
+Thank you for helping. Form Studio gets better fastest when people who print things bring what they know: a design
+helper, a slicer that behaves differently, a measured result, a sharper check.
 
 ## Ways to contribute
 
 | Contribution | Where it goes | Start here |
 |---|---|---|
-| **Recipes** | `community/recipes/<id>/` (gallery) or `form/recipes/` (built-in) | Open a [New recipe](https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml) issue: it is built, checked and sliced for you and answered with pictures. Or `form recipes submit <id>` for the folder and a pre-filled issue. See [community/recipes](community/recipes/README.md) and [Writing a recipe](docs/RECIPES.md) |
 | **Measured print results** | An issue or a [Show and tell](https://github.com/kaizensx/form-studio/discussions/categories/show-and-tell) post | Printer, nozzle, filament, slicer preset and the measured numbers. Attach a `.formstudio` file (renamed to `.zip`) and the automation replies with a turntable, four views, its checks and a slice |
 | **Slicer and printer support** | `form/adapters/` | [`form/adapters/__init__.py`](form/adapters/__init__.py) defines the adapter interface; OrcaSlicer forks that kept its command line need only an entry in [`form/adapters/orca_forks.py`](form/adapters/orca_forks.py) |
 | **Agent and provider support** | `form/agents/` | [`form/agents/base.py`](form/agents/base.py) defines the agent interface; model APIs are entries in [`form/agents/providers.py`](form/agents/providers.py) |
@@ -58,14 +57,13 @@ The interface journeys (`tests/test_ui_journeys.py`) drive the real window with 
 
 ```bash
 python site/build.py                    # docs pages, from docs/*.md
-python site/tools/build_recipe_index.py # site/recipes/index.json, from form/recipes and community/recipes
 python site/tools/check_site.py         # links, images, page weight
 python -m http.server -d site 8000
 ```
 
 ## Engineering principles
 
-- **One geometry authority.** Everything derives from the recipe's build123d code. Outputs are never edited by hand.
+- **One geometry authority.** Everything derives from the design's build123d code. Outputs are never edited by hand.
 - **Staleness is derived.** An artifact is current when a file exists under the hash of its inputs. If an input
   matters, it belongs in the key (`Studio.keys`).
 - **Evidence classes are not interchangeable.** A rule of thumb is `heuristic`; a formula with assumptions is `model`
@@ -81,7 +79,7 @@ python -m http.server -d site 8000
 2. Keep each pull request to one change. Include tests, and screenshots for interface changes.
 3. Add a line to `CHANGELOG.md` under the next version.
 4. Run the checks before you push (below). CI runs the test suite on Linux and macOS, checks that `docs/MCP.md` is
-   current, and builds the website. A pull request that touches recipes or the interface gets before and after
+   current, and builds the website. A pull request that touches the engine's building blocks or the interface gets before and after
    pictures in a comment.
 
 ## Checks on every pull request

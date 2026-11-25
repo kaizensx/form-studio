@@ -17,7 +17,7 @@ contact_links:
     about: Share something you designed and printed with Form Studio.
   - name: Documentation
     url: https://kaizensx.github.io/form-studio/docs/
-    about: The guide, the MCP reference, recipes, compatibility and the changelog.
+    about: The guide, the MCP reference, compatibility and the changelog.
   - name: Security vulnerability
     url: https://github.com/kaizensx/form-studio/security/advisories/new
     about: Report a vulnerability privately. Please do not open a public issue.

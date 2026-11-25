@@ -311,15 +311,9 @@ form tool get_project '{"project": "desk-stand"}'                               
 | **96 MCP tools** | [docs/MCP.md](docs/MCP.md) |
 | **How the engine is built** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 
-## Building blocks
-
-<p align="center"><img src="docs/images/recipes.webp" width="828" alt="Building blocks rendered by Form Studio's engine: Gridfinity bin, box with lid, phone and tablet stand, SKÅDIS pegboard accessory, self-watering planter, faceted vase, cable organizer, under-desk hanger, shelf bracket, hose adapter, battery and card holder, electronics enclosure"></p>
-
-Agents can also start from parametric building blocks: Gridfinity bins and baseplates, boxes with sliding, press-on or hinged lids, SKÅDIS pegboard accessories, phone and tablet stands, cable organizers, under-desk hangers, shelf brackets, hose adapters, self-watering planters, faceted vases, battery and card holders and electronics enclosures. Each passes its checks at its defaults. Browse them, and what the community adds, in the **[recipe gallery](https://kaizensx.github.io/form-studio/recipes/)**.
-
 ## Community
 
-**[Join the Form Studio Discord](https://discord.gg/b6ZgyndkmS)**: help, the things people made, recipes, ideas and every release as it ships.
+**[Join the Form Studio Discord](https://discord.gg/b6ZgyndkmS)**: help, the things people made, ideas and every release as it ships.
 
 | | |
 |---|---|
@@ -329,7 +323,7 @@ Agents can also start from parametric building blocks: Gridfinity bins and basep
 | **[Show and tell](https://github.com/kaizensx/form-studio/discussions/categories/show-and-tell)** | The things you made, and how they came out. |
 | **[Printers and slicers](https://github.com/kaizensx/form-studio/discussions/categories/printers-slicers)** | Presets, filaments and slicer questions, answered by people who print. |
 
-**Contributing.** Recipes, design helpers, agent integrations, software adapters and measured results are all welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Branch from `dev` and open the pull request against it. To share a recipe, [open a recipe issue](https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml) or run `form recipes submit`; it is built and checked automatically and answered with pictures.
+**Contributing.** Design helpers, agent integrations, software adapters and measured results are all welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Branch from `dev` and open the pull request against it.
 
 **Security.** Report a vulnerability privately as described in [SECURITY.md](SECURITY.md). [Code of Conduct](CODE_OF_CONDUCT.md) · [Support](SUPPORT.md) · [Changelog](CHANGELOG.md)
 

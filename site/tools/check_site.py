@@ -8,7 +8,6 @@ Fails (exit 1) when:
 - the exported data (site.json, toolpath.bin) does not match its own layout, or shows a slice the sample does not have
 - a page asks another host for a script, a stylesheet, a font or an image
 - the first view is heavier than the budget
-- recipes/index.json is missing, or names a preview that is not published
 - the site holds a video, a GIF or an animated image (the app is drawn in code instead)
 - a page's navigation bar or footer differs from the shared one in site/tools/chrome.py
 """
@@ -59,7 +58,7 @@ class Page(HTMLParser):
 
 def main() -> int:
     errors: list[str] = []
-    pages = sorted(SITE.glob("*.html")) + sorted((SITE / "docs").glob("*.html")) + sorted((SITE / "recipes").glob("*.html"))
+    pages = sorted(SITE.glob("*.html")) + sorted((SITE / "docs").glob("*.html"))
     pages += sorted((SITE / "compat").glob("*.html")) + sorted((SITE / "bench").glob("*.html")) + sorted((SITE / "measure").glob("*.html"))
     if not (SITE / "docs" / "index.html").exists():
         errors.append("site/docs is missing: run python site/build.py first")
@@ -117,19 +116,6 @@ def main() -> int:
         head = (data / glb).read_bytes()[:12]
         if head[:4] != b"glTF":
             errors.append(f"{glb}: not a binary glTF file")
-
-    idx = SITE / "recipes" / "index.json"
-    if not idx.is_file():
-        errors.append("recipes/index.json is missing: run python site/tools/build_recipe_index.py")
-    else:
-        d = json.loads(idx.read_text(encoding="utf-8"))
-        if d.get("version") != 1 or not d.get("recipes"):
-            errors.append("recipes/index.json: expected version 1 and at least one recipe")
-        for r in d.get("recipes", []):
-            if r.get("preview"):
-                local = SITE / "recipes" / "previews" / r["preview"].rsplit("/", 1)[-1]
-                if not local.is_file():
-                    errors.append(f"recipes/index.json: {r['id']} preview is not in site/recipes/previews")
 
     # the app is drawn in code: no video, GIF or animated image anywhere on the site
     for f in SITE.rglob("*"):
