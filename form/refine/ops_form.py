@@ -550,7 +550,7 @@ class PierMassing(Operator):
     targets = ("silhouette", "interior_read", "detail_scales")
     cost = 1.5
     label = "End piers"
-    params = {"width": 0.12, "proud": 0.3, "rise": 0.06, "bevel": 0.012, "cap": 0.5}
+    params = {"width": 0.12, "proud": 0.3, "rise": 0.06, "bevel": 0.02, "cap": 0.5}
 
     def _plan(self, design):
         parts = parts_of(design.source)
@@ -596,6 +596,10 @@ class PierMassing(Operator):
         i = len(parts)
         for end in (0, 1):
             plo, phi = lo.copy(), hi.copy()
+            # never flush with the slab's end or floor: coplanar faces make the kernel's fuse split or fail (the
+            # design then builds as more than one solid); a hair in from both keeps the fuse clean
+            gap = 0.002 * max(size[L], size[2])
+            plo[L], phi[L], plo[2] = lo[L] + gap, hi[L] - gap, lo[2] + gap
             if end == 0:
                 phi[L] = lo[L] + w
             else:
@@ -609,7 +613,7 @@ class PierMassing(Operator):
             grow = np.array([cap * proud] * 3)
             grow[2] = 0.0
             clo, chi = plo - grow, phi + grow
-            clo[L], chi[L] = max(clo[L], lo[L]), min(chi[L], hi[L])
+            clo[L], chi[L] = max(clo[L], lo[L] + gap), min(chi[L], hi[L] - gap)
             clo[2] = phi[2] - 0.6 * rise
             chi[2] = phi[2] + 0.4 * rise
             for b in (block(plo, phi, bev), block(clo, chi, 0.5 * bev)):
