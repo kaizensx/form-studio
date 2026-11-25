@@ -1097,44 +1097,15 @@ def _orientation_table(P, T, extra=()):
     return [analysis.orientation_row(P, T, name) for name in names]
 
 
-def _thickness(model, max_rays=1500):
-    """Opposing-wall thickness by casting rays inward from surface samples."""
-    from build123d import Vector
-    from . import analysis
-    inter_for = analysis.wall_intersectors(model)     # each part measured on its own: parts touching are not walls
-    total = sum(f["area"] for f in model["faces"]) or 1
-    kmin = 3 if len(model["faces"]) * 3 <= max_rays * 2 else 0      # a mesh has thousands of faces: sample by area only
-    best = {"t": float("inf")}
-    hist = []
-    rng = np.random.default_rng(0)   # fixed seed: the same solid always gets the same samples
-    exempt = set(getattr(model["recipe"], "wall_exempt", ()))     # lettering: its sharp corners are not walls (form/marks.py checks strokes)
-    for f in model["faces"]:
-        if f["feature"] in exempt:
-            continue
-        P, T = f["P"], f["T"]
-        a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
-        areas = np.linalg.norm(np.cross(b - a, c - a), axis=1) / 2
-        k = max(kmin, int(round(max_rays * f["area"] / total)))
-        if k == 0:
-            continue
-        pick = rng.choice(len(T), size=k, p=areas / areas.sum())
-        u, w_ = rng.random(k), rng.random(k)
-        flip = u + w_ > 1
-        u[flip], w_[flip] = 1 - u[flip], 1 - w_[flip]
-        pts = a[pick] + (b[pick] - a[pick]) * u[:, None] + (c[pick] - a[pick]) * w_[:, None]
-        for p in pts:
-            try:
-                n = f["face"].normal_at(Vector(*p))
-            except Exception:
-                continue
-            hit = analysis.wall_hit(inter_for(f["face"]), p, (n.X, n.Y, n.Z))   # the same ray the thickness map casts
-            if hit is None:                                      # nothing opposite, or a wedge at an edge or chamfer, not a wall
-                continue
-            w, qq = hit
-            hist.append(w)
-            if w < best["t"]:
-                best = {"t": float(w), "at": [float(x) for x in p], "to": [float(x) for x in qq], "feature": f["feature"]}
-    return best, hist
+def _thickness(model, max_rays=1500, floor=0.8, key=None):
+    """Opposing-wall thickness over the whole surface (form/thickness.py): (the thinnest wall, every thin region).
+
+    The thinnest is {"t": inf} when no opposing wall is found. `max_rays` is kept for callers of the sampled
+    measurement this replaced; the field measures every vertex."""
+    from . import thickness
+    res = thickness.regions(key if key is not None else model, floor, model=model)
+    best = dict(res["thinnest"]) if res["thinnest"] else {"t": float("inf")}
+    return best, res
 
 
 def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180, 180, 180), orientation="as_modelled",
@@ -1144,9 +1115,9 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
     model = _get(key, recipe_id, values, 0.05)
     P, T = _mesh_arrays(model)
     table = _orientation_table(P, T, extra=(orientation,))
-    thin, hist = _thickness(model)
+    thin, field = _thickness(model, floor=2 * nozzle, key=key)
     out = {"orientation_table": table, "thin": thin if thin["t"] < float("inf") else None,
-           "thickness_samples": len(hist),
+           "thickness_samples": field["samples"], "thin_regions": field,
            "brep": {"valid": bool(model["shape"].is_valid), "solids": len(model["shape"].solids()),
                     "expected_solids": getattr(model["recipe"], "solids", 1),
                     "volume_mm3": model["volume"], "mesh_design": bool(getattr(model["recipe"], "mesh", False))},
