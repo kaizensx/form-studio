@@ -7,8 +7,19 @@ name = "form-studio"
 version = "1.1.0.dev0"
 description = "Desktop app, engine and MCP server for designing 3D-printable parts with an AI agent: real CAD, real slicing and an honest evidence record."
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+# Form Studio is MIT. Shipped with it, under their own licences: form/recon/cadfit (CADFit, CC BY-NC 4.0, included
+# with its author's permission), the exemplars ported from CADEvolve (Apache-2.0), the interface fonts (OFL-1.1),
+# Lucide icons (ISC) and three.js (MIT). packaging/form.spec ships the same licence files in the app.
+license = "MIT AND CC-BY-NC-4.0 AND Apache-2.0 AND OFL-1.1 AND ISC"
+license-files = [
+  "LICENSE",
+  "form/recon/cadfit/LICENSE",
+  "form/recon/cadfit/PERMISSION.md",
+  "form/exemplars/LICENSE-CADEvolve",
+  "form/app/assets/fonts/*LICENSE*",
+  "form/fonts/*LICENSE*",
+  "form/web/vendor/THREE_LICENSE",
+]
 requires-python = ">=3.12,<3.13"
 keywords = ["3d-printing", "cad", "mcp", "build123d", "slicer", "agents"]
 classifiers = [
