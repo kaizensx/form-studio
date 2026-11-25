@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- **Cage operators keep every LOD closed and manifold.** Refinement replays a cage in a strict mode: the cage
+  literal's zero-length edges are collapsed before the first refinement op (the helmet had two beside its visor,
+  and Blender's bevel clamps the whole bevel to its tightest spot, so a panel line there folded into coincident
+  points), a bevel that would still clamp to zero width leaves out the edges with no room beside them or is refused,
+  and every op must leave the cage as closed, manifold and consistently wound as it found it (a new winding error is
+  repaired; anything else refuses the op in a second, before any bake). LOD decimation checks every try the way the
+  validator will (welded open and non-manifold edges, winding errors, inverted shells, faces folded against the
+  source), removes small parts the collapse turned flat or inside out (a rivet at LOD3), prefers a sound try over a
+  closer unsound one, and retries milder before giving up. Exemplar op lists replay exactly as before.
+- **Primary-form operators for game cages** (form/refine/ops_form.py), chosen by the brief's words and the cage's
+  shape: shell fairing (Taubin smoothing of a lumpy shell, creases, region borders and frozen regions held, carried
+  to the bake source), a dished wheel face (spokes sink, the hub stands out), lid and body massing for a chest (the
+  lid overhangs and its dome rises, the walls step in above the foot), end piers with caps for a wall piece (inside
+  its grid), and a waist for a handheld bar. They move points or add closed parts and never change a part's faces,
+  so the cage stays manifold by construction. A new `fairness` deficit measures how lumpy a cage's shell is.
+- **Refinement does not delay the next design's first picture.** A kernel worker pruned its checkpoint folder inside
+  the first feature it built after 20 s; with every design refined the folder holds about a thousand checkpoints
+  (three times as many as without), and the listing took milliseconds out of the next design's first stage. It now
+  prunes in a background thread. A candidate batch the engine stopped waiting for, or a finished run's, starts no
+  more builds and measures nothing it gets back.
+- **Benches, measured honestly.** Creation bench (docs/CREATION_BENCH.md): every gate passes: function checks
+  identical, mean critic gain 1.91, no brief lower, first visible 0.044 s on and 0.043 s off (within 5 %; an
+  earlier run before the pruning fix failed at 0.048 s against 0.0435 s). Game bench (docs/GAME_BENCH.md), three new
+  blind passes by model subagents over the fourteen sheets of both runs shuffled together: refinement now keeps a
+  primary-form change on three of six assets (shell fairing on the helmet, lid and body massing on the chest, end
+  piers on the wall) and no detail operator fails on a non-manifold LOD any more; rubric with refinement on 2.81
+  helmet, 3.31 chest, 3.19 sword, 2.94 wall, 3.31 wheel, 2.94 remote, so the aesthetic gate (4.0 on five of six)
+  still fails. The blind passes still read the helmet shell as lumpy and the remote as a plain bar; the wall went
+  from 2.38 to 2.94 and the chest from 3.12 to 3.31.
+
 - **Game refinement sees what a candidate looks like baked.** Each game candidate now gets a quick bake (256 px
   maps, few samples: a new internal `preview` bake of form/game) and is scored on that asset's game evidence: bevel
   coverage, value contrast, detail scales and their density, wear, and the interior read of a lit render with the
