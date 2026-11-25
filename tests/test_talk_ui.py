@@ -88,8 +88,16 @@ PREP = textwrap.dedent("""
 
 COMPARE = "(function () {" + LIB + textwrap.dedent("""
     var ch = { project: Store.pid, from: 1, to: 2 }
-    function on(what) { if (!Store.compare || Store.compare.rev !== 1) throw new Error("TALKUI compare did not start: " + what) }
-    function off(what) { if (Store.compare) throw new Error("TALKUI compare did not end: " + what) }
+    // comparing is a wipe: the other revision is drawn as a solid right of a line that can be dragged
+    function wipe() { var w = find(win.contentItem, "compareWipe"); return !!w && w.visible && Store.viewer.wipeOn && Store.viewer.wipeX >= 0 }
+    function on(what) {
+        if (!Store.compare || Store.compare.rev !== 1) throw new Error("TALKUI compare did not start: " + what)
+        if (!wipe()) throw new Error("TALKUI comparing shows no wipe line: " + what)
+    }
+    function off(what) {
+        if (Store.compare) throw new Error("TALKUI compare did not end: " + what)
+        if (wipe() || Store.viewer.alt) throw new Error("TALKUI the wipe stayed after comparing ended: " + what)
+    }
     if (Store.project.head !== 2) throw new Error("TALKUI the design has head " + Store.project.head)
     Store.setStage("fit")
     Store.compareChange(ch)                          // from another stage: it goes to Shape and compares

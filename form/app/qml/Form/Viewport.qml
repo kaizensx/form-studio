@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import QtQuick3D
 import FormNative
 import "F.js" as F
@@ -11,9 +12,21 @@ import "Labels.js" as Labels
 // design made for printing, or "Show build plate").
 Item {
     id: vp
+    clip: true                               // labels pinned to the part never draw over the panels beside the view
     // ── public state ─────────────────────────────────────────
     property var model: null                 // engine view: { mesh[], edges, bbox, companions }
     property var ghost: null                 // another revision drawn as blueprint edges
+    property real ghostK: 1                  // the ghost's strength; fadeGhost() takes it out over Theme.cross
+    // Another revision drawn as a solid, in the head's frame. Compare puts it right of a vertical wipe line (wipeX, in
+    // view pixels; the head stays left of it); a peek cross-fades to it and back (altK). Not in the assembled views.
+    property var alt: null                   // engine view: { mesh[], edges }
+    property real altK: 0                    // 0 the model, 1 the other revision
+    property real wipeX: -1
+    readonly property bool altOk: !!alt && !!alt.mesh && !asmOn && !mapShown
+    readonly property bool wipeOn: wipeX >= 0 && altOk
+    readonly property real _wipePx: wipeOn ? wipeX * Screen.devicePixelRatio : -1
+    readonly property real _altMix: altOk && !wipeOn ? altK : 0      // how far a peek has faded to the other revision
+    Behavior on altK { NumberAnimation { duration: Theme.cross; easing.type: Easing.OutCubic } }
     property string selected: ""
     property string hovered: ""
     property var flagged: []
@@ -328,6 +341,7 @@ Item {
     function setModel(v, how) {
         if (v === model) { if (v) _frame(); return }
         var old = model, same = _sameMesh(old, v), grow = false
+        var fitWas = !!old && !!v && interactive && !lite && !spin && _fits()
         if (how === "build" && v && interactive && !lite) grow = _planReveal(old, v)
         else if (!same) _endReveal()          // the same geometry again (a reload) lets a build-up carry on
         if (!same || grow) _mesh = v && v.mesh ? v.mesh : []     // held features are created hidden: they never fade out first
@@ -338,8 +352,34 @@ Item {
         if (v) _frame()
         _syncDims(false)
         if (grow && !v.stage) _reframe(old)
+        // a change that makes the part outgrow the view (a draft that widens it, a taller revision): the camera
+        // pulls back to hold it in the free area, so it never slides under the panels. A view the person zoomed
+        // into is left alone, and a face being dragged waits until it is let go.
+        else if (fitWas && !v.stage && !_fits()) { if (faceDrag.active) _refitDue = true; else _refit() }
         if (grow) { _stepAt = 0; stepper.interval = 16; stepper.restart() }
     }
+    property bool _refitDue: false
+    function _overshoot() {                  // how far the part's box reaches past the free area: <= 1 inside, 2 = twice too wide; 99 = behind the camera
+        var b = bounds, k = 0, cx = insetLeft + freeW / 2, cy = insetTop + freeH / 2
+        for (var i = 0; i < 8; i++) {
+            var q = _px(Qt.vector3d(i & 1 ? b.hi.x : b.lo.x, i & 2 ? b.hi.y : b.lo.y, i & 4 ? b.hi.z : b.lo.z))
+            if (!q) return 99
+            k = Math.max(k, Math.abs(q.x - cx) / (freeW / 2), Math.abs(q.y - cy) / (freeH / 2))
+        }
+        return k
+    }
+    function _fits() { return _overshoot() <= 1.0 }
+    function _refit() {
+        _refitDue = false
+        var k = _overshoot()
+        tween = true; target = center(bounds)
+        dist = Math.min(3000, Math.max(frame(bounds, 1.5), k < 99 ? dist * Math.max(1, k) * 1.08 : dist))
+        refitCheck.restart()
+    }
+    // once the camera has arrived: a part that is long across the view may still reach past it
+    Timer { id: refitCheck; interval: Motion.camera + 60
+        onTriggered: { var k = vp._overshoot(); if (k > 1.0 && k < 99 && !ma.pressed) { vp.tween = true; vp.dist = Math.min(3000, vp.dist * k * 1.06) } } }
+    Connections { target: faceDrag; function onActiveChanged() { if (!faceDrag.active && vp._refitDue) { if (vp._fits()) vp._refitDue = false; else vp._refit() } } }
     // The camera frames a new build once, as it starts, and then stays where it is while the features arrive. A build
     // of the same design at about the same size leaves the camera where the person put it.
     function _reframe(old) {
@@ -491,7 +531,11 @@ Item {
         if (was) revealDone()
     }
     Timer { id: stepper; onTriggered: vp._nextStep() }
-    function setGhost(v) { ghost = v }
+    function setGhost(v) { ghostFade.stop(); ghostK = 1; ghost = v }
+    function fadeGhost() { if (ghost) ghostFade.restart() }           // the ghost leaves over Theme.cross
+    SequentialAnimation { id: ghostFade
+        NumberAnimation { target: vp; property: "ghostK"; to: 0; duration: Theme.cross; easing.type: Easing.OutCubic }
+        ScriptAction { script: { vp.ghost = null; vp.ghostK = 1 } } }
     // what is under a pixel: the point on the part as printed (the pick's local frame is the part's print frame,
     // whatever arrangement it is drawn in), the same point where it is drawn now, the part and the feature
     function hitAt(x, y) {
@@ -669,10 +713,11 @@ Item {
                         pivot: under ? mid : Qt.vector3d(0, 0, 0)
                         scale: under ? Qt.vector3d(0.994, 0.994, 0.994) : Qt.vector3d(1, 1, 1)
                         opacity: k; position: under ? mid : Qt.vector3d(0, 0, -(1 - k) * vp.riseMm)
-                        pickable: !vp.mapShown && k > 0.5; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0 && k > 0.001
+                        pickable: !vp.mapShown && k > 0.5; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0 && k > 0.001 && vp._altMix < 0.999
                         geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                         materials: CustomMaterial {
                             shadingMode: CustomMaterial.Shaded; cullMode: pmod.k < 1 ? Material.BackFaceCulling : Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                            property real uWipe: vp._wipePx; property real uWipeSide: 1
                             property real uMap: 0
                             property color uColor: vp.partColor(feature, "")
                             property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
@@ -718,10 +763,11 @@ Item {
                                 Behavior on k { SequentialAnimation { PauseAnimation { duration: vp._trace ? vp.edgeMs : 0 }       // its edges first
                             NumberAnimation { duration: vp.revealMs; easing.type: Easing.OutCubic } } }
                                 opacity: k; z: -(1 - k) * vp.riseMm
-                                pickable: !vp.mapShown && k > 0.5; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0 && k > 0.001
+                                pickable: !vp.mapShown && k > 0.5; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0 && k > 0.001 && vp._altMix < 0.999
                                 geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                                 materials: CustomMaterial {
                                     shadingMode: CustomMaterial.Shaded; cullMode: amod.k < 1 ? Material.BackFaceCulling : Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                                    property real uWipe: vp._wipePx; property real uWipeSide: 1
                                     property real uMap: 0
                                     property color uColor: vp.partColor(feature, pn.pid)
                                     property color uGlow: feature === vp.selected ? "#0a2019" : "#000000"
@@ -738,9 +784,10 @@ Item {
                             model: vp._trace && vp.model ? (vp._meshByPart[pn.pid] || []) : []
                             FeatureEdges { required property var modelData; host: vp; mesh: modelData; partId: pn.pid }
                         }
-                        Model { pickable: false; castsShadows: false; depthBias: -2; visible: !vp._trace
+                        Model { pickable: false; castsShadows: false; depthBias: -2; visible: !vp._trace && vp._altMix < 0.5
                             geometry: LineGeometry { segments: pn.part.edges || "" }
-                            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
+                            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/wipeline.frag"; vertexShader: "shaders/line.vert"
+                                property real uWipe: vp._wipePx; property real uWipeSide: 1
                                 property color uColor: vp.edgeColor(pn.pid); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
                     }
                 }
@@ -750,9 +797,43 @@ Item {
                     FeatureEdges { required property var modelData; required property int index
                         host: vp; mesh: modelData; last: !(vp.model && vp.model.stage) || index >= partEdges.count - 1 }
                 }
-                Model { visible: !!(vp.model && vp.model.edges) && !vp.asm && !vp._trace; pickable: false; castsShadows: false; depthBias: -2
+                Model { visible: !!(vp.model && vp.model.edges) && !vp.asm && !vp._trace && vp._altMix < 0.5; pickable: false; castsShadows: false; depthBias: -2
                     geometry: LineGeometry { segments: vp.model && vp.model.edges ? vp.model.edges : "" }
-                    materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
+                    materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/wipeline.frag"; vertexShader: "shaders/line.vert"
+                        property real uWipe: vp._wipePx; property real uWipeSide: 1
+                        property color uColor: vp.edgeColor(""); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
+                // the other revision as a solid (alt): right of Compare's wipe line, or cross-faded over the model (a peek)
+                Repeater3D {
+                    model: vp.altOk && (vp.wipeOn || vp.altK > 0.001) ? vp.alt.mesh : []
+                    Model {
+                        id: xmod
+                        required property var modelData
+                        pickable: false; castsShadows: false; opacity: vp.wipeOn ? 1 : vp._altMix
+                        // a peek fades in over the model, which stays solid under it until the peek is whole; it is drawn
+                        // a hair larger about the part's middle meanwhile, so the faces the two share never fight
+                        readonly property bool over: !vp.wipeOn && vp._altMix < 0.999
+                        readonly property vector3d mid: { var b = vp.model ? vp.model.bbox : null
+                            return b ? Qt.vector3d((b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2, (b[0][2] + b[1][2]) / 2) : Qt.vector3d(0, 0, 0) }
+                        pivot: over ? mid : Qt.vector3d(0, 0, 0); position: over ? mid : Qt.vector3d(0, 0, 0)
+                        scale: over ? Qt.vector3d(1.003, 1.003, 1.003) : Qt.vector3d(1, 1, 1)
+                        geometry: MeshGeometry { positions: xmod.modelData.positions; indices: xmod.modelData.indices }
+                        materials: CustomMaterial {
+                            shadingMode: CustomMaterial.Shaded; cullMode: vp.wipeOn || vp._altMix >= 1 ? Material.NoCulling : Material.BackFaceCulling; fragmentShader: "shaders/clay.frag"
+                            property real uWipe: vp._wipePx; property real uWipeSide: -1
+                            property real uMap: 0
+                            property color uColor: vp.partColor("\u0001other", "")          // the design's own colour, never the selection's
+                            property color uGlow: "#000000"
+                            property color uRim: "#000000"
+                            property vector3d uClipN: vp.clipN
+                            property real uClipD: vp.clipD
+                            property real uClip: vp.clipOn ? 1 : 0
+                        }
+                    }
+                }
+                Model { visible: vp.altOk && !!vp.alt.edges && (vp.wipeOn || vp._altMix >= 0.5); pickable: false; castsShadows: false; depthBias: -2
+                    geometry: LineGeometry { segments: vp.altOk && vp.alt.edges ? vp.alt.edges : "" }
+                    materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/wipeline.frag"; vertexShader: "shaders/line.vert"
+                        property real uWipe: vp._wipePx; property real uWipeSide: -1
                         property color uColor: vp.edgeColor(""); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
                 // a game asset's LOD (form/game/app.py lod()), drawn by shaders/game.frag: shaded with its baked base
                 // colour, ORM, tangent-space normal map (gameNormalMap) and emissive map, a UV checker, or one baked
@@ -772,10 +853,21 @@ Item {
                         property TextureInput uNormal: TextureInput { texture: Texture { source: vp.gameTex && vp.gameTex.normal ? vp.gameTex.normal : "" } }
                         property TextureInput uEmissive: TextureInput { texture: Texture { source: vp.gameTex && vp.gameTex.emissive ? vp.gameTex.emissive : "" } }
                         property TextureInput uShow: TextureInput { texture: Texture { source: vp.gameTex && vp.gameTex[vp.gameChannel] ? vp.gameTex[vp.gameChannel] : "" } } } }
-                Model { visible: !!(vp.ghost && vp.ghost.edges) && !vp.asmOn; pickable: false; castsShadows: false
+                Model { visible: !!(vp.ghost && vp.ghost.edges) && !vp.asmOn && vp.ghostK > 0.001; pickable: false; castsShadows: false
                     geometry: LineGeometry { segments: vp.ghost && vp.ghost.edges ? vp.ghost.edges : "" }
-                    materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"; depthDrawMode: Material.NeverDepthDraw
-                        property color uColor: Theme.blueprint; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                    materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/wipeline.frag"; vertexShader: "shaders/line.vert"; depthDrawMode: Material.NeverDepthDraw
+                        sourceBlend: vp.ghostK < 0.999 ? CustomMaterial.One : CustomMaterial.NoBlend
+                        destinationBlend: vp.ghostK < 0.999 ? CustomMaterial.OneMinusSrcAlpha : CustomMaterial.NoBlend
+                        property real uWipe: vp._wipePx; property real uWipeSide: 1      // Compare: the blue lines stay on the head's side
+                        property color uColor: Theme.alpha(Theme.blueprint, vp.ghostK); property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                // the same lines once more, drawn after the solids: the first copy shows through the part, this one also
+                // shows where there is no part behind it (over the floor: a mesh's outline before its CAD has grown)
+                Model { visible: !!(vp.ghost && vp.ghost.edges) && !vp.asmOn && vp.ghostK > 0.001; pickable: false; castsShadows: false
+                    geometry: LineGeometry { segments: vp.ghost && vp.ghost.edges ? vp.ghost.edges : "" }
+                    materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/wipeline.frag"; vertexShader: "shaders/line.vert"; depthDrawMode: Material.NeverDepthDraw
+                        sourceBlend: CustomMaterial.One; destinationBlend: CustomMaterial.OneMinusSrcAlpha
+                        property real uWipe: vp._wipePx; property real uWipeSide: 1
+                        property color uColor: Theme.alpha(Theme.blueprint, vp.ghostK); property vector3d uClipN; property real uClipD; property real uClip: 0 } }
 
                 // the thing the part holds, as a blueprint volume
                 Repeater3D {
@@ -829,6 +921,7 @@ Item {
                     geometry: MeshGeometry { id: ageo; source: vp._map }
                     materials: CustomMaterial {
                         shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                        property real uWipe: -1; property real uWipeSide: 1
                         property real uMap: vp.mapMix
                         property color uColor: Theme.clay
                         property color uGlow: "#000000"
@@ -896,7 +989,7 @@ Item {
             }
 
             // overall dimensions, drawn like a drawing: extension lines, a dimension line, the number
-            Model { visible: vp.showDims && !!vp.model && vp.asmMode !== "exploded" && !vp.dimsHeld; pickable: false; castsShadows: false
+            Model { visible: vp.showDims && !!vp.model && vp.asmMode !== "exploded" && !vp.dimsHeld && vp._altMix < 0.5; pickable: false; castsShadows: false
                 geometry: LineGeometry { points: {
                     var o = 7, t = 2.2, p = []
                     var x0 = vp.dimLo.x, x1 = vp.dimHi.x, y0 = vp.dimLo.y, y1 = vp.dimHi.y, z0 = vp.dimLo.z, z1 = vp.dimHi.z
@@ -1014,7 +1107,7 @@ Item {
     // dimension numbers, on the 3D dimension lines
     Repeater {
         id: dimLabels
-        model: vp.showDims && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.dimsHeld ? 3 : 0
+        model: vp.showDims && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
         Rectangle {
             id: dl
             objectName: "dimLabel"

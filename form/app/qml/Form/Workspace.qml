@@ -178,7 +178,11 @@ Item {
             hiddenFeatures: Store.hidden                                           // design tools: quick actions
             order: ws.d && ws.d.recipe && ws.d.recipe.features ? ws.d.recipe.features.map(function (f) { return f.id }) : []
             onRevealStep: function (ids, at, count) { build.step(ids, at, count) }
-            onRevealDone: build.done()
+            onRevealDone: { build.done(); Store.reconSettle() }
+            // another revision as a solid: right of Compare's wipe line, or cross-faded in while Before is held
+            alt: Store.compare ? Store.compare.view : Store.peek ? Store.peek.view : null
+            altK: !Store.compare && Store.peek && Store.peek.on ? 1 : 0
+            wipeX: Store.compare ? wipe.at : -1
             // colours and materials: re-made whenever the design's appearance or the catalogue changes
             colorOf: { var a = Store.appearance, c = Store.materialCat; return function (part) { return Store.look(part).color || "" } }
             // what the HUD covers: the rail and options, the dock when it is open, the strip and the readout
@@ -237,6 +241,54 @@ Item {
                 label: buildCap.st ? buildCap.st.label : build.label
                 at: buildCap.st ? buildCap.st.at : build.at; of: buildCap.st ? buildCap.st.of : build.of
                 running: !!buildCap.st || build.running; pulse: !!buildCap.st } }
+
+        // a mesh made editable: how far the CAD is from the mesh at most, counted up as the CAD grows inside the mesh's lines
+        Rectangle {
+            id: reconCap; objectName: "reconReadout"; z: 6
+            readonly property var rc: Store.recon && Store.recon.project === Store.pid ? Store.recon : null
+            x: Math.round(Math.max(60, Math.min(parent.width - width - 12, buildCap.x + (buildCap.width - width) / 2))); y: buildCap.y + buildCap.height + Theme.s2
+            width: rcr.implicitWidth + 2 * Theme.s3; height: 30; radius: Theme.rSm
+            color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.alpha(Theme.blueprint, 0.35)
+            opacity: rc ? 1 : 0; visible: opacity > 0.01
+            Behavior on opacity { NumberAnimation { duration: reconCap.rc ? Theme.fast : Theme.cross } }
+            Row { id: rcr; x: Theme.s3; anchors.verticalCenter: parent.verticalCenter; spacing: Theme.s2
+                Txt { mono: true; kind: "fine"; tone: 2; text: "max deviation"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
+                Loader { active: !!reconCap.rc; anchors.verticalCenter: parent.verticalCenter       // made anew for each reconstruction, so it counts from zero
+                    sourceComponent: Tick { countIn: true; countMs: 1600; decimals: 3; unit: " mm"; font.pixelSize: Theme.tBody; font.weight: Theme.wMedium
+                        value: reconCap.rc ? reconCap.rc.mm : 0; color: reconCap.rc && !reconCap.rc.within ? Theme.amber : Theme.ink } }
+                Tag { text: "computed"; anchors.verticalCenter: parent.verticalCenter }
+                Txt { kind: "fine"; tone: 3; visible: !!reconCap.rc && !reconCap.rc.within; text: "outside the tolerance"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap } } }
+
+        // Compare's wipe: the head left of the line, the other revision right of it. Drag the line; a tag on each side
+        // says which revision it is.
+        Item {
+            id: wipe; objectName: "compareWipe"; z: 3
+            property real frac: 0.5                 // across the free area of the view
+            readonly property real lo: vp.insetLeft + 24
+            readonly property real hi: Math.max(lo + 40, vp.width - vp.insetRight - 24)
+            readonly property real at: Math.round(lo + (hi - lo) * frac)
+            readonly property bool on: vp.wipeOn && !ws.sim
+            visible: on; x: at; y: 0; width: 1; height: strip.y
+            Rectangle { x: 0; y: 44; width: 1; height: parent.height - 56; color: Theme.alpha(Theme.blueprint, 0.7) }
+            Rectangle { id: grip; anchors.horizontalCenter: parent.left; y: Math.round(parent.height / 2) - 18; width: 14; height: 36; radius: 7
+                color: wm.pressed ? Theme.plate4 : Theme.plate3; border.color: Theme.alpha(Theme.blueprint, wm.containsMouse || wm.pressed ? 0.9 : 0.55)
+                scale: wm.pressed ? Theme.from(0.96) : 1
+                Behavior on scale { Glide { duration: Theme.press } } Behavior on border.color { Tint {} }
+                Column { anchors.centerIn: parent; spacing: 3
+                    Repeater { model: 3; Rectangle { width: 2; height: 2; radius: 1; color: Theme.blueprint } } } }
+            Tag { objectName: "wipeTagHead"; anchors.right: parent.left; anchors.rightMargin: Theme.s2; y: 52; tint: Theme.ink2
+                color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.rule2
+                text: Store.project ? F.pad(Store.project.head) + " · head" : "" }
+            Tag { objectName: "wipeTagOther"; anchors.left: parent.right; anchors.leftMargin: Theme.s2; y: 52; kind: "draft"
+                color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.alpha(Theme.blueprint, 0.4)
+                text: Store.compare ? F.pad(Store.compare.rev) : "" }
+            MouseArea { id: wm; x: -22; width: 44; y: 44; height: parent.height - 56; hoverEnabled: true; cursorShape: Qt.SplitHCursor
+                preventStealing: true
+                onPositionChanged: function (e) { if (pressed) { var p = mapToItem(centre, e.x, e.y).x; wipe.frac = Math.max(0, Math.min(1, (p - wipe.lo) / Math.max(1, wipe.hi - wipe.lo))) } }
+                onDoubleClicked: wipe.frac = 0.5 }
+            Tip { show: wm.containsMouse && !wm.pressed; text: "Drag to wipe between the two revisions" }
+            Connections { target: Store; function onCompareChanged() { if (!Store.compare) wipe.frac = 0.5 } }
+        }
 
         // what is under the pointer: appears at once, no delay
         Rectangle { id: chip; property var feat: null; visible: !!feat && !Store.layers; z: 5
@@ -466,7 +518,9 @@ Item {
                 color: Theme.alpha(Theme.blueprint, 0.14); border.color: Theme.alpha(Theme.blueprint, 0.3)
                 Row { id: b2; x: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                     Txt { font.pixelSize: 12; color: Theme.strong(Theme.blueprint); wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
-                        text: Store.compare && Store.project ? "Comparing · solid is " + F.pad(Store.project.head) + " (head), blue lines are " + F.pad(Store.compare.rev) : "" }
+                        text: !Store.compare || !Store.project ? ""
+                            : vp.wipeOn ? "Comparing · " + F.pad(Store.project.head) + " (head) left, " + F.pad(Store.compare.rev) + " right · blue lines are " + F.pad(Store.compare.rev)
+                            : "Comparing · solid is " + F.pad(Store.project.head) + " (head), blue lines are " + F.pad(Store.compare.rev) }
                     Btn { objectName: "compareDone"; small: true; kind: "quiet"; text: "Done"; tip: "Stop comparing (Esc)"
                         anchors.verticalCenter: parent.verticalCenter; onClicked: Store.endCompare() } } }
             Rectangle { visible: ws.mapBlocked; width: Math.min(mb.implicitWidth + 20, centre.width - 32); height: 26; radius: Theme.rSm
