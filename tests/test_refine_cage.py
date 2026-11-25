@@ -203,6 +203,20 @@ class Operators(unittest.TestCase):
         bm.validate_ops(hops)
 
 
+class QuickBake(unittest.TestCase):
+    def test_quick_gate_leaves_texel_checks_to_the_full_bake(self):
+        from form.refine import engine, game_eval
+        texel = {"ok": False, "checks": [{"id": "texel_islands", "status": "FAIL", "label": "texel density"},
+                                         {"id": "manifold", "status": "PASS", "label": "closed and manifold"}]}
+        torn = {"ok": False, "checks": [{"id": "manifold", "status": "FAIL", "label": "LOD0 is closed and manifold"}]}
+        an = Analysis(deficits={}, measures={}, total=0.1)
+        base = engine.Evaluation(ok=True, analysis=an)
+        ok = engine.Evaluation(ok=True, analysis=an, game=game_eval.quick_validation(texel))
+        bad = engine.Evaluation(ok=True, analysis=an, game=game_eval.quick_validation(torn))
+        self.assertEqual(engine.gate(base, ok, "game"), [])
+        self.assertTrue(engine.gate(base, bad, "game"))
+
+
 def box_block():
     from form.exemplars.game.base import box
     return box([0, 20, 40], [0, 20], [0, 10]).region("panel", [0, 1])

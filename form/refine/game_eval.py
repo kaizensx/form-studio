@@ -115,6 +115,20 @@ def _with_validation(ev: dict, asset_dir) -> dict:
     return ev
 
 
+# checks a 256 px preview cannot judge: texel density per UV island and UV overlap are counted in texels, and at a
+# quarter of the shipped resolution a small kit part's island lands outside the band or touches its neighbour by a
+# texel. The full bake at the end checks them at the asset's own resolution.
+TEXEL_CHECKS = ("texel_islands", "uv_overlap")
+
+
+def quick_validation(v: dict | None) -> dict | None:
+    """The quick bake's validator report without the texel-counted checks (TEXEL_CHECKS); ok again over the rest."""
+    if not v:
+        return v
+    checks = [c for c in v.get("checks") or [] if c.get("id") not in TEXEL_CHECKS]
+    return {**v, "checks": checks, "ok": all(c.get("status") == "PASS" for c in checks)}
+
+
 def _mesh(cage):
     """The cage's level-2 subdivision as triangles, and the cage region each triangle comes from ("body" when none)."""
     import numpy as np
@@ -263,7 +277,7 @@ class GameEvaluator(Evaluator):
         else:
             # the quick bake's own validator (closed and manifold LODs, no flipped faces, ...): a candidate that would
             # fail the final bake is rejected here, not after the search has built on it
-            validation = game.get("validation")
+            validation = quick_validation(game.get("validation"))
         a = analyze(Measurement(geo["P"], geo["T"], tri_feature=geo["tf"], zones=zones_of(src), purpose="game",
                                 game=game, product_class=self.product_class), weights=self.weights)
         lo, hi = geo["P"].min(0), geo["P"].max(0)
