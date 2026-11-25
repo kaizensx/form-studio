@@ -145,16 +145,22 @@ Item {
         id: build
         property string label: ""
         property string sub: ""
+        property int at: 0
+        property int of: 0
+        property bool running: false
         function step(ids, at, count) {
             if (Store.building) return            // a streamed stage names itself (Store.buildingText)
             var names = ids.map(function (id) { var f = Store.featureById(id); return f && f.label ? f.label : id }).filter(function (n) { return !!n })
             label = names.length > 2 ? names.slice(0, 2).join(", ") + " and " + (names.length - 2) + " more" : names.join(", ")
             sub = count > 1 ? (at + 1) + " of " + count : ""
+            build.at = at + 1; build.of = count; running = true
+            Store.revealing = ids                 // the Design list marks the rows being built
             flash.stop()
         }
-        function done() { if (Store.building) return; sub = ""; flash.restart() }
+        function done() { Store.revealing = []; if (Store.building) return; sub = ""; running = false; flash.restart() }
     }
     Timer { id: flash; interval: 1400; onTriggered: { build.label = ""; build.sub = "" } }
+    Component.onDestruction: Store.revealing = []
 
     // ── centre: the part ─────────────────────────────────────
     Item {
@@ -172,7 +178,11 @@ Item {
             hiddenFeatures: Store.hidden                                           // design tools: quick actions
             order: ws.d && ws.d.recipe && ws.d.recipe.features ? ws.d.recipe.features.map(function (f) { return f.id }) : []
             onRevealStep: function (ids, at, count) { build.step(ids, at, count) }
-            onRevealDone: build.done()
+            onRevealDone: { build.done(); Store.reconSettle() }
+            // another revision as a solid: right of Compare's wipe line, or cross-faded in while Before is held
+            alt: Store.compare ? Store.compare.view : Store.peek ? Store.peek.view : null
+            altK: !Store.compare && Store.peek && Store.peek.on ? 1 : 0
+            wipeX: Store.compare ? wipe.at : -1
             // colours and materials: re-made whenever the design's appearance or the catalogue changes
             colorOf: { var a = Store.appearance, c = Store.materialCat; return function (part) { return Store.look(part).color || "" } }
             // what the HUD covers: the rail and options, the dock when it is open, the strip and the readout
@@ -210,29 +220,75 @@ Item {
                 GradientStop { position: 0; color: Theme.alpha(Theme.plate, 0.5) } GradientStop { position: 0.16; color: "transparent" }
                 GradientStop { position: 0.82; color: "transparent" } GradientStop { position: 1; color: Theme.alpha(Theme.plate, 0.75) } } }
 
-        // the build-up's caption: which feature just arrived
-        Rectangle {
+        // the build's ledger: which feature is arriving, how far the build is
+        Item {
             id: buildCap; objectName: "buildCaption"; z: 6
-            // centred over the part, but never under the dock's panels (top right: refinement, legends): it moves left
-            // of them, and below them when there is no room beside them
+            // pinned top centre over the part, but never under the dock's panels (top right: refinement, legends): it
+            // moves left of them, and below them when there is no room beside them
             readonly property bool dockShown: dock.visible && dock.width > 0 && dock.height > 0
             readonly property real centred: (parent.width - width) / 2
             readonly property real room: dockShown ? dock.x - 12 - width : centred
             readonly property bool beside: room >= 12
             x: Math.round(beside ? Math.min(centred, room) : centred)
             y: beside ? 58 : Math.round(dock.y + dock.height + 10)
-            width: bcr.implicitWidth + 28; height: 32; radius: 16; color: Theme.alpha(Theme.plate3, 0.94); border.color: Theme.alpha(Theme.datum, 0.45)
+            width: ledger.width; height: ledger.height
             // a stage streamed while the agent rewrites the design: "Building Rim (3 of 5)"
             readonly property var st: Store.building && Store.building.project === Store.pid ? Store.building : null
-            readonly property string caption: st ? Store.buildingText : build.label ? (build.sub ? "Building " : "Built ") + build.label + (build.sub ? " " + build.sub : "") : ""
+            readonly property string caption: st ? Store.buildingText : build.label ? (build.running ? "Building " : "Built ") + build.label + (build.sub ? " " + build.sub : "") : ""
             opacity: build.label || st ? 1 : 0; visible: opacity > 0.01
             Behavior on opacity { NumberAnimation { duration: build.label || buildCap.st ? Theme.fast : 420 } }
-            Row { id: bcr; anchors.centerIn: parent; spacing: 9
-                Rectangle { width: 6; height: 6; radius: 3; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
-                Txt { kind: "cap"; color: Theme.datum; text: buildCap.st || build.sub ? "Building" : "Built"; anchors.verticalCenter: parent.verticalCenter }
-                Txt { text: buildCap.st ? buildCap.st.label : build.label; font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter }
-                Txt { visible: buildCap.st ? buildCap.st.of > 1 : !!build.sub; kind: "fine"; mono: true; tone: 3; anchors.verticalCenter: parent.verticalCenter
-                    text: buildCap.st ? buildCap.st.at + " of " + buildCap.st.of : build.sub } } }
+            BuildLedger { id: ledger
+                label: buildCap.st ? buildCap.st.label : build.label
+                at: buildCap.st ? buildCap.st.at : build.at; of: buildCap.st ? buildCap.st.of : build.of
+                running: !!buildCap.st || build.running; pulse: !!buildCap.st } }
+
+        // a mesh made editable: how far the CAD is from the mesh at most, counted up as the CAD grows inside the mesh's lines
+        Rectangle {
+            id: reconCap; objectName: "reconReadout"; z: 6
+            readonly property var rc: Store.recon && Store.recon.project === Store.pid ? Store.recon : null
+            x: Math.round(Math.max(60, Math.min(parent.width - width - 12, buildCap.x + (buildCap.width - width) / 2))); y: buildCap.y + buildCap.height + Theme.s2
+            width: rcr.implicitWidth + 2 * Theme.s3; height: 30; radius: Theme.rSm
+            color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.alpha(Theme.blueprint, 0.35)
+            opacity: rc ? 1 : 0; visible: opacity > 0.01
+            Behavior on opacity { NumberAnimation { duration: reconCap.rc ? Theme.fast : Theme.cross } }
+            Row { id: rcr; x: Theme.s3; anchors.verticalCenter: parent.verticalCenter; spacing: Theme.s2
+                Txt { mono: true; kind: "fine"; tone: 2; text: "max deviation"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
+                Loader { active: !!reconCap.rc; anchors.verticalCenter: parent.verticalCenter       // made anew for each reconstruction, so it counts from zero
+                    sourceComponent: Tick { countIn: true; countMs: 1600; decimals: 3; unit: " mm"; font.pixelSize: Theme.tBody; font.weight: Theme.wMedium
+                        value: reconCap.rc ? reconCap.rc.mm : 0; color: reconCap.rc && !reconCap.rc.within ? Theme.amber : Theme.ink } }
+                Tag { text: "computed"; anchors.verticalCenter: parent.verticalCenter }
+                Txt { kind: "fine"; tone: 3; visible: !!reconCap.rc && !reconCap.rc.within; text: "outside the tolerance"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap } } }
+
+        // Compare's wipe: the head left of the line, the other revision right of it. Drag the line; a tag on each side
+        // says which revision it is.
+        Item {
+            id: wipe; objectName: "compareWipe"; z: 3
+            property real frac: 0.5                 // across the free area of the view
+            readonly property real lo: vp.insetLeft + 24
+            readonly property real hi: Math.max(lo + 40, vp.width - vp.insetRight - 24)
+            readonly property real at: Math.round(lo + (hi - lo) * frac)
+            readonly property bool on: vp.wipeOn && !ws.sim
+            visible: on; x: at; y: 0; width: 1; height: strip.y
+            Rectangle { x: 0; y: 44; width: 1; height: parent.height - 56; color: Theme.alpha(Theme.blueprint, 0.7) }
+            Rectangle { id: grip; anchors.horizontalCenter: parent.left; y: Math.round(parent.height / 2) - 18; width: 14; height: 36; radius: 7
+                color: wm.pressed ? Theme.plate4 : Theme.plate3; border.color: Theme.alpha(Theme.blueprint, wm.containsMouse || wm.pressed ? 0.9 : 0.55)
+                scale: wm.pressed ? Theme.from(0.96) : 1
+                Behavior on scale { Glide { duration: Theme.press } } Behavior on border.color { Tint {} }
+                Column { anchors.centerIn: parent; spacing: 3
+                    Repeater { model: 3; Rectangle { width: 2; height: 2; radius: 1; color: Theme.blueprint } } } }
+            Tag { objectName: "wipeTagHead"; anchors.right: parent.left; anchors.rightMargin: Theme.s2; y: 52; tint: Theme.ink2
+                color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.rule2
+                text: Store.project ? F.pad(Store.project.head) + " · head" : "" }
+            Tag { objectName: "wipeTagOther"; anchors.left: parent.right; anchors.leftMargin: Theme.s2; y: 52; kind: "draft"
+                color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.alpha(Theme.blueprint, 0.4)
+                text: Store.compare ? F.pad(Store.compare.rev) : "" }
+            MouseArea { id: wm; x: -22; width: 44; y: 44; height: parent.height - 56; hoverEnabled: true; cursorShape: Qt.SplitHCursor
+                preventStealing: true
+                onPositionChanged: function (e) { if (pressed) { var p = mapToItem(centre, e.x, e.y).x; wipe.frac = Math.max(0, Math.min(1, (p - wipe.lo) / Math.max(1, wipe.hi - wipe.lo))) } }
+                onDoubleClicked: wipe.frac = 0.5 }
+            Tip { show: wm.containsMouse && !wm.pressed; text: "Drag to wipe between the two revisions" }
+            Connections { target: Store; function onCompareChanged() { if (!Store.compare) wipe.frac = 0.5 } }
+        }
 
         // what is under the pointer: appears at once, no delay
         Rectangle { id: chip; property var feat: null; visible: !!feat && !Store.layers; z: 5
@@ -462,7 +518,9 @@ Item {
                 color: Theme.alpha(Theme.blueprint, 0.14); border.color: Theme.alpha(Theme.blueprint, 0.3)
                 Row { id: b2; x: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                     Txt { font.pixelSize: 12; color: Theme.strong(Theme.blueprint); wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
-                        text: Store.compare && Store.project ? "Comparing · solid is " + F.pad(Store.project.head) + " (head), blue lines are " + F.pad(Store.compare.rev) : "" }
+                        text: !Store.compare || !Store.project ? ""
+                            : vp.wipeOn ? "Comparing · " + F.pad(Store.project.head) + " (head) left, " + F.pad(Store.compare.rev) + " right · blue lines are " + F.pad(Store.compare.rev)
+                            : "Comparing · solid is " + F.pad(Store.project.head) + " (head), blue lines are " + F.pad(Store.compare.rev) }
                     Btn { objectName: "compareDone"; small: true; kind: "quiet"; text: "Done"; tip: "Stop comparing (Esc)"
                         anchors.verticalCenter: parent.verticalCenter; onClicked: Store.endCompare() } } }
             Rectangle { visible: ws.mapBlocked; width: Math.min(mb.implicitWidth + 20, centre.width - 32); height: 26; radius: Theme.rSm
@@ -553,9 +611,9 @@ Item {
                             Behavior on color { Tint {} } }
                         Column { anchors.centerIn: parent; spacing: 2
                             Row { id: tr; spacing: 5; anchors.horizontalCenter: parent.horizontalCenter
-                                Txt { mono: true; font.pixelSize: 10; tone: 4; text: "0" + (tab.index + 1); anchors.baseline: tl.baseline }
+                                Txt { mono: true; font.pixelSize: Theme.tFine; tone: 4; text: "0" + (tab.index + 1); anchors.baseline: tl.baseline }
                                 Txt { id: tl; text: tab.modelData.title; font.weight: Theme.wSemi; font.pixelSize: 13; tone: tab.on ? 1 : 2 } }
-                            Txt { id: tn; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: 10; text: tab.note[0]; color: ws.noteColor(tab.note[1]); wrapMode: Text.NoWrap } }
+                            Txt { id: tn; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: Theme.tFine; text: tab.note[0]; color: ws.noteColor(tab.note[1]); wrapMode: Text.NoWrap } }
                         MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.setStage(tab.modelData.id) }
                         Tip { show: tm.containsMouse; below: true; text: tab.modelData.hint; keys: "Ctrl+" + Store.stageKey[tab.modelData.id] }
                     }

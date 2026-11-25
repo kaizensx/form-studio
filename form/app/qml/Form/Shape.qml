@@ -29,8 +29,13 @@ Column {
                     readonly property bool touched: root.paramsOf(modelData.id).some(function (p) { return Store.draftValues[p.key] !== undefined })
                     readonly property var out: Store.leftOut(modelData.id)       // left out of a partial build
                     width: parent.width; height: Math.max(46, fcol.implicitHeight + 16); radius: Theme.rMd
-                    color: fm.pressed ? Theme.washPress : fm.containsMouse ? Theme.washHover : "transparent"
+                    // its step of a build-up is running in the viewport (Store.revealing, or the stage the agent streams)
+                    readonly property bool arriving: Store.revealing.indexOf(modelData.id) >= 0
+                        || (!!Store.building && Store.building.project === Store.pid && Store.building.feature === modelData.id)
+                    color: fm.pressed ? Theme.washPress : fm.containsMouse ? Theme.washHover : arriving ? Theme.washOn : "transparent"
                     Behavior on color { Tint {} }
+                    Rectangle { objectName: "featureArriving"; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 2; height: parent.height - 12; radius: 1; color: Theme.datum
+                        opacity: fr.arriving ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
                     Rectangle { x: 8; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 22; radius: 1.5; color: fr.out ? Theme.amber : Theme.evidence(fr.modelData.role); opacity: fr.out ? 0.45 : 0.8 }
                     Column { id: fcol; x: 20; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 20 - tg.width - 30; spacing: 1
                         Txt { text: fr.modelData.label + (fr.touched ? "  ●" : ""); font.weight: 550; color: fr.touched ? Theme.blueprint : fr.out ? Theme.ink3 : Theme.ink; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }

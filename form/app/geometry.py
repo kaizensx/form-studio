@@ -195,6 +195,39 @@ class GameGeometry(QQuick3DGeometry):
     triangles = Property(int, lambda self: self._tris, notify=changed)
 
 
+def mesh_edges(pos: np.ndarray, tri: np.ndarray, angle_deg: float = 30.0, limit: int = 120_000) -> np.ndarray:
+    """The edges of one feature's triangles, as (n, 6) segments: where a face of the solid ends, and creases.
+
+    The kernel triangulates each face of the solid on its own and does not share vertices between faces, so an edge
+    used by one triangle only is an edge of a face: the kernel's own edge, as tessellated. A mesh that does share
+    vertices (a faceted or textured solid) adds its creases sharper than `angle_deg`. Above `limit` segments the
+    creases are left out (a texture's creases are noise)."""
+    if not len(tri) or not len(pos) or int(tri.max()) >= len(pos):
+        return np.zeros((0, 6), dtype=np.float32)
+    tri = tri.astype(np.int64)
+    a, b, c = pos[tri[:, 0]], pos[tri[:, 1]], pos[tri[:, 2]]
+    n = np.cross(b - a, c - a).astype(np.float64)
+    n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
+    e = np.concatenate([tri[:, [0, 1]], tri[:, [1, 2]], tri[:, [2, 0]]])
+    of = np.tile(np.arange(len(tri)), 3)
+    key = np.sort(e, axis=1)
+    order = np.lexsort((key[:, 1], key[:, 0]))
+    key, of = key[order], of[order]
+    start = np.ones(len(key), dtype=bool)
+    start[1:] = np.any(key[1:] != key[:-1], axis=1)
+    first = np.flatnonzero(start)
+    count = np.diff(np.append(first, len(key)))
+    nxt = np.minimum(first + 1, len(key) - 1)
+    crease = (count >= 2) & (np.einsum("ij,ij->i", n[of[first]], n[of[nxt]]) < np.cos(np.radians(angle_deg)))
+    keep = first[(count == 1) | crease]
+    if len(keep) > limit:
+        keep = first[count == 1]
+    if not len(keep) or len(keep) > 4 * limit:
+        return np.zeros((0, 6), dtype=np.float32)
+    k = key[keep]
+    return np.hstack([pos[k[:, 0]], pos[k[:, 1]]]).astype(np.float32)
+
+
 @QmlElement
 class LineGeometry(QQuick3DGeometry):
     """Line segments: either the engine's base64 edge array (`segments`) or a flat list of xyz pairs (`points`)."""
@@ -203,6 +236,7 @@ class LineGeometry(QQuick3DGeometry):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._data, self._points = "", []
+        self._mp, self._mi = "", ""
 
     def _rebuild(self, arr: np.ndarray):
         self.clear()
@@ -225,8 +259,23 @@ class LineGeometry(QQuick3DGeometry):
         self._points = list(v or [])
         self._rebuild(np.array(self._points, dtype=np.float32))
 
+    # one feature's own edges, from its triangles (the build-up draws each feature's edges before its solid)
+    def _get_mp(self): return self._mp
+    def _set_mp(self, v):
+        self._mp = v or ""
+        self._from_mesh()
+    def _get_mi(self): return self._mi
+    def _set_mi(self, v):
+        self._mi = v or ""
+        self._from_mesh()
+    def _from_mesh(self):
+        if self._mp and self._mi:
+            self._rebuild(mesh_edges(_b64(self._mp, np.float32).reshape(-1, 3), _b64(self._mi, np.uint32).reshape(-1, 3)))
+
     segments = Property(str, _get_data, _set_data, notify=changed)
     points = Property("QVariantList", _get_points, _set_points, notify=changed)
+    meshPositions = Property(str, _get_mp, _set_mp, notify=changed)
+    meshIndices = Property(str, _get_mi, _set_mi, notify=changed)
 
 
 @QmlElement

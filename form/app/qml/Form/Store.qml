@@ -323,7 +323,10 @@ QtObject {
         var grow = !handoff && Date.now() - _buildNext < 15000          // a new build (see _buildNext): it grows in, feature by feature
         if (grow) _buildNext = 0
         viewer.setModel(view, grow ? "build" : "")
-        viewer.setGhost(compare ? compare.view : null)
+        var rg = recon && recon.project === pid && !recon.settled ? recon.ghost : null
+        viewer.setGhost(compare ? compare.view : rg)       // Compare's revision, or the mesh a reconstruction grows inside
+        if (recon && !rg && !recon.settled) recon = null
+        if (peek) peek = null                               // a peek belongs to the head it was asked on
         viewer.selected = feature
         Qt.callLater(applyStageView)
     }
@@ -804,6 +807,7 @@ QtObject {
     // "Make editable": the mesh becomes a new design, rebuilt as CAD and checked against the mesh (form/recon)
     function makeEditable(file) {
         toast("Reconstructing " + file, "Building the solid and fitting surfaces. A large mesh takes a few minutes.")
+        var mesh = ((shown && shown.companions) || []).filter(function (c) { return !!c.mesh && c.label === file })[0] || null
         return ppost("/reconstruct", { file: file }).then(function (r) {
             var m = r.summary || ({})
             var ed = Number(m.editable_pct || 0)
@@ -818,9 +822,27 @@ QtObject {
             else                                       // no verified feature recipe: the agent remodel is the next step
                 toast("“" + r.name + "” reached Layer " + m.layer, F.fmt(m.frozen_area_pct, 0) + "% frozen facets, no verified feature "
                       + "model. Rebuild as editable CAD has the agent model it with named features.")
-            return reloadStudio().then(function () { open(r.project) })
+            return reloadStudio().then(function () { s._reconReveal(r.project, mesh, m); return open(r.project) })
         }, fail)
     }
+    // The reconstruction's reveal: the mesh's own edges stay on screen in blueprint (the viewport's ghost), the CAD
+    // grows inside them with the build-up, and a readout counts to the largest distance the comparison measured
+    // between the two (summary.hausdorff_mm, computed by form/recon). When the build is in, the mesh's lines fade.
+    property var recon: null           // { project, file, ghost: { edges }, mm, within, settled }
+    function _reconReveal(project, mesh, m) {
+        if (!mesh || !mesh.edges || m.hausdorff_mm === undefined || m.hausdorff_mm === null) { recon = null; return }
+        recon = { project: project, file: mesh.label, ghost: { edges: mesh.edges }, mm: Number(m.hausdorff_mm), within: m.within_tolerance !== false, settled: false }
+        _buildNext = Date.now()
+    }
+    function reconSettle() {            // the build-up is in: the mesh's lines leave, the number stays a little longer
+        if (!recon || recon.settled || recon.project !== pid) return
+        recon = Object.assign({}, recon, { settled: true })
+        _reconFade.restart(); _reconEnd.restart()
+    }
+    property var _reconFade: Timer { interval: 900; onTriggered: if (s.viewer && s.recon && !s.compare && !s.hasDraft) s.viewer.fadeGhost() }
+    property var _reconEnd: Timer { interval: 4200; onTriggered: s.recon = null }
+    property var _reconReset: Connections { target: s
+        function onPidChanged() { if (s.recon && s.recon.project !== s.pid) s.recon = null } }
     // "Rebuild as editable CAD": a conversation that remodels the project's meshes as clean CAD with named features
     // and Params, compared with the meshes until within tolerance (form/remodel, design_guide "reference_parts")
     function rebuildAsCad(files) {
@@ -883,6 +905,24 @@ QtObject {
     }
     function refineUndo(id) { return _refinePost({ action: "undo", feature: id || "", expect_head: project ? project.head : null },
                                                  id ? "Undoing the refine change" : "Undoing the refinement") }
+    // Before / After: hold to see the revision before the refinement, cross-faded over the head; let go and the head
+    // is back. Looking changes nothing.
+    property var peek: null            // { rev, view, on }
+    property bool _peekWant: false
+    readonly property int refineBase: {                 // the revision the head's refinement started from; 0 = none
+        if (!project) return 0
+        var best = 0, rs = project.revisions || []
+        for (var i = 0; i < rs.length; i++) if (rs[i].n <= project.head && rs[i].n > best && (rs[i].refine || rs[i].origin === "refine")) best = rs[i].n
+        return best > 1 ? best - 1 : 0
+    }
+    function peekBefore(on) {
+        _peekWant = !!on
+        if (!on) { if (peek && peek.on) peek = Object.assign({}, peek, { on: false }); return }
+        var n = refineBase, at = pid
+        if (!n || hasDraft || scrub || compare) return
+        if (peek && peek.rev === n) { peek = Object.assign({}, peek, { on: true }); return }
+        loadRev(n).then(function (v) { if (s.pid === at && !s.compare && !s.scrub) s.peek = { rev: n, view: v, on: s._peekWant } }, function () {})
+    }
     function refineAgain() { return _refinePost({ action: "rerun" }, "Starting refinement") }
     function resetRefineLedger() {
         return act("Resetting what refinement learned", post("/refine/ledger/reset", {})).then(function (r) {
@@ -916,6 +956,7 @@ QtObject {
     // the part never blinks. When the design is saved its head takes over in place (showHead, _handoff), the same
     // solid, or the one the partial build kept if a stage was dropped: the saved design wins.
     property var building: null        // the stage on screen: { draft, project, feature, label, at, of, index }
+    property var revealing: []         // feature ids the viewport is building up right now (the Design list marks their rows)
     readonly property string buildingText: building ? "Building " + building.label + (building.of > 1 ? " (" + building.at + " of " + building.of + ")" : "") : ""
     property var stageLog: []          // stages drawn: { draft, feature, at, of, t (ms) } (diagnostics, tests)
     property var stageViewer: null     // the Designing screen's viewport (the workspace's is `viewer`)

@@ -12,6 +12,21 @@
   Analytic and freeform faces and a feature tree from the mesh are Beta.
 - **Designs built one feature at a time.** You watch the design take shape; a feature that fails no longer loses
   the work, and each feature is checked as it is made.
+- **The build, drawn like a drawing.** As a design builds, each feature's edges are traced first, then its solid
+  rises into place. The overall dimensions measure what is built so far and count up with it, a ledger over the
+  part names the feature and how far the build is ("6 of 12"), and the feature's row in the Design list lights
+  up while it is made. The camera frames the build once and then stays put.
+- **Compare is a wipe.** Comparing two revisions puts a line down the view: the head left of it, the other
+  revision right of it, each side tagged. Drag the line across the part; Done, Esc and Compare again still end it.
+- **Mesh to CAD, shown.** After Make editable, the mesh's outline stays on screen in blue while the CAD grows
+  inside it, with the largest distance between the two counted up beside it (computed). Then the outline fades.
+- **Refinement you can see.** Pointing at a refine change lights up its feature on the part, and holding
+  Before / After shows the design as it was before the refinement.
+- **The part stays in view.** A change that makes the part outgrow the view (a wider draft, a taller revision)
+  pulls the camera back instead of letting the part slide under the panels, and labels no longer draw over them.
+- **Waiting for a design reads like a drawing being started.** Two construction lines meet at an origin and
+  breathe; the agent's real steps are written from it as a ledger, and "Writing design code" shows the size of
+  the code as it grows. The floor's origin cross no longer runs through the words on an empty floor.
 - **Drag a face to change the design**, constrained 2D sketches, and sculpted forms as exact NURBS.
 - **Real standard hardware.** ISO screws, nuts, washers, heat-set inserts and bearings built into designs, with
   their masses in the bill of materials.
