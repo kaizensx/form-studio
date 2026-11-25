@@ -149,6 +149,16 @@ class Data(unittest.TestCase):
         self.assertIn("Every printer you have, compared", text)                       # the 1.0.0 section, and only it
         self.assertNotIn("## ", text.split("### Verify")[0])
         self.assertIn("Preview update channel", release_notes.notes_for("v99.0.0-preview.1", "## Unreleased\n\n- x\n"))
+        cl = (FIX.parent.parent.parent / "CHANGELOG.md").read_text()
+        pre = release_notes.notes_for("v1.1.0-preview.1", cl)           # the 1.1 summary only, never the details
+        self.assertIn("### Known limits", pre)
+        self.assertNotIn("### Details", pre)
+        self.assertIn("CHANGELOG.md", pre.split("### Verify")[0])
+        self.assertLess(len(pre), 125_000 // 4)
+        big = "## Unreleased\n\n### New\n\n" + "".join(f"- **Item {i}.** " + "x" * 300 + "\n" for i in range(400))
+        short = release_notes.notes_for("v9.9.0-preview.1", big)        # a summary that is too long is cut at a bullet
+        self.assertLess(len(short), release_notes.NOTES_MAX + 2000)
+        self.assertTrue(short.split("\n\nEvery change")[0].rstrip().endswith("x"))
         body = release_notes.draft_body([{"number": 3, "title": "Fix it", "labels": [{"name": "type:bug"}], "user": {"login": "a"}}], "v1")
         self.assertIn("### Fixed", body)
 

@@ -470,6 +470,20 @@ class WhatsNew(Tmp):
         self.assertEqual(n["highlights"][0]["title"], "Lighter")
         self.assertFalse(whatsnew.notes("1.1.0", cl)["found"])       # a release never shows the Unreleased notes
 
+    def test_only_the_summary_above_details(self):
+        cl = self.tmp / "CHANGELOG-sum.md"
+        cl.write_text("# Changelog\n\n## Unreleased\n\n### New\n\n- **Lighter.** Thinner walls.\n\n### Details\n\n"
+                      "- **Wall code.** Every detail.\n\n" + CHANGELOG.split("\n", 1)[1], encoding="utf-8")
+        for v in ("1.1.0-dev", "1.1.0-preview.1"):
+            n = whatsnew.notes(v, cl)
+            self.assertIn("Lighter", n["markdown"])
+            self.assertNotIn("Wall code", n["markdown"])
+            self.assertNotIn("Details", n["markdown"])
+            self.assertEqual([h["title"] for h in n["highlights"]], ["Lighter"])
+        real = whatsnew.notes("1.1.0-preview.1")                         # the bundled changelog's 1.1 summary
+        self.assertIn("Known limits", real["markdown"])
+        self.assertLess(len(real["markdown"]), 20_000)
+
     def test_shown_once_per_version(self):
         root = self.tmp / "data"
         self.assertFalse(whatsnew.due(root, "12.0.0", first_run=True, path=self.cl)["show"])       # a new folder: silent

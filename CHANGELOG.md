@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+### New
+
+- **Designs are refined after they build.** Once a design builds, Form Studio looks for small improvements (edge
+  rounding, details, materials) and keeps only those that pass its checks. They arrive as one extra revision,
+  "Refined: N changes", that you can undo change by change or all at once, and refinement can be turned off per
+  design or for everything in Settings › General.
+- **Mesh to editable CAD.** Make editable turns an STL, OBJ or 3MF into a new design checked against the mesh.
+  Analytic and freeform faces and a feature tree from the mesh are Beta.
+- **Designs built one feature at a time.** You watch the design take shape; a feature that fails no longer loses
+  the work, and each feature is checked as it is made.
+- **Drag a face to change the design**, constrained 2D sketches, and sculpted forms as exact NURBS.
+- **Real standard hardware.** ISO screws, nuts, washers, heat-set inserts and bearings built into designs, with
+  their masses in the bill of materials.
+- **Engineering materials for models.** Aluminium, steel, brass, titanium, woods and engineering plastics for designs
+  that are machined, cast or rendered, with the design's computed mass.
+- **Game assets (Beta).** A design can be made ready for a game engine: LODs, UVs, baked maps and collision, with
+  Blender as an optional modelling editor.
+- **Optional engines in one click.** Each engine in Settings › Software installs from its own button, with its size
+  and licence shown first. The learned mesh-to-CAD engine (CAD-Recode) is opt-in and non-commercial (CC BY-NC 4.0).
+- **A light appearance**, a new Home, concepts in the conversation, and links and every file type in chat.
+
+### Changed
+
+- **The Mac app is now called Form Studio.app** (it was FORM.app). If you added Form Studio to Claude Code, Codex or
+  another agent by the old app's path, add it again: `form setup` finds your agents and writes the entry.
+- **Creation first.** A new design is a 3D model; 3D printing is optional and turned on when you want it.
+- **Builds run side by side** in a kernel pool, and pipeline jobs survive a restart.
+- **Agents:** MCP 2026-07-28 throughout, long tools can run as tasks, and the design guidance is served as skills.
+
+### Known limits
+
+- Game assets are Beta: every asset passes its technical checks, and its visual quality is still improving. They are
+  refined only when you ask.
+- Mesh to CAD's freeform faces and feature tree are Beta; a feature that does not verify stays in the base solid, and
+  the report says so.
+- Refinement adds a revision to your history. Undo it, or turn refinement off, if you would rather keep the design as
+  you built it.
+
+### Details
+
 - **Game assets are marked Beta.** Home's "Make it for", the design's Purpose and the Game asset sheet carry a small
   "Beta" tag (BetaTag.qml, Theme tokens, light and dark); the website's game section, How we measure and the README
   say it once, with one line: every asset passes its technical checks, and its visual quality is still improving.

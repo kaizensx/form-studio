@@ -2,7 +2,8 @@
 
 The notes come from the CHANGELOG.md shipped with this copy of Form Studio (next to this file in the packaged app,
 at the top of a checkout), so they are offline and describe exactly the version that is running. A section starts
-with a line ``## <version>`` and ends at the next ``## `` heading.
+with a line ``## <version>`` and ends at the next ``## `` heading. A section with a ``### Details`` heading shows only
+what is above it: the short summary for people, not every change (the release notes on GitHub do the same).
 
 When is it shown? ``<data>/.form-whatsnew.json`` remembers the last version whose notes were shown. A different
 running version shows its notes once. A new data folder (first run) is not shown notes about changes it never saw;
@@ -44,6 +45,12 @@ def sections(text: str) -> dict[str, str]:
     return out
 
 
+def summary(md: str) -> str:
+    """A section's summary: the text above its "### Details" heading (all of it when it has none)."""
+    m = re.search(r"^###\s+Details\s*$", md, re.M)
+    return md[: m.start()].rstrip() if m else md
+
+
 def highlights(md: str, limit: int = 6) -> list[dict]:
     """The section's bold-led bullets ("- **Title.** Detail") as {title, text}, for the modal's list."""
     out = []
@@ -70,8 +77,9 @@ def notes(version: str, path: Path | None = None) -> dict:
         return {"version": version, "found": False, "markdown": "", "highlights": []}
     sec = sections(p.read_text(encoding="utf-8"))
     md = sec.get(version) or sec.get(version.lstrip("vV")) or ""
-    if not md and version.endswith("-dev"):          # a build of dev: what it has that the last release does not
-        md = sec.get("Unreleased", "")
+    if not md and re.search(r"-(dev|preview)", version):   # a build of dev or a preview: what it has that the
+        md = sec.get("Unreleased", "")                     # last release does not
+    md = summary(md)
     return {"version": version, "found": bool(md), "markdown": md, "highlights": highlights(md),
             "versions": list(sec)[:12]}
 

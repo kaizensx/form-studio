@@ -4,8 +4,10 @@
     python scripts/ci/release_notes.py draft [--base dev] [--dry-run]
 
 `changelog` writes the notes for a version tag from its CHANGELOG.md section ("## 1.0.0"). A pre-release tag such as
-v1.1.0-preview.2 uses the section of 1.1.0, or "## Unreleased" when that does not exist yet. The notes end with how to
-verify the download (SHA256SUMS and the build attestations).
+v1.1.0-preview.2 uses the section of 1.1.0, or "## Unreleased" when that does not exist yet. A section with a
+"### Details" heading contributes only what is above it (the short summary) and links to the full changelog; the
+notes stay under NOTES_MAX characters (GitHub refuses a release body over 125,000). They end with how to verify the
+download (SHA256SUMS and the build attestations).
 
 `draft` keeps one draft release named "Unreleased" up to date with the pull requests merged into dev since the latest
 published release, grouped by their type: label. It never publishes anything; maintainers turn it into the CHANGELOG.
@@ -23,6 +25,7 @@ from common import REPO, SERVER, GitHub, log  # noqa: E402
 GROUPS = [("type:feature", "New"), ("enhancement", "New"), ("type:bug", "Fixed"), ("bug", "Fixed"),
           ("type:performance", "Faster"), ("type:docs", "Documentation"), ("documentation", "Documentation")]
 DRAFT_NAME = "Unreleased"
+NOTES_MAX = 20_000                       # characters of changelog text in a release body (GitHub's limit: 125,000)
 DRAFT_TAG = "unreleased"
 
 
@@ -36,6 +39,20 @@ def section(text: str, version: str) -> str | None:
     return rest[: n.start() if n else len(rest)].strip()
 
 
+def summary(body: str, limit: int = NOTES_MAX) -> str:
+    """A section's summary: the text above its "### Details" heading (all of it when it has none), cut at a bullet
+    boundary to at most `limit` characters, with a link to the full changelog when anything was left out."""
+    m = re.search(r"^###\s+Details\s*$", body, re.M)
+    short = body[: m.start()].rstrip() if m else body
+    more = f"Every change in detail: [CHANGELOG.md]({SERVER}/{REPO}/blob/dev/CHANGELOG.md)."
+    cut = len(short) > limit
+    if cut:
+        room = limit - len(more) - 2
+        at = short.rfind("\n- ", 0, room)
+        short = short[: at if at > 0 else room].rstrip()
+    return short + ("\n\n" + more if m or cut else "")
+
+
 def notes_for(tag: str, changelog: str) -> str:
     version = tag[1:] if tag.startswith("v") else tag
     base = version.split("-", 1)[0]
@@ -45,6 +62,8 @@ def notes_for(tag: str, changelog: str) -> str:
         body = section(changelog, "Unreleased")
     if body is None:
         body = f"See the [changelog]({SERVER}/{REPO}/blob/main/CHANGELOG.md)."
+    else:
+        body = summary(body)
     head = "A preview from the `dev` branch, for the Preview update channel.\n\n" if pre else ""
     verify = (
         "\n\n### Verify the download\n\n"
