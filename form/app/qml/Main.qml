@@ -162,6 +162,7 @@ Window {
         else if (Store.paletteOpen) Store.paletteOpen = false
         else if (Store.ctxMenu) Store.ctxMenu = null
         else if (Store.sheet) Store.openSheet(null)
+        else if (Store.compare) Store.endCompare()
         else if (Store.measuring) Store.setMeasuring(false)
         else if (Store.selecting && Store.selItems.length) Store.selClear()
         else if (Store.selecting) Store.setSelecting(false)
