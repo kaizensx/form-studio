@@ -36,6 +36,8 @@ NOT_COVERED = ["No slice: print time and filament are not estimated.", "No slice
                "No print simulation: supports, bridges and the first layer are not previewed."]
 MODEL_ENVELOPE = [1e6, 1e6, 1e6]       # a 3D model is checked against no printer: nothing is too big
 STL_TOL = 0.01
+SOLID_TOL = 0.05     # the tessellation summaries, checks and impact signatures are read on (the kernel's op_summary
+                     # default): a draft's signature compares with its revision's, and the kernel meshes it once
 REF_FORMATS = (".step", ".stp", ".stl", ".obj", ".3mf")
 SCHEMA = "form-project/1"
 
@@ -129,6 +131,11 @@ class _BuildWatch:
 
 
 BUILD_TIMEOUT = float(os.environ.get("FORM_BUILD_TIMEOUT") or 180)   # seconds for a new design's build (quiet machine)
+# Kernel call deadlines (Studio.deadline): from the predicted build cost, since a call may have to build the solid.
+# The prior is above every build_s in the owner's 97 geometry records (at most 0.8 s per feature, 6.1 s for 8).
+DEADLINE_MIN, DEADLINE_MAX = 60.0, 1200.0
+DEADLINE_FACTOR, DEADLINE_PAD = 3.0, 45.0
+DEADLINE_PRIOR_S, DEADLINE_PER_FEATURE = 2.0, 1.0
 DRAFT_KEEP = 40                     # draft files (the live stages of an attempt) kept; older ones go
 DRAFT_AGE_S = 6 * 3600              # and none older than this
 
@@ -219,6 +226,7 @@ class Studio:
         self._choice_cache: dict = {}                 # printer choice -> (time, resolved), see printer_choice
         self._kernel_id = None
         self._recipe_sha: dict = {}
+        self._build_cost: dict = {}                   # recipe id or project id -> seconds its last build took
         self._layers_cache: dict = {}
         # A new data folder stays empty: nothing is created until the person makes something.
 
@@ -677,15 +685,15 @@ class Studio:
         on = self._draft_sink(draft, name) if draft else None
         watch = _BuildWatch(on)                     # what is kept if the kernel hangs or crashes part-way
         extra = {"refs": refs} if refs else {}
-        kw = dict(recipe_id=rid, values=vals, tol=0.1, p=p, timeout=BUILD_TIMEOUT, on_progress=watch,
+        kw = dict(recipe_id=rid, values=vals, tol=SOLID_TOL, p=p, timeout=BUILD_TIMEOUT, on_progress=watch,
                   _progress=True if on else "events", **extra)
         self._tl.last_log = None
         try:
             if not partial:
-                s = self._k("summary", key="pv-" + H(rid, vals), **kw)
+                s = self._k("summary", key=self.geometry_key(p, rid, vals), **kw)
                 self._tl.last_log = s.get("build_log")
                 return rid, self._skips(s, False, prev_skipped)
-            r = self._k("try_build", key="pv-" + H(rid, vals), **kw)
+            r = self._k("try_build", key=self.geometry_key(p, rid, vals), **kw)
         except StudioError as e:
             if e.extra.get("kind") not in ("timeout", "crash"):
                 raise
@@ -703,7 +711,7 @@ class Studio:
         rid2 = self._load_design(src, "python")
         kw.pop("on_progress", None)                 # its stages were shown as the failed build made them
         kw.pop("_progress", None)
-        self._k("summary", key="pv-" + H(rid2, vals), **{**kw, "recipe_id": rid2})
+        self._k("summary", key=self.geometry_key(p, rid2, vals), **{**kw, "recipe_id": rid2})
         diag = err.get("diagnosis") or {}
         info = {"failed": err.get("feature") or "", "built": list(r.get("stages", []))[:keep],
                 "dropped": list(r.get("stages", []))[keep:],    # made, but not a solid that shows (stage_checks)
@@ -781,7 +789,7 @@ class Studio:
         rid2 = self._load_design(src, "python")
         kw2 = {k: v for k, v in kw.items() if k not in ("on_progress", "_progress")}
         try:
-            s = self._k("summary", key="pv-" + H(rid2, vals), **{**kw2, "recipe_id": rid2})
+            s = self._k("summary", key=self.geometry_key(kw.get("p"), rid2, vals), **{**kw2, "recipe_id": rid2})
         except StudioError:
             raise err
         self._tl.last_log = s.get("build_log")
@@ -1018,17 +1026,24 @@ class Studio:
         p["decisions"] = p["decisions"][-300:]
 
     # ---- keys and status -------------------------------------------------
+    def geometry_key(self, p: dict | None, rid: str, values: dict, n: int | None = None) -> str:
+        """The solid's key: the design's code, the kernel and the values (+ imported parts, + marks). The same for a
+        draft and the revision it becomes, so the build a commit made is the one the pipeline, the view and every
+        check use (the kernel also keys its B-rep store by content: form/brepstore.py)."""
+        gk = H("geometry", rid, self.recipe_sha(rid), self.kernel_id(), values)
+        if p is not None and self.uses_references(rid):    # the design reads imported parts: their bytes are inputs too
+            gk = H(gk, self._refs_fp(p))
+        mc = self.mark_context(p, rid, values, n) if p is not None else None
+        if mc:                                         # label text and revision stamp are part of the solid
+            gk = H(gk, "mark", mc)
+        return gk
+
     def keys(self, p: dict, n: int | None = None) -> dict:
         r = self.rev(p, n)
         s = self.slicer_info(p=p)
         rid = self.rid(p, r["n"])
         recipe = self.recipes[rid]
-        gk = H("geometry", rid, self.recipe_sha(rid), self.kernel_id(), r["values"])
-        if self.uses_references(rid):                  # the design reads imported parts: their bytes are inputs too
-            gk = H(gk, self._refs_fp(p))
-        mc = self.mark_context(p, rid, r["values"], r["n"])
-        if mc:                                         # label text and revision stamp are part of the solid
-            gk = H(gk, "mark", mc)
+        gk = self.geometry_key(p, rid, r["values"], r["n"])
         ek = H("exports", gk, p["orientation"], STL_TOL)
         fit_in = None
         if recipe.fit:
@@ -1204,10 +1219,50 @@ class Studio:
         except OSError:
             pass
 
-    def _k(self, op, timeout=60, p=None, refs=None, rev=None, **kw):
+    def predicted_build_s(self, p: dict | None = None, rid: str | None = None) -> float:
+        """Seconds a build of this design is expected to take on a quiet machine: what its last build took (this
+        process, else the project's newest solid on disk), else a per-feature prior (DEADLINE_PER_FEATURE)."""
+        for k in (rid, (p or {}).get("id")):
+            if k and k in self._build_cost:
+                return self._build_cost[k]
+        if p is not None:
+            try:
+                files = sorted((self.dir(p["id"]) / "artifacts" / "geometry").glob("*.json"),
+                               key=lambda f: f.stat().st_mtime, reverse=True)
+                for f in files[:3]:
+                    t = (json.loads(f.read_text(encoding="utf-8")).get("timing") or {}).get("build_s")
+                    if isinstance(t, (int, float)):
+                        self._build_cost[p["id"]] = float(t)
+                        return float(t)
+            except (OSError, ValueError, StudioError):
+                pass
+        try:
+            n = len(getattr(self.recipes[rid], "features", None) or []) if rid else 0
+        except Exception:
+            n = 0
+        return DEADLINE_PRIOR_S + DEADLINE_PER_FEATURE * n
+
+    def deadline(self, op: str, p: dict | None = None, rid: str | None = None) -> float:
+        """A kernel call's time limit from the predicted cost of a build (it may have to build), not a fixed minute:
+        DEADLINE_FACTOR times the prediction plus DEADLINE_PAD, within [DEADLINE_MIN, DEADLINE_MAX]. A call that
+        finds the solid built (the kernel's B-rep store) finishes far inside it."""
+        est = self.predicted_build_s(p, rid)
+        return float(min(DEADLINE_MAX, max(DEADLINE_MIN, DEADLINE_FACTOR * est + DEADLINE_PAD)))
+
+    def _note_cost(self, p, rid, out) -> None:
+        t = (out.get("timing") or {}).get("build_s") if isinstance(out, dict) else None
+        if isinstance(t, (int, float)):
+            for k in (rid, (p or {}).get("id")):
+                if k:
+                    self._build_cost[k] = float(t)
+
+    def _k(self, op, timeout=None, p=None, refs=None, rev=None, **kw):
         """One kernel call. With p (the project), a design that reads imported parts gets their paths, and a
-        design with marks gets the label text and the revision (rev, or the one the values belong to)."""
+        design with marks gets the label text and the revision (rev, or the one the values belong to).
+        timeout: seconds on a quiet machine; None: deadline() from the design's predicted build cost."""
         self.cancel_point()
+        if timeout is None:
+            timeout = self.deadline(op, p, kw.get("recipe_id"))
         if p is not None and kw.get("recipe_id"):
             vals = kw.get("values") if kw.get("values") is not None else kw.get("base")
             mc = self.mark_context(p, kw["recipe_id"], vals, rev) if isinstance(vals, dict) else None
@@ -1233,11 +1288,12 @@ class Studio:
             out = self.kernel.call(op, timeout=timeout, **kw)
             if cache is not None and isinstance(out, dict):
                 self._view_cache_put(cache, out)
+            self._note_cost(p, kw.get("recipe_id"), out)
             return out
         except KernelFailure as e:
             raise self._kernel_error(e.info)
 
-    def view(self, p: dict, n: int | None = None, tol=0.03, timeout: float = 60) -> dict:
+    def view(self, p: dict, n: int | None = None, tol=0.03, timeout: float | None = None) -> dict:
         r = self.rev(p, n)
         gk = self.keys(p, r["n"])["geometry"]
         v = self._k("view", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"], tol=tol, dock_mass_g=self._sliced_mass(p, r["n"]), p=p,
@@ -1264,9 +1320,9 @@ class Studio:
         if unknown:
             raise StudioError("Unknown parameter(s): " + ", ".join(unknown) + ".", "List valid keys with describe_recipe (MCP) or `form recipe <id>` (CLI).")
         vals = {**self.rev(p)["values"], **{k: float(v) for k, v in values.items()}}
-        key = "pv-" + H(self.rid(p), vals)
+        key = self.geometry_key(p, self.rid(p), vals)
         t0 = time.perf_counter()
-        v = self._k("view", key=key, recipe_id=self.rid(p), values=vals, tol=0.06, p=p)
+        v = self._k("view", key=key, recipe_id=self.rid(p), values=vals, tol=SOLID_TOL, p=p)
         v["companions"] = (v.get("companions") or []) + self.reference_companions(p)
         v["impact"] = self.impact(p, vals, v)
         v["fit"] = self.fit(p, v["values"])
@@ -1346,8 +1402,8 @@ class Studio:
                     prov[k] = {kk: v[kk] for kk in ("source", "sigma", "note", "instrument") if kk in v}
             if vals == head["values"] and prov == head["provenance"]:
                 raise StudioError("Nothing changed.", "Edit a parameter or its provenance first.")
-            key = "pv-" + H(self.rid(p), vals)
-            cand = self._k("summary", key=key, recipe_id=self.rid(p), values=vals, tol=0.06, p=p)   # must build before it becomes a revision
+            key = self.geometry_key(p, self.rid(p), vals)
+            cand = self._k("summary", key=key, recipe_id=self.rid(p), values=vals, tol=SOLID_TOL, p=p)   # must build before it becomes a revision
             imp = self.impact(p, cand["values"], cand)
             n = max(r["n"] for r in p["revisions"]) + 1
             auto = ", ".join(f"{c['label']} {c['from']:g} → {c['to']:g} {c['unit']}" for c in imp["params"]) or "Provenance updated"

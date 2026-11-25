@@ -79,8 +79,17 @@ def _where(e: BaseException, recipe) -> str:
 
 
 def _build(recipe_id: str, values: dict, tol: float):
-    """Build, attribute every face to a feature, and tessellate."""
-    from build123d import CenterOf, Vertex
+    """Build, attribute every face to a feature, and tessellate at tol (no store: _get keeps built solids)."""
+    return _tessellated(_build_brep(recipe_id, values), tol)
+
+
+ATTR_TOL = 0.05     # faces are attributed on a mesh at this tolerance, once per build, whatever tolerance is asked
+
+
+def _build_brep(recipe_id: str, values: dict):
+    """Build and attribute every face of the result to a feature: the B-rep model every tessellation, export and
+    check is derived from (see _tessellated). This is the expensive step; _brep keeps its result."""
+    from build123d import CenterOf
     recipe = resolve(recipe_id)
     v = recipe.validate(values)
     t0 = time.perf_counter()
@@ -130,27 +139,70 @@ def _build(recipe_id: str, values: dict, tol: float):
             f"The result is {len(solids)} solid(s) (valid={final.is_valid}); this design declares {want}", stages[-1].feature,
             "A cut has split the body, or parts touch and fused. Separate parts by a gap, or reduce the last change.")
 
-    skins = [_Skin(s.shape) for s in stages[:-1]]
-    faces, by_feature = [], {}
-    # mesh the whole solid once (shared edge discretisation, parallel), then read each face's triangles
+    feats, tess = _attribute(final, stages, ATTR_TOL)
+    bb = final.bounding_box()
+    com = final.center(CenterOf.MASS)
+    base = {
+        "recipe": recipe, "values": v, "shape": final, "face_features": feats,
+        "bbox": [[bb.min.X, bb.min.Y, bb.min.Z], [bb.max.X, bb.max.Y, bb.max.Z]],
+        "volume": float(final.volume), "area": float(final.area), "com": (com.X, com.Y, com.Z),
+        "t_build": t_build, "t_total": time.perf_counter() - t0, "craft_notes": craft_notes,
+        "unchanged_stages": empty, "brep_from": "built", **featureprog.report(),
+    }
+    _finish_base(base)
+    base["_tess"][ATTR_TOL] = tess
+    return base
+
+
+def _face_mesh(face, trsf_loc=None):
+    """(P, T) of one face's current triangulation (outward winding), or None."""
     from OCP.BRep import BRep_Tool
-    from OCP.BRepMesh import BRepMesh_IncrementalMesh
     from OCP.TopAbs import TopAbs_REVERSED
     from OCP.TopLoc import TopLoc_Location
-    BRepMesh_IncrementalMesh(final.wrapped, tol, False, 0.25, True)
-    for face in final.faces():
-        loc = TopLoc_Location()
-        tri = BRep_Tool.Triangulation_s(face.wrapped, loc)
-        if tri is None or tri.NbTriangles() == 0:
+    loc = TopLoc_Location()
+    tri = BRep_Tool.Triangulation_s(face.wrapped, loc)
+    if tri is None or tri.NbTriangles() == 0:
+        return None
+    trsf = loc.Transformation()
+    P = np.empty((tri.NbNodes(), 3), dtype=np.float64)
+    for i in range(1, tri.NbNodes() + 1):
+        q = tri.Node(i).Transformed(trsf)
+        P[i - 1] = (q.X(), q.Y(), q.Z())
+    T = np.array([tri.Triangle(i).Get() for i in range(1, tri.NbTriangles() + 1)], dtype=np.uint32) - 1
+    if face.wrapped.Orientation() == TopAbs_REVERSED:
+        T = T[:, [0, 2, 1]]
+    return P, T
+
+
+def _mesh_faces(shape, faces, tol) -> list:
+    """[(face index, P, T, area)] of the solid meshed at tol: shared edge discretisation, parallel. The solid's old
+    triangulation goes first, so the result is the one tol gives whatever was meshed before."""
+    from OCP.BRepMesh import BRepMesh_IncrementalMesh
+    from OCP.BRepTools import BRepTools
+    BRepTools.Clean_s(shape.wrapped)
+    BRepMesh_IncrementalMesh(shape.wrapped, tol, False, 0.25, True)
+    out = []
+    for i, face in enumerate(faces):
+        m = _face_mesh(face)
+        if m is None:
             continue
-        trsf = loc.Transformation()
-        P = np.empty((tri.NbNodes(), 3), dtype=np.float64)
-        for i in range(1, tri.NbNodes() + 1):
-            q = tri.Node(i).Transformed(trsf)
-            P[i - 1] = (q.X(), q.Y(), q.Z())
-        T = np.array([tri.Triangle(i).Get() for i in range(1, tri.NbTriangles() + 1)], dtype=np.uint32) - 1
-        if face.wrapped.Orientation() == TopAbs_REVERSED:
-            T = T[:, [0, 2, 1]]
+        P, T = m
+        a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+        areas = np.linalg.norm(np.cross(b - a, c - a), axis=1) / 2
+        out.append((i, P, T, float(areas.sum())))
+    return out
+
+
+def _attribute(final, stages, tol):
+    """The feature of every face of the result (by face index; None for a face with no triangles), and the mesh at
+    tol it was read on. A final face belongs to the last stage that created the surface under it."""
+    from build123d import Vertex
+    skins = [_Skin(s.shape) for s in stages[:-1]]
+    faces = final.faces()
+    tess = _mesh_faces(final, faces, tol)
+    feats: list = [None] * len(faces)
+    for i, P, T, _area in tess:
+        face = faces[i]
         a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
         areas = np.linalg.norm(np.cross(b - a, c - a), axis=1) / 2
         k = int(np.argmax(areas))
@@ -159,6 +211,7 @@ def _build(recipe_id: str, values: dict, tol: float):
             # on a large free-form face a coarse triangle's centre can sit tenths of a mm off the surface: use the
             # nearest point on the face's own surface, so the feature test below compares surfaces, not the mesh
             try:
+                from OCP.BRep import BRep_Tool
                 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
                 from OCP.gp import gp_Pnt
                 pj = GeomAPI_ProjectPointOnSurf(gp_Pnt(*map(float, probe)), BRep_Tool.Surface_s(face.wrapped))
@@ -169,22 +222,38 @@ def _build(recipe_id: str, values: dict, tol: float):
                 pass
         feature = stages[0].feature
         pt = Vertex(*probe)
-        for i in range(len(skins) - 1, -1, -1):
-            if not skins[i].holds(face, probe, pt, max(1.5 * tol, 0.01)):
-                feature = stages[i + 1].feature
+        for j in range(len(skins) - 1, -1, -1):
+            if not skins[j].holds(face, probe, pt, max(1.5 * tol, 0.01)):
+                feature = stages[j + 1].feature
                 break
-        faces.append({"feature": feature, "P": P, "T": T, "face": face, "area": float(areas.sum())})
-        by_feature.setdefault(feature, []).append(face)
+        feats[i] = feature
+    return feats, tess
 
-    bb = final.bounding_box()
-    com = final.center(CenterOf.MASS)
-    model = {
-        "recipe": recipe, "values": v, "shape": final, "faces": faces, "by_feature": by_feature,
-        "bbox": [[bb.min.X, bb.min.Y, bb.min.Z], [bb.max.X, bb.max.Y, bb.max.Z]],
-        "volume": float(final.volume), "area": float(final.area), "com": (com.X, com.Y, com.Z),
-        "t_build": t_build, "t_total": time.perf_counter() - t0, "tol": tol, "craft_notes": craft_notes,
-        "unchanged_stages": empty, **featureprog.report(),
-    }
+
+def _finish_base(base) -> None:
+    """The parts of a B-rep model that follow from its shape and face map: faces in order and faces per feature."""
+    faces = base["shape"].faces()
+    base["_faces"] = faces
+    by = {}
+    for f, feat in zip(faces, base["face_features"]):
+        if feat is not None:
+            by.setdefault(feat, []).append(f)
+    base["by_feature"] = by
+    base["_tess"] = {}
+
+
+def _tessellated(base, tol):
+    """The model the operations read: the B-rep model with its faces meshed at tol (each with its feature)."""
+    tess = base["_tess"].get(tol)
+    t0 = time.perf_counter()
+    if tess is None:
+        tess = _mesh_faces(base["shape"], base["_faces"], tol)
+    feats, faces = base["face_features"], base["_faces"]
+    model = {k: v for k, v in base.items() if k not in ("_tess", "_faces")}
+    model["faces"] = [{"feature": feats[i], "P": P, "T": T, "face": faces[i], "area": area}
+                      for i, P, T, area in tess if feats[i] is not None]
+    model["tol"] = tol
+    model["t_mesh"] = time.perf_counter() - t0
     return model
 
 
@@ -337,26 +406,119 @@ def _craft_notes() -> list:
         return []
 
 
+CACHE_MAX = 12          # tessellated models kept in a worker, by (caller key, tolerance)
+BREPS_MAX = 8           # B-rep models kept in a worker, by content key (form/brepstore.py)
+EPHEMERAL = ("var-", "opt-", "mv-")   # sweeps, optimiser candidates, morph frames: kept in memory, never on disk
+_breps: dict = {}       # content key -> B-rep model (no tessellation)
+STATS = {"built": 0, "disk": 0, "memory": 0, "waited": 0, "build_s": 0.0}
+
+
+def _cache_put(k, m) -> None:
+    _cache.pop(k, None)
+    _cache[k] = m
+    while len(_cache) > CACHE_MAX:
+        _cache.pop(next(iter(_cache)))
+
+
+def _brep_put(ck, base) -> None:
+    _breps.pop(ck, None)
+    _breps[ck] = base
+    while len(_breps) > BREPS_MAX:
+        _breps.pop(next(iter(_breps)))
+
+
+def _meta(base) -> dict:
+    """What form/brepstore.py keeps next to the B-rep: everything _tessellated needs besides the shape."""
+    return {k: base.get(k) for k in ("face_features", "bbox", "volume", "area", "com", "t_build", "t_total",
+                                       "craft_notes", "unchanged_stages", "log", "skipped", "parts")} | \
+        {"n_faces": len(base["_faces"]), "kernel": kernel_id()}
+
+
+def _from_store(ck, recipe, v):
+    from . import brepstore
+    hit = brepstore.load(ck)
+    if hit is None:
+        return None
+    shape, meta = hit
+    base = {"recipe": recipe, "values": v, "shape": shape, "brep_from": "disk",
+            **{k: meta.get(k) for k in ("face_features", "bbox", "volume", "area", "t_build", "t_total",
+                                        "unchanged_stages")},
+            "com": tuple(meta.get("com") or (0.0, 0.0, 0.0)), "craft_notes": list(meta.get("craft_notes") or []),
+            "log": list(meta.get("log") or []), "skipped": list(meta.get("skipped") or [])}
+    if meta.get("parts"):
+        base["parts"] = meta["parts"]
+    _finish_base(base)
+    if len(base["_faces"]) != len(base["face_features"] or []):
+        return None
+    STATS["disk"] += 1
+    return base
+
+
+def _brep(key: str, recipe_id: str, values: dict):
+    """The B-rep model of (recipe, values): this worker's memory, else the disk store any process may have filled,
+    else built once (a process already building it is waited for, not raced)."""
+    from . import brepstore
+    recipe = resolve(recipe_id)
+    v = recipe.validate(values)
+    ck = brepstore.key(recipe, recipe_id, v)
+    base = _breps.get(ck)
+    if base is not None:
+        STATS["memory"] += 1
+        _brep_put(ck, base)
+        return base
+    persist = not str(key).startswith(EPHEMERAL)
+    base = _from_store(ck, recipe, v) if persist else None
+    mine = False
+    if base is None and persist:
+        mine = brepstore.claim(ck)
+        if not mine:                                   # another process builds it: wait, then read what it stored
+            STATS["waited"] += 1
+            from . import featureprog
+            left = featureprog.time_left()
+            brepstore.wait(ck, None if left is None else max(1.0, left))
+            base = _from_store(ck, recipe, v)
+            if base is None:
+                mine = brepstore.claim(ck)
+    try:
+        if base is None:
+            t = time.perf_counter()
+            base = _build_brep(recipe_id, values)
+            STATS["built"] += 1
+            STATS["build_s"] += time.perf_counter() - t
+            if persist and not base.get("skipped"):    # a skip can depend on a hang mark that expires: rebuild then
+                brepstore.save(ck, base["shape"], _meta(base))
+    finally:
+        if mine:
+            brepstore.release(ck)
+    base["content_key"] = ck
+    if not base.get("skipped"):                        # a build that left features out asks again next time: its
+        _brep_put(ck, base)                            # skip records (and hang marks) decide, and they change
+    return base
+
+
 def _get(key: str, recipe_id: str, values: dict, tol: float):
+    """The model of (recipe, values) tessellated at tol. One build serves every tolerance and every caller key."""
     m = _cache.get((key, tol))
     if m is None:
-        m = _build(recipe_id, values, tol)
-        if len(_cache) > 12:
-            _cache.pop(next(iter(_cache)))
-        _cache[(key, tol)] = m
+        m = _tessellated(_brep(key, recipe_id, values), tol)
+        _cache_put((key, tol), m)
     return m
 
 
 def _get_near(key: str, recipe_id: str, values: dict, tol: float):
-    """The built model for `key` at any tessellation already in the cache, else built at `tol`.
+    """The built model for `key` at any tessellation already in the cache, else tessellated at `tol`.
 
     For questions answered on the B-rep (what face is here, how thick is the wall): the viewer's model is
-    tessellated at 0.03 mm, and building the same solid again at another tolerance can take as long as the first
-    build (a threaded part takes tens of seconds), so a click would seem to do nothing."""
+    tessellated at 0.03 mm and is good enough, so a click does not wait for another tessellation."""
     for (k, t), m in _cache.items():
         if k == key:
             return m
     return _get(key, recipe_id, values, tol)
+
+
+def op_stats():
+    """How this worker got its B-rep models: built, read from the disk store, from memory, or waited for."""
+    return dict(STATS, breps=len(_breps), models=len(_cache))
 
 
 FEATURE_EDGE_DEG = 25.0     # between two facets, an edge is drawn only where the surface turns more than this
@@ -575,7 +737,8 @@ def _summary(model, extra_mass=None) -> dict:
         "com": model["com"], "derived": r.derived(v), "interface_audit": r.measure(v, model["by_feature"]),
         "statics": statics, "signature": _signature(model), "companions": r.companions(v),
         "faces": len(model["faces"]), "triangles": int(sum(len(f["T"]) for f in model["faces"])),
-        "timing": {"build_s": round(model["t_build"], 4), "total_s": round(model["t_total"], 4)},
+        "timing": {"build_s": round(model["t_build"], 4), "total_s": round(model["t_total"], 4),
+                   "brep": model.get("brep_from", "built")},
         "kernel": kernel_id(),
         "craft_notes": model.get("craft_notes", []),
         **({"build_log": model["log"]} if model.get("log") else {}),

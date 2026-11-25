@@ -1020,22 +1020,26 @@ def build() -> MCPServer:
             feats = [{"id": f.id, "label": f.label} for f in recipe.features]
             if highlight and highlight not in [f["id"] for f in feats]:
                 raise StudioError(f"Unknown feature “{highlight}”.", "Features: " + ", ".join(f["id"] for f in feats))
+            # the picture's name first: a render made before needs no view (no kernel call at all)
             if values:
-                v = st.preview(p, values)
-                title, key = f"{p['name']} - r{p['head']:02d} + DRAFT (not saved)", "pv-" + H(st.rid(p), v["values"])
+                draft = {**st.rev(p)["values"], **{k: float(x) for k, x in values.items()}}
+                title, key = f"{p['name']} - r{p['head']:02d} + DRAFT (not saved)", "pv-" + H(st.rid(p), draft)
             else:
                 n = rev or p["head"]
-                v = st.view(p, n)
                 title, key = f"{p['name']} - r{n:02d}", st.keys(p, n)["geometry"]
+            cache = st.dir(p["id"]) / "artifacts" / "renders"
+            cache.mkdir(parents=True, exist_ok=True)
+            f = cache / f"{key}-{view}-{highlight or 'all'}-v{rendering.VERSION}.png"
+            said = f.with_suffix(".caption.txt")
+            if f.exists() and said.is_file():
+                return f, said.read_text(encoding="utf-8")
+            v = st.preview(p, values) if values else st.view(p, n)
             if view in rendering.POSES:
                 try:
                     v = rendering.posed(v, view)
                 except ValueError as e:
                     raise StudioError(str(e))
             views = ["iso", "front", "top", "right"] if view == "sheet" else ["iso"] if view in rendering.POSES else [view]
-            cache = st.dir(p["id"]) / "artifacts" / "renders"
-            cache.mkdir(parents=True, exist_ok=True)
-            f = cache / f"{key}-{view}-{highlight or 'all'}-v{rendering.VERSION}.png"
             if not f.exists():
                 size = (640, 460) if view == "sheet" else (960, 680)
                 try:
@@ -1045,6 +1049,10 @@ def build() -> MCPServer:
                 f.write_bytes(pngs[0] if len(pngs) == 1 else rendering.contact_sheet(pngs))
             caption = (f"{title}. Rendered from the kernel tessellation ({v['triangles']} triangles), "
                        f"bounding box {' x '.join(f'{b - a:.1f}' for a, b in zip(*v['bbox']))} mm. File: {f}")
+            try:
+                said.write_text(caption, encoding="utf-8")
+            except OSError:
+                pass
             return f, caption
         f, caption = await _run(go)
         act(project, "look", f"Looking at the {view} view" + (f", {highlight}" if highlight else "")
