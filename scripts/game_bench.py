@@ -20,9 +20,9 @@ says who); each item takes the median of the passes, capped by the asset's game 
 is "not scored". Nothing is invented: every number in the report is from this run, failures included.
 
 --refine on: after the design is created, the refinement engine (form/refine/engine.py) refines it as it would in
-the app (cage and material operators for a cage, material operators for a kernel design; candidates judged on the
-cage geometry and materials, one bake at the end checked by the validator and the budgets), and the game asset is
-made from the refined head: the game pipeline replays REFINE_OPS on the low cage and keeps the bake source.
+the app (cage and material operators for a cage, material operators for a kernel design; candidates judged on a
+quick bake each, 256 px maps; one full bake at the end checked by the validator and the budgets), and the game asset
+is made from the refined head: the game pipeline replays REFINE_OPS on the low cage and on the bake source.
 """
 from __future__ import annotations
 
@@ -539,8 +539,8 @@ def write_compare(on: dict, off: dict) -> None:
     L = ["# Game bench", "",
          f"Six original game-asset briefs ({BRIEFS.relative_to(ROOT)}) and one deliberately bad control, made end to "
          f"end from the game exemplars in form/exemplars/game/, twice: with design refinement off (the exemplar as "
-         f"written) and on (form/refine: cage and material operators, one bake checked at the end, the asset made "
-         f"from the refined head). Run {m_on['date']} on {m_on['machine']} with Blender {m_on['blender']}. Every number "
+         f"written) and on (form/refine: cage and material operators, a quick bake of every candidate, one full bake "
+         f"checked at the end, the asset made from the refined head). Run {m_on['date']} on {m_on['machine']} with Blender {m_on['blender']}. Every number "
          "below is from those runs; failures are published as they came out. Budgets and thresholds are proposed "
          "values, not engine rules.", "",
          "## Result", "",
@@ -552,8 +552,9 @@ def write_compare(on: dict, off: dict) -> None:
          f"{sum(_ok(r) for r in off['rows'] if not r.get('control'))} of {len(real)} off.",
          f"- Scored by: {so.get('scored_by') or 'nobody'} ({so.get('date', 'undated')}). {so.get('method') or ''} "
          "The rubric is a model's judgement of rendered sheets, not a person's and not a measurement.",
-         f"- The off column's rubric is the earlier scores file ({Path(m_off.get('scores') or SCORES).name}), "
-         "scored on the sheets of the run it came with.", "",
+         f"- The off column's rubric is {Path(m_off.get('scores') or SCORES).name}: "
+         + ((m_off.get("scores_meta") or {}).get("method") or "scored on the sheets of the run it came with.")
+         + "", "",
          "| Brief | Validation off / on | LOD0 tris off / on | Bevel off / on | Contrast off / on | Wear off / on | "
          "Rubric off | Rubric on | Refinement (kept) |",
          "|---|---|---|---|---|---|---|---|---|"]

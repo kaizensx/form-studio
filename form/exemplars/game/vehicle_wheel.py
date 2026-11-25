@@ -1,13 +1,13 @@
-"""Vehicle wheel for an off-road game vehicle: a fat tyre with a baked lug tread, a rim ring with five open spokes,
-a hub with a cap and lug nuts.
+"""Vehicle wheel for an off-road game vehicle: a fat tyre with a lug tread, a rim ring with five open spokes, a hub
+with a cap and lug nuts.
 
 How it is made: the tyre and the rim are one lathed ring round the axle (Y), the rim barrel and lips inside the tyre's
 beads (one shell, so no face is buried), named by region; the hub is another ring; profile corners are creased and
-bevelled; five tapered spoke blocks run from the hub to the rim with open space between them, so the
-wheel reads as spoked from the side. Bake-only (high_only): the tread, two rows of chevron lugs (kit tread_block)
-round the tyre at one constant pitch, made by Geometry Nodes (geonodes_array as a ring: the seed lug turned round
-the axle in equal steps), the rows half a pitch apart and pointing opposite ways with a groove down the centre; and
-five lug nuts on the hub, from the kit.
+bevelled; five tapered spoke blocks run from the hub to the rim with open space between them, so the wheel reads as
+spoked from the side. The tread is modelled, not baked, because its lugs are what breaks the outline of the disc: two
+rows of chevron lugs (kit tread_block) round the tyre at one constant pitch, made by Geometry Nodes (geonodes_array as
+a ring: the seed lug turned round the axle in equal steps), the rows half a pitch apart and pointing opposite ways
+with a groove down the centre. Bake-only (high_only): five lug nuts on the hub, from the kit.
 """
 from __future__ import annotations
 
@@ -72,16 +72,17 @@ def ops() -> list[dict]:
         blocks.append(s.region("rim"))
     o = start(blocks)
     o += [{"op": "bevel", "edges": {"creased": True}, "width": 4.0, "segments": 2, "profile": 0.5, "crease": 1.0}]
-    # bake-only detail ----------------------------------------------------------------------------------------------
+    # the tread is modelled, not baked: its lugs are what breaks the outline of a disc (seen from the side a baked
+    # tread leaves a plain circle); only the lug nuts are bake-only
     # the tread: two rows of chevron lugs round the tyre at one constant pitch (Geometry Nodes turns each row's seed
     # lug round the axle in LUGS equal steps), the rows half a pitch apart and pointing opposite ways
     step = 2 * math.pi / LUGS
     for y, phase, turn in ((TREAD_Y, 0.0, 0.0), (-TREAD_Y, 0.5, 180.0)):
         a = step * phase
         seed = [TREAD_R * math.cos(a), y, TREAD_R * math.sin(a)]
-        o.append(kit_ring("tread_block", {"width": 66.0, "length": 48.0, "height": 14.0, "taper": 0.14,
+        o.append(kit_ring("tread_block", {"width": 66.0, "length": 48.0, "height": 22.0, "taper": 0.14,
                                           "chevron": 0.3}, [seed], [math.cos(a), 0.0, math.sin(a)], "y", LUGS,
-                          rotation=turn, name="tyre", high_only=True))
+                          rotation=turn, name="tyre"))
     nuts = [[62 * math.cos(2 * math.pi * k / 5), -64.0, 62 * math.sin(2 * math.pi * k / 5)] for k in range(5)]
     o.append({"op": "kit_place", "part": "hex_nut", "params": {"across_flats": 17.0, "height": 9.0, "stud": 4.0},
               "at": nuts, "normal": [0, -1, 0], "name": "hub", "high_only": True})

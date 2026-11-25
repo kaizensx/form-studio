@@ -145,6 +145,21 @@ class Operators(unittest.TestCase):
             self.assertEqual(op._region(d), "panel", op.name)
         self.assertEqual(ops_cage.Inset()._region(d), "shell")               # an inset needs no border
 
+    def test_crisp_regions_creases_soft_borders_once(self):
+        from form.exemplars.game.base import box, design_source
+        self.assertEqual(ops_cage.soft_borders(_source()), {"panel": 0.25})      # on the box's creased rim: crisp
+        b = box([0, 10, 20, 30], [0, 20], [0, 10]).region("panel", [3])            # the middle of the top
+        src = design_source(meshsource.cage(b.V, b.F, [[a, c2, w] for a, c2, w in b.creases], b.regions), "Mid")
+        self.assertEqual(ops_cage.soft_borders(src), {"panel": 0.5})
+        op = ops_cage.CrispRegions()
+        d = Design.from_source(src, purpose="game", bbox=((0, 0, 0), (30, 20, 10)))
+        self.assertTrue(op.check(d, None)[0])
+        out = op.apply(d, None, dict(op.params)).edit(src)
+        ops = ops_cage.refine_ops_of(out)
+        self.assertEqual(ops[0], {"op": "crease", "region_boundary": "panel", "value": 1.0, "pin_corners": True})
+        self.assertEqual(ops[1]["op"], "support_loops")
+        self.assertFalse(op.check(Design.from_source(out, purpose="game", bbox=d.bbox), None)[0])   # done once
+
     def test_packed_literals_read_back_the_same(self):
         """Large cages and op lists are written packed (meshsource.pack: deterministic JSON, zlib, base64), so a
         design source stays under its size limit; every reader unpacks them, and the same data packs the same."""

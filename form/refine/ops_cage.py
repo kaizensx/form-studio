@@ -496,9 +496,38 @@ class KitPlace(_RegionOp):
                      params={"ops": ops})
 
 
+def region_normals(source: str) -> dict:
+    """{region: (mean outward unit normal, share of the cage's faces)} of the source's bordered regions (Newell
+    normals of the cage faces, area weighted)."""
+    acc: dict = {}
+    total = 0
+    borders = region_borders(source)
+    for c in cages_of(source).values():
+        V = np.asarray(c["V"], float)
+        total += len(c["F"])
+        for r, fs in (c["regions"] or {}).items():
+            if r not in borders:
+                continue
+            n, k = acc.get(r, (np.zeros(3), 0))
+            for i in fs or ():
+                f = c["F"][int(i)]
+                P = V[f]
+                n = n + 0.5 * np.cross(P, np.roll(P, -1, axis=0)).sum(0)
+                k += 1
+            acc[r] = (n, k)
+    out = {}
+    for r, (n, k) in acc.items():
+        ln = float(np.linalg.norm(n))
+        if ln > 1e-9:
+            out[r] = (n / ln, k / max(total, 1))
+    return out
+
+
 class SilhouetteBreaker(Operator):
     """A brow, crest or vent extrusion, chosen from the 64 px convexity deficit of the views it would change, on the
-    cage region named after it."""
+    cage region named after it. A cage without such regions gets its plainest view broken instead: the bordered
+    region (3-25 % of the faces) whose mean normal lies most across that view's line of sight is pushed out along
+    it, its seat creased (a plate, a lid band, a boss standing out of the outline)."""
     name = "silhouette_breaker"
     domain = "cage"
     targets = ("silhouette",)
@@ -506,13 +535,33 @@ class SilhouetteBreaker(Operator):
     label = "Silhouette breaker"
     params = {"exaggeration": 1.0}
 
+    def _generic(self, design, analysis, done):
+        from .analyze import VIEWS6, _rot
+        sol = ((analysis.measures or {}).get("silhouette") or {}).get("solidity") if analysis else None
+        if not sol:
+            return None
+        worst = max(sol, key=lambda v: (sol[v], v))
+        fwd = _rot(*VIEWS6[worst])[2]
+        frozen = _frozen_regions(design)
+        best = None
+        for r, (n, share) in sorted(region_normals(design.source).items()):
+            if r in frozen or r in done or not 0.03 <= share <= 0.25:
+                continue
+            across = 1.0 - abs(float(n @ fwd))
+            if across < 0.7:
+                continue
+            key = (round(across, 3), round(share, 4), r)
+            if best is None or key > best[0]:
+                best = (key, r, n)
+        return None if best is None else ("region", best[1], [float(x) for x in best[2]])
+
     def _plan(self, design, analysis):
         regs = regions_of(design.source) - _frozen_regions(design)
         done = {o.get("faces", {}).get("region") for o in refine_ops_of(design.source)
                 if o.get("op") == "extrude_region"}
         avail = [k for k in BREAKERS if k in regs and k not in done]
         if not avail:
-            return None
+            return self._generic(design, analysis, done)
         sol = ((analysis.measures or {}).get("silhouette") or {}).get("solidity") if analysis else None
         if sol:
             from .analyze import SIL_BLOB
@@ -528,17 +577,91 @@ class SilhouetteBreaker(Operator):
         if not ok:
             return ok, why
         if self._plan(design, analysis) is None:
-            return False, "no brow, crest or vent region left to push out"
+            return False, "no brow, crest, vent or other bordered region left to push out"
         return True, ""
 
     def apply(self, design, analysis, params):
         kind = self._plan(design, analysis)
         ex = float(params.get("exaggeration", 1.0))
         size = 0.06 * min(design.size() or (100.0,))
+        if isinstance(kind, tuple):                       # the generic breaker: a region along its own normal
+            _k, region, n = kind
+            op = breaker_op("crest", region, size, ex, direction=n)
+            return Patch(edit=_append([op] + crisp(region)), reason=f"The {region} region pushed out "
+                         f"{size * ex:.3g} mm along its normal, its seat creased, breaks the plainest view's outline.",
+                         params={"kind": "region", "region": region, "vector": op["vector"]})
         op = breaker_op(kind, kind, size, ex)
-        return Patch(edit=_append([op]), reason=f"A {kind} pushed out {size * ex:.3g} mm breaks the outline in the "
-                     "views that read as a blob at 64 px.",
+        # its seat creased with the corners kept: pushed out of a smooth shell without it, the breaker subdivides
+        # into a swell (a lump) instead of a plate standing on the shell
+        return Patch(edit=_append([op] + crisp(kind)), reason=f"A {kind} pushed out {size * ex:.3g} mm, its seat "
+                     "creased, breaks the outline in the views that read as a blob at 64 px.",
                      params={"kind": kind, "vector": op["vector"]})
 
 
-OPERATORS = [SupportLoops(), PanelLine(), TrimStrip(), Inset(), KitPlace(), SilhouetteBreaker()]
+def soft_borders(source: str) -> dict:
+    """{region: share of its border edges that are not creased} for the regions of the source's cages that have a
+    border: a soft border subdivides into a smooth swell, which reads as a lump on a hard-surface part."""
+    out: dict = {}
+    for c in cages_of(source).values():
+        F = c["F"]
+        cr = {(min(int(a), int(b)), max(int(a), int(b))) for a, b, w in c["creases"] or [] if float(w) >= 0.5}
+        for r, fs in (c["regions"] or {}).items():
+            cnt: dict = {}
+            for i in set(fs or ()):
+                if 0 <= int(i) < len(F):
+                    f = F[int(i)]
+                    for a, b in zip(f, f[1:] + f[:1]):
+                        e = (min(a, b), max(a, b))
+                        cnt[e] = cnt.get(e, 0) + 1
+            border = [e for e, n in cnt.items() if n == 1]
+            if border:
+                soft, tot = out.get(r, (0, 0))
+                out[r] = (soft + sum(1 for e in border if e not in cr), tot + len(border))
+    return {r: round(s / t, 4) for r, (s, t) in out.items() if t}
+
+
+class CrispRegions(Operator):
+    """Hard-surface plates instead of lumps: the borders of up to three named regions whose borders are mostly soft
+    creased with their corners pinned, and support loops beside them (crisp()). A pushed-out brow or a cheek plate
+    whose border is not creased subdivides into a smooth swell; creased and supported it reads as a plate with a
+    shut line."""
+    name = "crisp_regions"
+    domain = "cage"
+    targets = ("edge_hierarchy", "surface_breaks", "interior_read")
+    cost = 0.5
+    label = "Crisp plates"
+    params = {"count": 3, "soft": 0.5}
+
+    def _pick(self, design, params):
+        frozen = _frozen_regions(design)
+        done = {o.get("region_boundary") for o in refine_ops_of(design.source) if o.get("op") == "crease"}
+        soft = soft_borders(design.source)
+        sizes = {}
+        for c in cages_of(design.source).values():
+            for r, fs in (c["regions"] or {}).items():
+                sizes[r] = sizes.get(r, 0) + len(fs or ())
+        cand = [r for r, s in soft.items() if s >= float(params.get("soft", 0.5)) and r not in frozen and r not in done]
+        return sorted(cand, key=lambda r: (-sizes.get(r, 0), r))[:int(params.get("count", 3))]
+
+    def preconditions(self, design, analysis):
+        ok, why = _game_cage(design)
+        if not ok:
+            return ok, why
+        if not self._pick(design, dict(self.params)):
+            return False, "every region border is creased already"
+        return True, ""
+
+    def apply(self, design, analysis, params):
+        regs = self._pick(design, params)
+        if not regs:
+            return None
+        d = 0.006 * min(design.size() or (100.0,))
+        ops = []
+        for r in regs:
+            ops += crisp(r, round(d, 3))
+        return Patch(edit=_append(ops), reason="The borders of " + ", ".join(regs) + " creased with their corners "
+                     f"kept and support loops {d:.2g} mm beside them: plates with a shut line instead of soft swells.",
+                     params={"regions": regs, "distance": d})
+
+
+OPERATORS = [SupportLoops(), PanelLine(), TrimStrip(), Inset(), KitPlace(), SilhouetteBreaker(), CrispRegions()]

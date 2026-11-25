@@ -106,6 +106,15 @@ def refined_cage(source: str, cfg: dict | None = None, cache_dir=None, timeout: 
     return cage
 
 
+def _with_validation(ev: dict, asset_dir) -> dict:
+    """The game evidence with the build's validator report (report.json "validation") as ev["validation"]."""
+    try:
+        ev["validation"] = json.loads((Path(asset_dir) / "report.json").read_text(encoding="utf-8")).get("validation")
+    except (OSError, ValueError):
+        ev["validation"] = None
+    return ev
+
+
 def _mesh(cage):
     """The cage's level-2 subdivision as triangles, and the cage region each triangle comes from ("body" when none)."""
     import numpy as np
@@ -198,7 +207,7 @@ class GameEvaluator(Evaluator):
         ev = None
         if (d / "report.json").is_file():
             try:
-                ev = critique.game_evidence(d)
+                ev = _with_validation(critique.game_evidence(d), d)
             except Exception:                                   # noqa: BLE001 - bake it again
                 ev = None
         if ev is None:
@@ -209,7 +218,7 @@ class GameEvaluator(Evaluator):
                     pipeline.build({"cage": cage, "materials": mats}, tmp / "a", asset="quick", preset="gltf",
                                    budgets=self.budgets, texture_px=QUICK_PX, bake="preview", collision="none",
                                    cfg=getattr(self.st, "cfg", None))
-                ev = critique.game_evidence(tmp / "a")
+                ev = _with_validation(critique.game_evidence(tmp / "a"), tmp / "a")
                 self.stats["quick_bakes"] += 1
                 try:
                     if d.exists():
@@ -248,12 +257,17 @@ class GameEvaluator(Evaluator):
         else:
             self.stats["geometry_reused"] += 1
         game = self.quick_evidence(src, geo["cage"]) if self.quick else None
+        validation = None
         if game is None:
             game = {"edges": {"coverage": geo["coverage"]}}
+        else:
+            # the quick bake's own validator (closed and manifold LODs, no flipped faces, ...): a candidate that would
+            # fail the final bake is rejected here, not after the search has built on it
+            validation = game.get("validation")
         a = analyze(Measurement(geo["P"], geo["T"], tri_feature=geo["tf"], zones=zones_of(src), purpose="game",
                                 game=game, product_class=self.product_class), weights=self.weights)
         lo, hi = geo["P"].min(0), geo["P"].max(0)
-        out = Evaluation(ok=True, analysis=a, checks=None, frozen=None, wall_mm=None, triangles=geo["tris"],
+        out = Evaluation(ok=True, analysis=a, checks=None, frozen=None, wall_mm=None, triangles=geo["tris"], game=validation,
                          bbox=(tuple(lo.tolist()), tuple(hi.tolist())), seconds=round(time.time() - t0, 2),
                          extra={"faces": len(geo["cage"].F), "quick": bool(game.get("dir"))})
         self._memo[h] = out

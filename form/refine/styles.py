@@ -48,7 +48,7 @@ STYLES = {
         "weights": {"panel_line": 1.8, "inset": 1.5, "kit_place": 1.6, "trim_strip": 1.3, "silhouette_breaker": 1.5,
                     "support_loops": 1.3, "recessed_panel": 1.5, "parting_line": 1.4, "fillet_hierarchy": 1.0,
                     "edge_break": 0.8, "knurl_zone": 0.6, "button_pads": 1.0, "material_zones": 1.4,
-                    "contrast_pair": 1.3, "edge_wear": 0.8, "rib_lightening": 1.0},
+                    "contrast_pair": 1.3, "edge_wear": 0.8, "rib_lightening": 1.0, "crisp_regions": 1.6},
         "params": {"kit_place": {"ratios": [1.0, 0.38, 0.15], "pitch": "constant"}, "panel_line": {"width": 0.6},
                    "edge_wear": {"amount": 0.3}},
         "deficits": {"silhouette": 1.4, "interior_read": 1.3, "surface_breaks": 1.3},
