@@ -239,10 +239,12 @@ Item {
     property real el: 28.4
     property real dist: 420
     property bool tween: false
-    Behavior on az { enabled: vp.tween; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
-    Behavior on el { enabled: vp.tween; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
-    Behavior on dist { enabled: vp.tween; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
-    Behavior on target { enabled: vp.tween; Vector3dAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    property var camCurve: Motion.out        // the build-up's one re-framing moves on screen (Theme.easeMove); everything else answers (ease-out)
+    Timer { id: camBack; interval: Motion.camera + 40; onTriggered: vp.camCurve = Motion.out }
+    Behavior on az { enabled: vp.tween; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: vp.camCurve } }
+    Behavior on el { enabled: vp.tween; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: vp.camCurve } }
+    Behavior on dist { enabled: vp.tween; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: vp.camCurve } }
+    Behavior on target { enabled: vp.tween; Vector3dAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: vp.camCurve } }
 
     // ── the free area: pixels the HUD covers on each side. The camera keeps the part in what is left, so a legend
     // or an options bar never sits on it. The parent sets the targets; the camera glides there.
@@ -331,8 +333,23 @@ Item {
         if (!same || grow) _mesh = v && v.mesh ? v.mesh : []     // held features are created hidden: they never fade out first
         _syncAsm(v, !same || grow)
         model = v
+        // while a build-up runs (and for a streamed stage) each feature draws its own edges (FeatureEdges)
+        _trace = interactive && !lite && !!v && (grow || revealing || !!v.stage)
         if (v) _frame()
+        _syncDims(false)
+        if (grow && !v.stage) _reframe(old)
         if (grow) { _stepAt = 0; stepper.interval = 16; stepper.restart() }
+    }
+    // The camera frames a new build once, as it starts, and then stays where it is while the features arrive. A build
+    // of the same design at about the same size leaves the camera where the person put it.
+    function _reframe(old) {
+        var r = radius(bounds), same = !!old && !!model && old.pid === model.pid && !!old.bbox
+        if (same) {
+            var ob = old.bbox, orad = Math.max(Math.hypot(ob[1][0] - ob[0][0], ob[1][1] - ob[0][1], ob[1][2] - ob[0][2]) / 2, 12)
+            if (Math.abs(orad - r) < 0.04 * r) return
+        }
+        camCurve = Theme.easeMove; camBack.restart()
+        tween = true; target = center(bounds); dist = frame(bounds, 1.5)
     }
     // the meshes drawn by the parts repeaters: replaced only when the geometry really changed
     property var _mesh: []
@@ -376,10 +393,12 @@ Item {
     function swap(apply) { apply() }
 
     // ── the build-up: a new build grows in feature by feature, in build order ──
-    // Each step fades its features in and lets them rise the last few millimetres into place (eased, about a third of
-    // a second); what is already shown is never touched, and the last step leaves exactly the final model. Features
-    // whose geometry did not change since the model before stay as they are. With reduced motion everything new
-    // fades in at once, without moving.
+    // Each step first draws its features' own edges in datum (edgeMs), then fades their solid in and lets it rise the
+    // last few millimetres into place (revealMs, eased) while the edges settle to the ordinary edge colour; what is
+    // already shown is never touched, and the last step leaves exactly the final model. The overall dimensions
+    // measure what is drawn so far and count up to each new value. Features whose geometry did not change since the
+    // model before stay as they are. The camera frames the build once, as it starts (_reframe). With reduced motion
+    // everything new fades in at once, without moving.
     property var order: []                   // feature ids in build order (the recipe's); others follow in mesh order
     property var _hold: []                   // features of the drawn model not revealed yet
     property var _steps: []                  // [[feature ids], ...] still to reveal
@@ -387,6 +406,45 @@ Item {
     readonly property bool revealing: _steps.length > 0
     readonly property int revealMs: Theme.reduced ? 220 : 340
     readonly property real riseMm: Theme.reduced ? 0 : Math.max(2, Math.min(8, radius(bounds) * 0.08))
+    readonly property int edgeMs: Theme.fast
+    property bool _trace: false              // each feature draws its own edges instead of the model's whole edge set
+    // the box the overall dimensions measure: what is drawn so far of a build-up, else everything (bounds)
+    property vector3d dimLo: bounds.lo
+    property vector3d dimHi: bounds.hi
+    property bool dimsHeld: false            // a build-up that has drawn nothing yet: no dimensions
+    property bool _dimGlide: false
+    Behavior on dimLo { enabled: vp._dimGlide; Vector3dAnimation { duration: Theme.move(Theme.cross); easing.type: Easing.OutCubic } }
+    Behavior on dimHi { enabled: vp._dimGlide; Vector3dAnimation { duration: Theme.move(Theme.cross); easing.type: Easing.OutCubic } }
+    onBoundsChanged: if (!revealing) _syncDims(false)
+    function _shownBox() {                   // { lo, hi } on the plate of the features drawn so far; null = all of it; "none"
+        if (!revealing || !_hold.length || asmOn) return null
+        var lo = null, hi = null
+        function add(g, f) {
+            if (!g) return false
+            if (_hold.indexOf(f) >= 0) return true
+            var a = g.lo, c = g.hi
+            if (a.x === c.x && a.y === c.y && a.z === c.z) return true
+            lo = lo ? Qt.vector3d(Math.min(lo.x, a.x), Math.min(lo.y, a.y), Math.min(lo.z, a.z)) : a
+            hi = hi ? Qt.vector3d(Math.max(hi.x, c.x), Math.max(hi.y, c.y), Math.max(hi.z, c.z)) : c
+            return true
+        }
+        for (var i = 0; i < parts.count; i++) { var m = parts.objectAt(i); if (!m || !add(m.geometry, m.feature)) return "none" }
+        for (var k = 0; k < asmParts.count; k++) {
+            var n = asmParts.objectAt(k)
+            if (!n) return "none"
+            for (var j = 0; j < n.meshes.count; j++) { var g = n.meshes.objectAt(j); if (!g || !add(g.geometry, g.feature)) return "none" }
+        }
+        return lo ? { lo: lo.plus(shiftTo), hi: hi.plus(shiftTo) } : "none"
+    }
+    function _syncDims(glide) {
+        var b = _shownBox(), was = dimsHeld
+        dimsHeld = b === "none"
+        if (dimsHeld) return
+        if (!b) b = bounds
+        _dimGlide = !!glide && !was          // the first numbers of a build appear; the next ones count up
+        dimLo = b.lo; dimHi = b.hi
+        _dimGlide = false
+    }
     signal revealStep(var ids, int at, int count)
     signal revealDone()
     function _featureGeo(m) {                // feature id → its meshes' geometry, as one comparable string
@@ -413,12 +471,18 @@ Item {
         return true
     }
     function _nextStep() {
-        if (_stepAt >= _steps.length) { _steps = []; _hold = []; revealDone(); return }
+        if (_stepAt >= _steps.length) {
+            _steps = []; _hold = []
+            if (!(model && model.stage)) _trace = false       // the model's own edges again: the same lines
+            _syncDims(true); revealDone(); return
+        }
         var ids = _steps[_stepAt]
         _hold = _hold.filter(function (f) { return ids.indexOf(f) < 0 })
+        _syncDims(true)
         revealStep(ids, _stepAt, _steps.length)
         _stepAt++
-        stepper.interval = _stepAt >= _steps.length ? revealMs : Math.max(250, Math.min(400, 2600 / _steps.length))
+        // the last step waits until its edges are in, its solid has landed and its edges have settled
+        stepper.interval = _stepAt >= _steps.length ? edgeMs + revealMs + 20 : Math.max(280, Math.min(420, 2800 / _steps.length))
         stepper.restart()
     }
     function _endReveal() {                  // anything else that changes the model shows it whole, at once
@@ -595,7 +659,8 @@ Item {
                         readonly property string part: ""
                         // the build-up: 0 while held, eased to 1 when its step comes (it fades in and rises into place)
                         property real k: vp._hold.indexOf(feature) < 0 ? 1 : 0
-                        Behavior on k { NumberAnimation { duration: vp.revealMs; easing.type: Easing.OutCubic } }
+                        Behavior on k { SequentialAnimation { PauseAnimation { duration: vp._trace ? vp.edgeMs : 0 }       // its edges first
+                            NumberAnimation { duration: vp.revealMs; easing.type: Easing.OutCubic } } }
                         // a streamed stage (Store.showStage) grows in over the one before; that one is drawn a hair
                         // smaller about the part's middle until it goes, so their shared faces never fight
                         readonly property bool under: !!vp.model && !!vp.model.stage && index < vp._mesh.length - 1
@@ -650,7 +715,8 @@ Item {
                                 readonly property string feature: modelData.feature || ""
                                 readonly property string part: pn.pid
                                 property real k: vp._hold.indexOf(feature) < 0 ? 1 : 0
-                                Behavior on k { NumberAnimation { duration: vp.revealMs; easing.type: Easing.OutCubic } }
+                                Behavior on k { SequentialAnimation { PauseAnimation { duration: vp._trace ? vp.edgeMs : 0 }       // its edges first
+                            NumberAnimation { duration: vp.revealMs; easing.type: Easing.OutCubic } } }
                                 opacity: k; z: -(1 - k) * vp.riseMm
                                 pickable: !vp.mapShown && k > 0.5; visible: !vp.mapShown && vp.hiddenFeatures.indexOf(feature) < 0 && k > 0.001
                                 geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
@@ -667,13 +733,24 @@ Item {
                                 }
                             }
                         }
-                        Model { pickable: false; castsShadows: false; depthBias: -2
+                        Repeater3D {
+                            id: pe
+                            model: vp._trace && vp.model ? (vp._meshByPart[pn.pid] || []) : []
+                            FeatureEdges { required property var modelData; host: vp; mesh: modelData; partId: pn.pid }
+                        }
+                        Model { pickable: false; castsShadows: false; depthBias: -2; visible: !vp._trace
                             geometry: LineGeometry { segments: pn.part.edges || "" }
                             materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
                                 property color uColor: vp.edgeColor(pn.pid); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
                     }
                 }
-                Model { visible: !!(vp.model && vp.model.edges) && !vp.asm; pickable: false; castsShadows: false; depthBias: -2
+                Repeater3D {
+                    id: partEdges
+                    model: vp._trace && vp.model && !vp.asm ? vp._mesh : []
+                    FeatureEdges { required property var modelData; required property int index
+                        host: vp; mesh: modelData; last: !(vp.model && vp.model.stage) || index >= partEdges.count - 1 }
+                }
+                Model { visible: !!(vp.model && vp.model.edges) && !vp.asm && !vp._trace; pickable: false; castsShadows: false; depthBias: -2
                     geometry: LineGeometry { segments: vp.model && vp.model.edges ? vp.model.edges : "" }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
                         property color uColor: vp.edgeColor(""); property vector3d uClipN: vp.clipN; property real uClipD: vp.clipD; property real uClip: vp.clipOn ? 1 : 0 } }
@@ -819,15 +896,15 @@ Item {
             }
 
             // overall dimensions, drawn like a drawing: extension lines, a dimension line, the number
-            Model { visible: vp.showDims && !!vp.model && vp.asmMode !== "exploded"; pickable: false; castsShadows: false
+            Model { visible: vp.showDims && !!vp.model && vp.asmMode !== "exploded" && !vp.dimsHeld; pickable: false; castsShadows: false
                 geometry: LineGeometry { points: {
-                    var b = vp.bounds, o = 7, t = 2.2, p = []
-                    var x0 = b.lo.x, x1 = b.hi.x, y0 = b.lo.y, y1 = b.hi.y, z1 = b.hi.z
+                    var o = 7, t = 2.2, p = []
+                    var x0 = vp.dimLo.x, x1 = vp.dimHi.x, y0 = vp.dimLo.y, y1 = vp.dimHi.y, z0 = vp.dimLo.z, z1 = vp.dimHi.z
                     var g = 0.12, sx = vp.camRight ? 1 : -1, sy = vp.camFront ? -1 : 1
                     var xe = vp.camRight ? x1 : x0, ye = vp.camFront ? y0 : y1, yf = vp.camFront ? y1 : y0
                     p.push(x0, ye + sy * o, g, x1, ye + sy * o, g, x0, ye + sy * (o + t), g, x0, ye + sy, g, x1, ye + sy * (o + t), g, x1, ye + sy, g)
                     p.push(xe + sx * o, y0, g, xe + sx * o, y1, g, xe + sx, y0, g, xe + sx * (o + t), y0, g, xe + sx, y1, g, xe + sx * (o + t), y1, g)
-                    p.push(xe + sx * o, yf, 0, xe + sx * o, yf, z1, xe + sx, yf, z1, xe + sx * (o + t), yf, z1)
+                    p.push(xe + sx * o, yf, z0, xe + sx * o, yf, z1, xe + sx, yf, z1, xe + sx * (o + t), yf, z1)
                     return p } }
                 materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
                     property color uColor: Theme.alpha(Theme.datum, 0.72); property vector3d uClipN; property real uClipD; property real uClip: 0 } }
@@ -890,10 +967,10 @@ Item {
         return s.z > 0 ? Qt.point(s.x, s.y) : null
     }
     function _dimLine(i) {                   // the two ends of dimension line i, on the plate (see the Model above)
-        var b = bounds, o = 7, xs = camRight ? b.hi.x + o : b.lo.x - o, ys = camFront ? b.lo.y - o : b.hi.y + o
+        var b = { lo: dimLo, hi: dimHi }, o = 7, xs = camRight ? b.hi.x + o : b.lo.x - o, ys = camFront ? b.lo.y - o : b.hi.y + o
         return i === 0 ? [Qt.vector3d(b.lo.x, ys, 0), Qt.vector3d(b.hi.x, ys, 0)]
              : i === 1 ? [Qt.vector3d(xs, b.lo.y, 0), Qt.vector3d(xs, b.hi.y, 0)]
-             : [Qt.vector3d(xs, camFront ? b.hi.y : b.lo.y, 0), Qt.vector3d(xs, camFront ? b.hi.y : b.lo.y, b.hi.z)]
+             : [Qt.vector3d(xs, camFront ? b.hi.y : b.lo.y, b.lo.z), Qt.vector3d(xs, camFront ? b.hi.y : b.lo.y, b.hi.z)]
     }
     function _seatLabels() {
         var items = [], refs = [], i, k, it, w, h, p, c
@@ -937,15 +1014,15 @@ Item {
     // dimension numbers, on the 3D dimension lines
     Repeater {
         id: dimLabels
-        model: vp.showDims && vp.model && !(vp.asmOn && vp.asmMode === "exploded") ? 3 : 0
+        model: vp.showDims && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.dimsHeld ? 3 : 0
         Rectangle {
             id: dl
             objectName: "dimLabel"
             required property int index
             property bool shown: false
             property int cand: -1
-            readonly property var b: vp.bounds
-            readonly property real mm: index === 0 ? b.hi.x - b.lo.x : index === 1 ? b.hi.y - b.lo.y : b.hi.z
+            // what is drawn so far while a build-up runs (it counts up to each new value), else the whole part
+            readonly property real mm: index === 0 ? vp.dimHi.x - vp.dimLo.x : index === 1 ? vp.dimHi.y - vp.dimLo.y : vp.dimHi.z - vp.dimLo.z
             width: t.implicitWidth + 10; height: 17; radius: Theme.rXs; color: Theme.plate; border.color: Theme.alpha(Theme.datum, 0.28)
             opacity: shown ? 1 : 0; visible: opacity > 0.01                // a label that loses its seat fades, never blinks
             Behavior on opacity { NumberAnimation { duration: 120 } }

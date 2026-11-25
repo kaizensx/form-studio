@@ -12,6 +12,10 @@
   Analytic and freeform faces and a feature tree from the mesh are Beta.
 - **Designs built one feature at a time.** You watch the design take shape; a feature that fails no longer loses
   the work, and each feature is checked as it is made.
+- **The build, drawn like a drawing.** As a design builds, each feature's edges are traced first, then its solid
+  rises into place. The overall dimensions measure what is built so far and count up with it, a ledger over the
+  part names the feature and how far the build is ("6 of 12"), and the feature's row in the Design list lights
+  up while it is made. The camera frames the build once and then stays put.
 - **Drag a face to change the design**, constrained 2D sketches, and sculpted forms as exact NURBS.
 - **Real standard hardware.** ISO screws, nuts, washers, heat-set inserts and bearings built into designs, with
   their masses in the bill of materials.

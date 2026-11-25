@@ -916,6 +916,7 @@ QtObject {
     // the part never blinks. When the design is saved its head takes over in place (showHead, _handoff), the same
     // solid, or the one the partial build kept if a stage was dropped: the saved design wins.
     property var building: null        // the stage on screen: { draft, project, feature, label, at, of, index }
+    property var revealing: []         // feature ids the viewport is building up right now (the Design list marks their rows)
     readonly property string buildingText: building ? "Building " + building.label + (building.of > 1 ? " (" + building.at + " of " + building.of + ")" : "") : ""
     property var stageLog: []          // stages drawn: { draft, feature, at, of, t (ms) } (diagnostics, tests)
     property var stageViewer: null     // the Designing screen's viewport (the workspace's is `viewer`)

@@ -93,22 +93,16 @@ Item {
                 onClicked: run(function () { return Store.startBlock("") }) } }
     }
 
-    // a quiet caption while the stages arrive: "Building Rim (3 of 5)"
-    Rectangle {
+    // the build's ledger while the stages arrive: "Building · Rim · 3 of 5", pinned top centre like the workspace's
+    Item {
         id: stageCap; objectName: "stageCaption"; z: 6
         readonly property string caption: Store.buildingText
-        anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 32
-        width: scr.implicitWidth + 28; height: 32; radius: 16; color: Theme.alpha(Theme.plate3, 0.94); border.color: Theme.alpha(Theme.datum, 0.45)
+        anchors.horizontalCenter: parent.horizontalCenter; y: 58
+        width: stageLedger.width; height: stageLedger.height
         opacity: dz.staged ? 1 : 0; visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: dz.staged ? Theme.fast : 420 } }
-        Row { id: scr; anchors.centerIn: parent; spacing: 9
-            Rectangle { width: 6; height: 6; radius: 3; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter
-                SequentialAnimation on opacity { running: stageCap.visible && !Theme.reduced; loops: Animation.Infinite
-                    NumberAnimation { to: 0.35; duration: 700 } NumberAnimation { to: 1; duration: 700 } } }
-            Txt { kind: "cap"; color: Theme.datum; text: "Building"; anchors.verticalCenter: parent.verticalCenter }
-            Txt { text: Store.building ? Store.building.label : ""; font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter }
-            Txt { visible: !!Store.building && Store.building.of > 1; kind: "fine"; mono: true; tone: 3; anchors.verticalCenter: parent.verticalCenter
-                text: Store.building ? Store.building.at + " of " + Store.building.of : "" } }
+        BuildLedger { id: stageLedger; pulse: true
+            label: Store.building ? Store.building.label : ""; at: Store.building ? Store.building.at : 0; of: Store.building ? Store.building.of : 0 }
     }
 
     // the blank canvas: the empty studio floor and the ways to put something on it

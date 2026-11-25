@@ -145,16 +145,22 @@ Item {
         id: build
         property string label: ""
         property string sub: ""
+        property int at: 0
+        property int of: 0
+        property bool running: false
         function step(ids, at, count) {
             if (Store.building) return            // a streamed stage names itself (Store.buildingText)
             var names = ids.map(function (id) { var f = Store.featureById(id); return f && f.label ? f.label : id }).filter(function (n) { return !!n })
             label = names.length > 2 ? names.slice(0, 2).join(", ") + " and " + (names.length - 2) + " more" : names.join(", ")
             sub = count > 1 ? (at + 1) + " of " + count : ""
+            build.at = at + 1; build.of = count; running = true
+            Store.revealing = ids                 // the Design list marks the rows being built
             flash.stop()
         }
-        function done() { if (Store.building) return; sub = ""; flash.restart() }
+        function done() { Store.revealing = []; if (Store.building) return; sub = ""; running = false; flash.restart() }
     }
     Timer { id: flash; interval: 1400; onTriggered: { build.label = ""; build.sub = "" } }
+    Component.onDestruction: Store.revealing = []
 
     // ── centre: the part ─────────────────────────────────────
     Item {
@@ -210,29 +216,27 @@ Item {
                 GradientStop { position: 0; color: Theme.alpha(Theme.plate, 0.5) } GradientStop { position: 0.16; color: "transparent" }
                 GradientStop { position: 0.82; color: "transparent" } GradientStop { position: 1; color: Theme.alpha(Theme.plate, 0.75) } } }
 
-        // the build-up's caption: which feature just arrived
-        Rectangle {
+        // the build's ledger: which feature is arriving, how far the build is
+        Item {
             id: buildCap; objectName: "buildCaption"; z: 6
-            // centred over the part, but never under the dock's panels (top right: refinement, legends): it moves left
-            // of them, and below them when there is no room beside them
+            // pinned top centre over the part, but never under the dock's panels (top right: refinement, legends): it
+            // moves left of them, and below them when there is no room beside them
             readonly property bool dockShown: dock.visible && dock.width > 0 && dock.height > 0
             readonly property real centred: (parent.width - width) / 2
             readonly property real room: dockShown ? dock.x - 12 - width : centred
             readonly property bool beside: room >= 12
             x: Math.round(beside ? Math.min(centred, room) : centred)
             y: beside ? 58 : Math.round(dock.y + dock.height + 10)
-            width: bcr.implicitWidth + 28; height: 32; radius: 16; color: Theme.alpha(Theme.plate3, 0.94); border.color: Theme.alpha(Theme.datum, 0.45)
+            width: ledger.width; height: ledger.height
             // a stage streamed while the agent rewrites the design: "Building Rim (3 of 5)"
             readonly property var st: Store.building && Store.building.project === Store.pid ? Store.building : null
-            readonly property string caption: st ? Store.buildingText : build.label ? (build.sub ? "Building " : "Built ") + build.label + (build.sub ? " " + build.sub : "") : ""
+            readonly property string caption: st ? Store.buildingText : build.label ? (build.running ? "Building " : "Built ") + build.label + (build.sub ? " " + build.sub : "") : ""
             opacity: build.label || st ? 1 : 0; visible: opacity > 0.01
             Behavior on opacity { NumberAnimation { duration: build.label || buildCap.st ? Theme.fast : 420 } }
-            Row { id: bcr; anchors.centerIn: parent; spacing: 9
-                Rectangle { width: 6; height: 6; radius: 3; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
-                Txt { kind: "cap"; color: Theme.datum; text: buildCap.st || build.sub ? "Building" : "Built"; anchors.verticalCenter: parent.verticalCenter }
-                Txt { text: buildCap.st ? buildCap.st.label : build.label; font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter }
-                Txt { visible: buildCap.st ? buildCap.st.of > 1 : !!build.sub; kind: "fine"; mono: true; tone: 3; anchors.verticalCenter: parent.verticalCenter
-                    text: buildCap.st ? buildCap.st.at + " of " + buildCap.st.of : build.sub } } }
+            BuildLedger { id: ledger
+                label: buildCap.st ? buildCap.st.label : build.label
+                at: buildCap.st ? buildCap.st.at : build.at; of: buildCap.st ? buildCap.st.of : build.of
+                running: !!buildCap.st || build.running; pulse: !!buildCap.st } }
 
         // what is under the pointer: appears at once, no delay
         Rectangle { id: chip; property var feat: null; visible: !!feat && !Store.layers; z: 5
@@ -553,9 +557,9 @@ Item {
                             Behavior on color { Tint {} } }
                         Column { anchors.centerIn: parent; spacing: 2
                             Row { id: tr; spacing: 5; anchors.horizontalCenter: parent.horizontalCenter
-                                Txt { mono: true; font.pixelSize: 10; tone: 4; text: "0" + (tab.index + 1); anchors.baseline: tl.baseline }
+                                Txt { mono: true; font.pixelSize: Theme.tFine; tone: 4; text: "0" + (tab.index + 1); anchors.baseline: tl.baseline }
                                 Txt { id: tl; text: tab.modelData.title; font.weight: Theme.wSemi; font.pixelSize: 13; tone: tab.on ? 1 : 2 } }
-                            Txt { id: tn; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: 10; text: tab.note[0]; color: ws.noteColor(tab.note[1]); wrapMode: Text.NoWrap } }
+                            Txt { id: tn; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: Theme.tFine; text: tab.note[0]; color: ws.noteColor(tab.note[1]); wrapMode: Text.NoWrap } }
                         MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.setStage(tab.modelData.id) }
                         Tip { show: tm.containsMouse; below: true; text: tab.modelData.hint; keys: "Ctrl+" + Store.stageKey[tab.modelData.id] }
                     }
