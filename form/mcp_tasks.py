@@ -69,6 +69,9 @@ TASK_TOOLS: dict[str, Callable[[dict], bool]] = {
     "print_simulation": lambda a: True,
     "install_software": lambda a: _arg(a, "confirm", False) is True,
     "fetch_link": lambda a: True,
+    # Blender work (registered by form.adapters.blender_model / form.game): a bake or an op replay takes minutes
+    "model_mesh": lambda a: True,
+    "game_asset": lambda a: _arg(a, "action", "build") in ("build", "export"),
 }
 TASK_TOOL_NAMES: tuple[str, ...] = tuple(TASK_TOOLS)
 FOLLOW: dict[str, tuple[str, ...]] = {"refine_design": ("pipeline", "refine")}   # children a tool's task waits for

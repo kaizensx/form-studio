@@ -1000,7 +1000,7 @@ def build() -> MCPServer:
         """Get a job's status: a pipeline job started by run_pipeline/commit_change; waits up to wait_s for it to finish."""
         st = studio()
         if job not in st.jobs:
-            raise ToolError("Unknown job (jobs live only as long as this server process).")
+            raise ToolError("Unknown job. Jobs are kept on disk under the data folder; check the id from the call that started it.")
         return job_digest(await _wait_job(st, job, max(0.0, min(wait_s, 300))))
 
     @mcp.tool(annotations=RO, structured_output=False, meta=ALWAYS)
