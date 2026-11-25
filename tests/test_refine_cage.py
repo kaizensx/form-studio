@@ -175,6 +175,8 @@ class Operators(unittest.TestCase):
         self.assertTrue(np.allclose(back.V, c.V))
         self.assertEqual(back.F, c.F)
         self.assertEqual(ops_cage.cages_of(src)["CAGE_0"]["regions"], b.regions)
+        # region order is kept: a face in two regions takes the material of the later one (the wall's bricks)
+        self.assertEqual(list(meshsource.unpack(meshsource.pack({"cells": [1], "brick": [1]}))), ["cells", "brick"])
         ns: dict = {}
         exec(compile(src, "<src>", "exec"), ns)                              # the build runs the same call
         self.assertEqual(len(ns["CAGE_0"].F), len(c.F))

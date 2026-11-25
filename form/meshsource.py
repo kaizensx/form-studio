@@ -159,11 +159,12 @@ PACK_PREFIX = "zb64:"
 
 
 def pack(obj) -> str:
-    """Data as a compact, deterministic string literal: JSON (sorted keys, no spaces), zlib level 9, base64. The same
-    data always packs to the same text, so a design source that holds it hashes the same way every time."""
+    """Data as a compact, deterministic string literal: JSON (keys in their own order: a cage's region order decides
+    which region a face's material comes from), no spaces, zlib level 9, base64. The same data always packs to the
+    same text, so a design source that holds it hashes the same way every time."""
     import base64
     import zlib
-    raw = json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()
+    raw = json.dumps(obj, separators=(",", ":")).encode()      # key order kept: region order is meaningful
     return PACK_PREFIX + base64.b64encode(zlib.compress(raw, 9)).decode("ascii")
 
 
