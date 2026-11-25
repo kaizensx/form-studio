@@ -157,14 +157,17 @@ def build_web():
     for px, name in ((180, "apple-touch-icon.png"), (192, "icon-192.png"), (512, "icon-512.png")):
         save(O.render(tile_svg(px, 0.6), px), SITE / "assets" / name)
     build_og()
+    build_og(2, ROOT / "docs" / "readme" / "banner.png")
 
 
-def build_og():
-    """1200x630: the lockup on graphite, two lines, and a real build photographed in the app (brand/og-part.png)."""
+def build_og(scale: int = 1, out: Path | None = None):
+    """1200x630: the lockup on graphite, two lines, and a real build photographed in the app (brand/og-part.png).
+    scale 2 draws the same card at 2400x1260: the banner at the top of the README and in Discord's #welcome."""
     W, H = 1200, 630
-    im = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied)
+    im = QImage(W * scale, H * scale, QImage.Format.Format_ARGB32_Premultiplied)
     im.fill(QColor(PLATE))
     p = QPainter(im)
+    p.scale(scale, scale)
     for h in (QPainter.RenderHint.Antialiasing, QPainter.RenderHint.SmoothPixmapTransform, QPainter.RenderHint.TextAntialiasing):
         p.setRenderHint(h)
     part = HERE / "og-part.png"
@@ -197,7 +200,7 @@ def build_og():
     p.drawText(80, round(238 + lh + 66), "Describe anything.")
     p.drawText(80, round(238 + lh + 108), "The open-source AI CAD studio.")
     p.end()
-    save(im, SITE / "assets" / "og.png")
+    save(im, out or SITE / "assets" / "og.png")
 
 
 def build_qml():

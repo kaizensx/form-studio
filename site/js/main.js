@@ -5,26 +5,21 @@ import { scrub, reveals, countUp, easeOut, reduced } from "./motion.js";
 
 const $ = (s) => document.querySelector(s);
 
-// ---------- hero: the photograph settles as the page scrolls; the drawn window stands up as it arrives ----------
+// ---------- hero: the drawn window lies back on the bench, then stands up as the page scrolls ----------
 {
-  const shot = $("#hero-shot img"), copy = $("#hero-copy"), par = [...document.querySelectorAll("[data-par]")];
-  if (shot && !reduced) {
-    scrub(null, (q) => {
-      const e = easeOut(q), y = scrollY;
-      shot.style.setProperty("--hs", (1.08 - 0.08 * e).toFixed(4));
-      shot.style.setProperty("--hy", `${(18 * e).toFixed(2)}px`);
-      copy.style.transform = `translateY(${(y * 0.2).toFixed(1)}px)`;
-      copy.style.opacity = String(Math.max(0, 1 - y / (innerHeight * 0.8)).toFixed(3));
-      par.forEach((el) => { el.style.translate = `0 ${(y * +el.dataset.par).toFixed(1)}px`; });
-    }, { mode: "page", smooth: 12, over: () => innerHeight * 0.9 });
-  } else if (shot) shot.style.setProperty("--hs", "1");
-  const tilt = $("#stage-tilt");
+  const tilt = $("#stage-tilt"), copy = $("#hero-copy"), par = [...document.querySelectorAll("[data-par]")];
   if (tilt && !reduced) {
-    scrub($("#try"), (q) => {
-      const e = easeOut(Math.min(1, q / 0.42)), t = innerWidth < 900 ? 8 : 14;
+    const narrow = () => innerWidth < 900;
+    scrub(null, (q) => {
+      const e = easeOut(q), t = narrow() ? 9 : 16;
       tilt.style.setProperty("--tilt", `${(t * (1 - e)).toFixed(3)}deg`);
       tilt.style.setProperty("--sc", (0.94 + 0.06 * e).toFixed(4));
-    }, { mode: "pass", smooth: 12 });
+      tilt.style.setProperty("--ty", `${(-24 * e).toFixed(2)}px`);
+      const y = scrollY;
+      copy.style.transform = `translateY(${(y * 0.28).toFixed(1)}px)`;
+      copy.style.opacity = String(Math.max(0, 1 - y / (innerHeight * 0.75)).toFixed(3));
+      par.forEach((el) => { el.style.translate = `0 ${(y * +el.dataset.par).toFixed(1)}px`; });
+    }, { mode: "page", smooth: 12, over: () => innerHeight * 0.7 });
   }
 }
 

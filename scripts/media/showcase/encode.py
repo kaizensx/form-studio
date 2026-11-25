@@ -16,8 +16,6 @@ SITE = ROOT / "site" / "assets" / "shots"
 DOCS = ROOT / "docs" / "readme"
 C = (0.11, 0.11, 0.89, 0.89)          # the middle of a frame: the camera leaves a wide margin
 JOBS = [  # source, name, crop (l, t, r, b as fractions), width, quality
-    ("readme_planetary-hero", "hero", (0.04, 0.135, 0.96, 0.825), 2112, 80),
-    ("readme_planetary-hero", "hero-1200", (0.04, 0.135, 0.96, 0.825), 1200, 78),
     ("ratchet_wrench-ex", "ratchet", (0.12, 0.08, 0.92, 0.88), 1200, 80),
     ("cam_follower-as", "cam", (0.14, 0.14, 0.98, 0.94), 1200, 80),
     ("readme_planetary-as", "planetary", (0.10, 0.06, 0.90, 0.86), 1200, 80),
@@ -43,15 +41,12 @@ for src, name, (l, t, r, b), w, q in JOBS:
         im = im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)
     im.save(SITE / f"{name}.webp", "WEBP", quality=q, method=6)
     print(name, im.size, (SITE / f"{name}.webp").stat().st_size)
-# README: JPEG (GitHub shows it everywhere), the hero and a strip of four
-h = Image.open(SITE / "hero.webp").convert("RGB")
-h = h.resize((1656, round(1656 * h.height / h.width)), Image.LANCZOS)
-h.save(DOCS / "hero-render.jpg", quality=86, optimize=True, progressive=True)
+# README: JPEG (GitHub shows it everywhere), a strip of four; the banner on top is brand/build.py's (og-part.png)
 for n in ("planetary", "ratchet", "game-chest", "vase", "shade", "cam", "bottle", "speaker"):
     im = Image.open(SITE / f"{n}.webp").convert("RGB")
     s = min(im.size)
     im = im.crop(((im.width - s) // 2, (im.height - s) // 2, (im.width + s) // 2, (im.height + s) // 2)).resize((800, 800), Image.LANCZOS)
     im.save(DOCS / f"made-{n}.jpg", quality=84, optimize=True, progressive=True)
-# the social card: the planetary stage, square (brand/build.py fades its edges into the card)
-Image.open(S / "readme_planetary-hero.png").convert("RGB").crop((600, 273, 1800, 1473)).resize((1000, 1000), Image.LANCZOS).save(ROOT / "brand" / "og-part.png", optimize=True)
+# the social card and the README banner: the planetary stage, square (brand/build.py fades its edges into the card)
+Image.open(S / "readme_planetary-hero.png").convert("RGB").crop((600, 273, 1800, 1473)).resize((1600, 1600), Image.LANCZOS).save(ROOT / "brand" / "og-part.png", optimize=True)
 print("readme and og-part ok")

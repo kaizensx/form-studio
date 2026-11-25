@@ -1,6 +1,6 @@
 # Showcase pictures
 
-The product pictures on the website (`site/assets/shots/`), in the README (`docs/readme/hero-render.jpg`,
+The product pictures on the website (`site/assets/shots/`), in the README (`docs/readme/banner.png` through `brand/build.py`,
 `made-*.jpg`) and on the social card (`brand/og-part.png`) are made here, from designs in this repository. Nothing is
 drawn by hand: each picture is a build of the engine, rendered.
 

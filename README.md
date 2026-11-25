@@ -1,11 +1,10 @@
 <p align="center">
-  <a href="https://kaizensx.github.io/form-studio/"><img src="docs/readme/hero-render.jpg" width="828" alt="A planetary gear stage built by Form Studio: a graphite ring gear in a flanged housing, a steel sun gear and three teal planet gears on their carrier, meshed."></a>
+  <a href="https://kaizensx.github.io/form-studio/"><img src="docs/readme/banner.png" width="828" alt="Form Studio. Describe anything. The open-source AI CAD studio. Beside it, a planetary gear stage built by Form Studio: a graphite ring gear, a steel sun gear and three teal planets, meshed."></a>
 </p>
 
 <h1 align="center">Form Studio</h1>
 
-<p align="center"><b>Describe anything. An engineer-grade agent builds it as real, editable CAD.</b><br>
-<sub>The gear stage above is one parametric design in six parts: involute gears that mesh, built by the CAD kernel and rendered from its own geometry.</sub></p>
+<p align="center"><b>Describe anything. An engineer-grade agent builds it as real, editable CAD.</b><br></p>
 
 <p align="center">
   <a href="https://github.com/kaizensx/form-studio/releases/latest/download/FORM-macos-arm64.zip"><img src="docs/readme/download-macos-arm64.svg" width="168" height="56" alt="Download for macOS, Apple silicon"></a>
