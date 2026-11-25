@@ -424,7 +424,9 @@ def cam(base_r: float = 15, lift: float = 6, rise: float = 150, dwell_top: float
                 q.append(Vector(pts[i].X - fr * nx, pts[i].Y - fr * ny, 0))
             return one(extrude(make_face(Wire([Spline(*q, periodic=True)])).faces()[0], T))
 
-        plate = attempt("cam", [("2D offset of the pitch curve", by_offset), ("offset along the normals", by_normals)],
+        # the normals first: OCCT's negative 2D offset of a periodic spline can crash the process outright (seen on
+        # x86-64 macOS), which no fallback can catch; the kernel offset stays as the second try
+        plate = attempt("cam", [("offset along the normals", by_normals), ("2D offset of the pitch curve", by_offset)],
                         "Use a smaller follower radius than the cam's smallest radius of curvature.", ["follower_r"])
     if b:
         plate = plate - Cylinder(b / 2, T + 1, align=BOTTOM)
