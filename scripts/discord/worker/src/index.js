@@ -1,11 +1,12 @@
-// The Form Studio bot, live: slash commands, buttons, the role picker, the showcase form, levels and the weekly
-// challenge. A Cloudflare Worker that Discord calls for every interaction (signed with the app's public key), plus
-// a cron that counts XP and runs the challenge. Channel names, roles and texts come from config.json, written from
+// The Form Studio bot, live: slash commands, buttons, the role picker, the showcase form, reports to moderators,
+// levels and the weekly challenge. A Cloudflare Worker that Discord calls for every interaction (signed with the
+// app's public key), plus a cron that counts XP and runs the challenge. Everything it says is plain text: no embeds. Channel names, roles and texts come from config.json, written from
 // scripts/discord/server.py. Secrets: DISCORD_BOT_TOKEN. Vars: APP_ID, PUBLIC_KEY, GUILD_ID. KV: STATE.
 import C from "../config.json" with { type: "json" };
 
 const API = "https://discord.com/api/v10";
 const EPHEMERAL = 64;
+const NO_PREVIEWS = 4;             // SUPPRESS_EMBEDS: links stay links, with no preview box under the text
 const STAR = "⭐";
 
 // ---- Discord REST ------------------------------------------------------------------------------------------------
@@ -47,11 +48,11 @@ async function role(env, name) { return (await guild(env)).roles.find((r) => r.n
 const mention = async (env, key) => { const c = await chan(env, key); return c ? `<#${c.id}>` : `#${key}`; };
 
 // ---- small helpers ---------------------------------------------------------------------------------------------------
-const footer = (section) => ({ text: `Form Studio · ${section}`, icon_url: C.icon });
 const reply = (data, ephemeral = true) => ({ type: 4, data: { allowed_mentions: { parse: [] }, ...data,
-                                                              flags: ephemeral ? EPHEMERAL : 0 } });
-const linkBtn = (label, url, emoji) => ({ type: 2, style: 5, label, url, ...(emoji ? { emoji: { name: emoji } } : {}) });
-const btn = (label, id, emoji, style = 2) => ({ type: 2, style, label, custom_id: id, ...(emoji ? { emoji: { name: emoji } } : {}) });
+                                                              flags: (ephemeral ? EPHEMERAL : 0) | NO_PREVIEWS } });
+const linkBtn = (label, url) => ({ type: 2, style: 5, label, url });
+const btn = (label, id, style = 2) => ({ type: 2, style, label, custom_id: id });
+const clean = (text) => String(text || "").replace(/@/g, "@\u200b");       // what a member typed never pings anyone
 const row = (...c) => ({ type: 1, components: c.slice(0, 5) });
 const userOf = (i) => i.member?.user || i.user;
 const opt = (i, name) => (i.data.options || []).find((o) => o.name === name)?.value;
@@ -81,25 +82,26 @@ async function guideThreads(env) {
   for (const t of [...active.threads, ...archived.threads]) if (t.parent_id === g.id) out[t.name] = t.id;
   return out;
 }
-function recipeEmbed(r) {
-  return { color: C.colors.violet, title: `🧩 ${r.title}`, url: C.site + "recipes/", description: r.summary,
-           image: r.preview ? { url: r.preview } : undefined,
-           fields: [{ name: "Parameters", value: String(r.params_count ?? "—"), inline: true },
-                    { name: "Author", value: r.author || "—", inline: true },
-                    { name: "Tags", value: (r.tags || []).slice(0, 6).join(", ") || "—", inline: false }],
-           footer: footer("Recipes") };
+function recipeText(r) {
+  return `## ${r.title}\n${r.summary || ""}\n\n` +
+    `- **Parameters:** ${r.params_count ?? "—"}\n- **Author:** ${r.author || "—"}\n- **Tags:** ${(r.tags || []).slice(0, 8).join(", ") || "—"}\n\n` +
+    `Start from it: ask your agent for it by name, or run \`form new "My design" ${r.id}\`.` +
+    (r.preview ? `\n${r.preview}` : "");
 }
 
 // ---- commands --------------------------------------------------------------------------------------------------------
 async function cmdHelp(env) {
-  return reply({ embeds: [{ color: C.colors.blueprint, title: "🧭 Where to go", footer: footer("Help"), description:
-    `🛟 **Stuck?** Post in ${await mention(env, "help")} with a tag; the bot answers with the right guides.\n` +
-    `📘 **Learning?** ${await mention(env, "guides")}, or \`/guide\`.\n` +
-    `🧩 **Building blocks?** ${await mention(env, "recipes")}, or \`/recipe\`.\n` +
-    `🧠 **Design talk:** ${await mention(env, "design-tips")} · 🧬 **Mesh to CAD:** ${await mention(env, "mesh-to-cad")} · 🤖 **Agents:** ${await mention(env, "agents")}\n` +
-    `🖨️ **3D printing (optional):** ${await mention(env, "printers")}\n` +
-    `🐞 **A bug you can reproduce?** [Open an issue](${C.repo}/issues/new/choose).` }],
-    components: [row(linkBtn("Docs", C.docs, "📘"), linkBtn("Download", C.repo + "/releases/latest", "⬇️"))] });
+  return reply({ content:
+    `## Where to go\n` +
+    `- **Stuck?** Post in ${await mention(env, "help")} with a tag. The bot answers with the right guide, a person follows.\n` +
+    `- **Learning?** ${await mention(env, "guides")} has complete guides; \`/guide\` shows one, \`/docs\` finds a page of the documentation.\n` +
+    `- **Installing?** \`/download\`, then the guide Getting started.\n` +
+    `- **A bug you can reproduce?** \`/bug\` shows how to report it so it gets fixed.\n` +
+    `- **An idea?** ${await mention(env, "ideas")}. **Something you made?** ${await mention(env, "showcase")} or \`/showcase\`.\n` +
+    `- **Agents and models:** ${await mention(env, "agents")} · **Mesh to CAD:** ${await mention(env, "mesh-to-cad")} · **Game assets:** ${await mention(env, "game-assets")}\n` +
+    `- **Building blocks:** ${await mention(env, "recipes")}, or \`/recipe\`. **3D printing (optional):** ${await mention(env, "printers")}\n` +
+    `- **Someone breaking the rules?** Right-click the message › Apps › Report to moderators.`,
+    components: [row(linkBtn("Docs", C.docs), linkBtn("Download", C.repo + "/releases/latest"), linkBtn("GitHub", C.repo))] });
 }
 
 async function cmdGuide(env, i) {
@@ -107,8 +109,31 @@ async function cmdGuide(env, i) {
   const g = C.guides.find(([t]) => t === want) || C.guides[0];
   const threads = await guideThreads(env);
   const where = threads[g[0]] ? `<#${threads[g[0]]}>` : await mention(env, "guides");
-  return reply({ embeds: [{ color: C.colors.datum, title: `📘 ${g[0]}`, description: `The full guide: ${where}`, footer: footer("Guides") }],
-                 components: [row(...g[2].slice(0, 5).map(([l, u]) => linkBtn(l, u)))] }, false);
+  return reply({ content: `## ${g[0]}\n${g[2]}\n\nRead it here: ${where}`,
+                 components: [row(linkBtn("The same guide on GitHub", g[3]), linkBtn("All docs", C.docs))] }, false);
+}
+
+function cmdDocs(i) {
+  const want = opt(i, "topic");
+  const pages = want ? C.docs_pages.filter(([n]) => n === want) : C.docs_pages;
+  const list = (pages.length ? pages : C.docs_pages).map(([n, u]) => `- [${n}](${u})`).join("\n");
+  return reply({ content: `## Documentation\n${list}\n\nThe guides on this server: \`/guide\`.` }, !want);
+}
+
+async function cmdBug(env) {
+  return reply({ content:
+    `## Reporting a bug\n` +
+    `A bug is something you can reproduce. It goes to GitHub, where it is tracked until it is fixed. Not sure it is a bug? Ask in ${await mention(env, "help")} first.\n\n` +
+    `**A report that gets fixed fast has**\n` +
+    `1. **What happened:** what you did, step by step, what you expected, and what Form Studio did instead.\n` +
+    `2. **Your Form Studio version** (About, or \`form update --check\`) and **your operating system**.\n` +
+    `3. **Your agent and model**, and your slicer and printer if they were involved.\n` +
+    `4. **The output of** \`form setup --check\`. You can remove home folder paths.\n` +
+    `5. **A screenshot**, and the design's \`.formstudio\` file (renamed to \`.zip\`) when a design shows the problem.\n\n` +
+    `Search the open issues first: if yours is there, add what you know to it.\n` +
+    `**Security problems are never posted in public.** Report them privately with the button below.`,
+    components: [row(linkBtn("Open a bug report", C.repo + "/issues/new?template=1-bug.yml"), linkBtn("Search issues", C.repo + "/issues"),
+                     linkBtn("Report a vulnerability", C.repo + "/security/advisories/new"))] }, false);
 }
 
 async function cmdRecipe(env, i, random = false) {
@@ -117,8 +142,10 @@ async function cmdRecipe(env, i, random = false) {
   const r = random || !want ? all[Math.floor(Math.random() * all.length)]
     : all.find((x) => x.id === want || x.title.toLowerCase() === want) || all.find((x) => x.title.toLowerCase().includes(want));
   if (!r) return reply({ content: `No recipe matches “${want}”. Try \`/recipe\` and pick from the list.` });
-  return reply({ embeds: [recipeEmbed(r)], components: [row(linkBtn("Open the gallery", C.site + "recipes/", "🧩"),
-    btn("Another one", "open:recipe", "🎲"))] }, random || !want);
+  const out = reply({ content: recipeText(r), components: [row(linkBtn("Open the gallery", C.site + "recipes/"),
+    btn("Another one", "open:recipe"))] }, random || !want);
+  out.data.flags &= ~NO_PREVIEWS;                // the recipe's picture is its link: let it show
+  return out;
 }
 
 async function autocomplete(env, i) {
@@ -128,6 +155,9 @@ async function autocomplete(env, i) {
   if (i.data.name === "recipe") {
     choices = (await recipes()).filter((r) => !q || r.title.toLowerCase().includes(q) || (r.tags || []).some((t) => t.includes(q)))
       .slice(0, 25).map((r) => ({ name: r.title, value: r.id }));
+  }
+  if (i.data.name === "docs") {
+    choices = C.docs_pages.filter(([n]) => !q || n.toLowerCase().includes(q)).slice(0, 25).map(([n]) => ({ name: n, value: n }));
   }
   return { type: 8, data: { choices } };
 }
@@ -140,35 +170,32 @@ async function cmdRank(env, i) {
   const ranked = Object.entries(s.xp).sort((a, b) => b[1].xp - a[1].xp);
   const place = ranked.findIndex(([u]) => u === who) + 1;
   const nextRole = C.levels.find(([lv]) => lv > level);
-  return reply({ embeds: [{ color: C.colors.datum, title: `📈 Level ${level}`, footer: footer("Levels"),
-    description: `<@${who}>\n\`${bar(into, next)}\` ${into} / ${next} XP\n\n` +
-      `🏅 Rank **#${place || "—"}** · 💬 ${me.msgs || 0} messages · 🙏 ${me.kudos || 0} thanks` +
-      (nextRole ? `\nNext role: **${nextRole[1]}** at level ${nextRole[0]}` : "\nEvery level role earned. 🏗️") }] }, false);
+  return reply({ content: `## Level ${level}\n<@${who}> · \`${bar(into, next)}\` ${into} / ${next} XP\n` +
+      `Rank **#${place || "—"}** · ${me.msgs || 0} messages · ${me.kudos || 0} thanks` +
+      (nextRole ? `\nNext role: **${nextRole[1]}** at level ${nextRole[0]}` : "\nEvery level role earned.") }, false);
 }
 
 async function cmdLeaderboard(env) {
   const s = await load(env);
   const top = Object.entries(s.xp).sort((a, b) => b[1].xp - a[1].xp).slice(0, 10);
-  const medal = ["🥇", "🥈", "🥉"];
-  const lines = top.map(([u, v], n) => `${medal[n] || `\`${n + 1}.\``} <@${u}> · level ${levelOf(v.xp).level} · ${v.xp} XP`);
-  return reply({ embeds: [{ color: C.colors.amber, title: "🏆 Most active makers", footer: footer("Levels"),
-    description: lines.join("\n") || "Nobody has XP yet. Say hi in #introductions to be first." }] }, false);
+  const lines = top.map(([u, v], n) => `${n + 1}. <@${u}> · level ${levelOf(v.xp).level} · ${v.xp} XP`);
+  return reply({ content: `## Most active makers\n` + (lines.join("\n") || "Nobody has XP yet. Say hello in #general to be first.") }, false);
 }
 
 async function cmdThanks(env, i) {
   const from = userOf(i).id, to = opt(i, "user");
   const target = i.data.resolved?.users?.[to];
-  if (!to || to === from || target?.bot) return reply({ content: "Thank someone else: not yourself, and not a bot. 🙂" });
+  if (!to || to === from || target?.bot) return reply({ content: "Thank someone else: not yourself, and not a bot." });
   const s = await load(env);
   const day = new Date().toISOString().slice(0, 10);
   const t = s.thanks[from]?.day === day ? s.thanks[from] : { day, count: 0 };
-  if (t.count >= C.xp.thanks_per_day) return reply({ content: `You have thanked ${C.xp.thanks_per_day} people today. More tomorrow. 🙏` });
+  if (t.count >= C.xp.thanks_per_day) return reply({ content: `You have thanked ${C.xp.thanks_per_day} people today. More tomorrow.` });
   t.count++; s.thanks[from] = t;
   await save(env, s);
   await bonus(env, to, C.xp.thanks, "thanks");
   const why = opt(i, "for");
-  return { type: 4, data: { content: `🙏 <@${from}> thanks <@${to}>${why ? `: ${why}` : "."} (+${C.xp.thanks} XP)`,
-                            allowed_mentions: { users: [to] } } };
+  return { type: 4, data: { content: `<@${from}> thanks <@${to}>${why ? `: ${clean(why)}` : "."} (+${C.xp.thanks} XP)`,
+                            allowed_mentions: { users: [to] }, flags: NO_PREVIEWS } };
 }
 
 function cmdShowcaseModal() {
@@ -188,17 +215,14 @@ async function showcaseSubmit(env, i) {
   const u = userOf(i);
   const forum = await chan(env, "showcase");
   const img = /^https:\/\/\S+$/.test(v.image) ? v.image : null;
-  const emb = { color: C.colors.datum, title: `🧊 ${v.title}`, description: v.story, footer: footer("Showcase"),
-                author: { name: u.global_name || u.username, icon_url: u.avatar ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png` : undefined },
-                fields: v.setup ? [{ name: "🛠️ Made with", value: v.setup, inline: false }] : [],
-                ...(img ? { image: { url: img } } : {}) };
   const tags = Object.fromEntries((forum.available_tags || []).map((t) => [t.name, t.id]));
+  const text = `Made by <@${u.id}>\n\n${clean(v.story)}` + (v.setup ? `\n\n**Made with:** ${clean(v.setup)}` : "") + (img ? `\n${img}` : "");
   const t = await api(env, "POST", `/channels/${forum.id}/threads`, {
     name: v.title.slice(0, 100), applied_tags: [tags["3D model"]].filter(Boolean),
-    message: { content: `Made by <@${u.id}>`, embeds: [emb], allowed_mentions: { parse: [] },
-               components: /^https:\/\//.test(v.file) ? [row(linkBtn("Download the design", v.file, "📦"))] : [] } });
+    message: { content: text.slice(0, 2000), allowed_mentions: { parse: [] },
+               components: /^https:\/\//.test(v.file) ? [row(linkBtn("Download the design", v.file))] : [] } });
   await bonus(env, u.id, C.xp.showcase, "showcase");
-  return reply({ content: `🔥 Posted: <#${t.id}> (+${C.xp.showcase} XP). Add photos by replying in it.` });
+  return reply({ content: `Posted: <#${t.id}> (+${C.xp.showcase} XP). Add photos by replying in it.` });
 }
 
 async function cmdChallenge(env) {
@@ -206,8 +230,7 @@ async function cmdChallenge(env) {
   const c = s.challenge;
   if (!c) return reply({ content: `The first challenge opens shortly in ${await mention(env, "challenges")}.` });
   const [title, brief, rule] = C.challenges[c.index % C.challenges.length];
-  return reply({ embeds: [{ color: C.colors.amber, title: `🏁 ${title}`, footer: footer("Weekly challenge"),
-    description: `${brief}\n\n**To count:** ${rule}\n\nPost your entry in <#${c.thread}>. Closes <t:${Math.floor(c.closes / 1000)}:R>.` }] }, false);
+  return reply({ content: `## This week: ${title}\n${brief}\n\n**To count:** ${rule}\n\nPost your entry in <#${c.thread}>. Closes <t:${Math.floor(c.closes / 1000)}:R>.` }, false);
 }
 
 function cmdPoll(i) {
@@ -219,11 +242,18 @@ function cmdPoll(i) {
 }
 
 function cmdDownload() {
-  const d = (os) => `${C.repo}/releases/latest/download/${os}`;
-  return reply({ embeds: [{ color: C.colors.datum, title: "⬇️ Download Form Studio", footer: footer("Download"),
-    description: "Free and open source. The first start installs what it needs by itself." }],
-    components: [row(linkBtn("macOS (Apple silicon)", d("FORM-macos-arm64.zip"), "🍎"), linkBtn("macOS (Intel)", d("FORM-macos-x64.zip"), "🍏"),
-                     linkBtn("Windows", d("FORM-windows-x64.zip"), "🪟"), linkBtn("Linux", d("FORM-linux-x64.tar.gz"), "🐧"))] }, false);
+  const d = (file) => `${C.repo}/releases/latest/download/${file}`;
+  return reply({ content:
+    `## Download Form Studio\nFree and open source, for macOS, Windows and Linux. The first start installs what it needs after asking you.\n\n` +
+    `- **macOS, Apple silicon:** [FORM-macos-arm64.zip](${d("FORM-macos-arm64.zip")}). Unzip, then right-click **Form Studio.app** › **Open** the first time.\n` +
+    `- **macOS, Intel:** [FORM-macos-x64.zip](${d("FORM-macos-x64.zip")}). The same.\n` +
+    `- **Windows 10 and 11:** [FORM-windows-x64.zip](${d("FORM-windows-x64.zip")}). Unzip and run \`FORM.exe\`; in SmartScreen choose **More info** › **Run anyway**.\n` +
+    `- **Linux x64:** [FORM-linux-x64.tar.gz](${d("FORM-linux-x64.tar.gz")}). Unpack and run \`FORM/FORM\`.\n\n` +
+    `Or from a terminal on macOS and Linux:\n\`\`\`bash\ncurl -LsSf https://raw.githubusercontent.com/kaizensx/form-studio/main/install.sh | sh\nform app\n\`\`\`\n` +
+    `Every release ships with \`SHA256SUMS\`. The guide Getting started (\`/guide\`) covers each system and your first design.`,
+    components: [row(linkBtn("macOS (Apple silicon)", d("FORM-macos-arm64.zip")), linkBtn("macOS (Intel)", d("FORM-macos-x64.zip")),
+                     linkBtn("Windows", d("FORM-windows-x64.zip")), linkBtn("Linux", d("FORM-linux-x64.tar.gz")),
+                     linkBtn("All releases", C.repo + "/releases"))] }, false);
 }
 
 async function rolePicker(env, i) {
@@ -231,11 +261,11 @@ async function rolePicker(env, i) {
   const g = await guild(env);
   const rows = C.picker.map(([key, placeholder, names]) => {
     const options = names.map((n) => g.roles.find((r) => r.name === n)).filter(Boolean)
-      .map((r) => ({ label: r.name.split(" ").slice(1).join(" "), value: r.id, emoji: { name: r.name.split(" ")[0] },
+      .map((r) => ({ label: r.name, value: r.id, ...(C.role_emoji[r.name] ? { emoji: { name: C.role_emoji[r.name] } } : {}),
                      default: (member?.roles || []).includes(r.id) }));
     return row({ type: 3, custom_id: `roles:${key}`, placeholder, min_values: 0, max_values: options.length, options });
   });
-  return reply({ content: "🎭 Pick what fits; what you leave out is removed.", components: rows });
+  return reply({ content: "Pick what fits; what you leave out is removed.", components: rows });
 }
 
 async function rolesChosen(env, i) {
@@ -255,7 +285,7 @@ async function rolesChosen(env, i) {
   }
   const say = [add.length && `Added ${add.map((r) => `<@&${r}>`).join(" ")}`, drop.length && `removed ${drop.map((r) => `<@&${r}>`).join(" ")}`]
     .filter(Boolean).join(", ");
-  return reply({ content: say ? `✅ ${say}.` : "Nothing changed." });
+  return reply({ content: say ? `${say}.` : "Nothing changed." });
 }
 
 async function markSolved(env, i) {
@@ -263,24 +293,48 @@ async function markSolved(env, i) {
   const helpF = await chan(env, "help");
   if (!helpF || t.parent_id !== helpF.id) return reply({ content: "Mark as solved works inside a post in the help forum." });
   const u = userOf(i).id;
-  const staff = await role(env, "Maintainer");
-  if (t.owner_id !== u && !(staff && i.member.roles.includes(staff.id))) return reply({ content: "Only the person who asked (or a maintainer) can mark it solved." });
+  if (t.owner_id !== u && !(await isStaff(env, i))) return reply({ content: "Only the person who asked (or a maintainer) can mark it solved." });
   const solved = (helpF.available_tags || []).find((x) => x.name === "Solved");
   if (solved) await api(env, "PATCH", `/channels/${t.id}`, { applied_tags: [...new Set([...(t.applied_tags || []), solved.id])].slice(0, 5) });
   const msg = Object.values(i.data.resolved.messages)[0];
   const helper = msg.author.id;
   if (helper !== u && !msg.author.bot) await bonus(env, helper, C.xp.solved, "solved");
-  return { type: 4, data: { content: `✅ Solved. The answer: ${`https://discord.com/channels/${env.GUILD_ID}/${t.id}/${msg.id}`}` +
+  return { type: 4, data: { flags: NO_PREVIEWS, content: `**Solved.** The answer: ${`https://discord.com/channels/${env.GUILD_ID}/${t.id}/${msg.id}`}` +
     (helper !== u && !msg.author.bot ? ` · thank you <@${helper}> (+${C.xp.solved} XP)` : ""), allowed_mentions: { users: [helper] } } };
 }
 
+async function isStaff(env, i) {
+  const g = await guild(env);
+  const ids = C.staff.map((n) => g.roles.find((r) => r.name === n)?.id).filter(Boolean);
+  return (i.member?.roles || []).some((r) => ids.includes(r));
+}
+
+// "Report to moderators" on a message: the report goes to #mod-log with a link; only the reporter sees the answer
+async function reportMessage(env, i) {
+  const msg = Object.values(i.data.resolved?.messages || {})[0];
+  const log = await chan(env, "mod-log");
+  if (!msg || !log) return reply({ content: "The report could not be sent. Please tell a moderator directly." });
+  const from = userOf(i).id;
+  if (msg.author?.id === from) return reply({ content: "That is your own message. You can edit or delete it yourself." });
+  const key = `report:${msg.id}:${from}`;
+  if (await env.STATE.get(key)) return reply({ content: "You already reported that message. The moderators have it." });
+  await env.STATE.put(key, "1", { expirationTtl: 7 * 24 * 3600 });
+  const where = `https://discord.com/channels/${env.GUILD_ID}/${i.channel_id}/${msg.id}`;
+  const text = clean(msg.content || "").replace(/\s+/g, " ").slice(0, 600) || "(no text: a picture, a file or an embed)";
+  await api(env, "POST", `/channels/${log.id}/messages`, { flags: NO_PREVIEWS, allowed_mentions: { parse: [] },
+    content: `**Report** · <@${from}> reported a message by <@${msg.author?.id}> in <#${i.channel_id}>\n${where}\n\n${text}` });
+  return reply({ content: "Thank you. The moderators have your report; only they can see it." });
+}
+
 async function startHere(env) {
-  return reply({ embeds: [{ color: C.colors.blueprint, title: "🧭 Where do I start?", footer: footer("Start"), description:
-    `1️⃣ Say hi in ${await mention(env, "introductions")}: what you want to design and which agent you use.\n` +
-    `2️⃣ Read the first guide in ${await mention(env, "guides")}, then download Form Studio.\n` +
-    `3️⃣ Make something and post it in ${await mention(env, "showcase")}, or enter ${await mention(env, "challenges")}.\n` +
-    `4️⃣ Stuck? ${await mention(env, "help")}. Everyone was a beginner once.` }],
-    components: [row(btn("Pick my roles", "open:roles", "🎭", 1), linkBtn("Download", C.repo + "/releases/latest", "⬇️"))] });
+  return reply({ content:
+    `## Where do I start?\n` +
+    `1. Read ${await mention(env, "rules")}, then pick your roles: your system, your agent and the pings you want.\n` +
+    `2. Open ${await mention(env, "guides")} and read **Getting started**: install, the first start and your first design.\n` +
+    `3. Download Form Studio (\`/download\`) and describe something small you need.\n` +
+    `4. Show it in ${await mention(env, "showcase")}, or enter ${await mention(env, "challenges")}.\n` +
+    `5. Stuck? ${await mention(env, "help")}. Everyone was a beginner once.`,
+    components: [row(btn("Pick my roles", "open:roles", 1), linkBtn("Download", C.repo + "/releases/latest"))] });
 }
 
 // ---- interactions ----------------------------------------------------------------------------------------------------
@@ -299,6 +353,9 @@ export async function handle(env, i) {
       case "challenge": return cmdChallenge(env);
       case "poll": return cmdPoll(i);
       case "download": return cmdDownload();
+      case "docs": return cmdDocs(i);
+      case "bug": return cmdBug(env);
+      case "Report to moderators": return reportMessage(env, i);
       case "roles": return rolePicker(env, i);
       case "Mark as solved": return markSolved(env, i);
     }
@@ -315,9 +372,9 @@ export async function handle(env, i) {
 }
 
 // answered at once: PING, autocomplete, the showcase form, and commands that need nothing from Discord
-const INSTANT = new Set(["showcase", "poll", "download"]);
+const INSTANT = new Set(["showcase", "poll", "download", "docs"]);
 function immediate(i) { return i.type === 1 || i.type === 4 || (i.type === 2 && INSTANT.has(i.data.name)); }
-const PUBLIC = new Set(["guide", "rank", "leaderboard", "thanks", "challenge", "Mark as solved", "recipe"]);
+const PUBLIC = new Set(["guide", "rank", "leaderboard", "thanks", "challenge", "Mark as solved", "recipe", "bug"]);
 function ephemeral(i) {
   if (i.type !== 2 || !PUBLIC.has(i.data.name)) return true;
   if (i.data.name === "recipe") return !opt(i, "name");
@@ -384,7 +441,7 @@ async function levelRoles(env, s) {
       await api(env, "PUT", `/guilds/${env.GUILD_ID}/members/${u}/roles/${earned[1].id}`);
       for (const [, r] of lvRoles) if (r.id !== earned[1].id) await api(env, "DELETE", `/guilds/${env.GUILD_ID}/members/${u}/roles/${r.id}`).catch(() => {});
       s.levels[u] = earned[1].id;
-      if (general) await api(env, "POST", `/channels/${general.id}/messages`, { content: `🎉 <@${u}> reached level ${level} and is now **${earned[1].name}**!`,
+      if (general) await api(env, "POST", `/channels/${general.id}/messages`, { content: `<@${u}> reached level ${level} and is now **${earned[1].name}**.`,
                                                                                 allowed_mentions: { users: [u] } });
     } catch (e) { console.log("level role", u, String(e)); }
   }
@@ -405,12 +462,10 @@ async function closeChallenge(env, s) {
     .sort((a, b) => b.stars - a.stars || (a.m.id < b.m.id ? -1 : 1));
   const win = entries[0] && entries[0].stars > 0 ? entries[0] : null;
   const [title] = C.challenges[c.index % C.challenges.length];
-  const text = win ? `🏆 **${title}** is won by <@${win.m.author.id}> with ${win.stars} ${STAR}. Congratulations!`
-                   : `🏁 **${title}** closed with ${entries.length} entr${entries.length === 1 ? "y" : "ies"} and no stars. Next week's brief is open.`;
+  const text = win ? `**${title}** is won by <@${win.m.author.id}> with ${win.stars} ${STAR}. Congratulations!`
+                   : `**${title}** closed with ${entries.length} entr${entries.length === 1 ? "y" : "ies"} and no stars. Next week's brief is open.`;
   await api(env, "POST", `/channels/${c.thread}/messages`, { content: text, allowed_mentions: { users: win ? [win.m.author.id] : [] } });
-  const ev = await chan(env, "events");
-  if (ev) await api(env, "POST", `/channels/${ev.id}/messages`, { content: text, allowed_mentions: { users: win ? [win.m.author.id] : [] } });
-  if (win) { const r = await role(env, "🏆 Challenge winner"); if (r) await api(env, "PUT", `/guilds/${env.GUILD_ID}/members/${win.m.author.id}/roles/${r.id}`); }
+  if (win) { const r = await role(env, "Challenge winner"); if (r) await api(env, "PUT", `/guilds/${env.GUILD_ID}/members/${win.m.author.id}/roles/${r.id}`); }
   const forum = await api(env, "GET", `/channels/${(await chan(env, "challenges")).id}`);
   const closed = (forum.available_tags || []).find((t) => t.name === "Closed");
   await api(env, "PATCH", `/channels/${c.thread}`, { applied_tags: closed ? [closed.id] : [], locked: true, archived: true });
@@ -423,18 +478,19 @@ async function openChallenge(env, s) {
   const [title, brief, rule] = C.challenges[index % C.challenges.length];
   const closes = nextClose(Date.now());
   const open = (forum.available_tags || []).find((t) => t.name === "Open");
-  const ping = await role(env, "🏁 Challenge pings");
+  const ping = await role(env, "Challenge pings");
   const t = await api(env, "POST", `/channels/${forum.id}/threads`, {
-    name: `🏁 Week ${index + 1}: ${title}`.slice(0, 100), applied_tags: open ? [open.id] : [], auto_archive_duration: 10080,
-    message: { content: ping ? `<@&${ping.id}> a new challenge is open.` : "", allowed_mentions: { roles: ping ? [ping.id] : [] },
-      embeds: [{ color: C.colors.amber, title: `🏁 ${title}`, footer: footer("Weekly challenge"),
-        description: `${brief}\n\n**To count:** ${rule}\n\n**Enter:** reply here with a render or a photo and how you made it.\n` +
-          `**Vote:** react ${STAR} on the entries you like.\n**Closes:** <t:${Math.floor(closes / 1000)}:F> (<t:${Math.floor(closes / 1000)}:R>). ` +
-          "The most starred entry wins 🏆 Challenge winner." }],
-      components: [row(linkBtn("Download Form Studio", C.repo + "/releases/latest", "⬇️"), linkBtn("Recipes", C.site + "recipes/", "🧩"))] } });
+    name: `Week ${index + 1}: ${title}`.slice(0, 100), applied_tags: open ? [open.id] : [], auto_archive_duration: 10080,
+    message: { allowed_mentions: { roles: ping ? [ping.id] : [] }, flags: NO_PREVIEWS,
+      content: `# ${title}\n${brief}\n\n**To count:** ${rule}\n\n` +
+        `- **Enter:** reply here with a render or a photo, and how you made it.\n` +
+        `- **Vote:** react ${STAR} on the entries you like.\n` +
+        `- **Closes:** <t:${Math.floor(closes / 1000)}:F> (<t:${Math.floor(closes / 1000)}:R>). The most starred entry wins the Challenge winner role.` +
+        (ping ? `\n\n-# <@&${ping.id}> a new challenge is open. Change this ping in #roles.` : ""),
+      components: [row(linkBtn("Download Form Studio", C.repo + "/releases/latest"), linkBtn("Recipes", C.site + "recipes/"))] } });
   s.challenge = { index, thread: t.id, opened: Date.now(), closes };
   try {     // the challenge in the server's Events tab
-    await api(env, "POST", `/guilds/${env.GUILD_ID}/scheduled-events`, { name: `🏁 Challenge: ${title}`.slice(0, 100), privacy_level: 2,
+    await api(env, "POST", `/guilds/${env.GUILD_ID}/scheduled-events`, { name: `Challenge: ${title}`.slice(0, 100), privacy_level: 2,
       entity_type: 3, scheduled_start_time: new Date(Date.now() + 60000).toISOString(), scheduled_end_time: new Date(closes).toISOString(),
       entity_metadata: { location: `#${N("challenges")}` }, description: `${brief} ${rule}`.slice(0, 1000) });
   } catch (e) { console.log("event", String(e)); }
@@ -480,7 +536,7 @@ export default {
     ctx.waitUntil((async () => {
       let out;
       try { out = await handle(env, i); } catch (e) { console.log("interaction", String(e)); out = reply({ content: "Something went wrong. Try again in a moment." }); }
-      const data = { ...(out.data || {}) }; delete data.flags;
+      const data = { ...(out.data || {}) }; data.flags = (data.flags || 0) & NO_PREVIEWS;
       const r = await fetch(`${API}/webhooks/${env.APP_ID}/${i.token}/messages/@original`, { method: "PATCH",
         headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
       if (!r.ok) console.log("follow-up", r.status, (await r.text()).slice(0, 300));

@@ -20,14 +20,15 @@ def config() -> dict:
         "site": S.SITE, "docs": S.DOCS, "repo": S.REPO, "icon": S.ICON, "invite": S.INVITE,
         "names": S.NAMES,
         "roles": S.R,
+        "role_emoji": S.ROLE_EMOJI,
+        "staff": ["Maintainer", "Moderator"],
         "levels": [[lv, name] for lv, name in S.LEVELS],
         "picker": [[k, p, names] for k, p, names in S.ROLE_PICKER],
-        "guides": [[t, tag, links] for t, tag, _, _, links in S.GUIDES],
+        "guides": [[title, tag, summary, S.GUIDE_URL + slug + ".md"] for slug, title, tag, _, summary in S.GUIDES],
         "help_guides": S.HELP_GUIDES,
+        "docs_pages": [[name, url] for name, url in S.DOC_PAGES],
         "xp": S.XP,
         "challenges": S.CHALLENGES,
-        "colors": {"datum": 0xB9E8D7, "blueprint": 0x86A8FF, "violet": 0xC7B2FF, "amber": 0xE9B860,
-                   "signal": 0xFF6F51, "pass": 0x86D9AD, "plate": 0x0E1113},
     }
 
 

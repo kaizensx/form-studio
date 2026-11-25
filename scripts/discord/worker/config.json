@@ -5,355 +5,283 @@
  "icon": "https://raw.githubusercontent.com/kaizensx/form-studio/main/form/app/assets/icon-64.png",
  "invite": "https://discord.gg/b6ZgyndkmS",
  "names": {
-  "welcome": "👋・welcome",
-  "rules": "📜・rules",
-  "roles": "🎭・roles",
-  "announcements": "📣・announcements",
-  "releases": "🚀・releases",
-  "showcase": "🧊・showcase",
-  "design-tips": "🧠・design-and-engineering",
-  "mesh-to-cad": "🧬・mesh-to-cad",
-  "agents": "🤖・agents-and-models",
-  "general": "💬・general",
-  "introductions": "🙋・introductions",
-  "wins-and-fails": "🍝・wins-and-fails",
-  "off-topic": "🎲・off-topic",
-  "guides": "📘・guides",
-  "recipes": "🧩・recipes",
-  "help": "🛟・help",
-  "ideas": "💡・ideas",
-  "challenges": "🏁・weekly-challenge",
-  "polls": "🗳️・polls",
-  "events": "📅・events",
-  "lounge": "🔊 Lounge",
-  "live": "🎙️ Live builds",
-  "contributing": "🧑‍💻・contributing",
-  "github": "🐙・github",
-  "ci": "🧯・ci",
-  "printers": "🖨️・printers-and-slicers",
-  "calibration": "🧪・calibration",
-  "mod-log": "🔒・mod-log"
+  "welcome": "welcome",
+  "rules": "rules",
+  "guides": "guides",
+  "roles": "roles",
+  "general": "general",
+  "showcase": "show-and-tell",
+  "help": "help",
+  "ideas": "ideas",
+  "challenges": "weekly-challenge",
+  "lounge": "Lounge",
+  "agents": "agents-and-models",
+  "mesh-to-cad": "mesh-to-cad",
+  "game-assets": "game-assets",
+  "recipes": "recipes",
+  "printers": "printing",
+  "announcements": "announcements",
+  "releases": "releases",
+  "github": "github",
+  "contributing": "contributing",
+  "mod-log": "mod-log"
  },
  "roles": {
-  "🛠️ Maintainer": "🛠️ Maintainer",
-  "🧑‍💻 Contributor": "🧑‍💻 Contributor",
-  "🧩 Recipe author": "🧩 Recipe author",
-  "🏆 Challenge winner": "🏆 Challenge winner",
-  "🏗️ Architect": "🏗️ Architect",
-  "⚙️ Assembly": "⚙️ Assembly",
-  "🧊 Solid": "🧊 Solid",
-  "🧱 Extrude": "🧱 Extrude",
-  "📐 Sketch": "📐 Sketch",
-  "🍎 macOS": "🍎 macOS",
-  "🪟 Windows": "🪟 Windows",
-  "🐧 Linux": "🐧 Linux",
-  "🟢 Bambu Lab": "🟢 Bambu Lab",
-  "🟠 Prusa": "🟠 Prusa",
-  "🔵 Creality": "🔵 Creality",
-  "🖨️ Other printer": "🖨️ Other printer",
-  "🎨 I don't print": "🎨 I don't print",
-  "🧡 Claude Code": "🧡 Claude Code",
-  "⚪ Codex": "⚪ Codex",
-  "🔷 Gemini CLI": "🔷 Gemini CLI",
-  "🔑 Model API": "🔑 Model API",
-  "🖥️ Local models": "🖥️ Local models",
-  "🔔 Release pings": "🔔 Release pings",
-  "🏁 Challenge pings": "🏁 Challenge pings",
-  "📅 Event pings": "📅 Event pings",
-  "Maintainer": "🛠️ Maintainer",
-  "Contributor": "🧑‍💻 Contributor",
-  "Recipe author": "🧩 Recipe author",
-  "macOS": "🍎 macOS",
-  "Windows": "🪟 Windows",
-  "Linux": "🐧 Linux",
-  "Bambu Lab": "🟢 Bambu Lab",
-  "Prusa": "🟠 Prusa",
-  "Creality": "🔵 Creality",
-  "Other printer": "🖨️ Other printer",
-  "No printer yet": "🎨 I don't print",
-  "Claude Code": "🧡 Claude Code",
-  "Codex": "⚪ Codex",
-  "Gemini CLI": "🔷 Gemini CLI",
-  "Model API": "🔑 Model API",
-  "Local models": "🖥️ Local models",
-  "Release pings": "🔔 Release pings",
-  "Creality / Elegoo / other": "🖨️ Other printer",
-  "Just designing": "🎨 I don't print",
-  "✏️ No printer yet": "🎨 I don't print",
-  "🧱 First Layer": "📐 Sketch",
-  "📏 Calibrated": "🧱 Extrude",
-  "🏭 Print Farm": "🏗️ Architect"
+  "Maintainer": "Maintainer",
+  "Moderator": "Moderator",
+  "Contributor": "Contributor",
+  "Recipe author": "Recipe author",
+  "Challenge winner": "Challenge winner",
+  "Architect": "Architect",
+  "Assembly": "Assembly",
+  "Solid": "Solid",
+  "Extrude": "Extrude",
+  "Sketch": "Sketch",
+  "macOS": "macOS",
+  "Windows": "Windows",
+  "Linux": "Linux",
+  "Claude Code": "Claude Code",
+  "Codex": "Codex",
+  "Gemini CLI": "Gemini CLI",
+  "Model API": "Model API",
+  "Local models": "Local models",
+  "Game dev": "Game dev",
+  "3D printing": "3D printing",
+  "Release pings": "Release pings",
+  "Challenge pings": "Challenge pings",
+  "🛠️ Maintainer": "Maintainer",
+  "🧑‍💻 Contributor": "Contributor",
+  "🧩 Recipe author": "Recipe author",
+  "🏆 Challenge winner": "Challenge winner",
+  "🏗️ Architect": "Architect",
+  "⚙️ Assembly": "Assembly",
+  "🧊 Solid": "Solid",
+  "🧱 Extrude": "Extrude",
+  "📐 Sketch": "Sketch",
+  "🍎 macOS": "macOS",
+  "🪟 Windows": "Windows",
+  "🐧 Linux": "Linux",
+  "🧡 Claude Code": "Claude Code",
+  "⚪ Codex": "Codex",
+  "🔷 Gemini CLI": "Gemini CLI",
+  "🔑 Model API": "Model API",
+  "🖥️ Local models": "Local models",
+  "🔔 Release pings": "Release pings",
+  "🏁 Challenge pings": "Challenge pings",
+  "🖨️ Other printer": "3D printing",
+  "Other printer": "3D printing"
  },
+ "role_emoji": {
+  "macOS": "🍎",
+  "Windows": "🪟",
+  "Linux": "🐧",
+  "Claude Code": "🧡",
+  "Codex": "⚪",
+  "Gemini CLI": "🔷",
+  "Model API": "🔑",
+  "Local models": "🖥️",
+  "Game dev": "🎮",
+  "3D printing": "🖨️",
+  "Release pings": "🔔",
+  "Challenge pings": "🏁"
+ },
+ "staff": [
+  "Maintainer",
+  "Moderator"
+ ],
  "levels": [
   [
    3,
-   "📐 Sketch"
+   "Sketch"
   ],
   [
    8,
-   "🧱 Extrude"
+   "Extrude"
   ],
   [
    15,
-   "🧊 Solid"
+   "Solid"
   ],
   [
    25,
-   "⚙️ Assembly"
+   "Assembly"
   ],
   [
    40,
-   "🏗️ Architect"
+   "Architect"
   ]
  ],
  "picker": [
   [
-   "agent",
-   "Your agent or model",
-   [
-    "🧡 Claude Code",
-    "⚪ Codex",
-    "🔷 Gemini CLI",
-    "🔑 Model API",
-    "🖥️ Local models"
-   ]
-  ],
-  [
    "system",
    "Your system",
    [
-    "🍎 macOS",
-    "🪟 Windows",
-    "🐧 Linux"
+    "macOS",
+    "Windows",
+    "Linux"
+   ]
+  ],
+  [
+   "agent",
+   "Your agent or model",
+   [
+    "Claude Code",
+    "Codex",
+    "Gemini CLI",
+    "Model API",
+    "Local models"
+   ]
+  ],
+  [
+   "make",
+   "What you make",
+   [
+    "Game dev",
+    "3D printing"
    ]
   ],
   [
    "pings",
    "Notifications",
    [
-    "🔔 Release pings",
-    "🏁 Challenge pings",
-    "📅 Event pings"
-   ]
-  ],
-  [
-   "printer",
-   "3D printing (optional): your printer",
-   [
-    "🟢 Bambu Lab",
-    "🟠 Prusa",
-    "🔵 Creality",
-    "🖨️ Other printer",
-    "🎨 I don't print"
+    "Release pings",
+    "Challenge pings"
    ]
   ]
  ],
  "guides": [
   [
-   "Install and choose what you make",
+   "Getting started",
    "Start",
-   [
-    [
-     "Download",
-     "https://github.com/kaizensx/form-studio/releases/latest"
-    ],
-    [
-     "Setup and settings",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#setup-settings-and-updates"
-    ],
-    [
-     "Try it in your browser",
-     "https://kaizensx.github.io/form-studio/#try"
-    ]
-   ]
+   "Install on macOS, Windows or Linux, the first start, and your first design from description to release.",
+   "https://github.com/kaizensx/form-studio/blob/dev/docs/community/getting-started.md"
   ],
   [
-   "Start a design from anything",
-   "Start",
-   [
-    [
-     "Start from anything",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#start-from-anything"
-    ],
-    [
-     "Concepts and measurements",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#concepts-and-measurements"
-    ]
-   ]
-  ],
-  [
-   "Design intelligence: brief, plan, critique",
-   "Design",
-   [
-    [
-     "Design intelligence",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#design-intelligence"
-    ]
-   ]
-  ],
-  [
-   "Mechanisms, shapes and texture",
-   "Design",
-   [
-    [
-     "Design intelligence",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#design-intelligence"
-    ]
-   ]
+   "Agents and MCP: Claude Code, Codex and others",
+   "Agents",
+   "Use Form Studio from Claude Code, Codex, Gemini CLI, Cursor or any MCP client, with a model API or a local model.",
+   "https://github.com/kaizensx/form-studio/blob/dev/docs/community/agents-and-mcp.md"
   ],
   [
    "Mesh to editable CAD",
-   "Design",
-   [
-    [
-     "Mesh to editable CAD",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#mesh-to-editable-cad"
-    ]
-   ]
+   "Create",
+   "Turn an STL, OBJ or 3MF into CAD you can change, read the report, and know what it cannot do yet.",
+   "https://github.com/kaizensx/form-studio/blob/dev/docs/community/mesh-to-cad.md"
   ],
   [
-   "Agents and models",
-   "Agents",
-   [
-    [
-     "Conversations and agents",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#conversations-and-agents"
-    ],
-    [
-     "Any model, any provider",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#any-model-any-provider"
-    ]
-   ]
+   "Game assets",
+   "Create",
+   "LODs, UVs, baked maps and collision for Unreal, Unity, Godot and glTF (Beta).",
+   "https://github.com/kaizensx/form-studio/blob/dev/docs/community/game-assets.md"
   ],
   [
-   "Linked conversations and forks",
-   "Agents",
-   [
-    [
-     "Conversations and agents",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#conversations-and-agents"
-    ]
-   ]
-  ],
-  [
-   "Checks and evidence",
-   "App",
-   [
-    [
-     "Checks and evidence",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#checks-and-evidence"
-    ],
-    [
-     "Verification",
-     "https://kaizensx.github.io/form-studio/docs/verification.html"
-    ]
-   ]
-  ],
-  [
-   "Revisions, compare and variants",
-   "App",
-   [
-    [
-     "Revisions, branches and variants",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#revisions-branches-and-variants"
-    ]
-   ]
-  ],
-  [
-   "Release a design",
-   "App",
-   [
-    [
-     "Release",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#release"
-    ]
-   ]
-  ],
-  [
-   "Move and share designs",
-   "App",
-   [
-    [
-     "Moving and sharing designs",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#moving-and-sharing-designs"
-    ],
-    [
-     "Pictures",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#pictures-renders-share-cards-animations"
-    ]
-   ]
-  ],
-  [
-   "Headless: the CLI and MCP",
+   "Optional engines and programs",
    "Reference",
-   [
-    [
-     "CLI",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/CLI.md"
-    ],
-    [
-     "MCP tools",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/MCP.md"
-    ],
-    [
-     "Architecture",
-     "https://kaizensx.github.io/form-studio/docs/architecture.html"
-    ]
-   ]
+   "CAD-Recode, CADFit, CoACD, the CADEvolve corpus, Blender, FreeCAD, OpenSCAD and slicers: what each does, its size and its licence.",
+   "https://github.com/kaizensx/form-studio/blob/dev/docs/community/optional-engines.md"
   ],
   [
-   "Recipes: use, write and share",
-   "Reference",
-   [
-    [
-     "Recipe gallery",
-     "https://kaizensx.github.io/form-studio/recipes/"
-    ],
-    [
-     "Writing recipes",
-     "https://kaizensx.github.io/form-studio/docs/recipes.html"
-    ]
-   ]
-  ],
-  [
-   "3D printing (optional): slicers, printers and fit",
+   "3D printing (optional)",
    "3D printing",
-   [
-    [
-     "3D printing",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#3d-printing-optional"
-    ],
-    [
-     "Printers and slicing",
-     "https://github.com/kaizensx/form-studio/blob/dev/docs/FEATURES.md#printers-slicing-and-print-simulation"
-    ]
-   ]
+   "Your slicer and presets, checks for printed parts, fit, print simulation and comparing printers.",
+   "https://github.com/kaizensx/form-studio/blob/dev/docs/community/printing.md"
+  ],
+  [
+   "Troubleshooting and reporting bugs",
+   "Help",
+   "Fix the common problems, ask for help well, and write a bug report that gets fixed.",
+   "https://github.com/kaizensx/form-studio/blob/dev/docs/community/troubleshooting.md"
+  ],
+  [
+   "Contributing",
+   "Project",
+   "Where contributions go, the development setup, the engineering principles and pull requests.",
+   "https://github.com/kaizensx/form-studio/blob/dev/docs/community/contributing.md"
   ]
  ],
  "help_guides": {
   "Setup": [
-   "Install and choose what you make"
+   "Getting started",
+   "Troubleshooting and reporting bugs"
   ],
   "Agents & models": [
-   "Agents and models",
-   "Linked conversations and forks"
+   "Agents and MCP: Claude Code, Codex and others"
   ],
   "Designing": [
-   "Design intelligence: brief, plan, critique",
-   "Mechanisms, shapes and texture"
+   "Getting started"
   ],
   "Mesh to CAD": [
-   "Mesh to editable CAD"
+   "Mesh to editable CAD",
+   "Optional engines and programs"
+  ],
+  "Game assets": [
+   "Game assets",
+   "Optional engines and programs"
   ],
   "Export & CAD exchange": [
-   "Release a design",
-   "Move and share designs"
+   "Optional engines and programs"
   ],
   "3D printing": [
-   "3D printing (optional): slicers, printers and fit"
+   "3D printing (optional)"
   ],
-  "Bug": []
+  "Bug": [
+   "Troubleshooting and reporting bugs"
+  ]
  },
+ "docs_pages": [
+  [
+   "Features: everything Form Studio does",
+   "https://github.com/kaizensx/form-studio/blob/main/docs/FEATURES.md"
+  ],
+  [
+   "The desktop app",
+   "https://github.com/kaizensx/form-studio/blob/main/docs/APP.md"
+  ],
+  [
+   "CLI: every form command",
+   "https://github.com/kaizensx/form-studio/blob/main/docs/CLI.md"
+  ],
+  [
+   "MCP: every agent tool",
+   "https://github.com/kaizensx/form-studio/blob/main/docs/MCP.md"
+  ],
+  [
+   "AGENTS.md: the guide for coding agents",
+   "https://github.com/kaizensx/form-studio/blob/main/AGENTS.md"
+  ],
+  [
+   "Architecture",
+   "https://github.com/kaizensx/form-studio/blob/main/docs/ARCHITECTURE.md"
+  ],
+  [
+   "Writing a recipe",
+   "https://github.com/kaizensx/form-studio/blob/main/docs/RECIPES.md"
+  ],
+  [
+   "Compatibility and testing",
+   "https://github.com/kaizensx/form-studio/blob/main/docs/VERIFICATION.md"
+  ],
+  [
+   "Releasing: channels and versions",
+   "https://github.com/kaizensx/form-studio/blob/main/docs/RELEASING.md"
+  ],
+  [
+   "Changelog",
+   "https://github.com/kaizensx/form-studio/blob/main/CHANGELOG.md"
+  ],
+  [
+   "Contributing",
+   "https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md"
+  ],
+  [
+   "Licences of everything shipped or installed",
+   "https://github.com/kaizensx/form-studio/blob/dev/THIRD_PARTY_NOTICES.md"
+  ],
+  [
+   "The website and its docs",
+   "https://kaizensx.github.io/form-studio/docs/"
+  ]
+ ],
  "xp": {
   "message": [
    15,
@@ -436,14 +364,5 @@
    "Free brief: a part that fixed something broken in your home.",
    "Tell the story: what broke, what you measured, how it fits now."
   ]
- ],
- "colors": {
-  "datum": 12183767,
-  "blueprint": 8825087,
-  "violet": 13087487,
-  "amber": 15317088,
-  "signal": 16740177,
-  "pass": 8837549,
-  "plate": 921875
- }
+ ]
 }

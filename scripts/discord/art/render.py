@@ -1,6 +1,6 @@
-"""Render the Discord art: a cover for every guide and a header card for the pinned posts, in the app's palette.
+"""Render the Discord art: a cover for every guide, in the app's palette.
 
-    .venv/bin/python scripts/discord/art/render.py          # writes art/guides/*.png and art/cards/*.png
+    .venv/bin/python scripts/discord/art/render.py          # writes art/guides/<slug>.png
 
 The pictures inside are the README's drawings of the app (docs/readme/*.svg, drawn from real engine runs) and the
 recipe previews from the website gallery (real builds). Fonts are the app's own (site/fonts).
@@ -52,6 +52,10 @@ def guide(i, title, tag, art):
     if art == "hero":
         pic = f"<img src='{(README / 'hero-dark.svg').as_uri()}' style='position:absolute;right:-40px;top:70px;width:840px;" \
               "border-radius:26px;box-shadow:0 30px 120px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06)'>"
+    elif art.startswith("made-"):                 # a product picture from a real build (docs/readme/made-*.jpg)
+        pic = f"<img src='{(README / (art + '.jpg')).as_uri()}' style='position:absolute;right:90px;top:70px;width:660px;" \
+              "height:660px;object-fit:cover;border-radius:24px;box-shadow:0 30px 120px rgba(0,0,0,.55),0 0 0 1px " \
+              "rgba(255,255,255,.06)'>"
     elif art == "recipes":
         ids = ["gridfinity_bin", "storage_box", "planter", "enclosure"]
         cells = "".join(f"<div style='background:#13171a;border-radius:18px;overflow:hidden;box-shadow:0 0 0 1px "
@@ -69,28 +73,10 @@ def guide(i, title, tag, art):
     body = f"""{pic}
 <div style='position:absolute;left:96px;top:120px;width:{560 if art == "hero" else 700}px'>
  <div class='kicker'>Guide {i:02d} <i>·</i> {html.escape(tag)}</div>
- <h1 style='font-size:76px'>{html.escape(title)}</h1>
+ <h1 style='font-size:{76 if len(title) < 30 else 62}px'>{html.escape(title)}</h1>
 </div>
 <img class='lockup' src='{LOCKUP}' style='left:96px;bottom:84px'>"""
     return page(W, H, body)
-
-
-CARDS = {
-    "rules": ("Rules", "Server", "Six short rules, so they get read. Moderators may remove what breaks them."),
-    "contributing": ("Build Form Studio with us", "Contributing",
-                     "The code, the docs, recipes and the website are all open. Here is where to start."),
-}
-
-
-def card(title, kicker, text):
-    body = f"""
-<img src='{MARK}' style='position:absolute;right:110px;top:96px;width:150px;opacity:.95'>
-<div style='position:absolute;left:96px;top:96px;width:1100px'>
- <div class='kicker'>Form Studio <i>·</i> {html.escape(kicker)}</div>
- <h1 style='font-size:92px'>{html.escape(title)}</h1>
- <p style='width:1000px'>{html.escape(text)}</p>
-</div>"""
-    return page(W, 440, body)
 
 
 def render(jobs):
@@ -131,10 +117,8 @@ def render(jobs):
 
 
 def main():
-    jobs = [(HERE / "guides" / f"{i:02d}.png", W, H, guide(i, t, tag, art))
-            for i, (t, tag, art, _, _) in enumerate(S.GUIDES, 1)]
-    jobs += [(HERE / "cards" / f"{k}.png", W, 440, card(*v)) for k, v in CARDS.items()]
-    render(jobs)
+    render([(HERE / "guides" / f"{slug}.png", W, H, guide(i, title, tag, art))
+            for i, (slug, title, tag, art, _) in enumerate(S.GUIDES, 1)])
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ const roles = Object.values(C.roles).filter((v, i, a) => a.indexOf(v) === i).map
 const R = (name) => roles.find((r) => r.name === name).id;
 const channels = [
   ...Object.entries(C.names).map(([k, name], n) => ({ id: `c${n}`, name, type: ["showcase", "guides", "recipes", "help", "ideas", "challenges"].includes(k) ? 15 : 0,
-    permission_overwrites: k === "mod-log" ? [{ id: GUILD, deny: "1024" }] : [] })),
+      permission_overwrites: k === "mod-log" ? [{ id: GUILD, deny: "1024" }] : [] })),
 ];
 const ch = (k) => channels.find((c) => c.name === N(k));
 ch("help").available_tags = [{ id: "tSolved", name: "Solved" }, { id: "tInstall", name: "Install" }];
@@ -82,20 +82,53 @@ await t("every command has a handler and fits Discord's limits", async () => {
   for (const c of COMMANDS) { assert.ok(c.name.length <= 32); if (c.description) assert.ok(c.description.length <= 100, c.name); }
   assert.ok(COMMANDS.find((c) => c.name === "guide").options[0].choices.length === C.guides.length);
 });
-await t("/help and /download", async () => {
-  assert.match(JSON.stringify(await send(cmd("help"))), /Where to go/);
-  assert.equal((await send(cmd("download"))).data.components[0].components.length, 4);
+const noEmbeds = (r) => { assert.ok(!r.data.embeds || !r.data.embeds.length, "plain text, no embeds"); assert.ok(!/^>/m.test(r.data.content || ""), "no quote blocks"); return r; };
+await t("/help, /download, /docs and /bug answer in plain text", async () => {
+  assert.match(noEmbeds(await send(cmd("help"))).data.content, /Where to go/);
+  const dl = noEmbeds(await send(cmd("download")));
+  assert.equal(dl.data.components[0].components.length, 5);
+  assert.match(dl.data.content, /FORM-macos-arm64\.zip[\s\S]*FORM-windows-x64\.zip[\s\S]*FORM-linux-x64\.tar\.gz/);
+  assert.ok(dl.data.content.length <= 2000);
+  const docs = noEmbeds(await send(cmd("docs")));
+  assert.equal((docs.data.content.match(/^- \[/gm) || []).length, C.docs_pages.length);
+  assert.ok(docs.data.content.length <= 2000);
+  const one = await send(cmd("docs", [{ name: "topic", value: C.docs_pages[2][0] }]));
+  assert.equal((one.data.content.match(/^- \[/gm) || []).length, 1);
+  const ac = await send({ type: 4, guild_id: GUILD, member: member("u1"), data: { name: "docs", options: [{ name: "topic", value: "mcp", focused: true }] } });
+  assert.ok(ac.data.choices.length >= 1 && ac.data.choices.every((c) => /mcp/i.test(c.name)));
+  const bug = noEmbeds(await send(cmd("bug")));
+  assert.match(bug.data.content, /form setup --check/);
+  assert.match(bug.data.components[0].components[0].url, /template=1-bug\.yml/);
+  assert.ok(bug.data.content.length <= 2000);
+});
+await t("Report to moderators: to #mod-log once, nobody pinged, the reporter told in private", async () => {
+  const i = (who) => ({ type: 2, guild_id: GUILD, channel_id: ch("general").id, member: member(who),
+    data: { name: "Report to moderators", type: 3, resolved: { messages: { m7: { id: "m7", content: "buy @everyone cheap", author: { id: "u9" } } } } } });
+  calls.length = 0;
+  const r = await send(i("u1"));
+  assert.match(r.data.content, /moderators have your report/);
+  assert.equal(r.deferred.flags, 64);
+  const post = calls.find(([m, p]) => m === "POST" && p === `/channels/${ch("mod-log").id}/messages`);
+  assert.match(post[2].content, /<@u1> reported a message by <@u9>/);
+  assert.deepEqual(post[2].allowed_mentions, { parse: [] });
+  assert.ok(!post[2].content.includes("@everyone"));
+  calls.length = 0;
+  assert.match((await send(i("u1"))).data.content, /already reported/);
+  assert.ok(!calls.some(([m, p]) => m === "POST" && p.endsWith("/messages")));
+  const own = await send({ ...i("u9") });
+  assert.match(own.data.content, /your own message/);
 });
 await t("/recipe autocomplete and a named recipe", async () => {
   const a = await send({ type: 4, guild_id: GUILD, member: member("u1"), data: { name: "recipe", options: [{ name: "name", value: "grid", focused: true }] } });
   assert.deepEqual(a.data.choices, [{ name: "Gridfinity bin", value: "gridfinity_bin" }]);
   const r = await send(cmd("recipe", [{ name: "name", value: "gridfinity_bin" }]));
-  assert.equal(r.data.embeds[0].title, "🧩 Gridfinity bin");
+  assert.match(noEmbeds(r).data.content, /^## Gridfinity bin[\s\S]*https:\/\/x\/p\.webp$/);
   assert.equal(r.data.flags, 0);
 });
 await t("/guide links the guide's own post", async () => {
   const r = await send(cmd("guide", [{ name: "topic", value: C.guides[0][0] }]));
-  assert.match(r.data.embeds[0].description, /<#g1>/);
+  assert.match(noEmbeds(r).data.content, /<#g1>/);
+  assert.match(r.data.components[0].components[0].url, /docs\/community\/.*\.md$/);
 });
 await t("/thanks: not yourself, three a day, XP via a bonus", async () => {
   assert.match((await send(cmd("thanks", [{ name: "user", value: "u1" }]))).data.content, /someone else/);
@@ -110,12 +143,12 @@ await t("/poll builds a native poll", async () => {
 await t("role picker adds and removes within its group only", async () => {
   calls.length = 0;
   const sys = C.picker.find(([k]) => k === "system")[2];
-  const r = await send({ type: 3, guild_id: GUILD, member: member("u1", [R(sys[1]), R("🛠️ Maintainer")]),
+  const r = await send({ type: 3, guild_id: GUILD, member: member("u1", [R(sys[1]), R("Maintainer")]),
                          message: { flags: 64 }, data: { custom_id: "roles:system", values: [R(sys[0])] } });
   assert.match(r.data.content, /Added/);
   assert.ok(calls.some(([m, p]) => m === "PUT" && p.endsWith(`/roles/${R(sys[0])}`)));
   assert.ok(calls.some(([m, p]) => m === "DELETE" && p.endsWith(`/roles/${R(sys[1])}`)));
-  assert.ok(!calls.some(([, p]) => p.endsWith(`/roles/${R("🛠️ Maintainer")}`)));
+  assert.ok(!calls.some(([, p]) => p.endsWith(`/roles/${R("Maintainer")}`)));
 });
 await t("the shared #roles menu toggles only what was picked", async () => {
   calls.length = 0;
@@ -134,11 +167,14 @@ await t("showcase: a modal, then a forum post with XP", async () => {
   assert.match(r.data.content, /<#th1>/);
   const post = calls.find(([m, p]) => m === "POST" && p.endsWith("/threads"));
   assert.deepEqual(post[2].applied_tags, ["t3d"]);
+  assert.ok(!post[2].message.embeds && /Made by <@u1>[\s\S]*Holds cables[\s\S]*https:\/\/x\/i\.png/.test(post[2].message.content));
 });
 await t("Mark as solved: only the asker, tags Solved, rewards the helper", async () => {
   const i = (who) => ({ type: 2, guild_id: GUILD, channel_id: "hthread", member: member(who),
     data: { name: "Mark as solved", type: 3, resolved: { messages: { m9: { id: "m9", author: { id: "u2" } } } } } });
   assert.match((await send(i("u3"))).data.content, /Only the person/);
+  calls.length = 0;
+  assert.match((await send({ ...i("u3"), member: member("u3", [R("Moderator")]) })).data.content, /Solved/);   // staff may
   calls.length = 0;
   assert.match((await send(i("u1"))).data.content, /Solved.*u2/);
   assert.deepEqual(calls.find(([m, p]) => m === "PATCH" && p === "/channels/hthread")[2].applied_tags, ["tInstall", "tSolved"]);
@@ -152,6 +188,8 @@ await t("cron: XP with cooldown, no bots, bonuses folded in, a challenge opened"
   assert.equal(s.xp[BOT], undefined);
   assert.equal([...kv.keys()].filter((k) => k.startsWith("bonus:")).length, 0);
   assert.equal(s.challenge.thread, "th1");
+  const opened = calls.filter(([m, p]) => m === "POST" && p === `/channels/${ch("challenges").id}/threads`).pop();
+  assert.ok(!opened[2].message.embeds && opened[2].message.content.startsWith("# "));
   assert.ok(s.challenge.closes > Date.now());
   const again = await tick(env);                                  // nothing is counted twice
   assert.equal(again.xp.u1.msgs, 2);

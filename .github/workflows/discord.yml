@@ -2,7 +2,8 @@
 #   secret   DISCORD_BOT_TOKEN  the bot's token (Developer Portal › the application › Bot › Reset Token)
 #   variable DISCORD_GUILD_ID   the server's id
 # Without them every job here is skipped. "Set up the server" (Actions › Discord › Run workflow) builds the roles,
-# channels, onboarding and the welcome posts from scripts/discord/server.py; the other jobs post what happens.
+# channels, onboarding, moderation and the posts from scripts/discord/server.py and the guides from docs/community;
+# the other jobs post what happens: a release in #releases (a stable one also in #announcements), the rest in #github.
 name: Discord
 
 on:
@@ -20,15 +21,19 @@ on:
   watch:
     types: [started]
   schedule:
-    - cron: "0 9 * * 1"              # Monday 09:00 UTC: the week in Form Studio
-    - cron: "17 */2 * * *"           # every two hours: the help desk (answers new #help posts, archives solved ones)
+    - cron: "0 9 * * 1"              # Monday 09:00 UTC: the week in Form Studio, in #github
+    - cron: "17 */2 * * *"           # every two hours: the help desk (answers new #help posts, reminds quiet ones, archives solved ones)
   workflow_dispatch:
     inputs:
       task:
         description: What to do
         type: choice
-        options: [setup, plan, snapshot, helpdesk, digest]
+        options: [setup, plan, snapshot, helpdesk, digest, release]
         default: setup
+      tag:
+        description: "For release: the tag to post (v1.1.0). Previews go to #releases, stables also to #announcements"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -41,16 +46,19 @@ jobs:
   post:
     if: ${{ vars.DISCORD_GUILD_ID != '' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       # pull_request_target: only the base branch's scripts run; nothing from the pull request is checked out
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          sparse-checkout-cone-mode: false
           sparse-checkout: |
             scripts/discord
+            docs/community
+            docs/readme/hero-render.jpg
             form/app/assets
-            site/recipes/index.json
+            site/recipes
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
@@ -59,6 +67,7 @@ jobs:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_GUILD_ID: ${{ vars.DISCORD_GUILD_ID }}
           GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag }}
           TASK: ${{ github.event.inputs.task || (github.event.schedule == '0 9 * * 1' && 'digest') || (github.event_name == 'schedule' && 'helpdesk') || 'event' }}
         run: |
           if [ -z "$DISCORD_BOT_TOKEN" ]; then echo "DISCORD_BOT_TOKEN is not set; nothing to post"; exit 0; fi
@@ -67,6 +76,7 @@ jobs:
             plan) python scripts/discord/setup_server.py --dry-run && python scripts/discord/helpdesk.py --dry-run ;;
             snapshot) python scripts/discord/snapshot.py discord-snapshot.json ;;
             digest) python scripts/discord/post.py digest ;;
+            release) python scripts/discord/post.py release "$RELEASE_TAG" ;;
             helpdesk) python scripts/discord/helpdesk.py ;;
             *) python scripts/discord/post.py event ;;
           esac
