@@ -25,4 +25,8 @@ Numbers here are starting hypotheses. The filament's datasheet, printed coupons 
    model) from validated properties. Isotropic FEA or a datasheet modulus is not proof that a layered part is safe.
    Escalate to another material, process or qualified testing when the consequence of failure is high.
 
+Design-for-printing rules in short (bed orientation, overhangs, bridges, walls, clearances per side, layer
+direction, texture scale, splitting large shells): `references/dfm.md`, the same text as `design_guide(topic="dfm")`.
+They apply only to a design whose purpose is print.
+
 FORM never writes generic G-code and never starts a print. A slice is a simulation; report it as one.

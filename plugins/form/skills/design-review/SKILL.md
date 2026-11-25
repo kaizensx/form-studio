@@ -18,6 +18,11 @@ Three scales
 3. **Details**: seam location, entry chamfers, finger relief, drainage, support scars, tool access, the underside and
    the assembled state. Look at the print orientation as well as the use orientation.
 
+For a briefed design, `critique()` records the review against the head revision (close-ups per feature, metrics,
+a checklist, aesthetic scores from photos); a briefed design cannot be released without a critique pass. The
+automatic refinement lands as its own "Refined" revision: review it like any other, and `refine_design()` can take
+one change out.
+
 Three passes
 - Designer: proportion, interaction, finish.
 - Engineer: interfaces, load path, assembly, tolerances (read the checks and fit model).

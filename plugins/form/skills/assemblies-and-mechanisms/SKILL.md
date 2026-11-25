@@ -8,6 +8,9 @@ description: Design multi-part FORM assemblies and moving parts — hinges, slid
 FORM tools: `design_guide()`, `create_design()`, `update_design()`, `render()`, `animate()`, `explore_alternatives()`,
 `slice_test_piece()`.
 
+Read `references/mechanisms.md` (the same text as `design_guide(topic="mechanisms")`): the form.craft helpers for
+hinges, snaps, sliders, gears, cams, linkages and fits, with their clearances.
+
 Modelling
 - Multiple printed bodies go side by side on the bed, at least 5 mm apart, with `solids = N` in the design. Each body
   gets its own features so renders name them.

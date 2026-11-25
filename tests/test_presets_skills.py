@@ -155,7 +155,7 @@ class Plugin(unittest.TestCase):
 
     def test_skills_frontmatter_unique(self):
         self.assertGreaterEqual(len(SKILLS), 10)
-        self.assertLessEqual(len(SKILLS), 14)
+        self.assertLessEqual(len(SKILLS), 24)
         names = []
         for f in SKILLS:
             fm = frontmatter(f.read_text(encoding="utf-8"))

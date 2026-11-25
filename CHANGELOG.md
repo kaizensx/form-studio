@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Design guidance as skills, one source.** The design guide's topics and the plugin's skills now live once in
+  `form/guidance/<skill>/` (SKILL.md plus `references/`). `design_guide(topic)` returns the same text as before, read
+  from those files, and names the skill that holds it (`skill`, `skill_file`). `form/mcp_skills.py` serves them over
+  MCP as the `io.modelcontextprotocol/skills` extension (`skills/list`, `skills/get`, files through `resources/read`
+  at `skill://<name>/...`, each manifest digest the SHA-256 of the bytes served); the server registers it separately.
+  `scripts/gen_skills.py` writes `plugins/form/skills` from the same source, and a test fails on drift. Six new
+  skills: cad-core, staged-design, surfacing-organic, texture, remodel-from-mesh and game-asset (listed only when the
+  game pipeline is in the build); aesthetics joins industrial-design, mechanisms joins assemblies-and-mechanisms and
+  design for printing joins fdm-engineering. The skills mention the automatic refinement (`refine_design`), and intake
+  points meshes to remodel-from-mesh instead of saying scans cannot be rebuilt.
 - **Every design is refined after it builds.** create_design, update_design, add_feature (code and standard
   features) and a kept candidate now start design refinement in the background once the revision is saved and on
   screen, so the first picture comes as fast as before. What the engine keeps lands as one more revision, "Refined: N
