@@ -136,6 +136,7 @@ def safe_fillet(shape, edges, radius: float, min_fraction: float = 0.25):
 def safe_chamfer(shape, edges, length: float, min_fraction: float = 0.25):
     """Chamfer edges; when it does not fit, 75 %, 50 % and min_fraction of the length, then edge by edge, then leave
     them sharp. Every reduction is noted."""
+    from .surfaces import guarded_blend
     d = num(length, "length", positive=True)
     E = list(edges)
     if not E:
@@ -143,7 +144,7 @@ def safe_chamfer(shape, edges, length: float, min_fraction: float = 0.25):
     fr = [1.0, 0.75, 0.5, min_fraction]
     for i, f in enumerate(fr):
         try:
-            out = shape.chamfer(d * f, None, E)
+            out = guarded_blend(shape, d * f, E, chamfer=True)
             if ok(out):
                 if i:
                     note(f"safe_chamfer: {d:g} mm did not fit; used {d * f:.2g} mm")
@@ -158,7 +159,7 @@ def safe_chamfer(shape, edges, length: float, min_fraction: float = 0.25):
             break
         for f in fr:
             try:
-                o = out.chamfer(d * f, None, [cur])
+                o = guarded_blend(out, d * f, [cur], chamfer=True)
                 if ok(o):
                     out, done = o, done + 1
                     break

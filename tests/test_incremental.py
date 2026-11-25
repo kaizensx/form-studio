@@ -286,6 +286,14 @@ CRASHES = HANGS.replace('''        import signal
         return body''', '''        import os
         os._exit(3)                                   # the kernel process dies, as on a segfault''')
 
+SEGFAULTS = HANGS.replace('''        import signal
+        import time
+        signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM})
+        time.sleep(120)
+        return body''', '''        import ctypes
+        ctypes.string_at(0)                           # a real segfault, as OCCT's C++ ends the process
+        return body''')
+
 PLAIN_HANGS = '''
 from build123d import Box, Cylinder
 from form.recipes.base import Feature, Param, Recipe, Stage
@@ -449,6 +457,15 @@ class Hangs(unittest.TestCase):
         self.assertEqual(part["built"], ["body", "bore"])
         self.assertEqual(part["hang"]["kind"], "crash")
         self.assertIn("crashed", part["message"])
+
+    def test_a_segfault_names_the_call_and_the_source_line(self):
+        st = self.st
+        p = st.create_design("Segfaults", SEGFAULTS)
+        part = st.rev(p)["partial"]
+        self.assertEqual(part["built"], ["body", "bore"])
+        self.assertEqual(part["hang"]["kind"], "crash")
+        self.assertIn("It crashed in string_at", part["message"])
+        self.assertRegex(part["message"], r"at line \d+ of the design source: `ctypes.string_at\(0\)")
 
     def test_a_plain_recipe_that_hangs_keeps_its_stages(self):
         from form import studio as studio_mod

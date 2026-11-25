@@ -17,12 +17,18 @@ class KernelFailure(Exception):
         self.info = info
 
 
-def _serve(conn):
+def _serve(conn, crash_file=None):
     import os
     try:
         os.dup2(2, 1)       # stdout may be an MCP stdio channel; the kernel must never write to it
     except OSError:
         pass
+    if crash_file:          # a crash in OCCT's C++ writes the Python stack here: the supervisor names the call
+        try:
+            import faulthandler
+            faulthandler.enable(open(crash_file, "w", encoding="utf-8"), all_threads=False)
+        except OSError:
+            pass
     from . import kernel
     from .recipes import RecipeError
     while True:
@@ -51,6 +57,40 @@ def _serve(conn):
 FEATURE_GRACE = 10.0       # a feature still running this long past its budget is a hang in C++: stop the kernel
 
 
+def crash_site(text: str) -> dict | None:
+    """The call a kernel crash happened in, from the stack faulthandler wrote: {"op": the innermost function and file,
+    "via": the first form.craft helper on the way, "line"/"code": the design source line that called it}. None when
+    the text has no stack."""
+    import re
+    frames = re.findall(r'File "([^"]+)", line (\d+) in (\S+)', text or "")
+    if not frames:
+        return None
+    path, line, fn = frames[0]                     # faulthandler lists the most recent call first
+    out = {"op": f"{fn} ({path.replace(chr(92), '/').rsplit('/', 1)[-1]}:{line})"}
+    for p, ln, f in frames:
+        q = p.replace("\\", "/")
+        if "/form/craft/" in q and "via" not in out:
+            out["via"] = f"craft.{f}"
+        if "/.sources/" in q:
+            out["line"] = int(ln)
+            try:
+                with open(p, encoding="utf-8") as fh:
+                    out["code"] = fh.read().splitlines()[int(ln) - 1].strip()[:160]
+            except (OSError, IndexError):
+                pass
+            break
+    return out
+
+
+def crash_text(site: dict | None) -> str:
+    if not site:
+        return ""
+    t = f" It crashed in {site['op']}" + (f", called from {site['via']}" if site.get("via") else "")
+    if site.get("line"):
+        t += f", at line {site['line']} of the design source" + (f": `{site['code']}`" if site.get("code") else "")
+    return t + "."
+
+
 def _mark_hang(running: dict | None, info: dict) -> None:
     """Write down the feature that hung or crashed the kernel (form/featureprog.py hang_path), so its next build
     leaves it out at once."""
@@ -76,10 +116,20 @@ class Kernel:
         self._conn = None
         self.restarts = 0
         self.last_failure = None
+        self._crash_file = None
 
     def _start(self):
+        import os
+        import tempfile
+        import uuid
         parent, child = self._ctx.Pipe()
-        self._proc = self._ctx.Process(target=_serve, args=(child,), daemon=True, name="form-kernel")
+        if self._crash_file:                       # the last worker's stack file (a timeout or a stop left it)
+            try:
+                os.unlink(self._crash_file)
+            except OSError:
+                pass
+        self._crash_file = os.path.join(tempfile.gettempdir(), f"form-kernel-{uuid.uuid4().hex[:12]}.crash")
+        self._proc = self._ctx.Process(target=_serve, args=(child, self._crash_file), daemon=True, name="form-kernel")
         self._proc.start()
         child.close()
         self._conn = parent
@@ -149,15 +199,29 @@ class Kernel:
                         except Exception:
                             pass
             except (EOFError, BrokenPipeError, ConnectionResetError, OSError):
+                cf = self._crash_file
                 self._kill(f"{op} crashed the kernel process")
+                site = None
+                if cf:
+                    import os
+                    try:
+                        with open(cf, encoding="utf-8", errors="replace") as fh:
+                            site = crash_site(fh.read())
+                        os.unlink(cf)
+                    except OSError:
+                        pass
                 r = locals().get("running")
                 hang = None
                 if r:
                     hang = {"feature": r.get("feature", ""), "s": round(time.monotonic() - r["t"], 1),
                             "budget": r.get("budget"), "i": r.get("i"), "kind": "crash"}
                     _mark_hang(r, hang)
+                if site and hang:
+                    hang["site"] = site
                 raise KernelFailure({"kind": "crash", "message": "The geometry kernel stopped unexpectedly and was restarted."
-                                     + (f" It was building {hang['feature']} ({hang['s']:g} s on it)." if hang else ""),
+                                     + (f" It was building {hang['feature']} ({hang['s']:g} s on it)." if hang else "")
+                                     + crash_text(site),
+                                     **({"site": site} if site else {}),
                                      "hint": "Nothing was saved from that attempt. Your last committed revision is intact.",
                                      **({"feature": hang["feature"], "hang": hang} if hang else {})})
         if status == "ok":

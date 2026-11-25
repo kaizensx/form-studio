@@ -56,7 +56,7 @@ FEATURE_BUDGET_S = 10.0
 FEATURE_MIN_S = 2.0
 BUDGET_S = {"cad": 20.0, "game": 300.0}      # game: every candidate gets a quick bake (game_eval)
 FINAL_RESERVE_S = 5.0             # CAD: of the budget, kept for the final check (STL export and mesh audit, twice)
-WALL_FLOOR = {"print": 0.8, "model": 0.5, "game": 0.0}     # mm; print: two perimeters of a 0.4 mm nozzle
+WALL_FLOOR = {"print": 1.2, "model": 0.5, "game": 0.0}     # mm; form/wallguard.py floor_for (print: 0.4 mm nozzle)
 WALL_KEEP = 0.8                   # a candidate's thinnest wall stays at least this share of the base's
 FROZEN_AREA_REL, FROZEN_BREP_MM = 1e-3, 1e-3      # B-rep faces: exact area (relative) and centre (mm)
 FROZEN_TESS_MM = 0.1              # without a B-rep face list (a texture): the view's tessellation tolerance
@@ -166,8 +166,11 @@ def gate(base: Evaluation, cand: Evaluation, purpose: str = "model", budgets: li
                 and ci["class_score"] < bi["class_score"] - 0.02:
             out.append(f"silhouette: the class outline score fell from {bi['class_score']:.2f} to {ci['class_score']:.2f}")
     floor = WALL_FLOOR.get(purpose, 0.5)
-    if cand.wall_mm is not None and (cand.wall_mm < floor or (base.wall_mm is not None and
-                                                              cand.wall_mm < WALL_KEEP * base.wall_mm)):
+    # under the floor fails when the refinement thinned it (a base already under it is the design's own wall: the
+    # structure check reports that; a refinement may still round it), and no candidate loses more than WALL_KEEP
+    thinned = base.wall_mm is None or cand.wall_mm is None or cand.wall_mm < base.wall_mm - 0.05
+    if cand.wall_mm is not None and ((cand.wall_mm < floor and thinned) or (base.wall_mm is not None and
+                                                                         cand.wall_mm < WALL_KEEP * base.wall_mm)):
         out.append(f"wall: thinnest wall {cand.wall_mm:g} mm (floor {floor:g} mm"
                    + (f", base {base.wall_mm:g} mm" if base.wall_mm is not None else "") + ")")
     if purpose == "game":

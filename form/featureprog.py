@@ -553,6 +553,10 @@ def _build_features(self, v: dict) -> list[Stage]:
                     problem, hint = _problem(out, mesh, i, n0, v0, want if counted else None, declared, adds)
                     if problem:
                         raise RecipeError(f"The {fid} feature {problem}.", fid, hint)
+                    if i and not mesh and out is not body:
+                        problem, hint = _thin_finish(fid, m, before, out)
+                        if problem:
+                            raise RecipeError(problem, fid, hint)
                     if m.get("expects"):               # its own postconditions, measured on what it returned
                         from . import proving
                         proving.expects(fid, m["expects"], out)
@@ -674,6 +678,27 @@ def _problem(out, mesh: bool, i: int = 1, n0: int = 0, v0: float = 0.0, want: in
                 "A cut removed nearly the whole body: check that its tool is the region to remove, not a box "
                 "around the body.")
     return "", ""
+
+
+def _thin_finish(fid: str, meta: dict, before, after) -> tuple[str, str]:
+    """A decorative feature (form/wallguard.py GUARDED_ROLES: finish, texture, grip, refine, ...) that thins a wall
+    under the minimum wall (the print minimum, or a model's process minimum) is left out: (message with the measured wall and where, hint), or ("", "")."""
+    from . import wallguard
+    if not wallguard.guarded(meta.get("role")):
+        return "", ""
+    floor = wallguard.current_floor()
+    if floor <= 0:
+        return "", ""
+    w = wallguard.cut_walls(before, after)
+    if w is None or w["t"] >= floor - 1e-3:
+        return "", ""
+    label = meta.get("label") or fid
+    return (f"The {fid} feature ({label}, a {meta.get('role')} feature) would leave a {w['t']:.2f} mm wall at "
+            f"{wallguard.where(w['at'])} mm, under the {floor:g} mm minimum wall for this design; a finish never thins a wall below "
+            f"it, so it is left out",
+            f"Make the cut {floor - w['t']:.2f} mm shallower where the wall is thin, "
+            "keep it off that region, or thicken the wall under it first. craft.finish_cut(body, cuts, depth) "
+            "makes each cut only as deep as the wall behind it allows and notes what it clamped.")
 
 
 def _diagnosis(e: BaseException, recipe, fid: str) -> dict:
@@ -970,7 +995,12 @@ def _context_fingerprint() -> str:
     out = []
     try:
         from . import marks
-        out.append({k: v for k, v in marks.context().items() if k != "nozzle"})   # the nozzle shapes no solid
+        ctx = {k: v for k, v in marks.context().items() if k not in ("nozzle", "wall_floor")}   # the nozzle shapes no solid
+        from . import wallguard                    # the finish floor does (a finish thinner than it is left out)
+        floor = wallguard.current_floor()
+        if abs(floor - wallguard.DEFAULT_FLOOR) > 1e-9:   # the common floor keeps the keys builds had before
+            ctx["wall_floor"] = floor
+        out.append(ctx)
     except Exception:
         pass
     try:

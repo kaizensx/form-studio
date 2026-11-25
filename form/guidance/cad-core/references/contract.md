@@ -126,6 +126,19 @@ RULES
   6. Design for how it will be made when the person says (CNC, moulding, casting, sheet metal: the checks name the
      smallest feature that process holds). Otherwise favour proportion and finish: real fillets and chamfers,
      consistent wall thickness, no knife edges.
+  6a. Decorative finishes go LAST and only on walls with margin. Flutes, grooves, knurls, grip textures, parting
+     lines, recessed panels, edge chamfers over many small edges: build them after every structural feature, as
+     their own feature with role="finish", and only where the wall under them is at least the print minimum
+     (1.2 mm on a 0.4 nozzle: max(2 line widths, 3 nozzle widths)) PLUS the cut depth. A finish that would leave
+     less is left out of the build with the measured wall and where; craft.finish_cut(body, cuts, depth) makes each
+     cut only as deep as the wall behind it allows. Never chamfer or fillet across a texture's edges: soften the
+     ends first, then cut the texture, or the export slows to a crawl and the mesh comes out open.
+  6b. A hollow structural shell (a corbel, a box section, a hollow arm) keeps at least its stated wall
+     everywhere. An inner cavity is an OFFSET of the outer surface (offset_2d / craft.shell / the same ellipse with
+     both semi-axes reduced by t about the SAME centre), never a second shape placed by eye: two ellipses with
+     different centres or ratios leave a wall that thins to a third of t partway round the curve. Measure it
+     (analyze map="thickness") before adding anything to it. A structural wall under 3 nozzle widths FAILS the
+     Thinnest-wall check; it is not a warning to explain away.
   7. Dimensions from datasheets or drawings (open them with read_document): put them in params with
      provenance="specified" and the source in doc ("Raspberry Pi 5 mechanical drawing"). Values the user
      measured: provenance="measured". Your own estimates stay "assumed". Say in your reply which you could not confirm.

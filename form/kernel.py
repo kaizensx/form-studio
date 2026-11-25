@@ -6,6 +6,7 @@ kernel crash or runaway boolean can be killed without losing project state.
 from __future__ import annotations
 
 import base64
+import os
 import math
 import time
 from pathlib import Path
@@ -888,6 +889,9 @@ def _open_edges(path) -> int:
     return int((counts == 1).sum())
 
 
+STL_RETRY_BUDGET = float(os.environ.get("FORM_STL_RETRY_BUDGET") or 20.0)   # seconds for write_stl's re-mesh tries
+
+
 def write_stl(shape, path, tol: float = 0.01, ang: float = 0.1) -> dict:
     """An STL of a valid solid with no holes. OCCT's mesher can fail on a face at one setting (a small face between
     tangent surfaces) and still return: that face gets no triangles, or its edges get a different polygon from its
@@ -909,17 +913,37 @@ def write_stl(shape, path, tol: float = 0.01, ang: float = 0.1) -> dict:
 
     dropped = [0]
 
+    # the retries have a time budget: a mesh's cost grows about with the cube of 1 / tolerance, and a solid whose
+    # mesh no setting closes (sliver faces from a chamfer over many small edges) spent 700 s on the finest try alone
+    # and timed the export out; a retry predicted to overrun the budget is not started, and the report says so
     tries = [(tol, ang), (tol, ang * 2), (tol / 2, ang * 2), (tol * 2, ang * 2), (tol / 10, ang), (tol * 5, max(ang * 2, 0.25))]
     first = None
+    t_start = time.perf_counter()
+    first_s = None
+    skipped = []
     for t, a in tries:
+        if first_s is not None:
+            pred = first_s * max(1.0, tol / t) ** 3
+            if time.perf_counter() - t_start + pred > STL_RETRY_BUDGET:
+                skipped.append(t)
+                continue
+        t0 = time.perf_counter()
         open_ = write(t, a)
+        if first_s is None:
+            first_s = time.perf_counter() - t0
         first = open_ if first is None else first
         if not open_:
             return {"tolerance": t, "angular_tolerance": a, "remeshed": (t, a) != (tol, ang), "open_edges": 0,
                     "open_edges_first": first, "degenerate_dropped": dropped[0]}
     open_ = write(tol, ang)
-    return {"tolerance": tol, "angular_tolerance": ang, "remeshed": False, "open_edges": open_, "open_edges_first": first,
-            "degenerate_dropped": dropped[0]}
+    out = {"tolerance": tol, "angular_tolerance": ang, "remeshed": False, "open_edges": open_, "open_edges_first": first,
+           "degenerate_dropped": dropped[0], "seconds": round(time.perf_counter() - t_start, 2)}
+    if skipped:
+        out["finer_skipped"] = {"tolerances": skipped, "budget_s": STL_RETRY_BUDGET,
+                                "why": "no coarser setting closed the mesh, and a finer one was predicted to take longer "
+                                       "than the export's budget; the open edges come from the solid's faces (often "
+                                       "slivers left by a chamfer or fillet over many small edges)"}
+    return out
 
 
 def _textured_parts(model, face_part: list, ids: list, budget: int | None = None) -> list | None:
@@ -1108,6 +1132,18 @@ def _thickness(model, max_rays=1500, floor=0.8, key=None):
     from . import thickness
     res = thickness.regions(key if key is not None else model, floor, model=model)
     best = dict(res["thinnest"]) if res["thinnest"] else {"t": float("inf")}
+    # a wall of a structural feature (role "structure", the load path) is held to a stricter minimum by the
+    # Thinnest-wall check than a decorative ridge: the thinnest region a structural feature carries
+    feats = getattr(model["recipe"], "features", None) or []
+    roles, labels = {f.id: f.role for f in feats}, {f.id: f.label for f in feats}
+    for r in res.get("regions") or []:                      # sorted thinnest first
+        sides = [x for x in dict.fromkeys([r.get("feature")] + list(r.get("features") or [])) if x]
+        carry = [x for x in sides if roles.get(x) == "structure"]
+        if carry:
+            best["structural"] = {"t": r["min_mm"], "at": r["at"], "to": r["to"], "feature": carry[0],
+                                  "features": sides, "label": labels.get(carry[0], carry[0]),
+                                  "cut_by": [labels.get(x, x) for x in sides if roles.get(x) != "structure"]}
+            break
     return best, res
 
 
@@ -1119,7 +1155,8 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
     P, T = _mesh_arrays(model)
     table = _orientation_table(P, T, extra=(orientation,))
     thin, field = _thickness(model, floor=2 * nozzle, key=key)
-    out = {"orientation_table": table, "thin": thin if thin["t"] < float("inf") else None,
+    struct = thin.pop("structural", None)
+    out = {"orientation_table": table, "thin": thin if thin["t"] < float("inf") else None, "thin_structural": struct,
            "thickness_samples": field["samples"], "thin_regions": field,
            "brep": {"valid": bool(model["shape"].is_valid), "solids": len(model["shape"].solids()),
                     "expected_solids": getattr(model["recipe"], "solids", 1),
