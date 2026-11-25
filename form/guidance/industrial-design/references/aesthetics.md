@@ -63,6 +63,8 @@ ribbon_phone_stand, lamp_base, cube_speaker, slim_remote, floating_wall_hook, so
       split line      a 0.6-0.8 mm groove where two shells meet (slim_remote): a thin superellipse ring cut
       recess ring     a small part set into a recess 1.5 mm larger (lamp_base's collar, every key)
   * Stepped tiers: each part steps in 1.5-2 mm from the one below; the step's shadow does the work.
+  * "Premium" is never paid for in wall: a groove, flute or panel goes only where the wall keeps 1.2 mm (a 0.4
+    nozzle) under its full depth, after the structure is final. A thin load-bearing curve gets thicker, not fluted.
   * Fillet the body BEFORE cutting a pocket into a face, so the pocket never meets a fillet.
   * On a lofted or sculpted skin, character lines and trim are craft.organic.surface_band regions and openings are
     two_view_cutter cuts that follow the form (design_guide topic "organic"), never where booleans happen to meet.

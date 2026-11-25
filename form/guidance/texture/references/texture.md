@@ -19,5 +19,9 @@ TEXTURE, two honest tiers
     Seeing it: the six-view sheet draws a 270 mm helmet at about 0.5 mm a pixel, so a 0.25 mm weave is invisible
     there; it shows in render_photo close-ups and in the app. Do not deepen it past what the material would have
     to make it show in the sheet.
+Walls first: a B-rep texture cut into a wall (flutes, grooves, knurl rings) must leave the print minimum under it
+(1.2 mm on a 0.4 nozzle). Add it last, role="finish", with craft.finish_cut(body, [lambda d: tool_at(d), ...], depth)
+so each cut is only as deep as its wall allows; a finish feature that thins a wall below the minimum is left out of
+the build, and its message names the wall and where. Raised textures (ribs, cells) do not thin anything.
 Choose: if a person sees it from a metre away or it does work (grip, alignment), make it B-rep. If it is felt or seen
 up close, make it a mesh texture. Printed texture needs >= 2 nozzle widths in plan and >= 0.3 mm depth to survive.

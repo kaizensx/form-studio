@@ -32,6 +32,27 @@
 - **Agents:** MCP 2026-07-28 throughout, long tools can run as tasks, and the design guidance is served as skills.
 - **Recipes are no longer a public library.** The engine still uses them as building blocks for agents; the website page, the Discord forum and the submission form are gone.
 
+### Fixed
+
+- **A decorative finish can no longer thin a wall below the print minimum.** Flutes, grooves, knurls, grip textures,
+  parting lines, recessed panels and ribbed lightening (added by an agent or by refinement) are measured as they are
+  made. A finish that would leave a wall under 1.2 mm on a 0.4 mm nozzle (three nozzle widths; a model uses its
+  process minimum) is left out, and the build log names the wall and where it is. Agents can use
+  `craft.finish_cut`, which makes each cut only as deep as the wall behind it allows. Before this, 0.5 mm flutes cut
+  a sofa-arm holder's corbel wall to 0.81 mm.
+- **A thin wall in a structural feature now fails the Thinnest-wall check.** A wall under three nozzle widths
+  (1.2 mm on a 0.4 mm nozzle) in a structural feature, such as a corbel, an arm or a clip's spine, is a FAIL. The
+  check gives the measured value, the feature, what thinned it and where. Decorative ridges between 2 and 3 nozzle
+  widths still show as a warning.
+- **STL export no longer hangs on a mesh that will not close.** The retries at finer settings now have a time limit.
+  A solid with sliver faces (from chamfering every edge of a fluted end) took 703 s to export and timed out. It now
+  exports in 1.8 s, and the mesh check reports the open edges.
+- **A fillet as large as an arc's own radius no longer crashes the geometry kernel.** `craft.safe_fillet` and
+  `craft.safe_chamfer` skip that size on those edges and try a smaller one. When the kernel does crash, the message
+  names the call and the line of the design source that caused it.
+- **Design guidance:** decorative finishes are added last, and only where the wall has room for them. Hollow
+  structural shells keep their stated wall all the way round: the cavity is an offset of the outside.
+
 ### Known limits
 
 - Game assets are Beta: every asset passes its technical checks, and its visual quality is still improving. They are
