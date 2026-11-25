@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ART = ROOT / "scripts" / "discord" / "art"
 RECIPES = ROOT / "site" / "recipes" / "index.json"
 PREVIEWS = ROOT / "site" / "recipes" / "previews"
-WELCOME_ART = ROOT / "docs" / "readme" / "hero-render.jpg"
+WELCOME_ART = ROOT / "docs" / "readme" / "banner.png"
 
 VIEW, SEND, ADD_REACTIONS, HISTORY = S.P["view"], S.P["send"], S.P["react"], S.P["history"]
 CREATE_PUBLIC_THREADS, CREATE_PRIVATE_THREADS, SEND_THREADS = S.P["public_threads"], S.P["private_threads"], S.P["send_in_threads"]
@@ -594,7 +594,7 @@ class Setup:
         parts = self.text_parts(S.WELCOME)
         files = None
         if WELCOME_ART.exists():                                  # the picture is a message of its own, on top
-            files = {"form-studio.jpg": WELCOME_ART.read_bytes()}
+            files = {"form-studio.png": WELCOME_ART.read_bytes()}
             parts = [""] + parts
         self.sync(self.channel("welcome")["id"], "#welcome", parts, components=buttons, files=files)
 

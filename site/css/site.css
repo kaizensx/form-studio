@@ -824,7 +824,7 @@ html { scroll-padding-top: calc(var(--nav-h) + 8px); }
 .js .hero .in-1 { animation: rise 900ms var(--ease-expo) both; }
 .js .hero .in-2 { animation: rise 900ms var(--ease-expo) 260ms both; }
 .js .hero .in-3 { animation: rise 900ms var(--ease-expo) 360ms both; }
-.js .hero-shot { animation: rise-stage 1400ms var(--ease-expo) 420ms both; }
+.js .stage { animation: rise-stage 1400ms var(--ease-expo) 420ms both; }
 @keyframes line-up { from { transform: translateY(108%); } }
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
 @keyframes rise-stage { from { opacity: 0; transform: translateY(80px); } }
@@ -1051,13 +1051,6 @@ html { scroll-padding-top: calc(var(--nav-h) + 8px); }
 .reduce .stage-tilt { transform: none !important; }
 
 /* ---------- hero picture: a real build, photographed. It stays dark in both themes, like the app ---------- */
-.hero-shot { position: relative; width: min(1240px, calc(100% - 2 * var(--gutter))); margin: clamp(36px, 6vh, 64px) auto 0; }
-.hero-shot::before { content: ""; position: absolute; left: 10%; right: 10%; top: 18%; bottom: -4%; border-radius: 50%; background: color-mix(in srgb, var(--datum) 18%, transparent); filter: blur(80px); z-index: -1; opacity: .5; }
-.hero-shot-in { border-radius: clamp(14px, 2vw, 24px); overflow: hidden; aspect-ratio: 16 / 9; background: #0a0c0e; box-shadow: var(--shadow); }
-.hero-shot img { display: block; width: 100%; height: 100%; object-fit: cover; transform: scale(var(--hs, 1.08)) translateY(var(--hy, 0px)); will-change: transform; }
-.hero-shot figcaption { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-top: 16px; font-size: 13.5px; color: var(--ink3); }
-.hero-shot figcaption b { color: var(--ink); font-weight: 600; }
-.hero-shot figcaption span { flex: 1 1 320px; max-width: 64ch; }
 figure { margin: 0; }
 
 /* ---------- what it makes: a bento of real builds ---------- */
@@ -1082,11 +1075,6 @@ figure { margin: 0; }
 }
 
 /* ---------- the drawn app, below the gallery ---------- */
-.try { padding-top: clamp(40px, 8vh, 96px); }
-.try-head { display: grid; justify-items: center; text-align: center; gap: 18px; }
-.try-head h2 { font-size: clamp(2.2rem, 5vw, 4.3rem); line-height: 1.02; letter-spacing: -.048em; font-weight: 640; }
-.try-head > p:last-child { max-width: 56ch; color: var(--ink2); margin: 0; }
-.try .stage { margin-top: clamp(36px, 6vh, 64px); }
 
 /* ---------- feature sections: copy beside a picture ---------- */
 .fx { padding-top: clamp(96px, 16vh, 180px); }
@@ -1143,5 +1131,4 @@ figure { margin: 0; }
 @media (max-width: 899px) {
   .gx-t.w4.p2 { grid-column: span 2; height: 62vw; }
   .gx-t.w4.p2 figcaption > span:last-child { display: block; }
-  .hero-shot-in { aspect-ratio: 4 / 3; }
 }
