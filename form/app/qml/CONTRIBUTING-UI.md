@@ -111,7 +111,7 @@ Shortcuts are written the Qt way everywhere (`"Ctrl+Shift+O"`) and shown the pla
 | `Sec { title; note; tag }` | titled group; children stack in a column, spacing 8 |
 | `Cap { text; note; tag }` | caption line |
 | `KV { k; sub; value; tag; first }` | key/value row; children go on the right instead of `value` |
-| `Delta { label; from; to; unit; tint }` | a change, from → to |
+| `Delta { label; from; to; unit; tint; tick }` | a change, from → to; `tick` counts a numeric `to` up from `start` over `Theme.cross` (set at once with reduced motion) |
 | `Note { kind; title; text }` | kind: `plain amber red green blue`; children allowed |
 | `Field { text; placeholder; numeric; unit; error; busy; bare; onAccepted(text); onEdited(text) }` | one-line input. `error: "Why it is wrong"` turns the edge red and shows the sentence under it; `bare` drops the well (palette) |
 | `Area { text; placeholder; minLines; submitOnEnter; onSubmit(text); onBlurred(text) }` | multi-line input |

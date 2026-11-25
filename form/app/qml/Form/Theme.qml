@@ -178,8 +178,9 @@ QtObject {
         case "specified": case "computed": case "interface": case "geometry": return datum
         case "assumed": case "photo": case "WARN": case "simulated": case "modelled": case "model": case "partial":
         case "left out": return amber
-        case "FAIL": case "resized": case "moved": case "added": case "removed": return signal
-        case "trimmed": case "draft": return blueprint
+        case "FAIL": return signal
+        // what a draft does to a feature is a change to compare, not a failure: the draft's own colour
+        case "resized": case "moved": case "added": case "removed": case "trimmed": case "draft": return blueprint
         }
         return ink2
     }
