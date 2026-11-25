@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Game assets are marked Beta.** Home's "Make it for", the design's Purpose and the Game asset sheet carry a small
+  "Beta" tag (BetaTag.qml, Theme tokens, light and dark); the website's game section, How we measure and the README
+  say it once, with one line: every asset passes its technical checks, and its visual quality is still improving.
+- **Website: 1.1.** The hero badge names Form Studio 1.1 and what it brings (engineering materials for CNC, game
+  assets in Beta) and links to the releases; the README no longer says "Also in 1.0.0".
 - **Game assets are refined only when you ask.** Automatic refinement still runs after every CAD build; a game asset
   (purpose "game", or a cage source) is left as it was built unless refinement is turned on for it
   (`refine_design(action="on")`, or Refine again once) or for all of them in Settings › General › Refine game assets

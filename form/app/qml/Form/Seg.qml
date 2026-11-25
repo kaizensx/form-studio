@@ -1,7 +1,8 @@
 import QtQuick
 
-// Segmented control. model: [{ value, text, off, tip }] or [string]. Left/Right move when it has keyboard focus.
-// An item with off: true is shown but cannot be picked; its tip says why.
+// Segmented control. model: [{ value, text, off, tip, badge }] or [string]. Left/Right move when it has keyboard focus.
+// An item with off: true is shown but cannot be picked; its tip says why. badge: a small calm tag after the text
+// ("Beta").
 Rectangle {
     id: g
     property var model: []
@@ -30,12 +31,14 @@ Rectangle {
                 readonly property var v: g._v(modelData)
                 readonly property bool on: v === g.value
                 readonly property bool off: !!modelData.off
-                width: l.implicitWidth + 16; height: 22; radius: Theme.rXs       // concentric: 6 − 2
+                width: lr.implicitWidth + 16; height: 22; radius: Theme.rXs       // concentric: 6 − 2
                 color: on ? Theme.plate4 : off ? "transparent" : sm.pressed ? Theme.washPress : sm.containsMouse ? Theme.washHover : "transparent"
                 border.width: on ? 1 : 0; border.color: Theme.rule
                 Behavior on color { Tint {} }
-                Text { id: l; anchors.centerIn: parent; text: modelData.text !== undefined ? modelData.text : modelData; renderType: Text.NativeRendering
-                    font.family: Theme.sans; font.pixelSize: 12; font.weight: Theme.wMedium; color: parent.on ? Theme.ink : parent.off ? Theme.ink4 : sm.containsMouse ? Theme.ink2 : Theme.ink3 }
+                Row { id: lr; anchors.centerIn: parent; spacing: 5
+                    Text { id: l; anchors.verticalCenter: parent.verticalCenter; text: modelData.text !== undefined ? modelData.text : modelData; renderType: Text.NativeRendering
+                        font.family: Theme.sans; font.pixelSize: 12; font.weight: Theme.wMedium; color: lr.parent.on ? Theme.ink : lr.parent.off ? Theme.ink4 : sm.containsMouse ? Theme.ink2 : Theme.ink3 }
+                    BetaTag { visible: !!modelData.badge; text: modelData.badge || ""; tip: ""; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 15 } }
                 MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; cursorShape: parent.off ? Qt.ArrowCursor : Qt.PointingHandCursor
                     onClicked: if (!parent.off) g.picked(parent.v) }
                 Tip { show: sm.containsMouse && !!modelData.tip; text: modelData.tip || "" }

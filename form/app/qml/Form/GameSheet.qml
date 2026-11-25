@@ -12,6 +12,8 @@ Column {
     id: gs
     objectName: "gameSheet"
     property string title: "Game asset"
+    property string badge: "Beta"
+    property string badgeTip: "Game assets are in Beta: they work end to end, and their visual quality is still improving."
     property string note: Store.project ? Store.project.name + " · " + F.pad(Store.project.head) + (Store.gameDesign ? "" : " · its purpose is not “Game asset”; the asset is made all the same") : ""
     property int sheetWidth: Theme.sheetXl
     property string preset: "gltf"

@@ -242,7 +242,7 @@ Item {
                             value: Store.newPurpose === "print" || Store.newPurpose === "game" ? Store.newPurpose : "any"; onPicked: function (v) { Store.setNewPurpose(v) }
                             model: [{ value: "any", text: "Anything", tip: "A 3D model: STEP, STL, 3MF and more, for any way of making it." + (Store.printOn ? " Say “for my printer” in the request, or pick My printer, to check and slice it." : "") }]
                                    .concat(Store.printOn ? [{ value: "print", text: "My printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" }] : [])
-                                   .concat([{ value: "game", text: "Game asset", tip: "For a game engine: LODs at triangle budgets, UVs, baked textures and collision, for Godot, Unity or Unreal" }]) }
+                                   .concat([{ value: "game", text: "Game asset", badge: "Beta", tip: "For a game engine: LODs at triangle budgets, UVs, baked textures and collision, for Godot, Unity or Unreal. In Beta: visual quality is still improving." }]) }
                         Btn { id: printerChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startPrinter"; small: true; kind: "quiet"; icon: "printer"; visible: Store.printOn && Store.newPurposeEffective === "print"
                             text: Store.printerName ? Store.printerName : "Choose a printer"
                             tip: "The printer the next design is checked and sliced for. Click to change it."

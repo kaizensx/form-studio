@@ -31,7 +31,7 @@
   <img src="docs/readme/made-speaker.jpg" width="204" alt="A cube speaker with a perforated grille.">
   <img src="docs/readme/made-bottle.jpg" width="204" alt="A clear bottle with a blue screw cap.">
   <br>
-  <sub>Mechanisms, assemblies, organic shells, products and game assets: every picture is a real build, an original design written as parametric code. <a href="https://kaizensx.github.io/form-studio/#make">See what it makes</a> · <a href="https://kaizensx.github.io/form-studio/measure/">How we measure</a></sub>
+  <sub>Mechanisms, assemblies, organic shells, products and game assets (Beta): every picture is a real build, an original design written as parametric code. <a href="https://kaizensx.github.io/form-studio/#make">See what it makes</a> · <a href="https://kaizensx.github.io/form-studio/measure/">How we measure</a></sub>
 </p>
 
 **Form Studio is the open-source AI CAD studio: describe anything, and an engineer-grade agent builds it as real, editable CAD.** Type what you need, drop a photo or a sketch, or bring a part. The agent of your choice writes a parametric design in [build123d](https://github.com/gumyr/build123d), and the OpenCascade kernel builds it as a B-rep solid while you watch: features you can click, parameters you can change, and every revision checked on the solid itself. Take it out as STEP for your CAD program or a CNC shop, as meshes for renders and the web, or to your own slicer if you print. Everything runs on your computer.
@@ -157,11 +157,12 @@ One design, the output you need:
 | Output | What you get |
 |---|---|
 | **CAD exchange** | STEP from the B-rep, re-imported in FreeCAD as a check; FreeCAD macros to carry on in FreeCAD, and OpenSCAD designs welcome as a source. |
-| **CNC, laser and moulding** | Mark a design *Just a 3D model* for its process: its thinnest feature is compared with what that process can make, and no print checks get in the way. |
+| **CNC, laser and moulding** | Mark a design *Just a 3D model* for its process: its thinnest feature is compared with what that process can make, and no print checks get in the way. Give it an engineering material (aluminium 6061 or 7075, steel, stainless, brass, titanium, woods, POM and more) for its look and its computed mass. |
 | **Renders and the web** | OBJ and GLB, four-view sheets, turntable videos and photoreal renders in Blender. |
+| **Game engines (Beta)** | Four levels of detail inside triangle budgets, UVs, baked textures and collision, for Unreal, Unity, Godot and glTF. Every asset passes its technical checks; visual quality is still improving. |
 | **3D printing (optional)** | Your own slicer with your printer's presets, slices played back layer by layer, every printer you have compared, fits modelled against your printer's accuracy. Turn it on when you print; it stays out of the way when you do not. |
 
-Also in 1.0.0: concepts that come back as several genuinely different designs, screw bosses and snap-fit hooks placed with a click, text on any flat face, what changed between two revisions on the solids, assembly instructions as a PDF and turntable videos. All of it is in the [changelog](CHANGELOG.md) and [docs/FEATURES.md](docs/FEATURES.md).
+Also in Form Studio: concepts that come back as several genuinely different designs, screw bosses and snap-fit hooks placed with a click, text on any flat face, what changed between two revisions on the solids, assembly instructions as a PDF and turntable videos. All of it is in the [changelog](CHANGELOG.md) and [docs/FEATURES.md](docs/FEATURES.md).
 
 > [!NOTE]
 > Nothing on this page is mocked up. The parts are the CAD kernel's own meshes and edges, and the gears turn by their own tooth counts. The two designs at the top are build123d code in [`scripts/readme_designs/`](scripts/readme_designs), built through the same `create_design` tool an agent calls; the checks, ratios, G-code layer, joint sweep and file hashes are what a real run of the engine produced. [`scripts/readme_art.py`](scripts/readme_art.py) draws every picture again from a fresh run.

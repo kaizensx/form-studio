@@ -7,6 +7,7 @@ Icon 1.0 Icon.qml
 Btn 1.0 Btn.qml
 Tip 1.0 Tip.qml
 Tag 1.0 Tag.qml
+BetaTag 1.0 BetaTag.qml
 Cap 1.0 Cap.qml
 Sec 1.0 Sec.qml
 KV 1.0 KV.qml

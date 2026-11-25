@@ -8,6 +8,7 @@ import QtQuick.Controls
 //   property string title              the header (required)
 //   property int sheetWidth            Theme.sheetS | sheetM | sheetL | sheetXl
 //   property string note               one quiet line under the title
+//   property string badge              optional: a small calm tag after the title ("Beta"); badgeTip says what it means
 //   property var tabs; property string tab     [{ value, text, badge? }] — the host shows them under the header and sets `tab`
 //   property Component footer          the actions, a Row: primary button LAST (it sits at the right edge)
 //   property Component footerLeft      secondary things at the left of the action bar (a Row: quiet buttons, a status line)
@@ -85,7 +86,12 @@ Item {
 
         // header
         Column { x: card.pad; width: parent.width - card.pad * 2 - 36; anchors.verticalCenter: head.verticalCenter; spacing: 1
-            Txt { kind: "lead"; font.weight: Theme.wSemi; font.letterSpacing: -0.1; text: host.sheet && host.sheet.title ? host.sheet.title : ""; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+            Row { width: parent.width; spacing: 8
+                Txt { id: sheetTitle; kind: "lead"; font.weight: Theme.wSemi; font.letterSpacing: -0.1; text: host.sheet && host.sheet.title ? host.sheet.title : ""
+                    width: Math.min(implicitWidth, parent.width - (sheetBadge.visible ? sheetBadge.width + 8 : 0)); elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                BetaTag { id: sheetBadge; anchors.verticalCenter: sheetTitle.verticalCenter
+                    visible: !!(host.sheet && host.sheet.badge); text: host.sheet && host.sheet.badge ? host.sheet.badge : ""
+                    tip: host.sheet && host.sheet.badgeTip ? host.sheet.badgeTip : "" } }
             Txt { kind: "fine"; visible: text !== ""; text: host.sheet && host.sheet.note ? host.sheet.note : ""; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
         Item { id: head; width: parent.width; height: card.headH }
         Btn { kind: "quiet"; icon: "x"; tip: "Close"; keys: "Esc"; anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: head.verticalCenter; activeFocusOnTab: false

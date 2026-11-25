@@ -90,11 +90,12 @@ Column {
         readonly property var pu: Store.data && Store.data.purpose ? Store.data.purpose : ({ purpose: "print" })
         Seg { objectName: "purposeSeg"; value: purposeSec.pu.purpose; enabled: !Store.job
             model: (Store.printOn || purposeSec.pu.purpose === "print" ? [{ value: "print", text: "For 3D printing" }] : [])
-                   .concat([{ value: "model", text: "Just a 3D model" }, { value: "game", text: "Game asset" }])
+                   .concat([{ value: "model", text: "Just a 3D model" }, { value: "game", text: "Game asset", badge: "Beta",
+                              tip: "In Beta: game assets work end to end, and their visual quality is still improving." }])
             onPicked: function (v) { if (v !== Store.purpose) Store.setPurpose(v) } }
         Txt { kind: "fine"; width: parent.width
             text: purposeSec.pu.purpose === "game"
-                ? "For a game engine: levels of detail at triangle budgets, UVs, baked base colour, normal, ORM and AO maps, and collision, exported for Godot, Unity or Unreal. Not sliced; print checks do not apply. The design stays the CAD it is made from."
+                ? "For a game engine: levels of detail at triangle budgets, UVs, baked base colour, normal, ORM and AO maps, and collision, exported for Godot, Unity or Unreal. Not sliced; print checks do not apply. The design stays the CAD it is made from. In Beta: visual quality is still improving."
                 : purposeSec.pu.purpose === "model"
                 ? "For rendering, CAD exchange, CNC, laser cutting, moulding or visualisation. No printer or slicer is used; print checks such as overhangs, plate contact and the build volume do not apply. Releases carry STEP, STL, 3MF, OBJ, GLB and rendered views."
                 : "Checked against your printer (build volume, walls for the nozzle, overhangs, plate contact) and sliced when a slicer is installed." }
