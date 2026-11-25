@@ -44,6 +44,12 @@ class PackageLicences(unittest.TestCase):
                 name, version = pin.split("==")
                 self.assertIn(version, notices, pin)
 
+    def test_readme_names_the_shipped_libraries(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        licence = readme[readme.index("## Licence"):]
+        for name in ("bd_warehouse", "bd_materials", "threejs-materials", "py_gearworks", "CC BY-NC 4.0"):
+            self.assertIn(name, licence)
+
 
 if __name__ == "__main__":
     unittest.main()
