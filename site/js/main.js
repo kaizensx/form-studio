@@ -36,14 +36,36 @@ reveals();
 countUp($("#why-tools"), +$("#why-tools").dataset.count);     // docs/MCP.md: N tools (site/tools/check_site.py keeps it in step)
 countUp($("#why-skills"), +$("#why-skills").dataset.count);   // plugins/form/skills: one folder per skill
 
-// a soft light follows the pointer over the cards
-document.addEventListener("pointermove", (e) => {
-  const c = e.target.closest && e.target.closest(".why-grid article");
-  if (!c) return;
-  const r = c.getBoundingClientRect();
-  c.style.setProperty("--mx", `${e.clientX - r.left}px`);
-  c.style.setProperty("--my", `${e.clientY - r.top}px`);
-}, { passive: true });
+// the terminal session plays once when it comes into view: each command types, then its real output follows.
+// Without script, or with reduced motion, the whole session is simply there; the lines keep their room either way.
+{
+  const term = $("#term");
+  if (term && !reduced) {
+    const lines = [...term.querySelectorAll(".ln")];
+    term.classList.add("play");
+    const io = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return; io.disconnect();
+      let t = 250;
+      const at = (ms, fn) => setTimeout(fn, ms);
+      for (const ln of lines) {
+        const tx = ln.querySelector(".tx");
+        if (tx) {
+          const full = tx.textContent;
+          at(t, () => { tx.textContent = ""; ln.classList.add("on", "typing"); });
+          for (let i = 1; i <= full.length; i++) at(t + 120 + i * 26, () => { tx.textContent = full.slice(0, i); });
+          t += 120 + full.length * 26 + 260;
+          at(t, () => ln.classList.remove("typing"));
+          t += 120;
+        } else {
+          at(t, () => ln.classList.add("on"));
+          t += 45;
+        }
+      }
+      at(t + 600, () => term.classList.remove("play"));
+    }, { threshold: 0.45 });
+    io.observe(term);
+  }
+}
 
 // ---------- downloads: point the hero button at the visitor's system ----------
 {
@@ -72,6 +94,7 @@ const near = (el, fn) => {
 };
 (async () => {
   near($("#try"), () => import("./app.js").then((m) => m.initHero()).catch(console.error));
+  near($("#recon"), () => import("./recon.js").then((m) => m.initRecon()).catch(console.error));
   near($("#how-track"), () => import("./how.js").then((m) => m.initHow()).catch(console.error));
   near($("#moves-track"), () => import("./moves.js").then((m) => m.initMoves()).catch(console.error));
 })();
