@@ -92,3 +92,34 @@ def run(ui):
         ui.click_text("Cancel", within=conf)
     ui.settle(400)
     ui.shot(f"software-after-{theme}")
+
+    # every engine card says what it does and when you would want it, and what it gives you
+    for sid in ("recon.learned", "recon.cadfit", "game.coacd", "exemplars.cadevolve"):
+        about = _row(ui, "softwareAbout", sid)
+        gives = _row(ui, "softwareGives", sid)
+        ui.check(about is not None and len(about.property("text")) > 60, f"{sid} says what it does")
+        ui.check(gives is not None and "What this gives you" in gives.property("text"), f"{sid} says what it gives you")
+
+    # Remove: what Form Studio downloaded for the corpus goes, after one question; Cancel removes nothing
+    ui.wait_until(lambda: ui.js("(Store.softwareItem('exemplars.cadevolve') || {}).removable") is True, 20, "CADEvolve to be removable")
+    rm = ui.wait_until(lambda: _row(ui, "softwareRemove", "exemplars.cadevolve"), 10, "its Remove button")
+    ui.scroll_to(rm)
+    ui.settle(200)
+    ui.click(rm)
+    conf = ui.wait_until(lambda: (lambda c: c if c is not None and c.isVisible() else None)(_row(ui, "removeConfirm", "exemplars.cadevolve")),
+                         5, "the Remove question")
+    ui.check(any("Your designs are not affected" in t for t in ui.texts(conf)), f"the question says what goes: {ui.texts(conf)}")
+    ui.settle(200)
+    ui.shot(f"software-remove-{theme}")
+    ui.click_text("Cancel", within=conf)
+    ui.wait_until(lambda: not _row(ui, "removeConfirm", "exemplars.cadevolve").isVisible(), 5, "the question to close")
+    ui.eq(_status(ui, "exemplars.cadevolve"), "ok", "Cancel removed nothing")
+    ui.click(_row(ui, "softwareRemove", "exemplars.cadevolve"))
+    conf = ui.wait_until(lambda: (lambda c: c if c is not None and c.isVisible() else None)(_row(ui, "removeConfirm", "exemplars.cadevolve")),
+                         5, "the Remove question again")
+    ui.click(ui.item("removeAccept", within=conf))
+    ui.wait_until(lambda: _status(ui, "exemplars.cadevolve") == "missing", 30, "the CADEvolve row to say not installed")
+    import os
+    from pathlib import Path
+    ui.check(not (Path(os.environ["FORM_DATA"]) / "corpus" / "cadevolve").exists(), "the corpus folder is gone")
+    ui.check(_row(ui, "softwareInstall", "exemplars.cadevolve") is not None, "it can be installed again")

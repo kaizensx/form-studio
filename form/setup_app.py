@@ -11,6 +11,7 @@ The installer registry (form/installer.py), sign-in, settings and capabilities, 
     POST /api/install               {ids, shown: {id: [commands]}, methods?} → job (runs only what was shown)
     GET  /api/install/job/<id>?from=N   state, steps, new log lines
     POST /api/install/job/<id>/cancel
+    POST /api/install/remove {id}   delete what Form Studio downloaded for one optional engine (installer.REMOVABLE)
     POST /api/install/auto {ids?}   hands-free: install what is needed, pause only where the person must act (sign in,
                                     a download page), detect that and continue; same job API, steps may be "needs_user"
     POST /api/install/job/<id>/skip {id}    leave one item of a hands-free setup
@@ -373,6 +374,12 @@ def route_post(st, path: str, body):
                                                  body.get("methods") if isinstance(body.get("methods"), dict) else None))
         st.activity(None, "setup", "Installing: " + ", ".join(s["label"] for s in job.steps), by="you")
         return job.public()
+    if path == "/api/install/remove":             # delete what Form Studio downloaded for one optional engine
+        if any(j.state == "running" for j in sa.installer.jobs.values()):
+            raise StudioError("An install is running.", hint="Remove it once the install has finished.", status=409)
+        done = _wrap(lambda: installer.remove(str(body.get("id") or ""), st.cfg))
+        st.activity(None, "setup", done["message"], by="you")
+        return done
     if path == "/api/updates/install":            # upgrade FORM itself: the command that was shown, as an install job
         job = _wrap(lambda: sa.installer.update(body.get("shown") if isinstance(body.get("shown"), str) else None))
         st.activity(None, "setup", "Upgrading Form Studio", by="you")

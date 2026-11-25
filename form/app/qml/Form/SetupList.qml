@@ -48,6 +48,7 @@ Rectangle {
                 readonly property bool queued: !!step && (step.state === "running" || step.state === "waiting")
                 readonly property bool open: r.status !== "ok" && r.status !== "info"
                 property bool confirming: false     // the licence line is showing, waiting for Install or Cancel
+                property bool removing: false       // the Remove question is showing
                 readonly property bool hasPage: r.methods.some(function (m) { return m.kind === "open" })
                 // the latest line this row's install wrote, and how far a download got ("… (40%)")
                 readonly property string lastLine: {
@@ -77,12 +78,33 @@ Rectangle {
                                 anchors.verticalCenter: parent.verticalCenter } }
                         Txt { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; kind: "fine"; wrapMode: Text.NoWrap
                             text: sl.word(row.r); color: sl.tint(row.r.status) } }
-                    Txt { kind: "fine"; tone: 2; width: parent.width; text: row.r.status === "ok" ? row.r.detail : row.r.why
-                        wrapMode: row.r.status === "ok" ? Text.NoWrap : Text.WordWrap; elide: row.r.status === "ok" ? Text.ElideMiddle : Text.ElideNone }
+                    // what it does for the person and when they would want it, then what it gives them
+                    Txt { objectName: "softwareAbout"; readonly property string sid: row.r.id; tone: 2; width: parent.width; lineHeight: 1.3
+                        text: row.r.about || row.r.why }
+                    Txt { objectName: "softwareGives"; readonly property string sid: row.r.id; kind: "fine"; width: parent.width; visible: !!row.r.gives
+                        textFormat: Text.StyledText; color: Theme.ink2
+                        text: row.r.gives ? "<font color='" + Theme.ink3 + "'>What this gives you</font>&nbsp;&nbsp;" + row.r.gives.replace(/&/g, "&amp;").replace(/</g, "&lt;") : "" }
+                    // where it is, once it is there
+                    Txt { kind: "fine"; tone: 3; width: parent.width; visible: row.r.status === "ok" && row.r.detail !== ""; text: row.r.detail
+                        wrapMode: Text.NoWrap; elide: Text.ElideMiddle }
                     // size and licence, always on the card
                     Txt { objectName: "softwareMeta"; readonly property string sid: row.r.id; kind: "fine"; tone: 3; width: parent.width; wrapMode: Text.WordWrap
                         visible: text !== ""
                         text: [row.r.size ? "Size: " + row.r.size : "", row.r.licence ? "Licence: " + row.r.licence : ""].filter(function (x) { return x }).join("   ·   ") }
+                    // Remove: what Form Studio downloaded for it (an engine's own Python, model weights, the corpus); asks first
+                    Row { visible: !!row.r.removable && !row.removing && !Store.installing; spacing: 8; topPadding: 1
+                        Btn { objectName: "softwareRemove"; readonly property string sid: row.r.id; small: true; kind: "quiet"; icon: "trash_2"; text: "Remove…"
+                            tip: "Delete what Form Studio downloaded for it. You can install it again later."; onClicked: row.removing = true } }
+                    Rectangle { objectName: "removeConfirm"; readonly property string sid: row.r.id; visible: row.removing && !!row.r.removable
+                        width: parent.width; height: rc.implicitHeight + 20; radius: Theme.rSm; color: Theme.well; border.color: Theme.rule2
+                        Column { id: rc; x: 10; y: 10; width: parent.width - 20; spacing: 8
+                            Txt { kind: "fine"; width: parent.width; tone: 2
+                                text: "Remove " + row.r.label + "? This deletes what Form Studio downloaded for it"
+                                      + " from this computer. Your designs are not affected, and you can install it again any time." }
+                            Row { spacing: 8
+                                Btn { objectName: "removeAccept"; small: true; kind: "danger"; icon: "trash_2"; text: "Remove"
+                                    onClicked: run(function () { return Store.removeSoftware(row.r.id).then(function () { row.removing = false }) }) }
+                                Btn { small: true; kind: "quiet"; text: "Cancel"; onClicked: row.removing = false } } } }
                     Txt { visible: row.open && row.r.detail !== "" && row.r.detail.indexOf("Not installed.") !== 0 && row.r.detail.indexOf("Installed; Form Studio is not") !== 0
                         kind: "fine"; width: parent.width; text: row.r.detail; wrapMode: Text.Wrap }
                     Txt { visible: row.open && !!row.r.blocked_by; kind: "fine"; width: parent.width; color: Theme.amber

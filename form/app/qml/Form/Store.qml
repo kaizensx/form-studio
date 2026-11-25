@@ -229,7 +229,7 @@ QtObject {
                  [/^\/recipes\/(package\/)?inspect/, "Reading the recipe"], [/^\/recipes\/share\/prepare/, "Preparing the recipe to share"],
                  [/^\/recipes\/share\/submission/, "Saving the submission folder"], [/^\/recipes\/derive$/, "Building the recipe from the design"],
                  [/^\/recipes\/uninstall/, "Uninstalling the recipe"], [/^\/(archive\/)?import/, "Importing"], [/^\/capabilities$/, m === "POST" ? "Saving what Form Studio is set up for" : ""],
-                 [/^\/setup$/, "Checking this computer"], [/^\/install$/, m === "GET" ? "Checking software" : "Starting the install"], [/^\/updates/, "Checking for updates"],
+                 [/^\/setup$/, "Checking this computer"], [/^\/install$/, m === "GET" ? "Checking software" : "Starting the install"], [/^\/install\/remove$/, "Removing"], [/^\/updates/, "Checking for updates"],
                  [/^\/studio\/slicers/, "Finding slicers"], [/^\/studio\/slicer$/, "Switching slicer"], [/^\/printers/, "Reading printers"], [/^\/briefs/, "Writing the brief"],
                  [/^\/config$/, m === "POST" ? "Saving settings" : ""]]
         for (var i = 0; i < g.length; i++) if (g[i][0].test(p)) return g[i][1]
@@ -728,6 +728,7 @@ QtObject {
     property var game: null
     property bool gameBusy: false
     property string gameError: ""
+    property string gameErrorHint: ""          // what to do about it, when the engine says
     property int gameLod: 0
     property var gameLods: ({})
     readonly property var gameAsset: game && game.last ? game.last : null
@@ -736,15 +737,15 @@ QtObject {
         var at = pid
         return get("/projects/" + pid + "/game").then(function (r) {
             if (at !== pid) return null
-            game = r; gameError = ""
+            game = r; gameError = ""; gameErrorHint = ""
             if (r.last) showGameLod(gameLod)
-            return r }, function (e) { gameError = e && e.message ? e.message : String(e); return null })
+            return r }, function (e) { gameError = e && e.message ? e.message : String(e); gameErrorHint = e && e.hint ? e.hint : ""; return null })
     }
     // build (or export) with an engine preset: { preset, texture_px, bake, budgets?, action? }
     function buildGame(opts) {
         if (!pid || gameBusy) return Promise.resolve(null)
         var at = pid, body = Object.assign({ action: "build", preset: "gltf", texture_px: 1024, bake: "fast" }, opts || ({}))
-        gameBusy = true; gameError = ""
+        gameBusy = true; gameError = ""; gameErrorHint = ""
         return post("/projects/" + pid + "/game", body).then(function (r) {
             gameBusy = false
             if (at !== pid) return null
@@ -752,7 +753,7 @@ QtObject {
             game = Object.assign({}, game || ({}), { last: r })
             showGameLod(Math.min(gameLod, (r.lods || []).length - 1))
             return r
-        }, function (e) { gameBusy = false; gameError = e && e.message ? e.message : String(e); return null })
+        }, function (e) { gameBusy = false; gameError = e && e.message ? e.message : String(e); gameErrorHint = e && e.hint ? e.hint : ""; return null })
     }
     function showGameLod(i) {
         var a = gameAsset
@@ -1661,6 +1662,13 @@ QtObject {
             return r
         }, function (e) { softwareChecking = false; fail(e); return null })
     }
+    // Remove what Form Studio downloaded for one optional engine (installer.REMOVABLE); the row asks first
+    function removeSoftware(id) {
+        return post("/install/remove", { id: id }).then(function (r) {
+            toast(r.message, "Your designs are not affected.")
+            return checkSoftware()
+        }, function (e) { fail(e); return checkSoftware() })
+    }
     function setInstallPick(id, on) { var p = Object.assign({}, installPick); p[id] = on; installPick = p }
     function installSoftware(ids) {
         var shown = ({})
@@ -1987,7 +1995,7 @@ QtObject {
         return ppost("/appearance", body).then(function () { return s.refresh(false) }, fail)
     }
     property var _matLoad: Connections { target: s; function onPidChanged() { if (s.pid) s.loadMaterials() } }
-    property var _gameReset: Connections { target: s; function onPidChanged() { s.game = null; s.gameLods = ({}); s.gameLod = 0; s.gameError = "" } }
+    property var _gameReset: Connections { target: s; function onPidChanged() { s.game = null; s.gameLods = ({}); s.gameLod = 0; s.gameError = ""; s.gameErrorHint = "" } }
 
     // print orientation finder (GET /orient): candidates ranked by a score whose terms are shown
     property var orient: null

@@ -326,5 +326,74 @@ class Corpus(Base):
                          and any((Path(self.cfg["data"]["dir"]) / "corpus").iterdir()))
 
 
+class CardsSayWhatTheyDo(Base):
+    """Settings › Software: every optional engine says what it does and when you would want it, and what it gives
+    you; the texts name what the code really does (no fillets in CADFit, MIT CoACD, reference-only corpus)."""
+
+    def test_every_engine_card_has_a_description_and_what_it_gives(self):
+        rows = {r["id"]: r for r in installer.survey(self.cfg)}
+        for sid in ("recon.learned", "recon.cadfit", "game.coacd", "exemplars.cadevolve", "blender", "freecad",
+                    "openscad", "slicer.bambu", "slicer.orca", "slicer.prusa", "parts", "kernel"):
+            r = rows[sid]
+            self.assertGreater(len(r["about"]), 60, sid)
+            self.assertTrue(r["gives"], sid)
+            self.assertLess(len(r["gives"]), 200, sid)
+        self.assertIn("point cloud", rows["recon.learned"]["about"])
+        self.assertIn("Non-commercial", rows["recon.learned"]["about"])
+        self.assertIn("revolves", rows["recon.cadfit"]["about"])
+        self.assertNotIn("fillet", rows["recon.cadfit"]["about"].lower())     # its fillet pass is not run here
+        self.assertIn("convex", rows["game.coacd"]["about"])
+        self.assertEqual(rows["game.coacd"]["licence"], "MIT")
+        self.assertIn("never run", rows["exemplars.cadevolve"]["about"])
+        self.assertIn("game assets", rows["blender"]["about"])
+        self.assertTrue(all("about" in r and "gives" in r for r in rows.values()))
+
+
+class RemoveWhatFormStudioDownloaded(Base):
+    def test_remove_deletes_the_engine_environment_and_only_that(self):
+        self.fake_env("game.coacd")
+        other = self.tmp / "engines" / "recon.cadfit" / "keep.txt"
+        other.parent.mkdir(parents=True)
+        other.write_text("x", encoding="utf-8")
+        rows = {r["id"]: r for r in installer.survey(self.cfg, only=["game.coacd"])}
+        self.assertEqual(rows["game.coacd"]["status"], "ok")
+        self.assertTrue(rows["game.coacd"]["removable"])
+        r = installer.remove("game.coacd", self.cfg)
+        self.assertFalse((self.tmp / "engines" / "game.coacd").exists())
+        self.assertTrue(other.exists(), "another engine is left alone")
+        self.assertIn("Removed CoACD", r["message"])
+        rows = {r["id"]: r for r in installer.survey(self.cfg, only=["game.coacd"])}
+        self.assertEqual(rows["game.coacd"]["status"], "missing")
+        self.assertFalse(rows["game.coacd"]["removable"])
+
+    def test_remove_cadfit_turns_it_off(self):
+        self.fake_env("recon.cadfit")
+        installer._enable_cadfit(self.cfg)
+        installer.remove("recon.cadfit", self.cfg)
+        self.assertFalse((self.tmp / "engines" / "recon.cadfit").exists())
+        from form import config as cfgmod
+        self.assertFalse((cfgmod.load().get("recon") or {}).get("cadfit", False))
+
+    def test_the_corpus_and_the_weights_are_removed_from_the_data_folder(self):
+        corpus = Path(self.cfg["data"]["dir"]) / "corpus" / "cadevolve"
+        corpus.mkdir(parents=True)
+        (corpus / "parametric_generators.json").write_text("[]", encoding="utf-8")
+        self.assertEqual(installer.removable_paths("exemplars.cadevolve", self.cfg), [corpus.resolve()])
+        installer.remove("exemplars.cadevolve", self.cfg)
+        self.assertFalse(corpus.exists())
+        self.assertTrue((Path(self.cfg["data"]["dir"])).exists(), "the data folder itself stays")
+
+    def test_nothing_outside_form_studios_folders_and_nothing_else_is_removable(self):
+        outside = self.tmp / "elsewhere"
+        outside.mkdir()
+        with mock.patch.dict(os.environ, {"FORM_EXEMPLAR_CORPUS_DIR": str(outside)}):
+            self.assertEqual(installer.removable_paths("exemplars.cadevolve", self.cfg), [])
+        for sid in ("blender", "slicer.bambu", "kernel", "claude", "freecad"):
+            self.assertEqual(installer.removable_paths(sid, self.cfg), [], sid)
+            with self.assertRaises(installer.InstallError):
+                installer.remove(sid, self.cfg)
+        self.assertTrue(outside.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

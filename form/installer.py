@@ -109,6 +109,8 @@ class Software:
     licence: str = ""           # shown before anything is downloaded when it is not Form Studio's own (e.g. model weights)
     licence_url: str = ""
     noncommercial: bool = False # the app asks for the licence to be accepted (one line, then Install) before downloading
+    about: str = ""             # Settings › Software's card: what it does for the person and when they would want it
+    gives: str = ""             # the card's one line "What this gives you"
 
     def __post_init__(self):
         if not self.capability:
@@ -794,16 +796,25 @@ def _agent_software() -> list["Software"]:
 
 def _slicer(kind, label, why, brew, winget, flatpak, url, size, level) -> Software:
     return Software(f"slicer.{kind}", label, why, level, "slicer", _d_slicer(kind),
-                    _app_methods(brew, winget, flatpak, url), size=size, homepage=url, one_of="slicer")
+                    _app_methods(brew, winget, flatpak, url), size=size, homepage=url, one_of="slicer",
+                    about=why + " Only needed if you 3D print; one slicer is enough.",
+                    gives="A slice of each design made for printing (a simulation): print time, filament and the "
+                          "layers to look through, with the printer, filament and process from " + label + ".")
 
 
 REGISTRY: list[Software] = [
     Software("kernel", "CAD kernel", "Builds every part as exact geometry (build123d on OpenCascade).",
-             "required", "engine", _d_kernel, _m_kernel, size="about 250 MB"),
+             "required", "engine", _d_kernel, _m_kernel, size="about 250 MB",
+             about="The geometry engine every design is built with: build123d on OpenCascade, the same exact solids "
+                   "that STEP files carry. Form Studio cannot build anything without it.",
+             gives="Exact, editable solids, and STEP, STL and 3MF exports from them."),
     Software("data", "Project folder", "Where your designs, their history and releases are kept.",
              "required", "engine", _d_data, _m_data),
     Software("parts", "Standard-parts libraries", "Real screws, threads, bearings and gears (bd_warehouse, py_gearworks).",
-             "recommended", "engine", _d_parts, _m_parts, size="about 5 MB"),
+             "recommended", "engine", _d_parts, _m_parts, size="about 5 MB",
+             about="Libraries of standard hardware (bd_warehouse and py_gearworks), so a design can use real screws, "
+                   "threads, bearings and gears at their true sizes instead of drawn stand-ins.",
+             gives="Standard hardware at its catalogue sizes."),
     _slicer("bambu", "Bambu Studio", "Slices for Bambu Lab printers. Form Studio reads the printer, filament and process selected in it.",
             "bambu-studio", "Bambulab.Bambustudio", "com.bambulab.BambuStudio", "https://bambulab.com/en/download/studio",
             "about 200 MB", "recommended"),
@@ -823,7 +834,11 @@ REGISTRY: list[Software] = [
              "proposal is snapped to the mesh and kept only when it verifies; mesh to CAD works fully without it.",
              "optional", "engine", _d_learned, _m_learned, size="3.09 GB of weights, plus about 1 GB of PyTorch and Transformers",
              homepage="https://huggingface.co/filapro/cad-recode", licence="CC BY-NC 4.0 (non-commercial use only)",
-             licence_url="https://creativecommons.org/licenses/by-nc/4.0/", noncommercial=True),
+             licence_url="https://creativecommons.org/licenses/by-nc/4.0/", noncommercial=True,
+             about="A learned model (CAD-Recode) that reads a mesh as a point cloud and writes a sketch-and-extrude CAD "
+                   "program for it. Worth it if you often turn STL or 3MF files of simple, boxy parts into editable "
+                   "CAD. It runs on this computer, offline once downloaded. Non-commercial use only.",
+             gives="One more mesh-to-CAD proposal for simple prismatic parts, kept only when it matches the mesh."),
     Software("recon.cadfit", "CADFit mesh to CAD search",
              "Optional, non-commercial: CADFit's IoU search over sketch extrusions as one more mesh-to-CAD candidate "
              "(Nehme, Whalen, Ahmed, ICML 2026). Every proposal is snapped to the mesh and kept only when it verifies.",
@@ -831,21 +846,34 @@ REGISTRY: list[Software] = [
              size="about 0.7 GB (its own Python 3.12 with build123d, trimesh, scikit-learn, SciPy and manifold3d)",
              homepage="https://github.com/ghadinehme/CADFit",
              licence="CC BY-NC 4.0 (non-commercial use only; included with its author's permission)",
-             licence_url="https://creativecommons.org/licenses/by-nc/4.0/", noncommercial=True),
+             licence_url="https://creativecommons.org/licenses/by-nc/4.0/", noncommercial=True,
+             about="A search (CADFit) that tries extrusions and revolves against a mesh and keeps the ones that fit it "
+                   "best, as an editable program. Slower than the built-in route; worth it when a part made of "
+                   "extruded and turned shapes does not come out right. Runs on this computer, out of the app. "
+                   "Non-commercial use only.",
+             gives="One more mesh-to-CAD candidate made of extrudes and revolves, kept only when it verifies."),
     Software("game.coacd", "CoACD collision for game assets",
              "Optional: approximate convex decomposition (CoACD) for tighter game collision than one convex hull per "
              "part. Runs in its own Python, out of the app.",
              "optional", "engine", _d_coacd, _m_coacd,
              size="about 60 MB (its own Python 3.12 with CoACD and NumPy)",
              homepage="https://github.com/SarahWeiii/CoACD", licence="MIT",
-             licence_url="https://github.com/SarahWeiii/CoACD/blob/main/LICENSE"),
+             licence_url="https://github.com/SarahWeiii/CoACD/blob/main/LICENSE",
+             about="Approximate convex decomposition (CoACD): it splits a concave part into several convex pieces for a "
+                   "game engine's physics. Worth it for game assets with hollows, arches or handles, where one convex "
+                   "hull per part would close the openings. Runs in its own Python, out of the app.",
+             gives="Tighter collision for game assets than one convex hull per part."),
     Software("exemplars.cadevolve", "Reference CadQuery corpus (CADEvolve)",
              "Optional: about 8,000 parametric CadQuery generators from CADEvolve, offered to the agent after Form "
              "Studio's own design examples, labelled reference CadQuery, not the Form API. Read as text, never run.",
              "optional", "engine", _d_corpus, _m_corpus,
              size="4.73 GB download; only CADEvolve-G/parametric_generators.json is kept",
              homepage="https://huggingface.co/datasets/kulibinai/cadevolve", licence="Apache-2.0",
-             licence_url="https://www.apache.org/licenses/LICENSE-2.0"),
+             licence_url="https://www.apache.org/licenses/LICENSE-2.0",
+             about="A library of about 8,000 parametric CadQuery example programs (CADEvolve) that the agent can look "
+                   "at for construction ideas, after Form Studio's own examples. Reference text only: never run, and "
+                   "designs are still written with Form Studio's own tools.",
+             gives="More worked examples for the agent to learn constructions from."),
     Software("claude", "Claude Code", "Anthropic's agent. Chat can run it on your own Claude account. Everything else works without it.",
              "recommended", "ai", _d_claude, _m_claude, size="about 280 MB", homepage=CLAUDE_DOCS),
     Software("claude.signin", "Claude sign-in", "Claude Code answers in chat only when it is signed in to your account.",
@@ -873,15 +901,25 @@ REGISTRY: list[Software] = [
     Software("openscad", "OpenSCAD", "Builds designs written in OpenSCAD (mesh designs: no STEP).",
              "optional", "cad", _d_openscad, _app_methods("openscad", "OpenSCAD.OpenSCAD", "org.openscad.OpenSCAD",
                                                          "https://openscad.org/downloads.html", apt="openscad"),
-             size="about 50 MB", homepage="https://openscad.org/downloads.html"),
+             size="about 50 MB", homepage="https://openscad.org/downloads.html",
+             about="Builds designs written in the OpenSCAD language. Worth it if you or your agent write OpenSCAD. "
+                   "Those designs are meshes: they export STL and 3MF, not STEP.",
+             gives="OpenSCAD designs build and open here."),
     Software("blender", "Blender", "Illustrative renders of a design. Never used for measurements.",
              "optional", "cad", _d_blender, _app_methods("blender", "BlenderFoundation.Blender", "org.blender.Blender",
                                                         "https://www.blender.org/download/"),
-             size="about 400 MB", homepage="https://www.blender.org/download/"),
+             size="about 400 MB", homepage="https://www.blender.org/download/",
+             about="Blender, run in the background by Form Studio. It makes studio-lit pictures of a design, bakes game "
+                   "assets (levels of detail, UVs and texture maps) and runs organic modelling steps on subdivision "
+                   "cages. It is never used for measurements.",
+             gives="Renders, game assets and organic modelling."),
     Software("freecad", "FreeCAD", "“Open in FreeCAD”, and re-importing each exported STEP as an extra check.",
              "optional", "cad", _d_freecad, _app_methods("freecad", "FreeCAD.FreeCAD", "org.freecad.FreeCAD",
                                                         "https://www.freecad.org/downloads.php", apt="freecad"),
-             size="about 700 MB", homepage="https://www.freecad.org/downloads.php"),
+             size="about 700 MB", homepage="https://www.freecad.org/downloads.php",
+             about="FreeCAD, the open-source CAD app. “Open in FreeCAD” hands it a design, and the checks read each design's STEP "
+                   "export back in it as an independent check that it imports cleanly.",
+             gives="Open in FreeCAD, and a second CAD app's check of every STEP export."),
 ]
 
 
@@ -890,6 +928,73 @@ def get(sid: str) -> Software:
         if s.id == sid:
             return s
     raise KeyError(sid)
+
+
+# ---- Remove: what Form Studio itself downloaded for an optional engine ----------------------------------------------
+# Only folders Form Studio made, inside its data folder or its engines folder: an engine's own Python
+# (<data>/.engines/<id>), CAD-Recode's weights, the CADEvolve corpus. Software installed by another installer (a
+# slicer, Blender, an agent app, libraries in Form Studio's own Python) is never removed here. A folder named by an
+# environment variable (FORM_CADRECODE_DIR, FORM_EXEMPLAR_CORPUS_DIR) belongs to whoever set it and is left alone.
+REMOVABLE = ("recon.learned", "recon.cadfit", "game.coacd", "exemplars.cadevolve")
+
+
+def removable_paths(sid: str, cfg: dict) -> list[Path]:
+    if sid not in REMOVABLE:
+        return []
+    from . import engines
+    out: list[Path] = []
+    if sid in ("recon.learned", "recon.cadfit", "game.coacd"):
+        out.append(engines.env_dir(sid, cfg))
+    if sid == "recon.learned" and not os.environ.get("FORM_CADRECODE_DIR"):
+        out.append(_weights_dir(cfg))
+    if sid == "exemplars.cadevolve" and not os.environ.get("FORM_EXEMPLAR_CORPUS_DIR"):
+        out.append(_corpus_dir(cfg))
+    roots = [Path(cfg["data"]["dir"]).expanduser().resolve(), engines.root(cfg).expanduser().resolve()]
+    safe = []
+    for p in out:
+        try:
+            rp = p.expanduser().resolve()
+        except OSError:
+            continue
+        if rp.is_dir() and any(rp != r and r in rp.parents for r in roots):
+            safe.append(rp)
+    return safe
+
+
+def _folder_bytes(p: Path) -> int:
+    n = 0
+    for f in p.rglob("*"):
+        try:
+            if f.is_file() and not f.is_symlink():
+                n += f.stat().st_size
+        except OSError:
+            pass
+    return n
+
+
+def remove(sid: str, cfg: dict) -> dict:
+    """Delete what Form Studio downloaded for one optional engine (see REMOVABLE). It can be installed again later."""
+    try:
+        sw = get(sid)
+    except KeyError:
+        raise InstallError(f"Unknown software “{sid}”.", status=404) from None
+    paths = removable_paths(sid, cfg)
+    if not paths:
+        raise InstallError(f"Form Studio has nothing of {sw.label} to remove here.",
+                           hint="Only what Form Studio downloaded itself can be removed from Settings › Software.")
+    from . import fsutil
+    freed = 0
+    for p in paths:
+        freed += _folder_bytes(p)
+        fsutil.rmtree(p)
+    if sid == "recon.cadfit" and _cadfit_on(cfg):
+        from . import config_edit
+        config_edit.set_values(cfg, {"recon.cadfit": False})
+    home = str(Path.home())
+    shown = [str(p).replace(home, "~", 1) if len(home) > 1 else str(p) for p in paths]
+    return {"id": sid, "label": sw.label, "removed": shown, "freed_bytes": freed,
+            "message": f"Removed {sw.label} ({freed / 1e9:.2f} GB). Install it again any time."
+                       if freed >= 1e8 else f"Removed {sw.label}. Install it again any time."}
 
 
 def _has_pip() -> bool:
@@ -947,7 +1052,9 @@ def survey(cfg: dict, platform: str | None = None, which=None, only: list[str] |
             f = Found("warn", f"Could not check: {type(e).__name__}: {e}")
         ms = methods_for(sw, platform, which, ctx) if f.status != "ok" else []
         chosen = next((m for m in ms if m.available and m.kind in ("command", "action", "login")), None)
-        rows.append({"id": sw.id, "label": sw.label, "why": sw.why, "level": sw.level, "group": sw.group, "size": sw.size,
+        rows.append({"id": sw.id, "label": sw.label, "why": sw.why, "about": sw.about or sw.why, "gives": sw.gives,
+                     "removable": f.status == "ok" and bool(removable_paths(sw.id, cfg)),
+                     "level": sw.level, "group": sw.group, "size": sw.size,
                      "capability": sw.capability, "licence": sw.licence, "licence_url": sw.licence_url,
                      "noncommercial": sw.noncommercial,
                      "licence_notice": (f"{sw.label} is licensed {sw.licence}. Pressing Install accepts this licence."
