@@ -10,7 +10,9 @@ button that does nothing fails the journey. Outcomes are asserted against the St
 
 The run uses the data folder in $FORM_DATA (the test suite gives each journey its own copy), its own window
 settings, never the network, and - when $FORM_UITEST_AGENT names a script - a stand-in agent CLI, so no model runs.
-Exit code 0 means every assertion held and the interface printed no QML warning.
+Exit code 0 means every assertion held and the interface printed no QML warning. When a journey fails, its
+screenshot (fail-<journey>-<function>.png) gets a JSON dump of the visible item tree beside it (fail-....json, see
+tree()); `python -m form.app --tree out.json` writes the same dump for any screen.
 """
 from __future__ import annotations
 
@@ -26,6 +28,122 @@ import urllib.request
 from pathlib import Path
 
 TEXT_PROPS = ("text", "tip", "title", "label", "placeholder", "k")
+TREE_TEXT_MAX = 240                        # characters of one text kept in a tree dump: what a person sees, not a log
+PASSWORD_ECHO = (2, 3)                     # TextInput.Password, TextInput.PasswordEchoOnEdit
+
+
+def _shown_item(item) -> bool:
+    if not item.isVisible() or item.width() <= 0 or item.height() <= 0:
+        return False
+    p = item
+    while p is not None:
+        if p.opacity() < 0.02:
+            return False
+        p = p.parentItem()
+    return True
+
+
+def _password(item) -> bool:
+    """True for a text input whose echoMode hides what is typed (Password, PasswordEchoOnEdit). An input whose echo
+    mode cannot be read counts as one: a dump never risks a secret."""
+    mo = item.metaObject()
+    if mo.indexOfProperty("echoMode") < 0:
+        return False
+    try:
+        from PySide6.QtQml import QQmlEngine, QQmlExpression
+        ex = QQmlExpression(QQmlEngine.contextForObject(item), item, "Number(echoMode)")
+        v = ex.evaluate()
+        v = v[0] if isinstance(v, tuple) else v
+        if ex.hasError() or v is None:
+            return True
+        return int(v) in PASSWORD_ECHO
+    except Exception:                          # noqa: BLE001
+        return True
+
+
+def _qml_file(item) -> str:
+    """The QML file an item was declared in (its context's file), relative to form/app/qml; "" when unknown."""
+    try:
+        from PySide6.QtQml import QQmlEngine
+        ctx = QQmlEngine.contextForObject(item)
+        url = ctx.baseUrl().toLocalFile() if ctx is not None else ""
+    except Exception:                          # noqa: BLE001 - the file is a hint
+        return ""
+    if not url:
+        return ""
+    p = Path(url)
+    parts = p.parts
+    return "/".join(parts[parts.index("qml") + 1:]) if "qml" in parts else p.name
+
+
+def tree(win, max_text: int = TREE_TEXT_MAX) -> dict:
+    """The visible QML item tree of a window as plain data: for each shown item its className, objectName, visible
+    texts (each cut to max_text characters), enabled / checked / activeFocus, its bounds in the scene and the QML
+    file it comes from. Hidden or fully transparent items and their children are left out. The text of a password
+    field (echoMode Password) is never included, nor any other property that holds the same text."""
+    from PySide6.QtCore import QRectF
+    root = win.contentItem()
+    W, H = win.width(), win.height()
+
+    def walk(item):
+        yield item
+        for c in item.childItems():
+            yield from walk(c)
+
+    secrets = set()                            # what password fields hold: redacted wherever it shows up
+    for it in walk(root):
+        if _password(it):
+            for k in ("text", "preeditText"):
+                v = it.property(k)
+                if isinstance(v, str) and v:
+                    secrets.add(v)
+
+    def clean(v: str) -> str:
+        for s in secrets:
+            if s and s in v:
+                v = v.replace(s, "•" * 8)
+        return v if len(v) <= max_text else v[:max_text - 1] + "…"
+
+    def node(item) -> dict | None:
+        if not _shown_item(item):
+            return None
+        r = item.mapRectToScene(QRectF(0, 0, item.width(), item.height()))
+        on = r.right() >= 0 and r.bottom() >= 0 and r.left() <= W and r.top() <= H
+        n = {"className": item.metaObject().className(), "objectName": item.objectName() or "",
+             "bounds": [round(r.x(), 1), round(r.y(), 1), round(r.width(), 1), round(r.height(), 1)]}
+        if on:                                 # text only for what is inside the window, where a person can read it
+            texts = {}
+            password = _password(item)
+            for k in TEXT_PROPS:
+                v = item.property(k)
+                if isinstance(v, str) and v:
+                    texts[k] = "•" * 8 if password and k == "text" else clean(v)
+            if texts:
+                n["text"] = texts
+        else:
+            n["offscreen"] = True
+        n["enabled"] = bool(item.isEnabled())
+        ch = item.property("checked")
+        if isinstance(ch, bool):
+            n["checked"] = ch
+        if item.hasActiveFocus():
+            n["activeFocus"] = True
+        src = _qml_file(item)
+        if src:
+            n["source"] = src
+        kids = [k for k in (node(c) for c in item.childItems()) if k]
+        if kids:
+            n["children"] = kids
+        return n
+
+    return {"window": [W, H], "root": node(root) or {}, "max_text": max_text}
+
+
+def write_tree(win, path) -> Path:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(tree(win), indent=1, ensure_ascii=False), encoding="utf-8")
+    return p
 
 
 class UIError(AssertionError):
@@ -209,14 +327,7 @@ class UI:
             yield from self._walk(c)
 
     def _shown(self, item) -> bool:
-        if not item.isVisible() or item.width() <= 0 or item.height() <= 0:
-            return False
-        p = item
-        while p is not None:
-            if p.opacity() < 0.02:
-                return False
-            p = p.parentItem()
-        return True
+        return _shown_item(item)
 
     def _on_screen(self, item) -> bool:
         from PySide6.QtCore import QPointF
@@ -516,6 +627,15 @@ class UI:
         self.win.grabWindow().save(str(p))
         return p
 
+    def tree(self, path=None) -> dict:
+        """The visible item tree (module tree()); with path, also written there as JSON."""
+        t = tree(self.win)
+        if path is not None:
+            p = Path(path)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(json.dumps(t, indent=1, ensure_ascii=False), encoding="utf-8")
+        return t
+
     # -- assertions ----------------------------------------------------------
     def check(self, ok, msg: str = ""):
         if not ok:
@@ -570,7 +690,13 @@ def run_script(app, engine, win, studio, bridge, script: str, warnings: list, fi
                     shot = ui.shot("fail-" + Path(script.partition('::')[0]).stem + "-" + name)
                 except Exception:
                     shot = None
-                print(f"FAIL {name} ({time.time() - t0:.1f}s)" + (f"  screenshot: {shot}" if shot else ""), flush=True)
+                try:                               # the item tree beside it: what was on screen, as data
+                    dump = write_tree(win, (shot.with_suffix(".json") if shot else
+                                            out / f"fail-{Path(script.partition('::')[0]).stem}-{name}.json"))
+                except Exception:
+                    dump = None
+                print(f"FAIL {name} ({time.time() - t0:.1f}s)" + (f"  screenshot: {shot}" if shot else "")
+                      + (f"  tree: {dump}" if dump else ""), flush=True)
                 traceback.print_exc()
                 print("  last actions: " + " | ".join(ui.log[-8:]), file=sys.stderr, flush=True)
                 if os.environ.get("FORM_UITEST_DUMP") == "1":

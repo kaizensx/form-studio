@@ -17,6 +17,11 @@
   and look (form/material_library.py), and the design's mass is shown and reported by `get_project` (computed:
   modelled volume x typical density). A design's `appearance()` zone may name one too (`"material": "brass"`).
   Printing filaments are unchanged, and a print design keeps to them.
+- **The interface as data, for failed journeys.** `ui.tree()` (form/app/uitest.py) writes the visible QML item tree
+  as JSON: each item's type, objectName, visible text (capped at 240 characters), enabled, checked and focus, its
+  bounds in the window and the QML file it comes from. Every failing journey writes it beside its fail-*.png, and
+  `python -m form.app --tree out.json` writes it for any screen, with or without `--shot`. The text of a password
+  field is never in it, on the field or anywhere else.
 - **The drawn app on the website shows a planetary gearbox, not the phone dock.** The sample project behind the
   live replica and "How it works" is the planetary gearbox exemplar, created for printing, with one committed change
   (backlash 0.15 to 0.2 mm), then built, checked and sliced: 6 parts, 1027 faces, 7 checks pass and one asks for a

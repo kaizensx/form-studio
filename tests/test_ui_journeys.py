@@ -306,6 +306,19 @@ class Journeys(unittest.TestCase):
     def test_software_engines(self):        # one Install per engine row; a non-commercial licence is confirmed first
         self.journey("software_engines.py", env_extra={"FORM_INSTALL_MOCK_DOWNLOADS": "1"})
 
+    def test_ui_tree(self):                 # the item tree as data, never a password field's text
+        self.journey("ui_tree.py", env_extra={"FORM_UITEST_API_AGENTS": "1"})
+
+    def test_a_failure_writes_the_tree_beside_its_screenshot(self):
+        with tempfile.TemporaryDirectory(prefix="form-ui-out-") as out:
+            rc, log = run_journey("ui_tree.py::deliberate_failure", env_extra={"FORM_UITEST_OUT": out})
+            self.assertEqual(rc, 1, log)
+            png, dump = Path(out) / "fail-ui_tree-deliberate_failure.png", Path(out) / "fail-ui_tree-deliberate_failure.json"
+            self.assertTrue(png.exists(), log)
+            t = json.loads(dump.read_text(encoding="utf-8"))
+            self.assertEqual(t["root"]["className"], "QQuickRootItem")
+            self.assertIn("tree: ", log)
+
     def test_smallest_window(self):
         self.journey("sizes.py", size="1120x700")
 

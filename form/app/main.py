@@ -3,6 +3,7 @@
     form app                      open the app
     form app --check              load every screen once and report QML errors (CI, development)
     form app --shot out.png       render a screenshot and quit (see --project, --stage, --size, --wait, --eval)
+    form app --tree out.json      save the visible item tree as JSON and quit (with or without --shot)
 """
 from __future__ import annotations
 
@@ -63,6 +64,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="form app", description="Form Studio desktop app")
     ap.add_argument("--check", action="store_true", help="load the interface, report QML errors, quit")
     ap.add_argument("--shot", metavar="PNG", help="save a screenshot and quit")
+    ap.add_argument("--tree", metavar="JSON", help="save the visible item tree as JSON (with or instead of --shot) and quit")
     ap.add_argument("--project", help="open this project id")
     ap.add_argument("--stage", choices=["brief", "shape", "fit", "prove", "release"])
     ap.add_argument("--size", default="1440x900")
@@ -123,7 +125,7 @@ def main(argv=None) -> int:
     engine.addImportPath(str(HERE / "qml"))
     w, h = (int(x) for x in args.size.lower().split("x"))
     engine.setInitialProperties({"startProject": args.project or "", "startStage": args.stage or "",
-                                 "headless": bool(args.shot or args.check), "width": w, "height": h})
+                                 "headless": bool(args.shot or args.check or args.tree), "width": w, "height": h})
     engine.load(QUrl.fromLocalFile(str(HERE / "qml" / "Main.qml")))
     code = {"rc": 0}
 
@@ -137,7 +139,7 @@ def main(argv=None) -> int:
         return 1
     win: QQuickWindow = engine.rootObjects()[0]
 
-    if args.check or args.shot:
+    if args.check or args.shot or args.tree:
         def done():
             if args.js:
                 from PySide6.QtQml import QQmlExpression
@@ -149,13 +151,20 @@ def main(argv=None) -> int:
             def snap():
                 if args.shot:
                     win.grabWindow().save(args.shot)
+                if args.tree:
+                    try:
+                        from .uitest import write_tree
+                        write_tree(win, args.tree)
+                    except Exception as e:           # noqa: BLE001 - reported like a QML problem
+                        errors.append(f"--tree: {type(e).__name__}: {e}")
                 bad = [e for e in errors if "Binding loop" not in e]
                 try:
                     kernel = st.kernel_id()          # the CAD kernel answers: the engine really works in this build
                 except Exception as e:
                     kernel, bad = "", bad + [f"CAD kernel did not start: {e}"]
                 lines = [f"QML: {e}" for e in bad] + [f"kernel: {kernel}" if kernel else "kernel: not running",
-                         f"ok: {len(bad)} warning(s)" + (f", saved {args.shot}" if args.shot else "")]
+                         f"ok: {len(bad)} warning(s)" + (f", saved {args.shot}" if args.shot else "")
+                         + (f", tree {args.tree}" if args.tree else "")]
                 # A windowed Windows build has no console, so the result is also written to a file when asked.
                 out = os.environ.get("FORM_CHECK_OUT")
                 if out:
