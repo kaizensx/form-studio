@@ -35,15 +35,15 @@ from .studio import H, Studio, StudioError
 
 INSTRUCTIONS = """\
 Form Studio is an AI CAD studio: it designs parts, products and mechanisms as real, editable CAD (a parametric kernel)
-and keeps an honest record of what is known. 3D printing is one optional way to make a design; it is off unless the
-person turned it on (form_overview: has_printer).
+and keeps an honest record of what is known. 3D printing is optional and off unless the person turned it on
+(form_overview: has_printer).
 
 Workflow: form_overview -> create_design from your own code (design_guide; design_brief first for a complex
 design), or create_project from a recipe (describe_recipe) -> render (look at it) -> preview_change ->
 commit_change, or update_design -> get_project (checks, next actions). Only for a design whose purpose is "print":
 run_pipeline (exports, print checks, a slice) -> request_release (a person approves in Form Studio).
-After every build, design refinement runs in the background and lands as one more revision, "Refined: N changes"
-(named refine features, each kept only when the checks hold; refine_design shows, undoes or turns it off).
+After every build, refinement runs in the background and lands as one more revision (refine_design shows, undoes
+or turns it off). Long work answers with a job: get_job.
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
@@ -53,33 +53,29 @@ Rules:
 - For a print design: a slice is a simulation, not a print, and fit yield is a model. Say so when you report them.
 - You cannot approve a release. request_release returns a link that opens the release in Form Studio for the user.
 - Nothing here starts a print or sends files anywhere.
-- Every design has a purpose: "print" (for 3D printing) or "model" (just a 3D model: rendering, CAD exchange, CNC,
-  laser cutting, moulding). get_project reports it. For a model never ask about a printer, slicer, filament or
-  orientation; print checks and slicing do not apply. Pass purpose to create_project/create_design when the person
-  says what it is for; otherwise Form Studio uses their default (form_overview: purpose_default).
+- Every design has a purpose: "print" or "model" (just a 3D model: rendering, CAD exchange, CNC, laser cutting,
+  moulding). get_project reports it. For a model never ask about a printer, slicer, filament or orientation. Pass
+  purpose to create_project/create_design when the person says what it is for (default: form_overview
+  purpose_default). A "Purpose:" line in the message is binding: "just a 3D model" means no print talk.
 - Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time,
-  at most three per task. Outside Form Studio's chat it tells you to ask in your own interface. For a dimension the
-  person can measure, use ask_measurement (where to measure, tolerance, a diagram); it updates the design with how
-  it was measured.
-- A new idea that is not already a precise specification: propose_concepts with 3-4 genuinely different structural
-  approaches as real designs (not size variants), a one-line rationale each; then stop and let the person pick.
-  Refine the picked one with update_design. Recipes may be used as building blocks; do not offer them to the person.
-- Photos: find the scale from a reference object (bank card 85.60 x 53.98 mm, a coin's official diameter, a ruler);
-  dimensions read off a photo are "estimated from the photo (scale from <reference>)" and stay assumed until measured.
-  Sketches from Form Studio carry structured JSON: it is authoritative over the picture; stated dimensions override
-  drawn lengths. STEP/STL/3MF: import_reference. PDF drawings: read_document. Download only files the person gave you.
-- A link the person gives (a file, a Printables/MakerWorld/Thingiverse page, a signed download link): fetch_link,
-  never a shell. A large mesh: mesh_preflight before analysing it.
-- Meshes to make editable or understand: never embed them as the design. design_guide(topic="reference_parts"):
-  analyze_reference (and analyze_assembly for several parts) -> plan named features -> build123d with Params ->
-  compare_to_reference -> refine until within tolerance (0.1 mm by default for a remodel).
-- One request makes one design. Several files of one product are one design with several parts: reconstruct(files=[...])
-  for meshes, create_design(relation="part_of") to add a part to the design in front. A second create_design in a
-  conversation that has a design says its relation (replaces, part_of, alternative, new). One brief serves the request.
-- If the message has a "Purpose:" line, respect it: "just a 3D model" means no slicing and no print talk.
+  at most three per task; ask_measurement for a dimension they can measure. Where Form Studio's chat or your
+  client's form cannot reach the person, the result tells you to ask in your own interface.
+- A new idea that is not a precise specification: propose_concepts with 3-4 genuinely different structural
+  approaches as real designs, a one-line rationale each; then stop and let the person pick. Do not offer recipes.
+- Photos: scale from a reference object (bank card 85.60 x 53.98 mm, a coin, a ruler); photo dimensions stay
+  assumed until measured. Form Studio sketches carry JSON that is authoritative over the picture. STEP/STL/3MF:
+  import_reference. PDF drawings: read_document. Links the person gives: fetch_link, never a shell; a large mesh:
+  mesh_preflight first. Download only what the person gave you.
+- Meshes to make editable: never embed them as the design. design_guide(topic="reference_parts"): analyze_reference
+  (analyze_assembly for several parts) -> named features -> build123d with Params -> compare_to_reference until
+  within tolerance (0.1 mm by default).
+- One request makes one design. Several files of one product are one design with several parts (reconstruct
+  files=[...], create_design relation="part_of"). A second create_design in a conversation says its relation
+  (replaces, part_of, alternative, new).
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
-  design_guide(topic=...) and design_examples -> plan_design -> create_design(plan=...) -> look at the sheet and
-  section -> critique -> update_design. Analyse like a top engineer and designer before writing code.
+  design_guide(topic=...) and design_examples -> plan_design -> create_design(plan=...) -> look at the sheet ->
+  critique -> update_design. The design_guide topics (and this server's skills, where your client lists them)
+  hold the full workflow for each kind of design.
 """
 
 S: dict[str, Any] = {"studio": None, "bench": {"url": None}, "lock": threading.Lock()}
@@ -130,11 +126,24 @@ async def _run(fn, *a, **kw):
 
 
 def _origin(ctx: Context | None) -> str:
+    """Who made a change: "agent:<client name>". On 2026-07-28 every request carries the client's info in its own
+    `_meta` (there is no session to remember it); a handshake-era client said it once in `initialize`. Neither:
+    "agent"."""
+    from mcp_types import CLIENT_INFO_META_KEY
+    from mcp_types.version import MODERN_PROTOCOL_VERSIONS
     try:
-        info = ctx.session.client_params.client_info
-        return f"agent:{info.name}"
+        info = (ctx.request_context.meta or {}).get(CLIENT_INFO_META_KEY)
+        name = info.get("name") if isinstance(info, dict) else getattr(info, "name", None)
+        if isinstance(name, str) and name.strip():
+            return f"agent:{name.strip()}"
     except Exception:
-        return "agent"
+        pass
+    try:
+        if ctx.protocol_version not in MODERN_PROTOCOL_VERSIONS:      # handshake era: the initialize request said it
+            return f"agent:{ctx.session.client_params.client_info.name}"
+    except Exception:
+        pass
+    return "agent"
 
 
 def act(pid, kind: str, text: str, ctx=None, **extra):
@@ -242,14 +251,51 @@ async def _wait_job(st: Studio, jid: str, wait_s: float) -> dict:
 
 # ---- server ---------------------------------------------------------------
 
+# Tools Claude Code loads up front when tool search defers the rest (the others are found by searching their
+# descriptions, so each description's first sentence names its verb and object).
+ALWAYS_LOAD = ("form_overview", "get_project", "create_design", "update_design", "render", "preview_change",
+               "commit_change", "design_guide", "ask_user", "get_job")
+ALWAYS = {"anthropic/alwaysLoad": True}
+
+
+def extensions() -> list:
+    """The MCP extensions this server offers, each only when its module is part of this build:
+    io.modelcontextprotocol/skills (form/mcp_skills.py: skills_extension()) and io.modelcontextprotocol/tasks
+    (form/mcp_tasks.py: tasks_extension(studio)). A missing module is skipped; any other import error is raised."""
+    out = []
+    try:
+        from .mcp_skills import skills_extension
+    except ModuleNotFoundError as e:
+        if e.name != f"{__package__}.mcp_skills":
+            raise
+    else:
+        out.append(skills_extension())
+    try:
+        from .mcp_tasks import tasks_extension
+    except ModuleNotFoundError as e:
+        if e.name != f"{__package__}.mcp_tasks":
+            raise
+    else:
+        out.append(tasks_extension(studio))
+    return out
+
+
 def build() -> MCPServer:
-    mcp = MCPServer("form", title="Form Studio AI CAD studio", version=__version__, instructions=INSTRUCTIONS)
+    import secrets as _secrets
+    from mcp.server.request_state import RequestStateSecurity
+    from . import elicit
+    # requestState (a 2026-07-28 form's round trip) is sealed with a key of this process; a person may take up to
+    # elicit.STATE_TTL_S to answer
+    security = RequestStateSecurity(keys=[_secrets.token_bytes(32)], ttl=elicit.STATE_TTL_S)
+    mcp = MCPServer("form", title="Form Studio AI CAD studio", version=__version__, instructions=INSTRUCTIONS,
+                    extensions=extensions(), request_state_security=security)
     RO = ToolAnnotations(read_only_hint=True, open_world_hint=False)
     RW = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
 
-    @mcp.tool(annotations=RO)
+    @mcp.tool(annotations=RO, meta=ALWAYS)
     async def form_overview() -> dict:
-        """Start here. Engine, slicer, printer, available recipes, existing projects and the bench URL."""
+        """Get an overview of Form Studio: engine, slicer, printer, available recipes, existing projects and the bench
+        URL. Start here."""
         st = studio()
         def go():
             env = st.environment()
@@ -275,7 +321,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def setup_status() -> dict:
-        """What FORM can use on this machine (kernel, slicer, printer, agents) and the exact command that fixes each gap.
+        """Check this machine's setup. What FORM can use on this machine (kernel, slicer, printer, agents) and the exact command that fixes each gap.
         Never run a fix without asking the user; the simplest path is to ask them to run `form setup` in a terminal."""
         def go():
             from . import installer, setup
@@ -290,33 +336,54 @@ def build() -> MCPServer:
         return await _run(go)
 
     @mcp.tool()
-    async def install_software(id: str, confirm: bool = False, method: str | None = None) -> dict:
+    async def install_software(id: str, confirm: bool = False, method: str | None = None, ctx: Context = None) -> dict:
         """Install one thing from FORM's registry (ids come from setup_status → software), e.g. "parts", "claude",
         "slicer.orca". Without confirm=True nothing runs: you get the exact commands to show the user. Ask the user
-        first, then call again with confirm=True. Never asks for a password; sign-in is not an install."""
-        def go():
-            from . import installer
-            cfg = studio().cfg
+        first, then call again with confirm=True. Never asks for a password; sign-in is not an install.
+        Outside Form Studio's chat, a client with its own forms (MCP elicitation) shows the command and the licence
+        and asks the person instead (always for a non-commercial licence, even with confirm=True)."""
+        from . import elicit
+        from . import installer
+        cfg = studio().cfg
+
+        def prepare():
             inst = installer.Installer(cfg)
             try:
                 pairs = inst.prepare([id], None, {id: method} if method else None)
             except installer.InstallError as e:
-                return {"installed": False, "error": e.public()}
+                return None, {"installed": False, "error": e.public()}
             sw, m = pairs[0]
             plan = {"id": sw.id, "label": sw.label, "why": sw.why, "size": sw.size, "method": m.label, "commands": m.commands,
                     **({"edits_a_file": m.note} if m.kind == "action" else {})}
-            if confirm is not True:
-                return {"installed": False, "refused": "confirm=True is required.", "would_run": plan,
-                        "tell_the_user": "Show these commands and ask before installing."}
+            return sw, plan
+
+        def install(plan):
             job = installer.run_blocking(cfg, [id], {id: method} if method else None)
             lines = [l["text"] for l in job.public(0)["log"]]
             return {"installed": job.state == "done", "state": job.state, "ran": plan, "steps": job.steps,
                     "log_tail": lines[-40:], "after": {k: {"status": v["status"], "detail": v["detail"]} for k, v in job.after.items()}}
-        return await _run(go)
+
+        sw, plan = await _run(prepare)
+        if sw is None:
+            return plan
+        if elicit.available(ctx) and (confirm is not True or sw.noncommercial):
+            r = await elicit.form(ctx, "install", elicit.install_message(plan, sw.licence, sw.licence_url, sw.noncommercial),
+                                  elicit.install_schema(sw.licence))
+            if elicit.pending(r):
+                return r
+            if r is not None:
+                if not (r.accepted and r.content.get("accept_licence") is True):
+                    return {"installed": False, "refused": "The person did not accept the install.", "would_run": plan,
+                            "note": "Nothing was installed. Do not ask again unless the person brings it up."}
+                return await _run(install, plan)
+        if confirm is not True:
+            return {"installed": False, "refused": "confirm=True is required.", "would_run": plan,
+                    "tell_the_user": "Show these commands and ask before installing."}
+        return await _run(install, plan)
 
     @mcp.tool(annotations=RO)
     async def describe_recipe(recipe: str) -> dict:
-        """Parameters (unit, range, group, the feature each one drives), features and what the recipe checks."""
+        """Describe a recipe's parameters. Parameters (unit, range, group, the feature each one drives), features and what the recipe checks."""
         st = studio()
         if recipe not in st.recipes:
             raise ToolError(f"Unknown recipe “{recipe}”. Known: {', '.join(st.recipes.builtins())}.")
@@ -332,9 +399,9 @@ def build() -> MCPServer:
                 "groups": {"brief": "facts about the world (measure these)", "interface": "how parts meet",
                            "form": "free design choices"}}
 
-    @mcp.tool(annotations=RO)
+    @mcp.tool(annotations=RO, meta=ALWAYS)
     async def design_guide(topic: str = "core", purpose: str | None = None) -> dict:
-        """Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
+        """Read the design guide for code designs. Read this before designing anything the built-in recipes do not cover (any enclosure, bracket, adapter,
         holder, mechanism...). topic="core" (default) returns the contract for a design written as code, the rules,
         the staged workflow and a complete example that builds; it leads with skeleton first, one validated feature
         at a time (a FeatureDesign, 2 retries per feature, then defer). Other topics, for complex designs: surfacing,
@@ -361,7 +428,7 @@ def build() -> MCPServer:
                            dimensions: dict[str, Any] | None = None, constraints: list[str] | None = None,
                            unknowns: list[str] | None = None, style: str = "", purpose: str | None = None,
                            references: list[str] | None = None, project: str | None = None, ctx: Context = None) -> dict:
-        """Stage 1 of a complex design: store the structured brief before any geometry. goal: what it is and does.
+        """Write a design brief. Stage 1 of a complex design: store the structured brief before any geometry. goal: what it is and does.
         requirements: what it must do. dimensions: {name: {value, unit, source}} where source is measured, specified
         (datasheet, standard) or assumed. constraints: limits (bed size, material, process). unknowns: what you could
         not settle; list them, never guess them (ask_user / ask_measurement for ones that change fit, load or
@@ -392,7 +459,7 @@ def build() -> MCPServer:
                           textures: list[str] | None = None, risks: list[str] | None = None, approach: str = "",
                           references_used: list[str] | None = None, product_class: str = "",
                           clearances: dict[str, float] | None = None, magnets: list[dict] | None = None) -> dict:
-        """Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id).
+        """Plan a design's features. Stage 2: store the feature plan for a brief (the id design_brief returned, or a project id).
         features: [{id, label, how, part?, dims?}] in build order; id becomes the Feature id in the code, how names
         the construction (e.g. "craft.loft_sections through 9 superellipse sections", "craft.pin_hinge 0.35 mm").
         parts: [{id, label, material?}]. key_dimensions: {name: value or {value, unit, why}}. mechanisms: each with its
@@ -420,7 +487,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def design_examples(query: str = "", name: str = "", technique: str = "", category: str = "") -> dict:
-        """Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of
+        """Search example designs and their code. Complete, high-quality example designs (build123d + form.craft) to learn construction from, over 40 of
         them: mechanical parts (linear slide, shaft coupler, pillow block, cam follower, gearbox), consumer products
         (mouse, earbud case, bottle and cap, game controller), organic forms (horn, handle), textured parts
         (knurl, hex relief, woven, fluted), assemblies (hinged case, ratchet wrench, robot head), helmets (full-face,
@@ -449,7 +516,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW, structured_output=False)
     async def critique(project: str, notes: str = "", reads_as: str = "", product_class: str = "",
                        aesthetic: dict[str, float] | None = None, ctx: Context = None) -> list:
-        """Stage 5: look closely and measure. Returns a close-up render of each feature, computed metrics (smallest
+        """Critique a design with close-ups and metrics. Stage 5: look closely and measure. Returns a close-up render of each feature, computed metrics (smallest
         fillet, sharp-edge fraction, symmetry, proportions, surface mix, sliver faces, planned features missing, folds
         in lofted skins, wall thickness by rays with break-through spots, silhouette kinks) and a checklist to answer
         by looking. When the brief names a product class (helmet_fullface, helmet_open, mouse, bottle; or pass
@@ -476,7 +543,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True), structured_output=False)
     async def read_document(source: str, pages: str = "1") -> list:
-        """Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). PDF pages come
+        """Read a document such as a datasheet or drawing. Look at a datasheet or mechanical drawing: an https URL or a local file (PDF, PNG, JPEG, WebP). PDF pages come
         back as images, because a drawing's dimensions are graphics that text extraction loses, plus any text on the page.
         pages: "1", "1-3", "2,5" (at most 4). Use this for official dimensions of boards, devices and hardware."""
         st = studio()
@@ -497,7 +564,7 @@ def build() -> MCPServer:
 
     # -- links and big meshes (form/sources, form/start.py, form/meshprep.py) ------------------------------------
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=True))
-    async def fetch_link(url: str, conversation: str = "") -> dict:
+    async def fetch_link(url: str, conversation: str = "", ctx: Context = None) -> dict:
         """Download what a link the person gave points to, from Form Studio's engine (use this instead of a shell: it
         works where your sandbox has no network). A file link (STL, 3MF, OBJ, STEP, PDF, image; also a signed
         MakerWorld download link, fetched at once before it expires) is downloaded; a Printables model page has its
@@ -505,13 +572,24 @@ def build() -> MCPServer:
         cannot be fetched and what the person can do; any other page is not read (resolve_model_page reads its title).
         In a Form Studio chat the files are attached to the conversation; otherwise they are saved under the data
         folder. Each mesh comes with its preflight (triangles, size, closed or not, class). Only fetch links the
-        person gave you."""
+        person gave you. Outside Form Studio's chat, a client with its own forms (MCP elicitation) asks the person
+        before a download over 100 MB; declined: {fetched: false, refused}."""
         import hashlib
         import os
         st = studio()
-        from . import meshprep
+        from . import elicit, meshprep
         from . import start as start_mod
         cid = conversation or os.environ.get("FORM_CONVERSATION", "")
+        if not cid and elicit.available(ctx):
+            size = await anyio.to_thread.run_sync(elicit.link_size, url)
+            if size and size > elicit.FETCH_CONFIRM_BYTES:
+                r = await elicit.form(ctx, "download", elicit.download_message(url, size), elicit.DOWNLOAD_SCHEMA)
+                if elicit.pending(r):
+                    return r
+                if r is not None and not (r.accepted and r.content.get("download") is True):
+                    return {"fetched": False, "url": url, "size_bytes": size,
+                            "refused": "The person did not want this download.",
+                            "note": "Nothing was downloaded. Ask for a smaller file, or for the person to drop it here."}
 
         def go():
             if cid:
@@ -541,7 +619,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
     async def resolve_model_page(url: str) -> dict:
-        """What a model link is, without downloading files: site, title, author, licence, pictures and the file list
+        """Resolve a model page link. What a model link is, without downloading files: site, title, author, licence, pictures and the file list
         (Printables, Thingiverse with an app token), or why the files cannot be fetched and how the person gets them
         (MakerWorld, Thingiverse without a token). Any other page: its OpenGraph title, description and pictures as a
         visual reference. Then fetch_link(url) downloads what can be downloaded."""
@@ -558,7 +636,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def mesh_preflight(path: str) -> dict:
-        """Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class
+        """Preflight a mesh file. Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class
         (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display
         proxy for a heavy one. The proxy is for display only; analysis and import always use the file itself.
         path: absolute local path. Cached by path, size and time, so asking again is instant."""
@@ -589,7 +667,7 @@ def build() -> MCPServer:
             out.append(v["section_error"])
         return out
 
-    @mcp.tool(annotations=RW, structured_output=False)
+    @mcp.tool(annotations=RW, structured_output=False, meta=ALWAYS)
     async def create_design(name: str, source: str, brief: str = "", values: dict[str, float] | None = None,
                             run: bool = True, language: str = "python", references: list[str] | None = None,
                             purpose: str | None = None, process: str | None = None, plan: str = "",
@@ -707,7 +785,7 @@ def build() -> MCPServer:
                            "sheet meanwhile."}
         return await _with_views(st, p["id"], res)
 
-    @mcp.tool(annotations=RW, structured_output=False)
+    @mcp.tool(annotations=RW, structured_output=False, meta=ALWAYS)
     async def update_design(project: str, source: str = "", note: str = "", values: dict[str, float] | None = None,
                             expect_head: int | None = None, run: bool = True, language: str | None = None,
                             feature: str = "", code: str = "", partial: bool = False, ctx: Context = None) -> list:
@@ -801,7 +879,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def refine_design(project: str, action: str = "status", feature: str = "", wait: float = 0,
                             expect_head: int | None = None, ctx: Context = None) -> dict:
-        """Design refinement of a project. It runs on its own after every build (create_design, update_design,
+        """Show, rerun, undo or turn off design refinement of a project. It runs on its own after every build (create_design, update_design,
         add_feature, a kept candidate): named, reversible refine features (fillet tiers, an edge break, a parting
         line, a grip texture, a recessed panel, button pads, ribs; materials and contrast; for game assets cage ops
         such as support loops, panel lines and silhouette breakers), each kept only when the function checks still
@@ -836,7 +914,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def get_design_source(project: str, rev: int | None = None) -> dict:
-        """The exact code a revision was built from (built-in recipes return their recipe file)."""
+        """Get a design's source code: the exact code a revision was built from (built-in recipes return their recipe file)."""
         st = studio()
         def go():
             p = st.load(project)
@@ -860,14 +938,14 @@ def build() -> MCPServer:
             await _wait_job(st, jid, 50)
         return await _run(digest, st, p["id"])
 
-    @mcp.tool(annotations=RO)
+    @mcp.tool(annotations=RO, meta=ALWAYS)
     async def get_project(project: str) -> dict:
-        """Current revision with every parameter and its provenance, output status (current/stale/failed/missing),
+        """Get a project's state: current revision with every parameter and its provenance, output status (current/stale/failed/missing),
         checks, fit model, next best actions, simulated slice, file paths, release gate and bench link."""
         st = studio()
         return await _run(digest, st, project)
 
-    @mcp.tool(annotations=RO)
+    @mcp.tool(annotations=RO, meta=ALWAYS)
     async def preview_change(project: str, values: dict[str, float], ctx: Context = None) -> dict:
         """Build a candidate change for real and report what it would touch, without saving anything:
         changed features, interface dimensions, stability, fit yield, which outputs it would invalidate.
@@ -886,7 +964,7 @@ def build() -> MCPServer:
         act(project, "draft", "Trying " + ", ".join(res["changes"]), ctx, values=values)
         return res
 
-    @mcp.tool(annotations=RW)
+    @mcp.tool(annotations=RW, meta=ALWAYS)
     async def commit_change(project: str, values: dict[str, float], note: str = "", expect_head: int | None = None,
                             provenance: dict[str, dict] | None = None, run: bool = True, ctx: Context = None) -> dict:
         """Save a change as a new revision (history is never rewritten). Pass expect_head from get_project/preview_change
@@ -917,18 +995,18 @@ def build() -> MCPServer:
         return job_digest(job) | ({"project": await _run(digest, st, project)} if job["state"] != "running" else
                                   {"next": f"get_job(project='{project}', job='{jid}')"})
 
-    @mcp.tool(annotations=RO)
+    @mcp.tool(annotations=RO, meta=ALWAYS)
     async def get_job(project: str, job: str, wait_s: float = 30) -> dict:
-        """Status of a pipeline job started by run_pipeline/commit_change; waits up to wait_s for it to finish."""
+        """Get a job's status: a pipeline job started by run_pipeline/commit_change; waits up to wait_s for it to finish."""
         st = studio()
         if job not in st.jobs:
             raise ToolError("Unknown job (jobs live only as long as this server process).")
         return job_digest(await _wait_job(st, job, max(0.0, min(wait_s, 300))))
 
-    @mcp.tool(annotations=RO, structured_output=False)
+    @mcp.tool(annotations=RO, structured_output=False, meta=ALWAYS)
     async def render(project: str, view: str = "iso", highlight: str | None = None, rev: int | None = None,
                      values: dict[str, float] | None = None, ctx: Context = None) -> list:
-        """Look at the part. Returns a PNG rendered from the real kernel geometry, coloured by feature.
+        """Render the part as an image. Look at the part. Returns a PNG rendered from the real kernel geometry, coloured by feature.
         view: iso, iso_back, front, back, left, right, top, bottom, "sheet" (four views at once), or for a design with
         several parts "assembled" (put together) and "exploded" (pulled apart along its explode offsets).
         highlight: a feature id to pick out. values: render an uncommitted candidate (same as preview_change)."""
@@ -973,7 +1051,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RO, structured_output=False)
     async def animate(project: str, kind: str = "turntable", from_rev: int | None = None, to_rev: int | None = None,
                       to_values: dict[str, float] | None = None, frames: int = 24, fmt: str = "gif") -> list:
-        """Make motion from real geometry. kind="turntable" spins the head revision. kind="morph" builds every in-between
+        """Animate a design. Make motion from real geometry. kind="turntable" spins the head revision. kind="morph" builds every in-between
         design from from_rev (default: head) to to_rev or to_values, so you can show how a change transforms the part.
         Returns the file path and a still. fmt: gif or webp."""
         st = studio()
@@ -1011,7 +1089,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def compare_revisions(project: str, a: int, b: int) -> dict:
-        """What changed between two revisions: parameters, features, interfaces, stability, fit."""
+        """Compare two revisions. What changed between two revisions: parameters, features, interfaces, stability, fit."""
         st = studio()
         def go():
             p = st.load(project)
@@ -1022,7 +1100,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def geometry_diff(project: str, a: int, b: int | None = None) -> dict:
-        """What changed in the solid between revision a and b (default the head): material added (b minus a) and removed
+        """Diff the geometry of two revisions. What changed in the solid between revision a and b (default the head): material added (b minus a) and removed
         (a minus b), each with its volume in mm³, number of separate regions and bounding box, computed with booleans on
         the B-rep. Also writes a picture (added green, removed red, the rest grey); look at it with the returned path."""
         st = studio()
@@ -1172,7 +1250,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def replace_part_guide() -> dict:
-        """How to design a replacement for a broken part from the person's photo: find the scale from a reference
+        """Guide a replacement part from a photo. How to design a replacement for a broken part from the person's photo: find the scale from a reference
         object in the photo and estimate sizes (assumed), ask_measurement for each fit-critical size (at most three),
         then create_design with the measured values and strengthen where it broke. In Form Studio this flow starts from
         Home › Replace a broken part."""
@@ -1203,7 +1281,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def assembly_instructions(project: str, rev: int | None = None) -> dict:
-        """Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then
+        """Write assembly instructions. Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then
         one page per part going on (in the declaration's parent order, at its explode offset, with arrows). Step text is
         the part's note, or what the declaration says. Returns the PDF path, page images and the steps. A design without
         an assembly() has none."""
@@ -1230,7 +1308,7 @@ def build() -> MCPServer:
                               fit_gap_max_mm: float | None = None, auto_slice: bool | None = None,
                               design_only: bool | None = None, material: str | None = None,
                               purpose: str | None = None, process: str | None = None) -> dict:
-        """Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from
+        """Set the print setup. Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from
         suggest_orientation), the acceptable total fit gap
         window, and whether the pipeline slices automatically. The checks include an orientation comparison table.
         design_only=True: the design is not sliced (checks, exports and release still work; the release says it was
@@ -1282,7 +1360,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RO)
     async def optimize(project: str, vary: list[dict], objective: dict[str, str], constraints: list[str] | None = None,
                        budget: int = 40, ctx: Context = None) -> dict:
-        """Goal seek: search parameter ranges for the best design that meets constraints. Every candidate is built by the kernel.
+        """Optimize a design. Goal seek: search parameter ranges for the best design that meets constraints. Every candidate is built by the kernel.
         vary: [{"key": "arm_t", "min": 4, "max": 20}] (1-4 parameters).
         objective: {"minimize": "solid_mass_g"} or {"maximize": "statics.safety_factor"}.
         constraints: ["statics.safety_factor >= 3", "overhang_mm2 <= 1", "derived.usable_depth >= 30", "fit_yield >= 0.9"].
@@ -1404,7 +1482,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=OPEN)
     async def open_bench(project: str | None = None, open_browser: bool = True) -> dict:
-        """The bench is the local web page where the user inspects the 3D model, compares revisions and approves releases."""
+        """Open the bench web page. The bench is the local web page where the user inspects the 3D model, compares revisions and approves releases."""
         url = _bench(f"#p={project}" if project else "")
         if not url:
             raise ToolError("The bench is not running in this server (started with --no-bench, or no free port).")
@@ -1414,7 +1492,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def brief_presets(preset: str = "") -> dict:
-        """Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure,
+        """List brief presets. Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure,
         car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a
         material to start from and the checks to plan for. Use it while gathering requirements; the defaults are
         assumptions to confirm with the person, never measurements."""
@@ -1555,7 +1633,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RO)
     async def analyze_assembly(project: str, references: list[str], fixed: str | None = None, near: float = 1.0,
                                ctx: Context = None) -> dict:
-        """How several imported meshes go together and move, measured in the positions they were given. references:
+        """Analyze an assembly of meshes. How several imported meshes go together and move, measured in the positions they were given. references:
         the mesh files (the part that stays still first, or name it in fixed). Returns mating surfaces (facing,
         area, gap, where), clearances per pair, each part's travel against the fixed one along +/-X, Y, Z and about
         the axes of round faces they share (free distance before touching, distance past bumps such as detents and
@@ -1590,7 +1668,7 @@ def build() -> MCPServer:
     async def reference_residual(project: str, reference: str, part: str | None = None, rev: int | None = None,
                                  voxel: float | None = None, axis: str | list[float] | None = None,
                                  center: list[float] | None = None, ctx: Context = None) -> dict:
-        """What is left to build in a remodel: the volume difference between the design (or one part) and an imported
+        """List what remains of a remodel. What is left to build in a remodel: the volume difference between the design (or one part) and an imported
         mesh as a named work list. missing: bodies the mesh has and the design lacks (add them); extra: bodies the
         design has and the mesh lacks (cut them). Each body has its volume, centre, principal axis, size, shape
         (cylinder with diameter and length along an axis, box, or body), where it is in words, and its angle and
@@ -1661,7 +1739,7 @@ def build() -> MCPServer:
     # ---- analysis on the model (form/analysis.py): maps, measuring, print orientation -------------
     @mcp.tool(annotations=RO, structured_output=False)
     async def analyze(project: str, map: str = "thickness", view: str = "iso", rev: int | None = None, ctx: Context = None) -> list:
-        """An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics.
+        """Analyze the part as a map. An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics.
         map: thickness (opposing-wall distance by ray, the same ray as the Thinnest-wall check; colours follow the nozzle),
         overhang (angle past vertical in the print orientation; plate contact and bridged ceilings are separate classes),
         section (area of each layer's slice by height, with the weakest neck: computed geometry, NOT a strength analysis),
@@ -1687,7 +1765,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RO)
     async def measure(project: str, from_point: list[float] | None = None, to_point: list[float] | None = None,
                       at: list[float] | None = None, rev: int | None = None) -> dict:
-        """Measure the part. Points are [x, y, z] in millimetres in the design frame.
+        """Measure distances and features of the part. Points are [x, y, z] in millimetres in the design frame.
         from_point + to_point: straight-line distance with dX/dY/dZ, and how far each point is from the surface.
         at: what is at that point: the nearest face (type, area, tilt to the bed), the nearest edge, and for a hole or
         round boss the diameter: exact from the CAD solid, or "fitted" to mesh edges for a mesh design (with its residual)."""
@@ -1725,7 +1803,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def list_annotations(project: str) -> dict:
-        """The selections the person named and kept on this design (annotations): name, note, the revision they were
+        """List annotations. The selections the person named and kept on this design (annotations): name, note, the revision they were
         made on, the picked items and their computed analysis, and `text` describing each. An annotation from an older
         revision describes that revision; reanalyse it with analyze_selection(items=...) to see the head."""
         st = studio()
@@ -1746,7 +1824,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def set_appearance(project: str, part: str = "", color: str | None = None, material: str | None = None,
                              clear: bool = False, ctx: Context = None) -> dict:
-        """Colour (#rrggbb) and material of the whole design (part="") or of one part (an assembly part id from
+        """Set the colour and material of a design. Colour (#rrggbb) and material of the whole design (part="") or of one part (an assembly part id from
         get_project / render). Materials: PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF. Form Studio draws the
         colour, writes it into its 3MF and adds material notes to the checks (heat, sunlight, warping, flexible, fibre-filled);
         stored in the same fields set_part_print uses (project material, parts.<id>.material), so the slicer picks the matching filament. Leave an argument out to keep it; clear=True removes both."""
@@ -1797,7 +1875,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RO, structured_output=False)
     async def print_simulation(project: str, layer: int | None = None, only: list[str] | None = None,
                                plate: int | None = None, ctx: Context = None) -> list:
-        """Look at the sliced print as it would stand at the end of `layer` (1-based; default: finished). Returns a
+        """Simulate the print layer by layer. Look at the sliced print as it would stand at the end of `layer` (1-based; default: finished). Returns a
         picture drawn from the slicer's G-code toolpaths, coloured by line type, plus statistics: z, line types in
         that layer, whether it has bridges or overhang walls, slicer time elapsed and remaining, and the list of
         bridge and overhang layers. only: draw just these line types (e.g. ["Bridge", "Overhang wall"]).
@@ -1830,7 +1908,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RO)
     async def estimate_cost(project: str, price_per_kg: float | None = None, kwh_price: float | None = None,
                             watts: float | None = None, machine_rate_per_h: float | None = None, copies: int = 1) -> dict:
-        """Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same
+        """Estimate the print cost. Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same
         volume in the other materials the slicer has presets for. Grams and hours are the slicer's simulation; prices
         are the user's (saved ones are used when you pass none). Never invent a price: when a cost is null, "needs"
         says which number to ask the user for. No currency is assumed."""
@@ -1845,7 +1923,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def plate_plan(project: str) -> dict:
-        """How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material),
+        """Plan the plates. How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material),
         the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts
         too big for the plate, and per plate the slicer's time and filament when it has been sliced. Computed by FORM from
         bounding boxes; each plate is sliced on its own. Needs current checks (run_pipeline)."""
@@ -1859,7 +1937,7 @@ def build() -> MCPServer:
     @mcp.tool()
     async def set_part_print(project: str, part: str, orientation: str | None = None, material: str | None = None,
                              color: str | None = None, ctx: Context = None) -> dict:
-        """Print settings for one printed part of a multi-part design (part ids from plate_plan): orientation (a named
+        """Set one part's print settings. Print settings for one printed part of a multi-part design (part ids from plate_plan): orientation (a named
         one, a "down:x,y,z" id, or "auto" for the best-ranked way for that part alone), material (PLA, PETG, TPU, ...;
         parts in different materials go on different plates, each sliced with its own filament), color ("#rrggbb").
         "" clears a setting. Checks and slice go stale; the pipeline runs again."""
@@ -1874,7 +1952,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def pack_plate(project: str, copies: int = 1, spacing_mm: float | None = None) -> dict:
-        """Do `copies` of this design fit on one plate? Bounding-box packing with a gap (default 6 mm) and 90° turns,
+        """Pack copies on a plate. Do `copies` of this design fit on one plate? Bounding-box packing with a gap (default 6 mm) and 90° turns,
         on the selected printer's bed. Returns the layout and the most copies this packer can place. Computed by FORM;
         the slicer arranges again when it slices, and FORM's export stays one plate."""
         _need_printing()
@@ -1891,7 +1969,7 @@ def build() -> MCPServer:
                            fast: bool = False, layer_lines: bool = True, view: str = "iso",
                            azimuth: float | None = None, elevation: float | None = None, zones: bool = True,
                            ctx: Context = None) -> list:
-        """A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed).
+        """Render a photo-real image. A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed).
         preset: studio (soft box, light backdrop) | desk (wooden desk) | dark (graphite, rim light).
         material: matte (PLA) | petg (gloss) | silk (silk PLA) | gloss (paint, clear coat) | carbon (carbon twill,
         clear coat) | smoke (smoked polycarbonate) | rubber | metal. color: hex, e.g. "#3d6fb6".
@@ -1935,7 +2013,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def list_variants(project: str) -> dict:
-        """The head and every saved variant side by side: size and volume (computed), print time and grams (simulated,
+        """List variants. The head and every saved variant side by side: size and volume (computed), print time and grams (simulated,
         only when the variant is a revision with a current slice), fit yield (modelled), checks, and each variant's
         differences from the head."""
         st = studio()
@@ -1944,7 +2022,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO, structured_output=False)
     async def share_card(project: str, picture: str = "model", ctx: Context = None) -> list:
-        """A 1600 x 900 share image of the head revision: the part with dimension lines, its name, size and volume
+        """Make a share card image. A 1600 x 900 share image of the head revision: the part with dimension lines, its name, size and volume
         (computed), print time and grams (simulated; only if the slice is current), checks, the revision and
         "Designed with FORM". picture: "model" (kernel geometry) or "photo" (the newest current Blender render, an
         illustration). The card states only what FORM knows; it is not evidence of a print."""
@@ -1981,8 +2059,27 @@ def build() -> MCPServer:
         """Delete a project by moving its whole folder to the trash folder inside the projects folder
         (<projects folder>/.trash/<id>-<UTC time>). Nothing is erased, and moving the folder back restores it, but the
         project disappears from FORM. Ask the user first and only call this after they said yes to deleting this
-        project. Returns {ok, id, trash}: tell the user the trash path."""
+        project. Returns {ok, id, trash}: tell the user the trash path. Outside Form Studio's chat, a client with
+        its own forms (MCP elicitation) asks the person to confirm first; declined: {ok: false, refused}."""
+        from . import elicit
         st = studio()
+        if elicit.available(ctx):
+            def who():
+                pid = st._pid(project)
+                if not (st.dir(pid) / "project.json").exists() and not (st.dir(pid) / "project.json.bak").exists():
+                    raise StudioError("Unknown project.", status=404)
+                try:
+                    return pid, st.load(pid).get("name") or pid
+                except Exception:
+                    return pid, pid
+            pid, name = await _run(who)
+            r = await elicit.form(ctx, "confirm", elicit.delete_message(name, pid, st.root / ".trash"),
+                                  elicit.CONFIRM_DELETE)
+            if elicit.pending(r):
+                return r
+            if r is not None and not (r.accepted and r.content.get("confirm") is True):
+                return {"ok": False, "id": pid, "refused": "The person did not confirm deleting this project.",
+                        "note": "Nothing was moved. Do not ask again unless the person brings it up."}
         res = await _run(st.delete_project, project)
         act(None, "project", f"Moved {project} to the trash folder", ctx)
         return res
@@ -1990,7 +2087,7 @@ def build() -> MCPServer:
     # ---- printers: every printer the user set up in any installed slicer (engine workstream, form/printers.py) ----
     @mcp.tool(annotations=RO)
     async def list_printers(project: str | None = None, printer: str | None = None) -> dict:
-        """Every printer set up in every installed slicer (the user's own presets and the system printers they enabled),
+        """List printers. Every printer set up in every installed slicer (the user's own presets and the system printers they enabled),
         with slicer, bed size and nozzle, plus the default printer. With `project`: which printer that design uses and
         why (its own choice, the default, or the slicer's selection). With `printer` ("<kind>:<printer name>", the id from
         this list): the filaments and processes that printer can use."""
@@ -2040,9 +2137,9 @@ def build() -> MCPServer:
         return res
 
     # ---- talking with the person (chat workstream): ask_user, suggest_replies ---------------------------------
-    @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False))
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False), meta=ALWAYS)
     async def ask_user(question: str, choices: list[str] | None = None, multi_select: bool = False,
-                       allow_text: bool = True, why: str = "", kind: str = "question") -> dict:
+                       allow_text: bool = True, why: str = "", kind: str = "question", ctx: Context = None) -> dict:
         """Ask the person one question and wait for the answer. Use it only when the answer changes the design
         and you cannot find it yourself: a measurement that sets a fit or a load, or an intent you cannot tell
         apart (which device, which side opens). At most a few questions per task; ask them one at a time.
@@ -2050,34 +2147,21 @@ def build() -> MCPServer:
         allow_text lets them type their own answer; why: one line on what the answer changes.
         kind="confirm" shows an approval card (choices default to Yes / No) before an action the person
         should agree to. Returns {answered, answer, choices, text} or, when nobody answered, {answered: false,
-        reason, note}: then continue with safe assumptions marked assumed. Outside Form Studio's chat nobody
-        can answer here and the result tells you to ask in your own interface."""
+        reason, note}: then continue with safe assumptions marked assumed. Outside Form Studio's chat the question
+        is shown in your client's own form when it supports one (MCP elicitation); otherwise nobody can answer
+        here and the result tells you to ask in your own interface."""
         from . import ask as ask_mod
-        import os as _os
+        from . import elicit
         try:
             q = ask_mod.question(question, choices, multi_select, allow_text, why, kind)
         except ask_mod.AskError as e:
             raise ToolError(str(e))
-        folder = _os.environ.get(ask_mod.ENV_DIR)
-        if not folder:
-            return ask_mod.unreachable(q)
-        timeout = ask_mod.timeout_from_env()
-        qid = ask_mod.post(Path(folder), q, timeout)
-        parent, t0 = _os.getppid(), time.time()
-        while True:
-            st_, extra = ask_mod.state(Path(folder), qid)
-            if st_ != "open":
-                return ask_mod.result(q, st_, extra)
-            if time.time() - t0 > timeout:
-                ask_mod.close(Path(folder), qid, "timeout")
-            elif _os.getppid() != parent:            # the agent that asked is gone
-                ask_mod.close(Path(folder), qid, "ended")
-            await anyio.sleep(0.25)
+        return await elicit.ask(ctx, q)
 
     @mcp.tool(annotations=RW)
     async def ask_measurement(project: str, param: str, question: str, where: str = "", unit: str = "mm",
                               tolerance_mm: float | None = None, diagram: dict | None = None, image: str | None = None,
-                              mark: list[float] | None = None) -> dict:
+                              mark: list[float] | None = None, ctx: Context = None) -> dict:
         """Ask the person to measure one dimension of the design, and wait. Form Studio shows a measurement card:
         the question, where to measure (where, e.g. "across the widest part of the phone, without the case"), the
         precision that matters (tolerance_mm), a diagram ({"shape": "box"|"cylinder"|"hole"|"gap"|"thickness",
@@ -2086,9 +2170,11 @@ def build() -> MCPServer:
         number and says how they measured it (calipers, ruler, tape, or estimate). The answer becomes a new revision
         of the design with provenance measured (calipers sigma 0.05 mm, ruler 0.5, tape 1.0) or, for an estimate,
         assumed. One question at a time. Returns {answered, value, unit, method, source, rev}; when nobody answered,
-        {answered: false, reason, note}. Outside Form Studio's chat it tells you to ask in your own interface."""
+        {answered: false, reason, note}. Outside Form Studio's chat it is asked in your client's own form when it
+        supports one (value, calipers / ruler / datasheet, or skipped; a datasheet value is recorded as specified);
+        otherwise it tells you to ask in your own interface."""
         from . import ask as ask_mod
-        from . import start
+        from . import elicit, start
         import os as _os
         import shutil as _sh
         st = studio()
@@ -2098,8 +2184,13 @@ def build() -> MCPServer:
             head = st.rev(p)
             if param not in head["values"]:
                 raise StudioError(f"“{param}” is not a parameter of {project}.", "get_project lists the parameters.")
-            return head["values"][param]
-        current = await _run(check)
+            try:
+                spec = st.recipe(p).spec(param)
+                bounds = (float(spec.min), float(spec.max))
+            except Exception:
+                bounds = (None, None)
+            return head["values"][param], bounds
+        current, (lo, hi) = await _run(check)
         folder = _os.environ.get(ask_mod.ENV_DIR)
         qid = ask_mod.new_id()
         ext = None
@@ -2114,22 +2205,22 @@ def build() -> MCPServer:
         except ask_mod.AskError as e:
             raise ToolError(str(e))
         if not folder:
-            return {**ask_mod.unreachable(q), "param": param, "current": current, "where": q["where"]}
+            r = await elicit.form(ctx, "measurement", elicit.measurement_message(q), elicit.measurement_schema(q, lo, hi))
+            if r is None:
+                return {**ask_mod.unreachable(q), "param": param, "current": current, "where": q["where"]}
+            if elicit.pending(r):
+                return r
+            got = elicit.measurement_reply(q, r, lo, hi)
+            if isinstance(got, dict):
+                return got
+            rec = await _run(elicit.record_measurement, st, project, param, *got)
+            return elicit.measurement_result(q, rec)
         Path(folder).mkdir(parents=True, exist_ok=True)
         if ext:
             _sh.copyfile(Path(image).expanduser(), Path(folder) / f"{qid}.{ext}")   # before the question appears
         timeout = ask_mod.timeout_from_env()
         ask_mod.post(Path(folder), q, timeout, qid=qid)
-        parent, t0 = _os.getppid(), time.time()
-        while True:
-            st_, extra = ask_mod.state(Path(folder), qid)
-            if st_ != "open":
-                break
-            if time.time() - t0 > timeout:
-                ask_mod.close(Path(folder), qid, "timeout")
-            elif _os.getppid() != parent:
-                ask_mod.close(Path(folder), qid, "ended")
-            await anyio.sleep(0.25)
+        st_, extra = await elicit.wait_folder(Path(folder), qid, timeout)
         res = ask_mod.measure_result(q, st_, extra)
         if res.get("answered") and res.get("value") is not None and not res.get("rev") and res.get("method"):
             # answered where nothing committed it (a terminal): record it here, the same way the app does
@@ -2142,7 +2233,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def propose_concepts(name: str, concepts: list[dict], brief: str = "", group: str | None = None,
                                run: bool = True, ctx: Context = None) -> dict:
-        """For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one.
+        """Propose concepts. For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one.
         concepts: [{"title": short name, "rationale": one line on the approach, "source": design code as for
         create_design (see design_guide), "language": "python", "values": {...} or null}]. Make them different
         structural approaches (how it holds, mounts, opens), not size variants. Each becomes its own project
@@ -2172,7 +2263,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def pick_concept(group: str, project: str, keep_others: bool = False, ctx: Context = None) -> dict:
-        """The person picked a concept (in words; in the app they pick on the board). The picked project takes the
+        """Pick a concept. The person picked a concept (in words; in the app they pick on the board). The picked project takes the
         group's name and records the choice; the other concepts move to the trash (recoverable) unless keep_others.
         Then refine the picked design with update_design. Only call this when the person said which one."""
         from . import concepts as concepts_mod
@@ -2183,7 +2274,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def dismiss_concepts(group: str, keep: str = "all", ctx: Context = None) -> dict:
-        """The person wants none of the concepts picked: close the group without a pick. keep="all" keeps every
+        """Dismiss concepts. The person wants none of the concepts picked: close the group without a pick. keep="all" keeps every
         concept as an ordinary design; keep="none" moves them all to the trash (recoverable). Only call this when
         the person said so."""
         from . import concepts as concepts_mod
@@ -2192,7 +2283,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def list_concepts(group: str = "") -> dict:
-        """Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>."""
+        """List concepts. Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>."""
         from . import concepts as concepts_mod
         st = studio()
         if group:
@@ -2215,7 +2306,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def list_starters() -> dict:
-        """Ideas for what this person might design next, ranked from what they already design (the building blocks
+        """List starter ideas. Ideas for what this person might design next, ranked from what they already design (the building blocks
         and kinds of part in their projects, their printer and material, what they pinned or used):
         {prompts: [{id, text, source, pinned}], briefs: [...]}. Offer them as suggestions when the person asks what to
         make; they edit the list with `form starters`."""
@@ -2309,7 +2400,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def export_conversation(conversation: str, format: str = "md") -> dict:
-        """A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again)."""
+        """Export a conversation. A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again)."""
         from . import bundle
         st = studio()
         if format == "json":

@@ -41,6 +41,7 @@ class Run:
     images: list = field(default_factory=list)    # absolute paths of attached images
     files: list = field(default_factory=list)     # absolute paths of every attachment the agent may read
     tool_timeout_s: float = 1200.0                # how long one MCP tool call may take (ask_user waits for a person)
+    tool_search: str = "auto"                     # Claude Code: "auto" (tools may be deferred behind ToolSearch) or "false"
 
 
 class Parser:

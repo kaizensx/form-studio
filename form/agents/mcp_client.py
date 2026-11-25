@@ -4,7 +4,11 @@ An API agent has no CLI to launch Form Studio's MCP server for it, so it launche
 process the CLI agents get, with the same environment (data folder, the conversation's ask_user folder), and calls
 its tools. Everything a tool does therefore reaches the app exactly as it does for a CLI agent.
 
-Messages are JSON-RPC 2.0, one per line (the MCP stdio transport).
+Messages are JSON-RPC 2.0, one per line (the MCP stdio transport). The client speaks MCP 2026-07-28: no initialize
+handshake; `server/discover` first, then every request carries the protocol version, the client's info and its
+capabilities in `params._meta`. It declares no capabilities (no elicitation: the API agents' questions go through
+the conversation's ask folder), so the server never answers with an InputRequiredResult. A server that does not
+know `server/discover` is spoken to with the older handshake (LEGACY_PROTOCOL).
 """
 from __future__ import annotations
 
@@ -14,7 +18,9 @@ import subprocess
 import threading
 import time
 
-PROTOCOL = "2025-06-18"           # the server answers with the version it speaks; any it accepts is fine here
+PROTOCOL = "2026-07-28"
+LEGACY_PROTOCOL = "2025-06-18"    # the initialize handshake, for a server that does not speak PROTOCOL
+CLIENT_INFO = {"name": "form-studio-api-agent", "version": "1"}
 
 
 class MCPError(RuntimeError):
@@ -37,6 +43,7 @@ class MCPClient:
         self._wlock = threading.Lock()
         self.stderr: list[str] = []
         self.instructions = ""
+        self.protocol: str | None = None             # set by initialize(): PROTOCOL, or LEGACY_PROTOCOL after a handshake
         threading.Thread(target=self._read, daemon=True, name="form-mcp-client").start()
         threading.Thread(target=lambda: self.stderr.extend(self.proc.stderr), daemon=True).start()
 
@@ -81,7 +88,10 @@ class MCPClient:
             self._next += 1
             rid = self._next
             self._wait[rid] = None
-        self._send({"jsonrpc": "2.0", "id": rid, "method": method, "params": params or {}})
+        params = dict(params or {})
+        if self.protocol == PROTOCOL:                    # 2026-07-28: each request says who asks and what it speaks
+            params["_meta"] = {**(params.get("_meta") or {}), **self._envelope()}
+        self._send({"jsonrpc": "2.0", "id": rid, "method": method, "params": params})
         end = time.monotonic() + timeout
         with self._cv:
             while self._wait.get(rid) is None:
@@ -101,11 +111,24 @@ class MCPClient:
         return m.get("result") or {}
 
     # -- MCP -----------------------------------------------------------------
+    @staticmethod
+    def _envelope() -> dict:
+        return {"io.modelcontextprotocol/protocolVersion": PROTOCOL, "io.modelcontextprotocol/clientInfo": CLIENT_INFO,
+                "io.modelcontextprotocol/clientCapabilities": {}}
+
     def initialize(self, timeout: float = 60.0) -> dict:
-        r = self.request("initialize", {"protocolVersion": PROTOCOL, "capabilities": {},
-                                        "clientInfo": {"name": "form-studio-api-agent", "version": "1"}}, timeout)
+        self.protocol = PROTOCOL
+        try:
+            r = self.request("server/discover", {}, timeout)
+        except MCPError:
+            if self.proc.poll() is not None:
+                raise
+            self.protocol = None                         # an older server: the initialize handshake
+            r = self.request("initialize", {"protocolVersion": LEGACY_PROTOCOL, "capabilities": {},
+                                            "clientInfo": CLIENT_INFO}, timeout)
+            self.protocol = LEGACY_PROTOCOL
+            self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
         self.instructions = str(r.get("instructions") or "")
-        self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
         return r
 
     def tools(self) -> list[dict]:

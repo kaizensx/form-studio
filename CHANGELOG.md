@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- **Questions through the agent's own client.** Outside Form Studio's chat, a client that supports MCP elicitation
+  (form mode) now shows Form Studio's questions in its own form: `ask_user` (choices, several at once, or a free
+  answer), `ask_measurement` (the value within the parameter's range, and calipers, ruler or a datasheet; a datasheet
+  value is recorded as specified), a confirmation before `delete_project` with the trash path, the commands and
+  licence before `install_software` (always for a non-commercial licence), and a check before a `fetch_link` download
+  over 100 MB. Declining or closing the form is an answer, not an error: nothing is changed. On MCP 2026-07-28 the
+  tool answers with an `InputRequiredResult` and a sealed request state, and takes an answer only with that state;
+  earlier versions get the form on the session. Form Studio's own chat, and clients without elicitation, get exactly
+  what they got before (`form/elicit.py`).
+- **Claude Code searches Form Studio's tools.** The chat's Claude Code runs list ToolSearch and set
+  `ENABLE_TOOL_SEARCH=auto`; ten tools (form_overview, get_project, create_design, update_design, render,
+  preview_change, commit_change, design_guide, ask_user, get_job) carry `anthropic/alwaysLoad` and the rest are found
+  by searching, so every tool description now opens with a verb and its object. `[chat] tool_search = "false"` (or
+  `FORM_TOOL_SEARCH=false`) loads every tool up front as before, for this release. The server's instructions are
+  shorter (3,805 characters, within the 4,096 Claude Code reads), and tests keep them and every description there.
+- **MCP 2026-07-28 throughout.** The API agents' MCP client speaks 2026-07-28 (`server/discover` and a per-request
+  envelope, with the older handshake as a fallback), and a change's author comes from each request's own client info.
+  The server registers the skills and tasks extensions when their modules are present (`form/mcp_skills.py`,
+  `form/mcp_tasks.py`). docs/MCP.md has new Skills, Questions to the person and Tool search sections.
+
 - **Every design is refined after it builds.** create_design, update_design, add_feature (code and standard
   features) and a kept candidate now start design refinement in the background once the revision is saved and on
   screen, so the first picture comes as fast as before. What the engine keeps lands as one more revision, "Refined: N
