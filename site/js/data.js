@@ -41,7 +41,7 @@ export async function loadGLB(url) {
 // Decoded into flat segments with, for each, its layer and its progress through the layer (by path length),
 // the same way the app times its print simulation.
 export const toolpath = () => (tp ||= Promise.all([siteData(), fetch("assets/data/toolpath.bin").then((r) => r.arrayBuffer())]).then(([d, buf]) => {
-  const m = d.dock.toolpath, L = m.layout;
+  const m = d.sample.toolpath, L = m.layout;
   const pts = new Uint16Array(buf, L.points[0], L.points[1]);
   const rc = new Uint16Array(buf, L.run_count[0], L.run_count[1]);
   const rt = new Uint8Array(buf, L.run_type[0], L.run_type[1]);

@@ -1,0 +1,4 @@
+{"samples": 160, "size": [1600, 1200], "shots": [
+ {"name": "refine_before", "pid": "refine-screw-post-enclosure", "rev": 1, "info": true, "views": [{"tag": "a", "pose": "exploded", "explode": 0.62, "preset": "dark", "az": -52, "el": 30, "finish": "matte", "color": "#d9d6cf"}]},
+ {"name": "refine_after", "pid": "refine-screw-post-enclosure", "rev": 2, "info": true, "views": [{"tag": "a", "pose": "exploded", "explode": 0.62, "preset": "dark", "az": -52, "el": 30, "finish": "matte", "color": "#d9d6cf"}]}
+]}

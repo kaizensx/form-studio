@@ -1,17 +1,23 @@
-"""Export the real FORM data the website draws: models, checks, fit, toolpath and CLI output.
+"""Export the real Form Studio data the website draws: models, checks, the slice, the toolpath and the assembly.
 
-Nothing on the home page is invented. Every number, shape and line it shows comes from this script,
-which asks FORM's own engine (the same Studio the app and the CLI use) for a sample project.
+Nothing in the drawn app is invented. Every number, shape and line it shows comes from this script, which makes the
+sample project with Form Studio's own engine (the same Studio the app and the CLI use) and asks it for the result.
 
-Run from the repository root with a data folder that holds the sample projects:
+Run from the repository root, with a scratch data folder and a slicer Form Studio can drive:
 
     FORM_DATA=.dev/web/data FORM_CONFIG=/nonexistent PYTHONPATH=. .venv/bin/python site/tools/export_site_data.py
 
+The sample is the planetary gearbox exemplar (form/exemplars/planetary_gearbox.py): an original design written as
+build123d code, created for printing, with one committed change, then built, checked and sliced. When the data folder
+has no such project the script makes it; a design that is not sliced gets no slice and no toolpath in the output, and
+the page then draws neither.
+
 Writes into site/assets/data/:
-    dock.glb       the phone dock at its head revision, one mesh per feature plus the kernel's B-rep edges
-    box.glb        the hinged box: its two parts, per feature, in the print frame
-    toolpath.bin   the dock's sliced toolpath, simplified for the browser (layout in site.json -> toolpath)
-    site.json      project state, checks, fit model over a clearance sweep, slice summary, assembly, CLI output
+    sample.glb     the sample at its head revision, one mesh per feature plus the kernel's B-rep edges
+    ../shots/card-sample.webp   the sample's design card on Home
+    box.glb        the hinged box: its two parts, per feature, in the print frame (kept when the folder has no box)
+    toolpath.bin   the sample's sliced toolpath, simplified for the browser (layout in site.json -> toolpath)
+    site.json      project state, checks, slice summary, revisions, wall-thickness map, assembly
 
 The .glb files are glTF 2.0 with KHR_mesh_quantization: int16 positions, dequantised by the node's scale and
 translation. Feature names are the mesh names; extras carry the feature labels.
@@ -33,7 +39,14 @@ from form.studio import Studio
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "site" / "assets" / "data"
-DOCK = "hallway-phone-dock"
+SHOTS = ROOT / "site" / "assets" / "shots"
+SAMPLE = "planetary-gearbox"
+SAMPLE_EXEMPLAR = "planetary_gearbox"
+SAMPLE_NAME = "Planetary gearbox"
+SAMPLE_BRIEF = ("A planetary gearbox I can print in one go: a sun, three planets and a ring housing with bolt lugs, "
+                "about 1 : 5, with a carrier that pins into the planets.")
+# the one change after the first build, committed the way an agent commits it
+SAMPLE_CHANGE = ({"backlash": 0.2}, "More backlash, so printed teeth turn freely")
 BOX = "hinged-box"
 
 
@@ -190,23 +203,38 @@ def export_toolpath(tp, eps=0.04, res=0.01):
 
 
 def cli(*args) -> dict:
-    env = dict(os.environ)
-    r = subprocess.run([str(ROOT / ".venv" / "bin" / "form"), *args], capture_output=True, text=True, env=env, cwd=ROOT)
+    r = subprocess.run([sys.executable, "-m", "form", *args], capture_output=True, text=True, env=dict(os.environ), cwd=ROOT)
     return {"cmd": "form " + " ".join(args), "out": r.stdout.strip()}
 
 
-def trim_json(text: str, keep: list[str]) -> str:
-    d = json.loads(text)
-    return json.dumps({k: d[k] for k in keep if k in d}, indent=1, ensure_ascii=False)
+def ensure_sample(s: Studio) -> dict:
+    """The sample project, made here when the data folder does not have it: the design, one change, the pipeline."""
+    from form import exemplars
+    from form.studio import StudioError
+    try:
+        p = s.load(SAMPLE)
+    except StudioError:
+        p = s.create_design(SAMPLE_NAME, exemplars.get(SAMPLE_EXEMPLAR)["source"], SAMPLE_BRIEF, purpose="print")
+        if p["id"] != SAMPLE:
+            raise SystemExit(f"the sample was created as {p['id']}, expected {SAMPLE}")
+        s.run_sync(p["id"])
+        values, note = SAMPLE_CHANGE
+        p = s.commit(s.load(p["id"]), values, note=note, origin="proposal:agent")
+    j = s.run_sync(p["id"])
+    if j["state"] != "done":
+        bad = next((x for x in j["steps"] if x.get("error")), {})
+        print("pipeline:", j["state"], (bad.get("error") or {}).get("message", ""))
+    return s.load(p["id"])
 
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
+    old = json.loads((OUT / "site.json").read_text(encoding="utf-8")) if (OUT / "site.json").exists() else {}
     s = Studio(config.load())
     site: dict = {}
     try:
-        # ---- the dock ----
-        p = s.load(DOCK)
+        # ---- the sample ----
+        p = ensure_sample(s)
         rev = s.rev(p)
         v = s.view(p)
         recipe = s.recipe(p)
@@ -214,90 +242,96 @@ def main() -> int:
         order = [f.id for f in recipe.features]
         lo = np.asarray(v["bbox"][0]); hi = np.asarray(v["bbox"][1]); span = np.maximum(hi - lo, 1e-6)
         g = GLB()
-        meshes = feature_meshes(v)
-        for (fid, _), (P, T) in sorted(meshes.items(), key=lambda kv: order.index(kv[0][0]) if kv[0][0] in order else 99):
-            P, T = weld(P, T)
+        by_feature: dict = {}
+        for (fid, _part), (P, T) in feature_meshes(v).items():     # a feature that spans several parts is one mesh here
+            Ps, Ts, n = by_feature.setdefault(fid, ([], [], [0]))
+            Ps.append(P); Ts.append(T + n[0]); n[0] += len(P)
+        for fid in sorted(by_feature, key=lambda k: order.index(k) if k in order else 99):
+            P, T = weld(np.concatenate(by_feature[fid][0]), np.concatenate(by_feature[fid][1]))
             g.add(fid, P, T, lo, span, {"feature": fid, **feats.get(fid, {})})
         E = f32(v["edges"]).reshape(-1, 3)
         g.add("edges", E, None, lo, span, {"edges": True}, lines=True)
-        nb = g.write(OUT / "dock.glb", {"project": DOCK, "rev": rev["n"]})
-        print("dock.glb", nb, "bytes", sum(len(m[0]) for m in meshes.values()), "vertices before weld")
+        nb = g.write(OUT / "sample.glb", {"project": SAMPLE, "rev": rev["n"]})
+        print("sample.glb", nb, "bytes")
+        # the design card on Home: the engine's own headless render of the head revision, in the app's dark colours
+        from form import render as rendering
+        rendering.PAPER, rendering.INK, rendering.PALETTE = (25, 30, 34), (11, 13, 14), [(216, 211, 200)]
+        card = rendering.render_png(v, [{"id": i, "label": feats[i]["label"]} for i in order], camera=(-58.0, 34.0), size=(560, 415),
+                                    overlay=False, as_image=True)
+        card.save(SHOTS / "card-sample.webp", "WEBP", quality=84, method=6)
 
         checks = s.read(p, "checks", s.keys(p)["checks"])["checks"]
-        state = json.loads(cli("state", DOCK)["out"])
-        fit_now = s.fit(p)
+        state = json.loads(cli("state", SAMPLE)["out"])
         prov = rev["provenance"]
-        sweep = []
-        for c in np.round(np.arange(0.10, 0.5001, 0.01), 3):
-            row = {"c": float(c)}
-            for tag, pv in (("assumed", prov), ("measured", {**prov, "device_width": {"source": "measured"}})):
-                f = s.fit(p, {**rev["values"], "clearance": float(c)}, pv)
-                row[tag] = {"gap": round(f["expected_gap"], 4), "sd": round(f["sd"], 4), "y": round(f["yield"], 4),
-                            "tight": round(f["p_tight"], 4), "loose": round(f["p_loose"], 4)}
-            sweep.append(row)
-        f_meas = s.fit(p, None, {**prov, "device_width": {"source": "measured"}})
-
-        tp = toolpath.for_project(s, p)
-        blob, tmeta = export_toolpath(tp)
-        (OUT / "toolpath.bin").write_bytes(blob)
-        tmeta["bytes"] = len(blob)
-        slice_meta = s.read(p, "slice", s.keys(p)["slice"])
-        print("toolpath.bin", len(blob), "bytes,", tmeta["runs"], "runs,", tmeta["points"], "points from", tmeta["segments_in_gcode"], "moves")
-
-        site["dock"] = {
-            "id": DOCK, "name": p.get("name") or state["name"], "head": rev["n"], "values": rev["values"],
+        purpose = p.get("purpose") if isinstance(p.get("purpose"), str) else (p.get("purpose") or {}).get("purpose")
+        purpose = purpose or "model"
+        asm = v.get("assembly") or {}
+        site["sample"] = {
+            "id": SAMPLE, "name": p.get("name") or state["name"], "head": rev["n"], "values": rev["values"], "purpose": purpose,
             "provenance": {k: x.get("source") for k, x in prov.items()},
-            "params": {sp.key: {"label": sp.label, "unit": sp.unit, "min": sp.min, "max": sp.max, "doc": sp.doc} for sp in recipe.params},
+            "params": [{"key": sp.key, "label": sp.label, "unit": sp.unit, "min": sp.min, "max": sp.max, "doc": sp.doc, "group": sp.group}
+                       for sp in recipe.params],
             "brief": state["brief"], "features": [{"id": i, **feats[i]} for i in order],
             "bbox": v["bbox"], "size": [round(float(x), 1) for x in span], "volume_cm3": round(v["volume_mm3"] / 1000, 1),
             "faces": v["faces"], "build_ms": round(v["timing"]["build_s"] * 1000), "kernel": v["kernel"],
-            "companions": v["companions"], "derived": v["derived"], "statics": v.get("statics"),
-            "checks": checks, "gate": state["release_gate"], "fit": fit_now, "fit_measured": {"yield": f_meas["yield"], "sd": f_meas["sd"]},
-            "fit_sweep": sweep, "next_actions": state["next_best_actions"], "slice": state["slice_simulated"],
-            "slice_meta": {k: slice_meta.get(k) for k in ("time_s", "filament_g", "filament_m", "layers", "slicer", "slicer_version", "presets")},
+            "parts": [{"id": x["id"], "label": x["label"]} for x in asm.get("parts", [])],
+            "derived": v["derived"], "checks": checks, "gate": state["release_gate"],
             "revisions": [{"n": r["n"], "note": r.get("note", ""), "summary": r.get("summary", ""), "origin": r.get("origin"), "ts": r.get("ts")}
                           for r in p["revisions"]],
-            "toolpath": tmeta,
         }
-        th = json.loads(cli("analyze", DOCK, "--map", "thickness")["out"])
-        site["dock"]["thickness"] = {k: th[k] for k in ("label", "evidence", "legend", "stats", "markers", "sample_spacing_mm", "samples")}
+        try:
+            th = json.loads(cli("analyze", SAMPLE, "--map", "thickness")["out"])
+            site["sample"]["thickness"] = {k: th[k] for k in ("label", "evidence", "legend", "stats", "markers", "sample_spacing_mm", "samples")}
+        except (ValueError, KeyError) as e:
+            print("no wall-thickness map:", e)
+
+        # a slice and its toolpath only for a print design that really was sliced
+        slice_meta = s.read(p, "slice", s.keys(p)["slice"]) if purpose == "print" else None
+        if slice_meta:
+            plate = 1 if slice_meta.get("plates") else None
+            m1, _folder, _gcode = s.plate_meta(p, plate)
+            tp = toolpath.for_project(s, p, plate)
+            blob, tmeta = export_toolpath(tp)
+            (OUT / "toolpath.bin").write_bytes(blob)
+            tmeta["bytes"] = len(blob)
+            site["sample"]["toolpath"] = tmeta
+            site["sample"]["slice"] = state.get("slice_simulated")
+            site["sample"]["slice_meta"] = {**{k: m1.get(k) for k in ("time_s", "filament_g", "filament_mm", "layers", "slicer_version", "presets")},
+                                            "plates": len(slice_meta.get("plates") or []) or 1, "profile": s.profile(p)}
+            print("toolpath.bin", len(blob), "bytes,", tmeta["runs"], "runs,", tmeta["points"], "points from", tmeta["segments_in_gcode"], "moves")
+        elif (OUT / "toolpath.bin").exists():
+            (OUT / "toolpath.bin").unlink()
 
         # ---- the hinged box (assembly) ----
-        pb = s.load(BOX)
-        vb = s.view(pb)
-        asm = vb["assembly"]
-        lo = np.asarray(vb["bbox"][0]); hi = np.asarray(vb["bbox"][1]); span = np.maximum(hi - lo, 1e-6)
-        gb = GLB()
-        rb = s.recipe(pb)
-        bfeats = {f.id: {"label": f.label, "role": f.role} for f in rb.features}
-        for (fid, part), (P, T) in feature_meshes(vb).items():
-            P, T = weld(P, T)
-            gb.add(f"{part}:{fid}", P, T, lo, span, {"feature": fid, "part": part, **bfeats.get(fid, {})})
-        for part in asm["parts"]:
-            E = f32(part["edges"]).reshape(-1, 3)
-            gb.add(f"{part['id']}:edges", E, None, lo, span, {"edges": True, "part": part["id"]}, lines=True)
-        nb = gb.write(OUT / "box.glb", {"project": BOX})
-        print("box.glb", nb, "bytes")
-        site["box"] = {"id": BOX, "name": pb.get("name"), "parts": [{k: x[k] for k in ("id", "label", "note", "placement", "explode", "bbox", "print_bbox", "volume_mm3")}
-                                                                  for x in asm["parts"]],
-                       "joints": asm["joints"], "hardware": asm["hardware"], "bbox": asm["bbox"], "bbox_exploded": asm["bbox_exploded"]}
+        try:
+            pb = s.load(BOX)
+        except Exception:
+            pb = None
+        if pb is None:
+            if "box" not in old or not (OUT / "box.glb").exists():
+                raise SystemExit(f"the data folder has no {BOX} project and site/assets/data has no published box to keep")
+            site["box"] = old["box"]
+            print("box.glb kept as published")
+        else:
+            vb = s.view(pb)
+            asm = vb["assembly"]
+            lo = np.asarray(vb["bbox"][0]); hi = np.asarray(vb["bbox"][1]); span = np.maximum(hi - lo, 1e-6)
+            gb = GLB()
+            rb = s.recipe(pb)
+            bfeats = {f.id: {"label": f.label, "role": f.role} for f in rb.features}
+            for (fid, part), (P, T) in feature_meshes(vb).items():
+                P, T = weld(P, T)
+                gb.add(f"{part}:{fid}", P, T, lo, span, {"feature": fid, "part": part, **bfeats.get(fid, {})})
+            for part in asm["parts"]:
+                E = f32(part["edges"]).reshape(-1, 3)
+                gb.add(f"{part['id']}:edges", E, None, lo, span, {"edges": True, "part": part["id"]}, lines=True)
+            nb = gb.write(OUT / "box.glb", {"project": BOX})
+            print("box.glb", nb, "bytes")
+            site["box"] = {"id": BOX, "name": pb.get("name"), "parts": [{k: x[k] for k in ("id", "label", "note", "placement", "explode", "bbox", "print_bbox", "volume_mm3")}
+                                                                      for x in asm["parts"]],
+                           "joints": asm["joints"], "hardware": asm["hardware"], "bbox": asm["bbox"], "bbox_exploded": asm["bbox_exploded"]}
     finally:
         s.kernel.stop()
-
-    # ---- CLI output, captured as run ----
-    pv = cli("preview", DOCK, "lean=19")
-    sim = cli("simulate", DOCK, "--layer", "51")
-    cost = cli("cost", DOCK)
-    st = cli("state", DOCK)
-    site["cli"] = [
-        {"cmd": st["cmd"], "out": trim_json(st["out"], ["project", "head", "outputs", "release_gate", "slice_simulated"])},
-        {"cmd": pv["cmd"], "out": pv["out"]},
-        {"cmd": sim["cmd"], "out": json.dumps({"at": {k: json.loads(sim["out"])["at"][k] for k in
-                                                     ("layer", "z_mm", "types_in_layer", "has_bridge", "elapsed_s", "remaining_s", "evidence")},
-                                              "label": json.loads(sim["out"])["label"]}, indent=1, ensure_ascii=False)},
-        {"cmd": cost["cmd"], "out": json.dumps({"filament": {k: json.loads(cost["out"])["filament"][k] for k in ("grams", "price_per_kg", "price_source", "cost", "evidence")},
-                                                "electricity": {"needs": json.loads(cost["out"])["electricity"]["needs"]}}, indent=1, ensure_ascii=False)},
-    ]
     (OUT / "site.json").write_text(json.dumps(site, separators=(",", ":"), ensure_ascii=False, default=float), encoding="utf-8")
     print("site.json", (OUT / "site.json").stat().st_size, "bytes")
     return 0

@@ -71,8 +71,9 @@ export class Viewport {
     g.add(new THREE.LineSegments(gg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false })));
     const fillM = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.025, depthWrite: false });
     const fill = new THREE.Mesh(new THREE.PlaneGeometry(180, 180), fillM); fill.position.z = -0.05; g.add(fill);
+    this.plateG = g; this.plateRim = [fill];
     const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(180, 180)), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.16 }));
-    g.add(edge);
+    g.add(edge); this.plateRim.push(edge);
     g.renderOrder = -1;
     this.world.add(g);
   }
@@ -83,6 +84,10 @@ export class Viewport {
     const bb = info.bbox;
     this.centre = new THREE.Vector3((bb[0][0] + bb[1][0]) / 2, (bb[0][1] + bb[1][1]) / 2, (bb[0][2] + bb[1][2]) / 2);
     this.size = new THREE.Vector3(bb[1][0] - bb[0][0], bb[1][1] - bb[0][1], bb[1][2] - bb[0][2]);
+    // several parts as modelled can be wider than one plate (the slicer lays them out): the plate then sits under the
+    // middle of the design and its outline shows only with the sliced toolpath, which is where the parts really print
+    this.laidOut = this.size.x > 180 || this.size.y > 180;
+    if (this.laidOut) { this.plateG.position.set(this.centre.x, this.centre.y, 0); this.plateRim.forEach((o) => { o.visible = false; }); }
     this.part = new THREE.Group(); this.world.add(this.part);
     for (const p of parts) {
       const geo = new THREE.BufferGeometry();
@@ -291,7 +296,7 @@ export class Viewport {
     cone.rotation.x = -Math.PI / 2; cone.position.z = 4.2; noz.add(cone);
     this.nozzle = noz; noz.visible = false; this.world.add(noz);
   }
-  setSim(on) { if (!this.sim) return; this.sim.visible = on; this.nozzle.visible = on; this.dirty = true; }
+  setSim(on) { if (!this.sim) return; this.sim.visible = on; this.nozzle.visible = on; if (this.laidOut) this.plateRim.forEach((o) => { o.visible = on; }); this.dirty = true; }
   setSimNow(p, here) {
     if (!this.sim) return;
     this.simU.uNow.value = p;

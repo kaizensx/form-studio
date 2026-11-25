@@ -29,7 +29,7 @@
   <img src="docs/readme/made-cam.jpg" width="204" alt="A cam and follower mechanism on a base plate.">
   <img src="docs/readme/made-helmet.jpg" width="204" alt="The hero helmet, assembled.">
   <img src="docs/readme/made-speaker.jpg" width="204" alt="A cube speaker with a perforated grille.">
-  <img src="docs/readme/made-controller.jpg" width="204" alt="A game controller shell.">
+  <img src="docs/readme/made-bottle.jpg" width="204" alt="A clear bottle with a blue screw cap.">
   <br>
   <sub>Mechanisms, assemblies, organic shells, products and game assets: every picture is a real build, an original design written as parametric code. <a href="https://kaizensx.github.io/form-studio/#make">See what it makes</a> · <a href="https://kaizensx.github.io/form-studio/measure/">How we measure</a></sub>
 </p>
@@ -133,7 +133,7 @@ Bring the part you already have. A STEP or STL of a board, a phone or a motor be
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-proved-dark.svg">
-    <img src="docs/readme/feature-proved-light.svg" width="414" alt="Proved on the solid: 11 checks pass on the desk phone stand, 8 computed, 1 heuristic and 2 model.">
+    <img src="docs/readme/feature-proved-light.svg" width="414" alt="Proved on the solid: 7 of 8 checks pass on the planetary gearbox and one asks for a look; 7 computed and 1 heuristic.">
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-release-dark.svg">
@@ -148,7 +148,7 @@ Every revision is checked on the B-rep and its mesh: a valid solid, a closed exp
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-slicer-dark.svg">
-    <img src="docs/readme/feature-slicer-light.svg" width="414" alt="Your slicer, if you print: one layer of the desk phone stand drawn line type by line type from the slicer's G-code. Bambu Studio, OrcaSlicer, PrusaSlicer, SuperSlicer, QIDISlicer, ElegooSlicer and Snapmaker Orca.">
+    <img src="docs/readme/feature-slicer-light.svg" width="414" alt="Your slicer, if you print: one layer of the planetary gearbox, its ring, gears and carrier laid out on the plate, drawn line type by line type from the slicer's G-code. Bambu Studio, OrcaSlicer, PrusaSlicer, SuperSlicer, QIDISlicer, ElegooSlicer and Snapmaker Orca.">
   </picture>
 </p>
 
@@ -280,7 +280,7 @@ Agents follow the same rules as the app: units in millimetres, preview before co
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/feature-headless-dark.svg">
-    <img src="docs/readme/feature-headless-light.svg" width="414" alt="Everything headless: form state desk-phone-stand prints the design as JSON, with every parameter's provenance and every check.">
+    <img src="docs/readme/feature-headless-light.svg" width="414" alt="Everything headless: form state planetary-gearbox prints the design as JSON, with every parameter's provenance and every check.">
   </picture>
 </p>
 

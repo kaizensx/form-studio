@@ -1,0 +1,156 @@
+{
+ "samples": 160,
+ "size": [
+  1600,
+  1200
+ ],
+ "shots": [
+  {
+   "name": "hero_helmet",
+   "views": [
+    {
+     "tag": "hero",
+     "pose": "exploded",
+     "explode": 1.25,
+     "preset": "dark",
+     "az": -38,
+     "el": 10,
+     "size": [
+      2400,
+      1800
+     ],
+     "samples": 256
+    },
+    {
+     "tag": "asm",
+     "pose": "assembled",
+     "preset": "dark",
+     "az": -22,
+     "el": 10,
+     "size": [
+      2000,
+      1500
+     ],
+     "samples": 200
+    }
+   ]
+  },
+  {
+   "name": "ratchet_wrench",
+   "views": [
+    {
+     "tag": "ex",
+     "pose": "exploded",
+     "preset": "dark",
+     "az": -60,
+     "el": 25
+    }
+   ]
+  },
+  {
+   "name": "cam_follower",
+   "views": [
+    {
+     "tag": "as",
+     "pose": "assembled",
+     "preset": "dark",
+     "az": -50,
+     "el": 30
+    }
+   ]
+  },
+  {
+   "name": "spiral_vase",
+   "views": [
+    {
+     "tag": "a",
+     "pose": "print",
+     "preset": "dark",
+     "az": -38,
+     "el": 14,
+     "finish": "silk",
+     "color": "#b9673c"
+    }
+   ]
+  },
+  {
+   "name": "perforated_lampshade",
+   "views": [
+    {
+     "tag": "a",
+     "pose": "print",
+     "preset": "dark",
+     "az": -38,
+     "el": 12
+    }
+   ]
+  },
+  {
+   "name": "cube_speaker",
+   "views": [
+    {
+     "tag": "a",
+     "pose": "print",
+     "preset": "dark",
+     "az": -38,
+     "el": 14
+    }
+   ]
+  },
+  {
+   "name": "woven_basket",
+   "views": [
+    {
+     "tag": "a",
+     "pose": "print",
+     "preset": "dark",
+     "az": -38,
+     "el": 22
+    }
+   ]
+  },
+  {
+   "name": "bottle_and_cap",
+   "views": [
+    {
+     "tag": "a",
+     "pose": "assembled",
+     "preset": "dark",
+     "az": -38,
+     "el": 8
+    }
+   ]
+  },
+  {
+   "name": "readme_planetary",
+   "file": "scripts/readme_designs/planetary.py",
+   "mats": {
+    "ring": [
+     "matte",
+     "#2f3338"
+    ],
+    "planets": [
+     "petg",
+     "#2a8c86"
+    ],
+    "sun": [
+     "metal",
+     "#c3c7cc"
+    ],
+    "carrier": [
+     "matte",
+     "#d9d6cf"
+    ]
+   },
+   "views": [
+    {
+     "tag": "as",
+     "pose": "assembled",
+     "preset": "dark",
+     "az": -50,
+     "el": 46
+    }
+   ]
+  }
+ ]
+}

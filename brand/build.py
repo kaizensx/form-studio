@@ -160,7 +160,7 @@ def build_web():
 
 
 def build_og():
-    """1200x630: the lockup on graphite, one line, and a real part as FORM's viewport draws it (brand/og-part.png)."""
+    """1200x630: the lockup on graphite, two lines, and a real build photographed in the app (brand/og-part.png)."""
     W, H = 1200, 630
     im = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied)
     im.fill(QColor(PLATE))
@@ -194,8 +194,8 @@ def build_og():
     f.setPixelSize(30)
     p.setFont(f)
     p.setPen(QColor(INK2))
-    p.drawText(80, round(238 + lh + 66), "AI-to-CAD for 3D printing.")
-    p.drawText(80, round(238 + lh + 108), "Open source.")
+    p.drawText(80, round(238 + lh + 66), "Describe anything.")
+    p.drawText(80, round(238 + lh + 108), "The open-source AI CAD studio.")
     p.end()
     save(im, SITE / "assets" / "og.png")
 
