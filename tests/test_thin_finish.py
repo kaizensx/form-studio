@@ -173,23 +173,18 @@ class KernelSafety(unittest.TestCase):
         self.assertIn("line 2 of the design source: `body = craft.safe_fillet(body, zs[-1], 1.2)`", crash_text(site))
         self.assertIsNone(crash_site("no stack here"))
 
-    def test_the_stl_remesh_ladder_keeps_to_its_budget(self):
-        from unittest import mock
+    def test_the_stl_export_ladder_keeps_to_its_budget(self):
+        """The export that hung 60 s (a chamfer over flute edges): the ladder (form/meshclose.py) stops at its
+        budget and answers, closed or with the cause."""
+        import time
         from build123d import Box
         from form import kernel
-        calls = []
-        real = kernel._open_edges
-
-        def always_open(path):
-            calls.append(path)
-            real(path)
-            return 7                                     # a mesh no setting closes
         out = os.path.join(TMP, "box.stl")
-        with mock.patch.object(kernel, "_open_edges", always_open), mock.patch.object(kernel, "STL_RETRY_BUDGET", 0.0):
-            info = kernel.write_stl(Box(10, 10, 10), out)
-        self.assertEqual(info["open_edges"], 7)
-        self.assertIn("finer_skipped", info)              # the 0.001 mm try is never started
-        self.assertIn(0.001, info["finer_skipped"]["tolerances"])
+        t0 = time.perf_counter()
+        info = kernel.write_stl(Box(10, 10, 10), out, budget_s=0.0)
+        self.assertLess(time.perf_counter() - t0, 5.0)
+        self.assertIn("closure", info)
+        self.assertTrue(info["closure"]["closed"])
 
 
 if __name__ == "__main__":

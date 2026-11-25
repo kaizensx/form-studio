@@ -36,7 +36,7 @@ from dataclasses import asdict, dataclass, field
 
 KINDS = ("hinge", "slide", "fixed")
 KIND_ALIAS = {"slider": "slide", "revolute": "hinge", "prismatic": "slide", "rigid": "fixed"}
-MATE_KINDS = ("pin", "thread", "press", "snap", "slip", "contact")
+MATE_KINDS = ("pin", "thread", "press", "snap", "slip", "contact", "ratchet")
 
 
 def _vec(v, n=3) -> tuple:
@@ -105,7 +105,9 @@ class Mate:
     """Two parts that touch or interlock by design: not booleaned against each other, their gap checked instead.
 
     kind: pin (pin or axle in a hole), thread (thread in thread), slip (sliding fit), snap, press (intended
-    interference), contact (faces that rest on each other). clearance: the designed gap per side in mm (negative for
+    interference), contact (faces that rest on each other), ratchet (a = the toothed wheel, b = the pawl in its
+    locking pose). With axis= and origin=, a thread is checked for engagement and a ratchet for locking against its
+    clearance (form/function_checks.py). clearance: the designed gap per side in mm (negative for
     a press fit), compared with the gap measured on the model; None = not declared.
     axis, origin (thread only): the thread's axis in the assembled frame, and a point on it. A modelled thread's phase
     (how far it is turned) is arbitrary, so Form Studio turns part a about that axis through one revolution and keeps

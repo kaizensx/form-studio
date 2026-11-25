@@ -33,7 +33,8 @@ from .agents import compat
 from .agents import providers as providers_mod
 from .agents.models import Learned, Recent
 from .agents.base import Run, short as _short  # noqa: F401  (_short: kept for callers of the old name)
-from .conversations import ConversationError, Conversations
+from . import verdict as verdict_mod
+from .conversations import ConversationError, Conversations, run_cost
 
 MAX_RUNNING = 3
 RECAP_CHARS = 6000
@@ -92,6 +93,10 @@ tool you call shows up there live (3D model, drafts, checks, slice), so you do n
   create_design, compare_to_reference until within 0.1 mm). PDF drawings: read_document. Links: open a model's page with web fetch when you have it; download only files the user gave.
 - A "Purpose:" line says what the design is for. Respect it. Just a 3D model: Design only is already set (no slicing);
   do not talk about printing.
+- Results that report checks lead with verdict and blocking. While blocking is not empty the design is not done: fix
+  each FAIL, or say plainly in your reply which checks fail and what that means. Never call it designed or finished
+  over a FAIL. A mechanism (a thread, a ratchet, a snap) is checked for what it does: declare it with Mate(kind=...,
+  axis=, origin=) so the function check runs, and report what it says.
 - Reply briefly: what you made, the key numbers, what is assumed or unverified, and what the user should check.
   Slices are simulations and fit yields are models; say so. You cannot approve releases; point to the Make tab (the last stage, where a release is approved).
 - Every design has a purpose (get_project reports it). For a "model" (not for 3D printing) never ask about a
@@ -334,6 +339,13 @@ class ChatJob:
         self.model_id: str | None = None       # the model the CLI reported for this run
         self.head0: int | None = None          # the project's head revision when the message was sent
         self.purpose: str | None = None        # "print" | "model" | "game": what the design is for (form/start.py)
+        self.session0: str | None = None       # the session this run resumed (its total before the run: cost)
+        # end-of-run gate (form/verdict.py): {project: [FAIL rows]} from the latest report of each design's checks,
+        # and the agent text said after each report; one continuation at most when a reply ends on unreported FAILs
+        self.fails: dict = {}
+        self.said_since: dict = {}
+        self.gated = False
+        self.gating = False
 
     def public(self, start: int = 0) -> dict:
         return {"id": self.id, "state": self.state, "session": self.session, "cost_usd": self.cost,
@@ -635,6 +647,8 @@ class Chat:
                 parts.append("Earlier in this conversation (the earlier agent session is not available, so this is a "
                              "transcript; check the project with Form Studio's tools rather than trusting it):\n" + recap + "\n\nNow:")
         parts.append(job.message)
+        if job.gating:                         # the gate's continuation: its message only, no attachments again
+            return "\n\n".join(parts)
         line = self._purpose_line(job.purpose)
         if line:
             parts.append(line)
@@ -707,80 +721,86 @@ class Chat:
         if job.conversation:
             threading.Thread(target=self._watch_asks, args=(job,), daemon=True, name=f"form-ask-{job.id}").start()
         try:
-            for attempt in (1, 2):
-                tmp = Path(tempfile.mkdtemp(prefix="form-chat-"))
-                fdir = self.store.files_dir(job.conversation) if job.conversation else cwd
-                files = [fdir / a["file"] for a in job.attachments]
-                run = Run(message=self._prompt(job, with_recap=had_history and not job.session),
-                          system=self._system(job),
-                          model=job.model, effort=self._effort(job, adapter, exe), session=job.session, cwd=cwd, scratch=tmp, mcp=self._mcp(job),
-                          tool_timeout_s=self._ask_timeout() + 300, tool_search=str(c.get("tool_search", "auto")),
-                          web=bool(c.get("web", True)), budget_usd=float(c.get("budget_usd_per_message", 3.0)),
-                          images=[f for f, a in zip(files, job.attachments) if a["kind"] == "image"], files=files)
-                job.parser = adapter.parser()
-                n0, err_text = len(job.events), ""
-                saved0 = self.store.meta(job.conversation).get("events", 0) if job.conversation else 0
-                try:
-                    cmd = adapter.command(run, exe)
-                    job.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
-                                                text=True, encoding="utf-8", errors="replace", cwd=str(cwd), bufsize=1,
-                                                env=dict(os.environ, **getattr(adapter, "env", {}), **secrets.agent_env(adapter.id),
-                                                         **adapter.run_env(run)))
-                    err_buf: list[str] = []
-                    drain = threading.Thread(target=lambda p=job.proc: err_buf.extend(p.stderr), daemon=True)
-                    drain.start()
-                    for line in job.proc.stdout:
-                        if line.strip() and not line.lstrip().startswith(("{", "[")):
-                            job.unread += 1
-                        self._event(job, line)
-                    job.proc.wait()
-                    self._event(job, None)                      # what the parser still owes (CLIs without an end event)
-                    drain.join(timeout=2)
-                    err_text = "".join(err_buf)
-                    for pipe in (job.proc.stdout, job.proc.stderr):
-                        try:
-                            pipe.close()
-                        except (OSError, ValueError):
-                            pass
-                finally:
-                    shutil.rmtree(tmp, ignore_errors=True)
-                rc = job.proc.returncode
-                said = any(e["t"] in ("text", "tool") for e in job.events[n0:])
-                if (attempt == 1 and job.session and not job.stop_asked and rc != 0 and not said
-                        and adapter.resume_failed(err_text + " " + (job.error or ""), job.events[n0:])):
-                    # the CLI no longer has that session: say so, then send again with a transcript instead
-                    job.session, job.error = None, None
-                    del job.events[n0:]
-                    if job.conversation:
-                        self.store.truncate(job.conversation, saved0)
-                        self.store.update(job.conversation, session=None, session_agent=None)
-                    continue
+            while True:                                 # a second pass only for the end-of-run gate
+                for attempt in (1, 2):
+                    job.session0 = job.session
+                    tmp = Path(tempfile.mkdtemp(prefix="form-chat-"))
+                    fdir = self.store.files_dir(job.conversation) if job.conversation else cwd
+                    files = [fdir / a["file"] for a in job.attachments]
+                    run = Run(message=self._prompt(job, with_recap=had_history and not job.session),
+                              system=self._system(job),
+                              model=job.model, effort=self._effort(job, adapter, exe), session=job.session, cwd=cwd, scratch=tmp, mcp=self._mcp(job),
+                              tool_timeout_s=self._ask_timeout() + 300, tool_search=str(c.get("tool_search", "auto")),
+                              web=bool(c.get("web", True)), budget_usd=float(c.get("budget_usd_per_message", 3.0)),
+                              images=[f for f, a in zip(files, job.attachments) if a["kind"] == "image"], files=files)
+                    job.parser = adapter.parser()
+                    n0, err_text = len(job.events), ""
+                    saved0 = self.store.meta(job.conversation).get("events", 0) if job.conversation else 0
+                    try:
+                        cmd = adapter.command(run, exe)
+                        job.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
+                                                    text=True, encoding="utf-8", errors="replace", cwd=str(cwd), bufsize=1,
+                                                    env=dict(os.environ, **getattr(adapter, "env", {}), **secrets.agent_env(adapter.id),
+                                                             **adapter.run_env(run)))
+                        err_buf: list[str] = []
+                        drain = threading.Thread(target=lambda p=job.proc: err_buf.extend(p.stderr), daemon=True)
+                        drain.start()
+                        for line in job.proc.stdout:
+                            if line.strip() and not line.lstrip().startswith(("{", "[")):
+                                job.unread += 1
+                            self._event(job, line)
+                        job.proc.wait()
+                        self._event(job, None)                      # what the parser still owes (CLIs without an end event)
+                        drain.join(timeout=2)
+                        err_text = "".join(err_buf)
+                        for pipe in (job.proc.stdout, job.proc.stderr):
+                            try:
+                                pipe.close()
+                            except (OSError, ValueError):
+                                pass
+                    finally:
+                        shutil.rmtree(tmp, ignore_errors=True)
+                    rc = job.proc.returncode
+                    said = any(e["t"] in ("text", "tool") for e in job.events[n0:])
+                    if (attempt == 1 and job.session and not job.stop_asked and rc != 0 and not said
+                            and adapter.resume_failed(err_text + " " + (job.error or ""), job.events[n0:])):
+                        # the CLI no longer has that session: say so, then send again with a transcript instead
+                        job.session, job.error = None, None
+                        del job.events[n0:]
+                        if job.conversation:
+                            self.store.truncate(job.conversation, saved0)
+                            self.store.update(job.conversation, session=None, session_agent=None)
+                        continue
+                    break
+                self._close_asks(job)                           # before the state changes: a reader sees it with the end
+                ended = any(e["t"] == "end" for e in job.events[n0:])
+                # Save the last events first and only then say the job is over: a reader that sees "failed" or
+                # "stopped" must also find its error or end event (found on a slow Windows runner).
+                if job.stop_asked:
+                    if not ended:
+                        self._add(job, {"t": "end", "stopped": True, "cost_usd": None, "steps": job.steps,
+                                        "seconds": round(time.time() - job.started, 1), "agent": job.agent})
+                    job.state = "stopped"
+                elif rc == 0 and not job.error:
+                    if self._gate(job):
+                        had_history = True
+                        continue
+                    job.state = "done"
+                else:
+                    if not job.error:
+                        job.error = err_text.strip()[-800:] or f"{adapter.label} exited with code {rc}"
+                        known = self._limit(job, job.error + " " + err_text) or adapter.explain(job.error) or compat.diagnose(
+                            adapter.id, adapter.label, exe, rc, err_text, job.unread,
+                            sum(1 for e in job.events[n0:] if e["t"] in ("start", "text", "tool", "end")), __version__)
+                        if known:                                   # a known failure, said plainly with the fix inside FORM
+                            job.error = known["message"]
+                            self._add(job, {"t": "error", "text": known["message"], "hint": known.get("hint", ""),
+                                            **({k: known[k] for k in ("kind", "agent", "until") if known.get(k)}
+                                               if known.get("kind") == "usage_limit" else {})})
+                        else:
+                            self._add(job, {"t": "error", "text": job.error})
+                    job.state = "failed"
                 break
-            self._close_asks(job)                           # before the state changes: a reader sees it with the end
-            ended = any(e["t"] == "end" for e in job.events[n0:])
-            # Save the last events first and only then say the job is over: a reader that sees "failed" or
-            # "stopped" must also find its error or end event (found on a slow Windows runner).
-            if job.stop_asked:
-                if not ended:
-                    self._add(job, {"t": "end", "stopped": True, "cost_usd": None, "steps": job.steps,
-                                    "seconds": round(time.time() - job.started, 1), "agent": job.agent})
-                job.state = "stopped"
-            elif rc == 0 and not job.error:
-                job.state = "done"
-            else:
-                if not job.error:
-                    job.error = err_text.strip()[-800:] or f"{adapter.label} exited with code {rc}"
-                    known = self._limit(job, job.error + " " + err_text) or adapter.explain(job.error) or compat.diagnose(
-                        adapter.id, adapter.label, exe, rc, err_text, job.unread,
-                        sum(1 for e in job.events[n0:] if e["t"] in ("start", "text", "tool", "end")), __version__)
-                    if known:                                   # a known failure, said plainly with the fix inside FORM
-                        job.error = known["message"]
-                        self._add(job, {"t": "error", "text": known["message"], "hint": known.get("hint", ""),
-                                        **({k: known[k] for k in ("kind", "agent", "until") if known.get(k)}
-                                           if known.get("kind") == "usage_limit" else {})})
-                    else:
-                        self._add(job, {"t": "error", "text": job.error})
-                job.state = "failed"
         except (OSError, ConversationError) as e:
             job.error = str(e)
             self._add(job, {"t": "error", "text": job.error})
@@ -789,13 +809,14 @@ class Chat:
             job.live = None
             self._close_asks(job)
 
-    def _run_inline(self, job: ChatJob, adapter) -> None:
-        """An API agent: the loop runs in this thread (form/agents/api.py); its events take the same path as a CLI's."""
+    def _run_inline(self, job: ChatJob, adapter, again: bool = False) -> None:
+        """An API agent: the loop runs in this thread (form/agents/api.py); its events take the same path as a CLI's.
+        again: the end-of-run gate's continuation (the question watcher is already running)."""
         from .agents.api import Control, SessionGone
         c = self.cfg.get("chat", {})
         cwd = self.store.dir(job.conversation) if job.conversation else self.data
-        had_history = bool(job.conversation) and self.store.meta(job.conversation).get("messages", 0) > 1
-        if job.conversation:
+        had_history = again or (bool(job.conversation) and self.store.meta(job.conversation).get("messages", 0) > 1)
+        if job.conversation and not again:
             threading.Thread(target=self._watch_asks, args=(job,), daemon=True, name=f"form-ask-{job.id}").start()
         failure = None
         try:
@@ -830,6 +851,8 @@ class Chat:
                 job.error = failure["message"]
                 self._add(job, {"t": "error", "text": failure["message"], "hint": failure.get("hint", "")})
                 job.state = "failed"
+            elif self._gate(job):
+                return self._run_inline(job, adapter, again=True)
             else:
                 job.state = "done"
         except (OSError, ConversationError, RuntimeError, ValueError) as e:
@@ -889,6 +912,7 @@ class Chat:
             elif t == "result":
                 full = ev.pop("full", "") or ""
                 self._enrich(job, ev, full)
+                self._note_verdicts(job, ev, full)
                 if ev.get("name") == "suggest_replies" and ev.get("ok"):
                     opts = self._suggestions(full)
                     self._add(job, ev)
@@ -901,6 +925,11 @@ class Chat:
                 ev = {"t": "error", "text": card["message"], "hint": card["hint"], "kind": "usage_limit",
                       "agent": card["agent"], "until": card["until"], "again": card.get("again")}
             elif t == "end":
+                if ev.get("cost_scope") == "session" and ev.get("cost_total_usd") is not None:
+                    # a running session total: the store keeps each session's last total and saves this run's own
+                    ev["cost_session"], ev["cost_resumed"] = job.session, job.session0
+                    if not job.conversation:
+                        ev["cost_usd"] = run_cost(ev["cost_total_usd"], None)
                 job.cost = ev.get("cost_usd")
                 err = ev.pop("error", None)
                 ev.update({"steps": job.steps, "seconds": round(time.time() - job.started, 1), "agent": job.agent})
@@ -910,6 +939,7 @@ class Chat:
                 if pid and h1 is not None and h1 != job.head0:
                     ev["change"] = {"project": pid, "from": job.head0, "to": h1}
                 self._add(job, ev)
+                job.cost = job.events[-1].get("cost_usd")       # the run's own spend, worked out by the store
                 if err and _model_unavailable(str(err)):
                     job.error = self._drop_model(job, str(err))
                     self._add(job, {"t": "error", "text": job.error})
@@ -935,7 +965,50 @@ class Chat:
                         used = job.model_id           # an API provider's Default is its last-used model: name it
                     self.recent.use(job.agent, used)
                 continue
+            if t == "text":
+                for pid in job.said_since:
+                    job.said_since[pid] += "\n" + str(ev.get("text", ""))
             self._add(job, ev)
+
+    # ---- end-of-run gate ---------------------------------------------------------------------------------------
+    def _note_verdicts(self, job: ChatJob, ev: dict, full: str) -> None:
+        """A tool result that reports checks: remember each design's FAIL rows (the latest report wins, so a fix
+        clears them) and start listening for the agent to report them."""
+        if not ev.get("ok"):
+            return
+        for rep in verdict_mod.fails(full):
+            pid = rep["project"] or job.project or ""
+            if rep["rows"]:
+                job.fails[pid] = rep["rows"]
+                job.said_since[pid] = ""
+                ev.setdefault("verdict", {"project": pid, "verdict": rep["verdict"], "blocking": rep["rows"]})
+            else:
+                job.fails.pop(pid, None)
+                job.said_since.pop(pid, None)
+
+    def unreported(self, job: ChatJob) -> dict:
+        """{project: FAIL rows} the agent's reply has not reported since the result that showed them."""
+        return {pid: rows for pid, rows in job.fails.items()
+                if not verdict_mod.acknowledged(rows, job.said_since.get(pid, ""))}
+
+    def _gate(self, job: ChatJob) -> bool:
+        """A reply that ends on FAIL rows it did not report gets one continuation that asks the agent to fix them or
+        say so; never a second one ([chat] fail_gate = false turns the gate off). True when the continuation starts:
+        the caller runs the agent again with job.message."""
+        if job.gated or job.stop_asked or not self.cfg.get("chat", {}).get("fail_gate", True):
+            return False
+        open_ = self.unreported(job)
+        if not open_:
+            return False
+        job.gated = job.gating = True
+        job.message = verdict_mod.continuation(open_)
+        n = sum(len(r) for r in open_.values())
+        self._add(job, {"t": "gate", "fails": open_, "text": job.message,
+                        "note": f"The reply ended with {n} failing check{'s' if n != 1 else ''} it did not report; "
+                                "Form Studio asked the agent once to fix or report them."})
+        for pid in open_:                      # what the agent says now is what counts
+            job.said_since[pid] = ""
+        return True
 
     def _effort(self, job: ChatJob, adapter, exe: str) -> str:
         """The effort this message runs at: the conversation's, raised for a hard task (a mesh to make editable, a

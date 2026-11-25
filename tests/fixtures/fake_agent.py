@@ -19,6 +19,12 @@ Home's start flow (form/start.py, form/concepts.py), by words in the FIRST line 
               "You measured: nothing (<reason>)" when the question closed unanswered.
   "Replace a broken part: <name>."  (form/replace.py) creates a tiny Block design named <name> (create_design), adds
               "Replacement: <name>", then asks the measurement question above about it.
+The end-of-run gate (form/chat.py, form/verdict.py), by words in the FIRST line:
+  "failcheck"  reports a get_project result whose checks FAIL (Thinnest wall: 0.00 mm) for project "wall-test" and
+               ends with "Designed." (FAIL not reported). With "ack" it says the wall check fails instead. With
+               "stubborn" the project is "wall-stubborn" and every reply, the gate's continuation too, ignores it.
+               The gate's continuation (a message naming "wall-test") gets "The Thinnest wall check FAILS at 0.00 mm."
+Cost: total_cost_usd is the session's running total, as Claude Code reports it for a resumed session.
 Always, from the prompt Form Studio builds:
   "Attached files:" present   -> a line "I received: <name> (<kind>), ..." (file names without the 6-hex id and dash)
   the sketch heading present  -> a line "Sketch: <n> primitives" per sketch, counted from the inlined JSON
@@ -38,6 +44,44 @@ def out(obj):
     print(json.dumps(obj), flush=True)
 
 
+def session_total(data: Path, sid: str, spent: float) -> float:
+    """The session's running total after this run (Claude Code restores it when a run resumes the session)."""
+    f = data / ".fake-sessions" / (re.sub(r"[^A-Za-z0-9_-]", "_", sid) + ".json")
+    f.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        before = json.loads(f.read_text())["total"]
+    except (OSError, ValueError, KeyError):
+        before = 0.0
+    total = round(before + spent, 6)
+    f.write_text(json.dumps({"total": total}))
+    return total
+
+
+FAIL_DIGEST = {"verdict": "FAIL", "blocking": ["Thinnest wall: 0.00 mm [computed]"], "project": "wall-test", "head": 1,
+               "checks": ["PASS  One valid solid: 1 solid  [computed]", "FAIL  Thinnest wall: 0.00 mm  [computed]"]}
+
+
+def failcheck(data: Path, message: str, sid: str) -> int:
+    first = message.splitlines()[0]
+    gate = message.startswith("Form Studio check before this reply ends")
+    stubborn = "stubborn" in first or "wall-stubborn" in message
+    if not gate or stubborn:
+        d = dict(FAIL_DIGEST, project="wall-stubborn" if stubborn else "wall-test")
+        out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "g1", "name": "mcp__form__get_project",
+                                                           "input": {"project": d["project"]}}]}})
+        out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "g1", "content": [
+            {"type": "text", "text": json.dumps(d)}]}]}})
+    if gate and not stubborn:
+        reply = "The Thinnest wall check FAILS at 0.00 mm: the wall is missing where the arm meets the clamp."
+    elif re.search(r"\back\b", first):
+        reply = "Made it, but the wall check fails: 0.00 mm at the clamp."
+    else:
+        reply = "Designed."
+    out({"type": "assistant", "message": {"content": [{"type": "text", "text": reply}]}})
+    out({"type": "result", "total_cost_usd": session_total(data, sid, 0.4), "num_turns": 2, "session_id": sid})
+    return 0
+
+
 def main():
     data, session, model, message = Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
     if session.startswith("gone"):
@@ -54,6 +98,8 @@ def main():
         time.sleep(60)
         return 0
     first0 = message.splitlines()[0] if message.strip() else ""
+    if re.search(r"\bfailcheck\b", first0) or message.startswith("Form Studio check before this reply ends"):
+        return failcheck(data, message, sid)
     if re.search(r"\beditable\b", first0):
         return editable(data, message, sid)
     if re.search(r"\bstages\b", first0):
@@ -135,7 +181,7 @@ def main():
                   "2. Second step\n   - a nested point\n     - and one below it\n\n- a **bold** bullet with `code`\n\n"
                   "```python\nform.run()\n```\n\n| Option | Yield |\n|---|--:|\n| Head | 66 % |\n")
     out({"type": "assistant", "message": {"content": [{"type": "text", "text": reply}]}})
-    out({"type": "result", "total_cost_usd": 0.25, "num_turns": 2, "session_id": sid})
+    out({"type": "result", "total_cost_usd": session_total(data, sid, 0.25), "num_turns": 2, "session_id": sid})
     return 0
 
 

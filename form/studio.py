@@ -1718,6 +1718,8 @@ class Studio:
                 files[kind] = {"name": f.name, "bytes": f.stat().st_size, "sha256": sha_file(f)}
         if r.get("unavailable"):
             meta["unavailable"] = r["unavailable"]
+        if r.get("closure"):                              # the export ladder: closed, its rung and deviation, or why not
+            meta["closure"] = r["closure"]
         if r.get("mesh_texture"):                         # STL/OBJ/GLB carry the textured mesh; STEP is the smooth solid
             meta["mesh_texture"] = r["mesh_texture"]
         (tmp / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")

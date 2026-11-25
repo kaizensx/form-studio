@@ -350,6 +350,19 @@ def bearing_seat(designation: str = "608", fit: float = 0.05, through: float = 3
 
 
 # ---- threads -----------------------------------------------------------------------------------------------
+def _minus_ridges(bore, ridges):
+    """A threaded hole's cutter: the bore minus the nut's thread ridges. OCCT's cut of a bore by the helical ridges
+    can fail silently and return the whole bore (a plain hole, no thread: seen on M8 x 1.25 and M12 x 1.75), so the
+    ridges inside the bore are found first (a common) and those are cut; a cutter that still lost none raises."""
+    inside = bore & ridges
+    kept = float(inside.volume) if inside is not None else 0.0
+    out = bore - inside if kept > 1e-6 else bore
+    if kept <= 1e-6 or float(bore.volume) - float(out.volume) < 0.5 * kept:
+        raise RecipeError("The threaded hole came out without thread ridges", "",
+                          "Try a different length, pitch or clearance; a plain bore would not hold the screw.")
+    return out
+
+
 def thread(major_d: float, pitch: float, length: float, external: bool = True, clearance: float = 0.3,
            chamfer: bool = True) -> HardwarePart:
     """A printable ISO metric thread (bd_warehouse IsoThread). Use pitch >= 1 mm for FDM.

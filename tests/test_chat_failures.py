@@ -87,24 +87,48 @@ class Stl(unittest.TestCase):
         self.assertEqual(kernel._open_edges(holed), 3)
 
     def test_write_stl_remeshes_until_closed(self):
+        """The mesher's failure on the first setting only: one face gets no triangles. The export ladder meshes again
+        finer and the STL is closed; the result says which rung closed it and how far it may be from the CAD."""
         from build123d import Box, Cylinder, Pos
+        from form import meshclose
         shape = Box(30, 20, 10) - Pos(0, 0, 2) * Cylinder(6, 10)
         out = Path(TMP) / "part.stl"
         calls = []
-        real = kernel._open_edges
+        real = meshclose._triangles
 
-        def flaky(path):                      # the mesher's failure, on the first setting only
+        def flaky(s):                         # the first meshing loses one face's triangles
+            V, missing = real(s)
             calls.append(1)
-            return 105 if len(calls) == 1 else real(path)
-        kernel._open_edges = flaky
+            return (V[:-40], missing) if len(calls) == 1 else (V, missing)
+        meshclose._triangles = flaky
         try:
             res = kernel.write_stl(shape, out, 0.01, 0.1)
         finally:
-            kernel._open_edges = real
+            meshclose._triangles = real
         self.assertTrue(res["remeshed"])
         self.assertEqual(res["open_edges"], 0)
-        self.assertEqual(res["open_edges_first"], 105)
+        self.assertGreater(res["open_edges_first"], 0)
+        self.assertTrue(res["closure"]["closed"])
+        self.assertEqual(res["closure"]["rung"], "finer")
+        self.assertLessEqual(res["closure"]["deviation_mm"], 0.01)
         self.assertEqual(kernel._open_edges(out), 0)
+
+    def test_an_assembly_export_is_closed_part_by_part(self):
+        """Parts that touch in their assembled pose share faces: not a defect. Each solid is meshed and audited on its
+        own (the STL's .parts.json sidecar), so two touching boxes are a closed export."""
+        from build123d import Box, Compound, Pos
+        from form import mesh_audit
+        shape = Compound([Box(10, 10, 10), Pos(10, 0, 0) * Box(10, 10, 10)])
+        out = Path(TMP) / "pair.stl"
+        res = kernel.write_stl(shape, out, 0.01, 0.1)
+        self.assertTrue(res["closure"]["closed"], res["closure"])
+        self.assertEqual(res["closure"]["solids"], 2)
+        tris, _f, _sha = mesh_audit.read_stl(out)
+        self.assertEqual(len(tris.parts), 2)
+        a = mesh_audit.audit(tris, expected_components=2)
+        self.assertEqual(a["status"], "PASS_LIMITED_SCREEN", a["failures"])
+        whole = mesh_audit.audit(list(tris), expected_components=2)   # welded as one mesh: the shared face shows
+        self.assertIn("nonmanifold_edges", whole["failures"])
 
 
 class MeshReferences(unittest.TestCase):

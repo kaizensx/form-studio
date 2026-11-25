@@ -19,6 +19,8 @@ KEY_VARS = ("OPENAI_API_KEY", "DASHSCOPE_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_
 
 
 class QwenParser(ClaudeParser):
+    session_totals = False                 # not known for Qwen Code: its result is read as this run's own cost
+
     def feed(self, line: str) -> list[dict]:
         out = super().feed(line)
         if any(e["t"] == "end" for e in out):
