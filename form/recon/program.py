@@ -1404,6 +1404,22 @@ def explained(plan) -> float:
     return got / tot if tot > 0 else 0.0
 
 
+def predicted_share(plan, total_area) -> float:
+    """The share of the surface (%) the plan's features could make at most: what faces or runs along its direction
+    (score), less the walls of the runs that do not read as sketches. Budget by predicted gain: a route that cannot
+    beat the floor is not built (recipe's floor_pct)."""
+    if not plan or plan.get("error") or total_area <= 0:
+        return 0.0
+    subs = plan["subs"]
+    kept = 0.0
+    for r in plan["runs"]:
+        if r.fate == "feature":
+            continue
+        kept += sum(float(np.linalg.norm(np.diff(np.r_[lp.mid, lp.mid[:1]], axis=0), axis=1).sum()) * (subs[k][1] - subs[k][0])
+                    for k, lp in r.loops)
+    return round(max(0.0, 100.0 * (float(plan["score"]) - kept / total_area)), 2)
+
+
 def best_plan(V, F, tol, O, deadline=None, progress=None, cache=None):
     """The plan along the direction (of the three best) whose sketches explain the most of the walls. Plans read
     along world axes are left in `cache` (axis index -> plan) for the other directions to use."""
@@ -1450,9 +1466,11 @@ def _secondary(V, F, tol, plan0, O, deadline, progress, cache=None):
     return out
 
 
-def recipe(V, F, tol, name="part", limit=None, out_dir=None, progress=None, deadline=None, d=None) -> dict:
+def recipe(V, F, tol, name="part", limit=None, out_dir=None, progress=None, deadline=None, d=None,
+           floor_pct=None) -> dict:
     """The program recipe of a mesh. Returns {"report", "source", "verified", "shape", "P", "T", "cmp", "refs",
-    "params"}."""
+    "params"}. With `floor_pct` (the share of the surface a result in hand already makes editable), a plan whose
+    predicted share (predicted_share) is not above it is not built."""
     say = progress or (lambda x: None)
     t0 = time.perf_counter()
     limit = tol if limit is None else limit
@@ -1478,6 +1496,14 @@ def recipe(V, F, tol, name="part", limit=None, out_dir=None, progress=None, dead
                         "curved surfaces, left to the surface fitting.")
         rep["seconds"] = round(time.perf_counter() - t0, 2)
         return {"report": rep}
+    if floor_pct is not None:
+        pred = predicted_share(plan, float(meshmod.tri_normals(V, F)[1].sum()))
+        rep["predicted_pct"] = pred
+        if pred <= float(floor_pct):
+            rep["error"] = (f"Its sketches could make at most {pred:g}% of the surface, not more than the "
+                            f"{float(floor_pct):g}% the result in hand makes: not built (budget by predicted gain).")
+            rep["seconds"] = round(time.perf_counter() - t0, 2)
+            return {"report": rep}
     envelopes(plan, tol)
     out = Path(out_dir or ".")
     snap = ([(r.fate, r.why, r.block) for r in plan["runs"]], [blk["fate"] for blk in plan["blocks"]])
