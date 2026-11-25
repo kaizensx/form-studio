@@ -1433,6 +1433,8 @@ def run_blocking(cfg: dict, ids: list[str], methods: dict | None = None, echo: C
     """Install and wait (CLI, MCP). `echo` receives each log line as it arrives."""
     inst = Installer(cfg)
     job = inst.install(ids, None, methods, start=True, timeout_s=timeout_s)
+    from . import taskstore                  # an MCP task running this install can cancel it (form/mcp_tasks.py)
+    taskstore.child("install", job.id, None, job.cancel, lambda: job.state != "running")
     seen = 0
     try:
         while True:
@@ -1440,6 +1442,7 @@ def run_blocking(cfg: dict, ids: list[str], methods: dict | None = None, echo: C
             for l in p["log"]:
                 if echo:
                     echo(("$ " if l["kind"] == "cmd" else "  ") + l["text"])
+                taskstore.progress(l["text"])
             seen = p["next"]
             if p["state"] != "running":
                 return job

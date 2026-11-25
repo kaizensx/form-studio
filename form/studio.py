@@ -22,6 +22,7 @@ from . import cad_bridges
 from .recipes import RecipeBook, RecipeError, SCAD_PREFIX, SOURCE_PREFIX, is_source, source_path, store_source
 from .worker import KernelFailure, KernelPool
 from . import fsutil
+from . import taskstore
 from . import printers as printers_mod
 from . import filaments as materials_mod, plates as plates_mod
 from . import purpose as purpose_mod
@@ -211,7 +212,7 @@ class Studio:
         self._tl = threading.local()                        # the pipeline step running on this thread (progress)
         self.recipes = RecipeBook(self.sources)
         self.calibration = fit_mod.Calibration(self.root / "calibration.json")
-        self.jobs: dict = {}
+        self.jobs = taskstore.JobBook(self.root)   # pipeline jobs, on disk: get_job finds them after a restart
         self._locks: dict = {}
         self._slicer = None
         self._slicer_at = 0.0
@@ -573,6 +574,7 @@ class Studio:
             except ValueError:
                 pass
         fsutil.replace(tmp, path)
+        taskstore.note_saved(p.get("id"), p.get("head"))      # what a cancelled task kept (form/mcp_tasks.py)
 
     def rid(self, p: dict, n: int | None = None) -> str:
         """Recipe id a revision was built with (designs written as code change it per revision)."""
@@ -643,6 +645,7 @@ class Studio:
         self._check_assembly(rid, vals)
         rid, info = self._try_design(rid, vals, partial=partial and language == "python", refs=refs, draft=draft,
                                      name=name)                    # must build before it is saved
+        self.cancel_point("the design was built but not saved")
         if info:
             values = {k: v for k, v in (values or {}).items() if k in {q.key for q in self.recipes[rid].params}}
         log = self._tl.last_log
@@ -828,6 +831,7 @@ class Studio:
                 fsutil.replace(tmp, f)
             except OSError:
                 pass
+            taskstore.note_draft(draft, ev["feature"], ev["index"], name)
             self.activity(None, "stage", f"Built {ev['feature']} (stage {ev['index']})" + (f" of {name}" if name else ""),
                           by="engine", draft=draft, stage=ev["feature"], index=ev["index"], at=ev.get("at", ev["index"]),
                           of=ev.get("of", 0), label=ev.get("label", ""), triangles=ev.get("triangles"))
@@ -883,6 +887,7 @@ class Studio:
             prev = {x["feature"] for x in (head.get("partial") or {}).get("skipped", [])}
             rid, info = self._try_design(rid, vals, partial=partial and language == "python", p=p, draft=draft,
                                          name=p.get("name", ""), prev_skipped=prev)
+            self.cancel_point("the new source was built but no revision was saved")
             new = self.recipes[rid]
             prov = {q.key: (head["provenance"][q.key] if q.key in head["provenance"] and q.key in keep
                             and head["provenance"][q.key].get("source") != "assumed" else _initial_provenance(q)) for q in new.params}
@@ -1191,6 +1196,7 @@ class Studio:
     def _k(self, op, timeout=60, p=None, refs=None, rev=None, **kw):
         """One kernel call. With p (the project), a design that reads imported parts gets their paths, and a
         design with marks gets the label text and the revision (rev, or the one the values belong to)."""
+        self.cancel_point()
         if p is not None and kw.get("recipe_id"):
             vals = kw.get("values") if kw.get("values") is not None else kw.get("base")
             mc = self.mark_context(p, kw["recipe_id"], vals, rev) if isinstance(vals, dict) else None
@@ -1452,12 +1458,33 @@ class Studio:
 
     def run(self, pid: str, nodes: list | None = None, force: bool = False) -> str:
         job = {"id": uuid.uuid4().hex[:10], "project": pid, "state": "running", "started": time.time(), "steps": []}
-        self.jobs[job["id"]] = job
-        if len(self.jobs) > 50:
-            for k in list(self.jobs)[:-50]:
-                self.jobs.pop(k, None)
+        self.jobs[job["id"]] = job                           # written to <data>/.tasks/jobs (form/taskstore.py)
+        jid = job["id"]
+        taskstore.child("pipeline", jid, pid, lambda: self.cancel_job(jid), lambda: job["state"] != "running",
+                        lambda: self._job_text(job))
         threading.Thread(target=self._run, args=(job, nodes, force), daemon=True).start()
-        return job["id"]
+        return jid
+
+    def cancel_job(self, jid: str) -> bool:
+        """Ask a pipeline job to stop: it finishes the step it is on and marks the rest cancelled (state
+        "cancelled"). Outputs already made are kept; they are keyed, so a later run reuses them."""
+        return self.jobs.request_cancel(jid)
+
+    def cancel_point(self, what: str = "") -> None:
+        """Stop here when the task this work runs for was cancelled (form/taskstore.py). Called between kernel
+        calls and before a revision is saved, so a cancelled task never leaves a half-written revision."""
+        if taskstore.cancelled():
+            raise StudioError("Cancelled." + (f" {what[0].upper()}{what[1:]}." if what else ""),
+                              "Nothing more was built or saved; the last saved revision is intact.", status=409,
+                              kind="cancelled")
+
+    @staticmethod
+    def _job_text(job: dict) -> str:
+        run = next((s for s in job.get("steps") or [] if s.get("state") == "running"), None)
+        if run:
+            return f"Pipeline: {run['label']}"
+        done = sum(1 for s in job.get("steps") or [] if s.get("state") in ("done", "cached"))
+        return f"Pipeline: {done} of {len(job.get('steps') or [])} steps" if job.get("steps") else "Pipeline queued"
 
     def run_sync(self, pid: str, nodes: list | None = None, force: bool = False) -> dict:
         job = {"id": "sync", "project": pid, "state": "running", "started": time.time(), "steps": []}
@@ -1480,7 +1507,14 @@ class Studio:
                 rev = self.rev(p)
                 name = f"{p['id']}_r{rev['n']:02d}"
                 blocked = False
+                self.jobs.save(job)
                 for step in job["steps"]:
+                    if self._job_cancelled(job):                 # cooperative: between steps, never inside one
+                        for s in job["steps"]:
+                            if s["state"] == "queued":
+                                s["state"] = "cancelled"
+                        job["cancelled"] = True
+                        break
                     node = step["node"]
                     key = keys[node]
                     idx = NODES.index(node)
@@ -1519,13 +1553,21 @@ class Studio:
                             fresh = self.load(pid)
                             self._record(fresh, node, key, ok, err, rev=rev["n"])
                             self.save(fresh)
+                    self.jobs.save(job)
                 job["state"] = "failed" if any(s["state"] == "failed" for s in job["steps"]) else \
-                    ("blocked" if any(s["state"] == "blocked" for s in job["steps"]) else "done")
+                    ("cancelled" if job.get("cancelled") else
+                     "blocked" if any(s["state"] == "blocked" for s in job["steps"]) else "done")
             except StudioError as e:
                 job["state"], job["error"] = "failed", e.public()
             except Exception as e:
                 job["state"], job["error"] = "failed", {"message": f"{type(e).__name__}: {e}"}
             job["finished"] = time.time()
+            self.jobs.save(job)
+            self.jobs.clear_cancel(job["id"])
+
+    def _job_cancelled(self, job: dict) -> bool:
+        """A pipeline job asked to stop (cancel_job), or a run_sync inside a cancelled task."""
+        return self.jobs.cancel_requested(job["id"]) if job["id"] in self.jobs else taskstore.cancelled()
 
     def _make_geometry(self, p, rev, keys, name):
         s = self._k("summary", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], p=p)

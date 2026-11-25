@@ -84,10 +84,21 @@ def enabled_text(st, pid: str) -> dict:
     return {"on": on, "why": why}
 
 
-def by_id(jid: str) -> dict | None:
+def by_id(jid: str, st=None) -> dict | None:
+    """A refinement job by id: running in this process, or (with st) the last job a project's refine.json records,
+    so a job is found after the process that ran it has stopped."""
     for pid, j in list(_RUN.items()):
         if j["id"] == jid:
             return {"id": jid, "project": pid, "state": "running"}
+    if st is not None:
+        try:
+            for f in st.root.glob(f"*/{FILE}"):
+                rec = _read(st, f.parent.name)
+                if rec and rec.get("job") == jid:
+                    s = status(st, f.parent.name)
+                    return {"id": jid, "project": f.parent.name, "state": s.get("state"), "stage": s.get("stage")}
+        except OSError:
+            pass
     return None
 
 
@@ -221,7 +232,15 @@ def start(st, pid: str, refine=None, **kw) -> str | None:
     with _lock:
         _RUN[pid] = {"id": jid, "cancel": ev, "thread": th}
     th.start()
+    from .. import taskstore                             # a task that started it can follow and cancel it
+    taskstore.child("refine", jid, pid, ev.set, lambda: (_RUN.get(pid) or {}).get("id") != jid,
+                    lambda: "Refining: " + str(rec.get("stage") or ""))
     return jid
+
+
+def task_id(pid: str, jid: str) -> str:
+    """The task id a refinement job has in the task list (form/taskstore.py: <kind>.<project>.<job>)."""
+    return f"refine.{pid}.{jid}"
 
 
 def set_project(st, pid: str, value: str | None) -> dict:
