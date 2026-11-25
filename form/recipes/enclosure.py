@@ -135,9 +135,32 @@ class Enclosure(Recipe):
             return parts.heat_insert_pocket(g["psize"])
         return parts.self_tap_pilot(g["psize"], depth=avail)
 
+    HEADS = {0: "pan", 1: "socket", 2: "countersunk"}
+    LAND = 0.4                                  # lid left under a recessed head, so the head seats on a real face
+
+    def _lid_head(self, v):
+        """(head, recessed, note): the head asked for when its recess fits in the lid with LAND to spare; otherwise
+        the next one that does (countersunk, then socket in a counterbore, then a pan head on the surface), so every
+        lid thickness and screw size in range builds. note says what changed and why ("" when nothing did)."""
+        size, t = self.g(v)["size"], v["lid_t"]
+        want = self.HEADS[int(round(v["lid_head"]))]
+        order = {"countersunk": ["countersunk", "socket"], "socket": ["socket"], "pan": []}[want]
+        for head in order:
+            try:
+                hole = parts.screw_clearance(size, t, head=head, fit="normal")
+            except RecipeError:                 # no head data for this size, or the recess is deeper than the lid
+                continue
+            if hole["recess_depth"] <= t - self.LAND + 1e-9:
+                note = "" if head == want else (f"A {want} {size} head needs a deeper recess than a {t:g} mm lid has; "
+                                                f"the lid takes a {head} head instead.")
+                return head, True, note
+        note = "" if want == "pan" else (f"A {t:g} mm lid is too thin to recess a {want} {size} head; the screws are "
+                                         f"pan heads on the surface. A thicker lid keeps the head flush.")
+        return "pan", False, note
+
     def _lid_hole(self, v):
-        head = {0: "pan", 1: "socket", 2: "countersunk"}[int(v["lid_head"])]
-        return parts.screw_clearance(self.g(v)["size"], v["lid_t"], head=head, fit="normal", recess=bool(v["lid_head"]))
+        head, recess, _note = self._lid_head(v)
+        return parts.screw_clearance(self.g(v)["size"], v["lid_t"], head=head, fit="normal", recess=recess)
 
     def _vent(self, v):
         """The lid's vent pattern (form.patterns): slots, honeycomb or a round-hole grid over the same area."""
@@ -359,7 +382,9 @@ class Enclosure(Recipe):
         """The lid, printed beside the box with its outer face down, turned over onto the box: the lip goes inside the
         walls and the lid holes line up with the corner bosses (both are symmetric about the box centre)."""
         g = self.g(v)
-        screws = [Hardware("Lid screw", f"{g['size']}", 4, "ISO 7380 / 14583, or a self-tapping screw of that size",
+        head = self._lid_head(v)[0]
+        std = {"countersunk": "ISO 10642", "socket": "ISO 4762"}.get(head, "ISO 7380 / 14583")
+        screws = [Hardware("Lid screw", f"{g['size']} {head} head", 4, f"{std}, or a self-tapping screw of that size",
                            "Screw the lid down at the four corners" + (" into the heat-set inserts." if v["fasten"] else "."),
                            after="lid")]
         return Assembly(
@@ -382,6 +407,9 @@ class Enclosure(Recipe):
              "formula": "plug height + 2 × clearance"},
             {"key": "lid_screw_len", "label": f"Lid screw length ({g['size']})", "value": L, "unit": "mm", "feature": "lid_screws",
              "formula": "lid thickness + insert length" if v["fasten"] else "lid thickness + pilot depth"},
+            {"key": "lid_head_used", "label": f"Lid screw head ({self._lid_head(v)[0]}; 0 pan, 1 socket, 2 countersunk)",
+             "value": {"pan": 0, "socket": 1, "countersunk": 2}[self._lid_head(v)[0]], "unit": "",
+             "feature": "lid_screws", "formula": self._lid_head(v)[2] or "as asked (lid_head)"},
             {"key": "board_top", "label": "Board top above floor", "value": v["standoff_h"] + PCB_T, "unit": "mm",
              "feature": "standoffs", "formula": "standoff + 1.6 mm board (assumed)"},
         ]

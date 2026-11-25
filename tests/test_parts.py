@@ -196,6 +196,30 @@ class NewRecipes(unittest.TestCase):
                         built += 1
             self.assertGreater(built, refused, rid)
 
+    def test_enclosure_lid_screws_build_at_every_edge(self):
+        """Every lid thickness edge with every head style and screw size builds: a head whose recess does not fit in
+        the lid falls back (countersunk, then socket, then a pan head on the surface) and says so."""
+        r = registry()["enclosure"]
+        lid = r.spec("lid_t")
+        for size in (2, 3, 5):
+            for head in (0, 1, 2):
+                for t in (lid.min, lid.max):
+                    over = dict(lid_screw=size, lid_head=head, lid_t=t)
+                    if size == 5:                    # a 5 mm insert needs a wider boss, and the board must clear it
+                        over.update(boss_d=12, pcb_w=70, pcb_d=40, hole_x=50, hole_y=30, hole_dx=0)
+                    with self.subTest(**over):
+                        v = r.validate({**r.defaults(), **over})
+                        used, recessed, note = r._lid_head(v)
+                        hole = r._lid_hole(v)
+                        if recessed:
+                            self.assertLessEqual(hole["recess_depth"], t - r.LAND + 1e-9)
+                        self.assertEqual(bool(note), used != r.HEADS[head])
+                        self._build(r, v)
+        thin = r.validate({**r.defaults(), "lid_head": 2, "lid_t": lid.min})
+        self.assertEqual(r._lid_head(thin)[0], "pan")
+        self.assertIn("too thin", r._lid_head(thin)[2])
+        self.assertEqual(r._lid_head(r.validate({**r.defaults(), "lid_head": 2, "lid_t": 2.0}))[0], "countersunk")
+
     def test_small_and_large_variants(self):
         reg = registry()
         cases = {

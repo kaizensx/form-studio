@@ -6,6 +6,11 @@
   (purpose "game", or a cage source) is left as it was built unless refinement is turned on for it
   (`refine_design(action="on")`, or Refine again once) or for all of them in Settings › General › Refine game assets
   (`[refine] game = true`). The guidance skills and `design_guide(topic="game")` say so.
+- **The enclosure builds with every lid thickness and screw head.** Since the countersink follows the screw's real
+  head cone, a 1.2 mm lid with countersunk M3 screws was refused ("recess deeper than the hole"). The lid now takes
+  the head asked for when its recess leaves at least 0.4 mm of lid under it, and otherwise the next that fits
+  (countersunk, then socket in a counterbore, then a pan head on the surface); the derived values and the BOM name
+  the head used and why. A test builds every lid thickness edge with every head and screw size.
 - **The drawn app on the website shows a planetary gearbox, not the phone dock.** The sample project behind the
   live replica and "How it works" is the planetary gearbox exemplar, created for printing, with one committed change
   (backlash 0.15 to 0.2 mm), then built, checked and sliced: 6 parts, 1027 faces, 7 checks pass and one asks for a
