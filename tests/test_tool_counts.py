@@ -53,7 +53,8 @@ class UploadClaim(unittest.TestCase):
     def test_the_claim_names_what_a_cloud_agent_sees(self):
         site = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("<span>uploads by Form Studio</span>", site)
+        self.assertIn("Uploads by Form Studio</dt>", site)         # the readout beside the terminal
+        self.assertNotIn(">Uploads</dt>", site)
         self.assertNotIn("<span>uploads</span>", site)
         for text in (site, readme):
             self.assertIn("never uploads your files on its own", text)
