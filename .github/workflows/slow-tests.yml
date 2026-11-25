@@ -10,8 +10,7 @@ on:
     - cron: "41 2 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: slow-tests
@@ -26,6 +25,8 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -54,5 +55,5 @@ jobs:
           FORM_CONFIG: ${{ github.workspace }}/.github/ci-studio.toml
           FORM_SLOW_TESTS: "1"
           FORM_SLOW: "1"
-        run: .venv/bin/python -X faulthandler -m unittest -v test_design_bench test_meshprep test_meshbody
+        run: '"$GITHUB_WORKSPACE/.venv/bin/python" -X faulthandler -m unittest -v test_design_bench test_meshprep test_meshbody'
         working-directory: tests

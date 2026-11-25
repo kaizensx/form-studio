@@ -98,6 +98,7 @@ def run(mods: list[str], times_out: Path | None = None) -> bool:
     spent: dict[str, float] = {}
     loader = unittest.TestLoader()
     t_all = time.perf_counter()
+    faulthandler.dump_traceback_later(_Watchdog.limit, exit=True)   # covers the first class's setUpClass too
     result.startTestRun()
     try:
         for m in mods:

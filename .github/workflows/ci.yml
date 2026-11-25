@@ -5,8 +5,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -25,6 +24,8 @@ jobs:
         shard: [1, 2, 3, 4]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
+    permissions:
+      contents: read
     env:
       SHARDS: 4
     steps:
@@ -68,9 +69,9 @@ jobs:
           .venv/bin/python scripts/ci/test_shards.py plan --shards "$SHARDS"
           # Linux measures line coverage of the engine (settings in pyproject.toml); macOS runs the tests plainly.
           if [ "$OS" = "ubuntu-latest" ]; then
-            .venv/bin/python -X faulthandler -m coverage run scripts/ci/test_shards.py run --shards "$SHARDS" --index "$SHARD" --times "times-$SHARD.json"
+            .venv/bin/python -X faulthandler -m coverage run scripts/ci/test_shards.py run --shards "$SHARDS" --index "$SHARD" --times "times-$OS-$SHARD.json"
           else
-            .venv/bin/python -X faulthandler scripts/ci/test_shards.py run --shards "$SHARDS" --index "$SHARD" --times "times-$SHARD.json"
+            .venv/bin/python -X faulthandler scripts/ci/test_shards.py run --shards "$SHARDS" --index "$SHARD" --times "times-$OS-$SHARD.json"
           fi
       - name: MCP reference is up to date
         if: matrix.shard == 1
@@ -162,6 +163,8 @@ jobs:
     name: Workflows and automation scripts
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

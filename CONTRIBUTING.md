@@ -88,7 +88,7 @@ python -m http.server -d site 8000
 
 | Check | What it does | Run it yourself |
 |---|---|---|
-| **CI** | The test suite on Linux and macOS in four shards each (with a coverage summary on Linux), the MCP reference, actionlint and the automation's own tests; the slowest tests run nightly | `.venv/bin/python -m unittest discover -s tests` (one shard: `scripts/ci/test_shards.py run --shards 4 --index 1`; the slow ones: `FORM_SLOW_TESTS=1 FORM_SLOW=1`) |
+| **CI** | The test suite on Linux and macOS in four shards each (with a coverage summary on Linux), the MCP reference, actionlint and the automation's own tests; the slowest tests run nightly | `.venv/bin/python -m unittest discover -s tests` (one shard: `.venv/bin/python scripts/ci/test_shards.py run --shards 4 --index 1`; the slow ones: `FORM_SLOW_TESTS=1 FORM_SLOW=1`) |
 | **Code quality** | ruff lint on the whole tree; the pre-commit hooks on the files you changed; ruff format on changed Python files, as advice | `pre-commit run --from-ref origin/dev --to-ref HEAD` |
 | **Dependency review** | Fails on a new dependency with a high or critical vulnerability, or a licence that cannot ship in an MIT app | — |
 | **CodeQL** | Security analysis of the Python, the website's JavaScript and the workflows | — |

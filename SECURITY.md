@@ -44,7 +44,8 @@ shasum -a 256 -c SHA256SUMS --ignore-missing
   Code from a fork's pull request never runs with a write token: the few jobs that need one for a fork (labels,
   preview comments) run only the base branch's own scripts and read the pull request as data.
 - CodeQL (`security-extended`), [zizmor](https://docs.zizmor.sh/) for the workflows and OpenSSF Scorecard report to
-  Security › Code scanning. Dependency review checks every pull request and comments when it fails; pip-audit checks
+  Security › Code scanning. Dependency review checks every pull request and comments when it fails
+  (on a fork's pull request, whose token cannot comment, the findings are in the job summary); pip-audit checks
   `requirements.lock` and writes its findings to the workflow's job summary.
 - Dependabot alerts and security updates, secret scanning and push protection are on.
 
