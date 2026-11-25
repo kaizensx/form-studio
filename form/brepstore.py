@@ -149,11 +149,8 @@ def _live(info: dict) -> bool:
         return False
     if info.get("host") != socket.gethostname():
         return True                                       # another machine on a shared folder: trust its marker
-    try:
-        os.kill(int(info.get("pid", -1)), 0)
-        return True
-    except (OSError, ValueError, TypeError):
-        return False
+    from .procs import pid_alive
+    return pid_alive(info.get("pid", -1))
 
 
 def _read_marker(m: Path) -> dict | None:

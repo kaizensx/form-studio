@@ -78,6 +78,7 @@ def read(skill: str, rel: str = "SKILL.md") -> str:
 
 def frontmatter(text: str) -> dict[str, str]:
     """The YAML frontmatter of a SKILL.md: one `key: value` per line (plain or quoted scalars only)."""
+    text = text.lstrip("\ufeff").replace("\r\n", "\n")      # a Windows checkout may give CRLF line ends
     m = re.match(r"---\n(.*?)\n---\n", text, re.S)
     if not m:
         raise ValueError("SKILL.md must begin with YAML frontmatter")

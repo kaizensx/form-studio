@@ -48,13 +48,8 @@ _CURRENT: contextvars.ContextVar["TaskRun | None"] = contextvars.ContextVar("for
 
 
 def _alive(os_pid) -> bool:
-    try:
-        os.kill(int(os_pid), 0)
-        return True
-    except PermissionError:                         # exists, owned by someone else
-        return True
-    except (OSError, TypeError, ValueError):
-        return False
+    from .procs import pid_alive
+    return pid_alive(os_pid)
 
 
 def _iso(ts: float) -> str:

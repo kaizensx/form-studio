@@ -55,6 +55,7 @@ jobs:
             [ "$i" = 3 ] && exit 1; echo "Install failed; retrying in 20 s."; sleep 20; done
       - name: Engine smoke tests
         shell: bash
+        timeout-minutes: 15        # a hang fails the build in minutes, not after the job's hour
         # The full suite runs sharded in ci.yml on every push; a download only needs the engine to work on this
         # platform, so this is a short set (studio, MCP, the B-rep store, packaging) instead of 90 minutes per build.
         run: |
