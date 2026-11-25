@@ -291,21 +291,29 @@ def refine_ops_of(source: str) -> list:
     m = re.search(rf"^{HOOK}\s*=\s*(.*)$", source or "", re.M)
     if not m:
         return []
+    from .. import meshsource
     try:
-        from .. import meshsource
-        out = meshsource.unpack(json.loads(m.group(1)))
-        return out if isinstance(out, list) else []
+        val = ast.literal_eval(m.group(1))       # a Python literal (True, False, None), as with_refine_ops writes it
+    except (ValueError, SyntaxError):
+        try:
+            val = json.loads(m.group(1))         # an older source: a JSON line
+        except ValueError:
+            return []
+    try:
+        out = meshsource.unpack(val)
     except ValueError:
         return []
+    return out if isinstance(out, list) else []
 
 
 PACK_OVER = 16_000                   # an op list longer than this (as JSON) is written packed (meshsource.pack)
 
 
 def with_refine_ops(source: str, ops: list) -> str:
-    """The source with REFINE_OPS set to ops (one JSON line after the CAGES list, or replacing the one there). A long
-    list is written as one packed string literal (meshsource.pack), so kit detail never runs into the source limit."""
-    text = json.dumps(ops, separators=(',', ':'))
+    """The source with REFINE_OPS set to ops (one line after the CAGES list, or replacing the one there), written as a
+    Python literal: the design source runs, and JSON's true / false / null are not Python. A long list is written as
+    one packed string literal (meshsource.pack), so kit detail never runs into the source limit."""
+    text = repr(json.loads(json.dumps(ops)))           # plain lists, dicts, str, float, int, bool, None
     if len(text) > PACK_OVER:
         from .. import meshsource
         text = json.dumps(meshsource.pack(ops))

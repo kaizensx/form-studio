@@ -158,6 +158,9 @@ class Operators(unittest.TestCase):
         ops = ops_cage.refine_ops_of(out)
         self.assertEqual(ops[0], {"op": "crease", "region_boundary": "panel", "value": 1.0, "pin_corners": True})
         self.assertEqual(ops[1]["op"], "support_loops")
+        ns: dict = {}
+        exec(compile(out, "<src>", "exec"), ns)          # the source runs: REFINE_OPS is Python (True), not JSON (true)
+        self.assertIs(ns["REFINE_OPS"][0]["pin_corners"], True)
         self.assertFalse(op.check(Design.from_source(out, purpose="game", bbox=d.bbox), None)[0])   # done once
 
     def test_packed_literals_read_back_the_same(self):
