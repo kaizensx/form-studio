@@ -382,6 +382,9 @@ def analyse(model, budget_s: float | None = None, progress=None) -> list:
     for n, m in enumerate(spec.mates):
         note({"phase": "fits", "label": "Joined parts", "done": n, "total": len(spec.mates)})
         out.append(_mate_row(m, lab, B, F0, tol2, warn, bud))
+        fn = _function_row(m, a, ids, lab, bud)          # does it work: a thread engages, a ratchet locks
+        if fn:
+            out.append(fn)
     timings["fits"] = time.perf_counter() - t
 
     # ---- 3. joints: sweep each through its range, everything attached moving with it -------------------------
@@ -431,6 +434,32 @@ def analyse(model, budget_s: float | None = None, progress=None) -> list:
                       frame=None, seconds=secs, budget_s=bud.seconds, partial=partial))
     note({"phase": "done", "label": "Assembly checks", "done": 1, "total": 1})
     return out
+
+
+def _function_row(m, a, ids, lab, bud):
+    """A declared thread or ratchet, checked for what it is for (form/function_checks.py). None for other kinds, a
+    mate without an axis, or when the budget is spent."""
+    if m.kind not in ("thread", "ratchet") or m.axis is None or bud.over():
+        return None
+    from . import function_checks as fc
+    sa, sb = a["placed"][ids.index(m.a)], a["placed"][ids.index(m.b)]
+    pair = f"{lab[m.a]} / {lab[m.b]}"
+    try:
+        if m.kind == "thread":
+            ra = fc._radial(sa, m.axis, m.origin)[0].min()
+            rb = fc._radial(sb, m.axis, m.origin)[0].min()
+            rod, nut = (sa, sb) if ra <= rb else (sb, sa)          # the screw is the one with material on the axis
+            row = fc.thread_engagement(rod, nut, m.axis, m.origin, label=f"{m.label or pair}: thread engages",
+                                       id_=f"fn_thread_{m.a}_{m.b}")
+        else:
+            row = fc.ratchet_engagement(sa, sb, m.axis, m.origin, 0.3 if m.clearance is None else max(0.0, m.clearance),
+                                        label=f"{m.label or pair}: ratchet locks", id_=f"fn_ratchet_{m.a}_{m.b}")
+            if m.clearance is None:
+                row["detail"] += " Clearance not declared: 0.3 mm per side assumed (FDM)."
+    except Exception as e:                             # noqa: BLE001 - a function check that cannot run says so
+        return _check(f"fn_{m.kind}_{m.a}_{m.b}", f"{m.label or pair}: {m.kind} works", "WARN", "not measured",
+                      f"The function check could not run: {type(e).__name__}: {e}", pose={})
+    return dict(row, frame="assembled", pose={})
 
 
 def _mate_row(m, lab, B, F0, tol2, warn, bud):

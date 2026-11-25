@@ -349,6 +349,19 @@ def bearing_seat(designation: str = "608", fit: float = 0.05, through: float = 3
 
 
 # ---- threads -----------------------------------------------------------------------------------------------
+def _minus_ridges(bore, ridges):
+    """A threaded hole's cutter: the bore minus the nut's thread ridges. OCCT's cut of a bore by the helical ridges
+    can fail silently and return the whole bore (a plain hole, no thread: seen on M8 x 1.25 and M12 x 1.75), so the
+    ridges inside the bore are found first (a common) and those are cut; a cutter that still lost none raises."""
+    inside = bore & ridges
+    kept = float(inside.volume) if inside is not None else 0.0
+    out = bore - inside if kept > 1e-6 else bore
+    if kept <= 1e-6 or float(bore.volume) - float(out.volume) < 0.5 * kept:
+        raise RecipeError("The threaded hole came out without thread ridges", "",
+                          "Try a different length, pitch or clearance; a plain bore would not hold the screw.")
+    return out
+
+
 def thread(major_d: float, pitch: float, length: float, external: bool = True, clearance: float = 0.3,
            chamfer: bool = True) -> HardwarePart:
     """A printable ISO metric thread (bd_warehouse IsoThread). Use pitch >= 1 mm for FDM.
@@ -373,7 +386,7 @@ def thread(major_d: float, pitch: float, length: float, external: bool = True, c
         th = th_mod.IsoThread(major_diameter=D, pitch=pitch, length=length, external=False, end_finishes=("fade", "fade"))
         r_out = D / 2
         bore = Cylinder(r_out, length, align=BOTTOM)
-        shape = Pos(0, 0, -length) * (bore - th) + Cylinder(r_out, OVERSHOOT, align=BOTTOM)
+        shape = Pos(0, 0, -length) * _minus_ridges(bore, th) + Cylinder(r_out, OVERSHOOT, align=BOTTOM)
         kind = "cut"
     if not shape.is_valid:
         raise RecipeError("The thread did not build as a valid solid", "", "Try a coarser pitch or a different length.")
@@ -854,7 +867,7 @@ def _thread_part(th, length: float, external: bool, label: str, dims: dict, comp
     else:
         # one cut, no fuse: a bore that overshoots z = 0, minus the nut's thread ridges (a fused overshoot disc
         # leaves an invalid solid at some lengths)
-        shape = Pos(0, 0, -length) * (Cylinder(r_out, length + OVERSHOOT, align=BOTTOM) - th)
+        shape = Pos(0, 0, -length) * _minus_ridges(Cylinder(r_out, length + OVERSHOOT, align=BOTTOM), th)
         kind = "cut"
     if not shape.is_valid or len(shape.solids()) != 1:
         raise RecipeError(f"The {label} did not build as one valid solid", "", "Try a different length or clearance.")
