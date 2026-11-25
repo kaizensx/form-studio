@@ -22,8 +22,10 @@ blender_model.py from form.game.kit; the runner only places copies of it.
 """
 import json
 import math
+import os
 import struct
 import sys
+import threading
 import time
 
 import bmesh
@@ -1140,8 +1142,22 @@ def guard(target, o, before):
     return after
 
 
+def watch_parent():
+    """Blender runs in its own process group, so it would outlive a Form Studio that was killed mid-run. A thread ends
+    this process when its parent is gone (it is re-parented), as the game runner does (blender_game.watch_parent)."""
+    parent = os.getppid()
+
+    def loop():
+        while True:
+            time.sleep(1.0)
+            if os.getppid() != parent:
+                os._exit(5)
+    threading.Thread(target=loop, name="form-parent-watch", daemon=True).start()
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    watch_parent()
     job = json.loads(open(argv[0], encoding="utf-8").read())
     strict = bool(job.get("strict"))
     global STRICT

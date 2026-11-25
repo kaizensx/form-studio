@@ -10,6 +10,7 @@ import json
 import os
 import struct
 import tempfile
+import threading
 import time
 import types
 import unittest
@@ -142,7 +143,17 @@ class Safety(unittest.TestCase):
             elif isinstance(n, ast.ImportFrom):
                 mods.add((n.module or "").split(".")[0])
         self.assertFalse(mods & self.NET, mods & self.NET)
-        self.assertEqual(mods, {"json", "math", "struct", "sys", "time", "bmesh", "bpy", "mathutils"})
+        self.assertEqual(mods, {"json", "math", "os", "struct", "sys", "threading", "time", "bmesh", "bpy",
+                                "mathutils"})
+
+    def test_the_runner_watches_its_parent(self):
+        """A Form Studio killed mid-run does not leave Blender running: the runner ends itself when re-parented."""
+        src = Path(bm.RUNNER).read_text(encoding="utf-8")
+        t = ast.parse(src)
+        main = next(n for n in t.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+        calls = [n.func.id for n in ast.walk(main) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
+        self.assertIn("watch_parent", calls)
+        self.assertIn("getppid", src)
 
     def test_no_exec_or_eval_of_agent_text(self):
         for path in (bm.RUNNER, Path(bm.__file__), Path(meshsource.__file__)):
@@ -213,6 +224,35 @@ class Safety(unittest.TestCase):
             time.sleep(0.1)
         else:
             self.fail("a process Blender started is still running")
+
+    @unittest.skipIf(os.name == "nt", "the stand-in Blender is a POSIX shell script")
+    def test_a_running_blender_is_killed_at_exit(self):
+        """model_mesh's Blender is in the registry kill_all (atexit) empties while it runs, and leaves it after."""
+        from form.game import pipeline
+        tmp = Path(tempfile.mkdtemp())
+        fake = tmp / "fake-blender"
+        fake.write_text("#!/bin/sh\necho 'FORM_STEP 1/1 cage_new'\nsleep 60\n", encoding="utf-8")
+        fake.chmod(0o755)
+        seen = {}
+
+        def at_exit_mid_run():
+            for _ in range(100):
+                with pipeline._LIVE_LOCK:
+                    if pipeline._LIVE:
+                        break
+                time.sleep(0.05)
+            with pipeline._LIVE_LOCK:
+                seen["live"] = list(pipeline._LIVE)
+            seen["killed"] = pipeline.kill_all()     # what atexit runs when Form Studio quits
+        t = threading.Thread(target=at_exit_mid_run)
+        t.start()
+        t0 = time.time()
+        bm._run([str(fake)], tmp, 60, list(CUBE), None, "")
+        t.join(10)
+        self.assertLess(time.time() - t0, 15)
+        self.assertEqual(len(seen["live"]), 1)
+        self.assertEqual(seen["killed"], 1)
+        self.assertEqual(pipeline._LIVE, {})
 
     def test_stale_head_refused(self):
         from form.studio import StudioError

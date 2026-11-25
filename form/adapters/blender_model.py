@@ -715,6 +715,9 @@ def _run(cmd, work: Path, timeout: float, norm: list, on_stage, label: str):
                                 start_new_session=(os.name != "nt"))
     except OSError as e:
         raise BlenderFailed(f"Could not start Blender: {e}", f"Check [blender].app, or reinstall from {DOWNLOAD_URL}")
+    from ..game import pipeline as live        # one registry: every Blender this process started is killed at exit
+    with live._LIVE_LOCK:
+        live._LIVE[proc.pid] = proc
     killed = {"v": False}
 
     def watchdog():                                # the blender.py pattern, but the whole process group goes
@@ -763,6 +766,11 @@ def _run(cmd, work: Path, timeout: float, norm: list, on_stage, label: str):
     finally:
         timer.cancel()
         proc.stdout.close()
+        if proc.poll() is None:                    # an error here: Blender must not run on unsupervised
+            live._kill_group(proc.pid)
+            proc.wait()
+        with live._LIVE_LOCK:
+            live._LIVE.pop(proc.pid, None)
     text = "\n".join(log)
     if killed["v"]:
         raise BlenderFailed(f"Blender did not finish the modelling ops within {timeout:.0f} s and was stopped.",
