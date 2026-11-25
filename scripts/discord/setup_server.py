@@ -481,8 +481,18 @@ class Setup:
                                          "exempt_roles": sorted(x.get("exempt_roles") or []),
                                          "exempt_channels": sorted(x.get("exempt_channels") or [])}, sort_keys=True)
             if norm(cur) != norm(patch):
-                self._try(f"AutoMod {name}", lambda: self._do(
-                    "PATCH", f"/guilds/{self.g}/auto-moderation/rules/{have['id']}", patch, f"AutoMod: update {name}"))
+                self._try(f"AutoMod {name}", lambda: self._update_or_create(have, patch, body, name))
+
+    def _update_or_create(self, have, patch, body, name):
+        """Discord lists its own suggested rules (Block Mention Spam) before anyone has set them up; they have no rule
+        behind them, so PATCH answers 404. Create the rule then."""
+        try:
+            return self._do("PATCH", f"/guilds/{self.g}/auto-moderation/rules/{have['id']}", patch,
+                            f"AutoMod: update {name}")
+        except d.DiscordError as e:
+            if "404" not in str(e):
+                raise
+            return self._do("POST", f"/guilds/{self.g}/auto-moderation/rules", body, f"AutoMod: {name} (set up)")
 
     def ensure_invite(self):
         welcome = self.channel("welcome")["id"]
