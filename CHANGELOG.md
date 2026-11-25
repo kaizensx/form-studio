@@ -65,6 +65,22 @@
   The server registers the skills and tasks extensions when their modules are present (`form/mcp_skills.py`,
   `form/mcp_tasks.py`). docs/MCP.md has new Skills, Questions to the person and Tool search sections.
 
+- **Long MCP tools can run as tasks** (`form/mcp_tasks.py`, extension `io.modelcontextprotocol/tasks`, schema
+  2026-07-28). A client that declares the extension on a call to create_design, update_design, reconstruct,
+  fit_params, optimize, build_candidates, propose_concepts, refine_design (rerun), run_pipeline, commit_change (run),
+  render_photo, turntable, print_simulation, install_software (confirm) or fetch_link gets a task handle at once and
+  polls `tasks/get` until it is completed (the tool's own result), failed or cancelled; progress the tool reports
+  becomes the task's status message, and the task waits for the pipeline job it started. `tasks/cancel` is
+  cooperative: the engine stops at its next stage, before a revision is saved, and cancels the pipeline job,
+  refinement or install the call started; a cancelled task says what it kept (revisions saved before the cancel, or
+  the last stage built as a draft, never a half-written revision). A task never asks the person anything. A client
+  that does not declare the extension gets exactly today's results. Tasks are kept for 24 hours in `<data>/.tasks`
+  (`form/taskstore.py`) and survive a server restart; one whose process stopped reads failed. The extension is
+  wired into the server separately; the tool count stays 96.
+- **Pipeline jobs survive a restart.** `Studio.jobs` writes each job to `<data>/.tasks/jobs/<id>.json` instead of an
+  in-memory list of the last 50, so `get_job` and the app find a job after the server that ran it restarted; a job
+  whose process stopped reads failed. A pipeline job can be cancelled (`Studio.cancel_job`): it finishes the step it
+  is on and marks the rest cancelled.
 - **Every design is refined after it builds.** create_design, update_design, add_feature (code and standard
   features) and a kept candidate now start design refinement in the background once the revision is saved and on
   screen, so the first picture comes as fast as before. What the engine keeps lands as one more revision, "Refined: N
