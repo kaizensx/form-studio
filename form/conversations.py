@@ -66,7 +66,18 @@ DRAFT_DAYS = 7                                  # a draft nobody sent goes to th
 CREATOR_TOOLS = {"create_project": "made", "create_design": "made", "reconstruct": "made", "duplicate_project": "made",
                  "import_project": "made", "pick_concept": "made", "propose_concepts": "concept",
                  "build_candidates": "made"}
-EVENT_KINDS = ("user", "start", "text", "tool", "result", "act", "end", "error", "ask", "answer", "suggest")
+EVENT_KINDS = ("user", "start", "text", "tool", "result", "act", "end", "error", "ask", "answer", "suggest", "gate")
+#: agents whose end event reports a running session total (form/agents/claude.py cost_scope); others report per run
+SESSION_TOTAL_AGENTS = ("claude",)
+
+
+def run_cost(total: float, before: float | None) -> float:
+    """This run's own spend from a session total and the session's total before the run (None: a new session). A total
+    below the one before means the session's count started over (a CLI that counts per run, or a new session under
+    the same id), so the total is the run's own."""
+    before = float(before or 0.0)
+    total = float(total)
+    return round(total - before if total + 1e-9 >= before else total, 6)
 
 
 
@@ -492,6 +503,17 @@ class Conversations:
         ev.setdefault("ts", _now())
         with self._lock:
             meta = self._read(cid)
+            if ev["t"] == "end" and ev.get("cost_scope") == "session" and ev.get("cost_total_usd") is not None:
+                # a running session total (Claude Code): what this run spent is the total minus what the session it
+                # resumed had already spent; the money shown and summed is that, never the running total again
+                totals = dict(meta.get("session_costs") or {})
+                resumed = ev.pop("cost_resumed", None)
+                ev["cost_usd"] = run_cost(ev["cost_total_usd"], totals.get(resumed) if resumed else None)
+                ev["cost_basis"] = "run"
+                sid = ev.pop("cost_session", None)
+                if sid:
+                    totals[sid] = float(ev["cost_total_usd"])
+                    meta["session_costs"] = totals
             if ev["t"] == "user" and self.is_draft(cid):    # the first message: the draft becomes a conversation
                 self._promote(cid)
                 meta.pop("draft", None)
@@ -700,6 +722,99 @@ class Conversations:
                 report["skipped"].append({"id": d.name, "why": why})
                 _log.warning("conversation %s was skipped by the migration: %s", d.name, why)
         return report
+
+    def migrate_costs(self, dry_run: bool = False) -> dict:
+        """Saved conversations whose end events summed a running session total (Claude Code reports the session's
+        whole spend on every resumed run, form/agents/claude.py): each such end event gets the run's own spend as
+        `cost_usd` (the reported value kept as `cost_total_usd`, `cost_basis: "migrated"`), and meta.json's `cost_usd`
+        becomes the sum of the runs. Old events carry no session id, so a session is read as running from one Claude
+        end event to the next until another agent answered in between or the total went down (a new session).
+        Idempotent: an end event with a `cost_basis` is already a run's own spend. Before a conversation is changed its
+        meta.json and events.jsonl are copied to <data>/.backups/costs-<UTC time>/<id>/. dry_run: report only."""
+        report = {"conversations": 0, "changed": [], "skipped": [], "backup": None}
+        if not self.root.is_dir():
+            return report
+        stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+        backup_dir = self.data / ".backups" / f"costs-{stamp}"
+        for d in sorted(self.root.iterdir()):
+            if not ID_RE.fullmatch(d.name) or not d.is_dir():
+                continue
+            report["conversations"] += 1
+            try:
+                with self._lock:
+                    row = self._migrate_costs_one(d, dry_run, backup_dir)
+                if row:
+                    report["changed"].append(row)
+                    if not dry_run:
+                        report["backup"] = str(backup_dir)
+            except Exception as e:                    # one bad conversation never stops the others
+                report["skipped"].append({"id": d.name, "why": f"{type(e).__name__}: {e}"})
+                _log.warning("conversation %s was skipped by the cost migration: %s", d.name, e)
+        return report
+
+    def _migrate_costs_one(self, d: Path, dry_run: bool, backup_dir: Path) -> dict | None:
+        mf, ef = d / "meta.json", d / "events.jsonl"
+        if not mf.is_file() or not ef.is_file():
+            return None
+        meta = json.loads(mf.read_text(encoding="utf-8"))
+        lines = ef.read_text(encoding="utf-8").splitlines()
+        evs = []
+        for line in lines:
+            try:
+                evs.append(json.loads(line))
+            except ValueError:
+                evs.append(None)                      # kept as it was
+        # a fork's copied events belong to its parent (its own count starts after them, in a new session)
+        own_from = (int(meta["fork_event"]) + 1) if meta.get("parent") and meta.get("fork_event") is not None else 0
+        chain, changed, total, known = None, False, 0.0, True
+        for i, e in enumerate(evs):
+            if not isinstance(e, dict) or e.get("t") != "end":
+                continue
+            if i == own_from and own_from:
+                chain = None
+            agent = e.get("agent")
+            if agent not in SESSION_TOTAL_AGENTS:
+                if agent:
+                    chain = None                      # another agent answered: the next Claude run starts a session
+            elif e.get("cost_basis"):
+                if e.get("cost_total_usd") is not None:
+                    chain = float(e["cost_total_usd"])
+            elif e.get("cost_usd") is not None:
+                reported = float(e["cost_usd"])
+                e["cost_usd"] = run_cost(reported, chain)
+                e["cost_total_usd"], e["cost_basis"] = reported, "migrated"
+                chain = reported
+                changed = True
+            if i < own_from:
+                continue
+            if e.get("cost_usd") is not None:
+                total += float(e["cost_usd"])
+            elif not e.get("stopped"):
+                known = False
+        before = meta.get("cost_usd")
+        new_total = round(total, 6)
+        if not changed and (before is None or abs(float(before) - new_total) < 1e-6):
+            return None
+        row = {"id": d.name, "title": meta.get("title", ""), "cost_before": before, "cost_after": new_total}
+        if dry_run:
+            return row
+        dest = backup_dir / d.name
+        dest.mkdir(parents=True, exist_ok=True)
+        for f in (mf, ef):
+            if not (dest / f.name).exists():
+                shutil.copy2(f, dest / f.name)
+        if changed:
+            out = [json.dumps(e, ensure_ascii=False, default=str) if isinstance(e, dict) else line
+                   for e, line in zip(evs, lines)]
+            tmp = ef.with_suffix(".jsonl.tmp")
+            tmp.write_text("\n".join(out) + ("\n" if out else ""), encoding="utf-8")
+            fsutil.replace(tmp, ef)
+        meta["cost_usd"] = new_total
+        meta["cost_known"] = bool(known)
+        tmp = mf.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(meta, indent=1, ensure_ascii=False), encoding="utf-8")
+        fsutil.replace(tmp, mf)
+        return row
 
     def _migrate_one(self, d: Path, report: dict, dry_run: bool, families: bool, backup) -> None:
         f = d / "meta.json"
@@ -1098,6 +1213,26 @@ def _would_write(data: Path, project: str, root_pid: str | None) -> bool:
 
 
 MIGRATION_KEY = "conversation_designs"
+COST_MIGRATION_KEY = "conversation_costs"
+
+
+def _migrate_costs_once(data: Path, f: Path, done: dict) -> dict:
+    """Conversations.migrate_costs, recorded under its key in .form-migrations.json (it is idempotent as well)."""
+    try:
+        rep = Conversations(data).migrate_costs()
+        row = {"ts": time.time(), "conversations": rep["conversations"], "changed": rep["changed"],
+               "skipped": rep["skipped"], "backup": rep["backup"]}
+    except Exception as e:                        # recorded as done: it never fails again at every start
+        _log.warning("the cost migration stopped: %s", e)
+        row = {"ts": time.time(), "error": f"{type(e).__name__}: {e}"}
+    done = dict(done, **{COST_MIGRATION_KEY: row})
+    try:
+        tmp = f.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(done), encoding="utf-8")
+        fsutil.replace(tmp, f)
+    except OSError:
+        pass
+    return done
 
 
 def migrate_once(data: Path) -> dict | None:
@@ -1108,7 +1243,11 @@ def migrate_once(data: Path) -> dict | None:
         done = json.loads(f.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         done = {}
-    if not isinstance(done, dict) or MIGRATION_KEY in done:
+    if not isinstance(done, dict):
+        return None
+    if COST_MIGRATION_KEY not in done:              # its own key: it runs once on folders migrated before it existed
+        done = _migrate_costs_once(Path(data), f, done)
+    if MIGRATION_KEY in done:
         return None
     try:
         rep = Conversations(data).migrate()
