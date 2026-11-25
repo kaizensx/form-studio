@@ -874,11 +874,14 @@ class Studio:
             source = featureprog.strip_partial(source)
         rid = self._load_design(source, language)
         new = self.recipes[rid]
-        with self.lock(p["id"]):
-            p = self.load(p["id"])
-            if expect_head is not None and p["head"] != expect_head:
-                raise StudioError(f"The design moved on: head is r{p['head']}, not r{expect_head}.",
-                                  "Read the project again, then re-apply your edit.", status=409, head=p["head"])
+        # The build runs outside the project lock (it can take minutes), so a rename or a note is never held up by
+        # it; the lock is taken only to check that the head is still the one this source was built on, and to save.
+        p = self.load(p["id"])
+        if expect_head is not None and p["head"] != expect_head:
+            raise StudioError(f"The design moved on: head is r{p['head']}, not r{expect_head}.",
+                              "Read the project again, then re-apply your edit.", status=409, head=p["head"])
+        built_on = p["head"]
+        if True:
             head = self.rev(p)
             keep = {k: v for k, v in head["values"].items() if k in {q.key for q in new.params}}
             vals = {**new.defaults(), **keep, **{k: float(v) for k, v in (values or {}).items()}}
@@ -888,6 +891,14 @@ class Studio:
             rid, info = self._try_design(rid, vals, partial=partial and language == "python", p=p, draft=draft,
                                          name=p.get("name", ""), prev_skipped=prev)
             self.cancel_point("the new source was built but no revision was saved")
+        with self.lock(p["id"]):
+            fresh = self.load(p["id"])               # what changed meanwhile (a name, a note, an appearance) is kept
+            if fresh["head"] != built_on:
+                raise StudioError(f"The design moved on while this source was building: head is r{fresh['head']}, "
+                                  f"not r{built_on}.", "Read the project again, then re-apply your edit.", status=409,
+                                  head=fresh["head"])
+            p = fresh
+            head = self.rev(p)
             new = self.recipes[rid]
             prov = {q.key: (head["provenance"][q.key] if q.key in head["provenance"] and q.key in keep
                             and head["provenance"][q.key].get("source") != "assumed" else _initial_provenance(q)) for q in new.params}
