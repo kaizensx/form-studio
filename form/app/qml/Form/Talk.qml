@@ -116,12 +116,17 @@ Rectangle {
         }
         return out
     }
+    // A block that arrives while you watch (a reply, a step, your message) fades in where it lands. A saved
+    // conversation that opens arrives all at once and is drawn as it is: nothing fades, so nothing can be left
+    // half-drawn when the feed jumps to its end (a ListView add transition stopped by that jump left whole
+    // messages at opacity 0: an empty column with only the last footer).
+    readonly property int arrivals: 3            // at most this many new blocks at once count as arriving live
     function sync() {
-        var b = build()
+        var b = build(), live = b.length - blocks.count <= talk.arrivals && blocks.count > 0, now = Date.now()
         for (var i = 0; i < b.length; i++) {
             var j = JSON.stringify(b[i])
             if (i < blocks.count) { if (blocks.get(i).j !== j) blocks.set(i, { k: b[i].k, j: j }) }
-            else blocks.append({ k: b[i].k, j: j })
+            else blocks.append({ k: b[i].k, j: j, born: live ? now : 0 })
         }
         while (blocks.count > b.length) blocks.remove(blocks.count - 1)
     }
@@ -271,7 +276,7 @@ Rectangle {
 
     // ── the feed ──
     ListView {
-        id: feed
+        id: feed; objectName: "talkFeed"
         property bool stick: true              // follow the newest message unless the reader scrolled up
         property bool auto: false
         visible: !talk.empty
@@ -279,10 +284,6 @@ Rectangle {
         topMargin: 16; bottomMargin: 12; clip: true; spacing: 14
         boundsBehavior: Flickable.StopAtBounds
         model: blocks
-        // a new message, step group or footer fades in where it lands; nothing moves, so the feed never jumps
-        // and rises the last few pixels into place (a transform, so the rows around it never re-lay out)
-        add: Transition { ParallelAnimation { Glide { property: "opacity"; from: 0; to: 1; duration: Theme.base }
-            Glide { property: "rise"; from: Theme.shift(Theme.rise); to: 0; duration: Theme.move(Theme.panel) } } }
         function toEnd() { if (!stick) return; auto = true; positionViewAtEnd(); auto = false }
         onContentHeightChanged: Qt.callLater(toEnd)
         onHeightChanged: Qt.callLater(toEnd)
@@ -293,8 +294,16 @@ Rectangle {
             required property string j
             required property string k
             required property int index
+            required property real born
             property real rise: 0
             transform: Translate { y: it.rise }
+            // a new message, step group or footer fades in where it lands and rises the last few pixels into place
+            // (a transform, so the rows around it never re-lay out). The delegate runs it itself, so the view moving
+            // can never stop it half-way; made again later (scrolled back to), it is simply there.
+            Component.onCompleted: if (born > 0 && Date.now() - born < 400) arrive.start()
+            ParallelAnimation { id: arrive; alwaysRunToEnd: true
+                Glide { target: it; property: "opacity"; from: 0; to: 1; duration: Theme.base }
+                Glide { target: it; property: "rise"; from: Theme.shift(Theme.rise); to: 0; duration: Theme.move(Theme.panel) } }
             readonly property var m: JSON.parse(j)
             width: feed.width; implicitHeight: body.item ? body.item.implicitHeight : 0; height: implicitHeight
             HoverHandler { id: hh }

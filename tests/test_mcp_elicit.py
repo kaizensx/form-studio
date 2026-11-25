@@ -234,6 +234,12 @@ class Elicitation(unittest.TestCase):
             if (tool.meta or {}).get("anthropic/alwaysLoad") is True:
                 always.add(tool.name)
         self.assertEqual(always, set(mcp_server.ALWAYS_LOAD))
+        # the workflow the instructions give is callable by name at once: a deferred tool answers
+        # "No such tool available" (design_guide did, in a real conversation); the set stays small
+        first = {"form_overview", "design_guide", "design_brief", "create_design", "update_design", "get_project",
+                 "render", "preview_change", "commit_change"}
+        self.assertLessEqual(first, always)
+        self.assertLessEqual(len(always), 12)
 
     def test_skills_and_tasks_extensions_register_when_present(self):
         import types

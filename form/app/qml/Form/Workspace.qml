@@ -213,7 +213,14 @@ Item {
         // the build-up's caption: which feature just arrived
         Rectangle {
             id: buildCap; objectName: "buildCaption"; z: 6
-            anchors.horizontalCenter: parent.horizontalCenter; y: 58
+            // centred over the part, but never under the dock's panels (top right: refinement, legends): it moves left
+            // of them, and below them when there is no room beside them
+            readonly property bool dockShown: dock.visible && dock.width > 0 && dock.height > 0
+            readonly property real centred: (parent.width - width) / 2
+            readonly property real room: dockShown ? dock.x - 12 - width : centred
+            readonly property bool beside: room >= 12
+            x: Math.round(beside ? Math.min(centred, room) : centred)
+            y: beside ? 58 : Math.round(dock.y + dock.height + 10)
             width: bcr.implicitWidth + 28; height: 32; radius: 16; color: Theme.alpha(Theme.plate3, 0.94); border.color: Theme.alpha(Theme.datum, 0.45)
             // a stage streamed while the agent rewrites the design: "Building Rim (3 of 5)"
             readonly property var st: Store.building && Store.building.project === Store.pid ? Store.building : null
@@ -451,10 +458,13 @@ Item {
                 color: Theme.alpha(Theme.blueprint, 0.14); border.color: Theme.alpha(Theme.blueprint, 0.3)
                 Txt { id: b1; anchors.centerIn: parent; font.pixelSize: 12; color: Theme.strong(Theme.blueprint); wrapMode: Text.NoWrap
                     text: "Draft, not committed · blue lines are " + (Store.project ? F.pad(Store.project.head) : "") } }
-            Rectangle { visible: !!Store.compare; width: b2.implicitWidth + 20; height: 26; radius: Theme.rSm
+            Rectangle { objectName: "compareChip"; visible: !!Store.compare; width: b2.implicitWidth + 20; height: 26; radius: Theme.rSm
                 color: Theme.alpha(Theme.blueprint, 0.14); border.color: Theme.alpha(Theme.blueprint, 0.3)
-                Txt { id: b2; anchors.centerIn: parent; font.pixelSize: 12; color: Theme.strong(Theme.blueprint); wrapMode: Text.NoWrap
-                    text: Store.compare ? "Comparing · solid is " + F.pad(Store.project.head) + " (head), blue lines are " + F.pad(Store.compare.rev) : "" } }
+                Row { id: b2; x: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+                    Txt { font.pixelSize: 12; color: Theme.strong(Theme.blueprint); wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
+                        text: Store.compare && Store.project ? "Comparing · solid is " + F.pad(Store.project.head) + " (head), blue lines are " + F.pad(Store.compare.rev) : "" }
+                    Btn { objectName: "compareDone"; small: true; kind: "quiet"; text: "Done"; tip: "Stop comparing (Esc)"
+                        anchors.verticalCenter: parent.verticalCenter; onClicked: Store.endCompare() } } }
             Rectangle { visible: ws.mapBlocked; width: Math.min(mb.implicitWidth + 20, centre.width - 32); height: 26; radius: Theme.rSm
                 color: Theme.alpha(Theme.amber, 0.12); border.color: Theme.alpha(Theme.amber, 0.3)
                 Txt { id: mb; x: 10; width: parent.width - 20; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; color: Theme.strong(Theme.amber); wrapMode: Text.NoWrap; elide: Text.ElideRight

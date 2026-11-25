@@ -486,7 +486,7 @@ QtObject {
     function checkout(n) {
         if (hasDraft) return toast("Commit or discard the draft first.", "", true)
         ppost("/checkout", { rev: n }).then(function (r) {
-            compare = null; ack = []
+            endCompare(); ack = []
             if (r.job) track(r.job)
             refresh(true)
             toast("Head is now " + F.pad(n))
@@ -532,7 +532,7 @@ QtObject {
     function setStage(id) {
         stage = id; section = null
         if (id !== "prove") layers = null
-        if (id !== "release" && compare) { compare = null; if (viewer) viewer.setGhost(hasDraft ? view : null) }
+        if (id !== "release" && compare) endCompare()
         if (viewer) { var had = !!viewer.marker; viewer.setMarker(null); if (had) viewer.setView(viewName, true) }    // a check's marker zoomed in: frame the part again
         applyStageView()
     }
@@ -542,8 +542,15 @@ QtObject {
     function toggleDims() { dims = !dims; applyStageView() }
     function setAck(id, on) { ack = on ? ack.concat([id]) : ack.filter(function (x) { return x !== id }) }
 
+    // Compare: an older revision as a ghost over the head. It ends from the same button (a toggle), the Done on the
+    // viewport's "Comparing" chip, Esc, another stage, or showing or checking out another revision.
+    function endCompare() {
+        if (!compare) return
+        compare = null
+        if (viewer) { viewer.setGhost(hasDraft ? view : null); viewer.flagged = [] }
+    }
     function compareWith(n) {
-        if (compare && compare.rev === n) { compare = null; if (viewer) { viewer.setGhost(null); viewer.flagged = [] } return }
+        if (compare && compare.rev === n) return endCompare()
         Promise.all([pget("/view?rev=" + n), pget("/diff?a=" + n + "&b=" + project.head)]).then(function (r) {
             compare = { rev: n, view: r[0], diff: r[1], geo: null, geoBusy: true, geoError: "" }
             if (viewer) {
@@ -950,6 +957,7 @@ QtObject {
         _endDraft(d)
         if (building && building.draft === d) { _handoff = true; if (screen === "designing") calmArrive = true }
         follow(w.ev)
+        if (building) _stageEnd.restart()          // the head takes over; if it never does, the caption still goes
     }
     function _stageView() { return screen === "designing" ? stageViewer : screen === "work" ? viewer : null }
     // the agent of this conversation (or any agent, while the open design was not worked on) starts a new design while
@@ -1012,9 +1020,23 @@ QtObject {
         building = null; _handoff = false; calmArrive = false; _framedDiag = 0; _commitWait = null
         if (stageViewer && stageViewer.model && stageViewer.model.stage) stageViewer.setModel(null)
     }
-    property var _stageEnd: Timer { interval: 3000; onTriggered: if (s.building && !s._handoff && !s._commitWait && !s.chatBusy) s._stageClear() }
+    // The caption of a streamed build never outlives it. 3 s after the last stage, the last commit or the end of the
+    // reply: a build that was saved (or handed to the saved head) drops its caption whatever else happened (a commit
+    // that arrived with its last stages, a head that was never shown because a revision was being viewed); a build
+    // nobody saved is cleared once the reply has ended. A build still streaming while the agent works keeps it.
+    property var _stageEnd: Timer { interval: 3000; onTriggered: s._stageTimeout() }
+    function _stageTimeout() {
+        if (!building || _commitWait) return
+        if (_handoff || _draftDone[building.draft]) {
+            building = null; _handoff = false; calmArrive = false; _framedDiag = 0
+            if (screen === "work" && viewer && viewer.model && viewer.model.stage) showHead()     // the saved head, not a stage
+            return
+        }
+        if (!chatBusy) _stageClear()
+    }
     property var _stageWatch: Connections { target: s
         function onChatBusyChanged() { if (!s.chatBusy && s.building) s._stageEnd.restart() }
+        function onBuildingChanged() { if (s.building) s._stageEnd.restart() }
         function onScreenChanged() { if (s.screen !== "designing" && s.screen !== "work") s._stageClear() }
         function onPidChanged() { if (s.building && s.building.project && s.building.project !== s.pid) s.building = null } }
     property var _stageDone1: Connections { target: s.stageViewer; ignoreUnknownSignals: true; function onRevealDone() { s._stageSettle(s.stageViewer) } }
@@ -1408,7 +1430,9 @@ QtObject {
     }
     // a change the agent made, from its reply card: compare with the revision before, or go back to it
     function compareChange(c) {
-        var go = function () { setStage("shape"); compareWith(c.from) }
+        // the same card again ends it: setStage would have ended it and compareWith started it again, so it never went off
+        if (c.project === pid && compare && compare.rev === c.from) return endCompare()
+        var go = function () { if (stage !== "shape") setStage("shape"); compareWith(c.from) }
         if (c.project !== pid) open(c.project).then(go); else go()
     }
     function undoChange(c) {
@@ -2035,6 +2059,7 @@ QtObject {
     }
     function _showScrub(n, v) {
         if (!viewer) return
+        endCompare()                         // another revision on screen: the ghost would describe the wrong pair
         if (n === project.head) { scrub = null; if (preview) { viewer.setModel(preview); viewer.setGhost(view) } else showHead() }
         else { scrub = { rev: n, view: v }; viewer.flagged = []; viewer.setModel(v); viewer.setGhost(null) }
     }
