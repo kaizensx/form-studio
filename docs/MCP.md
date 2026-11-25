@@ -80,6 +80,8 @@ read with `resources/read` at `skill://<name>/SKILL.md`. Claude Code lists them 
 available in headless runs (`claude -p`, the Agent SDK) or to clients without the extension, so the same guidance
 stays reachable through the `design_guide` tool.
 
+This build of the server offers the extensions `io.modelcontextprotocol/skills`.
+
 ## Questions to the person
 
 A tool that needs the person asks, in this order: Form Studio's own chat (when the agent runs inside it); the
