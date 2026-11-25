@@ -1060,12 +1060,15 @@ def _stages_get(key: str):
 _stages_mem: dict = {}
 
 
-def checkpoint_get(key: str):
-    hit = _mem.get(key)
-    if hit is not None:
-        _mem[key] = _mem.pop(key)
-        return hit
-    d = _dir()
+def checkpoint_get(key: str, d: Path | None = None):
+    """The shape kept under key, or None. d: another folder (form/brepstore.py), read from disk only."""
+    own = d is None
+    if own:
+        hit = _mem.get(key)
+        if hit is not None:
+            _mem[key] = _mem.pop(key)
+            return hit
+        d = _dir()
     if d is None:
         return None
     f = d / f"{key}.bin"
@@ -1086,7 +1089,8 @@ def checkpoint_get(key: str):
         os.utime(f)
     except Exception:
         return None
-    _remember(key, shape)
+    if own:
+        _remember(key, shape)
     return shape
 
 
@@ -1116,9 +1120,12 @@ def _restore_names(shape, meta: dict) -> None:
             pass
 
 
-def checkpoint_put(key: str, shape) -> None:
-    _remember(key, shape)
-    d = _dir()
+def checkpoint_put(key: str, shape, d: Path | None = None) -> None:
+    """Keep shape under key. d: another folder (form/brepstore.py, which prunes its own), written to disk only."""
+    own = d is None
+    if own:
+        _remember(key, shape)
+        d = _dir()
     if d is None:
         return
     try:
@@ -1130,7 +1137,7 @@ def checkpoint_put(key: str, shape) -> None:
                                                        **_names(shape)}, default=str), encoding="utf-8")
             os.replace(tmp, d / f"{key}.bin")
         global _pruned
-        if time.monotonic() - _pruned >= PRUNE_EVERY_S:   # listing hundreds of files on every feature costs the build
+        if own and time.monotonic() - _pruned >= PRUNE_EVERY_S:   # listing hundreds of files on every feature costs the build
             _pruned = time.monotonic()
             # off the build's path: with a thousand checkpoints (a session that refines every design) the listing
             # and stat calls took milliseconds out of the first feature of the next design, before its first stage

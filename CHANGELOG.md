@@ -29,6 +29,11 @@
   another agent by the old app's path, add it again: `form setup` finds your agents and writes the entry.
 - **Creation first.** A new design is a 3D model; 3D printing is optional and turned on when you want it.
 - **Builds run side by side** in a kernel pool, and pipeline jobs survive a restart.
+- **A design is built once.** The solid a change builds is kept (on disk, for every Form Studio process) and reused
+  for the view, the exports, the checks and every render and analysis at any detail. Replaying a real session on the
+  shower holder: 1 build per change instead of 3 (update_design 22 to 33 s instead of 37 to 49 s), a render right after
+  the change 1.4 s, and a new window opening the same revision builds nothing (it built again for 8 to 9 s). Renders draw 4 to 8 times
+  faster, pixel for pixel the same. Kernel time limits follow how long the design takes to build.
 - **Agents:** MCP 2026-07-28 throughout, long tools can run as tasks, and the design guidance is served as skills.
 - **Recipes are no longer a public library.** The engine still uses them as building blocks for agents; the website page, the Discord forum and the submission form are gone.
 

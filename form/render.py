@@ -117,6 +117,71 @@ def _font(size: int):
     return f
 
 
+RASTER_BATCH = 4_000_000     # candidate pixels per batch of triangles (memory: about 60 bytes each)
+
+
+def _raster(X, Y, Z, w: int, h: int):
+    """Z-buffer of screen-space triangles: (depth, index of the nearest triangle or -1) per pixel. The same pixels
+    and the same winner as drawing the triangles one after another with a strict depth test (the nearest wins, the
+    first of equal depths), computed for many triangles at once: triangles go in batches of similar box size, each
+    batch's pixel candidates are measured together, and the nearest per pixel is kept."""
+    zbuf = np.full((h, w), np.inf)
+    ibuf = np.full((h, w), -1, dtype=np.int64)
+    n = len(X)
+    if not n:
+        return zbuf, ibuf
+    x0 = np.maximum(np.floor(X.min(axis=1)).astype(np.int64), 0)
+    x1 = np.minimum(np.ceil(X.max(axis=1)).astype(np.int64), w - 1)
+    y0 = np.maximum(np.floor(Y.min(axis=1)).astype(np.int64), 0)
+    y1 = np.minimum(np.ceil(Y.max(axis=1)).astype(np.int64), h - 1)
+    area = (X[:, 1] - X[:, 0]) * (Y[:, 2] - Y[:, 0]) - (X[:, 2] - X[:, 0]) * (Y[:, 1] - Y[:, 0])
+    ok = (x1 >= x0) & (y1 >= y0) & (np.abs(area) >= 1e-9)
+    idx = np.flatnonzero(ok)
+    if not len(idx):
+        return zbuf, ibuf
+    gw, gh = x1[idx] - x0[idx] + 1, y1[idx] - y0[idx] + 1
+    # triangles in buckets of box size (powers of two), each bucket in batches of RASTER_BATCH candidate pixels
+    bx = np.ceil(np.log2(gw)).astype(np.int64)
+    by = np.ceil(np.log2(gh)).astype(np.int64)
+    order = np.lexsort((idx, bx, by))
+    idx, bx, by = idx[order], bx[order], by[order]
+    cut = np.flatnonzero((bx[1:] != bx[:-1]) | (by[1:] != by[:-1])) + 1
+    batches = []
+    for lo_, hi_ in zip(np.r_[0, cut], np.r_[cut, len(idx)]):
+        bw, bh = 1 << int(bx[lo_]), 1 << int(by[lo_])
+        step = max(1, RASTER_BATCH // (bw * bh))
+        batches += [(idx[k:min(k + step, hi_)], bw, bh) for k in range(lo_, hi_, step)]
+    pix, dep, tri = [], [], []
+    for b, bw, bh in batches:
+        ox = np.arange(bw)[None, None, :]
+        oy = np.arange(bh)[None, :, None]
+        pxi = x0[b][:, None, None] + ox
+        pyi = y0[b][:, None, None] + oy
+        valid = (pxi <= x1[b][:, None, None]) & (pyi <= y1[b][:, None, None])
+        px, py = pxi + 0.5, pyi + 0.5
+        x, y, z = X[b], Y[b], Z[b]
+        xa, xb, xc = (x[:, k][:, None, None] for k in range(3))
+        ya, yb, yc = (y[:, k][:, None, None] for k in range(3))
+        ar = area[b][:, None, None]
+        w0 = ((xb - px) * (yc - py) - (xc - px) * (yb - py)) / ar
+        w1 = ((xc - px) * (ya - py) - (xa - px) * (yc - py)) / ar
+        w2 = 1 - w0 - w1
+        inside = valid & (w0 >= -1e-6) & (w1 >= -1e-6) & (w2 >= -1e-6)
+        zz = w0 * z[:, 0][:, None, None] + w1 * z[:, 1][:, None, None] + w2 * z[:, 2][:, None, None]
+        t, r, c = np.nonzero(inside)
+        pix.append(pyi[t, r, 0] * w + pxi[t, 0, c])
+        dep.append(zz[t, r, c])
+        tri.append(b[t])
+    pix, dep, tri = np.concatenate(pix), np.concatenate(dep), np.concatenate(tri)
+    o = np.lexsort((tri, dep, pix))                      # per pixel: nearest first, then the earlier triangle
+    pix, dep, tri = pix[o], dep[o], tri[o]
+    first = np.ones(len(pix), dtype=bool)
+    first[1:] = pix[1:] != pix[:-1]
+    zbuf.reshape(-1)[pix[first]] = dep[first]
+    ibuf.reshape(-1)[pix[first]] = tri[first]
+    return zbuf, ibuf
+
+
 def render_png(view_data: dict, features: list, view: str = "iso", highlight: str | None = None,
                size=(960, 680), title: str = "", ss: int = 2, camera: tuple | None = None, frame_box=None,
                overlay: bool = True, caption: str = "", as_image: bool = False, lines: list | None = None):
@@ -184,29 +249,7 @@ def render_png(view_data: dict, features: list, view: str = "iso", highlight: st
     light /= np.linalg.norm(light)
     shade = 0.42 + 0.58 * np.clip(n @ light, 0, 1)
 
-    zbuf = np.full((h, w), np.inf)
-    ibuf = np.full((h, w), -1, dtype=np.int64)
-    for i in range(len(V)):
-        x, y, z = X[i], Y[i], Z[i]
-        x0, x1 = max(int(math.floor(x.min())), 0), min(int(math.ceil(x.max())), w - 1)
-        y0, y1 = max(int(math.floor(y.min())), 0), min(int(math.ceil(y.max())), h - 1)
-        if x1 < x0 or y1 < y0:
-            continue
-        area = (x[1] - x[0]) * (y[2] - y[0]) - (x[2] - x[0]) * (y[1] - y[0])
-        if abs(area) < 1e-9:
-            continue
-        px, py = np.meshgrid(np.arange(x0, x1 + 1) + 0.5, np.arange(y0, y1 + 1) + 0.5)
-        w0 = ((x[1] - px) * (y[2] - py) - (x[2] - px) * (y[1] - py)) / area
-        w1 = ((x[2] - px) * (y[0] - py) - (x[0] - px) * (y[2] - py)) / area
-        w2 = 1 - w0 - w1
-        inside = (w0 >= -1e-6) & (w1 >= -1e-6) & (w2 >= -1e-6)
-        if not inside.any():
-            continue
-        zz = w0 * z[0] + w1 * z[1] + w2 * z[2]
-        zs = zbuf[y0:y1 + 1, x0:x1 + 1]
-        m = inside & (zz < zs)
-        zs[m] = zz[m]
-        ibuf[y0:y1 + 1, x0:x1 + 1][m] = i
+    zbuf, ibuf = _raster(X, Y, Z, w, h)
 
     hl = order.index(highlight) if highlight in order else None
     base = np.array([PALETTE[k % len(PALETTE)] for k in range(len(order) + 1)], dtype=np.float64)
@@ -236,16 +279,19 @@ def render_png(view_data: dict, features: list, view: str = "iso", highlight: st
             Xa, Ya = (ax - cx) * scale + w / 2, h - ((ay - cy) * scale + bottom_band + usable_h / 2)
             Xb, Yb = (bx - cx) * scale + w / 2, h - ((by - cy) * scale + bottom_band + usable_h / 2)
             steps = np.maximum(np.ceil(np.hypot(Xb - Xa, Yb - Ya)), 1).astype(int)
-            for k in range(len(E)):
-                t = np.linspace(0, 1, steps[k] + 1)
-                xs = (Xa[k] + (Xb[k] - Xa[k]) * t).astype(int)
-                ys = (Ya[k] + (Yb[k] - Ya[k]) * t).astype(int)
-                zs = az_[k] + (bz[k] - az_[k]) * t
-                ok = (xs >= 0) & (xs < w) & (ys >= 0) & (ys < h)
-                xs, ys, zs = xs[ok], ys[ok], zs[ok]
-                vis = zs <= zbuf[ys, xs] + eps
-                for dx, dy in (((0, 0), (1, 0), (0, 1)) if wide == 1 else ((0, 0), (1, 0), (0, 1), (1, 1), (2, 0), (0, 2), (2, 1), (1, 2), (2, 2))):
-                    img[np.clip(ys[vis] + dy, 0, h - 1), np.clip(xs[vis] + dx, 0, w - 1)] = ink
+            # every segment's samples at once: segment k has steps[k] + 1 evenly spaced (np.linspace(0, 1, n))
+            k = np.repeat(np.arange(len(E)), steps + 1)
+            j = np.arange(len(k)) - np.repeat(np.cumsum(steps + 1) - (steps + 1), steps + 1)
+            t = j * (1.0 / steps[k])
+            t[j == steps[k]] = 1.0
+            xs = (Xa[k] + (Xb[k] - Xa[k]) * t).astype(int)
+            ys = (Ya[k] + (Yb[k] - Ya[k]) * t).astype(int)
+            zs = az_[k] + (bz[k] - az_[k]) * t
+            ok = (xs >= 0) & (xs < w) & (ys >= 0) & (ys < h)
+            xs, ys, zs = xs[ok], ys[ok], zs[ok]
+            vis = zs <= zbuf[ys, xs] + eps
+            for dx, dy in (((0, 0), (1, 0), (0, 1)) if wide == 1 else ((0, 0), (1, 0), (0, 1), (1, 1), (2, 0), (0, 2), (2, 1), (1, 2), (2, 2))):
+                img[np.clip(ys[vis] + dy, 0, h - 1), np.clip(xs[vis] + dx, 0, w - 1)] = ink
 
     out = Image.fromarray(img.clip(0, 255).astype(np.uint8)).resize((W, Hh), Image.LANCZOS)
     d = ImageDraw.Draw(out)

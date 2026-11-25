@@ -78,6 +78,16 @@ only the slice. Reverting an input makes the earlier artifact current again, wit
 last stage that created the surface under it. This is what makes click-to-select, colour by feature and "features
 touched" real rather than declared.
 
+**A solid is built once.** A (design source, values) pair is built once, whatever tolerance, operation or process
+asks for it: the kernel keeps the B-rep with its face-to-feature map (by face index, attributed on a 0.05 mm mesh) and
+derives each tessellation from it. `form/brepstore.py` keeps it on disk under `.cache/brep/<content key>` (the design's
+code, the values, the code that builds and attributes solids, the kernel, label text and imported parts), so another
+worker, MCP server or the CLI loads it instead of building; a `.building` marker makes a second process wait for the
+first instead of building the same key. A draft and the revision it becomes share one geometry key
+(`Studio.geometry_key`). Kernel call deadlines follow the design's predicted build cost (`Studio.deadline`), not a fixed
+minute. `scripts/bench_replay.py` replays logged tool calls on a copy of a project and counts builds, seconds and
+restarts.
+
 **Purpose decides what applies.** A design for 3D printing runs every check and is sliced. A design that is just a 3D
 model skips the print-only checks (build volume, nozzle walls, overhangs, bridges, plate contact, the fit model) and the
 slice; its thinnest feature is compared with the process it names. The release says what it does not cover.
