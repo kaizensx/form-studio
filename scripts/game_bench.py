@@ -553,8 +553,9 @@ def write_compare(on: dict, off: dict) -> None:
          f"- Scored by: {so.get('scored_by') or 'nobody'} ({so.get('date', 'undated')}). {so.get('method') or ''} "
          "The rubric is a model's judgement of rendered sheets, not a person's and not a measurement.",
          f"- The off column's rubric is {Path(m_off.get('scores') or SCORES).name}: "
-         + ((m_off.get("scores_meta") or {}).get("method") or "scored on the sheets of the run it came with.")
-         + "", "",
+         + ("the same blind passes (the sheets of both runs were scored together, shuffled)."
+            if (m_off.get("scores_meta") or {}).get("method") == so.get("method") and so.get("method") else
+            (m_off.get("scores_meta") or {}).get("method") or "scored on the sheets of the run it came with."), "",
          "| Brief | Validation off / on | LOD0 tris off / on | Bevel off / on | Contrast off / on | Wear off / on | "
          "Rubric off | Rubric on | Refinement (kept) |",
          "|---|---|---|---|---|---|---|---|---|"]

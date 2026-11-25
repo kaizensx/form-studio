@@ -19,6 +19,21 @@
 - **Stricter game deficits.** A game asset's silhouette deficit also counts its plainest view (a slab or a disc
   from the side), and its detail scales count how dense the secondary breakup is (feature-edge length per diagonal),
   so the engine has something to do on assets the old measures called finished.
+- **New cage operators.** Crisp plates (`crisp_regions`): soft region borders creased with their corners kept and
+  support loops beside them, so a pushed-out plate reads as a plate, not a swell. The silhouette breaker works on
+  any cage: without a brow, crest or vent region it pushes out the bordered region that faces across the plainest
+  view, and every breaker's seat is creased. A quick bake that fails the validator's geometric checks (closed and
+  manifold LODs, flipped faces, baked normals) rejects its candidate during the search; texel density and UV
+  overlap are left to the full bake.
+- **More refinement fixes.** REFINE_OPS is written as a Python literal (an op with `pin_corners: true` made the
+  refined source fail to load), and packed literals keep their region order (the wall's bricks lost their
+  material). The bench sword's guard ends in two terminals.
+- **Game bench, measured honestly.** docs/GAME_BENCH.md has the new on and off runs and three new blind passes by
+  model subagents over the fourteen sheets of both runs shuffled together: 0 of 6 assets at 4.0 (gate failed),
+  the control fails as it must, every technical check passes. Refinement kept one change (a silhouette breaker on
+  the wall); on the other assets the panel line, crisp plates, inset and kit operators made LODs that are not
+  manifold or have flipped faces after decimation, and the quick bake rejected them. That LOD robustness is the next
+  piece of work.
 
 - **Every design is refined after it builds.** create_design, update_design, add_feature (code and standard
   features) and a kept candidate now start design refinement in the background once the revision is saved and on
