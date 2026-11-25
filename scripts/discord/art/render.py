@@ -37,7 +37,7 @@ h1{{font-weight:620;letter-spacing:-.02em;line-height:1.02;margin:22px 0 0}}
 p{{font-size:30px;line-height:1.38;color:#a8b2af;font-weight:420;margin:26px 0 0}}
 .datum{{position:absolute;left:0;bottom:0;height:6px;width:100%;background:linear-gradient(90deg,#b9e8d7 0 14%,
  rgba(185,232,215,.25) 14% 100%)}}
-.lockup{{position:absolute;height:34px}}
+.lockup{{position:absolute;height:64px}}
 """
 
 
@@ -67,7 +67,7 @@ def guide(i, title, tag, art):
  <div class='kicker'>Guide {i:02d} <i>·</i> {html.escape(tag)}</div>
  <h1 style='font-size:{76 if len(title) < 30 else 62}px'>{html.escape(title)}</h1>
 </div>
-<img class='lockup' src='{LOCKUP}' style='left:96px;bottom:84px'>"""
+<img class='lockup' src='{LOCKUP}' style='left:96px;bottom:88px'>"""
     return page(W, H, body)
 
 
