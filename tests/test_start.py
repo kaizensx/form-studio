@@ -428,8 +428,11 @@ class Concepts(Env):
         self.assertEqual(concepts.board(self.st, b["id"])["state"], "picked")
         self.assertNotIn(b["id"], [g["id"] for g in concepts.groups(self.st)])
         self.assertIn(b["id"], [g["id"] for g in concepts.groups(self.st, "picked")])
-        with self.assertRaises(StudioError) as e:
-            concepts.pick(self.st, b["id"], picked)
+        again = concepts.pick(self.st, b["id"], picked)          # the same pick again answers with it, no error
+        self.assertEqual((again["picked"], again["already"], again["trashed"]), (picked, True, []))
+        other = next(m["project"] for m in more["members"] if m["project"] != picked)
+        with self.assertRaises(StudioError) as e:                 # a different concept after the pick is still refused
+            concepts.pick(self.st, b["id"], other)
         self.assertEqual(e.exception.status, 409)
 
     def test_keep_others_and_refusals(self):
