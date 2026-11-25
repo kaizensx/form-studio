@@ -37,7 +37,7 @@ import bmesh
 import bpy
 import numpy as np
 
-RUNNER_VERSION = 4
+RUNNER_VERSION = 5
 CREASE = "crease_edge"
 BOARD = "form_board"          # a face attribute: one value 0..1 per board (wood plank, stone block), see boards()
 KINDS = ("wood", "bare_metal", "brushed_metal", "painted_metal", "leather", "plastic", "rubber", "stone", "fabric",

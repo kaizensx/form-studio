@@ -32,6 +32,7 @@ from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 
 RUNNER_VERSION = 1
+STRICT = False                      # set by main() from the job: refinement replays guard every op (guard())
 MAX_SCATTER = 2000
 MAX_PLACE = 512
 CREASE = "crease_edge"
@@ -654,9 +655,102 @@ def border_edges(faces):
                   key=lambda e: e.index)
 
 
+def tolerance(bm):
+    """Points closer than this are one point (1e-6 of the cage's diagonal, as the game validator welds)."""
+    if not len(bm.verts):
+        return 1e-9
+    lo = Vector((min(v.co.x for v in bm.verts), min(v.co.y for v in bm.verts), min(v.co.z for v in bm.verts)))
+    hi = Vector((max(v.co.x for v in bm.verts), max(v.co.y for v in bm.verts), max(v.co.z for v in bm.verts)))
+    return max((hi - lo).length * 1e-6, 1e-9)
+
+
+def topology(bm, tol=None):
+    """{open, nonmanifold, inconsistent, degenerate}: edges with one face, edges with three or more, shared edges
+    whose two faces run the same way (a flipped face), and zero-length edges or zero-area faces (closer than tol)."""
+    tol = tolerance(bm) if tol is None else tol
+    out = {"open": 0, "nonmanifold": 0, "inconsistent": 0, "degenerate": 0}
+    for e in bm.edges:
+        n = len(e.link_faces)
+        if n == 1:
+            out["open"] += 1
+        elif n > 2:
+            out["nonmanifold"] += 1
+        elif n == 2:
+            l0, l1 = e.link_loops[0], e.link_loops[1]
+            if l0.vert == l1.vert:
+                out["inconsistent"] += 1
+        if e.calc_length() <= tol:
+            out["degenerate"] += 1
+    for f in bm.faces:
+        if f.calc_area() <= tol * tol:
+            out["degenerate"] += 1
+    return out
+
+
+def clean_around(bm, edges):
+    """Zero-length edges beside an edge selection collapsed (bmesh dissolve_degenerate) before a bevel: one of them
+    makes clamp_overlap clamp the whole bevel to zero width, and a panel line or a support loop then folds into
+    coincident points (a non-manifold cage). Returns the selection's edges that are still there."""
+    tol = tolerance(bm)
+    ring = {g for e in edges for v in e.verts for g in v.link_edges}
+    ring |= {g for e in list(ring) for v in e.verts for g in v.link_edges}
+    deg = [e for e in ring if e.calc_length() <= tol]
+    if deg:
+        bmesh.ops.dissolve_degenerate(bm, dist=tol, edges=deg)
+        bm.verts.ensure_lookup_table()
+        bm.edges.ensure_lookup_table()
+        bm.faces.ensure_lookup_table()
+    out = [e for e in edges if e.is_valid]
+    if not out:
+        raise OpError("the edge selection is empty once its zero-length edges are collapsed")
+    return out
+
+
+def _bevel_collapses(bm, idx, width, segments, profile) -> bool:
+    """Would a clamped bevel of these edges (by index) collapse to zero width somewhere? Tried on a copy."""
+    c = bm.copy()
+    try:
+        c.edges.ensure_lookup_table()
+        tol = tolerance(c)
+        res = bmesh.ops.bevel(c, geom=[c.edges[i] for i in idx], offset=width, offset_type="OFFSET",
+                              segments=segments, profile=profile, affect="EDGES", clamp_overlap=True, loop_slide=True)
+        return any(e.calc_length() <= tol for f in res["faces"] if f.is_valid for e in f.edges)
+    finally:
+        c.free()
+
+
+def _bevel_room(bm, edges, width, segments, profile):
+    bm.edges.index_update()
+    idx = [e.index for e in edges]
+    if not _bevel_collapses(bm, idx, width, segments, profile):
+        return edges
+    sel = set(edges)
+    keep = [e for e in edges if all(g in sel or g.calc_length() >= width / 0.45
+                                    for v in e.verts for g in v.link_edges)]
+    if keep and not _bevel_collapses(bm, [e.index for e in keep], width, segments, profile):
+        return keep
+    raise OpError(f"no room for a {width:.3g} mm bevel along this selection: short edges beside it clamp it to zero")
+
+
 def _bevel(bm, edges, width, segments, profile):
-    return bmesh.ops.bevel(bm, geom=list(edges), offset=width, offset_type="OFFSET", segments=segments,
-                           profile=profile, affect="EDGES", clamp_overlap=True, loop_slide=True)
+    """Blender's bevel. In a strict job (STRICT: refinement replays) zero-length edges beside the selection are
+    collapsed first and a bevel that still collapses to zero width is refused; an exemplar's own op list (not
+    strict) replays exactly as it always did, so its cage and op key do not change."""
+    if STRICT:
+        edges = clean_around(bm, edges)
+        # Blender clamps the whole bevel to its tightest spot (clamp_overlap is one global limit), so one short edge
+        # beside the selection takes every edge to zero width. A trial on a copy says whether it would; if so, the
+        # edges with a side edge too short for the width are left out (their stretch keeps no bevel) and the rest
+        # tried again; a selection that still collapses, or has nothing left, is refused
+        edges = _bevel_room(bm, edges, width, segments, profile)
+    tol = tolerance(bm)
+    res = bmesh.ops.bevel(bm, geom=list(edges), offset=width, offset_type="OFFSET", segments=segments,
+                          profile=profile, affect="EDGES", clamp_overlap=True, loop_slide=True)
+    short = [e for f in res["faces"] if f.is_valid for e in f.edges if e.calc_length() <= tol] if STRICT else []
+    if short:
+        raise OpError(f"the bevel collapsed to zero width on {len(short)} edges (clamped by a short edge beside "
+                      "it); its points would coincide")
+    return res
 
 
 def op_bevel(ob, o):
@@ -1006,9 +1100,53 @@ def write_stage(ob, path, index, levels):
     say("FORM_STAGE", path)
 
 
+def _start_op(o) -> bool:
+    """The ops that rebuild a cage literal (exemplars/game/base.start): cage_new, then regions and creases by index."""
+    return o["op"] in ("cage_new", "name_region") or (o["op"] == "crease" and "edges" in o)
+
+
+def clean_cage(target):
+    """A strict replay works on a clean cage: before its first refinement op, the literal's zero-length edges and
+    zero-area faces are collapsed (bmesh dissolve_degenerate). The ops from there on select by region, box or crease,
+    never by index, so renumbering is safe."""
+    bm = load_bm(target)
+    tol = tolerance(bm)
+    if any(e.calc_length() <= tol for e in bm.edges) or any(f.calc_area() <= tol * tol for f in bm.faces):
+        bmesh.ops.dissolve_degenerate(bm, dist=tol, edges=bm.edges[:])
+        store_bm(target, bm)
+        canonical(target)
+    else:
+        bm.free()
+
+
+def guard(target, o, before):
+    """Strict jobs (refinement replays): an op must leave the cage as closed, manifold and consistently wound as it
+    found it, with no new zero-length edge or zero-area face. A new winding error is repaired (face normals
+    recalculated: every shell is closed); anything else refuses the op, so a candidate fails here, in a second,
+    instead of after a bake whose LODs the validator rejects."""
+    bm = load_bm(target)
+    tol = tolerance(bm)
+    after = topology(bm, tol)
+    if after["inconsistent"] > before["inconsistent"] and after["open"] == 0:
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+        store_bm(target, bm)
+        bm = load_bm(target)
+        after = topology(bm, tol)
+    bm.free()
+    bad = [f"{after[k] - before[k]} new {k} {'edge' if k != 'degenerate' else 'element'}(s)"
+           for k in ("open", "nonmanifold", "inconsistent", "degenerate") if after[k] > before[k]]
+    if bad:
+        raise OpError(f"{o['op']} would leave the cage with " + ", ".join(bad))
+    return after
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     job = json.loads(open(argv[0], encoding="utf-8").read())
+    strict = bool(job.get("strict"))
+    global STRICT
+    STRICT = strict
+    cleaned = set()
     for ob in list(bpy.data.objects):              # an empty scene: the factory cube, camera and light go
         bpy.data.objects.remove(ob)
     ob = cage_object()
@@ -1028,7 +1166,16 @@ def main():
                 target = high
             else:
                 target = ob
+            if strict and not _start_op(o):
+                if target.name not in cleaned:
+                    clean_cage(target)
+                    cleaned.add(target.name)
+                bm0 = load_bm(target)
+                before = topology(bm0)
+                bm0.free()
             fn(target, o)
+            if strict and not _start_op(o):
+                guard(target, o, before)
             canonical(target)
             dt = time.perf_counter() - t0
             if not len(target.data.polygons):

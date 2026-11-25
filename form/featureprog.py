@@ -1132,13 +1132,23 @@ def checkpoint_put(key: str, shape) -> None:
         global _pruned
         if time.monotonic() - _pruned >= PRUNE_EVERY_S:   # listing hundreds of files on every feature costs the build
             _pruned = time.monotonic()
-            prune(d)
+            # off the build's path: with a thousand checkpoints (a session that refines every design) the listing
+            # and stat calls took milliseconds out of the first feature of the next design, before its first stage
+            import threading
+            threading.Thread(target=_prune_quietly, args=(d,), daemon=True, name="form-ckpt-prune").start()
     except Exception:
         pass
 
 
 PRUNE_EVERY_S = 20.0             # a worker prunes the checkpoint folder at most this often (DISK_MAX is a soft bound)
 _pruned = -1e9
+
+
+def _prune_quietly(d) -> None:
+    try:
+        prune(d)
+    except Exception:                                    # noqa: BLE001 - pruning is housekeeping
+        pass
 
 
 def prune(d: Path | None = None) -> None:

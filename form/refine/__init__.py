@@ -91,6 +91,7 @@ DEFICITS = (
     "material_contrast",   # value contrast between the zones under 0.15
     "wear",                # (game) worn share on convex edges outside 2-12 %
     "touch_points",        # sharp edges where the hand goes
+    "fairness",            # (game cage) the shell's curvature is lumpy: it wobbles against its own smooth trend
 )
 
 
@@ -300,7 +301,7 @@ def rename_method(code: str, fid: str) -> str:
 # ---- registry -----------------------------------------------------------------------------------------------------
 
 _EXTRA: list = []
-MODULES = ("form.refine.ops_cad", "form.refine.ops_cage", "form.refine.ops_material")
+MODULES = ("form.refine.ops_cad", "form.refine.ops_cage", "form.refine.ops_form", "form.refine.ops_material")
 
 
 def register(*ops: Operator) -> None:

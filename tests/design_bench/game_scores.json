@@ -1,25 +1,89 @@
 {
  "about": "Aesthetic rubric scores (form/critique.py AESTHETIC, 0-5) for the game bench, refinement off: three new blind passes. The bench takes each item's median and caps it by the asset's game evidence. These are a model's judgement, not a measurement, and not a person's: a person should look and replace them.",
  "scored_by": "three blind passes by Claude subagents (an AI model), not a person",
- "method": "Three new blind passes by Claude subagents (an AI model), not a person, on 2026-11-25. Each pass saw only fourteen anonymous review sheets (LOD0 lit from four views and its 64 px outline): the seven assets of the refinement-on run and the seven of the refinement-off run, shuffled together with a fixed seed, the control among them, no names, briefs, numbers or key; each pass read them in its own order. The letters were mapped back to run and brief afterwards. One earlier third pass was discarded unused because it filed two sheets under each other's letters (its notes describe a wheel under a chest's letter and the reverse); a new third pass replaced it.",
+ "method": "Three new blind passes by Claude subagents (an AI model), not a person, on 2026-11-25. Each pass saw only fourteen anonymous review sheets (LOD0 lit from four views and its 64 px outline): the seven assets of the refinement-on run and the seven of the refinement-off run, shuffled together with a fixed seed, the control among them, no names, briefs, numbers or key; each pass read them in its own order. The letters were mapped back to run and brief afterwards.",
  "date": "2026-11-25",
  "passes": {
+  "treasure_chest": [
+   {
+    "silhouette": 3.0,
+    "proportion": 3.0,
+    "continuity": 3.0,
+    "radius_hierarchy": 2.5,
+    "break_up": 3.5,
+    "detail_rhythm": 3.5,
+    "material": 3.5,
+    "would_sell": 3.0
+   },
+   {
+    "silhouette": 2.5,
+    "proportion": 3.0,
+    "continuity": 3.0,
+    "radius_hierarchy": 2.0,
+    "break_up": 3.0,
+    "detail_rhythm": 3.0,
+    "material": 3.0,
+    "would_sell": 2.5
+   },
+   {
+    "silhouette": 3.0,
+    "proportion": 3.0,
+    "continuity": 3.0,
+    "radius_hierarchy": 2.5,
+    "break_up": 3.5,
+    "detail_rhythm": 3.5,
+    "material": 3.5,
+    "would_sell": 3.0
+   }
+  ],
+  "wall_kit": [
+   {
+    "silhouette": 1.5,
+    "proportion": 2.0,
+    "continuity": 2.5,
+    "radius_hierarchy": 1.5,
+    "break_up": 3.0,
+    "detail_rhythm": 3.5,
+    "material": 3.0,
+    "would_sell": 2.0
+   },
+   {
+    "silhouette": 1.5,
+    "proportion": 2.5,
+    "continuity": 3.0,
+    "radius_hierarchy": 1.5,
+    "break_up": 2.5,
+    "detail_rhythm": 3.0,
+    "material": 2.5,
+    "would_sell": 1.5
+   },
+   {
+    "silhouette": 1.5,
+    "proportion": 2.5,
+    "continuity": 2.5,
+    "radius_hierarchy": 1.5,
+    "break_up": 3.0,
+    "detail_rhythm": 3.0,
+    "material": 3.0,
+    "would_sell": 2.0
+   }
+  ],
   "scifi_helmet": [
    {
     "silhouette": 3.0,
     "proportion": 2.5,
     "continuity": 2.5,
-    "radius_hierarchy": 3.0,
+    "radius_hierarchy": 2.5,
     "break_up": 3.0,
     "detail_rhythm": 2.5,
     "material": 3.5,
     "would_sell": 2.5
    },
    {
-    "silhouette": 3.5,
+    "silhouette": 3.0,
     "proportion": 2.5,
     "continuity": 2.5,
-    "radius_hierarchy": 3.0,
+    "radius_hierarchy": 2.5,
     "break_up": 3.5,
     "detail_rhythm": 2.5,
     "material": 3.5,
@@ -36,41 +100,73 @@
     "would_sell": 2.0
    }
   ],
-  "wall_kit": [
+  "vehicle_wheel": [
    {
-    "silhouette": 1.5,
-    "proportion": 3.0,
+    "silhouette": 3.0,
+    "proportion": 3.5,
     "continuity": 3.5,
-    "radius_hierarchy": 2.0,
-    "break_up": 3.0,
+    "radius_hierarchy": 3.0,
+    "break_up": 3.5,
+    "detail_rhythm": 4.0,
+    "material": 3.5,
+    "would_sell": 3.5
+   },
+   {
+    "silhouette": 3.5,
+    "proportion": 3.5,
+    "continuity": 3.5,
+    "radius_hierarchy": 3.0,
+    "break_up": 3.5,
     "detail_rhythm": 3.5,
     "material": 3.5,
     "would_sell": 3.0
    },
    {
-    "silhouette": 1.5,
-    "proportion": 3.0,
-    "continuity": 3.0,
-    "radius_hierarchy": 2.0,
+    "silhouette": 3.0,
+    "proportion": 3.5,
+    "continuity": 3.5,
+    "radius_hierarchy": 3.0,
     "break_up": 3.5,
     "detail_rhythm": 3.5,
-    "material": 3.5,
+    "material": 4.0,
+    "would_sell": 3.0
+   }
+  ],
+  "tv_remote": [
+   {
+    "silhouette": 2.0,
+    "proportion": 2.5,
+    "continuity": 3.5,
+    "radius_hierarchy": 3.0,
+    "break_up": 3.0,
+    "detail_rhythm": 3.0,
+    "material": 3.0,
     "would_sell": 2.5
    },
    {
-    "silhouette": 1.5,
+    "silhouette": 2.0,
     "proportion": 3.0,
-    "continuity": 2.5,
-    "radius_hierarchy": 2.0,
+    "continuity": 3.5,
+    "radius_hierarchy": 3.0,
+    "break_up": 3.0,
+    "detail_rhythm": 3.5,
+    "material": 3.0,
+    "would_sell": 2.5
+   },
+   {
+    "silhouette": 2.0,
+    "proportion": 3.0,
+    "continuity": 3.5,
+    "radius_hierarchy": 3.5,
     "break_up": 3.5,
     "detail_rhythm": 3.5,
-    "material": 2.5,
+    "material": 3.0,
     "would_sell": 2.5
    }
   ],
   "fantasy_sword": [
    {
-    "silhouette": 4.0,
+    "silhouette": 3.5,
     "proportion": 3.5,
     "continuity": 3.5,
     "radius_hierarchy": 2.5,
@@ -81,135 +177,29 @@
    },
    {
     "silhouette": 3.5,
-    "proportion": 3.0,
+    "proportion": 3.5,
     "continuity": 3.5,
     "radius_hierarchy": 2.5,
     "break_up": 3.0,
-    "detail_rhythm": 2.5,
+    "detail_rhythm": 3.0,
+    "material": 3.0,
+    "would_sell": 3.0
+   },
+   {
+    "silhouette": 3.5,
+    "proportion": 3.5,
+    "continuity": 3.5,
+    "radius_hierarchy": 2.5,
+    "break_up": 3.0,
+    "detail_rhythm": 3.0,
     "material": 3.5,
     "would_sell": 2.5
-   },
-   {
-    "silhouette": 4.0,
-    "proportion": 3.5,
-    "continuity": 3.5,
-    "radius_hierarchy": 3.0,
-    "break_up": 3.5,
-    "detail_rhythm": 3.5,
-    "material": 4.0,
-    "would_sell": 3.5
-   }
-  ],
-  "tv_remote": [
-   {
-    "silhouette": 2.0,
-    "proportion": 3.0,
-    "continuity": 3.5,
-    "radius_hierarchy": 3.0,
-    "break_up": 3.0,
-    "detail_rhythm": 3.5,
-    "material": 3.0,
-    "would_sell": 3.0
-   },
-   {
-    "silhouette": 2.0,
-    "proportion": 3.0,
-    "continuity": 3.5,
-    "radius_hierarchy": 3.5,
-    "break_up": 3.5,
-    "detail_rhythm": 3.5,
-    "material": 3.0,
-    "would_sell": 3.0
-   },
-   {
-    "silhouette": 2.5,
-    "proportion": 3.5,
-    "continuity": 4.0,
-    "radius_hierarchy": 3.5,
-    "break_up": 4.0,
-    "detail_rhythm": 4.0,
-    "material": 3.5,
-    "would_sell": 3.5
-   }
-  ],
-  "treasure_chest": [
-   {
-    "silhouette": 3.0,
-    "proportion": 3.0,
-    "continuity": 3.5,
-    "radius_hierarchy": 2.5,
-    "break_up": 3.5,
-    "detail_rhythm": 3.5,
-    "material": 3.5,
-    "would_sell": 3.5
-   },
-   {
-    "silhouette": 3.0,
-    "proportion": 3.0,
-    "continuity": 3.5,
-    "radius_hierarchy": 2.5,
-    "break_up": 4.0,
-    "detail_rhythm": 3.5,
-    "material": 4.0,
-    "would_sell": 3.5
-   },
-   {
-    "silhouette": 3.5,
-    "proportion": 3.5,
-    "continuity": 3.5,
-    "radius_hierarchy": 3.0,
-    "break_up": 4.0,
-    "detail_rhythm": 3.5,
-    "material": 4.0,
-    "would_sell": 3.5
-   }
-  ],
-  "vehicle_wheel": [
-   {
-    "silhouette": 3.5,
-    "proportion": 3.5,
-    "continuity": 3.5,
-    "radius_hierarchy": 3.0,
-    "break_up": 3.5,
-    "detail_rhythm": 4.0,
-    "material": 4.0,
-    "would_sell": 3.5
-   },
-   {
-    "silhouette": 3.0,
-    "proportion": 3.5,
-    "continuity": 3.5,
-    "radius_hierarchy": 3.0,
-    "break_up": 3.5,
-    "detail_rhythm": 3.5,
-    "material": 4.0,
-    "would_sell": 3.0
-   },
-   {
-    "silhouette": 3.0,
-    "proportion": 3.5,
-    "continuity": 3.5,
-    "radius_hierarchy": 3.0,
-    "break_up": 3.5,
-    "detail_rhythm": 3.5,
-    "material": 3.5,
-    "would_sell": 3.0
    }
   ],
   "control_blob": [
    {
     "silhouette": 0.5,
     "proportion": 1.0,
-    "continuity": 3.0,
-    "radius_hierarchy": 0.5,
-    "break_up": 0.0,
-    "detail_rhythm": 0.0,
-    "material": 0.5,
-    "would_sell": 0.0
-   },
-   {
-    "silhouette": 0.5,
-    "proportion": 0.5,
     "continuity": 2.0,
     "radius_hierarchy": 0.5,
     "break_up": 0.0,
@@ -219,51 +209,61 @@
    },
    {
     "silhouette": 0.5,
-    "proportion": 1.0,
-    "continuity": 3.0,
+    "proportion": 0.5,
+    "continuity": 2.5,
     "radius_hierarchy": 0.5,
     "break_up": 0.0,
     "detail_rhythm": 0.0,
     "material": 0.5,
     "would_sell": 0.0
+   },
+   {
+    "silhouette": 0.5,
+    "proportion": 1.0,
+    "continuity": 3.0,
+    "radius_hierarchy": 1.0,
+    "break_up": 0.0,
+    "detail_rhythm": 0.0,
+    "material": 0.5,
+    "would_sell": 0.5
    }
   ]
  },
  "notes": {
-  "scifi_helmet": [
-   "Stylized helmet with dark crest, visor and orange ear pods; the white shell reads lumpy and soft, and the rivets along the brow are sparse and uneven.",
-   "Stylized helmet with a dark fin, a visor recess and orange ear pods; the shell is lumpy and the rear bulges look unresolved, with a small strap clip at the back.",
-   "Stylized helmet with a crest fin, dark visor and orange ear pods; the shell is lumpy and soft, with mushy transitions and a thin wire trim."
+  "treasure_chest": [
+   "Domed wooden chest with iron straps, plank grooves, a brass hasp and a base band; the body is a straight box and the edges are soft but uniform.",
+   "Domed chest built as a straight box with plank lines, two iron straps, a riveted base band and a brass lock; reads clearly but the edges are hard and the form is generic.",
+   "Domed wooden chest with iron straps, plank grooves, a rivet row and a brass lock; the box body reads plain."
   ],
   "wall_kit": [
-   "Modular wall slab: brick face, a cinderblock back, and capstone and plinth tiers; the silhouette is a flat box, and small dark artifacts show at the bottom corners.",
-   "Brick wall slab with a coping cap, a plinth and a block-faced back; the outline is a flat slab and stray dark dots show at the brick-panel corners.",
-   "Flat wall slab with a coping cap and plinth; brick on one face and cinder block on the other, with small dark artifacts and bulges at the brick-panel corners."
+   "Flat brick wall panel with coping and plinth; the outline is a slab, the back is a different grey block face, and the edges are hard.",
+   "Flat wall slab with a brick face, a coping strip and a base strip; the edges are sharp, the back face is plain block, and the silhouette is a rectangle.",
+   "Flat brick wall slab with coping and base strip; the back is cinderblock, the edges are hard and the outline is a rectangle."
   ],
-  "fantasy_sword": [
-   "Longsword with fuller, curved brass guard, wrapped grip and round pommel; clear silhouette, but the guard is simple and the edge bevels are thin.",
-   "Longsword with a fullered blade, a curved brass guard, a wrapped grip and a ball pommel; readable but simple, with a thin guard and few detail tiers.",
-   "Longsword with a fullered blade, curved brass guard, wrapped leather grip and round pommel; reads clearly, with a fairly simple guard."
-  ],
-  "tv_remote": [
-   "Same remote as D: a rounded bar with a regular button grid and a two-tone body; competent but a plain slab outline.",
-   "Rounded-slab remote with a split-line shell, a button grid, a nav ring and a red key; clean but a generic bar silhouette.",
-   "Rounded-slab remote with an aligned button grid, ring D-pad, red accent and a body split line; tidy, but the silhouette is a plain bar."
-  ],
-  "treasure_chest": [
-   "Same chest as C: wood planks with iron straps, a lock plate and a metal base band; tidy and stylized.",
-   "Domed wooden chest with plank grooves, riveted iron bands, a metal base trim and a brass lock plate; the outline reads well but is close to a box.",
-   "Domed wooden chest with plank grooves, riveted iron straps, a lock plate and a base band; good material pairing, standard form."
+  "scifi_helmet": [
+   "Helmet with a crest fin, dark visor and orange ear pads; the shell is lumpy and blobby in the side views, and the crest reads as stuck on.",
+   "Helmet with a white shell, a dark visor, orange ear pods, a crest fin and a trim seam; the material pairing is good, but the shell is lumpy and blobby and the masses feel unresolved.",
+   "Helmet with dark visor, orange ear cups and a fin crest; the white shell is lumpy and unresolved."
   ],
   "vehicle_wheel": [
-   "Same wheel as H: even chevron tread, spoked alloy rim, and a good rubber/metal pairing.",
-   "Wheel with a chevron-tread tire, a five-spoke alloy rim and a hub cap; solid two-material read, but the tread looks shallow.",
-   "Tyre with a chevron tread and a five-spoke rim; decent rubber/alloy read, with a shallow tread and small holes in the outline."
+   "Identical to G: a five-spoke rim with tyre and a consistent tread pitch.",
+   "Wheel with a five-spoke alloy rim, a hub cap and a chevron tread on a regular pitch; good tyre and metal contrast, but the spokes and tread are shallow.",
+   "Tyre and five-spoke alloy rim with even chevron tread and hub cap; solid but generic, and the inner rim is sparse."
+  ],
+  "tv_remote": [
+   "Identical to D: a slab remote with a button grid and a soft uniform fillet.",
+   "TV remote with a rounded bar body, a parting seam, a keypad grid, a d-pad and a red button; neat but slab-like with a generic silhouette.",
+   "Rounded remote slab with parting line, gridded keypad, d-pad and red button; the outline stays a generic bar."
+  ],
+  "fantasy_sword": [
+   "Identical to B: a fullered longsword with a brass guard and wrapped grip.",
+   "Longsword with a fullered blade, curved brass guard, wrapped grip and round pommel; clean and readable but the blade is thin edge-on and the hilt details are simple.",
+   "Longsword with fuller, curved brass guard, wrapped grip and round pommel; it is very thin edge-on and the guard ends are crude."
   ],
   "control_blob": [
-   "Same blob as K: a smooth untextured pebble with no design content.",
-   "Featureless grey pebble blob with no breaks, details or material separation.",
-   "Plain grey egg-shaped blob; no breaks, details or material separation."
+   "A featureless grey pebble blob with one material and no detail.",
+   "Featureless grey pebble or egg blob with one material and no breaks or details.",
+   "Featureless grey pebble blob with no breaks, details or material change."
   ]
  }
 }
