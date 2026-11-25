@@ -35,6 +35,9 @@
 - **Builds run side by side** in a kernel pool, and pipeline jobs survive a restart.
 - **Agents:** MCP 2026-07-28 throughout, long tools can run as tasks, and the design guidance is served as skills.
 - **Recipes are no longer a public library.** The engine still uses them as building blocks for agents; the website page, the Discord forum and the submission form are gone.
+- **A draft reads as a change, not an error.** What a draft does to each feature (resized, moved, added, removed) is
+  tagged in the draft's blue instead of the red used for failures, and its consequences count from the old value to
+  the new one (at once with reduced motion). Text fields keep a quiet edge under the pointer.
 
 ### Fixed
 

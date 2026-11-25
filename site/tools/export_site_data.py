@@ -18,6 +18,13 @@ Writes into site/assets/data/:
     box.glb        the hinged box: its two parts, per feature, in the print frame (kept when the folder has no box)
     toolpath.bin   the sample's sliced toolpath, simplified for the browser (layout in site.json -> toolpath)
     site.json      project state, checks, slice summary, revisions, wall-thickness map, assembly
+    recon.glb      mesh to CAD: the input mesh, the reconstructed CAD (faces and B-rep edges) of tests/recon_fixtures.py
+                   stepped_bracket, the fixture scripts/media/showcase/recon_shots.py pictures
+    recon.json     the reconstruction's report: triangles, faces, dimensions and where they sit, deviation per CAD vertex
+
+Only the mesh-to-CAD part, which needs no slicer and no data folder:
+
+    PYTHONPATH=. .venv/bin/python site/tools/export_site_data.py recon
 
 The .glb files are glTF 2.0 with KHR_mesh_quantization: int16 positions, dequantised by the node's scale and
 translation. Feature names are the mesh names; extras carry the feature labels.
@@ -48,6 +55,8 @@ SAMPLE_BRIEF = ("A planetary gearbox I can print in one go: a sun, three planets
 # the one change after the first build, committed the way an agent commits it
 SAMPLE_CHANGE = ({"backlash": 0.2}, "More backlash, so printed teeth turn freely")
 BOX = "hinged-box"
+RECON = "stepped_bracket"                      # tests/recon_fixtures.py: a synthetic part, never a file of anyone's
+RECON_WORK = Path(os.environ.get("RECON_WORK") or ROOT / ".dev" / "web" / "recon")
 
 
 def f32(b64: str) -> np.ndarray:
@@ -227,7 +236,74 @@ def ensure_sample(s: Studio) -> dict:
     return s.load(p["id"])
 
 
+def export_recon() -> None:
+    """Mesh to CAD on the synthetic stepped bracket: the engine's own reconstruction, as the page's wipe draws it.
+
+    The mesh is the fixture's STL as the engine loads it. The CAD is the reconstruction's tessellation from its deviation
+    map (so each vertex carries its measured distance from the mesh) and the STEP's B-rep edges. Each dimension is placed
+    at the centre of the feature it drives: the solid that feature adds or removes in the reconstructed recipe."""
+    import importlib.util
+    sys.path.insert(0, str(ROOT / "tests"))
+    import recon_fixtures as fx
+    from build123d import import_step
+    from form import kernel
+    from form.recon import pipeline
+    d = RECON_WORK / RECON
+    d.mkdir(parents=True, exist_ok=True)
+    stl, _solid, _facts = fx.export(RECON, d)
+    rep_f = d / f"{RECON}_report.json"
+    if not rep_f.exists():
+        pipeline.reconstruct(stl, d, name=RECON, tolerance=0.02)
+    rep = json.loads(rep_f.read_text(encoding="utf-8"))
+    res = rep["result"]
+    V, F = (np.asarray(x) for x in pipeline.load(stl)[:2])
+    V, F = V.astype(np.float64), F.astype(np.int64)
+    dev = json.loads((d / res["deviation_map"]).read_text(encoding="utf-8"))
+    P, T, val = f32(dev["positions"]).reshape(-1, 3), u32(dev["indices"]).reshape(-1, 3), f32(dev["values"])
+    shape = import_step(str(d / res["step"]))
+    E = np.asarray(kernel._edges(shape), np.float32).reshape(-1, 3)
+    lo = np.minimum(V.min(0), P.min(0)); span = np.maximum(np.maximum(V.max(0), P.max(0)) - lo, 1e-6)
+    g = GLB()
+    g.add("mesh", V, F, lo, span, {"role": "mesh"})
+    g.add("cad", P.astype(np.float64), T, lo, span, {"role": "cad"})
+    g.add("cad_edges", E.astype(np.float64), None, lo, span, {"edges": True}, lines=True)
+    nb = g.write(OUT / "recon.glb", {"fixture": RECON})
+    # where each dimension sits: the centre of what its feature adds to or removes from the solid
+    spec = importlib.util.spec_from_file_location("recon_recipe", d / res["recipe"])
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    rec = mod.Design()
+    values = {q.key: q.default for q in rec.params}
+    stages = rec.build(values)
+    where, prev = {}, None
+    for st in stages:
+        region = st.shape if prev is None else (st.shape - prev) + (prev - st.shape)
+        try:
+            c = region.center()
+            where[st.feature] = [round(float(c.X), 2), round(float(c.Y), 2), round(float(c.Z), 2)]
+        except Exception:                                    # nothing changed: keep the last place this feature had
+            pass
+        prev = st.shape
+    dims = [{"key": q.key, "label": q.label, "value": q.default, "unit": q.unit, "feature": q.feature, "at": where.get(q.feature)}
+            for q in rec.params]
+    missing = [x["key"] for x in dims if x["at"] is None]
+    if missing:
+        raise SystemExit(f"no place for the dimensions {missing}")
+    out = {"fixture": RECON, "tolerance_mm": rep["tolerance_mm"], "triangles": int(len(F)), "faces": len(shape.faces()),
+           "hausdorff_mm": res["hausdorff_mm"], "dimensions": res["dimensions"], "editable_pct": res["editable_pct"],
+           "headline": res["headline"], "dims": dims,
+           "deviation_nm": [int(round(float(x) * 1e6)) for x in val],          # per vertex of the CAD mesh, in order
+           "deviation_max_mm": dev["stats"]["max_mm"], "evidence": dev["evidence"]}
+    (OUT / "recon.json").write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    print("recon.glb", nb, "bytes;", out["triangles"], "triangles in,", out["faces"], "faces,",
+          f"{res['dimensions']['movable']} of {res['dimensions']['params']} dimensions,", res["hausdorff_mm"], "mm")
+
+
 def main() -> int:
+    if sys.argv[1:] == ["recon"]:
+        OUT.mkdir(parents=True, exist_ok=True)
+        export_recon()
+        return 0
     OUT.mkdir(parents=True, exist_ok=True)
     old = json.loads((OUT / "site.json").read_text(encoding="utf-8")) if (OUT / "site.json").exists() else {}
     s = Studio(config.load())
@@ -332,6 +408,7 @@ def main() -> int:
                            "joints": asm["joints"], "hardware": asm["hardware"], "bbox": asm["bbox"], "bbox_exploded": asm["bbox_exploded"]}
     finally:
         s.kernel.stop()
+    export_recon()
     (OUT / "site.json").write_text(json.dumps(site, separators=(",", ":"), ensure_ascii=False, default=float), encoding="utf-8")
     print("site.json", (OUT / "site.json").stat().st_size, "bytes")
     return 0
