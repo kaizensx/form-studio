@@ -844,7 +844,7 @@ def prepare(st, pid: str, refine=None, style: str | None = None,
     pc = critique.product_class(p)
     sty = style or styles_mod.detect(brief + " " + (p.get("name") or ""), pc)
     from .. import purpose as purpose_mod
-    if kind == "cage":                          # a cage: replayed in Blender, one bake at the end (game: budgets, preset)
+    if kind == "cage":                          # a cage: Blender replays it, a quick bake per candidate, one full bake
         from .game_eval import GameEvaluator
         ev = GameEvaluator(st, p, pc, frozen=frozen, **(game or {}))
     else:

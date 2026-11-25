@@ -267,8 +267,8 @@ class GameEvaluator(Evaluator):
         a = analyze(Measurement(geo["P"], geo["T"], tri_feature=geo["tf"], zones=zones_of(src), purpose="game",
                                 game=game, product_class=self.product_class), weights=self.weights)
         lo, hi = geo["P"].min(0), geo["P"].max(0)
-        out = Evaluation(ok=True, analysis=a, checks=None, frozen=None, wall_mm=None, triangles=geo["tris"], game=validation,
-                         bbox=(tuple(lo.tolist()), tuple(hi.tolist())), seconds=round(time.time() - t0, 2),
+        out = Evaluation(ok=True, analysis=a, checks=None, frozen=None, wall_mm=None, triangles=geo["tris"],
+                         game=validation, bbox=(tuple(lo.tolist()), tuple(hi.tolist())), seconds=round(time.time() - t0, 2),
                          extra={"faces": len(geo["cage"].F), "quick": bool(game.get("dir"))})
         self._memo[h] = out
         return out

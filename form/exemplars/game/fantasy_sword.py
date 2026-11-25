@@ -76,13 +76,12 @@ def ops() -> list[dict]:
     pommel = _round_prism(1.0, [-168, -158, -140, -124, -114, -106], "pommel")
     prof = {-168: 12.0, -158: 22.0, -140: 27.0, -124: 24.0, -114: 15.0, -106: 13.0}
     pommel.map(lambda V: _profile(V, prof))
-    # the guard's terminals: a flattened knob on each swept arm (the arms end in a shape, not a cut), and the peen
-    # block under the pommel; they carry the brass to the ends of the silhouette
-    tips = [quad_sphere(2, (15.0, 9.0, 13.0), (sx * 136.0, 0.0, 92.0)).region("pommel") for sx in (-1, 1)]
-    peen = quad_sphere(2, (9.0, 9.0, 7.0), (0.0, 0.0, -170.0)).region("pommel")
+    # the guard's terminals: a flattened knob on each swept arm (the arms end in a shape, not a cut), carrying the
+    # brass to the ends of the silhouette; light cages (24 faces each) so the LODs keep them
+    tips = [quad_sphere(1, (17.0, 10.0, 15.0), (sx * 136.0, 0.0, 92.0)).region("pommel") for sx in (-1, 1)]
     # the block steps down into the blade (a langet): it is narrower at the top than where it meets the arms
     block.map(lambda V: V * np.c_[1 - 0.3 * np.clip((V[:, 2] - 82) / 18, 0, 1), np.ones(len(V)), np.ones(len(V))])
-    o = start([blade, guard, block, grip, pommel, peen] + tips)
+    o = start([blade, guard, block, grip, pommel] + tips)
     o += [
         {"op": "inset", "faces": {"region": "fuller"}, "thickness": 1.4, "depth": -1.6, "crease": 1.0},
         {"op": "bevel", "edges": {"creased": True}, "width": 0.45, "segments": 1, "profile": 0.5, "crease": 1.0},
