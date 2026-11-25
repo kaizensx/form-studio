@@ -29,12 +29,19 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
 datas += [(str(p), "form/game") for p in sorted((ROOT / "form" / "game").glob("*.py"))]
 binaries, hidden = [], []
 for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfium2", "pypdfium2_raw",
-            "bd_warehouse", "py_gearworks", "manifold3d"):     # parts libraries and mesh booleans ship inside the app
+            "bd_warehouse", "bd_materials", "py_gearworks", "manifold3d"):   # parts libraries, materials, mesh booleans
     try:
         d, b, h = collect_all(pkg)
         datas += d; binaries += b; hidden += h
     except Exception:
         pass
+# bd_materials reads its look values (colour, metalness) from threejs_materials. Its code ships; its 87 MB of texture
+# maps (pbr_properties/_assets: wood, fabric, carbon images) do not: form.material_library reads values only.
+try:
+    hidden += [m for m in collect_submodules("threejs_materials") if m.startswith("threejs_materials")]
+    datas += [d for d in collect_data_files("threejs_materials") if "_assets" not in d[0].replace("\\", "/")]
+except Exception:
+    pass
 # Optional engines with libraries the app does not carry (CAD-Recode: PyTorch; CADFit: trimesh and friends) run in an
 # environment of their own that Settings > Software makes (form/engines.py), out of the app's process. That interpreter
 # imports the engine's code from these files, shipped as plain source under engine_src/ (never on the app's own path).

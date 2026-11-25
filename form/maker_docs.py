@@ -72,8 +72,11 @@ def bom(d) -> str:
                     f"{name}.stl" + (f", solid {x['solid'] + 1} of {len(parts)}" if len(parts) > 1 else ""),
                     x.get("material") or material or "not set: no current slice", g, ev, "", "no", ""])
     for h in (asm["hardware"] if asm else []):
-        w.writerow([h["name"], "purchased", h["qty"], h["size"], h["source"], "", "", "", h.get("url", ""),
-                    "no: check against the printed part", h["note"]])
+        each = h.get("grams")
+        g = f"{each * h['qty']:.2f}" if isinstance(each, (int, float)) else ""
+        ev = (f"computed: {h['qty']} x {each:g} g, modelled volume x typical density" if g else "")
+        w.writerow([h["name"], "purchased", h["qty"], h["size"], h["source"], h.get("material", ""), g, ev,
+                    h.get("url", ""), "no: check against the printed part", h["note"]])
     return out.getvalue()
 
 

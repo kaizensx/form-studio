@@ -116,8 +116,23 @@ HARDWARE: form.parts  (use it; do not guess screw, nut, insert, bearing or gear 
     parts.bearing_seat("608")           parts.thread(major_d, pitch, length, external=True)   # pitch >= 1 mm
     parts.spur_gear(module, teeth, thickness, bore)   parts.gear_pair(module, z1, z2, thickness, bore_a, bore_b,
     backlash)  -> .a, .b (b at +X, in mesh), .centre_distance = m (z1 + z2) / 2, .contact_ratio
-  M2-M6 screws, nuts, inserts and 6xx bearings work everywhere. Other sizes, threads and gears need the
-  [parts] extra (bd_warehouse, py_gearworks); without it they raise a RecipeError that says how to install.
+    parts.tap_hole("M3", depth, "soft"|"hard")   # ISO tap drill, for metal or wood stock (printed: inserts or pilots)
+    parts.trapezoidal_thread(8, 2, length, starts=4, external=False, clearance=0.3, acme=False)  # lead screws (Tr8x8)
+    parts.bottle_thread("PCO1881"|"M38SP400", external=False)   # a cap for a real soda bottle, or a neck
+    parts.sprocket(teeth, "06B"|"08B"|"ANSI 40", bore)   parts.chain_drive(chain, z1, z2, centre)  # even links, exact C
+    parts.pipe_socket('3/4', depth)   parts.pipe_size('3/4', '40', 'pvc') -> (OD, wall)   # stock pipe in a printed part
+  The hardware itself (kind "hardware": place it, never fuse it; .grams, .material, .bom(qty, note, after) -> an
+  Assembly Hardware row with its mass): parts.screw("M3", 10, "socket"|"pan"|"countersunk"|"button"|"hex"),
+  parts.nut, parts.washer, parts.heat_insert, parts.bearing("608"), parts.pipe, parts.pipe_flange.
+  A whole screw joint, with a STOCK screw length chosen for you (never type one):
+    j = parts.bolted_joint("M3", clamp=4, into="insert"|"nut"|"tap"|"self_tap", head="socket")
+    lid = lid - Pos(x, y, z_top) * j.top.shape;  box = box - Pos(x, y, z_top) * j.bottom.shape   # same position
+    j.length, j.base_min (thinnest base that holds it), j.dims (engagement), j.hardware(qty, after="lid") -> BOM rows
+  Materials for parts that are not printed (density, look): from form import material_library as ml;
+    ml.get("aluminum"), ml.mass_g(volume_mm3, "brass"), ml.zone("stainless", [features]) -> an appearance() zone.
+  M2-M6 screws, nuts, washers, inserts and 6xx bearings work everywhere from tables. Other sizes, threads, sprockets,
+  pipes and gears need bd_warehouse and py_gearworks (they ship with the app); without them a RecipeError says how
+  to install. Exemplars: lead_screw_axis, chain_drive, bottle_pipe_adapter.
   Example: a boss with an insert, sized from the published minimum wall
     ins = parts.heat_insert_pocket("M3")
     boss = Cylinder(ins["boss_min_d"] / 2 + 0.4, 10, align=(Align.CENTER, Align.CENTER, Align.MIN))

@@ -138,6 +138,8 @@ class Hardware:
     after: str = ""                             # part id it is fitted after; "" = after every part
     access: tuple = ()                          # Access items checked against the parts in place at that step
     url: str = ""
+    grams: float | None = None                  # mass of one item, when known (form.parts hardware: computed)
+    material: str = ""                          # what it is made of ("mild_steel", "brass")
 
 
 # ---- kinematics (numpy only) -----------------------------------------------------------------------------

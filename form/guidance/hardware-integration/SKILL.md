@@ -18,3 +18,10 @@ FORM tools: `read_document()`, `design_guide()`, `update_design()`, `slice_test_
 5. Magnets and bearings: press fits need a coupon (see fit-calibration); state per-side clearance.
 6. Assembly access: every fastener reachable with a real tool, in an order that works. Render the assembled state.
 7. List purchased parts with quantity and specification (standard, size, length, material). Never invent SKUs or links.
+
+Build with `form.parts` (the cad-core contract lists every call): `parts.bolted_joint(size, clamp, into=...)` cuts the
+clearance and counterbore, the insert pocket, nut trap or tap hole, and picks a stock screw length with enough
+engagement; `joint.hardware(qty, after=...)` and `parts.bearing("608").bom()` give BOM rows that carry the standard
+and a computed mass. Lead screws (`trapezoidal_thread`), bottle caps (`bottle_thread`), sprockets and chain
+(`sprocket`, `chain_drive`) and stock pipe (`pipe_socket`) come from published standards too. Exemplars:
+`lead_screw_axis`, `chain_drive`, `bottle_pipe_adapter`.

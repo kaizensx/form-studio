@@ -13,6 +13,21 @@
   build timings and slicer compatibility are linked from the footer. The drawn app loads when it comes near, so the
   first view is about 0.25 MB uncompressed where it was about 1.4 MB. The README opens with the same photograph and a strip of
   builds. Product pictures are Blender renders of the designs' own geometry with the app's scene and materials.
+
+- **Real standard hardware in designs, with masses in the BOM.** `form.parts` now builds the hardware itself from
+  bd_warehouse, not only the holes for it: ISO screws (socket, pan, countersunk, button, hex), nuts, washers, brass
+  heat-set inserts and 6xx bearings, each with a computed mass, its material and `.bom()` for the assembly's
+  hardware list. `parts.bolted_joint(size, clamp, into="insert" | "nut" | "tap" | "self_tap")` cuts the clearance
+  and counterbore, the insert pocket, nut trap or tap hole, and picks a stock screw length with enough thread
+  engagement. New: ISO tap drills, multi-start trapezoidal and ACME lead-screw threads, PCO 1881 and ASTM D2911
+  bottle threads, roller-chain sprockets with `chain_drive` (an even link count and the exact centre distance for
+  it), pipe sizes, pipe sockets and ASME B16.5 flanges. `form.material_library` gives densities and a look for
+  metals, woods and engineering plastics from bd_materials. BOM.csv lists the grams of purchased hardware (computed:
+  modelled volume x typical density). Three new exemplars show them: `lead_screw_axis`, `chain_drive` and
+  `bottle_pipe_adapter`. A countersink cut by `parts.screw_clearance` now follows the screw's theoretical head cone
+  (2 d for ISO 10642): the old one was narrower than the head below its top face, so a real screw stood proud.
+  bd_materials ships with the app (its 87 MB of texture maps do not).
+
 - **Cage operators keep every LOD closed and manifold.** Refinement replays a cage in a strict mode: the cage
   literal's zero-length edges are collapsed before the first refinement op (the helmet had two beside its visor,
   and Blender's bevel clamps the whole bevel to its tightest spot, so a panel line there folded into coincident

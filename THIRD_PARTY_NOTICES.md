@@ -83,3 +83,30 @@ names the exact commit that was read.
 - Use: an optional mesh-to-CAD candidate, off unless `[recon] cadfit = true`, needing `pip install
   form-studio[cadfit]`. The packaged app does not include the vendored search code; it ships the hook and this
   folder's `LICENSE` and `PERMISSION.md`, and reports that CADFit needs form-studio[cadfit].
+
+## Standard-parts libraries that ship with the app
+
+These are used as libraries (installed from PyPI, bundled in the packaged app by `packaging/form.spec`), not copied
+into Form Studio's source. Form Studio's own tables in `form/parts.py` repeat a few of their published dimension
+values (screw heads, nuts, washers, tap drills, bearings) so the common sizes work without them; a test checks the
+tables against the library.
+
+- **gumyr/bd_warehouse** 0.4.0 (https://github.com/gumyr/bd_warehouse, tag `v0.4.0`, commit
+  `8e9be0645b53db3d7414f74828c2d67b0da21138`). Licence: Apache License 2.0. Used by `form/parts.py` for ISO screws,
+  nuts, washers and heat-set inserts, ISO, trapezoidal, ACME and plastic-bottle threads, deep-groove bearings,
+  roller-chain sprockets, ASME B16.5 flanges and the pipe-size table. Form Studio works around two 0.4.0 issues
+  without changing the library: the ISO 1580 length list reads 6 and 8 mm as 68 (fixed upstream after 0.4.0), and
+  `Pipe` does not resolve the materials "pvc", "steel" and "iron", so `parts.pipe` builds the tube from the size table.
+- **bd_materials** 0.2.6 (https://github.com/bernhard-42/bd_materials, tag `v0.2.6`, commit
+  `c3299932006f87ac44f063eed983fe46b67f1abb`; gumyr/bd_materials is a fork of it). Licence: Apache License 2.0.
+  Used by `form/material_library.py` for densities and typical property ranges. bd_warehouse depends on it.
+- **threejs-materials** 1.2.5 (https://github.com/bernhard-42/threejs-materials). Licence: Apache License 2.0.
+  bd_materials reads its PBR values from it; the metal colours come from physicallybased.info (CC0 1.0). The packaged
+  app leaves out its texture maps (`pbr_properties/_assets`, about 87 MB); Form Studio reads values only.
+- **py_gearworks** 0.0.24 (https://github.com/GarryBGoode/py_gearworks). Licence: Apache License 2.0. Involute gear
+  profiles, meshing and contact ratio in `form/parts.py` and `form/craft/mechanisms.py`.
+- **gumyr/cq_warehouse** (https://github.com/gumyr/cq_warehouse, commit `a57bb7a24762d367d66369f280a24c38a64e73dd`).
+  Licence: Apache License 2.0. Read for comparison only: it is the CadQuery predecessor of bd_warehouse, and CadQuery
+  cannot share an environment with build123d here. bd_warehouse covers its fasteners, threads, bearings and
+  sprockets; its `Chain` (a chain wrapped over sprockets at any positions) has no build123d port, and Form Studio's
+  two-sprocket `chain_drive` uses the standard chain-length formula instead. Nothing copied.
