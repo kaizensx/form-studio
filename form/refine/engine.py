@@ -632,6 +632,7 @@ class StudioEvaluator(Evaluator):
         self.timeout = 180.0
         self._memo: dict = {}
         self._geo: dict = {}
+        self._gen = 0                          # batches started under an older generation are stale (close())
         self.stats = {"measured": 0, "geometry_reused": 0, "memo": 0}
 
     @staticmethod
@@ -771,6 +772,8 @@ class StudioEvaluator(Evaluator):
         """Build and measure the batch. With timeout, the engine waits that long (wall clock) and counts what has
         not finished as over budget; that work runs on in its kernel workers and its results are dropped."""
         self.timeout = max(15.0, float(timeout)) if timeout else 180.0
+        self._gen += 1
+        gen = self._gen
         results: list = [None] * len(sources)
         todo = []
         for i, s in enumerate(sources):
@@ -781,22 +784,34 @@ class StudioEvaluator(Evaluator):
                 todo.append(i)
         if todo:
             sub: list = [None] * len(todo)
-            th = threading.Thread(target=self._batch, args=([sources[i] for i in todo], sub), daemon=True,
+            th = threading.Thread(target=self._batch, args=([sources[i] for i in todo], sub, gen), daemon=True,
                                   name="refine-batch")
             th.start()
             th.join(None if timeout is None else max(1.0, float(timeout)))
+            if th.is_alive():
+                self.close()                 # what is left of the batch is stale: nothing more starts or is measured
             for k, i in enumerate(todo):
                 results[i] = sub[k]
         return [r if r is not None else Evaluation(ok=False, error="over the time budget") for r in results]
 
-    def _batch(self, sources, results):
+    def close(self) -> None:
+        """Make every batch still running stale (the engine stopped waiting for it, or the run is over): a stale
+        batch starts no more candidate builds and measures nothing it gets back, so an abandoned batch does not hold
+        a kernel worker or the server's interpreter while the next design builds. A build already in a kernel worker
+        finishes there (stopping it would kill the worker and its cache)."""
+        self._gen += 1
+
+    def _batch(self, sources, results, gen=None):
         from concurrent.futures import ThreadPoolExecutor
         from .. import candidates
         from ..studio import StudioError
         labels = [f"refine {i}" for i in range(len(sources))]
+        gen = self._gen if gen is None else gen
 
         def one(i):
             # one candidate per call, so a quick one (a material edit) lands while a slow fillet still builds
+            if gen != self._gen:
+                return
             try:
                 r = candidates.run(self.st, [{"label": labels[i], "source": sources[i]}], project=self.p["id"],
                                    keep="none", sweep=False, product_class=self.product_class, by="refine")
@@ -813,6 +828,8 @@ class StudioEvaluator(Evaluator):
                 err = row.get("error") or {}
                 results[i] = Evaluation(ok=False, error=(err.get("message") if isinstance(err, dict) else str(err))
                                         or "; ".join(row.get("notes") or []) or "did not build")
+                return
+            if gen != self._gen:                                 # stale: its result is dropped unmeasured
                 return
             try:
                 results[i] = self._measure(sources[i], row)
@@ -899,8 +916,12 @@ def refine(st, pid: str, refine=None, style: str | None = None, budget_s: float 
     led = ledger if ledger is not None else Ledger.open()
     total = engine_budget(d.purpose) if budget_s is None else float(budget_s)
     reserve = FINAL_RESERVE_S if getattr(ev, "final_base", False) else 0.0   # the exported-mesh check of the result
-    r = search(d, ev, ops=ops, ledger=led, budget_s=max(0.0, total - reserve - (time.monotonic() - t0 - prime_s)),
-               base=base, progress=progress, cancel=cancel)
+    try:
+        r = search(d, ev, ops=ops, ledger=led, budget_s=max(0.0, total - reserve - (time.monotonic() - t0 - prime_s)),
+                   base=base, progress=progress, cancel=cancel)
+    finally:
+        if hasattr(ev, "close"):
+            ev.close()                       # nothing of the search runs on behind the result (or the next build)
     r["prime_s"] = round(prime_s, 2)
     r["wrapped"] = wrapped
     r["budget_s"] = total

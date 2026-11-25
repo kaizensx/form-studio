@@ -639,13 +639,17 @@ def scrubbed_env(work: Path) -> dict:
 # ---- running -------------------------------------------------------------------------------------------------
 
 def run_ops(ops, cfg: dict | None = None, timeout: float = TIMEOUT_S, on_stage=None, label: str = "",
-            export_subdiv: int | None = None, app: str | None = None, keep_dir: Path | None = None) -> dict:
+            export_subdiv: int | None = None, app: str | None = None, keep_dir: Path | None = None,
+            strict: bool = False, stages: bool = True) -> dict:
     """Validate ops, run them in Blender, return {"cage": CageData, "hash", "key", "ops": per-op seconds,
     "stages": n, "seconds", "blender"}.
 
     on_stage(event): called for each op with the stage event (meshsource.stage_event), feature "model_mesh:<i>:<op>".
     export_subdiv: also return Blender's own Catmull-Clark subdivision of the result at that level ("subdiv": V),
     without the limit-surface projection (verification against form.craft.subd.catmull_clark).
+    strict: every op after cage_new must leave the cage as closed, manifold and consistently wound as it found it,
+    with no new zero-length edge or zero-area face (a new winding error is repaired), or the run fails at that op
+    (refinement replays use it: blender_ops.guard). stages=False: no per-op previews (nothing draws them).
     Raises OpError (before Blender starts), BlenderMissing or BlenderFailed (a timeout kills Blender)."""
     norm = validate_ops(ops)
     if app is None:
@@ -661,7 +665,9 @@ def run_ops(ops, cfg: dict | None = None, timeout: float = TIMEOUT_S, on_stage=N
         (work / "blender-user").mkdir()
         (work / "stages").mkdir()
         job = {"runner": RUNNER_VERSION, "ops": [expand(o) for o in norm], "out": str(work / "result.json"),
-               "stage_dir": str(work / "stages"), "preview_levels": PREVIEW_LEVELS}
+               "stage_dir": str(work / "stages") if stages else None, "preview_levels": PREVIEW_LEVELS}
+        if strict:
+            job["strict"] = True
         if export_subdiv:
             job["export_subdiv"] = {"levels": int(export_subdiv)}
         jp = work / "job.json"

@@ -18,6 +18,13 @@ melts first. Here, in order:
        closest one's distance is kept. Holding features wins on mild reductions (LOD1, LOD2); on severe ones holding
        everything at once makes the unheld small parts collapse instead, and the even collapse is kept
 
+    4. soundness: every try is checked as the validator will check it (after welding coincident points: open and
+       non-manifold edges, winding errors, shells enclosing no or negative volume, faces folded against the source
+       surface). A small closed part that the collapse turned inside out or flat (a rivet at LOD3) is removed: a LOD
+       drops small parts, and an inverted one is a flipped shell. An unsound try is used only when no try is sound;
+       a sound one is never traded for a closer unsound one. When every try is unsound the collapses run again a
+       little milder (97 %, then 93 % of the budget) before the best unsound one is kept.
+
 Returns (object, iterations), as the runner's own decimate_to.
 """
 import math
@@ -33,6 +40,7 @@ SILHOUETTE_W = 0.6
 CURVE_W = 0.5
 HOLD_SLACK = 1.25                # a held collapse is kept when its deviation is at most 1.25 x the closest one's
 FACTORS = (0.0, 1.0, 4.0)        # Decimate's vertex group factor per try: 0 an even collapse, then FormKeep holding
+SHARES = (1.0, 0.97, 0.93)       # of the budget per round of tries; a milder round only when no try was sound
 
 
 def _views():
@@ -170,6 +178,105 @@ def deviation(a, b):
     return worst
 
 
+def _shells(bm):
+    """Connected face sets of a bmesh (lists of faces)."""
+    bm.faces.index_update()
+    seen, out = set(), []
+    for f0 in bm.faces:
+        if f0.index in seen:
+            continue
+        stack, shell = [f0], []
+        seen.add(f0.index)
+        while stack:
+            f = stack.pop()
+            shell.append(f)
+            for e in f.edges:
+                for g in e.link_faces:
+                    if g.index not in seen:
+                        seen.add(g.index)
+                        stack.append(g)
+        out.append(shell)
+    return out
+
+
+def _volume(faces):
+    v = 0.0
+    for f in faces:
+        ls = f.verts
+        a = ls[0].co
+        for k in range(1, len(ls) - 1):
+            v += a.dot(ls[k].co.cross(ls[k + 1].co)) / 6.0
+    return v
+
+
+def _extent(verts):
+    return max((max(v.co[k] for v in verts) - min(v.co[k] for v in verts)) for k in range(3)) if verts else 0.0
+
+
+def soundness(ob, src_tree=None, drop=True):
+    """The validator's geometric checks on a LOD, in Blender ({open, nonmanifold, inconsistent, inverted, folded,
+    dropped}): coincident points welded first (to 1e-6 of the diagonal, as validate.weld), then edges with one face or
+    three or more, shared edges run the same way twice, closed shells of negative or no volume, and faces whose
+    normal points against the nearest source normal (src_tree: a BVH tree of the source). drop: small shells (at most
+    2 % of the object's size) with under four faces or next to no volume (under (ext / 20)^3), or negative volume, are
+    deleted from ob first: the collapse turned them
+    inside out or flat."""
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bm.faces.ensure_lookup_table()
+    dropped = 0
+    if drop and bm.faces:
+        size = _extent(bm.verts)
+        doomed = []
+        for sh in _shells(bm):
+            ext = _extent({v for f in sh for v in f.verts})
+            if (len(sh) < 4 or _volume(sh) <= (0.05 * ext) ** 3) and ext <= 0.02 * size:
+                doomed += sh
+        if doomed and len(doomed) < len(bm.faces):
+            dropped = len(doomed)
+            vs = {v for f in doomed for v in f.verts}
+            bmesh.ops.delete(bm, geom=list(doomed), context="FACES_ONLY")
+            loose_e = [e for e in bm.edges if not e.link_faces]
+            if loose_e:
+                bmesh.ops.delete(bm, geom=loose_e, context="EDGES")
+            loose_v = [v for v in vs if v.is_valid and not v.link_faces]
+            if loose_v:
+                bmesh.ops.delete(bm, geom=loose_v, context="VERTS")
+            bm.to_mesh(ob.data)
+            ob.data.update()
+    w = bm.copy()
+    bm.free()
+    out = {"open": 0, "nonmanifold": 0, "inconsistent": 0, "inverted": 0, "folded": 0, "dropped": dropped}
+    if w.verts:
+        tol = max(math.sqrt(sum((max(v.co[k] for v in w.verts) - min(v.co[k] for v in w.verts)) ** 2
+                                for k in range(3))) * 1e-6, 1e-12)
+        bmesh.ops.remove_doubles(w, verts=w.verts[:], dist=tol)
+    for e in w.edges:
+        n = len(e.link_faces)
+        if n == 1:
+            out["open"] += 1
+        elif n > 2:
+            out["nonmanifold"] += 1
+        elif n == 2 and e.link_loops[0].vert == e.link_loops[1].vert:
+            out["inconsistent"] += 1
+    if not out["open"]:
+        out["inverted"] = sum(1 for sh in _shells(w) if _volume(sh) <= 0)
+    w.free()
+    if src_tree is not None:
+        for p in ob.data.polygons:
+            hit = src_tree.find_nearest(p.center)
+            if hit[1] is not None and p.area > 0 and p.normal.dot(hit[1]) < -0.5:
+                out["folded"] += 1
+    return out
+
+
+def sound(st, tris):
+    """A LOD the validator passes: closed, manifold, wound one way, no inverted shell, and (as validate's
+    FLIPPED_MAX) at most 0.2 % of its faces folded."""
+    return (st["open"] == 0 and st["nonmanifold"] == 0 and st["inconsistent"] == 0 and st["inverted"] == 0
+            and st["folded"] <= 0.002 * max(tris, 1))
+
+
 def decimate_to(src, name, budget, rt):
     """src decimated to at most `budget` triangles: planar first, then collapses with FormKeep holding at each of
     FACTORS; the one closest to src (deviation) is kept."""
@@ -177,25 +284,35 @@ def decimate_to(src, name, budget, rt):
     base = copy_object(src, name + "_lodsrc")
     planar(base, rt)
     if rt["tris"](base) <= budget:
+        st = soundness(base, _tree(src))             # planar alone can flatten a small part into two faces
+        rt["say"]("FORM_LOD", f"{name}: planar only, {'sound' if sound(st, rt['tris'](base)) else 'NOT sound'} {st}")
         base.name = base.data.name = name
         return base, 1
     keep_weights(base)
+    tree = _tree(src)
     tried, tries = [], 0
-    for factor in FACTORS:
-        ob, it = collapse(base, name, budget, rt, factor)
-        tries += it
-        if ob is not None:
-            tried.append((factor, deviation(src, ob), ob))
+    for share in SHARES:                       # milder only when no try of the round before is sound
+        for factor in FACTORS:
+            ob, it = collapse(base, name, max(int(budget * share), 4), rt, factor)
+            tries += it
+            if ob is not None:
+                st = soundness(ob, tree)
+                tried.append((factor, deviation(src, ob), ob, st, sound(st, rt["tris"](ob))))
+        if any(t[4] for t in tried):
+            break
     bpy.data.objects.remove(base)
     if not tried:
         raise rt["JobError"](f"decimation could not reach {budget} triangles")
-    least = min(d for _f, d, _o in tried)
-    # the most held collapse whose surface is about as close as the closest one (features cost little distance)
-    factor, dev, best = max((t for t in tried if t[1] <= least * HOLD_SLACK + 1e-9), key=lambda t: t[0])
-    for _f, _d, o in tried:
-        if o is not best:
-            bpy.data.objects.remove(o)
-    rt["say"]("FORM_LOD", f"{name}: hold factor {factor:g}, deviation {dev:.4g} mm (closest {least:.4g} mm)")
+    pool = [t for t in tried if t[4]] or tried
+    least = min(t[1] for t in pool)
+    # the most held collapse whose surface is about as close as the closest one (features cost little distance),
+    # among the sound ones when there are any
+    factor, dev, best, st, ok = max((t for t in pool if t[1] <= least * HOLD_SLACK + 1e-9), key=lambda t: t[0])
+    for t in tried:
+        if t[2] is not best:
+            bpy.data.objects.remove(t[2])
+    rt["say"]("FORM_LOD", f"{name}: hold factor {factor:g}, deviation {dev:.4g} mm (closest {least:.4g} mm), "
+              f"{'sound' if ok else 'NOT sound'} {st}")
     for g in list(best.vertex_groups):
         best.vertex_groups.remove(g)
     best.name = best.data.name = name

@@ -50,7 +50,7 @@ SHARP_DEG = 25.0
 WEAR_BAND = (0.02, 0.12)
 WEIGHTS = {"silhouette": 1.5, "interior_read": 1.0, "proportion": 0.6, "balance": 0.6, "detail_scales": 1.0,
            "edge_hierarchy": 1.2, "surface_breaks": 0.8, "material_zones": 0.8, "material_contrast": 0.6,
-           "wear": 0.6, "touch_points": 0.8}
+           "wear": 0.6, "touch_points": 0.8, "fairness": 1.0}
 # grip zones: where a hand goes on a product class, as bands of the normalised height (0 bottom, 1 top)
 GRIP = {"mouse": (0.35, 1.0), "bottle": (0.2, 0.75), "helmet_fullface": None, "helmet_open": None}
 
@@ -400,6 +400,69 @@ def touch_points(P, T, product_class=None, tri_feature=None, texture=None) -> di
     return {"deficit": _clip(share / 0.25), "share": round(share, 4), "zone": band}
 
 
+FAIR_SMOOTH_DEG = 20.0            # fairness: edges turning less than this are smooth surface (else a feature)
+FAIR_ITERS = 8                    # rings of averaging that give the curvature's own smooth trend
+FAIR_OK, FAIR_BAD = 0.12, 0.42    # relative curvature wobble: fair below, lumpy at and above (proposed)
+
+
+def fairness(P, T) -> dict:
+    """How lumpy the smooth surface is: the mean curvature (umbrella operator along the normal, times the asset's
+    diagonal) at every point at least one ring away from a feature edge (over FAIR_SMOOTH_DEG) or an open edge,
+    against its own trend (FAIR_ITERS rings of averaging); the area-weighted mean wobble over the mean trend (at least
+    2, so a flat face does not divide by nothing). A faired shell bends evenly; a lumpy one wobbles at the scale of
+    its cage faces."""
+    P, T = np.asarray(P, float), np.asarray(T, np.int64)
+    n = len(P)
+    fn = np.cross(P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]])
+    area = np.linalg.norm(fn, axis=1) / 2
+    fnu = fn / np.maximum(2 * area, 1e-12)[:, None]
+    vn = np.zeros((n, 3))
+    va = np.zeros(n)
+    for k in range(3):
+        np.add.at(vn, T[:, k], fn)
+        np.add.at(va, T[:, k], area / 3)
+    vn /= np.maximum(np.linalg.norm(vn, axis=1), 1e-12)[:, None]
+    key = np.sort(np.concatenate([T[:, [0, 1]], T[:, [1, 2]], T[:, [2, 0]]]), axis=1)
+    fid = np.tile(np.arange(len(T)), 3)
+    order = np.lexsort((key[:, 1], key[:, 0]))
+    ks, fs = key[order], fid[order]
+    same = np.nonzero(np.all(ks[1:] == ks[:-1], axis=1))[0]
+    E = ks[same]
+    ang = np.degrees(np.arccos(np.clip(np.einsum("ij,ij->i", fnu[fs[same]], fnu[fs[same + 1]]), -1, 1)))
+    hard = np.zeros(n, bool)
+    hard[E[ang > FAIR_SMOOTH_DEG].ravel()] = True
+    u, c = np.unique(key, axis=0, return_counts=True)
+    hard[u[c != 2].ravel()] = True
+    if not len(E):
+        return {"deficit": 0.0, "wobble": 0.0, "smooth_share": 0.0}
+    A = np.concatenate([E, E[:, ::-1]])
+    deg = np.maximum(np.bincount(A[:, 0], minlength=n), 1).astype(float)
+
+    def avg(x):
+        s = np.zeros(x.shape)
+        np.add.at(s, A[:, 0], x[A[:, 1]])
+        return s / deg.reshape((-1,) + (1,) * (x.ndim - 1))
+    elen = np.linalg.norm(P[E[:, 0]] - P[E[:, 1]], axis=1)
+    h = np.zeros(n)
+    np.add.at(h, E[:, 0], elen)
+    np.add.at(h, E[:, 1], elen)
+    h /= np.maximum(np.bincount(E.ravel(), minlength=n), 1)
+    size = float(np.linalg.norm(P.max(0) - P.min(0))) or 1.0
+    H = np.einsum("ij,ij->i", avg(P) - P, vn) / np.maximum(h, 1e-9) ** 2 * size
+    near = hard.copy()
+    near[A[hard[A[:, 0]], 1]] = True
+    ok = ~near
+    Hs = H.copy()
+    for _ in range(FAIR_ITERS):
+        Hs = np.where(ok, avg(Hs), Hs)
+    w = va * ok
+    if w.sum() <= 0:
+        return {"deficit": 0.0, "wobble": 0.0, "smooth_share": 0.0}
+    wob = float((np.abs(H - Hs) * w).sum() / w.sum()) / max(float((np.abs(Hs) * w).sum() / w.sum()), 2.0)
+    return {"deficit": _clip((wob - FAIR_OK) / (FAIR_BAD - FAIR_OK)), "wobble": round(wob, 4),
+            "smooth_share": round(float(ok.mean()), 4)}
+
+
 def analyze(m: Measurement, weights: dict | None = None) -> Analysis:
     """The deficit vector of one built design. weights: per-key weights over WEIGHTS (a style's emphasis)."""
     P, T = np.asarray(m.P, float), np.asarray(m.T, np.int64)
@@ -420,6 +483,8 @@ def analyze(m: Measurement, weights: dict | None = None) -> Analysis:
         w = wear(m.game)
         if w is not None:
             parts["wear"] = w
+        if (m.extra or {}).get("cage"):           # a subdivision cage's limit mesh: how fair its shell is
+            parts["fairness"] = fairness(P, T)
     tp = touch_points(P, T, m.product_class, m.tri_feature, (m.extra or {}).get("texture_features"))
     if tp is not None:
         parts["touch_points"] = tp

@@ -44,7 +44,7 @@ from . import presets as pz
 from . import validate as vmod
 
 RUNNER = Path(__file__).resolve().parent.parent / "adapters" / "blender_game.py"
-RUNNER_VERSION = 4
+RUNNER_VERSION = 5
 TIMEOUT_S = 1800.0
 PATTERNS = matlib.LEGACY_PATTERNS
 EXTRA_MAPS = ("emissive", "curvature", "thickness")   # baked with the base colour; written when there

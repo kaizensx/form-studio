@@ -43,14 +43,14 @@ def _ops_hash(ops) -> str:
 def _run_cached(ops, cfg, cache_dir, timeout):
     from ..adapters import blender_model as bm
     from .. import meshsource
-    f = Path(cache_dir) / f"{_ops_hash(ops)}.json" if cache_dir else None
+    f = Path(cache_dir) / f"s2{_ops_hash(ops)}.json" if cache_dir else None     # s2: replayed strict, cleaned
     if f is not None and f.is_file():
         try:
             return meshsource.CageData.load(f)
         except Exception:                                    # noqa: BLE001 - a bad cache file: replay again
             pass
     with _sem:
-        cage = bm.run_ops(ops, cfg=cfg, timeout=timeout)["cage"]
+        cage = bm.run_ops(ops, cfg=cfg, timeout=timeout, strict=True, stages=False)["cage"]
     if f is not None:
         try:
             f.parent.mkdir(parents=True, exist_ok=True)
@@ -279,7 +279,7 @@ class GameEvaluator(Evaluator):
             # fail the final bake is rejected here, not after the search has built on it
             validation = quick_validation(game.get("validation"))
         a = analyze(Measurement(geo["P"], geo["T"], tri_feature=geo["tf"], zones=zones_of(src), purpose="game",
-                                game=game, product_class=self.product_class), weights=self.weights)
+                                game=game, product_class=self.product_class, extra={"cage": True}), weights=self.weights)
         lo, hi = geo["P"].min(0), geo["P"].max(0)
         out = Evaluation(ok=True, analysis=a, checks=None, frozen=None, wall_mm=None, triangles=geo["tris"],
                          game=validation, bbox=(tuple(lo.tolist()), tuple(hi.tolist())), seconds=round(time.time() - t0, 2),
@@ -330,7 +330,8 @@ class GameEvaluator(Evaluator):
         base = self._measure(source)
         geo = self._geo[geometry_key(source)]
         a = analyze(Measurement(geo["P"], geo["T"], tri_feature=geo["tf"], zones=zones_of(source), game=ev,
-                                purpose="game", product_class=self.product_class), weights=self.weights)
+                                purpose="game", product_class=self.product_class, extra={"cage": True}),
+                     weights=self.weights)
         lods = rep.get("lods") or []
         return Evaluation(ok=True, analysis=a, game=rep.get("validation"), triangles=lods[0]["triangles"] if lods else None,
                           bbox=base.bbox, extra={"dir": str(gdir), "evidence": ev})
