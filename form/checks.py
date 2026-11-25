@@ -12,7 +12,7 @@ and a motion check's pose names the joint position where it was found.
 """
 from __future__ import annotations
 
-CHECKS_VERSION = 6          # 5: every vertex, every thin region (form/thickness.py); 6: structural walls fail
+CHECKS_VERSION = 7          # 5: every vertex, every thin region (form/thickness.py); 6: structural walls fail; 7: textured STL volume N/A
 STRUCTURAL_LINES = 3    # a structural feature's wall under this many nozzle widths fails the Thinnest-wall check
 NA = "N/A"           # a check that cannot run for this kind of design; never counted as a pass
 
@@ -55,6 +55,12 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
             add("conversion", "STL matches the CAD solid", NA, "mesh design",
                 "Not available for mesh designs. There is no CAD solid to compare the STL with: the design itself is a mesh. "
                 f"Mesh volume {m['volume_mm3']/1000:.2f} cm³.", "none")
+        elif m.get("textured"):
+            # a mesh texture displaces the surface by design: the STL's volume differs from the smooth CAD solid's by
+            # the texture's amplitude, which is no conversion error (the mesh check above still runs on it)
+            add("conversion", "STL matches the CAD solid", NA, f"{dv*100:.1f}% volume (textured)",
+                f"Not comparable: the design's mesh texture displaces the exported surface on purpose. CAD "
+                f"{b['volume_mm3']/1000:.2f} cm³, textured mesh {m['volume_mm3']/1000:.2f} cm³.", "computed")
         else:
             add("conversion", "STL matches the CAD solid", "PASS" if dv <= 0.002 else ("WARN" if dv <= 0.01 else "FAIL"),
                 f"{dv*100:.3f}% volume", f"CAD {b['volume_mm3']/1000:.2f} cm³, mesh {m['volume_mm3']/1000:.2f} cm³. "

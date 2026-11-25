@@ -1154,6 +1154,11 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
         vols = a.get("signed_component_volumes_mm3") or [0]
         a["volume_mm3"] = float(sum(vols))
         a["format"], a["sha256"] = stl_format, stl_sha
+        try:                                            # a declared mesh texture displaces the STL on purpose
+            from .craft import meshtex
+            a["textured"] = bool(meshtex.declared(model["recipe"], model["values"]))
+        except Exception:                               # noqa: BLE001 - only the volume comparison reads this
+            a["textured"] = False
         out["mesh"] = a
     return out
 
