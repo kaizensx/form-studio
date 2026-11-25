@@ -26,6 +26,7 @@ from . import taskstore
 from . import printers as printers_mod
 from . import filaments as materials_mod, plates as plates_mod
 from . import purpose as purpose_mod
+from . import wallguard
 
 NODES = ["geometry", "exports", "checks", "slice"]
 STATICS_LABELS = {"tip_force_n": ("Tip-over force", "N"), "safety_factor": ("Bending safety factor", "x"),
@@ -542,6 +543,24 @@ class Studio:
                     r.setdefault("provenance", {}).setdefault(q.key, _initial_provenance(q))
 
     # ---- marks: label text and revision stamp (form/marks.py) ---------------
+    def finish_floor(self, p: dict) -> float:
+        """The thinnest wall a decorative feature may leave in this design (form/wallguard.py): the print minimum
+        for the project's nozzle, the process minimum for a model."""
+        try:
+            nz = self.slicer_info(p=p).get("nozzle_mm") if not purpose_mod.is_model(p) else None
+        except Exception:
+            nz = None
+        return wallguard.floor_for(purpose_mod.of(p), nz or 0.4, purpose_mod.process(p))
+
+    def _has_finish(self, rid: str) -> bool:
+        """Does the design have a feature the finish guard measures (form/featureprog.py, a decorative role)? Only
+        then does the floor shape its solid, and so its keys."""
+        try:
+            meta = getattr(type(self.recipes[rid]), "_form_meta", None) or {}
+        except Exception:
+            return False
+        return any(wallguard.guarded((m or {}).get("role")) for m in meta.values())
+
     def mark_context(self, p: dict, rid: str, values: dict, n: int | None = None) -> dict | None:
         """What a design that carries marks needs to know for this build: the revision the geometry is for, the
         project's label text and the stamp hash. None unless one of the recipe's mark_params is switched on,
@@ -643,8 +662,12 @@ class Studio:
             refs[self._ref_name(src.name)] = str(src.resolve())
         vals = {**self.recipes[rid].defaults(), **(values or {})}
         self._check_assembly(rid, vals)
+        # the project does not exist yet: its finish floor comes from the purpose it is about to get, so the first
+        # build keys its features as every later build of the project does (form/wallguard.py)
+        pur = purpose_mod.normalise(purpose) if purpose not in (None, "") else purpose_mod.default(self.cfg)
+        stub = {"purpose": pur or "print", "process": purpose_mod.normalise_process(process) if process else ""}
         rid, info = self._try_design(rid, vals, partial=partial and language == "python", refs=refs, draft=draft,
-                                     name=name)                    # must build before it is saved
+                                     name=name, floor=self.finish_floor(stub))   # must build before it is saved
         self.cancel_point("the design was built but not saved")
         if info:
             values = {k: v for k, v in (values or {}).items() if k in {q.key for q in self.recipes[rid].params}}
@@ -667,7 +690,8 @@ class Studio:
         return self.load(p["id"])
 
     def _try_design(self, rid: str, vals: dict, partial: bool = False, refs: dict | None = None, p: dict | None = None,
-                    draft: str | None = None, name: str = "", prev_skipped: set | None = None) -> tuple[str, dict | None]:
+                    draft: str | None = None, name: str = "", prev_skipped: set | None = None,
+                    floor: float | None = None) -> tuple[str, dict | None]:
         """Build a design source before it becomes a revision: (recipe id to save, partial info or None).
 
         A FeatureDesign whose later features fail builds with them skipped: refused unless partial (or the same
@@ -677,6 +701,8 @@ class Studio:
         on = self._draft_sink(draft, name) if draft else None
         watch = _BuildWatch(on)                     # what is kept if the kernel hangs or crashes part-way
         extra = {"refs": refs} if refs else {}
+        if p is None and floor is not None:
+            extra["_floor"] = floor
         kw = dict(recipe_id=rid, values=vals, tol=0.1, p=p, timeout=BUILD_TIMEOUT, on_progress=watch,
                   _progress=True if on else "events", **extra)
         self._tl.last_log = None
@@ -774,7 +800,19 @@ class Studio:
         d = featureprog._timeout_diag(fid or "next", {"s": secs, "budget": hang.get("budget") or run.get("budget"),
                                                       "kind": "crash" if kind == "crash" else "kill"})
         if not fid:                                 # a design that is not a FeatureDesign: the stage after the last
-            d["message"] = d["message"].replace("The next feature", f"The stage after {built[-1]}")
+            ids = [f.id for f in getattr(recipe, "features", None) or []]
+            nxt = ids[ids.index(built[-1]) + 1] if built[-1] in ids and ids.index(built[-1]) + 1 < len(ids) else ""
+            d["message"] = d["message"].replace("The next feature", f"The stage after {built[-1]}"
+                                                + (f" (the next declared feature, {nxt})" if nxt else ""))
+        site = err.extra.get("site") or hang.get("site")
+        if site:                                    # where in the code it crashed (form/worker.py crash_site)
+            from .worker import crash_text
+            d["message"] = d["message"].rstrip(".") + "." + crash_text(site)
+            d["diagnosis"] = {**d.get("diagnosis", {}), "site": site, "summary": d["message"]}
+            if "fillet" in site.get("op", "") or "chamfer" in site.get("op", ""):
+                d["hint"] = ("A fillet or chamfer as large as a face it runs along (an arc of that same radius, a rib "
+                             "narrower than twice the radius) crashes OCCT: use a smaller size, leave those edges out, or "
+                             "use craft.safe_fillet / safe_chamfer, which refuse that size. " + d["hint"])
         src = featureprog.partial_source(source_path(self.sources, rid).read_text(encoding="utf-8"), len(built),
                                          solids, rid, built, fid, True, upto=upto,
                                          why="crashed the kernel" if kind == "crash" else "did not finish")
@@ -808,7 +846,8 @@ class Studio:
         return StudioError(i.get("message", "Kernel failure"), i.get("hint", ""), status=422 if i.get("kind") == "recipe" else 500,
                            feature=i.get("feature"), params=i.get("params", []), kind=i.get("kind"),
                            **({"diagnosis": i["diagnosis"]} if i.get("diagnosis") else {}),
-                           **({"hang": i["hang"]} if i.get("hang") else {}))
+                           **({"hang": i["hang"]} if i.get("hang") else {}),
+                           **({"site": i["site"]} if i.get("site") else {}))
 
     def _draft_sink(self, draft: str, name: str = ""):
         """on_progress for a build: each stage's mesh goes to .cache/drafts/<draft>.json (the last valid solid of the
@@ -1029,6 +1068,9 @@ class Studio:
         mc = self.mark_context(p, rid, r["values"], r["n"])
         if mc:                                         # label text and revision stamp are part of the solid
             gk = H(gk, "mark", mc)
+        floor = self.finish_floor(p)
+        if abs(floor - wallguard.DEFAULT_FLOOR) > 1e-9 and self._has_finish(rid):
+            gk = H(gk, "floor", floor)               # a finish thinner than this floor is left out of the solid
         ek = H("exports", gk, p["orientation"], STL_TOL)
         fit_in = None
         if recipe.fit:
@@ -1208,15 +1250,22 @@ class Studio:
         """One kernel call. With p (the project), a design that reads imported parts gets their paths, and a
         design with marks gets the label text and the revision (rev, or the one the values belong to)."""
         self.cancel_point()
+        floor = kw.pop("_floor", None)              # a design built before its project exists (create_design)
+        if p is None and floor is not None:
+            kw["_mark"] = {"wall_floor": floor}
         if p is not None and kw.get("recipe_id"):
             vals = kw.get("values") if kw.get("values") is not None else kw.get("base")
             mc = self.mark_context(p, kw["recipe_id"], vals, rev) if isinstance(vals, dict) else None
             if mc and "key" in kw:
                 kw["key"] = f"{kw['key']}-{H(mc)}"
             nz = self.slicer_info(p=p).get("nozzle_mm")
-            ctx = {**(mc or {}), **({"nozzle": nz} if nz else {})}
+            ctx = {**(mc or {}), **({"nozzle": nz} if nz else {}), "wall_floor": self.finish_floor(p)}
             if ctx:
                 kw["_mark"] = ctx
+        wf = (kw.get("_mark") or {}).get("wall_floor")
+        if wf is not None and abs(wf - wallguard.DEFAULT_FLOOR) > 1e-9 and "key" in kw \
+                and self._has_finish(kw.get("recipe_id") or ""):
+            kw["key"] = f"{kw['key']}-f{wf:g}"        # the worker's model cache: a finish may be left out at this floor
         if refs is None and p is not None and self.uses_references(kw.get("recipe_id", "")):
             refs = self.reference_paths(p)
         if refs:

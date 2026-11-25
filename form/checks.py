@@ -12,7 +12,8 @@ and a motion check's pose names the joint position where it was found.
 """
 from __future__ import annotations
 
-CHECKS_VERSION = 4
+CHECKS_VERSION = 5
+STRUCTURAL_LINES = 3    # a structural feature's wall under this many nozzle widths fails the Thinnest-wall check
 NA = "N/A"           # a check that cannot run for this kind of design; never counted as a pass
 
 
@@ -104,12 +105,24 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
     thin, nz = analysis.get("thin"), ctx["nozzle"]
     if thin:
         st = "PASS" if thin["t"] >= 3 * nz else ("WARN" if thin["t"] >= 2 * nz else "FAIL")
-        add("wall", "Thinnest wall", st, f"{thin['t']:.2f} mm",
-            f"Smallest opposing-wall distance over {analysis['thickness_samples']:,} surface samples"
+        spot, detail = thin, ""
+        ts = analysis.get("thin_structural")
+        if ts and ts["t"] < STRUCTURAL_LINES * nz:
+            # a wall of a structural feature (the load path: a corbel, an arm, a clip's spine) under three nozzle
+            # widths is a fail, not a warning to note: the softer 2-3 line band is for decorative ridges and fins
+            spot, st = ts, "FAIL"
+            names = ts.get("label") or ts.get("feature", "")
+            by = f" (thinned by {', '.join(ts['cut_by'])})" if ts.get("cut_by") else ""
+            detail = (f"A wall of the structural feature {names}{by} is {ts['t']:.2f} mm at "
+                      f"({', '.join(f'{x:.1f}' for x in ts['at'])}) mm, under the {STRUCTURAL_LINES * nz:.1f} mm "
+                      f"(three lines of a {nz:g} mm nozzle) a load-bearing wall needs. Thicken it there; a finish cut "
+                      "into it (flutes, grooves, a chamfer) counts against it. ")
+        add("wall", "Thinnest wall", st, f"{spot['t']:.2f} mm",
+            detail + f"Smallest opposing-wall distance over {analysis['thickness_samples']:,} surface samples"
             + (" of the mesh. " if mesh else ". ") +
             f"Under {2*nz:.1f} mm cannot hold two perimeters on a {nz:g} mm nozzle"
             + (" (nozzle size assumed)." if ctx.get("nozzle_assumed") else "."),
-            "computed", feature=thin.get("feature"), at=thin.get("at"), to=thin.get("to"))
+            "computed", feature=spot.get("feature"), at=spot.get("at"), to=spot.get("to"))
 
     steep = row["steep_mm2"]
     add("overhang", "Unsupported overhangs", "PASS" if steep < 1 else "WARN", f"{steep:.0f} mm²",

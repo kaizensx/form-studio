@@ -267,6 +267,36 @@ def shell(solid, thickness: float, openings: Iterable | None = None, inward: boo
     return r
 
 
+SINGULAR = 0.03          # a blend this close (relative) to the radius of an arc edge it runs along degenerates
+
+
+def singular_edges(edges, size: float) -> list:
+    """Edges a fillet of radius `size` (or a chamfer of that length) must not be asked to take at once: arcs whose own
+    radius is within SINGULAR of it. The blend then shrinks the arc's face to nothing, and OCCT's BRepFilletAPI does
+    not fail cleanly: it ends the process (r05 of a sofa-arm holder: a 1.2 mm fillet on the top edge of a 1.2 mm
+    radius bead). Measured on the edge, nothing assumed."""
+    out = []
+    for e in edges:
+        try:
+            if e.geom_type.name == "CIRCLE" and abs(e.radius - size) <= SINGULAR * e.radius:
+                out.append(e)
+        except Exception:
+            continue
+    return out
+
+
+def guarded_blend(shape, size: float, edges, chamfer: bool = False):
+    """shape.fillet(size, edges) / shape.chamfer(size, None, edges), refusing (ValueError, which the safe_ helpers
+    treat as "did not fit") a size that would crash the kernel on one of the edges (singular_edges)."""
+    bad = singular_edges(edges, size)
+    if bad:
+        c = bad[0].center()
+        note(f"{'chamfer' if chamfer else 'fillet'} {size:.2g} mm not tried on {len(bad)} arc edge(s) of that same "
+             f"radius (at {c.X:.1f}, {c.Y:.1f}, {c.Z:.1f}): it degenerates and crashes the kernel")
+        raise ValueError("blend size equals an arc edge's radius")
+    return shape.chamfer(size, None, edges) if chamfer else shape.fillet(size, edges)
+
+
 def safe_fillet(shape, edges, radius: float, min_fraction: float = 0.25):
     """Fillet edges with radius; when it does not fit, try 75 %, 50 % and min_fraction of it, then leave the edges
     sharp. Every reduction is noted (form.craft.notes()); the chosen radius is what the solid has."""
@@ -277,7 +307,7 @@ def safe_fillet(shape, edges, radius: float, min_fraction: float = 0.25):
     fr = [1.0, 0.75, 0.5, min_fraction]
     for i, f in enumerate(fr):
         try:
-            out = shape.fillet(r * f, E)
+            out = guarded_blend(shape, r * f, E)
             if ok(out):
                 if i:
                     note(f"safe_fillet: {r:g} mm did not fit; used {r * f:.2g} mm")
@@ -293,7 +323,7 @@ def safe_fillet(shape, edges, radius: float, min_fraction: float = 0.25):
                 continue
             for f in fr:
                 try:
-                    o = out.fillet(r * f, [cur])
+                    o = guarded_blend(out, r * f, [cur])
                     if ok(o):
                         out, done = o, done + 1
                         sizes.add(round(r * f, 2))

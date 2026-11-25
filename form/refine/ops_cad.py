@@ -548,6 +548,26 @@ def edge_break(body, frozen=(), r: float = 0.3, deg: float = DEG_SHARP, max_edge
     return _per_solid(body, one)
 
 
+def _floor() -> float:
+    """The thinnest wall a refine finish may leave (form/wallguard.py: the print minimum of this build)."""
+    from .. import wallguard
+    return wallguard.current_floor()
+
+
+def _wall_kept(before, after) -> bool:
+    """True when the cut that made `after` leaves no wall under the floor (measured under its new faces)."""
+    from .. import wallguard
+    floor = _floor()
+    if floor <= 0:
+        return True
+    w = wallguard.cut_walls(before, after, n=150)
+    if w is not None and w["t"] < floor - 1e-3:
+        _note(f"refine: a cut would leave a {w['t']:.2f} mm wall at {wallguard.where(w['at'])}, under {floor:g} mm; "
+              "not made there")
+        return False
+    return True
+
+
 def _sections(solid, z: float):
     """The faces of the solid's cross-section at height z (the top faces of a 0.02 mm slab)."""
     from build123d import Align, Box, Pos
@@ -593,7 +613,7 @@ def parting_line(body, frozen=(), width: float = 0.5, depth: float = 0.4, at=(0.
             if _hits_frozen(removed, frozen):
                 continue
             out = solid - tool
-            if _ok(out) and len(_solids(out)) == 1:
+            if _ok(out) and len(_solids(out)) == 1 and _wall_kept(solid, out):
                 _note(f"refine parting_line: {width:g} x {depth:g} mm groove at z = {z0:.1f} mm")
                 return out
         return None
@@ -687,6 +707,8 @@ def knurl_zone(body, frozen=(), pitch: float = 1.6, depth: float = 0.5, band=(0.
                 return None
             k = craft.knurl(2 * R, hb, pitch=pitch, depth=1.5 * depth, kind=kind, chamfer=min(0.6, hb / 4))
             core = craft.safe_cut(solid, ring)
+            if not _wall_kept(solid, core):                         # the grip's wall (a bore behind it) too thin
+                return None
             out = craft.safe_union(core, Pos(x, y, zb) * k)
             _note(f"refine knurl_zone: {kind} knurl, pitch {pitch:g} mm, on a {2 * R:.1f} mm grip over {hb:.1f} mm")
             return out
@@ -774,8 +796,12 @@ def recessed_panel(body, frozen=(), depth: float = 0.6, inset: float = 0.12, min
             removed = solid & tool
             if removed is None or removed.volume < 0.9 * tool.volume or _hits_frozen(removed, frozen):
                 continue                                           # not all solid under the panel, or frozen
+            probe = extrude(region, depth + _floor(), dir=-f.normal_at())   # and a print-minimum wall behind it
+            behind = solid & probe
+            if behind is None or behind.volume < 0.98 * probe.volume:
+                continue
             out = solid - tool
-            if _ok(out) and len(_solids(out)) == 1:
+            if _ok(out) and len(_solids(out)) == 1 and _wall_kept(solid, out):
                 _note(f"refine recessed_panel: {depth:g} mm panel inset {m:.1f} mm in a {a:.0f} x {b:.0f} mm face")
                 return out
         return None
@@ -842,6 +868,8 @@ def rib_lightening(body, frozen=(), pitch: float = 10.0, t: float = 1.6, skin: f
     only where the body is solid at least pocket depth + skin, and never more than max_share of its volume."""
     from build123d import Pos, Rot, extrude
     from .. import craft
+
+    skin = max(float(skin), _floor())                              # the skin left is a wall: never under the floor
 
     def one(solid):
         lo, hi = _bb(solid)

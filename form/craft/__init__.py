@@ -34,6 +34,7 @@ Modules (each also importable on its own, e.g. `from form.craft import mechanism
   safe       operations that degrade gracefully, each fallback noted: safe_union, safe_cut, safe_intersect,
               safe_fillet, safe_chamfer, safe_loft (re-seamed, ruled, pairwise), safe_shell, safe_sweep; repair
               (ShapeFix + face merge), inspect (validity, faults, shortest edge), reseam (sections for a loft)
+  finish      finish_cut: decorative cuts (flutes, grooves) each only as deep as the wall behind it allows
   texture     B-rep: knurl, spiral_ribbed_body, wrapped_ribs, emboss_cells (capped at MAX_INSTANCES = 2000)
   meshtex     MeshTexture for STL/GLB/renders ("mesh texture; STEP carries the smooth body")
   patterns    form.patterns re-exported (hex_vents, perforation_grid, slot_array, knurl, grip_ribs)
@@ -68,6 +69,7 @@ _LAZY = {
                 "split_with_magnets", "split_spots", "radial_grid_heightmap"),
     "safe": ("safe_union", "safe_cut", "safe_intersect", "safe_chamfer", "safe_loft", "safe_shell", "safe_sweep",
              "repair", "inspect", "reseam", "BRIDGE"),
+    "finish": ("finish_cut",),
     "texture": ("knurl", "polyhedron", "spiral_ribbed_body", "wrapped_ribs", "emboss_cells", "MAX_INSTANCES"),
     "assemble": ("parts", "named_parts", "part_list", "inside_point", "split", "Split", "lens", "MAGNETS", "MAGNET_FITS",
                  "MAGNET_FLOOR", "magnet", "magnet_pair", "MagnetPair", "pocket_axes", "coaxial_error"),
