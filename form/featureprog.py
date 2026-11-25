@@ -85,7 +85,7 @@ def _h(*parts) -> str:
 # ---- the feature decorator and the design base ---------------------------------------------------------------------
 
 def feature(label: str = "", role: str = "structure", doc: str = "", parts: int | None = None,
-            budget: float | None = None, stages: bool = False):
+            budget: float | None = None, stages: bool = False, expects: list | None = None):
     """Mark a method of a FeatureDesign as a feature: `@feature("Eye openings", role="access")`.
 
     parts: how many separate parts (solids) this feature adds (a lens feature that makes two lenses: parts=2; the
@@ -93,15 +93,21 @@ def feature(label: str = "", role: str = "structure", doc: str = "", parts: int 
     every feature against the running total, and a feature that splits or fuses a part is skipped with the counts.
     budget: seconds this feature may take (default FEATURE_BUDGET); past it the feature is stopped and left out.
     stages: the method returns a list of Stages (a plain Recipe's build(), wrapped by form/refine/adapter.py): each
-    stage keeps its own feature (the class's declared features), and the body is the last stage's shape."""
+    stage keeps its own feature (the class's declared features), and the body is the last stage's shape.
+    expects: what the body must be when this feature is done, as kernel-checked assertions (form/contract.py):
+    `expects=[contract.bolt_circle(4, 5.2, 60), contract.cylinder(70, "boss")]`. They are measured on the solid the
+    feature returns; a miss fails this feature, with measured against wanted, like any other failure of it."""
     if parts is not None and (not isinstance(parts, int) or parts < 0):
         raise TypeError("feature(parts=) is a whole number of parts the feature adds (0 or more).")
     if budget is not None and not (isinstance(budget, (int, float)) and budget > 0):
         raise TypeError("feature(budget=) is a number of seconds above 0.")
 
+    if expects is not None and not (isinstance(expects, (list, tuple)) and all(isinstance(e, dict) for e in expects)):
+        raise TypeError("feature(expects=) is a list of assertions: form.contract.holes(4, 5.2), ...")
+
     def deco(fn):
         fn._form_feature = {"label": label, "role": role, "doc": doc, "parts": parts, "budget": budget,
-                            "stages": bool(stages)}
+                            "stages": bool(stages), "expects": list(expects or [])}
         return fn
     return deco
 
@@ -547,6 +553,9 @@ def _build_features(self, v: dict) -> list[Stage]:
                     problem, hint = _problem(out, mesh, i, n0, v0, want if counted else None, declared, adds)
                     if problem:
                         raise RecipeError(f"The {fid} feature {problem}.", fid, hint)
+                    if m.get("expects"):               # its own postconditions, measured on what it returned
+                        from . import proving
+                        proving.expects(fid, m["expects"], out)
                 except FeatureTimeout:
                     info = {"feature": fid, "s": round(time.perf_counter() - t0, 1), "budget": round(budget, 1),
                             "kind": "budget", "ts": time.time()}

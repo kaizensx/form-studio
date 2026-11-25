@@ -30,6 +30,8 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Starting a design | `form/start.py`, `form/sketch.py`, `form/photo.py`, `form/concepts.py` | Home's composer as one message (words, photos, files, a sketch as structured geometry, links), blank designs, concept groups and the pick |
 | Recipes | `form/recipes/`, `form/recipe_lib.py`, `form/recipe_share.py` | Internal building blocks for agents and designs written as code (Python or OpenSCAD); installed recipes, verified by SHA-256; `.formrecipe` packages |
 | Purpose | `form/purpose.py` | For 3D printing or just a 3D model, the process a model is made with, and which checks apply |
+| Canonical form and edits | `form/canon.py`, `form/edits.py` | A plain Recipe lifted into one method per feature (kernel-checked to be the same solid); edits as ops on one feature, helper or parameter: one build, one revision |
+| Contract and proof | `form/contract.py`, `form/proving.py`, `form/preflight.py` | The brief as kernel-checkable assertions with tolerance and provenance, the audit of its numbers, each assertion owed by one feature, the proof sheet per revision and the claim gate; what is wrong with a source that needs no kernel to find |
 | Checks and analysis | `form/checks.py`, `form/analysis.py`, `form/fit.py`, `form/selection.py` | Checks on the solid, analysis maps, the fit model, statics, selections and annotations |
 | Appearance | `form/materials.py` | Colours and materials per design or part, the 3MF with colours, material-aware checks |
 | Assemblies | `form/recipes/assembly.py`, `form/assembly.py`, `form/collide.py` | Parts, kinematic chains and fits as data; interference, fit and joint-sweep checks on meshes with B-rep refinement, in their own time budget |
@@ -37,7 +39,7 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Print simulation | `form/toolpath.py`, `form/simulate.py` | Per-layer toolpaths by line type, timed by the slicer's estimate |
 | Agents | `form/agents/`, `form/chat.py`, `form/ask.py` | Run an agent CLI, or talk to a model API, a local model or a provider added by URL with Form Studio's tools (`form/agents/mcp_client.py`); questions and measurements the agent asks wait for the person's answer |
 | Blender modelling bridge | `form/adapters/blender_model.py`, `form/adapters/blender_ops.py`, `form/meshsource.py` | An agent's declarative op list, schema-checked, run in Blender by a fixed runner; streams a preview per op; returns cage data (points, quads, creases, named regions) for a design's source |
-| MCP server | `form/mcp_server.py` | 95 tools over stdio |
+| MCP server | `form/mcp_server.py` | 96 tools over stdio |
 | CLI | `form/__main__.py` | Every capability as a JSON-printing command |
 | Archives | `form/bundle.py` | `.formstudio` files: a project, its conversations and the code it was built from, checked before anything is written |
 | Installer | `form/installer.py`, `form/setup.py` | Finds and installs slicers, agents and libraries, with consent; hands-free on first start |
@@ -101,6 +103,42 @@ time budget (`[assembly].budget_s`); a partial result names the range that was c
 *model* (statistics or statics with stated assumptions), *simulated* (from the slicer), *physical* (entered from a real
 print). Coupon measurements calibrate the printer profile; only a result from the part itself is physical evidence for
 a revision.
+
+## Proof-carrying build
+
+A build that returns a valid solid is done; it is not thereby correct. Four pieces close that gap, each small.
+
+**Canonical form.** `form/canon.py` rewrites a plain Recipe as a FeatureDesign: `build()` is cut after every statement
+that makes a Stage, and each piece becomes a method that takes the body the piece before it staged. What a piece
+reads from earlier pieces is replayed inside it only when that is arithmetic (or the design's own numeric helpers);
+a piece that would need geometry or a value measured on an earlier body is merged with the pieces before it, and a
+build that cannot be cut is one skeleton feature. The lift is accepted for a project only after it is built once and
+has the head's volume, face count and bounding box (`form/edits.py` `canonical`), and that build leaves the
+checkpoints the next edit starts from.
+
+**Edit protocol.** `edit_design(ops=[replace | insert | delete | set_param], expect_head)` applies ops to the canonical
+source: a feature, a function or a parameter by name, or text found exactly once. All ops are checked before any is
+applied; the result is one build and one revision, and it reports the features that were built again, not the file.
+
+**Contract and obligations.** `design_brief` compiles the brief into typed assertions (`form/contract.py`): read from
+its words where the words carry numbers, passed as typed assertions otherwise. The audit is arithmetic on those
+numbers (missing, conflicting, impossible) and blocks planning and building until they can all hold. Each assertion
+is assigned to the feature that must discharge it. `@feature(..., expects=[...])` makes it a postcondition measured
+when that feature is built (`form/proving.py` `expects`); a miss is that feature's failure. `op_prove` measures every
+assertion on the finished solid and, for a failure, on the solid as each feature left it, so the row says where it was
+never met or at which later feature it was lost.
+
+**Proof sheet.** One row per requirement: measured, tolerance, evidence class (computed, heuristic or none) and PASS,
+FAIL or UNPROVEN. It is stored under a key made of the solid's key and the contract's fingerprint, so it is current
+exactly while both are. `get_project` and every commit return it, a FAIL blocks release, and
+`contract.claim_gate(st, p)` returns what a summary may claim (the PASS rows), what it must not (FAIL and UNPROVEN,
+with the measurement) and the audit's open items.
+
+**Preflight.** `form/preflight.py` reads a source twice without the kernel: its syntax tree against a snapshot of the
+real API (`form/preflight_api.json`, written by `scripts/gen_preflight_api.py`), and a dry run in which the design's
+own code executes with every geometry module replaced by ghosts, so its numbers are the ones the kernel would get.
+It imports neither build123d nor OCCT. Errors refuse a create or an edit before any kernel time, all at once, and an
+edit is refused only for what it introduces.
 
 ## Blender modelling bridge
 

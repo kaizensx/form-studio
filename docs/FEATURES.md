@@ -88,6 +88,14 @@ each one named as it arrives.
   source: measured, specified, assumed, estimated from a photo, computed.
 - **Features you can click.** Each face of the solid is attributed to the feature that made it, so you can select a
   feature on the model, change it, hide it, and see which features a change touched.
+- **Edits that name what changes.** An agent changes one feature, one helper or one parameter by name (`edit_design`),
+  not by sending the file again. A design written as one build function is first rewritten as one method per
+  feature, and kept only when the kernel finds the same volume, faces and bounding box; then only the changed feature
+  and those after it are built.
+- **Mistakes found before the kernel runs.** A design's code is checked without building anything, and every problem
+  comes back at once: a constraint its own values break, a name or argument the CAD library does not have, a
+  parameter that is read but not declared, a polygon wound the wrong way for its extrusion, a bolt and a threaded
+  hole that barely engage.
 - **Drafts with computed impact.** A change is built for real before it is saved: the features and interface
   dimensions it moves, the change in stability and fit, and which outputs it would invalidate.
 - **Constraints that explain themselves.** An impossible combination is refused with the feature, the parameters
@@ -410,6 +418,16 @@ Building blocks and assemblies add their own: a bracket's bending safety factor,
 its hole. **Every result says how it is known** (computed, heuristic, model, simulated, measured, physical) and
 clicking a result shows where on the part it was found.
 
+**The brief as a contract, proved on the solid.** A brief's requirements become assertions the kernel checks: sizes,
+volume, the number of parts, holes of a diameter, a cylinder's diameter and axis, a bolt circle or a row of holes,
+the thinnest wall, the presence of a thread. Each carries its tolerance and where it came from (the brief's own
+words, a named dimension, the design's code). Before any code, the numbers themselves are audited: what is missing,
+what conflicts and what cannot be built is reported once. Every assertion is owed by one feature; a feature can
+promise its own (`expects=`), and a miss stops at that feature with what was measured against what was wanted.
+Each revision then has a proof sheet: one row per requirement with the measurement, the tolerance, the evidence
+class and PASS, FAIL or UNPROVEN. A failed requirement blocks release; a row that could not be measured is never
+shown as a pass.
+
 **Thinnest wall measures walls.** In a design of several parts each wall is measured inside its own part, so a bolt
 resting in its nut is not a 0 mm wall, and only faces within 30° of parallel count, so a tapered edge is not a wall
 either. A real thin fin still fails.
@@ -523,7 +541,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 95 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 96 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

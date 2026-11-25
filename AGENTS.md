@@ -20,7 +20,8 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Keep a change | `commit_change` with `expect_head` | `form commit <project> lean=18 --expect-head 3` |
 | Regenerate outputs | `run_pipeline` / `get_job` | `form run <project>` |
 | Ask for release | `request_release` (the user approves in the app) | — |
-| Design from your own code (the usual case) | `design_guide` → `create_design` → `update_design` | — |
+| Design from your own code (the usual case) | `design_guide` → `create_design` → `edit_design` (ops, not the file) | — |
+| Say what must be true, and read what was measured | `design_brief` (contract and audit) → `get_project` (`proof`) | — |
 | Read a datasheet or drawing | `read_document` (PDF pages as images) | — |
 | Find the best design under constraints | `optimize` | `form optimize <p> --vary arm_t:4:20 --minimize solid_mass_g --require "statics.safety_factor>=3"` |
 | Show motion | `animate` (turntable or morph) | `form animate <p> --morph 1:4` |
@@ -97,6 +98,8 @@ Commands:
 .venv/bin/python scripts/media/site_shot.py URL OUT  # a picture of the website's live replica (docs/images/try-it*.webp)
 .venv/bin/python scripts/media/showcase/product_shots.py  # product pictures for the site and README (scripts/media/showcase/README.md)
 .venv/bin/python scripts/gen_mcp_docs.py            # regenerates docs/MCP.md
+.venv/bin/python scripts/gen_preflight_api.py       # regenerates form/preflight_api.json (the API preflight checks names against)
+.venv/bin/python scripts/proof_demo.py              # brief with a trap, a red proof row, one edit op, a green sheet (real MCP, no model)
 ```
 
 Branches: `main` holds releases; `dev` is where work lands first. Open pull requests against `dev`.
