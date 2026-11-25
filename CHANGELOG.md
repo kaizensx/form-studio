@@ -24,6 +24,9 @@
   Before / After shows the design as it was before the refinement.
 - **The part stays in view.** A change that makes the part outgrow the view (a wider draft, a taller revision)
   pulls the camera back instead of letting the part slide under the panels, and labels no longer draw over them.
+- **Waiting for a design reads like a drawing being started.** Two construction lines meet at an origin and
+  breathe; the agent's real steps are written from it as a ledger, and "Writing design code" shows the size of
+  the code as it grows. The floor's origin cross no longer runs through the words on an empty floor.
 - **Drag a face to change the design**, constrained 2D sketches, and sculpted forms as exact NURBS.
 - **Real standard hardware.** ISO screws, nuts, washers, heat-set inserts and bearings built into designs, with
   their masses in the bill of materials.

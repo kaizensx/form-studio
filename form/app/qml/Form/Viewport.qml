@@ -32,6 +32,7 @@ Item {
     property var flagged: []
     property bool showCompanions: true
     property bool showDims: true
+    property bool showOrigin: true           // the faint origin cross on the floor; off where words sit over an empty floor
     property bool interactive: true
     property bool spin: false                // slow turntable (home screen)
     property bool lite: false                // thumbnails: no shadow map, no AO, lighter MSAA (many on screen at once)
@@ -667,7 +668,7 @@ Item {
                     property real uBelowAlpha: 0.3 * cam.belowK
                     property color uColor: Theme.benchGround; property color uFar: Theme.plate; property real uFade: Math.max(vp.groundSpan * 1.6, vp.dist * 0.9) } }
             // studio: a faint origin cross, the one fixed point on the floor (it gives way to the plate)
-            Model { objectName: "originCross"; pickable: false; castsShadows: false; visible: vp.plateK < 0.5; position: Qt.vector3d(vp.shift.x, vp.shift.y, 0)
+            Model { objectName: "originCross"; pickable: false; castsShadows: false; visible: vp.showOrigin && vp.plateK < 0.5; position: Qt.vector3d(vp.shift.x, vp.shift.y, 0)
                 geometry: LineGeometry { points: { var h = Math.max(6, Math.min(40, vp.radius(vp.bounds) * 0.22)); return [-h, 0, 0, h, 0, 0, 0, -h, 0, 0, h, 0] } }
                 materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
                     property color uColor: Theme.benchGrid; property vector3d uClipN; property real uClipD; property real uClip: 0 } }

@@ -25,8 +25,11 @@ Item {
         var out = []
         tools.forEach(function (t) { var n = String(t.name || "").replace(/^mcp__form__/, ""); var l = map[n] || ("Calling " + n)
             if (!out.length || out[out.length - 1] !== l) out.push(l) })
-        return out.slice(-5)
+        return out
     }
+    // the hero line while the agent writes code: the words, and the size of what it has written so far (it ticks)
+    readonly property bool writing: Store.chatBusy && !Store.chatAsking && !!Store.chatLive && Store.chatLive.kind === "tool"
+        && (Store.chatLive.name === "create_design" || Store.chatLive.name === "update_design" || Store.chatLive.name === "propose_concepts")
     function liveLine() {
         var L = Store.chatLive
         if (Store.chatAsking) return "Waiting for your answer"
@@ -34,7 +37,7 @@ Item {
                                                  : Store.convNoDesign ? "This conversation has not made a design yet" : "The agent answered without creating a design") : "Starting the agent…"
         if (!L) return "Thinking about it…"
         if (L.kind === "tool") return (L.name === "create_design" || L.name === "update_design" || L.name === "propose_concepts")
-                                      ? "Writing design code · " + (L.chars / 1000).toFixed(1) + " kB" : "Working…"
+                                      ? "Writing design code" : "Working…"
         if (L.kind === "thinking") return "Thinking it through…"
         if (L.kind === "text") return "Writing to you…"
         return "Working…"
@@ -43,49 +46,82 @@ Item {
     // the stages of the design as they build (Store.showStage), before it is saved
     readonly property bool staged: !!Store.building && !Store.building.project
     Viewport { id: dvp; objectName: "designingViewport"; anchors.fill: parent; lite: false; interactive: true; showDims: false; showCompanions: false
+        showOrigin: dz.staged                    // the floor's cross belongs to a part; before there is one the words stand here
         Component.onCompleted: { setModel(null); setView("iso", false); Store.stageViewer = dvp }
         Component.onDestruction: if (Store.stageViewer === dvp) Store.stageViewer = null }
     Rectangle { anchors.fill: parent
         gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.plate, 0.15) } GradientStop { position: 0.7; color: Theme.alpha(Theme.plate, 0.05) } GradientStop { position: 1; color: Theme.alpha(Theme.plate, 0.55) } } }
 
-    // the part that does not exist yet: a wireframe block assembling and dissolving, quietly, until the real one arrives
+    // The part that does not exist yet: the logo's construction. Two datum hairlines, X in from the left and Y down
+    // from the top, meet at an origin and breathe; what the agent is doing is written from that origin like the
+    // title block of a drawing: the line that matters large, its real steps as a ledger under it.
     Item {
-        id: ghost; width: 220; height: 220; anchors.centerIn: parent; anchors.verticalCenterOffset: -30
-        visible: opacity > 0.01 && !dz.done && !dz.empty
-        opacity: dz.staged ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.move(260) } }
-        Repeater { model: 12
-            Rectangle { required property int index
-                readonly property var e: [[0,0,1,0],[1,0,1,1],[1,1,0,1],[0,1,0,0],[0,0,0.5,-0.35],[1,0,1.5,-0.35],[1,1,1.5,0.65],[0,1,0.5,0.65],[0.5,-0.35,1.5,-0.35],[1.5,-0.35,1.5,0.65],[1.5,0.65,0.5,0.65],[0.5,0.65,0.5,-0.35]][index]
-                readonly property real ax: 40 + e[0] * 100; readonly property real ay: 80 + e[1] * 100
-                readonly property real bx: 40 + e[2] * 100; readonly property real by: 80 + e[3] * 100
-                x: ax; y: ay; width: Math.hypot(bx - ax, by - ay); height: 1.5; color: Theme.datum; antialiasing: true
-                transformOrigin: Item.Left; rotation: Math.atan2(by - ay, bx - ax) * 180 / Math.PI
-                opacity: 0
-                SequentialAnimation on opacity { loops: Animation.Infinite; running: !Theme.reduced && ghost.visible
-                    PauseAnimation { duration: index * 140 } NumberAnimation { to: 0.55; duration: 500; easing.type: Easing.OutCubic }
-                    PauseAnimation { duration: 2600 - index * 140 } NumberAnimation { to: 0.08; duration: 900; easing.type: Easing.InOutSine } PauseAnimation { duration: 400 } } } }
+        id: origin; objectName: "designingOrigin"
+        readonly property real col: Math.min(parent.width - 2 * Theme.s10, 560)        // the text column
+        x: Math.round((parent.width - col) / 2); y: Math.round(parent.height * 0.36)
+        width: 1; height: 1
+        visible: opacity > 0.01 && !dz.empty
+        opacity: dz.staged ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
+        Item { id: lines; anchors.fill: parent
+            property real breath: Theme.reduced ? 0.6 : 0.8
+            opacity: dz.done ? 0.4 : breath; Behavior on opacity { enabled: dz.done; NumberAnimation { duration: Theme.cross } }
+            SequentialAnimation on breath { running: !Theme.reduced && origin.visible && !dz.done; loops: Animation.Infinite
+                NumberAnimation { to: 0.35; duration: 1400; easing.type: Easing.InOutSine }
+                NumberAnimation { to: 0.8; duration: 1400; easing.type: Easing.InOutSine } }
+            Rectangle { y: 0; height: 1; width: Math.round(Math.min(origin.x - Theme.s6, 320)); x: -width
+                gradient: Gradient { orientation: Gradient.Horizontal
+                    GradientStop { position: 0; color: Theme.alpha(Theme.datum, 0) } GradientStop { position: 1; color: Theme.datum } } }
+            Rectangle { x: 0; width: 1; height: Math.round(Math.min(origin.y - Theme.s6, 240)); y: -height
+                gradient: Gradient {
+                    GradientStop { position: 0; color: Theme.alpha(Theme.datum, 0) } GradientStop { position: 1; color: Theme.datum } } }
+            // ticks every 24 px along both, the grid the mark is drawn on
+            Repeater { model: 5
+                Rectangle { required property int index; x: -(index + 1) * 24; y: -3; width: 1; height: 7; color: Theme.datum; opacity: 0.6 - index * 0.11 } }
+            Repeater { model: 5
+                Rectangle { required property int index; y: -(index + 1) * 24; x: -3; height: 1; width: 7; color: Theme.datum; opacity: 0.6 - index * 0.11 } }
+        }
     }
 
-    // what is happening, under the part
+    // what is happening, written from the origin
     Column {
         objectName: "designingState"; visible: !dz.empty && opacity > 0.01
-        opacity: dz.staged ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.move(260) } }
-        anchors.horizontalCenter: parent.horizontalCenter; anchors.top: ghost.bottom; anchors.topMargin: dz.done ? -120 : 8; spacing: 10; width: Math.min(parent.width - 80, 560)
-        Txt { kind: "cap"; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter; objectName: "designingCaption"; text: dz.done ? "No design yet" : "Being designed" }
-        Txt { objectName: "designingLine"; kind: "h2"; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width; text: dz.liveLine() }
+        opacity: dz.staged ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
+        x: origin.x + Theme.s5; y: origin.y + Theme.s5; spacing: Theme.s2; width: origin.col - Theme.s5
+        Txt { kind: "cap"; color: Theme.datum; objectName: "designingCaption"; text: dz.done ? "No design yet" : "Being designed" }
+        Row { spacing: 0; width: parent.width
+            Txt { objectName: "designingLine"; kind: "h2"; text: dz.liveLine(); width: Math.min(implicitWidth, parent.width - (kb.visible ? kb.width : 0)) }
+            Tick { id: kb; objectName: "designingKb"; visible: dz.writing; font.pixelSize: Theme.tH2; font.weight: Theme.wMedium; font.letterSpacing: -0.4; tone: 2
+                leftPadding: Theme.s3; unit: " kB"; decimals: 1; value: dz.writing ? Store.chatLive.chars / 1000 : 0 } }
         // a conversation whose designs were all moved to the trash says so, rather than pretending it made none
-        Txt { visible: dz.done && Store.convNoDesign && Store.designsHere.length > 0; kind: "body"; tone: 2; width: parent.width
-            horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
+        Txt { visible: dz.done && Store.convNoDesign && Store.designsHere.length > 0; kind: "body"; tone: 2; width: parent.width; wrapMode: Text.WordWrap
             text: Store.designsHere.length === 1 ? "Its design, “" + Store.designsHere[0].name + "”, is in the trash (.trash in your projects folder)."
                 : F.plural(Store.designsHere.length, "design") + " it made are in the trash (.trash in your projects folder)." }
-        Column { anchors.horizontalCenter: parent.horizontalCenter; spacing: 4; visible: dz.steps.length > 0
-            Repeater { model: dz.steps
-                Row { id: stepRow; required property string modelData; required property int index; spacing: 8; anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
-                    readonly property bool now: index === dz.steps.length - 1 && Store.chatBusy
-                    Icon { name: stepRow.now ? "loader_circle" : "check"; size: 12; color: stepRow.now ? Theme.datum : Theme.ink4; anchors.verticalCenter: parent.verticalCenter
-                        RotationAnimation on rotation { running: stepRow.now && !Theme.reduced; loops: Animation.Infinite; from: 0; to: 360; duration: 1100 } }
-                    Txt { kind: "fine"; tone: stepRow.now ? 2 : 3; text: stepRow.modelData } } } }
-        Row { visible: dz.done; spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
+        // the ledger: the agent's real steps, in order, the newest last and marked while it runs
+        Item { width: 1; height: Theme.s1; visible: ledger.visible }
+        Column { id: ledger; objectName: "designingLedger"; width: 320; spacing: Theme.s1; visible: dz.steps.length > 0
+            property int seen: 0                     // steps already written: only new lines arrive
+            readonly property int from: Math.max(0, dz.steps.length - 6)
+            Repeater { model: dz.steps.slice(ledger.from)
+                Item { id: stepRow; required property string modelData; required property int index
+                    readonly property int n: ledger.from + index               // its place in the whole run
+                    readonly property bool now: n === dz.steps.length - 1 && Store.chatBusy
+                    width: ledger.width; height: 18
+                    property real k: 1
+                    opacity: k; transform: Translate { y: (1 - stepRow.k) * Theme.shift(6) }
+                    Component.onCompleted: if (n >= ledger.seen) { k = 0; arrive.delay = Math.max(0, n - ledger.seen) * Theme.stagger; arrive.start()
+                        Qt.callLater(function () { ledger.seen = Math.max(ledger.seen, dz.steps.length) }) }
+                    SequentialAnimation { id: arrive; property int delay: 0
+                        PauseAnimation { duration: arrive.delay }
+                        NumberAnimation { target: stepRow; property: "k"; to: 1; duration: Theme.slow; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
+                    Txt { mono: true; kind: "fine"; tone: 4; text: (stepRow.n + 1 < 10 ? "0" : "") + (stepRow.n + 1); anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
+                    Txt { x: 28; width: parent.width - 28 - 14; mono: true; kind: "fine"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; elide: Text.ElideRight
+                        color: stepRow.now ? Theme.ink : Theme.ink3; text: stepRow.modelData }
+                    Rectangle { visible: stepRow.now; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 6; height: 6; radius: 3; color: Theme.datum
+                        SequentialAnimation on opacity { running: stepRow.now && !Theme.reduced; loops: Animation.Infinite
+                            NumberAnimation { to: 0.35; duration: 700 } NumberAnimation { to: 1; duration: 700 } } }
+                } } }
+        Item { width: 1; height: Theme.s2; visible: dz.done }
+        Row { visible: dz.done; spacing: 8
             Btn { objectName: "designingContinue"; kind: "primary"; icon: "message_square"; text: "Continue the conversation"; visible: Store.chatReady && Store.convId !== ""
                 tip: "Say what to make; it appears here as it is built"; onClicked: { Store.talkOpen = true; Store.chatFocus++ } }
             Btn { objectName: "designingHome"; icon: "arrow_left"; text: "Back to Home"; onClicked: Store.leaveDesigning() }
