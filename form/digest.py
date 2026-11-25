@@ -49,8 +49,7 @@ def digest(st, pid: str, bench: str | None = None) -> dict:
         except Exception:                            # noqa: BLE001 - the mass is a convenience; the record stands
             m = None
         if m:
-            out["mass"] = (f"{m['grams']:g} g in {m['label']} ({m['density_g_cm3']:g} g/cm³; computed: "
-                           f"{m['source']})")
+            out["mass"] = f"{m['grams']:g} g in {m['label']}, {m['density_g_cm3']:g} g/cm³ (computed: {m['source']})"
     if getattr(recipe, "mesh", False):
         out["mesh_design"] = recipe.public().get("notes", [])
     parts = [r for r in p["brief"].get("references", []) if r.get("kind") == "part"]
