@@ -170,19 +170,17 @@ message, with what the design is for.
 
 ## Recipes
 
-Recipes are building blocks for agents and the community gallery. Installing one never runs it: the code runs only
-when a design is created from it.
+Recipes are internal building blocks that agents may start a design from; they are not offered to people as a library.
+Installing one never runs it: the code runs only when a design is created from it.
 
 | Command | Does |
 |---|---|
-| `form recipes [list] [--q WORDS] [--section builtin\|mine\|community] [--tag T] [--sort name\|recent]` | Built-in recipes, the ones you installed, and the community gallery |
-| `form recipes community [--refresh]` | The community index from the website |
+| `form recipes [list] [--q WORDS] [--section builtin\|mine] [--tag T] [--sort name\|recent]` | Built-in recipes and the ones installed on this computer |
 | `form recipes inspect FILE` | What installing a file would install: its SHA-256, title and any problems |
 | `form recipes install FILE --sha256 HEX` | Install exactly that file, by its hash |
 | `form recipes uninstall ID` | Remove an installed recipe |
 | `form recipes export ID [--out FILE] [--author NAME] [--tags a,b]` | One `.formrecipe` file: the code, `meta.json` with its SHA-256, and a preview from a real build |
 | `form recipes import FILE.formrecipe [--sha256 HEX]` | Shows the code's checksum; with `--sha256`, installs it |
-| `form recipes submit ID [--out DIR] [--author NAME] [--tags a,b]` | The community submission folder, and a link to a pre-filled GitHub issue; nothing is posted |
 | `form recipes derive PROJECT [--title T] [--summary S] [--range key=min:max ...] [--install --sha256 HEX]` | Turn a design into a recipe whose defaults are the design's values |
 
 Release approval has no command. It is a deliberate action in the app's Release stage.

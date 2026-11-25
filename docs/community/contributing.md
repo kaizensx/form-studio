@@ -1,10 +1,9 @@
 # Contributing
 
-Form Studio is open source under the MIT licence: the app, the engine, the recipes, the docs and the website. This guide shows where each kind of contribution goes, how to set up a development copy, and what a pull request needs.
+Form Studio is open source under the MIT licence: the app, the engine, the docs and the website. This guide shows where each kind of contribution goes, how to set up a development copy, and what a pull request needs.
 
 ## Ways to contribute
 
-- **Recipes.** Parametric building blocks written as code, with their own checks. Open a [New recipe issue](https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml): it is built, checked and sliced for you and answered with pictures. Or run `form recipes submit <id>` for the folder and a pre-filled issue. See [Writing a recipe](https://github.com/kaizensx/form-studio/blob/main/docs/RECIPES.md).
 - **Measured results.** Printer, nozzle, filament, slicer preset and the measured numbers, in an issue or in #show-and-tell. Attach a `.formstudio` file (renamed to `.zip`).
 - **Slicer and printer support.** `form/adapters/`. `form/adapters/__init__.py` defines the adapter interface. OrcaSlicer forks that kept its command line need only an entry in `form/adapters/orca_forks.py`.
 - **Agent and provider support.** `form/agents/`. `form/agents/base.py` defines the agent interface; model APIs are entries in `form/agents/providers.py`.
@@ -59,7 +58,7 @@ python site/build.py                         # the website's docs pages, from do
 1. Open or find an issue for anything larger than a small fix, so the approach can be agreed first.
 2. Keep each pull request to one change. Include tests, and screenshots for interface changes.
 3. Add a line to `CHANGELOG.md` under the next version.
-4. CI runs the test suite on Linux and macOS, checks that `docs/MCP.md` is current and builds the website. A pull request that touches recipes or the interface gets before and after pictures in a comment.
+4. CI runs the test suite on Linux and macOS, checks that `docs/MCP.md` is current and builds the website. A pull request that touches the engine's building blocks or the interface gets before and after pictures in a comment.
 
 By contributing you agree that your work is released under the MIT licence, and to follow the [Code of Conduct](https://github.com/kaizensx/form-studio/blob/main/CODE_OF_CONDUCT.md).
 
@@ -77,7 +76,7 @@ Every build is posted in #releases. Stable releases are also announced in #annou
 
 ## On this server
 
-- Talk about the code, the docs, recipes or the website in #contributing.
+- Talk about the code, the docs or the website in #contributing.
 - Issues, pull requests, discussions and failed runs on `main` and `dev` are posted in #github.
 - **The Contributor role.** Add your GitHub login and your Discord user id to `CONTRIBUTORS` in `scripts/discord/server.py` in your pull request. The role is given when it merges.
 - **Security issues** are reported privately, never in a channel: [open a security advisory](https://github.com/kaizensx/form-studio/security/advisories/new).

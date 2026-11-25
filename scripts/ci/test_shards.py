@@ -50,7 +50,7 @@ OSES = ("ubuntu-latest", "macos-latest")
 HEAVY = ("test_recon", "test_recon_program", "test_remodel", "test_design_bench", "test_meshbody")
 # A pull request whose every changed path matches one of these runs the light scope: nothing here is read by a HEAVY
 # module. ci.yml, ci-studio.toml and this script are not here; anything not listed runs the full scope.
-LIGHT_PATHS = ("docs/*", "site/*", "brand/*", "community/*", ".github/ISSUE_TEMPLATE/*", ".github/*.md",
+LIGHT_PATHS = ("docs/*", "site/*", "brand/*", ".github/ISSUE_TEMPLATE/*", ".github/*.md",
                ".github/*.yml", ".github/workflows/*", "scripts/*", "LICENSE", ".coderabbit.yaml",
                ".pre-commit-config.yaml", ".gitignore")
 FULL_PATHS = (".github/workflows/ci.yml", ".github/ci-studio.toml", "scripts/ci/test_shards.py")

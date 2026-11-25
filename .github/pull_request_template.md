@@ -8,7 +8,7 @@
 
 - [ ] Bug fix
 - [ ] Feature
-- [ ] Recipe (built-in or `community/recipes/`)
+- [ ] Built-in recipe (an engine building block in `form/recipes/`)
 - [ ] Slicer or agent support
 - [ ] Docs or website
 

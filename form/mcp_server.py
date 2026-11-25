@@ -2330,20 +2330,20 @@ def build() -> MCPServer:
         st = studio()
         return await _run(starters.for_studio, st)
 
-    @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=True))
     async def recipe_library(q: str = "", section: str = "", tag: str = "") -> dict:
-        """Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index
-        on the project website, to find a building block to start a design from. section: builtin | mine | community.
-        Installing code is the person's decision and happens only with `form recipes install`, after they review the
-        source and its SHA-256."""
+        """Search the recipe library: built-in recipes and recipes the person installed ("mine"), to find a building
+        block to start a design from. section: builtin | mine. Recipes are internal building blocks: use one when it
+        fits, but do not offer the library to the person. Installing code is the person's decision and happens only
+        with `form recipes install`, after they review the source and its SHA-256."""
         from . import recipe_lib
         st = studio()
         def go():
             lib = recipe_lib.everything(st.root, st.recipes.builtins())
-            return {"recipes": recipe_lib.search(lib["items"], q, section, tag), "community_error": lib["community_error"]}
+            return {"recipes": recipe_lib.search(lib["items"], q, section, tag)}
         return await _run(go)
 
-    # ---- recipe sharing (form/recipe_share.py): packages and submissions are written locally; nothing is posted ----
+    # ---- recipe sharing (form/recipe_share.py): packages are written locally; nothing is posted ----
     @mcp.tool(annotations=RW)
     async def export_recipe(recipe: str, path: str | None = None, ctx: Context = None) -> dict:
         """Write an installed ("mine") recipe as one .formrecipe file: its code, meta.json (parameters, author, tags,
@@ -2357,22 +2357,6 @@ def build() -> MCPServer:
         if not path:
             out.mkdir(parents=True, exist_ok=True)
         return await _run(_home, recipe_share.export, st, recipe, out)
-
-    @mcp.tool(annotations=RW)
-    async def prepare_recipe_submission(recipe: str, folder: str | None = None) -> dict:
-        """Prepare an installed recipe for the community gallery: the community/recipes/<id>/ folder (written into
-        `folder` when given), what the gallery's checks would refuse, and the link to GitHub's recipe issue form with
-        the fields filled in. Never open or post it: give the link to the person, who submits it themselves."""
-        from . import recipe_share
-        st = studio()
-        def go():
-            r = recipe_share.prepare(st, recipe)
-            out = {k: r["submission"][k] for k in ("folder", "meta", "problems", "notes")}
-            out["issue_url"], out["omitted_from_link"] = r["submission"]["issue"]["url"], r["submission"]["issue"]["omitted"]
-            if folder:
-                out["saved"] = recipe_share.save_submission(st, recipe, folder)
-            return out
-        return await _run(_home, go)
 
     @mcp.tool(annotations=RW)
     async def design_as_recipe(project: str, title: str = "", summary: str = "",

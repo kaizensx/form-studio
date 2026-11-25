@@ -1,23 +1,20 @@
-"""Sharing recipes: one-file packages, community submissions, and a design turned into a recipe.
+"""Sharing recipes: one-file packages, and a design turned into a recipe.
 
-A recipe you installed ("Mine") can leave this computer three ways, and each one is started by the person:
+Recipes are building blocks agents may use; they are not offered to people as a library, and there is no community
+gallery to submit to any more. An installed recipe ("Mine") can still leave this computer two ways, each one started
+by the person:
 
     package      <id>.formrecipe, a zip with recipe.py (or recipe.scad), meta.json and preview.png. meta.json carries
                  the code's SHA-256; the preview is drawn from the real build at the recipe's defaults.
-    submission   the folder the community gallery reads, community/recipes/<id>/ (recipe file, meta.json in the
-                 gallery's schema, preview.png), saved where the person chooses, plus a link that opens GitHub's
-                 recipe issue form with the fields filled in. Nothing is sent: the browser shows the form and the
-                 person presses Submit there, or not.
     design       a project's current code, rewritten so its parameters default to the design's values, with ranges
                  the person may narrow. It is built once to check it reproduces the design before it is offered.
 
-Importing a package is the same two steps as a community recipe: ``inspect_package`` reads the zip without running
+Importing a package takes two steps: ``inspect_package`` reads the zip without running
 anything, checks the code against the checksum in meta.json and keeps the file aside; ``install_package`` installs
 exactly that file, by its hash, after the person pressed Install. The code runs only when a design is created.
 
     form recipes export ID [--out FILE] [--author NAME] [--tags a,b]
     form recipes import FILE.formrecipe [--sha256 HEX]
-    form recipes submit ID [--out DIR] [--author NAME] [--tags a,b]     prints the pre-filled issue link; opens nothing
     form recipes derive PROJECT [--title T] [--summary S] [--range key=min:max ...] [--install --sha256 HEX]
 """
 from __future__ import annotations
@@ -29,7 +26,6 @@ import io
 import json
 import re
 import time
-import urllib.parse
 import zipfile
 from pathlib import Path
 
@@ -38,16 +34,11 @@ from . import recipe_lib as lib
 EXT = ".formrecipe"
 FORMAT = "formrecipe"
 VERSION = 1
-GITHUB = "https://github.com/kaizensx/form-studio"
-ISSUE_TEMPLATE = "3-recipe.yml"
-ISSUE_KIND = "A recipe I wrote: build and check it here"
-URL_LIMIT = 7800                      # GitHub answers 414 a little above 8 kB
 PKG_MAX = 4_000_000
 META_MAX = 64_000
 PREVIEW_MAX = 3_000_000
 PREVIEW_SIZE = (960, 560)
 PNG = b"\x89PNG\r\n\x1a\n"
-COMMUNITY_ID = re.compile(r"^[a-z0-9][a-z0-9-]{1,48}$")          # site/tools/build_recipe_index.py
 AUTHOR = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")       # a GitHub username
 SHARE = ".share"
 PROFILE = ".share-profile.json"
@@ -76,12 +67,6 @@ def _clean_tags(tags) -> list[str]:
         if t and t not in out:
             out.append(t)
     return out[:8]
-
-
-def _cid(title: str) -> str:
-    """A gallery id: lowercase letters, digits and hyphens."""
-    s = lib._slug(title)
-    return s if COMMUNITY_ID.match(s) else (s + "-recipe")[:48]
 
 
 # ---- the person's sharing profile: their GitHub username, remembered -----------------------------------------
@@ -220,7 +205,7 @@ def _drop_package(root, rid: str):
 
 
 def prepare(st, rid: str, edits: dict | None = None) -> dict:
-    """Everything the Share sheet shows: the package (built and kept for Save), the submission and its link."""
+    """Everything the Share sheet shows: the package, built and kept for Save."""
     if edits:
         edit_meta(st.root, rid, **{k: edits.get(k) for k in ("title", "summary", "author", "tags") if k in edits})
     e = ensure_preview(st, rid)
@@ -234,7 +219,7 @@ def prepare(st, rid: str, edits: dict | None = None) -> dict:
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{rid}{EXT}").write_bytes(data)
     return {"id": rid, "meta": meta, "preview": preview_api(rid), "package": {"name": f"{rid}{EXT}", "bytes": len(data),
-            "api": f"/recipes/share/{rid}{EXT}"}, "submission": submission(st.root, e, meta, code)}
+            "api": f"/recipes/share/{rid}{EXT}"}}
 
 
 def package_bytes(st, rid: str) -> bytes:
@@ -367,90 +352,6 @@ def install_package(root, sha: str) -> dict:
 def import_file(root, path) -> dict:
     p = Path(path).expanduser()
     return inspect_package(root, p.read_bytes(), p.name)
-
-
-# ---- community submissions --------------------------------------------------------------------------------------
-
-def community_meta(e: dict, params_count: int) -> dict:
-    """meta.json in the gallery's schema (community/recipes/README.md), in its order."""
-    return {"id": _cid(e.get("community_id") or e["id"]), "title": e["title"], "summary": e.get("summary") or "",
-            "author": e.get("author") or "", "tags": e.get("tags") or [], "kind": e["kind"], "params_count": params_count}
-
-
-def submission_problems(cm: dict) -> list[str]:
-    """What the gallery's index builder would refuse, said before anything leaves the computer."""
-    out = []
-    if not COMMUNITY_ID.match(cm["id"]):
-        out.append("The id must be 2 to 49 lowercase letters, digits and hyphens.")
-    from .recipes import LEGACY, LIBRARY
-    if cm["id"] in LIBRARY + LEGACY or cm["id"].replace("-", "_") in LIBRARY + LEGACY:
-        out.append(f"“{cm['id']}” is a built-in recipe's id. Change the title so the id differs.")
-    if not cm["author"]:
-        out.append("Add your GitHub username as the author.")
-    if not cm["summary"]:
-        out.append("Add a one-sentence summary: what it is and what makes it fit.")
-    if not cm["tags"]:
-        out.append("Add a few tags people would search for.")
-    if cm["params_count"] < 1:
-        out.append("A recipe exposes at least one parameter.")
-    return out
-
-
-def issue_fields(cm: dict, code: str, params: list[dict]) -> dict:
-    """The fields of .github/ISSUE_TEMPLATE/3-recipe.yml, by id, as the link fills them in."""
-    lines = [f"{p['group']}: {p['label']} ({p['key']}) {_num(p['default'])} {p['unit']}, range {_num(p['min'])} to {_num(p['max'])}".rstrip()
-             for p in params]
-    fence = "python" if cm["kind"] == "python" else "openscad"
-    return {"title": f"[Recipe] {cm['title']}", "object": cm["summary"], "params": "\n".join(lines),
-            "recipe_id": cm["id"], "recipe_meta": "```json\n" + json.dumps(cm, indent=1, ensure_ascii=False) + "\n```",
-            "recipe_code": f"```{fence}\n{code.rstrip()}\n```"}
-
-
-def issue_link(fields: dict) -> dict:
-    """The new-issue URL. The code is left out (and said so) when the link would be too long for GitHub."""
-    def url(f):
-        q = {"template": ISSUE_TEMPLATE, **f}
-        # "+" for spaces and bare punctuation that is safe in a query keep a typical recipe inside the limit
-        return f"{GITHUB}/issues/new?" + urllib.parse.urlencode(q, quote_via=urllib.parse.quote_plus, safe="()[],:'*!~")
-    u, omitted = url(fields), []
-    if len(u) > URL_LIMIT:
-        omitted = ["recipe_code"]
-        u = url({**fields, "recipe_code": "The code is too long for a link. Drag recipe.py from the saved submission folder here."})
-    if len(u) > URL_LIMIT:
-        omitted.append("params")
-        u = url({k: v for k, v in fields.items() if k not in ("recipe_code", "params")} |
-                {"recipe_code": "The code is too long for a link. Drag recipe.py from the saved submission folder here."})
-    return {"url": u, "chars": len(u), "omitted": omitted}
-
-
-def submission(root, e: dict, meta: dict, code: str) -> dict:
-    cm = community_meta(e, meta["params_count"])
-    fields = issue_fields(cm, code, meta["params"])
-    link = issue_link(fields)
-    known = {r["id"] for r in lib.cached_community(root)["recipes"]}
-    notes = [f"The gallery already has a recipe with the id “{cm['id']}”; this is a new version of it only if it is yours."] if cm["id"] in known else []
-    return {"folder": f"community/recipes/{cm['id']}", "files": [_code_name(cm["kind"]), "meta.json", "preview.png"],
-            "meta": cm, "meta_json": json.dumps(cm, indent=2, ensure_ascii=False) + "\n", "problems": submission_problems(cm),
-            "notes": notes, "issue": {**link, "fields": {k: v for k, v in fields.items() if k not in link["omitted"]}},
-            "guide": f"{GITHUB}/tree/main/community/recipes"}
-
-
-def save_submission(st, rid: str, dest) -> dict:
-    """Write community/recipes/<id>/ (recipe file, meta.json, preview.png) inside dest, for a pull request."""
-    r = prepare(st, rid)
-    sub = r["submission"]
-    base = Path(str(dest or "")).expanduser()
-    if not str(dest or "").strip() or not base.is_absolute() or not base.is_dir():
-        raise ShareError("Choose a folder that exists.")
-    out = base / sub["meta"]["id"]
-    out.mkdir(exist_ok=True)
-    code = lib.source(st.root, rid)["source"]
-    written = []
-    for name, data in ((_code_name(sub["meta"]["kind"]), code.encode("utf-8")), ("meta.json", sub["meta_json"].encode("utf-8")),
-                       ("preview.png", preview_file(st.root, rid).read_bytes())):
-        (out / name).write_bytes(data)
-        written.append(str(out / name))
-    return {"dir": str(out), "files": written, "problems": sub["problems"], "issue": sub["issue"]}
 
 
 # ---- a design, as a recipe --------------------------------------------------------------------------------------
@@ -681,8 +582,6 @@ def route_post(st, path: str, body, q: dict):
         return prepare(st, str(b.get("id", "")), b.get("edits") or None)
     if path == "/api/recipes/share/meta":
         return edit_meta(st.root, str(b.get("id", "")), b.get("title"), b.get("summary"), b.get("author"), b.get("tags"))
-    if path == "/api/recipes/share/submission":
-        return save_submission(st, str(b.get("id", "")), str(b.get("dir", "")))
     if path == "/api/recipes/package/inspect":
         if not isinstance(body, bytes):
             raise ShareError("Send the package file itself.")
@@ -698,7 +597,7 @@ def route_post(st, path: str, body, q: dict):
     return None
 
 
-# ---- command line (form recipes export|import|submit|derive) -----------------------------------------------------
+# ---- command line (form recipes export|import|derive) -----------------------------------------------------
 
 def main(verb: str, argv: list[str]) -> int:
     import argparse
@@ -737,15 +636,6 @@ def main(verb: str, argv: list[str]) -> int:
             st = Studio(cfg)
             if verb == "export":
                 out = export(st, a.arg, a.out or None, a.author, a.tags)
-            elif verb == "submit":
-                if a.author is not None or a.tags is not None:
-                    edit_meta(root, a.arg, author=a.author, tags=a.tags)
-                r = prepare(st, a.arg)
-                out = {"submission": {k: r["submission"][k] for k in ("folder", "meta", "problems", "notes")},
-                       "issue_url": r["submission"]["issue"]["url"], "omitted_from_link": r["submission"]["issue"]["omitted"],
-                       "note": "Nothing was sent. Open issue_url in a browser to see the pre-filled form; it is posted only if you submit it there."}
-                if a.out:
-                    out["saved"] = save_submission(st, a.arg, a.out)
             elif verb == "derive":
                 ranges = {}
                 for r in a.range:

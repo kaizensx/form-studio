@@ -30,6 +30,7 @@
 - **Creation first.** A new design is a 3D model; 3D printing is optional and turned on when you want it.
 - **Builds run side by side** in a kernel pool, and pipeline jobs survive a restart.
 - **Agents:** MCP 2026-07-28 throughout, long tools can run as tasks, and the design guidance is served as skills.
+- **Recipes are no longer a public library.** The engine still uses them as building blocks for agents; the website page, the Discord forum and the submission form are gone.
 
 ### Known limits
 
@@ -114,7 +115,7 @@
   treasure chest game asset), then how it works, the app drawn live, mesh to editable CAD (a synthetic bracket:
   3,216 triangles to 18 dimensions, 0.0017 mm from the mesh), automatic refinement before and after, game assets
   with their four levels of detail, assemblies, and "your agent, your computer". The navigation is What it makes,
-  How it works, Your agent, Recipes, Docs; the "3D printing" menu is gone. A new page, How we measure
+  How it works, Your agent, Docs; the "3D printing" menu is gone. A new page, How we measure
   (site/measure/), states what the three benches measure and their numbers, with the full reports as docs pages;
   build timings and slicer compatibility are linked from the footer. The drawn app loads when it comes near, so the
   first view is about 0.25 MB uncompressed where it was about 1.4 MB. The README opens with the same photograph and a strip of
@@ -887,7 +888,7 @@
 - **Fewer failed steps in conversations.** A design that fails to build says the error and the line it came from; an STL export that comes out with a gap is meshed again until it is closed; a reference part named without an extension keeps its format; assembled and exploded views work for every multi-part design.
 - **A safer engine.** Download file names can no longer add HTTP headers, web pages from other sites cannot send requests to the engine on your computer, design ids cannot point outside their folder, and lock files are private to you.
 - **Errors are kept.** An unexpected engine error is written with its details to `.logs/engine-errors.log` in your projects folder.
-- **A Discord server.** [discord.gg/b6ZgyndkmS](https://discord.gg/b6ZgyndkmS) has a guide for each part of the app, a post for every recipe, a help forum where the bot answers each new post with the guides for its tags, a showcase, ideas, and every release as it ships. It is linked from the README and the website's footer.
+- **A Discord server.** [discord.gg/b6ZgyndkmS](https://discord.gg/b6ZgyndkmS) has a guide for each part of the app, a help forum where the bot answers each new post with the guides for its tags, a showcase, ideas, and every release as it ships. It is linked from the README and the website's footer.
 
 ## 1.0.0
 

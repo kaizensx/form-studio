@@ -6,9 +6,9 @@ Start from [`form/recipes/shelf_bracket.py`](../form/recipes/shelf_bracket.py). 
 
 ## The built-in library
 
-Recipes are building blocks: agents start from them and change anything, and people browse them in the
-[website gallery](https://kaizensx.github.io/form-studio/recipes/). The library is the recipes people print most, each
-designed to be bought, not only to work:
+Recipes are internal building blocks: an agent may start a design from one when it fits and change anything after that.
+They are not offered to people as a library, and there is no public gallery. This page is a developer reference. The
+built-in recipes are:
 
 | id | title | category |
 |---|---|---|
@@ -33,7 +33,7 @@ The order is `LIBRARY` in [`form/recipes/__init__.py`](../form/recipes/__init__.
 
 > **Tip:** an exact 45° chamfer or cone around a curved edge tessellates a little past 45° and trips the overhang check. Use a chamfer that rises more than it runs (0.3 mm in, 0.5 mm up), or 40° cones.
 
-**Legacy recipes.** `dock`, `gridfinity`, `hook`, `planter`, `gear_pair`, `knob` and `hinged_box` are retired (`legacy = True`). They are left out of every listing: `form recipes`, `form_overview`, `recipe_library` and the website gallery. Designs that name them still open, build and release exactly as before. To retire a recipe, set `legacy = True` and move its id from `LIBRARY` to `LEGACY`; never delete its file.
+**Legacy recipes.** `dock`, `gridfinity`, `hook`, `planter`, `gear_pair`, `knob` and `hinged_box` are retired (`legacy = True`). They are left out of every listing: `form recipes`, `form_overview` and `recipe_library`. Designs that name them still open, build and release exactly as before. To retire a recipe, set `legacy = True` and move its id from `LIBRARY` to `LEGACY`; never delete its file.
 
 ## 1. Parameters
 
@@ -114,11 +114,11 @@ category = "Wall & desk"
 tags = ("skadis", "ikea", "pegboard", "hook")
 ```
 
-`category` files the recipe in the library and the gallery; `tags` are the words people search for. Keep `summary` to one sentence.
+`category` files the recipe in the library; `tags` are the words an agent searches for with `recipe_library`. Keep `summary` to one sentence.
 
 ## 7. Register and test
 
-Built-in recipes live in `form/recipes/`. Community recipes live in [`community/recipes/`](../community/recipes/README.md) and need no registration.
+Built-in recipes live in `form/recipes/`.
 
 1. Add the id to `LIBRARY` in [`form/recipes/__init__.py`](../form/recipes/__init__.py).
 2. Run these checks:

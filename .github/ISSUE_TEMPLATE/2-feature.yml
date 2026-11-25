@@ -30,7 +30,7 @@ body:
       options:
         - Desktop app
         - Agents and conversations
-        - Design and recipes
+        - Design
         - Checks and analysis
         - Slicers and printers
         - CLI and MCP

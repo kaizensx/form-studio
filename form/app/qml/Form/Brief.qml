@@ -154,7 +154,7 @@ Column {
         // the deterministic reconstruction did not reach a verified feature recipe: say so, and offer the agent remodel
         Txt { kind: "fine"; width: parent.width; tone: 2; visible: root.recon !== null && !root.recon.recipe_verified
               text: root.recon ? "Make editable reached Layer " + root.recon.layer + " (" + F.fmt(root.recon.frozen_area_pct, 0)
-                                 + "% frozen facets, no verified feature recipe). Rebuild as editable CAD has the agent model it again "
+                                 + "% frozen facets, no verified feature model). Rebuild as editable CAD has the agent model it again "
                                  + "with named features and Params, compared with the mesh until it is within 0.1 mm." : "" }
         Row { spacing: 8
             Btn { text: "Import part…"; icon: "box"; onClicked: Store.ask(partDlg) }

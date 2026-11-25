@@ -1,8 +1,7 @@
 name: Website
 
 # Publishes site/ to GitHub Pages: https://kaizensx.github.io/form-studio/
-# The pages are hand-written; /docs is generated from the repository's markdown by site/build.py, and
-# /recipes/index.json (read by the app's community recipe browser) by site/tools/build_recipe_index.py.
+# The pages are hand-written; /docs is generated from the repository's markdown by site/build.py.
 # /compat/ and /bench/ show data the automation keeps on the ci-assets branch (compat.yml, bench.yml); the site is
 # rebuilt from main when either of those workflows finishes, so their pages stay current without a push.
 on:
@@ -13,8 +12,6 @@ on:
       - "docs/**"
       - "CHANGELOG.md"
       - "README.md"
-      - "community/**"
-      - "form/recipes/**"
       - ".github/workflows/pages.yml"
   workflow_run:
     workflows: ["Compatibility matrix", "Benchmarks"]
@@ -45,8 +42,6 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check "markdown>=3.6,<4"
           python site/build.py
-      - name: Build the recipe index
-        run: python site/tools/build_recipe_index.py
       - name: Data from CI (slicer matrix, benchmarks)
         run: |
           if git fetch -q --depth=1 origin ci-assets 2>/dev/null; then

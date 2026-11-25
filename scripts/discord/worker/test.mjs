@@ -9,7 +9,7 @@ const N = (k) => C.names[k];
 const roles = Object.values(C.roles).filter((v, i, a) => a.indexOf(v) === i).map((name, n) => ({ id: `r${n}`, name }));
 const R = (name) => roles.find((r) => r.name === name).id;
 const channels = [
-  ...Object.entries(C.names).map(([k, name], n) => ({ id: `c${n}`, name, type: ["showcase", "guides", "recipes", "help", "ideas", "challenges"].includes(k) ? 15 : 0,
+  ...Object.entries(C.names).map(([k, name], n) => ({ id: `c${n}`, name, type: ["showcase", "guides", "help", "ideas", "challenges"].includes(k) ? 15 : 0,
       permission_overwrites: k === "mod-log" ? [{ id: GUILD, deny: "1024" }] : [] })),
 ];
 const ch = (k) => channels.find((c) => c.name === N(k));
@@ -23,14 +23,11 @@ const messages = { [ch("general").id]: [
   { id: "4500", type: 0, author: { id: "u1" }, timestamp: "2026-11-19T10:00:30Z" },     // inside the cooldown
   { id: "5000", type: 0, author: { id: "u2" }, timestamp: "2026-11-19T10:02:00Z" },
   { id: "4900", type: 0, author: { id: BOT, bot: true }, timestamp: "2026-11-19T10:01:00Z" }] };
-const recipes = [{ id: "gridfinity_bin", title: "Gridfinity bin", summary: "A bin.", tags: ["gridfinity"], params_count: 18, author: "Form Studio",
-                   preview: "https://x/p.webp" }, { id: "vase", title: "Faceted vase", summary: "A vase.", tags: ["vase"] }];
 
 globalThis.fetch = async (url, init = {}) => {
   url = String(url);
   const method = init.method || "GET";
   const json = (b, status = 200) => new Response(b === null ? null : JSON.stringify(b), { status: b === null ? 204 : status });
-  if (url.endsWith("recipes/index.json")) return json({ recipes });
   const path = url.replace("https://discord.com/api/v10", "");
   const body = init.body ? JSON.parse(init.body) : undefined;
   calls.push([method, path, body]);
@@ -117,13 +114,6 @@ await t("Report to moderators: to #mod-log once, nobody pinged, the reporter tol
   assert.ok(!calls.some(([m, p]) => m === "POST" && p.endsWith("/messages")));
   const own = await send({ ...i("u9") });
   assert.match(own.data.content, /your own message/);
-});
-await t("/recipe autocomplete and a named recipe", async () => {
-  const a = await send({ type: 4, guild_id: GUILD, member: member("u1"), data: { name: "recipe", options: [{ name: "name", value: "grid", focused: true }] } });
-  assert.deepEqual(a.data.choices, [{ name: "Gridfinity bin", value: "gridfinity_bin" }]);
-  const r = await send(cmd("recipe", [{ name: "name", value: "gridfinity_bin" }]));
-  assert.match(noEmbeds(r).data.content, /^## Gridfinity bin[\s\S]*https:\/\/x\/p\.webp$/);
-  assert.equal(r.data.flags, 0);
 });
 await t("/guide links the guide's own post", async () => {
   const r = await send(cmd("guide", [{ name: "topic", value: C.guides[0][0] }]));

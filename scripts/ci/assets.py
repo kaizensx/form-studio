@@ -1,6 +1,5 @@
 """The `ci-assets` branch: an orphan branch only the automation writes. It holds the pictures embedded in bot comments
-(GitHub comments cannot show images from workflow artifacts), validated community-recipe bundles waiting for a
-maintainer, the compatibility matrix, benchmark history and the interface screenshot baselines.
+(GitHub comments cannot show images from workflow artifacts), the compatibility matrix, benchmark history and the interface screenshot baselines.
 
     python scripts/ci/assets.py put --src DIR --dest media/2026-11/pr-12-abc1234 [--message M]
     python scripts/ci/assets.py get --path compat/latest.json --out FILE        # read a file (no token needed)
@@ -8,7 +7,6 @@ maintainer, the compatibility matrix, benchmark history and the interface screen
 
 Layout:
     media/<YYYY-MM>/<what>/...        images for comments; pruned after --keep-days
-    recipes/issue-<n>/                recipe.py|recipe.scad, meta.json, preview.png, result.json (submission pipeline)
     compat/latest.json badge.json history.json
     bench/history.json
     ui/baseline/<shot>.png
@@ -31,7 +29,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import ASSETS_BRANCH, BOT_EMAIL, BOT_NAME, REPO, SERVER, log, raw_url  # noqa: E402
 
-KEEP = ("recipes/", "compat/", "bench/", "ui/")
+KEEP = ("compat/", "bench/", "ui/")
 
 
 def _git(cwd: Path, *args: str, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
@@ -61,8 +59,7 @@ def checkout(depth: int = 1) -> Path:
     else:
         _git(d, "checkout", "-q", "--orphan", ASSETS_BRANCH)
         (d / "README.md").write_text(
-            "# ci-assets\n\nWritten only by Form Studio's GitHub automation: pictures for bot comments, validated "
-            "community-recipe submissions, the slicer compatibility matrix, benchmark history and interface "
+            "# ci-assets\n\nWritten only by Form Studio's GitHub automation: pictures for bot comments, the slicer compatibility matrix, benchmark history and interface "
             "baselines. Old media is pruned and the history squashed from time to time.\n", encoding="utf-8")
         _git(d, "add", "README.md")
         _git(d, "commit", "-q", "-m", "Start the ci-assets branch")

@@ -1,51 +1,32 @@
-"""The recipe library: built-in recipes, recipes you installed ("Mine"), and community recipes from the website.
+"""The recipe library: built-in recipes and recipes installed on this computer ("Mine").
+
+Recipes are building blocks agents may start a design from. They are not offered to people as a library: there is no
+public gallery or community index any more, and nothing here goes to the network.
 
 A recipe is code. Nothing here runs it: installing a recipe writes its file to ``<data>/.recipes/`` and reads its
 title and summary without executing anything (Python is parsed with ``ast``; OpenSCAD's header comment is read). The
-code runs only when you create a design from it, which builds it in the kernel worker like any design written as code.
+code runs only when a design is created from it, which builds it in the kernel worker like any design written as code.
 
-Community recipes come from a public index on the project website:
-
-    https://kaizensx.github.io/form-studio/recipes/index.json
-    {"version": 1, "generated": ISO, "recipes": [{"id", "title", "summary", "author", "tags": [], "kind": "python"|"scad",
-                                                  "builtin": bool, "url": raw URL or null, "sha256": hex or null,
-                                                  "preview": URL or null}]}
-
-Installing one is two steps, never one: ``community_preview`` downloads the file, checks its SHA-256 against the
-index and returns the source for a person to read; ``install_community`` installs exactly that file (same hash) after
-they press Install. An unreachable or empty index is not an error: the Community section is simply empty.
-
-    form recipes [list] [--q words] [--section builtin|mine|community] [--tag t] [--sort name|recent]
+    form recipes [list] [--q words] [--section builtin|mine] [--tag t] [--sort name|recent]
     form recipes inspect FILE            what installing FILE would install: source hash, title, problems
     form recipes install FILE --sha256 HEX
-    form recipes community [--refresh]
     form recipes uninstall ID
-    form recipes export|import|submit|derive ...   sharing; see form/recipe_share.py
+    form recipes export|import|derive ...   packages and a design as a recipe; see form/recipe_share.py
 """
 from __future__ import annotations
 
 import ast
 import hashlib
 import json
-import os
 import re
 import time
-import urllib.parse
-import urllib.request
 from pathlib import Path
 
 DIR = ".recipes"
 PENDING = ".pending"
-INDEX_URL = "https://kaizensx.github.io/form-studio/recipes/index.json"
-REPO = "https://github.com/kaizensx/form-studio"
-DISCUSSIONS = REPO + "/discussions"
-CACHE = ".form-community.json"
-TTL = 3600
 MAX_SOURCE = 200_000
-MAX_INDEX = 2_000_000
-TIMEOUT = 8.0
 KINDS = {"python": ".py", "scad": ".scad"}
-SECTIONS = ("builtin", "mine", "community")
+SECTIONS = ("builtin", "mine")
 
 # Built-in recipes carry their category and tags (Recipe.category, Recipe.tags); this is the fallback for one that does not.
 BUILTIN_TAGS: dict = {}
@@ -229,156 +210,6 @@ def uninstall(root, rid: str) -> dict:
     return {"removed": rid, "title": m["title"]}
 
 
-# ---- community ---------------------------------------------------------------------------------------------------
-
-def _local(url: str, limit: int) -> bytes | None:
-    """Development and the interface tests: FORM_RECIPES_INDEX names a local index.json; "file:" urls in it are
-    files next to it. Never used unless that variable is set."""
-    idx = os.environ.get("FORM_RECIPES_INDEX", "").strip()
-    if not idx:
-        return None
-    base = Path(idx).resolve().parent
-    if url == INDEX_URL:
-        f = Path(idx)
-    elif str(url).startswith("file:"):
-        f = (base / str(url)[5:].lstrip("/")).resolve()
-        if not f.is_relative_to(base):
-            raise LibraryError("A local recipe file must be next to the local index.")
-    else:
-        return None
-    data = f.read_bytes()
-    if len(data) > limit:
-        raise LibraryError("The file is larger than a recipe can be, so it was not read.")
-    return data
-
-
-def _download(url: str, limit: int, opener=None) -> bytes:
-    if opener is None:
-        data = _local(url, limit)
-        if data is not None:
-            return data
-    if not str(url).startswith("https://"):
-        raise LibraryError("Community files are only read over https.")
-    if opener is not None:
-        data = opener(url, TIMEOUT)
-    else:
-        from . import __version__, net
-        req = urllib.request.Request(url, headers={"User-Agent": f"FormStudio/{__version__} recipes"})
-        with net.urlopen(req, timeout=TIMEOUT) as r:
-            data = r.read(limit + 1)
-    if len(data) > limit:
-        raise LibraryError("The file is larger than a recipe can be, so it was not read.")
-    return data
-
-
-def _norm(e) -> dict | None:
-    if not isinstance(e, dict) or not isinstance(e.get("id"), str) or not e.get("title"):
-        return None
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,80}", e["id"]):
-        return None
-    kind = e.get("kind") if e.get("kind") in KINDS else "python"
-    sha = str(e.get("sha256") or "").lower()
-    local = os.environ.get("FORM_RECIPES_INDEX") and isinstance(e.get("url"), str) and e["url"].startswith("file:")
-    url = e.get("url") if isinstance(e.get("url"), str) and (e["url"].startswith("https://") or local) else None
-    prev = e.get("preview") if isinstance(e.get("preview"), str) and e["preview"].startswith("https://") else None
-    disc = e.get("discussion") if isinstance(e.get("discussion"), str) and e["discussion"].startswith(DISCUSSIONS) else None
-    added = e.get("added") if isinstance(e.get("added"), str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", e["added"]) else None
-    n = e.get("params_count") if isinstance(e.get("params_count"), int) and 0 <= e["params_count"] < 1000 else None
-    title = str(e["title"])[:80]
-    return {"id": e["id"], "title": title, "summary": str(e.get("summary") or "")[:300],
-            "author": str(e.get("author") or "")[:80], "tags": [str(t)[:24] for t in (e.get("tags") or []) if isinstance(t, str)][:8],
-            "kind": kind, "builtin": bool(e.get("builtin")), "url": url,
-            "sha256": sha if re.fullmatch(r"[0-9a-f]{64}", sha) else None, "preview": prev, "params": n, "added": added,
-            # ratings need a server; the conversation about a recipe lives in the repository's Discussions
-            "discussion": disc or DISCUSSIONS + "?discussions_q=" + urllib.parse.quote(f'"{title}"'),
-            "page": None if e.get("builtin") else f"{REPO}/tree/main/community/recipes/{e['id']}"}
-
-
-def parse_index(data: bytes) -> list[dict]:
-    try:
-        idx = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError):
-        raise LibraryError("The community index is not valid JSON.") from None
-    if not isinstance(idx, dict) or idx.get("version") != 1 or not isinstance(idx.get("recipes"), list):
-        raise LibraryError("The community index has a format this version does not read.")
-    out = [r for r in (_norm(e) for e in idx["recipes"]) if r]
-    return out
-
-
-def community(root, force: bool = False, opener=None, url: str = INDEX_URL) -> dict:
-    """The community index, cached for an hour. Never raises: offline means an empty list and a reason."""
-    cache = Path(root) / CACHE
-    cached = None
-    try:
-        cached = json.loads(cache.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        pass
-    now = time.time()
-    if isinstance(cached, dict) and not force and now - float(cached.get("fetched", 0)) < TTL:
-        return {"recipes": cached.get("recipes") or [], "fetched": cached.get("fetched"), "url": url, "error": None}
-    try:
-        recipes = parse_index(_download(url, MAX_INDEX, opener))
-    except Exception as e:
-        reason = str(e) if isinstance(e, LibraryError) else "The recipe index could not be reached."
-        if isinstance(cached, dict):
-            return {"recipes": cached.get("recipes") or [], "fetched": cached.get("fetched"), "url": url, "error": reason, "stale": True}
-        return {"recipes": [], "fetched": None, "url": url, "error": reason}
-    try:
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_text(json.dumps({"fetched": now, "recipes": recipes}), encoding="utf-8")
-    except OSError:
-        pass
-    return {"recipes": recipes, "fetched": now, "url": url, "error": None}
-
-
-def _community_entry(root, cid: str, opener=None) -> dict:
-    for e in community(root, opener=opener)["recipes"]:
-        if e["id"] == cid:
-            return e
-    raise LibraryError("That recipe is not in the community index.", "Refresh the Community list and try again.")
-
-
-def community_preview(root, cid: str, opener=None) -> dict:
-    """Download a community recipe and verify it, for a person to read. Nothing is installed or run."""
-    e = _community_entry(root, cid, opener)
-    if e["builtin"]:
-        raise LibraryError("This recipe is already part of Form Studio.")
-    if not e["url"] or not e["sha256"]:
-        raise LibraryError("The index does not give this recipe a file and a checksum, so it cannot be installed safely.")
-    data = _download(e["url"], MAX_SOURCE, opener)
-    got = hashlib.sha256(data).hexdigest()
-    if got != e["sha256"]:
-        raise LibraryError("The downloaded file does not match the checksum in the index, so it was not installed.",
-                           f"Expected {e['sha256']}, got {got}.")
-    info = inspect(data, "recipe" + KINDS[e["kind"]])
-    pend = folder(root) / PENDING
-    pend.mkdir(parents=True, exist_ok=True)
-    (pend / f"{got}{KINDS[e['kind']]}").write_bytes(data)
-    return {**info, "entry": e, "verified": True}
-
-
-def install_community(root, cid: str, sha: str, opener=None) -> dict:
-    """Install the file community_preview verified and showed, identified by its hash."""
-    e = _community_entry(root, cid, opener)
-    sha = str(sha or "").lower()
-    if not re.fullmatch(r"[0-9a-f]{64}", sha) or sha != e["sha256"]:
-        raise LibraryError("The checksum does not match the community index; nothing was installed.")
-    f = folder(root) / PENDING / f"{sha}{KINDS[e['kind']]}"
-    if not f.is_file():
-        raise LibraryError("Review the recipe's source first.", "Open it from the Community list; Install appears under its source.")
-    data = f.read_bytes()
-    if hashlib.sha256(data).hexdigest() != sha:
-        raise LibraryError("The reviewed file changed on disk; nothing was installed.")
-    out = install(root, data.decode("utf-8"), e["kind"], sha,
-                  {"title": e["title"], "summary": e["summary"], "author": e["author"], "tags": e["tags"], "origin": "community",
-                   "url": e["url"], "community_id": e["id"], "preview": e["preview"]})
-    try:
-        f.unlink()
-    except OSError:
-        pass
-    return out
-
-
 # ---- the whole library -----------------------------------------------------------------------------------------
 
 def builtins(recipes: dict) -> list[dict]:
@@ -392,28 +223,12 @@ def builtins(recipes: dict) -> list[dict]:
     return out
 
 
-def cached_community(root) -> dict:
-    """What the last fetch of the index found, without going to the network."""
-    try:
-        c = json.loads((Path(root) / CACHE).read_text(encoding="utf-8"))
-        return {"recipes": c.get("recipes") or [], "fetched": c.get("fetched"), "error": None}
-    except (OSError, ValueError, AttributeError):
-        return {"recipes": [], "fetched": None, "error": None}
-
-
-def everything(root, recipes: dict, opener=None, refresh: bool = False, online: bool = True) -> dict:
-    """online=False lists the community recipes from the cache only: browsing built-in and your own recipes never
-    waits for the network."""
-    com = community(root, force=refresh, opener=opener) if online or refresh else cached_community(root)
+def everything(root, recipes: dict) -> dict:
+    """Built-in recipes and the ones installed on this computer. Nothing here goes to the network."""
     mine_ = mine(root)
-    have = {m.get("community_id") for m in mine_ if m.get("community_id")}
-    cs = []
-    for e in com["recipes"]:
-        cs.append({**e, "section": "community", "installed": e["builtin"] or e["id"] in have,
-                   "category": "Included" if e["builtin"] else (e["tags"][0].capitalize() if e["tags"] else "Community")})
     for m in mine_:
         m.setdefault("category", m["tags"][0].capitalize() if m.get("tags") else "Mine")
-    return {"items": builtins(recipes) + mine_ + cs, "community_error": com["error"], "community_fetched": com["fetched"]}
+    return {"items": builtins(recipes) + mine_}
 
 
 def search(items: list[dict], q: str = "", section: str = "", tag: str = "", sort: str = "name") -> list[dict]:
@@ -431,8 +246,6 @@ def search(items: list[dict], q: str = "", section: str = "", tag: str = "", sor
     order = {s: i for i, s in enumerate(SECTIONS)}
     if sort == "recent":
         out.sort(key=lambda i: (-(i.get("installed_at") or 0), i.get("title", "").lower()))
-    elif sort == "added":                    # newest in the gallery first (the date its folder was added), then installed
-        out.sort(key=lambda i: (i.get("added") or "", i.get("installed_at") or 0), reverse=True)
     elif sort == "author":
         out.sort(key=lambda i: (str(i.get("author") or "~").lower(), i.get("title", "").lower()))
     elif sort == "params":
@@ -467,27 +280,24 @@ def main(argv=None) -> int:
     import sys
 
     from . import config
-    ap = argparse.ArgumentParser(prog="form recipes", description="The recipe library: built-in, installed, community.")
-    if argv and argv[0] in ("export", "import", "submit", "derive"):          # sharing: form/recipe_share.py
+    ap = argparse.ArgumentParser(prog="form recipes", description="The recipe library: built-in and installed.")
+    if argv and argv[0] in ("export", "import", "derive"):          # sharing: form/recipe_share.py
         from .recipe_share import main as share_main
         return share_main(argv[0], argv[1:])
-    ap.add_argument("verb", nargs="?", default="list", choices=["list", "inspect", "install", "uninstall", "community", "source"])
+    ap.add_argument("verb", nargs="?", default="list", choices=["list", "inspect", "install", "uninstall", "source"])
     ap.add_argument("arg", nargs="?")
     ap.add_argument("--q", default="")
     ap.add_argument("--section", default="", choices=["", *SECTIONS])
     ap.add_argument("--tag", default="")
-    ap.add_argument("--sort", default="name", choices=["name", "recent", "added", "author", "params"])
+    ap.add_argument("--sort", default="name", choices=["name", "recent", "author", "params"])
     ap.add_argument("--sha256", default="", help="the hash `inspect` printed; install refuses anything else")
-    ap.add_argument("--refresh", action="store_true")
     a = ap.parse_args(argv)
     root = config.load()["data"]["dir"]
     try:
         if a.verb == "list":
             from .recipes import listed
-            lib = everything(root, listed(), refresh=a.refresh)
-            out = {"recipes": search(lib["items"], a.q, a.section, a.tag, a.sort), "community_error": lib["community_error"]}
-        elif a.verb == "community":
-            out = community(root, force=a.refresh)
+            lib = everything(root, listed())
+            out = {"recipes": search(lib["items"], a.q, a.section, a.tag, a.sort)}
         elif a.verb == "inspect":
             p = Path(a.arg or "").expanduser()
             out = {k: v for k, v in inspect(p.read_bytes(), p.name).items() if k != "source"}

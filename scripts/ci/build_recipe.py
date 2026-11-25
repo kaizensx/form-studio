@@ -2,7 +2,6 @@
 
     python scripts/ci/build_recipe.py --builtin dock --out OUT
     python scripts/ci/build_recipe.py --source recipe.py --out OUT [--variants] [--slice] [--turntable]
-    python scripts/ci/build_recipe.py --community community/recipes/cable-clip --out OUT
     python scripts/ci/build_recipe.py --archive design.formstudio --out OUT --turntable
     python scripts/ci/build_recipe.py --repo-root ../base --builtin hook --out OUT    # build with another checkout's code
 
@@ -139,12 +138,8 @@ def build(args) -> dict:
 
         source = language = None
         title = args.name or (st.recipes[args.builtin].title if args.builtin and args.builtin in st.recipes else "")
-        if args.source or args.community:
-            if args.community:
-                d = Path(args.community)
-                f = d / "recipe.py" if (d / "recipe.py").exists() else d / "recipe.scad"
-            else:
-                f = Path(args.source)
+        if args.source:
+            f = Path(args.source)
             source = f.read_text(encoding="utf-8")
             language = "openscad" if f.suffix.lower() == ".scad" else "python"
             result["source_sha256"] = hashlib.sha256(source.encode("utf-8")).hexdigest()
@@ -249,7 +244,6 @@ def main(argv=None) -> int:
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--builtin", help="a built-in recipe id")
     src.add_argument("--source", help="a recipe file (.py or .scad)")
-    src.add_argument("--community", help="a community/recipes/<id> folder")
     src.add_argument("--archive", help="a .formstudio or .formproj archive")
     ap.add_argument("--out", required=True)
     ap.add_argument("--name", help="design name shown in the pictures (default: the recipe's title)")

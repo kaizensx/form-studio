@@ -15,7 +15,7 @@ body:
       options:
         - Desktop app (window, viewport, sheets)
         - Conversations and agents
-        - Design, revisions and recipes
+        - Design and revisions
         - Checks, fit and analysis
         - Slicing and print simulation
         - Release, export and import

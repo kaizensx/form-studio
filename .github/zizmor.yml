@@ -13,10 +13,6 @@ rules:
       - pages.yml
       # workflow_run: the privileged half of the split PR preview; reads the other run's artifacts as data only.
       - pr-preview-comment.yml
-  artipacked:
-    ignore:
-      # the second checkout keeps its token on purpose to push the recipe branch; the job uploads no artifacts.
-      - recipe-accept.yml
   self-repository:
     # Local actions use the long-standing `./.github/actions/...` form, which actionlint also checks.
     disable: true

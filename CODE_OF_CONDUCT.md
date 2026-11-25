@@ -8,7 +8,7 @@ engineers, hobbyists and professionals, of any background or identity.
 - Be kind and patient, especially with people who are new to CAD, printing or open source.
 - Assume good intent, and ask before you assume.
 - Critique designs, code and ideas, never the person who made them.
-- Credit other people's work, recipes and measurements.
+- Credit other people's work, designs and measurements.
 - Keep discussions on topic and useful to the next person who reads them.
 
 ## What is not acceptable

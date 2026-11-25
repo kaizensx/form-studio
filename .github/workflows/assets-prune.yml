@@ -1,7 +1,7 @@
 name: CI assets prune
 
 # Keeps the ci-assets branch small: pictures for comments older than 120 days are removed and the branch history is
-# squashed into one commit. Recipe bundles, the slicer matrix, benchmarks and interface baselines are kept.
+# squashed into one commit. The slicer matrix, benchmarks and interface baselines are kept.
 on:
   schedule:
     - cron: "5 12 1 * *"     # midday, away from the nightly jobs that write to the branch

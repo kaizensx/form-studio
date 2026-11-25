@@ -3,7 +3,7 @@
     python site/build.py            (needs the `markdown` package: pip install markdown)
 
 Reads the markdown listed in PAGES and writes site/docs/*.html, site/sitemap.xml and site/robots.txt. The home
-page, the recipe gallery and How we measure are hand-written; only their shared nav and footer are stamped. The GitHub Pages workflow runs this before it
+page, How we measure, Build timings and Slicer compatibility are hand-written; only their shared nav and footer are stamped. The GitHub Pages workflow runs this before it
 uploads site/.
 """
 from __future__ import annotations
@@ -36,7 +36,6 @@ PAGES = [
     ("app", "docs/APP.md", "The desktop app", "Install, the window, the five stages, keys and settings."),
     ("cli", "docs/CLI.md", "Command line", "Every form command, with its arguments."),
     ("mcp", "docs/MCP.md", "MCP tools", "Every tool an agent can call, generated from the server itself."),
-    ("recipes", "docs/RECIPES.md", "Writing a recipe", "Parameters, features, constraints, fit and tests."),
     ("architecture", "docs/ARCHITECTURE.md", "Architecture", "The engine, the kernel worker, adapters, staleness and the fit model."),
     ("verification", "docs/VERIFICATION.md", "Compatibility", "Platforms, agents, programs and slicers, and what CI exercises."),
     ("changelog", "CHANGELOG.md", "Changelog", "What changed in each version."),
@@ -179,7 +178,7 @@ def main() -> int:
     if OUT.exists():
         shutil.rmtree(OUT)
     OUT.mkdir(parents=True)
-    urls = ["", "docs/", "recipes/", "measure/"]
+    urls = ["", "docs/", "measure/"]
     for slug, source, title, desc in PAGES:
         text = (ROOT / source).read_text(encoding="utf-8")
         body = rewrite(render(text), source)
@@ -193,9 +192,9 @@ def main() -> int:
     items = "\n".join(f'<li><a href="{slug}.html"><b>{html.escape(title)}</b><span>{html.escape(desc)}</span></a></li>'
                       for slug, _, title, desc in PAGES)
     index = (f"<h1>Documentation</h1>\n<p class=\"lede\">How to use Form Studio, from the desktop app to the command line and the "
-             f'MCP server, and how to extend it with recipes. Spotted something wrong? <a href="{REPO}/issues/new?template=6-docs.yml">Tell us</a>.</p>\n'
+             f'MCP server. Spotted something wrong? <a href="{REPO}/issues/new?template=6-docs.yml">Tell us</a>.</p>\n'
              f'<ul class="docs-index">\n{items}\n</ul>')
-    (OUT / "index.html").write_text(PAGE.format(title="Docs", desc="Form Studio documentation: features, the desktop app, the command line, MCP tools, recipes, architecture and compatibility.",
+    (OUT / "index.html").write_text(PAGE.format(title="Docs", desc="Form Studio documentation: features, the desktop app, the command line, MCP tools, architecture and compatibility.",
                                                 file="", base=BASE, repo=REPO, nav=nav("index"), src="", body=index, navhtml=NAVHTML, foothtml=FOOTHTML), encoding="utf-8")
 
     today = _dt.date.today().isoformat()
