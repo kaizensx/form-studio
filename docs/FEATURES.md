@@ -18,7 +18,7 @@ as an MCP tool ([MCP reference](MCP.md)), unless noted. 3D printing is optional 
 - [Conversations and agents](#conversations-and-agents)
 - [Any model, any provider](#any-model-any-provider)
 - [Moving and sharing designs](#moving-and-sharing-designs)
-- [Recipes: building blocks and the community gallery](#recipes-building-blocks-and-the-community-gallery)
+- [Building blocks for agents](#building-blocks-for-agents)
 - [3D printing (optional)](#3d-printing-optional)
   - [For a printer, or just a 3D model](#for-a-printer-or-just-a-3d-model)
   - [Fit](#fit)
@@ -406,7 +406,7 @@ Each revision is rebuilt and checked on the solid. The standard checks for a pri
 | Fit within the tolerance window | model |
 | Re-imported in FreeCAD (when installed) | computed |
 
-Recipes and assemblies add their own: a bracket's bending safety factor, a box's lid swing, the clearance of a pin in
+Building blocks and assemblies add their own: a bracket's bending safety factor, a box's lid swing, the clearance of a pin in
 its hole. **Every result says how it is known** (computed, heuristic, model, simulated, measured, physical) and
 clicking a result shows where on the part it was found.
 
@@ -523,7 +523,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 96 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 95 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
@@ -599,24 +599,15 @@ and what to do.
   `.formproj` files still import. `form export`, `form import`; MCP `export_project`, `import_project`.
 - **Conversations** export alone as Markdown (to read) or JSON (to import again). `form export-conversation`.
 
-## Recipes: building blocks and the community gallery
+## Building blocks for agents
 
-Recipes are parametric families written as code, with their own engineering checks. Agents use them as starting
-points and change anything; people browse them in the [website gallery](https://kaizensx.github.io/form-studio/recipes/)
-with categories and tags.
+Inside the engine, recipes are parametric building blocks written as code, each with its own engineering checks. An
+agent may start a design from one when it fits (`describe_recipe`, then `create_project`) and change anything after
+that. They are internal: Form Studio does not offer them to people as a library, and every design starts from what the
+person describes. Designs made from one open, build and release like any other.
 
-- **Built in**, made of the things people print most: Gridfinity bin and baseplate, a box with a sliding, press-on or
-  hinged lid, SKÅDIS pegboard accessories, a phone and tablet stand, a cable organizer, an under-desk hanger, a shelf
-  bracket, a hose and pipe adapter, a self-watering planter, a faceted vase and lamp shade, a battery and card holder,
-  an electronics enclosure and the fit coupon. Each passes its checks at its defaults and prints without supports.
-- **Community recipes** install from a file or from the gallery, after you read the source and its SHA-256. Downloads
-  are verified against the index, nothing runs until a design is created, and uninstalling is one command.
-  `form recipes list|inspect|install|uninstall|community`.
-- **Share a recipe** as one `.formrecipe` file (code, `meta.json` with its SHA-256, and a preview from a real build),
-  prepare a community submission with a pre-filled GitHub issue (nothing is posted from Form Studio), or turn a design
-  into a recipe. `form recipes export|import|submit|derive`.
-
-Writing one: [Writing a recipe](RECIPES.md) and [community recipes](../community/recipes/README.md).
+For developers: `form recipes list|inspect|install|uninstall|source`, `form recipes export|import|derive` (a recipe
+as one `.formrecipe` file, or a design turned into a recipe), and [Writing a recipe](RECIPES.md).
 
 ## 3D printing (optional)
 
@@ -718,10 +709,8 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
 
 ## On GitHub
 
-- **Recipes submitted in an issue** are built, checked and sliced, and the issue is answered with pictures; a
-  maintainer's label turns an accepted one into a pull request credited to its author.
-- **Pull requests** that touch recipes or the interface get before and after pictures.
-- **A nightly slicer compatibility matrix** (every recipe through every slicer CI installs) and **benchmarks** are
+- **Pull requests** that touch the engine's building blocks or the interface get before and after pictures.
+- **A nightly slicer compatibility matrix** (every sample design through every slicer CI installs) and **benchmarks** are
   published on the website: [compatibility](https://kaizensx.github.io/form-studio/compat/) and
   [benchmarks](https://kaizensx.github.io/form-studio/bench/).
 - **Releases** ship with `SHA256SUMS`, build provenance and an SBOM.

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Build timings · Form Studio</title>
-<meta name="description" content="How fast Form Studio builds, checks and slices each recipe and how fast the app starts, measured on every change to the dev branch.">
+<meta name="description" content="How fast Form Studio builds, checks and slices each sample design and how fast the app starts, measured on every change to the dev branch.">
 <meta name="theme-color" content="#0e1113" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
 <link rel="canonical" href="https://kaizensx.github.io/form-studio/bench/">
@@ -37,7 +37,7 @@
 <header class="nav" id="nav">
   <div class="wrap">
     <a class="brand" href="../"><img class="lk-d" src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="../assets/lockup-light.svg" alt="" width="143" height="22"></a>
-    <nav class="nav-links" aria-label="Site"><ul><li><a href="../#make">What it makes</a></li><li><a href="../#how">How it works</a></li><li><a href="../#agent">Your agent</a></li><li><a href="../recipes/">Recipes</a></li><li><a href="../docs/">Docs</a></li></ul></nav>
+    <nav class="nav-links" aria-label="Site"><ul><li><a href="../#make">What it makes</a></li><li><a href="../#how">How it works</a></li><li><a href="../#agent">Your agent</a></li><li><a href="../docs/">Docs</a></li></ul></nav>
     <div class="end">
       <button class="theme" type="button" id="theme" aria-label="Switch between light and dark"><svg class="ic sun" aria-hidden="true"><use href="#ic-sun"/></svg><svg class="ic moon" aria-hidden="true"><use href="#ic-moon"/></svg></button>
       <a class="gh" href="https://discord.gg/b6ZgyndkmS"><svg class="ic" aria-hidden="true"><use href="#ic-dc"/></svg><span>Discord</span></a>
@@ -47,7 +47,7 @@
     </div>
   </div>
   <div class="menu" id="menu" hidden>
-    <ul><li><a href="../#make">What it makes</a></li><li><a href="../#how">How it works</a></li><li><a href="../#agent">Your agent</a></li><li><a href="../recipes/">Recipes</a></li><li><a href="../docs/">Docs</a></li><li><a href="https://discord.gg/b6ZgyndkmS">Discord</a></li><li><a href="https://github.com/kaizensx/form-studio">GitHub</a></li></ul>
+    <ul><li><a href="../#make">What it makes</a></li><li><a href="../#how">How it works</a></li><li><a href="../#agent">Your agent</a></li><li><a href="../docs/">Docs</a></li><li><a href="https://discord.gg/b6ZgyndkmS">Discord</a></li><li><a href="https://github.com/kaizensx/form-studio">GitHub</a></li></ul>
   </div>
   <span class="scrolled-bar" id="scroll-bar" aria-hidden="true"></span>
 </header>
@@ -56,14 +56,14 @@
 <main id="main" class="wrap gallery ci-page">
   <div class="gallery-head">
     <h1>Build timings</h1>
-    <p class="lead">Every change to the <code>dev</code> branch is timed on the same kind of GitHub runner: how long each recipe takes to <b>build</b> in the CAD kernel, to <b>check</b> and to <b>slice</b> with PrusaSlicer, and how long the app takes to <b>start</b>.</p>
+    <p class="lead">Every change to the <code>dev</code> branch is timed on the same kind of GitHub runner: how long each sample design takes to <b>build</b> in the CAD kernel, to <b>check</b> and to <b>slice</b> with PrusaSlicer, and how long the app takes to <b>start</b>.</p>
     <p class="ci-stamp" id="stamp" aria-live="polite">Loading the history…</p>
   </div>
   <div class="ci-tiles" id="tiles"></div>
   <div class="ci-charts" id="charts"></div>
   <section class="ci-trend" aria-labelledby="per-title">
-    <h2 id="per-title">Per recipe, latest run</h2>
-    <div class="ci-scroll" tabindex="0" role="region" aria-label="Times per recipe"><table class="ci-matrix ci-times" id="recipes"></table></div>
+    <h2 id="per-title">Per design, latest run</h2>
+    <div class="ci-scroll" tabindex="0" role="region" aria-label="Times per design"><table class="ci-matrix ci-times" id="recipes"></table></div>
   </section>
   <section class="contribute" aria-labelledby="contrib-title">
     <div>
@@ -86,10 +86,10 @@
         <a class="brand" href="../"><img class="lk-d" src="../assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="../assets/lockup-light.svg" alt="" width="143" height="22"></a>
         <p>Describe anything. The open-source AI CAD studio, MIT licence.</p>
       </div>
-      <nav aria-label="Product"><span class="cap">Product</span><a href="../#make">What it makes</a><a href="../#how">How it works</a><a href="../#agent">Your agent</a><a href="../recipes/">Recipes</a><a href="../#download">Download</a></nav>
+      <nav aria-label="Product"><span class="cap">Product</span><a href="../#make">What it makes</a><a href="../#how">How it works</a><a href="../#agent">Your agent</a><a href="../#download">Download</a></nav>
       <nav aria-label="Measured"><span class="cap">Measured</span><a href="../measure/">How we measure</a><a href="../bench/">Build timings</a><a href="../compat/">Slicer compatibility</a></nav>
       <nav aria-label="Docs"><span class="cap">Docs</span><a href="../docs/features.html">Features</a><a href="../docs/app.html">The app</a><a href="../docs/cli.html">Command line</a><a href="../docs/mcp.html">MCP tools</a><a href="../docs/changelog.html">Changelog</a></nav>
-      <nav aria-label="Community"><span class="cap">Community</span><a href="https://discord.gg/b6ZgyndkmS">Discord</a><a href="https://github.com/kaizensx/form-studio/discussions">Discussions</a><a href="https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml">Share a recipe</a><a href="https://github.com/kaizensx/form-studio/issues/new/choose">Report an issue</a><a href="https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md">Contributing</a></nav>
+      <nav aria-label="Community"><span class="cap">Community</span><a href="https://discord.gg/b6ZgyndkmS">Discord</a><a href="https://github.com/kaizensx/form-studio/discussions">Discussions</a><a href="https://github.com/kaizensx/form-studio/issues/new/choose">Report an issue</a><a href="https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md">Contributing</a></nav>
     </div>
     <p class="foot-note">No cookies, trackers or third-party requests. Form Studio runs on your computer and never uploads your files or sends them to a machine on its own.</p>
   </div>

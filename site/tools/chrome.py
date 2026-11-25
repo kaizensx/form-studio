@@ -16,7 +16,6 @@ LINKS = [
     ("make", "What it makes", "#make"),
     ("how", "How it works", "#how"),
     ("agent", "Your agent", "#agent"),
-    ("recipes", "Recipes", "recipes/"),
     ("docs", "Docs", "docs/"),
 ]
 
@@ -103,10 +102,10 @@ def foot(prefix: str) -> str:
         <a class="brand" href="{home}"><img class="lk-d" src="{prefix}assets/lockup.svg" alt="Form Studio" width="143" height="22"><img class="lk-l" src="{prefix}assets/lockup-light.svg" alt="" width="143" height="22"></a>
         <p>Describe anything. The open-source AI CAD studio, MIT licence.</p>
       </div>
-      <nav aria-label="Product"><span class="cap">Product</span><a href="{home}#make">What it makes</a><a href="{home}#how">How it works</a><a href="{home}#agent">Your agent</a><a href="{prefix}recipes/">Recipes</a><a href="{home}#download">Download</a></nav>
+      <nav aria-label="Product"><span class="cap">Product</span><a href="{home}#make">What it makes</a><a href="{home}#how">How it works</a><a href="{home}#agent">Your agent</a><a href="{home}#download">Download</a></nav>
       <nav aria-label="Measured"><span class="cap">Measured</span><a href="{prefix}measure/">How we measure</a><a href="{prefix}bench/">Build timings</a><a href="{prefix}compat/">Slicer compatibility</a></nav>
       <nav aria-label="Docs"><span class="cap">Docs</span><a href="{prefix}docs/features.html">Features</a><a href="{prefix}docs/app.html">The app</a><a href="{prefix}docs/cli.html">Command line</a><a href="{prefix}docs/mcp.html">MCP tools</a><a href="{prefix}docs/changelog.html">Changelog</a></nav>
-      <nav aria-label="Community"><span class="cap">Community</span><a href="https://discord.gg/b6ZgyndkmS">Discord</a><a href="{REPO}/discussions">Discussions</a><a href="{REPO}/issues/new?template=3-recipe.yml">Share a recipe</a><a href="{REPO}/issues/new/choose">Report an issue</a><a href="{REPO}/blob/main/CONTRIBUTING.md">Contributing</a></nav>
+      <nav aria-label="Community"><span class="cap">Community</span><a href="https://discord.gg/b6ZgyndkmS">Discord</a><a href="{REPO}/discussions">Discussions</a><a href="{REPO}/issues/new/choose">Report an issue</a><a href="{REPO}/blob/main/CONTRIBUTING.md">Contributing</a></nav>
     </div>
     <p class="foot-note">No cookies, trackers or third-party requests. Form Studio runs on your computer and never uploads your files or sends them to a machine on its own.</p>
   </div>
@@ -117,7 +116,6 @@ def foot(prefix: str) -> str:
 # hand-written pages: path from site/, prefix to the root, current nav key
 STAMPED = [
     ("index.html", "", ""),
-    ("recipes/index.html", "../", "recipes"),
     ("compat/index.html", "../", "compat"),
     ("bench/index.html", "../", "bench"),
     ("measure/index.html", "../", "measure"),

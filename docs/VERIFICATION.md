@@ -42,7 +42,7 @@ every change.
 Every printer set up in one of these slicers can be chosen, per design or as the default. Time and filament are the
 slicer's own estimate and are labelled *simulated*.
 
-**Every night**, every recipe (built-in and community) is sliced by every slicer above on Linux, and the result of each
+**Every night**, every built-in recipe is sliced by every slicer above on Linux, and the result of each
 recipe and slicer pair (built, sliced, checks passed, print time, filament, layers) is published as the
 [compatibility matrix](https://kaizensx.github.io/form-studio/compat/). The pipeline's timings per recipe and the app's
 start time are tracked on every change to `dev` and drawn as [benchmarks](https://kaizensx.github.io/form-studio/bench/).
@@ -89,7 +89,6 @@ back as images, a stale `expect_head` is refused, and no tool can approve a rele
 | [Compatibility matrix](../.github/workflows/compat.yml) | Every recipe through every slicer CI installs | Linux, nightly |
 | [Benchmarks](../.github/workflows/bench.yml) | Pipeline time per recipe and app start time | Linux, every change to `dev` |
 | [Release smoke test](../.github/workflows/release-smoke.yml) | The latest published release, downloaded and checked against `SHA256SUMS`, then opened and used | All four platforms, nightly |
-| [Recipe check](../.github/workflows/recipe-check.yml) | A recipe submitted in an issue, built, checked and sliced, answered with pictures | Linux, on the issue |
 | [PR preview](../.github/workflows/pr-preview.yml) | Before and after pictures of the recipes and interface a pull request changes | Linux, on the pull request |
 | [CodeQL](../.github/workflows/codeql.yml) | Static analysis of the engine, the app, the website's JavaScript and the workflows | Every push and pull request |
 | [Links](../.github/workflows/links.yml) | Links in the docs and the website | Pull requests; every link weekly |

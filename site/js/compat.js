@@ -36,15 +36,15 @@ async function main() {
     (d.commit ? ` · commit <a href="https://github.com/kaizensx/form-studio/commit/${esc(d.commit)}">${esc(d.commit.slice(0, 7))}</a>` : "");
   const pct = t.cells ? Math.round((100 * t.sliced) / t.cells) : 0;
   $("#tiles").innerHTML = [
-    tile(`${t.sliced ?? 0}/${t.cells ?? 0}`, "", "recipe × slicer pairs sliced"),
+    tile(`${t.sliced ?? 0}/${t.cells ?? 0}`, "", "design × slicer pairs sliced"),
     tile(pct, "%", "of the matrix sliced"),
     tile(t.ok ?? 0, "", "sliced with every check passing"),
     tile((d.slicers || []).length, "", "slicers"),
-    tile((d.recipes || []).length, "", "recipes"),
+    tile((d.recipes || []).length, "", "sample designs"),
   ].join("");
   const slicers = d.slicers || [];
-  const head = `<thead><tr><th scope="col">Recipe</th>${slicers.map((s) => `<th scope="col">${esc(s.name)}<span class="ver">${esc(s.version || "")}</span></th>`).join("")}</tr></thead>`;
-  const body = (d.recipes || []).map((r) => `<tr><th scope="row">${esc(r.title)}${r.builtin ? "" : '<span class="tag">community</span>'}</th>` +
+  const head = `<thead><tr><th scope="col">Design</th>${slicers.map((s) => `<th scope="col">${esc(s.name)}<span class="ver">${esc(s.version || "")}</span></th>`).join("")}</tr></thead>`;
+  const body = (d.recipes || []).map((r) => `<tr><th scope="row">${esc(r.title)}</th>` +
     slicers.map((s) => cell((d.cells[r.id] || {})[s.kind])).join("") + "</tr>").join("");
   $("#matrix").innerHTML = head + `<tbody>${body}</tbody>`;
   $("#machine").innerHTML = 'For tools: <a href="data.json">data.json</a> (schema 1), <a href="history.json">history.json</a> and <a href="badge.json">badge.json</a>, a shields.io endpoint.';

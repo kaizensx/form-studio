@@ -1,4 +1,4 @@
-"""Home and the new-design flow, without a window: learned starters, the recipe library (file and community installs),
+"""Home and the new-design flow, without a window: learned starters, the recipe library (installs from a file),
 project archives with their conversations, conversation export/import, What's New and the update channel."""
 import hashlib
 import io
@@ -180,88 +180,11 @@ class Library(Tmp):
         with self.assertRaises(recipe_lib.LibraryError):
             recipe_lib.uninstall(self.tmp, "../etc")
 
-    def index(self, *entries):
-        return json.dumps({"version": 1, "generated": "2026-11-17T00:00:00Z", "recipes": list(entries)}).encode()
-
-    def opener(self, files):
-        calls = []
-
-        def op(url, timeout):
-            calls.append(url)
-            v = files.get(url)
-            if isinstance(v, Exception):
-                raise v
-            if v is None:
-                raise OSError("404")
-            return v
-        op.calls = calls
-        return op
-
-    def test_community_preview_then_install_verifies_the_checksum(self):
-        url = "https://raw.githubusercontent.com/x/y/main/block.py"
-        sha = hashlib.sha256(BLOCK.encode()).hexdigest()
-        op = self.opener({recipe_lib.INDEX_URL: self.index(
-            {"id": "block", "title": "Block", "summary": "A block", "author": "ann", "tags": ["test"], "kind": "python",
-             "builtin": False, "url": url, "sha256": sha, "preview": None},
-            {"id": "dock", "title": "Device dock", "kind": "python", "builtin": True, "url": None, "sha256": None},
-            {"title": "no id"}), url: BLOCK.encode()})
-        com = recipe_lib.community(self.tmp, opener=op)
-        self.assertEqual([r["id"] for r in com["recipes"]], ["block", "dock"])
-        with self.assertRaises(recipe_lib.LibraryError):
-            recipe_lib.install_community(self.tmp, "block", sha, opener=op)     # not reviewed yet
-        pv = recipe_lib.community_preview(self.tmp, "block", opener=op)
-        self.assertEqual((pv["sha256"], pv["verified"], pv["source"]), (sha, True, BLOCK))
-        with self.assertRaises(recipe_lib.LibraryError):
-            recipe_lib.install_community(self.tmp, "block", "f" * 64, opener=op)
-        m = recipe_lib.install_community(self.tmp, "block", sha, opener=op)
-        self.assertEqual((m["origin"], m["community_id"], m["author"]), ("community", "block", "ann"))
-        lib = recipe_lib.everything(self.tmp, {}, opener=op)
-        com_rows = {i["id"]: i for i in lib["items"] if i["section"] == "community"}
-        self.assertTrue(com_rows["block"]["installed"])
-        self.assertTrue(com_rows["dock"]["installed"])          # built in
-        with self.assertRaises(recipe_lib.LibraryError):
-            recipe_lib.community_preview(self.tmp, "dock", opener=op)
-
-    def test_a_tampered_download_is_refused(self):
-        url = "https://example.org/block.py"
-        op = self.opener({recipe_lib.INDEX_URL: self.index({"id": "block", "title": "Block", "kind": "python", "url": url,
-                                                            "sha256": "a" * 64}), url: BLOCK.encode()})
-        with self.assertRaises(recipe_lib.LibraryError) as cm:
-            recipe_lib.community_preview(self.tmp, "block", opener=op)
-        self.assertIn("does not match", str(cm.exception))
-        self.assertEqual(recipe_lib.mine(self.tmp), [])
-
-    def test_an_unreachable_empty_or_strange_index_is_an_empty_list(self):
-        for files in ({}, {recipe_lib.INDEX_URL: self.index()}, {recipe_lib.INDEX_URL: b"<html>"},
-                      {recipe_lib.INDEX_URL: json.dumps({"version": 9, "recipes": []}).encode()}):
-            shutil.rmtree(self.tmp, ignore_errors=True)
-            self.tmp.mkdir()
-            com = recipe_lib.community(self.tmp, opener=self.opener(files))
-            self.assertEqual(com["recipes"], [])
-        self.assertTrue(com["error"])
-
-    def test_browsing_never_waits_for_the_network(self):
-        def boom(url, timeout):
-            raise AssertionError("the network was used")
-        lib = recipe_lib.everything(self.tmp, {}, opener=boom, online=False)
-        self.assertEqual(lib["items"], [])
-
-    def test_a_local_index_for_development(self):
-        fx = Path(__file__).resolve().parent / "fixtures" / "community" / "index.json"
-        os.environ["FORM_RECIPES_INDEX"] = str(fx)
-        try:
-            com = recipe_lib.community(self.tmp)
-            self.assertEqual([r["id"] for r in com["recipes"]], ["cable-clip", "dock"])
-            pv = recipe_lib.community_preview(self.tmp, "cable-clip")
-            self.assertTrue(pv["verified"])
-            self.assertEqual(recipe_lib.install_community(self.tmp, "cable-clip", pv["sha256"])["title"], "Cable clip")
-        finally:
-            del os.environ["FORM_RECIPES_INDEX"]
-        self.assertIsNone(recipe_lib._norm({"id": "x", "title": "X", "url": "file:x.py"})["url"])   # only with the variable
-
-    def test_http_urls_are_never_read(self):
-        with self.assertRaises(recipe_lib.LibraryError):
-            recipe_lib._download("http://example.org/x.py", 10, opener=lambda u, t: b"")
+    def test_the_library_never_uses_the_network(self):
+        from form.recipes import registry
+        lib = recipe_lib.everything(self.tmp, registry())
+        self.assertEqual(set(lib), {"items"})
+        self.assertEqual({i["section"] for i in lib["items"]}, {"builtin"})
 
     def test_search_sections_tags_and_sort(self):
         from form.recipes import registry

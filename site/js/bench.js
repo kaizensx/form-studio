@@ -51,21 +51,21 @@ async function main() {
   const A = (k) => (h) => (h.app || {})[k];
   $("#tiles").innerHTML = [
     tile(sec(A("warm_s")(last)), "s", "app start (interface and CAD kernel ready)", delta(hist, A("warm_s"))),
-    tile(sec(T("pipeline_s")(last)), "s", `every built-in recipe through the pipeline`, delta(hist, T("pipeline_s"))),
+    tile(sec(T("pipeline_s")(last)), "s", `every sample design through the pipeline`, delta(hist, T("pipeline_s"))),
     tile(sec(T("geometry_s")(last)), "s", "building the solids", delta(hist, T("geometry_s"))),
     tile(sec(T("slice_s")(last)), "s", `slicing${last.slicer && last.slicer.name ? " with " + last.slicer.name : ""}`, delta(hist, T("slice_s"))),
   ].join("");
   $("#charts").innerHTML = [
     card("App start, warm", hist, A("warm_s")),
     card("App start, cold", hist, A("cold_s")),
-    card("Whole pipeline, all recipes", hist, T("pipeline_s")),
+    card("Whole pipeline, all designs", hist, T("pipeline_s")),
     card("Building the solids", hist, T("geometry_s")),
     card("Checks", hist, T("checks_s")),
     card("Slicing", hist, T("slice_s")),
   ].join("");
   const ids = Object.keys(last.recipes).sort();
   const cols = [["geometry_s", "Build"], ["exports_s", "STEP + STL"], ["checks_s", "Checks"], ["slice_s", "Slice"], ["pipeline_s", "Pipeline"]];
-  $("#recipes").innerHTML = `<thead><tr><th scope="col">Recipe</th>${cols.map(([, l]) => `<th scope="col">${l}</th>`).join("")}<th scope="col">Pipeline trend</th></tr></thead><tbody>` +
+  $("#recipes").innerHTML = `<thead><tr><th scope="col">Design</th>${cols.map(([, l]) => `<th scope="col">${l}</th>`).join("")}<th scope="col">Pipeline trend</th></tr></thead><tbody>` +
     ids.map((id) => {
       const r = last.recipes[id];
       const d = delta(hist, (h) => ((h.recipes || {})[id] || {}).pipeline_s).replace(" vs. the 5 runs before", "");

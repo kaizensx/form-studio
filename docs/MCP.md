@@ -112,7 +112,7 @@ instead.
 
 ## Tools at a glance
 
-96 tools. Read-only tools never change a project.
+95 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -203,9 +203,8 @@ instead.
 | [`list_concepts`](#list_concepts) | read-only | List concepts. Open concept groups ({groups: [...]}, newest first), or one group's board with group=<id>. |
 | [`suggest_replies`](#suggest_replies) | read-only | Offer up to 3 short follow-up messages the person might send next (each under 80 characters, written as the person would say it, e.g. "Make the walls 2 mm"). |
 | [`list_starters`](#list_starters) | read-only | List starter ideas. Ideas for what this person might design next, ranked from what they already design (the building blocks and kinds of part in their projects, their printer and material, what they pinned or used): {prompts: [{id, text, source, pinned}], briefs: [...]}. |
-| [`recipe_library`](#recipe_library) | read-only | Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index on the project website, to find a building block to start a design from. |
+| [`recipe_library`](#recipe_library) | read-only | Search the recipe library: built-in recipes and recipes the person installed ("mine"), to find a building block to start a design from. |
 | [`export_recipe`](#export_recipe) | changes | Write an installed ("mine") recipe as one .formrecipe file: its code, meta.json (parameters, author, tags, the code's SHA-256) and preview.png drawn from a real build at its defaults. |
-| [`prepare_recipe_submission`](#prepare_recipe_submission) | changes | Prepare an installed recipe for the community gallery: the community/recipes/<id>/ folder (written into `folder` when given), what the gallery's checks would refuse, and the link to GitHub's recipe issue form with the fields filled in. |
 | [`design_as_recipe`](#design_as_recipe) | changes | Turn a design's current code into a recipe whose defaults are the design's values; ranges narrow a parameter's range ({key: [min, max]}, never wider than the code's own). |
 | [`export_project`](#export_project) | changes | Write the project, its conversations and the code its revisions were built from to one .formstudio file (default: <projects folder>/<project>.formstudio). |
 | [`import_project`](#import_project) | changes | Import a .formstudio or .formproj archive (or a conversation .json) from an absolute path. |
@@ -1663,10 +1662,10 @@ make; they edit the list with `form starters`.
 
 *Read-only.*
 
-Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index
-on the project website, to find a building block to start a design from. section: builtin | mine | community.
-Installing code is the person's decision and happens only with `form recipes install`, after they review the
-source and its SHA-256.
+Search the recipe library: built-in recipes and recipes the person installed ("mine"), to find a building
+block to start a design from. section: builtin | mine. Recipes are internal building blocks: use one when it
+fits, but do not offer the library to the person. Installing code is the person's decision and happens only
+with `form recipes install`, after they review the source and its SHA-256.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1684,17 +1683,6 @@ Nothing is uploaded; the person shares the file however they like.
 |---|---|---|
 | `recipe` | string | yes |
 | `path` | string \| null |  |
-
-### `prepare_recipe_submission`
-
-Prepare an installed recipe for the community gallery: the community/recipes/<id>/ folder (written into
-`folder` when given), what the gallery's checks would refuse, and the link to GitHub's recipe issue form with
-the fields filled in. Never open or post it: give the link to the person, who submits it themselves.
-
-| Argument | Type | Required |
-|---|---|---|
-| `recipe` | string | yes |
-| `folder` | string \| null |  |
 
 ### `design_as_recipe`
 

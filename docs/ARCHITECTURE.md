@@ -28,7 +28,7 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Engine | `form/studio.py` | Projects, revisions, keys, pipeline jobs, release gate |
 | Kernel worker | `form/worker.py`, `form/kernel.py` | build123d on OpenCascade in a separate process; a crash or timeout restarts it without touching project state |
 | Starting a design | `form/start.py`, `form/sketch.py`, `form/photo.py`, `form/concepts.py` | Home's composer as one message (words, photos, files, a sketch as structured geometry, links), blank designs, concept groups and the pick |
-| Recipes | `form/recipes/`, `form/recipe_lib.py`, `form/recipe_share.py` | Parametric families and designs written as code (Python or OpenSCAD); installed and community recipes, verified by SHA-256; `.formrecipe` packages and submissions |
+| Recipes | `form/recipes/`, `form/recipe_lib.py`, `form/recipe_share.py` | Internal building blocks for agents and designs written as code (Python or OpenSCAD); installed recipes, verified by SHA-256; `.formrecipe` packages |
 | Purpose | `form/purpose.py` | For 3D printing or just a 3D model, the process a model is made with, and which checks apply |
 | Checks and analysis | `form/checks.py`, `form/analysis.py`, `form/fit.py`, `form/selection.py` | Checks on the solid, analysis maps, the fit model, statics, selections and annotations |
 | Appearance | `form/materials.py` | Colours and materials per design or part, the 3MF with colours, material-aware checks |
@@ -37,7 +37,7 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Print simulation | `form/toolpath.py`, `form/simulate.py` | Per-layer toolpaths by line type, timed by the slicer's estimate |
 | Agents | `form/agents/`, `form/chat.py`, `form/ask.py` | Run an agent CLI, or talk to a model API, a local model or a provider added by URL with Form Studio's tools (`form/agents/mcp_client.py`); questions and measurements the agent asks wait for the person's answer |
 | Blender modelling bridge | `form/adapters/blender_model.py`, `form/adapters/blender_ops.py`, `form/meshsource.py` | An agent's declarative op list, schema-checked, run in Blender by a fixed runner; streams a preview per op; returns cage data (points, quads, creases, named regions) for a design's source |
-| MCP server | `form/mcp_server.py` | 96 tools over stdio |
+| MCP server | `form/mcp_server.py` | 95 tools over stdio |
 | CLI | `form/__main__.py` | Every capability as a JSON-printing command |
 | Archives | `form/bundle.py` | `.formstudio` files: a project, its conversations and the code it was built from, checked before anything is written |
 | Installer | `form/installer.py`, `form/setup.py` | Finds and installs slicers, agents and libraries, with consent; hands-free on first start |
