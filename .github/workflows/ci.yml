@@ -18,8 +18,8 @@ jobs:
   # OS, measured on these runners; refresh it from the times-* artifacts with scripts/ci/test_shards.py merge):
   #   Linux   10 shards, the whole suite on every change (a docs-, site- or workflow-only pull request leaves out the
   #           long geometry runs), with line coverage
-  #   macOS   pull requests: 4 shards of everything but the long geometry runs; pushes to main and dev, the nightly
-  #           run and manual runs: the whole suite in 5 shards
+  #   macOS   5 shards; pull requests: everything but the long geometry runs; pushes to main and dev, the nightly
+  #           run and manual runs: the whole suite
   # The two "test (<os>)" jobs gather the shards; they are the checks the rulesets require.
   shard-linux:
     name: shard (ubuntu-latest, ${{ matrix.shard }}/10)
@@ -108,17 +108,17 @@ jobs:
           retention-days: 14
 
   shard-macos:
-    name: shard (macos-latest, ${{ matrix.shard }}/${{ github.event_name == 'pull_request' && 4 || 5 }})
+    name: shard (macos-latest, ${{ matrix.shard }}/5)
     strategy:
       fail-fast: ${{ github.event_name == 'pull_request' }}     # a red shard on a pull request stops the others
       matrix:
-        shard: ${{ fromJSON(github.event_name == 'pull_request' && '[1, 2, 3, 4]' || '[1, 2, 3, 4, 5]') }}
+        shard: [1, 2, 3, 4, 5]      # five: as many macOS jobs as a free account runs at once
     runs-on: macos-latest
     timeout-minutes: 25
     permissions:
       contents: read
     env:
-      SHARDS: ${{ github.event_name == 'pull_request' && 4 || 5 }}
+      SHARDS: 5
       OS: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -272,7 +272,7 @@ jobs:
       - name: Unit times
         if: ${{ !cancelled() }}
         env:
-          SHARDS: ${{ github.event_name == 'pull_request' && 4 || 5 }}
+          SHARDS: 5
         run: |
           if ls times-*.json >/dev/null 2>&1; then
             python3 scripts/ci/test_shards.py merge times-*.json > measured-timings-macos-latest.json
