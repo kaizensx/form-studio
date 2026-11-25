@@ -243,6 +243,43 @@ def faces_at(shape, where: str = "top", tol: float = 0.05) -> list:
     return out
 
 
+def made_by(after, before, what: str = "edges", tol: float = 0.01) -> list:
+    """The edges (or faces) of `after` that the last operation made: those that are not on `before`.
+
+        out = craft.cut(body, pocket)
+        out = craft.safe_fillet(out, craft.made_by(out, body), 1.0)      # only the pocket's edges
+
+    The rule is the one Form Studio attributes faces to features by (form/kernel.py): a face of `after` is new when
+    it is not a face of `before` and its centre does not lie on `before`'s surface (a face a cut only trimmed
+    stays the earlier feature's). what="faces": those faces; "edges": the edges that bound at least one of them.
+    Use it instead of an index (edges()[3]): an index names whatever the kernel happens to list there, and moves
+    when a parameter changes. before=None: everything is new."""
+    need(what in ("edges", "faces"), f"made_by: unknown what {what!r}", "Use \"edges\" or \"faces\".", ["what"])
+    from build123d import ShapeList, Vertex
+    faces = list(after.faces())
+    if before is not None and hasattr(before, "faces"):
+        from ..kernel import _Skin
+        skin = _Skin(before)
+        new = []
+        for f in faces:
+            if hash(f) in skin.ids:
+                continue
+            c = f.center()
+            if skin.holds(f, (c.X, c.Y, c.Z), Vertex(c.X, c.Y, c.Z), tol):
+                continue
+            new.append(f)
+        faces = new
+    if what == "faces":
+        return ShapeList(faces)
+    seen, out = set(), []
+    for f in faces:
+        for e in f.edges():
+            if hash(e) not in seen:
+                seen.add(hash(e))
+                out.append(e)
+    return ShapeList(out)
+
+
 def shell(solid, thickness: float, openings: Iterable | None = None, inward: bool = True):
     """A hollow body with walls `thickness` thick, open at the given faces (none: a closed hollow). The outside
     stays where it is (inward=True). Fallback: an intersection-style offset (sharper inner corners, noted)."""

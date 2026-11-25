@@ -1353,7 +1353,9 @@ class Studio:
             auto = ", ".join(f"{c['label']} {c['from']:g} → {c['to']:g} {c['unit']}" for c in imp["params"]) or "Provenance updated"
             p["revisions"].append({"n": n, "parent": head["n"], "ts": time.time(), "values": cand["values"], "recipe": self.rid(p), "note": note.strip() or auto,
                                    "summary": auto, "origin": origin, "provenance": prov,
-                                   "touched": [f["id"] for f in imp["features"]]})
+                                   "touched": [f["id"] for f in imp["features"]],
+                                   # per feature: built, or loaded from its checkpoint (a FeatureDesign)
+                                   **({"build_log": cand["build_log"]} if cand.get("build_log") else {})})
             p["head"] = n
             if imp["revokes_approval"]:
                 self.decide(p, "approval", f"r{n} supersedes approved r{head['n']}; the release of r{head['n']} no longer describes the current design.")
@@ -1616,6 +1618,12 @@ class Studio:
         fsutil.replace_dir(tmp, out)
 
     def _make_checks(self, p, rev, keys, name):
+        try:                                           # the brief's requirements, measured on this solid (form/contract.py)
+            from . import contract
+            if rev["n"] == p["head"]:
+                contract.prove(self, p)
+        except Exception:                              # noqa: BLE001 - the release gate says when a proof is missing
+            pass
         ex = self.read(p, "exports", keys["exports"])
         stl = self.apath(p, "exports", keys["exports"]) / ex["files"]["stl"]["name"]
         model = purpose_mod.is_model(p)
@@ -1914,6 +1922,11 @@ class Studio:
         if crit:
             reasons.append(crit)
             blocking.append(crit)
+        from . import contract                        # a requirement of the brief that the solid does not meet
+        unmet = contract.gate_reason(self, p)
+        if unmet:
+            reasons.append(unmet)
+            blocking.append(unmet)
         physical = [e for e in p["evidence"] if e["rev"] == p["head"] and (e["kind"] == "fit" or e.get("source") == "part")]
         model = bool(off) and off.get("why") == "purpose"
         level = ("Geometry computed · game asset, not for 3D printing" if purpose_mod.is_game(p) else
@@ -2278,8 +2291,11 @@ class Studio:
             "releases": sorted(d.name for d in (self.dir(pid) / "releases").glob("r*")) if (self.dir(pid) / "releases").exists() else [],
             "recovered": p.get("_recovered"),
         }
-        from . import maker_docs
+        from . import contract, maker_docs
         out["documents"] = maker_docs.available(self, p)          # maker documents the working files can produce
+        sheet = contract.prove(self, p, compute=False)            # the brief's requirements as measured, when they were
+        if sheet:
+            out["proof"] = {"summary": contract.summary(sheet), "green": sheet["green"], "rows": contract.table(sheet)}
         return out
 
     def layers(self, p: dict, plate: int | None = None) -> list:

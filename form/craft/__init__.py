@@ -7,7 +7,8 @@
 
 Modules (each also importable on its own, e.g. `from form.craft import mechanisms`):
   surfaces    superellipse / spline profiles, loft_sections, sweep_spline, revolve_profile, shell, safe_fillet,
-              variable_fillet, thicken, faces_at, cut and fuse (booleans with fuzzy fallbacks)
+              variable_fillet, thicken, faces_at, made_by (what the last operation made, instead of edges()[3]), cut
+              and fuse (booleans with fuzzy fallbacks)
   mechanisms  pin_hinge, living_hinge, cantilever_snap, annular_snap, bayonet, dovetail, detent, ratchet, cam,
               four_bar, four_bar_pose, link, link_between, gear_train, planetary (gears via form.parts)
   fits        ISO 286 iso_fit("H7/g6", d), shaft_limits, hole_limits, bearing_fit
@@ -53,7 +54,7 @@ from .meshtex import LABEL as MESH_TEXTURE_LABEL, MeshTexture  # noqa: F401
 
 _LAZY = {
     "surfaces": ("superellipse", "spline_profile", "polygon_profile", "superellipse_face", "section_at", "plane_on_path",
-                 "loft_sections", "sweep_spline", "revolve_profile", "faces_at", "shell", "safe_fillet",
+                 "loft_sections", "sweep_spline", "revolve_profile", "faces_at", "made_by", "shell", "safe_fillet",
                  "variable_fillet", "thicken", "cut", "fuse"),
     "mechanisms": ("Mech", "overlap", "pin_hinge", "living_hinge", "cantilever_snap", "annular_snap", "bayonet",
                    "dovetail", "detent", "ratchet", "cam", "link", "link_between", "four_bar", "four_bar_pose",

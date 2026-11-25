@@ -1,0 +1,6582 @@
+{
+"build123d_version": "0.13.0",
+"modules": {
+"build123d": {
+"ABC": {
+"kind": "class"
+},
+"ABCMeta": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"APIHeaderSection_MakeHeader": {
+"kind": "class"
+},
+"AbstractContextManager": {
+"kind": "class"
+},
+"AddType": {
+"kind": "value"
+},
+"Airfoil": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"airfoil_code",
+"n_points",
+"finite_te",
+"mode"
+],
+"pos": 4
+}
+},
+"Align": {
+"kind": "enum",
+"members": [
+"CENTER",
+"MAX",
+"MIN",
+"NONE"
+]
+},
+"Align2D": {
+"kind": "value"
+},
+"Align3D": {
+"kind": "value"
+},
+"AngularDirection": {
+"kind": "enum",
+"members": [
+"CLOCKWISE",
+"COUNTER_CLOCKWISE"
+]
+},
+"Any": {
+"kind": "class"
+},
+"ApproxOption": {
+"kind": "enum",
+"members": [
+"ARC",
+"NONE",
+"SPLINE"
+]
+},
+"Arrow": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"arrow_size",
+"shaft_path",
+"shaft_width",
+"head_at_start",
+"head_type",
+"mode"
+],
+"pos": 6
+}
+},
+"ArrowHead": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"head_type",
+"rotation",
+"mode"
+],
+"pos": 4
+}
+},
+"AutoNameEnum": {
+"kind": "enum",
+"members": []
+},
+"Axis": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"AxisMeta": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"B": {
+"kind": "value"
+},
+"BRepBndLib": {
+"kind": "class"
+},
+"BRepBuilderAPI_MakeFace": {
+"kind": "class"
+},
+"BRepBuilderAPI_MakePolygon": {
+"kind": "class"
+},
+"BRepBuilderAPI_MakeSolid": {
+"kind": "class"
+},
+"BRepBuilderAPI_Sewing": {
+"kind": "class"
+},
+"BRepBuilderAPI_Transform": {
+"kind": "class"
+},
+"BRepGProp": {
+"kind": "class"
+},
+"BRepGProp_Face": {
+"kind": "class"
+},
+"BRepLib": {
+"kind": "class"
+},
+"BRepMesh_IncrementalMesh": {
+"kind": "class"
+},
+"BRepTools": {
+"kind": "class"
+},
+"BRepTools_WireExplorer": {
+"kind": "class"
+},
+"BRep_Builder": {
+"kind": "class"
+},
+"BRep_Tool": {
+"kind": "class"
+},
+"BSpline": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"control_points",
+"knots",
+"degree",
+"weights",
+"periodic",
+"mode"
+],
+"pos": 6
+}
+},
+"BallJoint": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"label",
+"to_part",
+"joint_location",
+"angular_range",
+"angle_reference"
+],
+"pos": 5
+}
+},
+"BaseCurveObject": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"curve",
+"mode"
+],
+"pos": 2
+}
+},
+"BaseEdgeObject": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"curve",
+"mode"
+],
+"pos": 2
+}
+},
+"BaseLineObject": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"curve",
+"mode"
+],
+"pos": 2
+}
+},
+"BaseObject": {
+"kind": "class"
+},
+"BaseObjectMeta": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"BasePartObject": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"part",
+"rotation",
+"align",
+"mode"
+],
+"pos": 4
+}
+},
+"BaseSketchObject": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"rotation",
+"align",
+"mode"
+],
+"pos": 4
+}
+},
+"Bezier": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"weights",
+"mode"
+],
+"pos": null
+}
+},
+"BinaryIO": {
+"kind": "class"
+},
+"BlendCurve": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"curve0",
+"curve1",
+"continuity",
+"end_points",
+"tangent_scalars",
+"mode"
+],
+"pos": 6
+}
+},
+"Bnd_Box": {
+"kind": "class"
+},
+"Bnd_OBB": {
+"kind": "class"
+},
+"BoundBox": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"Box": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"width",
+"height",
+"rotation",
+"align",
+"mode"
+],
+"pos": 6
+}
+},
+"BuildLine": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"placement",
+"mode"
+],
+"pos": 2
+}
+},
+"BuildPart": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"mode"
+],
+"pos": null
+}
+},
+"BuildScope": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"parent",
+"builder",
+"operation_locations",
+"publication_locations",
+"output_placements",
+"owner",
+"publication_target",
+"isolated",
+"location_context",
+"object_context",
+"object_local_locations",
+"object_placements"
+],
+"pos": 12
+}
+},
+"BuildSketch": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"mode"
+],
+"pos": null
+}
+},
+"Builder": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"mode"
+],
+"pos": null
+}
+},
+"BytesIO": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"CLASS_REGISTRY": {
+"kind": "value"
+},
+"CM": {
+"kind": "value"
+},
+"Callable": {
+"kind": "class"
+},
+"CenterArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"center",
+"radius",
+"start_angle",
+"arc_size",
+"mode"
+],
+"pos": 5
+}
+},
+"CenterOf": {
+"kind": "enum",
+"members": [
+"BOUNDING_BOX",
+"GEOMETRY",
+"MASS"
+]
+},
+"ChamferFilletType": {
+"kind": "value"
+},
+"Circle": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"arc_size",
+"align",
+"mode"
+],
+"pos": 4
+}
+},
+"ClassVar": {
+"kind": "function",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"Collection": {
+"kind": "class"
+},
+"Color": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"ColorAndLabel": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"element",
+"parents",
+"label_by"
+],
+"pos": 3
+}
+},
+"ColorIndex": {
+"kind": "enum",
+"members": [
+"BLACK",
+"BLUE",
+"CYAN",
+"GRAY",
+"GREEN",
+"LIGHT_GRAY",
+"MAGENTA",
+"RED",
+"YELLOW"
+]
+},
+"ColorLike": {
+"kind": "value"
+},
+"Comparable": {
+"kind": "class"
+},
+"Compound": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"label",
+"color",
+"material",
+"joints",
+"parent",
+"children"
+],
+"pos": 7
+}
+},
+"Cone": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"bottom_radius",
+"top_radius",
+"height",
+"arc_size",
+"rotation",
+"align",
+"mode"
+],
+"pos": 7
+}
+},
+"ConstrainedArcs": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"ConstrainedLines": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"ContinuityLevel": {
+"kind": "enum",
+"members": [
+"C0",
+"C1",
+"C2"
+]
+},
+"ConvexHull": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"points",
+"incremental",
+"qhull_options"
+],
+"pos": 3
+}
+},
+"ConvexPolyhedron": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"points",
+"rotation",
+"align",
+"mode"
+],
+"pos": 4
+}
+},
+"Convexity": {
+"kind": "enum",
+"members": [
+"CONCAVE",
+"CONVEX",
+"SADDLE",
+"SMOOTH"
+]
+},
+"CounterBoreHole": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"counter_bore_radius",
+"counter_bore_depth",
+"depth",
+"mode"
+],
+"pos": 5
+}
+},
+"CounterSinkHole": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"counter_sink_radius",
+"depth",
+"counter_sink_angle",
+"mode"
+],
+"pos": 5
+}
+},
+"Curve": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"label",
+"color",
+"material",
+"joints",
+"parent",
+"children"
+],
+"pos": 7
+}
+},
+"Cylinder": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"height",
+"arc_size",
+"rotation",
+"align",
+"mode"
+],
+"pos": 6
+}
+},
+"CylindricalJoint": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"label",
+"to_part",
+"axis",
+"angle_reference",
+"linear_range",
+"angular_range"
+],
+"pos": 6
+}
+},
+"DEG2RAD": {
+"kind": "value"
+},
+"DimensionLine": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"path",
+"draft",
+"sketch",
+"label",
+"arrows",
+"tolerance",
+"label_angle",
+"mode"
+],
+"pos": 8
+}
+},
+"DotLength": {
+"kind": "enum",
+"members": [
+"INKSCAPE_COMPAT",
+"QCAD_IMPERIAL",
+"TRUE_DOT"
+]
+},
+"DoubleTangentArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"pnt",
+"tangent",
+"other",
+"keep",
+"mode"
+],
+"pos": 5
+}
+},
+"Draft": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"font_size",
+"font",
+"font_style",
+"head_type",
+"arrow_length",
+"line_width",
+"pad_around_text",
+"unit",
+"number_display",
+"display_units",
+"decimal_precision",
+"fractional_precision",
+"extension_gap"
+],
+"pos": 13
+}
+},
+"DraftAngleError": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"message",
+"face",
+"problematic_shape"
+],
+"pos": 3
+}
+},
+"Drawing": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"shape",
+"look_at",
+"look_from",
+"look_up",
+"with_hidden",
+"focus"
+],
+"pos": 1
+}
+},
+"ET": {
+"kind": "module"
+},
+"Edge": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"label",
+"color",
+"parent"
+],
+"pos": 4
+}
+},
+"Ellipse": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"x_radius",
+"y_radius",
+"rotation",
+"align",
+"mode"
+],
+"pos": 5
+}
+},
+"EllipticalCenterArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"center",
+"x_radius",
+"y_radius",
+"start_angle",
+"arc_size",
+"rotation",
+"mode"
+],
+"pos": 4
+}
+},
+"EllipticalStartArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"start_pnt",
+"start_tangent",
+"x_radius",
+"y_radius",
+"arc_size",
+"start_angle",
+"major_axis_dir",
+"mode"
+],
+"pos": 5
+}
+},
+"Enum": {
+"kind": "enum",
+"members": []
+},
+"Export2D": {
+"kind": "class"
+},
+"ExportDXF": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"version",
+"unit",
+"color",
+"line_weight",
+"line_type"
+],
+"pos": 5
+}
+},
+"ExportSVG": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"unit",
+"scale",
+"margin",
+"fit_to_stroke",
+"precision",
+"fill_color",
+"line_color",
+"line_weight",
+"line_type",
+"dot_length"
+],
+"pos": 10
+}
+},
+"ExtensionLine": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"border",
+"offset",
+"draft",
+"sketch",
+"label",
+"arrows",
+"tolerance",
+"label_angle",
+"measurement_direction",
+"mode"
+],
+"pos": 10
+}
+},
+"Extrinsic": {
+"kind": "enum",
+"members": [
+"XYX",
+"XYZ",
+"XZX",
+"XZY",
+"YXY",
+"YXZ",
+"YZX",
+"YZY",
+"ZXY",
+"ZXZ",
+"ZYX",
+"ZYZ"
+]
+},
+"FT": {
+"kind": "value"
+},
+"Face": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"FilletPolyline": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"close",
+"mode"
+],
+"pos": null
+}
+},
+"FontManager": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 0
+}
+},
+"FontStyle": {
+"kind": "enum",
+"members": [
+"BOLD",
+"BOLDITALIC",
+"ITALIC",
+"REGULAR"
+]
+},
+"FrameMethod": {
+"kind": "enum",
+"members": [
+"CORRECTED",
+"FRENET"
+]
+},
+"G": {
+"kind": "value"
+},
+"GEOM_KEY_DIGITS": {
+"kind": "value"
+},
+"GProp_GProps": {
+"kind": "class"
+},
+"G_PER_LB": {
+"kind": "value"
+},
+"GccEnt_enclosed": {
+"kind": "value"
+},
+"GccEnt_enclosing": {
+"kind": "value"
+},
+"GccEnt_outside": {
+"kind": "value"
+},
+"GccEnt_unqualified": {
+"kind": "value"
+},
+"Generic": {
+"kind": "class"
+},
+"GeomAPI_IntCS": {
+"kind": "class"
+},
+"GeomAPI_IntSS": {
+"kind": "class"
+},
+"GeomAPI_ProjectPointOnSurf": {
+"kind": "class"
+},
+"GeomConvert": {
+"kind": "class"
+},
+"GeomConvert_BSplineCurveToBezierCurve": {
+"kind": "class"
+},
+"GeomEncoder": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"skipkeys",
+"ensure_ascii",
+"check_circular",
+"allow_nan",
+"sort_keys",
+"indent",
+"separators",
+"default"
+],
+"pos": 0
+}
+},
+"GeomType": {
+"kind": "enum",
+"members": [
+"BEZIER",
+"BSPLINE",
+"CIRCLE",
+"CONE",
+"CYLINDER",
+"ELLIPSE",
+"EXTRUSION",
+"HYPERBOLA",
+"LINE",
+"OFFSET",
+"OTHER",
+"PARABOLA",
+"PLANE",
+"REVOLUTION",
+"SPHERE",
+"TORUS"
+]
+},
+"Geom_BSplineCurve": {
+"kind": "class"
+},
+"Geom_BezierCurve": {
+"kind": "class"
+},
+"Geom_BoundedSurface": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"Geom_ElementarySurface": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"Geom_Line": {
+"kind": "class"
+},
+"Geom_Plane": {
+"kind": "class"
+},
+"GridLocations": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"x_spacing",
+"y_spacing",
+"x_count",
+"y_count",
+"align"
+],
+"pos": 5
+}
+},
+"GroupBy": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"key_f",
+"shapelist",
+"reverse"
+],
+"pos": 2
+}
+},
+"HLRAlgo_Projector": {
+"kind": "class"
+},
+"HLRBRep_Algo": {
+"kind": "class"
+},
+"HLRBRep_HLRToShape": {
+"kind": "class"
+},
+"HeadType": {
+"kind": "enum",
+"members": [
+"CURVED",
+"FILLETED",
+"STRAIGHT"
+]
+},
+"Helix": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"pitch",
+"height",
+"radius",
+"center",
+"direction",
+"cone_angle",
+"lefthand",
+"mode"
+],
+"pos": 8
+}
+},
+"HexLocations": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"x_count",
+"y_count",
+"major_radius",
+"align"
+],
+"pos": 5
+}
+},
+"Hole": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"depth",
+"mode"
+],
+"pos": 3
+}
+},
+"HyperbolicCenterArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"center",
+"x_radius",
+"y_radius",
+"start_angle",
+"arc_size",
+"rotation",
+"mode"
+],
+"pos": 4
+}
+},
+"IFSelect_ReturnStatus": {
+"kind": "class"
+},
+"IGESControl_Controller": {
+"kind": "class"
+},
+"IN": {
+"kind": "value"
+},
+"IndexedDataMap_TCollection_AsciiString_TCollection_AsciiString": {
+"kind": "class"
+},
+"IntEnum": {
+"kind": "enum",
+"members": []
+},
+"Interface_Static": {
+"kind": "class"
+},
+"IntersectingLine": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"start",
+"direction",
+"other",
+"mode"
+],
+"pos": 4
+}
+},
+"Intrinsic": {
+"kind": "enum",
+"members": [
+"XYX",
+"XYZ",
+"XZX",
+"XZY",
+"YXY",
+"YXZ",
+"YZX",
+"YZY",
+"ZXY",
+"ZXZ",
+"ZYX",
+"ZYZ"
+]
+},
+"Iterable": {
+"kind": "class"
+},
+"Iterator": {
+"kind": "class"
+},
+"JernArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"start",
+"tangent",
+"radius",
+"arc_size",
+"mode"
+],
+"pos": 5
+}
+},
+"Joint": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"label",
+"parent"
+],
+"pos": 2
+}
+},
+"KG": {
+"kind": "value"
+},
+"Keep": {
+"kind": "enum",
+"members": [
+"ALL",
+"BOTH",
+"BOTTOM",
+"INSIDE",
+"OUTSIDE",
+"TOP"
+]
+},
+"Kind": {
+"kind": "enum",
+"members": [
+"ARC",
+"INTERSECTION",
+"TANGENT"
+]
+},
+"LB": {
+"kind": "value"
+},
+"LengthMode": {
+"kind": "enum",
+"members": [
+"DIAGONAL",
+"HORIZONTAL",
+"VERTICAL"
+]
+},
+"Lib3MF": {
+"kind": "module"
+},
+"Line": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"mode"
+],
+"pos": null
+}
+},
+"LineType": {
+"kind": "enum",
+"members": [
+"BORDER",
+"BORDER2",
+"BORDERX2",
+"CENTER",
+"CENTER2",
+"CENTERX2",
+"CONTINUOUS",
+"DASHDOT",
+"DASHDOT2",
+"DASHDOTX2",
+"DASHED",
+"DASHED2",
+"DASHEDX2",
+"DIVIDE",
+"DIVIDE2",
+"DIVIDEX2",
+"DOT",
+"DOT2",
+"DOTX2",
+"HIDDEN",
+"HIDDEN2",
+"HIDDENX2",
+"ISO_DASH",
+"ISO_DASH_DOT",
+"ISO_DASH_DOUBLE_DOT",
+"ISO_DASH_SPACE",
+"ISO_DASH_TRIPLE_DOT",
+"ISO_DOT",
+"ISO_DOUBLE_DASH_DOT",
+"ISO_DOUBLE_DASH_DOUBLE_DOT",
+"ISO_DOUBLE_DASH_TRIPLE_DOT",
+"ISO_LONG_DASH_DOT",
+"ISO_LONG_DASH_DOUBLE_DOT",
+"ISO_LONG_DASH_DOUBLE_SHORT_DASH",
+"ISO_LONG_DASH_SHORT_DASH",
+"ISO_LONG_DASH_TRIPLE_DOT",
+"PHANTOM",
+"PHANTOM2",
+"PHANTOMX2"
+]
+},
+"LinearJoint": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"label",
+"to_part",
+"axis",
+"linear_range"
+],
+"pos": 4
+}
+},
+"Literal": {
+"kind": "function",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"Location": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"LocationList": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"locations"
+],
+"pos": 1
+}
+},
+"Locations": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [],
+"pos": null
+}
+},
+"M": {
+"kind": "value"
+},
+"MC": {
+"kind": "value"
+},
+"MM": {
+"kind": "value"
+},
+"Matrix": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"MeshType": {
+"kind": "enum",
+"members": [
+"MODEL",
+"OTHER",
+"SOLIDSUPPORT",
+"SUPPORT"
+]
+},
+"Mesher": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"unit"
+],
+"pos": 1
+}
+},
+"Message": {
+"kind": "class"
+},
+"Message_Gravity": {
+"kind": "class"
+},
+"Message_ProgressRange": {
+"kind": "class"
+},
+"MirrorType": {
+"kind": "value"
+},
+"Mode": {
+"kind": "enum",
+"members": [
+"ADD",
+"INTERSECT",
+"PRIVATE",
+"REPLACE",
+"SUBTRACT"
+]
+},
+"Movable": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"MovableT": {
+"kind": "value"
+},
+"NotAllLocationLikeError": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"wrong_types"
+],
+"pos": 1
+}
+},
+"NumberDisplay": {
+"kind": "enum",
+"members": [
+"DECIMAL",
+"FRACTION"
+]
+},
+"OffsetType": {
+"kind": "value"
+},
+"OrientedBoundBox": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"shape"
+],
+"pos": 1
+}
+},
+"PT": {
+"kind": "module"
+},
+"PageSize": {
+"kind": "enum",
+"members": [
+"A0",
+"A1",
+"A10",
+"A2",
+"A3",
+"A4",
+"A5",
+"A6",
+"A7",
+"A8",
+"A9",
+"LEDGER",
+"LEGAL",
+"LETTER"
+]
+},
+"ParabolicCenterArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"vertex",
+"focal_length",
+"start_angle",
+"arc_size",
+"rotation",
+"mode"
+],
+"pos": 3
+}
+},
+"Part": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"label",
+"color",
+"material",
+"joints",
+"parent",
+"children"
+],
+"pos": 7
+}
+},
+"Path": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"PathDescriptor": {
+"kind": "value"
+},
+"PathLike": {
+"kind": "class"
+},
+"PathSegment": {
+"kind": "value"
+},
+"PbrProperties": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"id",
+"name",
+"source",
+"url",
+"license",
+"values",
+"maps",
+"texture_repeat",
+"texture_rotation",
+"normalize_uvs",
+"maps_dir"
+],
+"pos": 11
+}
+},
+"Plane": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"PlaneMeta": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"PointLike": {
+"kind": "value"
+},
+"PolarLine": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"start",
+"length",
+"angle",
+"direction",
+"length_mode",
+"mode"
+],
+"pos": 6
+}
+},
+"PolarLocations": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"count",
+"start_angle",
+"angular_range",
+"rotate",
+"endpoint"
+],
+"pos": 6
+}
+},
+"Polygon": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"rotation",
+"align",
+"mode"
+],
+"pos": null
+}
+},
+"Polyline": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"close",
+"mode"
+],
+"pos": null
+}
+},
+"Pos": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"PositionMode": {
+"kind": "enum",
+"members": [
+"LENGTH",
+"PARAMETER"
+]
+},
+"PreOrderIter": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"node",
+"filter_",
+"stop",
+"maxlevel"
+],
+"pos": 4
+}
+},
+"PrecisionMode": {
+"kind": "enum",
+"members": [
+"AVERAGE",
+"GREATEST",
+"LEAST",
+"SESSION"
+]
+},
+"ProjectType": {
+"kind": "value"
+},
+"Protocol": {
+"kind": "class"
+},
+"Quantity_Color": {
+"kind": "class"
+},
+"Quantity_ColorRGBA": {
+"kind": "class"
+},
+"Quantity_TypeOfColor": {
+"kind": "class"
+},
+"RAD2DEG": {
+"kind": "value"
+},
+"RGB": {
+"kind": "class"
+},
+"RWGltf_CafWriter": {
+"kind": "class"
+},
+"RWStl": {
+"kind": "class"
+},
+"RadiusArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"start_point",
+"end_point",
+"radius",
+"short_sagitta",
+"mode"
+],
+"pos": 5
+}
+},
+"Rectangle": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"width",
+"height",
+"rotation",
+"align",
+"mode"
+],
+"pos": 5
+}
+},
+"RectangleRounded": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"width",
+"height",
+"radius",
+"rotation",
+"align",
+"mode"
+],
+"pos": 6
+}
+},
+"RegularPolygon": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"side_count",
+"major_radius",
+"rotation",
+"align",
+"mode"
+],
+"pos": 6
+}
+},
+"RevoluteJoint": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"label",
+"to_part",
+"axis",
+"angle_reference",
+"angular_range"
+],
+"pos": 5
+}
+},
+"RigidJoint": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"label",
+"to_part",
+"joint_location"
+],
+"pos": 3
+}
+},
+"Rot": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"Rotation": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"RotationLike": {
+"kind": "value"
+},
+"STEPCAFControl_Controller": {
+"kind": "class"
+},
+"STEPCAFControl_Reader": {
+"kind": "class"
+},
+"STEPCAFControl_Writer": {
+"kind": "class"
+},
+"STEPControl_Controller": {
+"kind": "class"
+},
+"STEPControl_StepModelType": {
+"kind": "class"
+},
+"Sagitta": {
+"kind": "enum",
+"members": [
+"BOTH",
+"LONG",
+"SHORT"
+]
+},
+"SagittaArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"start_point",
+"end_point",
+"sagitta",
+"mode"
+],
+"pos": 4
+}
+},
+"Select": {
+"kind": "enum",
+"members": [
+"ALL",
+"LAST",
+"NEW"
+]
+},
+"Self": {
+"kind": "function",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"Sequence": {
+"kind": "class"
+},
+"Sequence_TDF_Label": {
+"kind": "class"
+},
+"Shape": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"label",
+"color",
+"parent"
+],
+"pos": 4
+}
+},
+"ShapeHistory": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"history",
+"before",
+"brought"
+],
+"pos": 3
+}
+},
+"ShapeList": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"ShapeT": {
+"kind": "value"
+},
+"Shell": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"label",
+"color",
+"parent"
+],
+"pos": 4
+}
+},
+"Side": {
+"kind": "enum",
+"members": [
+"BOTH",
+"LEFT",
+"RIGHT"
+]
+},
+"Sketch": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"label",
+"color",
+"material",
+"joints",
+"parent",
+"children"
+],
+"pos": 7
+}
+},
+"SkipClean": {
+"kind": "class"
+},
+"SlotArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"arc",
+"height",
+"rotation",
+"mode"
+],
+"pos": 4
+}
+},
+"SlotCenterPoint": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"center",
+"point",
+"height",
+"rotation",
+"mode"
+],
+"pos": 5
+}
+},
+"SlotCenterToCenter": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"center_separation",
+"height",
+"rotation",
+"mode"
+],
+"pos": 4
+}
+},
+"SlotOverall": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"width",
+"height",
+"rotation",
+"align",
+"mode"
+],
+"pos": 5
+}
+},
+"Solid": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"label",
+"color",
+"material",
+"joints",
+"parent"
+],
+"pos": 6
+}
+},
+"SortBy": {
+"kind": "enum",
+"members": [
+"AREA",
+"DISTANCE",
+"LENGTH",
+"RADIUS",
+"VOLUME"
+]
+},
+"Sphere": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"arc_size1",
+"arc_size2",
+"arc_size3",
+"rotation",
+"align",
+"mode"
+],
+"pos": 7
+}
+},
+"Spline": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"tangents",
+"tangent_scalars",
+"periodic",
+"mode"
+],
+"pos": null
+}
+},
+"SplitType": {
+"kind": "value"
+},
+"Standard_ConstructionError": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"Standard_Failure": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"StdFail_NotDone": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"StlAPI_Writer": {
+"kind": "class"
+},
+"StrEnum": {
+"kind": "enum",
+"members": []
+},
+"Superellipse": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"width",
+"height",
+"order",
+"point_count",
+"rotation",
+"align",
+"mode"
+],
+"pos": 7
+}
+},
+"SweepType": {
+"kind": "value"
+},
+"T": {
+"kind": "value"
+},
+"T2": {
+"kind": "value"
+},
+"TCollection_AsciiString": {
+"kind": "class"
+},
+"TCollection_ExtendedString": {
+"kind": "class"
+},
+"TCollection_HAsciiString": {
+"kind": "class"
+},
+"TDF_Label": {
+"kind": "class"
+},
+"TDataStd_Name": {
+"kind": "class"
+},
+"TDocStd_Document": {
+"kind": "class"
+},
+"THOU": {
+"kind": "value"
+},
+"TOL": {
+"kind": "value"
+},
+"TOLERANCE": {
+"kind": "value"
+},
+"TOL_DIGITS": {
+"kind": "value"
+},
+"TYPE_CHECKING": {
+"kind": "value"
+},
+"Tangency": {
+"kind": "enum",
+"members": [
+"ENCLOSED",
+"ENCLOSING",
+"OUTSIDE",
+"UNQUALIFIED"
+]
+},
+"TangentArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"tangent",
+"tangent_from_first",
+"mode"
+],
+"pos": null
+}
+},
+"TechnicalDrawing": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"designed_by",
+"design_date",
+"page_size",
+"title",
+"sub_title",
+"drawing_number",
+"sheet_number",
+"drawing_scale",
+"nominal_text_size",
+"line_width",
+"mode"
+],
+"pos": 11
+}
+},
+"Text": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"txt",
+"font_size",
+"font",
+"font_path",
+"font_style",
+"text_align",
+"align",
+"path",
+"position_on_path",
+"single_line_width",
+"rotation",
+"mode"
+],
+"pos": 12
+}
+},
+"TextAlign": {
+"kind": "enum",
+"members": [
+"BOTTOM",
+"CENTER",
+"LEFT",
+"RIGHT",
+"TOP",
+"TOPFIRSTLINE"
+]
+},
+"TextIO": {
+"kind": "class"
+},
+"ThreePointArc": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"mode"
+],
+"pos": null
+}
+},
+"TopAbs_FACE": {
+"kind": "value"
+},
+"TopAbs_Orientation": {
+"kind": "class"
+},
+"TopAbs_ShapeEnum": {
+"kind": "class"
+},
+"TopExp_Explorer": {
+"kind": "class"
+},
+"TopLoc_Location": {
+"kind": "class"
+},
+"TopoDS": {
+"kind": "module"
+},
+"TopoDS_Compound": {
+"kind": "class"
+},
+"TopoDS_Edge": {
+"kind": "class"
+},
+"TopoDS_Face": {
+"kind": "class"
+},
+"TopoDS_Shape": {
+"kind": "class"
+},
+"TopoDS_Shell": {
+"kind": "class"
+},
+"TopoDS_Solid": {
+"kind": "class"
+},
+"TopoDS_Vertex": {
+"kind": "class"
+},
+"TopoDS_Wire": {
+"kind": "class"
+},
+"Torus": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"major_radius",
+"minor_radius",
+"minor_start_angle",
+"minor_end_angle",
+"major_angle",
+"rotation",
+"align",
+"mode"
+],
+"pos": 8
+}
+},
+"Transition": {
+"kind": "enum",
+"members": [
+"RIGHT",
+"ROUND",
+"TRANSFORMED"
+]
+},
+"Trapezoid": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"width",
+"height",
+"left_side_angle",
+"right_side_angle",
+"rotation",
+"align",
+"mode"
+],
+"pos": 7
+}
+},
+"Triangle": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"a",
+"b",
+"c",
+"A",
+"B",
+"C",
+"align",
+"rotation",
+"mode"
+],
+"pos": 0
+}
+},
+"Type": {
+"kind": "function",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"TypeAlias": {
+"kind": "function",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"TypeVar": {
+"kind": "class"
+},
+"UNITS_PER_KILOGRAM": {
+"kind": "value"
+},
+"UNITS_PER_METER": {
+"kind": "value"
+},
+"UUID": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"hex",
+"bytes",
+"bytes_le",
+"fields",
+"int",
+"version",
+"is_safe"
+],
+"pos": 6
+}
+},
+"Unit": {
+"kind": "enum",
+"members": [
+"CM",
+"FT",
+"G",
+"IN",
+"KG",
+"LB",
+"M",
+"MC",
+"MM"
+]
+},
+"Until": {
+"kind": "enum",
+"members": [
+"FIRST",
+"LAST",
+"NEXT",
+"PREVIOUS"
+]
+},
+"Vec2": {
+"kind": "class"
+},
+"Vector": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"VectorLike": {
+"kind": "value"
+},
+"Vertex": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"Voronoi": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"points",
+"furthest_site",
+"incremental",
+"qhull_options"
+],
+"pos": 4
+}
+},
+"Wedge": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"xsize",
+"ysize",
+"zsize",
+"xmin",
+"zmin",
+"xmax",
+"zmax",
+"rotation",
+"align",
+"mode"
+],
+"pos": 10
+}
+},
+"Wire": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"XCAFApp_Application": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"XCAFDoc_ColorCurv": {
+"kind": "value"
+},
+"XCAFDoc_ColorGen": {
+"kind": "value"
+},
+"XCAFDoc_ColorSurf": {
+"kind": "value"
+},
+"XCAFDoc_ColorTool": {
+"kind": "class"
+},
+"XCAFDoc_ColorType": {
+"kind": "class"
+},
+"XCAFDoc_DocumentTool": {
+"kind": "class"
+},
+"XCAFDoc_ShapeTool": {
+"kind": "class"
+},
+"XSControl_WorkSession": {
+"kind": "class"
+},
+"abstractmethod": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"funcobj"
+],
+"pos": 1
+}
+},
+"aci2rgb": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"index"
+],
+"pos": 1
+}
+},
+"add": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"objects",
+"rotation",
+"clean",
+"mode"
+],
+"pos": 4
+}
+},
+"all_location_like": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"items"
+],
+"pos": 1
+}
+},
+"annotations": {
+"kind": "value"
+},
+"ansi_pattern": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": null
+}
+},
+"apply_location_like": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"other"
+],
+"pos": 2
+}
+},
+"atan2": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 2
+}
+},
+"auto": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"value"
+],
+"pos": 1
+}
+},
+"available_fonts": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 0
+}
+},
+"bounding_box": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"objects",
+"mode"
+],
+"pos": 2
+}
+},
+"brep_from_stl": {
+"kind": "module"
+},
+"build_common": {
+"kind": "module"
+},
+"build_constants": {
+"kind": "module"
+},
+"build_enums": {
+"kind": "module"
+},
+"build_line": {
+"kind": "module"
+},
+"build_part": {
+"kind": "module"
+},
+"build_sketch": {
+"kind": "module"
+},
+"cast": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"typ",
+"val"
+],
+"pos": 2
+}
+},
+"chamfer": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"objects",
+"length",
+"length2",
+"angle",
+"reference"
+],
+"pos": 5
+}
+},
+"colorsys": {
+"kind": "module"
+},
+"contextmanager": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"func"
+],
+"pos": 1
+}
+},
+"contextvars": {
+"kind": "module"
+},
+"copy": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"x"
+],
+"pos": 1
+}
+},
+"copy_module": {
+"kind": "module"
+},
+"copysign": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 2
+}
+},
+"cos": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 1
+}
+},
+"ctypes": {
+"kind": "module"
+},
+"cycle": {
+"kind": "class"
+},
+"dataclass": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"init",
+"repr",
+"eq",
+"order",
+"unsafe_hash",
+"frozen",
+"match_args",
+"kw_only",
+"slots",
+"weakref_slot"
+],
+"pos": 1
+}
+},
+"dataclass_field": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"default",
+"default_factory",
+"init",
+"repr",
+"hash",
+"compare",
+"metadata",
+"kw_only"
+],
+"pos": 0
+}
+},
+"date": {
+"kind": "class"
+},
+"datetime": {
+"kind": "class"
+},
+"degrees": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 1
+}
+},
+"delta": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"shapes_one",
+"shapes_two"
+],
+"pos": 2
+}
+},
+"deprecated": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"category",
+"stacklevel"
+],
+"pos": 1
+}
+},
+"detect_primitives": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"mesh"
+],
+"pos": 1
+}
+},
+"downcast": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"obj"
+],
+"pos": 1
+}
+},
+"draft": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"faces",
+"neutral_plane",
+"angle"
+],
+"pos": 3
+}
+},
+"drafting": {
+"kind": "module"
+},
+"edge": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"self",
+"select"
+],
+"pos": 2
+}
+},
+"edges": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"self",
+"select"
+],
+"pos": 2
+}
+},
+"edges_to_wires": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"edges",
+"tol"
+],
+"pos": 2
+}
+},
+"export_brep": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"to_export",
+"file_path"
+],
+"pos": 2
+}
+},
+"export_gltf": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"to_export",
+"file_path",
+"unit",
+"binary",
+"linear_deflection",
+"angular_deflection"
+],
+"pos": 6
+}
+},
+"export_obj": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"to_export",
+"file_path",
+"linear_deflection",
+"angular_deflection",
+"include_uvs",
+"atlas_packing",
+"atlas_gutter"
+],
+"pos": 7
+}
+},
+"export_step": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"to_export",
+"file_path",
+"unit",
+"write_pcurves",
+"precision_mode",
+"timestamp"
+],
+"pos": 5
+}
+},
+"export_stl": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"to_export",
+"file_path",
+"tolerance",
+"angular_tolerance",
+"ascii_format"
+],
+"pos": 5
+}
+},
+"export_to_pcbway": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"to_export",
+"unit",
+"write_pcurves",
+"precision_mode"
+],
+"pos": 4
+}
+},
+"exporters": {
+"kind": "module"
+},
+"exporters3d": {
+"kind": "module"
+},
+"extrude": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"to_extrude",
+"amount",
+"dir",
+"until",
+"target",
+"both",
+"taper",
+"clean",
+"mode"
+],
+"pos": 9
+}
+},
+"ezdxf": {
+"kind": "module"
+},
+"face": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"self",
+"select"
+],
+"pos": 2
+}
+},
+"faces": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"self",
+"select"
+],
+"pos": 2
+}
+},
+"fillet": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"objects",
+"radius"
+],
+"pos": 2
+}
+},
+"find_max_dimension": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"shapes"
+],
+"pos": 1
+}
+},
+"fix": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"obj"
+],
+"pos": 1
+}
+},
+"flatten_sequence": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": null
+}
+},
+"floor": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 1
+}
+},
+"fsdecode": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"filename"
+],
+"pos": 1
+}
+},
+"full_round": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"edge",
+"invert",
+"voronoi_point_count",
+"mode"
+],
+"pos": 4
+}
+},
+"functools": {
+"kind": "module"
+},
+"gcd": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": null
+}
+},
+"geometry": {
+"kind": "module"
+},
+"gp_Ax1": {
+"kind": "class"
+},
+"gp_Ax2": {
+"kind": "class"
+},
+"gp_Ax3": {
+"kind": "class"
+},
+"gp_Dir": {
+"kind": "class"
+},
+"gp_EulerSequence": {
+"kind": "class"
+},
+"gp_GTrsf": {
+"kind": "class"
+},
+"gp_Lin": {
+"kind": "class"
+},
+"gp_Pln": {
+"kind": "class"
+},
+"gp_Pnt": {
+"kind": "class"
+},
+"gp_Quaternion": {
+"kind": "class"
+},
+"gp_Trsf": {
+"kind": "class"
+},
+"gp_Vec": {
+"kind": "class"
+},
+"gp_XYZ": {
+"kind": "class"
+},
+"import_brep": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"file_name"
+],
+"pos": 1
+}
+},
+"import_dxf": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"dxf_file"
+],
+"pos": 1
+}
+},
+"import_step": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"filename"
+],
+"pos": 1
+}
+},
+"import_stl": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"file_name",
+"model_unit"
+],
+"pos": 2
+}
+},
+"import_svg": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"svg_file",
+"flip_y",
+"align",
+"ignore_visibility",
+"label_by"
+],
+"pos": 1
+}
+},
+"import_svg_as_buildline_code": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"file_name",
+"precision"
+],
+"pos": 2
+}
+},
+"import_svg_document": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"svg_file",
+"flip_y",
+"ignore_visibility",
+"metadata"
+],
+"pos": 1
+}
+},
+"importers": {
+"kind": "module"
+},
+"inf": {
+"kind": "value"
+},
+"inject_materials": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"target_path",
+"node_materials"
+],
+"pos": 2
+}
+},
+"insert": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"objects",
+"rotation",
+"clean",
+"mode"
+],
+"pos": 4
+}
+},
+"inspect": {
+"kind": "module"
+},
+"io": {
+"kind": "module"
+},
+"isclose_b": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"x",
+"y",
+"rel_tol",
+"abs_tol"
+],
+"pos": 4
+}
+},
+"iso_pattern": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": null
+}
+},
+"itertools": {
+"kind": "module"
+},
+"joints": {
+"kind": "module"
+},
+"json": {
+"kind": "module"
+},
+"loft": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"ruled",
+"clean",
+"mode"
+],
+"pos": 4
+}
+},
+"log10": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 1
+}
+},
+"log2": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 1
+}
+},
+"logger": {
+"kind": "value"
+},
+"logging": {
+"kind": "module"
+},
+"make_brake_formed": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"thickness",
+"station_widths",
+"line",
+"side",
+"kind",
+"clean",
+"mode"
+],
+"pos": 7
+}
+},
+"make_face": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"edges",
+"mode"
+],
+"pos": 2
+}
+},
+"make_hull": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"edges",
+"mode"
+],
+"pos": 2
+}
+},
+"math": {
+"kind": "module"
+},
+"mesher": {
+"kind": "module"
+},
+"minimize": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"fun",
+"x0",
+"args",
+"method",
+"jac",
+"hess",
+"hessp",
+"bounds",
+"constraints",
+"tol",
+"callback",
+"options"
+],
+"pos": 12
+}
+},
+"mirror": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"objects",
+"about",
+"mode"
+],
+"pos": 3
+}
+},
+"modify_copyreg": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 0
+}
+},
+"new_edges": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"combined"
+],
+"pos": null
+}
+},
+"np": {
+"kind": "module"
+},
+"objects_curve": {
+"kind": "module"
+},
+"objects_part": {
+"kind": "module"
+},
+"objects_sketch": {
+"kind": "module"
+},
+"offset": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"objects",
+"amount",
+"openings",
+"kind",
+"side",
+"closed",
+"min_edge_length",
+"mode"
+],
+"pos": 8
+}
+},
+"offset_topods_face": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"face",
+"amount"
+],
+"pos": 2
+}
+},
+"operations_apply_to": {
+"kind": "value"
+},
+"operations_generic": {
+"kind": "module"
+},
+"operations_part": {
+"kind": "module"
+},
+"operations_sketch": {
+"kind": "module"
+},
+"os": {
+"kind": "module"
+},
+"overload": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"func"
+],
+"pos": 1
+}
+},
+"pack": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"objects",
+"padding",
+"align_z"
+],
+"pos": 3
+}
+},
+"pack_utils": {
+"kind": "module"
+},
+"permutations": {
+"kind": "class"
+},
+"persistence": {
+"kind": "module"
+},
+"pi": {
+"kind": "value"
+},
+"polar": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"angle"
+],
+"pos": 2
+}
+},
+"prod": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"start"
+],
+"pos": 1
+}
+},
+"product": {
+"kind": "class"
+},
+"project": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"objects",
+"workplane",
+"target",
+"mode"
+],
+"pos": 4
+}
+},
+"project_workplane": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"origin",
+"x_dir",
+"projection_dir",
+"distance"
+],
+"pos": 4
+}
+},
+"radians": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 1
+}
+},
+"re": {
+"kind": "module"
+},
+"requests": {
+"kind": "module"
+},
+"revolve": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"profiles",
+"axis",
+"revolution_arc",
+"clean",
+"mode"
+],
+"pos": 5
+}
+},
+"scale": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"objects",
+"by",
+"about",
+"mode"
+],
+"pos": 4
+}
+},
+"section": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"section_by",
+"height",
+"clean",
+"mode"
+],
+"pos": 5
+}
+},
+"sentinel": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"repr",
+"name"
+],
+"pos": 2
+}
+},
+"sin": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 1
+}
+},
+"solid": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"self",
+"select"
+],
+"pos": 2
+}
+},
+"solids": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"self",
+"select"
+],
+"pos": 2
+}
+},
+"sort_wires_by_build_order": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"wire_list"
+],
+"pos": 1
+}
+},
+"split": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"objects",
+"bisect_by",
+"keep",
+"mode"
+],
+"pos": 4
+}
+},
+"sqrt": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 1
+}
+},
+"starmap": {
+"kind": "class"
+},
+"svgpathtools": {
+"kind": "module"
+},
+"sweep": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"path",
+"multisection",
+"is_frenet",
+"transition",
+"normal",
+"binormal",
+"clean",
+"mode"
+],
+"pos": 9
+}
+},
+"sys": {
+"kind": "module"
+},
+"ta": {
+"kind": "module"
+},
+"tan": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 1
+}
+},
+"tcast": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"typ",
+"val"
+],
+"pos": 2
+}
+},
+"tempfile": {
+"kind": "module"
+},
+"text": {
+"kind": "module"
+},
+"thicken": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"to_thicken",
+"amount",
+"normal_override",
+"both",
+"clean",
+"mode"
+],
+"pos": 6
+}
+},
+"to_align_offset": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"min_point",
+"max_point",
+"align",
+"center"
+],
+"pos": 4
+}
+},
+"topo_distance_to": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"other"
+],
+"pos": 1
+}
+},
+"topo_explore_common_vertex": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"edge1",
+"edge2"
+],
+"pos": 2
+}
+},
+"topo_explore_connected_edges": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"edge",
+"parent",
+"continuity"
+],
+"pos": 3
+}
+},
+"topo_explore_connected_faces": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"edge",
+"parent"
+],
+"pos": 2
+}
+},
+"topods_lut": {
+"kind": "value"
+},
+"topology": {
+"kind": "module"
+},
+"trace": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"lines",
+"line_width",
+"mode"
+],
+"pos": 3
+}
+},
+"trianglesolver": {
+"kind": "module"
+},
+"tuplify": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"obj",
+"dim"
+],
+"pos": 2
+}
+},
+"unicodedata": {
+"kind": "module"
+},
+"unique": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"enumeration"
+],
+"pos": 1
+}
+},
+"unit_conversion_scale": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"from_unit",
+"to_unit"
+],
+"pos": 2
+}
+},
+"unwrap_topods_compound": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"compound",
+"fully"
+],
+"pos": 2
+}
+},
+"validate_inputs": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"context",
+"validating_class",
+"objects"
+],
+"pos": 3
+}
+},
+"version": {
+"kind": "module"
+},
+"vertex": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"self",
+"select"
+],
+"pos": 2
+}
+},
+"vertices": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"self",
+"select"
+],
+"pos": 2
+}
+},
+"warn": {
+"kind": "function"
+},
+"warnings": {
+"kind": "module"
+},
+"webbrowser": {
+"kind": "module"
+},
+"webcolors": {
+"kind": "module"
+},
+"wire": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"self",
+"select"
+],
+"pos": 2
+}
+},
+"wires": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"self",
+"select"
+],
+"pos": 2
+}
+},
+"zoom": {
+"kind": "module"
+}
+},
+"form.craft": {
+"ANSUR_HAND": {
+"kind": "value"
+},
+"ANSUR_HEAD": {
+"kind": "value"
+},
+"BRIDGE": {
+"kind": "value"
+},
+"Cage": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"V",
+"F",
+"levels",
+"creases",
+"regions"
+],
+"pos": 5
+}
+},
+"HEADFORMS": {
+"kind": "value"
+},
+"HELMET_LAYERS": {
+"kind": "value"
+},
+"MAGNETS": {
+"kind": "value"
+},
+"MAGNET_FITS": {
+"kind": "value"
+},
+"MAGNET_FLOOR": {
+"kind": "value"
+},
+"MAX_INSTANCES": {
+"kind": "value"
+},
+"MESH_TEXTURE_LABEL": {
+"kind": "value"
+},
+"MagnetPair": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"at",
+"axis",
+"spec",
+"gap"
+],
+"pos": 4
+}
+},
+"Mech": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"name",
+"shapes",
+"dims",
+"checks",
+"axis",
+"origin",
+"info"
+],
+"pos": 7
+}
+},
+"MeshTexture": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"kind",
+"amplitude",
+"scale",
+"features",
+"seed",
+"octaves",
+"projection",
+"axis",
+"center",
+"direction",
+"image",
+"max_edge",
+"edge_falloff",
+"crease_deg",
+"groove",
+"facing",
+"extra",
+"region",
+"exclude"
+],
+"pos": 19
+}
+},
+"PCO1881": {
+"kind": "value"
+},
+"RecipeError": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"message",
+"feature",
+"hint",
+"params"
+],
+"pos": 4
+}
+},
+"Skin": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"C",
+"radius",
+"deviation",
+"label"
+],
+"pos": 4
+}
+},
+"Split": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"body",
+"insert",
+"ledge",
+"skin",
+"contact",
+"gap",
+"room_body",
+"room_insert",
+"pairs"
+],
+"pos": 9
+}
+},
+"_LAZY": {
+"kind": "value"
+},
+"_WHERE": {
+"kind": "value"
+},
+"__builtins__": {
+"kind": "value"
+},
+"__cached__": {
+"kind": "value"
+},
+"__dir__": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 0
+}
+},
+"__doc__": {
+"kind": "value"
+},
+"__file__": {
+"kind": "value"
+},
+"__getattr__": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"name"
+],
+"pos": 1
+}
+},
+"__loader__": {
+"kind": "value"
+},
+"__name__": {
+"kind": "value"
+},
+"__package__": {
+"kind": "value"
+},
+"__path__": {
+"kind": "value"
+},
+"__spec__": {
+"kind": "value"
+},
+"_common": {
+"kind": "module"
+},
+"annotations": {
+"kind": "value"
+},
+"annular_snap": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"d",
+"undercut",
+"height",
+"wall",
+"lead_angle",
+"clearance",
+"allow_strain"
+],
+"pos": 7
+}
+},
+"assemble": {
+"kind": "module"
+},
+"attempt": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"what",
+"tries",
+"hint",
+"params",
+"check"
+],
+"pos": 5
+}
+},
+"bayonet": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"d",
+"height",
+"lugs",
+"lug_w",
+"lug_h",
+"lug_depth",
+"twist",
+"clearance",
+"wall"
+],
+"pos": 9
+}
+},
+"bearing_fit": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"designation",
+"where",
+"rotating"
+],
+"pos": 3
+}
+},
+"boolean": {
+"kind": "module"
+},
+"boss_array": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"body",
+"points",
+"outer_d",
+"height",
+"hole_d",
+"top_z",
+"hole_depth",
+"base_fillet"
+],
+"pos": 8
+}
+},
+"bottle_profile": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"volume_ml",
+"diameter",
+"shoulder",
+"neck_d",
+"waist",
+"base_r"
+],
+"pos": 6
+}
+},
+"cam": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"base_r",
+"lift",
+"rise",
+"dwell_top",
+"fall",
+"kind",
+"thickness",
+"bore",
+"follower_r",
+"samples"
+],
+"pos": 10
+}
+},
+"cantilever_snap": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"thickness",
+"width",
+"undercut",
+"lead_angle",
+"return_angle",
+"allow_strain"
+],
+"pos": 7
+}
+},
+"check_sections": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"max_slope"
+],
+"pos": 2
+}
+},
+"checked_body": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"tip",
+"count",
+"label"
+],
+"pos": 4
+}
+},
+"coaxial_error": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"pair",
+"part_a",
+"part_b"
+],
+"pos": 3
+}
+},
+"curve": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"knots",
+"name",
+"end_slope"
+],
+"pos": 3
+}
+},
+"cut": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"body",
+"tool",
+"min_solids"
+],
+"pos": 3
+}
+},
+"detent": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"ball_d",
+"depth",
+"clearance"
+],
+"pos": 3
+}
+},
+"dome_sections": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"width",
+"height",
+"levels",
+"crown_back",
+"squash_front",
+"n_base",
+"n_top",
+"z0",
+"power",
+"seam"
+],
+"pos": 11
+}
+},
+"dovetail": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"width",
+"height",
+"angle",
+"clearance"
+],
+"pos": 5
+}
+},
+"emboss_cells": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"w",
+"d",
+"cell",
+"height",
+"kind",
+"gap",
+"margin",
+"plane",
+"base"
+],
+"pos": 9
+}
+},
+"faces_at": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"shape",
+"where",
+"tol"
+],
+"pos": 3
+}
+},
+"features": {
+"kind": "module"
+},
+"fit_cage": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"cage",
+"targets_fn",
+"rounds",
+"smooth",
+"k"
+],
+"pos": 5
+}
+},
+"fits": {
+"kind": "module"
+},
+"four_bar": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"ground",
+"crank",
+"coupler",
+"rocker",
+"samples",
+"width",
+"thickness",
+"hole_d"
+],
+"pos": 8
+}
+},
+"four_bar_pose": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"ground",
+"crank",
+"coupler",
+"rocker",
+"crank_deg",
+"branch"
+],
+"pos": 6
+}
+},
+"fuse": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"body",
+"other",
+"max_solids",
+"min_solids"
+],
+"pos": 4
+}
+},
+"gear_train": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"module",
+"teeth",
+"thickness",
+"bores",
+"backlash",
+"pressure_angle"
+],
+"pos": 6
+}
+},
+"grip": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"d_max",
+"d_min",
+"flat",
+"finger_grooves",
+"groove_depth",
+"end_r"
+],
+"pos": 7
+}
+},
+"grip_sections": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"hand_breadth",
+"flat",
+"swell_at",
+"taper"
+],
+"pos": 5
+}
+},
+"grow_outline": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"points",
+"amount"
+],
+"pos": 2
+}
+},
+"gusset": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"leg_x",
+"leg_z",
+"t",
+"at",
+"toward",
+"y"
+],
+"pos": 6
+}
+},
+"handle": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"span",
+"rise",
+"section_w",
+"section_h",
+"n",
+"foot"
+],
+"pos": 6
+}
+},
+"head_form": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"cephalic"
+],
+"pos": 2
+}
+},
+"helmet_fullface": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"layers",
+"cephalic",
+"crown_back",
+"chin",
+"tail"
+],
+"pos": 6
+}
+},
+"helmet_open": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"kind",
+"layers",
+"cephalic"
+],
+"pos": 4
+}
+},
+"helmet_sections": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"width",
+"height",
+"skirt",
+"crown_back",
+"squash_front"
+],
+"pos": 6
+}
+},
+"helmet_shell": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"width",
+"height",
+"wall",
+"skirt",
+"crown_back",
+"squash_front"
+],
+"pos": 7
+}
+},
+"hole_limits": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"letter",
+"grade",
+"d"
+],
+"pos": 3
+}
+},
+"inflate": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"amount",
+"tip",
+"normal"
+],
+"pos": 4
+}
+},
+"inset_body": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"wall",
+"tip",
+"open_bottom",
+"count",
+"open_top"
+],
+"pos": 6
+}
+},
+"inside_point": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"solid"
+],
+"pos": 1
+}
+},
+"inspect": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"shape"
+],
+"pos": 1
+}
+},
+"iso_fit": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"code",
+"d"
+],
+"pos": 2
+}
+},
+"knurl": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"diameter",
+"height",
+"pitch",
+"depth",
+"kind",
+"helix_angle",
+"chamfer"
+],
+"pos": 7
+}
+},
+"lattice": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"w",
+"d",
+"h",
+"cell",
+"strut",
+"kind"
+],
+"pos": 6
+}
+},
+"lens": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"skin",
+"region",
+"depth",
+"thickness"
+],
+"pos": 4
+}
+},
+"limit_points": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"V",
+"Q",
+"creases"
+],
+"pos": 3
+}
+},
+"link": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"width",
+"thickness",
+"hole_d"
+],
+"pos": 4
+}
+},
+"link_between": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"p",
+"q",
+"width",
+"thickness",
+"hole_d",
+"z"
+],
+"pos": 6
+}
+},
+"living_hinge": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"width",
+"gap",
+"web_t",
+"panel_t",
+"panel_len",
+"material"
+],
+"pos": 6
+}
+},
+"loft_report": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"shape",
+"grid",
+"fold_deg"
+],
+"pos": 3
+}
+},
+"loft_sections": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"ruled"
+],
+"pos": 2
+}
+},
+"made_by": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"after",
+"before",
+"what",
+"tol"
+],
+"pos": 4
+}
+},
+"magnet": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"stock",
+"fit",
+"pull_n",
+"source"
+],
+"pos": 4
+}
+},
+"magnet_boss": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"body",
+"at",
+"axis",
+"magnet_d",
+"magnet_t",
+"wall",
+"clearance",
+"floor"
+],
+"pos": 8
+}
+},
+"magnet_pair": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"at",
+"axis",
+"stock",
+"fit",
+"gap",
+"room_a",
+"room_b",
+"pull_n",
+"source"
+],
+"pos": 9
+}
+},
+"magnet_pocket": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"at",
+"axis",
+"magnet_d",
+"magnet_t",
+"clearance"
+],
+"pos": 5
+}
+},
+"mechanisms": {
+"kind": "module"
+},
+"meshtex": {
+"kind": "module"
+},
+"mouse_form": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"width",
+"height",
+"hand",
+"hump",
+"tilt",
+"flare",
+"nose",
+"hand_length"
+],
+"pos": 9
+}
+},
+"named_parts": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"result"
+],
+"pos": 1
+}
+},
+"need": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"cond",
+"message",
+"hint",
+"params",
+"feature"
+],
+"pos": 5
+}
+},
+"notes": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"clear"
+],
+"pos": 1
+}
+},
+"num": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"x",
+"name",
+"lo",
+"hi",
+"positive",
+"integer"
+],
+"pos": 6
+}
+},
+"offset_body": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"tip",
+"amount",
+"count"
+],
+"pos": 4
+}
+},
+"offset_grid": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"C",
+"d",
+"su",
+"sv",
+"outward"
+],
+"pos": 5
+}
+},
+"organic": {
+"kind": "module"
+},
+"overlap": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"a",
+"b"
+],
+"pos": 2
+}
+},
+"part_list": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"result",
+"labels",
+"notes",
+"explode"
+],
+"pos": 4
+}
+},
+"parts": {
+"kind": "function",
+"sig": {
+"kw": true,
+"params": [
+"clearance",
+"touching"
+],
+"pos": 2
+}
+},
+"patterns": {
+"kind": "module"
+},
+"pin_hinge": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"outer_d",
+"pin_d",
+"knuckles",
+"clearance",
+"leaf_w",
+"leaf_t",
+"gap"
+],
+"pos": 8
+}
+},
+"plane_on_path": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"path",
+"t"
+],
+"pos": 2
+}
+},
+"planetary": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"module",
+"sun",
+"planet",
+"planets",
+"thickness",
+"ring_rim",
+"backlash",
+"sun_bore",
+"planet_bore",
+"ring_od",
+"ring_height"
+],
+"pos": 11
+}
+},
+"pocket_axes": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"shape",
+"diameter",
+"tol"
+],
+"pos": 3
+}
+},
+"polygon_profile": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"points",
+"plane",
+"z"
+],
+"pos": 3
+}
+},
+"polyhedron": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"V",
+"F"
+],
+"pos": 2
+}
+},
+"profile_sections": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"front",
+"back",
+"half_width",
+"z_eq",
+"crown",
+"levels",
+"dome_levels",
+"n",
+"squash",
+"cy",
+"power",
+"seam",
+"z0"
+],
+"pos": 13
+}
+},
+"quad_sphere": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"n",
+"radius"
+],
+"pos": 2
+}
+},
+"radial_grid_heightmap": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"path",
+"spokes",
+"rings",
+"line",
+"sag",
+"size"
+],
+"pos": 6
+}
+},
+"ratchet": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"teeth",
+"od",
+"tooth_h",
+"thickness",
+"bore",
+"pawl_len"
+],
+"pos": 6
+}
+},
+"region_frame": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"cage",
+"name"
+],
+"pos": 2
+}
+},
+"region_tool": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"cage",
+"name",
+"out",
+"depth",
+"label"
+],
+"pos": 5
+}
+},
+"repair": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"shape",
+"unify"
+],
+"pos": 2
+}
+},
+"reseam": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"n",
+"spline"
+],
+"pos": 3
+}
+},
+"revolve_profile": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"points",
+"angle",
+"spline",
+"axis"
+],
+"pos": 4
+}
+},
+"rib": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"height",
+"t",
+"angle",
+"at",
+"draft",
+"chamfer_top"
+],
+"pos": 7
+}
+},
+"rib_grid": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"w",
+"d",
+"height",
+"pitch",
+"t",
+"angle",
+"border"
+],
+"pos": 7
+}
+},
+"safe": {
+"kind": "module"
+},
+"safe_chamfer": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"shape",
+"edges",
+"length",
+"min_fraction"
+],
+"pos": 4
+}
+},
+"safe_cut": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"body",
+"min_solids",
+"must_remove"
+],
+"pos": null
+}
+},
+"safe_fillet": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"shape",
+"edges",
+"radius",
+"min_fraction"
+],
+"pos": 4
+}
+},
+"safe_intersect": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"a",
+"b"
+],
+"pos": 2
+}
+},
+"safe_loft": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"ruled",
+"n"
+],
+"pos": 3
+}
+},
+"safe_shell": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"solid",
+"thickness",
+"openings",
+"inward",
+"min_fraction"
+],
+"pos": 5
+}
+},
+"safe_sweep": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"profile",
+"path",
+"frenet"
+],
+"pos": 3
+}
+},
+"safe_union": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"bridge",
+"expect"
+],
+"pos": null
+}
+},
+"section_at": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"face",
+"z"
+],
+"pos": 2
+}
+},
+"section_body": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"tip",
+"count"
+],
+"pos": 3
+}
+},
+"section_shell": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"wall",
+"tip",
+"open_bottom",
+"count",
+"open_top"
+],
+"pos": 6
+}
+},
+"shaft_limits": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"letter",
+"grade",
+"d"
+],
+"pos": 3
+}
+},
+"shell": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"solid",
+"thickness",
+"openings",
+"inward"
+],
+"pos": 4
+}
+},
+"skin_from_sections": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"tip",
+"n",
+"radius",
+"around",
+"along",
+"smooth",
+"label"
+],
+"pos": 8
+}
+},
+"slot_grille": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"center",
+"normal",
+"count",
+"length",
+"width",
+"pitch",
+"depth",
+"angle",
+"taper"
+],
+"pos": 9
+}
+},
+"spiral_ribbed_body": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"profile",
+"ribs",
+"rib_depth",
+"twist",
+"levels",
+"sharpness",
+"points",
+"fade"
+],
+"pos": 8
+}
+},
+"spline_profile": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"points",
+"plane",
+"closed",
+"z"
+],
+"pos": 4
+}
+},
+"split": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"body",
+"skin",
+"wall",
+"region",
+"gap",
+"lip",
+"ledge",
+"overlap"
+],
+"pos": 8
+}
+},
+"split_spots": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"body",
+"x",
+"heights",
+"magnet_d",
+"boss_wall",
+"sink"
+],
+"pos": 6
+}
+},
+"split_with_magnets": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"body",
+"x",
+"spots",
+"magnet_d",
+"magnet_t",
+"clearance",
+"boss_wall"
+],
+"pos": 7
+}
+},
+"structure": {
+"kind": "module"
+},
+"subd": {
+"kind": "module"
+},
+"subdivide": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"V",
+"F",
+"creases",
+"levels"
+],
+"pos": 4
+}
+},
+"superellipse": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"a",
+"b",
+"n",
+"count",
+"rotate",
+"squash_front",
+"seam"
+],
+"pos": 7
+}
+},
+"superellipse_face": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"a",
+"b",
+"n",
+"z",
+"plane",
+"center",
+"count",
+"rotate",
+"squash_front",
+"seam"
+],
+"pos": 10
+}
+},
+"surface_band": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"sections",
+"tip",
+"amount",
+"region",
+"depth",
+"count"
+],
+"pos": 6
+}
+},
+"surface_point": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"shape",
+"origin",
+"direction"
+],
+"pos": 3
+}
+},
+"surfaces": {
+"kind": "module"
+},
+"sweep_spline": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"profile",
+"path_points",
+"is_frenet",
+"through"
+],
+"pos": 4
+}
+},
+"texture": {
+"kind": "module"
+},
+"thicken": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"face",
+"thickness",
+"both"
+],
+"pos": 3
+}
+},
+"two_view_cutter": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"side",
+"front",
+"x_range",
+"y_half",
+"smooth"
+],
+"pos": 5
+}
+},
+"variable_fillet": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"shape",
+"edges",
+"r_start",
+"r_end"
+],
+"pos": 4
+}
+},
+"voxel_cage": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"cells",
+"size"
+],
+"pos": 2
+}
+},
+"wrapped_ribs": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"height",
+"count",
+"rib_w",
+"rib_h",
+"twist",
+"z0",
+"core"
+],
+"pos": 8
+}
+}
+},
+"form.parts": {
+"Align": {
+"kind": "enum",
+"members": [
+"CENTER",
+"MAX",
+"MIN",
+"NONE"
+]
+},
+"Any": {
+"kind": "class"
+},
+"BEARINGS": {
+"kind": "value"
+},
+"BEARING_SOURCE": {
+"kind": "value"
+},
+"BOTTOM": {
+"kind": "value"
+},
+"BoltedJoint": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"top",
+"bottom",
+"screw",
+"parts",
+"length",
+"base_min",
+"dims"
+],
+"pos": 7
+}
+},
+"Box": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"length",
+"width",
+"height",
+"rotation",
+"align",
+"mode"
+],
+"pos": 6
+}
+},
+"CHAINS": {
+"kind": "value"
+},
+"CHAIN_ALIASES": {
+"kind": "value"
+},
+"CHAIN_SOURCE": {
+"kind": "value"
+},
+"CLEARANCE": {
+"kind": "value"
+},
+"Cone": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"bottom_radius",
+"top_radius",
+"height",
+"arc_size",
+"rotation",
+"align",
+"mode"
+],
+"pos": 7
+}
+},
+"Cylinder": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"height",
+"arc_size",
+"rotation",
+"align",
+"mode"
+],
+"pos": 6
+}
+},
+"GearPair": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"a",
+"b",
+"centre_distance",
+"backlash",
+"contact_ratio",
+"dims"
+],
+"pos": 6
+}
+},
+"HEADS": {
+"kind": "value"
+},
+"HardwarePart": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"name",
+"shape",
+"kind",
+"dims",
+"grams",
+"material",
+"standard",
+"size"
+],
+"pos": 8
+}
+},
+"INSERTS": {
+"kind": "value"
+},
+"INSERT_SOURCE": {
+"kind": "value"
+},
+"INSTALL_HINT": {
+"kind": "value"
+},
+"ISO_273": {
+"kind": "value"
+},
+"ISO_LENGTHS": {
+"kind": "value"
+},
+"MASS_SOURCE": {
+"kind": "value"
+},
+"NUTS": {
+"kind": "value"
+},
+"OVERSHOOT": {
+"kind": "value"
+},
+"PIPE_SOURCE": {
+"kind": "value"
+},
+"PITCH": {
+"kind": "value"
+},
+"Plane": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"Pos": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"RecipeError": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"message",
+"feature",
+"hint",
+"params"
+],
+"pos": 4
+}
+},
+"RegularPolygon": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"radius",
+"side_count",
+"major_radius",
+"rotation",
+"align",
+"mode"
+],
+"pos": 6
+}
+},
+"Rot": {
+"kind": "class",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"SCREW_TYPES": {
+"kind": "value"
+},
+"TAP_DRILL": {
+"kind": "value"
+},
+"TAP_SOURCE": {
+"kind": "value"
+},
+"THREAD_BORE_OVERLAP": {
+"kind": "value"
+},
+"TOP": {
+"kind": "value"
+},
+"WASHERS": {
+"kind": "value"
+},
+"WASHER_SOURCE": {
+"kind": "value"
+},
+"annotations": {
+"kind": "value"
+},
+"available": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [],
+"pos": 0
+}
+},
+"bearing": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"designation"
+],
+"pos": 1
+}
+},
+"bearing_seat": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"designation",
+"fit",
+"through",
+"lip"
+],
+"pos": 4
+}
+},
+"bolted_joint": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"clamp",
+"into",
+"head",
+"base",
+"fit",
+"material"
+],
+"pos": 7
+}
+},
+"bottle_thread": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"finish",
+"external",
+"clearance"
+],
+"pos": 3
+}
+},
+"centre_distance": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"module",
+"teeth_a",
+"teeth_b"
+],
+"pos": 3
+}
+},
+"chain_centre": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"pitch",
+"teeth_a",
+"teeth_b",
+"links"
+],
+"pos": 4
+}
+},
+"chain_drive": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"chain",
+"teeth_a",
+"teeth_b",
+"centre"
+],
+"pos": 4
+}
+},
+"chain_links": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"pitch",
+"teeth_a",
+"teeth_b",
+"centre"
+],
+"pos": 4
+}
+},
+"chain_spec": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"chain"
+],
+"pos": 1
+}
+},
+"checked": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"stages"
+],
+"pos": 1
+}
+},
+"clearance_d": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"fit"
+],
+"pos": 2
+}
+},
+"contact_ratio": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"module",
+"teeth_a",
+"teeth_b",
+"pressure_angle"
+],
+"pos": 4
+}
+},
+"contact_ratio_modelled": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"module",
+"teeth_a",
+"teeth_b",
+"backlash",
+"pressure_angle"
+],
+"pos": 5
+}
+},
+"dataclass": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"init",
+"repr",
+"eq",
+"order",
+"unsafe_hash",
+"frozen",
+"match_args",
+"kw_only",
+"slots",
+"weakref_slot"
+],
+"pos": 1
+}
+},
+"extrude": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"to_extrude",
+"amount",
+"dir",
+"until",
+"target",
+"both",
+"taper",
+"clean",
+"mode"
+],
+"pos": 9
+}
+},
+"field": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"default",
+"default_factory",
+"init",
+"repr",
+"hash",
+"compare",
+"metadata",
+"kw_only"
+],
+"pos": 0
+}
+},
+"functools": {
+"kind": "module"
+},
+"gear_pair": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"module",
+"teeth_a",
+"teeth_b",
+"thickness",
+"bore_a",
+"bore_b",
+"backlash",
+"pressure_angle"
+],
+"pos": 8
+}
+},
+"head_dims": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"head"
+],
+"pos": 2
+}
+},
+"heat_insert": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size"
+],
+"pos": 1
+}
+},
+"heat_insert_pocket": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"extra_depth",
+"lead_in"
+],
+"pos": 3
+}
+},
+"magnet_pocket": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"d",
+"h",
+"clearance",
+"extra_depth"
+],
+"pos": 4
+}
+},
+"math": {
+"kind": "module"
+},
+"nominal_lengths": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"head"
+],
+"pos": 2
+}
+},
+"nut": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"style"
+],
+"pos": 2
+}
+},
+"nut_trap": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"style",
+"clearance",
+"depth",
+"slot"
+],
+"pos": 5
+}
+},
+"pipe": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"nps",
+"length",
+"identifier",
+"material"
+],
+"pos": 4
+}
+},
+"pipe_flange": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"nps",
+"flange_class",
+"kind",
+"face"
+],
+"pos": 4
+}
+},
+"pipe_size": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"nps",
+"identifier",
+"material"
+],
+"pos": 3
+}
+},
+"pipe_socket": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"nps",
+"depth",
+"identifier",
+"material",
+"clearance",
+"stop"
+],
+"pos": 6
+}
+},
+"screw": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"length",
+"head",
+"threaded"
+],
+"pos": 4
+}
+},
+"screw_clearance": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"length",
+"head",
+"fit",
+"head_clearance",
+"recess"
+],
+"pos": 6
+}
+},
+"screw_length": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"shortest",
+"longest",
+"head"
+],
+"pos": 4
+}
+},
+"self_tap_pilot": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"depth"
+],
+"pos": 2
+}
+},
+"size_name": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"d"
+],
+"pos": 1
+}
+},
+"sprocket": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"teeth",
+"chain",
+"bore",
+"thickness",
+"clearance"
+],
+"pos": 5
+}
+},
+"sprocket_pitch_d": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"teeth",
+"pitch"
+],
+"pos": 2
+}
+},
+"spur_gear": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"module",
+"teeth",
+"thickness",
+"bore",
+"backlash",
+"pressure_angle"
+],
+"pos": 6
+}
+},
+"tap_hole": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size",
+"depth",
+"material"
+],
+"pos": 3
+}
+},
+"thread": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"major_d",
+"pitch",
+"length",
+"external",
+"clearance",
+"chamfer"
+],
+"pos": 6
+}
+},
+"trapezoidal_thread": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"diameter",
+"pitch",
+"length",
+"starts",
+"external",
+"clearance",
+"acme"
+],
+"pos": 7
+}
+},
+"washer": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"size"
+],
+"pos": 1
+}
+}
+},
+"form.patterns": {
+"Any": {
+"kind": "class"
+},
+"Callable": {
+"kind": "function",
+"sig": {
+"kw": true,
+"params": [],
+"pos": null
+}
+},
+"OVERSHOOT": {
+"kind": "value"
+},
+"Pattern": {
+"kind": "class",
+"sig": {
+"kw": false,
+"params": [
+"name",
+"kind",
+"computed",
+"centres",
+"_make",
+"_shape"
+],
+"pos": 6
+}
+},
+"SQRT3": {
+"kind": "value"
+},
+"VENT_STYLES": {
+"kind": "value"
+},
+"annotations": {
+"kind": "value"
+},
+"dataclass": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"init",
+"repr",
+"eq",
+"order",
+"unsafe_hash",
+"frozen",
+"match_args",
+"kw_only",
+"slots",
+"weakref_slot"
+],
+"pos": 1
+}
+},
+"field": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"default",
+"default_factory",
+"init",
+"repr",
+"hash",
+"compare",
+"metadata",
+"kw_only"
+],
+"pos": 0
+}
+},
+"grip_ribs": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"w",
+"d",
+"rib_w",
+"pitch",
+"height"
+],
+"pos": 5
+}
+},
+"hex_vents": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"w",
+"d",
+"cell",
+"web",
+"depth"
+],
+"pos": 5
+}
+},
+"knurl": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"diameter",
+"height",
+"pitch",
+"depth"
+],
+"pos": 4
+}
+},
+"math": {
+"kind": "module"
+},
+"perforation_grid": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"w",
+"d",
+"hole_d",
+"web",
+"depth",
+"stagger"
+],
+"pos": 6
+}
+},
+"slot_array": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"slot_w",
+"slot_l",
+"count",
+"web",
+"depth",
+"w"
+],
+"pos": 6
+}
+}
+}
+}
+}

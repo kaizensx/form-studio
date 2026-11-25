@@ -82,7 +82,10 @@ def wrap(source: str) -> str | None:
     lines[i] = re.sub(r"\bdef\s+build\s*\(", "def recipe_build(", lines[i], count=1)
     # the stages feature goes right after the class's last line
     last = cls.end_lineno
-    lines[last:last] = STAGES.rstrip("\n").splitlines()
+    first = lines[cls.body[0].lineno - 1] if cls.body else "    "
+    ind = first[:len(first) - len(first.lstrip())] or "    "       # the class's own indent (a 1-space file stays valid)
+    import textwrap
+    lines[last:last] = [""] + textwrap.indent(textwrap.dedent(STAGES).strip("\n"), ind).splitlines()
     # the import goes after the last top-level import (the class may sit below helpers)
     imports = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
     at = imports[-1].end_lineno if imports else 0

@@ -184,6 +184,7 @@ def _build(recipe_id: str, values: dict, tol: float):
         "volume": float(final.volume), "area": float(final.area), "com": (com.X, com.Y, com.Z),
         "t_build": t_build, "t_total": time.perf_counter() - t0, "tol": tol, "craft_notes": craft_notes,
         "unchanged_stages": empty, **featureprog.report(),
+        "stages": [(s.feature, s.shape) for s in stages],      # the solid as each feature left it (form/proving.py)
     }
     return model
 
@@ -1164,6 +1165,15 @@ def op_assembly(key, recipe_id, values, budget_s=45.0):
     t0 = time.perf_counter()
     rows = asm.analyse(model, budget_s=budget_s, progress=PROGRESS)
     return {"checks": rows, "seconds": round(time.perf_counter() - t0, 2)}
+
+
+def op_prove(key, recipe_id, values, assertions=None, tol=0.1):
+    """The proof sheet's rows for a design: every contract assertion and every feature's expects=, measured on the
+    built solid (form/proving.py). The model is the cached one when the design was just built."""
+    from . import proving
+    model = _get_near(key, recipe_id, values, tol)
+    return {"rows": proving.rows(model, list(assertions or [])), "kernel": kernel_id(),
+            "volume_mm3": model["volume"], "faces": len(model["faces"])}
 
 
 def op_ping():
