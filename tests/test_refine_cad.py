@@ -326,6 +326,34 @@ class Design(FeatureDesign):
         self.assertAlmostEqual(b.extra["signature"]["bore"]["area"], n.extra["signature"]["bore"]["area"], places=2)
         self.assertEqual([c["status"] for c in b.checks], [c["status"] for c in n.checks])
 
+    def test_an_edit_during_refine_is_never_overwritten(self):
+        """prepare() reads the source at head N; an edit lands (N+1) before refine commits: the refined revision is
+        refused (409) and the edit stays the head, untouched."""
+        from unittest import mock
+        from form.refine import engine
+        from form.refine.ledger import Ledger
+        p = self.st.create_design("Block edit", self.SRC, brief="a desk block", purpose="model")
+        edited = self.SRC.replace('"A block with a bore."', '"A block with a bore, edited."')
+        real = engine.prepare
+        seen = {}
+
+        def prepare_then_edit(st, pid, *a, **kw):
+            out = real(st, pid, *a, **kw)
+            q = st.update_design(st.load(pid), edited, "a person's edit", None, "user", None, "python")
+            seen["head"] = q["head"]
+            return out
+
+        with mock.patch.object(engine, "prepare", prepare_then_edit):
+            r = engine.refine(self.st, p["id"], ops=list(ops_cad.OPERATORS), ledger=Ledger.memory(), budget_s=60)
+        self.assertEqual(r["from_rev"], 1)
+        self.assertTrue(r["changed"], r.get("rounds"))
+        self.assertEqual((r.get("commit_error") or {}).get("status"), 409, r.get("commit_error"))
+        self.assertNotIn("head", r)
+        q = self.st.load(p["id"])
+        self.assertEqual(q["head"], seen["head"])
+        self.assertEqual(self.st.source_text(q), edited)
+        self.assertNotIn("refine", self.st.rev(q))
+
 
 if __name__ == "__main__":
     unittest.main()

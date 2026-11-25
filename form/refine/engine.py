@@ -896,7 +896,7 @@ def prepare(st, pid: str, refine=None, style: str | None = None,
         ev = StudioEvaluator(st, p, pc, frozen=frozen, texture=texture_features(feats))
     ev.weights = styles_mod.deficit_weights(sty)
     d = Design(source=src, purpose=ev.purpose, values=st.rev(p)["values"], brief=brief, product_class=pc, style=sty,
-               features=feats)
+               features=feats, head=p["head"])
     return d, ev, ""
 
 
@@ -921,13 +921,15 @@ def refine(st, pid: str, refine=None, style: str | None = None, budget_s: float 
     d, ev, why = prepare(st, pid, refine, style, game)
     if d is None:
         return {"project": pid, "skipped": why}
+    # the head the source was read from: an edit that lands while refine runs makes the commit below refuse (409)
+    # rather than put a refinement of the old source on top of it
+    head = d.head
     p = st.load(pid)
-    head = p["head"]
     t0 = time.monotonic()
     emit = progress or (lambda e: None)
     emit({"kind": "refine_base", "text": "Measuring the design"})
     from . import adapter
-    head_src = st.source_text(p) or ""
+    head_src = st.source_text(p, head) or ""
     wrapped = adapter.is_wrapped(d.source) and d.source != head_src
     # a wrapped Recipe has the head's geometry: measure the head's own build (in the kernel's cache), not a new one
     measured = head_src if wrapped else d.source
@@ -965,7 +967,8 @@ def refine(st, pid: str, refine=None, style: str | None = None, budget_s: float 
             record_revision(st, pid, q["head"], {"from_rev": head, "style": r.get("style"),
                                                  "steps": r["applied"], "base": r.get("base"), "final": r.get("final")})
         except Exception as e:                                   # noqa: BLE001 - the head moved, or it did not build
-            r["commit_error"] = getattr(e, "public", lambda: {"message": str(e)})()
+            r["commit_error"] = {**getattr(e, "public", lambda: {"message": str(e)})(),
+                                 "status": getattr(e, "status", None)}
     return r
 
 

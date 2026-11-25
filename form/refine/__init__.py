@@ -108,6 +108,7 @@ class Design:
     frozen_boxes: dict = field(default_factory=dict)     # {frozen feature id: ((x0, y0, z0), (x1, y1, z1))}
     bbox: tuple | None = None                            # ((x0, y0, z0), (x1, y1, z1)) of the whole design
     checks: dict = field(default_factory=dict)           # {check id: status} of the base build (form/checks.py)
+    head: int | None = None                              # the revision the source was read from (refine's expect_head)
 
     @property
     def feature_ids(self) -> list[str]:
