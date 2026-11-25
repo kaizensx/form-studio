@@ -72,7 +72,7 @@ def journey_one_change_is_undone(ui):
 def journey_settings_turn_it_off_and_reset_what_it_learned(ui):
     ui.run_js("Store.openSettings('general')")
     ui.wait_until(lambda: ui.exists("settingsRefineLedger"), 10, "the reset row in Settings › General")
-    ui.check(ui.sees("Refine every design after it builds"), "the on/off row")
+    ui.wait_until(lambda: ui.exists(text="Refine every design after it builds", exact=False), 10, "the on/off row")
     ui.scroll_to(ui.item("settingsRefineLedger"), 0.5)
     ui.settle(300)
     ui.shot(f"refine-{_tag(ui)}-4-settings")

@@ -403,15 +403,26 @@ def search(design: Design, evaluator: Evaluator, ops: list[Operator] | None = No
         if getattr(evaluator, "final_base", False):
             emit({"kind": "refine_final", "text": "Checking the exported mesh"})
             ref = evaluator.final_check(root.source) or base
-        cand = best
-        while cand.steps:
-            fc = evaluator.final_check(cand.source)
+        steps, src = list(best.steps), best.source
+        dropped = []
+        while steps:
+            fc = evaluator.final_check(src)
             why = [] if fc is None else gate(ref, fc, purpose, evaluator.budgets)
             if not why:
                 break
-            final_note = f"the final check failed with {len(cand.steps)} steps ({why[0]}); shortened"
-            cand = _prefix(root, cand, len(cand.steps) - 1)
-        best = cand
+            # take out the last step that changed the geometry (a material edit cannot fail a mesh or a bake check),
+            # else the last step; the others stay
+            k = max((i for i, st in enumerate(steps) if st.fid or st.domain == "cage"), default=len(steps) - 1)
+            st = steps.pop(k)
+            src = delete_feature_or_edit(src, st)
+            dropped.append(st.op)
+            final_note = f"the final check failed ({why[0]}); took out {', '.join(dropped)}"
+        if dropped:
+            ev2 = evaluator.evaluate([src])[0] if steps else root.eval
+            if steps and (not ev2.ok or ev2.analysis is None):
+                steps, src, ev2 = [], root.source, root.eval
+            nd = Design.from_source(src, purpose=purpose, style=style)
+            best = State(src, nd, ev2, steps, sum(x.cost for x in steps))
     # the ledger: kept steps count as accepts with their gain, every other try as a miss
     kept = {st.op: st.before - st.after for st in best.steps}
     for name, passed, _g in tried:
@@ -458,6 +469,19 @@ def edit_record(old: str, new: str, domain: str) -> dict:
     while j < min(len(x), len(y)) - i and x[-1 - j] == y[-1 - j]:
         j += 1
     return {"before": "\n".join(x[i:len(x) - j]), "after": "\n".join(y[i:len(y) - j]), "line": i + 1}
+
+
+def delete_feature_or_edit(src: str, st: Step) -> str:
+    """The source with one kept step taken out (its refine feature, or its recorded edit)."""
+    from ..featureprog import delete_feature
+    if st.fid:
+        return delete_feature(src, st.fid)
+    if st.edit:
+        try:
+            return undo_edit(src, st.edit)
+        except ValueError:
+            return src
+    return src
 
 
 def _prefix(root: State, s: State, n: int) -> State:
@@ -600,6 +624,8 @@ class StudioEvaluator(Evaluator):
         self.frozen = set(frozen or ())
         self.texture = set(texture or ())
         self.head = st.rev(p)["values"]
+        # features the head already leaves out (a partial revision): a candidate that leaves out the same ones built
+        self.skipped = {x.get("feature") for x in (st.rev(p).get("partial") or {}).get("skipped") or []}
         self.zones_of = zones_of
         self.weights = None
         self.timeout = 180.0
@@ -777,6 +803,11 @@ class StudioEvaluator(Evaluator):
             except StudioError as e:
                 rows = e.extra.get("ranking") or []
             row = next((x for x in rows if x.get("label") == labels[i]), {})
+            notes = row.get("notes") or []
+            gone = {f.strip() for n in notes if str(n).startswith("feature(s) skipped: ")
+                    for f in str(n)[len("feature(s) skipped: "):].split(",")}
+            if not row.get("ok") and gone and gone <= self.skipped and not row.get("error"):
+                row = {**row, "ok": True}            # only what the head leaves out already
             if not row.get("ok"):
                 err = row.get("error") or {}
                 results[i] = Evaluation(ok=False, error=(err.get("message") if isinstance(err, dict) else str(err))

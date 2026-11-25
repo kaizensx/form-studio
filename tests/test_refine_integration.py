@@ -16,6 +16,7 @@ os.environ.setdefault("FORM_DATA", tempfile.mkdtemp(prefix="form-refine-int-")) 
 os.environ["FORM_REFINE_LOCAL"] = "1"          # never hand the job to an app that happens to be running
 
 from form.refine import Patch, adapter, engine, jobs, parse_features  # noqa: E402
+from form.refine.ledger import Ledger  # noqa: E402
 
 RECIPE = '''"""A block with a bore. Plain Recipe."""
 from build123d import Box, Cylinder, Pos
@@ -207,7 +208,7 @@ class StudioRefine(unittest.TestCase):
         st = self.st
         p = st.create_design("Block", FEATURES, brief="a desk block with a bore", purpose="model")
         pid = p["id"]
-        jid = jobs.start(st, pid, ops=list(ops_cad.OPERATORS), budget_s=120)
+        jid = jobs.start(st, pid, ops=list(ops_cad.OPERATORS), budget_s=120, ledger=Ledger.memory())
         self.assertTrue(jid)
         rec = jobs.wait(st, pid, 300)
         self.assertEqual(rec["state"], "done", rec)
@@ -242,7 +243,7 @@ class StudioRefine(unittest.TestCase):
         st = self.st
         p = st.create_design("Bored block", RECIPE, brief="a desk block with a bore", purpose="model")
         base = st.view(p)
-        r = engine.refine(st, p["id"], ops=list(ops_cad.OPERATORS), budget_s=120)
+        r = engine.refine(st, p["id"], ops=list(ops_cad.OPERATORS), budget_s=120, ledger=Ledger.memory())
         self.assertTrue(r.get("wrapped"), r)
         self.assertTrue(r.get("changed"), r.get("rejected"))
         q = st.load(p["id"])
