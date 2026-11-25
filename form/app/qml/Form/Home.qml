@@ -232,27 +232,41 @@ Item {
                         Component.onDestruction: if (Store.screen === "designing" || Store.screen === "work") {
                             var p = composer.mapToItem(null, 0, 0); Store.morphFrom(Qt.rect(p.x, p.y, composer.width, composer.height)) }
                          width: parent.width; dragging: home.dropping; onSketchWanted: Store.openSheet("sketch") }
-                    Item { visible: !home.chatting; width: 1; height: 16 }
-                    // ── under the composer: what it is for, which printer, which agent and model, or a blank canvas ──
-                    Row { id: opts; objectName: "startOptions"; visible: !home.chatting; anchors.horizontalCenter: parent.horizontalCenter; spacing: 6; height: 30
-                        // only for someone who prints: what the next design is made for. Anything is the default; saying
-                        // "for my A1 mini" in the request does the same as picking My printer.
-                        Txt { kind: "fine"; tone: 3; text: "Make it for"; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
-                        Seg { id: purposeSeg; objectName: "startPurpose"; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 30
-                            value: Store.newPurpose === "print" || Store.newPurpose === "game" ? Store.newPurpose : "any"; onPicked: function (v) { Store.setNewPurpose(v) }
-                            model: [{ value: "any", text: "Anything", tip: "A 3D model: STEP, STL, 3MF and more, for any way of making it." + (Store.printOn ? " Say “for my printer” in the request, or pick My printer, to check and slice it." : "") }]
-                                   .concat(Store.printOn ? [{ value: "print", text: "My printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" }] : [])
-                                   .concat([{ value: "game", text: "Game asset", badge: "Beta", tip: "For a game engine: LODs at triangle budgets, UVs, baked textures and collision, for Godot, Unity or Unreal. In Beta: visual quality is still improving." }]) }
-                        Btn { id: printerChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startPrinter"; small: true; kind: "quiet"; icon: "printer"; visible: Store.printOn && Store.newPurposeEffective === "print"
-                            text: Store.printerName ? Store.printerName : "Choose a printer"
-                            tip: "The printer the next design is checked and sliced for. Click to change it."
-                            onClicked: Store.openSheet("printer") }
-                        Btn { id: modelChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startModel"; small: true; kind: "quiet"; icon: "sparkles"; active: homeModelPop.opened
+                    Item { visible: !home.chatting; width: 1; height: Theme.s4 }
+                    // ── under the composer: what it is for and which printer on the left, the agent on the right, both
+                    // lined up with the composer's edges. Every item is one height (Theme.hMd) on one centre line, and the
+                    // left group is measured with the printer chip whenever printing is on, so picking My printer only
+                    // shows the chip in its reserved place: nothing moves, nothing wraps. The row wraps (the agent to a
+                    // second line) only when the composer itself is too narrow for both groups.
+                    Item { id: opts; objectName: "startOptions"; visible: !home.chatting; width: parent.width
+                        readonly property int h: Theme.hMd
+                        readonly property int inset: Theme.s2
+                        readonly property real leftMax: forLbl.implicitWidth + forRow.spacing + purposeSeg.implicitWidth
+                                                        + (Store.printOn ? forRow.spacing + printerChip.implicitWidth : 0)
+                        readonly property bool wrap: leftMax + Theme.s4 + modelChip.implicitWidth > width - 2 * inset
+                        height: wrap ? 2 * h + Theme.s2 : h
+                        Row { id: forRow; x: opts.inset; height: opts.h; spacing: Theme.s2
+                            // what the next design is made for. Anything is the default; saying "for my A1 mini" in the
+                            // request does the same as picking My printer.
+                            Txt { id: forLbl; kind: "fine"; tone: 3; text: "Make it for"; height: opts.h; lineHeight: 1.0; verticalAlignment: Text.AlignVCenter; wrapMode: Text.NoWrap }
+                            Seg { id: purposeSeg; objectName: "startPurpose"; anchors.verticalCenter: parent.verticalCenter; implicitHeight: opts.h
+                                value: Store.newPurpose === "print" || Store.newPurpose === "game" ? Store.newPurpose : "any"; onPicked: function (v) { Store.setNewPurpose(v) }
+                                model: [{ value: "any", text: "Anything", tip: "A 3D model: STEP, STL, 3MF and more, for any way of making it." + (Store.printOn ? " Say “for my printer” in the request, or pick My printer, to check and slice it." : "") }]
+                                       .concat(Store.printOn ? [{ value: "print", text: "My printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" }] : [])
+                                       .concat([{ value: "game", text: "Game asset", badge: "Beta", tip: "For a game engine: LODs at triangle budgets, UVs, baked textures and collision, for Godot, Unity or Unreal. In Beta: visual quality is still improving." }]) }
+                            Btn { id: printerChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startPrinter"; small: true; height: opts.h; kind: "quiet"; icon: "printer"
+                                visible: Store.printOn && Store.newPurposeEffective === "print"
+                                text: Store.printerName ? Store.printerName : "Choose a printer"
+                                tip: "The printer the next design is checked and sliced for. Click to change it."
+                                onClicked: Store.openSheet("printer") } }
+                        Btn { id: modelChip; objectName: "startModel"; small: true; height: opts.h; kind: "quiet"; icon: "sparkles"; active: homeModelPop.opened
+                            x: opts.wrap ? opts.inset : opts.width - opts.inset - width; y: opts.wrap ? opts.h + Theme.s2 : 0
                             text: Store.chatReady ? Store.chatAgentLabel + " · " + Store.modelShort(Store.chatAgent, Store.chatModel) : "Connect an agent"
                             tip: Store.chatReady ? "The agent and model that design it. Click to change them." : "No agent is connected: add one in Settings › Agents"
                             onClicked: Store.chatReady ? (homeModelPop.opened ? homeModelPop.close() : homeModelPop.open()) : Store.openSettings("agents")
                             Pop {
-                                id: homeModelPop; y: parent.height + 6; x: Math.round((parent.width - width) / 2); width: 380; padding: 6; origin: Popup.TopLeft
+                                id: homeModelPop; y: parent.height + 6; x: opts.wrap ? 0 : Math.round(parent.width - width); width: 380; padding: 6
+                                origin: opts.wrap ? Popup.TopLeft : Popup.TopRight
                                 height: Math.min(hmp.implicitHeight + 12, home.height * 0.6)
                                 onAboutToShow: hmp.reset()
                                 onOpened: hmp.opened()
@@ -261,12 +275,15 @@ Item {
                                     if (Store.pendingSend) { Store.chatPrefill(Store.pendingSend); Store.pendingSend = "" } })
                                 Flickable { anchors.fill: parent; clip: true; contentHeight: hmp.implicitHeight; boundsBehavior: Flickable.StopAtBounds
                                     ScrollBar.vertical: ScrollBar { width: 6 }
-                                    TalkModelPicker { id: hmp; width: parent.width; onDone: homeModelPop.close() } } } }
-                        Item { width: 9; height: 30; anchors.verticalCenter: parent.verticalCenter; Rectangle { width: 1; height: 16; color: Theme.rule2; anchors.centerIn: parent } }
-                        Btn { id: blank; anchors.verticalCenter: parent.verticalCenter; objectName: "startBlank"; small: true; kind: "quiet"; icon: "square_dashed"; text: "Start blank"
+                                    TalkModelPicker { id: hmp; width: parent.width; onDone: homeModelPop.close() } } } } }
+                    // other ways in: an empty studio, or a replacement for a broken part
+                    Item { visible: !home.chatting; width: 1; height: Theme.s3 }
+                    Row { id: alts; objectName: "startAlternatives"; visible: !home.chatting; anchors.horizontalCenter: parent.horizontalCenter; spacing: Theme.s1; height: Theme.hMd
+                        Btn { id: blank; anchors.verticalCenter: parent.verticalCenter; objectName: "startBlank"; small: true; height: Theme.hMd; kind: "quiet"; icon: "square_dashed"; text: "Start blank"
                             tip: "An empty studio and the workspace. Describe, sketch or import what goes in it."
                             onClicked: Store.startBlank() }
-                        Btn { anchors.verticalCenter: parent.verticalCenter; objectName: "startReplace"; small: true; kind: "quiet"; icon: "wrench"; text: "Replace a broken part"
+                        Rectangle { width: 3; height: 3; radius: 1.5; color: Theme.ink4; anchors.verticalCenter: parent.verticalCenter }
+                        Btn { anchors.verticalCenter: parent.verticalCenter; objectName: "startReplace"; small: true; height: Theme.hMd; kind: "quiet"; icon: "wrench"; text: "Replace a broken part"
                             tip: "From a photo: the agent estimates sizes, asks you for the ones that matter, then designs the new part."
                             onClicked: Store.openSheet("replace") } }
                     // the design you were on, one click away

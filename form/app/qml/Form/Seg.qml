@@ -23,7 +23,7 @@ Rectangle {
     Keys.onRightPressed: _step(1)
     FocusRing { on: g.activeFocus; radius: g.radius + 3 }
     Row {
-        id: row; x: 2; y: 2; spacing: 0
+        id: row; x: 2; anchors.verticalCenter: parent.verticalCenter; spacing: 0     // centred whatever height the caller gives
         Repeater {
             model: g.model
             Rectangle {
@@ -31,7 +31,7 @@ Rectangle {
                 readonly property var v: g._v(modelData)
                 readonly property bool on: v === g.value
                 readonly property bool off: !!modelData.off
-                width: lr.implicitWidth + 16; height: 22; radius: Theme.rXs       // concentric: 6 − 2
+                width: lr.implicitWidth + 16; height: g.height - 4; radius: Theme.rXs       // concentric: 6 − 2
                 color: on ? Theme.plate4 : off ? "transparent" : sm.pressed ? Theme.washPress : sm.containsMouse ? Theme.washHover : "transparent"
                 border.width: on ? 1 : 0; border.color: Theme.rule
                 Behavior on color { Tint {} }
