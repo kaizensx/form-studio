@@ -23,6 +23,11 @@ a checklist, aesthetic scores from photos); a briefed design cannot be released 
 automatic refinement lands as its own "Refined" revision: review it like any other, and `refine_design()` can take
 one change out.
 
+A design with a brief carries a proof sheet in `get_project()` (`proof`): each requirement of the brief with what
+the kernel measured on this revision, the tolerance, the evidence class and PASS, FAIL or UNPROVEN. Start the
+engineering pass there: a FAIL is a finding with its feature already named, UNPROVEN is an open question, and
+neither is a physical result.
+
 Three passes
 - Designer: proportion, interaction, finish.
 - Engineer: interfaces, load path, assembly, tolerances (read the checks and fit model).

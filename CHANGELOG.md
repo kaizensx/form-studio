@@ -4,6 +4,13 @@
 
 ### New
 
+- **A design is checked against what you asked for.** The numbers in a request (sizes, hole counts and diameters, a
+  bolt circle, wall thickness, threads, the number of parts) become requirements that Form Studio measures on the
+  built solid. Each revision shows, per requirement, what was measured and whether it passed; one that fails blocks
+  release. Numbers that cannot all be true are reported before anything is designed.
+- **Faster, cheaper changes by an agent.** An agent now changes one feature or one parameter by name instead of
+  sending the whole design again, and only what changed is rebuilt. Common mistakes in design code are found before
+  the build starts, all at once.
 - **Designs are refined after they build.** Once a design builds, Form Studio looks for small improvements (edge
   rounding, details, materials) and keeps only those that pass its checks. They arrive as one extra revision,
   "Refined: N changes", that you can undo change by change or all at once, and refinement can be turned off per
@@ -37,6 +44,8 @@
 
 ### Fixed
 
+- **Threaded holes have their thread.** A hole cut with the built-in internal thread could come out as a plain
+  bore that no bolt held. The thread is now cut, and a thread that cannot be cut is reported instead of built plain.
 - **Saved conversations open with every message.** A long conversation could open as an empty column with only its
   last footer; every message is now drawn, and only what arrives while you watch fades in.
 - **Compare turns off.** Compare on a reply's change card is now a toggle, the viewport's Comparing chip has Done,

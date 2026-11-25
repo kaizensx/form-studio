@@ -6,8 +6,8 @@ description: Stage a complex Form Studio design (a mechanism, an organic or styl
 # Staged design
 
 FORM tools: `design_brief()`, `design_guide()`, `design_examples()`, `plan_design()`, `create_design()`,
-`add_feature()`, `build_candidates()`, `render()`, `render_photo()`, `critique()`, `refine_design()`, `ask_user()`,
-`ask_measurement()`.
+`add_feature()`, `edit_design()`, `get_project()`, `build_candidates()`, `render()`, `render_photo()`, `critique()`,
+`refine_design()`, `ask_user()`, `ask_measurement()`.
 
 Form Studio enforces this for complex designs: `create_design()` refuses one without a plan and gives the reasons
 (a heuristic).
@@ -15,7 +15,10 @@ Form Studio enforces this for complex designs: `create_design()` refuses one wit
 1. **Brief.** `design_brief()`: goal, requirements, key dimensions with their source (measured, specified or
    assumed), constraints, style and the unknowns. Never guess a dimension that changes fit, load or safety: ask with
    `ask_user()` or `ask_measurement()`, one question at a time, at most three per task. The brief returns the guide
-   topics and exemplars to read.
+   topics and exemplars to read, and the contract: the requirements as assertions the kernel will check (add
+   `assertions` for what the words do not say) with an audit of what is missing, conflicting or impossible in the
+   numbers. Put `audit.ask` to the person once, before any code; a brief whose numbers cannot all hold is refused
+   by `plan_design()` and `create_design()` until it is written again.
 2. **Read.** `design_guide()` for each topic the brief names (the cad-core, surfacing-organic, texture,
    assemblies-and-mechanisms and industrial-design skills carry the same texts), and `design_examples()` for the
    closest exemplar. Read its source.
@@ -24,12 +27,17 @@ Form Studio enforces this for complex designs: `create_design()` refuses one wit
    helper names are refused; each step comes back with its risk and fallback.
 4. **Skeleton.** `create_design()` with `plan=<brief id>` and only the skeleton feature. Look at the six-view sheet
    and the section it returns before adding anything.
-5. **One feature at a time.** `add_feature()` per plan step. A failure comes back diagnosed: apply the first fix,
-   retry at most twice, then defer it and list it. A risky step with several constructions: `build_candidates()`.
-6. **Critique.** `critique()` with close-ups, metrics and a checklist; for a design that must look good, score the
+5. **One feature at a time.** `add_feature()` per plan step; give the feature that owes a requirement
+   `expects=[...]` so a miss fails there, with measured against wanted. A failure comes back diagnosed: apply the
+   first fix with `edit_design()` (one op, one build), retry at most twice, then defer it and list it. A risky step
+   with several constructions: `build_candidates()`.
+6. **Proof.** `get_project()` returns the proof sheet: every requirement with what the kernel measured, the
+   tolerance, the evidence class and PASS, FAIL or UNPROVEN. Repair a FAIL at the feature it names. In your summary
+   claim only PASS rows, name every FAIL and UNPROVEN row, and never call the sheet a physical result.
+7. **Critique.** `critique()` with close-ups, metrics and a checklist; for a design that must look good, score the
    aesthetic items from `render_photo()` pictures. Fix the lowest item and critique again. A briefed design cannot be
    released until its head revision has a critique pass.
-7. **Refinement.** The refinement engine runs after each build and lands one "Refined" revision, kept only when the
+8. **Refinement.** The refinement engine runs after each build and lands one "Refined" revision, kept only when the
    checks pass and interface faces are unchanged. `refine_design()` reports it, undoes one change or turns it off.
 
 One request makes one design. A second design in the same conversation states its relation (replaces, part_of,

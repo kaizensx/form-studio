@@ -7,7 +7,8 @@ SKELETON FIRST, ONE VALIDATED FEATURE AT A TIME (do this for every design that i
      you commit to more.
   3. Add one feature per call: add_feature(project, kind="code", feature="bore", code="def bore(self, v, body): ...").
      Only that feature is built; the ones before it load from their checkpoints. Fix one with
-     update_design(project, feature="bore", code=...). Look after every feature that changes the silhouette.
+     edit_design(project, ops=[{"op": "replace", "feature": "bore", "code": ...}]) (EDIT, DO NOT RESEND below).
+     Look after every feature that changes the silhouette.
   4. A feature that fails comes back with its diagnosis and the body unchanged. Retry it at most 2 times (apply the
      diagnosis' first fix, then a simpler construction). Still failing: defer it, go on with the next feature, and
      list every deferred feature in your final message. Never let one feature block the design.
@@ -38,6 +39,54 @@ SKELETON FIRST, ONE VALIDATED FEATURE AT A TIME (do this for every design that i
   feature that says how many parts it adds, @feature("Lenses", parts=2), returning craft.parts(**craft.named_parts(
   body), lens_l=a, lens_r=b); every revision is saved while parts are still to come. A slow feature gets
   @feature(..., budget=seconds); one that hangs is stopped and left out, and the features before it are kept.
+
+EDIT, DO NOT RESEND (every change after the first build)
+  Read the source once: get_design_source(project) returns it in canonical form, one method per feature, with the
+  feature ids (feature="bore" returns that one method and the values it reads). Then name what changes:
+    edit_design(project, expect_head=N, ops=[
+      {"op": "replace", "feature": "bore", "code": "def bore(self, v, body): ..."},       # one feature
+      {"op": "replace", "def": "constraints", "code": "def constraints(self, v): ..."},   # a helper or method
+      {"op": "replace", "find": "amount=L", "with": "amount=-L"},                         # text found exactly once
+      {"op": "insert", "feature": "ribs", "code": "...", "after": "plate", "label": "Ribs", "role": "structure"},
+      {"op": "insert", "param": {"key": "rib_t", "label": "Rib", "default": 2, "min": 1, "max": 4}},
+      {"op": "delete", "feature": "ribs"},
+      {"op": "set_param", "param": "wall", "value": 2.4}])            # with default/min/max: the declaration too
+  One call is one build and one revision. Only the changed feature and the ones after it are built; the rest load
+  from their checkpoints. The result lists what was built, not the file. A small fix inside a long feature is a
+  find/with; a rewritten feature is a replace by name. update_design(source=...) is for a different design, not for
+  a change. A design written as a plain Recipe is edited the same way: its build() is lifted into one method per
+  Stage (kept only when the kernel finds the same volume, faces and bounding box), and those are its feature ids.
+
+THE CONTRACT AND THE PROOF SHEET (done is not correct)
+  A build that returns a valid solid says nothing about whether the four holes are there. design_brief turns the
+  brief into a contract: assertions the kernel checks, each with a tolerance and where it came from. Numbers in the
+  goal and requirements are read ("4 x Ø5.2 on a 60 mm bolt circle", "2.4 mm wall", "80 x 60 x 20 mm", "M6 thread",
+  "two-part"); pass the rest as assertions=[{"kind": "hole_count", "count": 2, "d": 3.4}, ...] (kinds: bbox, volume,
+  part_count, face_count, hole_count, cylinder, bolt_circle, pattern, min_wall, thread).
+  * design_brief returns the audit: what is missing, conflicting or impossible in the numbers themselves. Put
+    audit.ask to the person once (ask_user), before any code. Conflicting or impossible numbers cannot be built from.
+  * Every assertion is an obligation of one feature (named, or matched to the feature that makes that kind of
+    thing; otherwise the finished design). Promise it in the code and it is checked the moment the feature is built:
+        from form import contract
+        @feature("Bolt holes", role="interface", expects=[contract.bolt_circle(4, 5.2, 60)])
+        def holes(self, v, body): ...
+    A miss fails that feature with measured against wanted ("measured 0 hole(s) Ø5.2 (round holes found: Ø5)"),
+    the features before it stay built, and one edit_design op repairs it.
+  * get_project and every commit return the proof sheet: one row per requirement with what was measured, the
+    tolerance, the evidence class (computed: read off the B-rep; heuristic: thread presence) and PASS, FAIL or
+    UNPROVEN. A FAIL names the feature to repair and whether it was never met or lost at a later feature. UNPROVEN
+    is not a pass. Report the sheet as it is; claim only the PASS rows; a release waits while a row fails.
+
+PREFLIGHT (before the kernel, all at once)
+  create_design, update_design and edit_design first check the source without building anything and return every
+  problem together: a constraint its own values violate; a name, keyword or enum member build123d, form.craft,
+  form.parts or form.patterns do not have (with the closest real ones); a v["key"] that is not a Param; a Polygon
+  whose points wind clockwise and is extruded with a positive amount (it goes to -Z: list points counter-clockwise);
+  a bolt and its threaded hole that share too little flank (give both the same nominal major_d and set the play
+  with clearance=, never both); a thread the contract asks for that nothing makes (a plain bore holds no bolt);
+  parts= that add up to more than solids. Warnings: edges()[3] (select what a feature made instead:
+  craft.made_by(after, before) for its edges, "faces" for its faces, or filter_by / sort_by / group_by), and a
+  fillet of every edge placed before a pattern (finish last). Errors refuse the call; fix them all in one go.
 
 A Form Studio design is one Python file that defines one subclass of Recipe. Form Studio imports it, builds it in the
 CAD kernel (build123d on OpenCascade), attributes every face to a feature, and runs the full pipeline:
@@ -204,20 +253,22 @@ TEXT AND MARKS: form.marks   PATTERNS: form.patterns
        lid = lid - Pos(0, 0, lid_t) * patterns.hex_vents(60, 36, cell=5, web=1.2, depth=lid_t + 0.2).shape
 
 WORKFLOW
-  design_guide -> write source -> create_design (or update_design) -> render -> get_project (checks, slice)
-  -> fix -> request_release. Parameter-only changes: preview_change / commit_change, as for any project.
+  design_guide -> write source -> create_design -> render -> get_project (checks, the proof sheet, slice)
+  -> fix with edit_design (ops, not the file) -> request_release. Parameter-only changes: preview_change /
+  commit_change, as for any project.
 
   Anything complex (a mechanism, an organic or styled form, a texture, several parts) is staged, and the tools
   enforce it:
     1. design_brief: requirements, key dimensions with their source, constraints, style, and the unknowns (list
-       them; never guess a dimension that changes fit, load or safety: ask_user / ask_measurement).
+       them; never guess a dimension that changes fit, load or safety: ask_user / ask_measurement). It returns
+       the contract and its audit (THE CONTRACT AND THE PROOF SHEET above): settle the audit before coding.
     2. design_guide(topic=...) for the topics the brief needs, and design_examples(query) for a close exemplar.
        Read the exemplar's source: it shows the construction a top designer would use.
     3. plan_design: every feature with HOW it is built (which form.craft helper, which sections), the parts, key
        dimensions, mechanisms with their clearances, textures with their tier, and the risks.
     4. create_design(..., plan=<brief id>) with the skeleton feature only: it returns a six-view sheet and a
        section. LOOK at both. Then the plan's steps one add_feature(kind="code") at a time (SKELETON FIRST above).
-    5. critique(project): close-ups per feature, metrics, a checklist. Fix, update_design, critique again.
+    5. critique(project): close-ups per feature, metrics, a checklist. Fix with edit_design, critique again.
        A briefed design cannot be released until its head revision has a critique pass.
   The helper library for all of this is form.craft (topics surfacing, mechanisms, organic, texture).
 

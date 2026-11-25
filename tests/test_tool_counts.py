@@ -18,7 +18,7 @@ STATED = {
     "docs/ARCHITECTURE.md": [r"\| (\d+) tools over stdio \|"],
     "docs/FEATURES.md": [r"The full engine over (\d+) tools"],
     "docs/MCP.md": [r"^(\d+) tools\. Read-only"],
-    "site/index.html": [r'data-count="(\d+)" id="why-tools"', r'id="why-tools">(\d+)<'],
+    "site/index.html": [r'id="why-tools" data-count="(\d+)"', r'id="why-tools"[^>]*>(\d+)<'],
     "docs/readme/numbers-1-light.svg": [r"(\d+) MCP tools for any agent", r'class="k10">(\d+)<'],
     "docs/readme/numbers-1-dark.svg": [r"(\d+) MCP tools for any agent", r'class="k10">(\d+)<'],
     "docs/readme/feature-headless-light.svg": [r"one of (\d+) MCP"],

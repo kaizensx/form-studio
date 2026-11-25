@@ -34,7 +34,8 @@ and keeps an honest record of what is known. 3D printing is optional and off unl
 
 Workflow: form_overview -> create_design from your own code (design_guide; design_brief first for a complex
 design), or create_project from a recipe (describe_recipe) -> render (look at it) -> preview_change ->
-commit_change, or update_design -> get_project (checks, next actions). Only for a design whose purpose is "print":
+commit_change, or edit_design (ops on one feature or parameter; update_design sends a whole file) -> get_project
+(checks, the proof sheet of the brief's requirements, next actions). Only for a design whose purpose is "print":
 run_pipeline (exports, print checks, a slice) -> request_release (a person approves in Form Studio).
 After every build, refinement runs in the background and lands as one more revision (refine_design shows, undoes
 or turns it off; game assets only when turned on). Long work answers with a job: get_job.
@@ -104,7 +105,7 @@ Earlier protocol versions get `elicitation/create` on the session. A client with
 ## Tool search
 
 Claude Code can defer MCP tools and find them with its ToolSearch tool. These tools carry
-`_meta["anthropic/alwaysLoad"]: true` and are always loaded: `form_overview`, `get_project`, `create_design`, `update_design`, `render`, `preview_change`, `commit_change`, `design_guide`, `design_brief`, `ask_user`, `get_job`. Every tool's description opens with what it
+`_meta["anthropic/alwaysLoad"]: true` and are always loaded: `form_overview`, `get_project`, `create_design`, `update_design`, `render`, `preview_change`, `commit_change`, `design_guide`, `design_brief`, `ask_user`, `get_job`, `edit_design`. Every tool's description opens with what it
 does (a verb and its object), so a search finds it; descriptions and the instructions above stay within the 4,096
 characters Claude Code reads. Form Studio's own chat runs Claude Code with `ENABLE_TOOL_SEARCH=auto` and ToolSearch
 in its tools; `[chat] tool_search = "false"` in studio.toml (or `FORM_TOOL_SEARCH=false`) loads every tool up front
@@ -112,7 +113,7 @@ instead.
 
 ## Tools at a glance
 
-95 tools. Read-only tools never change a project.
+96 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -131,9 +132,10 @@ instead.
 | [`mesh_preflight`](#mesh_preflight) | read-only | Preflight a mesh file. Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display proxy for a heavy one. |
 | [`create_design`](#create_design) | changes | Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass, built with build123d. |
 | [`update_design`](#update_design) | changes | Replace a design's code as a new revision (history keeps every version). |
+| [`edit_design`](#edit_design) | changes | Edit a design's code by naming what changes: one build, one revision. |
 | [`build_candidates`](#build_candidates) | changes | Build 2-6 versions of a risky design or step at the same time (one kernel worker each), verify and score every one, and keep the best. |
 | [`refine_design`](#refine_design) | changes | Show, rerun, undo or turn off design refinement of a project. |
-| [`get_design_source`](#get_design_source) | read-only | Get a design's source code: the exact code a revision was built from (built-in recipes return their recipe file). |
+| [`get_design_source`](#get_design_source) | read-only | Get a design's source code: the code a revision was built from (built-in recipes return their recipe file). |
 | [`create_project`](#create_project) | changes | Create a project from a built-in recipe (form_overview lists them: gridfinity_bin, storage_box, pegboard, device_stand, ...). |
 | [`get_project`](#get_project) | read-only | Get a project's state: current revision with every parameter and its provenance, output status (current/stale/failed/missing), checks, fit model, next best actions, simulated slice, file paths, release gate and bench link. |
 | [`preview_change`](#preview_change) | read-only | Build a candidate change for real and report what it would touch, without saving anything: changed features, interface dimensions, stability, fit yield, which outputs it would invalidate. |
@@ -280,8 +282,20 @@ requirements: what it must do. dimensions: {name: {value, unit, source}} where s
 (datasheet, standard) or assumed. constraints: limits (bed size, material, process). unknowns: what you could
 not settle; list them, never guess them (ask_user / ask_measurement for ones that change fit, load or
 safety). style: the design language. project: attach to an existing project instead of a new design.
-Returns the brief id, whether it is complex (heuristic), which design_guide topics and exemplars to read, and
-the route (prismatic, revolve, skin+features or mechanism) with how its skeleton is built.
+The brief becomes a contract: requirements the kernel can check, each with a tolerance and where it came
+from. Numbers in goal, requirements and constraints are read ("4 x Ø5.2 on a 60 mm bolt circle", "2.4 mm
+wall", "80 x 60 x 20 mm", "M6 thread", "two-part", "Ø30 bore"); add what words cannot say as assertions:
+[{"kind": "bolt_circle", "count": 4, "hole_d": 5.2, "circle_d": 60}] with kind bbox (size [x, y, z]),
+volume (mm3, op), part_count (count), face_count (count, of), hole_count (count, d), cylinder (d, of
+any|boss|bore), bolt_circle, pattern (count, pitch, hole_d), min_wall (t), thread (major, pitch); each may
+carry tol (mm; 0.1 when not given, said to be assumed), axis and feature (the feature that must meet it).
+Returns contract.assertions and contract.audit: what is missing, conflicting or impossible in the numbers
+themselves (arithmetic, nothing measured). When audit.ask is there, put it to the person once with ask_user
+before any code; a brief with conflicting or impossible numbers cannot be planned or built from.
+After a build, get_project and every commit return the proof sheet: one row per requirement with what the
+kernel measured, the tolerance, the evidence class and PASS, FAIL or UNPROVEN.
+Also returns the brief id, whether it is complex (heuristic), which design_guide topics and exemplars to
+read, and the route (prismatic, revolve, skin+features or mechanism) with how its skeleton is built.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -295,6 +309,7 @@ the route (prismatic, revolve, skin+features or mechanism) with how its skeleton
 | `purpose` | string \| null |  |
 | `references` | array \| null |  |
 | `project` | string \| null |  |
+| `assertions` | array \| null |  |
 
 ### `plan_design`
 
@@ -464,7 +479,12 @@ box), "alternative" (a separate design in its family) or "new" (an unrelated des
 design: use part_of for the parts of one product.
 refine: "auto" (default): after the build, design refinement runs in the background and lands as one more
 revision, "Refined: N changes", each change a named refine feature you can undo (refine_design); "off": not
-for this design; "on": also for a game asset, which is not refined unless asked. Returns the project, a six-view sheet and a section: look.
+for this design; "on": also for a game asset, which is not refined unless asked.
+preflight: before the kernel is asked for anything, the source is checked without it and every problem comes
+back at once (a constraint its own values violate, a name or keyword build123d and form.craft do not have,
+a parameter that is read but not declared, a Polygon wound clockwise and extruded upward, a thread pair
+that does not engage); "block" (default) refuses on errors, "warn" builds anyway, "off" skips it.
+Returns the project (with the proof sheet when the brief has a contract), a six-view sheet and a section: look.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -481,10 +501,12 @@ for this design; "on": also for a game asset, which is not refined unless asked.
 | `relation` | string |  |
 | `partial` | boolean |  |
 | `refine` | string |  |
+| `preflight` | string |  |
 
 ### `update_design`
 
-Replace a design's code as a new revision (history keeps every version). Existing parameter values carry over;
+Replace a design's code as a new revision (history keeps every version). To change one feature, a helper or
+a parameter, use edit_design: it sends only what changes. Existing parameter values carry over;
 changing a default does not change a saved value, so pass values={...} to change them. New parameters start at
 their defaults. Use preview_change/commit_change instead when only values change. language defaults to the
 project's current one ("python" or "openscad"). An unusable assembly() declaration is refused with the reason,
@@ -493,6 +515,7 @@ One feature of a FeatureDesign: feature="eyes", code="def eyes(self, v, body): .
 method only; features before it load from their checkpoints. A feature that fails makes no revision (the head
 stays) and returns its diagnosis, unless partial=True, which saves the revision with it left out (release
 blocked). result.build_log says per feature whether it was built, loaded from its checkpoint or skipped.
+preflight: as create_design (an update is refused only for errors this source introduces).
 For a briefed design, critique(project) the revision before asking for release.
 
 | Argument | Type | Required |
@@ -507,6 +530,40 @@ For a briefed design, critique(project) the revision before asking for release.
 | `feature` | string |  |
 | `code` | string |  |
 | `partial` | boolean |  |
+| `preflight` | string |  |
+
+### `edit_design`
+
+Edit a design's code by naming what changes: one build, one revision. Send ops, not the file.
+ops, applied in order, all checked before any is applied (every problem comes back at once):
+{"op": "replace", "feature": "holes", "code": "def holes(self, v, body): ..."}  one feature method;
+{"op": "replace", "def": "poly", "code": "def poly(pts, L): ..."}  a helper or another method (constraints,
+derived, setup); {"op": "replace", "find": "exact text", "with": "new text"}  text found exactly once;
+{"op": "insert", "feature": "ribs", "code": "...", "after": "body", "label": "Ribs", "role": "structure"};
+{"op": "insert", "def": "ring", "code": "def ring(r): ..."}; {"op": "insert", "param": {"key": "rib_t",
+"label": "Rib thickness", "default": 2, "min": 1, "max": 4}}; {"op": "delete", "feature" | "def" | "param": name};
+{"op": "set_param", "param": "wall", "value": 2.4}  this revision's value; with default, min, max, step,
+label or doc it changes the declaration too (a new default is also the value).
+A design written as a plain Recipe is edited in its canonical form: its build() is lifted into one method
+per Stage, built once and accepted only when volume, face count and bounding box are unchanged (computed);
+get_design_source returns that form, and its feature ids are what ops name.
+Only what changed is built: features before the first changed one load from their checkpoints. The source
+is checked without the kernel first (preflight: "block" refuses on errors the edit introduces, "warn",
+"off"); a feature that fails makes no revision unless partial=True. Pass expect_head.
+Returns head, source_sha, changed (only the features built again: status, seconds, volume change), reused
+(how many loaded from checkpoints), the proof sheet (requirement, measured, tolerance, evidence, status)
+when the design has a contract or expects=, failing checks, and with look=True the six-view sheet.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `ops` | array | yes |
+| `expect_head` | integer \| null |  |
+| `note` | string |  |
+| `run` | boolean |  |
+| `partial` | boolean |  |
+| `preflight` | string |  |
+| `look` | boolean |  |
 
 ### `build_candidates`
 
@@ -566,12 +623,20 @@ heuristics (form/refine/analyze.py); the checks are the kernel's.
 
 *Read-only.*
 
-Get a design's source code: the exact code a revision was built from (built-in recipes return their recipe file).
+Get a design's source code: the code a revision was built from (built-in recipes return their recipe file).
+Read it once; then change it with edit_design ops, which name features, and never send it back whole.
+The head comes in canonical form, one method per feature: a FeatureDesign as it is, a plain Recipe lifted
+(form: "features" when its build() split into feature methods, "skeleton" when it is one feature, "none"
+with the reason when it stays as written), kernel-checked to be the same solid. features lists the ids
+edit_design addresses; source_sha names this text. feature="holes" returns only that method (and the
+parameters it reads). canonical=False, or a rev, returns the stored text.
 
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
 | `rev` | integer \| null |  |
+| `feature` | string |  |
+| `canonical` | boolean |  |
 
 ### `create_project`
 
