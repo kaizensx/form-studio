@@ -68,7 +68,7 @@ def available() -> bool:
     try:
         import bd_materials  # noqa: F401
         return True
-    except ImportError:
+    except Exception:                       # noqa: BLE001 - missing, or broken on import: the built-in table serves
         return False
 
 
@@ -92,34 +92,11 @@ def get(name: str) -> dict:
     Raises KeyError naming close matches when the name is unknown."""
     k = _key(name)
     try:
-        from bd_materials import resolve
-    except ImportError:
-        resolve = None
-    if resolve is not None:
-        try:
-            fm = resolve(k)
-        except (ValueError, TypeError):
-            fm = None
-        if fm is not None:
-            m = fm.material
-            color, finish = _CATEGORY_COLOR.get(m.category, "#d8d8d8"), _finish(m.category, m.family)
-            look = "category default colour"
-            try:
-                p = fm.pbr                      # values only; texture maps are never loaded
-                has_maps = any(v for v in vars(p.maps).values()) if p.maps else False
-                if m.category == "metal" and p.values.color and not has_maps:
-                    color, look = _hex(p.values.color), f"{p.source} ({p.license})"
-            except Exception:                   # the look is decoration: a missing PBR module never fails a lookup
-                pass
-            if look == "category default colour" and k in FALLBACK:
-                color, look = FALLBACK[k][3], "Form Studio display colour"
-            props = {}
-            for f, v in vars(m).items():
-                if hasattr(v, "min") and hasattr(v, "max") and not (math.isnan(v.min) or math.isnan(v.max)):
-                    props[f] = [float(v.min), float(v.max)]
-            return {"id": k, "name": m.name, "category": m.category, "family": m.family,
-                    "density_kg_m3": float(m.density), "color": color, "finish": finish, "properties": props,
-                    "source": SOURCE, "look": look}
+        hit = _from_bd_materials(k)
+    except Exception:                       # noqa: BLE001 - a broken install never fails a lookup the table can answer
+        hit = None
+    if hit is not None:
+        return hit
     if k in FALLBACK:
         nm, cat, rho, col, fin = FALLBACK[k]
         return {"id": k, "name": nm, "category": cat, "family": k, "density_kg_m3": float(rho), "color": col,
@@ -129,11 +106,44 @@ def get(name: str) -> dict:
                    " (form.material_library.names() lists them).")
 
 
+def _from_bd_materials(k: str) -> dict | None:
+    """One material from bd_materials, or None when it is not installed or does not know the name."""
+    try:
+        from bd_materials import resolve
+    except ImportError:
+        return None
+    try:
+        fm = resolve(k)
+    except (ValueError, TypeError, KeyError, LookupError):
+        return None
+    if fm is None:
+        return None
+    m = fm.material
+    color, finish = _CATEGORY_COLOR.get(m.category, "#d8d8d8"), _finish(m.category, m.family)
+    look = "category default colour"
+    try:
+        p = fm.pbr                      # values only; texture maps are never loaded
+        has_maps = any(v for v in vars(p.maps).values()) if p.maps else False
+        if m.category == "metal" and p.values.color and not has_maps:
+            color, look = _hex(p.values.color), f"{p.source} ({p.license})"
+    except Exception:                   # the look is decoration: a missing PBR module never fails a lookup
+        pass
+    if look == "category default colour" and k in FALLBACK:
+        color, look = FALLBACK[k][3], "Form Studio display colour"
+    props = {}
+    for f, v in vars(m).items():
+        if hasattr(v, "min") and hasattr(v, "max") and not (math.isnan(v.min) or math.isnan(v.max)):
+            props[f] = [float(v.min), float(v.max)]
+    return {"id": k, "name": m.name, "category": m.category, "family": m.family,
+            "density_kg_m3": float(m.density), "color": color, "finish": finish, "properties": props,
+            "source": SOURCE, "look": look}
+
+
 def names() -> list[str]:
     try:
         from bd_materials import material_names
         return sorted(set(material_names()) | set(FALLBACK) | set(ALIASES))
-    except ImportError:
+    except Exception:                       # noqa: BLE001 - missing or broken: the built-in table's names
         return sorted(set(FALLBACK) | set(ALIASES))
 
 

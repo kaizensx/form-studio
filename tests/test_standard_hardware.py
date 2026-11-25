@@ -233,6 +233,34 @@ class Materials(unittest.TestCase):
 
 
 class WithoutTheLibraries(unittest.TestCase):
+    def test_a_broken_bd_materials_falls_back_to_the_table(self):
+        """bd_materials (or threejs_materials under it) that fails on import with something other than ImportError,
+        or whose lookups raise, never fails a lookup the built-in table can answer."""
+        import builtins
+        from unittest import mock
+        real = builtins.__import__
+
+        def broken(name, *a, **k):
+            if name.split(".")[0] == "bd_materials":
+                raise RuntimeError("bd_materials is broken")
+            return real(name, *a, **k)
+        ml.get.cache_clear()
+        try:
+            with mock.patch("builtins.__import__", broken):
+                self.assertFalse(ml.available())
+                m = ml.get("brass")
+                self.assertEqual(m["source"], ml.FALLBACK_SOURCE)
+                self.assertAlmostEqual(m["density_kg_m3"], ml.FALLBACK["brass"][2])
+                self.assertIn("brass", ml.names())
+                self.assertGreater(ml.mass_g(1000, "aluminium"), 0)
+            ml.get.cache_clear()
+            if ml.available():
+                import bd_materials
+                with mock.patch.object(bd_materials, "resolve", side_effect=OSError("data file missing"), create=True):
+                    self.assertEqual(ml.get("steel")["source"], ml.FALLBACK_SOURCE)
+        finally:
+            ml.get.cache_clear()
+
     def test_common_hardware_falls_back_to_tables(self):
         import builtins
         from unittest import mock
