@@ -252,9 +252,11 @@ async def _wait_job(st: Studio, jid: str, wait_s: float) -> dict:
 # ---- server ---------------------------------------------------------------
 
 # Tools Claude Code loads up front when tool search defers the rest (the others are found by searching their
-# descriptions, so each description's first sentence names its verb and object).
+# descriptions, so each description's first sentence names its verb and object). Every tool INSTRUCTIONS tells an
+# agent to call before it has searched for anything is here: a deferred one answers "No such tool available" when
+# called by name. Kept small: each one costs context in every run.
 ALWAYS_LOAD = ("form_overview", "get_project", "create_design", "update_design", "render", "preview_change",
-               "commit_change", "design_guide", "ask_user", "get_job")
+               "commit_change", "design_guide", "design_brief", "ask_user", "get_job")
 ALWAYS = {"anthropic/alwaysLoad": True}
 
 
@@ -423,7 +425,7 @@ def build() -> MCPServer:
             out["built_in_recipes"] = ", ".join(studio().recipes.builtins()) + " (use create_project for these)"
         return out
 
-    @mcp.tool(annotations=RW)
+    @mcp.tool(annotations=RW, meta=ALWAYS)
     async def design_brief(name: str, goal: str, requirements: list[str] | None = None,
                            dimensions: dict[str, Any] | None = None, constraints: list[str] | None = None,
                            unknowns: list[str] | None = None, style: str = "", purpose: str | None = None,

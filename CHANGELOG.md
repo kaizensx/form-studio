@@ -32,6 +32,17 @@
 - **Agents:** MCP 2026-07-28 throughout, long tools can run as tasks, and the design guidance is served as skills.
 - **Recipes are no longer a public library.** The engine still uses them as building blocks for agents; the website page, the Discord forum and the submission form are gone.
 
+### Fixed
+
+- **Saved conversations open with every message.** A long conversation could open as an empty column with only its
+  last footer; every message is now drawn, and only what arrives while you watch fades in.
+- **Compare turns off.** Compare on a reply's change card is now a toggle, the viewport's Comparing chip has Done,
+  and Esc, another stage or showing another revision end it too.
+- **The Building caption goes when the build is saved**, even when the save arrives with the last stages, and it
+  moves aside so it never sits on the refinement panel.
+- **Agents can call the design workflow by name at once.** Every tool the server's instructions name first,
+  design_brief included, loads up front, so an agent no longer gets "No such tool available" for design_guide.
+
 ### Known limits
 
 - Game assets are Beta: every asset passes its technical checks, and its visual quality is still improving. They are
@@ -218,8 +229,8 @@
   earlier versions get the form on the session. Form Studio's own chat, and clients without elicitation, get exactly
   what they got before (`form/elicit.py`).
 - **Claude Code searches Form Studio's tools.** The chat's Claude Code runs list ToolSearch and set
-  `ENABLE_TOOL_SEARCH=auto`; ten tools (form_overview, get_project, create_design, update_design, render,
-  preview_change, commit_change, design_guide, ask_user, get_job) carry `anthropic/alwaysLoad` and the rest are found
+  `ENABLE_TOOL_SEARCH=auto`; eleven tools (form_overview, get_project, create_design, update_design, render,
+  preview_change, commit_change, design_guide, design_brief, ask_user, get_job) carry `anthropic/alwaysLoad` and the rest are found
   by searching, so every tool description now opens with a verb and its object. `[chat] tool_search = "false"` (or
   `FORM_TOOL_SEARCH=false`) loads every tool up front as before, for this release. The server's instructions are
   shorter (3,805 characters, within the 4,096 Claude Code reads), and tests keep them and every description there.

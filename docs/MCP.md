@@ -104,7 +104,7 @@ Earlier protocol versions get `elicitation/create` on the session. A client with
 ## Tool search
 
 Claude Code can defer MCP tools and find them with its ToolSearch tool. These tools carry
-`_meta["anthropic/alwaysLoad"]: true` and are always loaded: `form_overview`, `get_project`, `create_design`, `update_design`, `render`, `preview_change`, `commit_change`, `design_guide`, `ask_user`, `get_job`. Every tool's description opens with what it
+`_meta["anthropic/alwaysLoad"]: true` and are always loaded: `form_overview`, `get_project`, `create_design`, `update_design`, `render`, `preview_change`, `commit_change`, `design_guide`, `design_brief`, `ask_user`, `get_job`. Every tool's description opens with what it
 does (a verb and its object), so a search finds it; descriptions and the instructions above stay within the 4,096
 characters Claude Code reads. Form Studio's own chat runs Claude Code with `ENABLE_TOOL_SEARCH=auto` and ToolSearch
 in its tools; `[chat] tool_search = "false"` in studio.toml (or `FORM_TOOL_SEARCH=false`) loads every tool up front
