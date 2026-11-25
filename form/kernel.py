@@ -722,38 +722,21 @@ def _open_edges(path) -> int:
     return int((counts == 1).sum())
 
 
-def write_stl(shape, path, tol: float = 0.01, ang: float = 0.1) -> dict:
-    """An STL of a valid solid with no holes. OCCT's mesher can fail on a face at one setting (a small face between
-    tangent surfaces) and still return: that face gets no triangles, or its edges get a different polygon from its
-    neighbour's, and the STL has an open boundary although the CAD solid is fine. The written mesh is checked
-    edge by edge; when it is open the solid is meshed again with nearby settings and the first closed mesh is kept.
-    A mesh that no setting closes is written with the asked-for settings, and the mesh check reports it."""
-    from OCP.BRepMesh import BRepMesh_IncrementalMesh
-    from OCP.BRepTools import BRepTools
-    from OCP.StlAPI import StlAPI_Writer
-
-    def write(t, a):
-        BRepTools.Clean_s(shape.wrapped)
-        BRepMesh_IncrementalMesh(shape.wrapped, t, True, a, True).Perform()
-        w = StlAPI_Writer()
-        w.ASCIIMode = False                                    # binary, as build123d's export_stl writes
-        w.Write(shape.wrapped, str(path))
-        dropped[0] = drop_degenerate(path)
-        return _open_edges(path)
-
-    dropped = [0]
-
-    tries = [(tol, ang), (tol, ang * 2), (tol / 2, ang * 2), (tol * 2, ang * 2), (tol / 10, ang), (tol * 5, max(ang * 2, 0.25))]
-    first = None
-    for t, a in tries:
-        open_ = write(t, a)
-        first = open_ if first is None else first
-        if not open_:
-            return {"tolerance": t, "angular_tolerance": a, "remeshed": (t, a) != (tol, ang), "open_edges": 0,
-                    "open_edges_first": first, "degenerate_dropped": dropped[0]}
-    open_ = write(tol, ang)
-    return {"tolerance": tol, "angular_tolerance": ang, "remeshed": False, "open_edges": open_, "open_edges_first": first,
-            "degenerate_dropped": dropped[0]}
+def write_stl(shape, path, tol: float = 0.01, ang: float = 0.1, budget_s: float = 35.0) -> dict:
+    """An STL of a valid solid with no holes, or one that says exactly why it has them. OCCT's mesher can fail on a
+    face at one setting (a small or sliver face between tangent surfaces) and still return: that face gets no
+    triangles, or its edges get a different polygon from its neighbour's, and the STL has an open boundary although
+    the CAD solid is fine. Each solid climbs the export ladder (form/meshclose.py: finer mesh, sewing, welding, a
+    last-resort repair) until its mesh is closed; `closure` reports the rung, the most the mesh can be from the CAD
+    surface, and, for a solid still open, the cause. The climb stops after budget_s (the kernel call must answer)."""
+    from . import meshclose
+    pieces, closure = meshclose.close(shape, tol, ang, budget_s)
+    meshclose.write(path, pieces)
+    first = next((r["tries"][0]["open_edges"] for r in closure["per_solid"] if r["tries"]), 0)
+    open_ = sum(sum((r.get("open") or {}).values()) for r in closure["per_solid"])
+    used = [r.get("tolerance") or tol for r in closure["per_solid"]]
+    return {"tolerance": min(used) if used else tol, "angular_tolerance": ang, "remeshed": closure["rung"] != "mesh",
+            "open_edges": open_, "open_edges_first": first, "closure": closure}
 
 
 def _textured_parts(model, face_part: list, ids: list, budget: int | None = None) -> list | None:
@@ -851,10 +834,19 @@ def op_export(key, recipe_id, values, out_dir, name, orientation="as_modelled", 
         lo, hi = V.min(axis=0), V.max(axis=0)
         V = V - np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]])
         meshtex.write_stl(stl, V, F)
+        from . import meshclose
+        topo = meshclose.topology(*meshclose.weld(V[F].astype(np.float32).astype(np.float64)))
+        closure = {"closed": meshclose.closed(topo), "rung": "texture", "solids": 1,
+                   "deviation_mm": 0.02,                  # _fine_faces: the tessellation the texture displaces
+                   "note": "A mesh texture displaces the surface by design: the STL is the CAD surface meshed within "
+                           "0.02 mm and then displaced by the texture, so it differs from the smooth STEP by the "
+                           "texture's amplitude and its volume differs from the CAD volume."}
+        if not closure["closed"]:
+            closure["why"] = f"the textured mesh has {meshclose.open_edges(topo)} open or non-manifold edges"
         size = hi - lo
         out = {"step": str(step), "stl": str(stl), "orientation": orientation, "stl_tolerance_mm": tol,
                "print_bbox": [float(size[0]), float(size[1]), float(size[2])], "brep_volume_mm3": model["volume"],
-               "seconds": round(time.perf_counter() - t, 3),
+               "seconds": round(time.perf_counter() - t, 3), "closure": closure,
                "mesh_texture": {"label": meshtex.LABEL, "triangles": info["triangles_out"],
                                 "textures": [{k: x[k] for k in ("kind", "amplitude", "scale", "features")} for x in info["textures"]],
                                 **({"coarser": info["coarser"]} if info.get("coarser") else {})}}
@@ -864,7 +856,8 @@ def op_export(key, recipe_id, values, out_dir, name, orientation="as_modelled", 
     bb = oriented.bounding_box()
     out = {"step": None if mesh else str(step), "stl": str(stl), "orientation": orientation,
            "stl_tolerance_mm": used["tolerance"], "print_bbox": [bb.size.X, bb.size.Y, bb.size.Z],
-           "brep_volume_mm3": model["volume"], "seconds": round(time.perf_counter() - t, 3)}
+           "brep_volume_mm3": model["volume"], "seconds": round(time.perf_counter() - t, 3),
+           "closure": used["closure"]}                     # closed or why not, the rung and the stated deviation
     if mesh:
         out["unavailable"] = {"step": "Not available for mesh designs: OpenSCAD produces triangles, not a CAD solid."}
     return out
