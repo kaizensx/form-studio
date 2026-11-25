@@ -166,18 +166,51 @@ class Shards(unittest.TestCase):
         self.assertEqual(got, [["a", "d", "e"], ["b", "c"]])                 # 120 s and 110 s
         self.assertEqual(sorted(sum(got, [])), ["a", "b", "c", "d", "e"])
 
-    def test_the_real_suite_splits_into_four_with_nothing_lost(self):
-        got = test_shards.plan(4)
-        self.assertEqual(sorted({u.split(".")[0] for u in sum(got, [])}), test_shards.modules())
-        self.assertEqual(len(sum(got, [])), len(set(sum(got, []))))
-        self.assertTrue(all(got))
+    def test_the_real_suite_splits_with_nothing_lost(self):
+        for os_name in test_shards.OSES:
+            times = test_shards.timings(os_name=os_name)
+            for n in (4, 5, 10):
+                got = test_shards.plan(n, times=times)
+                self.assertEqual(sorted({u.split(".")[0] for u in sum(got, [])}), test_shards.modules())
+                self.assertEqual(len(sum(got, [])), len(set(sum(got, []))))
+                self.assertTrue(all(got))
 
-    def test_a_module_timed_by_class_is_split_into_all_its_classes(self):
-        times = {"test_recon.Layers": 400}
+    def test_the_light_scope_leaves_out_only_the_heavy_modules(self):
+        got = {u.split(".")[0] for u in sum(test_shards.plan(4, light=True), [])}
+        self.assertEqual(got, set(test_shards.modules()) - set(test_shards.HEAVY))
+        self.assertTrue(set(test_shards.HEAVY) <= set(test_shards.modules()))
+
+    def test_a_long_module_timed_by_class_is_split_into_all_its_classes(self):
+        times = {"test_recon.OrganicBlob": 400}
         got = test_shards.units(["test_fsutil", "test_recon"], times)
         self.assertEqual(got[0], "test_fsutil")
         self.assertEqual(set(got[1:]), {f"test_recon.{c}" for c in test_shards.classes("test_recon")})
-        self.assertIn("test_recon.FeatureTree", got)
+        self.assertIn("test_recon.SteppedBracket", got)
+        self.assertNotIn("test_recon._Edits", got)                             # a mixin without tests of its own
+        self.assertEqual(test_shards.units(["test_recon"], {"test_recon.Readers": 30}), ["test_recon"])   # short: whole
+
+    def test_classes_include_those_that_inherit_their_tests(self):
+        self.assertIn("Detection", test_shards.classes("test_api_agents"))     # class Detection(Env)
+
+    def test_scope(self):
+        light = ["README.md", "docs/RELEASING.md", "site/index.html", "brand/logo.svg", ".github/workflows/links.yml",
+                 "scripts/gen_mcp_docs.py", "community/recipes/x.json"]
+        self.assertEqual(test_shards.scope(light), "light")
+        for p in ("form/recon/pipeline.py", "tests/test_recon.py", ".github/workflows/ci.yml", "requirements.lock",
+                  "scripts/ci/test_shards.py", ".github/ci-studio.toml", "pyproject.toml", "docs/../form/x.py"):
+            self.assertEqual(test_shards.scope(light + [p]), "full", p)
+        self.assertEqual(test_shards.scope([]), "full")
+
+    def test_merge_keeps_each_os_apart(self):
+        d = Path(tempfile.mkdtemp())
+        (d / "times-ubuntu-latest-1.json").write_text('{"test_a.A": 5, "test_b.B": 2}')
+        (d / "times-ubuntu-latest-2.json").write_text('{"test_a.A": 7}')
+        (d / "times-macos-latest-1.json").write_text('{"test_a.A": 9}')
+        got = test_shards.merge(sorted(d.glob("*.json")))
+        self.assertEqual(got, {"macos-latest": {"test_a.A": 9.0}, "ubuntu-latest": {"test_a.A": 7.0, "test_b.B": 2.0}})
+        (d / "t.json").write_text(json.dumps(got))
+        self.assertEqual(test_shards.timings(d / "t.json", "macos-latest"), {"test_a.A": 9.0})
+        self.assertEqual(test_shards.cost("test_b", test_shards.timings(d / "t.json", "ubuntu-latest")), 2.0)
 
 
 if __name__ == "__main__":

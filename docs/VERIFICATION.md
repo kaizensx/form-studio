@@ -81,7 +81,7 @@ back as images, a stale `expect_head` is refused, and no tool can approve a rele
 
 | Workflow | Runs | On |
 |---|---|---|
-| [CI](../.github/workflows/ci.yml) | The test suite in four parallel shards per OS, balanced by `tests/ci_timings.json` (`scripts/ci/test_shards.py`); checks that the MCP reference matches the server | Linux, macOS; every push to `main` and `dev` and every pull request |
+| [CI](../.github/workflows/ci.yml) | The test suite in parallel shards balanced by `tests/ci_timings.json` (`scripts/ci/test_shards.py`): on Linux the whole suite in ten shards with line coverage; on macOS everything but the long geometry runs (mesh to CAD, remodelling, the design bench, mesh bodies) in four shards for a pull request, and the whole suite in five for every push and every night. A pull request that changes only docs, the site, artwork or other workflows leaves the long geometry runs out on Linux too. Checks that the MCP reference matches the server | Linux, macOS; every push to `main` and `dev`, every pull request, nightly on `dev` |
 | [Slow tests](../.github/workflows/slow-tests.yml) | The design bench's helmet and mouse exemplars, the 250 MB STL preflight and the 200k-triangle helmet run (`FORM_SLOW_TESTS=1`, `FORM_SLOW=1`) | Linux, macOS; nightly on `dev` |
 | [Desktop app](../.github/workflows/app.yml) | Engine tests, the app bundle build, the packaged app launch | macOS arm64 and x64, Windows, Linux |
 | [Interface tests](../.github/workflows/ui.yml) | The interface journeys with a real PrusaSlicer | Windows, Linux |
