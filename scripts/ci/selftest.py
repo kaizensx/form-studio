@@ -168,8 +168,16 @@ class Shards(unittest.TestCase):
 
     def test_the_real_suite_splits_into_four_with_nothing_lost(self):
         got = test_shards.plan(4)
-        self.assertEqual(sorted(sum(got, [])), test_shards.modules())
+        self.assertEqual(sorted({u.split(".")[0] for u in sum(got, [])}), test_shards.modules())
+        self.assertEqual(len(sum(got, [])), len(set(sum(got, []))))
         self.assertTrue(all(got))
+
+    def test_a_module_timed_by_class_is_split_into_all_its_classes(self):
+        times = {"test_recon.Layers": 400}
+        got = test_shards.units(["test_fsutil", "test_recon"], times)
+        self.assertEqual(got[0], "test_fsutil")
+        self.assertEqual(set(got[1:]), {f"test_recon.{c}" for c in test_shards.classes("test_recon")})
+        self.assertIn("test_recon.FeatureTree", got)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ through the Studio (kernel worker) for the project, CLI and "Make editable" rout
 pipeline without its program route (sketches and extrusions read off the mesh, tested in test_recon_program.py), so
 Layers 0, 1 and the feature tree are always exercised.
 """
+import importlib.util
 import json
 import os
 import subprocess
@@ -130,6 +131,8 @@ class Layers(unittest.TestCase):
     def test_layer0_is_the_mesh_exactly(self):
         for name in LAYERED:
             with self.subTest(name):
+                if name == "spur_gear" and importlib.util.find_spec("py_gearworks") is None:
+                    self.skipTest("py_gearworks is not installed (the [parts] extra)")
                 rep, out = run(name, TESTED_AT.get(name, TOL))
                 L0 = rep["layers"]["0"]
                 self.assertTrue(L0["valid"])

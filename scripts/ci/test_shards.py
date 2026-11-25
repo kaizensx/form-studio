@@ -1,7 +1,8 @@
 """Split the unit suite (tests/test_*.py) into shards of about equal run time and run one shard.
 
 The run times come from tests/ci_timings.json (seconds per test module, measured on the CI runners); a module that is
-not listed counts as DEFAULT seconds. Shards are filled longest module first, each into the shard with the least time
+not listed counts as DEFAULT seconds. A module the file lists by class ("test_recon.Layers") is split into its test
+classes (found in its source, so none is left out), each a unit of its own. Shards are filled longest module first, each into the shard with the least time
 so far, so the plan is stable for a given timing file and module list.
 
     python scripts/ci/test_shards.py plan --shards 4              # the plan, one line per shard
@@ -19,6 +20,7 @@ The CI run's `coverage` artifact holds that merge as measured-timings.json.
 from __future__ import annotations
 
 import argparse
+import ast
 import faulthandler
 import json
 import os
@@ -37,6 +39,24 @@ def modules() -> list[str]:
     return sorted(p.stem for p in TESTS.glob("test_*.py"))
 
 
+def classes(mod: str) -> list[str]:
+    """The top-level classes of tests/<mod>.py that define test methods, in source order."""
+    tree = ast.parse((TESTS / f"{mod}.py").read_text(encoding="utf-8"))
+    return [n.name for n in tree.body if isinstance(n, ast.ClassDef) and any(
+        isinstance(b, (ast.FunctionDef, ast.AsyncFunctionDef)) and b.name.startswith("test") for b in n.body)]
+
+
+def units(mods: list[str], times: dict[str, float]) -> list[str]:
+    """Modules, with each module that the timings list by class replaced by its classes."""
+    out = []
+    for m in mods:
+        if any(k.startswith(m + ".") for k in times):
+            out += [f"{m}.{c}" for c in classes(m)]
+        else:
+            out.append(m)
+    return out
+
+
 def timings(path: Path = TIMINGS) -> dict[str, float]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -50,7 +70,7 @@ def plan(n: int, mods: list[str] | None = None, times: dict[str, float] | None =
     times = timings() if times is None else times
     shards: list[list[str]] = [[] for _ in range(n)]
     load = [0.0] * n
-    for m in sorted(mods, key=lambda m: (-times.get(m, DEFAULT), m)):
+    for m in sorted(units(mods, times), key=lambda m: (-times.get(m, DEFAULT), m)):
         i = min(range(n), key=lambda k: (load[k], k))
         shards[i].append(m)
         load[i] += times.get(m, DEFAULT)
@@ -85,7 +105,7 @@ def run(mods: list[str], times_out: Path | None = None) -> bool:
             suite = loader.loadTestsFromName(m)
             suite.run(result)
             spent[m] = round(time.perf_counter() - t0, 1)
-            print(f"[shard] {m}: {spent[m]:.1f} s", file=sys.stderr, flush=True)
+            print(f"[shard] {m}: {spent[m]:.1f} s", file=sys.stderr, flush=True)     # m: a module or module.Class
     finally:
         faulthandler.cancel_dump_traceback_later()
         result.stopTestRun()
