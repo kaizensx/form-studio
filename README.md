@@ -1,11 +1,11 @@
 <p align="center">
-  <a href="https://kaizensx.github.io/form-studio/"><img src="docs/readme/hero-render.jpg" width="828" alt="An original full-face helmet built by Form Studio, pulled apart to show its four parts: a hex-textured shell, a brushed faceplate that sits on magnets, and two smoked lenses that clip in behind it."></a>
+  <a href="https://kaizensx.github.io/form-studio/"><img src="docs/readme/hero-render.jpg" width="828" alt="A planetary gear stage built by Form Studio: a graphite ring gear in a flanged housing, a steel sun gear and three teal planet gears on their carrier, meshed."></a>
 </p>
 
 <h1 align="center">Form Studio</h1>
 
 <p align="center"><b>Describe anything. An engineer-grade agent builds it as real, editable CAD.</b><br>
-<sub>The helmet above is one parametric design in four parts, built by the CAD kernel and photographed in the app.</sub></p>
+<sub>The gear stage above is one parametric design in six parts: involute gears that mesh, built by the CAD kernel and rendered from its own geometry.</sub></p>
 
 <p align="center">
   <a href="https://github.com/kaizensx/form-studio/releases/latest/download/FORM-macos-arm64.zip"><img src="docs/readme/download-macos-arm64.svg" width="168" height="56" alt="Download for macOS, Apple silicon"></a>
@@ -37,7 +37,7 @@
   <img src="docs/readme/made-game-chest.jpg" width="204" alt="A stylised treasure chest as a textured game asset.">
   <br>
   <img src="docs/readme/made-cam.jpg" width="204" alt="A cam and follower mechanism on a base plate.">
-  <img src="docs/readme/made-helmet.jpg" width="204" alt="The hero helmet, assembled.">
+  <img src="docs/readme/made-shade.jpg" width="204" alt="A domed lampshade perforated with rows of holes that grow towards the rim.">
   <img src="docs/readme/made-speaker.jpg" width="204" alt="A cube speaker with a perforated grille.">
   <img src="docs/readme/made-bottle.jpg" width="204" alt="A clear bottle with a blue screw cap.">
   <br>

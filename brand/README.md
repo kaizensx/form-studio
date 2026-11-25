@@ -20,7 +20,7 @@ This direction (option 1, "Frame") was chosen from six. The other five, with the
 | `wordmark.svg`, `wordmark-light.svg` | "Form Studio" alone, when the mark is already on screen |
 | `icon.svg` | The app icon (macOS grid: 824 px body in a 1024 px canvas) |
 | `build.py` | Builds all of the above, plus the app icons, the web icons, `og.png` and the outlines the app draws |
-| `og-part.png` | A real build (the hero helmet, rendered by scripts/media/showcase), used on the right of `site/assets/og.png` |
+| `og-part.png` | A real build (the planetary gear stage, rendered by scripts/media/showcase), used on the right of `site/assets/og.png` |
 
 Rebuild everything with `.venv/bin/python brand/build.py` (it needs `skia-pathops` and `fonttools` in the dev
 environment, and macOS for `iconutil`). Never edit an output by hand: change `build.py` or `options/build.py`

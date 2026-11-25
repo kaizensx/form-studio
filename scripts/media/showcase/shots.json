@@ -6,36 +6,6 @@
  ],
  "shots": [
   {
-   "name": "hero_helmet",
-   "views": [
-    {
-     "tag": "hero",
-     "pose": "exploded",
-     "explode": 1.25,
-     "preset": "dark",
-     "az": -38,
-     "el": 10,
-     "size": [
-      2400,
-      1800
-     ],
-     "samples": 256
-    },
-    {
-     "tag": "asm",
-     "pose": "assembled",
-     "preset": "dark",
-     "az": -22,
-     "el": 10,
-     "size": [
-      2000,
-      1500
-     ],
-     "samples": 200
-    }
-   ]
-  },
-  {
    "name": "ratchet_wrench",
    "views": [
     {
@@ -149,6 +119,18 @@
      "preset": "dark",
      "az": -50,
      "el": 46
+    },
+    {
+     "tag": "hero",
+     "pose": "assembled",
+     "preset": "dark",
+     "az": -40,
+     "el": 34,
+     "size": [
+      2400,
+      1800
+     ],
+     "samples": 256
     }
    ]
   }
