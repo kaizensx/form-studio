@@ -361,6 +361,19 @@ def _ok(r):
                 and (r.get("step") or {}).get("valid"))
 
 
+def scored_line(meta: dict) -> str:
+    """"- Scored by: <who> (<date>). <method>", saying who scored once: a method that opens by restating who scored
+    (a sentence naming the blind passes) is not repeated."""
+    who = (meta or {}).get("scored_by")
+    if not who:
+        return "- Scored by: nobody yet (no scores file)."
+    method = ((meta or {}).get("method") or "").strip()
+    first, _, rest = method.partition(". ")
+    if "blind passes by" in first.lower() and "not a person" in first.lower():
+        method = rest.strip()
+    return f"- Scored by: {who} ({meta.get('date', 'undated')}). {method}".rstrip()
+
+
 def write_doc(rows: list, cfg: dict, meta: dict, scores: dict) -> None:
     real = [r for r in rows if not r.get("control")]
     ctrl = [r for r in rows if r.get("control")]
@@ -381,9 +394,7 @@ def write_doc(rows: list, cfg: dict, meta: dict, scores: dict) -> None:
         a = r.get("aesthetic") or {}
         L.append(f"- Control ({r['title']}): rubric {fmt(a.get('mean'))}, "
                  f"{'passes the gate (the critic is miscalibrated)' if a.get('passed') else 'fails the gate, as it must'}.")
-    who = scores.get("scored_by")
-    L += [f"- Scored by: {who} ({scores.get('date', 'undated')}). {scores.get('method', '')}" if who else
-          "- Scored by: nobody yet (no scores file).", ""]
+    L += [scored_line(scores), ""]
     L += ["How it is measured:", "",
           "- **Model**: the exemplar's model_mesh op list run in Blender's fixed runner (blocks, bevel, inset, "
           "panel_line, trim_strip, kit_place); ops tagged high_only build the bake source only. The remote is a kernel "
@@ -550,8 +561,7 @@ def write_compare(on: dict, off: dict) -> None:
          f": **{'pass' if gate_ctrl else 'FAIL'}**.",
          f"- Technical checks pass on {tech_on} of {len(real)} with refinement on, "
          f"{sum(_ok(r) for r in off['rows'] if not r.get('control'))} of {len(real)} off.",
-         f"- Scored by: {so.get('scored_by') or 'nobody'} ({so.get('date', 'undated')}). {so.get('method') or ''} "
-         "The rubric is a model's judgement of rendered sheets, not a person's and not a measurement.",
+         scored_line(so) + " The rubric is a model's judgement of rendered sheets, not a person's and not a measurement.",
          f"- The off column's rubric is {Path(m_off.get('scores') or SCORES).name}: "
          + ("the same blind passes (the sheets of both runs were scored together, shuffled)."
             if (m_off.get("scores_meta") or {}).get("method") == so.get("method") and so.get("method") else

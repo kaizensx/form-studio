@@ -127,7 +127,7 @@
 - **Benches, measured honestly.** Creation bench (docs/CREATION_BENCH.md): every gate passes: function checks
   identical, mean critic gain 1.91, no brief lower, first visible 0.044 s on and 0.043 s off (within 5 %; an
   earlier run before the pruning fix failed at 0.048 s against 0.0435 s). Game bench (docs/GAME_BENCH.md), three new
-  blind passes by model subagents over the fourteen sheets of both runs shuffled together: refinement now keeps a
+  blind passes by an AI model, not a person, over the fourteen sheets of both runs shuffled together: refinement now keeps a
   primary-form change on three of six assets (shell fairing on the helmet, lid and body massing on the chest, end
   piers on the wall) and no detail operator fails on a non-manifold LOD any more; rubric with refinement on 2.81
   helmet, 3.31 chest, 3.19 sword, 2.94 wall, 3.31 wheel, 2.94 remote, so the aesthetic gate (4.0 on five of six)
@@ -161,7 +161,7 @@
   refined source fail to load), and packed literals keep their region order (the wall's bricks lost their
   material). The bench sword's guard ends in two terminals.
 - **Game bench, measured honestly.** docs/GAME_BENCH.md has the new on and off runs and three new blind passes by
-  model subagents over the fourteen sheets of both runs shuffled together: 0 of 6 assets at 4.0 (gate failed),
+  an AI model, not a person, over the fourteen sheets of both runs shuffled together: 0 of 6 assets at 4.0 (gate failed),
   the control fails as it must, every technical check passes. Refinement kept one change (a silhouette breaker on
   the wall); on the other assets the panel line, crisp plates, inset and kit operators made LODs that are not
   manifold or have flipped faces after decimation, and the quick bake rejected them. That LOD robustness is the next

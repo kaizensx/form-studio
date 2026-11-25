@@ -68,5 +68,27 @@ class DesignBench(unittest.TestCase):
         self.assertLess(r["total"], bench.PASS, r["notes"])
 
 
+class GameBenchWords(unittest.TestCase):
+    """Who scored the game bench is said once, as an AI model and not a person."""
+    def test_scored_once_by_an_ai_model(self):
+        import json
+        spec = importlib.util.spec_from_file_location("game_bench", HERE.parent / "scripts" / "game_bench.py")
+        gb = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gb)
+        for name in ("game_scores.json", "game_scores_refine.json"):
+            meta = json.loads((HERE / "design_bench" / name).read_text(encoding="utf-8"))
+            line = gb.scored_line(meta)
+            self.assertIn("by an AI model, not a person", line)
+            self.assertEqual(line.lower().count("blind passes by"), 1, line)
+            self.assertNotIn("subagent", line.lower())
+        dup = {"scored_by": "three blind passes by an AI model, not a person", "date": "2026-11-25",
+               "method": "Three blind passes by an AI model, not a person, on 2026-11-25. Each pass saw sheets."}
+        self.assertEqual(gb.scored_line(dup), "- Scored by: three blind passes by an AI model, not a person "
+                                               "(2026-11-25). Each pass saw sheets.")
+        doc = (HERE.parent / "docs" / "GAME_BENCH.md").read_text(encoding="utf-8")
+        self.assertNotIn("subagent", doc.lower())
+        self.assertEqual(doc.count("blind passes by"), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

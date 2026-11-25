@@ -1,7 +1,7 @@
 {
  "about": "Aesthetic rubric scores (form/critique.py AESTHETIC, 0-5) for the game bench, refinement off: three new blind passes. The bench takes each item's median and caps it by the asset's game evidence. These are a model's judgement, not a measurement, and not a person's: a person should look and replace them.",
- "scored_by": "three blind passes by Claude subagents (an AI model), not a person",
- "method": "Three new blind passes by Claude subagents (an AI model), not a person, on 2026-11-25. Each pass saw only fourteen anonymous review sheets (LOD0 lit from four views and its 64 px outline): the seven assets of the refinement-on run and the seven of the refinement-off run, shuffled together with a fixed seed, the control among them, no names, briefs, numbers or key; each pass read them in its own order. The letters were mapped back to run and brief afterwards.",
+ "scored_by": "three blind passes by an AI model, not a person",
+ "method": "Each pass saw only fourteen anonymous review sheets (LOD0 lit from four views and its 64 px outline): the seven assets of the refinement-on run and the seven of the refinement-off run, shuffled together with a fixed seed, the control among them, no names, briefs, numbers or key; each pass read them in its own order. The letters were mapped back to run and brief afterwards.",
  "date": "2026-11-25",
  "passes": {
   "treasure_chest": [
