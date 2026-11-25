@@ -11,7 +11,7 @@ from form import craft
 from form.craft import fits, meshtex
 from form.recipes.base import RecipeError
 
-try:                                                                    # the [parts] extra; CI runs without it
+try:                                                                    # the [parts] extra (requirements.lock has it)
     import py_gearworks  # noqa: F401
     HAVE_GEARS = True
 except ImportError:

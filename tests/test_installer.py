@@ -70,6 +70,20 @@ class Registry(unittest.TestCase):
         extras = tomllib.loads(py.read_text(encoding="utf-8"))["project"]["optional-dependencies"]["parts"]
         self.assertEqual(sorted(extras), sorted(installer.PARTS_PINS))
 
+    def test_lock_pins_the_parts_and_organic_extras(self):
+        root = Path(__file__).resolve().parents[1]
+        extras = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["optional-dependencies"]
+        lock = {}
+        for line in (root / "requirements.lock").read_text(encoding="utf-8").splitlines():
+            if "==" in line and not line.startswith("#"):
+                name, version = line.split("==")
+                lock[name.strip().lower().replace("_", "-")] = version.strip()
+        for req in extras["parts"] + extras["organic"]:
+            name = req.split("=")[0].split(">")[0].split("<")[0].strip().lower().replace("_", "-")
+            self.assertIn(name, lock, req)
+            if "==" in req:
+                self.assertEqual(lock[name], req.split("==")[1], req)
+
     def test_claude_uses_the_official_commands(self):
         c = installer.get("claude")
         mac = installer.plan(c, "darwin", which=lambda n: "/x/" + n)

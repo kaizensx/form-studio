@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-try:                                                    # the [parts] extra; CI runs without it
+try:                                                    # the [parts] extra (requirements.lock has it)
     import py_gearworks  # noqa: F401
     HAVE_GEARS = True
 except ImportError:
@@ -33,7 +33,7 @@ class DesignBench(unittest.TestCase):
             if not (b.get("exemplar") or b.get("solution")):
                 continue
             r = self.res[b["id"]]
-            if r["status"].startswith("skipped"):                 # gears without the [parts] extra (CI)
+            if r["status"].startswith("skipped"):                 # gears without the [parts] extra
                 self.assertFalse(HAVE_GEARS, (b["id"], r["notes"]))
                 self.assertIn("py_gearworks", " ".join(r["notes"]))
                 continue
