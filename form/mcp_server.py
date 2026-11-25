@@ -704,7 +704,7 @@ def build() -> MCPServer:
         st = studio()
         from . import staged
         if refine not in ("auto", "off", "on", ""):
-            raise ToolError("refine is \"auto\" or \"off\".")
+            raise ToolError("refine is \"auto\" (the default), \"off\" or \"on\" (also refine a game asset).")
         if relation and relation not in RELATIONS:
             raise ToolError(f"Unknown relation “{relation}”: use {', '.join(RELATIONS)}.")
         front = _front()

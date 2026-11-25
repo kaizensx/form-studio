@@ -263,6 +263,32 @@ class OverMCP(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_KERNEL, "needs build123d")
+class RefineArgument(unittest.TestCase):
+    def test_a_bad_refine_value_lists_every_valid_one(self):
+        import anyio
+        from form import mcp_server
+        with tempfile.TemporaryDirectory() as d:
+            with mock.patch.dict(os.environ, {"FORM_DATA": d}):
+                mcp_server.S["studio"] = None
+                srv = mcp_server.build()
+
+                async def go():
+                    try:
+                        await srv.call_tool("create_design", {"name": "X", "source": "x", "run": False,
+                                                              "refine": "maybe"})
+                    except Exception as e:                   # noqa: BLE001
+                        return str(e)
+                    return ""
+                try:
+                    msg = anyio.run(go)
+                finally:
+                    if mcp_server.S.get("studio") is not None:
+                        mcp_server.studio().kernel.stop()
+                    mcp_server.S["studio"] = None
+        for v in ('"auto"', '"off"', '"on"'):
+            self.assertIn(v, msg)
+
+
 class Replay(unittest.TestCase):
     """The owner's request: three meshes and "make this editable", through Form Studio's chat with the fake agent,
     which calls the real MCP tools."""
