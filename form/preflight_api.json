@@ -4344,6 +4344,24 @@
 "features": {
 "kind": "module"
 },
+"finish": {
+"kind": "module"
+},
+"finish_cut": {
+"kind": "function",
+"sig": {
+"kw": false,
+"params": [
+"body",
+"cuts",
+"depth",
+"min_wall",
+"min_depth",
+"label"
+],
+"pos": 6
+}
+},
 "fit_cage": {
 "kind": "function",
 "sig": {
