@@ -27,6 +27,7 @@ class PackagedData(unittest.TestCase):
         hooks.collect_all = lambda pkg: ([], [], [])
         hooks.collect_data_files = lambda pkg, include_py_files=False: []
         hooks.collect_submodules = lambda pkg: []
+        hooks.copy_metadata = lambda pkg, recursive=False: []
         stub = {"PyInstaller": types.ModuleType("PyInstaller"), "PyInstaller.utils": types.ModuleType("PyInstaller.utils"),
                 "PyInstaller.utils.hooks": hooks}
         captured = {}
@@ -92,6 +93,7 @@ class PackagedData(unittest.TestCase):
         hooks.collect_all = lambda pkg: ([], [], [])
         hooks.collect_data_files = lambda pkg, include_py_files=False: []
         hooks.collect_submodules = lambda pkg: list(mods)
+        hooks.copy_metadata = lambda pkg, recursive=False: []
         stub = {"PyInstaller": types.ModuleType("PyInstaller"), "PyInstaller.utils": types.ModuleType("PyInstaller.utils"),
                 "PyInstaller.utils.hooks": hooks}
         got = {}
@@ -155,6 +157,7 @@ class PackagedData(unittest.TestCase):
         hooks.collect_all = lambda pkg: ([], [], [])
         hooks.collect_data_files = lambda pkg, include_py_files=False: []
         hooks.collect_submodules = lambda pkg: []
+        hooks.copy_metadata = lambda pkg, recursive=False: []
         stub = {"PyInstaller": types.ModuleType("PyInstaller"), "PyInstaller.utils": types.ModuleType("PyInstaller.utils"),
                 "PyInstaller.utils.hooks": hooks}
         got = {}
