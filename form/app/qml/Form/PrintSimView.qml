@@ -22,6 +22,24 @@ Item {
     property var box: null                    // toolpath bounding box [[x0,y0,0],[x1,y1,z1]]
     property var layout: null                 // plate mode: packing result { placed: [{x,y,w,h,rotated}], fits }
     property real footer: 0                   // screen pixels at the bottom covered by controls
+    // The free stage (LayerView): the print is framed in this rectangle, clear of the panes, the line types and the
+    // transport. The scene still fills the whole view; it is drawn around the rectangle's middle, so the plate runs
+    // on under the glass. Changes glide (the conversation opening, the transport folding).
+    property real freeX: 0
+    property real freeY: 0
+    property real freeW: width
+    property real freeH: height
+    readonly property bool freeSet: freeW < width - 1 || freeH < height - 1
+    property bool freeGlide: false
+    Timer { interval: 500; running: true; onTriggered: v.freeGlide = true }
+    Behavior on freeX { enabled: v.freeGlide; NumberAnimation { duration: Theme.move(Theme.camera); easing.type: Easing.OutCubic } }
+    Behavior on freeY { enabled: v.freeGlide; NumberAnimation { duration: Theme.move(Theme.camera); easing.type: Easing.OutCubic } }
+    Behavior on freeW { enabled: v.freeGlide; NumberAnimation { duration: Theme.move(Theme.camera); easing.type: Easing.OutCubic } }
+    Behavior on freeH { enabled: v.freeGlide; NumberAnimation { duration: Theme.move(Theme.camera); easing.type: Easing.OutCubic } }
+    readonly property real offX: freeSet ? freeX + freeW / 2 - width / 2 : 0
+    readonly property real offY: freeSet ? freeY + freeH / 2 - height / 2 : 0
+    // pull back when the rectangle is much smaller than the view (as the design viewport does)
+    readonly property real fitK: !freeSet ? 1 : Math.min(4, Math.max(1, 0.86 * view.height / Math.max(60, freeH), 0.95 * view.height / Math.max(60, freeW)))
     readonly property alias geometry: geo
     signal loaded(var summary)
     signal failed(string message)
@@ -55,13 +73,13 @@ Item {
         if (mode === "plate") { lo = Qt.vector3d(-bed[0] / 2, -bed[1] / 2, 0); hi = Qt.vector3d(bed[0] / 2, bed[1] / 2, box[1][2]) }
         var r = Math.max(Math.hypot(hi.x - lo.x, hi.y - lo.y, hi.z - lo.z) / 2, 12)
         // keep the print clear of the controls: aim a little below it
-        var lift = footer > 0 && height > 0 ? r * 1.1 * footer / height : 0
+        var lift = !freeSet && footer > 0 && height > 0 ? r * 1.1 * footer / height : 0
         target = Qt.vector3d((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, (lo.z + hi.z) / 2 - lift)
         dist = r / Math.sin(13 * Math.PI / 180) * (mode === "plate" ? 1.18 : 1.42)
         if (mode === "plate") { az = -24; el = 52 }
         pan2 = Qt.point((box[0][0] + box[1][0]) / 2, (box[0][1] + box[1][1]) / 2)
-        var availH = Math.max(120, height - footer - 70)
-        var availW = Math.max(160, width - 230 - 48)          // clear of the line-type list on the left
+        var availH = freeSet ? Math.max(80, freeH - 24) : Math.max(120, height - footer - 70)
+        var availW = freeSet ? Math.max(120, freeW - 24) : Math.max(160, width - 230 - 48)          // clear of the line-type list on the left
         zoom2 = Math.max(0.5, Math.min(availW / Math.max(1, box[1][0] - box[0][0] + 6), availH / Math.max(1, box[1][1] - box[0][1] + 6)))
         framed = true
     }
@@ -79,7 +97,8 @@ Item {
 
     View3D {
         id: view
-        anchors.fill: parent
+        // centred on the free stage, and large enough to still cover the whole view
+        x: v.offX - Math.abs(v.offX); y: v.offY - Math.abs(v.offY); width: v.width + 2 * Math.abs(v.offX); height: v.height + 2 * Math.abs(v.offY)
         camera: v.flat ? ortho : persp
         environment: SceneEnvironment {
             clearColor: Theme.plate; backgroundMode: SceneEnvironment.Color
@@ -90,9 +109,10 @@ Item {
             fieldOfView: 26; clipNear: 2; clipFar: 6000
             readonly property real ra: v.az * Math.PI / 180
             readonly property real re: Math.max(-89, Math.min(89, v.el)) * Math.PI / 180
-            readonly property vector3d zpos: Qt.vector3d(v.target.x + v.dist * Math.sin(ra) * Math.cos(re),
-                                                         v.target.y - v.dist * Math.cos(ra) * Math.cos(re),
-                                                         v.target.z + v.dist * Math.sin(re))
+            readonly property real far: v.dist * v.fitK
+            readonly property vector3d zpos: Qt.vector3d(v.target.x + far * Math.sin(ra) * Math.cos(re),
+                                                         v.target.y - far * Math.cos(ra) * Math.cos(re),
+                                                         v.target.z + far * Math.sin(re))
             position: v.scene(zpos)
             rotation: Quaternion.lookAt(v.scene(zpos), v.scene(v.target))
         }
@@ -101,7 +121,8 @@ Item {
             clipNear: 1; clipFar: 4000
             horizontalMagnification: v.zoom2; verticalMagnification: v.zoom2
             // straight down; the controls at the bottom push the layer up a little
-            position: Qt.vector3d(v.pan2.x + v.origin.x - 115 / v.zoom2, 1500, -(v.pan2.y + v.origin.y - v.footer / 2 / v.zoom2 + 20 / v.zoom2))
+            position: v.freeSet ? Qt.vector3d(v.pan2.x + v.origin.x, 1500, -(v.pan2.y + v.origin.y))
+                                 : Qt.vector3d(v.pan2.x + v.origin.x - 115 / v.zoom2, 1500, -(v.pan2.y + v.origin.y - v.footer / 2 / v.zoom2 + 20 / v.zoom2))
             eulerRotation.x: -90
         }
         DirectionalLight { eulerRotation: Qt.vector3d(-52, -32, 0); brightness: 1.6 }

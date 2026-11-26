@@ -10,6 +10,7 @@ Rectangle {
     readonly property bool ready: !!info
     property string metric: "time"            // what the chart shows: time | length
     readonly property bool narrow: width < 580
+    property bool compact: false              // a short stage: the row of controls only, the scrubbers wait
     radius: Theme.rLg; color: Theme.alpha(Theme.plate1, 0.94); border.color: Theme.rule
     height: col.implicitHeight + 24
     function clock(s) {
@@ -53,7 +54,7 @@ Rectangle {
         }
 
         // ── along the current layer ──────────────────────────
-        Item { width: parent.width; height: 18; visible: bar.ready
+        Item { width: parent.width; height: 18; visible: bar.ready && !bar.compact
             Txt { id: al; kind: "fine"; text: "Along the layer"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
             Beam { objectName: "simAlong"; anchors.left: al.right; anchors.leftMargin: 12; anchors.right: pc.left; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                 from: 0; to: 1; step: 0.002; value: Math.min(1, bar.sim.frac); tint: Theme.datum
@@ -65,7 +66,7 @@ Rectangle {
         // ── every layer: the chart is the scrubber ───────────
         PrintSimChart {
             objectName: "simLayers"
-            width: parent.width; visible: bar.ready
+            width: parent.width; visible: bar.ready && !bar.compact
             values: !bar.ready ? [] : bar.metric === "time" && bar.sim.timed ? info.time_s : info.length_mm
             bridges: bar.ready ? info.bridge_layers : []
             overhangs: bar.ready ? info.overhang_layers : []
@@ -74,7 +75,7 @@ Rectangle {
             onScrub: function (l) { bar.sim.pause(); bar.sim.setNow(l + 0.9999) }
             onHoverChanged: hov.l = hover
         }
-        Item { width: parent.width; height: 24; visible: bar.ready
+        Item { width: parent.width; height: 24; visible: bar.ready && !bar.compact
             Row { spacing: 8; anchors.verticalCenter: parent.verticalCenter
                 Seg { model: bar.narrow ? [{ value: "time", text: "Time" }, { value: "length", text: "Path" }] : [{ value: "time", text: "Time per layer" }, { value: "length", text: "Path per layer" }]
                     value: bar.metric === "time" && bar.sim.timed ? "time" : "length"

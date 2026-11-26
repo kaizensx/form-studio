@@ -33,10 +33,23 @@ Item {
     readonly property bool onlySpecial: types.length > 0 && types.every(function (t) { return (special.indexOf(t) >= 0) !== !!hidden[t] })
     property real leftInset: 12                // the workspace's tool rail stays on screen at the left
     readonly property bool narrow: width < 640 // a narrow viewport: controls stack, the line types fold away
-    property bool typesFold: narrow
+    property bool typesFold: !typesRoom
+    onTypesRoomChanged: typesFold = !typesRoom
     property real rightInset: 12               // the workspace's panes on the right stay on screen
     property real topInset: 14                 // the top bar's capsules float over the view
     property real stripHeight: 60              // the workspace's bottom strip (pipeline), with its margin
+    property real axisX: width / 2             // the centre line the transport stands on (the conversation bar's)
+    // ── the layout: everything stands in the free stage, nothing over anything ──
+    //   top left   the way back and what this is, the line types under it      top right   how to look at it
+    //   bottom     the transport, on the bar's centre line, between the tool dock and the panes; it folds to its
+    //              one row of controls when the stage is short (the conversation open)
+    //   the rest   the print
+    readonly property real stageL: leftInset + 4
+    readonly property real stageR: width - rightInset
+    readonly property real headFoot: topInset + 76                 // under the way back and its note
+    readonly property real floorY: height - stripHeight - 12       // the top of the bottom row (the bar, its drawer)
+    readonly property bool short_: floorY - headFoot < 400         // not room for the whole transport and a print above it
+    readonly property bool typesRoom: !narrow && floorY - bar.height - 12 - headFoot >= 300
     readonly property int foot: bar.height + stripHeight + 12 + 10   // kept clear at the bottom: transport and the pipeline strip
 
     readonly property var inks: ({
@@ -131,6 +144,9 @@ Item {
         colors: sim.inks
         now: sim.now; total: Math.max(1, sim.count); mode: sim.mode; ghost: sim.ghost
         nozzle: sim.here; footer: sim.foot
+        // the print's own rectangle: right of the line types while they are open, above the transport
+        freeX: sim.stageL + (legend.visible && !sim.typesFold && sim.stageR - sim.stageL > 620 ? legend.width + 16 : 0); freeW: Math.max(120, sim.stageR - freeX)
+        freeY: sim.headFoot; freeH: Math.max(100, (bar.visible ? bar.y - 12 : sim.floorY) - freeY)
         box: sim.info ? sim.info.bbox : null
         bed: Store.slicer && Store.slicer.envelope_mm ? [Store.slicer.envelope_mm[0], Store.slicer.envelope_mm[1]] : [180, 180]
         layout: sim.packed
@@ -165,7 +181,7 @@ Item {
                 text: { var x = Store.plates[Store.plateShown - 1]; return x ? x.parts.map(function (q) { return q.label }).join(", ") : "" } } }
 
         // line types: click to hide or show
-        Rectangle { visible: sim.types.length > 0 && sim.mode !== "plate"
+        Rectangle { id: legend; visible: sim.types.length > 0 && sim.mode !== "plate"
             width: 214; height: lg.implicitHeight + 16; radius: Theme.rMd; color: Theme.alpha(Theme.plate1, 0.9); border.color: Theme.rule
             Column { id: lg; x: 6; y: 8; width: parent.width - 12; spacing: 0
                 Item { width: parent.width; height: 22
@@ -234,7 +250,8 @@ Item {
         id: bar
         sim: sim
         visible: sim.mode !== "plate"
-        anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: sim.stripHeight + 12
-        width: Math.min(parent.width - 24, 780)
+        compact: sim.short_
+        width: Math.round(Math.min(sim.stageR - sim.stageL, 780))
+        x: Math.round(Math.max(sim.stageL, Math.min(sim.axisX - width / 2, sim.stageR - width))); y: Math.round(sim.floorY - height)
     }
 }
