@@ -46,7 +46,8 @@ Item {
         // a capsule: thin and unblurred inside the top bar's own glass, a pane of its own when it drops under the bar
         source: Store.backdrop; flat: ab.inBar; shadow: false
         readonly property real want: row.implicitWidth + 28
-        width: Math.min(want, ab.inBar ? ab.slotW : 360); height: 28; radius: 14
+        readonly property real room: ab.inBar ? ab.slotW : 460
+        width: Math.min(want, room); height: 28; radius: 14
         x: ab.inBar ? Math.round(Math.max(ab.slotX, Math.min(ab.slotX + ab.slotW - width, (ab.width - width) / 2))) : ab.dropX >= 0 ? Math.round(ab.dropX - width / 2) : ab.width - width - 14
         y: (ab.inBar ? Math.round((ab.barH - height) / 2) : ab.barH + 8) + (ab.named ? 0 : Theme.shift(-3))
         opacity: ab.named ? 1 : 0; visible: opacity > 0.01
@@ -60,7 +61,7 @@ Item {
                     color: ab.lead && !ab.lead.ok ? Theme.signal : Theme.pass } }
             Txt { objectName: "activityLabel"; text: ab.lead ? ab.lead.label + (ab.lead.done ? "" : "…") : ""; font.pixelSize: 12; font.weight: Theme.wMedium; wrapMode: Text.NoWrap
                 elide: Text.ElideRight; width: Math.min(implicitWidth, 230); anchors.verticalCenter: parent.verticalCenter }
-            Txt { kind: "fine"; tone: 3; visible: text !== "" && card.width >= card.want; wrapMode: Text.NoWrap; elide: Text.ElideRight; width: Math.min(implicitWidth, 200); anchors.verticalCenter: parent.verticalCenter
+            Txt { kind: "fine"; tone: 3; visible: text !== "" && card.room >= 420; wrapMode: Text.NoWrap; elide: Text.ElideRight; width: Math.min(implicitWidth, 200); anchors.verticalCenter: parent.verticalCenter
                 text: !ab.lead ? "" : (ab.lead.detail || "") + (ab.items.length > 1 ? (ab.lead.detail ? " · " : "") + "and " + (ab.items.length - 1) + " more" : "") }
             Txt { kind: "fine"; mono: true; tone: 3; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
                 text: ab.lead ? (ab.progress >= 0 && !ab.lead.done ? Math.round(ab.progress * 100) + "% · " : "") + ((ab.now - ab.lead.t0) / 1000).toFixed(1) + " s" : "" } }

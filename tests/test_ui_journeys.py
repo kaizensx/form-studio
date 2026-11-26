@@ -76,6 +76,12 @@ class Journeys(unittest.TestCase):
     def test_design(self):
         self.journey("design.py")
 
+    def test_lightdesk(self):               # the room: panes never overlap, the bar and its keys, the cue and the program during a build
+        self.journey("lightdesk.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_lightdesk_light(self):         # the same on paper
+        self.journey("lightdesk.py", env_extra={"FORM_APPEARANCE": "light"})
+
     def test_viewport_tools(self):
         self.journey("tools.py")
 
