@@ -105,6 +105,8 @@ async def run(out: dict) -> None:
             print("   contract:", "; ".join(a["text"] for a in b["contract"]["assertions"]))
             print("   audit   :", au.get("ask") or "nothing to settle")
             out["audit_trap"] = au
+            out["brief_goal"] = brief["goal"]
+            out["contract_trap"] = [x["text"] for x in b["contract"]["assertions"]]
             refused = await call("create_design", {"name": "Bolted flange", "source": SOURCE, "plan": b["brief"],
                                                    "run": False})
             print("   building from it is refused:", str(refused).splitlines()[0][:110])
@@ -129,6 +131,7 @@ async def run(out: dict) -> None:
             e = await call("edit_design", {"project": pid, "expect_head": r["head"], "look": False, "run": False,
                                            "ops": [{"op": "set_param", "param": "hole_d", "default": 5.2}]})
             assert isinstance(e, dict), e
+            out["repair_op"] = {"op": "set_param", "param": "hole_d", "default": 5.2}
             print("   canonical form:", e.get("canonical"), "| built:", [(x["feature"], x["status"]) for x in e["changed"]],
                   "| reused:", e["reused"])
             print(sheet(e.get("proof")))
