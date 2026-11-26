@@ -19,6 +19,9 @@ def main() -> int:
     if argv[:2] == ["-m", "form.mcp_server"]:
         from form.mcp_server import main as mcp
         return mcp(argv[2:]) or 0
+    if argv[:2] == ["-m", "form.meshguard"]:   # the export's mesher in a child process (form/meshguard.py)
+        from form.meshguard import main as meshguard
+        return meshguard(argv[2:]) or 0
     if argv[:1] == ["cli"]:
         from form.__main__ import main as cli
         return cli(argv[1:]) or 0
