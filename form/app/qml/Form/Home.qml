@@ -78,7 +78,7 @@ Item {
     Timer { interval: 40 + 9 * Theme.stagger + Theme.slow; running: true; onTriggered: home.entered = true }
     Connections { target: Store; function onStudioChanged() { home.loadPhotos() }
         function onSheetChanged() { if (!Store.sheet) Store.loadStart() }                 // a printer chosen in its sheet shows here
-        function onModelPickWanted() { if (Store.screen === "home" && !Store.talkOpen) Qt.callLater(function () { if (!homeModelPop.opened) homeModelPop.open() }) } }
+        function onModelPickWanted() { if (Store.screen === "home" && !Store.talkOpen) Qt.callLater(function () { composer.pickModel() }) } }
     function recipeTitle(id) {
         if (!Store.studio) return ""
         if (String(id).indexOf("src:") === 0 || String(id).indexOf("scad:") === 0) return "Designed as code"
@@ -244,18 +244,13 @@ Item {
                         opacity: 0; transform: Translate { id: barLift }
                         Arrive { item: composer; lift: barLift; beat: 1 } }
                     Item { visible: !home.chatting; width: 1; height: Theme.s4 }
-                    // ── under the bar: what it is for and which printer on the left, the agent on the right, both
-                    // lined up with the bar's edges. Every item is one height on one centre line, and the
-                    // left group is measured with the printer chip whenever printing is on, so picking My printer only
-                    // shows the chip in its reserved place: nothing moves, nothing wraps. The row wraps (the agent to a
-                    // second line) only when the bar itself is too narrow for both groups.
+                    // ── under the bar: what it is for and which printer, lined up with the bar's left edge. Every item
+                    // is one height on one centre line. (The agent and model are chosen in the bar itself, beside
+                    // Design it: StartComposer.qml.)
                     Item { id: opts; objectName: "startOptions"; visible: !home.chatting; width: parent.width
                         readonly property int h: 34
                         readonly property int inset: 10
-                        readonly property real leftMax: forLbl.implicitWidth + forRow.spacing + purposeSeg.implicitWidth
-                                                        + (Store.printOn ? forRow.spacing + printerChip.implicitWidth : 0)
-                        readonly property bool wrap: leftMax + Theme.s4 + modelChip.implicitWidth > width - 2 * inset
-                        height: wrap ? 2 * h + Theme.s2 : h
+                        height: h
                         opacity: 0; transform: Translate { id: optsLift }
                         Arrive { item: opts; lift: optsLift; beat: 2 }
                         Row { id: forRow; x: opts.inset; height: opts.h; spacing: Theme.s3
@@ -271,24 +266,7 @@ Item {
                                 visible: Store.printOn && Store.newPurposeEffective === "print"
                                 text: Store.printerName ? Store.printerName : "Choose a printer"
                                 tip: "The printer the next design is checked and sliced for. Click to change it."
-                                onClicked: Store.openSheet("printer") } }
-                        Btn { id: modelChip; objectName: "startModel"; height: Theme.hMd; kind: "quiet"; icon: "sparkles"; active: homeModelPop.opened
-                            x: opts.wrap ? opts.inset - 13 : opts.width - opts.inset - width + 13; y: (opts.wrap ? opts.h + Theme.s2 : 0) + Math.round((opts.h - height) / 2)
-                            text: Store.chatReady ? Store.chatAgentLabel + " · " + Store.modelShort(Store.chatAgent, Store.chatModel) : "Connect an agent"
-                            tip: Store.chatReady ? "The agent and model that design it. Click to change them." : "No agent is connected: add one in Settings › Agents & models"
-                            onClicked: Store.chatReady ? (homeModelPop.opened ? homeModelPop.close() : homeModelPop.open()) : Store.openSettings("agents")
-                            Pop {
-                                id: homeModelPop; y: parent.height + 6; x: opts.wrap ? 0 : Math.round(parent.width - width); width: 380; padding: 6
-                                origin: opts.wrap ? Popup.TopLeft : Popup.TopRight
-                                height: Math.min(hmp.implicitHeight + 12, home.height * 0.6)
-                                onAboutToShow: hmp.reset()
-                                onOpened: hmp.opened()
-                                onClosed: Qt.callLater(function () {
-                                    Store.retryAfterPick = false
-                                    if (Store.pendingSend) { Store.chatPrefill(Store.pendingSend); Store.pendingSend = "" } })
-                                Flickable { anchors.fill: parent; clip: true; contentHeight: hmp.implicitHeight; boundsBehavior: Flickable.StopAtBounds
-                                    ScrollBar.vertical: ScrollBar { width: 6 }
-                                    TalkModelPicker { id: hmp; width: parent.width; onDone: homeModelPop.close() } } } } }
+                                onClicked: Store.openSheet("printer") } } }
                     Note { visible: !!Store.fatal; width: parent.width; kind: "red"; title: Store.fatal ? Store.fatal.message : ""; text: Store.fatal ? (Store.fatal.hint || "") : "" }
                 }
                 // first day: what is turning on the bench, said honestly (kernel geometry, an example, not one of yours)

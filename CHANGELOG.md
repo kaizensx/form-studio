@@ -7,6 +7,11 @@
 - **A new look: Lightdesk.** The 3D view now fills the whole window and every control floats over it as a pane of
   glass, in the dark studio or on paper. One colour, electric cyan, always means "this is where you are"; green only
   means pass and amber only means review. The app is set in Geist and Geist Mono.
+- **A smooth room.** The dark studio's wall, its pool of light and the floor under the part are dithered, so their
+  slow gradients no longer show as bands on a display.
+- **The agent and model are chosen in Home's composer.** A chip beside Design it names the agent, the model and the
+  effort and opens the same picker as a conversation; what you pick is what the next design is made with. With no
+  agent connected it says so and opens Settings › Agents & models.
 - **The top of the window is three capsules.** The design, its revision and its state on the left; the stages
   (Describe, Design, Fit, Review, Make) in the middle, each with one line that says where it stands; the printer (when
   printing is on), search and Settings on the right.
