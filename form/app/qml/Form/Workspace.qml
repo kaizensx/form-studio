@@ -164,6 +164,7 @@ Item {
     Component.onDestruction: { Store.revealing = []; Store.builtIds = []; Store.buildAt = 0; Store.buildOf = 0 }
     // a build is playing: the stages an agent streams for this design, or the build-up of a new revision
     readonly property bool cueOn: (!!Store.building && Store.building.project === Store.pid) || build.running
+    property bool cueRoom: false             // a build-up is playing in the view: the camera keeps the cue's room clear
 
     // ── centre: the part ─────────────────────────────────────
     Item {
@@ -197,7 +198,11 @@ Item {
             insetLeft: 84; insetTop: 84
             insetRight: centre.width - insp.x + 12 + (dock.open && !ws.compact ? dock.width + 12 : 0)
             // the bar under the part (taller when the transcript is open), and the cue above it while a build plays
-            insetBottom: Math.max(60, centre.height - (cue.shown ? cue.y - 10 : Math.min(Store.barY, status.y)) + 26)
+            // The cue's room is taken the moment a build-up starts, at once and before its first feature is drawn, so
+            // the part never shrinks while it grows; it is given back with a glide when the cue has left.
+            insetBottom: Math.max(60, centre.height - (cue.shown || ws.cueRoom ? cue.rest - 10 : Math.min(Store.barY, status.y)) + 26)
+            onRevealingChanged: if (revealing && !ws.cueRoom && !Theme.reduced) { var g = vp.insetGlide; vp.insetGlide = false; ws.cueRoom = true; vp.insetGlide = g }
+                                else if (!revealing) ws.cueRoom = false
             onContextRequested: function (f, x, y) { Store.ctxMenu = { feature: f, x: x, y: y } }
             Component.onCompleted: { Store.viewer = vp; if (Store.view) { Store.showHead(); vp.setView("iso", false) }; glide.start() }
             Component.onDestruction: if (Store.viewer === vp) Store.viewer = null
@@ -256,7 +261,11 @@ Item {
             width: Math.max(360, Store.barW); x: Math.round(Store.barX + (Store.barW - width) / 2)
             // the lower third: it stands clear above the bar (116 px in a 900 px window, less in a low one), not on it
             readonly property int clear: Math.round(Math.max(26, Math.min(116, centre.height * 0.129)))
-            height: title.height; y: Math.round(Store.barY - height - clear + lift)
+            // where it stands once it has arrived: over the bar as it is during a build (one line, 64 px, 16 from the
+            // foot). Not over the bar as it is this instant: the bar grows back when the build is in, a moment before
+            // the cue leaves, and the cue (and with it the camera) must not hop up for that moment.
+            readonly property real rest: Math.round(centre.height - 16 - 64 - height - clear)
+            height: title.height; y: rest + lift
             property real lift: shown ? 0 : Theme.shift(14)
             Behavior on lift { NumberAnimation { duration: Theme.move(Theme.panel); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
             opacity: shown ? 1 : 0; visible: opacity > 0.01
