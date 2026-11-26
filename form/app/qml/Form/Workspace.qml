@@ -170,6 +170,32 @@ Item {
     Item {
         id: centre
         anchors.fill: parent
+        // ── the free stage: the one rectangle the part, the cue and every overlay are laid out in ──
+        // Right of the tool dock, under the top row, left of the panes (and of the legends' dock when it is open),
+        // above the bottom row (the bar, taller when the transcript is open; the size line).
+        QtObject {
+            id: lay
+            readonly property real freeL: 84
+            readonly property real freeR: insp.x - 12 - (dock.open ? dock.width + 12 : 0)
+            // The part stands on the bar's centre line (the window's) whenever the free stage has room on both sides
+            // of it: at least 60 % of its width. Otherwise, a legend open or a narrow window, it stands in the middle
+            // of the free stage.
+            readonly property real axis: Store.barX + Store.barW / 2
+            readonly property real half: Math.min(axis - freeL, freeR - axis)
+            readonly property bool centred: 2 * half >= 0.6 * (freeR - freeL)
+            readonly property real left: centred ? axis - half : freeL
+            readonly property real right: centred ? axis + half : freeR
+            // While a build plays the finished part is framed as large as it stands at rest, not shrunk into the room
+            // above the cue (a part half built would fill a quarter of the window; the mockup's fills a third). The
+            // free area is the one at rest (over the bar as it will be, Store.barRestY; at most 100 px past the cue's
+            // top), lifted so the last features end above the cue's first line. When the cue leaves the camera
+            // settles down by that lift; it never re-frames and nothing changes size.
+            readonly property bool cueing: cue.shown || ws.cueRoom
+            readonly property real floorY: cueing ? Math.min(Store.barRestY, Store.barY, status.restY, cue.rest + 100) : Math.min(Store.barY, status.y)
+            readonly property real cueLift: cueing ? Math.round(centre.height * 0.045) : 0
+            readonly property real top: 84 - cueLift
+            readonly property real bottom: centre.height - Math.max(60, centre.height - floorY + 26 + cueLift)
+        }
         // the room: the 3D view and what belongs to it. This is what the panes blur, so nothing of theirs is in it.
         Item { id: studio; anchors.fill: parent
         Viewport {
@@ -194,22 +220,10 @@ Item {
             wipeX: Store.compare ? wipe.at : -1
             // colours and materials: re-made whenever the design's appearance or the catalogue changes
             colorOf: { var a = Store.appearance, c = Store.materialCat; return function (part) { return Store.look(part).color || "" } }
-            // what the HUD covers: the rail and options, the dock when it is open, the strip and the readout
-            insetLeft: 84; insetTop: 84 - cueLift - cueGrow
-            insetRight: centre.width - insp.x + 12 + (dock.open && !ws.compact ? dock.width + 12 : 0)
-            // the bar under the part (taller when the transcript is open), and the cue above it while a build plays
-            // The cue's room is taken the moment a build-up starts, at once and before its first feature is drawn, so
-            // the part never shrinks while it grows; it is given back with a glide when the cue has left.
-            // While a build plays the finished part is framed a little larger than it stands at rest, not shrunk into
-            // the room above the cue (a part half built would fill a quarter of the window; the mockup's fills a
-            // third). The free area is the one at rest (over the bar as it will be, Store.barRestY; at most 100 px
-            // past the cue's top), grown by 8 % and lifted so the last features end above the cue's first line. When
-            // the cue leaves the camera settles down by that lift and eases back by that 8 %; it never re-frames.
-            readonly property bool cueing: cue.shown || ws.cueRoom
-            readonly property real freeFoot: cueing ? Math.min(Store.barRestY, Store.barY, status.restY, cue.rest + 100) : Math.min(Store.barY, status.y)
-            readonly property real cueLift: cueing ? Math.round(centre.height * 0.045) : 0
-            readonly property real cueGrow: cueing ? Math.round(Math.max(0, freeFoot - 110) * 0.04) : 0
-            insetBottom: Math.max(60, centre.height - freeFoot + 26 + cueLift - cueGrow)
+            // what the HUD leaves free (lay, below): the camera keeps the part there and eases when it changes
+            insetLeft: lay.left; insetTop: lay.top; insetRight: centre.width - lay.right; insetBottom: centre.height - lay.bottom
+            // The build's frame is taken the moment a build-up starts, at once and before its first feature is drawn, so
+            // the part never changes size while it grows; the camera settles with a glide when the cue has left.
             onRevealingChanged: if (revealing && !ws.cueRoom && !Theme.reduced) { var g = vp.insetGlide; vp.insetGlide = false; ws.cueRoom = true; vp.insetGlide = g }
                                 else if (!revealing) ws.cueRoom = false
             onContextRequested: function (f, x, y) { Store.ctxMenu = { feature: f, x: x, y: y } }
@@ -236,7 +250,7 @@ Item {
             onHoveredValue: function (v, x, y, on) { vchip.on = on; vchip.v = v; vchip.x = Math.min(x + 14, centre.width - vchip.width - 8); vchip.y = y + 14 }
         }
         Loader { id: lv; anchors.fill: parent; active: !!Store.layers; source: "LayerView.qml"
-            onLoaded: { item.leftInset = 84; item.topInset = 84; item.rightInset = Qt.binding(function () { return centre.width - insp.x + 12 }); item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }) } }
+            onLoaded: { item.leftInset = 84; item.topInset = 84; item.rightInset = Qt.binding(function () { return centre.width - insp.x + 12 }); item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }); item.axisX = Qt.binding(function () { return lay.axis }) } }
         // the corners of the room fall away
         Room { anchors.fill: parent; wall: false; poolK: 0; visible: !Store.layers }
         }
@@ -558,9 +572,12 @@ Item {
         Column {
             id: status
             // above the view buttons; in a narrow window the bar reaches over here, so it stands above the bar instead
-            x: Theme.edge + 14; y: Math.round(Math.min(viewCtl.y - 14, ws.compact && width + x + 8 > Store.barX ? Store.barY - 10 : centre.height) - height); z: 4;
+            // (there it starts right of the tool dock, which reaches down that far, not under it)
+            readonly property bool overBar: ws.compact && width + Theme.edge + 14 + 8 > Store.barX
+            x: overBar && Store.barY - 10 - height < rail.y + rail.height + 8 ? lay.freeL + 4 : Theme.edge + 14
+            y: Math.round(Math.min(viewCtl.y - 14, overBar ? Store.barY - 10 : centre.height) - height); z: 4;
             // where it stands once no build plays (the bar is then taller): the camera frames a build over this
-            readonly property real restY: Math.round(Math.min(viewCtl.y - 14, ws.compact && width + x + 8 > Store.barX ? Store.barRestY - 10 : centre.height) - height)
+            readonly property real restY: Math.round(Math.min(viewCtl.y - 14, overBar ? Store.barRestY - 10 : centre.height) - height)
             spacing: 8; visible: !ws.sim && !!Store.shown
             // notices: the picture is not simply "the head revision"
             Rectangle { visible: !!Store.scrub; width: sn.implicitWidth + 16; height: 28; radius: Theme.rSm
@@ -619,7 +636,7 @@ Item {
             source: studio; z: 7
             visible: Store.timelineOpen && !!Store.project && !ws.sim
             width: Math.max(320, Math.min(760, insp.x - 82 - 24)); height: 48; radius: 24
-            x: Math.round(Math.max(82, Math.min((centre.width - 168 - width) / 2, insp.x - 12 - width))); y: 82 + (opts.height > 0 ? opts.height + 8 : 0)
+            x: Math.round(Math.max(82, Math.min(Store.barX + (Store.barW - width) / 2, insp.x - 12 - width))); y: 82 + (opts.height > 0 ? opts.height + 8 : 0)
             MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }
             Tools.Timeline { id: tline; x: 8; width: parent.width - 16; height: 40; anchors.verticalCenter: parent.verticalCenter }
         }
@@ -671,6 +688,10 @@ Item {
             contentHeight: body.implicitHeight + 16; clip: true; boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { width: 6 }
             // there is more below: a quiet mark at the foot of the pane
+            // (the rows under it fade out into the pane, so the mark never lies across a line of words)
+            Rectangle { parent: scroll; z: 2; anchors.bottom: parent.bottom; x: 1; width: parent.width - 2; height: 30
+                opacity: scroll.contentHeight > scroll.height + 4 && scroll.contentY < scroll.contentHeight - scroll.height - 4 ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.base } }
+                gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.glassSolid, 0) } GradientStop { position: 0.75; color: Theme.glassSolid } } }
             Rectangle { parent: scroll; z: 3; anchors.bottom: parent.bottom; anchors.bottomMargin: 5; anchors.horizontalCenter: parent.horizontalCenter; width: 28; height: 4; radius: 2; color: Theme.alpha(Theme.lineBase, 0.22)
                 opacity: scroll.contentHeight > scroll.height + 4 && scroll.contentY < 4 ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.base } } }
             Connections { target: Store; function onRevealInspector(y) { scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, y)) } }

@@ -19,7 +19,7 @@ Window {
     // macOS draws the window title over our own top bar (the title bar is see-through), so it stays empty there;
     // the Dock, the app menu and Mission Control still say Form Studio. Windows and Linux show it in their frame.
     title: mac ? "" : Store.project ? Store.project.name + (Store.hasDraft ? " (draft)" : "") + " — Form Studio" : "Form Studio"
-    minimumWidth: 1120; minimumHeight: 700
+    minimumWidth: 1100; minimumHeight: 700
     // on macOS the content runs under a transparent title bar, so the window buttons sit in our own bar
     flags: mac ? Qt.Window | Qt.ExpandedClientAreaHint | Qt.NoTitleBarBackgroundHint : Qt.Window
 
@@ -46,9 +46,9 @@ Window {
     Timer { id: later; interval: 600; onTriggered: win.remember() }
     onXChanged: later.restart(); onYChanged: later.restart()
     onWidthChanged: { later.restart(); buttons.restart() } onHeightChanged: { later.restart(); buttons.restart() }
-    // macOS: the window buttons sit in the middle of the top bar, not above it; AppKit puts them back after a resize
-    // or full screen, so they are moved again then
-    function centerButtons() { if (mac && !full && !headless) Bridge.centerWindowButtons(win, top.capY * 2 + top.capH) }
+    // macOS: the window buttons sit on the top row's centre line, as far in from the side as the row's capsules begin
+    // below the top (TopBar.buttonsX); AppKit puts them back after a resize or full screen, so they are moved again then
+    function centerButtons() { if (mac && !full && !headless) Bridge.centerWindowButtons(win, top.capY * 2 + top.capH, top.buttonsX) }
     Timer { id: buttons; interval: 0; onTriggered: win.centerButtons() }
     onVisibilityChanged: buttons.restart()
     onActiveChanged: buttons.restart()
@@ -69,7 +69,7 @@ Window {
     function setBackdrop() { if (!win.plates) Store.backdrop = room }
     Connections { target: Store; function onScreenChanged() { win.setBackdrop() } }
 
-    TopBar { id: top; width: parent.width; inset: win.mac && !win.full ? 78 : 0; z: 10; logoHeld: splash.visible && splash.carrying }
+    TopBar { id: top; width: parent.width; inset: win.mac && !win.full ? top.buttonsX + 54 + 8 : 0; z: 10; logoHeld: splash.visible && splash.carrying }
 
     // The conversation. In a workspace: one bar under the part, clear of the view buttons on its left and the panes on
     // its right; it opens upward into the transcript sheet with a spring and folds back while a build plays. On Home:
@@ -88,10 +88,15 @@ Window {
         readonly property bool tight: win.width < 1300                         // the view buttons fold to one
         readonly property real leftLimit: tight ? 148 : 336
         readonly property real rightLimit: win.width - Theme.edge - 356 - Theme.gap
-        readonly property real barW: Math.max(360, Math.min(600, rightLimit - leftLimit))
-        readonly property real barX: Math.round(Math.max(leftLimit, Math.min((win.width - 168 - barW) / 2, rightLimit - barW)))
-        // open, it is as tall as what was said, up to about half the window: the part keeps the rest
-        readonly property real sheetMax: Math.round(Math.min(win.height - 190, Math.max(380, win.height * (Store.screen === "designing" ? 0.42 : 0.52))))
+        // One rule for where the bar stands: on the window's centre line, as wide as fits there between the view
+        // buttons and the panes (600 at most). Only in a window so narrow that this would leave it under 440 px does
+        // it stand in the middle of the free strip between them instead.
+        readonly property real axisRoom: 2 * Math.min(win.width / 2 - leftLimit, rightLimit - win.width / 2)
+        readonly property bool centred: axisRoom >= 440
+        readonly property real barW: Math.round(centred ? Math.min(600, axisRoom) : Math.max(360, Math.min(600, rightLimit - leftLimit)))
+        readonly property real barX: Math.round(centred ? (win.width - barW) / 2 : leftLimit + (rightLimit - leftLimit - barW) / 2)
+        // open, it is a drawer as tall as what was said and never more than 40 % of the window: the stage keeps the rest
+        readonly property real sheetMax: Math.round(Math.max(barHeight + 150, win.height * 0.4))
         readonly property real sheetH: Math.round(Math.max(barHeight + 150, Math.min(sheetMax, barHeight + bodyWant)))
         // k: 0 folded .. 1 open; a spring carries it (Reduce Motion: it is there at once and only the words fade)
         property real k: expanded ? 1 : 0
@@ -162,7 +167,7 @@ Window {
     Connections { target: Store; function onMorphFrom(r) { morph.play(r) } }
     Toasts { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 18; z: 80 }
     ActivityBar { y: 0; width: parent.width; z: 70; barH: top.capY * 2 + top.capH; slotX: top.freeX; slotW: top.freeW
-        dropX: win.plates ? (win.width - 168) / 2 : -1 }          // named engine work over 300 ms, with progress
+        dropX: win.plates ? talk.barX + talk.barW / 2 : -1 }          // named engine work over 300 ms, with progress
     SheetHost {}
     Exports {}
     Palette { id: palette }
@@ -199,4 +204,7 @@ Window {
     Shortcut { sequences: ["Ctrl+,"]; onActivated: Store.openSettings("general"); onActivatedAmbiguously: Store.openSettings("general") }      // Settings (⌘, on macOS)
     Shortcut { sequence: "Ctrl+Shift+O"; onActivated: { Store.newChat(); Store.talkOpen = true } onActivatedAmbiguously: { Store.newChat(); Store.talkOpen = true } }
     Shortcut { sequence: "Ctrl+Shift+H"; onActivated: Store.home(); onActivatedAmbiguously: Store.home() }
+    // back: out of a design to all designs, as in a browser or the Finder (the title capsule's ‹ does the same)
+    function back() { if (Store.sheet || Store.paletteOpen) return; if (Store.screen === "work" || Store.screen === "designing") Store.home() }
+    Shortcut { sequence: "Ctrl+["; onActivated: win.back(); onActivatedAmbiguously: win.back() }
 }
