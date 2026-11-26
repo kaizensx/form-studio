@@ -29,11 +29,11 @@ Item {
         id: pool; visible: room.poolK > 0 && room.poolW > 0
         x: room.width * room.poolX - width / 2; y: room.height * room.poolY - height / 2
         width: room.poolW; height: room.poolH
-        // breathing is stepped ten times a second, not animated: a still window then redraws ten times a second
+        // breathing is stepped five times a second, not animated: a still window then redraws five times a second
         // instead of sixty, and the steps (half a percent each) cannot be seen
         property real phase: 0
         opacity: 0.91 + 0.09 * Math.cos(phase)
-        Timer { interval: 100; repeat: true; running: room.breathe && room.visible && !Theme.reduced; onTriggered: pool.phase += 0.0827 }
+        Timer { interval: 200; repeat: true; running: room.breathe && room.visible && !Theme.reduced; onTriggered: pool.phase += 0.1654 }
         transform: Scale { yScale: pool.height / Math.max(1, pool.width) }
         ShapePath {
             strokeWidth: -1

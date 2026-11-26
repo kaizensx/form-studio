@@ -26,6 +26,20 @@
 - **Glass you can turn off.** With "Reduce transparency" on, in Low Power Mode or without a graphics card the panes
   are solid and nothing is blurred. Reduce Motion keeps only fades.
 - **Home, the first run, Settings, sheets, menus and messages** use the same glass, type and colours.
+- **Words sit where they belong.** Every label is now in the middle of its line, so text lines up with the icon, dot
+  or tag beside it everywhere in the app. On a Mac the text is also drawn at its real weight; it used to look a
+  little bold.
+- **Light that looks like light.** The margin of a running program, the step being built and the prompt's caret have
+  a soft glow around a sharp shape. The dimension lines on the part are thin lines with a dot at each end and a small
+  number, with nothing around them, and they are drawn in when they appear.
+- **The program's margin line no longer runs through its ticks.** The ticks and the pointer stand beside the line.
+  The line being built is one pane that glides from line to line, and a tick lands with a small spring.
+- **The bar is one line while a build plays** and while a conversation is folded: the prompt, attach, the agent and
+  send in a row. The build's title stands clear above it.
+- **The pipeline capsule is on a grid**: every value sits right under its name and the dots are level with the names.
+- **Menus are easier to read** over the part, and a button's tooltip no longer covers the menu it opened.
+- **A still window is quieter.** Home with an empty prompt used to redraw about 65 times a second; it now redraws
+  about 15 times a second or fewer, and so does a design that is open and still.
 
 - **A design is checked against what you asked for.** The numbers in a request (sizes, hole counts and diameters, a
   bolt circle, wall thickness, threads, the number of parts) become requirements that Form Studio measures on the

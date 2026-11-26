@@ -147,14 +147,13 @@ Item {
                         font.family: Theme.mono; font.pixelSize: 24; font.weight: Theme.wMedium }
                     // the caret: a block of the accent that breathes while nothing is typed. With words in the field the
                     // field's own cursor takes over.
-                    Item { id: caret; objectName: "startCaret"; visible: words.empty; x: words.textX; y: 21; width: 10; height: 24
-                        Rectangle { anchors.fill: parent; anchors.margins: -5; radius: 7; color: Theme.alpha(Theme.datum, 0.07) }
-                        Rectangle { anchors.fill: parent; anchors.margins: -2; radius: 4; color: Theme.alpha(Theme.datum, 0.16) }
-                        Rectangle { anchors.fill: parent; radius: 2; color: Theme.datum }
-                        SequentialAnimation on opacity { running: caret.visible && !Theme.reduced; loops: Animation.Infinite; alwaysRunToEnd: false
-                            NumberAnimation { to: 0.35; duration: 800; easing.type: Easing.InOutSine }
-                            NumberAnimation { to: 1; duration: 800; easing.type: Easing.InOutSine } }
-                        onVisibleChanged: if (!visible) opacity = 1 }
+                    Rectangle { id: caret; objectName: "startCaret"; visible: words.empty; x: words.textX; y: 21; width: 10; height: 24; radius: 2; color: Theme.datum
+                        Glow { blur: 12; strength: 0.85; radius: 2 }
+                        // stepped eight times a second, not animated: a waiting Home does not draw at the display's rate.
+                        // It breathes between full and about three quarters, so it is always plainly lit.
+                        property real phase: 0
+                        opacity: 0.86 + 0.14 * Math.cos(phase)
+                        Timer { interval: 125; repeat: true; running: caret.visible && sc.visible && !Theme.reduced; onTriggered: caret.phase += 0.49 } }
                     ScrollView { anchors.fill: parent; clip: true
                         TextArea {
                             id: ta

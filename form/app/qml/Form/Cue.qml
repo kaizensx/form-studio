@@ -87,6 +87,12 @@ Item {
                         Glow { blur: 16; strength: 0.95; opacity: seg.current ? 1 : 0
                             visible: opacity > 0.01
                             Behavior on opacity { NumberAnimation { duration: seg.current ? 220 : 420; easing.type: Easing.OutCubic } } }
+                        // a step that has just been built: its segment flares once in the ink it now is, and settles
+                        Glow { id: flare; color: Theme.ink; blur: 12; strength: 0.8; opacity: 0; visible: opacity > 0.01 }
+                        property bool ready: false
+                        Component.onCompleted: ready = true
+                        onDoneChanged: if (ready && done && cue.running && !Theme.reduced) landed.restart()
+                        NumberAnimation { id: landed; target: flare; property: "opacity"; from: 0.85; to: 0; duration: 480; easing.type: Easing.OutCubic }
                         Rectangle { height: 5; radius: 2.5; color: seg.done ? Theme.ink : Theme.datum
                             width: parent.width * k
                             // a segment fills when its step starts (to a little over half: the step is under way) and to the end when it is built

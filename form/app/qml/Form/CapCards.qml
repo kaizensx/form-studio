@@ -39,15 +39,18 @@ Grid {
                     Txt { text: card.c.title + (card.c.id === "print" ? " (optional)" : ""); font.weight: Theme.wSemi; anchors.verticalCenter: parent.verticalCenter
                         wrapMode: Text.NoWrap; elide: Text.ElideRight; width: Math.min(implicitWidth, parent.width - 24 - 34) } }
                 Txt { kind: "fine"; tone: 2; width: parent.width; text: card.c.sub }
-                Txt { kind: "fine"; width: parent.width - 64; elide: Text.ElideRight; wrapMode: Text.NoWrap   // room for the size
-                    text: card.locked ? "Always on · " + card.c.installs
-                        : cc.settings && card.on ? card.c.installs + " · off uninstalls nothing"
-                        : card.c.installs } }
+                Item { width: 1; height: installs.height } }      // the room of the last line, which stands on the card's foot
+            // what it installs, and at the other end of the same line what that downloads
+            Txt { id: installs; kind: "fine"; x: 16; anchors.bottom: parent.bottom; anchors.bottomMargin: 12
+                width: parent.width - 32 - capSize.width - 12; elide: Text.ElideRight; wrapMode: Text.NoWrap
+                text: card.locked ? "Always on · " + card.c.installs
+                    : cc.settings && card.on ? card.c.installs + " · off uninstalls nothing"
+                    : card.c.installs }
             // on/off, and what it downloads
             Rectangle { anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 12; width: 18; height: 18; radius: 5
                 color: card.on ? Theme.datum : "transparent"; border.width: card.on ? 0 : 1.5; border.color: Theme.rule2; opacity: card.locked ? 0.55 : 1
                 Icon { visible: card.on; anchors.centerIn: parent; name: "check"; size: 12; color: Theme.datumInk } }
-            Txt { objectName: "capSize"; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 12; kind: "fine"; mono: true
+            Txt { id: capSize; objectName: "capSize"; anchors.right: parent.right; anchors.rightMargin: 16; anchors.baseline: installs.baseline; kind: "fine"; mono: true
                 text: cc.sizeText(card.c); color: card.c.ready || card.c.id === "core" ? Theme.ink3 : card.on ? Theme.datum : Theme.ink3 }
             MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; enabled: !card.locked && !Store.installing
                 cursorShape: card.locked ? Qt.ArrowCursor : Qt.PointingHandCursor
