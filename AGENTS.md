@@ -96,6 +96,7 @@ Commands:
 .venv/bin/python scripts/readme_art.py              # the README's pictures (docs/readme/*.svg), drawn from a real engine and slicer run
 .venv/bin/python scripts/make_app_media.py          # app animations, recorded from the real app window (the website draws the app in code)
 .venv/bin/python site/tools/export_proof.py         # the home page's proof sheet, stamped from a real run of scripts/proof_demo.py
+.venv/bin/python site/tools/export_case.py          # the home page's hero: the sensor case, one mesh per feature, with its checks (case.glb, case.json)
 .venv/bin/python scripts/media/site_shot.py URL OUT  # a picture of the website's live replica (docs/images/try-it*.webp)
 .venv/bin/python scripts/media/showcase/product_shots.py  # product pictures for the site and README (scripts/media/showcase/README.md)
 .venv/bin/python scripts/gen_mcp_docs.py            # regenerates docs/MCP.md
