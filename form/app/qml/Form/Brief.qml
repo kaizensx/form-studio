@@ -65,9 +65,9 @@ Column {
         Row { spacing: 10
             Txt { id: big; kind: "hero"; mono: true; wrapMode: Text.NoWrap; text: root.measured + "/" + root.known.length
                 color: root.measured === root.known.length ? Theme.pass : Theme.ink }
-            Column { anchors.verticalCenter: big.verticalCenter; spacing: 4
-                Txt { tone: 2; text: "dimensions of the object measured" }
-                Txt { kind: "fine"; text: root.mix() } } }
+            Column { anchors.verticalCenter: big.verticalCenter; spacing: 4; width: root.width - big.width - 10
+                Txt { tone: 2; width: parent.width; text: "dimensions of the object measured" }
+                Txt { kind: "fine"; width: parent.width; text: root.mix() } } }
         Row { width: parent.width; height: 6; spacing: 3
             Repeater { model: root.sources
                 Rectangle { required property var modelData
@@ -102,7 +102,7 @@ Column {
         Btn { objectName: "briefGame"; visible: purposeSec.pu.purpose === "game"; small: true; icon: "gamepad_2"; text: "Game asset…"; onClicked: Store.openSheet("game") }
         Row { visible: purposeSec.pu.purpose === "model"; spacing: 10
             Txt { text: "Made by"; tone: 2; anchors.verticalCenter: parent.verticalCenter }
-            Pick { objectName: "processPick"; width: 260; value: purposeSec.pu.process || ""
+            Pick { objectName: "processPick"; width: Math.min(260, root.width - 76); value: purposeSec.pu.process || ""
                 model: Store.purposeInfo.processes.map(function (x) { return { value: x.id, text: x.label + (x.min_feature_mm ? "  · min " + x.min_feature_mm + " mm" : "") } })
                 onPicked: function (v) { Store.setPurpose("model", v) } } }
         Txt { kind: "fine"; width: parent.width; visible: purposeSec.pu.purpose === "model"

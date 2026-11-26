@@ -31,27 +31,31 @@ def run(ui):
     ui.run_js("Store._buildNext = Date.now(); Store.view = null; Store.reloadStudio().then(function () { Store.open(%r) })" % pid)
     ui.wait_until(lambda: ui.store.get("screen") == "work", 30, "the design to open")
     feats = None
-    ui.wait_until(lambda: ui.js("Store.buildOf") > 2, 30, "the build-up to start")
-    of = ui.js("Store.buildOf")
-    half = max(2, of // 2)
-    ui.wait_until(lambda: ui.js("Store.buildAt") >= half, 30, "the build to be half-way")
-    ui.wait(160)
-    at = ui.js("Store.buildAt")
-    shot_at = at
-    ui.shot("lightdesk-build")
-    if ui.js("Store.buildAt") == at and at < of:        # still on the step that was read
-        ui.check(ui.exists("buildCaption"), "the cue is up while the build plays")
-        ui.eq(ui.item("buildLedgerCount").property("text"), f"{at} of {of}", "the cue counts the step the viewport is on")
-        built, now = ui.js("[Store.builtIds.slice(), Store.revealing.slice()]")
-        ui.check(len(built) >= 1 and len(now) >= 1 and not set(built) & set(now), f"built lines and the line being built are different lines: {built} {now}")
-        feats = ui.js("Store.recipe.features.map(function (f) { return f.id })")
-        ui.check(all(feats.index(b) < feats.index(now[0]) for b in built), f"what is built comes before what is being built: {built} {now}")
-        ui.check(ui.sees("building", "programPane"), "the line being built says so in the program")
-    ui.wait_until(lambda: ui.js("Store.viewer && !Store.viewer.revealing && Store.buildOf === 0") is True, 40, "the build-up to finish")
-    ui.check(ui.js("Store.builtIds.length === 0 && Store.revealing.length === 0") is True, "nothing is marked as building once it is in")
-    ui.settle(1700)
-    ui.check(not ui.exists("buildCaption"), "the cue leaves when the build is in")
-    print(f"  build pictured at step {shot_at} of {of}", flush=True)
+    if ui.js("Theme.reduced"):                         # Reduce Motion: the design is simply there, no build-up plays
+        ui.wait_until(lambda: ui.js("!!Store.view && !!Store.viewer && !Store.viewer.revealing") is True, 40, "the design to be drawn")
+        ui.settle(2200)                                # whatever the cue said about it has left
+    else:
+        ui.wait_until(lambda: ui.js("Store.buildOf") > 2, 30, "the build-up to start")
+        of = ui.js("Store.buildOf")
+        half = max(2, of // 2)
+        ui.wait_until(lambda: ui.js("Store.buildAt") >= half, 30, "the build to be half-way")
+        ui.wait(160)
+        at = ui.js("Store.buildAt")
+        shot_at = at
+        ui.shot("lightdesk-build")
+        if ui.js("Store.buildAt") == at and at < of:        # still on the step that was read
+            ui.check(ui.exists("buildCaption"), "the cue is up while the build plays")
+            ui.eq(ui.item("buildLedgerCount").property("text"), f"{at} of {of}", "the cue counts the step the viewport is on")
+            built, now = ui.js("[Store.builtIds.slice(), Store.revealing.slice()]")
+            ui.check(len(built) >= 1 and len(now) >= 1 and not set(built) & set(now), f"built lines and the line being built are different lines: {built} {now}")
+            feats = ui.js("Store.recipe.features.map(function (f) { return f.id })")
+            ui.check(all(feats.index(b) < feats.index(now[0]) for b in built), f"what is built comes before what is being built: {built} {now}")
+            ui.check(ui.sees("building", "programPane"), "the line being built says so in the program")
+        ui.wait_until(lambda: ui.js("Store.viewer && !Store.viewer.revealing && Store.buildOf === 0") is True, 40, "the build-up to finish")
+        ui.check(ui.js("Store.builtIds.length === 0 && Store.revealing.length === 0") is True, "nothing is marked as building once it is in")
+        ui.settle(1700)
+        ui.check(not ui.exists("buildCaption"), "the cue leaves when the build is in")
+        print(f"  build pictured at step {shot_at} of {of}", flush=True)
 
     ui.shot("lightdesk-workspace")
 

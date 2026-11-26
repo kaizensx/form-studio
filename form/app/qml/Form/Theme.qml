@@ -77,7 +77,7 @@ QtObject {
     readonly property color clay: "#d8d3c8"   // the part itself, the same in both
     // the mark, as brand/README.md sets it on graphite and on a light ground
     readonly property color markPart: dark ? clay : "#0e1113"
-    readonly property color markOrigin: dark ? "#b9e8d7" : "#2f8a6c"
+    readonly property color markOrigin: datum                                   // the mark's origin square is the accent
     readonly property color markInk: dark ? "#f4f3f1" : "#161616"   // "Form"
     readonly property color markInk2: dark ? "#a9a8a5" : "#5d5c59"   // "Studio"
     readonly property color datumHi: dark ? "#c3cdff" : "#4c64e2"   // the accent, hovered

@@ -49,7 +49,7 @@ Item {
     Item { id: studio; anchors.fill: parent
     Viewport { id: dvp; objectName: "designingViewport"; anchors.fill: parent; lite: false; interactive: true; showDims: false; showCompanions: false
         showOrigin: dz.staged                    // the floor's cross belongs to a part; before there is one the words stand here
-        floorGrid: Store.floorGrid; insetTop: 84; insetLeft: 40; insetRight: dz.staged ? 372 : 40
+        floorGrid: Store.floorGrid; insetTop: 84; insetLeft: 40; insetRight: dz.staged ? 396 : 40
         insetBottom: Math.max(60, dz.height - (dz.staged ? stageCap.y - 10 : Store.barY) + 26)
         Component.onCompleted: { setModel(null); setView("iso", false); Store.stageViewer = dvp; Store.backdrop = studio }
         Component.onDestruction: if (Store.stageViewer === dvp) Store.stageViewer = null }
@@ -161,7 +161,7 @@ Item {
         readonly property var rows: { var b = Store.building, out = []
             for (var i = 0; b && i < Store.stageLog.length; i++) { var e = Store.stageLog[i]; if (e.draft === b.draft && !out.some(function (o) { return o.at === e.at })) out.push(e) }
             return out }
-        width: 332; radius: Theme.rPane; x: dz.width - Theme.edge - width; y: 80
+        width: 356; radius: Theme.rPane; x: dz.width - Theme.edge - width; y: 80
         height: Math.min(dz.height - 80 - Theme.edge, 52 + rows.length * 32)
         opacity: dz.staged && rows.length > 0 ? 1 : 0; visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: Theme.base } }

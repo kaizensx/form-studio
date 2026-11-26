@@ -18,6 +18,13 @@ def send(ui, text):
     ui.key("Return")
 
 
+def to_top(ui):
+    """Scroll the transcript to its first message (the open transcript is as tall as about half the window)."""
+    for _ in range(12):
+        ui.wheel("talkFeed", 360)
+    ui.settle(250)
+
+
 def png(path):
     def chunk(tag, data):
         c = struct.pack(">I", len(data)) + tag + data
@@ -142,6 +149,8 @@ def run(ui):
     row = ui.wait_until(lambda: next((r for r in ui.find_all(name="convRow") if ui.sees("Dock ideas", r)), None), 5, "the pinned row")
     ui.click(row, 0.3, 0.5)
     ui.wait_until(lambda: ui.store.get("convId") == first_id, 5, "the conversation to open")
+    ui.settle(700)
+    to_top(ui)                                         # the transcript opens at its newest message; the first one is a scroll up
     ui.expect("You said: Hello there")
     # delete the other one
     ui.click("convSwitch")
@@ -162,6 +171,7 @@ def run(ui):
     ui.settle(300)
 
     # ── fork from a message: a branch in the same thread, switched from the header ──
+    to_top(ui)
     msg = ui.wait_until(lambda: next((m for m in ui.find_all(name="replyText") if "You said: Hello there" in m.property("text")), None),
                         5, "the first reply")
     ui.scroll_to(msg)

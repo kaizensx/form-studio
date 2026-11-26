@@ -17,7 +17,7 @@ Item {
     readonly property int capY: 16            // where the capsules sit, and how tall they are
     readonly property int capH: 44
     height: 44                                // what Home starts under; the capsules reach a little below it
-    Item { id: grip; width: parent.width; height: bar.capY + bar.capH + 8
+    Item { id: grip; width: parent.width; height: bar.work ? bar.capY + bar.capH + 8 : bar.height      // on Home the column's header starts right under the bar
         // drag to move the window, double-click to zoom (macOS) or maximise. Buttons and chips take their own clicks first.
         DragHandler { target: null; grabPermissions: PointerHandler.CanTakeOverFromAnything
             onActiveChanged: if (active && bar.Window.window) bar.Window.window.startSystemMove() }
@@ -42,6 +42,7 @@ Item {
         // on Home it is the lockup alone: no pane
         bare: !bar.work
         x: Math.max(Theme.edge, bar.inset + 6); y: bar.capY; height: bar.capH; radius: height / 2
+        visible: !Store.welcome               // the first run brings its own lockup
         width: lrow.implicitWidth + (bar.work ? 22 : 12)
         Row { id: lrow; x: bar.work ? 8 : 6; anchors.verticalCenter: parent.verticalCenter; spacing: 4
             Item { id: logoBox; objectName: "homeButton"; width: mark.implicitWidth + 16; height: 30; anchors.verticalCenter: parent.verticalCenter
@@ -130,6 +131,7 @@ Item {
         source: Store.backdrop; arrive: 2
         anchors.right: parent.right; anchors.rightMargin: Theme.edge; y: bar.capY; height: bar.capH; radius: height / 2
         width: rrow.implicitWidth + 14
+        visible: !Store.welcome
         onXChanged: place()
         Row { id: rrow; x: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 2
             // another conversation is working while Home or a design being made is in front: named, one click opens it

@@ -465,7 +465,7 @@ Item {
             Row { id: vrow; x: 6; anchors.verticalCenter: parent.verticalCenter; spacing: 2; opacity: ws.cueOn ? 0.45 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
                 // the grid: the build plate of a design made for printing while Describe or Design is open (Fit, Review and
                 // Make show it anyway); otherwise the 10 mm grid of the studio floor
-                Btn { id: gridBtn; objectName: "showPlate"; small: true; kind: "quiet"; height: 30; width: 32; icon: "grid_3x3"; anchors.verticalCenter: parent.verticalCenter
+                Btn { id: gridBtn; objectName: plate ? "showPlate" : "floorGrid"; small: true; kind: "quiet"; height: 30; width: 32; icon: "grid_3x3"; anchors.verticalCenter: parent.verticalCenter
                     readonly property bool plate: Store.printUi && (Store.stage === "brief" || Store.stage === "shape")
                     active: plate ? Store.showPlate : Store.floorGrid && !Store.plateWanted
                     enabled: plate || !Store.plateWanted
@@ -610,7 +610,7 @@ Item {
         id: insp
         objectName: "programPane"
         source: studio; arrive: 5
-        width: 332; radius: Theme.rPane
+        width: 356; radius: Theme.rPane
         x: ws.width - Theme.edge - width; y: 80
         // as tall as what it holds, up to the pipeline under it
         readonly property real room_: strip.y - Theme.gap - y

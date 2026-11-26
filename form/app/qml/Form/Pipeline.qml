@@ -141,11 +141,10 @@ Rectangle {
             readonly property bool on: !!pl.d && pl.d.project.auto_run !== false
             Rectangle { visible: !pl.grid; x: 0; y: 10; width: 1; height: parent.height - 20; color: Theme.rule }
             Txt { visible: !pl.narrow; kind: "cap"; text: "Auto"; anchors.verticalCenter: parent.verticalCenter; x: pl.grid ? 21 : Math.round((parent.width - width - 37) / 2) }
-            // on is green: it is a state (everything follows each commit), not where you are
-            Rectangle { id: sw; width: 30; height: 18; radius: 9; color: auto.on ? Theme.pass : Theme.alpha(Theme.lineBase, 0.2); anchors.verticalCenter: parent.verticalCenter
+            Rectangle { id: sw; width: 30; height: 18; radius: 9; color: auto.on ? Theme.datum : Theme.alpha(Theme.lineBase, 0.2); anchors.verticalCenter: parent.verticalCenter
                 x: pl.grid ? parent.width - width - 8 : pl.narrow ? Math.round((parent.width - width) / 2) : Math.round((parent.width + 37) / 2 - 3)
                 Behavior on color { ColorAnimation { duration: Motion.ui } }
-                Rectangle { y: 2; x: auto.on ? 14 : 2; width: 14; height: 14; radius: 7; color: "white"
+                Rectangle { y: 2; x: auto.on ? 14 : 2; width: 14; height: 14; radius: 7; color: auto.on ? Theme.datumInk : Theme.ink2
                     Behavior on x { NumberAnimation { duration: Motion.move(Motion.ui); easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } } }
             MouseArea { id: am; anchors.fill: parent; hoverEnabled: true; onClicked: Store.settings({ auto_run: !auto.on }) }
             Tip { show: am.containsMouse; text: "Auto: when on, every commit regenerates the solid, exports, checks and slice. When off they stay stale until you run them." } }

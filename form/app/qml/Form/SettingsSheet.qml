@@ -201,6 +201,15 @@ Item {
             Txt { kind: "fine"; tone: 3; mono: true; text: Bridge.version; anchors.verticalCenter: parent.verticalCenter } }
     }
     function go(v) { search.text = ""; st.query = ""; st.tab = v }
+    // Bring something that just appeared on the page (the provider editor) into view at once, so its first field is
+    // under the pointer and never below the sheet's edge. The columns are laid out first: a new item has no place yet.
+    function reveal(it) {
+        if (!it) return
+        for (var p = it.parent; p && p !== pane.contentItem; p = p.parent) if (p.forceLayout) p.forceLayout()
+        var y = it.mapToItem(pane.contentItem, 0, 0).y
+        if (y < pane.contentY + 8 || y + it.height > pane.contentY + pane.height - 24)
+            pane.contentY = Math.max(0, Math.min(y - 20, Math.max(0, pane.contentHeight - pane.height)))
+    }
 
     // ── the page ─────────────────────────────────────────────────────────────────────────────────────────────────
     Flickable {
@@ -353,7 +362,8 @@ Item {
             // providers you added by address: any server in a format Form Studio speaks
             Group { title: "Your providers"
                 sub: "A model service that is not listed above, a company gateway or a server on your network. Give its address; Form Studio finds the format, the models and whether they call tools."
-                Loader { visible: active; width: parent.width; active: st.editingProvider !== undefined
+                Loader { id: editorLd; visible: active; width: parent.width; active: st.editingProvider !== undefined
+                    onLoaded: st.reveal(editorLd)
                     sourceComponent: ProviderEditor { width: parent ? parent.width : 600; editing: st.editingProvider
                         onClosed: st.editingProvider = undefined
                         onSaved: function (p) { st.editingProvider = undefined; st.loadProviders(); st.loadKeys(); Store.refreshAgents() } } }

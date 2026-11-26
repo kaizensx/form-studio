@@ -86,7 +86,7 @@ Window {
         // the bar: where it may be, and how tall
         readonly property bool tight: win.width < 1300                         // the view buttons fold to one
         readonly property real leftLimit: tight ? 148 : 336
-        readonly property real rightLimit: win.width - Theme.edge - 332 - Theme.gap
+        readonly property real rightLimit: win.width - Theme.edge - 356 - Theme.gap
         readonly property real barW: Math.max(360, Math.min(600, rightLimit - leftLimit))
         readonly property real barX: Math.round(Math.max(leftLimit, Math.min((win.width - 168 - barW) / 2, rightLimit - barW)))
         // open, it is as tall as what was said, up to about half the window: the part keeps the rest
@@ -100,7 +100,6 @@ Window {
         height: bar ? Math.round(barHeight + (sheetH - barHeight) * Math.max(0, k)) : win.height - top.height - Theme.gap
         x: bar ? barX : shown ? Theme.gap : -width - Theme.gap - 40
         y: bar ? win.height - 16 - height : top.height
-        visible: bar || x > -width
         Behavior on x { enabled: !talk.bar; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
         Behavior on width { enabled: !talk.bar && !talk.dragging && win.restored; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
         // where the bar is, for the screen in front: the camera keeps the part clear of it, the cue sits above it

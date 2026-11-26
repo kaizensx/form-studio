@@ -29,10 +29,11 @@ Item {
         id: pool; visible: room.poolK > 0 && room.poolW > 0
         x: room.width * room.poolX - width / 2; y: room.height * room.poolY - height / 2
         width: room.poolW; height: room.poolH
-        opacity: 1
-        SequentialAnimation on opacity { running: room.breathe && room.visible && !Theme.reduced; loops: Animation.Infinite
-            NumberAnimation { to: 0.82; duration: 3800; easing.type: Easing.InOutSine }
-            NumberAnimation { to: 1; duration: 3800; easing.type: Easing.InOutSine } }
+        // breathing is stepped ten times a second, not animated: a still window then redraws ten times a second
+        // instead of sixty, and the steps (half a percent each) cannot be seen
+        property real phase: 0
+        opacity: 0.91 + 0.09 * Math.cos(phase)
+        Timer { interval: 100; repeat: true; running: room.breathe && room.visible && !Theme.reduced; onTriggered: pool.phase += 0.0827 }
         transform: Scale { yScale: pool.height / Math.max(1, pool.width) }
         ShapePath {
             strokeWidth: -1

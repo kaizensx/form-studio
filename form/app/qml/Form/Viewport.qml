@@ -1133,10 +1133,10 @@ Item {
             property int cand: -1
             // what is drawn so far while a build-up runs (it counts up to each new value), else the whole part
             readonly property real mm: index === 0 ? vp.dimHi.x - vp.dimLo.x : index === 1 ? vp.dimHi.y - vp.dimLo.y : vp.dimHi.z - vp.dimLo.z
-            width: t.implicitWidth + 10; height: 17; radius: Theme.rXs; color: Theme.plate; border.color: Theme.alpha(Theme.datum, 0.28)
+            width: t.implicitWidth + 18; height: 22; radius: 11; color: Theme.dark ? Theme.alpha(Theme.well, 0.86) : Theme.alpha(Theme.plate3, 0.92); border.color: Theme.alpha(Theme.datum, 0.35)
             opacity: shown ? 1 : 0; visible: opacity > 0.01                // a label that loses its seat fades, never blinks
             Behavior on opacity { NumberAnimation { duration: 120 } }
-            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.datum; font.family: Theme.mono; font.pixelSize: Theme.tFine; font.weight: 500; renderType: Text.NativeRendering }
+            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.strong(Theme.datum); font.family: Theme.mono; font.pixelSize: Theme.tFine; font.weight: 500; renderType: Text.NativeRendering }
         }
     }
 

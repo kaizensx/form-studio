@@ -572,11 +572,13 @@ Rectangle {
             // the prompt: an accent "›" before whatever is typed
             Text { x: 16; y: sv.y + 9; visible: sv.contentItem.contentY < 4; text: "›"; color: Theme.datum; font.family: Theme.mono; font.pixelSize: 22; font.weight: Theme.wMedium; renderType: Text.NativeRendering }
             // the caret, standing in the empty prompt while the keyboard is elsewhere (with it here, the field draws its own)
-            Rectangle { objectName: "promptCaret"; x: 38; y: sv.y + 14; width: 8; height: 19; radius: 2; color: Theme.datum
+            Rectangle { id: restCaret; objectName: "promptCaret"; x: 38; y: sv.y + 14; width: 8; height: 19; radius: 2; color: Theme.datum
                 visible: !ta.activeFocus && ta.text === "" && ta.enabled
                 Rectangle { anchors.centerIn: parent; width: 20; height: 31; radius: 8; color: Theme.alpha(Theme.datum, 0.16) }
-                SequentialAnimation on opacity { running: parent.visible && talk.visible && !Theme.reduced; loops: Animation.Infinite
-                    NumberAnimation { to: 0.35; duration: 800; easing.type: Easing.InOutSine } NumberAnimation { to: 1; duration: 800; easing.type: Easing.InOutSine } } }
+                // stepped, like the room's light: a waiting prompt must not keep the window drawing at full rate
+                property real phase: 0
+                opacity: 0.675 + 0.325 * Math.cos(phase)
+                Timer { interval: 66; repeat: true; running: restCaret.visible && talk.visible && !Theme.reduced; onTriggered: restCaret.phase += 0.26 } }
             Rectangle { anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3; border.color: Theme.alpha(Theme.datum, 0.13)
                 opacity: ta.activeFocus ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
             Column {
@@ -623,8 +625,9 @@ Rectangle {
                         cursorDelegate: Rectangle { id: cur; visible: ta.activeFocus; color: Theme.datum; radius: 2
                             width: ta.text === "" ? 8 : 2; height: 19
                             Behavior on width { NumberAnimation { duration: Theme.move(Theme.fast) } }
-                            SequentialAnimation on opacity { running: cur.visible && !Theme.reduced; loops: Animation.Infinite
-                                NumberAnimation { to: 0.3; duration: 620; easing.type: Easing.InOutSine } NumberAnimation { to: 1; duration: 620; easing.type: Easing.InOutSine } } }
+                            property real phase: 0
+                            opacity: 0.65 + 0.35 * Math.cos(phase)
+                            Timer { interval: 66; repeat: true; running: cur.visible && !Theme.reduced; onTriggered: cur.phase += 0.33 } }
                         readonly property string placeholder: !Store.chat.available ? "No agent is connected" : Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure" ? "Answer the question above…" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to make…"
                         placeholderText: "\u2003" + placeholder
                         placeholderTextColor: Theme.ink4; enabled: Store.chat.available

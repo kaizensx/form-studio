@@ -85,6 +85,15 @@ that Settings › Engines & software installs only when you ask.
   form-studio[cadfit]`. The packaged app does not include the vendored search code; it ships the hook and this
   folder's `LICENSE` and `PERMISSION.md`, and reports that CADFit needs form-studio[cadfit].
 
+## Fonts that ship with the app
+
+- **Geist** and **Geist Mono** (The Geist Project Authors, https://github.com/vercel/geist-font): SIL Open Font
+  License 1.1. `form/app/assets/fonts/Geist.ttf`, `GeistMono.ttf` (Latin subsets, unmodified outlines), licence texts
+  beside them (`Geist-LICENSE.txt`, `GeistMono-LICENSE.txt`). The interface typeface and its numbers.
+- **Instrument Sans** (The Instrument Sans Project Authors): SIL Open Font License 1.1.
+  `form/app/assets/fonts/InstrumentSans.ttf`, licence beside it. Lettering on share cards and renders.
+- **Lucide** icons as a font: ISC License. `form/app/assets/fonts/lucide.ttf`, licence beside it.
+
 ## Standard-parts libraries that ship with the app
 
 These are used as libraries (installed from PyPI, bundled in the packaged app by `packaging/form.spec`), not copied

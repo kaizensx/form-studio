@@ -12,7 +12,7 @@ Glass {
     readonly property var d: Store.data
     readonly property int at: { for (var i = 0; i < Store.stages.length; i++) if (Store.stages[i].id === Store.stage) return i; return 0 }
     function stageNote(id) {
-        if (!d) return ["", ""]
+        if (!d || !Store.head || !d.recipe) return ["", ""]
         var roll = d.checks ? d.checks.rollup : null
         if (id === "brief") {
             var k = d.recipe.params.filter(function (p) { return p.group === "brief" })

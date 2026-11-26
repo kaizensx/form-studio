@@ -1,7 +1,7 @@
 # Design brief
 
-How Form Studio's desktop app looks, is organised and moves, and why. The visual direction (plates on a frame,
-drawing lettering, the lit floor and its grid) is in `docs/design/DIRECTION.md`. The tokens live in
+How Form Studio's desktop app looks, is organised and moves, and why. The visual direction (Lightdesk: a room, panes
+of glass over the 3D view, the program and the bar) is in `docs/design/DIRECTION.md`. The tokens live in
 `form/app/qml/Form/Theme.qml`; the rules for writing QML are in `form/app/qml/CONTRIBUTING-UI.md`. This page is the
 intent those two serve. Change it first, then the code.
 
@@ -27,8 +27,8 @@ Three tests for any screen:
 | Opening | Under a second while the engine starts | The mark drawn on its origin, the name, one status line |
 | First run | Three choices, then only what was chosen is downloaded | Rail of steps, the step, the log |
 | Home | Start a design; find the ones you made | The question and composer, concepts waiting for a pick, designs (one card per family), conversations |
-| Workspace | One design | Conversation (left, with a strip of its designs when it made several), the part (centre), stages (right), pipeline (bottom) |
-| Designing | A design being made, or a conversation with none yet | The empty studio floor, what the agent is doing, or "No design yet" and Continue the conversation |
+| Workspace | One design | The part, edge to edge. Over it, as panes of glass: title, stages and tools (top), the tool dock (left), the size line and views (bottom left), the Program, which is the stage's panel (right), the pipeline (bottom right), the conversation bar (bottom centre, opening upward into the transcript, with a strip of its designs when it made several) |
+| Designing | A design being made, or a conversation with none yet | The empty studio floor, what the agent is doing, then the cue and the program so far as stages arrive; or "No design yet" and Continue the conversation |
 | Sheets | One task that needs the whole attention | Title, body, actions with the primary one last |
 
 **The stages** are the flow of making something, left to right: **Describe** (what it is for, what is known),
@@ -40,9 +40,9 @@ checks and their evidence), **Make** (approve, then the files). The engine, the 
 share `lineage.root`. Home shows one card per family: the member changed last is its face, a count opens the family
 under its row, the first design first. Conversations are grouped the same way by `thread`.
 
-**Top bar.** Logo, the design's name and revision, its release state, search, settings. It never names a printer and
-never labels a design as "not for printing". The printer chip (`PrinterChip.qml`) sits in the header of Fit, Review
-and Make of a design made for printing.
+**Top bar.** Three capsules: the mark, the design's name, revision and release state; the stages; search and
+settings. It never labels a design as "not for printing". The printer chip (`PrinterChip.qml`) sits in the right
+capsule for a design made for printing, in every stage.
 
 **Conversations and designs.** Opening a conversation lands on its design within a second; with several, a strip
 under its title lists them; with none, Designing says "No design yet". Once the person has worked on the open design
@@ -56,7 +56,7 @@ grid and its outline ease in, and leave on the way back. Home, cards and Designi
 
 ## Appearance
 
-Two appearances, one design: the bench at night (dark, the default) and by day (light). Settings › General ›
+Two appearances, one design: the dark studio (the default) and paper (light). Settings › General ›
 Appearance chooses Dark, Light or Match system. Every colour token is a pair, so a screen that uses only tokens is
 right in both; a hard-coded colour is a bug.
 

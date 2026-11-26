@@ -39,15 +39,17 @@ uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizens
 
 ## The window
 
-![The workspace: conversation, viewport and stages](images/prove.webp)
-
 | Area | What it holds |
 |---|---|
-| **Top bar** | The design and its revision, release state, search (Ctrl/⌘ K) and Settings. No printer and no purpose: the printer is named in Fit, Review and Make of a design made for printing (click it to choose another). Work that takes longer than 300 ms is named in the middle of the bar, on one line, with progress and a hairline under the bar |
-| **Conversation** (left) | The agent conversation for this design: messages, the agent's steps, the views it looked at, attachments. A conversation that made several designs shows them in a strip under its title; click one to open it. Paste a link to attach the file it points at. Resizable; Ctrl/⌘ J hides it |
-| **Viewport** (centre) | The kernel's geometry, one mesh per feature, with its dimensions, on a neutral studio floor with an origin cross and a scale cue. The printer's build plate appears only in Fit, Review and Make of a design made for printing, or with **Show build plate** in Describe and Design. The tool rail on its left edge holds Select, Measure, Annotate, Section, Analyze, Assembly, History, Simulate the print and Photo render |
-| **Stages** (right) | Describe, Design, Fit, Review and Make. Each tab shows where it stands: measured values, features, fit yield, checks to review, release readiness |
-| **Pipeline** (bottom) | Parameters › Solid › Exports › Checks › Slice › Release. A node is current only when it describes the revision on screen. A 3D model, or a design that is not sliced, has no Slice step |
+| **Top** | Three capsules over the view. Left: the design, its revision and release state (the mark goes Home; the arrow opens the menu). Centre: the stages, Describe, Design, Fit, Review and Make, each with where it stands: measured values, features, fit yield, checks to review, release readiness. Right: the printer of a design made for printing (click it to choose another), search (Ctrl/⌘ K) and Settings. Work that takes longer than 300 ms is named beside them with progress |
+| **Viewport** (the whole window) | The kernel's geometry, one mesh per feature, with its dimensions, in a pool of light on a studio floor with an origin cross and a scale cue. The printer's build plate appears only in Fit, Review and Make of a design made for printing, or with the grid button in Describe and Design; elsewhere that button shows the floor's 10 mm grid |
+| **Tool dock** (left) | Select, Measure, Annotate, Section, Analyze, Assembly, History, Simulate the print and Photo render; the active tool's options sit beside it |
+| **Size and views** (bottom left) | Width × depth × height and volume of what is on screen, then Iso, Front, Side, Top and Under |
+| **Program** (right) | The panel of the stage you are in. In Design it is the features in build order as a numbered listing; click a line for its parameters. While a design builds, the line being built is lit and the built ones are ticked |
+| **Pipeline** (bottom right) | Parameters, Solid, Exports, Checks, Slice, Release, each with its value. A step is current only when it describes the revision on screen. A 3D model, or a design that is not sliced, has no Slice step |
+| **Conversation** (bottom centre) | One bar: what the agent is doing, numbered suggestions (keys 1 to 4), the prompt. It opens upward into the whole conversation: messages, the agent's steps, the views it looked at, attachments, and a strip of its designs when it made several. Ctrl/⌘ J or a click on its status line opens and folds it; it folds while a build plays. Paste a link to attach the file it points at |
+
+While a design builds, the lower part of the view shows the feature being made, its number and how far the build is.
 
 ### The five stages
 

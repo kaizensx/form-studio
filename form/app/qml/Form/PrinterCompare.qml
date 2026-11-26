@@ -70,7 +70,7 @@ Column {
                             text: pr.modelData.slicer + (pr.modelData.nozzle_mm ? " · " + pr.modelData.nozzle_mm + " mm nozzle" : "") + (pr.modelData.process ? " · " + pr.modelData.process : "") }
                         // the time, as a bar against the slowest printer
                         Rectangle { visible: pr.ok && root.maxT > 0; width: parent.width; height: 4; radius: 2; color: Theme.rule
-                            Rectangle { height: parent.height; radius: 2; color: pr.tags.indexOf("fastest") >= 0 ? Theme.pass : Theme.datum
+                            Rectangle { height: parent.height; radius: 2; color: pr.tags.indexOf("fastest") >= 0 ? Theme.datum : Theme.alpha(Theme.datum, 0.45)
                                 width: pr.ok && root.maxT > 0 ? parent.width * pr.modelData.time_s / root.maxT : 0
                                 Behavior on width { NumberAnimation { duration: Theme.move(Theme.slow); easing.type: Easing.OutCubic } } } }
                         Flow { width: parent.width; spacing: 4; visible: pr.tags.length > 0
