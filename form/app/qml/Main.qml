@@ -149,7 +149,7 @@ Window {
         to: { var p = stage.mapToItem(null, 0, 0); return Qt.rect(p.x + 8, p.y + 8, stage.width - 16, stage.height - 16) } }
     Connections { target: Store; function onMorphFrom(r) { morph.play(r) } }
     Toasts { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 18; z: 80 }
-    ActivityBar { anchors.top: top.bottom; width: parent.width; z: 70 }          // named engine work over 300 ms, with progress
+    ActivityBar { anchors.top: top.bottom; width: parent.width; z: 70; barH: top.height; slotX: top.freeX; slotW: top.freeW }          // named engine work over 300 ms, with progress
     SheetHost {}
     Exports {}
     Palette { id: palette }

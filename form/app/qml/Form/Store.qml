@@ -185,6 +185,15 @@ QtObject {
     function post(path, body) { return _track(new Promise(function (res, rej) { var id = ++_rid; _pending[id] = [res, rej]; Bridge.request(id, "POST", path, body || ({})) }), "POST", path) }
     function upload(path, fileUrl) { return _track(new Promise(function (res, rej) { var id = ++_rid; _pending[id] = [res, rej]; Bridge.upload(id, path, fileUrl) }), "UPLOAD", path) }
     function pget(rest) { return get("/projects/" + pid + (rest || "")) }
+    // What a revision changed against the one before (features, parameters), for the conversation's revision cards.
+    // Asked quietly (never named in the activity bar: nobody clicked for it) and kept, since a revision never changes.
+    property var _revDiffs: ({})
+    function revDiff(project, a, b) {
+        var k = project + ":" + a + ":" + b
+        if (_revDiffs[k]) return Promise.resolve(_revDiffs[k])
+        return new Promise(function (res, rej) { var id = ++_rid; _pending[id] = [res, rej]
+            Bridge.request(id, "GET", "/projects/" + project + "/diff?a=" + a + "&b=" + b, null) }).then(function (r) { s._revDiffs[k] = r; return r })
+    }
     function ppost(rest, body) { return post("/projects/" + pid + rest, body) }
 
     // ── toasts ───────────────────────────────────────────────
@@ -276,7 +285,7 @@ QtObject {
             if (!a.shown && !a.done && now - a.t0 >= 300) { a.shown = now }
             if (a.done && (!a.shown || now - a.shown >= 400) && now - a.done >= 160) { delete _acts[k]; continue }
             left = true
-            if (a.shown) list.push({ id: a.id, label: a.label, t0: a.t0, progress: a.done ? 1 : -1, detail: "", done: !!a.done, ok: a.ok })
+            if (a.shown) list.push({ id: a.id, label: a.label, t0: a.t0, progress: a.done ? 1 : -1, detail: "", done: !!a.done, ok: a.ok, click: !!a.click })
         }
         if (job && jobSteps.length) {
             var n = jobSteps.length, fin = jobSteps.filter(function (x) { return x.state !== "queued" && x.state !== "running" }).length
@@ -396,12 +405,17 @@ QtObject {
         }, function (e) { fail(e); screen = "home"; pid = "" })
     }
     function refresh(withView) {
+        // An answer that arrives after another design was opened belongs to the design that asked: it is dropped, so
+        // the design you left can never be drawn (or built up) for a moment in the one you opened.
+        var at = pid
         return pget().then(function (d) {
+            if (pid !== at) return
             data = d
             if (d.recovered) toast("Project recovered", d.recovered)
             loadRefine()                                   // the head's refine changes follow the head
             if (withView || !view || view.rev !== d.project.head) {
                 return pget("/view").then(function (v) {
+                    if (pid !== at) return
                     v.rev = d.project.head; v.pid = d.project.id; view = v
                     if (!hasDraft) showHead()
                 }, function (e) { fail(e) })
@@ -510,7 +524,11 @@ QtObject {
     property var _poll: Timer { interval: 160; onTriggered: s._tick() }
     function run(nodes, force) { ppost("/run", { nodes: nodes || [], force: !!force }).then(function (r) { track(r.job) }, fail) }
     function settings(body) { return ppost("/settings", body).then(function (r) { if (r.job) track(r.job); return refresh() }, fail) }
-    function track(id) { if (!id) return; job = id; jobSteps = []; _jobT0 = Date.now(); _poll.restart(); _actTimer.start() }
+    // A pipeline that starts by itself as a design opens is not news when it ends: the dock and the bar show it.
+    property real _openT: 0
+    property bool _jobQuiet: false
+    onPidChanged: _openT = Date.now()
+    function track(id) { if (!id) return; job = id; jobSteps = []; _jobT0 = Date.now(); _jobQuiet = _jobT0 - _openT < 4000; _poll.restart(); _actTimer.start() }
     function _tick() {
         var id = job
         pget("/job/" + id).then(function (j) {
@@ -524,7 +542,7 @@ QtObject {
             for (var k = 0; k < j.steps.length; k++) if (j.steps[k].state === "failed" || j.steps[k].state === "blocked") { bad = j.steps[k]; break }
             if (!bad && j.error) bad = { label: "Pipeline", error: j.error }
             if (bad) toast(bad.label + ": " + (bad.error && bad.error.message || "stopped"), bad.error && bad.error.hint, true)
-            else if (Date.now() - _jobT0 > 1500 && j.steps.some(function (x) { return x.state === "done" }))
+            else if (!_jobQuiet && Date.now() - _jobT0 > 1500 && j.steps.some(function (x) { return x.state === "done" }))
                 toast("Outputs are current", F.plural(j.steps.filter(function (x) { return x.state === "done" }).length, "step") + " rebuilt in " + ((Date.now() - _jobT0) / 1000).toFixed(1) + " s.")
             var t = Object.assign({}, thumbTick); t[pid] = (t[pid] || 0) + 1; thumbTick = t
             refresh(true)
@@ -1802,7 +1820,13 @@ QtObject {
         var v = onboardStep, send = function () { return post("/setup/step", { step: v }).then(function () {}, function () {}) }
         _stepSave = _stepSave ? _stepSave.then(send) : send()
     }
-    function openSettings(tab) { openSheet("settings", { tab: tab || "general" }); loadConfig(); checkSoftware(); loadCaps() }
+    // tab: general | printer | chat | apps | updates | advanced | software. "agents" (what the tab reads) means chat;
+    // a tab that does not exist, or Printing while printing is off, opens General instead of an empty sheet.
+    function openSettings(tab) {
+        var t = tab === "agents" ? "chat" : tab
+        if (["general", "printer", "chat", "apps", "updates", "advanced", "software"].indexOf(t) < 0 || (t === "printer" && !printOn)) t = "general"
+        openSheet("settings", { tab: t }); loadConfig(); checkSoftware(); loadCaps()
+    }
     // "Update now" (pip / uv / source installs): the upgrade command runs as an install job with a streamed log.
     // The running app keeps its code until it is restarted; the sheet says so.
     property var updateJob: null       // { id, state, steps, log, seconds, fake }

@@ -67,7 +67,7 @@
 <section class="hero" id="top" aria-labelledby="hero-title">
   <div class="hero-bg" aria-hidden="true"><div class="hero-grid" data-par="-0.12"></div><div class="hero-glow" data-par="0.18"></div></div>
   <div class="wrap hero-copy" id="hero-copy">
-    <p class="eyebrow in-1"><a class="launch" href="https://github.com/kaizensx/form-studio/releases"><span class="pip"></span><b>Form Studio 1.1</b> · engineering materials for CNC, game assets in Beta · macOS, Windows and Linux <span aria-hidden="true">→</span></a></p>
+    <p class="eyebrow in-1"><a class="launch" href="https://github.com/kaizensx/form-studio/releases"><span class="pip"></span><b>Form Studio 1.1</b><i> · engineering materials for CNC, game assets in Beta · macOS, Windows and Linux</i> <span aria-hidden="true">→</span></a></p>
     <h1 id="hero-title" class="hero-title"><span class="ln"><span>Describe</span></span> <span class="ln"><span>anything.</span></span></h1>
     <p class="lead in-2">An engineer-grade agent builds it as real, editable CAD: a parametric design in a real CAD kernel, checked on the solid, ready for your CAD program, a CNC shop, a render or your slicer.</p>
     <div class="cta in-3">
@@ -254,6 +254,38 @@
   </div>
 </section>
 
+<!--proof-->
+<section class="fx proof" id="proof" data-nav="how" aria-labelledby="proof-title">
+  <div class="wrap fx-grid">
+    <div class="fx-copy">
+      <p class="eyebrow rv">The proof sheet</p>
+      <h2 id="proof-title" class="rv">A brief is<br class="br"> a contract.</h2>
+      <p class="rv">The numbers in your brief become requirements. They are audited by arithmetic before any code is written, then measured on the kernel's solid after every build. A red row names the feature that owes it, and one edit rebuilds only what changed.</p>
+      <dl class="readout rv">
+        <div><dt>Requirements</dt><dd class="mono">4</dd></div>
+        <div><dt>Proved at r01</dt><dd class="mono">3 of 4</dd></div>
+        <div><dt>Proved at r02</dt><dd class="mono">4 of 4</dd></div>
+      </dl>
+      <p class="rv"><a class="more" href="docs/features.html#checks-and-evidence">How a design is proved <span aria-hidden="true">→</span></a></p>
+    </div>
+    <figure class="proof-win island rv" id="proof-win" data-at="r02">
+      <div class="mtb"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><b class="pn">Bolted flange</b><span class="rv-chip mono" id="pf-rev" data-brief="brief" data-r01="r01" data-r02="r02">r02</span><span class="sp"></span><span class="tag t-datum">Proof sheet</span></div>
+      <div class="pf-tabs" role="group" aria-label="The run, step by step">
+        <button type="button" data-at="brief" aria-pressed="false"><span class="mono">01</span><b>The brief</b><em>audited, not built</em></button>
+        <button type="button" data-at="r01" aria-pressed="false"><span class="mono">02</span><b>First build</b><em>r01 · 3 of 4 proved</em></button>
+        <button type="button" data-at="r02" aria-pressed="true"><span class="mono">03</span><b>One edit</b><em>r02 · 4 of 4 proved</em></button>
+      </div>
+      <div class="pf-body">
+        <div class="pf-pane" data-pane="brief"><p class="pf-goal">“A flange Ø68 with a Ø20 bore, 4 × Ø5.2 on a 60 mm bolt circle and 2.4 mm walls, 8 mm thick.”</p><ul class="pf-asserts" aria-label="The contract read from the brief"><li>Ø68 mm boss</li><li>Ø20 mm bore</li><li>4 × Ø5.2 mm on a Ø60 mm bolt circle</li><li>walls at least 2.4 mm</li></ul><div class="pf-audit"><span class="tag t-signal">Conflict</span><p>Between a hole and the Ø68 edge there is 1.40 mm ((68 − 60 − 5.2) / 2); the brief asks for walls of at least 2.4 mm, which needs an outside diameter of at least 70 mm.</p><span class="pf-ev">Arithmetic on the stated values; nothing measured.</span></div><p class="pf-sum"><i aria-hidden="true"></i>The numbers cannot all hold, so there is nothing to build to yet.</p></div>
+        <div class="pf-pane" data-pane="r01"><div class="pf-head" aria-hidden="true"><span>Status</span><span>Requirement</span><span>Measured</span><span>Tolerance</span><span>Owed by</span><span>Evidence</span></div><ol class="pf-rows"><li class="pf-row" style="--i:0"><span class="tag t-pass">PASS</span><span class="pf-req">Ø70 mm boss</span><span class="pf-meas mono">Ø70 mm (nearest)</span><span class="pf-tol mono">±0.1 mm</span><span class="pf-feat mono">disc</span><span class="tag t-ink">computed</span></li><li class="pf-row" style="--i:1"><span class="tag t-pass">PASS</span><span class="pf-req">Ø20 mm bore</span><span class="pf-meas mono">Ø20 mm (nearest)</span><span class="pf-tol mono">±0.1 mm</span><span class="pf-feat mono">bore</span><span class="tag t-ink">computed</span></li><li class="pf-row bad" style="--i:2"><span class="tag t-signal">FAIL</span><span class="pf-req">4 × Ø5.2 mm on a Ø60 mm bolt circle<span class="pf-why">wanted 4 × Ø5.2 · not met when holes finished, nor after any later feature</span></span><span class="pf-meas mono">0 hole(s) Ø5.2 (round holes found: Ø5, Ø20)</span><span class="pf-tol mono">±0.1 mm</span><span class="pf-feat mono">holes</span><span class="tag t-ink">computed</span></li><li class="pf-row" style="--i:3"><span class="tag t-pass">PASS</span><span class="pf-req">walls at least 2.4 mm</span><span class="pf-meas mono">2.5 mm thinnest of 10 samples</span><span class="pf-tol mono">±0.1 mm</span><span class="pf-feat mono">edges</span><span class="tag t-ink">computed</span></li></ol><p class="pf-sum"><i aria-hidden="true"></i>3 of 4 requirements proved, 1 failed</p></div>
+        <div class="pf-pane" data-pane="r02"><p class="pf-edit"><code>edit_design</code><span class="mono">set_param hole_d = 5.2</span><span class="pf-built">rebuilt: holes, edges · reused: 2</span></p><div class="pf-head" aria-hidden="true"><span>Status</span><span>Requirement</span><span>Measured</span><span>Tolerance</span><span>Owed by</span><span>Evidence</span></div><ol class="pf-rows"><li class="pf-row" style="--i:0"><span class="tag t-pass">PASS</span><span class="pf-req">Ø70 mm boss</span><span class="pf-meas mono">Ø70 mm (nearest)</span><span class="pf-tol mono">±0.1 mm</span><span class="pf-feat mono">disc</span><span class="tag t-ink">computed</span></li><li class="pf-row" style="--i:1"><span class="tag t-pass">PASS</span><span class="pf-req">Ø20 mm bore</span><span class="pf-meas mono">Ø20 mm (nearest)</span><span class="pf-tol mono">±0.1 mm</span><span class="pf-feat mono">bore</span><span class="tag t-ink">computed</span></li><li class="pf-row" style="--i:2"><span class="tag t-pass">PASS</span><span class="pf-req">4 × Ø5.2 mm on a Ø60 mm bolt circle</span><span class="pf-meas mono">4 × Ø5.2 on Ø60</span><span class="pf-tol mono">±0.1 mm</span><span class="pf-feat mono">holes</span><span class="tag t-ink">computed</span></li><li class="pf-row" style="--i:3"><span class="tag t-pass">PASS</span><span class="pf-req">walls at least 2.4 mm</span><span class="pf-meas mono">2.4 mm thinnest of 10 samples</span><span class="pf-tol mono">±0.1 mm</span><span class="pf-feat mono">edges</span><span class="tag t-ink">computed</span></li></ol><p class="pf-sum green"><i aria-hidden="true"></i>4 of 4 requirements proved</p></div>
+      </div>
+      <figcaption>A real run of <code>scripts/proof_demo.py</code>: a script calls the same MCP tools an agent calls. Pass and fail are measured on the kernel's solid of that revision; nothing here is a physical result.</figcaption>
+    </figure>
+  </div>
+</section>
+<!--/proof-->
+
 <section class="fx wide" id="recon" aria-labelledby="recon-title">
   <div class="wrap fx-grid">
     <div class="fx-copy">
@@ -393,7 +425,7 @@
       <div><b><svg class="ic" aria-hidden="true"><use href="#ic-term"/></svg>Any platform, with uv</b><pre tabindex="0"><code>uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizensx/form-studio"</code></pre></div>
     </div>
     <div class="get-foot rv">
-      <a href="https://github.com/kaizensx/form-studio/releases/tag/v1.1.0-preview.5">Preview 1.1</a>
+      <a href="https://github.com/kaizensx/form-studio/releases/tag/v1.1.0-preview.1">Preview 1.1</a>
       <a href="https://github.com/kaizensx/form-studio/releases">All releases</a>
       <a href="docs/changelog.html">Changelog</a>
       <a href="docs/app.html">Install guide</a>

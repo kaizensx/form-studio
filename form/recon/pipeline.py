@@ -1,11 +1,19 @@
 """Mesh to editable CAD, end to end. Kernel worker only (form/kernel.py runs `op_reconstruct`).
 
     Layer 2  first: the program route (program.py), sketches extruded and lofted between levels read straight off
-             the mesh, the rest kept as the mesh's own slices. When it verifies and the Params drive most of the
-             surface, it is the result and the slower layers below are not built.
+             the mesh, the rest kept as the mesh's own slices. It is built only when its own prediction says it can
+             be enough alone; when it verifies and its Params drive most of the surface, it is the result and the
+             slower layers below are not built.
     Layer 0  the mesh as an exact solid                              solid.layer0
+    Floor    what is recognised on it becomes features at once (a     mixed.py, patterns.py
+             pattern of teeth, planes as thickness, width and level
+             dimensions), the rest stays frozen: never 0 % editable when faces were recognised. The program route is
+             read again against it when its prediction beats it.
     Layer 1  analytic faces where they fit, frozen facets elsewhere segment.segment + brep.build
     Layer 2  a feature recipe on the Layer 1 solid (tree.py, features.py), compared with the program route
+
+Budget by predicted gain: after the floor, each route gets at most the share of the budget that matches the share of
+the surface it could still add (_gain_cap), and a route worth less than MIN_STAGE_S is not started.
 
 Each layer is verified against the mesh before it is offered; the result is the verified layer whose Params drive the
 most of the surface ("editable"), and every result says how far it is from the mesh and whether that is within the
@@ -55,6 +63,14 @@ FINISH_S = 15.0            # seconds kept back for writing the result (STEP, dev
 GATE_SHARE = 0.04          # of the budget the critics (gates.py) may use in all, ranking the candidates
 GATE_CELLS = 2_000_000     # voxels of the critics' occupancy grid
 NOISE_SHARE = 0.05         # of the budget measuring the scan noise and snapping the vertices may use
+MIXED = True               # build the floor (mixed.py: recognised features on the exact solid) before the other routes
+MIXED_SHARE = 0.3          # of the budget the floor may use
+GAIN_K = 1.0               # a route after the floor may use at most its predicted gain (the share of the surface it can
+                           # still add to the best so far) times this, of the budget: 10 % to gain, 10 % of the budget
+FLOOR_CREDIT = 0.5         # what a share of the surface the floor makes editable counts for, against real features
+LAYER_GAIN_K = 0.5         # the same for Layer 1 and the feature search together, which can only make recipes of the
+                           # surfaces Layer 1 recognises
+MIN_STAGE_S = 8.0          # a route whose predicted worth is less time than this is not started
 
 
 class Heartbeat:
@@ -216,23 +232,14 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
                  "fraction": 0.02})
     gx = _Gates(V, F, tol, budget_s)
 
-    # Layer 2, the program route: when it verifies and drives most of the surface, it is the result
+    # Layer 2, the program route, first: built only when its own prediction (program.predicted_share) says it can be
+    # enough alone (PROGRAM_ENOUGH); when it verifies and drives most of the surface, it is the result and nothing
+    # else is built. Otherwise it stops after reading the slices and is tried again against the floor below
     prog = None
+    tp0 = time.perf_counter()
     if layer >= 2:
-        say({"stage": "layer2", "text": "Reading the part as sketches and extrusions", "fraction": 0.02})
-        if _program is not _PROGRAM:                    # replaced in this process (a test, the bench's "before")
-            got = {"status": "unbounded", "value": _program(Vr, F, tol, name, out, say, t0, budget_s)}
-        else:
-            got = bounded.run(_program_child, (Vr, F, tol, name, out, t0, budget_s),
-                              timeout_s=min(PROGRAM_SHARE * float(budget_s) + PROGRAM_SLACK,
-                                            _left(hard, fin) - _layer0_estimate(len(F))),
-                              progress=lambda d: say({**d, "fraction": 0.02 + 0.6 * d.get("fraction", 0)}))
-        prog = got.get("value") if got["status"] in ("ok", "unbounded") else None
-        if prog is None:
-            prog = {"report": {"method": "sketches and extrusions", "error": f"The program route {got.get('error')}"}}
-            _cut(rep, "the program route (sketches and extrusions)", got)
-        if Vr is not V:
-            prog = _against_input(prog, V, F, tol)
+        prog = _run_program(Vr, V, F, tol, name, out, say, rep, hard, fin, tp0, PROGRAM_SHARE * float(budget_s),
+                            float(budget_s), PROGRAM_ENOUGH)
         # the other candidates, one after another, each through the same gates as the program route: verified against
         # the mesh, then the critics (gates.py), then the share of the surface their Params drive (_Gates.better)
         ctx = {"V": V, "F": F, "tol": tol, "name": name, "say": say, "budget_s": budget_s, "rep": rep, "hard": hard,
@@ -244,24 +251,21 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
                 rep.setdefault("candidates_failed", []).append({"candidate": key, "error": f"{type(e).__name__}: {e}"[:300]})
         if prog.get("verified") and prog["report"].get("editable_pct", 0.0) >= PROGRAM_ENOUGH \
                 and gx.verdict(prog) is not False:
-            why = (f"The program route verified first with {prog['report']['editable_pct']:g}% of the surface made by its "
-                   "features; the slower layers were not needed.")
+            why = (f"The program route verified first with {prog['report']['editable_pct']:g}% of the surface made by "
+                   "its features; the slower layers were not needed.")
             rep["layers"]["0"] = {"skipped": why}
             rep["layers"]["1"] = {"skipped": why}
             rep["gates"] = gx.summary()
+            rep["program_seconds"] = round(time.perf_counter() - tp0, 2)
             return _take_program(rep, prog, V, F, mvol, out, name, t0, tol, budget_s)
-    # the layers below have what is left of the budget: the program route is held to PROGRAM_SHARE of it (and stopped
-    # PROGRAM_SLACK past that), and nothing runs past the budget as a whole (`hard`)
-    tl = time.perf_counter() if prog is not None else t0
-    if prog is not None:
-        rep["program_seconds"] = round(tl - t0, 2)
+        rep["program_seconds"] = round(time.perf_counter() - tp0, 2)
 
-    # Layer 0
-    say({"stage": "layer0", "text": "Building the exact solid", "fraction": 0.02})
+    # Layer 0: the mesh as an exact solid is the fallback of every result, and the floor below is built on it
+    say({"stage": "layer0", "text": "Building the exact solid", "fraction": 0.3})
     P0 = T0 = c0 = None
-    # Layer 0 is the fallback of every result: it may use all the time there is
+    # Layer 0 may use all the time there is
     run0 = bounded.run(_layer0_child, (V, F), timeout_s=hard - 1.0 - time.perf_counter(),
-                       progress=lambda d: say({**d, "fraction": 0.02 + 0.25 * d.get("fraction", 0)}))
+                       progress=lambda d: say({**d, "fraction": 0.3 + 0.05 * d.get("fraction", 0)}))
     if run0["status"] in ("ok", "unbounded"):
         sh0, i0 = run0["value"]
     else:
@@ -280,6 +284,31 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
     rep["layers"]["0"] = L0
     best = ("0", sh0, P0, T0, c0, None) if L0.get("valid") else None
 
+    # The floor (mixed.py): what is recognised on the exact solid becomes features at once (a pattern of teeth, planes
+    # as thickness, width and level dimensions), the rest stays frozen. Every route after it is a candidate against
+    # it, and each gets time in proportion to what it can still add (_gain_cap): budget by predicted gain
+    floor = None
+    if layer >= 2 and MIXED and best is not None and c0 is not None and c0["hausdorff_mm"] <= tol:
+        floor = _floor(V, F, sh0, tol, name, out, say, hard, fin, budget_s, rep)
+
+    if layer >= 2:
+        # the program route again, when its first reading stopped at the prediction and the prediction beats the floor
+        pred = prog["report"].get("predicted_pct")
+        if pred is not None and not prog.get("source") and float(pred) > _share(floor):
+            tp1 = time.perf_counter()
+            cap = _gain_cap(floor, budget_s)
+            again = _run_program(Vr, V, F, tol, name, out, say, rep, hard, fin, tp1,
+                                 min(PROGRAM_SHARE * float(budget_s), cap), float(budget_s), _floor_pct(floor),
+                                 gain=_gain(floor))
+            rep["program_seconds"] = round(rep.get("program_seconds", 0.0) + time.perf_counter() - tp1, 2)
+            if gx.better(again, prog):
+                prog = again
+        if floor is not None and floor.get("verified") and _floor_better(floor, prog):
+            floor["report"]["also_tried"] = [{k: prog["report"].get(k) for k in (
+                "method", "verified", "hausdorff_mm", "editable_pct", "predicted_pct", "error")
+                if prog["report"].get(k) is not None}]
+            prog = floor
+
     # A spur gear is recognised from the mesh itself (gears.py); when its parametric gear is within the tolerance,
     # it is the result and the surface-by-surface layer is not needed
     gear = None
@@ -288,13 +317,25 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         if gear is not None and gear.get("verified"):
             rep["layers"]["1"] = {"skipped": "A parametric gear was found and verified against the mesh first (Layer 2)."}
 
+    # what Layer 1 and the feature search may still add over the best so far, as time (budget by predicted gain)
+    held = prog if (prog or {}).get("verified") else floor
+    held = held if (held or {}).get("verified") else None
+    # without a verified result in hand nothing is predicted: Layer 1 and the feature search have the time there is
+    cap2 = LAYER_GAIN_K / GAIN_K * _gain_cap(held, budget_s) if layer >= 2 and held else float("inf")
+    if layer >= 2 and cap2 < MIN_STAGE_S and not (gear and gear.get("verified")):
+        rep["layers"]["1"] = {"skipped": f"Layer 1 and the feature search could add at most "
+                                         f"{_gain(held):.3g}% of the surface "
+                                         "to the result so far: not worth the time."}
+
     # Layer 1
     regions = l1shape = None
-    if layer >= 1 and best is not None and not (gear and gear.get("verified")):
-        say({"stage": "layer1", "text": "Finding planes, cylinders, cones, spheres and tori", "fraction": 0.3})
-        lim = LAYER1_SHARE * _left(hard, fin)
+    tl1 = time.perf_counter()
+    if layer >= 1 and best is not None and not (gear and gear.get("verified")) and \
+            not (layer >= 2 and cap2 < MIN_STAGE_S):
+        say({"stage": "layer1", "text": "Finding planes, cylinders, cones, spheres and tori", "fraction": 0.6})
+        lim = min(LAYER1_SHARE * _left(hard, fin), 0.6 * cap2)
         run1 = bounded.run(_layer1, (V, F, tol), {"budget_s": max(5.0, 0.4 * lim)}, timeout_s=lim,
-                           progress=lambda d: say({**d, "fraction": 0.3 + 0.4 * d.get("fraction", 0)}))
+                           progress=lambda d: say({**d, "fraction": 0.6 + 0.2 * d.get("fraction", 0)}))
         if run1["status"] in ("ok", "unbounded"):
             got = run1["value"]
             for r in got.get("regions") or []:          # surfaces cached on a fit do not cross the process boundary
@@ -307,10 +348,15 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         if got.get("shape") is not None:
             regions = got["regions"]
             l1shape = got["shape"]
-            best = ("1", got["shape"], got["P"], got["T"], got["cmp"], regions)
+            if got["cmp"]["hausdorff_mm"] <= tol or best is None:
+                best = ("1", got["shape"], got["P"], got["T"], got["cmp"], regions)
+            else:                                       # outside the tolerance: Layer 0 stays the better answer
+                rep["layers"]["1"]["note"] = (f"{got['cmp']['hausdorff_mm']:.4g} mm from the mesh, more than the {tol:g} mm "
+                                              "asked for: Layer 0 stays the result below it.")
 
     # Layer 2
     recipe = None
+    prog_wins = False
     refs = []
     ref_paths = {}
     if gear is not None and gear.get("verified"):
@@ -318,12 +364,17 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         (out / f"{name}_recipe.py").write_text(recipe, encoding="utf-8")
         rep["layers"]["2"] = {**gear["report"], "file": f"{name}_recipe.py", "driven_by_params_pct": 100.0}
         best = ("2", gear["shape"], gear["P"], gear["T"], gear["cmp"], None)
+    elif layer >= 2 and regions is not None and (held or {}).get("verified") and \
+            float(rep["layers"]["1"].get("parametric_area_pct") or 0.0) <= _share(held):
+        rep["layers"]["2"] = {"method": "feature tree", "skipped": (
+            f"Layer 1 recognised {rep['layers']['1'].get('parametric_area_pct'):g}% of the surface, not more than the "
+            f"{_share(held):g}% the result in hand makes editable: the feature search was not run.")}
     elif layer >= 2 and regions is not None:
-        say({"stage": "layer2", "text": "Looking for features: base, holes, fillets, chamfers, patterns", "fraction": 0.72})
-        lim = _left(hard, fin)
+        say({"stage": "layer2", "text": "Looking for features: base, holes, fillets, chamfers, patterns", "fraction": 0.8})
+        lim = min(_left(hard, fin), max(0.0, cap2 - (time.perf_counter() - tl1)))
         run2 = bounded.run(layer2, (V, F, regions, l1shape, tol, name, out, rep["layers"]["1"]),
                            {"deadline": time.perf_counter() + 0.85 * lim}, timeout_s=lim,
-                           progress=lambda d: say({**d, "fraction": 0.72 + 0.25 * d.get("fraction", 0)}))
+                           progress=lambda d: say({**d, "fraction": 0.8 + 0.17 * d.get("fraction", 0)}))
         if run2["status"] in ("ok", "unbounded"):
             r2 = run2["value"]
         else:
@@ -332,16 +383,19 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         if gear is not None:
             r2["report"]["also_tried"] = r2["report"].get("also_tried", []) + [
                 {k: gear["report"].get(k) for k in ("method", "base", "verified", "hausdorff_mm", "error") if gear["report"].get(k) is not None}]
-        if prog is not None and gx.better(prog, r2):
-            r2 = {**prog, "report": {**prog["report"], "also_tried": [
+        if prog is not None and (_floor_better(prog, r2) if prog is floor else gx.better(prog, r2)):
+            # the program route (or the floor) is the better answer: it is taken whole below (_take_program)
+            prog["report"]["also_tried"] = prog["report"].get("also_tried", []) + [
                 {k: r2["report"].get(k) for k in ("method", "base", "verified", "hausdorff_mm", "driven_by_params_pct", "error")
-                 if r2["report"].get(k) is not None}]}}
+                 if r2["report"].get(k) is not None}]
+            r2 = {"report": r2["report"]}
+            prog_wins = True
         elif prog is not None:
             r2["report"]["also_tried"] = r2["report"].get("also_tried", []) + [
                 {k: prog["report"].get(k) for k in ("method", "verified", "hausdorff_mm", "editable_pct", "error")
                  if prog["report"].get(k) is not None}]
         rep["layers"]["2"] = r2["report"]
-        if r2.get("source"):
+        if r2.get("source") and not prog_wins:
             recipe = r2["source"]
             (out / f"{name}_recipe.py").write_text(recipe, encoding="utf-8")
             rep["layers"]["2"]["file"] = f"{name}_recipe.py"
@@ -351,10 +405,11 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
                 ref_paths = dict(r2["refs"]) if isinstance(r2.get("refs"), dict) else {}
 
     rep["gates"] = gx.summary()
-    if prog is not None and prog.get("verified") and (best is None or best[0] != "2") and \
+    if prog is not None and prog.get("verified") and (best is None or best[0] != "2" or prog_wins) and \
             (best is None or gx.verdict(prog) is not False):     # a program the critics fail never beats the mesh's faces
-        rep["layers"]["2"] = {**prog["report"], **({"also_tried": rep["layers"]["2"].get("also_tried", [])}
-                                                  if isinstance(rep["layers"].get("2"), dict) else {})}
+        before = rep["layers"]["2"].get("also_tried", []) if isinstance(rep["layers"].get("2"), dict) else []
+        mine = prog["report"].get("also_tried", [])
+        rep["layers"]["2"] = {**prog["report"], "also_tried": mine + [t for t in before if t not in mine]}
         return _take_program(rep, prog, V, F, mvol, out, name, t0, tol, budget_s)
     if best is None:
         rep["error"] = "No layer produced a valid solid."
@@ -397,8 +452,8 @@ def _offer_learned(prog, ctx):
     if _lm.candidate is not _lm.CANDIDATE:              # replaced in this process (a test): run it here
         got_l = {"status": "unbounded", "value": _learned(V, F, tol, name, say)}
     else:
-        got_l = bounded.run(_learned_child, (V, F, tol, name), timeout_s=LEARNED_SHARE * _left(hard, fin),
-                            progress=say)
+        got_l = bounded.run(_learned_child, (V, F, tol, name),
+                            timeout_s=min(LEARNED_SHARE * _left(hard, fin), ctx.get("cap", float("inf"))), progress=say)
     lc = got_l.get("value") if got_l["status"] in ("ok", "unbounded") else None
     if got_l["status"] not in ("ok", "unbounded"):
         _cut(rep, "the learned engine", got_l)
@@ -419,7 +474,7 @@ def _offer_cadfit(prog, ctx):
     """The optional CADFit candidate (cadfit/): off unless [recon] cadfit = true; its own time slice and child process."""
     from . import cadfit
     return cadfit.offer(prog, ctx["V"], ctx["F"], ctx["tol"], ctx["name"], ctx["say"], ctx["budget_s"], ctx["rep"],
-                        ctx["better"], left_s=_left(ctx["hard"], ctx["fin"]))
+                        ctx["better"], left_s=min(_left(ctx["hard"], ctx["fin"]), ctx.get("cap", float("inf"))))
 
 
 # Candidates beside the program route, in order: each gets the best so far and returns it or its own verified, better
@@ -520,6 +575,111 @@ def _layer0_estimate(n_tris: int) -> float:
     return 2.0 + n_tris / 4000.0
 
 
+def _gain(best) -> float:
+    """The share of the surface a route could still add to `best` (a verified candidate, or None). The floor's
+    pushed faces count FLOOR_CREDIT of a feature each: a later route can still turn them into holes, fillets and
+    sketches."""
+    if not isinstance(best, dict) or not best.get("verified"):
+        return 100.0
+    got = _share(best)
+    if str(best.get("report", {}).get("method", "")).startswith("mixed"):
+        got *= FLOOR_CREDIT
+    return max(0.0, 100.0 - got)
+
+
+def _run_program(Vr, V, F, tol, name, out, say, rep, hard, fin, tstart, share, budget_s, floor_pct, gain=None):
+    """The program route in its bounded step: its own deadline `share` seconds from `tstart` (plus slack), not built
+    when its prediction is not above `floor_pct`. Returns the candidate (a report with the error when it failed)."""
+    allowed = min(share + min(PROGRAM_SLACK, share), _left(hard, fin))
+    in_time = min(PROGRAM_SHARE * float(budget_s) + PROGRAM_SLACK, _left(hard, fin))
+    if in_time < MIN_STAGE_S:                           # the budget, not the gain, leaves no room for it
+        _cut(rep, "the program route (sketches and extrusions)",
+             {"status": "not started", "seconds": 0.0, "error": f"only {max(in_time, 0.0):.1f} s were left for it"})
+        return {"report": {"method": "sketches and extrusions",
+                           "error": f"Not started: {max(in_time, 0.0):.1f} s were left for it"}}
+    if allowed < MIN_STAGE_S:
+        why = (f"Not started: it could add at most {gain:.3g}% of the surface to the floor, worth {allowed:.0f} s of "
+               f"the budget (less than {MIN_STAGE_S:g} s)")
+        rep["program_skipped"] = why
+        return {"report": {"method": "sketches and extrusions", "error": why}}
+    say({"stage": "layer2", "text": "Reading the part as sketches and extrusions", "fraction": 0.02})
+    sb = share / PROGRAM_SHARE                          # the route's deadline is tstart + PROGRAM_SHARE * sb = + share
+    if _program is not _PROGRAM:                        # replaced in this process (a test, the bench's "before")
+        got = {"status": "unbounded", "value": _program(Vr, F, tol, name, out, say, tstart, sb)}
+    else:
+        got = bounded.run(_program_child, (Vr, F, tol, name, out, tstart, sb, floor_pct), timeout_s=allowed,
+                          progress=lambda d: say({**d, "fraction": 0.02 + 0.28 * d.get("fraction", 0)}))
+    prog = got.get("value") if got["status"] in ("ok", "unbounded") else None
+    if prog is None:
+        prog = {"report": {"method": "sketches and extrusions", "error": f"The program route {got.get('error')}"}}
+        _cut(rep, "the program route (sketches and extrusions)", got)
+    if Vr is not V:
+        prog = _against_input(prog, V, F, tol)
+    return prog
+
+
+def _floor_better(f, c) -> bool:
+    """Is the floor `f` a better answer than candidate `c`? Both are checked against the mesh; the floor's editable
+    share counts FLOOR_CREDIT (its pushed faces are weaker features than holes, fillets and sketches), and the critics
+    (gates.py) do not rank them: the floor is the exact solid with faces that move, nothing for them to catch, so a
+    critic's verdict on the other one would decide alone."""
+    if not (isinstance(f, dict) and f.get("verified")):
+        return False
+    if not (isinstance(c, dict) and c.get("verified")):
+        return True
+    a, b = FLOOR_CREDIT * _share(f), _share(c)
+    if round(a, 1) != round(b, 1):
+        return a > b
+    return float(f["report"].get("hausdorff_mm") or 1e9) < float(c["report"].get("hausdorff_mm") or 1e9)
+
+
+def _share(c) -> float:
+    """The share of the surface a verified candidate's Params make (0 for anything else)."""
+    if not isinstance(c, dict) or not c.get("verified"):
+        return 0.0
+    rp = c.get("report", {})
+    return float(rp.get("editable_pct", rp.get("driven_by_params_pct")) or 0.0)
+
+
+def _floor_pct(floor):
+    """The share of the surface the verified floor makes editable (None without one)."""
+    return None if not (isinstance(floor, dict) and floor.get("verified")) else _share(floor)
+
+
+def _gain_cap(best, budget_s) -> float:
+    """Seconds a route after `best` is worth: its predicted gain as a share of the budget (GAIN_K)."""
+    return GAIN_K * float(budget_s) * _gain(best) / 100.0
+
+
+def _floor(V, F, sh0, tol, name, out, say, hard, fin, budget_s, rep):
+    """The mixed result on Layer 0 (mixed.py) in its own bounded step, within MIXED_SHARE of the budget. Returns the
+    candidate (None when it failed) and notes it in the report under "mixed"."""
+    say({"stage": "layer2", "text": "Turning what is recognised into features", "fraction": 0.08})
+    lim = min(MIXED_SHARE * float(budget_s), _left(hard, fin))
+    if lim < MIN_STAGE_S:
+        rep["mixed"] = {"error": f"Not started: {lim:.1f} s were left for it"}
+        _cut(rep, "the mixed result (recognised features on the exact solid)",
+             {"status": "not started", "seconds": 0.0, "error": f"only {lim:.1f} s were left for it"})
+        return None
+    got = bounded.run(_mixed_child, (V, F, sh0, tol, name, out), {"deadline": time.perf_counter() + 0.8 * lim},
+                      timeout_s=lim, progress=lambda d: say({**d, "fraction": 0.08 + 0.2 * d.get("fraction", 0)}))
+    if got["status"] not in ("ok", "unbounded") or got.get("value") is None:
+        _cut(rep, "the mixed result (recognised features on the exact solid)", got)
+        rep["mixed"] = {"error": f"The mixed result {got.get('error')}"}
+        return None
+    c = got["value"]
+    rep["mixed"] = {k: c["report"].get(k) for k in ("verified", "editable_pct", "hausdorff_mm", "params", "face_params",
+                                                     "pattern", "budget", "stopped", "seconds", "error")
+                    if c["report"].get(k) is not None}
+    return c
+
+
+def _mixed_child(V, F, sh0, tol, name, out, deadline=None, progress=None):
+    from . import mixed
+    return mixed.recipe(V, F, sh0, tol, name=name, out_dir=out, progress=progress, deadline=deadline,
+                        base_doc="Layer 0: the mesh as an exact solid, its coplanar facets merged into planes.")
+
+
 def _layer0_child(V, F, progress=None):
     from . import solid
     return solid.layer0(V, F, progress=progress)
@@ -529,20 +689,20 @@ def _learned_child(V, F, tol, name, progress=None):
     return _learned(V, F, tol, name, progress or (lambda d: None))
 
 
-def _program_child(V, F, tol, name, out, t0, budget_s, progress=None):
+def _program_child(V, F, tol, name, out, t0, budget_s, floor_pct=None, progress=None):
     """_program in the bounded child: the plan (only used in this process) is not sent back."""
-    got = _program(V, F, tol, name, out, progress or (lambda d: None), t0, budget_s, raw=True)
+    got = _program(V, F, tol, name, out, progress or (lambda d: None), t0, budget_s, raw=True, floor_pct=floor_pct)
     got.pop("plan", None)
     return got
 
 
-def _program(V, F, tol, name, out, say, t0, budget_s, raw=False) -> dict:
+def _program(V, F, tol, name, out, say, t0, budget_s, raw=False, floor_pct=None) -> dict:
     """The program route (program.py), within PROGRAM_SHARE of the budget. Never raises."""
     from . import program
     try:
         return program.recipe(V, F, tol, name=name, limit=tol, out_dir=out,
                               progress=say if raw else lambda d: say({**d, "fraction": 0.02 + 0.6 * d.get("fraction", 0)}),
-                              deadline=t0 + PROGRAM_SHARE * float(budget_s))
+                              deadline=t0 + PROGRAM_SHARE * float(budget_s), floor_pct=floor_pct)
     except Exception as e:                              # noqa: BLE001
         return {"report": {"method": "sketches and extrusions", "error": f"{type(e).__name__}: {e}"[:300]}}
 
@@ -603,8 +763,11 @@ def _take_program(rep, prog, V, F, mvol, out, name, t0, tol, budget_s=240.0):
     if isinstance(r2.get("gates"), dict):
         rep["result"]["gates"] = r2["gates"].get("verdict")
     refs = prog.get("refs") or {}
-    _dimensions(rep, prog["source"], {k: str(v) for k, v in refs.items()} if isinstance(refs, dict) else {},
-                t0, budget_s, lambda d: None)
+    if isinstance(prog.get("dimensions"), dict):        # the mixed result rebuilt every Param as it kept it
+        rep["result"]["dimensions"] = prog["dimensions"]
+    else:
+        _dimensions(rep, prog["source"], {k: str(v) for k, v in refs.items()} if isinstance(refs, dict) else {},
+                    t0, budget_s, lambda d: None)
     _headline(rep, tol)
     dmap = verify.deviation_map(P, T, cmp["_rec_dev"], tol)
     (out / f"{name}_deviation.json").write_text(json.dumps(dmap), encoding="utf-8")

@@ -45,7 +45,7 @@ def write(path: Path, text: str):
 def save(im: QImage, path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     assert im.save(str(path)), path
-    print("  ", path.relative_to(ROOT), f"{im.width()}x{im.height()}")
+    print("  ", path.relative_to(ROOT) if path.is_relative_to(ROOT) else path, f"{im.width()}x{im.height()}")
 
 
 def to_pil(im: QImage):
@@ -160,9 +160,14 @@ def build_web():
     build_og(2, ROOT / "docs" / "readme" / "banner.png")
 
 
-def build_og(scale: int = 1, out: Path | None = None):
+OG_MARK = 88                          # the mark's height on the 630 px card; the wordmark's cap height follows it
+
+
+def build_og(scale: int = 1, out: Path | None = None, mark: float = OG_MARK):
     """1200x630: the lockup on graphite, two lines, and a real build photographed in the app (brand/og-part.png).
-    scale 2 draws the same card at 2400x1260: the banner at the top of the README and in Discord's #welcome."""
+    scale 2 draws the same card at 2400x1260: the banner at the top of the README and in Discord's #welcome.
+    mark is the height of the mark in px on the 1200x630 card; the lockup, the two lines and the build's place
+    all follow it, so the logo leads at any size."""
     W, H = 1200, 630
     im = QImage(W * scale, H * scale, QImage.Format.Format_ARGB32_Premultiplied)
     im.fill(QColor(PLATE))
@@ -170,12 +175,17 @@ def build_og(scale: int = 1, out: Path | None = None):
     p.scale(scale, scale)
     for h in (QPainter.RenderHint.Antialiasing, QPainter.RenderHint.SmoothPixmapTransform, QPainter.RenderHint.TextAntialiasing):
         p.setRenderHint(h)
+    lk = O.lockup(FRAME, DARK)
+    left = 72
+    lh = float(mark)
+    lw = lh / O.ratio(lk)
     part = HERE / "og-part.png"
     if part.exists():
         pim = QImage(str(part))
         th = 600
         tw = round(pim.width() * th / pim.height())
-        x, top = W - tw + 70, (H - th) / 2 + 20
+        # the build keeps clear of the wordmark: it slides right (and off the edge a little) as the lockup grows
+        x, top = max(W - tw + 70, left + lw - 36), (H - th) / 2 + 20
         p.drawImage(QRectF(x, top, tw, th), pim)
         clear = QColor(PLATE)
         clear.setAlpha(0)
@@ -189,16 +199,19 @@ def build_og(scale: int = 1, out: Path | None = None):
             p.fillRect(rect, g)
         p.fillRect(QRectF(x, 0, tw, top + 1), QColor(PLATE))
         p.fillRect(QRectF(x, top + th - 1, tw, H), QColor(PLATE))
-    lk = O.lockup(FRAME, DARK)
-    lw = 420
-    lh = lw * O.ratio(lk)
-    QSvgRenderer(QByteArray(lk.encode())).render(p, QRectF(80, 238, lw, lh))
+    size = round(22 + lh * 0.14)                     # 34 px beside an 88 px mark
+    lead = round(size * 1.38)
+    block = lh + size * 1.9 + lead                   # lockup, a gap, two lines
+    y = (H - block) / 2 - 6
+    QSvgRenderer(QByteArray(lk.encode())).render(p, QRectF(left, y, lw, lh))
     f = O._font("sans", 440, 0)
-    f.setPixelSize(30)
+    f.setPixelSize(size)
     p.setFont(f)
+    base = round(y + lh + size * 1.9)
+    p.setPen(QColor(INK))
+    p.drawText(left, base, "Describe anything.")
     p.setPen(QColor(INK2))
-    p.drawText(80, round(238 + lh + 66), "Describe anything.")
-    p.drawText(80, round(238 + lh + 108), "The open-source AI CAD studio.")
+    p.drawText(left, base + lead, "The open-source AI CAD studio.")
     p.end()
     save(im, out or SITE / "assets" / "og.png")
 

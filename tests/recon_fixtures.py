@@ -240,12 +240,68 @@ def box_with_square_hole():
     return body, {"holes": sorted([5.5] * 4), "prismatic": True}
 
 
+# The three failure classes of WP8 (docs/RECON_EDITABILITY.md), built synthetically: the
+# shapes of the parts that failed, none of their geometry. Each has a large share of plane faces, so the mixed result
+# (form/recon/mixed.py) must make at least half of its surface editable.
+
+def railed_tray():
+    """Planes everywhere (the plate class): a plate 2.5 thick with two rails whose top edges are chamfered at 45
+    degrees, rounded corners and a row of slots. Nearly all of its surface is analytic; when the routes that make
+    recipes fail on it (tests/test_recon_mixed.py makes them), only the floor keeps it editable."""
+    from build123d import Align, Box, Pos, RectangleRounded, SlotOverall, chamfer, extrude
+    plate = extrude(RectangleRounded(60.0, 100.0, 4.0), 2.5)
+    A = (Align.CENTER, Align.CENTER, Align.MIN)
+    for x in (-26.0, 26.0):
+        rail = Pos(x, 0, 2.5) * Box(3.0, 90.0, 7.5, align=A)
+        top = [e for e in rail.edges() if abs(e.center().Z - 10.0) < 1e-6 and abs(e.center().Y) < 1e-6]
+        plate = plate + chamfer(top, 1.0)
+    for y in (-30.0, -10.0, 10.0, 30.0):
+        plate = plate - Pos(0, y, -1) * extrude(SlotOverall(20.0, 4.0), 5.0)
+    return plate, {"thickness": 2.5, "rails": 2, "prismatic": True}
+
+
+def rounded_tray():
+    """Walls that curve along the direction (the tray class): a tray 8 high whose outside is rounded 3.5 mm at the top
+    and the bottom and whose pocket is rounded 3 mm at its floor, so the program route reads under 40 % of its walls
+    as sketches; a floor with a window, and notches in one wall."""
+    from build123d import Align, Box, Pos, RectangleRounded, extrude, fillet
+    A = (Align.CENTER, Align.CENTER, Align.MIN)
+    body = extrude(RectangleRounded(60.0, 100.0, 6.0), 8.0)
+    body = fillet([e for e in body.edges() if abs(e.center().Z) < 1e-6 or abs(e.center().Z - 8.0) < 1e-6], 3.5)
+    body = body - Pos(0, 0, 1.5) * extrude(RectangleRounded(44.0, 84.0, 4.0), 10.0)        # walls 8 thick, floor 1.5
+    body = fillet([e for e in body.edges() if abs(e.center().Z - 1.5) < 1e-6], 3.0)        # the pocket's floor rounded
+    body = body - Pos(10, -30, -1) * extrude(RectangleRounded(8.0, 5.0, 1.5), 5.0)         # a window in the floor
+    for k in range(6):                                                                     # notches in the left wall
+        body = body - Pos(-30.0, -10.0 + 3.0 * k, 2.0) * Box(1.6, 1.5, 4.0, align=A)
+    return body, {"floor": 1.5, "wall": 8.0, "prismatic": True}
+
+
+def sector_ratchet(teeth: int = 6, pitch: float = 20.0):
+    """Teeth round a hole (the toothed class): a hub with `teeth` equal teeth at `pitch` degrees round a Ø6 hole, on
+    a wedge whose top is cut at a slant, so its faces are many small cylinders, planes at many angles and facets."""
+    from build123d import Align, Axis, Cylinder, Plane, Polyline, Pos, extrude, make_face
+    A = (Align.CENTER, Align.CENTER, Align.MIN)
+    H = 6.0
+    body = Cylinder(9.0, H, align=A)                                                       # the hub, root circle r 9
+    wedge = make_face(Plane.XY * Polyline((0, -9), (30, -9), (0, 9), close=True))
+    body = body + extrude(wedge, H)
+    slant = Plane(origin=(20, 0, H), z_dir=(0.25, 0, 1))                                   # the slanted top of the wedge
+    body = body - extrude(make_face(slant * Polyline((-30, -30), (30, -30), (30, 30), (-30, 30), close=True)), 20)
+    tooth = make_face(Plane.XY * Polyline((8.6, -1.5), (12.0, -0.7), (12.0, 0.7), (8.6, 1.5), close=True))
+    tooth = extrude(tooth, H)
+    for k in range(teeth):
+        body = body + tooth.rotate(Axis.Z, 90.0 + k * pitch)
+    body = body - Pos(0, 0, -1) * Cylinder(3.0, H + 2, align=A)                            # Ø6 hole
+    return body, {"teeth": teeth, "pitch_deg": pitch, "hole": 6.0, "prismatic": False}
+
+
 FIXTURES = {"box_with_holes": box_with_holes, "turned_part": turned_part, "filleted_bracket": filleted_bracket, "gear": gear,
             "stepped_bracket": stepped_bracket, "flanged_shaft": flanged_shaft, "spur_gear": spur_gear_part,
             "organic_blob": organic_blob, "wallet_plate": wallet_plate,
             "bolt_flange": bolt_flange, "turned_shaft": turned_shaft, "enclosure_with_holes": enclosure_with_holes,
             "filleted_block": filleted_block, "hollow_block": hollow_block, "cavity_filler": cavity_filler,
-            "box_with_square_hole": box_with_square_hole}
+            "box_with_square_hole": box_with_square_hole, "railed_tray": railed_tray, "rounded_tray": rounded_tray,
+            "sector_ratchet": sector_ratchet}
 
 
 # A smooth shape meshed finely, the way a scan or a careful export is: its facets are within 0.01 mm of the surface

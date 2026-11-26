@@ -56,13 +56,18 @@ Item {
     // a conversation is open in the column on the left: that is where you type, so the middle does not offer a second box
     readonly property bool chatting: Store.talkOpen && (Store.chatItems.length > 0 || Store.chatBusy)
     // the composer always sits in the middle; the bench behind it stays empty (the part you made last is in the list below)
-    readonly property bool split: false
+    // … except on the first day, when there is nothing below yet: then the words sit on the left and a real build turns
+    // beside them (Bridge.showpiece: kernel geometry kept as a file, not a project), so Home shows what gets made here.
+    readonly property bool split: fresh && !chatting && width >= 1180 && !!showpiece
+    property var showpiece: null
+    function loadShowpiece() { if (showpiece) return; try { var t = Bridge.showpiece(); if (t) showpiece = JSON.parse(t) } catch (e) { showpiece = null } }
+    onFreshChanged: if (fresh) loadShowpiece()
     readonly property real side: Math.round((width - cw) / 2)
     function openGroup(gid) { for (var i = 0; i < Store.concepts.length; i++) if (Store.concepts[i].id === gid) return true; return false }
     // newest Blender render of each project's current geometry (form/photo.py)
     property var photos: ({})
     function loadPhotos() { Store.get("/photos").then(function (r) { home.photos = r.latest }, function () {}) }
-    Component.onCompleted: { loadPhotos(); Store.loadStart(); Store.loadConcepts(); Store.loadConvs() }
+    Component.onCompleted: { if (fresh) loadShowpiece(); loadPhotos(); Store.loadStart(); Store.loadConcepts(); Store.loadConvs() }
     // Everything rises in once, when Home appears. Sorting, filtering or a reload afterwards puts things in place at once.
     property bool entered: false
     Timer { interval: 40 + 9 * Theme.stagger + Theme.slow; running: true; onTriggered: home.entered = true }
@@ -139,10 +144,11 @@ Item {
                 NumberAnimation { from: -60; to: -34; duration: 7000; easing.type: Easing.InOutSine } }
             property string showing: ""
             function load() {
-                var id = home.latest && home.split ? home.latest.id : ""      // narrow: the bench alone; a part would sit behind the words
+                var id = home.split ? "showpiece" : ""       // narrow, or once there are designs: the bench alone
                 if (id === showing) return
                 showing = id
                 if (!id) { setModel(null); return }
+                if (home.showpiece) { stage.setModel(home.showpiece); stage.setView("iso", false); stage.dist *= 1.1; return }
                 Store.get("/projects/" + id + "/view").then(function (v) {
                     if (stage.showing !== id) return
                     v.companions = []
@@ -162,8 +168,8 @@ Item {
                 GradientStop { position: 0.72; color: Theme.alpha(Theme.plate, 0.35) }
                 GradientStop { position: 1.0; color: Theme.alpha(Theme.plate, 0.92) } } }
         // split: the words sit on a quiet bench; the bench brightens towards the part
-        Rectangle { visible: home.split; width: frame3d.edge; height: parent.height; color: Theme.plate }
-        Rectangle { visible: home.split; x: frame3d.edge - 1; width: 300; height: parent.height
+        Rectangle { visible: home.split; width: frame3d.x; height: parent.height; color: Theme.plate }
+        Rectangle { visible: home.split; x: frame3d.x - 1; width: Math.max(300, frame3d.edge - frame3d.x + 200); height: parent.height
             gradient: Gradient { orientation: Gradient.Horizontal
                 GradientStop { position: 0.0; color: Theme.plate }
                 GradientStop { position: 0.45; color: Theme.alpha(Theme.plate, 0.7) }
@@ -174,8 +180,8 @@ Item {
         Rectangle { anchors.fill: parent
             gradient: Gradient {
                 GradientStop { position: 0.0; color: Theme.alpha(Theme.plate, 0.85) }
-                GradientStop { position: 0.32; color: Theme.alpha(Theme.plate, 0.25) }
-                GradientStop { position: 0.62; color: Theme.alpha(Theme.plate, 0.55) }
+                GradientStop { position: 0.32; color: Theme.alpha(Theme.plate, home.split ? 0.0 : 0.25) }
+                GradientStop { position: 0.62; color: Theme.alpha(Theme.plate, home.split ? 0.12 : 0.55) }
                 GradientStop { position: 1.0; color: Theme.plate } } }
         // a scan line crossing the plate now and then: the bench is on
         Rectangle { id: scanLine; width: parent.width; height: 120; opacity: 0.0
@@ -230,7 +236,7 @@ Item {
                         Btn { objectName: "homeNewDesign"; kind: "primary"; icon: "plus"; text: "New design"; keys: "Ctrl+N"; onClicked: Store.startNew() }
                         Btn { kind: "quiet"; icon: "panel_left_close"; text: "Hide the conversation"; onClicked: Store.talkOpen = false } }
                     StartComposer { id: composer; visible: !home.chatting
-                        Component.onDestruction: if (Store.screen === "designing" || Store.screen === "work") {
+                        Component.onDestruction: if (Store.screen === "designing") {
                             var p = composer.mapToItem(null, 0, 0); Store.morphFrom(Qt.rect(p.x, p.y, composer.width, composer.height)) }
                          width: parent.width; dragging: home.dropping; onSketchWanted: Store.openSheet("sketch") }
                     Item { visible: !home.chatting; width: 1; height: Theme.s4 }
@@ -279,7 +285,7 @@ Item {
                                     TalkModelPicker { id: hmp; width: parent.width; onDone: homeModelPop.close() } } } } }
                     // other ways in: an empty studio, or a replacement for a broken part
                     Item { visible: !home.chatting; width: 1; height: Theme.s3 }
-                    Row { id: alts; objectName: "startAlternatives"; visible: !home.chatting; anchors.horizontalCenter: parent.horizontalCenter; spacing: Theme.s1; height: Theme.hMd
+                    Row { id: alts; objectName: "startAlternatives"; visible: !home.chatting; x: home.split ? 0 : Math.round((parent.width - width) / 2); spacing: Theme.s1; height: Theme.hMd
                         Btn { id: blank; anchors.verticalCenter: parent.verticalCenter; objectName: "startBlank"; small: true; height: Theme.hMd; kind: "quiet"; icon: "square_dashed"; text: "Start blank"
                             tip: "An empty studio and the workspace. Describe, sketch or import what goes in it."
                             onClicked: Store.startBlank() }
@@ -292,30 +298,15 @@ Item {
                     Txt { objectName: "homeContinue"; visible: !home.chatting && !home.fresh && !!home.latest; anchors.horizontalCenter: parent.horizontalCenter; kind: "fine"; tone: cm.containsMouse ? 1 : 3
                         text: home.latest ? "Continue “" + home.latest.name + "” · " + F.pad(home.latest.head) + " · " + F.ago(home.latest.updated) + "  →" : ""
                         MouseArea { id: cm; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.open(home.latest.id) } }
-                    Item { visible: home.fresh && !home.chatting; width: 1; height: 40 }
-                    Grid { id: ways; visible: home.fresh && !home.chatting; width: parent.width; columns: 4; spacing: 10
-                        readonly property real tw: Math.floor((width - 3 * spacing) / 4)
-                        Repeater {
-                            model: [{ icon: "camera", t: "A photo", d: "With a card, coin or ruler in it, the agent can estimate sizes", run: function () { composer.pickFiles() } },
-                                    { icon: "pen_tool", t: "A sketch", d: "Lines, arcs and the dimensions that matter", run: function () { Store.openSheet("sketch") } },
-                                    { icon: "cuboid", t: "A part", d: "STEP, STL or 3MF to design around or change", run: function () { composer.pickFiles() } },
-                                    { icon: "link", t: "A link", d: "A model page or a direct file link", run: function () { composer.openLink() } }]
-                            Rectangle { id: way; required property var modelData; required property int index
-                                width: ways.tw; height: 104; radius: Theme.rLg
-                                color: wm.pressed ? Theme.plate1 : wm.containsMouse ? Theme.alpha(Theme.plate2, 0.9) : Theme.alpha(Theme.plate1, 0.55)
-                                border.color: wm.containsMouse ? Theme.rule3 : Theme.rule
-                                Behavior on color { Tint {} }
-                                opacity: 0; Component.onCompleted: wIn.start()
-                                SequentialAnimation { id: wIn; PauseAnimation { duration: 380 + way.index * 70 }
-                                    ParallelAnimation { Glide { target: way; property: "opacity"; to: 1; duration: Theme.slow } Glide { target: wtr; property: "y"; from: Theme.shift(10); to: 0; duration: Theme.slow } } }
-                                transform: Translate { id: wtr }
-                                Icon { x: 14; y: 14; name: way.modelData.icon; size: 16; color: wm.containsMouse ? Theme.datum : Theme.ink3; Behavior on color { Tint {} } }
-                                Column { x: 14; y: 40; width: parent.width - 28; spacing: 2
-                                    Txt { text: way.modelData.t; font.weight: Theme.wMedium }
-                                    Txt { kind: "fine"; tone: 3; width: parent.width; text: way.modelData.d; maximumLineCount: 2; elide: Text.ElideRight } }
-                                MouseArea { id: wm; anchors.fill: parent; hoverEnabled: true; onClicked: way.modelData.run() } } } }
                     Note { visible: !!Store.fatal; width: parent.width; kind: "red"; title: Store.fatal ? Store.fatal.message : ""; text: Store.fatal ? (Store.fatal.hint || "") : "" }
                 }
+                // first day: what is turning on the bench, said honestly (kernel geometry, an example, not one of yours)
+                Row { id: pieceCap; objectName: "showpieceCaption"; visible: home.split; spacing: Theme.s2
+                    x: Math.round(hero.colW + (hero.width - hero.colW) / 2 - width / 2 + 28); y: Math.round(hero.height * 0.8)
+                    opacity: stage.model ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.slow } }
+                    Rectangle { width: 5; height: 5; radius: 2.5; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { kind: "cap"; tone: 3; font.letterSpacing: 0.8; anchors.verticalCenter: parent.verticalCenter
+                        text: home.showpiece ? "An example build · " + home.showpiece.name + " · " + home.showpiece.features + " features · real CAD from the kernel" : "" } }
                 // the empty bench says where the work will appear, once
                 Txt { visible: home.fresh; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 26
                     kind: "fine"; tone: 4

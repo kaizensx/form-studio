@@ -961,6 +961,123 @@ def hero(data, light: bool):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+# The workspace mid-build: the window, the design's features as the engine lists them, and the build's ledger
+# (BuildLedger.qml: "Building · Lid · 9 of 12") over the part. The features, their names and their faces are the
+# design's own (Studio.view); the drawing stops the build at one of them.
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+BUILDING_ID = "hinged-box"
+
+
+def build_order(d) -> list:
+    """[(feature id, label, triangles)] in the order the engine's view lists them, for the features that own faces."""
+    by = {}
+    for m in d["meshes"]:
+        by.setdefault(m["feature"], []).append(m["tris"])
+    feats = d["view"].get("features") or []
+    order = [f["id"] for f in feats if f["id"] in by] + [k for k in by if k not in {f["id"] for f in feats}]
+    label = {f["id"]: f.get("label") or f["id"] for f in feats}
+    return [(k, label.get(k, k.replace("_", " ").capitalize()), np.concatenate(by[k])) for k in order]
+
+
+def building(data, light: bool):
+    p = P(light)
+    d = data[BUILDING_ID]
+    M = model_facts(d)
+    feats = build_order(d)
+    n = len(feats)
+    at = max(2, min(n - 1, round(n * 0.75)))            # the feature arriving: three quarters of the way through
+    name = feats[at - 1][1]
+    W, H, TB, RAIL = 828, 520, 46, 214
+    loop = 6.0
+    svg = Svg(W, H, loop, "Form Studio, building")
+    svg.rect(0.5, 0.5, W - 1, H - 1, 22, fill=p["panel"], stroke=p["grid"])
+    # title bar (TopBar.qml)
+    for i, c in enumerate(("#ec6a5e", "#f4bf4f", "#61c554")):
+        svg.circle(26 + i * 19, TB / 2, 5.5, c)
+    lw = logo(svg, 92, TB / 2, size=15, ink=p["ink"], ink2=p["ink2"], part=p["logo_part"], datum=p["datum"])
+    x = 92 + lw + 14
+    svg.text(x, TB / 2 + 5, "/", 14, 420, p["ink4"])
+    x += 16
+    x += svg.text(x, TB / 2 + 4.5, M["name"], 13.5, 620, p["ink"]) + 12
+    svg.text(x, TB / 2 + 4.5, "r%02d" % d["state"]["head"], 12, 450, p["ink2"], family="mono")
+    tw = text_w("DESIGN", 10.5, 640, ls=0.8) + 16
+    svg.rect(W - 22 - tw, TB / 2 - 10, tw, 20, 5, fill=alpha(p["datum"], 0.14) if not light else "rgba(29,116,87,.12)")
+    svg.text(W - 22 - tw / 2, TB / 2 + 3.8, "DESIGN", 10.5, 640, p["datum"], anchor="middle", ls=0.8)
+    svg.line(0.5, TB, W - 0.5, TB, p["grid"])
+    # the features: made, arriving, still to come
+    svg.line(RAIL, TB, RAIL, H - 0.5, p["grid"])
+    svg.text(26, TB + 34, "FEATURES", 10.5, 640, p["ink3"], ls=0.9)
+    svg.text(RAIL - 22, TB + 34, "%d of %d" % (at, n), 11.5, 450, p["ink3"], family="mono", anchor="end")
+    lh = min(27.0, (H - TB - 78) / n)
+    pulse = svg.anim([(0, {"opacity": "1"}), (loop / 2, {"opacity": ".35"}), (loop, {"opacity": "1"})], ease="ease-in-out")
+    for i, (_fid, lab, _t) in enumerate(feats):
+        y = TB + 62 + i * lh
+        done, now = i < at - 1, i == at - 1
+        if now:
+            svg.rect(14, y - 15.5, RAIL - 28, 24, 6, fill=alpha(p["datum"], 0.10) if not light else "rgba(29,116,87,.08)")
+            svg.circle(31, y - 3.5, 3.2, p["datum"], cls=pulse)
+        elif done:
+            svg.circle(31, y - 3.5, 6.5, alpha(p["pass_"], 0.16) if not light else "rgba(31,122,77,.14)")
+            svg.add('<path d="%s" stroke="%s" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' % (check_mark(31, y - 3.5, 0.62), p["pass_"]))
+        else:
+            svg.add('<circle cx="31" cy="%s" r="5.5" stroke="%s" stroke-width="1.2"/>' % (f1(y - 3.5), p["ink4"]))
+        svg.text(48, y + 1, elide(lab, RAIL - 74, 13, 520 if now else 450), 13, 560 if now else 450, p["ink"] if now else p["ink2"] if done else p["ink3"])
+    # the viewport: the finished design as a faint plot, the features made so far as solid, the one arriving in datum
+    vx, vy, vw, vh = RAIL + 1, TB + 1, W - RAIL - 2, H - TB - 2
+    every = all_tris(d).reshape(-1, 3)
+    lo, hi = every.min(0), every.max(0)
+    c = (lo + hi) / 2
+    cam = Camera(az=-38, el=27, target=(c[0], c[1], c[2]), dist=440)
+    cam.fit(every, (vx + 60, vy + 92, vw - 120, vh - 150))
+    rad = float(np.linalg.norm((hi - lo)[:2])) / 2
+    kpx = px_per_mm(cam, 440)
+    soft_shadow(svg, cam, (c[0], c[1], lo[2]), rad * kpx * 1.05, rad * kpx * 0.34, p["shadow"])
+    rings_ = []
+    for r in (rad * 1.2, rad * 1.6):
+        a = np.linspace(0, 2 * math.pi, 97)
+        xy, _ = cam.project(np.stack([c[0] + r * np.cos(a), c[1] + r * np.sin(a), np.full_like(a, lo[2])], 1))
+        rings_.append("M" + "L".join("%s %s" % (f1(px), f1(py)) for px, py in xy) + "Z")
+    svg.add('<clipPath id="vp"><rect x="%s" y="%s" width="%s" height="%s"/></clipPath><g clip-path="url(#vp)">' % (f1(vx), f1(vy), f1(vw), f1(vh)))
+    svg.add('<path d="%s" stroke="%s" stroke-width="1"/>' % ("".join(rings_), p["grid"]))
+    if d["edges"] is not None:
+        svg.add('<path d="%s" stroke="%s" stroke-width="0.8" opacity="%s"/>' % (wire(cam, d["edges"]), p["ink3"], "0.34" if not light else "0.4"))
+    made = np.concatenate([t for _, _, t in feats[:at - 1]])
+    fills, _ed = draw_solid(cam, made, svg.w, svg.h, None, base=p["clay"])
+    svg.add("<g>%s</g>" % fills)
+    arrive = svg.anim([(0, {"opacity": ".28"}), (0.5, {"opacity": ".28"}), (1.7, {"opacity": "1"}), (loop - 0.7, {"opacity": "1"}), (loop, {"opacity": ".28"})],
+                      rest={"opacity": "1"})
+    fills, _ed = draw_solid(cam, feats[at - 1][2], svg.w, svg.h, None, base=p["mint"] if not light else "#8fd0b8")
+    svg.add('<g class="%s">%s</g>' % (arrive, fills))
+    svg.add("</g>")
+    # the ledger (BuildLedger.qml), pinned top centre of the viewport
+    cnt = "%d of %d" % (at, n)
+    cap_w = text_w("BUILDING", 10.5, 640, ls=0.9)
+    nm_w = text_w(name, 15, 520)
+    cn_w = text_w(cnt, 12, 450, "mono")
+    lw_ = max(264.0, 16 + 6 + 8 + cap_w + 12 + nm_w + 28 + cn_w + 16)
+    lx, ly = vx + (vw - lw_) / 2, vy + 20
+    svg.rect(lx, ly + 5, lw_, 44, 9, fill=p["shadow"], extra=' opacity=".55"')
+    svg.rect(lx, ly, lw_, 44, 9, fill=p["panel2"] if not light else "#ffffff", stroke=p["grid"] if not light else "rgba(14,17,19,.14)")
+    svg.circle(lx + 19, ly + 22, 3, p["datum"], cls=pulse)
+    svg.text(lx + 30, ly + 25.8, "BUILDING", 10.5, 640, p["datum"], ls=0.9)
+    svg.text(lx + 30 + cap_w + 12, ly + 27, name, 15, 520, p["ink"])
+    svg.text(lx + lw_ - 16, ly + 26.2, cnt, 12, 450, p["ink2"], family="mono", anchor="end")
+    bx, bw = lx + 16, lw_ - 32
+    svg.rect(bx, ly + 35, bw, 2, 1, fill=p["grid"] if not light else "rgba(14,17,19,.12)")
+    f0, f1_ = (at - 1) / n, at / n
+    bar = svg.anim([(0, {"transform": "scaleX(%.4f)" % f0}), (0.5, {"transform": "scaleX(%.4f)" % f0}), (1.7, {"transform": "scaleX(%.4f)" % f1_}),
+                    (loop - 0.7, {"transform": "scaleX(%.4f)" % f1_}), (loop, {"transform": "scaleX(%.4f)" % f0})],
+                   origin="left center", rest={"transform": "scaleX(%.4f)" % f1_})
+    svg.rect(bx, ly + 35, bw, 2, 1, fill=p["datum"], cls=bar)
+    svg.text(vx + 20, H - 22, "%s mm" % M["size"], 12, 450, p["ink2"], family="mono")
+    svg.text(W - 22, H - 22, "build123d on OpenCascade", 12, 450, p["ink3"], anchor="end")
+    desc = ("The Form Studio workspace while a design builds: %s, feature %d of %d, %s, arriving. The features made so far are "
+            "solid, the rest of the design is a faint plot, and the list on the left ticks them off: %s."
+            % (M["name"].lower(), at, n, name, ", ".join(lab for _, lab, _ in feats)))
+    return [("building", svg.render(desc))]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 # Small motion helpers shared by the strips and cards
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 def counter(svg: Svg, x, y, values: list, times: list, size, weight, fill, dur, once=True, anchor="start", ls=0.0):
@@ -1608,7 +1725,7 @@ def downloads(data, light: bool):
 
 
 downloads.neutral = True
-SCENES = {"hero": hero, "steps": steps, "numbers": numbers, "features": features, "downloads": downloads}
+SCENES = {"hero": hero, "building": building, "steps": steps, "numbers": numbers, "features": features, "downloads": downloads}
 
 
 def main():

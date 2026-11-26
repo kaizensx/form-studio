@@ -15,6 +15,10 @@ it stays readable and every number in it is a Param or a coordinate read off the
     polar(x, y, pcd, n, phase)             the n centres of a polar pattern on a pitch circle
     grid(x0, y0, nx, ny, px, py)           the centres of a linear pattern
     slab(face, z0, z1, top=None)           the solid between two levels: an extrusion, or a ruled loft to `top`
+    plane_faces(shape, normal, offset)     the planar faces of a shape on one plane, facing one way
+    push(shape, normal, offset, delta)     those faces moved `delta` along their normal (a push or pull of the face)
+    sector(plane, x, y, r0, r1, a0, a1)    an annular sector (radii r0 to r1, angles a0 to a1 degrees) as a face
+    spin(shape, plane, x, y, angle)        a shape turned `angle` degrees about the axis through (x, y) along the normal
 """
 from __future__ import annotations
 
@@ -241,3 +245,69 @@ def grid(x0, y0, nx, ny, px, py):
     if nx < 1 or ny < 1:
         raise ValueError("a pattern needs at least one item")
     return [(x0 + i * px, y0 + j * py) for j in range(ny) for i in range(nx)]
+
+
+def plane_faces(shape, normal, offset, eps: float = 1e-4, cos_min: float = 0.99999):
+    """The planar faces of `shape` that lie on the plane normal . p = offset and face along `normal` (outward)."""
+    from build123d import ShapeList
+    from OCP.BRepAdaptor import BRepAdaptor_Surface
+    from OCP.GeomAbs import GeomAbs_Plane
+    from OCP.TopAbs import TopAbs_REVERSED
+    n = [float(x) for x in normal]
+    out = []
+    for f in shape.faces():
+        ad = BRepAdaptor_Surface(f.wrapped)
+        if ad.GetType() != GeomAbs_Plane:
+            continue
+        pl = ad.Plane()
+        d = pl.Axis().Direction()
+        m = [d.X(), d.Y(), d.Z()]
+        if f.wrapped.Orientation() == TopAbs_REVERSED:
+            m = [-x for x in m]
+        if sum(a * b for a, b in zip(m, n)) < cos_min:
+            continue
+        c = f.center()
+        if abs(n[0] * c.X + n[1] * c.Y + n[2] * c.Z - float(offset)) <= eps:
+            out.append(f)
+    return ShapeList(out)
+
+
+def push(shape, normal, offset, delta, eps: float = 1e-4):
+    """The faces of `shape` on the plane normal . p = offset (facing along `normal`) moved `delta` along it: a pull
+    (delta > 0) adds the faces swept outward, a push (delta < 0) cuts them swept inward. 0 leaves the shape as it is.
+    Raises ValueError when no face is on that plane (an earlier change removed it)."""
+    from build123d import Vector, extrude
+    delta = float(delta)
+    if abs(delta) < 1e-9:
+        return shape
+    faces = plane_faces(shape, normal, offset, eps)
+    if not faces:
+        raise ValueError(f"no face on the plane {tuple(round(float(x), 4) for x in normal)} . p = {float(offset):g}")
+    d = Vector(*[float(x) for x in normal]) * (1.0 if delta > 0 else -1.0)
+    tools = [extrude(f, amount=abs(delta), dir=d) for f in faces]
+    out = shape.fuse(*tools) if delta > 0 else shape.cut(*tools)
+    return out.clean()
+
+
+def sector(plane, x, y, r0, r1, a0, a1):
+    """An annular sector on `plane` about (x, y): radii r0 to r1, from angle a0 to a1 (degrees, a1 > a0), as a face."""
+    from build123d import Face, Line, ThreePointArc, Wire
+    if not (0 <= r0 < r1) or a1 <= a0:
+        raise ValueError(f"a sector of radii {r0:g} to {r1:g} and angles {a0:g} to {a1:g}")
+    q = lambda r, a: plane.from_local_coords((float(x) + r * math.cos(math.radians(a)),
+                                              float(y) + r * math.sin(math.radians(a))))
+    am = (a0 + a1) / 2
+    out = [Line(q(r0, a0), q(r1, a0)), ThreePointArc(q(r1, a0), q(r1, am), q(r1, a1)), Line(q(r1, a1), q(r0, a1))]
+    if r0 > 0:
+        out.append(ThreePointArc(q(r0, a1), q(r0, am), q(r0, a0)))
+    else:
+        out = [Line(q(0, 0), q(r1, a0)), out[1], Line(q(r1, a1), q(0, 0))]
+    return Face(Wire(out))
+
+
+def spin(shape, plane, x, y, angle):
+    """`shape` turned `angle` degrees about the axis through (x, y) on `plane`, along the plane's normal."""
+    from build123d import Axis
+    if abs(float(angle)) < 1e-12:
+        return shape
+    return shape.rotate(Axis(plane.from_local_coords((float(x), float(y))), plane.z_dir), float(angle))

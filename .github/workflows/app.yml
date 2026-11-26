@@ -53,6 +53,12 @@ jobs:
           # retried: a large wheel (cadquery-ocp) sometimes times out on the runner's network
           for i in 1 2 3; do uv pip install --python .venv -e ".[all]" pyinstaller && break
             [ "$i" = 3 ] && exit 1; echo "Install failed; retrying in 20 s."; sleep 20; done
+          # cryptography 49+ ships no Intel-Mac wheel: built from source it links Homebrew's OpenSSL, and the bundled
+          # libssl (Python's, older) then lacks its symbols, so the MCP server would not start. 48.0.1 is the last
+          # release with a universal2 wheel (OpenSSL linked in).
+          if [ "$RUNNER_OS" = "macOS" ] && [ "$RUNNER_ARCH" = "X64" ]; then
+            uv pip install --python .venv "cryptography==48.0.1"
+          fi
       - name: Engine smoke tests
         shell: bash
         timeout-minutes: 15        # a hang fails the build in minutes, not after the job's hour
@@ -93,6 +99,20 @@ jobs:
           cat "$FORM_CHECK_OUT" || { echo "The packaged app did not reach its interface."; exit 1; }
           grep -q "^ok:" "$FORM_CHECK_OUT"
           grep -q "^kernel: build123d" "$FORM_CHECK_OUT" || { echo "The CAD kernel did not start inside the packaged app."; exit 1; }
+      - name: Use the packaged engine
+        # The built bundle builds, exports, checks and serves MCP, as the release on the Mac does before install
+        # (scripts/smoke_packaged.py); steps needing programs the runner lacks (Blender, a slicer) are skipped.
+        shell: bash
+        timeout-minutes: 15
+        env:
+          FORM_NO_UPDATE_CHECK: "1"
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then APP="dist/Form Studio.app"
+          elif [ "$RUNNER_OS" = "Windows" ]; then APP=dist/FORM/FORM.exe
+          else APP=dist/FORM/FORM; fi
+          PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
+          RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a"
+          $RUN "$PY" scripts/smoke_packaged.py "$APP"
       - name: Package
         shell: bash
         run: |
