@@ -220,7 +220,7 @@ Item {
             onHoveredValue: function (v, x, y, on) { vchip.on = on; vchip.v = v; vchip.x = Math.min(x + 14, centre.width - vchip.width - 8); vchip.y = y + 14 }
         }
         Loader { id: lv; anchors.fill: parent; active: !!Store.layers; source: "LayerView.qml"
-            onLoaded: { item.leftInset = 84; item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }) } }
+            onLoaded: { item.leftInset = 84; item.topInset = 84; item.rightInset = Qt.binding(function () { return centre.width - insp.x + 12 }); item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }) } }
         // the corners of the room fall away
         Room { anchors.fill: parent; wall: false; poolK: 0; visible: !Store.layers }
         }
@@ -465,13 +465,16 @@ Item {
             Row { id: vrow; x: 6; anchors.verticalCenter: parent.verticalCenter; spacing: 2; opacity: ws.cueOn ? 0.45 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
                 // the grid: the build plate of a design made for printing while Describe or Design is open (Fit, Review and
                 // Make show it anyway); otherwise the 10 mm grid of the studio floor
-                Btn { id: gridBtn; objectName: plate ? "showPlate" : "floorGrid"; small: true; kind: "quiet"; height: 30; width: 32; icon: "grid_3x3"; anchors.verticalCenter: parent.verticalCenter
-                    readonly property bool plate: Store.printUi && (Store.stage === "brief" || Store.stage === "shape")
-                    active: plate ? Store.showPlate : Store.floorGrid && !Store.plateWanted
-                    enabled: plate || !Store.plateWanted
-                    tip: plate ? (Store.showPlate ? "Hide the build plate" : "Show the build plate" + (Store.printing.available ? ": " + Store.printing.presets.machine.name : ""))
-                        : Store.plateWanted ? "The build plate is shown in this stage" : Store.floorGrid ? "Hide the floor grid" : "Show the floor grid: a line every 10 mm"
-                    onClicked: { if (plate) Store.showPlate = !Store.showPlate; else Store.floorGrid = !Store.floorGrid } }
+                Btn { objectName: "showPlate"; small: true; kind: "quiet"; height: 30; width: 32; icon: "grid_3x3"; anchors.verticalCenter: parent.verticalCenter
+                    visible: Store.printUi && (Store.stage === "brief" || Store.stage === "shape")
+                    active: Store.showPlate
+                    tip: Store.showPlate ? "Hide the build plate" : "Show the build plate" + (Store.printing.available ? ": " + Store.printing.presets.machine.name : "")
+                    onClicked: Store.showPlate = !Store.showPlate }
+                Btn { objectName: "floorGrid"; small: true; kind: "quiet"; height: 30; width: 32; icon: "grid_3x3"; anchors.verticalCenter: parent.verticalCenter
+                    visible: !(Store.printUi && (Store.stage === "brief" || Store.stage === "shape"))
+                    active: Store.floorGrid && !Store.plateWanted; enabled: !Store.plateWanted
+                    tip: Store.plateWanted ? "The build plate is shown in this stage" : Store.floorGrid ? "Hide the floor grid" : "Show the floor grid: a line every 10 mm"
+                    onClicked: Store.floorGrid = !Store.floorGrid }
                 Seg { id: vseg; visible: !ws.compact; model: viewCtl.names; value: Store.viewName; onPicked: function (v) { Store.setView(v) }
                     color: "transparent"; border.width: 0; anchors.verticalCenter: parent.verticalCenter }
                 Btn { id: cyc; visible: ws.compact; small: true; kind: "quiet"; height: 30; icon: "move_3d"; tip: "Next view (keys 1 to 5)"; anchors.verticalCenter: parent.verticalCenter
@@ -531,7 +534,8 @@ Item {
         // ── bottom left: what you are looking at ─────────────
         Column {
             id: status
-            x: Theme.edge + 14; anchors.bottom: viewCtl.top; anchors.bottomMargin: 14; z: 4; spacing: 8; visible: !ws.sim && !!Store.shown
+            // above the view buttons; in a narrow window the bar reaches over here, so it stands above the bar instead
+            x: Theme.edge + 14; y: Math.round(Math.min(viewCtl.y - 14, ws.compact && width + x + 8 > Store.barX ? Store.barY - 10 : centre.height) - height); z: 4; spacing: 8; visible: !ws.sim && !!Store.shown
             // notices: the picture is not simply "the head revision"
             Rectangle { visible: !!Store.scrub; width: sn.implicitWidth + 16; height: 28; radius: Theme.rSm
                 color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.alpha(Theme.blueprint, 0.4)

@@ -34,6 +34,8 @@ Item {
     property real leftInset: 12                // the workspace's tool rail stays on screen at the left
     readonly property bool narrow: width < 640 // a narrow viewport: controls stack, the line types fold away
     property bool typesFold: narrow
+    property real rightInset: 12               // the workspace's panes on the right stay on screen
+    property real topInset: 14                 // the top bar's capsules float over the view
     property real stripHeight: 60              // the workspace's bottom strip (pipeline), with its margin
     readonly property int foot: bar.height + stripHeight + 12 + 10   // kept clear at the bottom: transport and the pipeline strip
 
@@ -148,7 +150,7 @@ Item {
             GradientStop { position: 0.8; color: "transparent" } GradientStop { position: 1; color: Theme.alpha(Theme.plate, 0.7) } } }
 
     // ── top left: way back, and what this is ─────────────────
-    Column { x: sim.leftInset + 4; y: 14; spacing: 10
+    Column { x: sim.leftInset + 4; y: sim.topInset; spacing: 10
         Row { spacing: 10
             Btn { icon: "arrow_left"; text: sim.narrow ? "Back" : "Back to the design"; onClicked: Store.showLayers(false) }
             Tag { text: "simulated"; anchors.verticalCenter: parent.verticalCenter } }
@@ -195,7 +197,7 @@ Item {
     }
 
     // ── top right: how to look at it ─────────────────────────
-    Column { anchors.right: parent.right; anchors.rightMargin: 12; y: sim.narrow ? 50 : 14; spacing: 8
+    Column { anchors.right: parent.right; anchors.rightMargin: sim.rightInset; y: sim.topInset + (sim.narrow ? 36 : 0); spacing: 8
         Row { anchors.right: parent.right; spacing: 8
             Btn { kind: "quiet"; icon: "ghost"; text: sim.narrow ? "" : "Ghost"; active: sim.ghost; visible: sim.mode === "3d"
                 tip: "Ghost: show the toolpaths still to come, faintly"; onClicked: sim.ghost = !sim.ghost }

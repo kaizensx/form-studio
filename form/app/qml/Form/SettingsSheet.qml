@@ -229,15 +229,16 @@ Item {
                     text: st.searching ? (st.found.length ? F.plural(st.found.length, "setting") + " on every page match “" + st.query.trim() + "”."
                                                            : "No setting matches “" + st.query.trim() + "”.")
                                        : st.section.sub } }
+            // a page is laid out once the settings are read, so nothing on it moves under the pointer when they arrive
             Txt { visible: !st.cfg; tone: 2; text: "Reading the settings…" }
             SettingsRows { visible: st.searching && st.found.length > 0; sheet: st; rows: st.searching ? st.found : [] }
-            Loader { width: parent.width; active: !st.searching && st.tab === "general"; visible: active; sourceComponent: generalPage }
-            Loader { width: parent.width; active: !st.searching && st.tab === "chat"; visible: active; sourceComponent: agentsPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "general" && !!st.cfg; visible: active; sourceComponent: generalPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "chat" && !!st.cfg; visible: active; sourceComponent: agentsPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "software"; visible: active; sourceComponent: softwarePage }
-            Loader { width: parent.width; active: !st.searching && st.tab === "printer"; visible: active; sourceComponent: printingPage }
-            Loader { width: parent.width; active: !st.searching && st.tab === "apps"; visible: active; sourceComponent: appsPage }
-            Loader { width: parent.width; active: !st.searching && st.tab === "updates"; visible: active; sourceComponent: updatesPage }
-            Loader { width: parent.width; active: !st.searching && st.tab === "advanced"; visible: active; sourceComponent: advancedPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "printer" && !!st.cfg; visible: active; sourceComponent: printingPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "apps" && !!st.cfg; visible: active; sourceComponent: appsPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "updates" && !!st.cfg; visible: active; sourceComponent: updatesPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "advanced" && !!st.cfg; visible: active; sourceComponent: advancedPage }
         }
     }
     // the page slides under the title bar and the action bar

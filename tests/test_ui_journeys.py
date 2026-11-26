@@ -79,6 +79,9 @@ class Journeys(unittest.TestCase):
     def test_lightdesk(self):               # the room: panes never overlap, the bar and its keys, the cue and the program during a build
         self.journey("lightdesk.py", env_extra={"FORM_APPEARANCE": "dark"})
 
+    def test_lightdesk_small(self):         # the smallest window: the same panes, still clear of each other
+        self.journey("lightdesk.py", size="1120x700", env_extra={"FORM_APPEARANCE": "dark"})
+
     def test_lightdesk_light(self):         # the same on paper
         self.journey("lightdesk.py", env_extra={"FORM_APPEARANCE": "light"})
 
