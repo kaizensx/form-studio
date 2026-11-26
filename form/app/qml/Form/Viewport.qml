@@ -282,7 +282,7 @@ Item {
     readonly property real freeH: Math.max(40, Math.min(120, height), _fin(height - insetTop - insetBottom, height))
     // pull back when the free area is much smaller than the view, so the framing keeps its margin
     // (across: a part seen from a corner is about 0.85 of its bounding sphere wide, and that and its dimension lines have to fit the free width)
-    readonly property real fitK: Math.min(4, Math.max(1, _fin(0.78 * height / freeH, 1), _fin(0.95 * height / freeW, 1)))
+    readonly property real fitK: Math.min(4, Math.max(1, _fin(0.78 * height / freeH, 1), _fin(1.0 * height / freeW, 1)))
     readonly property real mmPerPx: _fin(dist, 420) * fitK * 2 * Math.tan(13 * Math.PI / 180) / Math.max(1, height)
     // the orbit centre stays near what is on the plate: a long pan or a jump never leaves the part in the dark
     readonly property real reach: Math.max(groundSpan, 2 * radius(bounds)) * 1.5 + 200
