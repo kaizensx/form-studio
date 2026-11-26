@@ -58,7 +58,7 @@ it is either a number or a label on the drawing.
 
 ## Colour
 
-One accent. The datum colour (periwinkle on near-black, deep periwinkle on paper) marks what is selected, specified or "you
+One accent. The datum colour (cyan on near-black, deep cyan on paper) marks what is selected, specified or "you
 are here": the active tool, the active stage's mark, dimension lines, the focus ring. Evidence colours keep their
 meanings (pass, amber, signal, blueprint) and never decorate. The part is clay in both appearances.
 

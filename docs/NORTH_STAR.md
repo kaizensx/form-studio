@@ -42,7 +42,7 @@ CAD package), not like a developer demo.
 
 ## The bar
 
-- **Design:** near-black plate, one periwinkle datum colour, clay parts, evidence-coloured tags. One focal point per view.
+- **Design:** near-black plate, one cyan datum colour, clay parts, evidence-coloured tags. One focal point per view.
   Hierarchy from weight and space, not lines. No decoration that does not carry meaning.
 - **Motion:** purposeful and fast. Geometry changes are shown, not swapped: parts rebuild, cameras glide, panels answer
   the pointer. 120–320 ms, ease-out; nothing used all day animates; reduced-motion is respected.
