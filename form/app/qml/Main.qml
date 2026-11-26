@@ -33,7 +33,7 @@ Window {
             if (mem.w >= minimumWidth && mem.h >= minimumHeight) { width = Math.min(mem.w, Screen.desktopAvailableWidth); height = Math.min(mem.h, Screen.desktopAvailableHeight) }
             // only where it is still on a screen
             if (mem.x >= 0 && mem.y >= 0 && mem.x < Screen.virtualX + Screen.desktopAvailableWidth - 120 && mem.y < Screen.virtualY + Screen.desktopAvailableHeight - 120) { x = mem.x; y = mem.y }
-            Store.talkWidth = Math.max(talk.minW, Math.min(talk.maxW, mem.talkWidth)); Store.talkOpen = mem.talkOpen
+            Store.talkWidth = Math.max(talk.minW, Math.min(talk.maxW, mem.talkWidth)); Store.talkOpen = mem.talkOpen && width >= 1200      // a narrow window starts with the conversation folded: the part and its panes first
             try { Store.paletteRecent = JSON.parse(mem.recent) } catch (e) { Store.paletteRecent = [] }
         }
         restored = true
@@ -77,7 +77,14 @@ Window {
     Talk {
         id: talk
         z: 6
-        bar: win.plates
+        // In a workspace the conversation, once something was said, is a glass column on the left: under the top row,
+        // down to the foot of the window, with the gutters of the panes on the right. The stage is what is left
+        // between the two. Folded (Ctrl+J, the column's own button) it is the bar under the part, as it is before
+        // anything was said. (A window under 1200 px has room for the column or the panes, not both: Workspace.panesOff.)
+        readonly property bool col: Store.screen === "work" && Store.talkOpen && !empty
+        readonly property int colW: win.width >= 1400 ? 384 : win.width >= 1200 ? 360 : 340
+        bar: win.plates && !col
+        docked: col
         onScreen: shown
         readonly property int minW: 300
         readonly property int maxW: Math.max(minW, Math.min(560, win.width - 760))
@@ -102,12 +109,17 @@ Window {
         property real k: expanded ? 1 : 0
         Behavior on k { enabled: win.restored && !Theme.reduced; SpringAnimation { spring: Theme.springK; damping: Theme.springDamp; mass: 0.9; epsilon: 0.001 } }
         roomAbove: win.height - 110
-        width: bar ? barW : Math.max(minW, Math.min(maxW, Store.talkWidth))
-        height: bar ? Math.round(barHeight + (sheetH - barHeight) * Math.max(0, k)) : win.height - top.height - Theme.gap
-        x: bar ? barX : shown ? Theme.gap : -width - Theme.gap - 40
-        y: bar ? win.height - 16 - height : top.height
-        Behavior on x { enabled: !talk.bar; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
-        Behavior on width { enabled: !talk.bar && !talk.dragging && win.restored; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
+        width: bar ? barW : col ? colW : Math.max(minW, Math.min(maxW, Store.talkWidth))
+        height: bar ? Math.round(barHeight + (sheetH - barHeight) * Math.max(0, k)) : col ? win.height - 80 - Theme.edge : win.height - top.height - Theme.gap
+        x: bar ? barX : col ? Theme.edge : shown ? Theme.gap : -width - Theme.gap - 40
+        y: bar ? win.height - 16 - height : col ? 80 : top.height
+        // the column and the bar are two places: one fades in where it stands, it does not fly across the part
+        onColChanged: if (win.restored && Store.screen === "work") swap.restart()
+        NumberAnimation { id: swap; target: talk; property: "opacity"; from: 0; to: 1; duration: Theme.base; easing.type: Easing.OutCubic }
+        // where the column ends, for the workspace: its tools and its stage begin right of it
+        Binding { target: Store; property: "talkCol"; value: talk.col ? Theme.edge + talk.colW : 0 }
+        Behavior on x { enabled: !talk.bar && !talk.col; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
+        Behavior on width { enabled: !talk.bar && !talk.col && !talk.dragging && win.restored; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
         // where the bar is, for the screen in front: the camera keeps the part clear of it, the cue sits above it
         onYChanged: if (bar) Store.barY = y
         onBarChanged: Store.barY = bar ? y : win.height
@@ -117,7 +129,7 @@ Window {
         Component.onCompleted: { Store.barY = bar ? y : win.height; Store.barX = x; Store.barW = width }
         // the column on Home: drag the edge to resize; double-click puts it back
         MouseArea {
-            visible: talk.shown && !talk.bar; z: 9
+            visible: talk.shown && !talk.bar && !talk.col; z: 9
             anchors.right: parent.right; anchors.rightMargin: -4; width: 9; height: parent.height
             hoverEnabled: true; cursorShape: Qt.SplitHCursor; preventStealing: true
             property real x0: 0; property real w0: 0

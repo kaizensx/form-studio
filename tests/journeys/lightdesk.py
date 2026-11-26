@@ -98,7 +98,7 @@ def run(ui):
     ui.wait_until(lambda: ui.store.get("sheet") is None, 4, "the sheet to close")
     ui.settle(600)
 
-    # the conversation opens upward into the transcript, and folds back
+    # the conversation opens into its column on the left, and folds back to the bar
     ui.click("composer")
     ui.type("hello there")
     ui.eq(ui.item("composer").property("text"), "hello there", "typing reaches the prompt")
@@ -106,9 +106,21 @@ def run(ui):
     ui.wait_until(lambda: ui.js("Store.chatItems.length") > 0 and not ui.store.get("chatBusy"), 30, "the agent's reply")
     ui.settle(900)
     open_h = _rect(ui, "talk")[3]
-    ui.check(ui.store.get("talkOpen") is True and open_h > 250, f"the transcript is open above the prompt: {open_h}")
+    ui.check(ui.store.get("talkOpen") is True and open_h > 250, f"the transcript is open: {open_h}")
     ui.check(ui.exists("talkFeed") and ui.exists("convSwitch"), "with its messages and the conversation switcher")
-    ui.check(_apart(_rect(ui, "talk"), _rect(ui, "programPane")) and _apart(_rect(ui, "talk"), _rect(ui, "viewsCapsule")), "it stays clear of the other panes")
+    # open, it is a column on the left: under the top row, down to the foot of the window; the tools and the stage
+    # begin right of it. A window under 1200 px has room for the column or the panes: the panes fold to one button.
+    t = _rect(ui, "talk")
+    pc = rects["pipelineCapsule"]; gut = ui.win.width() - (pc[0] + pc[2])          # the gutter the panes on the right keep
+    ui.check(abs(t[0] - gut) <= 1 and abs(t[1] - 80) <= 1 and abs(t[1] + t[3] - (ui.win.height() - gut)) <= 1,
+             f"the conversation is a column on the left, with the gutters of the panes on the right ({gut}): {t}")
+    ui.check(_rect(ui, "toolDock")[0] >= t[0] + t[2] + 8, f"the tool dock stands right of it: {_rect(ui, 'toolDock')}")
+    ui.check(float(ui.item("viewport").property("insetLeft")) >= t[0] + t[2] + 60, "the stage begins right of the column and the dock")
+    ui.check(_apart(t, _rect(ui, "viewsCapsule")), "it stays clear of the view buttons")
+    if ui.win.width() >= 1200:
+        ui.check(_apart(t, _rect(ui, "programPane")), "and of the panes on the right")
+    else:
+        ui.check(not ui.exists("programPane") and ui.exists("panesButton"), "in a narrow window the panes fold to one button while it is open")
     ui.shot("lightdesk-conversation")
     ui.key("Ctrl+J")
     ui.wait_until(lambda: ui.store.get("talkOpen") is False, 3, "Ctrl+J to fold it")

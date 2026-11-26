@@ -9,7 +9,7 @@ Rectangle {
     readonly property var info: sim.info
     readonly property bool ready: !!info
     property string metric: "time"            // what the chart shows: time | length
-    readonly property bool narrow: width < 580
+    readonly property bool narrow: width < 660
     property bool compact: false              // a short stage: the row of controls only, the scrubbers wait
     radius: Theme.rLg; color: Theme.alpha(Theme.plate1, 0.94); border.color: Theme.rule
     height: col.implicitHeight + 24

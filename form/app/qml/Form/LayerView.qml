@@ -32,7 +32,7 @@ Item {
     readonly property var special: ["Bridge", "Overhang wall", "Floating vertical shell"]
     readonly property bool onlySpecial: types.length > 0 && types.every(function (t) { return (special.indexOf(t) >= 0) !== !!hidden[t] })
     property real leftInset: 12                // the workspace's tool rail stays on screen at the left
-    readonly property bool narrow: width < 640 // a narrow viewport: controls stack, the line types fold away
+    readonly property bool narrow: width - leftInset - rightInset < 640    // a narrow stage: controls stack, the line types fold away
     property bool typesFold: !typesRoom
     onTypesRoomChanged: typesFold = !typesRoom
     property real rightInset: 12               // the workspace's panes on the right stay on screen
@@ -171,7 +171,7 @@ Item {
             Btn { icon: "arrow_left"; text: sim.narrow ? "Back" : "Back to the design"; onClicked: Store.showLayers(false) }
             Tag { text: "simulated"; anchors.verticalCenter: parent.verticalCenter } }
         Item { width: 1; height: 24; visible: sim.narrow }       // the view controls take this row when it is narrow
-        Txt { kind: "fine"; tone: 2; text: "Simulated from the slicer's G-code. Not a print."; width: Math.min(implicitWidth, sim.width - sim.leftInset - 20) }
+        Txt { kind: "fine"; tone: 2; text: "Simulated from the slicer's G-code. Not a print."; width: Math.min(implicitWidth, sim.stageR - sim.stageL - 8) }
         // several plates: which one is on screen (each was sliced on its own)
         Row { visible: Store.plates.length > 1; spacing: 8
             Seg { objectName: "simPlates"; value: Store.plateShown
@@ -222,7 +222,7 @@ Item {
                 value: sim.mode; onPicked: function (m) { sim.pause(); sim.mode = m } } }
         // copies on the plate
         Rectangle { visible: sim.mode === "plate"; anchors.right: parent.right
-            width: Math.min(300, sim.width - sim.leftInset - 20); height: pk.implicitHeight + 24; radius: Theme.rMd; color: Theme.alpha(Theme.plate1, 0.94); border.color: Theme.rule
+            width: Math.min(300, sim.stageR - sim.stageL - 8); height: pk.implicitHeight + 24; radius: Theme.rMd; color: Theme.alpha(Theme.plate1, 0.94); border.color: Theme.rule
             Column { id: pk; x: 14; y: 12; width: parent.width - 28; spacing: 8
                 Item { width: parent.width; height: 28
                     Txt { text: "Copies on one plate"; font.weight: 600; anchors.verticalCenter: parent.verticalCenter }

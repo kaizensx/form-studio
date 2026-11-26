@@ -42,6 +42,7 @@ QtObject {
     property real barY: 100000         // the conversation bar in the window (Main.qml): its top edge, left edge and width
     property real barRestY: 100000     // its top edge once no build plays (during one the bar is one line)
     property real barX: 0
+    property real talkCol: 0           // a workspace's conversation column: its right edge (0: folded to the bar)
     property real barW: 600
     property int buildAt: 0            // the build-up playing in the workspace: which step of how many (0: none)
     property int buildOf: 0

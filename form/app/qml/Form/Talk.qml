@@ -16,6 +16,7 @@ Rectangle {
     readonly property var attachFilters: pick.nameFilters     // what the attach dialog offers (tests/journeys/open_conv.py)
     color: "transparent"
     property bool bar: false                 // one bar under the part that opens upward (a workspace); false: a column (Home)
+    property bool docked: false              // the column of a workspace (Main.qml): it folds to the bar under the part
     property bool onScreen: true             // false while it is parked beside the window (Home with no conversation open): nothing in it ticks
     property real roomAbove: 600             // how tall something that opens upward from the bar may be (Main.qml)
     // a build is playing: the bar is slim and the transcript waits, so the cue has the room
@@ -198,7 +199,9 @@ Rectangle {
                                  text: (i === 0 ? "Original" : "Branch " + (i + 1)) + (b.fork_reason ? " · " + b.fork_reason : "") + " · " + F.ago(b.updated),
                                  run: function () { if (b.id !== Store.convId) Store.openConv(b.id) } } }) } }
             Btn { objectName: "talkNewChat"; kind: "quiet"; icon: "message_square_plus"; tip: "New conversation"; keys: "Ctrl+Shift+O"
-                visible: !talk.empty || Store.convId !== ""; onClicked: Store.newChat() } }
+                visible: !talk.empty || Store.convId !== ""; onClicked: Store.newChat() }
+            Btn { objectName: "talkFold"; kind: "quiet"; icon: "panel_left_close"; tip: "Fold the conversation to the bar"; keys: "Ctrl+J"
+                visible: talk.docked; onClicked: Store.talkOpen = false } }
         Rectangle { anchors.bottom: parent.bottom; x: 14; width: parent.width - 28; height: 1; color: Theme.rule }
         Pop {
             id: list; x: 8; y: head.height + 2; width: Math.max(talk.width - 17, 320); padding: 6; origin: Popup.TopLeft

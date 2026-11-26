@@ -52,8 +52,17 @@ Item {
 
     // ── tools ────────────────────────────────────────────────
     readonly property string tool: Ws.tool
-    readonly property bool compact: ws.width < 1300                 // a narrow window: controls shorten, docks fold
+    readonly property bool compact: ws.width - shift < 1300                 // a narrow window: controls shorten, docks fold
     readonly property bool sim: !!Store.layers
+    // the conversation column (Main.qml) takes the left of the window: the tools, the size line, the view buttons and
+    // the stage begin right of it. 0 while it is folded to the bar.
+    readonly property bool col: Store.talkCol > 0
+    // A window under 1200 px has room for the conversation column or for the panes on the right, not both: while the
+    // column is open the panes fold to one button in their corner (it folds the conversation and brings them back).
+    readonly property bool panesOff: col && ws.width < 1200
+    readonly property real paneX: panesOff ? ws.width - Theme.edge - 44 : insp.x      // where the right column begins
+    property real shift: col ? Store.talkCol + Theme.gap - Theme.edge : 0
+    Behavior on shift { enabled: insp.settled; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
     // a design that declares how its parts go together: assembled / exploded / as printed. Separate bodies
     // with no declaration (form/recipes/assembly.py from_solids): as modelled / pulled apart.
     // A design with separate bodies and no declaration is shown as modelled, or pulled apart; Assembled is there but
@@ -175,14 +184,16 @@ Item {
         // above the bottom row (the bar, taller when the transcript is open; the size line).
         QtObject {
             id: lay
-            readonly property real freeL: 84
-            readonly property real freeR: insp.x - 12 - (dock.open ? dock.width + 12 : 0)
+            readonly property real freeL: 84 + ws.shift + (ws.col ? 12 : 0)     // beside the column the dock is close: the dimension lines keep clear of it
+            readonly property real freeR: ws.paneX - 12
             // The part stands on the bar's centre line (the window's) whenever the free stage has room on both sides
             // of it: at least 60 % of its width. Otherwise, a legend open or a narrow window, it stands in the middle
             // of the free stage.
-            readonly property real axis: Store.barX + Store.barW / 2
+            // (with the conversation as a column there is no bar: the stage is the free stage, and its middle the line)
+            readonly property real axis: ws.col ? (freeL + freeR) / 2 : Store.barX + Store.barW / 2
             readonly property real half: Math.min(axis - freeL, freeR - axis)
             readonly property bool centred: 2 * half >= 0.6 * (freeR - freeL)
+            readonly property real mid: (left + right) / 2          // the line the part, the cue and the stage's capsules stand on
             readonly property real left: centred ? axis - half : freeL
             readonly property real right: centred ? axis + half : freeR
             // While a build plays the finished part is framed as large as it stands at rest, not shrunk into the room
@@ -201,7 +212,7 @@ Item {
         Viewport {
             id: vp
             objectName: "viewport"
-            labelRight: dock.open ? dock.x : insp.x
+            labelRight: ws.paneX
             slack: 0.98
             scaleLeft: status.x; scaleFoot: status.y - 12
             floorGrid: Store.floorGrid
@@ -250,7 +261,7 @@ Item {
             onHoveredValue: function (v, x, y, on) { vchip.on = on; vchip.v = v; vchip.x = Math.min(x + 14, centre.width - vchip.width - 8); vchip.y = y + 14 }
         }
         Loader { id: lv; anchors.fill: parent; active: !!Store.layers; source: "LayerView.qml"
-            onLoaded: { item.leftInset = 84; item.topInset = 84; item.rightInset = Qt.binding(function () { return centre.width - insp.x + 12 }); item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }); item.axisX = Qt.binding(function () { return lay.axis }) } }
+            onLoaded: { item.leftInset = Qt.binding(function () { return 84 + ws.shift }); item.topInset = 84; item.rightInset = Qt.binding(function () { return centre.width - ws.paneX + 12 }); item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }); item.axisX = Qt.binding(function () { return lay.mid }) } }
         // the corners of the room fall away
         Room { anchors.fill: parent; wall: false; poolK: 0; visible: !Store.layers }
         }
@@ -281,7 +292,7 @@ Item {
                 var fs = Store.recipe ? Store.recipe.features : []
                 for (var i = 0; st && i < fs.length; i++) if (fs[i].id === st.feature && i + 1 < fs.length) return fs[i + 1].label || ""
                 return "" }
-            width: Math.max(360, Store.barW); x: Math.round(Store.barX + (Store.barW - width) / 2)
+            width: Math.round(ws.col ? Math.max(360, Math.min(600, lay.right - lay.left)) : Math.max(360, Store.barW)); x: Math.round(lay.mid - width / 2)
             // the lower third: it stands clear above the bar (116 px in a 900 px window, less in a low one), not on it
             readonly property int clear: Math.round(Math.max(26, Math.min(116, centre.height * 0.129)))
             // where it stands once it has arrived: over the bar as it is during a build (one line, 64 px, 16 from the
@@ -304,7 +315,7 @@ Item {
         Rectangle {
             id: reconCap; objectName: "reconReadout"; z: 6
             readonly property var rc: Store.recon && Store.recon.project === Store.pid ? Store.recon : null
-            x: Math.round(Math.max(84, Math.min(parent.width - width - 12, cue.x + (cue.width - width) / 2))); y: cue.y - height - Theme.s4
+            x: Math.round(Math.max(84 + ws.shift, Math.min(parent.width - width - 12, cue.x + (cue.width - width) / 2))); y: cue.y - height - Theme.s4
             width: rcr.implicitWidth + 2 * Theme.s4; height: 32; radius: 16
             color: Theme.glassSolid; border.color: Theme.alpha(Theme.blueprint, 0.35)
             opacity: rc ? 1 : 0; visible: opacity > 0.01
@@ -366,7 +377,7 @@ Item {
         Glass {
             id: rail; objectName: "toolDock"
             source: studio; arrive: 3
-            x: Theme.edge; y: 80; z: 6; width: 48; height: railCol.implicitHeight + 12; radius: 24
+            x: Theme.edge + ws.shift; y: 80; z: 6; width: 48; height: railCol.implicitHeight + 12; radius: 24
             visible: !!Store.view
             // while a build plays the tools step back: the part and its cue have the room
             // (as one picture while it is dimmed, so the filled disc and its icon fade together and not one through the other)
@@ -410,8 +421,8 @@ Item {
         // ── options of the active tool (one place, one row) ──
         Item {
             id: opts
-            x: 82; y: 85; z: 5; visible: !ws.sim && !!Store.view
-            readonly property real room: Math.max(160, insp.x - 82 - 16)
+            x: 82 + ws.shift; y: 85; z: 5; visible: !ws.sim && !!Store.view
+            readonly property real room: Math.max(160, ws.paneX - x - 16)
             height: Math.max(sectionBar.shown ? sectionBar.height : 0, analyzeBar.shown ? analyzeBar.height : 0,
                              measureBar.shown ? measureBar.height : 0, asmBar.shown ? asmBar.height : 0, annotateBar.shown ? annotateBar.height : 0)
 
@@ -496,7 +507,7 @@ Item {
         Glass {
             id: viewCtl; objectName: "viewsCapsule"
             source: studio; arrive: 4
-            x: Theme.edge; y: centre.height - Theme.edge - height; z: 5; visible: !ws.sim && !!Store.view
+            x: Theme.edge + ws.shift; y: centre.height - Theme.edge - height; z: 5; visible: !ws.sim && !!Store.view
             width: vrow.implicitWidth + 12; height: 40; radius: 20
             readonly property var names: [{ value: "iso", text: "Iso" }, { value: "front", text: "Front" }, { value: "side", text: "Side" }, { value: "top", text: "Top" }, { value: "under", text: "Under" }]
             Row { id: vrow; x: 6; anchors.verticalCenter: parent.verticalCenter; spacing: 2; opacity: ws.cueOn ? 0.45 : 1; layer.enabled: opacity < 0.999; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
@@ -522,7 +533,7 @@ Item {
         // an agent is working on another design than this one: named, never jumped to once you are working here
         Rectangle {
             id: elsewhere; objectName: "agentElsewhere"; z: 6
-            x: Math.round(Store.barX + (Store.barW - width) / 2); y: 84
+            x: Math.round(lay.mid - width / 2); y: 84
             visible: !!Store.agentElsewhere && !ws.sim
             width: er.implicitWidth + 24; height: 34; radius: 17; color: Theme.glassSolid; border.color: Theme.rule2
             Row { id: er; x: 14; anchors.verticalCenter: parent.verticalCenter; spacing: 8
@@ -536,11 +547,16 @@ Item {
                 Btn { objectName: "agentElsewhereShow"; small: true; kind: "quiet"; text: "Show"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.showElsewhere() }
                 Btn { small: true; kind: "quiet"; icon: "x"; tip: "Stay here"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.agentElsewhere = null } } }
 
-        // ── the dock: legends and readouts, top right, never over the middle of the part ──
+        // ── the dock: legends, measurements, the selection and refinement. Its slot is in the right column, between
+        //    the stage's pane and the pipeline: nothing of it stands over the stage. The pane above gives it the room
+        //    (insp.room_); a panel takes what it needs, up to 300 px or 40 % of the column, and scrolls beyond that. ──
         Column {
             id: dock
-            x: insp.x - 12 - width; y: 82; z: 4; spacing: 8; visible: !ws.sim
-            readonly property bool folded: Ws.dockTouched ? Ws.dockCollapsed : ws.compact
+            x: insp.x; width: insp.width; y: strip.y - reserve; z: 7; spacing: 8; visible: !ws.sim && !ws.panesOff
+            readonly property bool any: showMap || showMeasures || showSel || showRefine
+            // what the column keeps for it above the pipeline (its own height, each panel at most `room`), gap included
+            readonly property real reserve: any && height > 0 ? Math.round(height + Theme.gap) : 0
+            readonly property bool folded: Ws.dockTouched && Ws.dockCollapsed
             readonly property bool showMap: !!Store.analysisMap && !ws.mapBlocked
             readonly property bool showMeasures: Store.measures.length > 0
             readonly property bool showSel: ws.tool === "annotate" || Store.selItems.length > 0 || !!Store.annFocus
@@ -548,22 +564,23 @@ Item {
             readonly property bool showRefine: !!Store.refine && !Store.scrub && (Store.refine.state === "running"
                 || (Store.refine.changes || []).length > 0 || Store.refine.state === "failed")
             readonly property bool open: (showMap || showMeasures || showSel || showRefine) && !folded
-            readonly property real room: Math.max(120, Math.min(Store.barY, centre.height) - y - 60)
+            readonly property real room: Math.max(120, Math.round(Math.min(300, (strip.y - 80) * 0.4)))
             function flip() { var now = folded; Ws.dockTouched = true; Ws.dockCollapsed = !now }
-            AnalysisLegend { objectName: "analysisLegend"; visible: opacity > 0.01; opacity: dock.showMap ? 1 : 0
+            AnalysisLegend { objectName: "analysisLegend"; width: dock.width; visible: opacity > 0.01; opacity: dock.showMap ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Motion.ui; easing.type: Easing.OutCubic } }
                 map: Store.analysis; busy: Store.analysisBusy; pending: Store.analysisLabel(Store.analysisMap); check: Store.analysis ? Store.analysisCheck() : null
                 collapsed: dock.folded || (dock.showMeasures && ws.tool === "measure")
                 maxHeight: dock.room - (dock.showMeasures ? 44 : 0); onToggled: dock.flip() }
-            SelectionPanel { visible: dock.showSel
+            SelectionPanel { width: dock.width; visible: dock.showSel
                 collapsed: dock.folded || ((dock.showMap || dock.showMeasures) && ws.tool !== "annotate" && !Store.annFocus)
                 maxHeight: dock.room - (dock.showMap ? 44 : 0) - (dock.showMeasures ? 44 : 0); onToggled: dock.flip() }
-            MeasurePanel { objectName: "measurePanel"; visible: dock.showMeasures
+            MeasurePanel { objectName: "measurePanel"; width: dock.width; visible: dock.showMeasures
                 collapsed: dock.folded || (dock.showMap && ws.tool !== "measure")
                 maxHeight: dock.room - (dock.showMap ? 44 : 0); onToggled: dock.flip() }
-            RefinePanel { visible: opacity > 0.01; opacity: dock.showRefine ? 1 : 0
+            RefinePanel { width: dock.width; visible: opacity > 0.01; opacity: dock.showRefine ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Motion.ui; easing.type: Easing.OutCubic } }
-                collapsed: dock.folded || dock.showMap || dock.showMeasures || dock.showSel
+                // open in Design, where its changes are made; in the other stages it is its header, and the stage's pane keeps the column
+                collapsed: dock.folded || dock.showMap || dock.showMeasures || dock.showSel || Store.stage !== "shape"
                 maxHeight: dock.room - (dock.showMap ? 44 : 0) - (dock.showMeasures ? 44 : 0) - (dock.showSel ? 44 : 0)
                 onToggled: dock.flip() }
         }
@@ -573,8 +590,8 @@ Item {
             id: status
             // above the view buttons; in a narrow window the bar reaches over here, so it stands above the bar instead
             // (there it starts right of the tool dock, which reaches down that far, not under it)
-            readonly property bool overBar: ws.compact && width + Theme.edge + 14 + 8 > Store.barX
-            x: overBar && Store.barY - 10 - height < rail.y + rail.height + 8 ? lay.freeL + 4 : Theme.edge + 14
+            readonly property bool overBar: !ws.col && ws.compact && width + Theme.edge + 14 + 8 > Store.barX
+            x: overBar && Store.barY - 10 - height < rail.y + rail.height + 8 ? lay.freeL + 4 : Theme.edge + 14 + ws.shift
             y: Math.round(Math.min(viewCtl.y - 14, overBar ? Store.barY - 10 : centre.height) - height); z: 4;
             // where it stands once no build plays (the bar is then taller): the camera frames a build over this
             readonly property real restY: Math.round(Math.min(viewCtl.y - 14, overBar ? Store.barRestY - 10 : centre.height) - height)
@@ -635,8 +652,8 @@ Item {
             id: history; objectName: "historyCapsule"
             source: studio; z: 7
             visible: Store.timelineOpen && !!Store.project && !ws.sim
-            width: Math.max(320, Math.min(760, insp.x - 82 - 24)); height: 48; radius: 24
-            x: Math.round(Math.max(82, Math.min(Store.barX + (Store.barW - width) / 2, insp.x - 12 - width))); y: 82 + (opts.height > 0 ? opts.height + 8 : 0)
+            width: Math.max(320, Math.min(760, ws.paneX - 82 - ws.shift - 24)); height: 48; radius: 24
+            x: Math.round(Math.max(82 + ws.shift, Math.min(lay.mid - width / 2, ws.paneX - 12 - width))); y: 82 + (opts.height > 0 ? opts.height + 8 : 0)
             MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }
             Tools.Timeline { id: tline; x: 8; width: parent.width - 16; height: 40; anchors.verticalCenter: parent.verticalCenter }
         }
@@ -644,7 +661,7 @@ Item {
         Glass {
             id: strip; objectName: "pipelineCapsule"
             source: studio; arrive: 6; z: 7
-            width: insp.width; height: pipe.implicitHeight; radius: Theme.rPane
+            width: insp.width; height: pipe.implicitHeight; radius: Theme.rPane; visible: !ws.panesOff
             x: centre.width - Theme.edge - width; y: centre.height - Theme.edge - height
             MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }   // the pane is not the viewport
             Pipeline { id: pipe; flat: true; grid: true; width: parent.width; height: implicitHeight }
@@ -652,15 +669,24 @@ Item {
         Tools.ContextMenu { anchors.fill: parent; z: 8 }
     }
 
+    // the panes folded (a narrow window with the conversation open): one button where they stood
+    Glass {
+        id: panesBtn; objectName: "panesButton"; source: studio; z: 7
+        visible: ws.panesOff; x: ws.width - Theme.edge - width; y: 80; width: 44; height: 44; radius: 22
+        Rectangle { anchors.fill: parent; anchors.margins: 4; radius: height / 2; color: pbm.pressed ? Theme.washPress : pbm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
+        Icon { anchors.centerIn: parent; name: "panel_right"; size: 16; color: pbm.containsMouse ? Theme.ink : Theme.ink2 }
+        MouseArea { id: pbm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.talkOpen = false }
+        Tip { show: pbm.containsMouse; below: true; text: "Show the " + (Store.stage === "shape" ? "Program" : "stage's pane") + " (folds the conversation)"; keys: "Ctrl+J" }
+    }
     // ── right: the Program, the stage's panel ────────────────
     Glass {
         id: insp
         objectName: "programPane"
         source: studio; arrive: 5
-        width: 356; radius: Theme.rPane
+        width: 356; radius: Theme.rPane; visible: !ws.panesOff
         x: ws.width - Theme.edge - width; y: 80
         // as tall as what it holds, up to the pipeline under it
-        readonly property real room_: strip.y - Theme.gap - y
+        readonly property real room_: strip.y - Theme.gap - y - dock.reserve
         // In Design, with no feature open, that is the listing: the general parameters, colours and Explore are a scroll below it.
         readonly property real listing: panel.item && panel.item.paneHeight !== undefined && panel.item.paneHeight > 0 && !foot.on ? panel.item.paneHeight : -1
         height: Math.round(Math.max(120, Math.min(room_, stageHead.height + (listing > 0 ? listing + 8 : body.implicitHeight + 22) + foot.height)))

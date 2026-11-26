@@ -41,25 +41,37 @@ Three tests for any screen:
 
 ## The workspace
 
-- **Top:** three capsules. The title (the mark, the design, its revision, its state), the stages in the centre
-  (Describe, Design, Fit, Review, Make, each with its one line; the lit segment glides), and tools on the right (the
-  printer when printing is on, search, settings).
-- **Left:** the tool dock, one capsule. The active tool is the one filled disc. The tool's options sit beside it.
-- **Bottom left:** the size line (W × D × H mm · volume cm³, and which arrangement that is) above the view buttons
-  and the floor-grid button. During a build it reads "as modelled so far" with the size of what is built, no volume.
+- **Top:** one row on one centre line. On macOS the window buttons start 24 px in from the side; then the title
+  capsule (a ‹ and the mark go back to all designs, then the design, its revision, its state), the stages on the
+  window's centre line (Describe, Design, Fit, Review, Make, each with its one line; the lit segment glides), and
+  tools on the right (the printer when printing is on, search, settings). Under 1400 px the printer is its icon.
+- **Left: the conversation.** Once something was said it is a glass column, under the top row and down to the foot
+  of the window: the conversation picker and New at its head, everything that was said (replies, steps, revision
+  cards with Compare), the prompt at its foot. Ctrl/⌘ J or the button at its head folds it to the bar (below).
+- **The tool dock** stands right of the column (at the window's edge while the column is folded), one capsule. The
+  active tool is the one filled disc. The tool's options sit beside it.
+- **Centre: the stage.** The rectangle between the column (or the dock) and the panes on the right, under the top
+  row. The part is always framed in it and the camera glides when it changes. Nothing stands over the part but its
+  dimension lines and, during a build, the cue in the stage's lower third. Bottom left of the stage: the size line
+  (W × D × H mm · volume cm³, and which arrangement that is) above the view buttons and the floor-grid button.
 - **Right:** the Program. In Design it is the feature list as a listing: line numbers, the name, the role in neutral
-  mono capitals. In the other stages the same pane holds that stage.
+  mono capitals. In the other stages the same pane holds that stage. Under it, when there is one, a legend, the
+  measurements, the selection or the refinement's changes (a panel takes what it needs, at most 40 % of the column).
 - **Bottom right:** the pipeline as a capsule: a state dot, the step, one mono line with its real value; Auto.
-- **Bottom centre:** the conversation as one bar: a status line, numbered suggestions (keys 1 to 4 pick them while the
-  prompt is empty), the prompt with a `›` and a block caret, attach, the agent, send. It opens upward into the
-  transcript, as tall as what was said and at most about half the window, and folds back on Ctrl/⌘ J.
+- **Bottom centre, while the conversation is folded or nothing was said yet:** the bar on the window's centre line:
+  a status line, numbered suggestions (keys 1 to 4 pick them while the prompt is empty), the prompt with a `›` and a
+  block caret, attach, the agent, send.
+- **The print simulation** uses the same stage: the way back and the line types top left, the views top right, the
+  transport along the foot of the stage; the print is framed in what is left.
+- **A window under 1200 px** has room for the column or the panes, not both: with the conversation open the panes
+  fold to one button in their corner, which folds the conversation and brings them back.
 
 **The cue.** While a build plays, the lower third of the room is a film title: `BUILDING 6 OF 12`, the feature in
-large type with its number, a track with one segment per step and the current one glowing, and "built 05 … / next
-07 …". The same step is lit in the Program: the gutter is lit down to it, the lines above are ticked, the ones below
-wait. The tools and view buttons step back to 45 %, the key light narrows and warms, and the transcript folds so the
-part has the room. All of it is driven by the real build (the stages the kernel streams, or the build-up of a new
-revision); nothing counts on its own.
+large type with its number, a track with one segment per step and the current one glowing, and "built 05 … / next 07
+…". The same step is lit in the Program: the gutter is lit down to it, the lines above are ticked, the ones below
+wait. The tools and view buttons step back to 45 %, the key light narrows and warms; the folded bar is one line so the
+part has the room, and an open column stays where it is. All of it is driven by the real build (the stages the kernel
+streams, or the build-up of a new revision); nothing counts on its own.
 
 ## Type
 
