@@ -77,7 +77,8 @@ Item {
         if (Store.concepts.length) add("Tools", "concepts", "boxes", "Concepts waiting for a pick", Store.concepts[0].name, function () { Store.openConcepts(Store.concepts[0].id) })
         if (Store.studio) Store.studio.projects.forEach(function (p) { if (!p.error && p.id !== Store.pid) add("Designs", "p." + p.id, "cuboid", p.name, F.pad(p.head) + " · " + F.ago(p.updated), function () { Store.open(p.id) }) })
         add("Conversations", "chat.new", "message_square_plus", "New conversation", "", function () { Store.newChat(); Store.talkOpen = true }, "Ctrl+Shift+O")
-        if (w) add("Conversations", "chat.toggle", "panel_left", (Store.talkOpen ? "Hide" : "Show") + " the conversation", "", function () { Store.talkOpen = !Store.talkOpen }, "Ctrl+J")
+        if (w) add("Conversations", "chat.toggle", "panel_left", (Store.talkOpen ? "Hide" : "Show") + " the conversation", "", function () { Store.toggleTalk() }, "Ctrl+J")
+        if (w) add("View", "view.focus", "maximize_2", Store.focusView ? "Leave Focus: bring the side columns back" : "Focus: the part alone, both side columns away", "", function () { Store.focusView = !Store.focusView }, "Ctrl+.")
         Store.convs.forEach(function (cv) { if (cv.messages > 0 && cv.id !== Store.convId) add("Conversations", "c." + cv.id, "message_square", cv.title, F.ago(cv.updated), function () { Store.openConv(cv.id); Store.talkOpen = true }) })
         // the model that answers: every model of the current agent, and each other agent that is installed
         var ai = Store.chatAgentInfo

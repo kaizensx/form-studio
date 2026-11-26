@@ -47,7 +47,9 @@ QtObject {
     // the room behind everything: top, upper wall, the lit floor, the foot
     readonly property var room: dark ? ["#0a0a0b", "#131314", "#1b1b1c", "#0d0d0e"] : ["#e6e3de", "#efede9", "#f6f5f2", "#e4e1dc"]
     readonly property color vignette: dark ? Qt.rgba(0, 0, 0, 0.78) : Qt.rgba(0.47, 0.41, 0.35, 0.16)
-    readonly property int edge: 20          // panes sit this far from the window's edge
+    readonly property int edge: 12          // panes sit this far from the window's edge
+    readonly property int paneTop: 68       // where the side panes begin, under the top row (capsules 12..52, stages 8..56)
+    readonly property int paneW: 300        // the right pane
     readonly property int rPane: 22         // panes; capsules are fully round
     // ink
     readonly property color ink: dark ? "#f4f3f1" : "#161616"

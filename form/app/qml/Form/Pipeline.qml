@@ -32,7 +32,9 @@ Rectangle {
     readonly property string summary: {
         var order = ["geometry", "exports", "checks", "slice"], names = ({ geometry: "Solid", exports: "Exports", checks: "Checks", slice: "Slice" })
         for (var i = 0; i < order.length; i++) { var s = stateOf(order[i]); if (s !== "current" && s !== "off") return names[order[i]] + ": " + (meta(order[i]) || s) }
-        return rev + " · all current"
+        // everything is made for this revision: say what the checks found, the one thing that is not just "made"
+        var c = stateOf("checks") === "current" ? meta("checks") : ""
+        return rev + " · " + (c || "all current")
     }
     color: flat ? "transparent" : Theme.alpha(Theme.plate1, 0.9); radius: Theme.rLg; border.color: Theme.rule; border.width: flat ? 0 : 1
     implicitHeight: grid ? row.implicitHeight + 24 : narrow ? 34 : 48
@@ -68,6 +70,7 @@ Rectangle {
         { id: "checks", label: "Checks", stage: "prove" }, { id: "slice", label: "Slice", stage: "prove" }, { id: "release", label: "Release", stage: "release" }]
         .filter(function (n) { return n.id !== "slice" || Store.printUi })
     onNodesChanged: needs = nodes.map(function () { return 0 })
+    readonly property string steps: nodes.map(function (n) { return n.label }).join(" ")      // its steps by name, whatever is drawn (as dots, the names are in the tips)
     Grid {
         // the capsule's grid: 16 px in, 12 from the top; two columns 14 apart, rows 10 apart; a cell is its name (13 px)
         // and, 2 px under it, its value in mono, indented to stand under the name and not under the dot

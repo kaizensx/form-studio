@@ -8,7 +8,7 @@ import os
 import time
 from pathlib import Path
 
-from _lib import close_sheet_esc, head, make, open_sheet_wait, sheet, toasts_gone, wait_job, printing_on
+from _lib import close_sheet_esc, head, make, open_sheet_wait, sheet, toasts_gone, wait_job, printing_on, click_stage
 
 DATA = "fresh"
 S = {}
@@ -545,6 +545,17 @@ def journey_every_listed_shortcut(ui):
         ui.key("Ctrl+J")
         ui.wait_until(lambda: ui.store.get("talkOpen") is t, 3, "Ctrl+J again")
 
+    def do_focus():
+        ui.key("Ctrl+.")
+        ui.wait_until(lambda: ui.store.get("focusView") is True, 3, "Ctrl+. for Focus")
+        ui.settle(500)
+        ui.check(not ui.exists("programPane") and ui.exists("panesButton"), "in Focus the pane on the right is one button")
+        ui.shot("focus")
+        ui.key("Ctrl+.")
+        ui.wait_until(lambda: ui.store.get("focusView") is False, 3, "Ctrl+. again to leave Focus")
+        ui.settle(400)
+        ui.check(ui.exists("programPane"), "and the pane is back")
+
     def do_back():
         ui.key("Ctrl+[")
         ui.wait_until(lambda: ui.store.get("screen") == "home", 5, "Ctrl+[ to go back to all designs")
@@ -576,7 +587,7 @@ def journey_every_listed_shortcut(ui):
         wall = ui.js("Store.values.wall")
         ui.run_js("Store.setParam('wall', %r, true)" % (wall - 0.2))
         ui.wait_until(lambda: ui.js("!!Store.preview"), 60, "a draft")
-        ui.click("viewport", 0.05, 0.9)                # the keyboard is not in a field
+        click_stage(ui)                # the keyboard is not in a field
         ui.key("Ctrl+Return")
         ui.wait_until(lambda: head(ui) == h + 1, 30, "Ctrl+Return to commit the draft")
         wait_job(ui, pid)
@@ -603,7 +614,7 @@ def journey_every_listed_shortcut(ui):
         ui.key("Up")
         ui.eq(ui.item("composer").property("text"), "Hello from a shortcut", "Up brings back the last message")
         ui.clear()
-        ui.click("viewport", 0.05, 0.9)
+        click_stage(ui)
 
     # ── inside Measure and Annotate (keys only work while that tool is open) ──
     def in_tool(open_key, key, prop, value):
@@ -675,7 +686,7 @@ def journey_every_listed_shortcut(ui):
         "1": lambda: (view("2", "front"), view("1", "iso")), "2": lambda: view("2", "front"), "3": lambda: view("3", "side"),
         "4": lambda: view("4", "top"), "5": lambda: (view("5", "under"), view("1", "iso")),
         ".": do_dot, "H": do_h, "Shift+H": do_shift_h, "Right-click": do_right_click,
-        "Ctrl+K": do_palette, "Ctrl+N": do_new, "Ctrl+Shift+O": do_new_chat, "Ctrl+J": do_j, "Ctrl+Shift+H": do_home, "Ctrl+[": do_back, "Ctrl+,": do_settings,
+        "Ctrl+K": do_palette, "Ctrl+N": do_new, "Ctrl+Shift+O": do_new_chat, "Ctrl+J": do_j, "Ctrl+Shift+H": do_home, "Ctrl+[": do_back, "Ctrl+.": do_focus, "Ctrl+,": do_settings,
         "Ctrl+1": lambda: stage("Ctrl+1", "brief"), "Ctrl+2": lambda: stage("Ctrl+2", "shape"), "Ctrl+3": lambda: stage("Ctrl+3", "fit"),
         "Ctrl+4": lambda: stage("Ctrl+4", "prove"), "Ctrl+5": lambda: (stage("Ctrl+5", "release"), stage("Ctrl+2", "shape")),
         "Ctrl+Return": do_commit, "?": do_question,
@@ -692,7 +703,7 @@ def journey_every_listed_shortcut(ui):
     ui.type("vmate")
     ui.eq((tool(ui), ui.store.get("timelineOpen"), ui.item("composer").property("text")), ("select", False, "vmate"), "letters typed in the composer are text, not shortcuts")
     ui.clear()
-    ui.click("viewport", 0.05, 0.9)
+    click_stage(ui)
     # the keys the menu and palette show, which the sheet must also list
     for k in ("Ctrl+K", "Ctrl+N", "Ctrl+J", "Ctrl+,", "Ctrl+Shift+O", "Ctrl+Shift+H", "Ctrl+Return", "V", "M", "X", "A", "E", "T", "F", ".", "Shift+H", "?"):
         ui.check(k in listed, f"{k} is shown elsewhere in the app but missing from the Shortcuts sheet")

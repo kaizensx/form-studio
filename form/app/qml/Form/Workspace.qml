@@ -59,10 +59,13 @@ Item {
     readonly property bool col: Store.talkCol > 0
     // A window under 1200 px has room for the conversation column or for the panes on the right, not both: while the
     // column is open the panes fold to one button in their corner (it folds the conversation and brings them back).
-    readonly property bool panesOff: col && ws.width < 1200
+    readonly property bool panesOff: (col && ws.width < 1200) || Store.focusView
+    // a click into the 3D view from the conversation folds its column to the bar (calm); the prompt brings it back
+    Connections { target: vp; function onActiveFocusChanged() { if (vp.activeFocus && ws.col && insp.settled) Store.talkCalm = true } }
+    readonly property real colFoot: ws.height - Theme.edge        // the foot of the side columns
     readonly property real paneX: panesOff ? ws.width - Theme.edge - 44 : insp.x      // where the right column begins
     property real shift: col ? Store.talkCol + Theme.gap - Theme.edge : 0
-    Behavior on shift { enabled: insp.settled; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    Behavior on shift { enabled: insp.settled && !Store.talkDragging; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
     // a design that declares how its parts go together: assembled / exploded / as printed. Separate bodies
     // with no declaration (form/recipes/assembly.py from_solids): as modelled / pulled apart.
     // A design with separate bodies and no declaration is shown as modelled, or pulled apart; Assembled is there but
@@ -184,7 +187,9 @@ Item {
         // above the bottom row (the bar, taller when the transcript is open; the size line).
         QtObject {
             id: lay
-            readonly property real freeL: 84 + ws.shift + (ws.col ? 12 : 0)     // beside the column the dock is close: the dimension lines keep clear of it
+            // The tool dock floats inside the stage at its left edge, over the room: it takes no column of its own.
+            // The frame starts a little inside it, so a part's left dimension line stays clear of its discs.
+            readonly property real freeL: Theme.edge + 36 + ws.shift
             readonly property real freeR: ws.paneX - 12
             // The part stands on the bar's centre line (the window's) whenever the free stage has room on both sides
             // of it: at least 60 % of its width. Otherwise, a legend open or a narrow window, it stands in the middle
@@ -204,7 +209,7 @@ Item {
             readonly property bool cueing: cue.shown || ws.cueRoom
             readonly property real floorY: cueing ? Math.min(Store.barRestY, Store.barY, status.restY, cue.rest + 100) : Math.min(Store.barY, status.y)
             readonly property real cueLift: cueing ? Math.round(centre.height * 0.045) : 0
-            readonly property real top: 84 - cueLift
+            readonly property real top: Theme.paneTop + 4 - cueLift
             readonly property real bottom: centre.height - Math.max(60, centre.height - floorY + 26 + cueLift)
         }
         // the room: the 3D view and what belongs to it. This is what the panes blur, so nothing of theirs is in it.
@@ -261,7 +266,7 @@ Item {
             onHoveredValue: function (v, x, y, on) { vchip.on = on; vchip.v = v; vchip.x = Math.min(x + 14, centre.width - vchip.width - 8); vchip.y = y + 14 }
         }
         Loader { id: lv; anchors.fill: parent; active: !!Store.layers; source: "LayerView.qml"
-            onLoaded: { item.leftInset = Qt.binding(function () { return 84 + ws.shift }); item.topInset = 84; item.rightInset = Qt.binding(function () { return centre.width - ws.paneX + 12 }); item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }); item.axisX = Qt.binding(function () { return lay.mid }) } }
+            onLoaded: { item.leftInset = Qt.binding(function () { return Theme.edge + 62 + ws.shift }); item.topInset = Theme.paneTop + 4; item.rightInset = Qt.binding(function () { return centre.width - ws.paneX + 12 }); item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }); item.axisX = Qt.binding(function () { return lay.mid }) } }
         // the corners of the room fall away
         Room { anchors.fill: parent; wall: false; poolK: 0; visible: !Store.layers }
         }
@@ -315,7 +320,7 @@ Item {
         Rectangle {
             id: reconCap; objectName: "reconReadout"; z: 6
             readonly property var rc: Store.recon && Store.recon.project === Store.pid ? Store.recon : null
-            x: Math.round(Math.max(84 + ws.shift, Math.min(parent.width - width - 12, cue.x + (cue.width - width) / 2))); y: cue.y - height - Theme.s4
+            x: Math.round(Math.max(Theme.edge + 62 + ws.shift, Math.min(parent.width - width - 12, cue.x + (cue.width - width) / 2))); y: cue.y - height - Theme.s4
             width: rcr.implicitWidth + 2 * Theme.s4; height: 32; radius: 16
             color: Theme.glassSolid; border.color: Theme.alpha(Theme.blueprint, 0.35)
             opacity: rc ? 1 : 0; visible: opacity > 0.01
@@ -377,7 +382,7 @@ Item {
         Glass {
             id: rail; objectName: "toolDock"
             source: studio; arrive: 3
-            x: Theme.edge + ws.shift; y: 80; z: 6; width: 48; height: railCol.implicitHeight + 12; radius: 24
+            x: Theme.edge + ws.shift; y: Theme.paneTop; z: 6; width: 48; height: railCol.implicitHeight + 12; radius: 24
             visible: !!Store.view
             // while a build plays the tools step back: the part and its cue have the room
             // (as one picture while it is dimmed, so the filled disc and its icon fade together and not one through the other)
@@ -421,7 +426,7 @@ Item {
         // ── options of the active tool (one place, one row) ──
         Item {
             id: opts
-            x: 82 + ws.shift; y: 85; z: 5; visible: !ws.sim && !!Store.view
+            x: Theme.edge + 60 + ws.shift; y: Theme.paneTop + 5; z: 5; visible: !ws.sim && !!Store.view
             readonly property real room: Math.max(160, ws.paneX - x - 16)
             height: Math.max(sectionBar.shown ? sectionBar.height : 0, analyzeBar.shown ? analyzeBar.height : 0,
                              measureBar.shown ? measureBar.height : 0, asmBar.shown ? asmBar.height : 0, annotateBar.shown ? annotateBar.height : 0)
@@ -533,7 +538,7 @@ Item {
         // an agent is working on another design than this one: named, never jumped to once you are working here
         Rectangle {
             id: elsewhere; objectName: "agentElsewhere"; z: 6
-            x: Math.round(lay.mid - width / 2); y: 84
+            x: Math.round(lay.mid - width / 2); y: Theme.paneTop + 4
             visible: !!Store.agentElsewhere && !ws.sim
             width: er.implicitWidth + 24; height: 34; radius: 17; color: Theme.glassSolid; border.color: Theme.rule2
             Row { id: er; x: 14; anchors.verticalCenter: parent.verticalCenter; spacing: 8
@@ -552,7 +557,7 @@ Item {
         //    (insp.room_); a panel takes what it needs, up to 300 px or 40 % of the column, and scrolls beyond that. ──
         Column {
             id: dock
-            x: insp.x; width: insp.width; y: strip.y - reserve; z: 7; spacing: 8; visible: !ws.sim && !ws.panesOff
+            x: insp.x; width: insp.width; y: ws.colFoot - height; z: 7; spacing: 8; visible: !ws.sim && !ws.panesOff
             readonly property bool any: showMap || showMeasures || showSel || showRefine
             // what the column keeps for it above the pipeline (its own height, each panel at most `room`), gap included
             readonly property real reserve: any && height > 0 ? Math.round(height + Theme.gap) : 0
@@ -564,7 +569,7 @@ Item {
             readonly property bool showRefine: !!Store.refine && !Store.scrub && (Store.refine.state === "running"
                 || (Store.refine.changes || []).length > 0 || Store.refine.state === "failed")
             readonly property bool open: (showMap || showMeasures || showSel || showRefine) && !folded
-            readonly property real room: Math.max(120, Math.round(Math.min(300, (strip.y - 80) * 0.4)))
+            readonly property real room: Math.max(120, Math.round(Math.min(300, (ws.colFoot - Theme.paneTop) * 0.4)))
             function flip() { var now = folded; Ws.dockTouched = true; Ws.dockCollapsed = !now }
             AnalysisLegend { objectName: "analysisLegend"; width: dock.width; visible: opacity > 0.01; opacity: dock.showMap ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Motion.ui; easing.type: Easing.OutCubic } }
@@ -652,19 +657,10 @@ Item {
             id: history; objectName: "historyCapsule"
             source: studio; z: 7
             visible: Store.timelineOpen && !!Store.project && !ws.sim
-            width: Math.max(320, Math.min(760, ws.paneX - 82 - ws.shift - 24)); height: 48; radius: 24
-            x: Math.round(Math.max(82 + ws.shift, Math.min(lay.mid - width / 2, ws.paneX - 12 - width))); y: 82 + (opts.height > 0 ? opts.height + 8 : 0)
+            width: Math.max(320, Math.min(760, ws.paneX - Theme.edge - 60 - ws.shift - 24)); height: 48; radius: 24
+            x: Math.round(Math.max(Theme.edge + 60 + ws.shift, Math.min(lay.mid - width / 2, ws.paneX - 12 - width))); y: Theme.paneTop + 2 + (opts.height > 0 ? opts.height + 8 : 0)
             MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }
             Tools.Timeline { id: tline; x: 8; width: parent.width - 16; height: 40; anchors.verticalCenter: parent.verticalCenter }
-        }
-        // ── bottom right: where the artifacts of this revision stand ──
-        Glass {
-            id: strip; objectName: "pipelineCapsule"
-            source: studio; arrive: 6; z: 7
-            width: insp.width; height: pipe.implicitHeight; radius: Theme.rPane; visible: !ws.panesOff
-            x: centre.width - Theme.edge - width; y: centre.height - Theme.edge - height
-            MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }   // the pane is not the viewport
-            Pipeline { id: pipe; flat: true; grid: true; width: parent.width; height: implicitHeight }
         }
         Tools.ContextMenu { anchors.fill: parent; z: 8 }
     }
@@ -672,24 +668,24 @@ Item {
     // the panes folded (a narrow window with the conversation open): one button where they stood
     Glass {
         id: panesBtn; objectName: "panesButton"; source: studio; z: 7
-        visible: ws.panesOff; x: ws.width - Theme.edge - width; y: 80; width: 44; height: 44; radius: 22
+        visible: ws.panesOff; x: ws.width - Theme.edge - width; y: Theme.paneTop; width: 44; height: 44; radius: 22
         Rectangle { anchors.fill: parent; anchors.margins: 4; radius: height / 2; color: pbm.pressed ? Theme.washPress : pbm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
         Icon { anchors.centerIn: parent; name: "panel_right"; size: 16; color: pbm.containsMouse ? Theme.ink : Theme.ink2 }
-        MouseArea { id: pbm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.talkOpen = false }
-        Tip { show: pbm.containsMouse; below: true; text: "Show the " + (Store.stage === "shape" ? "Program" : "stage's pane") + " (folds the conversation)"; keys: "Ctrl+J" }
+        MouseArea { id: pbm; anchors.fill: parent; hoverEnabled: true; onClicked: { if (Store.focusView) Store.focusView = false; else Store.talkOpen = false } }
+        Tip { show: pbm.containsMouse; below: true; text: Store.focusView ? "Leave Focus: bring the side columns back" : "Show the " + (Store.stage === "shape" ? "Program" : "stage's pane") + " (folds the conversation)"; keys: Store.focusView ? "Ctrl+." : "Ctrl+J" }
     }
     // ── right: the Program, the stage's panel ────────────────
     Glass {
         id: insp
         objectName: "programPane"
         source: studio; arrive: 5
-        width: 356; radius: Theme.rPane; visible: !ws.panesOff
-        x: ws.width - Theme.edge - width; y: 80
-        // as tall as what it holds, up to the pipeline under it
-        readonly property real room_: strip.y - Theme.gap - y - dock.reserve
+        width: Theme.paneW; radius: Theme.rPane; visible: !ws.panesOff
+        x: ws.width - Theme.edge - width; y: Theme.paneTop
+        // as tall as what it holds, down to the foot of the window or the legends' dock under it
+        readonly property real room_: ws.colFoot - y - dock.reserve
         // In Design, with no feature open, that is the listing: the general parameters, colours and Explore are a scroll below it.
         readonly property real listing: panel.item && panel.item.paneHeight !== undefined && panel.item.paneHeight > 0 && !foot.on ? panel.item.paneHeight : -1
-        height: Math.round(Math.max(120, Math.min(room_, stageHead.height + (listing > 0 ? listing + 8 : body.implicitHeight + 22) + foot.height)))
+        height: Math.round(Math.max(120, Math.min(room_, stageHead.height + (listing > 0 ? listing + 8 : body.implicitHeight + 22) + foot.height + pipeRow.height)))
         Behavior on height { enabled: insp.settled; NumberAnimation { duration: Theme.move(Theme.cross); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
         property bool settled: false
         Timer { interval: 700; running: true; onTriggered: insp.settled = true }
@@ -734,10 +730,18 @@ Item {
                         NumberAnimation { target: slide; property: "x"; to: 0; duration: Theme.move(Theme.cross); easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }
             }
         }
+        // where the artifacts of this revision stand: one line at the foot of the pane, a dot for each step, a
+        // sentence for whatever is not current, and Auto. (It was a card of its own under the pane.)
+        Item {
+            id: pipeRow; objectName: "pipelineCapsule"
+            anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right; height: 42
+            Rectangle { x: 14; width: parent.width - 28; height: 1; color: Theme.rule }
+            Pipeline { id: pipe; flat: true; x: 8; y: 5; width: parent.width - 16; height: 34 }
+        }
         // the open draft and its Commit stay in reach at the foot of the inspector, whatever the panel's length
         Item {
             id: foot
-            anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
+            anchors.bottom: pipeRow.top; anchors.left: parent.left; anchors.right: parent.right
             readonly property bool on: Store.hasDraft || !!Store.draftError
             height: on ? Math.min(draft.implicitHeight + 24, Math.round(insp.room_ * 0.46)) : 0
             Rectangle { x: 14; width: parent.width - 28; height: 1; color: Theme.rule; visible: foot.on }

@@ -14,8 +14,8 @@ Item {
     id: bar
     objectName: "topBar"
     property real inset: 0                    // room for the macOS window buttons
-    readonly property int capY: 16            // where the capsules sit, and how tall they are
-    readonly property int capH: 44
+    readonly property int capY: 12            // where the capsules sit, and how tall they are
+    readonly property int capH: 40
     // macOS: where the close button starts. The three buttons (54 px) stand on the capsules' centre line, 24 px in
     // from the side, and the title capsule begins 14 px after them: one row, evenly spaced.
     readonly property int buttonsX: 24

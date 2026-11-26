@@ -81,10 +81,12 @@ Window {
         // down to the foot of the window, with the gutters of the panes on the right. The stage is what is left
         // between the two. Folded (Ctrl+J, the column's own button) it is the bar under the part, as it is before
         // anything was said. (A window under 1200 px has room for the column or the panes, not both: Workspace.panesOff.)
-        readonly property bool col: Store.screen === "work" && Store.talkOpen && !empty
-        readonly property int colW: win.width >= 1400 ? 384 : win.width >= 1200 ? 360 : 340
+        readonly property bool col: Store.screen === "work" && Store.talkOpen && !empty && !Store.talkCalm && !Store.focusView
+        // 340 px wide unless its edge was dragged (300 to 480, remembered with the window)
+        readonly property int colW: Math.round(Math.max(300, Math.min(480, win.width - 700, Store.talkWidth)))
         bar: win.plates && !col
         docked: col
+        drawer: Store.screen !== "work"
         onScreen: shown
         readonly property int minW: 300
         readonly property int maxW: Math.max(minW, Math.min(560, win.width - 760))
@@ -93,8 +95,8 @@ Window {
                                     : Store.screen === "home" ? Store.talkOpen && (Store.chatItems.length > 0 || Store.chatBusy) : false
         // the bar: where it may be, and how tall
         readonly property bool tight: win.width < 1300                         // the view buttons fold to one
-        readonly property real leftLimit: tight ? 148 : 336
-        readonly property real rightLimit: win.width - Theme.edge - 356 - Theme.gap
+        readonly property real leftLimit: tight ? 140 : 328
+        readonly property real rightLimit: win.width - Theme.edge - Theme.paneW - Theme.gap
         // One rule for where the bar stands: on the window's centre line, as wide as fits there between the view
         // buttons and the panes (600 at most). Only in a window so narrow that this would leave it under 440 px does
         // it stand in the middle of the free strip between them instead.
@@ -110,9 +112,9 @@ Window {
         Behavior on k { enabled: win.restored && !Theme.reduced; SpringAnimation { spring: Theme.springK; damping: Theme.springDamp; mass: 0.9; epsilon: 0.001 } }
         roomAbove: win.height - 110
         width: bar ? barW : col ? colW : Math.max(minW, Math.min(maxW, Store.talkWidth))
-        height: bar ? Math.round(barHeight + (sheetH - barHeight) * Math.max(0, k)) : col ? win.height - 80 - Theme.edge : win.height - top.height - Theme.gap
+        height: bar ? Math.round(barHeight + (sheetH - barHeight) * Math.max(0, k)) : col ? win.height - Theme.paneTop - Theme.edge : win.height - top.height - Theme.gap
         x: bar ? barX : col ? Theme.edge : shown ? Theme.gap : -width - Theme.gap - 40
-        y: bar ? win.height - 16 - height : col ? 80 : top.height
+        y: bar ? win.height - Theme.edge - height : col ? Theme.paneTop : top.height
         // the column and the bar are two places: one fades in where it stands, it does not fly across the part
         onColChanged: if (win.restored && Store.screen === "work") swap.restart()
         NumberAnimation { id: swap; target: talk; property: "opacity"; from: 0; to: 1; duration: Theme.base; easing.type: Easing.OutCubic }
@@ -123,19 +125,19 @@ Window {
         // where the bar is, for the screen in front: the camera keeps the part clear of it, the cue sits above it
         onYChanged: if (bar) Store.barY = y
         onBarChanged: Store.barY = bar ? y : win.height
-        Binding { target: Store; property: "barRestY"; value: talk.bar ? win.height - 16 - talk.restHeight : win.height }
+        Binding { target: Store; property: "barRestY"; value: talk.bar ? win.height - Theme.edge - talk.restHeight : win.height }
         onXChanged: if (bar) Store.barX = x
         onWidthChanged: if (bar) Store.barW = width
         Component.onCompleted: { Store.barY = bar ? y : win.height; Store.barX = x; Store.barW = width }
         // the column on Home: drag the edge to resize; double-click puts it back
         MouseArea {
-            visible: talk.shown && !talk.bar && !talk.col; z: 9
+            visible: talk.shown && !talk.bar; z: 9
             anchors.right: parent.right; anchors.rightMargin: -4; width: 9; height: parent.height
             hoverEnabled: true; cursorShape: Qt.SplitHCursor; preventStealing: true
             property real x0: 0; property real w0: 0
-            onPressed: function (e) { talk.dragging = true; x0 = mapToItem(null, e.x, 0).x; w0 = talk.width }
-            onPositionChanged: function (e) { if (pressed) Store.talkWidth = Math.max(talk.minW, Math.min(talk.maxW, w0 + mapToItem(null, e.x, 0).x - x0)) }
-            onReleased: talk.dragging = false
+            onPressed: function (e) { talk.dragging = true; Store.talkDragging = true; x0 = mapToItem(null, e.x, 0).x; w0 = talk.width }
+            onPositionChanged: function (e) { if (pressed) Store.talkWidth = Math.max(talk.minW, Math.min(talk.col ? 480 : talk.maxW, w0 + mapToItem(null, e.x, 0).x - x0)) }
+            onReleased: { talk.dragging = false; Store.talkDragging = false }
             onDoubleClicked: Store.talkWidth = 340
         }
     }
@@ -199,6 +201,8 @@ Window {
         else if (Store.annFocus) Store.focusAnnotation(null)
         else if (Store.layers) Store.showLayers(false)
         else if (Store.feature) Store.select("")
+        else if (Store.focusView) Store.focusView = false
+        else if (talk.col) Store.talkCalm = true           // nothing else to leave: the conversation steps back, the part has the room
     }
     function stageKey(id) { if (Store.data) Store.setStage(id) }
     function commitKey() { if (Store.hasDraft && !Store.draftError) Store.commit() }
@@ -212,7 +216,10 @@ Window {
     Shortcut { sequence: "Ctrl+Return"; onActivated: win.commitKey(); onActivatedAmbiguously: win.commitKey() }
     function newDesign() { Store.startNew() }
     Shortcut { sequences: [StandardKey.New]; onActivated: win.newDesign(); onActivatedAmbiguously: win.newDesign() }
-    Shortcut { sequence: "Ctrl+J"; onActivated: Store.talkOpen = !Store.talkOpen; onActivatedAmbiguously: Store.talkOpen = !Store.talkOpen }
+    Shortcut { sequence: "Ctrl+J"; onActivated: Store.toggleTalk(); onActivatedAmbiguously: Store.toggleTalk() }
+    // Focus: both side columns step away and the part has the window; again to bring them back
+    function focusKey() { if (Store.screen === "work" && !Store.sheet) Store.focusView = !Store.focusView }
+    Shortcut { sequence: "Ctrl+."; onActivated: win.focusKey(); onActivatedAmbiguously: win.focusKey() }
     Shortcut { sequences: ["Ctrl+,"]; onActivated: Store.openSettings("general"); onActivatedAmbiguously: Store.openSettings("general") }      // Settings (⌘, on macOS)
     Shortcut { sequence: "Ctrl+Shift+O"; onActivated: { Store.newChat(); Store.talkOpen = true } onActivatedAmbiguously: { Store.newChat(); Store.talkOpen = true } }
     Shortcut { sequence: "Ctrl+Shift+H"; onActivated: Store.home(); onActivatedAmbiguously: Store.home() }

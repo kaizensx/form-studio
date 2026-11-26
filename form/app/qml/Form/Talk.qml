@@ -21,7 +21,10 @@ Rectangle {
     property real roomAbove: 600             // how tall something that opens upward from the bar may be (Main.qml)
     // a build is playing: the bar is slim and the transcript waits, so the cue has the room
     readonly property bool cueing: bar && (!!Store.building || Store.revealing.length > 0)
-    readonly property bool expanded: !bar || (((Store.talkOpen && !empty) || list.opened) && !cueing)
+    // the bar opens upward into a drawer only where there is no column for the conversation (while a design is being
+    // made); in a workspace it opens into the column instead, and upward only for the list of conversations
+    property bool drawer: true
+    readonly property bool expanded: !bar || (((drawer && Store.talkOpen && !empty) || list.opened) && !cueing)
     readonly property bool slim: bar && !expanded && (!empty || cueing)          // just the prompt, on one line
     readonly property bool suggOn: bar && empty && !cueing && Store.chat.available && !!Store.project && forProject.length > 0
     readonly property int leadH: bar && !cueing ? 32 : 0      // while a build plays the cue says what is happening
@@ -34,7 +37,7 @@ Rectangle {
     // what the open transcript wants above the prompt: its header, the strips under it, and what was said
     readonly property real bodyWant: head.height + 8 + (rsteps.visible ? rsteps.height : 0) + (strip.visible ? strip.height : 0) + feed.contentHeight + feed.topMargin + feed.bottomMargin + 6
     function pickSuggestion(m) { if (m.sheet) Store.openSheet(m.sheet); else if (m.review) Store.askReview(); else Store.send(m.prompt) }
-    function toggle() { if (empty) { ta.forceActiveFocus(); return } Store.talkOpen = !Store.talkOpen }
+    function toggle() { if (empty) { ta.forceActiveFocus(); return } Store.toggleTalk() }
     onXChanged: pane.place(); onYChanged: pane.place()
     Glass { id: pane; source: Store.backdrop; z: -1; y: talk.leadH; width: parent.width; height: parent.height - talk.leadH; radius: talk.bar ? 26 : Theme.rPane }
     readonly property bool empty: Store.chatItems.length === 0 && !Store.chatBusy
@@ -545,7 +548,7 @@ Rectangle {
 
     // ── composer ──
     Item {
-        id: foot; width: parent.width; height: comp.height + sugg.height + (talk.bar ? 12 : 36); z: 2
+        id: foot; width: parent.width; height: comp.height + sugg.height + (talk.bar ? 12 : talk.docked ? 42 : 36); z: 2
         y: talk.height - height
         // numbered suggestions for the open design, from its real state; keys 1 to 4 pick them while the prompt is empty
         Grid {
@@ -632,6 +635,8 @@ Rectangle {
                     TextArea {
                         id: ta
                         objectName: "composer"
+                        // the prompt taken up again brings a calmed conversation back (Store.talkCalm)
+                        onActiveFocusChanged: if (activeFocus && (Store.talkCalm || Store.focusView) && !talk.empty) { Store.focusView = false; Store.talkCalm = false }
                         // "Ask about this feature…" from the viewport's context menu lands here
                         Connections { target: Store; function onChatPrefill(text) { Store.talkOpen = true; ta.text = text; ta.cursorPosition = text.length; ta.forceActiveFocus() } }
                         wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: talk.slim ? 14 : 15; font.letterSpacing: -0.1

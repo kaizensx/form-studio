@@ -60,7 +60,7 @@ def run(ui):
     ui.shot("lightdesk-workspace")
 
     # the panes: all there, inside the window, none over another
-    names = ["titleCapsule", "stageTabs", "toolsCapsule", "toolDock", "viewsCapsule", "programPane", "pipelineCapsule", "talk"]
+    names = ["titleCapsule", "stageTabs", "toolsCapsule", "toolDock", "viewsCapsule", "programPane", "talk"]
     rects = {n: _rect(ui, n) for n in names}
     w, h = ui.win.width(), ui.win.height()
     for n, r in rects.items():
@@ -68,6 +68,9 @@ def run(ui):
     for i, a in enumerate(names):
         for b in names[i + 1:]:
             ui.check(_apart(rects[a], rects[b]), f"{a} and {b} do not overlap: {rects[a]} {rects[b]}")
+    # the pipeline is one line at the foot of the pane
+    pp, pl = rects["programPane"], _rect(ui, "pipelineCapsule")
+    ui.check(pl[0] >= pp[0] and pl[0] + pl[2] <= pp[0] + pp[2] + 1 and abs(pl[1] + pl[3] - (pp[1] + pp[3])) <= 1 and pl[3] <= 48, f"the pipeline is a line at the foot of the pane: {pl} in {pp}")
     vp = _rect(ui, "viewport")
     ui.check(vp[0] <= 1 and vp[1] <= 1 and vp[2] >= w - 2 and vp[3] >= h - 2, f"the 3D view fills the window: {vp}")
 
@@ -111,11 +114,11 @@ def run(ui):
     # open, it is a column on the left: under the top row, down to the foot of the window; the tools and the stage
     # begin right of it. A window under 1200 px has room for the column or the panes: the panes fold to one button.
     t = _rect(ui, "talk")
-    pc = rects["pipelineCapsule"]; gut = ui.win.width() - (pc[0] + pc[2])          # the gutter the panes on the right keep
-    ui.check(abs(t[0] - gut) <= 1 and abs(t[1] - 80) <= 1 and abs(t[1] + t[3] - (ui.win.height() - gut)) <= 1,
+    pc = rects["programPane"]; gut = ui.win.width() - (pc[0] + pc[2])          # the gutter the pane on the right keeps
+    ui.check(abs(t[0] - gut) <= 1 and abs(t[1] - pc[1]) <= 1 and abs(t[1] + t[3] - (ui.win.height() - gut)) <= 1,
              f"the conversation is a column on the left, with the gutters of the panes on the right ({gut}): {t}")
     ui.check(_rect(ui, "toolDock")[0] >= t[0] + t[2] + 8, f"the tool dock stands right of it: {_rect(ui, 'toolDock')}")
-    ui.check(float(ui.item("viewport").property("insetLeft")) >= t[0] + t[2] + 60, "the stage begins right of the column and the dock")
+    ui.check(float(ui.item("viewport").property("insetLeft")) >= t[0] + t[2] + 40, "the part is framed right of the column (the tool dock floats at the stage's edge)")
     ui.check(_apart(t, _rect(ui, "viewsCapsule")), "it stays clear of the view buttons")
     if ui.win.width() >= 1200:
         ui.check(_apart(t, _rect(ui, "programPane")), "and of the panes on the right")
@@ -141,7 +144,7 @@ def run(ui):
         ui.wait_until(lambda: ui.store.get("stage") == stage, 3, f"the {stage} stage")
         ui.settle(500)
         r = _rect(ui, "programPane")
-        ui.check(r[1] + r[3] <= _rect(ui, "pipelineCapsule")[1] + 1, f"{stage}: the pane ends above the pipeline: {r}")
+        ui.check(r[1] + r[3] <= ui.win.height() - gut + 1, f"{stage}: the pane ends above the foot of the window: {r}")
         if stage in ("brief", "release"):
             ui.shot("lightdesk-stage-" + stage)
 

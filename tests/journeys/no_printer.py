@@ -66,7 +66,7 @@ def journey_a_3d_model(ui):
     d = data(ui)
     ui.eq(d["purpose"]["purpose"], "model", "a 3D model")
     ui.eq(d["status"]["slice"]["off"]["why"], "purpose", "not sliced because it is not for printing")
-    ui.check("Slice" not in ui.texts("pipeline"), "the pipeline strip has no Slice step")
+    ui.check("Slice" not in ui.item("pipeline").property("steps"), "the pipeline strip has no Slice step")
     ui.check(not ui.sees("not for printing", "topBar") and ui.find(name="printerChip") is None, "the top bar says nothing about printing")
     ui.check("fit" not in [x["id"] for x in ui.js("Store.stages")], "no Fit stage")
     ids = [c["id"] for c in d["checks"]["checks"]]
@@ -138,7 +138,7 @@ def journey_purpose_switch(ui):
     wait_job(ui, S["pid"])
     ids = [c["id"] for c in data(ui)["checks"]["checks"]]
     ui.check("envelope" in ids, f"the print checks run now: {ids}")
-    ui.wait_until(lambda: "Slice" in ui.texts("pipeline"), 5, "the Slice step back in the strip")
+    ui.wait_until(lambda: "Slice" in ui.item("pipeline").property("steps"), 5, "the Slice step back in the strip")
     ui.shot("noprinter-switched-to-print")
     ui.click_text("Just a 3D model", within=ui.item("purposeSeg"))
     ui.wait_until(lambda: data(ui)["purpose"]["purpose"] == "model", 10, "a 3D model again")

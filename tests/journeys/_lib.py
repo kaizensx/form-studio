@@ -98,3 +98,10 @@ def toasts_gone(ui):
 
 def has_slicer(ui):
     return bool(ui.js("Store.slicer.available"))
+
+
+def click_stage(ui):
+    """Put the keyboard on the part: a click on the empty room at the top left of the stage, right of the tool dock.
+    (The corner of the window is not the stage: the conversation column may stand there.)"""
+    vp = ui.item("viewport")
+    ui.click("viewport", (float(vp.property("insetLeft")) + 44) / vp.width(), (float(vp.property("insetTop")) + 2) / vp.height())

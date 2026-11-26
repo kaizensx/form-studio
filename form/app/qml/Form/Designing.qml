@@ -48,7 +48,7 @@ Item {
     // The free stage, as in a workspace: the part stands on the bar's centre line (the window's) whenever there is room
     // on both sides of it (at least 60 % of the free width, left of the Program once stages arrive); else in the middle.
     readonly property real freeL: 40
-    readonly property real freeR: width - (staged ? 396 : 40)
+    readonly property real freeR: width - (staged ? Theme.paneW + Theme.edge + 20 : 40)
     readonly property real axisX: Store.barX + Store.barW / 2
     readonly property real halfW: Math.min(axisX - freeL, freeR - axisX)
     readonly property bool centred: 2 * halfW >= 0.6 * (freeR - freeL)
@@ -58,7 +58,7 @@ Item {
     Item { id: studio; anchors.fill: parent
     Viewport { id: dvp; objectName: "designingViewport"; anchors.fill: parent; lite: false; interactive: true; showDims: false; showCompanions: false
         showOrigin: dz.staged                    // the floor's cross belongs to a part; before there is one the words stand here
-        floorGrid: Store.floorGrid; insetTop: 84; insetLeft: dz.stageL; insetRight: dz.width - dz.stageR
+        floorGrid: Store.floorGrid; insetTop: Theme.paneTop + 4; insetLeft: dz.stageL; insetRight: dz.width - dz.stageR
         insetBottom: Math.max(60, dz.height - (dz.staged ? stageCap.y - 10 : Store.barY) + 26)
         Component.onCompleted: { setModel(null); setView("iso", false); Store.stageViewer = dvp; Store.backdrop = studio }
         Component.onDestruction: if (Store.stageViewer === dvp) Store.stageViewer = null }
@@ -170,8 +170,8 @@ Item {
         readonly property var rows: { var b = Store.building, out = []
             for (var i = 0; b && i < Store.stageLog.length; i++) { var e = Store.stageLog[i]; if (e.draft === b.draft && !out.some(function (o) { return o.at === e.at })) out.push(e) }
             return out }
-        width: 356; radius: Theme.rPane; x: dz.width - Theme.edge - width; y: 80
-        height: Math.min(dz.height - 80 - Theme.edge, 52 + rows.length * 32)
+        width: Theme.paneW; radius: Theme.rPane; x: dz.width - Theme.edge - width; y: Theme.paneTop
+        height: Math.min(dz.height - Theme.paneTop - Theme.edge, 52 + rows.length * 32)
         opacity: dz.staged && rows.length > 0 ? 1 : 0; visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: Theme.base } }
         Behavior on height { NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }

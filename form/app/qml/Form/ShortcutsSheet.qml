@@ -44,6 +44,7 @@ Column {
             ["Ctrl+N", "New design"],
             ["Ctrl+Shift+O", "New conversation"],
             ["Ctrl+J", "Show or hide the conversation"],
+            ["Ctrl+.", "Focus: the part alone, both side columns away"],
             ["Ctrl+Shift+H", "All designs"],
             ["Ctrl+[", "Back to all designs"],
             ["Ctrl+,", "Settings"],

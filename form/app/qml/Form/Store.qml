@@ -42,6 +42,7 @@ QtObject {
     property real barY: 100000         // the conversation bar in the window (Main.qml): its top edge, left edge and width
     property real barRestY: 100000     // its top edge once no build plays (during one the bar is one line)
     property real barX: 0
+    property bool talkDragging: false  // its edge is being dragged: what follows it follows at once
     property real talkCol: 0           // a workspace's conversation column: its right edge (0: folded to the bar)
     property real barW: 600
     property int buildAt: 0            // the build-up playing in the workspace: which step of how many (0: none)
@@ -51,6 +52,14 @@ QtObject {
 
     // chat: saved conversations with an agent, and the live feed of what any agent does (chat workstream)
     property bool talkOpen: true
+    // Calm: a click into the 3D view or Esc folds an open conversation column to the bar, without forgetting that it
+    // is open; typing in the prompt or clicking it brings the column back. Focus (Ctrl+.) hides both side columns.
+    property bool talkCalm: false
+    property bool focusView: false
+    onTalkOpenChanged: talkCalm = false
+    onChatAskingChanged: if (chatAsking) talkCalm = false
+    onScreenChanged: { talkCalm = false; focusView = false }
+    function toggleTalk() { if (focusView) { focusView = false; talkCalm = false; talkOpen = true } else if (talkOpen && talkCalm) talkCalm = false; else talkOpen = !talkOpen }
     property string convId: ""         // the open conversation; "" = a new one that is not saved yet
     property var conv: null            // its record: { id, title, project, agent, model, effort, resolved_model, cost_usd, … }
     property var convs: []             // every saved conversation, pinned first, then newest

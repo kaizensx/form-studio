@@ -7,7 +7,7 @@ import math
 
 import numpy as np
 
-from _lib import open_project, wait_job
+from _lib import open_project, wait_job, click_stage
 
 DATA = "fresh"
 S = {}
@@ -78,7 +78,7 @@ def journey_chain_moves_together(ui):
     joints = {j["id"]: j for j in a["joints"]}
     ui.eq(joints["arm_tilt"]["moves"], ["arm", "cup", "pin"], "the arm carries the cup and the pin")
 
-    ui.click("viewport", 0.05, 0.95)          # the viewport has the keys
+    click_stage(ui)          # the viewport has the keys
     ui.key("E")
     ui.wait_until(lambda: ui.js("Ws.tool") == "assembly", 5, "E to open Assembly")
     bar = ui.item("asmBar")

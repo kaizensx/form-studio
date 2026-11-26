@@ -38,7 +38,7 @@ P.MenuBar {
         P.MenuItem { text: "Search and Commands…"; shortcut: "Ctrl+K"; onTriggered: Store.paletteOpen = !Store.paletteOpen }
     }
     P.Menu { title: "View"
-        P.MenuItem { text: Store.talkOpen ? "Hide the Conversation" : "Show the Conversation"; shortcut: "Ctrl+J"; enabled: mb.work; onTriggered: Store.talkOpen = !Store.talkOpen }
+        P.MenuItem { text: Store.talkOpen ? "Hide the Conversation" : "Show the Conversation"; shortcut: "Ctrl+J"; enabled: mb.work; onTriggered: Store.toggleTalk() }
         P.MenuItem { text: Store.timelineOpen ? "Hide the Revision Timeline" : "Show the Revision Timeline"; enabled: mb.work
             onTriggered: { Store.timelineOpen = !Store.timelineOpen; if (!Store.timelineOpen) Store.endScrub() } }
         P.MenuSeparator {}

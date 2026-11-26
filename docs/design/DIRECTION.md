@@ -48,7 +48,7 @@ Three tests for any screen:
 - **Left: the conversation.** Once something was said it is a glass column, under the top row and down to the foot
   of the window: the conversation picker and New at its head, everything that was said (replies, steps, revision
   cards with Compare), the prompt at its foot. Ctrl/⌘ J or the button at its head folds it to the bar (below).
-- **The tool dock** stands right of the column (at the window's edge while the column is folded), one capsule. The
+- **The tool dock** floats inside the stage at its left edge, one capsule over the room; it takes no column. The
   active tool is the one filled disc. The tool's options sit beside it.
 - **Centre: the stage.** The rectangle between the column (or the dock) and the panes on the right, under the top
   row. The part is always framed in it and the camera glides when it changes. Nothing stands over the part but its
@@ -57,12 +57,15 @@ Three tests for any screen:
 - **Right:** the Program. In Design it is the feature list as a listing: line numbers, the name, the role in neutral
   mono capitals. In the other stages the same pane holds that stage. Under it, when there is one, a legend, the
   measurements, the selection or the refinement's changes (a panel takes what it needs, at most 40 % of the column).
-- **Bottom right:** the pipeline as a capsule: a state dot, the step, one mono line with its real value; Auto.
+- **At the foot of that pane:** the pipeline as one line: a state dot for each step, a sentence for whatever is not
+  current (or what the checks found), Auto.
 - **Bottom centre, while the conversation is folded or nothing was said yet:** the bar on the window's centre line:
   a status line, numbered suggestions (keys 1 to 4 pick them while the prompt is empty), the prompt with a `›` and a
   block caret, attach, the agent, send.
 - **The print simulation** uses the same stage: the way back and the line types top left, the views top right, the
   transport along the foot of the stage; the print is framed in what is left.
+- **Calm and Focus.** A click into the 3D view, or Esc, folds the open column to the bar; the prompt brings it back.
+  Ctrl/⌘ . is Focus: both side columns step away and the part has the window.
 - **A window under 1200 px** has room for the column or the panes, not both: with the conversation open the panes
   fold to one button in their corner, which folds the conversation and brings them back.
 
