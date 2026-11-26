@@ -39,7 +39,7 @@ def run(ui):
     ui.click("viewport", 0.5, 0.5)
     got = ui.wait_until(lambda: ui.store.get("feature"), 5, "a feature to be selected by clicking the model")
     ui.check(got in [f["id"] for f in ui.js("Store.recipe.features")], f"{got} is a feature of the recipe")
-    ui.expect("Drives this feature")
+    ui.wait_until(lambda: ui.sees("Parameters") or ui.sees("What shapes it"), 5, "the feature panel's parameter section")
     ui.settle(500)
     ui.shot("design-feature-selected")
     ui.key("Escape")

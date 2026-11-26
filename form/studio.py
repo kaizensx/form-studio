@@ -1036,7 +1036,7 @@ class Studio:
              "fit": dict(zip(("gap_min", "gap_max"), (r.fit or {}).get("window", (0.10, 0.80)))),
              "orientation": "as_modelled", "auto_slice": True, "purpose": pur,
              "revisions": [{"n": 1, "parent": None, "ts": now, "values": vals, "recipe": recipe_id,
-                            "note": "Starting point from recipe defaults" if not is_source(recipe_id) else "First version of the design",
+                            "note": "First version of the design",
                             "origin": "recipe", "provenance": {pp.key: _initial_provenance(pp) for pp in r.params}}],
              "head": 1, "produced": {n: [] for n in NODES}, "decisions": [], "evidence": [], "approvals": []}
         from . import presets                       # a brief filled in from a template carries its answers
