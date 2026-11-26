@@ -19,6 +19,7 @@ from pathlib import Path
 
 from . import __version__, checks as checks_mod, fit as fit_mod, slicer
 from . import cad_bridges
+from . import use as use_mod
 from .recipes import RecipeBook, RecipeError, SCAD_PREFIX, SOURCE_PREFIX, is_source, source_path, store_source
 from .worker import KernelFailure, KernelPool
 from . import fsutil
@@ -615,6 +616,9 @@ class Studio:
             raise StudioError("Design source is larger than 200 kB.")
         if language not in ("python", "openscad"):
             raise StudioError(f"Unknown design language “{language}”.", "Use language=\"python\" (build123d) or \"openscad\".")
+        if language == "openscad" and not use_mod.on("openscad", self.cfg):
+            raise StudioError(use_mod.off_reason("openscad"),
+                              "Turn it on there, or write the design in Python with build123d.", status=409)
         if language == "openscad" and not cad_bridges.find_openscad(self.cfg):
             raise StudioError("OpenSCAD is not installed, so an OpenSCAD design cannot be built.",
                               "Install it from https://openscad.org/downloads.html (or set [cad].openscad in studio.toml), "
@@ -2259,7 +2263,7 @@ class Studio:
         """FreeCADCmd for the optional re-import check; cached briefly like the slicer."""
         now = time.time()
         if getattr(self, "_fc_at", 0) < now - 30:
-            self._fc, self._fc_at = cad_bridges.find_freecad(self.cfg), now
+            self._fc, self._fc_at = cad_bridges.freecad(self.cfg), now      # None too when it is switched off
         return self._fc
 
     @staticmethod

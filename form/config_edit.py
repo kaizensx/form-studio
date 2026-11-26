@@ -36,8 +36,17 @@ SCHEMA: dict[str, dict] = {
                          "help": "true turns the 3D printing capability on, false turns it off (general.capabilities)."},
     # CADFit as one more mesh-to-CAD candidate (form/recon/cadfit; CC BY-NC 4.0, included with its author's permission).
     # Settings > Software turns it on when it installs it.
-    "recon.cadfit": {"type": "bool", "tab": "advanced", "hidden": True, "label": "CADFit mesh to CAD search",
+    "recon.cadfit": {"type": "bool", "tab": "software", "hidden": True, "label": "CADFit mesh to CAD search",
                      "help": "true also tries CADFit's IoU search when a mesh is made editable (non-commercial licence)."},
+    # "Use in Form Studio" (form/use.py): the switch on each card of Settings › Engines & software. Applied at once.
+    "recon.learned": {"type": "bool", "tab": "software", "hidden": True, "label": "Use CAD-Recode",
+                      "help": "false: CAD-Recode is never asked, also when it is installed (non-commercial licence)."},
+    **{"use." + k: {"type": "bool", "tab": "software", "hidden": True, "label": "Use " + n,
+                    "help": "false: " + n + " is never called, also when it is installed."}
+       for k, n in (("coacd", "CoACD"), ("corpus", "the CADEvolve corpus"), ("blender", "Blender"), ("freecad", "FreeCAD"),
+                    ("openscad", "OpenSCAD"), ("bambu", "Bambu Studio"), ("orca", "OrcaSlicer"), ("prusa", "PrusaSlicer"),
+                    ("superslicer", "SuperSlicer"), ("qidi", "QIDISlicer"), ("elegoo", "ElegooSlicer"),
+                    ("snapmaker", "Snapmaker Orca"))},
     "refine.enabled": {"type": "bool", "tab": "general", "label": "Refine every design after it builds",
                        "help": "Adds named, reversible refinements (fillet tiers, parting lines, grip zones, materials) "
                                "as one more revision, kept only when the design's checks still pass. Each one can be "
@@ -393,7 +402,7 @@ def _detect(cfg: dict) -> dict:
         pass
     try:
         from .adapters import blender
-        b = blender.resolve(cfg)
+        b = blender.probe(cfg)
         out["blender.app"] = short(b.get("app") or "") if b.get("available") else ""
     except Exception:
         pass

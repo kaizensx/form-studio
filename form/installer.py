@@ -281,8 +281,9 @@ def _d_freecad(cfg, ctx) -> Found:
 
 
 def _d_blender(cfg, ctx) -> Found:
+    from . import use
     from .adapters import blender as bl
-    b = bl.resolve(cfg)
+    b = bl.resolve(cfg) if use.on("blender", cfg) else bl.probe(cfg)    # installed is one thing, used another
     if b["available"]:
         return Found("ok", f"Blender {b['version']} · {b['app']}", version=b["version"], path=b["app"])
     return Found("warn" if b["app"] else "missing", ("Not installed. " if not b["app"] else b["reason"] + " ") +
@@ -528,19 +529,15 @@ def _cadfit_ready(cfg: dict) -> str:
 
 
 def _cadfit_on(cfg: dict) -> bool:
-    env = os.environ.get("FORM_RECON_CADFIT")
-    if env is not None and env.strip() != "":
-        return env.strip().lower() in ("1", "true", "yes", "on")
-    return bool((cfg.get("recon") or {}).get("cadfit", False))
+    from . import use
+    return use.on("recon.cadfit", cfg)
 
 
 def _d_cadfit(cfg, ctx) -> Found:
     importlib.invalidate_caches()
     where = _cadfit_ready(cfg)
-    if where and _cadfit_on(cfg):
-        return Found("ok", f"On. Runs in {where}. Licence CC BY-NC 4.0 (non-commercial), included with its author's permission.")
-    if where:
-        return Found("missing", f"Its libraries are installed ({where}), but it is off. Install turns it on.")
+    if where:                                            # installed; whether it is used is its switch (form/use.py)
+        return Found("ok", f"Runs in {where}. Licence CC BY-NC 4.0 (non-commercial), included with its author's permission.")
     return Found("missing", "Optional. Not installed. Mesh to CAD works fully without it.")
 
 
@@ -576,9 +573,6 @@ def _m_cadfit(platform, ctx) -> list[Method]:
     cfg = ctx.get("cfg") or _cfg_default()
     note = ("CADFit's code is CC BY-NC 4.0 (non-commercial use only), included with its author's permission "
             "(form/recon/cadfit/PERMISSION.md); by installing you accept that licence. Off until installed.")
-    if _cadfit_ready(cfg):
-        return [Method("enable", "Turn it on", kind="action", action=lambda: _enable_cadfit(cfg),
-                       commands=["set [recon] cadfit = true in studio.toml"], note=note)]
     eng = Method("engine", "Its own Python, set up by Form Studio", kind="action", streams=True,
                  commands=engines.commands(cadfit.ENGINE_ID, cfg, ["set [recon] cadfit = true in studio.toml"]),
                  action=_cadfit_engine(cfg), note=note + " Its search runs in that environment, out of the app.")
@@ -1039,6 +1033,7 @@ def manual(sw: Software, platform: str | None = None, ctx: dict | None = None) -
 
 def survey(cfg: dict, platform: str | None = None, which=None, only: list[str] | None = None) -> list[dict]:
     """Detect everything (or `only` these ids) and describe it. Read-only."""
+    from . import use as use_mod
     ctx: dict = {"cfg": cfg}
     home = str(Path.home())
     rows = []
@@ -1054,6 +1049,8 @@ def survey(cfg: dict, platform: str | None = None, which=None, only: list[str] |
         chosen = next((m for m in ms if m.available and m.kind in ("command", "action", "login")), None)
         rows.append({"id": sw.id, "label": sw.label, "why": sw.why, "about": sw.about or sw.why, "gives": sw.gives,
                      "removable": f.status == "ok" and bool(removable_paths(sw.id, cfg)),
+                     # "Use in Form Studio" (form/use.py): {key, on, default, effect, locked_by}, or None (no switch)
+                     "use": use_mod.describe(sw.id, cfg),
                      "level": sw.level, "group": sw.group, "size": sw.size,
                      "capability": sw.capability, "licence": sw.licence, "licence_url": sw.licence_url,
                      "noncommercial": sw.noncommercial,

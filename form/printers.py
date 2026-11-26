@@ -408,6 +408,9 @@ def slicer_printers(cfg: dict, kind: str) -> dict:
     out = {"kind": kind, "label": a.LABEL, "installed": bool(app), "printers": [], "reason": ""}
     if not app:
         return out
+    if not slicer_mod.used(kind, cfg):                  # installed, but its "Use in Form Studio" switch is off
+        out.update(off=True, reason=f"{a.LABEL} is switched off in Settings › Engines & software.")
+        return out
     try:
         inv = _bbl_printers(kind, a, cfg) if kind in BBL_KINDS else _prusa_printers(kind, a, cfg)
         out["printers"] = inv["printers"]
@@ -421,7 +424,7 @@ def slicer_printers(cfg: dict, kind: str) -> dict:
 
 def inventory(cfg: dict, kinds=None) -> dict:
     """Every printer in every installed slicer, plus the default choice."""
-    key = json.dumps([cfg["slicer"].get(k) for k in ("kind", "app", "config_dir")] +
+    key = json.dumps([cfg["slicer"].get(k) for k in ("kind", "app", "config_dir")] + [cfg.get("use")] +
                      [cfg["slicer"].get(k) for k in AUTO_ORDER if isinstance(cfg["slicer"].get(k), dict)], sort_keys=True, default=str)
     hit = _cache.get(key)
     if hit and time.time() - hit[0] < 30 and kinds is None:
@@ -449,6 +452,8 @@ def options(cfg: dict, kind: str, machine: str) -> dict:
     a = slicer_mod.adapter(kind)
     if not _app(a, cfg):
         raise PrinterError(f"{a.LABEL} is not installed.")
+    if not slicer_mod.used(kind, cfg):
+        raise PrinterError(f"{a.LABEL} is switched off in Settings › Engines & software.", "Turn “Use in Form Studio” on for it.")
     fn = _bbl_options if kind in BBL_KINDS else _prusa_options
     out = fn(kind, a, cfg, machine)
     out.update(kind=kind, machine=machine, slicer=a.LABEL)

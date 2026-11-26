@@ -64,7 +64,8 @@ def software(cfg) -> dict:
     try:
         from .. import engines
         from .lod import COACD_ENGINE
-        out["coacd"] = engines.python(COACD_ENGINE, cfg) is not None
+        from .. import use
+        out["coacd"] = use.on(COACD_ENGINE, cfg) and engines.python(COACD_ENGINE, cfg) is not None
     except Exception:                                            # noqa: BLE001
         out["coacd"] = False
     return out

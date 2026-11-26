@@ -46,8 +46,11 @@ class ScadRecipe(Recipe):
                               "Give each editable top-level number a Customizer range comment, e.g. `width = 40; // [20:1:120]`.")
 
     def build(self, v):
+        from .. import use
         from ..cad_bridges import find_openscad, run_openscad
         from .meshsolid import read_stl_solid
+        if not use.on("openscad"):
+            raise RecipeError(use.off_reason("openscad"), "body", "Turn it on there to build this design.")
         exe = find_openscad()
         if not exe:
             raise RecipeError("OpenSCAD is not installed, so this design cannot be built.", "body",

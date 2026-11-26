@@ -26,7 +26,7 @@ _busy_lock = threading.Lock()
 
 def blender(cfg: dict, refresh: bool = False) -> dict:
     """Is Blender usable here? Cached for a minute."""
-    key = json.dumps(cfg.get("blender", {}), sort_keys=True, default=str)
+    key = json.dumps([cfg.get("blender", {}), (cfg.get("use") or {}).get("blender")], sort_keys=True, default=str)
     if refresh or _info["v"] is None or _info["key"] != key or time.time() - _info["at"] > 60:
         _info.update(v=bl.resolve(cfg), at=time.time(), key=key)
     return _info["v"]

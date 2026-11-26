@@ -144,7 +144,19 @@ def version(app: str) -> str:
 
 
 def resolve(cfg: dict | None = None) -> dict:
-    """{"available", "app", "version", "reason"}. Never raises."""
+    """{"available", "app", "version", "reason"} for running Blender. Never raises. With its "Use in Form Studio"
+    switch off (form/use.py) it is not available, whatever is installed, and Blender is not even asked its version."""
+    try:
+        from .. import use
+        if not use.on("blender", cfg):
+            return {"available": False, "app": "", "version": "", "off": True, "reason": use.off_reason("blender")}
+    except ImportError:
+        pass
+    return probe(cfg)
+
+
+def probe(cfg: dict | None = None) -> dict:
+    """Is Blender installed here? The same answer as resolve(), without the switch (Settings shows both)."""
     conf = ((cfg or {}).get("blender") or {}).get("app") or ""
     for c in candidates(cfg):
         if c and Path(c).is_file():

@@ -47,19 +47,18 @@ ENGINE_TEXT = (
 )
 
 
+ENGINE_ID = "recon.cadfit"             # its managed environment (form/engines.py) and its switch (form/use.py)
+
+
 def enabled() -> bool:
     """Is the CADFit candidate asked for? $FORM_RECON_CADFIT (1/0) first, else `[recon] cadfit` (default false)."""
-    env = os.environ.get("FORM_RECON_CADFIT")
-    if env is not None and env.strip() != "":
-        return env.strip().lower() in ("1", "true", "yes", "on")
     try:
-        from ... import config
-        return bool(config.load().get("recon", {}).get("cadfit", False))
+        from ... import use
+        return use.on(ENGINE_ID)                        # the "Use in Form Studio" switch (form/use.py)
     except Exception:                                   # noqa: BLE001
         return False
 
 
-ENGINE_ID = "recon.cadfit"             # its managed environment (form/engines.py)
 
 
 def engine_python():

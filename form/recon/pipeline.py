@@ -443,7 +443,8 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
 
 
 def _offer_learned(prog, ctx):
-    """The optional learned engine's candidate (learned/), when it is installed: its own child process and time slice."""
+    """The optional learned engine's candidate (learned/), when it is installed and switched on (form/use.py): its own
+    child process and time slice."""
     rep, say, hard, fin = ctx["rep"], ctx["say"], ctx["hard"], ctx["fin"]
     if not (LEARNED and _left(hard, fin) > 0 and _learned_installed()):
         return prog
@@ -471,7 +472,8 @@ def _offer_learned(prog, ctx):
 
 
 def _offer_cadfit(prog, ctx):
-    """The optional CADFit candidate (cadfit/): off unless [recon] cadfit = true; its own time slice and child process."""
+    """The optional CADFit candidate (cadfit/): off unless its switch is on ([recon] cadfit = true, form/use.py); its
+    own time slice and child process."""
     from . import cadfit
     return cadfit.offer(prog, ctx["V"], ctx["F"], ctx["tol"], ctx["name"], ctx["say"], ctx["budget_s"], ctx["rep"],
                         ctx["better"], left_s=min(_left(ctx["hard"], ctx["fin"]), ctx.get("cap", float("inf"))))
@@ -562,10 +564,19 @@ def _cut(rep, what, run):
                                             "why": run.get("error")})
 
 
+def _learned_on() -> bool:
+    """The "Use in Form Studio" switch of CAD-Recode (form/use.py): off, it is never asked, installed or not."""
+    try:
+        from .. import use
+        return use.on("recon.learned")
+    except Exception:                                   # noqa: BLE001
+        return False
+
+
 def _learned_installed() -> bool:
     try:
         from . import learned
-        return bool(learned.status()["installed"])
+        return _learned_on() and bool(learned.status()["installed"])
     except Exception:                                   # noqa: BLE001
         return False
 
@@ -711,7 +722,7 @@ def _learned(V, F, tol, name, say):
     """The learned engine's candidate (learned/), or None when it is not installed. Never raises."""
     try:
         from . import learned
-        if not learned.status()["installed"]:
+        if not _learned_on() or not learned.status()["installed"]:
             return None
         say({"stage": "layer2", "text": "Asking the learned engine for a sketch program", "fraction": 0.3})
         return learned.candidate(V, F, tol, name=name, limit=tol)

@@ -295,7 +295,7 @@ class SettingsApply(unittest.TestCase):
         self.assertIsInstance(rows["slicer.kind"]["detected"], list)
         self.assertEqual(rows["chat.model"]["type"], "model", "the model is picked, not typed")
         self.assertTrue(rows["slicer.machine"].get("hidden"), "preset names are chosen in the printer picker")
-        self.assertEqual({r["tab"] for r in d["settings"]} - {"general", "printer", "chat", "apps", "updates", "advanced"}, set())
+        self.assertEqual({r["tab"] for r in d["settings"]} - {"general", "printer", "chat", "apps", "updates", "advanced", "software"}, set())
         self.assertEqual(config_edit.coerce("chat.model", ""), "default")
 
 

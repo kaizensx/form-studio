@@ -37,11 +37,24 @@ def label(kind: str) -> str:
         return kind
 
 
+def used(kind: str, cfg: dict) -> bool:
+    """The slicer's "Use in Form Studio" switch (form/use.py): off, Form Studio never runs it or reads its printers."""
+    from . import use
+    return use.on(f"slicer.{kind}", cfg)
+
+
+def _installed(kind: str, cfg: dict) -> bool:
+    try:
+        return bool(adapter(kind).find_app(cfg))
+    except Exception:                                      # a broken adapter reads as not installed
+        return False
+
+
 def auto_kind(cfg: dict) -> str | None:
-    """The first installed slicer, or None."""
+    """The first installed slicer that is switched on, or None."""
     for kind in AUTO_ORDER:
         try:
-            if adapter(kind).find_app(cfg):
+            if used(kind, cfg) and adapter(kind).find_app(cfg):
                 return kind
         except Exception:                                  # a broken adapter must not hide the others
             continue
@@ -53,8 +66,11 @@ def resolve(cfg: dict) -> dict:
     kind = want
     if want == "auto":
         kind = auto_kind(cfg) or "bambu"
+    off = kind in SLICERS and not used(kind, cfg)
     try:
-        out = adapter(kind).resolve(cfg)
+        out = ({"available": False, "off": True, "presets": {}, "app": "",
+                "reason": f"{label(kind)} is switched off in Settings › Engines & software (“Use in Form Studio”)."}
+               if off else adapter(kind).resolve(cfg))
     except SlicerBlocked as e:
         out = {"available": False, "reason": str(e), "presets": {}, "app": ""}
     out["kind"] = kind
@@ -65,8 +81,11 @@ def resolve(cfg: dict) -> dict:
         if why:
             out["reason"] = why[0] + " " + why[1]
     if want == "auto" and auto_kind(cfg) is None:
+        idle = [label(k) for k in AUTO_ORDER if not used(k, cfg) and _installed(k, cfg)]
         others = ", ".join(label(k) for k in AUTO_ORDER if k != "bambu")
-        out["reason"] = (f"{label('bambu')} was not found at {out.get('app') or 'its usual place'}, and neither was {others}. "
+        out["reason"] = (f"{' and '.join(idle)} {'is' if len(idle) == 1 else 'are'} installed but switched off in "
+                         "Settings › Engines & software (“Use in Form Studio”). Turn one on to slice."
+                         if idle else f"{label('bambu')} was not found at {out.get('app') or 'its usual place'}, and neither was {others}. "
                          "Install one of them, or set [slicer].kind and its app in studio.toml.")
     return out
 
@@ -125,11 +144,13 @@ def detect_all(cfg: dict) -> list[dict]:
         a = adapter(kind)
         try:
             app = a.find_app(cfg)
-            r = a.resolve(cfg)
+            r = a.resolve(cfg) if used(kind, cfg) else {
+                "available": False, "presets": {}, "app": app or "",
+                "reason": f"{a.LABEL} is switched off in Settings › Engines & software (“Use in Form Studio”)."}
         except Exception as e:                             # report, never hide
             app, r = None, {"available": False, "reason": f"Could not check {a.LABEL}: {e}", "presets": {}}
         entry = {
-            "kind": kind, "label": a.LABEL, "installed": bool(app), "app": app or r.get("app", ""),
+            "kind": kind, "label": a.LABEL, "installed": bool(app), "used": used(kind, cfg), "app": app or r.get("app", ""),
             "available": bool(r.get("available")), "reason": r.get("reason", ""), "active": kind == active,
             "presets": {k: v["name"] for k, v in r.get("presets", {}).items()},
             "source": r.get("source", {}), "config_dir": r.get("config_dir", ""),

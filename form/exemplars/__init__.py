@@ -289,8 +289,12 @@ def search(query: str, limit: int = 5, category: str | None = None, reference: i
 
 
 def _corpus():
-    """form.exemplars.corpus, or None where it cannot be imported (a copy of this file loaded on its own)."""
+    """form.exemplars.corpus, or None where it cannot be imported (a copy of this file loaded on its own) or where
+    its "Use in Form Studio" switch is off (form/use.py): then the corpus is never read."""
     try:
+        from .. import use
+        if not use.on("exemplars.cadevolve"):
+            return None
         from . import corpus
         return corpus
     except ImportError:

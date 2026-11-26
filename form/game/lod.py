@@ -171,7 +171,9 @@ def convex_parts(P: np.ndarray, T: np.ndarray, tolerance_mm: float | None = None
 def coacd_parts(P: np.ndarray, T: np.ndarray, cfg: dict | None = None, threshold: float = 0.05,
                 work: Path | None = None) -> list[dict]:
     """CoACD's decomposition, run in its engine environment. Raises RuntimeError when it is not installed or fails."""
-    from .. import engines
+    from .. import engines, use
+    if not use.on(COACD_ENGINE, cfg):                   # installed or not: switched off means never started
+        raise RuntimeError(use.off_reason(COACD_ENGINE))
     py = engines.python(COACD_ENGINE, cfg)
     if py is None:
         raise RuntimeError("CoACD is not installed. Settings › Software › CoACD sets up its own Python in one click; "

@@ -61,6 +61,18 @@ def _find(configured: str, names: tuple, candidates: list[str]) -> str | None:
     return next((c for c in candidates if Path(c).is_file()), None)
 
 
+def openscad(cfg: dict | None = None) -> str | None:
+    """OpenSCAD to build with: None when it is not installed or its "Use in Form Studio" switch is off (form/use.py)."""
+    from . import use
+    return find_openscad(cfg) if use.on("openscad", cfg) else None
+
+
+def freecad(cfg: dict | None = None) -> str | None:
+    """FreeCADCmd to run: None when it is not installed or its "Use in Form Studio" switch is off."""
+    from . import use
+    return find_freecad(cfg) if use.on("freecad", cfg) else None
+
+
 def find_openscad(cfg: dict | None = None) -> str | None:
     conf = ((cfg or {}).get("cad") or {}).get("openscad", "") or os.environ.get("FORM_OPENSCAD", "")
     return _find(conf, ("openscad",), _candidates_openscad())
@@ -99,11 +111,15 @@ def version(exe: str, timeout=15) -> str:
 
 def status(cfg: dict | None = None) -> dict:
     """What the app shows: which bridges exist on this machine."""
-    o, f = find_openscad(cfg), find_freecad(cfg)
-    return {"openscad": {"available": bool(o), "path": o,
-                         "reason": "" if o else "OpenSCAD not found. Install it from https://openscad.org/downloads.html."},
-            "freecad": {"available": bool(f), "path": f, "gui": freecad_gui_app(cfg),
-                        "reason": "" if f else "FreeCAD not found. Install it from https://www.freecad.org/downloads.php."}}
+    from . import use
+    o, f = openscad(cfg), freecad(cfg)
+    o_on, f_on = use.on("openscad", cfg), use.on("freecad", cfg)
+    return {"openscad": {"available": bool(o), "path": o, "use": o_on,
+                         "reason": "" if o else use.off_reason("openscad") if not o_on
+                         else "OpenSCAD not found. Install it from https://openscad.org/downloads.html."},
+            "freecad": {"available": bool(f), "path": f, "gui": freecad_gui_app(cfg) if f_on else None, "use": f_on,
+                        "reason": "" if f else use.off_reason("freecad") if not f_on
+                        else "FreeCAD not found. Install it from https://www.freecad.org/downloads.php."}}
 
 
 # ---- OpenSCAD: Customizer parameters --------------------------------------------------------------------------------
@@ -438,6 +454,9 @@ def open_output(st, pid: str, what: str = "3mf", app: str = "") -> dict:
     chosen = app or {"3mf": apps.get("slicer"), "gcode": apps.get("slicer"), "step": apps.get("cad"),
                      "stl": apps.get("viewer")}.get(what, "") or ""
     if chosen.lower() == "freecad":
+        from . import use
+        if not use.on("freecad", st.cfg):
+            raise StudioError(use.off_reason("freecad"), "Turn it on there, or open the file in another app.", status=409)
         found = freecad_gui_app(st.cfg)
         if not found:
             raise StudioError("FreeCAD was not found on this computer.",

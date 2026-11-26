@@ -70,7 +70,13 @@ DEFAULTS = {
     "assembly": {"budget_s": 45},
     # Mesh to CAD. cadfit: also try CADFit's IoU search as a candidate (form/recon/cadfit; CC BY-NC 4.0 code included
     # with its author's permission, needs `pip install form-studio[cadfit]`). Off by default.
-    "recon": {"cadfit": False},
+    # learned: also ask CAD-Recode (form/recon/learned, CC BY-NC 4.0 weights) when it is installed. On by default.
+    # Both are the "Use in Form Studio" switches of Settings › Engines & software (form/use.py).
+    "recon": {"cadfit": False, "learned": True},
+    # "Use in Form Studio" for the other optional engines and apps (form/use.py): false = installed but never called.
+    "use": {"coacd": True, "corpus": True, "blender": True, "freecad": True, "openscad": True,
+            "bambu": True, "orca": True, "prusa": True, "superslicer": True, "qidi": True, "elegoo": True,
+            "snapmaker": True},
     # Design refinement (form/refine): after every build, named and reversible refine features (fillet tiers, parting
     # lines, grip zones, materials; cage ops for game assets) kept only when the function checks hold, as one more
     # revision. Off here, per design (refine_design action="off"), per call (create_design refine="off") or with

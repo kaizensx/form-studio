@@ -421,6 +421,7 @@ def route_post(st, path: str, body):
         done = _wrap(lambda: config_edit.set_values(st.cfg, body.get("values")))
         if done["changed"]:
             try:
+                st._fc_at = 0                           # a "Use in Form Studio" switch applies to the next call
                 st.slicer_info(refresh=True)
             except Exception:
                 pass
