@@ -31,12 +31,13 @@ from PySide6.QtGui import QColor, QGuiApplication, QImage, QLinearGradient, QPai
 from PySide6.QtSvg import QSvgRenderer  # noqa: E402
 
 FRAME = O.OPTIONS[0]                  # the chosen direction
-# The palette is Lightdesk's (docs/design/directions/h): a near-black room, paper, and one accent, periwinkle, which
+# The palette is Lightdesk's (docs/design/directions/h): a near-black room, paper, and one accent, electric cyan, which
 # marks the origin. brand/options/ keeps the graphite and mint the six directions were first drawn in, as the record
 # of the choice; only the geometry and the type are taken from there.
-PLATE, INK, INK2, CLAY, DATUM = "#0b0b0c", "#f4f3f1", "#a9a8a5", "#d8d3c8", "#a9b8ff"
-PAPER, PAPER_INK, PAPER_INK2, DATUM_PAPER = "#eeece8", "#161616", "#5d5c59", "#3d55d6"
-DATUM_SMALL = "#8fa4ff"               # the origin at 3 to 12 px, where it is a handful of pixels beside the clay
+PLATE, INK, INK2, CLAY, DATUM = "#0b0b0c", "#f4f3f1", "#a9a8a5", "#d8d3c8", "#3ee6ff"
+PAPER, PAPER_INK, PAPER_INK2, DATUM_PAPER = "#eeece8", "#161616", "#5d5c59", "#0a8fb3"
+# DATUM_PAPER is for the origin square. Words and controls on paper use the deeper #06708d (4.8:1), set where they are drawn.
+DATUM_SMALL = "#1fcff2"               # the origin at 3 to 12 px, where it is a handful of pixels beside the clay
 DARK = {"part": CLAY, "accent": DATUM, "ink": INK, "ink2": INK2, "line": CLAY}
 LIGHT = {"part": PAPER_INK, "accent": DATUM_PAPER, "ink": PAPER_INK, "ink2": PAPER_INK2, "line": PAPER_INK}
 SMALL = {**DARK, "accent": DATUM_SMALL}
@@ -65,7 +66,7 @@ def to_pil(im: QImage):
 
 
 # ── the app icon: near-black squircle on the macOS grid (824 body in 1024), the mark lifted by a soft shadow ──────
-DATUM_TOP, DATUM_FOOT = "#b9c5ff", "#98a9ff"      # the origin on the icon: lit from above, a shade deeper at its foot
+DATUM_TOP, DATUM_FOOT = "#7df0ff", "#22d2f4"      # the origin on the icon: lit from above, a shade deeper at its foot
 
 
 def icon_svg(small: bool = False) -> str:
@@ -250,7 +251,7 @@ def build_og(scale: int = 1, out: Path | None = None, mark: float = OG_MARK):
     p.setFont(f)
     cy = base + lead + cap * 3.4
     p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor(169, 184, 255, 56))
+    p.setBrush(QColor(62, 230, 255, 56))
     p.drawEllipse(QRectF(left - 4, cy - cap * 0.36 - 7, 14, 14))
     p.setBrush(QColor(ACCENT))
     p.drawEllipse(QRectF(left, cy - cap * 0.36 - 3, 6, 6))

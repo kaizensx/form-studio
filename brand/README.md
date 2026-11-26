@@ -1,7 +1,7 @@
 # Form Studio brand
 
 The mark is the letter F drawn as a coordinate frame. The top arm is X, the stem is Y, and the square where they
-meet is the origin, in the accent: periwinkle. Every part Form Studio builds is measured from that origin. The mark sits
+meet is the origin, in the accent: electric cyan. Every part Form Studio builds is measured from that origin. The mark sits
 next to the wordmark "Form Studio": "Form" is set heavier and "Studio" lighter.
 
 This direction (option 1, "Frame") was chosen from six. The other five, with their sheets, are kept in
@@ -52,28 +52,31 @@ and wordmark is 0.42 × the mark's height.
 ## Colours
 
 The palette is Lightdesk's, the look of the app and the website (`docs/design/directions/h`): a near-black room,
-warm paper, and one accent, periwinkle.
+warm paper, and one accent, electric cyan.
 
 | Role | On near-black | On paper or white |
 |---|---|---|
 | Background | Room `#0b0b0c` | Paper `#eeece8`, or white `#ffffff` |
 | The F (the part) | Clay `#d8d3c8` | Ink `#161616` |
-| The origin | Periwinkle `#a9b8ff` | Deep periwinkle `#3d55d6` |
+| The origin | Cyan `#3ee6ff` | Deep cyan `#0a8fb3` |
 | "Form" | Ink `#f4f3f1` | Ink `#161616` |
 | "Studio" | Ink 2 `#a9a8a5` | `#5d5c59` |
 | One colour | Ink `#161616`, or white on a dark photo | |
 
-Periwinkle is the only accent. It marks the origin and nothing else in the logo.
+Cyan is the only accent. It marks the origin and nothing else in the logo.
 
-Two shades serve the small and the lit cases, and are used nowhere else:
+Three more shades serve the small, the lit and the written cases, and are used nowhere else:
 
-- **Small sizes** (`mark-32.svg`, the favicon, the app icon below 64 px): the origin is `#8fa4ff`. At 16 px it is
-  nine pixels beside the clay, and the deeper shade keeps it a separate square.
-- **The app icon** at 64 px and up: the origin is lit from above, `#b9c5ff` at the top to `#98a9ff` at its foot, on
+- **Small sizes** (`mark-32.svg`, the favicon, the app icon below 64 px): the origin is `#1fcff2`. Cyan and clay are
+  equally light, so at 16 px, where the origin is nine pixels, the deeper shade keeps it a separate square.
+- **The app icon** at 64 px and up: the origin is lit from above, `#7df0ff` at the top to `#22d2f4` at its foot, on
   a tile that runs `#2b2b2e` to `#0b0b0c`.
+- **Text and controls on paper** (links, labels, buttons on the website and in the app's light appearance): cyan is
+  `#06708d`, which reads at 4.8:1 on paper and 5.7:1 on white. `#0a8fb3` is 3.2:1 on paper: right for the origin
+  square, too light for words.
 
-Green is not a brand colour. In the app and on the website it means one thing, a check that passed (`#86d9a8` on
-near-black, `#1f8a52` on paper), beside amber for review and red for a failure.
+Green is not a brand colour, and it is kept well away from cyan. In the app and on the website it means one thing,
+a check that passed (`#7bd88f` on near-black, `#1a7a3a` on paper), beside amber for review and red for a failure.
 
 ## Type
 
@@ -92,15 +95,15 @@ is not covered by the OFL and is MIT, like the rest of this repository. Geist Mo
 
 - Use `lockup.svg` on near-black wherever there is room. Use the mark alone where the name is already visible
   (title bar, app icon, favicon, avatar).
-- Keep the two-tone F: clay part, periwinkle origin. In one colour, use the `-mono` files, which keep the hairline cut.
+- Keep the two-tone F: clay part, cyan origin. In one colour, use the `-mono` files, which keep the hairline cut.
 - Write the name "Form Studio" in text, in sentence case, as two words.
 
 ## Don't
 
 - Don't stretch, rotate, outline, add shadows to or put a gradient on the lockup or the mark. The app icon's soft
   light is part of the icon only.
-- Don't recolour the origin with anything other than periwinkle (or its deep shade on paper and white), and don't
-  colour any other part of the F periwinkle.
+- Don't recolour the origin with anything other than cyan (or its deep shade on paper and white), and don't
+  colour any other part of the F cyan.
 - Don't re-typeset the wordmark in another font or weight, and don't set it in capitals ("FORM STUDIO") or as one
   word.
 - Don't put the mark inside another shape, except the app icon squircle and the favicon tile.
