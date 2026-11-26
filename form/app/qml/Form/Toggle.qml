@@ -17,7 +17,7 @@ Item {
         Rectangle { y: 2; width: ma.pressed ? 17 : 14; height: 14; radius: 7
             x: t.checked ? parent.width - width - 2 : 2
             color: t.checked ? Theme.datumInk : Theme.ink2
-            Behavior on x { Glide { duration: Theme.move(Theme.pop) } }
+            Behavior on x { NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeSpring } }     // the knob lands with the faintest settle
             Behavior on width { Glide { duration: Theme.move(Theme.press) } }
             Behavior on color { Tint {} } } }
     FocusRing { on: t.activeFocus; radius: height / 2 + 3 }

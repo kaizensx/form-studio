@@ -20,7 +20,9 @@ Item {
     Rectangle {
         id: jaw; x: s._pos(s.value); y: 2; width: 10; height: 14; radius: 2
         color: ma.pressed || ma.containsMouse ? Theme.datum : s.tint
-        scale: ma.pressed ? 1.15 : 1
+        scale: ma.pressed ? Theme.from(1.15) : 1
+        // a value set from elsewhere (a typed number, a reset, the agent) travels to its place; under the hand it is 1:1
+        Behavior on x { enabled: !ma.pressed; Glide { duration: Theme.move(Theme.fast) } }
         Behavior on scale { NumberAnimation { duration: Theme.fast; easing.type: Easing.OutCubic } }
         Behavior on color { ColorAnimation { duration: Theme.fast } }
     }
