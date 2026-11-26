@@ -13,7 +13,7 @@ Every part, number and check in these drawings comes from a run on this machine:
      the slicer layer is the slicer's G-code, read by form/toolpath.py; the file hashes are SHA-256 of the exported
      files; the terminal lines are what `form state` printed. The gears turn by their own tooth counts.
 
-Colours are Lightdesk's (docs/design/directions/h), the mark comes from LogoPaths.js and keeps its own colours, and
+Colours are Lightdesk's (docs/design/directions/h), the mark comes from LogoPaths.js with its origin in the accent, and
 the type is Geist and Geist Mono (SIL OFL 1.1), subset and embedded in each file. GitHub shows an SVG in an <img> without scripts, so all motion is CSS keyframes and
 stroke dashes, and every drawing rests on its finished frame when the reader prefers reduced motion.
 
@@ -67,14 +67,13 @@ def _theme() -> dict:
 T = _theme()
 # Lightdesk, the approved direction (docs/design/directions/h/style.css): a near-black studio, warm key light, and one
 # accent, periwinkle, for "this is where you are". Set here so the drawings match the website and the app's new look;
-# the mark keeps its own colours (markOrigin, clay).
-MARK_ORIGIN = T.get("markOrigin", T["datum"])
+# the mark is the brand's (brand/build.py): a clay F with its origin in the accent.
 T.update(plate="#0b0b0c", plate1="#121213", plate2="#19191a", plate3="#232324", plate4="#2f2f31", well="#070708",
          ink="#f4f3f1", ink2="#a9a8a5", ink3="#7d7c78", ink4="#4c4b48", datum="#a9b8ff", datumInk="#0b0b0c",
          blueprint="#a9b8ff", amber="#f2c36b", signal="#ff6f51", clay="#d8d3c8")
 T["pass"] = "#86d9a8"
 KEY = "#ffe9cf"
-MARK_ORIGIN_LIGHT = "#2f8a6c"                          # Theme.qml markOrigin on a light page
+MARK_ORIGIN, MARK_ORIGIN_LIGHT = "#a9b8ff", "#3d55d6"   # the mark's origin: periwinkle on the room, its deep shade on paper
 
 
 def alpha(hexv: str, a: float) -> str:
@@ -788,14 +787,14 @@ def elide(s: str, width: float, size=13, weight=420, family="sans") -> str:
 def P(light: bool) -> dict:
     if light:
         return dict(panel="#f8f7f4", panel2="#e6e3de", well="#ffffff", ink="#161616", ink2="#5d5c59", ink3="#7a7975",
-                    ink4="#b5b2ac", datum="#3d55d6", mint=T["datum"], mark=MARK_ORIGIN_LIGHT, mintInk=T["datumInk"], clay="#d6d0c3",
+                    ink4="#b5b2ac", datum="#3d55d6", tint=T["datum"], mark=MARK_ORIGIN_LIGHT, tintInk=T["datumInk"], clay="#d6d0c3",
                     edge="rgba(22,22,22,.62)", grid="rgba(22,22,22,.10)", amber="#a86a00", pass_="#1f8a52",
                     signal="#c8452b", blueprint="#3d55d6", shadow="rgba(60,50,40,.16)", logo_part="#161616",
                     glass="rgba(255,255,255,.62)", glass2="rgba(255,255,255,.95)", glass_edge="rgba(255,255,255,.9)",
                     well_glass="rgba(255,255,255,.82)", room=("#e6e3de", "#efede9", "#f6f5f2", "#e4e1dc"), key="#ffffff", key_a=0.95,
                     dim_bg="rgba(255,255,255,.92)", dim_ink="#2b3fb0", send="#161616", send_ink="#ffffff", track="rgba(22,22,22,.13)")
     return dict(panel="#121213", panel2="#19191a", well="#070708", ink=T["ink"], ink2=T["ink2"], ink3=T["ink3"],
-                ink4=T["ink4"], datum=T["datum"], mint=T["datum"], mark=MARK_ORIGIN, mintInk=T["datumInk"], clay=T["clay"],
+                ink4=T["ink4"], datum=T["datum"], tint=T["datum"], mark=MARK_ORIGIN, tintInk=T["datumInk"], clay=T["clay"],
                 edge="rgba(16,16,16,.62)", grid="rgba(255,255,255,.09)", amber=T["amber"], pass_=T["pass"],
                 signal=T["signal"], blueprint=T["blueprint"], shadow="rgba(0,0,0,.45)", logo_part=T["clay"],
                 glass="rgba(255,255,255,.07)", glass2="rgba(255,255,255,.14)", glass_edge="rgba(255,255,255,.11)",
@@ -1270,8 +1269,8 @@ def beat_describe(svg, p, x, y, w, h, t0, t1, t_out):
                      (t_out + 0.3, {"opacity": ".25"})], rest={"opacity": "1"})
     cx, cy = x + w - 24, y + 89
     svg.add('<g class="%s"><circle cx="%s" cy="%s" r="12" fill="%s"/><path d="M%s %sv-10M%s %sl4.5-4.5 4.5 4.5" stroke="%s" stroke-width="1.8" '
-            'stroke-linecap="round" stroke-linejoin="round"/></g>' % (send, f1(cx), f1(cy), p["mint"], f1(cx), f1(cy + 5), f1(cx - 4.5),
-                                                                    f1(cy - 0.5), p["mintInk"]))
+            'stroke-linecap="round" stroke-linejoin="round"/></g>' % (send, f1(cx), f1(cy), p["tint"], f1(cx), f1(cy + 5), f1(cx - 4.5),
+                                                                    f1(cy - 0.5), p["tintInk"]))
 
 
 def beat_build(svg, p, d, x, y, w, h, t0, t1, t_out):
@@ -1438,8 +1437,8 @@ def f_start(data, light):
                     rest={"opacity": "1"})
     cx, cy = 387 - 31, fy + 31
     svg.add('<g class="%s"><circle cx="%s" cy="%s" r="16" fill="%s"/><path d="M%s %sv-12M%s %sl5.5-5.5 5.5 5.5" stroke="%s" stroke-width="2" '
-            'stroke-linecap="round" stroke-linejoin="round"/></g>' % (send, f1(cx), f1(cy), p["mint"], f1(cx), f1(cy + 6), f1(cx - 5.5),
-                                                                    f1(cy - 0.5), p["mintInk"]))
+            'stroke-linecap="round" stroke-linejoin="round"/></g>' % (send, f1(cx), f1(cy), p["tint"], f1(cx), f1(cy + 6), f1(cx - 5.5),
+                                                                    f1(cy - 0.5), p["tintInk"]))
     card_words(svg, p, title, "Words, a photo with a coin for scale, a sketch with real dimensions, a STEP, STL or 3MF part, a PDF drawing or a link.")
     return svg.render("%s: words, photos, sketches, STEP, STL and 3MF parts, PDF drawings and links in one composer." % title)
 
@@ -1486,7 +1485,7 @@ def f_gears(data, light):
     cam = Camera(az=0, el=89.9, target=(0, 0, z_top), dist=6000, fov=1.2)
     every = np.concatenate([t for t, _ in parts.values()]).reshape(-1, 3)
     cam.fit(every, (166, 24, 222, 222))
-    tone = {"carrier": mix(p["clay"], p["panel"], 0.55), "ring": p["clay"], "sun": p["mint"],
+    tone = {"carrier": mix(p["clay"], p["panel"], 0.55), "ring": p["clay"], "sun": p["tint"],
             "planet0": mix(p["clay"], "#ffffff" if not light else "#000000", 0.08)}
     tone["planet1"] = tone["planet2"] = tone["planet0"]
     # carrier held: the sun turns once, each planet -zs/zp of a turn on its own pin, the ring -zs/zr
@@ -1542,7 +1541,7 @@ def f_talk(data, light):
     svg, p = card(title, light, step * len(picks))
     cols = [("Agent apps", AGENT_APPS), ("Model APIs", MODEL_APIS), ("Local", LOCAL)]
     cx_, x0, y0, rh = [0, 144, 272], 27, 74, 23
-    hl = alpha(p["mint"], 0.16) if not light else alpha(p["datum"], 0.12)
+    hl = alpha(p["tint"], 0.16) if not light else alpha(p["datum"], 0.12)
     fr = []
     for i, (c, r) in enumerate(picks):
         t = i * step

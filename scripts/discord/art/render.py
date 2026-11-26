@@ -2,7 +2,9 @@
 profile banner.
 
     .venv/bin/python scripts/discord/art/render.py          # writes art/guides/<slug>.png, art/banner.html,
-                                                            # art/banner.png and art/profile-banner.png
+                                                            # art/banner.png, art/profile-banner.png and art/icon.png
+
+art/icon.png, the server's icon and the bot's avatar, is the app icon at 512 px (brand/build.py draws it).
 
 art/welcome.gif is the same banner in motion: art/frames.py records art/banner.html.
 
@@ -12,6 +14,7 @@ product pictures from real builds (docs/readme/made-*.jpg). Fonts are the app's 
 from __future__ import annotations
 
 import html
+import shutil
 import sys
 from pathlib import Path
 
@@ -132,6 +135,8 @@ def render(jobs):
 
 
 def main():
+    shutil.copyfile(ROOT / "form" / "app" / "assets" / "icon-512.png", HERE / "icon.png")
+    print((HERE / "icon.png").relative_to(ROOT), "512 x 512")
     # also what art/frames.py records for welcome.gif; its links are relative, so the file is the same on any machine
     (HERE / "banner.html").write_text(banner().replace(ROOT.as_uri(), "../../.."), encoding="utf-8")
     render([(HERE / "guides" / f"{slug}.png", W, H, guide(i, title, tag, art))
