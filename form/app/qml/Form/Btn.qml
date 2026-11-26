@@ -65,8 +65,10 @@ Item {
     TextMetrics { id: tmA; font: lbl.font; text: b.text }
     TextMetrics { id: tmB; font: lbl.font; text: b.busyText }
     readonly property real _textW: b.text === "" ? 0 : Math.ceil(Math.max(tmA.advanceWidth, b.busyText !== "" ? tmB.advanceWidth : 0)) + 1
+    // the words on its face are as wide as they are, so they stay in the middle; the room for the longer text is the button's
+    readonly property real _nowW: b.text === "" ? 0 : Math.ceil(b.shownText === b.text ? tmA.advanceWidth : tmB.advanceWidth) + 1
     implicitHeight: small ? Theme.hSm : large ? Theme.hLg : Theme.hMd
-    implicitWidth: Math.max(implicitHeight, row.implicitWidth + (text ? (small ? 20 : large ? 34 : 26) : (small ? 10 : 14)))
+    implicitWidth: Math.max(implicitHeight, row.implicitWidth + (_textW - _nowW) + (text ? (small ? 20 : large ? 34 : 26) : (small ? 10 : 14)))
     opacity: enabled ? 1 : 0.4
     scale: down ? Theme.from(0.97) : 1
     activeFocusOnTab: true          // Qt skips hidden and disabled items by itself
@@ -104,7 +106,7 @@ Item {
                 color: b.kind === "primary" ? Theme.sendInk : b.kind === "danger" ? Theme.signal : (b.active || ma.containsMouse) ? Theme.ink : Theme.ink2 }
             Spinner { objectName: "btnSpinner"; anchors.centerIn: parent; visible: b._shown; size: parent.width; color: b.kind === "primary" ? Theme.sendInk : Theme.ink2 } }
         Text { id: lbl; visible: b.text !== ""; text: b.shownText; anchors.verticalCenter: parent.verticalCenter
-            width: b._textW; horizontalAlignment: b.icon !== "" || b._shown ? Text.AlignLeft : Text.AlignHCenter; elide: Text.ElideRight
+            width: b._nowW; elide: Text.ElideRight
             font.family: Theme.sans; font.pixelSize: b.small ? 12 : b.large ? 14 : 13; font.letterSpacing: -0.1; font.weight: b.kind === "primary" ? Theme.wSemi : Theme.wMedium; renderType: Theme.textRender
             color: b.kind === "primary" ? Theme.sendInk : b.kind === "danger" ? Theme.signal : (b.kind === "quiet" && !b.active && !ma.containsMouse) ? Theme.ink2 : Theme.ink }
     }
