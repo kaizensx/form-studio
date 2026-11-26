@@ -1260,8 +1260,8 @@ figure { margin: 0; }
 @media (max-width: 899px) { .readout > div { padding-right: 16px; } .readout > div + div { padding-left: 16px; } }
 
 /* pictures get a neutral inner edge, so a dark render does not melt into the page */
-.gx-t::before, .ba-frame::after, .shot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); z-index: 3; pointer-events: none; }
-.shot { position: relative; }
+.gx-t::before, .ba-frame::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); z-index: 3; pointer-events: none; }
+.shot img, .lods img { outline: 1px solid rgba(255,255,255,.07); outline-offset: -1px; }
 .gx-t { transition: transform 700ms var(--ease-expo); }
 .gx-t figcaption { transition: transform 700ms var(--ease-expo); }
 @media (hover: hover) { .gx-t:hover figcaption { transform: translateY(-3px); } }
