@@ -21,7 +21,7 @@ export async function initMoves() {
   const key = new THREE.DirectionalLight(0xffffff, 1.9); key.position.set(-180, 320, 260); scene.add(key);
   const fill = new THREE.DirectionalLight(0xdfe8ff, 0.5); fill.position.set(260, 120, -200); scene.add(fill);
   const world = new THREE.Group(); world.rotation.x = -Math.PI / 2; scene.add(world);
-  const grid = new THREE.GridHelper(420, 42, 0xffffff, 0xffffff); grid.material.transparent = true; grid.material.opacity = 0.05; grid.rotation.x = Math.PI / 2; world.add(grid);
+
   const groups = {}, info = {};
   for (const p of b.parts) { groups[p.id] = new THREE.Group(); groups[p.id].matrixAutoUpdate = false; world.add(groups[p.id]); info[p.id] = p; }
   const tint = { body: 0xd8d3c8, lid: 0xcfcbc1 };
@@ -29,7 +29,7 @@ export async function initMoves() {
     const part = p.extras.part, geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(p.pos, 3));
     let o;
-    if (p.lines) o = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x0b0d0e, transparent: true, opacity: 0.5 }));
+    if (p.lines) o = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x080809, transparent: true, opacity: 0.5 }));
     else { geo.setIndex(new THREE.BufferAttribute(p.index, 1)); geo.computeVertexNormals(); o = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: tint[part] || 0xd8d3c8, roughness: 0.82, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })); }
     groups[part].add(o);
   }
