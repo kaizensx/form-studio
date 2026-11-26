@@ -346,6 +346,17 @@ class Bridge(QObject):
                 return p.read_text(encoding="utf-8", errors="replace")
         return ""
 
+    @Slot(result=str)
+    def showpiece(self) -> str:
+        """Home's first-day part: the view of a real build (a sensor enclosure, 13 features, made by the kernel from
+        its recipe) kept as a file, so an empty Home shows what a design looks like without creating a project.
+        "" when the file is missing."""
+        p = Path(__file__).resolve().parent / "assets" / "showpiece.json"
+        try:
+            return p.read_text(encoding="utf-8")
+        except OSError:
+            return ""
+
     # -- desktop integration -------------------------------------------------
     @Slot(str, QUrl, result=bool)
     def save(self, api_path: str, dest: QUrl) -> bool:
