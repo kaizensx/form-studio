@@ -62,7 +62,7 @@ MODERATE = perms("kick", "audit_log", "manage_messages", "manage_threads", "time
 # ---- roles -------------------------------------------------------------------------------------------------------
 # name, colour, hoist, mentionable, permissions. Listed top to bottom; setup orders them so (under the bot's own role).
 ROLES = [
-    ("Maintainer", 0xA9B8FF, True, False, MODERATE | perms("ban", "mention_everyone")),   # keeps Form Studio
+    ("Maintainer", 0x3EE6FF, True, False, MODERATE | perms("ban", "mention_everyone")),   # keeps Form Studio
     ("Moderator", 0x86D9AD, True, False, MODERATE),                 # keeps the server: timeouts, kicks, tidying
     ("Contributor", 0x86A8FF, True, False, 0),                      # has a merged pull request
     ("Recipe author", 0xC7B2FF, True, False, 0),                    # kept for the people who earned it; no longer given
