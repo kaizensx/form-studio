@@ -31,7 +31,7 @@ Column {
                 opacity: t.age > 250 ? 1 : 0; y: t.age > 250 ? 0 : Theme.shift(Theme.rise)
                 Shadow { radius: card.radius; spread: 20; drop: 9 }
                 Rectangle { anchors.fill: parent; radius: card.radius; color: Theme.alpha(Theme.plate3, card.blurred ? 0.58 : 0.85) }
-                Rectangle { x: 16; y: 19; width: 6; height: 6; radius: 3; color: t.modelData.bad ? Theme.signal : Theme.pass
+                Rectangle { x: 16; y: 20; width: 6; height: 6; radius: 3; color: t.modelData.bad ? Theme.signal : Theme.pass
                     Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(parent.color, 0.18) } }
                 Column { id: tcol; x: 32; y: 13; width: parent.width - 32 - 16; spacing: 2
                     Txt { text: t.modelData.msg; width: parent.width; font.weight: Theme.wSemi }

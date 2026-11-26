@@ -22,7 +22,7 @@ Item {
         y: t.below ? t.height + 6 : -implicitHeight - 6; x: Math.round((t.width - implicitWidth) / 2)
         transformOrigin: t.below ? Popup.Top : Popup.Bottom
         contentItem: Row { padding: 7; leftPadding: 10; rightPadding: 10; spacing: 8
-            Text { text: t.text; color: Theme.ink; font.family: Theme.sans; font.pixelSize: 12; wrapMode: Text.WordWrap; width: Math.min(implicitWidth, 280); renderType: Theme.textRender; lineHeight: 1.2 }
+            Txt { text: t.text; font.pixelSize: 12; width: Math.min(implicitWidth, 280); lineHeight: 1.2 }
             Kbd { visible: t.keys !== ""; keys: t.keys; quiet: true; anchors.verticalCenter: parent.verticalCenter } }
         background: Item {
             Loader { anchors.fill: parent; active: tt.visible

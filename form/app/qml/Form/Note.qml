@@ -13,7 +13,7 @@ Rectangle {
     width: parent ? parent.width : 0
     implicitHeight: col.implicitHeight + 24; radius: 14
     color: kind === "plain" ? Theme.glass : Theme.alpha(tint, Theme.dark ? 0.09 : 0.075)
-    Rectangle { visible: n.dotted; x: 14; y: 18; width: 6; height: 6; radius: 3; color: n.tint }
+    Rectangle { visible: n.dotted; x: 14; y: 19; width: 6; height: 6; radius: 3; color: n.tint }
     Column {
         id: col; x: n.dotted ? 30 : 14; y: 12; width: parent.width - x - 14; spacing: 4
         Txt { visible: n.title !== ""; text: n.title; width: parent.width; font.weight: Theme.wSemi; color: Theme.ink }

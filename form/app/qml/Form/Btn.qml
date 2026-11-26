@@ -109,5 +109,5 @@ Item {
             color: b.kind === "primary" ? Theme.sendInk : b.kind === "danger" ? Theme.signal : (b.kind === "quiet" && !b.active && !ma.containsMouse) ? Theme.ink2 : Theme.ink }
     }
     MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: b._shown ? Qt.BusyCursor : Qt.ArrowCursor; onClicked: b._press() }
-    Tip { text: b._shown && b.busyText ? b.busyText : b.tip; keys: b._shown ? "" : b.keys; show: ma.containsMouse && (b.tip !== "" || (b._shown && b.busyText !== "")) && !ma.pressed }
+    Tip { text: b._shown && b.busyText ? b.busyText : b.tip; keys: b._shown ? "" : b.keys; show: ma.containsMouse && (b.tip !== "" || (b._shown && b.busyText !== "")) && !ma.pressed && !b.active }     // not over the menu it has just opened
 }

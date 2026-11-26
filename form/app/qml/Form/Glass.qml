@@ -46,7 +46,7 @@ Item {
             Rectangle { id: shape; anchors.fill: parent; radius: g.radius; visible: false; layer.enabled: true; antialiasing: true }
             MultiEffect {
                 anchors.fill: parent; source: grab
-                blurEnabled: true; blur: 1; blurMax: 24; blurMultiplier: 0.6; autoPaddingEnabled: false
+                blurEnabled: true; blur: 1; blurMax: 32; blurMultiplier: 1.0; autoPaddingEnabled: false
                 saturation: 0.3
                 maskEnabled: true; maskSource: shape; maskThresholdMin: 0.5; maskSpreadAtMin: 1
             }

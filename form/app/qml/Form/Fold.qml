@@ -18,14 +18,14 @@ Column {
         width: parent.width; height: 40
         Rectangle { x: -8; y: 4; width: parent.width + 16; height: parent.height - 7; radius: 10; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent"
             Behavior on color { Tint {} } }
-        Icon { id: chev; y: 14; name: "chevron_right"; size: 12; color: hm.containsMouse ? Theme.ink2 : Theme.ink4
+        Icon { id: chev; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: 0.5; name: "chevron_right"; size: 12; color: hm.containsMouse ? Theme.ink2 : Theme.ink4
             rotation: f.open ? 90 : 0
             Behavior on rotation { Glide { duration: Theme.move(Theme.ui) } } }
-        Txt { id: cap; kind: "cap"; x: 20; y: 14; text: f.title; color: f.open || hm.containsMouse ? Theme.ink2 : Theme.ink3
+        Txt { id: cap; kind: "cap"; x: 20; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: 0.5; text: f.title; color: f.open || hm.containsMouse ? Theme.ink2 : Theme.ink3
             width: Math.min(implicitWidth, parent.width - 20 - 70); elide: Text.ElideRight; wrapMode: Text.NoWrap }
-        Txt { kind: "fine"; visible: f.note !== "" && f.tag === ""; text: f.note; color: f.noteColor; anchors.right: parent.right; y: 13
+        Txt { kind: "fine"; visible: f.note !== "" && f.tag === ""; text: f.note; color: f.noteColor; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: 0.5
             width: Math.min(implicitWidth, parent.width - 20 - cap.width - 14); elide: Text.ElideRight; wrapMode: Text.NoWrap; horizontalAlignment: Text.AlignRight }
-        Tag { visible: f.tag !== ""; text: f.tag; anchors.right: parent.right; y: 12 }
+        Tag { visible: f.tag !== ""; text: f.tag; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: 0.5 }
         MouseArea { id: hm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: f.toggle() }
     }
     // Opening: the content fades in and settles 6 px down into place, behind a clip, while the chevron turns.

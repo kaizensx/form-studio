@@ -637,7 +637,7 @@ Item {
             readonly property bool on: !(Store.stage === "shape" && !Store.feature && !Store.hasDraft)
             width: parent.width; height: on ? say.implicitHeight + 26 : 6; z: 2; clip: true
             readonly property var s: ws.stageSay(Store.stage)
-            Rectangle { visible: stageHead.on; x: 18; y: 19; width: 6; height: 6; radius: 3; color: ws.noteColor(stageHead.s[1]) }
+            Rectangle { visible: stageHead.on; x: 18; y: 20; width: 6; height: 6; radius: 3; color: ws.noteColor(stageHead.s[1]) }
             Txt { id: say; visible: stageHead.on; x: 34; y: 13; width: parent.width - 52; text: stageHead.s[0]; tone: 2 }
             Rectangle { anchors.bottom: parent.bottom; x: 14; width: parent.width - 28; height: 1; color: Theme.rule; opacity: stageHead.on && scroll.contentY > 2 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Motion.quick } } }

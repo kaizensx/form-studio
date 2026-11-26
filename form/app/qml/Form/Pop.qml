@@ -17,7 +17,7 @@ Popup {
             sourceComponent: Glass { source: Store.backdrop; radius: pop.radius; shadow: false
                 Shadow { radius: pop.radius; spread: 22; drop: 10 }
                 // a menu is read at a glance: a denser tint than a pane of the workspace
-                Rectangle { anchors.fill: parent; radius: pop.radius; color: Theme.alpha(Theme.plate3, blurred ? 0.46 : 0.85) } } }
+                Rectangle { anchors.fill: parent; radius: pop.radius; color: Theme.alpha(Theme.plate3, blurred ? 0.74 : 0.9) } } }
         function place() { if (bg.item) bg.item.place() } }
     onOpened: background.place()
     enter: Transition { enabled: !pop.instant

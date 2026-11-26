@@ -293,7 +293,7 @@ Column {
                         Item { width: parent.width; implicitHeight: Math.max(nt.implicitHeight, 18)
                             Txt { id: nt; text: rv.modelData.note || "No note"; font.weight: 600; anchors.left: parent.left; anchors.right: ag.left; anchors.rightMargin: 8
                                 maximumLineCount: 3; elide: Text.ElideRight; color: rv.modelData.note ? Theme.ink : Theme.ink3 }
-                            Txt { id: ag; kind: "fine"; text: F.ago(rv.modelData.ts); anchors.right: parent.right; y: 2; wrapMode: Text.NoWrap } }
+                            Txt { id: ag; kind: "fine"; text: F.ago(rv.modelData.ts); anchors.right: parent.right; y: 1; wrapMode: Text.NoWrap } }
                         Txt { kind: "fine"; width: parent.width; text: root.origin(rv.modelData) }
                         Row { visible: !rv.head; spacing: 4; x: -8
                             Btn { kind: "quiet"; small: true; icon: "git_compare"; active: rv.compared

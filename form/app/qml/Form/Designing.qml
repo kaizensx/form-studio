@@ -148,7 +148,7 @@ Item {
             for (var i = Store.stageLog.length - 1; b && i >= 0; i--) { var e = Store.stageLog[i]; if (e.draft === b.draft && e.at === b.at - 1) return e.label || "" }
             return "" }
         width: Math.max(360, Store.barW); x: Math.round(Store.barX + (Store.barW - width) / 2)
-        height: stageLedger.height; y: Math.round(Store.barY - height - 26)
+        height: stageLedger.height; y: Math.round(Store.barY - height - Math.max(26, Math.min(116, dz.height * 0.129)))     // the lower third, as in a workspace
         opacity: dz.staged ? 1 : 0; visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: dz.staged ? Theme.base : 420 } }
         Cue { id: stageLedger; width: parent.width; pulse: true
@@ -166,22 +166,35 @@ Item {
         opacity: dz.staged && rows.length > 0 ? 1 : 0; visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: Theme.base } }
         Behavior on height { NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
-        Txt { id: dpt; x: 18; y: 13; text: "Program"; font.weight: Theme.wSemi; font.pixelSize: 14 }
+        Txt { id: dpt; x: 18; y: 6 + (40 - height) / 2; text: "Program"; font.weight: Theme.wSemi; font.pixelSize: 14; font.letterSpacing: -0.15 }
         Txt { anchors.right: parent.right; anchors.rightMargin: 18; anchors.baseline: dpt.baseline; mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 1.5; font.capitalization: Font.AllUppercase; color: Theme.datum
             text: Store.building && Store.building.of > 1 ? Store.building.at + " of " + Store.building.of : "building" }
-        Rectangle { x: 51; y: 50; width: 1; height: Math.max(0, parent.height - 60); color: Theme.rule }
-        Rectangle { x: 50; y: 46; width: 2; radius: 1; height: Math.max(0, dprog.rows.length * 32 - 12); color: Theme.datum; opacity: 0.8
-            Behavior on height { NumberAnimation { duration: Theme.reduced ? 0 : 140 } } }
+        // the same listing as a design's Program (Shape.qml): the gutter 39 px into the lines, lit down to the middle of
+        // the line being built; numbers left of it, ticks and the pointer right of it, never under it
+        Rectangle { x: 45; y: 50; width: 1; height: Math.max(0, parent.height - 60); color: Theme.rule }
+        Rectangle { id: dnow; x: 6; width: parent.width - 12; height: 32; radius: 10; color: Theme.glass2
+            y: 46 + Math.max(0, dprog.rows.length - 1) * 32; visible: dprog.rows.length > 0
+            Behavior on y { NumberAnimation { duration: Theme.move(220); easing.type: Easing.OutCubic } }
+            Rectangle { x: parent.radius; width: parent.width - 2 * parent.radius; height: 1; color: Qt.rgba(1, 1, 1, Theme.dark ? 0.1 : 0) } }
+        Rectangle { x: 44.5; y: 46; width: 2; radius: 1; height: Math.max(0, dprog.rows.length * 32 - 16)
+            gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.datum, 0.25) } GradientStop { position: 0.7; color: Theme.datum } }
+            Behavior on height { NumberAnimation { duration: Theme.reduced ? 0 : 220; easing.type: Easing.OutCubic } }
+            Glow { blur: 10; strength: 0.55 } }
         Column { x: 6; y: 46; width: parent.width - 12; clip: true; height: parent.height - 52
             Repeater { model: dprog.rows
                 Item { id: dl; required property var modelData; required property int index
                     readonly property bool now: !!Store.building && modelData.at === Store.building.at
                     width: parent.width; height: 32
-                    Rectangle { anchors.fill: parent; radius: 10; color: dl.now ? Theme.glass2 : "transparent" }
-                    Txt { width: 30; y: 9; horizontalAlignment: Text.AlignRight; mono: true; font.pixelSize: 11; color: dl.now ? Theme.datum : Theme.ink3; text: (dl.modelData.at < 10 ? "0" : "") + dl.modelData.at }
-                    Icon { visible: !dl.now; x: 41; y: 10; name: "check"; size: 13; color: Theme.pass }
-                    Txt { x: 66; y: 8; width: parent.width - 150; elide: Text.ElideRight; wrapMode: Text.NoWrap; font.pixelSize: 13; font.weight: dl.now ? Theme.wSemi : Theme.wMedium; tone: dl.now ? 1 : 2; text: dl.modelData.label || dl.modelData.feature }
-                    Txt { visible: dl.now; anchors.right: parent.right; anchors.rightMargin: 12; y: 10; mono: true; font.pixelSize: 10; font.weight: Theme.wMedium; font.letterSpacing: 1.0; color: Theme.datum; text: "BUILDING" } } } }
+                    Txt { width: 30; anchors.verticalCenter: parent.verticalCenter; horizontalAlignment: Text.AlignRight; mono: true; font.pixelSize: 11; color: dl.now ? Theme.datum : Theme.ink3; text: (dl.modelData.at < 10 ? "0" : "") + dl.modelData.at }
+                    Item { x: 34; width: 30; height: 32
+                        Icon { anchors.centerIn: parent; name: "check"; size: 13; color: Theme.pass
+                            opacity: dl.now ? 0 : 1; scale: dl.now ? Theme.from(0.3) : 1
+                            Behavior on opacity { NumberAnimation { duration: Theme.fast } }
+                            Behavior on scale { SpringAnimation { spring: 5.5; damping: 0.36; epsilon: 0.01 } } }
+                        Icon { anchors.centerIn: parent; name: "play"; size: 10; color: Theme.datum; opacity: dl.now ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: Theme.fast } } } }
+                    Txt { x: 64; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 150; elide: Text.ElideRight; wrapMode: Text.NoWrap; font.pixelSize: 13; font.weight: dl.now ? Theme.wSemi : Theme.wMedium; tone: dl.now ? 1 : 2; text: dl.modelData.label || dl.modelData.feature }
+                    Txt { visible: dl.now; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 10; font.weight: Theme.wMedium; font.letterSpacing: 1.0; color: Theme.datum; text: "BUILDING" } } } }
     }
 
     // the blank canvas: the empty studio floor and the ways to put something on it
