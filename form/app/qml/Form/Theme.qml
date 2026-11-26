@@ -19,12 +19,17 @@ QtObject {
 
     // surfaces. Dark: lowest is darkest and each step up is lighter. Light: the bench is the quiet grey and each
     // step up is whiter, so "higher = nearer the light" holds in both.
-    readonly property color well: dark ? "#0a0c0e" : "#ffffff"        // inset: inputs receive content
+    readonly property color frame: dark ? "#070909" : "#dfe3e1"       // the window itself: what the plates of a workspace sit in
+    readonly property color well: dark ? "#090b0d" : "#ffffff"        // inset: inputs receive content
     readonly property color plate: dark ? "#0e1113" : "#eceeed"       // the bench
-    readonly property color plate1: dark ? "#13171a" : "#f4f5f4"      // panels resting on the bench
-    readonly property color plate2: dark ? "#191e22" : "#fafbfa"      // raised: cards
-    readonly property color plate3: dark ? "#21282d" : "#ffffff"      // highest: menus, buttons
+    readonly property color plate1: dark ? "#121619" : "#f5f6f5"      // panels resting on the bench
+    readonly property color plate2: dark ? "#181d21" : "#fafbfa"      // raised: cards
+    readonly property color plate3: dark ? "#20272c" : "#ffffff"      // highest: menus, buttons
     readonly property color plate4: dark ? "#2a3238" : "#e9eceb"      // a raised control under the pointer
+    // the workspace is plates on the frame: one radius, one gutter, a hairline, a line of light on the top edge
+    readonly property int rPanel: 12
+    readonly property int gap: 8
+    readonly property color panelEdge: alpha(lineBase, dark ? 0.08 : 0.11)
     // ink
     readonly property color ink: dark ? "#e8edeb" : "#151a1b"
     readonly property color ink2: dark ? "#a8b2af" : "#465150"
@@ -59,7 +64,9 @@ QtObject {
     readonly property color datumHi: dark ? "#cdf2e4" : "#1b9179"               // primary button, hovered
     readonly property color focus: alpha(datum, 0.6)                            // keyboard focus ring (datum)
     // the 3D bench (Viewport.qml): the ground to the horizon, the build plate on it, its 10 mm grid and its outline
-    readonly property color benchGround: dark ? "#1d2327" : "#e6e9e7"
+    readonly property color benchGround: dark ? "#1c2226" : "#e4e7e5"
+    readonly property color benchPool: dark ? "#333d43" : "#fbfbfa"             // the floor where the studio light falls, under the part
+    readonly property color benchLine: alpha(lineBase, dark ? 0.075 : 0.2)     // the floor's 10 mm drafting grid, fading with distance
     readonly property color benchPlate: dark ? "#262d32" : "#c2c8c5"
     readonly property color benchGrid: dark ? "#2e363b" : "#b4bbb7"
     readonly property color benchEdge: dark ? "#55616a" : "#7f8985"

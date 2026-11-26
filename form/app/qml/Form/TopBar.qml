@@ -12,8 +12,8 @@ Rectangle {
     id: bar
     objectName: "topBar"
     property real inset: 0                    // room for the macOS window buttons
-    height: 44; color: Theme.plate1
-    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule }
+    property color ground: Theme.plate       // the window's own colour: the bar is part of the frame, not a strip on it
+    height: 44; color: ground
     // the bar is the window's title bar: drag it to move the window, double-click it to zoom (macOS) or maximise.
     // Buttons and chips on it take their own clicks first.
     DragHandler { target: null; grabPermissions: PointerHandler.CanTakeOverFromAnything

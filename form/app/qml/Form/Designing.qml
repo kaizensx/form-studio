@@ -45,6 +45,7 @@ Item {
 
     // the stages of the design as they build (Store.showStage), before it is saved
     readonly property bool staged: !!Store.building && !Store.building.project
+    PlateFrame { z: 40 }
     Viewport { id: dvp; objectName: "designingViewport"; anchors.fill: parent; lite: false; interactive: true; showDims: false; showCompanions: false
         showOrigin: dz.staged                    // the floor's cross belongs to a part; before there is one the words stand here
         Component.onCompleted: { setModel(null); setView("iso", false); Store.stageViewer = dvp }
