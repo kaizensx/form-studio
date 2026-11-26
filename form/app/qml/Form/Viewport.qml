@@ -1136,7 +1136,7 @@ Item {
             width: t.implicitWidth + 18; height: 22; radius: 11; color: Theme.dark ? Theme.alpha(Theme.well, 0.86) : Theme.alpha(Theme.plate3, 0.92); border.color: Theme.alpha(Theme.datum, 0.35)
             opacity: shown ? 1 : 0; visible: opacity > 0.01                // a label that loses its seat fades, never blinks
             Behavior on opacity { NumberAnimation { duration: 120 } }
-            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.strong(Theme.datum); font.family: Theme.mono; font.pixelSize: Theme.tFine; font.weight: 500; renderType: Text.NativeRendering }
+            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.dark ? Qt.lighter(Theme.datum, 1.6) : Theme.datumHi; font.family: Theme.mono; font.pixelSize: Theme.tFine; font.weight: 500; renderType: Text.NativeRendering }
         }
     }
 

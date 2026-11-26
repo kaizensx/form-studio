@@ -9,14 +9,16 @@ DATA = "fresh"
 S = {}
 
 
-def hits(ui, n=26):
-    """Viewport pixels on the part with what is under them: [(x, y, hit)]."""
+def hits(ui, n=34):
+    """Viewport pixels on the part with what is under them: [(x, y, hit)]. The grid covers the open room: the part of
+    the 3D view no pane covers, where the camera keeps the part."""
     vp = ui.item("viewport")
-    w, h = vp.width(), vp.height()
+    l, t = float(vp.property("insetLeft")), float(vp.property("insetTop"))
+    w, h = vp.width() - l - float(vp.property("insetRight")), vp.height() - t - float(vp.property("insetBottom"))
     out = []
     for j in range(n):
         for i in range(n):
-            x, y = w * (0.1 + 0.8 * (i + 0.5) / n), h * (0.1 + 0.8 * (j + 0.5) / n)
+            x, y = l + w * (i + 0.5) / n, t + h * (j + 0.5) / n
             r = ui.js("JSON.stringify(Store.viewer.hitAt(%f, %f))" % (x, y))
             r = json.loads(r) if r and r != "null" else None
             if r:

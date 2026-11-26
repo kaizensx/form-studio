@@ -295,7 +295,7 @@ Item {
                                         Rectangle { x: 8; y: 8; width: 26; height: parent.height - 16; radius: 5; color: dk ? "#1c1c1e" : "#ffffff" }
                                         Rectangle { x: 42; y: 10; width: Math.max(10, parent.width - 62); height: 5; radius: 2.5; color: dk ? "#f4f3f1" : "#161616"; opacity: 0.8 }
                                         Rectangle { x: 42; y: 21; width: Math.max(8, parent.width - 84); height: 4; radius: 2; color: dk ? "#74736f" : "#8b8a86"; opacity: 0.7 }
-                                        Rectangle { x: 42; y: 33; width: 22; height: 9; radius: 4.5; color: dk ? "#3ee6ff" : "#087f9f" } } } }
+                                        Rectangle { x: 42; y: 33; width: 22; height: 9; radius: 4.5; color: dk ? "#3ee6ff" : "#06708d" } } } }
                             Txt { x: 14; anchors.bottom: parent.bottom; anchors.bottomMargin: 12; text: look.modelData.text
                                 font.weight: look.on ? Theme.wSemi : Theme.wMedium; color: look.on ? Theme.ink : Theme.ink2 }
                             Icon { visible: look.on; name: "circle_check"; size: 15; color: Theme.datum; anchors.right: parent.right; anchors.rightMargin: 12

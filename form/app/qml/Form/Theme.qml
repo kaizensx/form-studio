@@ -67,20 +67,20 @@ QtObject {
     readonly property real shadow: dark ? 1 : 0.3                              // how strong Shadow.qml draws
     readonly property color gleam: Qt.rgba(1, 1, 1, dark ? 0.08 : 0.9)   // the hairline of light on a raised top edge
     // meaning. Dark: pale tints that glow on graphite. Light: the same hues, deep enough to read on paper.
-    readonly property color datum: dark ? "#3ee6ff" : "#087f9f"
+    readonly property color datum: dark ? "#3ee6ff" : "#06708d"
     readonly property color datumInk: dark ? "#03222a" : "#ffffff"
-    readonly property color blueprint: dark ? "#3ee6ff" : "#087f9f"
+    readonly property color blueprint: dark ? "#3ee6ff" : "#06708d"
     readonly property color amber: dark ? "#f2c36b" : "#a86a00"
     readonly property color signal: dark ? "#ff6f51" : "#cf3a1c"
-    readonly property color pass: dark ? "#7bd88f" : "#1f8a52"
+    readonly property color pass: dark ? "#7bd88f" : "#1a7a3a"
     readonly property color annotate: dark ? "#c7b2ff" : "#6f49cc"              // selections and annotations on the part
     readonly property color clay: "#d8d3c8"   // the part itself, the same in both
     // the mark, as brand/README.md sets it on graphite and on a light ground
     readonly property color markPart: dark ? clay : "#0e1113"
-    readonly property color markOrigin: datum                                   // the mark's origin square is the accent
+    readonly property color markOrigin: dark ? "#1fcff2" : "#0a8fb3"              // the mark's origin square: the accent as the brand sets it at small sizes
     readonly property color markInk: dark ? "#f4f3f1" : "#161616"   // "Form"
     readonly property color markInk2: dark ? "#a9a8a5" : "#5d5c59"   // "Studio"
-    readonly property color datumHi: dark ? "#8af0ff" : "#0a8fb3"   // the accent, hovered
+    readonly property color datumHi: dark ? "#7ff0ff" : "#055d76"   // the accent, hovered
     readonly property color focus: alpha(datum, 0.6)                            // keyboard focus ring (datum)
     // the 3D bench (Viewport.qml): the ground to the horizon, the build plate on it, its 10 mm grid and its outline
     readonly property color benchGround: dark ? "#0c0c0d" : "#e9e6e1"
