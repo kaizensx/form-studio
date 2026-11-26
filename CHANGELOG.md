@@ -5,7 +5,7 @@
 ### New
 
 - **A new look: Lightdesk.** The 3D view now fills the whole window and every control floats over it as a pane of
-  glass, in the dark studio or on paper. One colour, periwinkle, always means "this is where you are"; green only
+  glass, in the dark studio or on paper. One colour, electric cyan, always means "this is where you are"; green only
   means pass and amber only means review. The app is set in Geist and Geist Mono.
 - **The top of the window is three capsules.** The design, its revision and its state on the left; the stages
   (Describe, Design, Fit, Review, Make) in the middle, each with one line that says where it stands; the printer (when

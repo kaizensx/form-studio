@@ -67,7 +67,7 @@ right in both; a hard-coded colour is a bug.
 | Inputs (`well`) | darkest | white |
 | Ink (`ink…ink4`) | `#f4f3f1` to `#4c4b48` | `#161616` to `#a5a39e` |
 | Edges and washes | white at 5 to 20 % | near-black at 5 to 26 % |
-| Datum (the one accent) | periwinkle `#a9b8ff` | deep periwinkle `#3d55d6` |
+| Datum (the one accent) | electric cyan `#3ee6ff` | deep cyan `#087f9f` |
 | Pass, review, fail (state only) | `#86d9a8`, `#f2c36b`, `#ff6f51` | `#1f8a52`, `#a86a00`, `#c8452b` |
 | The part (`clay`) | `#d8d3c8` | the same |
 

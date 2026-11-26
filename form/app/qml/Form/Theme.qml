@@ -5,7 +5,7 @@ import FormNative
 
 // Form Studio — Lightdesk (docs/design/DIRECTION.md).
 // The window is a photo studio: the part alone in a pool of warm light, every control a pane of glass over it.
-// One signal colour, periwinkle (`datum`), with one meaning: this is where you are. Green only means pass, amber
+// One signal colour, electric cyan (`datum`), with one meaning: this is where you are. Green only means pass, amber
 // only means review, signal only means fail. Geist for words, Geist Mono for numbers and lettering.
 QtObject {
     id: theme
@@ -67,12 +67,12 @@ QtObject {
     readonly property real shadow: dark ? 1 : 0.3                              // how strong Shadow.qml draws
     readonly property color gleam: Qt.rgba(1, 1, 1, dark ? 0.08 : 0.9)   // the hairline of light on a raised top edge
     // meaning. Dark: pale tints that glow on graphite. Light: the same hues, deep enough to read on paper.
-    readonly property color datum: dark ? "#a9b8ff" : "#3d55d6"
-    readonly property color datumInk: dark ? "#0d1020" : "#ffffff"
-    readonly property color blueprint: dark ? "#a9b8ff" : "#3d55d6"
+    readonly property color datum: dark ? "#3ee6ff" : "#087f9f"
+    readonly property color datumInk: dark ? "#03222a" : "#ffffff"
+    readonly property color blueprint: dark ? "#3ee6ff" : "#087f9f"
     readonly property color amber: dark ? "#f2c36b" : "#a86a00"
     readonly property color signal: dark ? "#ff6f51" : "#cf3a1c"
-    readonly property color pass: dark ? "#86d9a8" : "#1f8a52"
+    readonly property color pass: dark ? "#7bd88f" : "#1f8a52"
     readonly property color annotate: dark ? "#c7b2ff" : "#6f49cc"              // selections and annotations on the part
     readonly property color clay: "#d8d3c8"   // the part itself, the same in both
     // the mark, as brand/README.md sets it on graphite and on a light ground
@@ -80,7 +80,7 @@ QtObject {
     readonly property color markOrigin: datum                                   // the mark's origin square is the accent
     readonly property color markInk: dark ? "#f4f3f1" : "#161616"   // "Form"
     readonly property color markInk2: dark ? "#a9a8a5" : "#5d5c59"   // "Studio"
-    readonly property color datumHi: dark ? "#c3cdff" : "#4c64e2"   // the accent, hovered
+    readonly property color datumHi: dark ? "#8af0ff" : "#0a8fb3"   // the accent, hovered
     readonly property color focus: alpha(datum, 0.6)                            // keyboard focus ring (datum)
     // the 3D bench (Viewport.qml): the ground to the horizon, the build plate on it, its 10 mm grid and its outline
     readonly property color benchGround: dark ? "#0c0c0d" : "#e9e6e1"

@@ -79,7 +79,7 @@ Weights: 400 to read, 500 for labels, 600 for names, titles and buttons.
 
 ## Colour
 
-One accent, periwinkle (`datum`: `#a9b8ff` on the dark room, `#3d55d6` on paper). It has one meaning: **this is where
+One accent, electric cyan (`datum`: `#3ee6ff` on the dark room, `#087f9f` on paper, where `#0a8fb3` is its brighter step for fills). It has one meaning: **this is where
 you are**: the stage you are in, the line being built, the prompt, a selection, focus, the dimension lines on the
 part. It is the complement of the warm key light. Green (`pass`) only means pass, released, built: a status, never a control. Amber only
 means review. Red (`signal`) only means fail. The one filled button is ink on the room (`send`, `sendInk`): send,
