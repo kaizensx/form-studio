@@ -1,0 +1,19 @@
+iso: part 157.0 (278 px)  frame 213.1  bright 1.00
+iso: part 157.0 (278 px)  frame 213.1  bright 1.00
+front: part 167.0 (113 px)  frame 228.5  bright 1.00
+side: part 135.9 (100 px)  frame 227.9  bright 1.00
+back: part 138.6 (238 px)  frame 213.3  bright 1.00
+top: part 206.4 (380 px)  frame 219.7  bright 0.98
+under: part 184.1 (311 px)  frame 236.2  bright 1.00
+sweep d=30: darkest el -25 part 147.2, brightest 200.3
+orbiting at distance 30: el -33 → el -31 goes through the part's wall (the cut colour), not compared
+orbiting at distance 30: el -29 → el -27 goes through the part's wall (the cut colour), not compared
+orbiting at distance 30: worst step part 0.101 of iso, frame 0.062
+sweep d=420: darkest el 5 part 138.6, brightest 207.8
+orbiting at distance 420: worst step part 0.122 of iso, frame 0.030
+sweep d=3000: darkest el 25 part 132.3, brightest 187.1
+orbiting at distance 3000: worst step part 0.151 of iso, frame 0.018
+zooming at elevation 28.4: worst step part 0.070 of iso, frame 0.017
+zooming at elevation -30: dist 30 → dist 32 goes through the part's wall (the cut colour), not compared
+zooming at elevation -30: worst step part 0.154 of iso, frame 0.095
+zooming at elevation 6: worst step part 0.080 of iso, frame 0.023
