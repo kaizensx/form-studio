@@ -691,6 +691,7 @@ Item {
                     property real uSoft: Math.max(4, vp.radius(vp.bounds) * 0.16)
                     property real uContact: !vp.model ? 0 : Theme.dark ? 0.62 : 0.14
                     property real uLift: Theme.dark ? 0 : 0.72
+                    property real uDither: 1.0
                     property color uGrid: !vp.floorGrid ? "transparent" : Qt.rgba(Theme.lineBase.r, Theme.lineBase.g, Theme.lineBase.b, Theme.benchLine.a * (1 - vp.plateK)) } }
             // studio: a faint origin cross, the one fixed point on the floor (it gives way to the plate)
             Model { objectName: "originCross"; pickable: false; castsShadows: false; visible: vp.showOrigin && vp.plateK < 0.5; position: Qt.vector3d(vp.shift.x, vp.shift.y, 0)

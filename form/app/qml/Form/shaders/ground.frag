@@ -12,6 +12,13 @@ float gridLine(vec2 p, float step)
     float thin = 1.0 - smoothstep(0.18, 0.42, max(w.x, w.y));
     return line * thin;
 }
+// a fixed value 0..1 per pixel (the dither below)
+float pixelHash(vec2 p)
+{
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
 void MAIN()
 {
     float d = length(VAR_WORLD_POSITION.xz);
@@ -36,6 +43,13 @@ void MAIN()
     // and lit paper under a filmic curve turns grey); the rest still takes the light, the shadow and the occlusion
     EMISSIVE_COLOR = uFar.rgb * k + base * uLift * (1.0 - k);
     BASE_COLOR.rgb *= (1.0 - k) * (1.0 - uLift);
+    // the floor is a slow gradient between tones a few 8-bit steps apart: undithered it shows as bands. About one
+    // step of noise, fixed to the pixels (a still view is not redrawn for it), is added before the colour is
+    // written. The colour here is linear and the step is one of the display's, so it is scaled by the display
+    // curve's slope at this tone (uDither: how many steps; the filmic curve of the dark room needs more).
+    vec3 tone = max(uFar.rgb * k + base * (1.0 - k), vec3(1e-4));
+    float n = pixelHash(gl_FragCoord.xy) + pixelHash(gl_FragCoord.xy + vec2(37.0, 17.0)) - 1.0;
+    EMISSIVE_COLOR += n * uDither / 255.0 * 2.2 * pow(tone, vec3(0.545));
     // seen from below (the camera under the bench) it is a translucent ground: its own tone, unlit, thinning out
     // with distance, so the part above it reads through and the view never turns into a black slab
     if (!gl_FrontFacing) {
