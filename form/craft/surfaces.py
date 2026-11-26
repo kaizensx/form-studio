@@ -243,6 +243,43 @@ def faces_at(shape, where: str = "top", tol: float = 0.05) -> list:
     return out
 
 
+def made_by(after, before, what: str = "edges", tol: float = 0.01) -> list:
+    """The edges (or faces) of `after` that the last operation made: those that are not on `before`.
+
+        out = craft.cut(body, pocket)
+        out = craft.safe_fillet(out, craft.made_by(out, body), 1.0)      # only the pocket's edges
+
+    The rule is the one Form Studio attributes faces to features by (form/kernel.py): a face of `after` is new when
+    it is not a face of `before` and its centre does not lie on `before`'s surface (a face a cut only trimmed
+    stays the earlier feature's). what="faces": those faces; "edges": the edges that bound at least one of them.
+    Use it instead of an index (edges()[3]): an index names whatever the kernel happens to list there, and moves
+    when a parameter changes. before=None: everything is new."""
+    need(what in ("edges", "faces"), f"made_by: unknown what {what!r}", "Use \"edges\" or \"faces\".", ["what"])
+    from build123d import ShapeList, Vertex
+    faces = list(after.faces())
+    if before is not None and hasattr(before, "faces"):
+        from ..kernel import _Skin
+        skin = _Skin(before)
+        new = []
+        for f in faces:
+            if hash(f) in skin.ids:
+                continue
+            c = f.center()
+            if skin.holds(f, (c.X, c.Y, c.Z), Vertex(c.X, c.Y, c.Z), tol):
+                continue
+            new.append(f)
+        faces = new
+    if what == "faces":
+        return ShapeList(faces)
+    seen, out = set(), []
+    for f in faces:
+        for e in f.edges():
+            if hash(e) not in seen:
+                seen.add(hash(e))
+                out.append(e)
+    return ShapeList(out)
+
+
 def shell(solid, thickness: float, openings: Iterable | None = None, inward: bool = True):
     """A hollow body with walls `thickness` thick, open at the given faces (none: a closed hollow). The outside
     stays where it is (inward=True). Fallback: an intersection-style offset (sharper inner corners, noted)."""
@@ -267,6 +304,36 @@ def shell(solid, thickness: float, openings: Iterable | None = None, inward: boo
     return r
 
 
+SINGULAR = 0.03          # a blend this close (relative) to the radius of an arc edge it runs along degenerates
+
+
+def singular_edges(edges, size: float) -> list:
+    """Edges a fillet of radius `size` (or a chamfer of that length) must not be asked to take at once: arcs whose own
+    radius is within SINGULAR of it. The blend then shrinks the arc's face to nothing, and OCCT's BRepFilletAPI does
+    not fail cleanly: it ends the process (r05 of a sofa-arm holder: a 1.2 mm fillet on the top edge of a 1.2 mm
+    radius bead). Measured on the edge, nothing assumed."""
+    out = []
+    for e in edges:
+        try:
+            if e.geom_type.name == "CIRCLE" and abs(e.radius - size) <= SINGULAR * e.radius:
+                out.append(e)
+        except Exception:
+            continue
+    return out
+
+
+def guarded_blend(shape, size: float, edges, chamfer: bool = False):
+    """shape.fillet(size, edges) / shape.chamfer(size, None, edges), refusing (ValueError, which the safe_ helpers
+    treat as "did not fit") a size that would crash the kernel on one of the edges (singular_edges)."""
+    bad = singular_edges(edges, size)
+    if bad:
+        c = bad[0].center()
+        note(f"{'chamfer' if chamfer else 'fillet'} {size:.2g} mm not tried on {len(bad)} arc edge(s) of that same "
+             f"radius (at {c.X:.1f}, {c.Y:.1f}, {c.Z:.1f}): it degenerates and crashes the kernel")
+        raise ValueError("blend size equals an arc edge's radius")
+    return shape.chamfer(size, None, edges) if chamfer else shape.fillet(size, edges)
+
+
 def safe_fillet(shape, edges, radius: float, min_fraction: float = 0.25):
     """Fillet edges with radius; when it does not fit, try 75 %, 50 % and min_fraction of it, then leave the edges
     sharp. Every reduction is noted (form.craft.notes()); the chosen radius is what the solid has."""
@@ -277,7 +344,7 @@ def safe_fillet(shape, edges, radius: float, min_fraction: float = 0.25):
     fr = [1.0, 0.75, 0.5, min_fraction]
     for i, f in enumerate(fr):
         try:
-            out = shape.fillet(r * f, E)
+            out = guarded_blend(shape, r * f, E)
             if ok(out):
                 if i:
                     note(f"safe_fillet: {r:g} mm did not fit; used {r * f:.2g} mm")
@@ -293,7 +360,7 @@ def safe_fillet(shape, edges, radius: float, min_fraction: float = 0.25):
                 continue
             for f in fr:
                 try:
-                    o = out.fillet(r * f, [cur])
+                    o = guarded_blend(out, r * f, [cur])
                     if ok(o):
                         out, done = o, done + 1
                         sizes.add(round(r * f, 2))

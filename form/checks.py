@@ -12,7 +12,8 @@ and a motion check's pose names the joint position where it was found.
 """
 from __future__ import annotations
 
-CHECKS_VERSION = 4
+CHECKS_VERSION = 7          # 5: every vertex, every thin region (form/thickness.py); 6: structural walls fail; 7: textured STL volume N/A
+STRUCTURAL_LINES = 3    # a structural feature's wall under this many nozzle widths fails the Thinnest-wall check
 NA = "N/A"           # a check that cannot run for this kind of design; never counted as a pass
 
 
@@ -54,6 +55,12 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
             add("conversion", "STL matches the CAD solid", NA, "mesh design",
                 "Not available for mesh designs. There is no CAD solid to compare the STL with: the design itself is a mesh. "
                 f"Mesh volume {m['volume_mm3']/1000:.2f} cm³.", "none")
+        elif m.get("textured"):
+            # a mesh texture displaces the surface by design: the STL's volume differs from the smooth CAD solid's by
+            # the texture's amplitude, which is no conversion error (the mesh check above still runs on it)
+            add("conversion", "STL matches the CAD solid", NA, f"{dv*100:.1f}% volume (textured)",
+                f"Not comparable: the design's mesh texture displaces the exported surface on purpose. CAD "
+                f"{b['volume_mm3']/1000:.2f} cm³, textured mesh {m['volume_mm3']/1000:.2f} cm³.", "computed")
         else:
             add("conversion", "STL matches the CAD solid", "PASS" if dv <= 0.002 else ("WARN" if dv <= 0.01 else "FAIL"),
                 f"{dv*100:.3f}% volume", f"CAD {b['volume_mm3']/1000:.2f} cm³, mesh {m['volume_mm3']/1000:.2f} cm³. "
@@ -104,12 +111,25 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
     thin, nz = analysis.get("thin"), ctx["nozzle"]
     if thin:
         st = "PASS" if thin["t"] >= 3 * nz else ("WARN" if thin["t"] >= 2 * nz else "FAIL")
-        add("wall", "Thinnest wall", st, f"{thin['t']:.2f} mm",
-            f"Smallest opposing-wall distance over {analysis['thickness_samples']:,} surface samples"
+        spot, detail = thin, ""
+        ts = analysis.get("thin_structural")
+        if ts and ts["t"] < STRUCTURAL_LINES * nz:
+            # a wall of a structural feature (the load path: a corbel, an arm, a clip's spine) under three nozzle
+            # widths is a fail, not a warning to note: the softer 2-3 line band is for decorative ridges and fins
+            spot, st = ts, "FAIL"
+            names = ts.get("label") or ts.get("feature", "")
+            by = f" (thinned by {', '.join(ts['cut_by'])})" if ts.get("cut_by") else ""
+            detail = (f"A wall of the structural feature {names}{by} is {ts['t']:.2f} mm at "
+                      f"({', '.join(f'{x:.1f}' for x in ts['at'])}) mm, under the {STRUCTURAL_LINES * nz:.1f} mm "
+                      f"(three lines of a {nz:g} mm nozzle) a load-bearing wall needs. Thicken it there; a finish cut "
+                      "into it (flutes, grooves, a chamfer) counts against it. ")
+        add("wall", "Thinnest wall", st, f"{spot['t']:.2f} mm",
+            detail + f"Smallest opposing-wall distance over {analysis['thickness_samples']:,} surface samples"
             + (" of the mesh. " if mesh else ". ") +
             f"Under {2*nz:.1f} mm cannot hold two perimeters on a {nz:g} mm nozzle"
-            + (" (nozzle size assumed)." if ctx.get("nozzle_assumed") else "."),
-            "computed", feature=thin.get("feature"), at=thin.get("at"), to=thin.get("to"))
+            + (" (nozzle size assumed)." if ctx.get("nozzle_assumed") else ".") + _regions_line(analysis),
+            "computed", feature=spot.get("feature"), at=spot.get("at"), to=spot.get("to"),
+            regions=(analysis.get("thin_regions") or {}).get("regions", []))
 
     steep = row["steep_mm2"]
     add("overhang", "Unsupported overhangs", "PASS" if steep < 1 else "WARN", f"{steep:.0f} mm²",
@@ -179,6 +199,12 @@ def _model_checks(add, summary, analysis, ctx, mesh):
                 f"{where} No manufacturing process is stated for this model, so there is no minimum to compare it with. "
                 "Name one in the design's purpose to check it.", "computed",
                 feature=thin.get("feature"), at=thin.get("at"), to=thin.get("to"))
+
+
+def _regions_line(analysis) -> str:
+    """Every thin region in the wall check's detail (form/thickness.py), so one answer lists them all."""
+    from . import thickness
+    return thickness.sentence(analysis.get("thin_regions") or {})
 
 
 def _fit_feature(recipe):

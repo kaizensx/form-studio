@@ -98,6 +98,22 @@ def digest(st, pid: str, bench: str | None = None) -> dict:
             files["3mf"] = str(d / s["slice"]["threemf"])
     if files:
         out["files"] = files
+    try:                                             # the proof sheet of this revision, when it has been measured
+        from . import contract
+        sheet = contract.prove(st, p, compute=False)
+        if sheet:
+            out["proof"] = {"summary": contract.summary(sheet), "green": sheet["green"], "rows": contract.table(sheet),
+                            "note": sheet["note"]}
+        elif contract.of(p):
+            out["proof"] = {"summary": "The contract has not been measured for this revision.", "green": False,
+                            "rows": [], "stale": True}
+    except Exception:                                # noqa: BLE001 - the digest is a view; the gate says what blocks
+        pass
+    cl = (s["exports"] or {}).get("closure") if s["exports"] else None
+    if cl and (not cl.get("closed") or cl.get("rung") not in ("mesh", "texture")):
+        out["export_mesh"] = ("closed" if cl.get("closed") else "OPEN") + f" (rung: {cl.get('rung')}" + (
+            f", within {cl['deviation_mm']:g} mm of the CAD surface" if cl.get("deviation_mm") is not None else "") + ")" + (
+            f": {cl['why']}" if cl.get("why") else "")
     out["recent_revisions"] = [f"r{r['n']:02d} [{r.get('origin', 'user')}] {r['note']}" for r in p["revisions"][-5:]]
     if s["releases"]:
         out["releases"] = s["releases"]
@@ -105,7 +121,8 @@ def digest(st, pid: str, bench: str | None = None) -> dict:
         out["recovered"] = s["recovered"]
     if bench:
         out["bench"] = f"{bench}/#p={pid}"
-    return out
+    from .verdict import lead
+    return lead(out)                                 # verdict and blocking first: a FAIL is the first thing read
 
 
 def impact_digest(imp: dict) -> dict:

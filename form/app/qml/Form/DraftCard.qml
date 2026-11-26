@@ -7,6 +7,10 @@ Rectangle {
     id: d
     objectName: "draftCard"
     readonly property var im: Store.preview ? Store.preview.impact : null
+    // where each consequence last landed (label and old value → number), so a draft rebuilt while a slider moves
+    // ticks on from the shown number rather than starting again from the old value. Mutated in place: no rebinding.
+    property var seen: ({})
+    function seenFrom(label, from) { var v = d.seen[label + "|" + from]; return v === undefined ? from : String(v) }
     readonly property string next: Store.project ? F.pad(Math.max.apply(null, Store.project.revisions.map(function (r) { return r.n })) + 1) : ""
     visible: Store.hasDraft || !!Store.draftError
     width: parent ? parent.width : 0
@@ -40,7 +44,8 @@ Rectangle {
             visible: !!d.im && d.im.derived.some(function (x) { return x.interface })
             Txt { kind: "cap"; text: "Interface dimensions change"; color: Theme.signal }
             Repeater { model: d.im ? d.im.derived.filter(function (x) { return x.interface }) : []
-                Delta { required property var modelData; label: modelData.label; from: F.fmt(modelData.from); to: F.fmt(modelData.to); unit: modelData.unit; tint: Theme.signal } } }
+                Delta { required property var modelData; label: modelData.label; from: F.fmt(modelData.from); to: F.fmt(modelData.to); unit: modelData.unit; tint: Theme.signal
+                    tick: true; start: d.seenFrom(label, from); onSettled: function (v) { d.seen[label + "|" + from] = v } } } }
         Txt { kind: "fine"; width: parent.width
             visible: !!d.im && d.im.params.length > 0 && !d.im.derived.some(function (x) { return x.interface })
             text: "No interface dimension changes. Fit is unaffected by this draft." }
@@ -50,7 +55,8 @@ Rectangle {
             visible: rows.length > 0
             Txt { kind: "cap"; text: "Consequences" }
             Repeater { model: parent.rows
-                Delta { required property var modelData; label: modelData.label; from: modelData.from; to: modelData.to; unit: modelData.unit } } }
+                Delta { required property var modelData; label: modelData.label; from: modelData.from; to: modelData.to; unit: modelData.unit
+                    tick: true; start: d.seenFrom(label, from); onSettled: function (v) { d.seen[label + "|" + from] = v } } } }
         Txt { kind: "fine"; width: parent.width; color: Theme.amber
             visible: !!d.im && d.im.invalidates.length > 0
             text: d.im ? "Committing makes " + d.im.invalidates.join(", ") + " stale; they are regenerated for " + d.next + "."

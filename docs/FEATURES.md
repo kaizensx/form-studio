@@ -18,7 +18,7 @@ as an MCP tool ([MCP reference](MCP.md)), unless noted. 3D printing is optional 
 - [Conversations and agents](#conversations-and-agents)
 - [Any model, any provider](#any-model-any-provider)
 - [Moving and sharing designs](#moving-and-sharing-designs)
-- [Recipes: building blocks and the community gallery](#recipes-building-blocks-and-the-community-gallery)
+- [Building blocks for agents](#building-blocks-for-agents)
 - [3D printing (optional)](#3d-printing-optional)
   - [For a printer, or just a 3D model](#for-a-printer-or-just-a-3d-model)
   - [Fit](#fit)
@@ -88,6 +88,14 @@ each one named as it arrives.
   source: measured, specified, assumed, estimated from a photo, computed.
 - **Features you can click.** Each face of the solid is attributed to the feature that made it, so you can select a
   feature on the model, change it, hide it, and see which features a change touched.
+- **Edits that name what changes.** An agent changes one feature, one helper or one parameter by name (`edit_design`),
+  not by sending the file again. A design written as one build function is first rewritten as one method per
+  feature, and kept only when the kernel finds the same volume, faces and bounding box; then only the changed feature
+  and those after it are built.
+- **Mistakes found before the kernel runs.** A design's code is checked without building anything, and every problem
+  comes back at once: a constraint its own values break, a name or argument the CAD library does not have, a
+  parameter that is read but not declared, a polygon wound the wrong way for its extrusion, a bolt and a threaded
+  hole that barely engage.
 - **Drafts with computed impact.** A change is built for real before it is saved: the features and interface
   dimensions it moves, the change in stability and fit, and which outputs it would invalidate.
 - **Constraints that explain themselves.** An impossible combination is refused with the feature, the parameters
@@ -406,9 +414,19 @@ Each revision is rebuilt and checked on the solid. The standard checks for a pri
 | Fit within the tolerance window | model |
 | Re-imported in FreeCAD (when installed) | computed |
 
-Recipes and assemblies add their own: a bracket's bending safety factor, a box's lid swing, the clearance of a pin in
+Building blocks and assemblies add their own: a bracket's bending safety factor, a box's lid swing, the clearance of a pin in
 its hole. **Every result says how it is known** (computed, heuristic, model, simulated, measured, physical) and
 clicking a result shows where on the part it was found.
+
+**The brief as a contract, proved on the solid.** A brief's requirements become assertions the kernel checks: sizes,
+volume, the number of parts, holes of a diameter, a cylinder's diameter and axis, a bolt circle or a row of holes,
+the thinnest wall, the presence of a thread. Each carries its tolerance and where it came from (the brief's own
+words, a named dimension, the design's code). Before any code, the numbers themselves are audited: what is missing,
+what conflicts and what cannot be built is reported once. Every assertion is owed by one feature; a feature can
+promise its own (`expects=`), and a miss stops at that feature with what was measured against what was wanted.
+Each revision then has a proof sheet: one row per requirement with the measurement, the tolerance, the evidence
+class and PASS, FAIL or UNPROVEN. A failed requirement blocks release; a row that could not be measured is never
+shown as a pass.
 
 **Thinnest wall measures walls.** In a design of several parts each wall is measured inside its own part, so a bolt
 resting in its nut is not a 0 mm wall, and only faces within 30° of parallel count, so a tapered edge is not a wall
@@ -599,24 +617,15 @@ and what to do.
   `.formproj` files still import. `form export`, `form import`; MCP `export_project`, `import_project`.
 - **Conversations** export alone as Markdown (to read) or JSON (to import again). `form export-conversation`.
 
-## Recipes: building blocks and the community gallery
+## Building blocks for agents
 
-Recipes are parametric families written as code, with their own engineering checks. Agents use them as starting
-points and change anything; people browse them in the [website gallery](https://kaizensx.github.io/form-studio/recipes/)
-with categories and tags.
+Inside the engine, recipes are parametric building blocks written as code, each with its own engineering checks. An
+agent may start a design from one when it fits (`describe_recipe`, then `create_project`) and change anything after
+that. They are internal: Form Studio does not offer them to people as a library, and every design starts from what the
+person describes. Designs made from one open, build and release like any other.
 
-- **Built in**, made of the things people print most: Gridfinity bin and baseplate, a box with a sliding, press-on or
-  hinged lid, SKÅDIS pegboard accessories, a phone and tablet stand, a cable organizer, an under-desk hanger, a shelf
-  bracket, a hose and pipe adapter, a self-watering planter, a faceted vase and lamp shade, a battery and card holder,
-  an electronics enclosure and the fit coupon. Each passes its checks at its defaults and prints without supports.
-- **Community recipes** install from a file or from the gallery, after you read the source and its SHA-256. Downloads
-  are verified against the index, nothing runs until a design is created, and uninstalling is one command.
-  `form recipes list|inspect|install|uninstall|community`.
-- **Share a recipe** as one `.formrecipe` file (code, `meta.json` with its SHA-256, and a preview from a real build),
-  prepare a community submission with a pre-filled GitHub issue (nothing is posted from Form Studio), or turn a design
-  into a recipe. `form recipes export|import|submit|derive`.
-
-Writing one: [Writing a recipe](RECIPES.md) and [community recipes](../community/recipes/README.md).
+For developers: `form recipes list|inspect|install|uninstall|source`, `form recipes export|import|derive` (a recipe
+as one `.formrecipe` file, or a design turned into a recipe), and [Writing a recipe](RECIPES.md).
 
 ## 3D printing (optional)
 
@@ -718,10 +727,8 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
 
 ## On GitHub
 
-- **Recipes submitted in an issue** are built, checked and sliced, and the issue is answered with pictures; a
-  maintainer's label turns an accepted one into a pull request credited to its author.
-- **Pull requests** that touch recipes or the interface get before and after pictures.
-- **A nightly slicer compatibility matrix** (every recipe through every slicer CI installs) and **benchmarks** are
+- **Pull requests** that touch the engine's building blocks or the interface get before and after pictures.
+- **A nightly slicer compatibility matrix** (every sample design through every slicer CI installs) and **benchmarks** are
   published on the website: [compatibility](https://kaizensx.github.io/form-studio/compat/) and
   [benchmarks](https://kaizensx.github.io/form-studio/bench/).
 - **Releases** ship with `SHA256SUMS`, build provenance and an SBOM.

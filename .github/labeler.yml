@@ -24,7 +24,7 @@
       - any-glob-to-any-file: ["form/agents/**", "form/chat.py", "form/mcp_server.py", "form/ask.py", "plugins/**", "AGENTS.md"]
 "area:recipes":
   - changed-files:
-      - any-glob-to-any-file: ["form/recipes/**", "community/recipes/**", "docs/RECIPES.md"]
+      - any-glob-to-any-file: ["form/recipes/**", "docs/RECIPES.md"]
 "area:site":
   - changed-files:
       - any-glob-to-any-file: ["site/**"]

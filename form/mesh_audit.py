@@ -16,7 +16,34 @@ LIMITS = [
     'Envelope check allows translation, not rotation, packing, supports or brim geometry.',
 ]
 
+PARTS_SUFFIX = '.parts.json'   # form/meshclose.py: triangles per solid of an STL that holds several solids
+
+
+class Triangles(list):
+    """The triangles of an STL; `parts` (triangle counts per solid, from the STL's sidecar) when it has one."""
+    parts = None
+
+
+def _parts(path, count):
+    """Triangle counts per solid from <stl>.parts.json, when they add up to the file's triangles; else None."""
+    try:
+        parts = json.loads(Path(str(path) + PARTS_SUFFIX).read_text(encoding='utf-8'))['parts']
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if (isinstance(parts, list) and parts and all(isinstance(n, int) and n >= 0 for n in parts)
+            and sum(parts) == count):
+        return parts
+    return None
+
+
 def read_stl(path):
+    triangles, encoding, digest = _read_stl(path)
+    out = Triangles(triangles)
+    out.parts = _parts(path, len(out))
+    return out, encoding, digest
+
+
+def _read_stl(path):
     data = Path(path).read_bytes()
     if len(data) >= 84:
         count = struct.unpack_from('<I', data, 80)[0]
@@ -64,7 +91,9 @@ def dot(a, b):
     return sum(x*y for x, y in zip(a, b))
 
 def audit(triangles, bed=(180, 180, 180), margin=5.0, expected_components=1,
-          expected_size=None, dimension_tolerance=0.05, weld_grid=1e-6):
+          expected_size=None, dimension_tolerance=0.05, weld_grid=1e-6, parts=None):
+    """parts: triangle counts per solid (default: the `parts` read_stl found beside the STL). Each solid is welded
+    and screened as its own mesh: solids of an assembly that touch share faces, which is not a defect."""
     values = list(bed) + [margin, dimension_tolerance, weld_grid]
     if not all(math.isfinite(v) for v in values):
         raise ValueError('Settings must be finite.')
@@ -116,8 +145,16 @@ def audit(triangles, bed=(180, 180, 180), margin=5.0, expected_components=1,
         a, b = root(a), root(b)
         if a != b:
             parent[b] = a
+    parts = parts if parts is not None else getattr(triangles, 'parts', None)
+    owner = []
+    if parts and sum(parts) == len(triangles):
+        for k, n in enumerate(parts):
+            owner += [k] * n
+        result['solids_audited_separately'] = len(parts)
+    else:
+        owner = [0] * len(triangles)
     for i, t in enumerate(triangles):
-        keys = [tuple(round(c / weld_grid) for c in v) for v in t]
+        keys = [(owner[i],) + tuple(round(c / weld_grid) for c in v) for v in t]
         norm2 = dot(cross(sub(t[1], t[0]), sub(t[2], t[0])),
                     cross(sub(t[1], t[0]), sub(t[2], t[0])))
         if len(set(keys)) != 3 or norm2 <= weld_grid**4:

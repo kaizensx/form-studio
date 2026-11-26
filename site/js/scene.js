@@ -196,14 +196,29 @@ export class Viewport {
 
   // ---------- camera ----------
   _target() { return cad(this.centre.x, this.centre.y, this.centre.z * 0.7); }
-  _dist() { const r = Math.hypot(this.size.x, this.size.y, this.size.z) / 2; return (r / Math.sin((this.camera.fov * Math.PI) / 360)) * this.fitPad(); }
-  fitPad() { return this.camera.aspect < 1 ? 1.5 / Math.max(this.camera.aspect, 0.6) : 1.32; }
+  // the distance at which the part's box, seen from dir, spans FILL of the viewport's width or height (whichever binds);
+  // fitted to the box's projection, not to its bounding sphere, so a flat part fills the view as much as a tall one
+  _dist(dir) {
+    const FILL = this.camera.aspect < 1 ? 0.7 : 0.55;
+    const fwd = dir.clone().negate(), right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0));
+    if (right.lengthSq() < 1e-8) right.set(1, 0, 0);
+    right.normalize();
+    const up = new THREE.Vector3().crossVectors(right, fwd).normalize(), t = this._target();
+    let hx = 0, hy = 0, near = 0;
+    const [a, b] = this.info.bbox;
+    for (const x of [a[0], b[0]]) for (const y of [a[1], b[1]]) for (const z of [a[2], b[2]]) {
+      const c = cad(x, y, z).sub(t);
+      hx = Math.max(hx, Math.abs(c.dot(right))); hy = Math.max(hy, Math.abs(c.dot(up))); near = Math.max(near, c.dot(dir));
+    }
+    const tv = Math.tan((this.camera.fov * Math.PI) / 360), th = tv * this.camera.aspect;
+    return near + Math.max(hx / (FILL * th), hy / (FILL * tv));
+  }
   view(name, animate = true) {
     this.currentView = name;
     const d = VIEWS[name]; if (!d) return;
     const dir = cad(...d).normalize();
     const target = this._target();
-    const to = target.clone().add(dir.multiplyScalar(this._dist()));
+    const to = target.clone().add(dir.clone().multiplyScalar(this._dist(dir)));
     this.glide(to, target, animate);
   }
   frame(animate = true) { this.view(this.currentView || "iso", animate); }

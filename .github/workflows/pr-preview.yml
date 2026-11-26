@@ -2,7 +2,7 @@ name: PR preview
 
 # Pictures of what a pull request changes, posted as one comment by pr-preview-comment.yml.
 #
-#   plan     which built-in and community recipes the change can affect (a recipe file, or code every recipe goes
+#   plan     which built-in recipes the change can affect (a recipe file, or code every recipe goes
 #            through: the kernel, checks, renderer, recipe base), and whether the interface changed (form/app/).
 #   recipes  builds each affected recipe at its defaults twice, with the base branch's code and with the pull request's,
 #            and records pictures, volume, mass and every check.
@@ -16,7 +16,6 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - form/recipes/**
-      - community/recipes/**
       - form/kernel.py
       - form/worker.py
       - form/checks.py

@@ -11,8 +11,6 @@ export const COMMANDS = [
     description: "What you are looking for (empty: every page)", autocomplete: true }] },
   { name: "download", description: "Download Form Studio for macOS, Windows or Linux" },
   { name: "bug", description: "How to report a bug so it gets fixed" },
-  { name: "recipe", description: "Show a recipe with its render", options: [{ type: STR, name: "name", description: "Recipe (empty: a random one)",
-    autocomplete: true }] },
   { name: "showcase", description: "Post something you designed to show-and-tell" },
   { name: "challenge", description: "This week's design challenge" },
   { name: "roles", description: "Pick your system, agent, what you make and your pings" },

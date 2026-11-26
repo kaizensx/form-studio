@@ -46,6 +46,7 @@ from .recipes.base import RecipeError
 
 INSTALL_HINT = 'Install the parts extra: pip install "form-studio[parts]" (adds bd_warehouse and py_gearworks).'
 OVERSHOOT = 0.2
+THREAD_BORE_OVERLAP = 0.02      # mm a threaded hole's bore is moved off the thread's root when the cut fails there
 BOTTOM = (Align.CENTER, Align.CENTER, Align.MIN)
 TOP = (Align.CENTER, Align.CENTER, Align.MAX)
 
@@ -349,6 +350,19 @@ def bearing_seat(designation: str = "608", fit: float = 0.05, through: float = 3
 
 
 # ---- threads -----------------------------------------------------------------------------------------------
+def _minus_ridges(bore, ridges):
+    """A threaded hole's cutter: the bore minus the nut's thread ridges. OCCT's cut of a bore by the helical ridges
+    can fail silently and return the whole bore (a plain hole, no thread: seen on M8 x 1.25 and M12 x 1.75), so the
+    ridges inside the bore are found first (a common) and those are cut; a cutter that still lost none raises."""
+    inside = bore & ridges
+    kept = float(inside.volume) if inside is not None else 0.0
+    out = bore - inside if kept > 1e-6 else bore
+    if kept <= 1e-6 or float(bore.volume) - float(out.volume) < 0.5 * kept:
+        raise RecipeError("The threaded hole came out without thread ridges", "",
+                          "Try a different length, pitch or clearance; a plain bore would not hold the screw.")
+    return out
+
+
 def thread(major_d: float, pitch: float, length: float, external: bool = True, clearance: float = 0.3,
            chamfer: bool = True) -> HardwarePart:
     """A printable ISO metric thread (bd_warehouse IsoThread). Use pitch >= 1 mm for FDM.
@@ -372,8 +386,8 @@ def thread(major_d: float, pitch: float, length: float, external: bool = True, c
         D = major_d + clearance
         th = th_mod.IsoThread(major_diameter=D, pitch=pitch, length=length, external=False, end_finishes=("fade", "fade"))
         r_out = D / 2
-        bore = Cylinder(r_out, length, align=BOTTOM)
-        shape = Pos(0, 0, -length) * (bore - th) + Cylinder(r_out, OVERSHOOT, align=BOTTOM)
+        cutter, r_out = _ridged_bore(th, r_out, length, f"M{major_d:g}x{pitch:g} internal thread")
+        shape = Pos(0, 0, -length) * cutter + Cylinder(r_out, OVERSHOOT, align=BOTTOM)
         kind = "cut"
     if not shape.is_valid:
         raise RecipeError("The thread did not build as a valid solid", "", "Try a coarser pitch or a different length.")
@@ -845,6 +859,31 @@ def bolted_joint(size: str = "M3", clamp: float = 5.0, into: str = "insert", hea
 
 
 # ---- lead screws and bottle threads -------------------------------------------------------------------------
+def _ridged_bore(th, r_out: float, length: float, label: str):
+    """(the cutter of a threaded hole: a bore minus the nut's thread ridges, the bore radius used).
+
+    The cut is measured, not assumed. Where the bore and the thread's own root cylinder coincide, OCCT can return
+    the bore untouched: a plain cylinder, and the hole cut with it has no thread at all. When the ridges are not
+    gone from the cutter, the bore is moved by THREAD_BORE_OVERLAP off that surface (outward where the thread
+    reaches past it, inward otherwise, so the ridges stay joined to the wall) and cut again; a cutter that is still
+    plain is an error, never a part."""
+    def cut(r):
+        bore = Cylinder(r, length, align=BOTTOM)
+        c = bore - th
+        return c, bore.volume - c.volume >= 0.2 * th.volume
+    cutter, ok = cut(r_out)
+    if ok:
+        return cutter, r_out
+    bb = th.bounding_box()
+    reach = max(bb.max.X, bb.max.Y, -bb.min.X, -bb.min.Y)
+    r = r_out + (THREAD_BORE_OVERLAP if reach >= r_out + 2 * THREAD_BORE_OVERLAP else -THREAD_BORE_OVERLAP)
+    cutter, ok = cut(r)
+    if not ok:
+        raise RecipeError(f"The {label} did not cut (the cutter is a plain bore)", "",
+                          "Try a coarser pitch, a different length or clearance; do not use the result as a threaded hole.")
+    return cutter, r
+
+
 def _thread_part(th, length: float, external: bool, label: str, dims: dict, comp: float) -> HardwarePart:
     """comp: bd_warehouse's radial manufacturing compensation, which moves the thread but not its radius attributes."""
     r_in, r_out = min(th.apex_radius, th.root_radius), max(th.apex_radius, th.root_radius)
@@ -854,7 +893,8 @@ def _thread_part(th, length: float, external: bool, label: str, dims: dict, comp
     else:
         # one cut, no fuse: a bore that overshoots z = 0, minus the nut's thread ridges (a fused overshoot disc
         # leaves an invalid solid at some lengths)
-        shape = Pos(0, 0, -length) * (Cylinder(r_out, length + OVERSHOOT, align=BOTTOM) - th)
+        cutter, _r = _ridged_bore(th, r_out, length + OVERSHOOT, label)
+        shape = Pos(0, 0, -length) * cutter
         kind = "cut"
     if not shape.is_valid or len(shape.solids()) != 1:
         raise RecipeError(f"The {label} did not build as one valid solid", "", "Try a different length or clearance.")

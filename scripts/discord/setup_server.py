@@ -4,8 +4,8 @@
 
 Idempotent. Roles, categories and channels are matched by name and created, renamed, moved or updated. Nothing with
 history is deleted: a channel that is no longer used moves to the hidden ARCHIVE category, and only an empty one is
-removed. The posts (#welcome, #rules, #roles, #contributing, the staff handbook) and the forum posts (#guides,
-#recipes) are plain messages, edited in place when their text changes. Runs in GitHub Actions
+removed. The posts (#welcome, #rules, #roles, #contributing, the staff handbook) and the forum posts (#guides)
+are plain messages, edited in place when their text changes. Runs in GitHub Actions
 (.github/workflows/discord.yml, "setup"), between a before and an after snapshot.
 """
 from __future__ import annotations
@@ -24,8 +24,6 @@ import server as S  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 ART = ROOT / "scripts" / "discord" / "art"
-RECIPES = ROOT / "site" / "recipes" / "index.json"
-PREVIEWS = ROOT / "site" / "recipes" / "previews"
 WELCOME_ART = ROOT / "docs" / "readme" / "banner.png"
 
 VIEW, SEND, ADD_REACTIONS, HISTORY = S.P["view"], S.P["send"], S.P["react"], S.P["history"]
@@ -147,12 +145,10 @@ class Setup:
         return {r["id"]: r for r in self.roles.values()}
 
     def ensure_members(self):
-        """Recognition: the owner and MAINTAINERS are Maintainers; MODERATORS, CONTRIBUTORS and RECIPE_AUTHORS get
-        their roles."""
+        """Recognition: the owner and MAINTAINERS are Maintainers; MODERATORS and CONTRIBUTORS get their roles."""
         give = [(self.guild["owner_id"], "Maintainer")] + [(u, "Maintainer") for u in S.MAINTAINERS]
         give += [(u, "Moderator") for u in S.MODERATORS]
         give += [(u, "Contributor") for u in S.CONTRIBUTORS.values()]
-        give += [(u, "Recipe author") for u in S.RECIPE_AUTHORS.values()]
         for user, role in give:
             r = self.roles.get(role)
             if not r or not user:
@@ -481,8 +477,18 @@ class Setup:
                                          "exempt_roles": sorted(x.get("exempt_roles") or []),
                                          "exempt_channels": sorted(x.get("exempt_channels") or [])}, sort_keys=True)
             if norm(cur) != norm(patch):
-                self._try(f"AutoMod {name}", lambda: self._do(
-                    "PATCH", f"/guilds/{self.g}/auto-moderation/rules/{have['id']}", patch, f"AutoMod: update {name}"))
+                self._try(f"AutoMod {name}", lambda: self._update_or_create(have, patch, body, name))
+
+    def _update_or_create(self, have, patch, body, name):
+        """Discord lists its own suggested rules (Block Mention Spam) before anyone has set them up; they have no rule
+        behind them, so PATCH answers 404. Create the rule then."""
+        try:
+            return self._do("PATCH", f"/guilds/{self.g}/auto-moderation/rules/{have['id']}", patch,
+                            f"AutoMod: update {name}")
+        except d.DiscordError as e:
+            if "404" not in str(e):
+                raise
+            return self._do("POST", f"/guilds/{self.g}/auto-moderation/rules", body, f"AutoMod: {name} (set up)")
 
     def ensure_invite(self):
         welcome = self.channel("welcome")["id"]
@@ -681,29 +687,6 @@ class Setup:
                              d.link_button("This guide on GitHub", f"{S.GUIDE_URL}{slug}.md"))]
             self.forum_post(forum, threads, title, tag_name, parts, buttons, files, pin=(i == 1))
 
-    def recipes(self):
-        if not RECIPES.exists():
-            log("no site/recipes/index.json: recipes skipped")
-            return
-        forum = self.fresh("recipes")
-        threads = self.forum_threads(forum["id"])
-        for r in reversed(json.loads(RECIPES.read_text(encoding="utf-8"))["recipes"]):
-            src = (f"{S.REPO}/blob/main/form/recipes/{r['id']}.py" if r.get("builtin")
-                   else (r.get("url") or "").replace("raw.githubusercontent.com/kaizensx/form-studio/main/",
-                                                     "github.com/kaizensx/form-studio/blob/main/"))
-            text = (f"# {r['title']}\n\n{r.get('summary', '')}\n\n"
-                    f"- **Parameters:** {r.get('params_count', '—')}\n"
-                    f"- **Author:** {r.get('author', '—')}\n"
-                    f"- **Tags:** {', '.join(r.get('tags', [])[:8]) or '—'}\n\n"
-                    f"Start a design from it: ask your agent for it by name, run `form new \"My design\" {r['id']}`, "
-                    f"or look at its parameters with `form recipe {r['id']}`. `/recipe` shows it anywhere on this server.")
-            img = PREVIEWS / f"{r['id']}.webp"
-            files = {f"{r['id']}.webp": img.read_bytes()} if img.exists() else None
-            buttons = [d.row(d.link_button("Open the gallery", S.SITE + "recipes/"),
-                             *([d.link_button("Source", src)] if src.startswith("https://") else []))]
-            self.forum_post(forum, threads, r["title"], "Built-in" if r.get("builtin") else "Community",
-                            d.split_text(text), buttons, files)
-
     def run(self):
         log(f"server: {self.guild['name']} · bot: {self.me['username']}")
         self.ensure_profile()
@@ -723,7 +706,6 @@ class Setup:
         self.contributing()
         self.staff_post()
         self.guides()
-        self.recipes()
         code = self.ensure_invite()
         summary = os.environ.get("GITHUB_STEP_SUMMARY")
         lines = [f"Invite: https://discord.gg/{code}"] + [f"- {n}" for n in self.notes]

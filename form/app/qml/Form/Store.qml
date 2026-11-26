@@ -224,11 +224,8 @@ QtObject {
                       "/variants": "Loading variants", "/reference": "Saving the reference" }
             return t[r] !== undefined ? t[r] : ""
         }
-        var g = [[/^\/projects$/, "Creating the design"], [/^\/recipes\/create$/, "Creating the design"], [/^\/recipes\/library/, "Loading recipes"],
-                 [/^\/recipes\/community\/preview/, "Downloading and checking the recipe"], [/^\/recipes\/(community\/|package\/|derive\/)?install/, "Installing the recipe"],
-                 [/^\/recipes\/(package\/)?inspect/, "Reading the recipe"], [/^\/recipes\/share\/prepare/, "Preparing the recipe to share"],
-                 [/^\/recipes\/share\/submission/, "Saving the submission folder"], [/^\/recipes\/derive$/, "Building the recipe from the design"],
-                 [/^\/recipes\/uninstall/, "Uninstalling the recipe"], [/^\/(archive\/)?import/, "Importing"], [/^\/capabilities$/, m === "POST" ? "Saving what Form Studio is set up for" : ""],
+        var g = [[/^\/projects$/, "Creating the design"], [/^\/recipes\/create$/, "Creating the design"],
+                 [/^\/(archive\/)?import/, "Importing"], [/^\/capabilities$/, m === "POST" ? "Saving what Form Studio is set up for" : ""],
                  [/^\/setup$/, "Checking this computer"], [/^\/install$/, m === "GET" ? "Checking software" : "Starting the install"], [/^\/install\/remove$/, "Removing"], [/^\/updates/, "Checking for updates"],
                  [/^\/studio\/slicers/, "Finding slicers"], [/^\/studio\/slicer$/, "Switching slicer"], [/^\/printers/, "Reading printers"], [/^\/briefs/, "Writing the brief"],
                  [/^\/config$/, m === "POST" ? "Saving settings" : ""]]
@@ -326,7 +323,10 @@ QtObject {
         var grow = !handoff && Date.now() - _buildNext < 15000          // a new build (see _buildNext): it grows in, feature by feature
         if (grow) _buildNext = 0
         viewer.setModel(view, grow ? "build" : "")
-        viewer.setGhost(compare ? compare.view : null)
+        var rg = recon && recon.project === pid && !recon.settled ? recon.ghost : null
+        viewer.setGhost(compare ? compare.view : rg)       // Compare's revision, or the mesh a reconstruction grows inside
+        if (recon && !rg && !recon.settled) recon = null
+        if (peek) peek = null                               // a peek belongs to the head it was asked on
         viewer.selected = feature
         Qt.callLater(applyStageView)
     }
@@ -489,7 +489,7 @@ QtObject {
     function checkout(n) {
         if (hasDraft) return toast("Commit or discard the draft first.", "", true)
         ppost("/checkout", { rev: n }).then(function (r) {
-            compare = null; ack = []
+            endCompare(); ack = []
             if (r.job) track(r.job)
             refresh(true)
             toast("Head is now " + F.pad(n))
@@ -535,7 +535,7 @@ QtObject {
     function setStage(id) {
         stage = id; section = null
         if (id !== "prove") layers = null
-        if (id !== "release" && compare) { compare = null; if (viewer) viewer.setGhost(hasDraft ? view : null) }
+        if (id !== "release" && compare) endCompare()
         if (viewer) { var had = !!viewer.marker; viewer.setMarker(null); if (had) viewer.setView(viewName, true) }    // a check's marker zoomed in: frame the part again
         applyStageView()
     }
@@ -545,8 +545,15 @@ QtObject {
     function toggleDims() { dims = !dims; applyStageView() }
     function setAck(id, on) { ack = on ? ack.concat([id]) : ack.filter(function (x) { return x !== id }) }
 
+    // Compare: an older revision as a ghost over the head. It ends from the same button (a toggle), the Done on the
+    // viewport's "Comparing" chip, Esc, another stage, or showing or checking out another revision.
+    function endCompare() {
+        if (!compare) return
+        compare = null
+        if (viewer) { viewer.setGhost(hasDraft ? view : null); viewer.flagged = [] }
+    }
     function compareWith(n) {
-        if (compare && compare.rev === n) { compare = null; if (viewer) { viewer.setGhost(null); viewer.flagged = [] } return }
+        if (compare && compare.rev === n) return endCompare()
         Promise.all([pget("/view?rev=" + n), pget("/diff?a=" + n + "&b=" + project.head)]).then(function (r) {
             compare = { rev: n, view: r[0], diff: r[1], geo: null, geoBusy: true, geoError: "" }
             if (viewer) {
@@ -800,6 +807,7 @@ QtObject {
     // "Make editable": the mesh becomes a new design, rebuilt as CAD and checked against the mesh (form/recon)
     function makeEditable(file) {
         toast("Reconstructing " + file, "Building the solid and fitting surfaces. A large mesh takes a few minutes.")
+        var mesh = ((shown && shown.companions) || []).filter(function (c) { return !!c.mesh && c.label === file })[0] || null
         return ppost("/reconstruct", { file: file }).then(function (r) {
             var m = r.summary || ({})
             var ed = Number(m.editable_pct || 0)
@@ -813,10 +821,28 @@ QtObject {
                       + "positions, not dimensions. Rebuild as editable CAD has the agent model it with named features.")
             else                                       // no verified feature recipe: the agent remodel is the next step
                 toast("“" + r.name + "” reached Layer " + m.layer, F.fmt(m.frozen_area_pct, 0) + "% frozen facets, no verified feature "
-                      + "recipe. Rebuild as editable CAD has the agent model it with named features.")
-            return reloadStudio().then(function () { open(r.project) })
+                      + "model. Rebuild as editable CAD has the agent model it with named features.")
+            return reloadStudio().then(function () { s._reconReveal(r.project, mesh, m); return open(r.project) })
         }, fail)
     }
+    // The reconstruction's reveal: the mesh's own edges stay on screen in blueprint (the viewport's ghost), the CAD
+    // grows inside them with the build-up, and a readout counts to the largest distance the comparison measured
+    // between the two (summary.hausdorff_mm, computed by form/recon). When the build is in, the mesh's lines fade.
+    property var recon: null           // { project, file, ghost: { edges }, mm, within, settled }
+    function _reconReveal(project, mesh, m) {
+        if (!mesh || !mesh.edges || m.hausdorff_mm === undefined || m.hausdorff_mm === null) { recon = null; return }
+        recon = { project: project, file: mesh.label, ghost: { edges: mesh.edges }, mm: Number(m.hausdorff_mm), within: m.within_tolerance !== false, settled: false }
+        _buildNext = Date.now()
+    }
+    function reconSettle() {            // the build-up is in: the mesh's lines leave, the number stays a little longer
+        if (!recon || recon.settled || recon.project !== pid) return
+        recon = Object.assign({}, recon, { settled: true })
+        _reconFade.restart(); _reconEnd.restart()
+    }
+    property var _reconFade: Timer { interval: 900; onTriggered: if (s.viewer && s.recon && !s.compare && !s.hasDraft) s.viewer.fadeGhost() }
+    property var _reconEnd: Timer { interval: 4200; onTriggered: s.recon = null }
+    property var _reconReset: Connections { target: s
+        function onPidChanged() { if (s.recon && s.recon.project !== s.pid) s.recon = null } }
     // "Rebuild as editable CAD": a conversation that remodels the project's meshes as clean CAD with named features
     // and Params, compared with the meshes until within tolerance (form/remodel, design_guide "reference_parts")
     function rebuildAsCad(files) {
@@ -879,6 +905,24 @@ QtObject {
     }
     function refineUndo(id) { return _refinePost({ action: "undo", feature: id || "", expect_head: project ? project.head : null },
                                                  id ? "Undoing the refine change" : "Undoing the refinement") }
+    // Before / After: hold to see the revision before the refinement, cross-faded over the head; let go and the head
+    // is back. Looking changes nothing.
+    property var peek: null            // { rev, view, on }
+    property bool _peekWant: false
+    readonly property int refineBase: {                 // the revision the head's refinement started from; 0 = none
+        if (!project) return 0
+        var best = 0, rs = project.revisions || []
+        for (var i = 0; i < rs.length; i++) if (rs[i].n <= project.head && rs[i].n > best && (rs[i].refine || rs[i].origin === "refine")) best = rs[i].n
+        return best > 1 ? best - 1 : 0
+    }
+    function peekBefore(on) {
+        _peekWant = !!on
+        if (!on) { if (peek && peek.on) peek = Object.assign({}, peek, { on: false }); return }
+        var n = refineBase, at = pid
+        if (!n || hasDraft || scrub || compare) return
+        if (peek && peek.rev === n) { peek = Object.assign({}, peek, { on: true }); return }
+        loadRev(n).then(function (v) { if (s.pid === at && !s.compare && !s.scrub) s.peek = { rev: n, view: v, on: s._peekWant } }, function () {})
+    }
     function refineAgain() { return _refinePost({ action: "rerun" }, "Starting refinement") }
     function resetRefineLedger() {
         return act("Resetting what refinement learned", post("/refine/ledger/reset", {})).then(function (r) {
@@ -912,6 +956,7 @@ QtObject {
     // the part never blinks. When the design is saved its head takes over in place (showHead, _handoff), the same
     // solid, or the one the partial build kept if a stage was dropped: the saved design wins.
     property var building: null        // the stage on screen: { draft, project, feature, label, at, of, index }
+    property var revealing: []         // feature ids the viewport is building up right now (the Design list marks their rows)
     readonly property string buildingText: building ? "Building " + building.label + (building.of > 1 ? " (" + building.at + " of " + building.of + ")" : "") : ""
     property var stageLog: []          // stages drawn: { draft, feature, at, of, t (ms) } (diagnostics, tests)
     property var stageViewer: null     // the Designing screen's viewport (the workspace's is `viewer`)
@@ -953,6 +998,7 @@ QtObject {
         _endDraft(d)
         if (building && building.draft === d) { _handoff = true; if (screen === "designing") calmArrive = true }
         follow(w.ev)
+        if (building) _stageEnd.restart()          // the head takes over; if it never does, the caption still goes
     }
     function _stageView() { return screen === "designing" ? stageViewer : screen === "work" ? viewer : null }
     // the agent of this conversation (or any agent, while the open design was not worked on) starts a new design while
@@ -1015,9 +1061,23 @@ QtObject {
         building = null; _handoff = false; calmArrive = false; _framedDiag = 0; _commitWait = null
         if (stageViewer && stageViewer.model && stageViewer.model.stage) stageViewer.setModel(null)
     }
-    property var _stageEnd: Timer { interval: 3000; onTriggered: if (s.building && !s._handoff && !s._commitWait && !s.chatBusy) s._stageClear() }
+    // The caption of a streamed build never outlives it. 3 s after the last stage, the last commit or the end of the
+    // reply: a build that was saved (or handed to the saved head) drops its caption whatever else happened (a commit
+    // that arrived with its last stages, a head that was never shown because a revision was being viewed); a build
+    // nobody saved is cleared once the reply has ended. A build still streaming while the agent works keeps it.
+    property var _stageEnd: Timer { interval: 3000; onTriggered: s._stageTimeout() }
+    function _stageTimeout() {
+        if (!building || _commitWait) return
+        if (_handoff || _draftDone[building.draft]) {
+            building = null; _handoff = false; calmArrive = false; _framedDiag = 0
+            if (screen === "work" && viewer && viewer.model && viewer.model.stage) showHead()     // the saved head, not a stage
+            return
+        }
+        if (!chatBusy) _stageClear()
+    }
     property var _stageWatch: Connections { target: s
         function onChatBusyChanged() { if (!s.chatBusy && s.building) s._stageEnd.restart() }
+        function onBuildingChanged() { if (s.building) s._stageEnd.restart() }
         function onScreenChanged() { if (s.screen !== "designing" && s.screen !== "work") s._stageClear() }
         function onPidChanged() { if (s.building && s.building.project && s.building.project !== s.pid) s.building = null } }
     property var _stageDone1: Connections { target: s.stageViewer; ignoreUnknownSignals: true; function onRevealDone() { s._stageSettle(s.stageViewer) } }
@@ -1411,7 +1471,9 @@ QtObject {
     }
     // a change the agent made, from its reply card: compare with the revision before, or go back to it
     function compareChange(c) {
-        var go = function () { setStage("shape"); compareWith(c.from) }
+        // the same card again ends it: setStage would have ended it and compareWith started it again, so it never went off
+        if (c.project === pid && compare && compare.rev === c.from) return endCompare()
+        var go = function () { if (stage !== "shape") setStage("shape"); compareWith(c.from) }
         if (c.project !== pid) open(c.project).then(go); else go()
     }
     function undoChange(c) {
@@ -2038,6 +2100,7 @@ QtObject {
     }
     function _showScrub(n, v) {
         if (!viewer) return
+        endCompare()                         // another revision on screen: the ghost would describe the wrong pair
         if (n === project.head) { scrub = null; if (preview) { viewer.setModel(preview); viewer.setGhost(view) } else showHead() }
         else { scrub = { rev: n, view: v }; viewer.flagged = []; viewer.setModel(v); viewer.setGhost(null) }
     }

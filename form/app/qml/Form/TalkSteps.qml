@@ -17,7 +17,7 @@ Column {
     function rich(s) {
         switch (s.tool) {
         case "create_design": return ["cuboid", "Wrote a new design"]
-        case "create_project": return ["cuboid", "Started a design from the " + (arg(s, "recipe") || "chosen") + " recipe"]
+        case "create_project": return ["cuboid", "Started a design from a building block"]
         case "update_design": return ["pencil_ruler", "Rewrote the design code"]
         case "commit_change": return ["git_commit_horizontal", "Committed a revision"]
         case "render": return ["eye", "Looked at the " + (arg(s, "view") || "iso").replace("_", " ") + " view" + (arg(s, "highlight") ? ", " + arg(s, "highlight") : "")]

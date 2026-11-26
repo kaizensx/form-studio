@@ -18,8 +18,12 @@ Rectangle {
     signal edited(string text)
     implicitHeight: Theme.hMd; implicitWidth: 120; radius: Theme.rSm
     opacity: enabled ? 1 : 0.5
-    color: bare ? "transparent" : Theme.well; border.width: bare ? 0 : 1
-    border.color: invalid ? Theme.signal : input.activeFocus ? Theme.datum : hh.hovered ? Theme.rule3 : Theme.rule2
+    // the well keeps its quiet rule2 edge under the pointer (the fill lifts a wash instead), so a form of fields stays
+    // calm on a sheet; the edge changes only for meaning: focus (datum) and a mistake (signal)
+    color: bare ? "transparent" : hh.hovered && !input.activeFocus ? Qt.tint(Theme.well, Theme.washHover) : Theme.well
+    border.width: bare ? 0 : 1
+    border.color: invalid ? Theme.signal : input.activeFocus ? Theme.datum : Theme.rule2
+    Behavior on color { Tint {} }
     Behavior on border.color { Tint {} }
     HoverHandler { id: hh; cursorShape: Qt.IBeamCursor }
     // the focus halo: a soft second edge, so focus reads from across the room

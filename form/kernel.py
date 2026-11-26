@@ -6,13 +6,13 @@ kernel crash or runaway boolean can be killed without losing project state.
 from __future__ import annotations
 
 import base64
-import math
+import os
 import time
 from pathlib import Path
 
 import numpy as np
 
-from .recipes import RecipeError, registry, resolve
+from .recipes import RecipeError, resolve
 
 KERNEL_ID = None
 _cache: dict = {}     # geometry key -> built model (kept small)
@@ -79,8 +79,17 @@ def _where(e: BaseException, recipe) -> str:
 
 
 def _build(recipe_id: str, values: dict, tol: float):
-    """Build, attribute every face to a feature, and tessellate."""
-    from build123d import CenterOf, Vertex
+    """Build, attribute every face to a feature, and tessellate at tol (no store: _get keeps built solids)."""
+    return _tessellated(_build_brep(recipe_id, values), tol)
+
+
+ATTR_TOL = 0.05     # faces are attributed on a mesh at this tolerance, once per build, whatever tolerance is asked
+
+
+def _build_brep(recipe_id: str, values: dict):
+    """Build and attribute every face of the result to a feature: the B-rep model every tessellation, export and
+    check is derived from (see _tessellated). This is the expensive step; _brep keeps its result."""
+    from build123d import CenterOf
     recipe = resolve(recipe_id)
     v = recipe.validate(values)
     t0 = time.perf_counter()
@@ -130,27 +139,73 @@ def _build(recipe_id: str, values: dict, tol: float):
             f"The result is {len(solids)} solid(s) (valid={final.is_valid}); this design declares {want}", stages[-1].feature,
             "A cut has split the body, or parts touch and fused. Separate parts by a gap, or reduce the last change.")
 
-    skins = [_Skin(s.shape) for s in stages[:-1]]
-    faces, by_feature = [], {}
-    # mesh the whole solid once (shared edge discretisation, parallel), then read each face's triangles
+    feats, tess = _attribute(final, stages, ATTR_TOL)
+    bb = final.bounding_box()
+    com = final.center(CenterOf.MASS)
+    base = {
+        "recipe": recipe, "values": v, "shape": final, "face_features": feats,
+        "bbox": [[bb.min.X, bb.min.Y, bb.min.Z], [bb.max.X, bb.max.Y, bb.max.Z]],
+        "volume": float(final.volume), "area": float(final.area), "com": (com.X, com.Y, com.Z),
+        "t_build": t_build, "t_total": time.perf_counter() - t0, "craft_notes": craft_notes,
+        "unchanged_stages": empty, "brep_from": "built", **featureprog.report(),
+        # the solid as each feature left it (form/proving.py); not kept on disk: a model read from the store
+        # proves its rows on the finished solid only
+        "stages": [(s.feature, s.shape) for s in stages],
+    }
+    _finish_base(base)
+    base["_tess"][ATTR_TOL] = tess
+    return base
+
+
+def _face_mesh(face, trsf_loc=None):
+    """(P, T) of one face's current triangulation (outward winding), or None."""
     from OCP.BRep import BRep_Tool
-    from OCP.BRepMesh import BRepMesh_IncrementalMesh
     from OCP.TopAbs import TopAbs_REVERSED
     from OCP.TopLoc import TopLoc_Location
-    BRepMesh_IncrementalMesh(final.wrapped, tol, False, 0.25, True)
-    for face in final.faces():
-        loc = TopLoc_Location()
-        tri = BRep_Tool.Triangulation_s(face.wrapped, loc)
-        if tri is None or tri.NbTriangles() == 0:
+    loc = TopLoc_Location()
+    tri = BRep_Tool.Triangulation_s(face.wrapped, loc)
+    if tri is None or tri.NbTriangles() == 0:
+        return None
+    trsf = loc.Transformation()
+    P = np.empty((tri.NbNodes(), 3), dtype=np.float64)
+    for i in range(1, tri.NbNodes() + 1):
+        q = tri.Node(i).Transformed(trsf)
+        P[i - 1] = (q.X(), q.Y(), q.Z())
+    T = np.array([tri.Triangle(i).Get() for i in range(1, tri.NbTriangles() + 1)], dtype=np.uint32) - 1
+    if face.wrapped.Orientation() == TopAbs_REVERSED:
+        T = T[:, [0, 2, 1]]
+    return P, T
+
+
+def _mesh_faces(shape, faces, tol) -> list:
+    """[(face index, P, T, area)] of the solid meshed at tol: shared edge discretisation, parallel. The solid's old
+    triangulation goes first, so the result is the one tol gives whatever was meshed before."""
+    from OCP.BRepMesh import BRepMesh_IncrementalMesh
+    from OCP.BRepTools import BRepTools
+    BRepTools.Clean_s(shape.wrapped)
+    BRepMesh_IncrementalMesh(shape.wrapped, tol, False, 0.25, True)
+    out = []
+    for i, face in enumerate(faces):
+        m = _face_mesh(face)
+        if m is None:
             continue
-        trsf = loc.Transformation()
-        P = np.empty((tri.NbNodes(), 3), dtype=np.float64)
-        for i in range(1, tri.NbNodes() + 1):
-            q = tri.Node(i).Transformed(trsf)
-            P[i - 1] = (q.X(), q.Y(), q.Z())
-        T = np.array([tri.Triangle(i).Get() for i in range(1, tri.NbTriangles() + 1)], dtype=np.uint32) - 1
-        if face.wrapped.Orientation() == TopAbs_REVERSED:
-            T = T[:, [0, 2, 1]]
+        P, T = m
+        a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+        areas = np.linalg.norm(np.cross(b - a, c - a), axis=1) / 2
+        out.append((i, P, T, float(areas.sum())))
+    return out
+
+
+def _attribute(final, stages, tol):
+    """The feature of every face of the result (by face index; None for a face with no triangles), and the mesh at
+    tol it was read on. A final face belongs to the last stage that created the surface under it."""
+    from build123d import Vertex
+    skins = [_Skin(s.shape) for s in stages[:-1]]
+    faces = final.faces()
+    tess = _mesh_faces(final, faces, tol)
+    feats: list = [None] * len(faces)
+    for i, P, T, _area in tess:
+        face = faces[i]
         a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
         areas = np.linalg.norm(np.cross(b - a, c - a), axis=1) / 2
         k = int(np.argmax(areas))
@@ -159,6 +214,7 @@ def _build(recipe_id: str, values: dict, tol: float):
             # on a large free-form face a coarse triangle's centre can sit tenths of a mm off the surface: use the
             # nearest point on the face's own surface, so the feature test below compares surfaces, not the mesh
             try:
+                from OCP.BRep import BRep_Tool
                 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
                 from OCP.gp import gp_Pnt
                 pj = GeomAPI_ProjectPointOnSurf(gp_Pnt(*map(float, probe)), BRep_Tool.Surface_s(face.wrapped))
@@ -169,22 +225,38 @@ def _build(recipe_id: str, values: dict, tol: float):
                 pass
         feature = stages[0].feature
         pt = Vertex(*probe)
-        for i in range(len(skins) - 1, -1, -1):
-            if not skins[i].holds(face, probe, pt, max(1.5 * tol, 0.01)):
-                feature = stages[i + 1].feature
+        for j in range(len(skins) - 1, -1, -1):
+            if not skins[j].holds(face, probe, pt, max(1.5 * tol, 0.01)):
+                feature = stages[j + 1].feature
                 break
-        faces.append({"feature": feature, "P": P, "T": T, "face": face, "area": float(areas.sum())})
-        by_feature.setdefault(feature, []).append(face)
+        feats[i] = feature
+    return feats, tess
 
-    bb = final.bounding_box()
-    com = final.center(CenterOf.MASS)
-    model = {
-        "recipe": recipe, "values": v, "shape": final, "faces": faces, "by_feature": by_feature,
-        "bbox": [[bb.min.X, bb.min.Y, bb.min.Z], [bb.max.X, bb.max.Y, bb.max.Z]],
-        "volume": float(final.volume), "area": float(final.area), "com": (com.X, com.Y, com.Z),
-        "t_build": t_build, "t_total": time.perf_counter() - t0, "tol": tol, "craft_notes": craft_notes,
-        "unchanged_stages": empty, **featureprog.report(),
-    }
+
+def _finish_base(base) -> None:
+    """The parts of a B-rep model that follow from its shape and face map: faces in order and faces per feature."""
+    faces = base["shape"].faces()
+    base["_faces"] = faces
+    by = {}
+    for f, feat in zip(faces, base["face_features"]):
+        if feat is not None:
+            by.setdefault(feat, []).append(f)
+    base["by_feature"] = by
+    base["_tess"] = {}
+
+
+def _tessellated(base, tol):
+    """The model the operations read: the B-rep model with its faces meshed at tol (each with its feature)."""
+    tess = base["_tess"].get(tol)
+    t0 = time.perf_counter()
+    if tess is None:
+        tess = _mesh_faces(base["shape"], base["_faces"], tol)
+    feats, faces = base["face_features"], base["_faces"]
+    model = {k: v for k, v in base.items() if k not in ("_tess", "_faces")}
+    model["faces"] = [{"feature": feats[i], "P": P, "T": T, "face": faces[i], "area": area}
+                      for i, P, T, area in tess if feats[i] is not None]
+    model["tol"] = tol
+    model["t_mesh"] = time.perf_counter() - t0
     return model
 
 
@@ -337,26 +409,119 @@ def _craft_notes() -> list:
         return []
 
 
+CACHE_MAX = 12          # tessellated models kept in a worker, by (caller key, tolerance)
+BREPS_MAX = 8           # B-rep models kept in a worker, by content key (form/brepstore.py)
+EPHEMERAL = ("var-", "opt-", "mv-")   # sweeps, optimiser candidates, morph frames: kept in memory, never on disk
+_breps: dict = {}       # content key -> B-rep model (no tessellation)
+STATS = {"built": 0, "disk": 0, "memory": 0, "waited": 0, "build_s": 0.0}
+
+
+def _cache_put(k, m) -> None:
+    _cache.pop(k, None)
+    _cache[k] = m
+    while len(_cache) > CACHE_MAX:
+        _cache.pop(next(iter(_cache)))
+
+
+def _brep_put(ck, base) -> None:
+    _breps.pop(ck, None)
+    _breps[ck] = base
+    while len(_breps) > BREPS_MAX:
+        _breps.pop(next(iter(_breps)))
+
+
+def _meta(base) -> dict:
+    """What form/brepstore.py keeps next to the B-rep: everything _tessellated needs besides the shape."""
+    return {k: base.get(k) for k in ("face_features", "bbox", "volume", "area", "com", "t_build", "t_total",
+                                       "craft_notes", "unchanged_stages", "log", "skipped", "parts")} | \
+        {"n_faces": len(base["_faces"]), "kernel": kernel_id()}
+
+
+def _from_store(ck, recipe, v):
+    from . import brepstore
+    hit = brepstore.load(ck)
+    if hit is None:
+        return None
+    shape, meta = hit
+    base = {"recipe": recipe, "values": v, "shape": shape, "brep_from": "disk",
+            **{k: meta.get(k) for k in ("face_features", "bbox", "volume", "area", "t_build", "t_total",
+                                        "unchanged_stages")},
+            "com": tuple(meta.get("com") or (0.0, 0.0, 0.0)), "craft_notes": list(meta.get("craft_notes") or []),
+            "log": list(meta.get("log") or []), "skipped": list(meta.get("skipped") or [])}
+    if meta.get("parts"):
+        base["parts"] = meta["parts"]
+    _finish_base(base)
+    if len(base["_faces"]) != len(base["face_features"] or []):
+        return None
+    STATS["disk"] += 1
+    return base
+
+
+def _brep(key: str, recipe_id: str, values: dict):
+    """The B-rep model of (recipe, values): this worker's memory, else the disk store any process may have filled,
+    else built once (a process already building it is waited for, not raced)."""
+    from . import brepstore
+    recipe = resolve(recipe_id)
+    v = recipe.validate(values)
+    ck = brepstore.key(recipe, recipe_id, v)
+    base = _breps.get(ck)
+    if base is not None:
+        STATS["memory"] += 1
+        _brep_put(ck, base)
+        return base
+    persist = not str(key).startswith(EPHEMERAL)
+    base = _from_store(ck, recipe, v) if persist else None
+    mine = False
+    if base is None and persist:
+        mine = brepstore.claim(ck)
+        if not mine:                                   # another process builds it: wait, then read what it stored
+            STATS["waited"] += 1
+            from . import featureprog
+            left = featureprog.time_left()
+            brepstore.wait(ck, None if left is None else max(1.0, left))
+            base = _from_store(ck, recipe, v)
+            if base is None:
+                mine = brepstore.claim(ck)
+    try:
+        if base is None:
+            t = time.perf_counter()
+            base = _build_brep(recipe_id, values)
+            STATS["built"] += 1
+            STATS["build_s"] += time.perf_counter() - t
+            if persist and not base.get("skipped"):    # a skip can depend on a hang mark that expires: rebuild then
+                brepstore.save(ck, base["shape"], _meta(base))
+    finally:
+        if mine:
+            brepstore.release(ck)
+    base["content_key"] = ck
+    if not base.get("skipped"):                        # a build that left features out asks again next time: its
+        _brep_put(ck, base)                            # skip records (and hang marks) decide, and they change
+    return base
+
+
 def _get(key: str, recipe_id: str, values: dict, tol: float):
+    """The model of (recipe, values) tessellated at tol. One build serves every tolerance and every caller key."""
     m = _cache.get((key, tol))
     if m is None:
-        m = _build(recipe_id, values, tol)
-        if len(_cache) > 12:
-            _cache.pop(next(iter(_cache)))
-        _cache[(key, tol)] = m
+        m = _tessellated(_brep(key, recipe_id, values), tol)
+        _cache_put((key, tol), m)
     return m
 
 
 def _get_near(key: str, recipe_id: str, values: dict, tol: float):
-    """The built model for `key` at any tessellation already in the cache, else built at `tol`.
+    """The built model for `key` at any tessellation already in the cache, else tessellated at `tol`.
 
     For questions answered on the B-rep (what face is here, how thick is the wall): the viewer's model is
-    tessellated at 0.03 mm, and building the same solid again at another tolerance can take as long as the first
-    build (a threaded part takes tens of seconds), so a click would seem to do nothing."""
+    tessellated at 0.03 mm and is good enough, so a click does not wait for another tessellation."""
     for (k, t), m in _cache.items():
         if k == key:
             return m
     return _get(key, recipe_id, values, tol)
+
+
+def op_stats():
+    """How this worker got its B-rep models: built, read from the disk store, from memory, or waited for."""
+    return dict(STATS, breps=len(_breps), models=len(_cache))
 
 
 FEATURE_EDGE_DEG = 25.0     # between two facets, an edge is drawn only where the surface turns more than this
@@ -575,7 +740,8 @@ def _summary(model, extra_mass=None) -> dict:
         "com": model["com"], "derived": r.derived(v), "interface_audit": r.measure(v, model["by_feature"]),
         "statics": statics, "signature": _signature(model), "companions": r.companions(v),
         "faces": len(model["faces"]), "triangles": int(sum(len(f["T"]) for f in model["faces"])),
-        "timing": {"build_s": round(model["t_build"], 4), "total_s": round(model["t_total"], 4)},
+        "timing": {"build_s": round(model["t_build"], 4), "total_s": round(model["t_total"], 4),
+                   "brep": model.get("brep_from", "built")},
         "kernel": kernel_id(),
         "craft_notes": model.get("craft_notes", []),
         **({"build_log": model["log"]} if model.get("log") else {}),
@@ -722,38 +888,21 @@ def _open_edges(path) -> int:
     return int((counts == 1).sum())
 
 
-def write_stl(shape, path, tol: float = 0.01, ang: float = 0.1) -> dict:
-    """An STL of a valid solid with no holes. OCCT's mesher can fail on a face at one setting (a small face between
-    tangent surfaces) and still return: that face gets no triangles, or its edges get a different polygon from its
-    neighbour's, and the STL has an open boundary although the CAD solid is fine. The written mesh is checked
-    edge by edge; when it is open the solid is meshed again with nearby settings and the first closed mesh is kept.
-    A mesh that no setting closes is written with the asked-for settings, and the mesh check reports it."""
-    from OCP.BRepMesh import BRepMesh_IncrementalMesh
-    from OCP.BRepTools import BRepTools
-    from OCP.StlAPI import StlAPI_Writer
-
-    def write(t, a):
-        BRepTools.Clean_s(shape.wrapped)
-        BRepMesh_IncrementalMesh(shape.wrapped, t, True, a, True).Perform()
-        w = StlAPI_Writer()
-        w.ASCIIMode = False                                    # binary, as build123d's export_stl writes
-        w.Write(shape.wrapped, str(path))
-        dropped[0] = drop_degenerate(path)
-        return _open_edges(path)
-
-    dropped = [0]
-
-    tries = [(tol, ang), (tol, ang * 2), (tol / 2, ang * 2), (tol * 2, ang * 2), (tol / 10, ang), (tol * 5, max(ang * 2, 0.25))]
-    first = None
-    for t, a in tries:
-        open_ = write(t, a)
-        first = open_ if first is None else first
-        if not open_:
-            return {"tolerance": t, "angular_tolerance": a, "remeshed": (t, a) != (tol, ang), "open_edges": 0,
-                    "open_edges_first": first, "degenerate_dropped": dropped[0]}
-    open_ = write(tol, ang)
-    return {"tolerance": tol, "angular_tolerance": ang, "remeshed": False, "open_edges": open_, "open_edges_first": first,
-            "degenerate_dropped": dropped[0]}
+def write_stl(shape, path, tol: float = 0.01, ang: float = 0.1, budget_s: float = 35.0) -> dict:
+    """An STL of a valid solid with no holes, or one that says exactly why it has them. OCCT's mesher can fail on a
+    face at one setting (a small or sliver face between tangent surfaces) and still return: that face gets no
+    triangles, or its edges get a different polygon from its neighbour's, and the STL has an open boundary although
+    the CAD solid is fine. Each solid climbs the export ladder (form/meshclose.py: finer mesh, sewing, welding, a
+    last-resort repair) until its mesh is closed; `closure` reports the rung, the most the mesh can be from the CAD
+    surface, and, for a solid still open, the cause. The climb stops after budget_s (the kernel call must answer)."""
+    from . import meshclose
+    pieces, closure = meshclose.close(shape, tol, ang, budget_s)
+    meshclose.write(path, pieces)
+    first = next((r["tries"][0]["open_edges"] for r in closure["per_solid"] if r["tries"]), 0)
+    open_ = sum(sum((r.get("open") or {}).values()) for r in closure["per_solid"])
+    used = [r.get("tolerance") or tol for r in closure["per_solid"]]
+    return {"tolerance": min(used) if used else tol, "angular_tolerance": ang, "remeshed": closure["rung"] != "mesh",
+            "open_edges": open_, "open_edges_first": first, "closure": closure}
 
 
 def _textured_parts(model, face_part: list, ids: list, budget: int | None = None) -> list | None:
@@ -851,10 +1000,19 @@ def op_export(key, recipe_id, values, out_dir, name, orientation="as_modelled", 
         lo, hi = V.min(axis=0), V.max(axis=0)
         V = V - np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]])
         meshtex.write_stl(stl, V, F)
+        from . import meshclose
+        topo = meshclose.topology(*meshclose.weld(V[F].astype(np.float32).astype(np.float64)))
+        closure = {"closed": meshclose.closed(topo), "rung": "texture", "solids": 1,
+                   "deviation_mm": 0.02,                  # _fine_faces: the tessellation the texture displaces
+                   "note": "A mesh texture displaces the surface by design: the STL is the CAD surface meshed within "
+                           "0.02 mm and then displaced by the texture, so it differs from the smooth STEP by the "
+                           "texture's amplitude and its volume differs from the CAD volume."}
+        if not closure["closed"]:
+            closure["why"] = f"the textured mesh has {meshclose.open_edges(topo)} open or non-manifold edges"
         size = hi - lo
         out = {"step": str(step), "stl": str(stl), "orientation": orientation, "stl_tolerance_mm": tol,
                "print_bbox": [float(size[0]), float(size[1]), float(size[2])], "brep_volume_mm3": model["volume"],
-               "seconds": round(time.perf_counter() - t, 3),
+               "seconds": round(time.perf_counter() - t, 3), "closure": closure,
                "mesh_texture": {"label": meshtex.LABEL, "triangles": info["triangles_out"],
                                 "textures": [{k: x[k] for k in ("kind", "amplitude", "scale", "features")} for x in info["textures"]],
                                 **({"coarser": info["coarser"]} if info.get("coarser") else {})}}
@@ -864,7 +1022,8 @@ def op_export(key, recipe_id, values, out_dir, name, orientation="as_modelled", 
     bb = oriented.bounding_box()
     out = {"step": None if mesh else str(step), "stl": str(stl), "orientation": orientation,
            "stl_tolerance_mm": used["tolerance"], "print_bbox": [bb.size.X, bb.size.Y, bb.size.Z],
-           "brep_volume_mm3": model["volume"], "seconds": round(time.perf_counter() - t, 3)}
+           "brep_volume_mm3": model["volume"], "seconds": round(time.perf_counter() - t, 3),
+           "closure": used["closure"]}                     # closed or why not, the rung and the stated deviation
     if mesh:
         out["unavailable"] = {"step": "Not available for mesh designs: OpenSCAD produces triangles, not a CAD solid."}
     return out
@@ -934,44 +1093,27 @@ def _orientation_table(P, T, extra=()):
     return [analysis.orientation_row(P, T, name) for name in names]
 
 
-def _thickness(model, max_rays=1500):
-    """Opposing-wall thickness by casting rays inward from surface samples."""
-    from build123d import Vector
-    from . import analysis
-    inter_for = analysis.wall_intersectors(model)     # each part measured on its own: parts touching are not walls
-    total = sum(f["area"] for f in model["faces"]) or 1
-    kmin = 3 if len(model["faces"]) * 3 <= max_rays * 2 else 0      # a mesh has thousands of faces: sample by area only
-    best = {"t": float("inf")}
-    hist = []
-    rng = np.random.default_rng(0)   # fixed seed: the same solid always gets the same samples
-    exempt = set(getattr(model["recipe"], "wall_exempt", ()))     # lettering: its sharp corners are not walls (form/marks.py checks strokes)
-    for f in model["faces"]:
-        if f["feature"] in exempt:
-            continue
-        P, T = f["P"], f["T"]
-        a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
-        areas = np.linalg.norm(np.cross(b - a, c - a), axis=1) / 2
-        k = max(kmin, int(round(max_rays * f["area"] / total)))
-        if k == 0:
-            continue
-        pick = rng.choice(len(T), size=k, p=areas / areas.sum())
-        u, w_ = rng.random(k), rng.random(k)
-        flip = u + w_ > 1
-        u[flip], w_[flip] = 1 - u[flip], 1 - w_[flip]
-        pts = a[pick] + (b[pick] - a[pick]) * u[:, None] + (c[pick] - a[pick]) * w_[:, None]
-        for p in pts:
-            try:
-                n = f["face"].normal_at(Vector(*p))
-            except Exception:
-                continue
-            hit = analysis.wall_hit(inter_for(f["face"]), p, (n.X, n.Y, n.Z))   # the same ray the thickness map casts
-            if hit is None:                                      # nothing opposite, or a wedge at an edge or chamfer, not a wall
-                continue
-            w, qq = hit
-            hist.append(w)
-            if w < best["t"]:
-                best = {"t": float(w), "at": [float(x) for x in p], "to": [float(x) for x in qq], "feature": f["feature"]}
-    return best, hist
+def _thickness(model, max_rays=1500, floor=0.8, key=None):
+    """Opposing-wall thickness over the whole surface (form/thickness.py): (the thinnest wall, every thin region).
+
+    The thinnest is {"t": inf} when no opposing wall is found. `max_rays` is kept for callers of the sampled
+    measurement this replaced; the field measures every vertex."""
+    from . import thickness
+    res = thickness.regions(key if key is not None else model, floor, model=model)
+    best = dict(res["thinnest"]) if res["thinnest"] else {"t": float("inf")}
+    # a wall of a structural feature (role "structure", the load path) is held to a stricter minimum by the
+    # Thinnest-wall check than a decorative ridge: the thinnest region a structural feature carries
+    feats = getattr(model["recipe"], "features", None) or []
+    roles, labels = {f.id: f.role for f in feats}, {f.id: f.label for f in feats}
+    for r in res.get("regions") or []:                      # sorted thinnest first
+        sides = [x for x in dict.fromkeys([r.get("feature")] + list(r.get("features") or [])) if x]
+        carry = [x for x in sides if roles.get(x) == "structure"]
+        if carry:
+            best["structural"] = {"t": r["min_mm"], "at": r["at"], "to": r["to"], "feature": carry[0],
+                                  "features": sides, "label": labels.get(carry[0], carry[0]),
+                                  "cut_by": [labels.get(x, x) for x in sides if roles.get(x) != "structure"]}
+            break
+    return best, res
 
 
 def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180, 180, 180), orientation="as_modelled",
@@ -981,9 +1123,10 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
     model = _get(key, recipe_id, values, 0.05)
     P, T = _mesh_arrays(model)
     table = _orientation_table(P, T, extra=(orientation,))
-    thin, hist = _thickness(model)
-    out = {"orientation_table": table, "thin": thin if thin["t"] < float("inf") else None,
-           "thickness_samples": len(hist),
+    thin, field = _thickness(model, floor=2 * nozzle, key=key)
+    struct = thin.pop("structural", None)
+    out = {"orientation_table": table, "thin": thin if thin["t"] < float("inf") else None, "thin_structural": struct,
+           "thickness_samples": field["samples"], "thin_regions": field,
            "brep": {"valid": bool(model["shape"].is_valid), "solids": len(model["shape"].solids()),
                     "expected_solids": getattr(model["recipe"], "solids", 1),
                     "volume_mm3": model["volume"], "mesh_design": bool(getattr(model["recipe"], "mesh", False))},
@@ -1011,6 +1154,11 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
         vols = a.get("signed_component_volumes_mm3") or [0]
         a["volume_mm3"] = float(sum(vols))
         a["format"], a["sha256"] = stl_format, stl_sha
+        try:                                            # a declared mesh texture displaces the STL on purpose
+            from .craft import meshtex
+            a["textured"] = bool(meshtex.declared(model["recipe"], model["values"]))
+        except Exception:                               # noqa: BLE001 - only the volume comparison reads this
+            a["textured"] = False
         out["mesh"] = a
     return out
 
@@ -1164,6 +1312,15 @@ def op_assembly(key, recipe_id, values, budget_s=45.0):
     t0 = time.perf_counter()
     rows = asm.analyse(model, budget_s=budget_s, progress=PROGRESS)
     return {"checks": rows, "seconds": round(time.perf_counter() - t0, 2)}
+
+
+def op_prove(key, recipe_id, values, assertions=None, tol=0.1):
+    """The proof sheet's rows for a design: every contract assertion and every feature's expects=, measured on the
+    built solid (form/proving.py). The model is the cached one when the design was just built."""
+    from . import proving
+    model = _get_near(key, recipe_id, values, tol)
+    return {"rows": proving.rows(model, list(assertions or [])), "kernel": kernel_id(),
+            "volume_mm3": model["volume"], "faces": len(model["faces"])}
 
 
 def op_ping():

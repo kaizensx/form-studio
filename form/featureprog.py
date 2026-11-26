@@ -85,7 +85,7 @@ def _h(*parts) -> str:
 # ---- the feature decorator and the design base ---------------------------------------------------------------------
 
 def feature(label: str = "", role: str = "structure", doc: str = "", parts: int | None = None,
-            budget: float | None = None, stages: bool = False):
+            budget: float | None = None, stages: bool = False, expects: list | None = None):
     """Mark a method of a FeatureDesign as a feature: `@feature("Eye openings", role="access")`.
 
     parts: how many separate parts (solids) this feature adds (a lens feature that makes two lenses: parts=2; the
@@ -93,15 +93,21 @@ def feature(label: str = "", role: str = "structure", doc: str = "", parts: int 
     every feature against the running total, and a feature that splits or fuses a part is skipped with the counts.
     budget: seconds this feature may take (default FEATURE_BUDGET); past it the feature is stopped and left out.
     stages: the method returns a list of Stages (a plain Recipe's build(), wrapped by form/refine/adapter.py): each
-    stage keeps its own feature (the class's declared features), and the body is the last stage's shape."""
+    stage keeps its own feature (the class's declared features), and the body is the last stage's shape.
+    expects: what the body must be when this feature is done, as kernel-checked assertions (form/contract.py):
+    `expects=[contract.bolt_circle(4, 5.2, 60), contract.cylinder(70, "boss")]`. They are measured on the solid the
+    feature returns; a miss fails this feature, with measured against wanted, like any other failure of it."""
     if parts is not None and (not isinstance(parts, int) or parts < 0):
         raise TypeError("feature(parts=) is a whole number of parts the feature adds (0 or more).")
     if budget is not None and not (isinstance(budget, (int, float)) and budget > 0):
         raise TypeError("feature(budget=) is a number of seconds above 0.")
 
+    if expects is not None and not (isinstance(expects, (list, tuple)) and all(isinstance(e, dict) for e in expects)):
+        raise TypeError("feature(expects=) is a list of assertions: form.contract.holes(4, 5.2), ...")
+
     def deco(fn):
         fn._form_feature = {"label": label, "role": role, "doc": doc, "parts": parts, "budget": budget,
-                            "stages": bool(stages)}
+                            "stages": bool(stages), "expects": list(expects or [])}
         return fn
     return deco
 
@@ -547,6 +553,13 @@ def _build_features(self, v: dict) -> list[Stage]:
                     problem, hint = _problem(out, mesh, i, n0, v0, want if counted else None, declared, adds)
                     if problem:
                         raise RecipeError(f"The {fid} feature {problem}.", fid, hint)
+                    if i and not mesh and out is not body:
+                        problem, hint = _thin_finish(fid, m, before, out)
+                        if problem:
+                            raise RecipeError(problem, fid, hint)
+                    if m.get("expects"):               # its own postconditions, measured on what it returned
+                        from . import proving
+                        proving.expects(fid, m["expects"], out)
                 except FeatureTimeout:
                     info = {"feature": fid, "s": round(time.perf_counter() - t0, 1), "budget": round(budget, 1),
                             "kind": "budget", "ts": time.time()}
@@ -665,6 +678,27 @@ def _problem(out, mesh: bool, i: int = 1, n0: int = 0, v0: float = 0.0, want: in
                 "A cut removed nearly the whole body: check that its tool is the region to remove, not a box "
                 "around the body.")
     return "", ""
+
+
+def _thin_finish(fid: str, meta: dict, before, after) -> tuple[str, str]:
+    """A decorative feature (form/wallguard.py GUARDED_ROLES: finish, texture, grip, refine, ...) that thins a wall
+    under the minimum wall (the print minimum, or a model's process minimum) is left out: (message with the measured wall and where, hint), or ("", "")."""
+    from . import wallguard
+    if not wallguard.guarded(meta.get("role")):
+        return "", ""
+    floor = wallguard.current_floor()
+    if floor <= 0:
+        return "", ""
+    w = wallguard.cut_walls(before, after)
+    if w is None or w["t"] >= floor - 1e-3:
+        return "", ""
+    label = meta.get("label") or fid
+    return (f"The {fid} feature ({label}, a {meta.get('role')} feature) would leave a {w['t']:.2f} mm wall at "
+            f"{wallguard.where(w['at'])} mm, under the {floor:g} mm minimum wall for this design; a finish never thins a wall below "
+            f"it, so it is left out",
+            f"Make the cut {floor - w['t']:.2f} mm shallower where the wall is thin, "
+            "keep it off that region, or thicken the wall under it first. craft.finish_cut(body, cuts, depth) "
+            "makes each cut only as deep as the wall behind it allows and notes what it clamped.")
 
 
 def _diagnosis(e: BaseException, recipe, fid: str) -> dict:
@@ -961,7 +995,12 @@ def _context_fingerprint() -> str:
     out = []
     try:
         from . import marks
-        out.append({k: v for k, v in marks.context().items() if k != "nozzle"})   # the nozzle shapes no solid
+        ctx = {k: v for k, v in marks.context().items() if k not in ("nozzle", "wall_floor")}   # the nozzle shapes no solid
+        from . import wallguard                    # the finish floor does (a finish thinner than it is left out)
+        floor = wallguard.current_floor()
+        if abs(floor - wallguard.DEFAULT_FLOOR) > 1e-9:   # the common floor keeps the keys builds had before
+            ctx["wall_floor"] = floor
+        out.append(ctx)
     except Exception:
         pass
     try:
@@ -1060,12 +1099,15 @@ def _stages_get(key: str):
 _stages_mem: dict = {}
 
 
-def checkpoint_get(key: str):
-    hit = _mem.get(key)
-    if hit is not None:
-        _mem[key] = _mem.pop(key)
-        return hit
-    d = _dir()
+def checkpoint_get(key: str, d: Path | None = None):
+    """The shape kept under key, or None. d: another folder (form/brepstore.py), read from disk only."""
+    own = d is None
+    if own:
+        hit = _mem.get(key)
+        if hit is not None:
+            _mem[key] = _mem.pop(key)
+            return hit
+        d = _dir()
     if d is None:
         return None
     f = d / f"{key}.bin"
@@ -1086,7 +1128,8 @@ def checkpoint_get(key: str):
         os.utime(f)
     except Exception:
         return None
-    _remember(key, shape)
+    if own:
+        _remember(key, shape)
     return shape
 
 
@@ -1116,9 +1159,12 @@ def _restore_names(shape, meta: dict) -> None:
             pass
 
 
-def checkpoint_put(key: str, shape) -> None:
-    _remember(key, shape)
-    d = _dir()
+def checkpoint_put(key: str, shape, d: Path | None = None) -> None:
+    """Keep shape under key. d: another folder (form/brepstore.py, which prunes its own), written to disk only."""
+    own = d is None
+    if own:
+        _remember(key, shape)
+        d = _dir()
     if d is None:
         return
     try:
@@ -1130,7 +1176,7 @@ def checkpoint_put(key: str, shape) -> None:
                                                        **_names(shape)}, default=str), encoding="utf-8")
             os.replace(tmp, d / f"{key}.bin")
         global _pruned
-        if time.monotonic() - _pruned >= PRUNE_EVERY_S:   # listing hundreds of files on every feature costs the build
+        if own and time.monotonic() - _pruned >= PRUNE_EVERY_S:   # listing hundreds of files on every feature costs the build
             _pruned = time.monotonic()
             # off the build's path: with a thousand checkpoints (a session that refines every design) the listing
             # and stat calls took milliseconds out of the first feature of the next design, before its first stage

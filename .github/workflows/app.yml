@@ -53,11 +53,16 @@ jobs:
           # retried: a large wheel (cadquery-ocp) sometimes times out on the runner's network
           for i in 1 2 3; do uv pip install --python .venv -e ".[all]" pyinstaller && break
             [ "$i" = 3 ] && exit 1; echo "Install failed; retrying in 20 s."; sleep 20; done
-      - name: Engine tests
+      - name: Engine smoke tests
         shell: bash
+        timeout-minutes: 15        # a hang fails the build in minutes, not after the job's hour
+        # The full suite runs sharded in ci.yml on every push; a download only needs the engine to work on this
+        # platform, so this is a short set (studio, MCP, the B-rep store, packaging) instead of 90 minutes per build.
         run: |
-          PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
-          FORM_CONFIG=.github/ci-studio.toml FORM_DATA="$RUNNER_TEMP/form-data" "$PY" -X faulthandler -m unittest discover -v -s tests
+          PY=$PWD/.venv/bin/python; [ -f "$PY" ] || PY=$PWD/.venv/Scripts/python.exe
+          cd tests
+          FORM_CONFIG=../.github/ci-studio.toml FORM_DATA="$RUNNER_TEMP/form-data" PYTHONPATH=.. "$PY" -X faulthandler \
+            -m unittest -v test_studio test_mcp test_brepstore test_packaging_data
       - name: Interface loads without errors
         continue-on-error: true      # CI runners have no GPU; the 3D viewport may warn there
         shell: bash

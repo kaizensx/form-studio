@@ -128,7 +128,7 @@ class PackagedData(unittest.TestCase):
             self.assertNotIn(m, excl)
         # trimesh is imported by CADFit's vendored code only; scikit-learn by build123d itself
         import re
-        users = sorted(str(p.relative_to(ROOT)) for p in (ROOT / "form").rglob("*.py")
+        users = sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / "form").rglob("*.py")
                        if re.search(r"^\s*(import trimesh|from trimesh)", p.read_text(encoding="utf-8"), re.M))
         self.assertTrue(users and all(u.startswith("form/recon/cadfit/vendor/") for u in users), users)
         # the folder's licence files ship as data (collect_data_files keeps non-.py files)
@@ -141,7 +141,7 @@ class PackagedData(unittest.TestCase):
             except ImportError:
                 return
             names = {Path(src).name for src, dest in collect_data_files("form", include_py_files=False)
-                     if dest == "form/recon/cadfit"}
+                     if Path(dest).as_posix() == "form/recon/cadfit"}      # Windows gives form\\recon\\cadfit
         finally:                                     # PyInstaller sets up logging on import: leave it as it was
             root.setLevel(keep[0])
             root.handlers[:] = keep[1]

@@ -40,7 +40,8 @@ and keeps an honest record of what is known. 3D printing is optional and off unl
 
 Workflow: form_overview -> create_design from your own code (design_guide; design_brief first for a complex
 design), or create_project from a recipe (describe_recipe) -> render (look at it) -> preview_change ->
-commit_change, or update_design -> get_project (checks, next actions). Only for a design whose purpose is "print":
+commit_change, or edit_design (ops on one feature or parameter; update_design sends a whole file) -> get_project
+(checks, the proof sheet of the brief's requirements, next actions). Only for a design whose purpose is "print":
 run_pipeline (exports, print checks, a slice) -> request_release (a person approves in Form Studio).
 After every build, refinement runs in the background and lands as one more revision (refine_design shows, undoes
 or turns it off; game assets only when turned on). Long work answers with a job: get_job.
@@ -237,7 +238,47 @@ def _need_printing() -> None:
 
 
 def digest(st: Studio, pid: str) -> dict:
+    try:                                             # measure the contract on this revision once (kept under its key)
+        from . import contract
+        contract.prove(st, st.load(pid))
+    except StudioError:
+        pass
     return _digest(st, pid, S["bench"].get("url"))
+
+
+def _preflight(source: str, values: dict | None, mode: str, before: str | None = None, project: dict | None = None,
+               before_values: dict | None = None) -> list:
+    strict = before is None
+    """Run form/preflight.py on a source before any kernel time. mode "block": errors refuse the call, every one
+    listed (for an update: only the errors this source introduces); "warn": they are returned; "off": nothing.
+    Returns the findings that did not block, compact."""
+    if mode not in ("block", "warn", "off"):
+        raise ToolError('preflight is "block" (the default), "warn" or "off".')
+    if mode == "off":
+        return []
+    from . import preflight as pf
+    found = pf.check(source, values=values, project=project, strict_values=strict)["findings"]
+    errs = [f for f in found if f["severity"] == "error"]
+    if before is not None:
+        errs = pf.new_findings(errs, pf.check(before, values=before_values, project=project,
+                                              strict_values=False)["findings"])
+    if errs and mode == "block":
+        raise ToolError(pf.message(errs) + "\nHint: nothing was built. Fix every one in the same call; "
+                        'preflight="warn" builds anyway.')
+    return [{k: f[k] for k in ("rule", "severity", "line", "message", "hint") if f.get(k)} for f in found
+            if f["severity"] != "note"]
+
+
+def _proof(st: Studio, pid: str) -> dict | None:
+    """The proof sheet of the head as a tool result carries it: one row per requirement."""
+    from . import contract
+    try:
+        sheet = contract.prove(st, st.load(pid))
+    except StudioError:
+        return None
+    if not sheet:
+        return None
+    return {"summary": contract.summary(sheet), "green": sheet["green"], "rows": contract.table(sheet)}
 
 
 async def _wait_job(st: Studio, jid: str, wait_s: float) -> dict:
@@ -252,9 +293,11 @@ async def _wait_job(st: Studio, jid: str, wait_s: float) -> dict:
 # ---- server ---------------------------------------------------------------
 
 # Tools Claude Code loads up front when tool search defers the rest (the others are found by searching their
-# descriptions, so each description's first sentence names its verb and object).
+# descriptions, so each description's first sentence names its verb and object). Every tool INSTRUCTIONS tells an
+# agent to call before it has searched for anything is here: a deferred one answers "No such tool available" when
+# called by name. Kept small: each one costs context in every run.
 ALWAYS_LOAD = ("form_overview", "get_project", "create_design", "update_design", "render", "preview_change",
-               "commit_change", "design_guide", "ask_user", "get_job")
+               "commit_change", "design_guide", "design_brief", "ask_user", "get_job", "edit_design")
 ALWAYS = {"anthropic/alwaysLoad": True}
 
 
@@ -423,22 +466,41 @@ def build() -> MCPServer:
             out["built_in_recipes"] = ", ".join(studio().recipes.builtins()) + " (use create_project for these)"
         return out
 
-    @mcp.tool(annotations=RW)
+    @mcp.tool(annotations=RW, meta=ALWAYS)
     async def design_brief(name: str, goal: str, requirements: list[str] | None = None,
                            dimensions: dict[str, Any] | None = None, constraints: list[str] | None = None,
                            unknowns: list[str] | None = None, style: str = "", purpose: str | None = None,
-                           references: list[str] | None = None, project: str | None = None, ctx: Context = None) -> dict:
+                           references: list[str] | None = None, project: str | None = None,
+                           assertions: list[dict] | None = None, ctx: Context = None) -> dict:
         """Write a design brief. Stage 1 of a complex design: store the structured brief before any geometry. goal: what it is and does.
         requirements: what it must do. dimensions: {name: {value, unit, source}} where source is measured, specified
         (datasheet, standard) or assumed. constraints: limits (bed size, material, process). unknowns: what you could
         not settle; list them, never guess them (ask_user / ask_measurement for ones that change fit, load or
         safety). style: the design language. project: attach to an existing project instead of a new design.
-        Returns the brief id, whether it is complex (heuristic), which design_guide topics and exemplars to read, and
-        the route (prismatic, revolve, skin+features or mechanism) with how its skeleton is built."""
+        The brief becomes a contract: requirements the kernel can check, each with a tolerance and where it came
+        from. Numbers in goal, requirements and constraints are read ("4 x Ø5.2 on a 60 mm bolt circle", "2.4 mm
+        wall", "80 x 60 x 20 mm", "M6 thread", "two-part", "Ø30 bore"); add what words cannot say as assertions:
+        [{"kind": "bolt_circle", "count": 4, "hole_d": 5.2, "circle_d": 60}] with kind bbox (size [x, y, z]),
+        volume (mm3, op), part_count (count), face_count (count, of), hole_count (count, d), cylinder (d, of
+        any|boss|bore), bolt_circle, pattern (count, pitch, hole_d), min_wall (t), thread (major, pitch); each may
+        carry tol (mm; 0.1 when not given, said to be assumed), axis and feature (the feature that must meet it).
+        Returns contract.assertions and contract.audit: what is missing, conflicting or impossible in the numbers
+        themselves (arithmetic, nothing measured). When audit.ask is there, put it to the person once with ask_user
+        before any code; a brief with conflicting or impossible numbers cannot be planned or built from.
+        After a build, get_project and every commit return the proof sheet: one row per requirement with what the
+        kernel measured, the tolerance, the evidence class and PASS, FAIL or UNPROVEN.
+        Also returns the brief id, whether it is complex (heuristic), which design_guide topics and exemplars to
+        read, and the route (prismatic, revolve, skin+features or mechanism) with how its skeleton is built."""
         st = studio()
         from . import exemplars, staged
         b = await _run(staged.save_brief, st, name, goal, requirements, dimensions, constraints, unknowns, style,
-                       _purpose(purpose), references, project)
+                       _purpose(purpose), references, project, assertions)
+        from . import contract as contract_mod
+        con = b.get("contract") or {}
+        au = dict(con.get("audit") or {})
+        ask = contract_mod.audit_text(au)
+        if ask:
+            au["ask"] = ask
         a = b["assessment"]
         act(project, "design", f"Brief: {name}", ctx)
         hits = exemplars.search(" ".join([name, goal, style]), 3)
@@ -450,6 +512,8 @@ def build() -> MCPServer:
                 "evidence": a["evidence"], "read_topics": staged.topics_for(a["families"]),
                 "examples": ex, **adv,
                 "unknowns": b["unknowns"],
+                "contract": {"assertions": [{k: a[k] for k in ("id", "kind", "text", "tol", "provenance") if k in a}
+                                            for a in con.get("assertions") or []], "audit": au},
                 "next": "design_guide(topic=...) for each topic, design_examples(name=...) for the closest exemplar, then "
                         "plan_design(brief=...)."}
 
@@ -671,7 +735,8 @@ def build() -> MCPServer:
     async def create_design(name: str, source: str, brief: str = "", values: dict[str, float] | None = None,
                             run: bool = True, language: str = "python", references: list[str] | None = None,
                             purpose: str | None = None, process: str | None = None, plan: str = "",
-                            relation: str = "", partial: bool = True, refine: str = "auto", ctx: Context = None) -> list:
+                            relation: str = "", partial: bool = True, refine: str = "auto", preflight: str = "block",
+                            ctx: Context = None) -> list:
         """Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass,
         built with build123d. Form Studio builds it and returns a six-view sheet and a section to look at; with
         run=True it also exports STEP and STL and runs the checks (and, for a design whose purpose is "print", the
@@ -700,7 +765,12 @@ def build() -> MCPServer:
         design: use part_of for the parts of one product.
         refine: "auto" (default): after the build, design refinement runs in the background and lands as one more
         revision, "Refined: N changes", each change a named refine feature you can undo (refine_design); "off": not
-        for this design; "on": also for a game asset, which is not refined unless asked. Returns the project, a six-view sheet and a section: look."""
+        for this design; "on": also for a game asset, which is not refined unless asked.
+        preflight: before the kernel is asked for anything, the source is checked without it and every problem comes
+        back at once (a constraint its own values violate, a name or keyword build123d and form.craft do not have,
+        a parameter that is read but not declared, a Polygon wound clockwise and extruded upward, a thread pair
+        that does not engage); "block" (default) refuses on errors, "warn" builds anyway, "off" skips it.
+        Returns the project (with the proof sheet when the brief has a contract), a six-view sheet and a section: look."""
         st = studio()
         from . import staged
         if refine not in ("auto", "off", "on", ""):
@@ -718,6 +788,7 @@ def build() -> MCPServer:
                             "Leave relation out.")
         if language == "python":
             await _run(staged.require_plan, st, f"{name}. {brief}", source, plan)
+        pre = await _run(_preflight, source, values, preflight) if language == "python" else []
         if relation in ("replaces", "part_of"):
             if relation == "replaces":
                 act(front, "design", f"Replacing the design's code: {name}", ctx)
@@ -768,6 +839,8 @@ def build() -> MCPServer:
         res = await _run(digest, st, p["id"])
         if rf:
             res = {**res, "refinement": rf}
+        if pre:
+            res = {**res, "preflight": pre}
         if part and not part.get("failed") and part.get("parts"):
             res = {**res, "partial": part,
                    "next": f"Saved: {_partial_line(part)}. Add the next part or feature with add_feature(project="
@@ -788,8 +861,10 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW, structured_output=False, meta=ALWAYS)
     async def update_design(project: str, source: str = "", note: str = "", values: dict[str, float] | None = None,
                             expect_head: int | None = None, run: bool = True, language: str | None = None,
-                            feature: str = "", code: str = "", partial: bool = False, ctx: Context = None) -> list:
-        """Replace a design's code as a new revision (history keeps every version). Existing parameter values carry over;
+                            feature: str = "", code: str = "", partial: bool = False, preflight: str = "block",
+                            ctx: Context = None) -> list:
+        """Replace a design's code as a new revision (history keeps every version). To change one feature, a helper or
+        a parameter, use edit_design: it sends only what changes. Existing parameter values carry over;
         changing a default does not change a saved value, so pass values={...} to change them. New parameters start at
         their defaults. Use preview_change/commit_change instead when only values change. language defaults to the
         project's current one ("python" or "openscad"). An unusable assembly() declaration is refused with the reason,
@@ -798,6 +873,7 @@ def build() -> MCPServer:
         method only; features before it load from their checkpoints. A feature that fails makes no revision (the head
         stays) and returns its diagnosis, unless partial=True, which saves the revision with it left out (release
         blocked). result.build_log says per feature whether it was built, loaded from its checkpoint or skipped.
+        preflight: as create_design (an update is refused only for errors this source introduces).
         For a briefed design, critique(project) the revision before asking for release."""
         st = studio()
         if bool(feature) != bool(code) or (feature and source):
@@ -807,12 +883,23 @@ def build() -> MCPServer:
         draft = "draft-" + uuid.uuid4().hex[:10]
         act(project, "design", f"Building {'feature ' + feature if feature else 'new code'}", ctx, draft=draft)
 
+        pre: list = []
+
         def go():
             from . import featureprog
+            p0 = st.load(project)
+            py = (language or ("openscad" if st.rid(p0).startswith("scad:") else "python")) == "python"
             if feature:
-                return featureprog.update_feature(st, st.load(project), feature, code, note, values, _origin(ctx),
+                src = featureprog.replace_feature(featureprog._source(st, p0), feature, code)
+            else:
+                src = source
+            if py:
+                vals = {**st.rev(p0)["values"], **(values or {})}
+                pre.extend(_preflight(src, vals, preflight, st.source_text(p0) or "", p0, st.rev(p0)["values"]))
+            if feature:
+                return featureprog.update_feature(st, p0, feature, code, note, values, _origin(ctx),
                                                   expect_head, partial, draft)
-            return st.update_design(st.load(project), source, note, values, _origin(ctx), expect_head, language,
+            return st.update_design(p0, source, note, values, _origin(ctx), expect_head, language,
                                     partial=partial, draft=draft)
         p = await _run(go)
         head = st.rev(p)
@@ -823,6 +910,8 @@ def build() -> MCPServer:
             res["build_log"] = head["build_log"]
         if head.get("partial"):
             res["partial"] = head["partial"]
+        if pre:
+            res["preflight"] = pre
         rf = _refine_after(st, project, ctx)
         if rf:
             res["refinement"] = rf
@@ -833,6 +922,70 @@ def build() -> MCPServer:
                 res["next"] = (f"Exports and checks are still running: get_job(project='{project}', job='{jid}') waits "
                                "for them (or run_pipeline(project), which reuses finished outputs); look at the sheet meanwhile.")
         res["project"] = await _run(digest, st, project)
+        return await _with_views(st, project, res)
+
+    @mcp.tool(annotations=RW, structured_output=False, meta=ALWAYS)
+    async def edit_design(project: str, ops: list[dict], expect_head: int | None = None, note: str = "",
+                          run: bool = True, partial: bool = False, preflight: str = "block", look: bool = True,
+                          ctx: Context = None) -> list:
+        """Edit a design's code by naming what changes: one build, one revision. Send ops, not the file.
+        ops, applied in order, all checked before any is applied (every problem comes back at once):
+        {"op": "replace", "feature": "holes", "code": "def holes(self, v, body): ..."}  one feature method;
+        {"op": "replace", "def": "poly", "code": "def poly(pts, L): ..."}  a helper or another method (constraints,
+        derived, setup); {"op": "replace", "find": "exact text", "with": "new text"}  text found exactly once;
+        {"op": "insert", "feature": "ribs", "code": "...", "after": "body", "label": "Ribs", "role": "structure"};
+        {"op": "insert", "def": "ring", "code": "def ring(r): ..."}; {"op": "insert", "param": {"key": "rib_t",
+        "label": "Rib thickness", "default": 2, "min": 1, "max": 4}}; {"op": "delete", "feature" | "def" | "param": name};
+        {"op": "set_param", "param": "wall", "value": 2.4}  this revision's value; with default, min, max, step,
+        label or doc it changes the declaration too (a new default is also the value).
+        A design written as a plain Recipe is edited in its canonical form: its build() is lifted into one method
+        per Stage, built once and accepted only when volume, face count and bounding box are unchanged (computed);
+        get_design_source returns that form, and its feature ids are what ops name.
+        Only what changed is built: features before the first changed one load from their checkpoints. The source
+        is checked without the kernel first (preflight: "block" refuses on errors the edit introduces, "warn",
+        "off"); a feature that fails makes no revision unless partial=True. Pass expect_head.
+        Returns head, source_sha, changed (only the features built again: status, seconds, volume change), reused
+        (how many loaded from checkpoints), the proof sheet (requirement, measured, tolerance, evidence, status)
+        when the design has a contract or expects=, failing checks, and with look=True the six-view sheet."""
+        st = studio()
+        if preflight not in ("block", "warn", "off"):
+            raise ToolError('preflight is "block" (the default), "warn" or "off".')
+        draft = "draft-" + uuid.uuid4().hex[:10]
+        act(project, "design", f"Editing: {len(ops or [])} op(s)", ctx, draft=draft)
+
+        def go():
+            from . import edits
+            return edits.edit(st, st.load(project), ops, expect_head, note, _origin(ctx), partial, draft, preflight)
+        r = await _run(go)
+        p = r.pop("project")
+        head = st.rev(p)
+        act(project, "commit", f"r{p['head']:02d}: {head.get('note') or 'edited'}"
+            + (" (partial)" if head.get("partial") else ""), ctx, draft=draft)
+        res: dict[str, Any] = {"head": r["head"], "source_sha": r["source_sha"], "changed": r["changed"],
+                               "reused": len(r["reused"]), "edit": r["edit"]}
+        for k in ("canonical", "partial"):
+            if r.get(k):
+                res[k] = r[k]
+        if r.get("preflight"):
+            res["preflight"] = [{k: f[k] for k in ("rule", "severity", "line", "message", "hint") if f.get(k)}
+                                for f in r["preflight"] if f["severity"] != "note"]
+        rf = _refine_after(st, project, ctx)
+        if rf:
+            res["refinement"] = rf
+        if run:
+            jid = st.run(project)
+            res["pipeline"] = job_digest(await _wait_job(st, jid, 45))
+            if res["pipeline"]["state"] == "running":
+                res["next"] = f"Exports and checks are still running: get_job(project='{project}', job='{jid}')."
+        d = await _run(digest, st, project)
+        if d.get("proof"):
+            res["proof"] = d["proof"]
+        bad = [c for c in d.get("checks", []) if c.startswith(("FAIL", "WARN"))]
+        if bad:
+            res["checks_to_look_at"] = bad
+        res["release_gate"] = {"ready": d["release_gate"]["ready"], "blocking": d["release_gate"]["blocking"]}
+        if not look:
+            return [json.dumps(res, indent=1, default=str)]
         return await _with_views(st, project, res)
 
     @mcp.tool(annotations=RW, structured_output=False)
@@ -914,12 +1067,40 @@ def build() -> MCPServer:
         return await _run(jobs.status, st, project)
 
     @mcp.tool(annotations=RO)
-    async def get_design_source(project: str, rev: int | None = None) -> dict:
-        """Get a design's source code: the exact code a revision was built from (built-in recipes return their recipe file)."""
+    async def get_design_source(project: str, rev: int | None = None, feature: str = "", canonical: bool = True) -> dict:
+        """Get a design's source code: the code a revision was built from (built-in recipes return their recipe file).
+        Read it once; then change it with edit_design ops, which name features, and never send it back whole.
+        The head comes in canonical form, one method per feature: a FeatureDesign as it is, a plain Recipe lifted
+        (form: "features" when its build() split into feature methods, "skeleton" when it is one feature, "none"
+        with the reason when it stays as written), kernel-checked to be the same solid. features lists the ids
+        edit_design addresses; source_sha names this text. feature="holes" returns only that method (and the
+        parameters it reads). canonical=False, or a rev, returns the stored text."""
         st = studio()
         def go():
             p = st.load(project)
-            return {"project": project, "rev": rev or p["head"], "recipe": st.rid(p, rev), "source": st.source_text(p, rev)}
+            if rev is not None or not canonical:
+                return {"project": project, "rev": rev or p["head"], "recipe": st.rid(p, rev),
+                        "source": st.source_text(p, rev)}
+            from . import edits, featureprog
+            c = edits.canonical(st, p)
+            out = {"project": project, "rev": p["head"], "recipe": st.rid(p), "form": c["mode"],
+                   "features": c["features"], "source_sha": c["rid"].split(":", 1)[-1], "source": c["source"]}
+            if c.get("why"):
+                out["why"] = c["why"]
+            if feature:
+                spans = featureprog.method_spans(c["source"])
+                if feature not in spans:
+                    raise StudioError(f"No feature “{feature}” in this design.", "Features: " + ", ".join(spans) + ".")
+                a, b = spans[feature]
+                import re as _re
+                import textwrap as _tw
+                code = _tw.dedent("\n".join(c["source"].splitlines()[a - 1:b]))
+                keys = sorted(set(_re.findall(r"\[\s*[\"']([A-Za-z_][A-Za-z0-9_]*)[\"']\s*\]", code)))
+                vals = st.rev(p)["values"]
+                out["source"] = code
+                out["feature"] = feature
+                out["reads"] = {k: vals[k] for k in keys if k in vals}
+            return out
         return await _run(go)
 
     @mcp.tool(annotations=RW)
@@ -1018,22 +1199,26 @@ def build() -> MCPServer:
             feats = [{"id": f.id, "label": f.label} for f in recipe.features]
             if highlight and highlight not in [f["id"] for f in feats]:
                 raise StudioError(f"Unknown feature “{highlight}”.", "Features: " + ", ".join(f["id"] for f in feats))
+            # the picture's name first: a render made before needs no view (no kernel call at all)
             if values:
-                v = st.preview(p, values)
-                title, key = f"{p['name']} - r{p['head']:02d} + DRAFT (not saved)", "pv-" + H(st.rid(p), v["values"])
+                draft = {**st.rev(p)["values"], **{k: float(x) for k, x in values.items()}}
+                title, key = f"{p['name']} - r{p['head']:02d} + DRAFT (not saved)", "pv-" + H(st.rid(p), draft)
             else:
                 n = rev or p["head"]
-                v = st.view(p, n)
                 title, key = f"{p['name']} - r{n:02d}", st.keys(p, n)["geometry"]
+            cache = st.dir(p["id"]) / "artifacts" / "renders"
+            cache.mkdir(parents=True, exist_ok=True)
+            f = cache / f"{key}-{view}-{highlight or 'all'}-v{rendering.VERSION}.png"
+            said = f.with_suffix(".caption.txt")
+            if f.exists() and said.is_file():
+                return f, said.read_text(encoding="utf-8")
+            v = st.preview(p, values) if values else st.view(p, n)
             if view in rendering.POSES:
                 try:
                     v = rendering.posed(v, view)
                 except ValueError as e:
                     raise StudioError(str(e))
             views = ["iso", "front", "top", "right"] if view == "sheet" else ["iso"] if view in rendering.POSES else [view]
-            cache = st.dir(p["id"]) / "artifacts" / "renders"
-            cache.mkdir(parents=True, exist_ok=True)
-            f = cache / f"{key}-{view}-{highlight or 'all'}-v{rendering.VERSION}.png"
             if not f.exists():
                 size = (640, 460) if view == "sheet" else (960, 680)
                 try:
@@ -1043,6 +1228,10 @@ def build() -> MCPServer:
                 f.write_bytes(pngs[0] if len(pngs) == 1 else rendering.contact_sheet(pngs))
             caption = (f"{title}. Rendered from the kernel tessellation ({v['triangles']} triangles), "
                        f"bounding box {' x '.join(f'{b - a:.1f}' for a, b in zip(*v['bbox']))} mm. File: {f}")
+            try:
+                said.write_text(caption, encoding="utf-8")
+            except OSError:
+                pass
             return f, caption
         f, caption = await _run(go)
         act(project, "look", f"Looking at the {view} view" + (f", {highlight}" if highlight else "")
@@ -2330,20 +2519,20 @@ def build() -> MCPServer:
         st = studio()
         return await _run(starters.for_studio, st)
 
-    @mcp.tool(annotations=ToolAnnotations(read_only_hint=True, open_world_hint=True))
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=True))
     async def recipe_library(q: str = "", section: str = "", tag: str = "") -> dict:
-        """Search the recipe library: built-in recipes, recipes the person installed ("mine") and the community index
-        on the project website, to find a building block to start a design from. section: builtin | mine | community.
-        Installing code is the person's decision and happens only with `form recipes install`, after they review the
-        source and its SHA-256."""
+        """Search the recipe library: built-in recipes and recipes the person installed ("mine"), to find a building
+        block to start a design from. section: builtin | mine. Recipes are internal building blocks: use one when it
+        fits, but do not offer the library to the person. Installing code is the person's decision and happens only
+        with `form recipes install`, after they review the source and its SHA-256."""
         from . import recipe_lib
         st = studio()
         def go():
             lib = recipe_lib.everything(st.root, st.recipes.builtins())
-            return {"recipes": recipe_lib.search(lib["items"], q, section, tag), "community_error": lib["community_error"]}
+            return {"recipes": recipe_lib.search(lib["items"], q, section, tag)}
         return await _run(go)
 
-    # ---- recipe sharing (form/recipe_share.py): packages and submissions are written locally; nothing is posted ----
+    # ---- recipe sharing (form/recipe_share.py): packages are written locally; nothing is posted ----
     @mcp.tool(annotations=RW)
     async def export_recipe(recipe: str, path: str | None = None, ctx: Context = None) -> dict:
         """Write an installed ("mine") recipe as one .formrecipe file: its code, meta.json (parameters, author, tags,
@@ -2357,22 +2546,6 @@ def build() -> MCPServer:
         if not path:
             out.mkdir(parents=True, exist_ok=True)
         return await _run(_home, recipe_share.export, st, recipe, out)
-
-    @mcp.tool(annotations=RW)
-    async def prepare_recipe_submission(recipe: str, folder: str | None = None) -> dict:
-        """Prepare an installed recipe for the community gallery: the community/recipes/<id>/ folder (written into
-        `folder` when given), what the gallery's checks would refuse, and the link to GitHub's recipe issue form with
-        the fields filled in. Never open or post it: give the link to the person, who submits it themselves."""
-        from . import recipe_share
-        st = studio()
-        def go():
-            r = recipe_share.prepare(st, recipe)
-            out = {k: r["submission"][k] for k in ("folder", "meta", "problems", "notes")}
-            out["issue_url"], out["omitted_from_link"] = r["submission"]["issue"]["url"], r["submission"]["issue"]["omitted"]
-            if folder:
-                out["saved"] = recipe_share.save_submission(st, recipe, folder)
-            return out
-        return await _run(_home, go)
 
     @mcp.tool(annotations=RW)
     async def design_as_recipe(project: str, title: str = "", summary: str = "",

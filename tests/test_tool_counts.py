@@ -18,7 +18,7 @@ STATED = {
     "docs/ARCHITECTURE.md": [r"\| (\d+) tools over stdio \|"],
     "docs/FEATURES.md": [r"The full engine over (\d+) tools"],
     "docs/MCP.md": [r"^(\d+) tools\. Read-only"],
-    "site/index.html": [r'data-count="(\d+)" id="why-tools"', r'id="why-tools">(\d+)<'],
+    "site/index.html": [r'id="why-tools" data-count="(\d+)"', r'id="why-tools"[^>]*>(\d+)<'],
     "docs/readme/numbers-1-light.svg": [r"(\d+) MCP tools for any agent", r'class="k10">(\d+)<'],
     "docs/readme/numbers-1-dark.svg": [r"(\d+) MCP tools for any agent", r'class="k10">(\d+)<'],
     "docs/readme/feature-headless-light.svg": [r"one of (\d+) MCP"],
@@ -53,7 +53,8 @@ class UploadClaim(unittest.TestCase):
     def test_the_claim_names_what_a_cloud_agent_sees(self):
         site = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("<span>uploads by Form Studio</span>", site)
+        self.assertIn("Uploads by Form Studio</dt>", site)         # the readout beside the terminal
+        self.assertNotIn(">Uploads</dt>", site)
         self.assertNotIn("<span>uploads</span>", site)
         for text in (site, readme):
             self.assertIn("never uploads your files on its own", text)

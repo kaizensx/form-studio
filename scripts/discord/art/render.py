@@ -2,8 +2,8 @@
 
     .venv/bin/python scripts/discord/art/render.py          # writes art/guides/<slug>.png
 
-The pictures inside are the README's drawings of the app (docs/readme/*.svg, drawn from real engine runs) and the
-recipe previews from the website gallery (real builds). Fonts are the app's own (site/fonts).
+The pictures inside are the README's drawings of the app (docs/readme/*.svg, drawn from real engine runs) and
+product pictures from real builds (docs/readme/made-*.jpg). Fonts are the app's own (site/fonts).
 """
 from __future__ import annotations
 
@@ -21,7 +21,6 @@ FONTS = (ROOT / "site" / "fonts").as_uri()
 MARK = (ROOT / "brand" / "mark.svg").as_uri()
 LOCKUP = (ROOT / "brand" / "lockup.svg").as_uri()
 README = ROOT / "docs" / "readme"
-PREVIEWS = ROOT / "site" / "recipes" / "previews"
 
 BASE = f"""
 @font-face{{font-family:'Instrument Sans';src:url('{FONTS}/InstrumentSans.woff2') format('woff2');font-weight:100 900}}
@@ -56,13 +55,6 @@ def guide(i, title, tag, art):
         pic = f"<img src='{(README / (art + '.jpg')).as_uri()}' style='position:absolute;right:90px;top:70px;width:660px;" \
               "height:660px;object-fit:cover;border-radius:24px;box-shadow:0 30px 120px rgba(0,0,0,.55),0 0 0 1px " \
               "rgba(255,255,255,.06)'>"
-    elif art == "recipes":
-        ids = ["gridfinity_bin", "storage_box", "planter", "enclosure"]
-        cells = "".join(f"<div style='background:#13171a;border-radius:18px;overflow:hidden;box-shadow:0 0 0 1px "
-                        f"rgba(255,255,255,.07)'><img src='{(PREVIEWS / (r + '.webp')).as_uri()}' "
-                        "style='width:100%;height:100%;object-fit:cover'></div>" for r in ids)
-        pic = f"<div style='position:absolute;right:70px;top:70px;width:660px;height:660px;display:grid;" \
-              f"grid-template-columns:1fr 1fr;gap:20px'>{cells}</div>"
     else:
         # inlined, not <img>: the drawings embed their fonts, which an <img> SVG may refuse to load
         f = README / (art + "-dark.svg")

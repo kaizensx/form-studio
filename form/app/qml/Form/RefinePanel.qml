@@ -59,6 +59,11 @@ Rectangle {
                         required property int index
                         objectName: "refineChange_" + modelData.id
                         width: parent.width; height: rc.implicitHeight + 12
+                        // pointing at a change shows what it changed: its feature lights up on the part
+                        Rectangle { x: -8; width: parent.width + 16; height: parent.height; radius: Theme.rSm; color: rowHover.hovered ? Theme.washHover : "transparent"
+                            Behavior on color { Tint {} } }
+                        HoverHandler { id: rowHover
+                            onHoveredChanged: if (row.modelData.kind === "feature") Store.hover(hovered ? row.modelData.id : "") }
                         Rectangle { visible: row.index > 0; width: parent.width; height: 1; color: Theme.rule }
                         Column { id: rc; y: 6; width: parent.width - 26; spacing: 2
                             Txt { font.pixelSize: 13; font.weight: Theme.wMedium; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
@@ -71,6 +76,13 @@ Rectangle {
                     }
                 }
             }
+            // hold to see the design as it was before these changes; let go and the refined one is back
+            Btn { id: peekBtn; objectName: "refinePeek"; small: true; icon: "eye"; width: parent.width
+                visible: rp.list.length > 0 && !rp.running && Store.refineBase > 0 && !Store.hasDraft
+                text: Store.peek && Store.peek.on ? "Before · " + F.pad(Store.peek.rev) : "Hold for Before / After"
+                tip: "Hold to see " + F.pad(Store.refineBase) + ", before the refinement. Nothing changes."
+                active: !!Store.peek && Store.peek.on
+                onDownChanged: Store.peekBefore(down) }
             Row { spacing: 6; visible: !rp.running
                 Btn { objectName: "refineUndoAll"; small: true; kind: "quiet"; text: "Undo all"; visible: rp.list.length > 1
                     enabled: !Store.refineBusy; onClicked: Store.refineUndo("") }

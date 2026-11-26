@@ -1,7 +1,6 @@
-"""Sharing recipes (form/recipe_share.py): a .formrecipe package exported and imported again, the community
-submission (folder and pre-filled issue link), and a design turned into a recipe. Real kernel builds."""
+"""Sharing recipes (form/recipe_share.py): a .formrecipe package exported and imported again, and a design turned
+into a recipe. Real kernel builds."""
 import hashlib
-import importlib.util
 import io
 import json
 import os
@@ -10,7 +9,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-import urllib.parse
 import zipfile
 from pathlib import Path
 
@@ -18,14 +16,7 @@ from form import config, recipe_lib, recipe_share as rs
 from form.studio import Studio, StudioError
 
 ROOT = Path(__file__).resolve().parents[1]
-CLIP = (ROOT / "community" / "recipes" / "cable-clip" / "recipe.py").read_text(encoding="utf-8")
-
-
-def index_builder():
-    spec = importlib.util.spec_from_file_location("build_recipe_index", ROOT / "site" / "tools" / "build_recipe_index.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+CLIP = (ROOT / "tests" / "fixtures" / "recipes" / "cable_clip.py").read_text(encoding="utf-8")
 
 
 class Share(unittest.TestCase):
@@ -120,60 +111,6 @@ class Share(unittest.TestCase):
         with self.assertRaises(recipe_lib.LibraryError):
             rs.read_package(b"not a zip")
 
-    # ---- community submission ----
-    def test_submission_folder_passes_the_gallery_check_and_the_link_is_prefilled(self):
-        rs.edit_meta(self.st.root, self.clip["id"], author="maker-1", summary="Holds a cable.", tags=["desk"])
-        r = rs.prepare(self.st, self.clip["id"])
-        sub = r["submission"]
-        self.assertEqual(sub["problems"], [])
-        self.assertEqual(sub["meta"], {"id": "cable-clip", "title": "Cable clip", "summary": "Holds a cable.", "author": "maker-1",
-                                       "tags": ["desk"], "kind": "python", "params_count": 8})
-        url = urllib.parse.urlparse(sub["issue"]["url"])
-        self.assertEqual(f"{url.scheme}://{url.netloc}{url.path}", "https://github.com/kaizensx/form-studio/issues/new")
-        q = {k: v[0] for k, v in urllib.parse.parse_qs(url.query).items()}
-        self.assertEqual(q["template"], "3-recipe.yml")
-        self.assertEqual(q["title"], "[Recipe] Cable clip")
-        self.assertEqual(q["recipe_id"], "cable-clip")
-        self.assertIn(CLIP.strip()[:200], q["recipe_code"])
-        self.assertIn('"params_count": 8', q["recipe_meta"])
-        self.assertLessEqual(len(sub["issue"]["url"]), rs.URL_LIMIT)
-        # every field the link fills in exists in the issue form, by id
-        form = (ROOT / ".github" / "ISSUE_TEMPLATE" / "3-recipe.yml").read_text(encoding="utf-8")
-        for k in q:
-            if k not in ("template", "title"):
-                self.assertIn(f"id: {k}\n", form, k)
-        self.assertIn(rs.ISSUE_KIND, form)
-
-        # the folder for a pull request: exactly what site/tools/build_recipe_index.py reads
-        out = self.tmp / "pr" / "community" / "recipes"
-        out.mkdir(parents=True)
-        saved = rs.save_submission(self.st, self.clip["id"], out)
-        self.assertEqual(sorted(p.name for p in (out / "cable-clip").iterdir()), ["meta.json", "preview.png", "recipe.py"])
-        idx = index_builder()
-        idx.ROOT, idx.SITE = self.tmp / "pr", self.tmp / "pr" / "site"
-        errors = []
-        got = idx.community(errors)
-        self.assertEqual(errors, [])
-        self.assertEqual(got[0]["sha256"], hashlib.sha256(CLIP.encode()).hexdigest())
-        self.assertEqual(saved["problems"], [])
-
-    def test_a_long_recipe_leaves_its_code_out_of_the_link_and_says_so(self):
-        fields = rs.issue_fields({"id": "x-y", "title": "T", "summary": "s", "author": "a", "tags": [], "kind": "python", "params_count": 1},
-                                 "#" * 20000, [])
-        link = rs.issue_link(fields)
-        self.assertEqual(link["omitted"], ["recipe_code"])
-        self.assertLessEqual(link["chars"], rs.URL_LIMIT)
-        self.assertIn("too long for a link", urllib.parse.unquote_plus(link["url"]))
-
-    def test_missing_author_and_builtin_ids_are_named_before_anything_leaves(self):
-        cm = {"id": "hook", "title": "Hook", "summary": "", "author": "", "tags": [], "kind": "python", "params_count": 2}
-        p = " ".join(rs.submission_problems(cm))
-        self.assertIn("built-in", p)
-        self.assertIn("GitHub username", p)
-        self.assertIn("summary", p)
-        with self.assertRaises(recipe_lib.LibraryError):
-            rs.edit_meta(self.st.root, self.clip["id"], author="not a name")
-
     # ---- a design, as a recipe ----
     def test_a_design_becomes_a_recipe_that_reproduces_it(self):
         p = self.st.create("Coat hook", "hook", "", {"load_kg": 5.5, "plate_w": 32})
@@ -221,25 +158,13 @@ class Share(unittest.TestCase):
                            capture_output=True, text=True, timeout=120)
         self.assertEqual(r.returncode, 0, r.stdout)
         self.assertEqual(len(recipe_lib.mine(other)), 1)
-        r = subprocess.run([sys.executable, "-m", "form", "recipes", "submit", self.clip["id"], "--author", "maker-1"], cwd=ROOT, env=env,
-                           capture_output=True, text=True, timeout=600)
-        sub = json.loads(r.stdout)
-        self.assertTrue(sub["issue_url"].startswith("https://github.com/kaizensx/form-studio/issues/new?template=3-recipe.yml"))
-        self.assertIn("Nothing was sent", sub["note"])
 
 
-class GalleryIndex(unittest.TestCase):
-    def test_the_index_carries_discussion_links_and_dates(self):
-        idx = json.dumps({"version": 1, "recipes": [
-            {"id": "a", "title": "Alpha", "author": "z", "kind": "python", "params_count": 3, "added": "2026-01-02",
-             "discussion": "https://github.com/kaizensx/form-studio/discussions/12"},
-            {"id": "b", "title": "Beta", "author": "m", "kind": "python", "discussion": "https://evil.example/x"}]}).encode()
-        a, b = recipe_lib.parse_index(idx)
-        self.assertEqual(a["discussion"], "https://github.com/kaizensx/form-studio/discussions/12")
-        self.assertTrue(b["discussion"].startswith("https://github.com/kaizensx/form-studio/discussions?discussions_q="))
-        self.assertEqual((a["params"], a["added"]), (3, "2026-01-02"))
+class Search(unittest.TestCase):
+    def test_sort_by_author_and_parameters(self):
+        a = {"id": "a", "title": "Alpha", "author": "z", "params": 3}
+        b = {"id": "b", "title": "Beta", "author": "m", "params": 1}
         self.assertEqual([i["id"] for i in recipe_lib.search([a, b], sort="author")], ["b", "a"])
-        self.assertEqual([i["id"] for i in recipe_lib.search([b, a], sort="added")], ["a", "b"])
         self.assertEqual([i["id"] for i in recipe_lib.search([b, a], sort="params")], ["a", "b"])
 
 

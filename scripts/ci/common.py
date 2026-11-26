@@ -242,3 +242,22 @@ class GitHub:
 
 def raw_url(path: str, branch: str = ASSETS_BRANCH, repo: str = REPO) -> str:
     return f"https://raw.githubusercontent.com/{repo}/{branch}/{urllib.parse.quote(path)}"
+
+
+def checks_table(checks: list) -> list[str]:
+    """A design's checks as a Markdown table, every value escaped."""
+    rows = ["| Result | Check | Value | Evidence |", "|---|---|---|---|"]
+    for c in checks[:30]:
+        if not isinstance(c, dict):
+            continue
+        status = str(c.get("status", ""))
+        status = {"PASS": "Pass", "WARN": "**Warning**", "FAIL": "**Fail**"}.get(status, md(status, 10))
+        rows.append(f"| {status} | {md(c.get('label'), 80)} | {md(c.get('value'), 60)} | {md(c.get('evidence'), 20)} |")
+    return rows
+
+
+def fmt_time(seconds) -> str:
+    if not isinstance(seconds, (int, float)) or isinstance(seconds, bool):
+        return "—"
+    m = round(seconds / 60)
+    return f"{m // 60} h {m % 60:02d} min" if m >= 60 else f"{m} min"

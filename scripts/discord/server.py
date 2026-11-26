@@ -65,7 +65,7 @@ ROLES = [
     ("Maintainer", 0xB9E8D7, True, False, MODERATE | perms("ban", "mention_everyone")),   # keeps Form Studio
     ("Moderator", 0x86D9AD, True, False, MODERATE),                 # keeps the server: timeouts, kicks, tidying
     ("Contributor", 0x86A8FF, True, False, 0),                      # has a merged pull request
-    ("Recipe author", 0xC7B2FF, True, False, 0),                    # has a recipe in the community gallery
+    ("Recipe author", 0xC7B2FF, True, False, 0),                    # kept for the people who earned it; no longer given
     ("Challenge winner", 0xE9B860, True, False, 0),                 # won a weekly challenge (the bot gives it)
     # levels: earned by talking, sharing and helping (the bot counts it; /rank shows yours)
     ("Architect", 0xFF6F51, True, False, 0),                        # level 40
@@ -116,7 +116,6 @@ ROLE_PICKER = [
 MAINTAINERS: list[str] = []
 MODERATORS: list[str] = []
 CONTRIBUTORS: dict[str, str] = {}     # GitHub login -> Discord user id
-RECIPE_AUTHORS: dict[str, str] = {}   # GitHub login -> Discord user id
 
 # ---- channels ----------------------------------------------------------------------------------------------------
 TEXT, VOICE, CATEGORY, NEWS, STAGE, FORUM = 0, 2, 4, 5, 13, 15
@@ -146,7 +145,7 @@ LAYOUT = [
          {"access": "read_only", "default": True}),
     ]),
     ("COMMUNITY", [
-        ("general", "general", TEXT, "Talk about designing anything with Form Studio. Try /guide, /docs, /download or /recipe.",
+        ("general", "general", TEXT, "Talk about designing anything with Form Studio. Try /guide, /docs or /download.",
          {"default": True, "slowmode": 2}),
         ("showcase", "show-and-tell", FORUM, (
             "What you made with Form Studio: a part, a product, a mechanism, a game asset, a textured shell. One post "
@@ -168,7 +167,7 @@ LAYOUT = [
         ("ideas", "ideas", FORUM, (
             "What Form Studio should do next. One idea per post: the problem first, then what you would want. "
             "Vote with the reaction. Maintainers tag what is Planned and what Shipped."),
-         {"tags": ["✨ Feature", "🧠 Design intelligence", "🔧 Agent tool", "🧬 Mesh to CAD", "🎮 Game assets", "🧩 Recipe",
+         {"tags": ["✨ Feature", "🧠 Design intelligence", "🔧 Agent tool", "🧬 Mesh to CAD", "🎮 Game assets",
                    "🖨️ 3D printing", "!🗺️ Planned", "!🚢 Shipped"],
           "emoji": "👍", "default": True, "slowmode": 120}),
         ("challenges", "weekly-challenge", FORUM, (
@@ -187,12 +186,6 @@ LAYOUT = [
          {"default": True}),
         ("game-assets", "game-assets", TEXT,
          "Game assets (Beta): LODs, UVs, baked maps and collision for Unreal, Unity, Godot and glTF.", {}),
-        ("recipes", "recipes", FORUM, (
-            "Recipes are parametric building blocks written as code, with their own checks. Every built-in recipe has "
-            "a post here; `/recipe` shows one anywhere.\n\nShare your own: the .formrecipe file, a render from a real "
-            "build, what its parameters do and its licence. Tag it Review wanted."),
-         {"tags": ["📦 Built-in", "🌍 Community", "👀 Review wanted", "!✅ Accepted", "💡 Idea"], "emoji": "👍",
-          "layout": "gallery", "default": True, "slowmode": 60}),
         ("printers", "printing", TEXT,
          "For people who print (optional): slicers, printers, presets, filaments, fit coupons and measured results. "
          "Turn printing on in Settings › General › Set up for.", {}),
@@ -208,7 +201,7 @@ LAYOUT = [
          "GitHub activity, posted by the bot: issues, pull requests, discussions, failed runs on main and dev, and "
          "the week in numbers.", {"access": "read_only"}),
         ("contributing", "contributing", TEXT,
-         "Working on Form Studio's code, docs, recipes or the website. Start with the pinned post.", {"slowmode": 2}),
+         "Working on Form Studio's code, docs or the website. Start with the pinned post.", {"slowmode": 2}),
     ]),
     ("STAFF", [
         ("mod-log", "mod-log", TEXT, "AutoMod alerts, reports from members, Discord's community updates and the help desk queue.",
@@ -223,6 +216,7 @@ ARCHIVE_CATEGORY = "ARCHIVE"
 ARCHIVE = {
     "🧯・ci": "archive-ci",              # failed runs now go to #github
     "📅・events": "archive-events",      # challenge results stay in the challenge's own post
+    "recipes": "archive-recipes",        # recipes are engine building blocks now, not a public library
 }
 
 
@@ -237,7 +231,7 @@ CHANNEL_RENAMES = {
     "👋・welcome": "welcome", "📜・rules": "rules", "🎭・roles": "roles", "📘・guides": "guides",
     "📣・announcements": "announcements", "🚀・releases": "releases", "🧊・showcase": "show-and-tell",
     "🧬・mesh-to-cad": "mesh-to-cad", "🤖・agents-and-models": "agents-and-models", "💬・general": "general",
-    "🧩・recipes": "recipes", "🛟・help": "help", "💡・ideas": "ideas", "🏁・weekly-challenge": "weekly-challenge",
+    "🧩・recipes": "archive-recipes", "🛟・help": "help", "💡・ideas": "ideas", "🏁・weekly-challenge": "weekly-challenge",
     "🔊 Lounge": "Lounge", "🧑‍💻・contributing": "contributing", "🐙・github": "github",
     "🖨️・printers-and-slicers": "printing", "🔒・mod-log": "mod-log",
 }
@@ -389,7 +383,6 @@ Take it out as STEP for your CAD program or a CNC shop, as meshes for renders an
 - {agents}: Claude Code, Codex, other MCP agents, model APIs and local models.
 - {mesh-to-cad}: STL, OBJ and 3MF rebuilt as editable CAD.
 - {game-assets}: game assets for Unreal, Unity, Godot and glTF (Beta).
-- {recipes}: parametric building blocks, built-in and from the community.
 - {printers}: slicers, printers and fit, for people who print.
 
 **Project**
@@ -412,7 +405,7 @@ Take it out as STEP for your CAD program or a CNC shop, as meshes for renders an
 
 - `/guide` shows a guide. `/docs` finds a page of the documentation. `/download` gives the downloads for your system.
 - `/bug` shows how to report a bug so it gets fixed. `/help` says where to ask what.
-- `/recipe` shows a building block with its render. `/showcase` posts a design. `/challenge` shows this week's brief.
+- `/showcase` posts a design. `/challenge` shows this week's brief.
 - `/roles` changes your roles. `/rank` and `/leaderboard` show levels. `/thanks @someone` thanks a person who helped.
 - Right-click a message › **Apps › Report to moderators** sends it to the moderators privately.
 
@@ -482,13 +475,12 @@ Pick what fits. Roles help people with the same system, agent or interest find e
 
 - **Levels** come by themselves as you talk, share and help: {levels}. `/rank` shows yours.
 - **Challenge winner:** the most starred entry of a weekly challenge.
-- **Recipe author:** a recipe of yours is in the community gallery.
 - **Contributor:** a pull request of yours was merged. See the guide Contributing in {guides}.
 - **Moderator** and **Maintainer** keep the server and the project."""
 
 CONTRIBUTING_POST = """# Build Form Studio with us
 
-Form Studio is open source under the MIT licence: the app, the engine, recipes, docs and the website.
+Form Studio is open source under the MIT licence: the app, the engine, the docs and the website.
 
 1. **Read the guide.** *Contributing* in {guides} has the setup, the branches and what a pull request needs. The same text is in [CONTRIBUTING.md](https://github.com/kaizensx/form-studio/blob/main/CONTRIBUTING.md). If an agent helps you, it reads [AGENTS.md](https://github.com/kaizensx/form-studio/blob/main/AGENTS.md).
 2. **Pick an issue.** [good first issue](https://github.com/kaizensx/form-studio/labels/good%20first%20issue) and [help wanted](https://github.com/kaizensx/form-studio/labels/help%20wanted) are a good start, or say here what you want to work on.
@@ -578,7 +570,6 @@ DOC_PAGES = [
     ("MCP: every agent tool", BLOB + "docs/MCP.md"),
     ("AGENTS.md: the guide for coding agents", BLOB + "AGENTS.md"),
     ("Architecture", BLOB + "docs/ARCHITECTURE.md"),
-    ("Writing a recipe", BLOB + "docs/RECIPES.md"),
     ("Compatibility and testing", BLOB + "docs/VERIFICATION.md"),
     ("Releasing: channels and versions", BLOB + "docs/RELEASING.md"),
     ("Changelog", BLOB + "CHANGELOG.md"),

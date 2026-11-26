@@ -131,6 +131,7 @@ Item {
             anchors.fill: parent
             insetLeft: home.split ? frame3d.edge - frame3d.x : 0
             lite: true; interactive: false; showDims: false; showCompanions: false
+            showOrigin: !!stage.model                // an empty floor under the opening words has no cross through them
             // the part turns slowly to and fro around the bench's three-quarter view, like a piece being looked over
             SequentialAnimation on az { running: home.split && !!stage.model && !Theme.reduced && home.visible; loops: Animation.Infinite
                 NumberAnimation { from: -34; to: -8; duration: 7000; easing.type: Easing.InOutSine }

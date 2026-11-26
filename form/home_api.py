@@ -1,4 +1,4 @@
-"""HTTP routes for Home and the new-design flow (home workstream): learned starters, the recipe library, project
+"""HTTP routes for Home and the new-design flow (home workstream): learned starters, the recipe library (installed building blocks), project
 archives and conversation export/import, What's New. form/server.py hands requests here first; each function
 returns None for a path it does not own.
 
@@ -36,20 +36,17 @@ def route_get(st, path: str, q: dict):
         got = start.route_get(st, path, q)
         if got is not None:
             return got
-    if path.startswith("/api/recipes/"):          # sharing: packages, submissions, a design as a recipe (form/recipe_share.py)
+    if path.startswith("/api/recipes/"):          # sharing: packages, a design as a recipe (form/recipe_share.py)
         got = _call(recipe_share.route_get, st, path, q)
         if got is not None:
             return got
     if path == "/api/starters":
         return starters.for_studio(st, limit=int(q.get("limit") or 8))
     if path == "/api/recipes/library":
-        lib = recipe_lib.everything(st.root, st.recipes.builtins(), refresh=q.get("refresh") == "1",
-                                    online=q.get("section") == "community")
+        lib = recipe_lib.everything(st.root, st.recipes.builtins())
         items = recipe_lib.search(lib["items"], q.get("q", ""), q.get("section", ""), q.get("tag", ""), q.get("sort", "name"))
         counts = {s: sum(1 for i in lib["items"] if i["section"] == s) for s in recipe_lib.SECTIONS}
-        return {"items": items, "tags": recipe_lib.tags(lib["items"])[:24], "counts": counts,
-                "community_error": lib["community_error"], "community_fetched": lib["community_fetched"],
-                "index": recipe_lib.INDEX_URL}
+        return {"items": items, "tags": recipe_lib.tags(lib["items"])[:24], "counts": counts}
     m = re.fullmatch(r"/api/recipes/mine/([a-z0-9-]+)/source", path)
     if m:
         return _call(recipe_lib.source, st.root, m.group(1))
@@ -108,10 +105,6 @@ def route_post(st, path: str, body, q: dict):
     if path == "/api/recipes/install":
         return _call(recipe_lib.install, st.root, str(b.get("source", "")), str(b.get("kind", "")), str(b.get("sha256", "")),
                      {"title": b.get("title"), "summary": b.get("summary"), "origin": "file"})
-    if path == "/api/recipes/community/preview":
-        return _call(recipe_lib.community_preview, st.root, str(b.get("id", "")))
-    if path == "/api/recipes/community/install":
-        return _call(recipe_lib.install_community, st.root, str(b.get("id", "")), str(b.get("sha256", "")))
     if path == "/api/recipes/uninstall":
         return _call(recipe_lib.uninstall, st.root, str(b.get("id", "")))
     if path == "/api/recipes/create":

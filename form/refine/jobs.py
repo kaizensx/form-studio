@@ -55,11 +55,8 @@ def _read(st, pid: str) -> dict | None:
 
 
 def _alive(os_pid) -> bool:
-    try:
-        os.kill(int(os_pid), 0)
-        return True
-    except (OSError, TypeError, ValueError):
-        return False
+    from ..procs import pid_alive
+    return pid_alive(os_pid)
 
 
 def status(st, pid: str) -> dict:

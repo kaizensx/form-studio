@@ -33,7 +33,6 @@ MARKER = "form-studio:pr-preview"
 CORE = {"form/kernel.py", "form/worker.py", "form/checks.py", "form/render.py", "form/parts.py", "form/patterns.py",
         "form/marks.py", "form/fit.py", "form/recipes/base.py", "form/recipes/__init__.py", "form/recipes/assembly.py",
         "form/recipes/meshsolid.py", "pyproject.toml", "requirements.lock"}
-MAX_COMMUNITY = 6
 MAX_UI_SHOTS = 8
 
 
@@ -51,7 +50,7 @@ def builtin_ids(root: Path) -> dict[str, str]:
 
 def affected(changed: list[str], root: Path) -> dict:
     ids = builtin_ids(root)
-    recipes, community, reasons = set(), set(), {}
+    recipes, reasons = set(), {}
     qml = any(p.startswith("form/app/") and p.endswith((".qml", ".js", ".py")) for p in changed)
     core = sorted(p for p in changed if p in CORE)
     if core:
@@ -61,10 +60,7 @@ def affected(changed: list[str], root: Path) -> dict:
         if p.startswith("form/recipes/") and Path(p).name in ids:
             recipes.add(ids[Path(p).name])
             reasons.setdefault(ids[Path(p).name], []).append(p)
-        m = re.match(r"community/recipes/([a-z0-9][a-z0-9-]*)/", p)
-        if m:
-            community.add(m.group(1))
-    return {"recipes": sorted(recipes), "community": sorted(community)[:MAX_COMMUNITY], "ui": qml, "reasons": reasons}
+    return {"recipes": sorted(recipes), "ui": qml, "reasons": reasons}
 
 
 def changed_files(base: str, head: str) -> list[str]:
@@ -77,13 +73,7 @@ def changed_files(base: str, head: str) -> list[str]:
 def build_side(python: str, root: Path, kind: str, rid: str, out: Path, data: Path) -> None:
     script = Path(__file__).resolve().parent / "build_recipe.py"
     args = [python, str(script), "--repo-root", str(root), "--out", str(out)]
-    if kind == "builtin":
-        args += ["--builtin", rid]
-    else:
-        d = root / "community" / "recipes" / rid
-        if not d.is_dir():
-            return
-        args += ["--community", str(d)]
+    args += ["--builtin", rid]
     env = {**os.environ, "FORM_DATA": str(data), "PYTHONPATH": str(root), "FORM_NO_UPDATE_CHECK": "1"}
     t = subprocess.run(args, env=env, capture_output=True, text=True, timeout=900)
     if t.returncode:
@@ -94,7 +84,7 @@ def cmd_recipes(a) -> int:
     aff = json.loads(Path(a.affected).read_text(encoding="utf-8"))
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    items = [("builtin", r) for r in aff.get("recipes", [])] + [("community", c) for c in aff.get("community", [])]
+    items = [("builtin", r) for r in aff.get("recipes", [])]
     tmp = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "pr-preview-data"
     for kind, rid in items:
         for side, root in (("before", Path(a.base_root)), ("after", Path(a.head_root))):
@@ -171,7 +161,7 @@ def _delta(a, b, fmt="{:+.1f}", pct=True) -> str:
 
 def recipe_section(adir: Path, urls: dict) -> list[str]:
     meta = load_json(adir / "recipes.json")
-    items = [i for i in meta.get("items", []) if isinstance(i, str) and re.fullmatch(r"(builtin|community)-[a-z0-9_-]{1,48}", i)]
+    items = [i for i in meta.get("items", []) if isinstance(i, str) and re.fullmatch(r"builtin-[a-z0-9_-]{1,48}", i)]
     if not items:
         return []
     changed_rows, same = [], []
@@ -262,7 +252,7 @@ def cmd_comment(a) -> int:
     rdir, udir = root / "recipes", root / "ui"
     if (rdir / "recipes.json").exists():
         for item in [i for i in load_json(rdir / "recipes.json").get("items", []) if isinstance(i, str)][:20]:
-            if not re.fullmatch(r"(builtin|community)-[a-z0-9_-]{1,48}", item):
+            if not re.fullmatch(r"builtin-[a-z0-9_-]{1,48}", item):
                 continue
             for side in ("before", "after"):
                 f = rdir / item / side / "preview.png"
@@ -329,7 +319,7 @@ def main(argv=None) -> int:
         res = affected(files, Path("."))
         Path(a.out).write_text(json.dumps(res, indent=1), encoding="utf-8")
         print(json.dumps(res, indent=1))
-        set_output("recipes", "true" if res["recipes"] or res["community"] else "false")
+        set_output("recipes", "true" if res["recipes"] else "false")
         set_output("ui", "true" if res["ui"] else "false")
         return 0
     return {"recipes": cmd_recipes, "ui": cmd_ui, "comment": cmd_comment}[a.cmd](a)

@@ -9,8 +9,8 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Step | MCP tool | CLI |
 |---|---|---|
 | See what exists | `form_overview` | `form doctor`, `form list` |
-| Learn a recipe's parameters | `describe_recipe` | `form recipe device_stand` |
-| Start a design | `create_project` | `form new "Desk stand" device_stand device_width=75.6` |
+| Learn a building block's parameters | `describe_recipe` | `form recipe device_stand` |
+| Start a design from a building block | `create_project` | `form new "Desk stand" device_stand device_width=75.6` |
 | Start from words, photos, a sketch, files or links | — (Home in the app) | `form start --text "a hook for my desk" --photo desk.jpg` |
 | A blank design to shape | — | `form start --blank --name "Bracket"` |
 | Offer different concepts for a new idea, then let the person pick | `propose_concepts` → `pick_concept`, `list_concepts` | `form concepts`, `form concepts pick <group> <project>` |
@@ -20,7 +20,8 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Keep a change | `commit_change` with `expect_head` | `form commit <project> lean=18 --expect-head 3` |
 | Regenerate outputs | `run_pipeline` / `get_job` | `form run <project>` |
 | Ask for release | `request_release` (the user approves in the app) | — |
-| Design something no recipe covers | `design_guide` → `create_design` → `update_design` | — |
+| Design from your own code (the usual case) | `design_guide` → `create_design` → `edit_design` (ops, not the file) | — |
+| Say what must be true, and read what was measured | `design_brief` (contract and audit) → `get_project` (`proof`) | — |
 | Read a datasheet or drawing | `read_document` (PDF pages as images) | — |
 | Find the best design under constraints | `optimize` | `form optimize <p> --vary arm_t:4:20 --minimize solid_mass_g --require "statics.safety_factor>=3"` |
 | Show motion | `animate` (turntable or morph) | `form animate <p> --morph 1:4` |
@@ -41,7 +42,7 @@ For a model, never ask about a printer, slicer, filament or orientation: print c
 
 Rules that keep the record honest:
 
-1. **Units:** mm, degrees, grams. Only use parameter keys that `describe_recipe` lists.
+1. **Units:** mm, degrees, grams. For a design started from a building block, only use parameter keys that `describe_recipe` lists.
 2. **Preview, then commit.** Pass `expect_head` so you never overwrite someone else's newer revision.
 3. **Provenance is evidence.** Mark a value `measured` only when the user measured it and gave you the number. Ask how they measured it, for example with calipers. Otherwise it stays `assumed`.
 4. **Never invent physical results.** `record_physical_result` is only for what the user reports after a real print.
@@ -49,11 +50,15 @@ Rules that keep the record honest:
 6. **You cannot approve a release.** The user approves in the app's Release stage, after reviewing the checks and acknowledging the warnings.
 7. **No printing, no uploads.** Form Studio never sends files to a printer or a service, and you must not either unless the user explicitly asks.
 
-## Recipes
+## Recipes (internal building blocks)
+
+Recipes are parametric building blocks inside the engine. Use one on your own when it fits the request, then change
+anything; do not offer recipes, a recipe list or a gallery to the person. Every design starts from what the person
+describes. There is no public recipe library, community gallery or submission form.
 
 Built-in: `gridfinity_bin`, `gridfinity_baseplate`, `storage_box`, `pegboard`, `device_stand`, `cable_organizer`, `desk_hanger`, `shelf_bracket`, `hose_adapter`, `plant_pot`, `vase`, `battery_holder`, `enclosure`, `coupon`.
 Retired (`legacy`, never listed, but designs that use them still build): `dock`, `gridfinity`, `hook`, `planter`, `gear_pair`, `knob`, `hinged_box`.
-Community recipes are in `community/recipes/`. To write a new one, see `docs/RECIPES.md` and `community/recipes/README.md`.
+To write a new built-in one, see `docs/RECIPES.md`.
 
 ## Skills
 
@@ -93,6 +98,8 @@ Commands:
 .venv/bin/python scripts/media/site_shot.py URL OUT  # a picture of the website's live replica (docs/images/try-it*.webp)
 .venv/bin/python scripts/media/showcase/product_shots.py  # product pictures for the site and README (scripts/media/showcase/README.md)
 .venv/bin/python scripts/gen_mcp_docs.py            # regenerates docs/MCP.md
+.venv/bin/python scripts/gen_preflight_api.py       # regenerates form/preflight_api.json (the API preflight checks names against)
+.venv/bin/python scripts/proof_demo.py              # brief with a trap, a red proof row, one edit op, a green sheet (real MCP, no model)
 ```
 
 Branches: `main` holds releases; `dev` is where work lands first. Open pull requests against `dev`.

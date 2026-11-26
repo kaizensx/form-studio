@@ -111,7 +111,7 @@ Shortcuts are written the Qt way everywhere (`"Ctrl+Shift+O"`) and shown the pla
 | `Sec { title; note; tag }` | titled group; children stack in a column, spacing 8 |
 | `Cap { text; note; tag }` | caption line |
 | `KV { k; sub; value; tag; first }` | key/value row; children go on the right instead of `value` |
-| `Delta { label; from; to; unit; tint }` | a change, from → to |
+| `Delta { label; from; to; unit; tint; tick }` | a change, from → to; `tick` counts a numeric `to` up from `start` over `Theme.cross` (set at once with reduced motion) |
 | `Note { kind; title; text }` | kind: `plain amber red green blue`; children allowed |
 | `Field { text; placeholder; numeric; unit; error; busy; bare; onAccepted(text); onEdited(text) }` | one-line input. `error: "Why it is wrong"` turns the edge red and shows the sentence under it; `bare` drops the well (palette) |
 | `Area { text; placeholder; minLines; submitOnEnter; onSubmit(text); onBlurred(text) }` | multi-line input |
@@ -128,6 +128,7 @@ Shortcuts are written the Qt way everywhere (`"Ctrl+Shift+O"`) and shown the pla
 | `ParamRow { p; prov }` | a recipe parameter bound to the draft; `prov: true` adds source and ±σ |
 | `Tip { text; keys; show }` | tooltip, put inside the hovered item. After one has shown, its neighbours open without delay |
 | `Viewport`, `MiniView { projectId; turning }` | 3D |
+| `BuildLedger { label; at; of; running; pulse }` | the build's caption over the part: the feature arriving, "6 of 12", a progress hairline. The parent places and fades it |
 | `Fold { title; note; tag; key; openByDefault }` | a section that folds. Its content fades and settles 6 px into place; its height is never animated |
 | `Logo { size; mark; word }` | the Form Studio mark and wordmark as vectors in Theme colours (`size` = mark height: 12, 18, 24, 36). Never write the name as styled text; rules in `brand/README.md` |
 

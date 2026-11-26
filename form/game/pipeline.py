@@ -714,17 +714,8 @@ atexit.register(kill_all)
 
 
 def _alive(pid: int) -> bool:
-    if not pid or pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
+    from ..procs import pid_alive
+    return pid_alive(pid)
 
 
 def _write_owner(work: Path, blender_pid: int | None = None) -> None:

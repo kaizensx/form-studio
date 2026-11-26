@@ -257,7 +257,7 @@ class SetupTest(Base):
             self.assertTrue(msgs, key)
             self.assert_plain(msgs)
         welcome = self.fake.messages[self.fake.named("welcome")["id"]]
-        self.assertEqual(welcome[0]["attachments"][0]["filename"], "form-studio.jpg")
+        self.assertEqual(welcome[0]["attachments"][0]["filename"], "form-studio.png")
         self.assertIn(f"<#{self.fake.named('guides')['id']}>", "".join(m["content"] for m in welcome))
         self.assertNotIn("{", "".join(m["content"] for m in welcome))
         self.assertEqual(len(self.fake.messages[self.fake.named("roles")["id"]][-1]["components"]), len(S.ROLE_PICKER))

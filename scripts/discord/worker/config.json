@@ -18,7 +18,6 @@
   "agents": "agents-and-models",
   "mesh-to-cad": "mesh-to-cad",
   "game-assets": "game-assets",
-  "recipes": "recipes",
   "printers": "printing",
   "announcements": "announcements",
   "releases": "releases",
@@ -252,10 +251,6 @@
   [
    "Architecture",
    "https://github.com/kaizensx/form-studio/blob/main/docs/ARCHITECTURE.md"
-  ],
-  [
-   "Writing a recipe",
-   "https://github.com/kaizensx/form-studio/blob/main/docs/RECIPES.md"
   ],
   [
    "Compatibility and testing",

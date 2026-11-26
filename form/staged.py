@@ -175,7 +175,8 @@ def _clean_list(x, name, item=str) -> list:
 
 
 def save_brief(st, name: str, goal: str, requirements=None, dimensions=None, constraints=None, unknowns=None,
-               style: str = "", purpose: str | None = None, references=None, project: str | None = None) -> dict:
+               style: str = "", purpose: str | None = None, references=None, project: str | None = None,
+               assertions=None) -> dict:
     if not (goal or "").strip():
         raise StudioError("A brief needs a goal: one or two sentences of what the object is and does.")
     reqs = _clean_list(requirements, "requirements")
@@ -197,6 +198,9 @@ def save_brief(st, name: str, goal: str, requirements=None, dimensions=None, con
          "dimensions": norm, "constraints": _clean_list(constraints, "constraints"),
          "unknowns": _clean_list(unknowns, "unknowns"), "style": style, "purpose": purpose,
          "references": _clean_list(references, "references"), "ts": time.time(), "assessment": a, "plan": None}
+    # the brief as kernel-checkable assertions, and what is wrong with its numbers before any code (form/contract.py)
+    from . import contract
+    b["contract"] = contract.compile_brief(b, _clean_list(assertions, "assertions"))
     from .conversations import env_conversation
     cid = env_conversation()
     if cid:                                       # the brief belongs to the conversation that asked for it
@@ -336,6 +340,13 @@ def require_plan(st, brief: str, source: str, plan_ref: str = "") -> dict:
     a = assess(brief, source)
     if plan_ref:
         b = load_brief(st, plan_ref)
+        au = (b.get("contract") or {}).get("audit") or {}
+        if au.get("conflicting") or au.get("impossible") or au.get("invalid"):
+            from . import contract
+            raise StudioError(f"Brief {plan_ref} has numbers that cannot all hold, so there is nothing to build to yet.",
+                              contract.audit_text({k: au.get(k, []) for k in ("conflicting", "impossible", "invalid")})
+                              + " Settle them with the person (ask_user, once, with all of them), then write the "
+                              "brief again with design_brief.", status=409, audit=au)
         if not b.get("plan"):
             raise StudioError(f"Brief {plan_ref} has no plan yet.", "Call plan_design(brief=...) with the features, then "
                               "create_design(plan=...).", status=409)

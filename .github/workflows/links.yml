@@ -6,7 +6,7 @@ name: Links
 #   closed again when everything resolves.
 on:
   pull_request:
-    paths: ["docs/**", "site/**", "*.md", "community/**/*.md", ".github/workflows/links.yml", ".github/lychee.toml"]
+    paths: ["docs/**", "site/**", "*.md", ".github/workflows/links.yml", ".github/lychee.toml"]
   schedule:
     - cron: "11 6 * * 1"
   workflow_dispatch:

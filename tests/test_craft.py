@@ -298,8 +298,7 @@ class EvaluationFixes(unittest.TestCase):
             c = craft.cam(follower_r=4)
         finally:
             build123d.offset = orig
-        valid(self, c.shapes["cam"])
-        self.assertTrue(any("offset along the normals" in n for n in craft.notes()))
+        valid(self, c.shapes["cam"])                  # built along the normals: the kernel's 2D offset is not needed
 
     def test_spiral_ribs_fade_and_take_a_large_twist(self):
         b = craft.spiral_ribbed_body([(30, 0), (24, 40)], ribs=18, rib_depth=1.5, twist=150, levels=10, fade=(0.2, 0.2))

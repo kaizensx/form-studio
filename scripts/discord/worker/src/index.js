@@ -68,11 +68,7 @@ async function bonus(env, user, amount, why) {
   await env.STATE.put(`bonus:${Date.now()}:${user}:${Math.random().toString(36).slice(2, 8)}`, JSON.stringify({ user, amount, why }));
 }
 
-// ---- recipes and guides ----------------------------------------------------------------------------------------------
-async function recipes() {
-  const r = await fetch(C.site + "recipes/index.json", { cf: { cacheTtl: 600 } });
-  return (await r.json()).recipes;
-}
+// ---- guides ----------------------------------------------------------------------------------------------------------
 async function guideThreads(env) {
   const g = await chan(env, "guides");
   if (!g) return {};
@@ -82,13 +78,6 @@ async function guideThreads(env) {
   for (const t of [...active.threads, ...archived.threads]) if (t.parent_id === g.id) out[t.name] = t.id;
   return out;
 }
-function recipeText(r) {
-  return `## ${r.title}\n${r.summary || ""}\n\n` +
-    `- **Parameters:** ${r.params_count ?? "—"}\n- **Author:** ${r.author || "—"}\n- **Tags:** ${(r.tags || []).slice(0, 8).join(", ") || "—"}\n\n` +
-    `Start from it: ask your agent for it by name, or run \`form new "My design" ${r.id}\`.` +
-    (r.preview ? `\n${r.preview}` : "");
-}
-
 // ---- commands --------------------------------------------------------------------------------------------------------
 async function cmdHelp(env) {
   return reply({ content:
@@ -99,7 +88,7 @@ async function cmdHelp(env) {
     `- **A bug you can reproduce?** \`/bug\` shows how to report it so it gets fixed.\n` +
     `- **An idea?** ${await mention(env, "ideas")}. **Something you made?** ${await mention(env, "showcase")} or \`/showcase\`.\n` +
     `- **Agents and models:** ${await mention(env, "agents")} · **Mesh to CAD:** ${await mention(env, "mesh-to-cad")} · **Game assets:** ${await mention(env, "game-assets")}\n` +
-    `- **Building blocks:** ${await mention(env, "recipes")}, or \`/recipe\`. **3D printing (optional):** ${await mention(env, "printers")}\n` +
+    `- **3D printing (optional):** ${await mention(env, "printers")}\n` +
     `- **Someone breaking the rules?** Right-click the message › Apps › Report to moderators.`,
     components: [row(linkBtn("Docs", C.docs), linkBtn("Download", C.repo + "/releases/latest"), linkBtn("GitHub", C.repo))] });
 }
@@ -136,26 +125,10 @@ async function cmdBug(env) {
                      linkBtn("Report a vulnerability", C.repo + "/security/advisories/new"))] }, false);
 }
 
-async function cmdRecipe(env, i, random = false) {
-  const all = await recipes();
-  const want = (opt(i, "name") || "").toLowerCase();
-  const r = random || !want ? all[Math.floor(Math.random() * all.length)]
-    : all.find((x) => x.id === want || x.title.toLowerCase() === want) || all.find((x) => x.title.toLowerCase().includes(want));
-  if (!r) return reply({ content: `No recipe matches “${want}”. Try \`/recipe\` and pick from the list.` });
-  const out = reply({ content: recipeText(r), components: [row(linkBtn("Open the gallery", C.site + "recipes/"),
-    btn("Another one", "open:recipe"))] }, random || !want);
-  out.data.flags &= ~NO_PREVIEWS;                // the recipe's picture is its link: let it show
-  return out;
-}
-
 async function autocomplete(env, i) {
   const focused = (i.data.options || []).find((o) => o.focused);
   const q = String(focused?.value || "").toLowerCase();
   let choices = [];
-  if (i.data.name === "recipe") {
-    choices = (await recipes()).filter((r) => !q || r.title.toLowerCase().includes(q) || (r.tags || []).some((t) => t.includes(q)))
-      .slice(0, 25).map((r) => ({ name: r.title, value: r.id }));
-  }
   if (i.data.name === "docs") {
     choices = C.docs_pages.filter(([n]) => !q || n.toLowerCase().includes(q)).slice(0, 25).map(([n]) => ({ name: n, value: n }));
   }
@@ -345,7 +318,6 @@ export async function handle(env, i) {
     switch (i.data.name) {
       case "help": return cmdHelp(env);
       case "guide": return cmdGuide(env, i);
-      case "recipe": return cmdRecipe(env, i);
       case "rank": return cmdRank(env, i);
       case "leaderboard": return cmdLeaderboard(env);
       case "thanks": return cmdThanks(env, i);
@@ -365,7 +337,6 @@ export async function handle(env, i) {
     if (id.startsWith("roles:")) return rolesChosen(env, i);
     if (id === "open:roles") return rolePicker(env, i);
     if (id === "open:start") return startHere(env);
-    if (id === "open:recipe") return cmdRecipe(env, i, true);
   }
   if (i.type === 5 && i.data.custom_id === "showcase") return showcaseSubmit(env, i);
   return reply({ content: "That did not work. Try again in a moment." });
@@ -374,10 +345,9 @@ export async function handle(env, i) {
 // answered at once: PING, autocomplete, the showcase form, and commands that need nothing from Discord
 const INSTANT = new Set(["showcase", "poll", "download", "docs"]);
 function immediate(i) { return i.type === 1 || i.type === 4 || (i.type === 2 && INSTANT.has(i.data.name)); }
-const PUBLIC = new Set(["guide", "rank", "leaderboard", "thanks", "challenge", "Mark as solved", "recipe", "bug"]);
+const PUBLIC = new Set(["guide", "rank", "leaderboard", "thanks", "challenge", "Mark as solved", "bug"]);
 function ephemeral(i) {
   if (i.type !== 2 || !PUBLIC.has(i.data.name)) return true;
-  if (i.data.name === "recipe") return !opt(i, "name");
   if (i.data.name === "challenge") return true;
   return false;
 }
@@ -487,7 +457,7 @@ async function openChallenge(env, s) {
         `- **Vote:** react ${STAR} on the entries you like.\n` +
         `- **Closes:** <t:${Math.floor(closes / 1000)}:F> (<t:${Math.floor(closes / 1000)}:R>). The most starred entry wins the Challenge winner role.` +
         (ping ? `\n\n-# <@&${ping.id}> a new challenge is open. Change this ping in #roles.` : ""),
-      components: [row(linkBtn("Download Form Studio", C.repo + "/releases/latest"), linkBtn("Recipes", C.site + "recipes/"))] } });
+      components: [row(linkBtn("Download Form Studio", C.repo + "/releases/latest"), linkBtn("Docs", C.docs))] } });
   s.challenge = { index, thread: t.id, opened: Date.now(), closes };
   try {     // the challenge in the server's Events tab
     await api(env, "POST", `/guilds/${env.GUILD_ID}/scheduled-events`, { name: `Challenge: ${title}`.slice(0, 100), privacy_level: 2,

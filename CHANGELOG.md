@@ -4,6 +4,13 @@
 
 ### New
 
+- **A design is checked against what you asked for.** The numbers in a request (sizes, hole counts and diameters, a
+  bolt circle, wall thickness, threads, the number of parts) become requirements that Form Studio measures on the
+  built solid. Each revision shows, per requirement, what was measured and whether it passed; one that fails blocks
+  release. Numbers that cannot all be true are reported before anything is designed.
+- **Faster, cheaper changes by an agent.** An agent now changes one feature or one parameter by name instead of
+  sending the whole design again, and only what changed is rebuilt. Common mistakes in design code are found before
+  the build starts, all at once.
 - **Designs are refined after they build.** Once a design builds, Form Studio looks for small improvements (edge
   rounding, details, materials) and keeps only those that pass its checks. They arrive as one extra revision,
   "Refined: N changes", that you can undo change by change or all at once, and refinement can be turned off per
@@ -12,6 +19,21 @@
   Analytic and freeform faces and a feature tree from the mesh are Beta.
 - **Designs built one feature at a time.** You watch the design take shape; a feature that fails no longer loses
   the work, and each feature is checked as it is made.
+- **The build, drawn like a drawing.** As a design builds, each feature's edges are traced first, then its solid
+  rises into place. The overall dimensions measure what is built so far and count up with it, a ledger over the
+  part names the feature and how far the build is ("6 of 12"), and the feature's row in the Design list lights
+  up while it is made. The camera frames the build once and then stays put.
+- **Compare is a wipe.** Comparing two revisions puts a line down the view: the head left of it, the other
+  revision right of it, each side tagged. Drag the line across the part; Done, Esc and Compare again still end it.
+- **Mesh to CAD, shown.** After Make editable, the mesh's outline stays on screen in blue while the CAD grows
+  inside it, with the largest distance between the two counted up beside it (computed). Then the outline fades.
+- **Refinement you can see.** Pointing at a refine change lights up its feature on the part, and holding
+  Before / After shows the design as it was before the refinement.
+- **The part stays in view.** A change that makes the part outgrow the view (a wider draft, a taller revision)
+  pulls the camera back instead of letting the part slide under the panels, and labels no longer draw over them.
+- **Waiting for a design reads like a drawing being started.** Two construction lines meet at an origin and
+  breathe; the agent's real steps are written from it as a ledger, and "Writing design code" shows the size of
+  the code as it grows. The floor's origin cross no longer runs through the words on an empty floor.
 - **Drag a face to change the design**, constrained 2D sketches, and sculpted forms as exact NURBS.
 - **Real standard hardware.** ISO screws, nuts, washers, heat-set inserts and bearings built into designs, with
   their masses in the bill of materials.
@@ -29,7 +51,50 @@
   another agent by the old app's path, add it again: `form setup` finds your agents and writes the entry.
 - **Creation first.** A new design is a 3D model; 3D printing is optional and turned on when you want it.
 - **Builds run side by side** in a kernel pool, and pipeline jobs survive a restart.
+- **A design is built once.** The solid a change builds is kept (on disk, for every Form Studio process) and reused
+  for the view, the exports, the checks and every render and analysis at any detail. Replaying a real session on the
+  shower holder: 1 build per change instead of 3 (update_design 22 to 33 s instead of 37 to 49 s), a render right after
+  the change 1.4 s, and a new window opening the same revision builds nothing (it built again for 8 to 9 s). Renders draw 4 to 8 times
+  faster, pixel for pixel the same. Kernel time limits follow how long the design takes to build.
 - **Agents:** MCP 2026-07-28 throughout, long tools can run as tasks, and the design guidance is served as skills.
+- **Recipes are no longer a public library.** The engine still uses them as building blocks for agents; the website page, the Discord forum and the submission form are gone.
+- **A draft reads as a change, not an error.** What a draft does to each feature (resized, moved, added, removed) is
+  tagged in the draft's blue instead of the red used for failures, and its consequences count from the old value to
+  the new one (at once with reduced motion). Text fields keep a quiet edge under the pointer.
+
+### Fixed
+
+- **Threaded holes have their thread.** A hole cut with the built-in internal thread could come out as a plain
+  bore that no bolt held. The thread is now cut, and a thread that cannot be cut is reported instead of built plain.
+- **Saved conversations open with every message.** A long conversation could open as an empty column with only its
+  last footer; every message is now drawn, and only what arrives while you watch fades in.
+- **Compare turns off.** Compare on a reply's change card is now a toggle, the viewport's Comparing chip has Done,
+  and Esc, another stage or showing another revision end it too.
+- **The Building caption goes when the build is saved**, even when the save arrives with the last stages, and it
+  moves aside so it never sits on the refinement panel.
+- **Agents can call the design workflow by name at once.** Every tool the server's instructions name first,
+  design_brief included, loads up front, so an agent no longer gets "No such tool available" for design_guide.
+
+### Fixed
+
+- **A decorative finish can no longer thin a wall below the print minimum.** Flutes, grooves, knurls, grip textures,
+  parting lines, recessed panels and ribbed lightening (added by an agent or by refinement) are measured as they are
+  made. A finish that would leave a wall under 1.2 mm on a 0.4 mm nozzle (three nozzle widths; a model uses its
+  process minimum) is left out, and the build log names the wall and where it is. Agents can use
+  `craft.finish_cut`, which makes each cut only as deep as the wall behind it allows. Before this, 0.5 mm flutes cut
+  a sofa-arm holder's corbel wall to 0.81 mm.
+- **A thin wall in a structural feature now fails the Thinnest-wall check.** A wall under three nozzle widths
+  (1.2 mm on a 0.4 mm nozzle) in a structural feature, such as a corbel, an arm or a clip's spine, is a FAIL. The
+  check gives the measured value, the feature, what thinned it and where. Decorative ridges between 2 and 3 nozzle
+  widths still show as a warning.
+- **STL export no longer hangs on a mesh that will not close.** The retries at finer settings now have a time limit.
+  A solid with sliver faces (from chamfering every edge of a fluted end) took 703 s to export and timed out. It now
+  exports in 1.8 s, and the mesh check reports the open edges.
+- **A fillet as large as an arc's own radius no longer crashes the geometry kernel.** `craft.safe_fillet` and
+  `craft.safe_chamfer` skip that size on those edges and try a smaller one. When the kernel does crash, the message
+  names the call and the line of the design source that caused it.
+- **Design guidance:** decorative finishes are added last, and only where the wall has room for them. Hollow
+  structural shells keep their stated wall all the way round: the cavity is an offset of the outside.
 
 ### Known limits
 
@@ -114,7 +179,7 @@
   treasure chest game asset), then how it works, the app drawn live, mesh to editable CAD (a synthetic bracket:
   3,216 triangles to 18 dimensions, 0.0017 mm from the mesh), automatic refinement before and after, game assets
   with their four levels of detail, assemblies, and "your agent, your computer". The navigation is What it makes,
-  How it works, Your agent, Recipes, Docs; the "3D printing" menu is gone. A new page, How we measure
+  How it works, Your agent, Docs; the "3D printing" menu is gone. A new page, How we measure
   (site/measure/), states what the three benches measure and their numbers, with the full reports as docs pages;
   build timings and slicer compatibility are linked from the footer. The drawn app loads when it comes near, so the
   first view is about 0.25 MB uncompressed where it was about 1.4 MB. The README opens with the same photograph and a strip of
@@ -217,8 +282,8 @@
   earlier versions get the form on the session. Form Studio's own chat, and clients without elicitation, get exactly
   what they got before (`form/elicit.py`).
 - **Claude Code searches Form Studio's tools.** The chat's Claude Code runs list ToolSearch and set
-  `ENABLE_TOOL_SEARCH=auto`; ten tools (form_overview, get_project, create_design, update_design, render,
-  preview_change, commit_change, design_guide, ask_user, get_job) carry `anthropic/alwaysLoad` and the rest are found
+  `ENABLE_TOOL_SEARCH=auto`; eleven tools (form_overview, get_project, create_design, update_design, render,
+  preview_change, commit_change, design_guide, design_brief, ask_user, get_job) carry `anthropic/alwaysLoad` and the rest are found
   by searching, so every tool description now opens with a verb and its object. `[chat] tool_search = "false"` (or
   `FORM_TOOL_SEARCH=false`) loads every tool up front as before, for this release. The server's instructions are
   shorter (3,805 characters, within the 4,096 Claude Code reads), and tests keep them and every description there.
@@ -887,7 +952,7 @@
 - **Fewer failed steps in conversations.** A design that fails to build says the error and the line it came from; an STL export that comes out with a gap is meshed again until it is closed; a reference part named without an extension keeps its format; assembled and exploded views work for every multi-part design.
 - **A safer engine.** Download file names can no longer add HTTP headers, web pages from other sites cannot send requests to the engine on your computer, design ids cannot point outside their folder, and lock files are private to you.
 - **Errors are kept.** An unexpected engine error is written with its details to `.logs/engine-errors.log` in your projects folder.
-- **A Discord server.** [discord.gg/b6ZgyndkmS](https://discord.gg/b6ZgyndkmS) has a guide for each part of the app, a post for every recipe, a help forum where the bot answers each new post with the guides for its tags, a showcase, ideas, and every release as it ships. It is linked from the README and the website's footer.
+- **A Discord server.** [discord.gg/b6ZgyndkmS](https://discord.gg/b6ZgyndkmS) has a guide for each part of the app, a help forum where the bot answers each new post with the guides for its tags, a showcase, ideas, and every release as it ships. It is linked from the README and the website's footer.
 
 ## 1.0.0
 
