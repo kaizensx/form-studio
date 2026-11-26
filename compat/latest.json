@@ -1,8 +1,8 @@
 {
  "schema": 1,
- "generated": "2026-11-25T13:09:23+00:00",
- "commit": "5634e93462d12a3be052d8f20846e0f102c85460",
- "run_url": "https://github.com/kaizensx/form-studio/actions/runs/45619487669",
+ "generated": "2026-11-26T12:49:11+00:00",
+ "commit": "02838fae4bda21aac50be9b5aa0d673c9576e98e",
+ "run_url": "https://github.com/kaizensx/form-studio/actions/runs/45822213079",
  "slicers": [
   {
    "kind": "bambu",
@@ -152,11 +152,6 @@
    "id": "hook",
    "title": "Wall hook",
    "builtin": true
-  },
-  {
-   "id": "cable-clip",
-   "title": "Cable clip",
-   "builtin": false
   }
  ],
  "cells": {
@@ -164,2535 +159,2268 @@
    "bambu": {
     "title": "Battery and card holder",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.506,
-     "exports": 0.37,
-     "checks": 0.923,
-     "slice": 9.1,
-     "load": 0.004
+     "geometry": 0.473,
+     "exports": 2.081,
+     "checks": 2.839,
+     "load": 0.003
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 5369.0,
-    "filament_g": 43.36,
-    "layers": 121,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Battery and card holder",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.373,
-     "exports": 0.265,
-     "checks": 0.616,
-     "slice": 5.786,
-     "load": 0.003
+     "geometry": 0.634,
+     "exports": 2.793,
+     "checks": 3.591,
+     "load": 0.004
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Battery and card holder",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.404,
-     "exports": 0.296,
-     "checks": 0.711,
-     "slice": 5.806,
-     "load": 0.003
+     "geometry": 0.681,
+     "exports": 2.816,
+     "checks": 3.328,
+     "load": 0.004
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 4986.0,
-    "filament_g": 36.04,
-    "layers": 121,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Battery and card holder",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.533,
-     "exports": 0.362,
-     "checks": 0.909,
-     "slice": 4.076,
-     "load": 0.004
+     "geometry": 0.692,
+     "exports": 2.917,
+     "checks": 3.433,
+     "load": 0.003
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 12425.0,
-    "filament_g": 37.85,
-    "layers": 121,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Battery and card holder",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.37,
-     "exports": 0.262,
-     "checks": 0.625,
-     "slice": 6.242,
+     "geometry": 0.484,
+     "exports": 2.3,
+     "checks": 2.936,
      "load": 0.003
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 4476.0,
-    "filament_g": 34.94,
-    "layers": 121,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Battery and card holder",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.375,
-     "exports": 0.268,
-     "checks": 0.647,
-     "slice": 9.139,
+     "geometry": 0.477,
+     "exports": 2.092,
+     "checks": 2.877,
      "load": 0.003
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Battery and card holder",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.298,
-     "exports": 0.214,
-     "checks": 0.488,
-     "slice": 3.984,
-     "load": 0.002
+     "geometry": 0.642,
+     "exports": 2.914,
+     "checks": 3.807,
+     "load": 0.004
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 11980.0,
-    "filament_g": 37.99,
-    "layers": 122,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "cable_organizer": {
    "bambu": {
     "title": "Cable organizer",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.229,
-     "exports": 0.062,
-     "checks": 0.319,
-     "slice": 0.735,
+     "geometry": 0.187,
+     "exports": 0.063,
+     "checks": 0.367,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 6,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 298.0,
-    "filament_g": 1.9,
-    "layers": 43,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Cable organizer",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.18,
-     "exports": 0.047,
-     "checks": 0.186,
-     "slice": 0.734,
+     "geometry": 0.251,
+     "exports": 0.078,
+     "checks": 0.458,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 6,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Cable organizer",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.171,
-     "exports": 0.056,
-     "checks": 0.199,
-     "slice": 0.883,
+     "geometry": 0.242,
+     "exports": 0.081,
+     "checks": 0.44,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 6,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 778.0,
-    "filament_g": 1.84,
-    "layers": 43,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Cable organizer",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.24,
-     "exports": 0.066,
-     "checks": 0.318,
-     "slice": 0.151,
+     "geometry": 0.248,
+     "exports": 0.083,
+     "checks": 0.476,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 6,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 43,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Cable organizer",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.18,
-     "exports": 0.047,
-     "checks": 0.187,
-     "slice": 0.579,
+     "geometry": 0.192,
+     "exports": 0.06,
+     "checks": 0.385,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 6,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 43,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Cable organizer",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.188,
-     "exports": 0.049,
-     "checks": 0.19,
-     "slice": 2.099,
+     "geometry": 0.193,
+     "exports": 0.059,
+     "checks": 0.366,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 6,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Cable organizer",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.143,
-     "exports": 0.037,
-     "checks": 0.126,
-     "slice": 0.45,
+     "geometry": 0.258,
+     "exports": 0.078,
+     "checks": 0.483,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 6,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 43,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "coupon": {
    "bambu": {
     "title": "Fit coupon",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.087,
-     "exports": 0.019,
-     "checks": 0.237,
-     "slice": 0.269,
+     "geometry": 0.077,
+     "exports": 0.021,
+     "checks": 0.046,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 641.0,
-    "filament_g": 4.52,
-    "layers": 50,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Fit coupon",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.071,
-     "exports": 0.018,
-     "checks": 0.13,
-     "slice": 0.302,
+     "geometry": 0.099,
+     "exports": 0.026,
+     "checks": 0.061,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Fit coupon",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.066,
-     "exports": 0.016,
-     "checks": 0.135,
-     "slice": 0.44,
+     "geometry": 0.102,
+     "exports": 0.118,
+     "checks": 0.062,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 1029.0,
-    "filament_g": 3.83,
-    "layers": 50,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Fit coupon",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.091,
-     "exports": 0.021,
-     "checks": 0.226,
-     "slice": 0.148,
+     "geometry": 0.097,
+     "exports": 0.025,
+     "checks": 0.065,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 50,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Fit coupon",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.069,
-     "exports": 0.017,
-     "checks": 0.129,
-     "slice": 0.182,
+     "geometry": 0.078,
+     "exports": 0.021,
+     "checks": 0.048,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 50,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Fit coupon",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.071,
-     "exports": 0.018,
-     "checks": 0.132,
-     "slice": 2.103,
+     "geometry": 0.078,
+     "exports": 0.021,
+     "checks": 0.048,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Fit coupon",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.051,
-     "exports": 0.013,
-     "checks": 0.089,
-     "slice": 0.161,
+     "geometry": 0.102,
+     "exports": 0.027,
+     "checks": 0.064,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 50,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "desk_hanger": {
    "bambu": {
     "title": "Under-desk hanger",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.715,
-     "exports": 0.089,
-     "checks": 0.455,
-     "slice": 2.651,
+     "geometry": 0.502,
+     "exports": 1.837,
+     "checks": 0.446,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 11,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3337.0,
-    "filament_g": 35.61,
-    "layers": 200,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Under-desk hanger",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.551,
-     "exports": 0.071,
-     "checks": 0.277,
-     "slice": 1.641,
+     "geometry": 0.675,
+     "exports": 2.321,
+     "checks": 0.555,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 11,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Under-desk hanger",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.535,
-     "exports": 0.071,
-     "checks": 0.305,
-     "slice": 1.363,
+     "geometry": 0.661,
+     "exports": 2.451,
+     "checks": 0.563,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 11,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3563.0,
-    "filament_g": 28.78,
-    "layers": 200,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Under-desk hanger",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.72,
-     "exports": 0.088,
-     "checks": 0.455,
-     "slice": 0.869,
+     "geometry": 0.654,
+     "exports": 2.56,
+     "checks": 0.574,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 11,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 9628.0,
-    "filament_g": 29.92,
-    "layers": 200,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Under-desk hanger",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.547,
-     "exports": 0.07,
-     "checks": 0.272,
-     "slice": 1.448,
+     "geometry": 0.536,
+     "exports": 2.039,
+     "checks": 0.466,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 11,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 2764.0,
-    "filament_g": 26.7,
-    "layers": 200,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Under-desk hanger",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.554,
-     "exports": 0.072,
-     "checks": 0.277,
-     "slice": 4.122,
+     "geometry": 0.501,
+     "exports": 1.86,
+     "checks": 0.451,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 11,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Under-desk hanger",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.435,
-     "exports": 0.051,
-     "checks": 0.19,
-     "slice": 1.077,
+     "geometry": 0.684,
+     "exports": 2.575,
+     "checks": 0.598,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 11,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 9117.0,
-    "filament_g": 29.13,
-    "layers": 200,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "device_stand": {
    "bambu": {
     "title": "Phone and tablet stand",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.457,
-     "exports": 0.432,
-     "checks": 0.892,
-     "slice": 4.171,
+     "geometry": 0.338,
+     "exports": 2.169,
+     "checks": 5.956,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 7591.0,
-    "filament_g": 86.4,
-    "layers": 445,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Phone and tablet stand",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.339,
-     "exports": 0.304,
-     "checks": 0.621,
-     "slice": 3.044,
+     "geometry": 0.44,
+     "exports": 2.7,
+     "checks": 7.262,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Phone and tablet stand",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.348,
-     "exports": 0.338,
-     "checks": 0.688,
-     "slice": 2.588,
+     "geometry": 0.471,
+     "exports": 2.911,
+     "checks": 5.905,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 7159.0,
-    "filament_g": 72.43,
-    "layers": 445,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Phone and tablet stand",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.467,
-     "exports": 0.427,
-     "checks": 0.882,
-     "slice": 1.783,
+     "geometry": 0.466,
+     "exports": 3.038,
+     "checks": 6.353,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 23769.0,
-    "filament_g": 75.91,
-    "layers": 445,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Phone and tablet stand",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.333,
-     "exports": 0.3,
-     "checks": 0.599,
-     "slice": 3.306,
+     "geometry": 0.342,
+     "exports": 2.316,
+     "checks": 6.31,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 7363.0,
-    "filament_g": 65.03,
-    "layers": 445,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Phone and tablet stand",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.344,
-     "exports": 0.308,
-     "checks": 0.628,
-     "slice": 4.133,
+     "geometry": 0.337,
+     "exports": 2.159,
+     "checks": 6.158,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Phone and tablet stand",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.262,
-     "exports": 0.237,
-     "checks": 0.475,
-     "slice": 2.518,
+     "geometry": 0.451,
+     "exports": 3.062,
+     "checks": 8.077,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 19824.0,
-    "filament_g": 69.5,
-    "layers": 445,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "dock": {
    "bambu": {
     "title": "Device dock",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.462,
-     "exports": 0.147,
-     "checks": 0.633,
-     "slice": 1.983,
+     "geometry": 0.338,
+     "exports": 0.164,
+     "checks": 1.015,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3932.0,
-    "filament_g": 57.8,
-    "layers": 177,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Device dock",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.33,
-     "exports": 0.107,
-     "checks": 0.417,
-     "slice": 1.396,
+     "geometry": 0.442,
+     "exports": 0.22,
+     "checks": 1.211,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Device dock",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.355,
-     "exports": 0.115,
-     "checks": 0.5,
-     "slice": 1.207,
+     "geometry": 0.483,
+     "exports": 0.229,
+     "checks": 1.18,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 4655.0,
-    "filament_g": 51.07,
-    "layers": 177,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Device dock",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.471,
-     "exports": 0.148,
-     "checks": 0.617,
-     "slice": 1.056,
+     "geometry": 0.49,
+     "exports": 0.234,
+     "checks": 1.241,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 16990.0,
-    "filament_g": 59.74,
-    "layers": 177,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Device dock",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.33,
-     "exports": 0.107,
-     "checks": 0.415,
-     "slice": 1.708,
+     "geometry": 0.347,
+     "exports": 0.168,
+     "checks": 1.035,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 5261.0,
-    "filament_g": 52.24,
-    "layers": 177,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Device dock",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.337,
-     "exports": 0.109,
-     "checks": 0.437,
-     "slice": 3.126,
+     "geometry": 0.34,
+     "exports": 0.167,
+     "checks": 1.029,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Device dock",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.25,
-     "exports": 0.083,
-     "checks": 0.334,
-     "slice": 1.891,
+     "geometry": 0.468,
+     "exports": 0.217,
+     "checks": 1.325,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 15818.0,
-    "filament_g": 56.44,
-    "layers": 177,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "enclosure": {
    "bambu": {
     "title": "Electronics enclosure",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 1.151,
-     "exports": 0.296,
-     "checks": 1.466,
-     "slice": 5.275,
-     "load": 0.025
+     "geometry": 0.791,
+     "exports": 2.08,
+     "checks": 4.338,
+     "load": 0.021
     },
     "rollup": {
-     "PASS": 14,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 6620.0,
-    "filament_g": 68.64,
-    "layers": 160,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Electronics enclosure",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.93,
-     "exports": 0.225,
-     "checks": 1.048,
-     "slice": 3.913,
-     "load": 0.02
+     "geometry": 1.03,
+     "exports": 2.655,
+     "checks": 5.292,
+     "load": 0.025
     },
     "rollup": {
-     "PASS": 14,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Electronics enclosure",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.876,
-     "exports": 0.242,
-     "checks": 1.175,
-     "slice": 2.716,
-     "load": 0.019
+     "geometry": 0.979,
+     "exports": 2.738,
+     "checks": 4.731,
+     "load": 0.025
     },
     "rollup": {
-     "PASS": 14,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 6102.0,
-    "filament_g": 64.79,
-    "layers": 160,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Electronics enclosure",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 1.182,
-     "exports": 0.301,
-     "checks": 1.495,
-     "slice": 1.988,
+     "geometry": 0.991,
+     "exports": 2.865,
+     "checks": 4.998,
      "load": 0.025
     },
     "rollup": {
-     "PASS": 14,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 18859.0,
-    "filament_g": 70.66,
-    "layers": 160,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Electronics enclosure",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.928,
-     "exports": 0.223,
-     "checks": 1.042,
-     "slice": 3.456,
-     "load": 0.02
+     "geometry": 0.817,
+     "exports": 2.259,
+     "checks": 4.527,
+     "load": 0.021
     },
     "rollup": {
-     "PASS": 14,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 6086.0,
-    "filament_g": 61.91,
-    "layers": 160,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Electronics enclosure",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.947,
-     "exports": 0.23,
-     "checks": 1.084,
-     "slice": 5.233,
+     "geometry": 0.801,
+     "exports": 2.086,
+     "checks": 4.421,
      "load": 0.021
     },
     "rollup": {
-     "PASS": 14,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Electronics enclosure",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.69,
-     "exports": 0.169,
-     "checks": 0.785,
-     "slice": 2.095,
-     "load": 0.015
+     "geometry": 1.065,
+     "exports": 2.865,
+     "checks": 5.927,
+     "load": 0.026
     },
     "rollup": {
-     "PASS": 14,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 17990.0,
-    "filament_g": 66.7,
-    "layers": 160,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "gear_pair": {
    "bambu": {
     "title": "Spur gear pair",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 6.254,
-     "exports": 2.367,
-     "checks": 10.784,
-     "slice": 5.56,
-     "load": 0.868
+     "geometry": 2.924,
+     "exports": 4.302,
+     "checks": 8.468,
+     "load": 0.467
     },
     "rollup": {
-     "PASS": 16,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 13,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 2216.0,
-    "filament_g": 17.96,
-    "layers": 58,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Spur gear pair",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 4.413,
-     "exports": 1.736,
-     "checks": 7.995,
-     "slice": 4.025,
-     "load": 0.459
+     "geometry": 3.815,
+     "exports": 5.541,
+     "checks": 10.718,
+     "load": 0.616
     },
     "rollup": {
-     "PASS": 16,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 13,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Spur gear pair",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 4.312,
-     "exports": 1.947,
-     "checks": 8.871,
-     "slice": 3.679,
-     "load": 0.466
+     "geometry": 4.642,
+     "exports": 5.811,
+     "checks": 10.876,
+     "load": 0.867
     },
     "rollup": {
-     "PASS": 16,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 13,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 2590.0,
-    "filament_g": 16.2,
-    "layers": 58,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Spur gear pair",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 6.312,
-     "exports": 2.379,
-     "checks": 11.187,
-     "slice": 3.728,
-     "load": 0.813
+     "geometry": 4.461,
+     "exports": 5.721,
+     "checks": 10.86,
+     "load": 0.795
     },
     "rollup": {
-     "PASS": 16,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 13,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 5192.0,
-    "filament_g": 17.82,
-    "layers": 58,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Spur gear pair",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 4.422,
-     "exports": 1.722,
-     "checks": 7.913,
-     "slice": 11.324,
-     "load": 0.458
+     "geometry": 3.028,
+     "exports": 4.599,
+     "checks": 8.889,
+     "load": 0.467
     },
     "rollup": {
-     "PASS": 16,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 13,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 2084.0,
-    "filament_g": 15.52,
-    "layers": 58,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Spur gear pair",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 4.519,
-     "exports": 1.782,
-     "checks": 8.199,
-     "slice": 5.942,
-     "load": 0.479
+     "geometry": 2.912,
+     "exports": 4.273,
+     "checks": 8.229,
+     "load": 0.461
     },
     "rollup": {
-     "PASS": 16,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 13,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Spur gear pair",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 3.095,
-     "exports": 1.322,
-     "checks": 6.267,
-     "slice": 2.484,
-     "load": 0.275
+     "geometry": 3.765,
+     "exports": 5.722,
+     "checks": 11.004,
+     "load": 0.594
     },
     "rollup": {
-     "PASS": 16,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 13,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 5056.0,
-    "filament_g": 17.6,
-    "layers": 58,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "gridfinity": {
    "bambu": {
     "title": "Gridfinity-style bin",
     "builtin": true,
-    "state": "check-failed",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 1.392,
-     "exports": 0.19,
-     "checks": 0.945,
-     "slice": 2.44,
+     "geometry": 0.814,
+     "exports": 2.023,
+     "checks": 2.823,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 6,
-     "WARN": 3,
-     "FAIL": 1
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3189.0,
-    "filament_g": 35.85,
-    "layers": 230,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Gridfinity-style bin",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 1.069,
-     "exports": 0.143,
-     "checks": 0.63,
-     "slice": 1.852,
+     "geometry": 1.081,
+     "exports": 2.491,
+     "checks": 3.373,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 6,
-     "WARN": 3,
-     "FAIL": 1
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Gridfinity-style bin",
     "builtin": true,
-    "state": "check-failed",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 1.043,
-     "exports": 0.147,
-     "checks": 0.712,
-     "slice": 1.64,
+     "geometry": 1.096,
+     "exports": 2.605,
+     "checks": 3.206,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 6,
-     "WARN": 3,
-     "FAIL": 1
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3473.0,
-    "filament_g": 30.8,
-    "layers": 230,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Gridfinity-style bin",
     "builtin": true,
-    "state": "check-failed",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 1.399,
-     "exports": 0.189,
-     "checks": 0.962,
-     "slice": 1.368,
+     "geometry": 1.092,
+     "exports": 2.652,
+     "checks": 3.282,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 6,
-     "WARN": 3,
-     "FAIL": 1
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 11071.0,
-    "filament_g": 34.14,
-    "layers": 230,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Gridfinity-style bin",
     "builtin": true,
-    "state": "check-failed",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 1.072,
-     "exports": 0.141,
-     "checks": 0.617,
-     "slice": 1.709,
+     "geometry": 0.842,
+     "exports": 2.156,
+     "checks": 2.905,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 6,
-     "WARN": 3,
-     "FAIL": 1
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3819.0,
-    "filament_g": 30.11,
-    "layers": 230,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Gridfinity-style bin",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 1.093,
-     "exports": 0.144,
-     "checks": 0.639,
-     "slice": 3.14,
+     "geometry": 0.815,
+     "exports": 1.96,
+     "checks": 2.743,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 6,
-     "WARN": 3,
-     "FAIL": 1
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Gridfinity-style bin",
     "builtin": true,
-    "state": "check-failed",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.794,
-     "exports": 0.107,
-     "checks": 0.501,
-     "slice": 1.143,
+     "geometry": 1.121,
+     "exports": 2.77,
+     "checks": 3.729,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 6,
-     "WARN": 3,
-     "FAIL": 1
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 9656.0,
-    "filament_g": 31.47,
-    "layers": 230,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "gridfinity_baseplate": {
    "bambu": {
     "title": "Gridfinity baseplate",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 5.784,
-     "exports": 0.567,
-     "checks": 2.042,
-     "slice": 2.329,
+     "geometry": 3.673,
+     "exports": 2.405,
+     "checks": 1.605,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 2546.0,
-    "filament_g": 22.49,
-    "layers": 23,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Gridfinity baseplate",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 4.816,
-     "exports": 0.445,
-     "checks": 1.405,
-     "slice": 1.643,
+     "geometry": 4.75,
+     "exports": 3.01,
+     "checks": 1.935,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Gridfinity baseplate",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 4.38,
-     "exports": 0.459,
-     "checks": 1.511,
-     "slice": 1.646,
+     "geometry": 4.671,
+     "exports": 3.127,
+     "checks": 1.919,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 2643.0,
-    "filament_g": 20.44,
-    "layers": 23,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Gridfinity baseplate",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 6.31,
-     "exports": 0.591,
-     "checks": 2.089,
-     "slice": 1.118,
+     "geometry": 4.739,
+     "exports": 3.136,
+     "checks": 1.942,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 8581.0,
-    "filament_g": 22.41,
-    "layers": 23,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Gridfinity baseplate",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 4.713,
-     "exports": 0.436,
-     "checks": 1.411,
-     "slice": 1.471,
+     "geometry": 3.7,
+     "exports": 2.463,
+     "checks": 1.623,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 2885.0,
-    "filament_g": 20.03,
-    "layers": 23,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Gridfinity baseplate",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 4.824,
-     "exports": 0.452,
-     "checks": 1.453,
-     "slice": 3.13,
+     "geometry": 3.633,
+     "exports": 2.392,
+     "checks": 1.566,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Gridfinity baseplate",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 3.52,
-     "exports": 0.337,
-     "checks": 1.133,
-     "slice": 1.486,
+     "geometry": 4.906,
+     "exports": 3.293,
+     "checks": 2.09,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 7016.0,
-    "filament_g": 19.41,
-    "layers": 23,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "gridfinity_bin": {
    "bambu": {
     "title": "Gridfinity bin",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 1.23,
-     "exports": 0.187,
-     "checks": 0.772,
-     "slice": 2.492,
+     "geometry": 0.735,
+     "exports": 2.029,
+     "checks": 2.989,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3399.0,
-    "filament_g": 36.88,
-    "layers": 230,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Gridfinity bin",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.978,
-     "exports": 0.143,
-     "checks": 0.521,
-     "slice": 1.891,
+     "geometry": 0.945,
+     "exports": 2.454,
+     "checks": 3.634,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Gridfinity bin",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.939,
-     "exports": 0.148,
-     "checks": 0.585,
-     "slice": 1.699,
+     "geometry": 0.951,
+     "exports": 2.604,
+     "checks": 3.346,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3508.0,
-    "filament_g": 31.8,
-    "layers": 230,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Gridfinity bin",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 1.28,
-     "exports": 0.192,
-     "checks": 0.792,
-     "slice": 1.295,
+     "geometry": 0.941,
+     "exports": 2.55,
+     "checks": 3.502,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 11346.0,
-    "filament_g": 35.25,
-    "layers": 230,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Gridfinity bin",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.971,
-     "exports": 0.141,
-     "checks": 0.52,
-     "slice": 1.618,
+     "geometry": 0.74,
+     "exports": 2.054,
+     "checks": 3.123,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3686.0,
-    "filament_g": 34.28,
-    "layers": 230,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Gridfinity bin",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.985,
-     "exports": 0.143,
-     "checks": 0.511,
-     "slice": 3.137,
+     "geometry": 0.731,
+     "exports": 1.974,
+     "checks": 3.015,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Gridfinity bin",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.729,
-     "exports": 0.107,
-     "checks": 0.402,
-     "slice": 1.198,
+     "geometry": 0.984,
+     "exports": 2.799,
+     "checks": 4.1,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 9921.0,
-    "filament_g": 32.64,
-    "layers": 230,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "hinged_box": {
    "bambu": {
     "title": "Hinged box",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.252,
-     "exports": 0.087,
-     "checks": 22.412,
-     "slice": 1.356,
+     "geometry": 0.197,
+     "exports": 0.084,
+     "checks": 17.351,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 13,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3056.0,
-    "filament_g": 34.98,
-    "layers": 172,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Hinged box",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.205,
-     "exports": 0.065,
-     "checks": 17.194,
-     "slice": 1.123,
+     "geometry": 0.255,
+     "exports": 0.109,
+     "checks": 21.41,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 13,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Hinged box",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.193,
-     "exports": 0.068,
-     "checks": 19.014,
-     "slice": 1.113,
+     "geometry": 0.243,
+     "exports": 0.116,
+     "checks": 22.095,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 13,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3534.0,
-    "filament_g": 33.26,
-    "layers": 172,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Hinged box",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.256,
-     "exports": 0.084,
-     "checks": 24.316,
-     "slice": 0.573,
+     "geometry": 0.241,
+     "exports": 0.109,
+     "checks": 22.337,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 13,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 10058.0,
-    "filament_g": 36.11,
-    "layers": 172,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Hinged box",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.202,
-     "exports": 0.065,
-     "checks": 17.328,
-     "slice": 0.857,
+     "geometry": 0.199,
+     "exports": 0.085,
+     "checks": 17.442,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 13,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 172,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Hinged box",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.206,
-     "exports": 0.065,
-     "checks": 17.26,
-     "slice": 2.175,
+     "geometry": 0.201,
+     "exports": 0.084,
+     "checks": 17.174,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 13,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Hinged box",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.149,
-     "exports": 0.049,
-     "checks": 13.28,
-     "slice": 0.734,
+     "geometry": 0.265,
+     "exports": 0.112,
+     "checks": 22.164,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 13,
-     "WARN": 2,
-     "FAIL": 0
+     "PASS": 11,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 10007.0,
-    "filament_g": 34.96,
-    "layers": 172,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "hook": {
    "bambu": {
     "title": "Wall hook",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.116,
-     "exports": 0.049,
-     "checks": 0.303,
-     "slice": 0.617,
+     "geometry": 0.099,
+     "exports": 0.048,
+     "checks": 0.399,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 1751.0,
-    "filament_g": 16.11,
-    "layers": 400,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Wall hook",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.089,
-     "exports": 0.036,
-     "checks": 0.174,
-     "slice": 0.488,
+     "geometry": 0.13,
+     "exports": 0.062,
+     "checks": 0.482,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Wall hook",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.086,
-     "exports": 0.038,
-     "checks": 0.182,
-     "slice": 0.564,
+     "geometry": 0.131,
+     "exports": 0.065,
+     "checks": 0.491,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3585.0,
-    "filament_g": 13.49,
-    "layers": 400,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Wall hook",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.119,
-     "exports": 0.049,
-     "checks": 0.299,
-     "slice": 0.323,
+     "geometry": 0.129,
+     "exports": 0.063,
+     "checks": 0.527,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 6739.0,
-    "filament_g": 14.45,
-    "layers": 400,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Wall hook",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.088,
-     "exports": 0.036,
-     "checks": 0.173,
-     "slice": 0.301,
+     "geometry": 0.102,
+     "exports": 0.048,
+     "checks": 0.415,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 400,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Wall hook",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.09,
-     "exports": 0.037,
-     "checks": 0.171,
-     "slice": 2.105,
+     "geometry": 0.103,
+     "exports": 0.048,
+     "checks": 0.396,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Wall hook",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.068,
-     "exports": 0.028,
-     "checks": 0.114,
-     "slice": 0.393,
+     "geometry": 0.134,
+     "exports": 0.063,
+     "checks": 0.523,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 6682.0,
-    "filament_g": 14.12,
-    "layers": 400,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "hose_adapter": {
    "bambu": {
     "title": "Hose and pipe adapter",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.784,
-     "exports": 0.603,
-     "checks": 1.125,
-     "slice": 6.155,
+     "geometry": 0.584,
+     "exports": 2.39,
+     "checks": 1.024,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 2523.0,
-    "filament_g": 26.57,
-    "layers": 382,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Hose and pipe adapter",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.533,
-     "exports": 0.408,
-     "checks": 0.755,
-     "slice": 3.473,
+     "geometry": 0.762,
+     "exports": 2.97,
+     "checks": 1.294,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Hose and pipe adapter",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.612,
-     "exports": 0.465,
-     "checks": 0.968,
-     "slice": 3.241,
+     "geometry": 0.849,
+     "exports": 3.179,
+     "checks": 1.363,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3830.0,
-    "filament_g": 21.83,
-    "layers": 382,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Hose and pipe adapter",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.798,
-     "exports": 0.585,
-     "checks": 1.124,
-     "slice": 1.675,
+     "geometry": 0.855,
+     "exports": 3.227,
+     "checks": 1.344,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 7933.0,
-    "filament_g": 23.29,
-    "layers": 382,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Hose and pipe adapter",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.536,
-     "exports": 0.416,
-     "checks": 0.772,
-     "slice": 2.686,
+     "geometry": 0.588,
+     "exports": 2.485,
+     "checks": 1.08,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3707.0,
-    "filament_g": 20.78,
-    "layers": 382,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Hose and pipe adapter",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.548,
-     "exports": 0.416,
-     "checks": 0.798,
-     "slice": 5.13,
+     "geometry": 0.582,
+     "exports": 2.379,
+     "checks": 1.039,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Hose and pipe adapter",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.445,
-     "exports": 0.339,
-     "checks": 0.621,
-     "slice": 1.974,
+     "geometry": 0.786,
+     "exports": 3.26,
+     "checks": 1.349,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
-     "WARN": 1,
-     "FAIL": 0
+     "PASS": 5,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 7455.0,
-    "filament_g": 23.46,
-    "layers": 382,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "knob": {
    "bambu": {
     "title": "Control knob",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 3.264,
-     "exports": 0.425,
-     "checks": 1.353,
-     "slice": 2.679,
-     "load": 0.01
+     "geometry": 1.869,
+     "exports": 2.284,
+     "checks": 1.59,
+     "load": 0.008
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 882.0,
-    "filament_g": 5.32,
-    "layers": 80,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Control knob",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 2.397,
-     "exports": 0.316,
-     "checks": 0.883,
-     "slice": 1.922,
-     "load": 0.008
+     "geometry": 2.435,
+     "exports": 2.815,
+     "checks": 1.873,
+     "load": 0.01
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Control knob",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 2.498,
-     "exports": 0.339,
-     "checks": 1.015,
-     "slice": 1.744,
-     "load": 0.008
+     "geometry": 2.617,
+     "exports": 2.982,
+     "checks": 1.778,
+     "load": 0.009
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 1244.0,
-    "filament_g": 4.6,
-    "layers": 80,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Control knob",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 3.298,
-     "exports": 0.417,
-     "checks": 1.344,
-     "slice": 1.12,
+     "geometry": 2.669,
+     "exports": 2.93,
+     "checks": 1.846,
      "load": 0.009
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 1964.0,
-    "filament_g": 5.17,
-    "layers": 80,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Control knob",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 2.411,
-     "exports": 0.318,
-     "checks": 0.924,
-     "slice": 2.224,
+     "geometry": 1.899,
+     "exports": 2.304,
+     "checks": 1.594,
      "load": 0.008
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 80,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Control knob",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 2.416,
-     "exports": 0.317,
-     "checks": 0.904,
-     "slice": 3.105,
-     "load": 0.009
+     "geometry": 1.854,
+     "exports": 2.189,
+     "checks": 1.582,
+     "load": 0.008
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Control knob",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 1.834,
-     "exports": 0.24,
-     "checks": 0.726,
-     "slice": 1.157,
-     "load": 0.006
+     "geometry": 2.537,
+     "exports": 3.038,
+     "checks": 2.008,
+     "load": 0.01
     },
     "rollup": {
-     "PASS": 9,
-     "WARN": 3,
-     "FAIL": 0
+     "PASS": 7,
+     "WARN": 0,
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 1796.0,
-    "filament_g": 4.71,
-    "layers": 80,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "pegboard": {
    "bambu": {
     "title": "SK\u00c5DIS pegboard accessory",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.471,
-     "exports": 0.061,
-     "checks": 0.385,
-     "slice": 0.381,
+     "geometry": 0.321,
+     "exports": 1.907,
+     "checks": 0.114,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 7,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 438.0,
-    "filament_g": 3.35,
-    "layers": 22,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "SK\u00c5DIS pegboard accessory",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.335,
-     "exports": 0.048,
-     "checks": 0.227,
-     "slice": 0.352,
+     "geometry": 0.427,
+     "exports": 2.332,
+     "checks": 0.144,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 7,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "SK\u00c5DIS pegboard accessory",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.336,
-     "exports": 0.049,
-     "checks": 0.245,
-     "slice": 0.445,
+     "geometry": 0.44,
+     "exports": 2.404,
+     "checks": 0.151,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 7,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 772.0,
-    "filament_g": 2.99,
-    "layers": 22,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "SK\u00c5DIS pegboard accessory",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.471,
-     "exports": 0.063,
-     "checks": 0.383,
-     "slice": 0.187,
+     "geometry": 0.428,
+     "exports": 2.445,
+     "checks": 0.153,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 7,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 22,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "SK\u00c5DIS pegboard accessory",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.344,
-     "exports": 0.05,
-     "checks": 0.236,
-     "slice": 0.265,
+     "geometry": 0.324,
+     "exports": 1.96,
+     "checks": 0.117,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 7,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 22,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "SK\u00c5DIS pegboard accessory",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.339,
-     "exports": 0.048,
-     "checks": 0.233,
-     "slice": 2.097,
+     "geometry": 0.321,
+     "exports": 1.858,
+     "checks": 0.115,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 7,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "SK\u00c5DIS pegboard accessory",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.263,
-     "exports": 0.036,
-     "checks": 0.16,
-     "slice": 0.177,
+     "geometry": 0.431,
+     "exports": 2.591,
+     "checks": 0.149,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 10,
+     "PASS": 7,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 22,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "plant_pot": {
    "bambu": {
     "title": "Self-watering planter",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 31.158,
-     "exports": 0.487,
-     "checks": 4.282,
-     "slice": 21.531,
-     "load": 0.002
+     "geometry": 7.181,
+     "exports": 2.574,
+     "checks": 7.728,
+     "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 24323.0,
-    "filament_g": 237.25,
-    "layers": 630,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Self-watering planter",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 26.933,
-     "exports": 0.483,
-     "checks": 3.37,
-     "slice": 8.492,
+     "geometry": 9.28,
+     "exports": 3.204,
+     "checks": 9.493,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Self-watering planter",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 26.09,
-     "exports": 0.453,
-     "checks": 3.386,
-     "slice": 8.245,
+     "geometry": 9.524,
+     "exports": 3.207,
+     "checks": 8.68,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 24616.0,
-    "filament_g": 188.08,
-    "layers": 630,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Self-watering planter",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 31.764,
-     "exports": 0.57,
-     "checks": 4.367,
-     "slice": 5.904,
+     "geometry": 9.599,
+     "exports": 3.18,
+     "checks": 8.919,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 62985.0,
-    "filament_g": 201.25,
-    "layers": 630,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Self-watering planter",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 27.214,
-     "exports": 0.437,
-     "checks": 3.399,
-     "slice": 7.076,
+     "geometry": 7.222,
+     "exports": 2.587,
+     "checks": 7.806,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 21963.0,
-    "filament_g": 182.01,
-    "layers": 630,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Self-watering planter",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 27.38,
-     "exports": 0.463,
-     "checks": 3.392,
-     "slice": 14.37,
+     "geometry": 6.98,
+     "exports": 2.454,
+     "checks": 7.634,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Self-watering planter",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 21.778,
-     "exports": 0.355,
-     "checks": 2.541,
-     "slice": 8.478,
+     "geometry": 9.615,
+     "exports": 3.46,
+     "checks": 10.173,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 8,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 61984.0,
-    "filament_g": 198.5,
-    "layers": 630,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "planter": {
    "bambu": {
     "title": "Twisted planter",
     "builtin": true,
-    "state": "check-failed",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.304,
-     "exports": 0.07,
-     "checks": 1.217,
-     "slice": 5.565,
+     "geometry": 0.219,
+     "exports": 0.529,
+     "checks": 1.317,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 1
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 5585.0,
-    "filament_g": 114.52,
-    "layers": 500,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Twisted planter",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.217,
-     "exports": 0.05,
-     "checks": 0.8,
-     "slice": 2.372,
+     "geometry": 0.286,
+     "exports": 0.699,
+     "checks": 1.64,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 1
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Twisted planter",
     "builtin": true,
-    "state": "check-failed",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.239,
-     "exports": 0.056,
-     "checks": 0.929,
-     "slice": 2.687,
+     "geometry": 0.308,
+     "exports": 0.756,
+     "checks": 1.706,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 1
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 8110.0,
-    "filament_g": 81.95,
-    "layers": 500,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Twisted planter",
     "builtin": true,
-    "state": "check-failed",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.315,
-     "exports": 0.069,
-     "checks": 1.228,
-     "slice": 1.214,
+     "geometry": 0.302,
+     "exports": 1.572,
+     "checks": 1.63,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 1
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 26980.0,
-    "filament_g": 84.22,
-    "layers": 500,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Twisted planter",
     "builtin": true,
-    "state": "check-failed",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.215,
-     "exports": 0.05,
-     "checks": 0.797,
-     "slice": 1.703,
+     "geometry": 0.221,
+     "exports": 0.536,
+     "checks": 1.337,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 1
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 8198.0,
-    "filament_g": 76.75,
-    "layers": 500,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Twisted planter",
@@ -2700,616 +2428,425 @@
     "state": "slice-failed",
     "seconds": {
      "geometry": 0.216,
-     "exports": 0.051,
-     "checks": 0.808,
-     "slice": 5.131,
+     "exports": 0.525,
+     "checks": 1.269,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 1
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Twisted planter",
     "builtin": true,
-    "state": "check-failed",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.198,
-     "exports": 0.049,
-     "checks": 0.615,
-     "slice": 2.262,
+     "geometry": 0.29,
+     "exports": 0.694,
+     "checks": 1.717,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 8,
+     "PASS": 5,
      "WARN": 0,
-     "FAIL": 1
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 26333.0,
-    "filament_g": 85.2,
-    "layers": 500,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "shelf_bracket": {
    "bambu": {
     "title": "Shelf bracket",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.355,
-     "exports": 0.21,
-     "checks": 0.735,
-     "slice": 1.381,
+     "geometry": 0.273,
+     "exports": 0.233,
+     "checks": 6.494,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 14,
+     "PASS": 10,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3305.0,
-    "filament_g": 39.28,
-    "layers": 120,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Shelf bracket",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.265,
-     "exports": 0.146,
-     "checks": 0.483,
-     "slice": 0.791,
+     "geometry": 0.354,
+     "exports": 0.3,
+     "checks": 7.66,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 14,
+     "PASS": 10,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Shelf bracket",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.272,
-     "exports": 0.16,
-     "checks": 0.563,
-     "slice": 0.867,
+     "geometry": 0.372,
+     "exports": 0.323,
+     "checks": 6.391,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 14,
+     "PASS": 10,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3363.0,
-    "filament_g": 33.51,
-    "layers": 120,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Shelf bracket",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.355,
-     "exports": 0.206,
-     "checks": 0.718,
-     "slice": 0.618,
+     "geometry": 0.358,
+     "exports": 0.317,
+     "checks": 6.685,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 14,
+     "PASS": 10,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 10490.0,
-    "filament_g": 35.23,
-    "layers": 120,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Shelf bracket",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.264,
-     "exports": 0.145,
-     "checks": 0.476,
-     "slice": 0.669,
+     "geometry": 0.277,
+     "exports": 0.234,
+     "checks": 6.586,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 14,
+     "PASS": 10,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 120,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Shelf bracket",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.266,
-     "exports": 0.147,
-     "checks": 0.48,
-     "slice": 2.119,
+     "geometry": 0.27,
+     "exports": 0.23,
+     "checks": 6.347,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 14,
+     "PASS": 10,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Shelf bracket",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.275,
-     "exports": 0.133,
-     "checks": 0.425,
-     "slice": 1.176,
+     "geometry": 0.36,
+     "exports": 0.299,
+     "checks": 8.654,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 14,
+     "PASS": 10,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 10083.0,
-    "filament_g": 35.04,
-    "layers": 120,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "storage_box": {
    "bambu": {
     "title": "Box with lid",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.582,
-     "exports": 0.233,
-     "checks": 2.649,
-     "slice": 2.455,
+     "geometry": 0.547,
+     "exports": 2.092,
+     "checks": 3.011,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 9,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 3627.0,
-    "filament_g": 53.74,
-    "layers": 200,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Box with lid",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.445,
-     "exports": 0.163,
-     "checks": 1.939,
-     "slice": 1.503,
+     "geometry": 0.706,
+     "exports": 2.549,
+     "checks": 3.724,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 9,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Box with lid",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.445,
-     "exports": 0.177,
-     "checks": 2.141,
-     "slice": 1.311,
+     "geometry": 0.745,
+     "exports": 2.625,
+     "checks": 3.692,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 9,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 4681.0,
-    "filament_g": 48.43,
-    "layers": 200,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Box with lid",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.596,
-     "exports": 0.23,
-     "checks": 2.74,
-     "slice": 0.886,
+     "geometry": 0.748,
+     "exports": 2.651,
+     "checks": 3.73,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 9,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 13906.0,
-    "filament_g": 50.77,
-    "layers": 200,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Box with lid",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.439,
-     "exports": 0.163,
-     "checks": 1.927,
-     "slice": 1.411,
+     "geometry": 0.56,
+     "exports": 2.11,
+     "checks": 3.076,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 9,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 4470.0,
-    "filament_g": 46.61,
-    "layers": 200,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Box with lid",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.446,
-     "exports": 0.165,
-     "checks": 1.938,
-     "slice": 3.226,
+     "geometry": 0.543,
+     "exports": 1.999,
+     "checks": 2.971,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 9,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Box with lid",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.423,
-     "exports": 0.154,
-     "checks": 1.685,
-     "slice": 1.109,
+     "geometry": 0.737,
+     "exports": 2.791,
+     "checks": 4.029,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 12,
+     "PASS": 9,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 13795.0,
-    "filament_g": 53.42,
-    "layers": 200,
-    "supports": false
+    "error": "not sliced"
    }
   },
   "vase": {
    "bambu": {
     "title": "Faceted vase and lamp shade",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 1.042,
-     "exports": 0.149,
-     "checks": 1.086,
-     "slice": 3.536,
-     "load": 0.003
+     "geometry": 0.524,
+     "exports": 2.03,
+     "checks": 3.54,
+     "load": 0.001
     },
     "rollup": {
-     "PASS": 7,
+     "PASS": 4,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 6127.0,
-    "filament_g": 72.77,
-    "layers": 750,
-    "supports": false
+    "error": "not sliced"
    },
    "elegoo": {
     "title": "Faceted vase and lamp shade",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.747,
-     "exports": 0.14,
-     "checks": 0.669,
-     "slice": 1.454,
-     "load": 0.001
+     "geometry": 0.674,
+     "exports": 2.526,
+     "checks": 4.423,
+     "load": 0.002
     },
     "rollup": {
-     "PASS": 7,
+     "PASS": 4,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "orca": {
     "title": "Faceted vase and lamp shade",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.763,
-     "exports": 0.124,
-     "checks": 0.665,
-     "slice": 1.537,
+     "geometry": 0.753,
+     "exports": 2.559,
+     "checks": 4.183,
      "load": 0.002
     },
     "rollup": {
-     "PASS": 7,
+     "PASS": 4,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 7692.0,
-    "filament_g": 73.72,
-    "layers": 750,
-    "supports": false
+    "error": "not sliced"
    },
    "prusa": {
     "title": "Faceted vase and lamp shade",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 1.063,
-     "exports": 0.163,
-     "checks": 1.067,
-     "slice": 0.758,
+     "geometry": 0.76,
+     "exports": 2.606,
+     "checks": 4.293,
      "load": 0.002
     },
     "rollup": {
-     "PASS": 7,
+     "PASS": 4,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 22452.0,
-    "filament_g": 77.59,
-    "layers": 750,
-    "supports": false
+    "error": "not sliced"
    },
    "qidi": {
     "title": "Faceted vase and lamp shade",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.75,
-     "exports": 0.139,
-     "checks": 0.669,
-     "slice": 0.962,
+     "geometry": 0.529,
+     "exports": 2.065,
+     "checks": 3.571,
      "load": 0.001
     },
     "rollup": {
-     "PASS": 7,
+     "PASS": 4,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
-    "time_s": 7554.0,
-    "filament_g": 70.35,
-    "layers": 750,
-    "supports": false
+    "error": "not sliced"
    },
    "snapmaker": {
     "title": "Faceted vase and lamp shade",
     "builtin": true,
     "state": "slice-failed",
     "seconds": {
-     "geometry": 0.765,
-     "exports": 0.141,
-     "checks": 0.68,
-     "slice": 4.142,
-     "load": 0.003
+     "geometry": 0.516,
+     "exports": 1.966,
+     "checks": 3.489,
+     "load": 0.001
     },
     "rollup": {
-     "PASS": 7,
+     "PASS": 4,
      "WARN": 0,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
    },
    "superslicer": {
     "title": "Faceted vase and lamp shade",
     "builtin": true,
-    "state": "ok",
+    "state": "slice-failed",
     "seconds": {
-     "geometry": 0.512,
-     "exports": 0.093,
-     "checks": 0.506,
-     "slice": 0.798,
-     "load": 0.001
+     "geometry": 0.693,
+     "exports": 2.741,
+     "checks": 4.714,
+     "load": 0.002
     },
     "rollup": {
-     "PASS": 7,
+     "PASS": 4,
      "WARN": 0,
-     "FAIL": 0
-    },
-    "time_s": 22559.0,
-    "filament_g": 77.51,
-    "layers": 750,
-    "supports": false
-   }
-  },
-  "cable-clip": {
-   "bambu": {
-    "title": "Cable clip",
-    "builtin": false,
-    "state": "ok",
-    "seconds": {
-     "geometry": 0.066,
-     "exports": 0.032,
-     "checks": 0.256,
-     "slice": 0.657,
-     "load": 0.083
-    },
-    "rollup": {
-     "PASS": 7,
-     "WARN": 1,
-     "FAIL": 0
-    },
-    "time_s": 207.0,
-    "filament_g": 1.0,
-    "layers": 39,
-    "supports": false
-   },
-   "elegoo": {
-    "title": "Cable clip",
-    "builtin": false,
-    "state": "slice-failed",
-    "seconds": {
-     "geometry": 0.053,
-     "exports": 0.025,
-     "checks": 0.14,
-     "slice": 0.653,
-     "load": 0.069
-    },
-    "rollup": {
-     "PASS": 7,
-     "WARN": 1,
-     "FAIL": 0
+     "FAIL": 0,
+     "N/A": 1
     },
     "error": "not sliced"
-   },
-   "orca": {
-    "title": "Cable clip",
-    "builtin": false,
-    "state": "ok",
-    "seconds": {
-     "geometry": 0.05,
-     "exports": 0.026,
-     "checks": 0.15,
-     "slice": 0.779,
-     "load": 0.065
-    },
-    "rollup": {
-     "PASS": 7,
-     "WARN": 1,
-     "FAIL": 0
-    },
-    "time_s": 725.0,
-    "filament_g": 0.99,
-    "layers": 39,
-    "supports": false
-   },
-   "prusa": {
-    "title": "Cable clip",
-    "builtin": false,
-    "state": "ok",
-    "seconds": {
-     "geometry": 0.07,
-     "exports": 0.033,
-     "checks": 0.257,
-     "slice": 0.156,
-     "load": 0.086
-    },
-    "rollup": {
-     "PASS": 7,
-     "WARN": 1,
-     "FAIL": 0
-    },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 39,
-    "supports": false
-   },
-   "qidi": {
-    "title": "Cable clip",
-    "builtin": false,
-    "state": "ok",
-    "seconds": {
-     "geometry": 0.052,
-     "exports": 0.024,
-     "checks": 0.141,
-     "slice": 0.507,
-     "load": 0.066
-    },
-    "rollup": {
-     "PASS": 7,
-     "WARN": 1,
-     "FAIL": 0
-    },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 39,
-    "supports": false
-   },
-   "snapmaker": {
-    "title": "Cable clip",
-    "builtin": false,
-    "state": "slice-failed",
-    "seconds": {
-     "geometry": 0.053,
-     "exports": 0.025,
-     "checks": 0.141,
-     "slice": 2.097,
-     "load": 0.067
-    },
-    "rollup": {
-     "PASS": 7,
-     "WARN": 1,
-     "FAIL": 0
-    },
-    "error": "not sliced"
-   },
-   "superslicer": {
-    "title": "Cable clip",
-    "builtin": false,
-    "state": "ok",
-    "seconds": {
-     "geometry": 0.065,
-     "exports": 0.02,
-     "checks": 0.092,
-     "slice": 0.369,
-     "load": 0.067
-    },
-    "rollup": {
-     "PASS": 7,
-     "WARN": 1,
-     "FAIL": 0
-    },
-    "time_s": null,
-    "filament_g": null,
-    "layers": 39,
-    "supports": false
    }
   }
  },
  "totals": {
-  "ok": 100,
-  "sliced": 110,
-  "cells": 154
+  "ok": 0,
+  "sliced": 0,
+  "cells": 147
  }
 }
