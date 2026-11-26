@@ -121,7 +121,7 @@ const near = (el, fn) => {
   io.observe(el);
 };
 (async () => {
-  near($("#try"), () => import("./app.js").then((m) => m.initHero()).catch(console.error));
+  near($("#try"), () => import("./desk.js").then((m) => m.initDesk()).catch(console.error));
   near($("#recon"), () => import("./recon.js").then((m) => m.initRecon()).catch(console.error));
   near($("#how-track"), () => import("./how.js").then((m) => m.initHow()).catch(console.error));
   near($("#moves-track"), () => import("./moves.js").then((m) => m.initMoves()).catch(console.error));

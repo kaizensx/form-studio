@@ -14,7 +14,6 @@ the page then draws neither.
 
 Writes into site/assets/data/:
     sample.glb     the sample at its head revision, one mesh per feature plus the kernel's B-rep edges
-    ../shots/card-sample.webp   the sample's design card on Home
     box.glb        the hinged box: its two parts, per feature, in the print frame (kept when the folder has no box)
     toolpath.bin   the sample's sliced toolpath, simplified for the browser (layout in site.json -> toolpath)
     site.json      project state, checks, slice summary, revisions, wall-thickness map, assembly
@@ -329,13 +328,6 @@ def main() -> int:
         g.add("edges", E, None, lo, span, {"edges": True}, lines=True)
         nb = g.write(OUT / "sample.glb", {"project": SAMPLE, "rev": rev["n"]})
         print("sample.glb", nb, "bytes")
-        # the design card on Home: the engine's own headless render of the head revision, in the app's dark colours
-        from form import render as rendering
-        rendering.PAPER, rendering.INK, rendering.PALETTE = (25, 30, 34), (11, 13, 14), [(216, 211, 200)]
-        card = rendering.render_png(v, [{"id": i, "label": feats[i]["label"]} for i in order], camera=(-58.0, 34.0), size=(560, 415),
-                                    overlay=False, as_image=True)
-        card.save(SHOTS / "card-sample.webp", "WEBP", quality=84, method=6)
-
         checks = s.read(p, "checks", s.keys(p)["checks"])["checks"]
         state = json.loads(cli("state", SAMPLE)["out"])
         prov = rev["provenance"]

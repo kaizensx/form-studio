@@ -26,7 +26,7 @@ _spec = importlib.util.spec_from_file_location("brand_options", HERE / "options"
 O = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(O)
 
-from PySide6.QtCore import QByteArray, QRectF  # noqa: E402
+from PySide6.QtCore import QByteArray, QRectF, Qt  # noqa: E402
 from PySide6.QtGui import QColor, QGuiApplication, QImage, QLinearGradient, QPainter  # noqa: E402
 from PySide6.QtSvg import QSvgRenderer  # noqa: E402
 
@@ -163,57 +163,108 @@ def build_web():
 OG_MARK = 88                          # the mark's height on the 630 px card; the wordmark's cap height follows it
 
 
+# The card's surroundings are Lightdesk (docs/design/directions/h): the studio's near-black room, a pool of warm key
+# light under the build, Geist for the two lines and a Geist Mono caption in the one accent. The lockup is unchanged.
+ROOM, ROOM_INK, ROOM_INK2, ACCENT, KEY = "#0b0b0c", "#f4f3f1", "#a9a8a5", "#a9b8ff", (255, 233, 207)
+
+
+def _geist(weight: int, px: int, mono: bool = False):
+    """Geist (the website's copy, SIL OFL 1.1) at one weight, or the app's Geist Mono, as a QFont."""
+    from PySide6.QtGui import QFont, QFontDatabase
+    if mono:
+        f = O._font("mono", weight, 0)
+    else:
+        from fontTools.ttLib import TTFont
+        from fontTools.varLib import instancer
+        tmp = Path(tempfile.gettempdir()) / f"form-geist-{weight}.ttf"
+        if not tmp.exists():
+            ft = instancer.instantiateVariableFont(TTFont(SITE / "fonts" / "Geist.woff2"), {"wght": weight})
+            ft.flavor = None
+            ft.save(tmp)
+        fam = QFontDatabase.applicationFontFamilies(QFontDatabase.addApplicationFont(str(tmp)))[0]
+        f = QFont(fam)
+    f.setPixelSize(px)
+    return f
+
+
 def build_og(scale: int = 1, out: Path | None = None, mark: float = OG_MARK):
-    """1200x630: the lockup on graphite, two lines, and a real build photographed in the app (brand/og-part.png).
-    scale 2 draws the same card at 2400x1260: the banner at the top of the README and in Discord's #welcome.
-    mark is the height of the mark in px on the 1200x630 card; the lockup, the two lines and the build's place
-    all follow it, so the logo leads at any size."""
+    """1200x630: the lockup in the studio's room, two lines, and a real build photographed in the app
+    (brand/og-part.png) standing in the key light. scale 2 draws the same card at 2400x1260: the banner at the top
+    of the README and in Discord's #welcome. mark is the height of the mark in px on the 1200x630 card; the lockup,
+    the lines and the build's place all follow it, so the logo leads at any size."""
+    from PySide6.QtGui import QFont, QRadialGradient
     W, H = 1200, 630
     im = QImage(W * scale, H * scale, QImage.Format.Format_ARGB32_Premultiplied)
-    im.fill(QColor(PLATE))
+    im.fill(QColor(ROOM))
     p = QPainter(im)
     p.scale(scale, scale)
     for h in (QPainter.RenderHint.Antialiasing, QPainter.RenderHint.SmoothPixmapTransform, QPainter.RenderHint.TextAntialiasing):
         p.setRenderHint(h)
+    floor = QLinearGradient(0, 0, 0, H)                  # the sweep of the studio floor
+    for at, c in ((0, "#0a0a0b"), (.38, "#131314"), (.6, "#1b1b1c"), (1, "#0d0d0e")):
+        floor.setColorAt(at, QColor(c))
+    p.fillRect(QRectF(0, 0, W, H), floor)
     lk = O.lockup(FRAME, DARK)
     left = 72
     lh = float(mark)
     lw = lh / O.ratio(lk)
     part = HERE / "og-part.png"
     if part.exists():
-        pim = QImage(str(part))
+        pim = to_qimage_soft(QImage(str(part)))
         th = 600
         tw = round(pim.width() * th / pim.height())
         # the build keeps clear of the wordmark: it slides right (and off the edge a little) as the lockup grows
         x, top = max(W - tw + 70, left + lw - 36), (H - th) / 2 + 20
+        pool = QRadialGradient(x + tw * 0.5, top + th * 0.62, tw * 0.62)
+        pool.setColorAt(0, QColor(*KEY, 46))
+        pool.setColorAt(.55, QColor(*KEY, 14))
+        pool.setColorAt(1, QColor(*KEY, 0))
+        p.fillRect(QRectF(0, 0, W, H), pool)
         p.drawImage(QRectF(x, top, tw, th), pim)
-        clear = QColor(PLATE)
-        clear.setAlpha(0)
-        for (x0, y0, x1, y1, rect) in ((x, 0, x + 260, 0, QRectF(x - 1, 0, 261, H)),
-                                       (0, top, 0, top + 170, QRectF(x, top, tw, 170)),
-                                       (0, top + th - 140, 0, top + th, QRectF(x, top + th - 140, tw, 140))):
-            g = QLinearGradient(x0, y0, x1, y1)
-            a, b = (QColor(PLATE), clear) if rect.top() <= top or rect.left() < x else (clear, QColor(PLATE))
-            g.setColorAt(0, a)
-            g.setColorAt(1, b)
-            p.fillRect(rect, g)
-        p.fillRect(QRectF(x, 0, tw, top + 1), QColor(PLATE))
-        p.fillRect(QRectF(x, top + th - 1, tw, H), QColor(PLATE))
     size = round(22 + lh * 0.14)                     # 34 px beside an 88 px mark
     lead = round(size * 1.38)
-    block = lh + size * 1.9 + lead                   # lockup, a gap, two lines
-    y = (H - block) / 2 - 6
+    cap = round(size * 0.4)                          # the caption under the two lines
+    block = lh + size * 1.9 + lead + cap * 3.4       # lockup, a gap, two lines, the caption
+    y = (H - block) / 2 - 2
     QSvgRenderer(QByteArray(lk.encode())).render(p, QRectF(left, y, lw, lh))
-    f = O._font("sans", 440, 0)
-    f.setPixelSize(size)
-    p.setFont(f)
+    p.setFont(_geist(450, size))
     base = round(y + lh + size * 1.9)
-    p.setPen(QColor(INK))
+    p.setPen(QColor(ROOM_INK))
     p.drawText(left, base, "Describe anything.")
-    p.setPen(QColor(INK2))
+    p.setPen(QColor(ROOM_INK2))
     p.drawText(left, base + lead, "The open-source AI CAD studio.")
+    f = _geist(500, cap, mono=True)
+    f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, cap * 0.16)
+    p.setFont(f)
+    cy = base + lead + cap * 3.4
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor(169, 184, 255, 56))
+    p.drawEllipse(QRectF(left - 4, cy - cap * 0.36 - 7, 14, 14))
+    p.setBrush(QColor(ACCENT))
+    p.drawEllipse(QRectF(left, cy - cap * 0.36 - 3, 6, 6))
+    p.setPen(QColor(ACCENT))
+    p.drawText(left + 20, round(cy), "MIT · MACOS · WINDOWS · LINUX")
     p.end()
     save(im, out or SITE / "assets" / "og.png")
+
+
+def to_qimage_soft(pim: QImage) -> QImage:
+    """The build's photograph with its own dark backdrop faded out towards its edges, so it stands in the room
+    instead of in a rectangle: alpha falls off with a wide feather on every side (more on the left, where the
+    wordmark is)."""
+    from PIL import Image, ImageChops, ImageDraw, ImageFilter
+    src = to_pil(pim)
+    w, h = src.size
+    mask = Image.new("L", (w, h), 0)
+    d = ImageDraw.Draw(mask)
+    d.ellipse((w * 0.10, h * 0.10, w * 1.02, h * 0.92), fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(w * 0.075))
+    src.putalpha(ImageChops.multiply(src.getchannel("A"), mask))
+    buf = io.BytesIO()
+    src.save(buf, "PNG")
+    out = QImage()
+    out.loadFromData(buf.getvalue(), "PNG")
+    return out
 
 
 def build_qml():

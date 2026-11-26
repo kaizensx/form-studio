@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Form Studio: describe anything, build real CAD</title>
 <meta name="description" content="Form Studio is the open-source AI CAD studio for macOS, Windows and Linux. Describe anything, and an engineer-grade agent builds it as real, editable CAD: parametric build123d on OpenCascade, checked on the solid, out as STEP, meshes and renders, or to your slicer if you print.">
-<meta name="theme-color" content="#0e1113" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0b0c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#eeece8" media="(prefers-color-scheme: light)">
 <link rel="canonical" href="https://kaizensx.github.io/form-studio/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Form Studio">
@@ -23,10 +23,11 @@
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="preload" href="fonts/InstrumentSans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/Geist.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/GeistMono.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/lucide-form.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/site.css">
+<link rel="stylesheet" href="css/desk.css">
 <script>document.documentElement.classList.add("js");if(/[?&]reduce/.test(location.search))document.documentElement.classList.add("reduce");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
 <script type="module" src="js/main.js"></script>
@@ -78,110 +79,14 @@
 
   <div class="stage" id="try">
     <div class="stage-tilt" id="stage-tilt">
-    <div class="app-frame island" id="app-frame">
-      <div class="app" id="app" role="region" aria-roledescription="interactive recreation" aria-label="Form Studio, recreated in the page with a sample project. It plays a short story from Home to the workspace; type on Home, drag the 3D view to orbit, and use the stage tabs, view buttons, model menu and layer slider.">
-        <header class="tb">
-          <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
-          <button class="ib side" type="button" tabindex="-1" aria-hidden="true"><span class="i">&#xe21c;</span></button>
-          <button class="wm" type="button" id="tb-home" title="Home"><img src="assets/lockup.svg" alt="Form Studio: Home" width="98" height="15"></button>
-          <span class="slash" aria-hidden="true">/</span>
-          <span class="pname">Planetary gearbox</span>
-          <span class="rev" id="tb-rev">r02</span>
-          <span class="tag t-ink" id="tb-state">Unreleased</span>
-          <span class="sp"></span>
-          <span class="i warn" aria-hidden="true">&#xe193;</span>
-          <span class="printer"><span class="i" aria-hidden="true">&#xe141;</span>Bambu Lab A1 mini 0.4 nozzle</span>
-          <span class="search" aria-hidden="true"><span class="i">&#xe151;</span>Search<kbd>&#8984;K</kbd></span>
-          <button class="ib" type="button" tabindex="-1" aria-hidden="true"><span class="i">&#xe154;</span></button>
-        </header>
-        <div class="ws">
-          <aside class="talk" aria-label="Conversation">
-            <div class="talk-head"><span class="dot"></span><b id="talk-title">New conversation</b><span class="i" aria-hidden="true">&#xe06d;</span></div>
-            <div class="talk-body" id="talk-body" aria-live="polite"><div class="talk-scroll" id="talk-scroll"></div></div>
-            <div>
-              <div class="composer">
-                <div class="field ph" id="composer-field">Ask about Planetary gearbox, or describe a change…</div>
-                <div class="row"><span class="i" aria-hidden="true">&#xe12d;</span><button type="button" class="model-pick mpick" id="talk-model" aria-haspopup="dialog" aria-expanded="false"><span class="ml">Claude Code · Default</span> <span class="i" aria-hidden="true">&#xe06d;</span></button><span class="send" id="send"><span class="i" aria-hidden="true">&#xe04a;</span></span></div>
-              </div>
-              <div class="talk-hint">Enter sends · Shift+Enter for a new line · drop files to attach</div>
-            </div>
-          </aside>
-
-          <section class="vp" id="vp" aria-label="3D viewport">
-            <canvas class="gl" id="gl" tabindex="0" role="img" aria-label="The planetary gearbox, built by the CAD kernel. Drag to orbit, scroll or pinch to zoom."></canvas>
-            <div class="labels" id="labels" aria-hidden="true"></div>
-            <nav class="rail" aria-label="Tools">
-              <button type="button" data-tool="select" aria-pressed="true"><span class="i" aria-hidden="true">&#xe1c3;</span><span class="tipx">Select</span><span class="sr">Select</span></button>
-              <button type="button" data-tool="measure" tabindex="-1"><span class="i" aria-hidden="true">&#xe4f1;</span><span class="tipx">Measure</span></button>
-              <button type="button" data-tool="section" tabindex="-1"><span class="i" aria-hidden="true">&#xe14e;</span><span class="tipx">Section</span></button>
-              <button type="button" data-tool="analyze" aria-pressed="false"><span class="i" aria-hidden="true">&#xe258;</span><span class="tipx">Analyze: wall thickness</span><span class="sr">Wall-thickness map</span></button>
-              <button type="button" data-tool="history" tabindex="-1"><span class="i" aria-hidden="true">&#xe1f5;</span><span class="tipx">History</span></button>
-              <hr>
-              <button type="button" data-tool="sim" aria-pressed="false"><span class="i" aria-hidden="true">&#xe529;</span><span class="tipx">Simulate the print</span><span class="sr">Simulate the print</span></button>
-              <button type="button" data-tool="photo" tabindex="-1"><span class="i" aria-hidden="true">&#xe064;</span><span class="tipx">Photo render</span></button>
-              <hr>
-              <button type="button" data-tool="frame"><span class="i" aria-hidden="true">&#xe113;</span><span class="tipx">Frame the part</span><span class="sr">Frame the part</span></button>
-              <button type="button" data-tool="dims" aria-pressed="true"><span class="i" aria-hidden="true">&#xe14b;</span><span class="tipx">Overall dimensions</span><span class="sr">Overall dimensions</span></button>
-            </nav>
-            <div class="mseg" id="mseg"><div class="g"><button type="button" aria-pressed="true">Thickness</button><button type="button" tabindex="-1">Overhang</button><button type="button" tabindex="-1">Section</button><button type="button" tabindex="-1">Features</button></div><div class="g"><button type="button" id="clear-map" aria-label="Clear map" title="Clear map"><span class="i" aria-hidden="true" style="font-size:13px">&#xe1b2;</span></button></div></div>
-            <div class="vseg" role="group" aria-label="View">
-              <button type="button" data-v="iso" aria-pressed="true">Iso</button><button type="button" data-v="front">Front</button><button type="button" data-v="side">Side</button><button type="button" data-v="top">Top</button><button type="button" data-v="under">Under</button>
-            </div>
-            <div class="legend" id="legend" aria-live="polite"></div>
-            <div class="badge-sim" id="badge-sim"><button type="button" class="back" id="sim-back"><span class="i" aria-hidden="true">&#xe048;</span>Back to the design</button><span class="tag t-amber">Simulated</span><small>Simulated from the slicer’s G-code. Not a print.</small></div>
-            <div class="types-hud" id="types-hud"></div>
-            <div class="simbar" id="simbar"></div>
-            <div class="dims-read" id="dims-read"></div>
-            <div class="pipe" id="pipe" role="list" aria-label="Pipeline"></div>
-          </section>
-
-          <aside class="insp" aria-label="Stages">
-            <div class="tabs" role="tablist" id="tabs"></div>
-            <div class="panel-wrap" id="panel-wrap"></div>
-          </aside>
-        </div>
-        <section class="home-scr" id="home-scr" aria-label="Home">
-          <div class="bench" aria-hidden="true"><i></i></div>
-          <div class="home-in">
-            <span class="greet" id="home-greet">Good afternoon</span>
-            <h3 class="home-title">What are we making?</h3>
-            <p class="home-lead" id="home-lead">Describe it, drop a photo or a part, sketch it, or paste a link. It becomes real CAD, checked and sliced for your printer.</p>
-            <div class="hcomp" id="hcomp">
-              <textarea id="home-field" rows="2" spellcheck="false" aria-label="What are we making?" placeholder="A knob like the one in my photo, with a 6 mm D-shaft"></textarea>
-              <div class="hrow">
-                <button type="button" class="hq"><span class="i" aria-hidden="true">&#xe12d;</span>Photo or file</button>
-                <button type="button" class="hq"><span class="i" aria-hidden="true">&#xe131;</span>Sketch</button>
-                <button type="button" class="hq"><span class="i" aria-hidden="true">&#xe102;</span>Link</button>
-                <button type="button" class="hq" aria-label="Dictate"><span class="i" aria-hidden="true">&#xe118;</span></button>
-                <button type="button" class="hgo" id="home-go"><span>Design it</span><span class="i" aria-hidden="true">&#xe049;</span></button>
-              </div>
-            </div>
-            <div class="hopts">
-              <div class="hseg" role="group" aria-label="What the next design is for"><button type="button" data-p="print" aria-pressed="true">For my printer</button><button type="button" data-p="model" aria-pressed="false">Just a 3D model</button></div>
-              <button type="button" class="hchip" id="home-printer"><span class="i" aria-hidden="true">&#xe141;</span>Bambu Lab A1 mini 0.4 nozzle</button>
-              <button type="button" class="hchip mpick" id="home-model" aria-haspopup="dialog" aria-expanded="false"><span class="i" aria-hidden="true">&#xe412;</span><span class="ml">Claude Code · Default</span></button>
-              <span class="hdiv" aria-hidden="true"></span>
-              <button type="button" class="hchip" id="home-blank"><span class="i" aria-hidden="true">&#xe4c0;</span>Start blank</button>
-            </div>
-            <button type="button" class="hcont" id="home-cont">Continue “Planetary gearbox” · r02 · just now <span aria-hidden="true">→</span></button>
-          </div>
-          <div class="hdes">
-            <div class="hdes-h"><b>Designs</b><span class="mono">2</span><span class="sp"></span><span class="hq"><span class="i" aria-hidden="true">&#xe22f;</span>Import…</span><span class="hq" aria-hidden="true"><span class="i">&#xe247;</span></span></div>
-            <div class="hcards">
-              <button type="button" class="hcard" data-open="sample"><img src="assets/shots/card-sample.webp" width="560" height="415" alt="" loading="lazy"><span class="hf"><b>Planetary gearbox</b><span>Planetary gearbox · just now</span><em>r02</em></span></button>
-              <button type="button" class="hcard" data-open="box"><img src="assets/shots/card-box.webp" width="560" height="415" alt="" loading="lazy"><span class="hf"><b>Hinged box</b><span>Hinged box · just now</span><em>r01</em></span></button>
-            </div>
-          </div>
-        </section>
-        <div class="mmenu" id="mmenu" role="dialog" aria-label="Agent and model" hidden></div>
-        <div class="ptr" id="ptr" aria-hidden="true"><svg width="18" height="22" viewBox="0 0 18 22"><path d="M2 1.5v16.2l4.1-3.9 2.6 6.2 2.9-1.2-2.6-6.1h5.8z" fill="#fff" stroke="#000" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
+      <div class="desk-frame" id="desk-frame">
+        <div class="desk" id="desk" role="region" aria-roledescription="interactive drawing" aria-label="Form Studio, drawn in this page with a real design: the sensor case, built and checked by the engine"></div>
+        <p class="desk-nojs">The app is drawn here with scripts on: a sensor case, built feature by feature by the CAD kernel.</p>
       </div>
     </div>
-    </div>
     <div class="stage-cap">
-      <div class="scr-seg" role="group" aria-label="Screen"><button type="button" data-scr="home" aria-pressed="false">Home</button><button type="button" data-scr="work" aria-pressed="true">Workspace</button></div>
-      <p>The real app, drawn live in this page. The part comes from the CAD kernel, the toolpath from Bambu Studio’s G-code.</p>
-      <button class="story-ctl" type="button" id="story-ctl" aria-pressed="false"><span class="i" aria-hidden="true">&#xe12e;</span><span class="lbl">Pause</span><span class="bar" aria-hidden="true"><i id="story-bar"></i></span></button>
+      <p><b>The app, drawn in this page.</b> The solid is the CAD kernel’s own, the checks and the slice are the engine’s. Drag the part, choose a line of the program, press 1 to 4.</p>
+      <button class="story-ctl" type="button" id="desk-replay"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg><span class="lbl">Run the program</span></button>
     </div>
   </div>
 </section>
@@ -223,11 +128,11 @@
           <li><span class="n">04</span><h3>Made the way you need</h3><p>STEP for CAD and CNC, OBJ and GLB for renders. If you print, your slicer writes the G-code and every layer plays back first.</p></li>
         </ol>
         <div class="how-win island" id="how-win" aria-hidden="true">
-          <div class="mtb"><span class="lights"><i></i><i></i><i></i></span><img src="assets/lockup.svg" alt="" width="98" height="15"><span class="slash">/</span><span class="pn" id="hw-name">New design</span><span class="rv-chip mono" id="hw-rev"></span><span class="sp"></span><span class="tag t-ink" id="hw-stage">Home</span></div>
+          <div class="mtb"><img src="assets/lockup.svg" alt="" width="98" height="15"><span class="slash">/</span><span class="pn" id="hw-name">New design</span><span class="rv-chip mono" id="hw-rev"></span><span class="sp"></span><span class="tag t-ink" id="hw-stage">Home</span></div>
           <div class="scenes">
             <div class="scene s-home" data-s="0">
               <span class="greet">Good afternoon</span>
-              <b class="ht">What are we making?</b>
+              <b class="ht">What do you want to make?</b>
               <div class="hc"><p id="hw-type"><span class="ph">A knob like the one in my photo…</span></p><div class="hr"><span class="hq"><span class="i">&#xe12d;</span>Photo or file</span><span class="hq"><span class="i">&#xe131;</span>Sketch</span><span class="hq"><span class="i">&#xe102;</span>Link</span><span class="hgo" id="hw-go">Design it<span class="i">&#xe049;</span></span></div></div>
               <div class="hchips"><span class="on">For my printer</span><span>Just a 3D model</span><span class="ch"><span class="i">&#xe141;</span><em id="hw-printer"></em></span></div>
             </div>
@@ -269,7 +174,7 @@
       <p class="rv"><a class="more" href="docs/features.html#checks-and-evidence">How a design is proved <span aria-hidden="true">→</span></a></p>
     </div>
     <figure class="proof-win island rv" id="proof-win" data-at="r02">
-      <div class="mtb"><span class="lights" aria-hidden="true"><i></i><i></i><i></i></span><b class="pn">Bolted flange</b><span class="rv-chip mono" id="pf-rev" data-brief="brief" data-r01="r01" data-r02="r02">r02</span><span class="sp"></span><span class="tag t-datum">Proof sheet</span></div>
+      <div class="mtb"><b class="pn">Bolted flange</b><span class="rv-chip mono" id="pf-rev" data-brief="brief" data-r01="r01" data-r02="r02">r02</span><span class="sp"></span><span class="tag t-datum">Proof sheet</span></div>
       <div class="pf-tabs" role="group" aria-label="The run, step by step">
         <button type="button" data-at="brief" aria-pressed="false"><span class="mono">01</span><b>The brief</b><em>audited, not built</em></button>
         <button type="button" data-at="r01" aria-pressed="false"><span class="mono">02</span><b>First build</b><em>r01 · 3 of 4 proved</em></button>
@@ -400,7 +305,7 @@
         <p class="rv"><a class="more" href="docs/features.html">Every feature, in the docs <span aria-hidden="true">→</span></a></p>
       </div>
       <figure class="term island rv" id="term">
-        <div class="term-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="mono">~ — form</span></div>
+        <div class="term-bar" aria-hidden="true"><span class="mono">~ — form</span></div>
         <pre class="term-body" tabindex="0" aria-label="Three form commands and what they printed"><code><span class="ln c"><span class="ps">$ </span><span class="tx">form new &quot;Desk stand&quot; device_stand device_width=75.6</span></span><span class="ln">{ <span class="k">"pipeline"</span>: { <span class="k">"state"</span>: "done", <span class="k">"steps"</span>: [</span><span class="ln">    "Solid: done (0.194 s)", "STEP + STL: done (0.207 s)",</span><span class="ln">    "Checks: done (0.516 s)" ] },</span><span class="ln">  <span class="k">"project"</span>: { <span class="k">"project"</span>: "desk-stand", <span class="k">"head"</span>: 1, <span class="cut">…</span></span><span class="ln">    <span class="k">"checks"</span>: [ "<span class="ok">PASS</span>  One valid solid: 1 solid  [computed]",</span><span class="ln">                "<span class="ok">PASS</span>  Overall size: 70.0 × 115.6 × 88.9 mm  [computed]", <span class="cut">…</span> ] } }</span><span class="ln c"><span class="ps">$ </span><span class="tx">form preview desk-stand lean=18</span></span><span class="ln">{ <span class="k">"buildable"</span>: true, <span class="k">"base_rev"</span>: 1,</span><span class="ln">  <span class="k">"changes"</span>: [ "Lean angle: 20 -&gt; 18 deg" ],</span><span class="ln">  <span class="k">"derived"</span>: [ "Stand height: 92.29 -&gt; 93.24 mm" ],</span><span class="ln">  <span class="k">"metrics"</span>: [ "Material volume: 145.05 -&gt; 146.24 cm³",</span><span class="ln">               "Tip-over force: 1.12 -&gt; 1.16 N" ], <span class="cut">…</span> }</span><span class="ln c"><span class="ps">$ </span><span class="tx">form commit desk-stand lean=18 --expect-head 1</span></span><span class="ln">{ <span class="k">"pipeline"</span>: { <span class="k">"state"</span>: "done", <span class="cut">…</span> },</span><span class="ln">  <span class="k">"project"</span>: { <span class="k">"project"</span>: "desk-stand", <span class="k">"head"</span>: 2,</span><span class="ln">    <span class="k">"parameters"</span>: { <span class="k">"lean"</span>: "18 deg (assumed)", <span class="cut">…</span> },</span><span class="ln">    <span class="k">"checks"</span>: [ <span class="cut">…</span>, "<span class="ok">PASS</span>  Overall size: 70.0 × 115.6 × 90.2 mm  [computed]", <span class="cut">…</span> ] } }</span></code></pre>
         <figcaption>Real output of the <code>form</code> command in an empty data folder, trimmed where you see <span class="cut">…</span>. Each step is also an MCP tool.</figcaption>
       </figure>

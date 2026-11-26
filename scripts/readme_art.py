@@ -13,8 +13,8 @@ Every part, number and check in these drawings comes from a run on this machine:
      the slicer layer is the slicer's G-code, read by form/toolpath.py; the file hashes are SHA-256 of the exported
      files; the terminal lines are what `form state` printed. The gears turn by their own tooth counts.
 
-Colours come from Theme.qml, the mark from LogoPaths.js, and the type is Instrument Sans and Geist Mono, subset
-and embedded in each file. GitHub shows an SVG in an <img> without scripts, so all motion is CSS keyframes and
+Colours are Lightdesk's (docs/design/directions/h), the mark comes from LogoPaths.js and keeps its own colours, and
+the type is Geist and Geist Mono (SIL OFL 1.1), subset and embedded in each file. GitHub shows an SVG in an <img> without scripts, so all motion is CSS keyframes and
 stroke dashes, and every drawing rests on its finished frame when the reader prefers reduced motion.
 
     .venv/bin/python scripts/readme_art.py              # writes docs/readme/*.svg (dark and light)
@@ -65,6 +65,16 @@ def _theme() -> dict:
 
 
 T = _theme()
+# Lightdesk, the approved direction (docs/design/directions/h/style.css): a near-black studio, warm key light, and one
+# accent, periwinkle, for "this is where you are". Set here so the drawings match the website and the app's new look;
+# the mark keeps its own colours (markOrigin, clay).
+MARK_ORIGIN = T.get("markOrigin", T["datum"])
+T.update(plate="#0b0b0c", plate1="#121213", plate2="#19191a", plate3="#232324", plate4="#2f2f31", well="#070708",
+         ink="#f4f3f1", ink2="#a9a8a5", ink3="#7d7c78", ink4="#4c4b48", datum="#a9b8ff", datumInk="#0b0b0c",
+         blueprint="#a9b8ff", amber="#f2c36b", signal="#ff6f51", clay="#d8d3c8")
+T["pass"] = "#86d9a8"
+KEY = "#ffe9cf"
+MARK_ORIGIN_LIGHT = "#2f8a6c"                          # Theme.qml markOrigin on a light page
 
 
 def alpha(hexv: str, a: float) -> str:
@@ -82,7 +92,8 @@ def mix(a: str, b: str, k: float) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 # Fonts: measured with fontTools, embedded as subset WOFF2 per drawing
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-FAMILY = {"sans": ("InstrumentSans.ttf", "IS"), "mono": ("GeistMono.ttf", "GM"), "icon": ("lucide.ttf", "LU")}
+# Geist is the website's copy (site/fonts); Geist Mono and the icons are the app's
+FAMILY = {"sans": (ROOT / "site" / "fonts" / "Geist.woff2", "GS"), "mono": ("GeistMono.ttf", "GM"), "icon": ("lucide.ttf", "LU")}
 
 
 @lru_cache(maxsize=None)
@@ -244,7 +255,8 @@ class Svg:
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 # The engine: two real designs, built, checked and sliced
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-DESIGNS = {"hinged-box": ("Hinged box", "storage_box", ["lid=2"])}
+DESIGNS = {"hinged-box": ("Hinged box", "storage_box", ["lid=2"]),
+           "sensor-case": ("Sensor case", "enclosure", [])}      # the design the website's hero builds
 # the print design (the checks, slicer and terminal cards): an exemplar's design code, created for printing and sliced
 PRINT_ID = "planetary-gearbox"
 PRINT_DESIGN = ("Planetary gearbox", "planetary_gearbox",
@@ -351,7 +363,11 @@ def engine(data_dir: Path) -> dict:
             except Exception as e:  # no slicer: the print card is left out
                 print("no toolpath for %s: %s" % (pid, e))
         derived = {d["key"]: d for d in (st.head_summary(p).get("derived") or [])}
-        out[pid] = {"state": state, "view": view, "meshes": meshes, "edges": edges, "asm": asm,
+        try:                                                 # a recipe lists its features in build order
+            features = [{"id": f.id, "label": f.label, "role": f.role} for f in st.recipe(p).features]
+        except Exception:
+            features = []
+        out[pid] = {"state": state, "view": view, "meshes": meshes, "edges": edges, "asm": asm, "features": features,
                     "part_edges": part_edges, "toolpath": tp, "derived": derived}
     env = {**os.environ, "FORM_DATA": str(data_dir)}
 
@@ -677,7 +693,7 @@ def logo(svg: Svg, x, cy, size=14, ink=None, ink2=None, cls="", part=None, word=
     cut = 2 * u if size >= 24 else 0
     clay = part or T["clay"]
     out = ['<g%s>' % (' class="%s"' % cls if cls else "")]
-    out.append('<rect x="%s" y="%s" width="%s" height="%s" fill="%s"/>' % (f1(x), f1(y), "%.2f" % (12 * u), "%.2f" % (12 * u), datum or T["datum"]))
+    out.append('<rect x="%s" y="%s" width="%s" height="%s" fill="%s"/>' % (f1(x), f1(y), "%.2f" % (12 * u), "%.2f" % (12 * u), datum or MARK_ORIGIN))
     for rx, ry, rw, rh in ((12 * u + cut, 0, 28 * u - cut, 12 * u), (0, 12 * u + cut, 12 * u, 36 * u - cut), (12 * u, 20 * u, 20 * u, 12 * u)):
         out.append('<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" fill="%s"/>' % (x + rx, y + ry, rw, rh, clay))
     w = 40 * u
@@ -771,14 +787,20 @@ def elide(s: str, width: float, size=13, weight=420, family="sans") -> str:
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
 def P(light: bool) -> dict:
     if light:
-        return dict(panel="#f3f4f2", panel2="#e7eae7", well="#ffffff", ink="#0e1113", ink2="#4a5451", ink3="#6e7875",
-                    ink4="#b3bab7", datum="#1d7457", mint=T["datum"], mintInk=T["datumInk"], clay="#d6d0c3",
-                    edge="rgba(14,17,19,.62)", grid="rgba(14,17,19,.10)", amber="#9a6b12", pass_="#1f7a4d",
-                    signal="#c2452b", blueprint="#3557c4", shadow="rgba(14,17,19,.10)", logo_part="#0e1113")
-    return dict(panel="#13171a", panel2="#1b2024", well="#0a0c0e", ink=T["ink"], ink2=T["ink2"], ink3=T["ink3"],
-                ink4=T["ink4"], datum=T["datum"], mint=T["datum"], mintInk=T["datumInk"], clay=T["clay"],
-                edge="rgba(16,18,18,.62)", grid="rgba(232,237,235,.08)", amber=T["amber"], pass_=T["pass"],
-                signal=T["signal"], blueprint=T["blueprint"], shadow="rgba(0,0,0,.35)", logo_part=T["clay"])
+        return dict(panel="#f8f7f4", panel2="#e6e3de", well="#ffffff", ink="#161616", ink2="#5d5c59", ink3="#7a7975",
+                    ink4="#b5b2ac", datum="#3d55d6", mint=T["datum"], mark=MARK_ORIGIN_LIGHT, mintInk=T["datumInk"], clay="#d6d0c3",
+                    edge="rgba(22,22,22,.62)", grid="rgba(22,22,22,.10)", amber="#a86a00", pass_="#1f8a52",
+                    signal="#c8452b", blueprint="#3d55d6", shadow="rgba(60,50,40,.16)", logo_part="#161616",
+                    glass="rgba(255,255,255,.62)", glass2="rgba(255,255,255,.95)", glass_edge="rgba(255,255,255,.9)",
+                    well_glass="rgba(255,255,255,.82)", room=("#e6e3de", "#efede9", "#f6f5f2", "#e4e1dc"), key="#ffffff", key_a=0.95,
+                    dim_bg="rgba(255,255,255,.92)", dim_ink="#2b3fb0", send="#161616", send_ink="#ffffff", track="rgba(22,22,22,.13)")
+    return dict(panel="#121213", panel2="#19191a", well="#070708", ink=T["ink"], ink2=T["ink2"], ink3=T["ink3"],
+                ink4=T["ink4"], datum=T["datum"], mint=T["datum"], mark=MARK_ORIGIN, mintInk=T["datumInk"], clay=T["clay"],
+                edge="rgba(16,16,16,.62)", grid="rgba(255,255,255,.09)", amber=T["amber"], pass_=T["pass"],
+                signal=T["signal"], blueprint=T["blueprint"], shadow="rgba(0,0,0,.45)", logo_part=T["clay"],
+                glass="rgba(255,255,255,.07)", glass2="rgba(255,255,255,.14)", glass_edge="rgba(255,255,255,.11)",
+                well_glass="rgba(11,11,12,.66)", room=("#0a0a0b", "#131314", "#1b1b1c", "#0d0d0e"), key=KEY, key_a=0.24,
+                dim_bg="rgba(14,15,20,.86)", dim_ink="#dfe5ff", send="#f4f3f1", send_ink="#0b0b0c", track="rgba(255,255,255,.13)")
 
 
 def ev_ink(p: dict, ev: str) -> str:
@@ -936,7 +958,7 @@ def hero(data, light: bool):
     W, H = 828, 660
     svg = Svg(W, H, 8.0, "Form Studio")
     svg.rect(0, 0, W, H, 28, fill=p["panel"])
-    logo(svg, 40, 52, size=22, ink=p["ink"], ink2=p["ink2"], part=p["logo_part"], datum=p["datum"])
+    logo(svg, 40, 52, size=22, ink=p["ink"], ink2=p["ink2"], part=p["logo_part"], datum=p["mark"])
     svg.text(W - 40, 59, "Open source  ·  macOS, Windows, Linux", 14, 520, p["ink3"], anchor="end")
     h1 = svg.anim([(0, {"opacity": "0", "transform": "translateY(14px)"}), (0.15, {"opacity": "0", "transform": "translateY(14px)"}),
                    (0.95, {"opacity": "1", "transform": "translateY(0px)"})], dur=1.0, once=True)
@@ -961,11 +983,12 @@ def hero(data, light: bool):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-# The workspace mid-build: the window, the design's features as the engine lists them, and the build's ledger
-# (BuildLedger.qml: "Building · Lid · 9 of 12") over the part. The features, their names and their faces are the
-# design's own (Studio.view); the drawing stops the build at one of them.
+# The workspace mid-build, as Lightdesk draws it (docs/design/directions/h): the part in a pool of light with its
+# size on dimension lines, the features as a program listing whose gutter is lit down to the line that is running,
+# a lower-third title for that feature, and one bar under the part. The features, their names, their order and
+# their faces are the design's own (the recipe and Studio.view); the drawing stops the build at one of them.
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
-BUILDING_ID = "hinged-box"
+BUILDING_ID = "sensor-case"
 
 
 def build_order(d) -> list:
@@ -973,7 +996,7 @@ def build_order(d) -> list:
     by = {}
     for m in d["meshes"]:
         by.setdefault(m["feature"], []).append(m["tris"])
-    feats = d["view"].get("features") or []
+    feats = d.get("features") or d["view"].get("features") or []
     order = [f["id"] for f in feats if f["id"] in by] + [k for k in by if k not in {f["id"] for f in feats}]
     label = {f["id"]: f.get("label") or f["id"] for f in feats}
     return [(k, label.get(k, k.replace("_", " ").capitalize()), np.concatenate(by[k])) for k in order]
@@ -984,96 +1007,178 @@ def building(data, light: bool):
     d = data[BUILDING_ID]
     M = model_facts(d)
     feats = build_order(d)
+    listing = d.get("features") or [{"id": k, "label": lab, "role": ""} for k, lab, _ in feats]
     n = len(feats)
-    at = max(2, min(n - 1, round(n * 0.75)))            # the feature arriving: three quarters of the way through
-    name = feats[at - 1][1]
-    W, H, TB, RAIL = 828, 520, 46, 214
+    at = max(2, min(n - 1, round(n * 0.5)))             # the line running: half way down the program
+    fid, name = feats[at - 1][0], feats[at - 1][1]
+    line_of = {f["id"]: i for i, f in enumerate(listing)}
+    W, H = 828, 520
+    PW, PX, PY = 240, W - 16 - 240, 62                  # the program pane
+    CX = (16 + PX - 12) / 2                             # the centre of the room left of it
     loop = 6.0
+    acc, glass, glass2, edge = p["datum"], p["glass"], p["glass2"], p["glass_edge"]
     svg = Svg(W, H, loop, "Form Studio, building")
-    svg.rect(0.5, 0.5, W - 1, H - 1, 22, fill=p["panel"], stroke=p["grid"])
-    # title bar (TopBar.qml)
-    for i, c in enumerate(("#ec6a5e", "#f4bf4f", "#61c554")):
-        svg.circle(26 + i * 19, TB / 2, 5.5, c)
-    lw = logo(svg, 92, TB / 2, size=15, ink=p["ink"], ink2=p["ink2"], part=p["logo_part"], datum=p["datum"])
-    x = 92 + lw + 14
-    svg.text(x, TB / 2 + 5, "/", 14, 420, p["ink4"])
-    x += 16
-    x += svg.text(x, TB / 2 + 4.5, M["name"], 13.5, 620, p["ink"]) + 12
-    svg.text(x, TB / 2 + 4.5, "r%02d" % d["state"]["head"], 12, 450, p["ink2"], family="mono")
-    tw = text_w("DESIGN", 10.5, 640, ls=0.8) + 16
-    svg.rect(W - 22 - tw, TB / 2 - 10, tw, 20, 5, fill=alpha(p["datum"], 0.14) if not light else "rgba(29,116,87,.12)")
-    svg.text(W - 22 - tw / 2, TB / 2 + 3.8, "DESIGN", 10.5, 640, p["datum"], anchor="middle", ls=0.8)
-    svg.line(0.5, TB, W - 0.5, TB, p["grid"])
-    # the features: made, arriving, still to come
-    svg.line(RAIL, TB, RAIL, H - 0.5, p["grid"])
-    svg.text(26, TB + 34, "FEATURES", 10.5, 640, p["ink3"], ls=0.9)
-    svg.text(RAIL - 22, TB + 34, "%d of %d" % (at, n), 11.5, 450, p["ink3"], family="mono", anchor="end")
-    lh = min(27.0, (H - TB - 78) / n)
+    # the room: a sweep of floor and the key light pooled under the part
+    svg.defs.append('<linearGradient id="rm" x1="0" y1="0" x2="0" y2="1">%s</linearGradient>'
+                    % "".join('<stop offset="%s" stop-color="%s"/>' % (o, c) for o, c in zip((0, .38, .6, 1), p["room"])))
+    svg.defs.append('<radialGradient id="pl"><stop offset="0" stop-color="%s" stop-opacity="%s"/><stop offset=".55" stop-color="%s" stop-opacity="%s"/>'
+                    '<stop offset="1" stop-color="%s" stop-opacity="0"/></radialGradient>' % (p["key"], p["key_a"], p["key"], p["key_a"] * 0.3, p["key"]))
+    svg.defs.append('<clipPath id="win"><rect x="0.5" y="0.5" width="%s" height="%s" rx="22"/></clipPath>' % (W - 1, H - 1))
+    svg.add('<g clip-path="url(#win)"><rect width="%s" height="%s" fill="url(#rm)"/><ellipse cx="%s" cy="232" rx="300" ry="150" fill="url(#pl)"/></g>' % (W, H, f1(CX)))
+    svg.rect(0.5, 0.5, W - 1, H - 1, 22, stroke=edge)
     pulse = svg.anim([(0, {"opacity": "1"}), (loop / 2, {"opacity": ".35"}), (loop, {"opacity": "1"})], ease="ease-in-out")
-    for i, (_fid, lab, _t) in enumerate(feats):
-        y = TB + 62 + i * lh
-        done, now = i < at - 1, i == at - 1
-        if now:
-            svg.rect(14, y - 15.5, RAIL - 28, 24, 6, fill=alpha(p["datum"], 0.10) if not light else "rgba(29,116,87,.08)")
-            svg.circle(31, y - 3.5, 3.2, p["datum"], cls=pulse)
-        elif done:
-            svg.circle(31, y - 3.5, 6.5, alpha(p["pass_"], 0.16) if not light else "rgba(31,122,77,.14)")
-            svg.add('<path d="%s" stroke="%s" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' % (check_mark(31, y - 3.5, 0.62), p["pass_"]))
+
+    def pane(x, y, w, h, r, fill=None):
+        svg.rect(x, y, w, h, r, fill=fill or glass, stroke=edge)
+
+    # title capsule: the mark, the design, its revision and state
+    nm_w = text_w(M["name"], 13, 600)
+    rv = "r%02d" % d["state"]["head"]
+    tag_w = text_w("UNRELEASED", 8.5, 500, "mono", 0.8) + 12
+    cap_w = 14 + 16 + 9 + nm_w + 8 + text_w(rv, 10.5, 450, "mono") + 9 + tag_w + 10
+    pane(16, 14, cap_w, 32, 16)
+    logo(svg, 28, 30, size=14, part=p["logo_part"], datum=p["mark"], word=False)
+    x = 28 + 14 * 40 / 48 + 9
+    x += svg.text(x, 34.5, M["name"], 13, 600, p["ink"], ls=-0.1) + 8
+    x += svg.text(x, 34, rv, 10.5, 450, p["ink2"], family="mono") + 9
+    svg.rect(x, 21.5, tag_w, 17, 8.5, fill=glass2)
+    svg.text(x + tag_w / 2, 33, "UNRELEASED", 8.5, 500, p["ink2"], family="mono", anchor="middle", ls=0.8)
+    # stages: the one in front on raised glass, its count in the accent
+    stages = [("Describe", ""), ("Design", "%d of %d" % (at, n)), ("Review", ""), ("Make", "")]
+    sw_ = 74
+    sx = max(CX - sw_ * len(stages) / 2, 16 + cap_w + 18)
+    pane(sx - 4, 10, sw_ * len(stages) + 8, 40, 20)
+    for i, (s, sub) in enumerate(stages):
+        cx = sx + i * sw_ + sw_ / 2
+        if sub:
+            svg.rect(sx + i * sw_, 14, sw_, 32, 16, fill=glass2)
+            svg.text(cx, 29, s, 11.5, 600, p["ink"], anchor="middle")
+            svg.text(cx, 40.5, sub, 9, 450, acc, anchor="middle")
         else:
-            svg.add('<circle cx="31" cy="%s" r="5.5" stroke="%s" stroke-width="1.2"/>' % (f1(y - 3.5), p["ink4"]))
-        svg.text(48, y + 1, elide(lab, RAIL - 74, 13, 520 if now else 450), 13, 560 if now else 450, p["ink"] if now else p["ink2"] if done else p["ink3"])
-    # the viewport: the finished design as a faint plot, the features made so far as solid, the one arriving in datum
-    vx, vy, vw, vh = RAIL + 1, TB + 1, W - RAIL - 2, H - TB - 2
+            svg.text(cx, 34, s, 11.5, 600, p["ink2"], anchor="middle")
+
+    # the program: the features in build order; the gutter is lit down to the line that is running
+    rows, rh = len(listing), 25.0
+    pane(PX, PY, PW, 38 + rows * rh + 8, 20)
+    svg.text(PX + 16, PY + 24, "Program", 12.5, 600, p["ink"])
+    svg.text(PX + 16 + text_w("Program", 12.5, 600) + 7, PY + 24, str(rows), 10, 450, p["ink3"], family="mono")
+    cnt = ("%d of %d" % (at, n)).upper()
+    svg.text(PX + PW - 16, PY + 23.5, cnt, 9, 500, acc, family="mono", anchor="end", ls=1.2)
+    svg.circle(PX + PW - 16 - text_w(cnt, 9, 500, "mono", 1.2) - 9, PY + 20.5, 2.6, acc, cls=pulse)
+    gx, gy = PX + 33, PY + 38
+    svg.line(gx, gy, gx, gy + rows * rh, p["grid"])
+    now_row = line_of.get(fid, at - 1)
+    g0, g1 = max(0.0, (now_row - 1) * rh + rh / 2), now_row * rh + rh / 2
+    lit = svg.anim([(0, {"transform": "scaleY(%.4f)" % (g0 / g1)}), (0.5, {"transform": "scaleY(%.4f)" % (g0 / g1)}), (0.9, {"transform": "scaleY(1)"}),
+                    (loop - 0.7, {"transform": "scaleY(1)"}), (loop, {"transform": "scaleY(%.4f)" % (g0 / g1)})], origin="center top", rest={"transform": "scaleY(1)"})
+    svg.rect(gx - 1, gy, 2, g1, 1, fill=acc, cls=lit)
+    built = {k for k, _, _ in feats[:at - 1]}
+    for i, f in enumerate(listing):
+        y = gy + i * rh
+        now, done, off = f["id"] == fid, f["id"] in built, f["id"] not in {k for k, _, _ in feats}
+        if now:
+            svg.rect(PX + 5, y + 0.5, PW - 10, rh - 1, 8, fill=glass2)
+        ink = p["ink"] if now else p["ink2"] if done else p["ink3"]
+        svg.text(PX + 25, y + 16.5, "%02d" % (i + 1), 9.5, 450, acc if now else p["ink3"], family="mono", anchor="end")
+        if done:
+            svg.add('<path d="%s" stroke="%s" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' % (check_mark(gx + 12, y + rh / 2, 0.6), p["pass_"]))
+        elif now:
+            svg.add('<path d="M%s %sl6 3.6-6 3.6z" stroke="%s" stroke-width="1.3" stroke-linejoin="round" class="%s"/>' % (f1(gx + 9.5), f1(y + rh / 2 - 3.6), acc, pulse))
+        kw = "BUILDING" if now else "OFF" if off else (f.get("role") or "").upper()
+        kw_w = text_w(kw, 7.5, 500, "mono", 0.7)
+        svg.text(PX + 52, y + 16.5, elide(f["label"], PW - 52 - 14 - kw_w - 8, 12, 600 if now else 500), 12, 600 if now else 500, ink)
+        svg.text(PX + PW - 14, y + 15.5, kw, 7.5, 500, acc if now else p["ink3"], family="mono", anchor="end", ls=0.7,
+                 extra="" if now else ' opacity=".7"')
+
+    # the part: what is built so far solid, the feature arriving lit, the rest of the design a faint plot
     every = all_tris(d).reshape(-1, 3)
     lo, hi = every.min(0), every.max(0)
     c = (lo + hi) / 2
-    cam = Camera(az=-38, el=27, target=(c[0], c[1], c[2]), dist=440)
-    cam.fit(every, (vx + 60, vy + 92, vw - 120, vh - 150))
-    rad = float(np.linalg.norm((hi - lo)[:2])) / 2
-    kpx = px_per_mm(cam, 440)
-    soft_shadow(svg, cam, (c[0], c[1], lo[2]), rad * kpx * 1.05, rad * kpx * 0.34, p["shadow"])
-    rings_ = []
-    for r in (rad * 1.2, rad * 1.6):
-        a = np.linspace(0, 2 * math.pi, 97)
-        xy, _ = cam.project(np.stack([c[0] + r * np.cos(a), c[1] + r * np.sin(a), np.full_like(a, lo[2])], 1))
-        rings_.append("M" + "L".join("%s %s" % (f1(px), f1(py)) for px, py in xy) + "Z")
-    svg.add('<clipPath id="vp"><rect x="%s" y="%s" width="%s" height="%s"/></clipPath><g clip-path="url(#vp)">' % (f1(vx), f1(vy), f1(vw), f1(vh)))
-    svg.add('<path d="%s" stroke="%s" stroke-width="1"/>' % ("".join(rings_), p["grid"]))
+    cam = Camera(az=-27, el=31, target=(c[0], c[1], c[2]), dist=470)
+    cam.fit(every, (60, 72, PX - 12 - 60 - 30, 250))
+    made = np.concatenate([t for _, _, t in feats[:at]]).reshape(-1, 3)
+    mlo, mhi = made.min(0), made.max(0)
+    mc, kpx = (mlo + mhi) / 2, px_per_mm(cam, 470)
+    soft_shadow(svg, cam, (mc[0] + 6, mc[1] - 4, 0), (mhi[0] - mlo[0]) * kpx * 0.86, (mhi[1] - mlo[1]) * kpx * 0.5, p["shadow"])
     if d["edges"] is not None:
-        svg.add('<path d="%s" stroke="%s" stroke-width="0.8" opacity="%s"/>' % (wire(cam, d["edges"]), p["ink3"], "0.34" if not light else "0.4"))
-    made = np.concatenate([t for _, _, t in feats[:at - 1]])
-    fills, _ed = draw_solid(cam, made, svg.w, svg.h, None, base=p["clay"])
+        svg.add('<path d="%s" stroke="%s" stroke-width="0.8" opacity="%s"/>' % (wire(cam, d["edges"]), p["ink3"], "0.3" if not light else "0.36"))
+    fills, _ed = draw_solid(cam, np.concatenate([t for _, _, t in feats[:at - 1]]), svg.w, svg.h, None, base=p["clay"])
     svg.add("<g>%s</g>" % fills)
-    arrive = svg.anim([(0, {"opacity": ".28"}), (0.5, {"opacity": ".28"}), (1.7, {"opacity": "1"}), (loop - 0.7, {"opacity": "1"}), (loop, {"opacity": ".28"})],
+    arrive = svg.anim([(0, {"opacity": "0"}), (0.5, {"opacity": "0"}), (1.3, {"opacity": "1"}), (loop - 0.7, {"opacity": "1"}), (loop, {"opacity": "0"})],
                       rest={"opacity": "1"})
-    fills, _ed = draw_solid(cam, feats[at - 1][2], svg.w, svg.h, None, base=p["mint"] if not light else "#8fd0b8")
+    fills, _ed = draw_solid(cam, feats[at - 1][2], svg.w, svg.h, None, base=mix(p["clay"], p["key"], 0.55))
     svg.add('<g class="%s">%s</g>' % (arrive, fills))
-    svg.add("</g>")
-    # the ledger (BuildLedger.qml), pinned top centre of the viewport
-    cnt = "%d of %d" % (at, n)
-    cap_w = text_w("BUILDING", 10.5, 640, ls=0.9)
-    nm_w = text_w(name, 15, 520)
-    cn_w = text_w(cnt, 12, 450, "mono")
-    lw_ = max(264.0, 16 + 6 + 8 + cap_w + 12 + nm_w + 28 + cn_w + 16)
-    lx, ly = vx + (vw - lw_) / 2, vy + 20
-    svg.rect(lx, ly + 5, lw_, 44, 9, fill=p["shadow"], extra=' opacity=".55"')
-    svg.rect(lx, ly, lw_, 44, 9, fill=p["panel2"] if not light else "#ffffff", stroke=p["grid"] if not light else "rgba(14,17,19,.14)")
-    svg.circle(lx + 19, ly + 22, 3, p["datum"], cls=pulse)
-    svg.text(lx + 30, ly + 25.8, "BUILDING", 10.5, 640, p["datum"], ls=0.9)
-    svg.text(lx + 30 + cap_w + 12, ly + 27, name, 15, 520, p["ink"])
-    svg.text(lx + lw_ - 16, ly + 26.2, cnt, 12, 450, p["ink2"], family="mono", anchor="end")
-    bx, bw = lx + 16, lw_ - 32
-    svg.rect(bx, ly + 35, bw, 2, 1, fill=p["grid"] if not light else "rgba(14,17,19,.12)")
-    f0, f1_ = (at - 1) / n, at / n
-    bar = svg.anim([(0, {"transform": "scaleX(%.4f)" % f0}), (0.5, {"transform": "scaleX(%.4f)" % f0}), (1.7, {"transform": "scaleX(%.4f)" % f1_}),
-                    (loop - 0.7, {"transform": "scaleX(%.4f)" % f1_}), (loop, {"transform": "scaleX(%.4f)" % f0})],
-                   origin="left center", rest={"transform": "scaleX(%.4f)" % f1_})
-    svg.rect(bx, ly + 35, bw, 2, 1, fill=p["datum"], cls=bar)
-    svg.text(vx + 20, H - 22, "%s mm" % M["size"], 12, 450, p["ink2"], family="mono")
-    svg.text(W - 22, H - 22, "build123d on OpenCascade", 12, 450, p["ink3"], anchor="end")
-    desc = ("The Form Studio workspace while a design builds: %s, feature %d of %d, %s, arriving. The features made so far are "
-            "solid, the rest of the design is a faint plot, and the list on the left ticks them off: %s."
-            % (M["name"].lower(), at, n, name, ", ".join(lab for _, lab, _ in feats)))
+    # the size so far, on the part: three dimension lines from the built solid's own bounding box
+    m = 9.0
+    for a, b, val in (((mlo[0] - m, mhi[1], 0), (mlo[0] - m, mhi[1], mhi[2]), mhi[2] - mlo[2]),
+                      ((mlo[0] - m, mhi[1], 0), (mlo[0] - m, mlo[1], 0), mhi[1] - mlo[1]),
+                      ((mlo[0], mlo[1] - m, 0), (mhi[0], mlo[1] - m, 0), mhi[0] - mlo[0])):
+        (ax, ay), (bx, by) = cam.project(np.array([a, b], float))[0]
+        svg.line(ax, ay, bx, by, acc, 1.1)
+        svg.circle(ax, ay, 2.2, acc)
+        svg.circle(bx, by, 2.2, acc)
+        t = "%.1f" % val
+        tw = text_w(t, 9.5, 500, "mono") + 12
+        svg.rect((ax + bx) / 2 - tw / 2, (ay + by) / 2 - 8.5, tw, 17, 8.5, fill=p["dim_bg"], stroke=alpha(acc, 0.4) if acc.startswith("#") else acc)
+        svg.text((ax + bx) / 2, (ay + by) / 2 + 3.4, t, 9.5, 500, p["dim_ink"], family="mono", anchor="middle")
+
+    # the cue: a lower-third title for the feature being built, and the build as twelve segments
+    ty = 356
+    over = "BUILDING"
+    ow = text_w(over, 9, 500, "mono", 1.5)
+    of_ = ("%d of %d" % (at, n)).upper()
+    tot = 12 + ow + 9 + text_w(of_, 9, 500, "mono", 1.5)
+    ox = CX - tot / 2
+    svg.circle(ox + 3, ty - 3, 2.8, acc, cls=pulse)
+    svg.text(ox + 12, ty, over, 9, 500, acc, family="mono", ls=1.5)
+    svg.text(ox + 12 + ow + 9, ty, of_, 9, 500, p["ink2"], family="mono", ls=1.5)
+    no = "%02d" % (now_row + 1)
+    nw, tw = text_w(no, 13, 500, "mono"), text_w(name, 38, 600, ls=-1.4)
+    tx = CX - (nw + 9 + tw) / 2
+    rise = svg.anim([(0, {"opacity": "0", "transform": "translateY(8px)"}), (0.5, {"opacity": "0", "transform": "translateY(8px)"}),
+                     (1.0, {"opacity": "1", "transform": "translateY(0px)"}), (loop - 0.7, {"opacity": "1", "transform": "translateY(0px)"}),
+                     (loop, {"opacity": "0", "transform": "translateY(0px)"})], rest={"opacity": "1"})
+    svg.g(rise)
+    svg.text(tx, ty + 30, no, 13, 500, acc, family="mono")
+    svg.text(tx + nw + 9, ty + 44, name, 38, 600, p["ink"], ls=-1.4)
+    svg.end()
+    tw_all, gap = 372.0, 4.0
+    seg = (tw_all - gap * (n - 1)) / n
+    fill_now = svg.anim([(0, {"transform": "scaleX(0)"}), (0.5, {"transform": "scaleX(0)"}), (1.7, {"transform": "scaleX(.55)"}),
+                         (loop - 0.7, {"transform": "scaleX(.55)"}), (loop, {"transform": "scaleX(0)"})], origin="left center", rest={"transform": "scaleX(.55)"})
+    for i in range(n):
+        x0 = CX - tw_all / 2 + i * (seg + gap)
+        svg.rect(x0, ty + 60, seg, 4, 2, fill=p["ink"] if i < at - 1 else p["track"])
+        if i == at - 1:
+            svg.rect(x0, ty + 60, seg, 4, 2, fill=acc, cls=fill_now)
+    if at > 1:
+        pv = feats[at - 2]
+        x = CX - tw_all / 2
+        x += svg.text(x, ty + 82, "built", 10.5, 450, p["ink3"]) + 7
+        x += svg.text(x, ty + 82, "%02d" % (line_of.get(pv[0], at - 2) + 1), 9.5, 500, p["ink2"], family="mono") + 7
+        svg.text(x, ty + 82, pv[1], 10.5, 450, p["ink3"])
+    if at < n:
+        nx = feats[at]
+        x = CX + tw_all / 2
+        x -= svg.text(x, ty + 82, nx[1], 10.5, 450, p["ink3"], anchor="end") + 7
+        x -= svg.text(x, ty + 82, "%02d" % (line_of.get(nx[0], at) + 1), 9.5, 500, p["ink2"], family="mono", anchor="end") + 7
+        svg.text(x, ty + 82, "next", 10.5, 450, p["ink3"], anchor="end")
+
+    # the bar: one prompt under the part
+    bw_, by_ = 372.0, H - 16 - 40
+    pane(CX - bw_ / 2, by_, bw_, 40, 20)
+    svg.rect(CX - bw_ / 2 + 5, by_ + 5, bw_ - 10, 30, 15, fill=p["well_glass"])
+    svg.text(CX - bw_ / 2 + 18, by_ + 25.5, "›", 16, 500, acc, family="mono")
+    svg.rect(CX - bw_ / 2 + 32, by_ + 13, 6, 14, 1.5, fill=acc, cls=pulse)
+    svg.text(CX - bw_ / 2 + 46, by_ + 24.5, "Ask about %s, or describe a change…" % M["name"], 12, 450, p["ink3"])
+    svg.circle(CX + bw_ / 2 - 20, by_ + 20, 12, p["send"])
+    svg.add('<path d="M%s %sv4a2 2 0 01-2 2h-6m2.6-2.6l-2.6 2.6 2.6 2.6" stroke="%s" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+            % (f1(CX + bw_ / 2 - 15.5), f1(by_ + 15), p["send_ink"]))
+    svg.text(W - 26, H - 23, "build123d on OpenCascade", 10.5, 450, p["ink3"], anchor="end")
+    desc = ("The Form Studio workspace while a design builds: %s, line %d of the program, %s, being built. The part stands in a pool of "
+            "light with its size so far on dimension lines, the features built so far are solid and the rest of the design is a faint plot. "
+            "The program lists the features in build order: %s."
+            % (M["name"].lower(), now_row + 1, name, ", ".join(f["label"] for f in listing)))
     return [("building", svg.render(desc))]
 
 
@@ -1137,7 +1242,7 @@ def type_ink(p: dict, light: bool) -> dict:
     if not light:
         return TYPE_INK
     return {"Outer wall": p["ink"], "Inner wall": p["ink3"], "Sparse infill": p["amber"], "Internal solid infill": p["blueprint"],
-            "Top surface": p["datum"], "Bottom surface": mix("#1d7457", "#ffffff", 0.35), "Bridge": p["signal"],
+            "Top surface": p["datum"], "Bottom surface": mix(p["datum"], "#ffffff", 0.35), "Bridge": p["signal"],
             "Overhang wall": p["signal"], "Floating vertical shell": "#d0603f", "Gap infill": p["ink4"]}
 
 
@@ -1710,16 +1815,16 @@ def downloads(data, light: bool):
         primary = i == 0
         W, H = 168, 56
         svg = Svg(W, H, 1.0, "Download for %s, %s" % (os_, sub))
-        fill = T["datum"] if primary else "#161b1f"
-        ink = T["datumInk"] if primary else T["ink"]
-        ink2 = "rgba(13,26,22,.66)" if primary else T["ink2"]
-        svg.rect(0.5, 0.5, W - 1, H - 1, 27.5, fill=fill, stroke="rgba(13,26,22,.14)" if primary else "rgba(255,255,255,.14)")
+        fill = T["ink"] if primary else "#19191a"
+        ink = "#0b0b0c" if primary else T["ink"]
+        ink2 = "rgba(11,11,12,.66)" if primary else T["ink2"]
+        svg.rect(0.5, 0.5, W - 1, H - 1, 27.5, fill=fill, stroke="rgba(11,11,12,.14)" if primary else "rgba(255,255,255,.14)")
         svg.text(24, 26, os_, 16, 640, ink, ls=-0.2)
         svg.text(24, 42, sub, 12, 480, ink2)
         cx, cy = W - 29, H / 2
-        svg.circle(cx, cy, 18, T["datumInk"] if primary else T["datum"])
+        svg.circle(cx, cy, 18, "#0b0b0c" if primary else "rgba(255,255,255,.14)")
         svg.add('<path d="M%s %sv11M%s %sl5 5 5-5" stroke="%s" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
-                % (f1(cx), f1(cy - 6.5), f1(cx - 5), f1(cy - 0.5), T["datum"] if primary else T["datumInk"]))
+                % (f1(cx), f1(cy - 6.5), f1(cx - 5), f1(cy - 0.5), T["ink"]))
         out.append(("download-%s" % slug, svg.render("Download Form Studio for %s, %s" % (os_, sub))))
     return out
 

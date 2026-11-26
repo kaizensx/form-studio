@@ -53,8 +53,8 @@ PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title} · Form Studio docs</title>
 <meta name="description" content="{desc}">
-<meta name="theme-color" content="#0e1113" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b0b0c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#eeece8" media="(prefers-color-scheme: light)">
 <link rel="canonical" href="{base}docs/{file}">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Form Studio">
@@ -69,7 +69,7 @@ PAGE = """<!doctype html>
 <link rel="icon" type="image/png" href="../assets/favicon.png">
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 <link rel="manifest" href="../manifest.webmanifest">
-<link rel="preload" href="../fonts/InstrumentSans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../fonts/Geist.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../css/site.css">
 <script>document.documentElement.classList.add("js");try{{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}}catch(e){{}}</script>
 <script type="module" src="../js/nav.js"></script>

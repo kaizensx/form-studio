@@ -1,10 +1,12 @@
 """A sharp picture of the website's live replica of the app, for the README (it links to the page where it runs).
 
     python -m http.server 8793 --directory site &
-    python scripts/media/site_shot.py "http://127.0.0.1:8793/?reduce&home" docs/images/try-it.webp
+    QT_QPA_PLATFORM=offscreen python scripts/media/site_shot.py "http://127.0.0.1:8793/?reduce&desk=build-6" docs/images/try-it.webp
+    QT_QPA_PLATFORM=offscreen python scripts/media/site_shot.py "http://127.0.0.1:8793/?reduce&desk=rest" docs/images/try-it-workspace.webp
 
-Loads the page in Qt WebEngine at the screen's pixel ratio, crops to the replica's window and saves it. Query
-parameters choose the view the replica opens on (home, home=menu, stage=prove, sim=60); reduce turns motion off.
+Loads the page in Qt WebEngine, crops to the drawn window and saves it. The desk parameter chooses the moment the
+drawing holds (rest, build-N for line N of the program, answer-N, pick-N); reduce turns motion off. This is a picture
+of the website's drawing of the app, not a screenshot of the app.
 """
 from __future__ import annotations
 
@@ -27,7 +29,7 @@ def main() -> int:
     box = {}
 
     def measure():
-        js = ("(function(){ document.getElementById('nav').style.display = 'none'; const f = document.getElementById('app'); window.scrollTo(0, f.getBoundingClientRect().top + scrollY - 40);"
+        js = ("(function(){ document.getElementById('nav').style.display = 'none'; const f = document.getElementById('desk-frame'); window.scrollTo(0, f.getBoundingClientRect().top + scrollY - 40);"
               " const r = f.getBoundingClientRect(); return JSON.stringify([r.left, r.top, r.width, r.height]); })()")
         view.page().runJavaScript(js, 0, got)
 
