@@ -23,15 +23,13 @@ from urllib.parse import unquote, urlparse
 SITE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import chrome  # noqa: E402  the shared nav and footer, and what counts as moving media
-BUDGET_FIRST_VIEW = 2_500_000        # bytes, uncompressed: page, CSS, fonts, scripts and the drawn app in the hero
-FIRST_VIEW = ["index.html", "css/site.css", "fonts/InstrumentSans.woff2", "fonts/GeistMono.woff2", "fonts/lucide-form.woff2",
-              "assets/lockup.svg", "js/main.js", "js/nav.js", "js/theme.js", "js/motion.js", "js/data.js", "js/app.js",
-              "js/scene.js", "vendor/three.module.js", "vendor/OrbitControls.js", "assets/data/site.json",
-              "assets/data/sample.glb", "assets/data/toolpath.bin"]
-# the drawn app loads when it comes near: three.js, the sample project and its toolpath
-BUDGET_APP = 2_500_000
-APP_VIEW = [f for f in ["js/app.js", "js/scene.js", "vendor/three.module.js", "vendor/OrbitControls.js",
-            "assets/data/site.json", "assets/data/sample.glb", "assets/data/toolpath.bin"] if (SITE / f).exists()]
+BUDGET_FIRST_VIEW = 1_200_000        # bytes, uncompressed: page, CSS, fonts, scripts and the drawn app in the hero
+FIRST_VIEW = ["index.html", "css/site.css", "css/desk.css", "fonts/Geist.woff2", "fonts/GeistMono.woff2", "fonts/lucide-form.woff2",
+              "assets/lockup.svg", "js/main.js", "js/nav.js", "js/theme.js", "js/motion.js", "js/data.js", "js/desk.js",
+              "vendor/three.module.js", "assets/data/case.json", "assets/data/case.glb"]
+# the drawn app loads when it comes near: three.js and the sensor case, one mesh per feature
+BUDGET_APP = 1_200_000
+APP_VIEW = [f for f in ["js/desk.js", "vendor/three.module.js", "assets/data/case.json", "assets/data/case.glb"] if (SITE / f).exists()]
 
 
 class Page(HTMLParser):

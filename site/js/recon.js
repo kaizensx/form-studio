@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { loadGLB, reducedMotion } from "./data.js";
 
 const $ = (s) => document.querySelector(s);
-const BG = 0x101417, CLAY = 0xd8d3c8, WIRE = 0xb4beba, SLATE = 0x4a5250;
+const BG = 0x0f0f10, CLAY = 0xd8d3c8, WIRE = 0xb4beba, SLATE = 0x4a5250;
 const fmt = (n) => n.toLocaleString("en-US");
 const easeMove = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const upper = (a, x) => { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] <= x) lo = m + 1; else hi = m; } return lo; };
@@ -58,7 +58,7 @@ export async function initRecon() {
   const cadScene = new THREE.Scene(); lights(cadScene);
   const cg = geometry(node("cad")); cg.computeVertexNormals();
   cadScene.add(new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ color: CLAY, roughness: 0.82, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })));
-  cadScene.add(new THREE.LineSegments(geometry(node("cad_edges")), new THREE.LineBasicMaterial({ color: 0x0b0d0e, transparent: true, opacity: 0.6 })));
+  cadScene.add(new THREE.LineSegments(geometry(node("cad_edges")), new THREE.LineBasicMaterial({ color: 0x080809, transparent: true, opacity: 0.6 })));
 
   // the camera looks from the front left and above, CAD Z up, and fits the part's box to the frame
   mg.computeBoundingBox();

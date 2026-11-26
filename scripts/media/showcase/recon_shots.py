@@ -50,7 +50,7 @@ def main():
     a = render.render_png({"mesh": [{"positions": b64(V), "indices": b64(F), "feature": "m"}], "edges": b64(tri_edges.astype(np.float32))},
                           [{"id": "m", "label": ""}], camera=(az, el), size=size, overlay=False)
     (S / "out" / f"recon-{name}-mesh.png").write_bytes(a)
-    render.INK = (185, 232, 215)
+    render.INK = (169, 184, 255)
     render.PALETTE = [(216, 211, 200)]
     c = render.render_png({"mesh": [{"positions": b64(np.asarray(P, np.float32)), "indices": b64(np.asarray(T, np.uint32)), "feature": "m"}],
                            "edges": b64(np.asarray(E, np.float32))},

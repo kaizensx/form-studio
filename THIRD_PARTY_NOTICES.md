@@ -142,3 +142,19 @@ under the data folder (`form/engines.py`), showing its size and licence first. T
 - **uv** 0.13.7 (https://github.com/astral-sh/uv), downloaded from its GitHub release and checked against a pinned
   SHA-256 before use, makes these environments. Licence: MIT OR Apache-2.0. The Python 3.12 it installs for them is
   CPython (Python Software Foundation License) from uv's managed builds.
+
+## Fonts
+
+The typefaces in the app, on the website and in the README's drawings. Each licence text sits beside its font file.
+
+- **Geist** and **Geist Mono** (https://github.com/vercel/geist-font). Copyright 2024 The Geist Project Authors.
+  Licence: SIL Open Font License 1.1. Geist is the website's text face (`site/fonts/Geist.woff2`, licence in
+  `site/fonts/Geist-LICENSE.txt`) and is subset into the README's drawings and set on the social card; Geist Mono is
+  the face for numbers and small labels (`site/fonts/GeistMono.woff2`, `form/app/assets/fonts/GeistMono.ttf`, licence
+  in `GeistMono-LICENSE.txt` beside each).
+- **Instrument Sans** (https://github.com/Instrument/instrument-sans). Copyright 2022 The Instrument Sans Project
+  Authors. Licence: SIL Open Font License 1.1. The wordmark "Form Studio" is drawn from its outlines, and the app
+  ships it (`form/app/assets/fonts/InstrumentSans.ttf`, licence in `InstrumentSans-LICENSE.txt` beside it).
+- **Lucide** icons (https://lucide.dev), as a subset icon font (`site/fonts/lucide-form.woff2`,
+  `form/app/assets/fonts/lucide.ttf`). Copyright Lucide Icons and Contributors; parts derived from Feather, copyright
+  Cole Bemis. Licence: ISC, with the Feather-derived icons under MIT (`lucide-LICENSE.txt` beside each).

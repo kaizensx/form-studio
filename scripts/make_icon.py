@@ -47,12 +47,12 @@ def main():
     block(-1, -1, 1, 0.0, 0, 1.25)          # tall back
     block(-1, 0.0, 1, 1, 0, 0.55)           # low front step
     # one dimension, drawn like a drawing, in the datum colour
-    mint = (185, 232, 215, 255)
+    datum = (169, 184, 255, 255)
     o = 1.36
     a, b = P(-1, o), P(1, o)
-    d.line([a, b], fill=mint, width=S * 7)
+    d.line([a, b], fill=datum, width=S * 7)
     for p, q in ((P(-1, o - 0.14), P(-1, o + 0.14)), (P(1, o - 0.14), P(1, o + 0.14))):
-        d.line([p, q], fill=mint, width=S * 7)
+        d.line([p, q], fill=datum, width=S * 7)
     out = img.resize((1024, 1024), Image.LANCZOS)
     OUT.mkdir(parents=True, exist_ok=True)
     out.save(OUT / "icon.png")

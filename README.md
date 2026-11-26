@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://kaizensx.github.io/form-studio/"><img src="docs/readme/banner.png" width="828" alt="Form Studio. Describe anything. The open-source AI CAD studio. Beside it, a planetary gear stage built by Form Studio: a graphite ring gear, a steel sun gear and three teal planets, meshed."></a>
+  <a href="https://kaizensx.github.io/form-studio/"><img src="docs/readme/banner.png" width="828" alt="Form Studio. Describe anything. The open-source AI CAD studio. Beside it, a planetary gear stage built by Form Studio: a graphite ring gear, a steel sun gear and three periwinkle planets, meshed."></a>
 </p>
 
 <h1 align="center">Form Studio</h1>
@@ -21,12 +21,12 @@ Parametric build123d on OpenCascade, every requirement proved on the solid, on y
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/building-dark.svg">
-    <img src="docs/readme/building-light.svg" width="828" alt="The Form Studio workspace while a design builds: a hinged box, feature 6 of 8, Cavity, arriving. The features made so far are solid, the rest of the design is a faint plot, and the list on the left ticks them off.">
+    <img src="docs/readme/building-light.svg" width="828" alt="The Form Studio workspace, drawn, while a design builds: a sensor case, line 6 of 12 of the program, Board screw holes, being built. The part stands in a pool of light with its size so far on dimension lines; the features built so far are solid and the rest of the design is a faint plot. The program lists the 13 features in build order.">
   </picture>
 </p>
 
 <p align="center">
-  <img src="docs/readme/made-planetary.jpg" width="202" alt="A planetary gear stage: a steel sun gear, three teal planets and a graphite ring gear.">
+  <img src="docs/readme/made-planetary.jpg" width="202" alt="A planetary gear stage: a steel sun gear, three periwinkle planets and a graphite ring gear.">
   <img src="docs/readme/made-ratchet.jpg" width="202" alt="A ratchet wrench pulled apart into its handle, wheel, pawl and cover.">
   <img src="docs/readme/made-vase.jpg" width="202" alt="A copper vase with spiral flutes.">
   <img src="docs/readme/made-game-chest.jpg" width="202" alt="A stylised treasure chest as a textured game asset.">
@@ -89,8 +89,8 @@ flowchart LR
   kernel --> checks["Checks<br/>solid · mesh · fits · joints"]
   checks --> release{{"You approve<br/>files frozen with SHA-256"}}
   release --> out["STEP · STL · OBJ · GLB<br/>renders · your slicer"]
-  classDef datum fill:#b9e8d7,stroke:#0d1a16,color:#0d1a16
-  classDef plate fill:#191e22,stroke:#2a3238,color:#e8edeb
+  classDef datum fill:#a9b8ff,stroke:#0b0b0c,color:#0b0b0c
+  classDef plate fill:#19191a,stroke:#2f2f31,color:#f4f3f1
   class release datum
   class agent,engine,kernel,checks,out plate
 ```

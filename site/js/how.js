@@ -75,13 +75,13 @@ function cad(d) {
     const key = new THREE.DirectionalLight(0xffffff, 1.9); key.position.set(-180, 320, 260); scene.add(key);
     const fill = new THREE.DirectionalLight(0xdfe8ff, 0.55); fill.position.set(260, 120, -200); scene.add(fill);
     const world = new THREE.Group(); world.rotation.x = -Math.PI / 2; scene.add(world);
-    const grid = new THREE.GridHelper(420, 42, 0xffffff, 0xffffff); grid.material.transparent = true; grid.material.opacity = 0.05; grid.rotation.x = Math.PI / 2; world.add(grid);
+
     const feats = [];
     let edges = null;
     for (const p of parts) {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute("position", new THREE.BufferAttribute(p.pos, 3));
-      if (p.lines) { edges = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x0b0d0e, transparent: true, opacity: 0 })); world.add(edges); continue; }
+      if (p.lines) { edges = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x080809, transparent: true, opacity: 0 })); world.add(edges); continue; }
       geo.setIndex(new THREE.BufferAttribute(p.index, 1)); geo.computeVertexNormals();
       const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xd8d3c8, roughness: 0.82, side: THREE.DoubleSide, transparent: true, opacity: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
       world.add(m); feats.push({ mesh: m, label: p.extras.label || p.name });
@@ -172,7 +172,7 @@ function print(d) {
     ctx.lineWidth = Math.max(m.width_mm * 1.1, 1.4 / s);
     let head = null;
     for (let t = 0; t < m.types.length; t++) {
-      ctx.strokeStyle = INKS[m.types[t]] || "#a8b2af"; ctx.beginPath();
+      ctx.strokeStyle = INKS[m.types[t]] || "#a9a8a5"; ctx.beginPath();
       for (let i = a; i < b; i++) {
         if (tp.type[i] !== t || tp.p0[i] >= stop) continue;
         const f = Math.min(1, (stop - tp.p0[i]) / Math.max(1e-6, tp.p1[i] - tp.p0[i]));
@@ -186,8 +186,8 @@ function print(d) {
     if (head && frac < 1) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       const hx = ox + head[0] * s, hy = oy + head[1] * s;
-      ctx.fillStyle = "rgba(185,232,215,.22)"; ctx.beginPath(); ctx.arc(hx, hy, 9 * dpr, 0, 7); ctx.fill();
-      ctx.fillStyle = "#b9e8d7"; ctx.beginPath(); ctx.arc(hx, hy, 3 * dpr, 0, 7); ctx.fill();
+      ctx.fillStyle = "rgba(169,184,255,.22)"; ctx.beginPath(); ctx.arc(hx, hy, 9 * dpr, 0, 7); ctx.fill();
+      ctx.fillStyle = "#a9b8ff"; ctx.beginPath(); ctx.arc(hx, hy, 3 * dpr, 0, 7); ctx.fill();
     }
     const elapsed = m.t0_s[cur] + frac * m.time_s[cur];
     $("#hw-layer").textContent = `Layer ${cur + 1} of ${n}`;

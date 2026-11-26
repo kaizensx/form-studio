@@ -81,9 +81,9 @@ Weights: 400 to read, 500 for labels, 600 for names, titles and buttons.
 
 One accent, periwinkle (`datum`: `#a9b8ff` on the dark room, `#3d55d6` on paper). It has one meaning: **this is where
 you are**: the stage you are in, the line being built, the prompt, a selection, focus, the dimension lines on the
-part. It is the complement of the warm key light. Green (`pass`) only means pass, on, released, built. Amber only
+part. It is the complement of the warm key light. Green (`pass`) only means pass, released, built: a status, never a control. Amber only
 means review. Red (`signal`) only means fail. The one filled button is ink on the room (`send`, `sendInk`): send,
-Design it, the active tool. The part is clay in both appearances; the logo mark keeps its own colours.
+Design it, the active tool. The part is clay in both appearances; the origin of the logo mark is the accent too.
 
 ## The 3D view
 
