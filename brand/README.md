@@ -1,21 +1,22 @@
 # Form Studio brand
 
 The mark is the letter F drawn as a coordinate frame. The top arm is X, the stem is Y, and the square where they
-meet is the origin, in the datum colour. Every part Form Studio builds is measured from that origin. The mark sits
+meet is the origin, in the accent: periwinkle. Every part Form Studio builds is measured from that origin. The mark sits
 next to the wordmark "Form Studio": "Form" is set heavier and "Studio" lighter.
 
 This direction (option 1, "Frame") was chosen from six. The other five, with their sheets, are kept in
-[`options/`](options/) for reference ([`options/overview.png`](options/overview.png)).
+[`options/`](options/) for reference ([`options/overview.png`](options/overview.png)). Those sheets keep the graphite
+and mint the directions were first drawn in; the brand's colours are now Lightdesk's and are set in `build.py`.
 
 ## Files
 
 | File | Use |
 |---|---|
-| `lockup.svg` | Mark + wordmark, for graphite and other dark backgrounds. **The primary logo.** |
-| `lockup-light.svg` | The same for white and light backgrounds |
-| `lockup-mono.svg` | One colour (graphite), for print, engraving, embossing, single-colour stickers |
+| `lockup.svg` | Mark + wordmark, for near-black and other dark backgrounds. **The primary logo.** |
+| `lockup-light.svg` | The same for paper, white and other light backgrounds |
+| `lockup-mono.svg` | One colour (ink), for print, engraving, embossing, single-colour stickers |
 | `mark.svg` | The mark alone, 24 px and up |
-| `mark-32.svg` | The mark tuned for 32 px and below: no hairline cut |
+| `mark-32.svg` | The mark tuned for 32 px and below: no hairline cut, and the origin one shade deeper |
 | `mark-mono.svg` | The mark in one colour; the hairline cut keeps the origin readable without colour |
 | `wordmark.svg`, `wordmark-light.svg` | "Form Studio" alone, when the mark is already on screen |
 | `icon.svg` | The app icon (macOS grid: 824 px body in a 1024 px canvas) |
@@ -27,8 +28,8 @@ environment, and macOS for `iconutil`). Never edit an output by hand: change `bu
 (where the geometry lives) and rebuild.
 
 Outputs outside `brand/`: `form/app/assets/icon.{svg,png,icns,ico}` and `icon-{16…512}.png`,
-`form/app/qml/Form/LogoPaths.js` (drawn by `Logo.qml`), `site/assets/{favicon.svg,favicon.png,apple-touch-icon.png,
-icon-192.png,icon-512.png,og.png}` and `site/favicon.ico`.
+`form/app/qml/Form/LogoPaths.js` (drawn by `Logo.qml`), `site/assets/{lockup.svg,lockup-light.svg,favicon.svg,
+favicon.png,apple-touch-icon.png,icon-192.png,icon-512.png,og.png}`, `site/favicon.ico` and `docs/readme/banner.png`.
 
 ## Geometry
 
@@ -50,18 +51,29 @@ and wordmark is 0.42 × the mark's height.
 
 ## Colours
 
-These are the app's own tokens (`form/app/qml/Form/Theme.qml`).
+The palette is Lightdesk's, the look of the app and the website (`docs/design/directions/h`): a near-black room,
+warm paper, and one accent, periwinkle.
 
-| Role | On graphite | On white |
+| Role | On near-black | On paper or white |
 |---|---|---|
-| Background | Plate `#0e1113` | White `#ffffff` |
-| The F (the part) | Clay `#d8d3c8` | Graphite `#0e1113` |
-| The origin | Datum `#b9e8d7` | Datum, dark `#2f8a6c` |
-| "Form" | Ink `#e8edeb` | Graphite `#0e1113` |
-| "Studio" | Ink 2 `#a8b2af` | `#5b6562` |
-| One colour | Graphite `#0e1113`, or white on a dark photo | |
+| Background | Room `#0b0b0c` | Paper `#eeece8`, or white `#ffffff` |
+| The F (the part) | Clay `#d8d3c8` | Ink `#161616` |
+| The origin | Periwinkle `#a9b8ff` | Deep periwinkle `#3d55d6` |
+| "Form" | Ink `#f4f3f1` | Ink `#161616` |
+| "Studio" | Ink 2 `#a9a8a5` | `#5d5c59` |
+| One colour | Ink `#161616`, or white on a dark photo | |
 
-The datum mint is the only accent. It marks the origin and nothing else in the logo.
+Periwinkle is the only accent. It marks the origin and nothing else in the logo.
+
+Two shades serve the small and the lit cases, and are used nowhere else:
+
+- **Small sizes** (`mark-32.svg`, the favicon, the app icon below 64 px): the origin is `#8fa4ff`. At 16 px it is
+  nine pixels beside the clay, and the deeper shade keeps it a separate square.
+- **The app icon** at 64 px and up: the origin is lit from above, `#b9c5ff` at the top to `#98a9ff` at its foot, on
+  a tile that runs `#2b2b2e` to `#0b0b0c`.
+
+Green is not a brand colour. In the app and on the website it means one thing, a check that passed (`#86d9a8` on
+near-black, `#1f8a52` on paper), beside amber for review and red for a failure.
 
 ## Type
 
@@ -78,21 +90,21 @@ is not covered by the OFL and is MIT, like the rest of this repository. Geist Mo
 
 ## Do
 
-- Use `lockup.svg` on graphite wherever there is room. Use the mark alone where the name is already visible
+- Use `lockup.svg` on near-black wherever there is room. Use the mark alone where the name is already visible
   (title bar, app icon, favicon, avatar).
-- Keep the two-tone F: clay part, mint origin. In one colour, use the `-mono` files, which keep the hairline cut.
+- Keep the two-tone F: clay part, periwinkle origin. In one colour, use the `-mono` files, which keep the hairline cut.
 - Write the name "Form Studio" in text, in sentence case, as two words.
 
 ## Don't
 
 - Don't stretch, rotate, outline, add shadows to or put a gradient on the lockup or the mark. The app icon's soft
   light is part of the icon only.
-- Don't recolour the origin with anything other than the datum mint (or its dark version on white), and don't
-  colour any other part of the F mint.
+- Don't recolour the origin with anything other than periwinkle (or its deep shade on paper and white), and don't
+  colour any other part of the F periwinkle.
 - Don't re-typeset the wordmark in another font or weight, and don't set it in capitals ("FORM STUDIO") or as one
   word.
 - Don't put the mark inside another shape, except the app icon squircle and the favicon tile.
-- Don't place the light lockup on graphite or the dark lockup on white.
+- Don't place the light lockup on near-black or the dark lockup on paper or white.
 
 ## What keeps the old name
 

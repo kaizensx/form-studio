@@ -31,9 +31,16 @@ from PySide6.QtGui import QColor, QGuiApplication, QImage, QLinearGradient, QPai
 from PySide6.QtSvg import QSvgRenderer  # noqa: E402
 
 FRAME = O.OPTIONS[0]                  # the chosen direction
-PLATE, INK, INK2, CLAY, DATUM = O.PLATE, O.INK, O.INK2, O.CLAY, O.DATUM
-DARK, LIGHT = O.DARK, O.LIGHT
-MONO = {"part": PLATE, "accent": PLATE, "ink": PLATE, "ink2": PLATE, "line": PLATE}
+# The palette is Lightdesk's (docs/design/directions/h): a near-black room, paper, and one accent, periwinkle, which
+# marks the origin. brand/options/ keeps the graphite and mint the six directions were first drawn in, as the record
+# of the choice; only the geometry and the type are taken from there.
+PLATE, INK, INK2, CLAY, DATUM = "#0b0b0c", "#f4f3f1", "#a9a8a5", "#d8d3c8", "#a9b8ff"
+PAPER, PAPER_INK, PAPER_INK2, DATUM_PAPER = "#eeece8", "#161616", "#5d5c59", "#3d55d6"
+DATUM_SMALL = "#8fa4ff"               # the origin at 3 to 12 px, where it is a handful of pixels beside the clay
+DARK = {"part": CLAY, "accent": DATUM, "ink": INK, "ink2": INK2, "line": CLAY}
+LIGHT = {"part": PAPER_INK, "accent": DATUM_PAPER, "ink": PAPER_INK, "ink2": PAPER_INK2, "line": PAPER_INK}
+SMALL = {**DARK, "accent": DATUM_SMALL}
+MONO = {"part": PAPER_INK, "accent": PAPER_INK, "ink": PAPER_INK, "ink2": PAPER_INK, "line": PAPER_INK}
 
 
 def write(path: Path, text: str):
@@ -57,24 +64,27 @@ def to_pil(im: QImage):
     return Image.open(io.BytesIO(bytes(buf.data()))).convert("RGBA")
 
 
-# ── the app icon: graphite squircle on the macOS grid (824 body in 1024), the mark lifted by a soft shadow ──────
+# ── the app icon: near-black squircle on the macOS grid (824 body in 1024), the mark lifted by a soft shadow ──────
+DATUM_TOP, DATUM_FOOT = "#b9c5ff", "#98a9ff"      # the origin on the icon: lit from above, a shade deeper at its foot
+
+
 def icon_svg(small: bool = False) -> str:
     C, half = 512, 412
     body = O.squircle(C, C, half)
-    mark, (bx, by, bw, bh) = O.m_frame(DARK, small)
+    mark, (bx, by, bw, bh) = O.m_frame(SMALL if small else DARK, small)
     s = 8.2                                          # the F is 394 px tall in the 824 body
     fx = C - (bx + bw / 2) * s + 10                  # optical centre: the F's weight sits on its stem
     fy = C - (by + bh / 2) * s
     shadow = O.m_frame({"part": "#000", "accent": "#000"}, small)[0]
     soft = "" if small else f'<path d="{O.squircle(C, C + 12, half)}" fill="#000" fill-opacity="0.38" filter="url(#drop)"/>'
     lift = "" if small else f'<g transform="translate(0 {10 / s:.3f})" filter="url(#lift)" opacity="0.55">{shadow}</g>'
-    face = mark.replace(f'fill="{CLAY}"', 'fill="url(#clay)"').replace(f'fill="{DATUM}"', 'fill="url(#datum)"')
+    face = mark.replace(f'fill="{CLAY}"', 'fill="url(#clay)"').replace(f'fill="{DATUM}"', 'fill="url(#datum)"').replace(f'fill="{DATUM_SMALL}"', 'fill="url(#datum)"')
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><title>Form Studio</title>
 <defs>
   <filter id="drop" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14"/></filter>
   <filter id="lift" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="{9 / s:.3f}"/></filter>
   <linearGradient id="body" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="#2a3237"/><stop offset="0.5" stop-color="#171c1f"/><stop offset="1" stop-color="#0c0f11"/></linearGradient>
+    <stop offset="0" stop-color="#2b2b2e"/><stop offset="0.5" stop-color="#171718"/><stop offset="1" stop-color="#0b0b0c"/></linearGradient>
   <radialGradient id="lamp" cx="380" cy="260" r="620" gradientUnits="userSpaceOnUse">
     <stop offset="0" stop-color="#fff" stop-opacity="0.06"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
   <linearGradient id="rim" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
@@ -83,7 +93,7 @@ def icon_svg(small: bool = False) -> str:
   <linearGradient id="clay" x1="0" y1="8" x2="0" y2="56" gradientUnits="userSpaceOnUse">
     <stop offset="0" stop-color="#e7e2d8"/><stop offset="1" stop-color="#cec8bb"/></linearGradient>
   <linearGradient id="datum" x1="0" y1="8" x2="0" y2="20" gradientUnits="userSpaceOnUse">
-    <stop offset="0" stop-color="#c8efe1"/><stop offset="1" stop-color="#b0e2cf"/></linearGradient>
+    <stop offset="0" stop-color="{DATUM_TOP}"/><stop offset="1" stop-color="{DATUM_FOOT}"/></linearGradient>
 </defs>{soft}
 <path d="{body}" fill="url(#body)"/><path d="{body}" fill="url(#lamp)"/>
 <g transform="translate({fx:.1f} {fy:.1f}) scale({s})">{lift}{face}</g>
@@ -97,8 +107,8 @@ def icon_at(px: int) -> QImage:
 
 
 def tile_svg(px: int, scale: float, radius: float = 0) -> str:
-    """The mark on a graphite tile, for browsers and home screens (they round touch icons themselves)."""
-    mark, (bx, by, bw, bh) = O.m_frame(DARK, small=px < 64)
+    """The mark on a near-black tile, for browsers and home screens (they round touch icons themselves)."""
+    mark, (bx, by, bw, bh) = O.m_frame(SMALL if px < 64 else DARK, small=px < 64)
     s = 64 * scale / bh
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><title>Form Studio</title>'
             f'<rect width="64" height="64" rx="{radius}" fill="{PLATE}"/>'
@@ -109,7 +119,7 @@ def tile_svg(px: int, scale: float, radius: float = 0) -> str:
 def build_sources():
     print("brand/")
     write(HERE / "mark.svg", O.mark_svg(FRAME, DARK, pad=0))
-    write(HERE / "mark-32.svg", O.mark_svg(FRAME, DARK, px=32, small=True, pad=0.06))
+    write(HERE / "mark-32.svg", O.mark_svg(FRAME, SMALL, px=32, small=True, pad=0.06))
     write(HERE / "mark-mono.svg", O.mark_svg(FRAME, MONO, pad=0))
     paths, w, cap = O.wordmark(FRAME["words"])
     o = cap * 0.02
@@ -120,6 +130,8 @@ def build_sources():
     write(HERE / "lockup.svg", O.lockup(FRAME, DARK))
     write(HERE / "lockup-light.svg", O.lockup(FRAME, LIGHT))
     write(HERE / "lockup-mono.svg", O.lockup(FRAME, MONO))
+    for name in ("lockup.svg", "lockup-light.svg"):          # the website's header draws these two
+        write(SITE / "assets" / name, (HERE / name).read_text())
     write(HERE / "icon.svg", icon_svg())
 
 
@@ -165,7 +177,7 @@ OG_MARK = 88                          # the mark's height on the 630 px card; th
 
 # The card's surroundings are Lightdesk (docs/design/directions/h): the studio's near-black room, a pool of warm key
 # light under the build, Geist for the two lines and a Geist Mono caption in the one accent. The lockup is unchanged.
-ROOM, ROOM_INK, ROOM_INK2, ACCENT, KEY = "#0b0b0c", "#f4f3f1", "#a9a8a5", "#a9b8ff", (255, 233, 207)
+ROOM, ROOM_INK, ROOM_INK2, ACCENT, KEY = PLATE, INK, INK2, DATUM, (255, 233, 207)
 
 
 def _geist(weight: int, px: int, mono: bool = False):
