@@ -186,8 +186,8 @@ function print(d) {
     if (head && frac < 1) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       const hx = ox + head[0] * s, hy = oy + head[1] * s;
-      ctx.fillStyle = "rgba(169,184,255,.22)"; ctx.beginPath(); ctx.arc(hx, hy, 9 * dpr, 0, 7); ctx.fill();
-      ctx.fillStyle = "#a9b8ff"; ctx.beginPath(); ctx.arc(hx, hy, 3 * dpr, 0, 7); ctx.fill();
+      ctx.fillStyle = "rgba(62,230,255,.22)"; ctx.beginPath(); ctx.arc(hx, hy, 9 * dpr, 0, 7); ctx.fill();
+      ctx.fillStyle = "#3ee6ff"; ctx.beginPath(); ctx.arc(hx, hy, 3 * dpr, 0, 7); ctx.fill();
     }
     const elapsed = m.t0_s[cur] + frac * m.time_s[cur];
     $("#hw-layer").textContent = `Layer ${cur + 1} of ${n}`;

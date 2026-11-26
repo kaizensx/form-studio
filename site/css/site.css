@@ -1,5 +1,5 @@
 /* Form Studio website. The look is the app's own, Lightdesk (docs/design/directions/h): a near-black studio, a pool of
-   warm key light, panes of glass, Geist and Geist Mono, and one accent, periwinkle, for one meaning: this is where
+   warm key light, panes of glass, Geist and Geist Mono, and one accent, cyan, for one meaning: this is where
    you are. Green stays free to mean pass. The page has a light and a dark theme, and the drawn app follows it. */
 
 @font-face { font-family: "Geist"; src: url("../fonts/Geist.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
@@ -15,8 +15,8 @@
   --rule: rgba(255,255,255,.07); --rule2: rgba(255,255,255,.12); --rule3: rgba(255,255,255,.2);
   --wash-hover: rgba(255,255,255,.055); --wash-press: rgba(255,255,255,.1); --wash-on: rgba(255,255,255,.085);
   /* meaning */
-  --datum: #a9b8ff; --datum-ink: #0b0b0c; --datum-hi: #c3cdff; --blueprint: #a9b8ff; --amber: #f2c36b;
-  --signal: #ff6f51; --pass: #86d9a8; --clay: #d8d3c8; --focus: rgba(169,184,255,.6);
+  --datum: #3ee6ff; --datum-ink: #0b0b0c; --datum-hi: #7ff0ff; --blueprint: #3ee6ff; --amber: #f2c36b;
+  --signal: #ff6f51; --pass: #7bd88f; --clay: #d8d3c8; --focus: rgba(62,230,255,.6);
   --key: 255,233,207; --glass: rgba(255,255,255,.07); --glass2: rgba(255,255,255,.14); --edge: rgba(255,255,255,.11); --send: #f4f3f1; --send-ink: #0b0b0c;
   --lift: 0 24px 60px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.3);
   --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -35,8 +35,8 @@
   --ink: #161616; --ink2: #5d5c59; --ink3: #6f6e6a; --ink4: #a5a39e;
   --rule: rgba(22,22,22,.08); --rule2: rgba(22,22,22,.13); --rule3: rgba(22,22,22,.24);
   --wash-hover: rgba(22,22,22,.045); --wash-press: rgba(22,22,22,.08); --wash-on: rgba(22,22,22,.065);
-  --datum: #3d55d6; --datum-ink: #ffffff; --datum-hi: #2f45bd; --blueprint: #3d55d6; --amber: #a86a00;
-  --signal: #c8452b; --pass: #1f8a52; --focus: rgba(61,85,214,.55);
+  --datum: #06708d; --datum-ink: #ffffff; --datum-hi: #055d76; --blueprint: #06708d; --amber: #a86a00;
+  --signal: #c8452b; --pass: #1a7a3a; --focus: rgba(6,112,141,.55);
     --key: 255,255,255; --glass: rgba(255,255,255,.62); --glass2: rgba(255,255,255,.95); --edge: rgba(255,255,255,.9); --send: #161616; --send-ink: #ffffff;
     --lift: 0 24px 60px rgba(60,50,40,.16), 0 1px 3px rgba(60,50,40,.10);
 }
@@ -47,8 +47,8 @@
     --ink: #161616; --ink2: #5d5c59; --ink3: #6f6e6a; --ink4: #a5a39e;
     --rule: rgba(22,22,22,.08); --rule2: rgba(22,22,22,.13); --rule3: rgba(22,22,22,.24);
     --wash-hover: rgba(22,22,22,.045); --wash-press: rgba(22,22,22,.08); --wash-on: rgba(22,22,22,.065);
-    --datum: #3d55d6; --datum-ink: #ffffff; --datum-hi: #2f45bd; --blueprint: #3d55d6; --amber: #a86a00;
-    --signal: #c8452b; --pass: #1f8a52; --focus: rgba(61,85,214,.55);
+    --datum: #06708d; --datum-ink: #ffffff; --datum-hi: #055d76; --blueprint: #06708d; --amber: #a86a00;
+    --signal: #c8452b; --pass: #1a7a3a; --focus: rgba(6,112,141,.55);
     --key: 255,255,255; --glass: rgba(255,255,255,.62); --glass2: rgba(255,255,255,.95); --edge: rgba(255,255,255,.9); --send: #161616; --send-ink: #ffffff;
     --lift: 0 24px 60px rgba(60,50,40,.16), 0 1px 3px rgba(60,50,40,.10);
   }
@@ -63,7 +63,7 @@ body {
   font-weight: 420; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
   overflow-x: clip;
 }
-::selection { background: rgba(169,184,255,.28); color: var(--ink); }
+::selection { background: rgba(62,230,255,.28); color: var(--ink); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
 a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; text-decoration-color: var(--rule3); }
 a:hover { text-decoration-color: var(--ink2); }
@@ -153,7 +153,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px va
 .prose li { margin: 5px 0; }
 .prose li::marker { color: var(--ink4); }
 .prose strong { color: var(--ink); font-weight: 600; }
-.prose a { color: var(--datum); text-decoration-color: rgba(169,184,255,.35); }
+.prose a { color: var(--datum); text-decoration-color: rgba(62,230,255,.35); }
 .prose a:hover { text-decoration-color: var(--datum); }
 .prose :not(pre) > code { background: var(--plate2); padding: .12em .38em; border-radius: 4px; font-size: .85em; color: var(--ink); }
 .prose pre { background: var(--well); border: 1px solid var(--rule2); border-radius: var(--r-md); padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.65; color: var(--ink2); }
@@ -552,8 +552,8 @@ html { scroll-padding-top: calc(var(--nav-h) + 8px); }
 .term-body code { font-size: inherit; }
 .term-body .ln { display: block; white-space: pre; }
 .term-body .c { color: #f4f3f1; } .term-body .c:not(:first-child) { margin-top: 14px; }
-.term-body .ps { color: #a9b8ff; }
-.term-body .k { color: #a9b8ff; }
+.term-body .ps { color: #3ee6ff; }
+.term-body .k { color: #3ee6ff; }
 .term-body .ok { color: var(--pass); }
 .cut { color: #74736f; }
 .term figcaption { padding: 12px 20px 16px; border-top: 1px solid rgba(255,255,255,.06); font-size: 12.5px; color: #8b8a86; }
@@ -561,7 +561,7 @@ html { scroll-padding-top: calc(var(--nav-h) + 8px); }
 /* typing: lines wait unseen (their room kept), then each command types and its output follows */
 .term.play .ln { visibility: hidden; }
 .term.play .ln.on { visibility: visible; }
-.term .ln.typing .tx::after { content: ""; display: inline-block; width: .6em; height: 1.1em; margin-left: 1px; vertical-align: -.2em; background: #a9b8ff; }
+.term .ln.typing .tx::after { content: ""; display: inline-block; width: .6em; height: 1.1em; margin-left: 1px; vertical-align: -.2em; background: #3ee6ff; }
 .term-body:focus-visible { outline-offset: -2px; }
 .more { color: var(--datum); text-decoration: none; font-weight: 560; }
 .more:hover { text-decoration: underline; }
@@ -614,7 +614,7 @@ figure { margin: 0; }
 .gx-t::after { content: ""; position: absolute; inset: 40% 0 0; background: linear-gradient(180deg, transparent, rgba(5,5,6,.82)); z-index: 1; pointer-events: none; }
 .gx-t figcaption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: grid; gap: 2px; padding: 20px 22px; color: #a9a8a5; font-size: 14px; line-height: 1.45; }
 .gx-t figcaption b { color: #f4f3f1; font-size: 1.12rem; font-weight: 620; letter-spacing: -.02em; }
-.gx-t .k { font-size: 11px; font-weight: 620; letter-spacing: .09em; text-transform: uppercase; color: #a9b8ff; }
+.gx-t .k { font-size: 11px; font-weight: 620; letter-spacing: .09em; text-transform: uppercase; color: #3ee6ff; }
 @media (max-width: 899px) {
   .gx { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 32px; }
   .gx-t.w7, .gx-t.w6, .gx-t.w5 { grid-column: span 2; height: 62vw; min-height: 0; }
@@ -880,7 +880,7 @@ figure { margin: 0; }
 
 /* =========================================================================================================
    Lightdesk. The page is the app's studio: a near-black room, the work in a pool of warm key light, controls on
-   panes of glass with capsule shapes, small labels in Geist Mono capitals. One accent, periwinkle, marks where you
+   panes of glass with capsule shapes, small labels in Geist Mono capitals. One accent, cyan, marks where you
    are (the section in the bar, the step in front, the line being built); actions are ink on the room, like the
    app's send button. No rules between chapters: space and light separate them.
    ========================================================================================================= */

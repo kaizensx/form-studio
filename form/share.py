@@ -29,7 +29,7 @@ VERSION = 3                      # part of every cached card's name: change the 
 SIZE = (1600, 900)
 PLATE, PLATE1, PLATE2 = (14, 17, 19), (19, 23, 26), (25, 30, 34)
 INK, INK2, INK3, INK4 = (232, 237, 235), (168, 178, 175), (113, 123, 120), (73, 82, 79)
-DATUM, AMBER, PASS, SIGNAL, CLAY = (169, 184, 255), (233, 184, 96), (134, 217, 173), (255, 111, 81), (216, 211, 200)
+DATUM, AMBER, PASS, SIGNAL, CLAY = (62, 230, 255), (233, 184, 96), (123, 216, 143), (255, 111, 81), (216, 211, 200)
 EVIDENCE = {"computed": DATUM, "specified": DATUM, "simulated": AMBER, "modelled": AMBER, "assumed": AMBER,
             "physical": PASS, "measured": PASS}
 FONTS = Path(__file__).resolve().parent

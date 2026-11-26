@@ -69,15 +69,15 @@ if (S === "home") { const H = D.home; document.body.classList.add("home"); docum
   </section>`); }
 
 if (S === "tokens") document.body.insertAdjacentHTML("beforeend", tokenSheet({ letter: "H", name: "Lightdesk",
-  why: "A's room with B's instruments. The window is still a photo studio: the part alone in a pool of warm light, every control a pane of glass. Set into those panes are the two things that made Console honest: the features as a program that runs line by line while the agent builds, and a command line with numbered completions as the one bar under the part. The dimensions stay on the part, on its dimension lines. A lighting desk does the same job in a theatre: a quiet console that runs a cue list and moves the light. One signal colour, periwinkle, for one meaning: this is where you are. It is the complement of the warm key light, keeps its hue on paper, and leaves green free to mean pass.",
+  why: "A's room with B's instruments. The window is still a photo studio: the part alone in a pool of warm light, every control a pane of glass. Set into those panes are the two things that made Console honest: the features as a program that runs line by line while the agent builds, and a command line with numbered completions as the one bar under the part. The dimensions stay on the part, on its dimension lines. A lighting desk does the same job in a theatre: a quiet console that runs a cue list and moves the light. One signal colour, cyan, for one meaning: this is where you are. It is the complement of the warm key light, keeps its hue on paper, and leaves green free to mean pass.",
   type: [["d1", "What do you want to make?", "Geist 600 · 68/1.0 · −0.04em"], ["d2", "<span class='mono'>06</span>Board screw holes", "Geist 600 · 52/1.0 · −0.035em"],
     ["d3", "Sensor case", "Geist 600 · 15 · names, buttons"],
     ["d4", "Ask about this design, or describe a change.", "Geist 400 · 13/1.45 · reading"],
     ["d5 mono", "06  Board screw holes  BUILDING", "Geist Mono 500 · 11 · listing, keys, small numbers"], ["d6 mono", "BUILDING · 6 OF 12", "Geist Mono 500 · 11 · +0.14em caps"]],
   dark: [["room", "#0b0b0c", "the studio"], ["glass", "rgba(255,255,255,.07)", "blur 28, every pane"], ["ink", "#f4f3f1", "text"], ["ink 2", "#a9a8a5", "labels"],
-    ["key light", "#ffe9cf", "the pool, warm"], ["signal", "#a9b8ff", "the one accent: here, now"], ["pass", "#86d9a8", "state dot, built line"], ["review", "#f2c36b", "state only"]],
+    ["key light", "#ffe9cf", "the pool, warm"], ["signal", "#3ee6ff", "the one accent: here, now"], ["pass", "#7bd88f", "state dot, built line"], ["review", "#f2c36b", "state only"]],
   light: [["room", "#eeece8", "paper sweep"], ["glass", "rgba(255,255,255,.62)", "blur 28"], ["ink", "#161616", ""], ["ink 2", "#5d5c59", ""],
-    ["key light", "#ffffff", ""], ["signal", "#3d55d6", "same hue, as ink"], ["pass", "#1f8a52", ""], ["review", "#a86a00", ""]],
+    ["key light", "#ffffff", ""], ["signal", "#06708d", "same hue, as ink"], ["pass", "#1a7a3a", ""], ["review", "#a86a00", ""]],
   depth: [["l0", "Room", "the 3D view, edge to edge"], ["l1 glass", "Glass", "blur 28 · 1 px light edge · shadow 24/60"], ["l2 glass", "Well / raised", "the prompt, the running line"]],
   shape: "Capsules: radius 22 on panes, full on buttons, 10 on listing lines and keys. No dividers: the one drawn line is the listing's gutter, and it is the progress bar. 20 px from the window edge, 12 px between panes.",
   motion: [["Line executes", "the gutter lights down to the next line, 140 ms; the row's glass follows"], ["Light answers", "pool narrows and warms on build, 600 ms ease-in-out"],

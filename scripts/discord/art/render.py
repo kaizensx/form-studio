@@ -37,8 +37,8 @@ html,body{{margin:0;width:{{w}}px;height:{{h}}px;overflow:hidden;background:#0b0
 body{{position:relative;background:radial-gradient(ellipse 60% 58% at 68% 56%,rgba(255,233,207,.13),transparent 70%),
  linear-gradient(180deg,#0a0a0b 0%,#131314 38%,#1b1b1c 60%,#0d0d0e 100%)}}
 .kicker{{display:flex;align-items:center;gap:16px;font-family:'Geist Mono';font-weight:500;font-size:20px;letter-spacing:.16em;
- text-transform:uppercase;color:#a9b8ff}}
-.kicker::before{{content:"";width:10px;height:10px;border-radius:50%;background:#a9b8ff;box-shadow:0 0 0 7px rgba(169,184,255,.22)}}
+ text-transform:uppercase;color:#3ee6ff}}
+.kicker::before{{content:"";width:10px;height:10px;border-radius:50%;background:#3ee6ff;box-shadow:0 0 0 7px rgba(62,230,255,.22)}}
 .kicker i{{font-style:normal;color:#7d7c78}}
 h1{{font-weight:600;letter-spacing:-.04em;line-height:1.02;margin:26px 0 0}}
 p{{font-size:30px;line-height:1.38;color:#a9a8a5;font-weight:400;margin:26px 0 0}}

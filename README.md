@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://kaizensx.github.io/form-studio/"><img src="docs/readme/banner.png" width="828" alt="Form Studio. Describe anything. The open-source AI CAD studio. Beside it, a planetary gear stage built by Form Studio: a graphite ring gear, a steel sun gear and three periwinkle planets, meshed."></a>
+  <a href="https://kaizensx.github.io/form-studio/"><img src="docs/readme/banner.png" width="828" alt="Form Studio. Describe anything. The open-source AI CAD studio. Beside it, a planetary gear stage built by Form Studio: a graphite ring gear, a steel sun gear and three cyan planets, meshed."></a>
 </p>
 
 <h1 align="center">Form Studio</h1>
@@ -26,7 +26,7 @@ Parametric build123d on OpenCascade, every requirement proved on the solid, on y
 </p>
 
 <p align="center">
-  <img src="docs/readme/made-planetary.jpg" width="202" alt="A planetary gear stage: a steel sun gear, three periwinkle planets and a graphite ring gear.">
+  <img src="docs/readme/made-planetary.jpg" width="202" alt="A planetary gear stage: a steel sun gear, three cyan planets and a graphite ring gear.">
   <img src="docs/readme/made-ratchet.jpg" width="202" alt="A ratchet wrench pulled apart into its handle, wheel, pawl and cover.">
   <img src="docs/readme/made-vase.jpg" width="202" alt="A copper vase with spiral flutes.">
   <img src="docs/readme/made-game-chest.jpg" width="202" alt="A stylised treasure chest as a textured game asset.">
@@ -89,7 +89,7 @@ flowchart LR
   kernel --> checks["Checks<br/>solid · mesh · fits · joints"]
   checks --> release{{"You approve<br/>files frozen with SHA-256"}}
   release --> out["STEP · STL · OBJ · GLB<br/>renders · your slicer"]
-  classDef datum fill:#a9b8ff,stroke:#0b0b0c,color:#0b0b0c
+  classDef datum fill:#3ee6ff,stroke:#0b0b0c,color:#0b0b0c
   classDef plate fill:#19191a,stroke:#2f2f31,color:#f4f3f1
   class release datum
   class agent,engine,kernel,checks,out plate

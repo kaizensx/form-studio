@@ -82,8 +82,8 @@ export const fmtDur = (s) => {
 
 // line-type inks, exactly as LayerView.qml
 export const INKS = {
-  "Outer wall": "#f4f3f1", "Inner wall": "#74736f", "Sparse infill": "#f2c36b", "Internal solid infill": "#a9b8ff",
-  "Top surface": "#a9b8ff", "Bottom surface": "#6f7699", "Bridge": "#ff6f51", "Overhang wall": "#ff6f51",
+  "Outer wall": "#f4f3f1", "Inner wall": "#74736f", "Sparse infill": "#f2c36b", "Internal solid infill": "#3ee6ff",
+  "Top surface": "#3ee6ff", "Bottom surface": "#4f8f9c", "Bridge": "#ff6f51", "Overhang wall": "#ff6f51",
   "Floating vertical shell": "#ff8a65", "Gap infill": "#4c4b48",
 };
 
