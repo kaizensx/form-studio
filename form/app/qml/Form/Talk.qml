@@ -429,15 +429,17 @@ Rectangle {
                 Icon { name: "zap"; size: 12; color: Theme.blueprint; anchors.verticalCenter: parent.verticalCenter }
                 Txt { kind: "fine"; width: body.width - 20; text: it.m.by + "  " + it.m.text; color: Theme.ink2 } } }
             Component { id: cEnd; Column { spacing: 8
-              Item { width: body.width; height: 22
-                Txt { id: ft; kind: "fine"; mono: true; tone: 3; anchors.verticalCenter: parent.verticalCenter; width: Math.min(implicitWidth, parent.width - (rb.visible ? rb.width + 6 : 0)); elide: Text.ElideRight; wrapMode: Text.NoWrap
+              // the revision this reply made: what changed, compare it, or go back
+              TalkChange { visible: !!it.m.change; width: body.width; change: it.m.change }
+              // how the reply was made, small and out of the way at the right; on the newest reply, send it again
+              Item { width: body.width; height: 20
+                Row { id: rb; visible: !!it.m.last; spacing: 2; x: -4; anchors.verticalCenter: parent.verticalCenter
+                    Btn { small: true; kind: "quiet"; icon: "rotate_cw"; tip: "Send your last message again"; onClicked: Store.retryChat() }
+                    Btn { small: true; kind: "quiet"; icon: "repeat"; tip: "Send it again with another model"; onClicked: talk.tryAnother() } }
+                Txt { id: ft; objectName: "replyMeta"; mono: true; tone: 4; font.pixelSize: Theme.tCap; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    horizontalAlignment: Text.AlignRight; width: Math.min(implicitWidth, parent.width - (rb.visible ? rb.width + 6 : 0)); elide: Text.ElideLeft; wrapMode: Text.NoWrap
                     text: (it.m.stopped ? "stopped · " : "") + F.plural(it.m.steps || 0, "step") + " · " + talk.secs(it.m.seconds)
-                        + talk.costText(it.m) + (it.m.model ? " · " + it.m.model : "") }
-                Row { id: rb; visible: !!it.m.last; spacing: 2; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                    Btn { small: true; kind: "quiet"; icon: "repeat"; tip: "Send it again with another model"; onClicked: talk.tryAnother() }
-                    Btn { small: true; kind: "quiet"; icon: "rotate_cw"; tip: "Send your last message again"; onClicked: Store.retryChat() } } }
-              // what this reply changed in the design: compare it, or go back
-              TalkChange { visible: !!it.m.change; width: body.width; change: it.m.change } } }
+                        + talk.costText(it.m) + (it.m.model ? " · " + it.m.model : "") } } } }
             Component { id: cErr; Column { id: ec; spacing: 6
                 // a usage limit is not a failure: a calm card that says which agent, until when, and what is kept
                 readonly property var limit: Store.usageLimit(it.m)
