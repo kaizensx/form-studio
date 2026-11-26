@@ -1,6 +1,6 @@
 """API agents in the app: a local model server is found (a stand-in, tests/fixtures/fake_provider.py, on a free port),
 picked in the model menu, and answers through Form Studio's real tools with steps, follow-ups and a token count on
-the footer. A failed reply offers "Try another model…", which resends with the model picked. Settings › Agents lists
+the footer. A failed reply offers "Try another model…", which resends with the model picked. Settings › Agents & models lists
 it under Local models. No model is called and nothing leaves this computer.
 
 The test suite sets FORM_UITEST_API_AGENTS=1 (the API agents next to the stand-in CLI agent)."""
@@ -76,7 +76,7 @@ def run(ui):
         ui.wait_until(lambda: ui.store.get("chatBusy") is False and ui.sees("Answered by the other model."), 240, "the resent reply")
         ui.eq(srv.requests[-1]["model"], "other-model:3b", "sent again with the model picked")
 
-        # ── Settings › Agents lists it ──
+        # ── Settings › Agents & models lists it ──
         ui.run_js('Store.openSettings("chat")')
         ui.wait_until(lambda: ui.find(name="localRow") is not None, 10, "the local models section")
         ui.expect("Local models")

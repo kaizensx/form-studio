@@ -67,7 +67,7 @@ Column {
         Btn { objectName: "gameExport"; kind: gs.a ? "primary" : "quiet"; icon: "download"; enabled: gs.canBuild && !Store.gameBusy
             text: "Export for " + (gs.presetLabel[gs.preset] || gs.preset) + "…"; onClicked: gs.exportNow() } }
 
-    // ── no Blender: the install card (Settings › Software's row, one click) ──
+    // ── no Blender: the install card (Settings › Engines & software's row, one click) ──
     Column { objectName: "gameInstall"; width: parent.width; spacing: 8; visible: !!gs.sw && !gs.sw.blender
         Note { kind: "amber"; title: "Blender bakes the game asset"
             text: "LODs, UVs and baked maps are made in Blender 4.2 or newer, run in the background by Form Studio. Install it once; nothing else changes." }
@@ -135,10 +135,10 @@ Column {
     Note { objectName: "gameProblem"; width: parent.width; visible: !!Store.gameError; kind: "amber"
         title: "The game asset was not built"
         text: Store.gameError ? Store.gameError.trim() + (/[.!?]$/.test(Store.gameError.trim()) ? "" : ".") + "\n"
-              + (Store.gameErrorHint || "Nothing was changed. Build again; if it stops in the same place, check Blender under Settings › Software.") : ""
+              + (Store.gameErrorHint || "Nothing was changed. Build again; if it stops in the same place, check Blender under Settings › Engines & software.") : ""
         Row { spacing: Theme.s2; topPadding: Theme.s1
             Btn { objectName: "gameRetry"; visible: !!gs.a; small: true; icon: "refresh_cw"; text: "Build again"; enabled: gs.canBuild && !Store.gameBusy; onClicked: gs.build() }
-            Btn { small: true; kind: "quiet"; icon: "settings"; text: "Settings › Software"; onClicked: Store.openSettings("software") } } }
+            Btn { small: true; kind: "quiet"; icon: "settings"; text: "Settings › Engines & software"; onClicked: Store.openSettings("software") } } }
     Txt { objectName: "gameStatus"; width: parent.width; visible: !!gs.a && !Store.gameError
         color: gs.a && gs.a.validation.ok ? Theme.pass : Theme.amber
         text: gs.a ? (gs.a.validation.ok ? "Every check passed" : gs.a.validation.failed.length + " check(s) failed: " + gs.a.validation.failed.map(function (c) { return c.label + " (" + c.value + ")" }).join("; "))

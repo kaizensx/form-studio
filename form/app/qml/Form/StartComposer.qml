@@ -112,7 +112,7 @@ Rectangle {
             Txt { id: ph; x: 22; y: 20; width: parent.width - 44; visible: ta.text === "" && !ta.preeditText
                 font.pixelSize: ta.font.pixelSize; font.letterSpacing: -0.15; color: Theme.ink4; wrapMode: Text.NoWrap; elide: Text.ElideRight
                 property int n: 0
-                readonly property var lines: !Store.chatReady && Store.studio ? ["No agent is connected. Start blank, or connect one in Settings › Agents."]
+                readonly property var lines: !Store.chatReady && Store.studio ? ["No agent is connected. Start blank, or connect one in Settings › Agents & models."]
                     : ["Describe it, or drop a photo, a sketch, a part or a link…",
                        "A planetary gearbox for a NEMA 17 motor, about 1:16",
                        "A case for the board in this STEP file, with a snap lid",

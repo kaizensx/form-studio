@@ -1,7 +1,7 @@
 import QtQuick
 import FormNative
 
-// One provider you added by URL, in Settings › Agents › Your providers. `p` is its entry from GET /providers (never
+// One provider you added by URL, in Settings › Agents & models › Your providers. `p` is its entry from GET /providers (never
 // the key), `a` its agent from GET /chat (models, availability). Test asks one model, on your click, whether it calls
 // tools or takes images (POST /providers/probe: a few tokens); the answer is kept and shown in the model menu.
 Item {

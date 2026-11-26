@@ -1698,7 +1698,7 @@ QtObject {
             checkSoftware(); checkSetup()
             var c = r.capabilities.filter(function (x) { return x.id === id })[0]
             if (on && c && c.install.length) runSetup(c.install)
-            else toast((c ? c.title : id) + (on ? " is on" : " is off"), on ? (c && c.manual.length ? "Some of it is downloaded from its own page: Settings › Software." : "Nothing to download.") : "Hidden in Form Studio. Nothing was uninstalled.")
+            else toast((c ? c.title : id) + (on ? " is on" : " is off"), on ? (c && c.manual.length ? "Some of it is downloaded from its own page: Settings › Engines & software." : "Nothing to download.") : "Hidden in Form Studio. Nothing was uninstalled.")
             return r }, function (e) { fail(e); return null })
     }
     // a setup run of exactly these registry ids, with every command in the log (form/installer.py AutoJob)
@@ -1741,6 +1741,23 @@ QtObject {
             installPick = p
             return r
         }, function (e) { softwareChecking = false; fail(e); return null })
+    }
+    // "Use in Form Studio" (form/use.py): the switch on an engine's card. It is written to studio.toml and applies at
+    // once; the card shows the new state straight away and the software list is read again behind it.
+    property var useOverride: ({})          // id → on, while the engine confirms
+    function useOn(r) { return useOverride[r.id] !== undefined ? useOverride[r.id] : !!(r.use && r.use.on) }
+    function _useSettle(id) { var o = Object.assign({}, useOverride); delete o[id]; useOverride = o }
+    function setUse(r, on) {
+        if (!r || !r.use) return null
+        var o = Object.assign({}, useOverride), v = ({})
+        o[r.id] = on; useOverride = o
+        v[r.use.key] = on
+        return saveConfig(v, true).then(function (res) {
+            if (!res) { _useSettle(r.id); return null }
+            toast(on ? "Form Studio now uses " + r.label : "Form Studio no longer uses " + r.label,
+                  on ? "From the next time it is needed." : "It stays installed; turn it back on any time.")
+            return checkSoftware().then(function (x) { _useSettle(r.id); return x })
+        })
     }
     // Remove what Form Studio downloaded for one optional engine (installer.REMOVABLE); the row asks first
     function removeSoftware(id) {
@@ -1824,6 +1841,7 @@ QtObject {
     // a tab that does not exist, or Printing while printing is off, opens General instead of an empty sheet.
     function openSettings(tab) {
         var t = tab === "agents" ? "chat" : tab
+        if (t === "engines") t = "software"
         if (["general", "printer", "chat", "apps", "updates", "advanced", "software"].indexOf(t) < 0 || (t === "printer" && !printOn)) t = "general"
         openSheet("settings", { tab: t }); loadConfig(); checkSoftware(); loadCaps()
     }
@@ -2328,7 +2346,7 @@ QtObject {
         if (!text) text = chatAttach.some(function (a) { return a.kind === "sketch" }) ? "Design this from my sketch."
                         : chatAttach.some(function (a) { return a.kind === "image" }) ? "Design a part from this photo."
                         : chatAttach.length ? "Design a part around this file." : "Start from this link."
-        if (!chatReady) { toast("No agent is connected", "Start blank, or connect an agent in Settings › Agents.", true); return }
+        if (!chatReady) { toast("No agent is connected", "Start blank, or connect an agent in Settings › Agents & models.", true); return }
         if (pid) { pid = ""; data = null; view = null }
         designingSince = Date.now() / 1000
         blankCanvas = false; convNoDesign = false; steered = false; agentElsewhere = null

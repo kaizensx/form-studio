@@ -229,7 +229,7 @@ Rectangle {
                         Txt { kind: "fine"; width: parent.width; text: "So the agent can also use Form Studio from its own window or a terminal." }
                         SetupList { id: others; width: parent.width; ids: ["agent.claude", "agent.codex", "agent.gemini", "agent.cursor", "agent.desktop"] } }
                     Txt { kind: "fine"; width: parent.width; visible: wl.absentAgents.length > 0
-                        text: "Not found here: " + wl.absentAgents.join(", ") + ". If you install one later, add Form Studio to it under Settings, Software." } }
+                        text: "Not found here: " + wl.absentAgents.join(", ") + ". If you install one later, add Form Studio to it under Settings, Engines & software." } }
                 // a model API: keys found in the environment, or added here
                 Column { visible: wl.way === "api"; width: parent.width; spacing: 10
                     Txt { kind: "fine"; tone: 2; width: parent.width

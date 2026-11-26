@@ -150,7 +150,7 @@ Item {
             text: "Nothing here yet" }
         Txt { kind: "body"; tone: 2; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width; wrapMode: Text.WordWrap
             text: Store.chatReady ? "Say what goes here in the conversation on the left, draw it, or bring a part you have."
-                                  : "Draw it, bring a part you have, or start from a block you shape with sliders. Connect an agent in Settings › Agents to describe it in words." }
+                                  : "Draw it, bring a part you have, or start from a block you shape with sliders. Connect an agent in Settings › Agents & models to describe it in words." }
         Item { width: 1; height: 4 }
         Row { anchors.horizontalCenter: parent.horizontalCenter; spacing: 8
             Btn { objectName: "blankSketch"; icon: "pen_tool"; text: "Sketch it"; onClicked: Store.openSheet("sketch") }

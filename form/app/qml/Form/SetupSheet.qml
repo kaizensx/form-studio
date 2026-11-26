@@ -2,7 +2,7 @@ import QtQuick
 import FormNative
 
 // Software: everything FORM uses, whether it was found, and a button that installs it. The same registry as the
-// first-run steps and Settings › Software. Kept as its own sheet so Store.openSheet("setup") still works.
+// first-run steps and Settings › Engines & software. Kept as its own sheet so Store.openSheet("setup") still works.
 Column {
     id: ss
     property string title: "Software"
@@ -11,7 +11,7 @@ Column {
     spacing: 14
     Component.onCompleted: if (!Store.software) Store.checkSoftware()
     function accept() { if (Store.installChosen.length > 0 && !Store.installing) Store.installSoftware() }
-    // the same action bar as Settings › Software: what will happen on the left, the actions on the right
+    // the same action bar as Settings › Engines & software: what will happen on the left, the actions on the right
     property Component footerLeft: Txt { kind: "fine"; elide: Text.ElideRight; wrapMode: Text.NoWrap; verticalAlignment: Text.AlignVCenter
         text: Store.installing ? "Installing. Each command is in the log." : Store.softwareChecking ? "Looking at what is installed…" : "Nothing is installed until you press Install." }
     property Component footer: Row { spacing: 8

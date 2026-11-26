@@ -164,5 +164,5 @@ Column {
                                 Txt { mono: true; kind: "fine"; tone: 2; text: ps.size(pr.modelData.envelope_mm); anchors.verticalCenter: parent.verticalCenter } } } } } } } }
 
     Txt { kind: "fine"; width: parent.width; visible: ps.notInstalled.length > 0
-        text: "Not installed here: " + ps.notInstalled.map(function (s) { return s.label }).join(", ") + ". Add one under Settings, Software." }
+        text: "Not installed here: " + ps.notInstalled.map(function (s) { return s.label }).join(", ") + ". Add one under Settings, Engines & software." }
 }

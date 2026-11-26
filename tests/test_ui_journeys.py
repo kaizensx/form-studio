@@ -206,7 +206,7 @@ class Journeys(unittest.TestCase):
         # and a newer release is pretended so the update sheet has something to offer
         self.journey("shell.py", env_extra={"FORM_INSTALL_FAKE": "0.6", "FORM_SETUP_PRETEND_MISSING": "openscad,parts",
                                             "FORM_FAKE_LATEST": "99.0.0",
-                                            "FORM_UITEST_API_AGENTS": "1"})     # the provider rows on Settings › Agents
+                                            "FORM_UITEST_API_AGENTS": "1"})     # the provider rows on Settings › Agents & models
 
     def test_printers(self):
         # Bambu Studio is a fixture folder; every other slicer points at a program that does not exist
@@ -308,6 +308,12 @@ class Journeys(unittest.TestCase):
 
     def test_software_engines(self):        # one Install per engine row; a non-commercial licence is confirmed first
         self.journey("software_engines.py", env_extra={"FORM_INSTALL_MOCK_DOWNLOADS": "1"})
+
+    def test_settings_tour(self):           # every Settings page from the rail, the Use switch, search across pages
+        self.journey("settings_tour.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_settings_tour_light(self):     # the same in the light appearance
+        self.journey("settings_tour.py", env_extra={"FORM_APPEARANCE": "light"})
 
     def test_ui_tree(self):                 # the item tree as data, never a password field's text
         self.journey("ui_tree.py", env_extra={"FORM_UITEST_API_AGENTS": "1"})

@@ -83,7 +83,7 @@ Column {
         Field { id: broke; width: parent.width; placeholder: "e.g. the hook snapped at its root" } }
 
     Note { visible: !Store.chatReady && !!Store.studio; kind: "amber"; title: "No agent is connected"
-        text: "The replacement is designed by an agent. Connect one in Settings › Agents." }
+        text: "The replacement is designed by an agent. Connect one in Settings › Agents & models." }
     Txt { kind: "fine"; width: parent.width
         text: "Sizes read off a photo are estimates and stay assumed. The agent asks you to measure the ones that decide the fit, and only those are marked measured." }
 }

@@ -1,7 +1,7 @@
 import QtQuick
 import FormNative
 
-// Add or edit a model provider by its address (Settings › Agents › Your providers). The person types a name
+// Add or edit a model provider by its address (Settings › Agents & models › Your providers). The person types a name
 // (optional), the base URL and an API key (optional for a server on this computer); "Check connection" asks the
 // engine to work out the rest (POST /providers/detect, form/agents/custom.py: wire format, models, tool support)
 // and shows it before anything is saved. The key goes into Form Studio's private secrets file and is never shown again.

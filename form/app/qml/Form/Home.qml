@@ -269,7 +269,7 @@ Item {
                         Btn { id: modelChip; objectName: "startModel"; small: true; height: opts.h; kind: "quiet"; icon: "sparkles"; active: homeModelPop.opened
                             x: opts.wrap ? opts.inset : opts.width - opts.inset - width; y: opts.wrap ? opts.h + Theme.s2 : 0
                             text: Store.chatReady ? Store.chatAgentLabel + " · " + Store.modelShort(Store.chatAgent, Store.chatModel) : "Connect an agent"
-                            tip: Store.chatReady ? "The agent and model that design it. Click to change them." : "No agent is connected: add one in Settings › Agents"
+                            tip: Store.chatReady ? "The agent and model that design it. Click to change them." : "No agent is connected: add one in Settings › Agents & models"
                             onClicked: Store.chatReady ? (homeModelPop.opened ? homeModelPop.close() : homeModelPop.open()) : Store.openSettings("agents")
                             Pop {
                                 id: homeModelPop; y: parent.height + 6; x: opts.wrap ? 0 : Math.round(parent.width - width); width: 380; padding: 6

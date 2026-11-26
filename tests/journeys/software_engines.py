@@ -1,4 +1,4 @@
-"""Settings › Software: every optional engine has its own Install button, its size and licence on the card, and a
+"""Settings › Engines & software: every optional engine has its own Install button, its size and licence on the card, and a
 non-commercial licence is one line in a confirmation before anything is downloaded.
 
 Environment the test suite sets (test_software_engines): FORM_INSTALL_MOCK_DOWNLOADS=1 (the CADEvolve download is a
@@ -93,6 +93,21 @@ def run(ui):
     ui.settle(400)
     ui.shot(f"software-after-{theme}")
 
+    # installed and used are separate: the corpus is installed now, and its card has the switch, on by default
+    use = _row(ui, "softwareUse", "exemplars.cadevolve")
+    ui.check(use is not None and use.isVisible() and use.property("checked") is True, "the installed corpus has its Use switch, on")
+    ui.check(not _row(ui, "softwareUse", "recon.learned").isVisible(), "CAD-Recode is not installed: no switch yet")
+    ui.scroll_to(use)
+    ui.click(use)
+    ui.wait_until(lambda: ui.js("Store.softwareItem('exemplars.cadevolve').use.on") is False, 60, "the corpus to be switched off")
+    ui.eq(_status(ui, "exemplars.cadevolve"), "ok", "switched off, it is still installed")
+    import tomllib as _toml
+    ui.eq(_toml.loads(open(__import__("os").environ["FORM_CONFIG"], "rb").read().decode())["use"]["corpus"], False, "written to studio.toml")
+    ui.settle(300)
+    ui.shot(f"software-use-off-{theme}")
+    ui.click(_row(ui, "softwareUse", "exemplars.cadevolve"))
+    ui.wait_until(lambda: ui.js("Store.softwareItem('exemplars.cadevolve').use.on") is True, 60, "the corpus to be switched on again")
+
     # every engine card says what it does and when you would want it, and what it gives you
     for sid in ("recon.learned", "recon.cadfit", "game.coacd", "exemplars.cadevolve"):
         about = _row(ui, "softwareAbout", sid)
@@ -102,7 +117,11 @@ def run(ui):
 
     # Remove: what Form Studio downloaded for the corpus goes, after one question; Cancel removes nothing
     ui.wait_until(lambda: ui.js("(Store.softwareItem('exemplars.cadevolve') || {}).removable") is True, 20, "CADEvolve to be removable")
-    rm = ui.wait_until(lambda: _row(ui, "softwareRemove", "exemplars.cadevolve"), 10, "its Remove button")
+    more = _row(ui, "softwareMore", "exemplars.cadevolve")      # Remove is with the details, behind the chevron
+    ui.scroll_to(more)
+    ui.click(more)
+    rm = ui.wait_until(lambda: (lambda b: b if b is not None and b.isVisible() else None)(_row(ui, "softwareRemove", "exemplars.cadevolve")),
+                       10, "its Remove button")
     ui.scroll_to(rm)
     ui.settle(200)
     ui.click(rm)

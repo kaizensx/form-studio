@@ -13,6 +13,8 @@ import QtQuick.Controls
 //   property Component footer          the actions, a Row: primary button LAST (it sits at the right edge)
 //   property Component footerLeft      secondary things at the left of the action bar (a Row: quiet buttons, a status line)
 //   property int sheetHeight           a fixed body height, for sheets whose tabs would otherwise make the card jump
+//   property bool fillsBody            the sheet lays out the whole body itself, edge to edge, and scrolls its own
+//                                      panes (Settings: a navigation rail beside the page); the host then does not scroll
 //   function accept()                  run by Enter when no field has taken it (and by nothing else)
 // Esc closes. Tab and Shift+Tab stay inside the sheet. The body scrolls under soft edges when it is longer than the window.
 // Motion: scale 0.97 → 1 and fade in 180 ms; it leaves in 110 ms; none of it when the system asks for reduced motion.
@@ -24,6 +26,7 @@ Item {
                                     lighter: "LighterSheet.qml", replace: "ReplaceSheet.qml", game: "GameSheet.qml" })
     readonly property bool open: !!Store.sheet
     readonly property Item sheet: ld.item
+    readonly property bool fills: !!sheet && sheet.fillsBody === true
     property string file: ""                 // stays set while the sheet fades out
     visible: scrim.opacity > 0.001
     onOpenChanged: { if (open) { file = files[Store.sheet.kind] || ""; Qt.callLater(card.grab) } else unload.restart() }
@@ -100,16 +103,18 @@ Item {
             x: card.pad; y: card.headH - 4; width: parent.width - card.pad * 2
             model: visible ? host.sheet.tabs : []; value: visible ? host.sheet.tab : null
             onPicked: function (v) { host.sheet.tab = v; flick.contentY = 0 } }
-        Rectangle { visible: !tabs.visible; y: card.headH - 1; width: parent.width; height: 1; color: flick.atYBeginning ? "transparent" : Theme.rule }
+        Rectangle { visible: !tabs.visible; y: card.headH - 1; width: parent.width; height: 1; color: flick.atYBeginning && !host.fills ? "transparent" : Theme.rule }
 
         // body
         Flickable {
             id: flick
             objectName: "sheetScroll"
             x: 0; y: card.headH + card.tabsH; width: parent.width; height: parent.height - y - card.footH - (foot.visible ? 0 : 4)
-            clip: true; contentHeight: (host.sheet ? host.sheet.implicitHeight : 0) + card.pad + (tabs.visible ? 18 : 2); boundsBehavior: Flickable.StopAtBounds
+            clip: true; boundsBehavior: Flickable.StopAtBounds; interactive: !host.fills
+            contentHeight: host.fills ? height : (host.sheet ? host.sheet.implicitHeight : 0) + card.pad + (tabs.visible ? 18 : 2)
             ScrollBar.vertical: ScrollBar { width: 6; policy: flick.contentHeight > flick.height + 1 ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
-            Loader { id: ld; x: card.pad; y: tabs.visible ? 18 : 2; width: flick.width - card.pad * 2; source: host.file }
+            Loader { id: ld; x: host.fills ? 1 : card.pad; y: host.fills ? 0 : tabs.visible ? 18 : 2
+                width: flick.width - (host.fills ? 2 : card.pad * 2); height: host.fills ? flick.height : undefined; source: host.file }
         }
         // scroll shadows: the body slides under the header and the action bar
         Rectangle { x: 1; y: flick.y; width: parent.width - 2; height: 18; opacity: flick.atYBeginning ? 0 : 1

@@ -1,7 +1,7 @@
 import QtQuick
 import FormNative
 
-// One agent in Settings › Agents: an agent app (CLI), a model provider's API, or a local model server.
+// One agent in Settings › Agents & models: an agent app (CLI), a model provider's API, or a local model server.
 // `a` is its entry from GET /chat (form/agents); `k` the state of its API key from GET /secrets (never the key).
 Item {
     id: ag
