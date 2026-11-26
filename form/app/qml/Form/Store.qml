@@ -56,9 +56,10 @@ QtObject {
     // is open; typing in the prompt or clicking it brings the column back. Focus (Ctrl+.) hides both side columns.
     property bool talkCalm: false
     property bool focusView: false
+    property bool paneFolded: false    // the pane on the right folded to its button by hand (its tab), until it is asked back
     onTalkOpenChanged: talkCalm = false
     onChatAskingChanged: if (chatAsking) talkCalm = false
-    onScreenChanged: { talkCalm = false; focusView = false }
+    onScreenChanged: { talkCalm = false; focusView = false; paneFolded = false }
     function toggleTalk() { if (focusView) { focusView = false; talkCalm = false; talkOpen = true } else if (talkOpen && talkCalm) talkCalm = false; else talkOpen = !talkOpen }
     property string convId: ""         // the open conversation; "" = a new one that is not saved yet
     property var conv: null            // its record: { id, title, project, agent, model, effort, resolved_model, cost_usd, … }

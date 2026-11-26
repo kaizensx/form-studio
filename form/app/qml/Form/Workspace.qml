@@ -59,7 +59,7 @@ Item {
     readonly property bool col: Store.talkCol > 0
     // A window under 1200 px has room for the conversation column or for the panes on the right, not both: while the
     // column is open the panes fold to one button in their corner (it folds the conversation and brings them back).
-    readonly property bool panesOff: (col && ws.width < 1200) || Store.focusView
+    readonly property bool panesOff: (col && ws.width < 1200) || Store.focusView || Store.paneFolded
     // a click into the 3D view from the conversation folds its column to the bar (calm); the prompt brings it back
     Connections { target: vp; function onActiveFocusChanged() { if (vp.activeFocus && ws.col && insp.settled) Store.talkCalm = true } }
     readonly property real colFoot: ws.height - Theme.edge        // the foot of the side columns
@@ -188,8 +188,9 @@ Item {
         QtObject {
             id: lay
             // The tool dock floats inside the stage at its left edge, over the room: it takes no column of its own.
-            // The frame starts a little inside it, so a part's left dimension line stays clear of its discs.
-            readonly property real freeL: Theme.edge + 36 + ws.shift
+            // The frame starts 28 px right of it: a part's left dimension line and its number stand outside the part's
+            // own box, and must stay clear of the dock.
+            readonly property real freeL: Theme.edge + 76 + ws.shift
             readonly property real freeR: ws.paneX - 12
             // The part stands on the bar's centre line (the window's) whenever the free stage has room on both sides
             // of it: at least 60 % of its width. Otherwise, a legend open or a narrow window, it stands in the middle
@@ -671,8 +672,18 @@ Item {
         visible: ws.panesOff; x: ws.width - Theme.edge - width; y: Theme.paneTop; width: 44; height: 44; radius: 22
         Rectangle { anchors.fill: parent; anchors.margins: 4; radius: height / 2; color: pbm.pressed ? Theme.washPress : pbm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
         Icon { anchors.centerIn: parent; name: "panel_right"; size: 16; color: pbm.containsMouse ? Theme.ink : Theme.ink2 }
-        MouseArea { id: pbm; anchors.fill: parent; hoverEnabled: true; onClicked: { if (Store.focusView) Store.focusView = false; else Store.talkOpen = false } }
-        Tip { show: pbm.containsMouse; below: true; text: Store.focusView ? "Leave Focus: bring the side columns back" : "Show the " + (Store.stage === "shape" ? "Program" : "stage's pane") + " (folds the conversation)"; keys: Store.focusView ? "Ctrl+." : "Ctrl+J" }
+        MouseArea { id: pbm; anchors.fill: parent; hoverEnabled: true; onClicked: { if (Store.focusView) Store.focusView = false; else if (Store.paneFolded) Store.paneFolded = false; else Store.talkOpen = false } }
+        Tip { show: pbm.containsMouse; below: true; text: Store.focusView ? "Leave Focus: bring the side columns back" : Store.paneFolded ? "Show the " + (Store.stage === "shape" ? "Program" : "stage's pane") : "Show the " + (Store.stage === "shape" ? "Program" : "stage's pane") + " (folds the conversation)"; keys: Store.focusView ? "Ctrl+." : "Ctrl+J" }
+    }
+    // the pane's tab: a slim handle on its outer edge folds it to its button, for a wider stage
+    Rectangle {
+        id: paneTab; objectName: "paneTab"; z: 8
+        visible: insp.visible && !ws.sim; x: insp.x - 9; y: insp.y + 18; width: 14; height: 40; radius: 7
+        color: ptm.pressed ? Theme.plate4 : Theme.glassSolid; border.color: Theme.rule2
+        opacity: ptm.containsMouse ? 1 : 0.55; Behavior on opacity { NumberAnimation { duration: Theme.fast } }
+        Icon { anchors.centerIn: parent; name: "chevron_right"; size: 11; color: ptm.containsMouse ? Theme.ink : Theme.ink3 }
+        MouseArea { id: ptm; anchors.fill: parent; anchors.margins: -4; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.paneFolded = true }
+        Tip { show: ptm.containsMouse; text: "Fold this pane away" }
     }
     // ── right: the Program, the stage's panel ────────────────
     Glass {

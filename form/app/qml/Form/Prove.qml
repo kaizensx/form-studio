@@ -111,11 +111,15 @@ Column {
                             Glide { target: crIn; property: "y"; to: 0; duration: Theme.move(Theme.panel) } } }
                     Rectangle { visible: cr.index > 0; x: 8; width: parent.width - 16; height: 1; color: Theme.rule }
                     Column { id: cc; x: 8; y: 9; width: parent.width - 16; spacing: 5
-                        Item { width: parent.width; height: Math.max(lab.implicitHeight, 17)
+                        // a short value stands right of the name; a long one (a size, a sentence) under it, so the
+                        // name is never broken into a word a line to make room
+                        Item { width: parent.width; height: Math.max(lab.implicitHeight, 17) + (val.under ? val.implicitHeight + 3 : 0)
                             Tag { text: cr.modelData.status; y: 1 }
-                            Txt { id: lab; x: 50; width: parent.width - 50 - val.width - 10; text: cr.modelData.label; font.weight: 550 }
-                            Txt { id: val; mono: true; anchors.right: parent.right; text: String(cr.modelData.value === undefined || cr.modelData.value === null ? "" : cr.modelData.value)
-                                wrapMode: Text.NoWrap; elide: Text.ElideRight; width: Math.min(implicitWidth, 170); horizontalAlignment: Text.AlignRight } }
+                            Txt { id: lab; x: 50; width: parent.width - 50 - (val.under ? 0 : val.width + 10); text: cr.modelData.label; font.weight: 550 }
+                            Txt { id: val; mono: true; text: String(cr.modelData.value === undefined || cr.modelData.value === null ? "" : cr.modelData.value)
+                                readonly property bool under: implicitWidth > parent.width - 50 - 110
+                                x: under ? 50 : parent.width - width; y: under ? lab.implicitHeight + 3 : 0
+                                wrapMode: Text.NoWrap; elide: Text.ElideRight; width: Math.min(implicitWidth, under ? parent.width - 50 : 170); horizontalAlignment: under ? Text.AlignLeft : Text.AlignRight } }
                         Tag { x: 50; text: cr.modelData.evidence || ""; visible: text !== "" }
                         Txt { kind: "fine"; x: 50; width: parent.width - 50; text: cr.modelData.detail || ""; visible: text !== "" }
                         Row { x: 50; spacing: 5; visible: cr.link
