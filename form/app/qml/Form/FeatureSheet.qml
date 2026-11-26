@@ -81,7 +81,7 @@ Column {
                     placeholder: modelData.v === "" ? "auto" : ""
                     onEdited: { var o = Object.assign({}, fs.values); o[modelData.k] = text; fs.values = o; fs.recheck() } } } } }
 
-    Rectangle { width: parent.width; height: pc.implicitHeight + 24; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+    Rectangle { width: parent.width; height: pc.implicitHeight + 24; radius: 14; color: Theme.glass
         Column { id: pc; x: 14; y: 12; width: parent.width - 28; spacing: 6
             Item { width: parent.width; height: 17
                 Txt { kind: "cap"; text: fs.kind === "boss" ? "Boss" : "Hook"; anchors.verticalCenter: parent.verticalCenter }

@@ -3,128 +3,168 @@ import QtQuick.Window
 import FormNative
 import "F.js" as F
 
-// The window's own title bar, one calm line. Left: the agent column's toggle, where you are, which revision and whether
-// it is released. Right: another conversation at work (outside the workspace, which says it over the view), the
-// printer of a design made for printing, notices, search, settings. A 3D model shows no printer and no purpose: not
-// printing is the normal case and needs no label. It gives up detail, never function, as the window narrows: search
-// becomes its icon; notices become dots.
-Rectangle {
+// The top of the window: three glass capsules floating over the room, and nothing between them.
+//   left    the mark (home), the design's name, its revision and whether it is released
+//   centre  the stages of the design, each with its one line (StageTabs), in a workspace
+//   right   the printer of a design made for printing, notices, search, settings
+// On Home the left capsule is just the lockup, without glass. A 3D model shows no printer and no purpose: not printing
+// is the normal case and needs no label. As the window narrows the name is cut first, then the stages draw closer;
+// nothing loses its function. The strip is still the window's title bar: drag it to move the window.
+Item {
     id: bar
     objectName: "topBar"
     property real inset: 0                    // room for the macOS window buttons
-    property color ground: Theme.plate       // the window's own colour: the bar is part of the frame, not a strip on it
-    height: 44; color: ground
-    // the bar is the window's title bar: drag it to move the window, double-click it to zoom (macOS) or maximise.
-    // Buttons and chips on it take their own clicks first.
-    DragHandler { target: null; grabPermissions: PointerHandler.CanTakeOverFromAnything
-        onActiveChanged: if (active && bar.Window.window) bar.Window.window.startSystemMove() }
-    TapHandler { acceptedButtons: Qt.LeftButton; gesturePolicy: TapHandler.DragThreshold
-        onDoubleTapped: { var w = bar.Window.window; if (!w) return
-            w.visibility = w.visibility === Window.Maximized ? Window.Windowed : Window.Maximized } }
+    readonly property int capY: 16            // where the capsules sit, and how tall they are
+    readonly property int capH: 44
+    height: 44                                // what Home starts under; the capsules reach a little below it
+    Item { id: grip; width: parent.width; height: bar.capY + bar.capH + 8
+        // drag to move the window, double-click to zoom (macOS) or maximise. Buttons and chips take their own clicks first.
+        DragHandler { target: null; grabPermissions: PointerHandler.CanTakeOverFromAnything
+            onActiveChanged: if (active && bar.Window.window) bar.Window.window.startSystemMove() }
+        TapHandler { acceptedButtons: Qt.LeftButton; gesturePolicy: TapHandler.DragThreshold
+            onDoubleTapped: { var w = bar.Window.window; if (!w) return
+                w.visibility = w.visibility === Window.Maximized ? Window.Windowed : Window.Maximized } } }
     readonly property var ap: Store.data ? Store.data.approval : null
     readonly property bool work: Store.screen === "work"
     readonly property bool roomy: width >= 1500
     readonly property bool tight: width < 1260
     readonly property Item logo: mark         // where the opening screen's lockup lands (Splash.qml)
     property bool logoHeld: false             // while that lockup travels here, so there are never two logos on screen
-    // the empty middle of the bar, where the engine's work is named (ActivityBar.qml)
-    readonly property real freeX: left.x + left.width + 16
-    readonly property real freeW: Math.max(0, right.x - freeX - 16)
+    // the free strip between the capsules, where the engine's work is named (ActivityBar.qml)
+    readonly property real freeX: (stages.visible ? stages.x + stages.width : left.x + left.width) + 12
+    readonly property real freeW: Math.max(0, right.x - freeX - 12)
 
-    Row { id: left; x: bar.inset + (bar.inset ? 4 : 10); anchors.verticalCenter: parent.verticalCenter; spacing: 4
-        // elsewhere than macOS there is no menu bar at the top of the screen: the same actions live here
-        Btn { id: menuBtn; visible: !Theme.mac; kind: "quiet"; icon: "menu"; tip: "Menu"; active: appMenu.opened; onClicked: appMenu.opened ? appMenu.close() : appMenu.open()
-            PopMenu { id: appMenu; y: parent.height + 6; width: 264
-                model: [
-                    { icon: "plus", text: "New design", keys: "Ctrl+N", run: function () { Store.startNew() } },
-                    { icon: "message_square_plus", text: "New conversation", keys: "Ctrl+Shift+O", run: function () { Store.newChat(); Store.talkOpen = true } },
-                    { icon: "import", text: "Import…", run: function () { Store.askImport() } },
-                    { icon: "archive", text: "Export this design…", enabled: !!Store.project, run: function () { Store.exportProject(Store.pid) } },
-                    { sep: true },
-                    { icon: "home", text: "All designs", keys: "Ctrl+Shift+H", run: function () { Store.home() } },
-                    { icon: "folder_open", text: "Open the projects folder", run: function () { Bridge.openDataFolder() } },
-                    { sep: true },
-                    { icon: "search", text: "Search and commands…", keys: "Ctrl+K", run: function () { Store.paletteOpen = true } },
-                    { icon: "keyboard", text: "Keyboard shortcuts", run: function () { Store.openSheet("shortcuts") } },
-                    { icon: "wrench", text: "Software: install or check…", run: function () { Store.openSetup() } },
-                    { icon: "settings", text: "Settings…", keys: "Ctrl+,", run: function () { Store.openSettings("general") } },
-                    { sep: true },
-                    { icon: "sparkle", text: "What’s new", run: function () { Store.showWhatsNew() } },
-                    { icon: "info", text: "About Form Studio", run: function () { Store.openSheet("about") } }
-                ] } }
-        Btn { visible: bar.work; kind: "quiet"; icon: Store.talkOpen ? "panel_left_close" : "panel_left_open"; keys: "Ctrl+J"
-            tip: Store.talkOpen ? "Hide the conversation" : "Show the conversation"; onClicked: Store.talkOpen = !Store.talkOpen }
-        Item { id: logoBox; objectName: "homeButton"; width: mark.implicitWidth + 16; height: 28; anchors.verticalCenter: parent.verticalCenter
-            baselineOffset: mark.y + mark.baselineOffset          // the name, revision and tag sit on the wordmark's baseline
-            Rectangle { anchors.fill: parent; radius: Theme.rSm; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
-            Logo { id: mark; anchors.centerIn: parent; size: 14; opacity: bar.logoHeld ? 0 : 1; ink: bar.work ? Theme.ink2 : Theme.ink; ink2: bar.work ? Theme.ink3 : Theme.ink2 }
-            MouseArea { id: hm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.home() }
-            Tip { show: hm.containsMouse && bar.work; text: "All designs"; keys: "Ctrl+Shift+H" } }
-        Txt { visible: !!Store.project; text: "/"; tone: 4; anchors.baseline: logoBox.baseline; leftPadding: 2; rightPadding: 6 }
-        Txt { id: pname; visible: !!Store.project; text: Store.project ? Store.project.name : ""; font.weight: Theme.wSemi; anchors.baseline: logoBox.baseline
-            width: Math.min(implicitWidth, Math.max(120, bar.width - left.x - right.width - 420)); elide: Text.ElideRight; wrapMode: Text.NoWrap
-            HoverHandler { id: ph }
-            Tip { show: ph.hovered && !!Store.recipe; text: Store.recipe && Store.project ? (String(Store.project.recipe).indexOf("src:") === 0 ? "Designed by an agent" : "Started from: " + Store.recipe.title) : "" } }
-        Item { width: 6; height: 1 }
-        // the revision. A commit lands here: the number takes the settled colour for a moment and comes to rest,
-        // so saving a revision is seen where the revision is named (not when another design opens).
-        Txt { id: revTxt; objectName: "topRevision"; visible: !!Store.project; mono: true; font.pixelSize: 12; text: Store.project ? F.pad(Store.project.head) : ""; anchors.baseline: logoBox.baseline
-            property real lit: 0
-            property string forPid: ""
-            property int was: 0
-            color: Qt.tint(Theme.ink2, Theme.alpha(Theme.pass, lit))
-            transformOrigin: Item.Left; scale: 1 + 0.12 * lit * (Theme.reduced ? 0 : 1)
-            readonly property int head: Store.project ? Store.project.head : 0
-            onHeadChanged: { var same = Store.pid === forPid && was > 0 && head > was; forPid = Store.pid; was = head; if (same) landed.restart() }
-            SequentialAnimation { id: landed
-                NumberAnimation { target: revTxt; property: "lit"; to: 1; duration: Theme.fast; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut }
-                PauseAnimation { duration: 500 }
-                NumberAnimation { target: revTxt; property: "lit"; to: 0; duration: 700; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } } }
-        Item { width: 6; height: 1 }
-        Tag { visible: !!Store.project && text !== ""; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: 1
-            kind: Store.hasDraft ? "draft" : bar.ap && bar.ap.state === "approved" ? "PASS" : bar.ap && bar.ap.state === "superseded" ? "WARN" : ""
-            text: !Store.project || !bar.ap ? "" : Store.hasDraft ? "draft" : bar.ap.state === "approved" ? "released"
-                : bar.ap.state === "superseded" ? F.pad(bar.ap.rev) + " released" : "unreleased"
-            HoverHandler { id: th }
-            Tip { show: th.hovered
-                text: !Store.project || !bar.ap ? "" : Store.hasDraft ? "There is an uncommitted draft on top of " + F.pad(Store.project.head)
-                    : bar.ap.state === "approved" ? F.pad(Store.project.head) + " is released"
-                    : bar.ap.state === "superseded" ? F.pad(bar.ap.rev) + " is released. " + F.pad(Store.project.head) + " is not."
-                    : F.pad(Store.project.head) + " has not been approved for release" } }
-        // a partial build (features left out, a feature that hung, parts still to come): saved and shown, not released
-        Item { visible: !!Store.partial; width: 6; height: 1 }
-        Tag { objectName: "partialBadge"; visible: !!Store.project && !!Store.partial; kind: "partial"; text: "partial"
-            anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: 1
-            HoverHandler { id: pth }
-            Tip { show: pth.hovered; text: Store.project ? F.pad(Store.project.head) + " is a partial build. " + Store.partialLine : "" } }
+    // ── left: where you are ──
+    Glass {
+        id: left
+        objectName: "titleCapsule"
+        source: Store.backdrop; arrive: 0
+        // on Home it is the lockup alone: no pane
+        bare: !bar.work
+        x: Math.max(Theme.edge, bar.inset + 6); y: bar.capY; height: bar.capH; radius: height / 2
+        width: lrow.implicitWidth + (bar.work ? 22 : 12)
+        Row { id: lrow; x: bar.work ? 8 : 6; anchors.verticalCenter: parent.verticalCenter; spacing: 4
+            Item { id: logoBox; objectName: "homeButton"; width: mark.implicitWidth + 16; height: 30; anchors.verticalCenter: parent.verticalCenter
+                baselineOffset: mark.y + mark.baselineOffset
+                Rectangle { anchors.fill: parent; radius: height / 2; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
+                // the mark alone beside a design's name; the whole lockup on Home
+                Logo { id: mark; anchors.centerIn: parent; size: 18; word: !bar.work; opacity: bar.logoHeld ? 0 : 1 }
+                MouseArea { id: hm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.home() }
+                Tip { show: hm.containsMouse && bar.work; below: true; text: "All designs"; keys: "Ctrl+Shift+H" } }
+            Txt { id: pname; visible: bar.work && !!Store.project; text: Store.project ? Store.project.name : ""; font.weight: Theme.wSemi; font.pixelSize: 14; font.letterSpacing: -0.15
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(implicitWidth, Math.max(90, (bar.width - stages.width) / 2 - left.x - 210 - (partial.visible ? 60 : 0))); elide: Text.ElideRight; wrapMode: Text.NoWrap
+                HoverHandler { id: ph }
+                Tip { show: ph.hovered && !!Store.recipe; below: true; text: Store.recipe && Store.project ? (String(Store.project.recipe).indexOf("src:") === 0 ? "Designed by an agent" : "Started from: " + Store.recipe.title) : "" } }
+            Item { width: 5; height: 1; visible: pname.visible }
+            // the revision. A commit lands here: the number takes the pass colour for a moment and comes to rest,
+            // so saving a revision is seen where the revision is named.
+            Txt { id: revTxt; objectName: "topRevision"; visible: bar.work && !!Store.project; mono: true; font.pixelSize: 12; text: Store.project ? F.pad(Store.project.head) : ""
+                anchors.verticalCenter: parent.verticalCenter
+                property real lit: 0
+                property string forPid: ""
+                property int was: 0
+                color: Qt.tint(Theme.ink2, Theme.alpha(Theme.pass, lit))
+                transformOrigin: Item.Left; scale: 1 + 0.12 * lit * (Theme.reduced ? 0 : 1)
+                readonly property int head: Store.project ? Store.project.head : 0
+                onHeadChanged: { var same = Store.pid === forPid && was > 0 && head > was; forPid = Store.pid; was = head; if (same) landed.restart() }
+                SequentialAnimation { id: landed
+                    NumberAnimation { target: revTxt; property: "lit"; to: 1; duration: Theme.fast; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut }
+                    PauseAnimation { duration: 500 }
+                    NumberAnimation { target: revTxt; property: "lit"; to: 0; duration: 700; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } } }
+            Item { width: 5; height: 1; visible: stateTag.visible }
+            Tag { id: stateTag; visible: bar.work && !!Store.project && text !== ""; anchors.verticalCenter: parent.verticalCenter
+                kind: Store.hasDraft ? "draft" : bar.ap && bar.ap.state === "approved" ? "PASS" : bar.ap && bar.ap.state === "superseded" ? "WARN" : ""
+                text: !Store.project || !bar.ap ? "" : Store.hasDraft ? "draft" : bar.ap.state === "approved" ? "released"
+                    : bar.ap.state === "superseded" ? F.pad(bar.ap.rev) + " released" : "unreleased"
+                HoverHandler { id: th }
+                Tip { show: th.hovered; below: true
+                    text: !Store.project || !bar.ap ? "" : Store.hasDraft ? "There is an uncommitted draft on top of " + F.pad(Store.project.head)
+                        : bar.ap.state === "approved" ? F.pad(Store.project.head) + " is released"
+                        : bar.ap.state === "superseded" ? F.pad(bar.ap.rev) + " is released. " + F.pad(Store.project.head) + " is not."
+                        : F.pad(Store.project.head) + " has not been approved for release" } }
+            // a partial build (features left out, a feature that hung, parts still to come): saved and shown, not released
+            Item { visible: partial.visible; width: 2; height: 1 }
+            Tag { id: partial; objectName: "partialBadge"; visible: bar.work && !!Store.project && !!Store.partial; kind: "partial"; text: "partial"
+                anchors.verticalCenter: parent.verticalCenter
+                HoverHandler { id: pth }
+                Tip { show: pth.hovered; below: true; text: Store.project ? F.pad(Store.project.head) + " is a partial build. " + Store.partialLine : "" } }
+            // the design's menu (and, where there is no menu bar at the top of the screen, the app's)
+            Btn { id: menuBtn; objectName: "titleMenu"; visible: bar.work || !Theme.mac; kind: "quiet"; small: true; icon: bar.work ? "chevron_down" : "menu"; tip: "Menu"
+                anchors.verticalCenter: parent.verticalCenter; active: appMenu.opened; onClicked: appMenu.opened ? appMenu.close() : appMenu.open()
+                PopMenu { id: appMenu; y: parent.height + 12; width: 264
+                    model: [
+                        { icon: "plus", text: "New design", keys: "Ctrl+N", run: function () { Store.startNew() } },
+                        { icon: "message_square_plus", text: "New conversation", keys: "Ctrl+Shift+O", run: function () { Store.newChat(); Store.talkOpen = true } },
+                        { icon: "import", text: "Import…", run: function () { Store.askImport() } },
+                        { icon: "archive", text: "Export this design…", enabled: !!Store.project, run: function () { Store.exportProject(Store.pid) } },
+                        { sep: true },
+                        { icon: "home", text: "All designs", keys: "Ctrl+Shift+H", run: function () { Store.home() } },
+                        { icon: "folder_open", text: "Open the projects folder", run: function () { Bridge.openDataFolder() } },
+                        { sep: true },
+                        { icon: "search", text: "Search and commands…", keys: "Ctrl+K", run: function () { Store.paletteOpen = true } },
+                        { icon: "keyboard", text: "Keyboard shortcuts", run: function () { Store.openSheet("shortcuts") } },
+                        { icon: "wrench", text: "Software: install or check…", run: function () { Store.openSetup() } },
+                        { icon: "settings", text: "Settings…", keys: "Ctrl+,", run: function () { Store.openSettings("general") } },
+                        { sep: true },
+                        { icon: "sparkle", text: "What’s new", run: function () { Store.showWhatsNew() } },
+                        { icon: "info", text: "About Form Studio", run: function () { Store.openSheet("about") } }
+                    ] } }
+        }
     }
-    Row { id: right; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 6
-        // another conversation is working while Home or a design being made is in front: named, one click opens it
-        Rectangle { id: away; objectName: "agentElsewhereBar"; visible: !bar.work && !!Store.agentElsewhere && Store.screen !== "boot"
-            anchors.verticalCenter: parent.verticalCenter; height: 26; radius: 13
-            width: awt.width + 35
-            color: awm.pressed ? Theme.washPress : awm.containsMouse ? Theme.plate3 : Theme.plate2; border.color: Theme.rule2
-            Behavior on color { Tint {} }
-            Row { id: awr; x: 11; spacing: 7; anchors.verticalCenter: parent.verticalCenter
-                Rectangle { width: 6; height: 6; radius: 3; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter
-                    SequentialAnimation on opacity { running: away.visible && !Theme.reduced; loops: Animation.Infinite
-                        NumberAnimation { to: 0.35; duration: 700 } NumberAnimation { to: 1; duration: 700 } } }
-                Txt { id: awt; kind: "fine"; color: Theme.ink2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
-                    width: Math.min(implicitWidth, Math.max(130, bar.width * 0.3 - 35)); elide: Text.ElideRight
-                    text: Store.agentElsewhere ? Store.agentElsewhere.by + " is working on " + Store.agentElsewhere.name : "" } }
-            MouseArea { id: awm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.showElsewhere() }
-            Tip { show: awm.containsMouse; text: Store.agentElsewhere && Store.agentElsewhere.title ? "In “" + Store.agentElsewhere.title + "”. Click to open that conversation." : "Click to open it." } }
-        // the printer a design made for printing prints on, in every stage (a 3D model has none)
-        PrinterChip { anchors.verticalCenter: parent.verticalCenter; visible: Store.printUi && bar.work; roomy: bar.roomy }
-        StatusChips { anchors.verticalCenter: parent.verticalCenter; compact: bar.work ? !bar.roomy : bar.tight }      // setup / update notices
-        Rectangle { visible: !bar.tight; width: bar.roomy ? 220 : 170; height: 26; radius: Theme.rSm; anchors.verticalCenter: parent.verticalCenter
-            color: sm.pressed ? Theme.plate : sm.containsMouse ? Theme.plate2 : Theme.well; border.color: sm.containsMouse ? Theme.rule2 : Theme.rule
-            Behavior on color { Tint {} }
-            Icon { x: 9; name: "search"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
-            Txt { x: 29; text: bar.roomy ? "Search and commands" : "Search"; tone: 3; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
-            Kbd { keys: "Ctrl+K"; quiet: true; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter }
-            MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.paletteOpen = true } }
-        Btn { visible: bar.tight; kind: "quiet"; icon: "search"; tip: "Search and commands"; keys: "Ctrl+K"; onClicked: Store.paletteOpen = true }
-        Btn { kind: "quiet"; icon: "settings"; tip: "Settings"; keys: "Ctrl+,"; active: !!Store.sheet && Store.sheet.kind === "settings"; onClicked: Store.openSettings("general") }   // setup workstream
+
+    // ── centre: the stages ──
+    StageTabs {
+        id: stages
+        source: Store.backdrop; arrive: 1
+        visible: bar.work && !!Store.data
+        y: bar.capY - 4
+        room: Math.max(330, right.x - (left.x + left.width) - 24)
+        x: Math.round(Math.max(left.x + left.width + 12, Math.min((bar.width - width) / 2, right.x - 12 - width)))
+    }
+
+    // ── right: the printer, notices, search, settings ──
+    Glass {
+        id: right
+        objectName: "toolsCapsule"
+        source: Store.backdrop; arrive: 2
+        anchors.right: parent.right; anchors.rightMargin: Theme.edge; y: bar.capY; height: bar.capH; radius: height / 2
+        width: rrow.implicitWidth + 14
+        onXChanged: place()
+        Row { id: rrow; x: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 2
+            // another conversation is working while Home or a design being made is in front: named, one click opens it
+            Rectangle { id: away; objectName: "agentElsewhereBar"; visible: !bar.work && !!Store.agentElsewhere && Store.screen !== "boot"
+                anchors.verticalCenter: parent.verticalCenter; height: 30; radius: 15
+                width: awt.width + 35
+                color: awm.pressed ? Theme.washPress : awm.containsMouse ? Theme.washHover : "transparent"
+                Behavior on color { Tint {} }
+                Row { id: awr; x: 11; spacing: 7; anchors.verticalCenter: parent.verticalCenter
+                    Rectangle { width: 6; height: 6; radius: 3; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter
+                        SequentialAnimation on opacity { running: away.visible && !Theme.reduced; loops: Animation.Infinite
+                            NumberAnimation { to: 0.35; duration: 700 } NumberAnimation { to: 1; duration: 700 } } }
+                    Txt { id: awt; kind: "fine"; color: Theme.ink2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
+                        width: Math.min(implicitWidth, Math.max(130, bar.width * 0.3 - 35)); elide: Text.ElideRight
+                        text: Store.agentElsewhere ? Store.agentElsewhere.by + " is working on " + Store.agentElsewhere.name : "" } }
+                MouseArea { id: awm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.showElsewhere() }
+                Tip { show: awm.containsMouse; below: true; text: Store.agentElsewhere && Store.agentElsewhere.title ? "In “" + Store.agentElsewhere.title + "”. Click to open that conversation." : "Click to open it." } }
+            // the printer a design made for printing prints on, in every stage (a 3D model has none)
+            PrinterChip { id: printer; anchors.verticalCenter: parent.verticalCenter; visible: Store.printUi && bar.work; roomy: bar.roomy }
+            Item { visible: printer.visible || away.visible; width: 13; height: 18; anchors.verticalCenter: parent.verticalCenter
+                Rectangle { x: 6; width: 1; height: parent.height; color: Theme.rule } }
+            StatusChips { anchors.verticalCenter: parent.verticalCenter; compact: bar.work ? !bar.roomy : bar.tight }      // setup / update notices
+            Item { id: search; objectName: "searchButton"; width: srow.implicitWidth + 18; height: 32; anchors.verticalCenter: parent.verticalCenter
+                Rectangle { anchors.fill: parent; radius: 16; color: sm.pressed ? Theme.washPress : sm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
+                Row { id: srow; anchors.centerIn: parent; spacing: 8
+                    Icon { name: "search"; size: 16; color: sm.containsMouse ? Theme.ink : Theme.ink2; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; tone: 3; text: Theme.keyText("Ctrl+K"); anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap } }
+                MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.paletteOpen = true }
+                Tip { show: sm.containsMouse; below: true; text: "Search and commands"; keys: "Ctrl+K" } }
+            Item { width: 34; height: 32; anchors.verticalCenter: parent.verticalCenter
+                readonly property bool on: !!Store.sheet && Store.sheet.kind === "settings"
+                Rectangle { anchors.fill: parent; radius: 16; color: gm.pressed ? Theme.washPress : gm.containsMouse || parent.on ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
+                Icon { anchors.centerIn: parent; name: "sliders_horizontal"; size: 16; color: gm.containsMouse || parent.on ? Theme.ink : Theme.ink2 }
+                MouseArea { id: gm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.openSettings("general") }
+                Tip { show: gm.containsMouse; below: true; text: "Settings"; keys: "Ctrl+," } }
+        }
     }
 }

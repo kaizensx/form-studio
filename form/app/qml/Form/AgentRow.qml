@@ -30,7 +30,6 @@ Item {
     }
     width: parent ? parent.width : 400
     height: Math.max(left.implicitHeight, right.implicitHeight, 28) + 22
-    Rectangle { visible: !ag.first; x: 16; width: parent.width - 32; height: 1; color: Theme.rule }
     Rectangle { x: 16; y: 17; width: 7; height: 7; radius: 3.5
         color: !ag.a.available ? (ag.k && ag.k.set ? Theme.amber : Theme.ink4) : ag.si && ag.si.signed_in === false ? Theme.amber : Theme.pass }
     Column { id: left; x: 32; width: parent.width - 32 - right.width - 28; anchors.verticalCenter: parent.verticalCenter; spacing: 2

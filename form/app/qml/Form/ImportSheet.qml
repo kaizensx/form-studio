@@ -31,7 +31,7 @@ Column {
         property string icon: ""; property string title: ""; property string text: ""
         signal picked()
         width: (ns.width - 12) / 2; height: 150; radius: Theme.rLg
-        color: im.pressed ? Theme.plate1 : im.containsMouse ? Theme.plate3 : Theme.plate2; border.color: im.containsMouse ? Theme.rule3 : Theme.rule
+        color: im.pressed ? Theme.washPress : im.containsMouse ? Theme.glass2 : Theme.glass
         Behavior on color { Tint {} }
         Rectangle { x: 18; y: 18; width: 40; height: 40; radius: Theme.rMd; color: Theme.alpha(Theme.datum, 0.1)
             Icon { anchors.centerIn: parent; name: ic.icon; size: 18; color: Theme.datum } }

@@ -32,13 +32,13 @@ Pop {
                 required property var modelData
                 required property int index
                 readonly property bool off: modelData.enabled === false
-                width: col.width; height: modelData.sep ? 9 : 28
-                Rectangle { visible: !!row.modelData.sep; y: 4; x: 6; width: parent.width - 12; height: 1; color: Theme.rule }
-                Rectangle { visible: !row.modelData.sep; anchors.fill: parent; radius: Theme.rSm
-                    color: m.sel === row.index && !row.off ? (row.modelData.danger ? Theme.alpha(Theme.signal, 0.14) : Theme.washOn) : "transparent" }
-                Icon { visible: !row.modelData.sep && !!row.modelData.icon; x: 9; size: 14; anchors.verticalCenter: parent.verticalCenter; name: row.modelData.icon || "dot"
+                width: col.width; height: modelData.sep ? 9 : 30
+                Rectangle { visible: !!row.modelData.sep; y: 4; x: 10; width: parent.width - 20; height: 1; color: Theme.rule }
+                Rectangle { visible: !row.modelData.sep; anchors.fill: parent; radius: 10
+                    color: m.sel === row.index && !row.off ? (row.modelData.danger ? Theme.alpha(Theme.signal, 0.14) : Theme.glass2) : "transparent" }
+                Icon { visible: !row.modelData.sep && !!row.modelData.icon; x: 10; size: 14; anchors.verticalCenter: parent.verticalCenter; name: row.modelData.icon || "dot"
                     opacity: row.off ? 0.4 : 1; color: row.modelData.danger ? Theme.signal : m.sel === row.index ? Theme.ink : Theme.ink2 }
-                Txt { visible: !row.modelData.sep; x: row.modelData.icon ? 32 : 10; anchors.verticalCenter: parent.verticalCenter; text: row.modelData.text || ""
+                Txt { visible: !row.modelData.sep; x: row.modelData.icon ? 33 : 11; anchors.verticalCenter: parent.verticalCenter; text: row.modelData.text || ""
                     width: parent.width - x - 10 - (kb.visible ? kb.width + 8 : 0) - (ck.visible ? 22 : 0); elide: Text.ElideRight; wrapMode: Text.NoWrap
                     opacity: row.off ? 0.4 : 1; color: row.modelData.danger ? Theme.signal : Theme.ink }
                 Kbd { id: kb; visible: !row.modelData.sep && !!row.modelData.keys; keys: row.modelData.keys || ""; quiet: true; anchors.right: parent.right; anchors.rightMargin: 9; anchors.verticalCenter: parent.verticalCenter }

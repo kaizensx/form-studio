@@ -92,7 +92,7 @@ Column {
 
     // what this design uses now
     Rectangle { visible: !!ps.current; width: parent.width; height: now.implicitHeight + 24; radius: Theme.rMd
-        color: Theme.plate1; border.color: Theme.rule
+        color: Theme.glass
         Column { id: now; x: 16; y: 12; width: parent.width - 32; spacing: 3
             Row { spacing: 8
                 Icon { name: "printer"; size: 15; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
@@ -107,7 +107,7 @@ Column {
                 text: ps.current ? ps.current.slicer.reason || "" : "" } } }
 
     // filament and process for the chosen printer
-    Rectangle { visible: !!ps.pick; width: parent.width; height: fp.implicitHeight + 28; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+    Rectangle { visible: !!ps.pick; width: parent.width; height: fp.implicitHeight + 28; radius: 14; color: Theme.glass
         Column { id: fp; x: 16; y: 14; width: parent.width - 32; spacing: 10
             Txt { font.weight: Theme.wSemi; text: ps.pick ? "Slice on " + ps.pick.name : "" }
             Row { spacing: 8; visible: ps.optsLoading
@@ -139,16 +139,15 @@ Column {
                 Txt { kind: "cap"; text: grp.modelData.slicer.label }
                 Txt { kind: "fine"; text: grp.modelData.rows.length ? F.plural(grp.modelData.rows.length, "printer") : "" } }
             Txt { visible: grp.modelData.rows.length === 0; kind: "fine"; width: parent.width; text: grp.modelData.slicer.reason }
-            Rectangle { visible: grp.modelData.rows.length > 0; width: parent.width; height: list.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule; clip: true
+            Rectangle { visible: grp.modelData.rows.length > 0; width: parent.width; height: list.implicitHeight; radius: 14; color: Theme.glass; clip: true
                 Column { id: list; width: parent.width
                     Repeater { model: grp.modelData.rows
                         Rectangle { id: pr; required property var modelData; required property int index
                             objectName: "printerRow"; readonly property string pid_: modelData.id
                             readonly property bool on: !!ps.pick && ps.pick.id === modelData.id
                             width: list.width; height: 48
-                            color: on ? Theme.alpha(Theme.datum, 0.07) : ph.hovered ? Theme.plate3 : "transparent"
+                            color: on ? Theme.alpha(Theme.datum, 0.07) : ph.hovered ? Theme.glass2 : "transparent"
                             Behavior on color { Tint {} }
-                            Rectangle { visible: pr.index > 0; width: parent.width; height: 1; color: Theme.rule }
                             HoverHandler { id: ph }
                             MouseArea { anchors.fill: parent; enabled: ps.busy === ""; onClicked: ps.choose(pr.modelData, null) }
                             Rectangle { x: 16; width: 16; height: 16; radius: 8; anchors.verticalCenter: parent.verticalCenter

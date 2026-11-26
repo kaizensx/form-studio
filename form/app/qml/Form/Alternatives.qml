@@ -68,7 +68,7 @@ Column {
             onClicked: alt.build() } }
 
     // ── what to vary, and what counts ───────────────────────
-    Rectangle { width: parent.width; height: setup.implicitHeight + 32; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+    Rectangle { width: parent.width; height: setup.implicitHeight + 32; radius: 14; color: Theme.glass
         Row { id: setup; x: 16; y: 16; width: parent.width - 32; spacing: 40
             Column { width: (parent.width - 40) * 0.56; spacing: 8
                 Txt { kind: "cap"; text: "Vary" }
@@ -126,7 +126,7 @@ Column {
                     readonly property var m: c.ok ? c.metrics : ({})
                     width: alt.cardW; height: 12 + 17 + 8 + 132 + 10 + 20 + 4 + (2 + (alt.hasTip ? 1 : 0) + (alt.hasFit ? 1 : 0)) * 22 + 10 + 3 + 14
                     radius: Theme.rMd
-                    color: !c.ok ? Theme.alpha(Theme.signal, 0.05) : cm.pressed ? Theme.plate : cm.containsMouse || keep.hovered ? Theme.plate3 : Theme.plate1
+                    color: !c.ok ? Theme.alpha(Theme.signal, 0.05) : cm.pressed ? Theme.washPress : cm.containsMouse || keep.hovered ? Theme.glass2 : Theme.glass
                     border.color: !c.ok ? Theme.alpha(Theme.signal, 0.3) : c.best ? Theme.alpha(Theme.datum, 0.6) : cm.containsMouse || keep.hovered ? Theme.rule2 : Theme.rule
                     Behavior on color { Tint {} }
                     // infeasible
@@ -141,7 +141,7 @@ Column {
                             Tag { visible: !!card.c.is_current; text: "current" }
                             Tag { visible: !!card.c.pareto && !card.c.best; text: "frontier" } }
                         Item { width: 1; height: 8 }
-                        Rectangle { width: parent.width; height: 132; radius: Theme.rXs; color: Theme.plate; clip: true
+                        Rectangle { width: parent.width; height: 132; radius: 10; color: Theme.plate; clip: true
                             Loader { anchors.fill: parent; active: !!card.c.ok
                                 sourceComponent: Viewport { id: vp; selected: "-"; lite: true; interactive: false; showDims: false; showCompanions: false
                                     Component.onCompleted: {

@@ -92,7 +92,7 @@ Column {
     // Before the first build it is a calm card on the sheet's own surface (never a black box): what one build makes,
     // and the Build button. While it bakes, a spinner and one line; then the LOD in the viewport.
     Rectangle { objectName: "gamePreview"; width: parent.width; height: gs.a || Store.gameBusy ? 380 : 300; radius: Theme.rMd; clip: true
-        color: gs.a ? Theme.well : Theme.plate1; border.color: gs.a ? Theme.rule2 : Theme.rule
+        color: gs.a ? Theme.glassWell : Theme.glass; border.color: gs.a ? Theme.rule : "transparent"
         Behavior on color { Tint {} }
         Viewport { id: view; objectName: "gameViewport"; anchors.fill: parent; anchors.margins: 1; showDims: false; showCompanions: false
             visible: !!gs.lod; gameMode: gs.mode; gameChannel: gs.channel; gameNormalMap: gs.normalMap

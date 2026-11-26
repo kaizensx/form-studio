@@ -61,7 +61,6 @@ Column {
                         Repeater { model: g.modelData.rows
                             Item { id: r; required property var modelData; required property int index
                                 width: g.width; height: 32
-                                Rectangle { width: parent.width; height: 1; color: Theme.rule }
                                 Txt { text: r.modelData[1]; tone: 2; anchors.verticalCenter: parent.verticalCenter; width: parent.width - kr.width - 16; elide: Text.ElideRight; wrapMode: Text.NoWrap }
                                 Kbd { id: kr; keys: r.modelData[0]; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter } } } } } } } }
 

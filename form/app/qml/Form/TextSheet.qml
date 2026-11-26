@@ -65,7 +65,7 @@ Column {
             Field { id: dField; width: parent.width; numeric: true; unit: "mm"; text: "0.6"; error: ts.dErr; onEdited: ts.recheck() } } }
 
     // printability, computed on the glyphs of the bundled font
-    Rectangle { width: parent.width; height: pc.implicitHeight + 24; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+    Rectangle { width: parent.width; height: pc.implicitHeight + 24; radius: 14; color: Theme.glass
         visible: ts.check !== null || ts.checking
         Column { id: pc; x: 14; y: 12; width: parent.width - 28; spacing: 6
             Item { width: parent.width; height: 17

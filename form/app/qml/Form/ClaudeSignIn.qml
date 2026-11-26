@@ -11,7 +11,7 @@ Rectangle {
     readonly property bool running: !!job && job.state === "running"
     readonly property bool signedIn: !!item && item.status === "ok"
     readonly property bool hasClaude: !!Store.softwareItem("claude") && Store.softwareItem("claude").status === "ok"
-    height: col.implicitHeight + 26; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+    height: col.implicitHeight + 26; radius: 14; color: Theme.glass
     Item { x: 16; y: 14; width: 16; height: 16
         Icon { visible: si.signedIn; name: "circle_check"; size: 15; color: Theme.pass; anchors.centerIn: parent }
         Icon { visible: si.running; name: "loader_circle"; size: 14; color: Theme.ink2; anchors.centerIn: parent
@@ -31,7 +31,7 @@ Rectangle {
         // waiting for the browser
         Column { visible: si.running; width: parent.width; spacing: 6; topPadding: 2
             Txt { width: parent.width; text: si.job && si.job.url ? "Finish signing in on the page that opened in your browser. If no page opened, use the link." : "Starting Claude Code's sign-in…" }
-            Rectangle { visible: !!si.job && si.job.url !== ""; width: parent.width; height: 28; radius: Theme.rSm; color: Theme.well; border.color: Theme.rule
+            Rectangle { visible: !!si.job && si.job.url !== ""; width: parent.width; height: 28; radius: Theme.rMd; color: Theme.glassWell; border.color: Theme.rule
                 Txt { x: 10; width: parent.width - 20; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 11; tone: 2
                     elide: Text.ElideMiddle; wrapMode: Text.NoWrap; text: si.job ? si.job.url : "" } }
             Row { spacing: 8

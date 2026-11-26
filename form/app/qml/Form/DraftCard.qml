@@ -15,7 +15,7 @@ Rectangle {
     visible: Store.hasDraft || !!Store.draftError
     width: parent ? parent.width : 0
     implicitHeight: visible ? col.implicitHeight + 28 : 0
-    color: Theme.plate2; radius: Theme.rLg; border.color: Theme.alpha(Theme.blueprint, 0.35)
+    color: Theme.glass; radius: Theme.rLg; border.color: Theme.alpha(Theme.blueprint, 0.35)
     Column {
         id: col; x: 14; y: 14; width: parent.width - 28; spacing: 8
         Item { width: parent.width; height: 16
@@ -36,7 +36,7 @@ Rectangle {
             Btn { kind: "primary"; text: "Commit as " + d.next; icon: "git_commit_horizontal"
                 enabled: !Store.draftError && (!!Store.preview || F.keys(Store.draftProv).length > 0); onClicked: Store.commit() }
             Btn { kind: "quiet"; text: "Discard"; onClicked: Store.discard() } }
-        Rectangle { width: parent.width; height: 1; color: Theme.rule; visible: !!d.im }
+        Item { width: parent.width; height: 2; visible: !!d.im }
         Flow { width: parent.width; spacing: 5; visible: !!(d.im && d.im.features.length)
             Repeater { model: d.im ? d.im.features : []
                 Tag { required property var modelData; text: modelData.label + " · " + modelData.change; kind: modelData.change } } }

@@ -37,7 +37,7 @@ Column {
     Note { visible: !!us.rel && !!us.rel.fake; kind: "amber"; title: "Development"
         text: "This release comes from FORM_FAKE_LATEST. Nothing was fetched from GitHub." }
     Rectangle { visible: !!us.rel && us.rel.notes !== "" && us.phase === "idle"
-        width: parent.width; height: Math.min(notes.implicitHeight, 320) + 24; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule; clip: true
+        width: parent.width; height: Math.min(notes.implicitHeight, 320) + 24; radius: 14; color: Theme.glass; clip: true
         Md { id: notes; x: 14; y: 12; width: parent.width - 28; color: Theme.ink2; lineHeight: 1.25; source: us.rel ? us.rel.notes : "" } }
 
     // packaged app: open the download in the browser
@@ -55,7 +55,7 @@ Column {
             title: us.phase === "failed" ? "The upgrade did not finish" : "The upgrade was cancelled"
             text: (us.job && us.job.steps.length && us.job.steps[0].message ? us.job.steps[0].message + ". " : "") + "Form Studio is unchanged and keeps working. The output is below." }
         // what the command printed
-        Rectangle { objectName: "updateLog"; visible: us.phase !== "idle"; width: parent.width; height: 178; radius: Theme.rSm; color: Theme.well; border.color: Theme.rule; clip: true
+        Rectangle { objectName: "updateLog"; visible: us.phase !== "idle"; width: parent.width; height: 178; radius: Theme.rMd; color: Theme.glassWell; border.color: Theme.rule; clip: true
             Column { x: 12; width: parent.width - 24; spacing: 2; anchors.bottom: parent.bottom; anchors.bottomMargin: 10
                 Repeater { model: us.tail
                     Txt { required property var modelData; width: parent.width; mono: true; font.pixelSize: 11; wrapMode: Text.NoWrap; elide: Text.ElideRight
@@ -68,7 +68,7 @@ Column {
         Item { width: parent.width; height: 22
             Btn { x: -8; small: true; kind: "quiet"; icon: us.showCommand ? "chevron_down" : "chevron_right"; text: "What Update now runs"
                 onClicked: us.showCommand = !us.showCommand } }
-        Rectangle { visible: us.showCommand; width: parent.width; height: cmd.implicitHeight + 20; radius: Theme.rSm; color: Theme.well; border.color: Theme.rule
+        Rectangle { visible: us.showCommand; width: parent.width; height: cmd.implicitHeight + 20; radius: Theme.rMd; color: Theme.glassWell; border.color: Theme.rule
             Txt { x: 12; y: 10; mono: true; font.pixelSize: 12; tone: 4; text: "$" }
             Txt { id: cmd; x: 28; y: 10; width: parent.width - 40 - cp.width; mono: true; font.pixelSize: 12; wrapMode: Text.WrapAnywhere; text: us.u ? us.u.command : "" }
             Btn { id: cp; small: true; kind: "quiet"; icon: "copy"; tip: "Copy the command"; anchors.right: parent.right; anchors.rightMargin: 4; y: 4

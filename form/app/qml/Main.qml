@@ -4,7 +4,8 @@ import QtCore
 import Form
 import FormNative
 
-// FORM — the window. Home is where a design starts; the agent on the left, the work in the middle.
+// Form Studio — the window (Lightdesk). One room: Home is where a design starts; a workspace is the 3D view edge to
+// edge with every control a pane of glass over it, and the conversation one bar under the part.
 Window {
     id: win
     property string startProject: ""
@@ -12,10 +13,9 @@ Window {
     property bool headless: false
     readonly property bool mac: Bridge.platform === "darwin"
     readonly property bool full: visibility === Window.FullScreen
-    // a workspace is plates on the window's frame (the conversation, the part, the inspector); Home is one open bench
+    // a workspace fills the window with its 3D view; Home and the first run stand in the window's own room
     readonly property bool plates: Store.screen === "work" || Store.screen === "designing"
-    visible: true; color: plates ? Theme.frame : Theme.plate
-    Behavior on color { ColorAnimation { duration: Theme.screen } }
+    visible: true; color: Theme.frame
     // macOS draws the window title over our own top bar (the title bar is see-through), so it stays empty there;
     // the Dock, the app menu and Mission Control still say Form Studio. Windows and Linux show it in their frame.
     title: mac ? "" : Store.project ? Store.project.name + (Store.hasDraft ? " (draft)" : "") + " — Form Studio" : "Form Studio"
@@ -48,7 +48,7 @@ Window {
     onWidthChanged: { later.restart(); buttons.restart() } onHeightChanged: { later.restart(); buttons.restart() }
     // macOS: the window buttons sit in the middle of the top bar, not above it; AppKit puts them back after a resize
     // or full screen, so they are moved again then
-    function centerButtons() { if (mac && !full && !headless) Bridge.centerWindowButtons(win, top.height) }
+    function centerButtons() { if (mac && !full && !headless) Bridge.centerWindowButtons(win, top.capY * 2 + top.capH) }
     Timer { id: buttons; interval: 0; onTriggered: win.centerButtons() }
     onVisibilityChanged: buttons.restart()
     onActiveChanged: buttons.restart()
@@ -57,52 +57,61 @@ Window {
         function onTalkWidthChanged() { later.restart() }
         function onTalkOpenChanged() { later.restart() }
         function onPaletteRecentChanged() { later.restart() } }
-    Component.onCompleted: { restore(); buttons.restart(); Store.boot(startProject, startStage); Store.bootSetup(headless); Store.checkWhatsNew(headless) }
+    Component.onCompleted: { setBackdrop(); restore(); buttons.restart(); Store.boot(startProject, startStage); Store.bootSetup(headless); Store.checkWhatsNew(headless) }
 
     // the native menu bar (macOS). Elsewhere the same actions are in the top bar's menu button and the palette.
     Loader { active: win.mac; sourceComponent: MacMenu { onFullScreen: win.visibility = win.full ? Window.Windowed : Window.FullScreen } }
 
-    TopBar { id: top; width: parent.width; inset: win.mac && !win.full ? 78 : 0; z: 10; logoHeld: splash.visible && splash.carrying; ground: win.color }
+    // the room behind Home, the first run and the opening screen: what their glass blurs. A workspace brings its own
+    // (the 3D view) and puts it in Store.backdrop while it is in front.
+    Room { id: room; anchors.fill: parent; visible: !win.plates; poolX: 0.5; poolY: 0.27; poolW: Math.min(width * 1.1, 1500); poolH: 760; poolK: Theme.dark ? 0.1 : 0.9
+        breathe: Store.screen === "home" && !Store.sheet && win.active }
+    function setBackdrop() { if (!win.plates) Store.backdrop = room }
+    Connections { target: Store; function onScreenChanged() { win.setBackdrop() } }
 
-    // collapsed: a slim rail keeps the agent's state in sight
-    Rectangle {
-        id: rail
-        visible: Store.screen === "work"
-        anchors.top: top.bottom; anchors.bottom: parent.bottom; width: 44; color: "transparent"
-        Column { y: 10; width: parent.width; spacing: 4
-            Item { width: 28; height: 28; anchors.horizontalCenter: parent.horizontalCenter
-                Rectangle { anchors.fill: parent; radius: Theme.rSm; color: rm.pressed ? Theme.washPress : rm.containsMouse ? Theme.washHover : "transparent" }
-                Rectangle { anchors.centerIn: parent; width: 8; height: 8; radius: 4
-                    color: Store.chatBusy ? Theme.datum : Store.chatReady ? Theme.pass : Theme.ink4
-                    SequentialAnimation on opacity { running: Store.chatBusy && rail.visible; loops: Animation.Infinite; alwaysRunToEnd: true
-                        NumberAnimation { to: 0.3; duration: 600 } NumberAnimation { to: 1; duration: 600 } } }
-                MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.talkOpen = true }
-                Tip { show: rm.containsMouse; keys: "Ctrl+J"
-                    text: Store.chatBusy ? Store.chatAgentLabel + " is working. Show the conversation" : Store.chatReady ? "Show the conversation" : "No agent is connected. Show the conversation" } }
-            Btn { kind: "quiet"; icon: "message_square_plus"; tip: "New conversation"; keys: "Ctrl+Shift+O"; anchors.horizontalCenter: parent.horizontalCenter
-                onClicked: { Store.newChat(); Store.talkOpen = true } }
-            Btn { kind: "quiet"; icon: "history"; tip: "Conversations"; anchors.horizontalCenter: parent.horizontalCenter
-                onClicked: { Store.talkOpen = true; talk.showList() } } }
-    }
+    TopBar { id: top; width: parent.width; inset: win.mac && !win.full ? 78 : 0; z: 10; logoHeld: splash.visible && splash.carrying }
+
+    // The conversation. In a workspace: one bar under the part, clear of the view buttons on its left and the panes on
+    // its right; it opens upward into the transcript sheet with a spring and folds back while a build plays. On Home:
+    // a glass column on the left once a conversation is under way.
     Talk {
         id: talk
+        z: 6
+        bar: win.plates
         readonly property int minW: 300
         readonly property int maxW: Math.max(minW, Math.min(560, win.width - 760))
         property bool dragging: false
-        anchors.top: top.bottom; anchors.bottom: parent.bottom; anchors.bottomMargin: Theme.gap
-        radius: Theme.rPanel; border.width: 1; border.color: Theme.panelEdge
-        // Home is the start: the column appears there once a conversation is under way. While a design is being made
-        // it is always there; in the workspace it can be folded away.
-        readonly property bool shown: Store.screen === "designing" ? true
-                                    : Store.screen === "home" ? Store.talkOpen && (Store.chatItems.length > 0 || Store.chatBusy)
-                                    : Store.screen === "work" && Store.talkOpen
-        width: Math.max(minW, Math.min(maxW, Store.talkWidth))
-        x: shown ? Theme.gap : -width - Theme.gap
-        Behavior on x { NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
-        Behavior on width { enabled: !talk.dragging && win.restored; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
-        // drag the edge to resize; double-click puts it back
+        readonly property bool shown: Store.screen === "designing" || Store.screen === "work" ? true
+                                    : Store.screen === "home" ? Store.talkOpen && (Store.chatItems.length > 0 || Store.chatBusy) : false
+        // the bar: where it may be, and how tall
+        readonly property bool tight: win.width < 1300                         // the view buttons fold to one
+        readonly property real leftLimit: tight ? 148 : 336
+        readonly property real rightLimit: win.width - Theme.edge - 332 - Theme.gap
+        readonly property real barW: Math.max(360, Math.min(600, rightLimit - leftLimit))
+        readonly property real barX: Math.round(Math.max(leftLimit, Math.min((win.width - 168 - barW) / 2, rightLimit - barW)))
+        // open, it is as tall as what was said, up to about half the window: the part keeps the rest
+        readonly property real sheetMax: Math.round(Math.min(win.height - 190, Math.max(380, win.height * (Store.screen === "designing" ? 0.42 : 0.52))))
+        readonly property real sheetH: Math.round(Math.max(barHeight + 150, Math.min(sheetMax, barHeight + bodyWant)))
+        // k: 0 folded .. 1 open; a spring carries it (Reduce Motion: it is there at once and only the words fade)
+        property real k: expanded ? 1 : 0
+        Behavior on k { enabled: win.restored && !Theme.reduced; SpringAnimation { spring: Theme.springK; damping: Theme.springDamp; mass: 0.9; epsilon: 0.001 } }
+        roomAbove: win.height - 110
+        width: bar ? barW : Math.max(minW, Math.min(maxW, Store.talkWidth))
+        height: bar ? Math.round(barHeight + (sheetH - barHeight) * Math.max(0, k)) : win.height - top.height - Theme.gap
+        x: bar ? barX : shown ? Theme.gap : -width - Theme.gap - 40
+        y: bar ? win.height - 16 - height : top.height
+        visible: bar || x > -width
+        Behavior on x { enabled: !talk.bar; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
+        Behavior on width { enabled: !talk.bar && !talk.dragging && win.restored; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
+        // where the bar is, for the screen in front: the camera keeps the part clear of it, the cue sits above it
+        onYChanged: if (bar) Store.barY = y
+        onBarChanged: Store.barY = bar ? y : win.height
+        onXChanged: if (bar) Store.barX = x
+        onWidthChanged: if (bar) Store.barW = width
+        Component.onCompleted: { Store.barY = bar ? y : win.height; Store.barX = x; Store.barW = width }
+        // the column on Home: drag the edge to resize; double-click puts it back
         MouseArea {
-            visible: talk.shown; z: 9
+            visible: talk.shown && !talk.bar; z: 9
             anchors.right: parent.right; anchors.rightMargin: -4; width: 9; height: parent.height
             hoverEnabled: true; cursorShape: Qt.SplitHCursor; preventStealing: true
             property real x0: 0; property real w0: 0
@@ -110,15 +119,13 @@ Window {
             onPositionChanged: function (e) { if (pressed) Store.talkWidth = Math.max(talk.minW, Math.min(talk.maxW, w0 + mapToItem(null, e.x, 0).x - x0)) }
             onReleased: talk.dragging = false
             onDoubleClicked: Store.talkWidth = 340
-            Rectangle { anchors.right: parent.right; anchors.rightMargin: 4; width: parent.pressed ? 2 : 1; height: parent.height
-                color: Theme.datum; opacity: parent.pressed ? 0.9 : parent.containsMouse ? 0.5 : 0
-                Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
         }
     }
     Item {
         id: stage
-        anchors.top: top.bottom; anchors.bottom: parent.bottom
-        x: Math.max(rail.visible ? rail.width - Theme.gap : 0, talk.x + talk.width); width: parent.width - x
+        // a workspace runs under the top bar's capsules, edge to edge; Home starts below them
+        y: win.plates ? 0 : top.height; height: parent.height - y
+        x: win.plates ? 0 : Math.max(0, talk.x + talk.width); width: parent.width - x
         // One screen hands over to the next along one axis, depth: going deeper (Home -> designing -> the workspace)
         // the new screen pushes in from slightly small; coming back it settles from slightly large. Its panels then
         // arrive a beat apart (each screen staggers its own). Reduced motion: a plain fade.
@@ -139,7 +146,7 @@ Window {
             NumberAnimation { id: arriveScale; target: arrive.target; property: "scale"; to: 1; duration: Theme.move(Theme.screen); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
         Loader { id: homeLd; anchors.fill: parent; active: Store.screen === "home"; onLoaded: stage.enter(item); sourceComponent: Home {} }
         Loader { anchors.fill: parent; active: Store.screen === "work"; onLoaded: stage.enter(item); sourceComponent: Workspace {} }
-        Loader { anchors.fill: parent; anchors.leftMargin: Theme.gap; anchors.rightMargin: Theme.gap; anchors.bottomMargin: Theme.gap
+        Loader { anchors.fill: parent
             active: Store.screen === "designing"; onLoaded: stage.enter(item); sourceComponent: Designing {} }
     }
     Loader { anchors.top: top.bottom; anchors.bottom: parent.bottom; width: parent.width; z: 30; active: Store.welcome; sourceComponent: Welcome {} }
@@ -150,10 +157,11 @@ Window {
         done: Store.screen !== "boot" && splashMin.ran
         Timer { id: splashMin; property bool ran: win.headless; interval: Theme.reduced ? 300 : 800; running: true; onTriggered: ran = true } }
     MorphFrame { id: morph; anchors.fill: parent; z: 85
-        to: { var p = stage.mapToItem(null, 0, 0); return Qt.rect(p.x + 8, p.y + 8, stage.width - 16, stage.height - 16) } }
+        to: { var p = stage.mapToItem(null, 0, 0); return Qt.rect(p.x, p.y, stage.width, stage.height) } }
     Connections { target: Store; function onMorphFrom(r) { morph.play(r) } }
     Toasts { anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 18; z: 80 }
-    ActivityBar { anchors.top: top.bottom; width: parent.width; z: 70; barH: top.height; slotX: top.freeX; slotW: top.freeW }          // named engine work over 300 ms, with progress
+    ActivityBar { y: 0; width: parent.width; z: 70; barH: top.capY * 2 + top.capH; slotX: top.freeX; slotW: top.freeW
+        dropX: win.plates ? (win.width - 168) / 2 : -1 }          // named engine work over 300 ms, with progress
     SheetHost {}
     Exports {}
     Palette { id: palette }

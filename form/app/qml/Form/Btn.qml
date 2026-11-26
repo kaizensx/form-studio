@@ -65,7 +65,7 @@ Item {
     TextMetrics { id: tmB; font: lbl.font; text: b.busyText }
     readonly property real _textW: b.text === "" ? 0 : Math.ceil(Math.max(tmA.advanceWidth, b.busyText !== "" ? tmB.advanceWidth : 0)) + 1
     implicitHeight: small ? Theme.hSm : large ? Theme.hLg : Theme.hMd
-    implicitWidth: row.implicitWidth + (text ? (small ? 16 : large ? 28 : 22) : (small ? 8 : 12))
+    implicitWidth: Math.max(implicitHeight, row.implicitWidth + (text ? (small ? 20 : large ? 34 : 26) : (small ? 10 : 14)))
     opacity: enabled ? 1 : 0.4
     scale: down ? Theme.from(0.97) : 1
     activeFocusOnTab: true          // Qt skips hidden and disabled items by itself
@@ -75,17 +75,17 @@ Item {
     onActiveFocusChanged: if (!activeFocus) kdown = false
     Rectangle {
         id: face
-        anchors.fill: parent; radius: b.large ? Theme.rMd : Theme.rSm
+        anchors.fill: parent; radius: height / 2          // Lightdesk: buttons are capsules
         readonly property bool hot: ma.containsMouse && b.enabled && !b.working
-        color: b.kind === "primary" ? (b.down ? Qt.darker(Theme.datum, 1.08) : hot ? Theme.datumHi : Theme.datum)
+        color: b.kind === "primary" ? (b.down ? Qt.darker(Theme.send, 1.08) : hot ? Theme.sendHi : Theme.send)
              : b.kind === "quiet" ? (b.down ? Theme.washPress : b.active ? Theme.washOn : hot ? Theme.washHover : "transparent")
              : b.kind === "danger" ? (b.down ? Theme.alpha(Theme.signal, 0.24) : hot ? Theme.alpha(Theme.signal, 0.17) : Theme.alpha(Theme.signal, 0.1))
-             : (b.down ? Theme.plate2 : hot || b.active ? Theme.plate4 : Theme.plate3)
-        border.width: b.kind === "default" ? 1 : 0; border.color: hot ? Theme.rule3 : Theme.rule2
+             : (b.down ? Theme.washPress : hot || b.active ? Theme.alpha(Theme.lineBase, Theme.dark ? 0.16 : 0.1) : Theme.alpha(Theme.lineBase, Theme.dark ? 0.1 : 0.055))
+        border.width: b.kind === "default" ? 1 : 0; border.color: hot ? Theme.rule2 : Theme.rule
         Behavior on color { Tint {} }
         // a hairline of light on the top edge of raised buttons
         Rectangle { visible: b.kind === "default" || b.kind === "primary"; x: parent.radius; width: parent.width - 2 * parent.radius; y: 1; height: 1
-            color: b.kind === "primary" ? Qt.rgba(1, 1, 1, Theme.dark ? 0.35 : 0.22) : Theme.gleam }
+            color: b.kind === "primary" ? Qt.rgba(1, 1, 1, Theme.dark ? 0.5 : 0.16) : Theme.gleam }
         // while busy, a soft sheen runs across the face: the button is visibly alive, not stuck
         Item { anchors.fill: parent; clip: true; visible: b._shown && !Theme.reduced
             Rectangle { id: sheen; width: parent.width * 0.5; height: parent.height; y: 0
@@ -100,12 +100,12 @@ Item {
         id: row; anchors.centerIn: parent; spacing: b.small ? 5 : 6
         Item { visible: b.icon !== "" || b._shown; width: b.small ? 13 : 14; height: width; anchors.verticalCenter: parent.verticalCenter
             Icon { anchors.centerIn: parent; visible: !b._shown; name: b.icon; size: parent.width
-                color: b.kind === "primary" ? Theme.datumInk : b.kind === "danger" ? Theme.signal : (b.active || ma.containsMouse) ? Theme.ink : Theme.ink2 }
-            Spinner { objectName: "btnSpinner"; anchors.centerIn: parent; visible: b._shown; size: parent.width; color: b.kind === "primary" ? Theme.datumInk : Theme.ink2 } }
+                color: b.kind === "primary" ? Theme.sendInk : b.kind === "danger" ? Theme.signal : (b.active || ma.containsMouse) ? Theme.ink : Theme.ink2 }
+            Spinner { objectName: "btnSpinner"; anchors.centerIn: parent; visible: b._shown; size: parent.width; color: b.kind === "primary" ? Theme.sendInk : Theme.ink2 } }
         Text { id: lbl; visible: b.text !== ""; text: b.shownText; anchors.verticalCenter: parent.verticalCenter
             width: b._textW; horizontalAlignment: b.icon !== "" || b._shown ? Text.AlignLeft : Text.AlignHCenter; elide: Text.ElideRight
-            font.family: Theme.sans; font.pixelSize: b.small ? 12 : 13; font.weight: b.kind === "primary" ? Theme.wSemi : Theme.wMedium; renderType: Text.NativeRendering
-            color: b.kind === "primary" ? Theme.datumInk : b.kind === "danger" ? Theme.signal : (b.kind === "quiet" && !b.active && !ma.containsMouse) ? Theme.ink2 : Theme.ink }
+            font.family: Theme.sans; font.pixelSize: b.small ? 12 : b.large ? 14 : 13; font.letterSpacing: -0.1; font.weight: b.kind === "primary" ? Theme.wSemi : Theme.wMedium; renderType: Text.NativeRendering
+            color: b.kind === "primary" ? Theme.sendInk : b.kind === "danger" ? Theme.signal : (b.kind === "quiet" && !b.active && !ma.containsMouse) ? Theme.ink2 : Theme.ink }
     }
     MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: b._shown ? Qt.BusyCursor : Qt.ArrowCursor; onClicked: b._press() }
     Tip { text: b._shown && b.busyText ? b.busyText : b.tip; keys: b._shown ? "" : b.keys; show: ma.containsMouse && (b.tip !== "" || (b._shown && b.busyText !== "")) && !ma.pressed }

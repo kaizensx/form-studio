@@ -59,7 +59,7 @@ Column {
     // With variants on the board this is a strip above them. With none it moves into the empty place beside the head
     // (see `slot`), so the sheet has one thing to look at and one thing to do.
     Rectangle { id: strip; visible: !!vs.board && !vs.empty
-        width: parent.width; height: stripBody.height + 32; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+        width: parent.width; height: stripBody.height + 32; radius: 14; color: Theme.glass
         Item { id: stripBody; x: 16; y: 16; width: parent.width - 32; height: form.implicitHeight } }
     Column { id: form; parent: vs.empty ? slotForm : stripBody; width: parent ? parent.width : 0; spacing: vs.empty ? 12 : 10
         Grid { width: parent.width; columns: vs.empty ? 1 : 2; spacing: 12
@@ -91,7 +91,7 @@ Column {
                 readonly property var m: c.metrics || null
                 readonly property bool head: c.id === "@head"
                 width: vs.cardW; height: inner.implicitHeight + 28; radius: Theme.rMd
-                color: ch.hovered ? Theme.plate3 : Theme.plate1
+                color: ch.hovered ? Theme.glass2 : Theme.glass
                 border.color: card.head ? Theme.alpha(Theme.datum, 0.55) : ch.hovered ? Theme.rule2 : Theme.rule
                 Behavior on color { Tint {} }
                 HoverHandler { id: ch }
@@ -102,7 +102,7 @@ Column {
                         Tag { visible: !card.head && !card.c.rev; text: "saved draft"; kind: "draft" }
                         Tag { visible: !card.head && !!card.c.is_head; text: "same as head" } }
                     Item { width: 1; height: 8 }
-                    Rectangle { width: parent.width; height: 150; radius: Theme.rXs; color: Theme.plate; clip: true
+                    Rectangle { width: parent.width; height: 150; radius: 10; color: Theme.plate; clip: true
                         Viewport { id: mini; anchors.fill: parent; lite: true; interactive: false; showDims: false; showCompanions: false; selected: "-"; spin: ch.hovered
                             property bool ready: false
                             opacity: ready ? 1 : 0
@@ -132,7 +132,6 @@ Column {
                             { k: "Checks", v: card.m.checks ? card.m.checks.PASS + " pass · " + card.m.checks.WARN + " review · " + card.m.checks.FAIL + " fail" : "not run", tag: "", d: "" }] : []
                         Item { id: mr; required property var modelData; required property int index
                             width: inner.width; height: 28
-                            Rectangle { width: parent.width; height: 1; color: Theme.rule }
                             Txt { id: mk; text: mr.modelData.k; tone: 2; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
                             Row { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 6
                                 Txt { text: mr.modelData.v; mono: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter

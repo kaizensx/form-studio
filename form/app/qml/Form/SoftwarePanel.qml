@@ -32,7 +32,7 @@ Column {
             Rectangle {
                 required property var modelData
                 visible: modelData.n > 0 || modelData.t === "installed"
-                width: chip.implicitWidth + 22; height: 26; radius: 13; color: Theme.alpha(Theme.lineBase, 0.04); border.color: Theme.rule
+                width: chip.implicitWidth + 22; height: 26; radius: 13; color: Theme.glass
                 Row { id: chip; anchors.centerIn: parent; spacing: 6
                     Rectangle { width: 6; height: 6; radius: 3; color: parent.parent.modelData.c; anchors.verticalCenter: parent.verticalCenter }
                     Txt { kind: "fine"; mono: true; tone: 1; color: Theme.ink; text: String(parent.parent.modelData.n); anchors.verticalCenter: parent.verticalCenter }
@@ -65,7 +65,7 @@ Column {
         }
     }
     SetupList { visible: !sp.sw; width: parent.width; all: true }
-    Rectangle { visible: !!Store.setup; width: parent.width; height: 44; radius: Theme.rMd; color: Theme.alpha(Theme.lineBase, 0.025); border.color: Theme.rule
+    Rectangle { visible: !!Store.setup; width: parent.width; height: 44; radius: 14; color: Theme.glass
         Txt { x: 14; anchors.verticalCenter: parent.verticalCenter; kind: "fine"; mono: true; width: parent.width - 28 - cp.width - 8; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
             text: Store.setup ? "MCP server for agents: " + Store.setup.mcp_command : "" }
         Btn { id: cp; small: true; kind: "quiet"; icon: "copy"; text: "Copy"; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter

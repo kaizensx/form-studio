@@ -38,20 +38,22 @@ Item {
     property real barH: 44
     property real slotX: 0
     property real slotW: 0
+    property real dropX: -1                  // when it drops under the bar: its centre (-1: the bar's right end)
     readonly property bool inBar: slotW >= 240
-    Rectangle {
+    Glass {
         id: card
         objectName: "activityCard"
-        readonly property real want: row.implicitWidth + 26
-        width: Math.min(want, ab.inBar ? ab.slotW : 360); height: 26; radius: 13
-        x: ab.inBar ? Math.round(Math.max(ab.slotX, Math.min(ab.slotX + ab.slotW - width, (ab.width - width) / 2))) : ab.width - width - 14
-        y: (ab.inBar ? -ab.barH + Math.round((ab.barH - height) / 2) : 10) + (ab.named ? 0 : Theme.shift(-3))
-        color: Theme.plate3; border.color: Theme.rule2
+        // a capsule: thin and unblurred inside the top bar's own glass, a pane of its own when it drops under the bar
+        source: Store.backdrop; flat: ab.inBar; shadow: false
+        readonly property real want: row.implicitWidth + 28
+        width: Math.min(want, ab.inBar ? ab.slotW : 360); height: 28; radius: 14
+        x: ab.inBar ? Math.round(Math.max(ab.slotX, Math.min(ab.slotX + ab.slotW - width, (ab.width - width) / 2))) : ab.dropX >= 0 ? Math.round(ab.dropX - width / 2) : ab.width - width - 14
+        y: (ab.inBar ? Math.round((ab.barH - height) / 2) : ab.barH + 8) + (ab.named ? 0 : Theme.shift(-3))
         opacity: ab.named ? 1 : 0; visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: ab.named ? Theme.base : Theme.slow } }
         Behavior on y { Glide { duration: Theme.base } }
-        Shadow { visible: !ab.inBar; radius: parent.radius; spread: 14; drop: 6 }
-        Row { id: row; x: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 7
+        Shadow { visible: !ab.inBar; radius: 14; spread: 14; drop: 6 }
+        Row { id: row; x: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 7
             Item { width: 13; height: 13; anchors.verticalCenter: parent.verticalCenter
                 Spinner { anchors.fill: parent; size: 13; visible: ab.lead && !ab.lead.done }
                 Icon { anchors.centerIn: parent; size: 13; visible: !!ab.lead && ab.lead.done; name: ab.lead && !ab.lead.ok ? "circle_alert" : "circle_check"

@@ -6,11 +6,11 @@ Item {
     id: pc
     objectName: "printerChip"
     property bool roomy: false                  // room for the filament too
-    width: row.implicitWidth + 16; height: 26
+    width: row.implicitWidth + 22; height: 26
     visible: Store.printUi
-    Rectangle { anchors.fill: parent; radius: Theme.rSm; color: cm.pressed ? Theme.washPress : cm.containsMouse ? Theme.washHover : "transparent"
-        border.color: Theme.rule; Behavior on color { Tint {} } }
-    Row { id: row; x: 8; spacing: 7; anchors.verticalCenter: parent.verticalCenter
+    Rectangle { anchors.fill: parent; radius: height / 2; color: cm.pressed ? Theme.washPress : cm.containsMouse ? Theme.washHover : "transparent"
+        Behavior on color { Tint {} } }
+    Row { id: row; x: 11; spacing: 7; anchors.verticalCenter: parent.verticalCenter
         Icon { name: "printer"; size: 13; anchors.verticalCenter: parent.verticalCenter; color: Store.printing.available ? Theme.ink3 : Theme.amber }
         Txt { kind: "fine"; anchors.verticalCenter: parent.verticalCenter; color: Theme.ink2
             width: Math.min(implicitWidth, 200); elide: Text.ElideRight; wrapMode: Text.NoWrap

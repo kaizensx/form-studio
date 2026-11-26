@@ -17,7 +17,8 @@ import QtQuick.Controls
 //                                      panes (Settings: a navigation rail beside the page); the host then does not scroll
 //   function accept()                  run by Enter when no field has taken it (and by nothing else)
 // Esc closes. Tab and Shift+Tab stay inside the sheet. The body scrolls under soft edges when it is longer than the window.
-// Motion: scale 0.97 → 1 and fade in 180 ms; it leaves in 110 ms; none of it when the system asks for reduced motion.
+// The card is a pane of glass over the room (Glass.qml) with a tint under its content, so a form stays legible.
+// Motion: it rises 12 px, scales 0.98 → 1 and fades in 200 ms; it leaves in 110 ms; only the fade with reduced motion.
 Item {
     id: host
     anchors.fill: parent; z: 40
@@ -29,9 +30,10 @@ Item {
     readonly property bool fills: !!sheet && sheet.fillsBody === true
     property string file: ""                 // stays set while the sheet fades out
     visible: scrim.opacity > 0.001
-    onOpenChanged: { if (open) { file = files[Store.sheet.kind] || ""; Qt.callLater(card.grab) } else unload.restart() }
+    onOpenChanged: { if (open) { file = files[Store.sheet.kind] || ""; Qt.callLater(card.grab); landed.restart() } else unload.restart() }
     Connections { target: Store; function onSheetChanged() { if (Store.sheet) { host.file = host.files[Store.sheet.kind] || ""; flick.contentY = 0; Qt.callLater(card.grab) } } }
     Timer { id: unload; interval: Theme.exit + 40; onTriggered: if (!host.open) host.file = "" }
+    Timer { id: landed; interval: Theme.sheet + 30; onTriggered: pane.place() }          // the glass looks through where the card came to rest
 
     Rectangle { id: scrim; anchors.fill: parent; color: Theme.scrim; opacity: host.open ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: host.open ? Theme.base : Theme.exit } }
@@ -50,9 +52,14 @@ Item {
         width: Math.min(parent.width - 64, host.sheet && host.sheet.sheetWidth ? host.sheet.sheetWidth : Theme.sheetM)
         height: Math.min(parent.height - 88, headH + tabsH + bodyH + pad + (foot.visible ? 0 : 4) + footH)
         opacity: host.open ? 1 : 0
-        scale: host.open ? 1 : Theme.from(0.97)
-        Behavior on opacity { NumberAnimation { duration: host.open ? Theme.base : Theme.exit; easing.type: Easing.OutCubic } }
-        Behavior on scale { Glide { duration: host.open ? Theme.base : Theme.exit } }
+        scale: host.open ? 1 : Theme.from(0.98)
+        transform: Translate { y: host.open ? 0 : Theme.shift(12)
+            Behavior on y { Glide { duration: host.open ? Theme.sheet : Theme.exit } } }
+        Behavior on opacity { NumberAnimation { duration: host.open ? Theme.sheet : Theme.exit; easing.type: Easing.OutCubic } }
+        Behavior on scale { Glide { duration: host.open ? Theme.sheet : Theme.exit } }
+        onYChanged: pane.place()
+        onWidthChanged: pane.place()
+        onHeightChanged: pane.place()
 
         // A focused control moves Tab along the window's whole chain by itself, so the card never sees the key.
         // Two guards, first and last in the card, catch the keyboard on its way out and send it round.
@@ -81,16 +88,15 @@ Item {
         Keys.onEnterPressed: function (e) { if (host.sheet && host.sheet.accept) host.sheet.accept(); else e.accepted = false }
         Keys.onEscapePressed: Store.openSheet(null)
 
-        Rectangle { anchors.fill: parent; radius: Theme.rXl; color: Theme.plate2; border.color: Theme.rule2
-            Shadow { radius: parent.radius; spread: 44; drop: 18; strength: 1.25 }
-            // light catches the top edge
-            Rectangle { x: parent.radius; y: 1; width: parent.width - 2 * parent.radius; height: 1; color: Theme.gleam } }
+        Glass { id: pane; anchors.fill: parent; radius: Theme.rXl; source: Store.backdrop
+            // the tint under the content: a sheet is read, so it is denser than a pane of the workspace
+            Rectangle { anchors.fill: parent; radius: Theme.rXl; color: Theme.alpha(Theme.plate1, pane.blurred ? 0.8 : 0.9) } }
         MouseArea { anchors.fill: parent; onWheel: function (w) { w.accepted = true } }
 
         // header
         Column { x: card.pad; width: parent.width - card.pad * 2 - 36; anchors.verticalCenter: head.verticalCenter; spacing: 1
             Row { width: parent.width; spacing: 8
-                Txt { id: sheetTitle; kind: "lead"; font.weight: Theme.wSemi; font.letterSpacing: -0.1; text: host.sheet && host.sheet.title ? host.sheet.title : ""
+                Txt { id: sheetTitle; kind: "lead"; font.weight: Theme.wSemi; font.letterSpacing: -0.2; text: host.sheet && host.sheet.title ? host.sheet.title : ""
                     width: Math.min(implicitWidth, parent.width - (sheetBadge.visible ? sheetBadge.width + 8 : 0)); elide: Text.ElideRight; wrapMode: Text.NoWrap }
                 BetaTag { id: sheetBadge; anchors.verticalCenter: sheetTitle.verticalCenter
                     visible: !!(host.sheet && host.sheet.badge); text: host.sheet && host.sheet.badge ? host.sheet.badge : ""
@@ -103,7 +109,6 @@ Item {
             x: card.pad; y: card.headH - 4; width: parent.width - card.pad * 2
             model: visible ? host.sheet.tabs : []; value: visible ? host.sheet.tab : null
             onPicked: function (v) { host.sheet.tab = v; flick.contentY = 0 } }
-        Rectangle { visible: !tabs.visible; y: card.headH - 1; width: parent.width; height: 1; color: flick.atYBeginning && !host.fills ? "transparent" : Theme.rule }
 
         // body
         Flickable {
@@ -129,9 +134,6 @@ Item {
             id: foot
             visible: !!host.sheet && (!!host.sheet.footer || !!host.sheet.footerLeft)
             anchors.bottom: parent.bottom; width: parent.width; height: 60
-            Rectangle { width: parent.width; height: 1; color: Theme.rule }
-            Rectangle { x: 1; y: 1; width: parent.width - 2; height: parent.height - 2; color: Theme.alpha(Theme.plate1, 0.55)
-                radius: Theme.rXl - 1; Rectangle { width: parent.width; height: parent.radius; color: parent.color } }
             Loader { id: fl; x: card.pad; anchors.verticalCenter: parent.verticalCenter; width: Math.max(0, parent.width - card.pad * 2 - fr.width - 16); clip: true
                 sourceComponent: host.sheet && host.sheet.footerLeft ? host.sheet.footerLeft : null }
             Loader { id: fr; anchors.right: parent.right; anchors.rightMargin: card.pad; anchors.verticalCenter: parent.verticalCenter

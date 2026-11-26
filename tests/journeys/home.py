@@ -44,6 +44,13 @@ def run(ui):
     # a conversation about the design that will be deleted
     conv = ui.api("/conversations", {"project": ids["Zebra hook"], "agent": "fake"})
     ui.run_js("Store.reloadStudio()")
+    # the shelf shows its first row: the designs that fit, then "All 7 designs" for the rest
+    more = ui.item("designsMore", timeout=20)
+    ui.check(ui.sees("All 7 designs", more), "the last place on the shelf counts every design")
+    ui.check(0 < len(ui.find_all(name="projectCard")) < 7, "the first row shows only what fits")
+    ui.settle(900)
+    ui.shot("home-shelf")
+    ui.click(more)
     ui.wait_until(lambda: len(ui.find_all(name="projectCard")) == 7, 20, "seven cards")
     ui.settle(900)
     ui.shot("home-grid")

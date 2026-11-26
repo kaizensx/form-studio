@@ -50,7 +50,7 @@ Column {
                         return t
                     }
                     objectName: "printerRow"
-                    width: parent.width; height: pc.implicitHeight + 12; radius: Theme.rXs
+                    width: parent.width; height: pc.implicitHeight + 12; radius: 10
                     color: tags.length ? Theme.alpha(Theme.datum, 0.07) : "transparent"
                     opacity: 0
                     Component.onCompleted: rise.start()

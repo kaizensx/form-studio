@@ -4,32 +4,20 @@ import QtQuick.Window
 import "F.js" as F
 import "." as Tools      // Timeline and ContextMenu are also Qt type names; qualify ours
 
-// A project: the part in the middle, the question being asked of it on the right.
+// A project, as Lightdesk: the 3D view fills the window and everything else is a pane of glass over it.
 //
-// The viewport has one tool system. A rail on its left edge holds the tools (one active at a time), the things
-// that open elsewhere (print simulation, photo render) and what the view shows. The active tool's options sit
-// beside the rail and nowhere else. Legends and measurements dock top right and fold to their header. The readout
-// is one quiet line bottom left; notices about what is on screen stack above it. The bottom strip is the pipeline
-// ("now") with the revision timeline ("history") as a second row when asked for. The camera is told how much of
-// the view these cover and keeps the part in the rest.
+//   left          the tool dock (one tool active at a time); the active tool's options sit beside it
+//   bottom left   the size of what is on screen, one small line, above the view buttons
+//   right         the Program: the stage's panel. In Design it is the features as a listing that runs while a build
+//                 plays; in the other stages it is that stage (Describe, Fit, Review, Make)
+//   bottom right  the pipeline: where the artifacts of this revision stand
+//   bottom centre the conversation bar (Main.qml) and, while a build plays, the cue above it
+// Legends and measurements dock left of the Program and fold to their header. The camera is told how much of the view
+// these cover and keeps the part in the rest; it eases when that changes (the transcript opening, a build starting).
 Item {
     id: ws
     readonly property var d: Store.data
-    function stageNote(id) {
-        if (!d) return ["", ""]
-        var roll = d.checks ? d.checks.rollup : null
-        if (id === "brief") {
-            var k = d.recipe.params.filter(function (p) { return p.group === "brief" })
-            var m = k.filter(function (p) { var pv = Store.head.provenance[p.key]; return pv && pv.source === "measured" }).length
-            return k.length ? [m + "/" + k.length + " measured", m === k.length ? "ok" : ""] : ["", ""]
-        }
-        if (id === "shape") return [Store.hasDraft ? "Draft open" : F.plural(d.recipe.features.length, "feature"), Store.hasDraft ? "draft" : ""]
-        if (id === "fit") return d.fit ? [Math.round(d.fit.yield * 100) + "% modelled", d.fit.yield >= 0.95 ? "ok" : "warn"] : ["Calibration", ""]
-        if (id === "prove") return !roll ? ["Not current", "warn"] : roll.FAIL ? [roll.FAIL + " failed", "fail"] : roll.WARN ? [roll.WARN + " to review", "warn"] : ["All pass", "ok"]
-        if (id === "release") return d.approval.state === "approved" ? ["Released", "ok"] : d.gate.ready ? ["Ready", ""] : ["Not ready", ""]
-        return ["", ""]
-    }
-    function noteColor(c) { return c === "ok" ? Theme.pass : c === "warn" ? Theme.amber : c === "fail" ? Theme.signal : c === "draft" ? Theme.blueprint : Theme.ink3 }
+    function noteColor(c) { return c === "ok" ? Theme.pass : c === "warn" ? Theme.amber : c === "fail" ? Theme.signal : c === "draft" ? Theme.datum : Theme.ink3 }
     // the stage's status, as one sentence under the tabs
     function stageSay(id) {
         if (!d || !Store.head) return ["", ""]
@@ -64,7 +52,7 @@ Item {
 
     // ── tools ────────────────────────────────────────────────
     readonly property string tool: Ws.tool
-    readonly property bool compact: centre.width < 640              // a narrow viewport: controls shorten, docks fold
+    readonly property bool compact: ws.width < 1300                 // a narrow window: controls shorten, docks fold
     readonly property bool sim: !!Store.layers
     // a design that declares how its parts go together: assembled / exploded / as printed. Separate bodies
     // with no declaration (form/recipes/assembly.py from_solids): as modelled / pulled apart.
@@ -116,7 +104,7 @@ Item {
         function onFadeTo(apply) { vp.swap(apply) }                 // the timeline and anything else that swaps the geometry
     }
     // a design that has just opened has the keyboard on the part, not in the conversation box Home left it in
-    Component.onCompleted: { Ws.tool = Store.measuring ? "measure" : Store.timelineOpen ? "history" : "select"; vp.forceActiveFocus() }
+    Component.onCompleted: { Store.backdrop = studio; Ws.tool = Store.measuring ? "measure" : Store.timelineOpen ? "history" : "select"; vp.forceActiveFocus() }
 
     readonly property Item focusItem: Window.activeFocusItem
     readonly property bool keys: Store.screen === "work" && !Store.sheet && !Store.paletteOpen && !(focusItem && focusItem.cursorPosition !== undefined)
@@ -148,30 +136,46 @@ Item {
         property int at: 0
         property int of: 0
         property bool running: false
+        property string before: ""            // the step before this one, and the feature that comes after it
+        property string after: ""
+        property var last: []
+        function labelsOf(ids) {
+            var n = ids.map(function (id) { var f = Store.featureById(id); return f && f.label ? f.label : id }).filter(function (x) { return !!x })
+            return n.length > 2 ? n.slice(0, 2).join(", ") + " and " + (n.length - 2) + " more" : n.join(", ") }
         function step(ids, at, count) {
             if (Store.building) return            // a streamed stage names itself (Store.buildingText)
             var names = ids.map(function (id) { var f = Store.featureById(id); return f && f.label ? f.label : id }).filter(function (n) { return !!n })
             label = names.length > 2 ? names.slice(0, 2).join(", ") + " and " + (names.length - 2) + " more" : names.join(", ")
             sub = count > 1 ? (at + 1) + " of " + count : ""
+            // the steps before this one are in place; the feature after this step's last one is next
+            if (at === 0) { Store.builtIds = []; before = "" } else { Store.builtIds = Store.builtIds.concat(last); before = build.labelsOf(last) }
+            last = ids
+            var fs = Store.recipe ? Store.recipe.features : [], nx = ""
+            for (var i = 0; i < fs.length; i++) if (fs[i].id === ids[ids.length - 1] && i + 1 < fs.length) nx = fs[i + 1].label || fs[i + 1].id
+            after = at + 1 < count ? nx : ""
             build.at = at + 1; build.of = count; running = true
+            Store.buildAt = at + 1; Store.buildOf = count
             Store.revealing = ids                 // the Design list marks the rows being built
             flash.stop()
         }
-        function done() { Store.revealing = []; if (Store.building) return; sub = ""; running = false; flash.restart() }
+        function done() { Store.revealing = []; Store.builtIds = []; Store.buildAt = 0; Store.buildOf = 0; last = []; if (Store.building) return; sub = ""; running = false; flash.restart() }
     }
     Timer { id: flash; interval: 1400; onTriggered: { build.label = ""; build.sub = "" } }
-    Component.onDestruction: Store.revealing = []
+    Component.onDestruction: { Store.revealing = []; Store.builtIds = []; Store.buildAt = 0; Store.buildOf = 0 }
+    // a build is playing: the stages an agent streams for this design, or the build-up of a new revision
+    readonly property bool cueOn: (!!Store.building && Store.building.project === Store.pid) || build.running
 
     // ── centre: the part ─────────────────────────────────────
     Item {
         id: centre
-        anchors.left: parent.left; anchors.right: insp.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-        anchors.leftMargin: Theme.gap; anchors.rightMargin: Theme.gap; anchors.bottomMargin: Theme.gap
-        PlateFrame { z: 9 }
+        anchors.fill: parent
+        // the room: the 3D view and what belongs to it. This is what the panes blur, so nothing of theirs is in it.
+        Item { id: studio; anchors.fill: parent
         Viewport {
             id: vp
             objectName: "viewport"
-            labelRight: dock.open ? dock.x : width
+            labelRight: dock.open ? dock.x : insp.x
+            floorGrid: Store.floorGrid
             anchors.fill: parent
             visible: !Store.layers
             asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
@@ -188,9 +192,10 @@ Item {
             // colours and materials: re-made whenever the design's appearance or the catalogue changes
             colorOf: { var a = Store.appearance, c = Store.materialCat; return function (part) { return Store.look(part).color || "" } }
             // what the HUD covers: the rail and options, the dock when it is open, the strip and the readout
-            insetLeft: ws.compact ? 76 : 60; insetTop: 46
-            insetRight: dock.open && !ws.compact ? dock.width + 20 : 0
-            insetBottom: centre.height - strip.y + 30
+            insetLeft: 84; insetTop: 84
+            insetRight: centre.width - insp.x + 12 + (dock.open && !ws.compact ? dock.width + 12 : 0)
+            // the bar under the part (taller when the transcript is open), and the cue above it while a build plays
+            insetBottom: Math.max(60, centre.height - (cue.shown ? cue.y - 10 : Math.min(Store.barY, status.y)) + 26)
             onContextRequested: function (f, x, y) { Store.ctxMenu = { feature: f, x: x, y: y } }
             Component.onCompleted: { Store.viewer = vp; if (Store.view) { Store.showHead(); vp.setView("iso", false) }; glide.start() }
             Component.onDestruction: if (Store.viewer === vp) Store.viewer = null
@@ -215,42 +220,57 @@ Item {
             onHoveredValue: function (v, x, y, on) { vchip.on = on; vchip.v = v; vchip.x = Math.min(x + 14, centre.width - vchip.width - 8); vchip.y = y + 14 }
         }
         Loader { id: lv; anchors.fill: parent; active: !!Store.layers; source: "LayerView.qml"
-            onLoaded: { item.leftInset = 56; item.stripHeight = Qt.binding(function () { return strip.height + 12 }) } }
-        // soft vignette so the bench falls away towards the top and under the strip
-        Rectangle { anchors.fill: parent; visible: !Store.layers
-            gradient: Gradient { orientation: Gradient.Vertical
-                GradientStop { position: 0; color: Theme.alpha(Theme.plate, 0.5) } GradientStop { position: 0.16; color: "transparent" }
-                GradientStop { position: 0.82; color: "transparent" } GradientStop { position: 1; color: Theme.alpha(Theme.plate, 0.75) } } }
+            onLoaded: { item.leftInset = 84; item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }) } }
+        // the corners of the room fall away
+        Room { anchors.fill: parent; wall: false; poolK: 0; visible: !Store.layers }
+        }
+        // the key light answers: a faint pool over the floor that breathes while nothing happens, and narrows and warms
+        // while a build plays. It lies over the room, not in it, so its breathing never makes the glass blur again.
+        Room { id: keyLight; anchors.fill: parent; wall: false; vignetteK: 0; visible: !Store.layers && !Store.plateWanted
+            poolX: (vp.insetLeft + (centre.width - vp.insetRight)) / 2 / Math.max(1, centre.width)
+            poolY: Math.min(0.72, (vp.insetTop + (centre.height - vp.insetBottom)) / 2 / Math.max(1, centre.height) + 0.1)
+            poolW: ws.cueOn ? 640 : 900; poolH: ws.cueOn ? 300 : 380
+            poolK: Theme.dark ? (ws.cueOn ? 0.11 : 0.05) : (ws.cueOn ? 0.5 : 0.25)
+            breathe: !ws.cueOn && !Store.chatBusy && !Store.sheet && Window.active
+            Behavior on poolW { NumberAnimation { duration: Theme.move(600); easing.type: Easing.InOutQuad } }
+            Behavior on poolH { NumberAnimation { duration: Theme.move(600); easing.type: Easing.InOutQuad } }
+            Behavior on poolK { NumberAnimation { duration: 600; easing.type: Easing.InOutQuad } } }
 
-        // the build's ledger: which feature is arriving, how far the build is
+        // the cue: the build's lower third, over the room and above the bar. The same step is lit in the Program.
         Item {
-            id: buildCap; objectName: "buildCaption"; z: 6
-            // pinned top centre over the part, but never under the dock's panels (top right: refinement, legends): it
-            // moves left of them, and below them when there is no room beside them
-            readonly property bool dockShown: dock.visible && dock.width > 0 && dock.height > 0
-            readonly property real centred: (parent.width - width) / 2
-            readonly property real room: dockShown ? dock.x - 12 - width : centred
-            readonly property bool beside: room >= 12
-            x: Math.round(beside ? Math.min(centred, room) : centred)
-            y: beside ? 58 : Math.round(dock.y + dock.height + 10)
-            width: ledger.width; height: ledger.height
-            // a stage streamed while the agent rewrites the design: "Building Rim (3 of 5)"
+            id: cue; objectName: "buildCaption"; z: 6
+            // a stage streamed while the agent rewrites the design, or a step of the build-up of a new revision
             readonly property var st: Store.building && Store.building.project === Store.pid ? Store.building : null
+            readonly property bool shown: !!build.label || !!st
             readonly property string caption: st ? Store.buildingText : build.label ? (build.running ? "Building " : "Built ") + build.label + (build.sub ? " " + build.sub : "") : ""
-            opacity: build.label || st ? 1 : 0; visible: opacity > 0.01
-            Behavior on opacity { NumberAnimation { duration: build.label || buildCap.st ? Theme.fast : 420 } }
-            BuildLedger { id: ledger
-                label: buildCap.st ? buildCap.st.label : build.label
-                at: buildCap.st ? buildCap.st.at : build.at; of: buildCap.st ? buildCap.st.of : build.of
-                running: !!buildCap.st || build.running; pulse: !!buildCap.st } }
+            function stagedBefore() {             // the stage this draft drew just before the one on screen
+                if (!st) return ""
+                for (var i = Store.stageLog.length - 1; i >= 0; i--) { var e = Store.stageLog[i]; if (e.draft === st.draft && e.at === st.at - 1) return e.label || "" }
+                return "" }
+            function stagedAfter() {              // known only when the design being rewritten already lists what follows
+                var fs = Store.recipe ? Store.recipe.features : []
+                for (var i = 0; st && i < fs.length; i++) if (fs[i].id === st.feature && i + 1 < fs.length) return fs[i + 1].label || ""
+                return "" }
+            width: Math.max(360, Store.barW); x: Math.round(Store.barX + (Store.barW - width) / 2)
+            height: title.height; y: Math.round(Store.barY - height - 26 + lift)
+            property real lift: shown ? 0 : Theme.shift(14)
+            Behavior on lift { NumberAnimation { duration: Theme.move(Theme.panel); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
+            opacity: shown ? 1 : 0; visible: opacity > 0.01
+            Behavior on opacity { NumberAnimation { duration: cue.shown ? Theme.base : 420 } }
+            Cue { id: title; width: parent.width
+                label: cue.st ? cue.st.label : build.label
+                at: cue.st ? cue.st.at : build.at; of: cue.st ? cue.st.of : build.of
+                before: cue.st ? cue.stagedBefore() : build.running ? build.before : ""
+                after: cue.st ? cue.stagedAfter() : build.running ? build.after : ""
+                running: !!cue.st || build.running; pulse: !!cue.st || build.running } }
 
         // a mesh made editable: how far the CAD is from the mesh at most, counted up as the CAD grows inside the mesh's lines
         Rectangle {
             id: reconCap; objectName: "reconReadout"; z: 6
             readonly property var rc: Store.recon && Store.recon.project === Store.pid ? Store.recon : null
-            x: Math.round(Math.max(60, Math.min(parent.width - width - 12, buildCap.x + (buildCap.width - width) / 2))); y: buildCap.y + buildCap.height + Theme.s2
-            width: rcr.implicitWidth + 2 * Theme.s3; height: 30; radius: Theme.rSm
-            color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.alpha(Theme.blueprint, 0.35)
+            x: Math.round(Math.max(84, Math.min(parent.width - width - 12, cue.x + (cue.width - width) / 2))); y: cue.y - height - Theme.s4
+            width: rcr.implicitWidth + 2 * Theme.s4; height: 32; radius: 16
+            color: Theme.glassSolid; border.color: Theme.alpha(Theme.blueprint, 0.35)
             opacity: rc ? 1 : 0; visible: opacity > 0.01
             Behavior on opacity { NumberAnimation { duration: reconCap.rc ? Theme.fast : Theme.cross } }
             Row { id: rcr; x: Theme.s3; anchors.verticalCenter: parent.verticalCenter; spacing: Theme.s2
@@ -270,7 +290,7 @@ Item {
             readonly property real hi: Math.max(lo + 40, vp.width - vp.insetRight - 24)
             readonly property real at: Math.round(lo + (hi - lo) * frac)
             readonly property bool on: vp.wipeOn && !ws.sim
-            visible: on; x: at; y: 0; width: 1; height: strip.y
+            visible: on; x: at; y: 40; width: 1; height: Math.min(Store.barY, centre.height) - 60
             Rectangle { x: 0; y: 44; width: 1; height: parent.height - 56; color: Theme.alpha(Theme.blueprint, 0.7) }
             Rectangle { id: grip; anchors.horizontalCenter: parent.left; y: Math.round(parent.height / 2) - 18; width: 14; height: 36; radius: 7
                 color: wm.pressed ? Theme.plate4 : Theme.plate3; border.color: Theme.alpha(Theme.blueprint, wm.containsMouse || wm.pressed ? 0.9 : 0.55)
@@ -294,7 +314,7 @@ Item {
 
         // what is under the pointer: appears at once, no delay
         Rectangle { id: chip; property var feat: null; visible: !!feat && !Store.layers; z: 5
-            width: ct.implicitWidth + 16; height: 24; radius: Theme.rSm; color: Theme.plate3; border.color: Theme.rule2
+            width: ct.implicitWidth + 20; height: 26; radius: 13; color: Theme.glassSolid; border.color: Theme.rule2
             Row { id: ct; anchors.centerIn: parent; spacing: 6
                 Txt { text: chip.feat ? chip.feat.label : ""; font.pixelSize: 12; font.weight: 550 }
                 Txt { text: chip.feat ? chip.feat.role : ""; kind: "fine" } } }
@@ -303,18 +323,19 @@ Item {
             readonly property var lg: Store.analysis ? Store.analysis.legend : null
             readonly property string say: !lg ? "" : isNaN(v) ? (lg.none || "") : String(lg.hover || "{v}").replace("{v}", F.fmt(v, Store.analysisMap === "thickness" || Store.analysisMap === "features" ? 2 : 0))
             visible: on && !Store.layers && say !== "" && !!vp.analysis
-            width: vt.implicitWidth + 16; height: 24; radius: Theme.rSm; color: Theme.plate3; border.color: Theme.rule2
+            width: vt.implicitWidth + 20; height: 26; radius: 13; color: Theme.glassSolid; border.color: Theme.rule2
             Txt { id: vt; anchors.centerIn: parent; mono: true; font.pixelSize: 12; text: vchip.say; wrapMode: Text.NoWrap } }
 
-        // ── the rail ─────────────────────────────────────────
-        Rectangle {
-            id: rail
-            x: 12; y: 12; z: 6; width: 40; height: railCol.implicitHeight + 8; radius: Theme.rMd
-            color: Theme.alpha(Theme.plate2, 0.94); border.color: Theme.rule2
-            Shadow { radius: parent.radius; spread: 14; drop: 5; strength: 0.7 }
+        // ── the tool dock ────────────────────────────────────
+        Glass {
+            id: rail; objectName: "toolDock"
+            source: studio; arrive: 3
+            x: Theme.edge; y: 80; z: 6; width: 48; height: railCol.implicitHeight + 12; radius: 24
             visible: !!Store.view
+            // while a build plays the tools step back: the part and its cue have the room
+            Item { anchors.fill: parent; opacity: ws.cueOn ? 0.45 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
             Column {
-                id: railCol; x: 4; y: 4; spacing: 1
+                id: railCol; x: 6; y: 6; spacing: 2
                 RailBtn { icon: "mouse_pointer_2"; label: "Select"; keys: "V"; hint: "Click a feature to edit it. Drag to orbit, shift-drag to pan."
                     active: ws.tool === "select" && !ws.sim; onClicked: ws.setTool("select") }
                 RailBtn { icon: "pencil_ruler"; label: "Measure"; keys: "M"; hint: "Distances, faces and hole diameters, computed from the part’s surface."
@@ -330,7 +351,7 @@ Item {
                     active: ws.tool === "assembly" && !ws.sim; marked: Store.asmMode !== "print"; onClicked: ws.setTool("assembly") }
                 RailBtn { icon: "history"; label: "History"; keys: "T"; hint: "Scrub through the revisions. Looking changes nothing."
                     active: ws.tool === "history" && !ws.sim; marked: !!Store.scrub; onClicked: ws.setTool("history") }
-                Item { width: 32; height: 9; Rectangle { x: 6; y: 4; width: 20; height: 1; color: Theme.rule2 } }
+                Item { width: 36; height: 9; Rectangle { x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
                 RailBtn { icon: "layers"; label: "Simulate the print"; hint: ws.d && ws.d.slice ? "Play the slicer’s toolpaths. Simulated, not a print." : "Needs a current slice of this revision."
                     enabled: !!ws.d && !!ws.d.slice; active: ws.sim
                     onClicked: { if (ws.sim) Store.showLayers(false); else Store.simulate({ at: 0, play: true }) } }
@@ -338,7 +359,7 @@ Item {
                     visible: Store.gameDesign; enabled: !Store.hasDraft; onClicked: Store.openSheet("game") }
                 RailBtn { icon: "camera"; label: "Photo render"; hint: Store.hasDraft ? "Commit or discard the draft first." : "Render the current revision in Blender (an illustration)."
                     enabled: !Store.hasDraft; onClicked: Store.openSheet("render") }
-                Item { width: 32; height: 9; Rectangle { x: 6; y: 4; width: 20; height: 1; color: Theme.rule2 } }
+                Item { width: 36; height: 9; Rectangle { x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
                 RailBtn { icon: "maximize_2"; label: Store.feature ? "Frame the selection" : "Frame the part"; keys: "F"; enabled: !ws.sim
                     onClicked: Store.frameSelection() }
                 RailBtn { icon: "ruler"; toggle: true; label: Store.dims ? "Hide overall dimensions" : "Show overall dimensions"; active: Store.dims; enabled: !ws.sim; onClicked: Store.toggleDims() }
@@ -346,13 +367,14 @@ Item {
                     visible: !!(Store.shown && Store.shown.companions && Store.shown.companions.length)
                     active: vp.showCompanions; enabled: !ws.sim; onClicked: Store.toggleCompanions() }
             }
+            }
         }
 
         // ── options of the active tool (one place, one row) ──
         Item {
             id: opts
-            x: 60; y: 14; z: 5; visible: !ws.sim && !!Store.view
-            readonly property real room: Math.max(160, centre.width - 60 - 12 - viewCtl.width - 12)
+            x: 82; y: 85; z: 5; visible: !ws.sim && !!Store.view
+            readonly property real room: Math.max(160, insp.x - 82 - 16)
             height: Math.max(sectionBar.shown ? sectionBar.height : 0, analyzeBar.shown ? analyzeBar.height : 0,
                              measureBar.shown ? measureBar.height : 0, asmBar.shown ? asmBar.height : 0, annotateBar.shown ? annotateBar.height : 0)
 
@@ -433,31 +455,36 @@ Item {
             }
         }
 
-        // ── top right: where you look from ───────────────────
-        Item {
-            id: viewCtl
-            anchors.right: parent.right; anchors.rightMargin: 12; y: 14; z: 5; visible: !ws.sim && !!Store.view
-            width: ws.compact ? cyc.width : vseg.width; height: 26
+        // ── bottom left: where you look from, and the floor's grid ──
+        Glass {
+            id: viewCtl; objectName: "viewsCapsule"
+            source: studio; arrive: 4
+            x: Theme.edge; y: centre.height - Theme.edge - height; z: 5; visible: !ws.sim && !!Store.view
+            width: vrow.implicitWidth + 12; height: 40; radius: 20
             readonly property var names: [{ value: "iso", text: "Iso" }, { value: "front", text: "Front" }, { value: "side", text: "Side" }, { value: "top", text: "Top" }, { value: "under", text: "Under" }]
-            Seg { id: vseg; visible: !ws.compact; model: viewCtl.names; value: Store.viewName; onPicked: function (v) { Store.setView(v) } }
-            Btn { id: cyc; visible: ws.compact; small: true; height: 26; icon: "move_3d"; tip: "Next view (keys 1 to 5)"
-                text: Store.viewName.charAt(0).toUpperCase() + Store.viewName.slice(1)
-                onClicked: { var o = ["iso", "front", "side", "top", "under"]; Store.setView(o[(o.indexOf(Store.viewName) + 1) % o.length]) } }
+            Row { id: vrow; x: 6; anchors.verticalCenter: parent.verticalCenter; spacing: 2; opacity: ws.cueOn ? 0.45 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
+                // the grid: the build plate of a design made for printing while Describe or Design is open (Fit, Review and
+                // Make show it anyway); otherwise the 10 mm grid of the studio floor
+                Btn { id: gridBtn; objectName: "showPlate"; small: true; kind: "quiet"; height: 30; width: 32; icon: "grid_3x3"; anchors.verticalCenter: parent.verticalCenter
+                    readonly property bool plate: Store.printUi && (Store.stage === "brief" || Store.stage === "shape")
+                    active: plate ? Store.showPlate : Store.floorGrid && !Store.plateWanted
+                    enabled: plate || !Store.plateWanted
+                    tip: plate ? (Store.showPlate ? "Hide the build plate" : "Show the build plate" + (Store.printing.available ? ": " + Store.printing.presets.machine.name : ""))
+                        : Store.plateWanted ? "The build plate is shown in this stage" : Store.floorGrid ? "Hide the floor grid" : "Show the floor grid: a line every 10 mm"
+                    onClicked: { if (plate) Store.showPlate = !Store.showPlate; else Store.floorGrid = !Store.floorGrid } }
+                Seg { id: vseg; visible: !ws.compact; model: viewCtl.names; value: Store.viewName; onPicked: function (v) { Store.setView(v) }
+                    color: "transparent"; border.width: 0; anchors.verticalCenter: parent.verticalCenter }
+                Btn { id: cyc; visible: ws.compact; small: true; kind: "quiet"; height: 30; icon: "move_3d"; tip: "Next view (keys 1 to 5)"; anchors.verticalCenter: parent.verticalCenter
+                    text: Store.viewName.charAt(0).toUpperCase() + Store.viewName.slice(1)
+                    onClicked: { var o = ["iso", "front", "side", "top", "under"]; Store.setView(o[(o.indexOf(Store.viewName) + 1) % o.length]) } } }
         }
-        // a design made for printing, while Describe or Design is open: it stands on the build plate; this hides it
-        // (Fit, Review and Make show it anyway)
-        Btn { objectName: "showPlate"; z: 5; small: true; kind: "quiet"; height: 26; icon: "grid_3x3"; active: Store.showPlate
-            anchors.right: viewCtl.left; anchors.rightMargin: 6; y: viewCtl.y
-            visible: !ws.sim && !!Store.view && Store.printUi && (Store.stage === "brief" || Store.stage === "shape")
-            tip: Store.showPlate ? "Hide the build plate" : "Show the build plate" + (Store.printing.available ? ": " + Store.printing.presets.machine.name : "")
-            onClicked: Store.showPlate = !Store.showPlate }
 
         // an agent is working on another design than this one: named, never jumped to once you are working here
         Rectangle {
             id: elsewhere; objectName: "agentElsewhere"; z: 6
-            anchors.horizontalCenter: parent.horizontalCenter; y: 58
-            visible: !!Store.agentElsewhere && !build.label && !ws.sim
-            width: er.implicitWidth + 20; height: 32; radius: 16; color: Theme.alpha(Theme.plate3, 0.96); border.color: Theme.rule2
+            x: Math.round(Store.barX + (Store.barW - width) / 2); y: 84
+            visible: !!Store.agentElsewhere && !ws.sim
+            width: er.implicitWidth + 24; height: 34; radius: 17; color: Theme.glassSolid; border.color: Theme.rule2
             Row { id: er; x: 14; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                 Rectangle { width: 6; height: 6; radius: 3; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter
                     SequentialAnimation on opacity { running: elsewhere.visible && !Theme.reduced; loops: Animation.Infinite
@@ -472,7 +499,7 @@ Item {
         // ── the dock: legends and readouts, top right, never over the middle of the part ──
         Column {
             id: dock
-            anchors.right: parent.right; anchors.rightMargin: 12; y: 48; z: 4; spacing: 8; visible: !ws.sim
+            x: insp.x - 12 - width; y: 82; z: 4; spacing: 8; visible: !ws.sim
             readonly property bool folded: Ws.dockTouched ? Ws.dockCollapsed : ws.compact
             readonly property bool showMap: !!Store.analysisMap && !ws.mapBlocked
             readonly property bool showMeasures: Store.measures.length > 0
@@ -481,7 +508,7 @@ Item {
             readonly property bool showRefine: !!Store.refine && !Store.scrub && (Store.refine.state === "running"
                 || (Store.refine.changes || []).length > 0 || Store.refine.state === "failed")
             readonly property bool open: (showMap || showMeasures || showSel || showRefine) && !folded
-            readonly property real room: Math.max(120, strip.y - y - 46)
+            readonly property real room: Math.max(120, Math.min(Store.barY, centre.height) - y - 60)
             function flip() { var now = folded; Ws.dockTouched = true; Ws.dockCollapsed = !now }
             AnalysisLegend { objectName: "analysisLegend"; visible: opacity > 0.01; opacity: dock.showMap ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Motion.ui; easing.type: Easing.OutCubic } }
@@ -504,7 +531,7 @@ Item {
         // ── bottom left: what you are looking at ─────────────
         Column {
             id: status
-            x: 16; anchors.bottom: strip.top; anchors.bottomMargin: 10; z: 4; spacing: 6; visible: !ws.sim && !!Store.shown
+            x: Theme.edge + 14; anchors.bottom: viewCtl.top; anchors.bottomMargin: 14; z: 4; spacing: 8; visible: !ws.sim && !!Store.shown
             // notices: the picture is not simply "the head revision"
             Rectangle { visible: !!Store.scrub; width: sn.implicitWidth + 16; height: 28; radius: Theme.rSm
                 color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.alpha(Theme.blueprint, 0.4)
@@ -530,114 +557,80 @@ Item {
                 color: Theme.alpha(Theme.amber, 0.12); border.color: Theme.alpha(Theme.amber, 0.3)
                 Txt { id: mb; x: 10; width: parent.width - 20; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; color: Theme.strong(Theme.amber); wrapMode: Text.NoWrap; elide: Text.ElideRight
                     text: "The map describes " + (Store.project ? F.pad(Store.project.head) : "the head") + ". " + (Store.hasDraft ? "Commit or discard the draft to see it." : "Stop comparing to see it.") } }
-            // the readout: size, volume, and which arrangement the size belongs to
-            Row { id: ro; spacing: 7; height: 18
+            // the size line: W × D × H and the volume of what is on screen, and under it which arrangement that is.
+            // While an agent's build streams in it is the size of what is built so far (the stage's own bounds, the
+            // same numbers as the dimension lines on the part), and there is no volume yet.
+            Column { id: ro; objectName: "readout"; spacing: 3
                 readonly property bool asm: !!Store.assembly && Store.asmMode !== "print"
-                readonly property var bb: asm ? Store.assembly.bbox : (Store.shown ? Store.shown.bbox : null)
-                Tick { font.pixelSize: 12; tone: 2; value: ro.bb ? ro.bb[1][0] - ro.bb[0][0] : 0; anchors.verticalCenter: parent.verticalCenter }
-                Txt { text: "×"; tone: 4; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
-                Tick { font.pixelSize: 12; tone: 2; value: ro.bb ? ro.bb[1][1] - ro.bb[0][1] : 0; anchors.verticalCenter: parent.verticalCenter }
-                Txt { text: "×"; tone: 4; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
-                Tick { font.pixelSize: 12; tone: 2; value: ro.bb ? ro.bb[1][2] - ro.bb[0][2] : 0; unit: " mm"; anchors.verticalCenter: parent.verticalCenter }
-                Txt { text: "·"; tone: 4; anchors.verticalCenter: parent.verticalCenter }
-                Tick { font.pixelSize: 12; tone: 2; value: Store.shown ? Store.shown.volume_mm3 / 1000 : 0; unit: " cm³"; anchors.verticalCenter: parent.verticalCenter }
-                Txt { text: "·"; tone: 4; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact && (Store.plateWanted || !!Store.assembly) }
-                Txt { font.pixelSize: 12; tone: 3; anchors.verticalCenter: parent.verticalCenter; visible: !ws.compact && (Store.plateWanted || !!Store.assembly); wrapMode: Text.NoWrap
-                    text: !Store.assembly ? "plate " + ws.bed : Store.asmMode === "assembled" ? "assembled" : Store.asmMode === "exploded" ? (Store.assembly.derived ? "as modelled, shown pulled apart" : "assembled size, shown exploded")
+                // a streamed stage carries its own bounds; a build-up playing here is measured by the view (the bounds of
+                // what is drawn so far, which the dimension lines on the part use too)
+                readonly property bool staged: !!vp.model && !!vp.model.stage && !!vp.model.bbox
+                readonly property bool sofar: staged || (vp.revealing && build.running)
+                readonly property var bb: staged ? vp.model.bbox : sofar ? [[vp.dimLo.x, vp.dimLo.y, vp.dimLo.z], [vp.dimHi.x, vp.dimHi.y, vp.dimHi.z]]
+                                        : asm ? Store.assembly.bbox : (Store.shown ? Store.shown.bbox : null)
+                Row { spacing: 7; height: 16
+                    Tick { font.pixelSize: 12; tone: 1; value: ro.bb ? ro.bb[1][0] - ro.bb[0][0] : 0; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { text: "×"; tone: 3; mono: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+                    Tick { font.pixelSize: 12; tone: 1; value: ro.bb ? ro.bb[1][1] - ro.bb[0][1] : 0; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { text: "×"; tone: 3; mono: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+                    Tick { font.pixelSize: 12; tone: 1; value: ro.bb ? ro.bb[1][2] - ro.bb[0][2] : 0; unit: " mm"; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { visible: !ro.sofar; text: "·"; tone: 3; leftPadding: 4; rightPadding: 4; anchors.verticalCenter: parent.verticalCenter }
+                    Tick { visible: !ro.sofar; font.pixelSize: 12; tone: 1; value: Store.shown ? Store.shown.volume_mm3 / 1000 : 0; unit: " cm³"; anchors.verticalCenter: parent.verticalCenter } }
+                Txt { objectName: "readoutNote"; font.pixelSize: 12; tone: 3; wrapMode: Text.NoWrap; visible: text !== ""
+                    text: ro.sofar ? "as modelled so far"
+                        : !Store.assembly ? (Store.plateWanted ? "on a " + ws.bed + " mm plate" : "")
+                        : Store.asmMode === "assembled" ? "assembled" : Store.asmMode === "exploded" ? (Store.assembly.derived ? "as modelled, shown pulled apart" : "assembled size, shown exploded")
                         : (Store.assembly.derived || !Store.printUi ? "as modelled, " : "as printed, ") + F.plural(Store.assembly.parts.length, "part") } }
         }
 
-        // ── bottom: history above now ────────────────────────
-        Rectangle {
-            id: strip
-            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 12; z: 7
-            height: stripCol.height; radius: Theme.rLg
-            color: Theme.alpha(Theme.plate2, 0.94); border.color: Theme.rule2
-            Shadow { radius: parent.radius; spread: 16; drop: 6; strength: 0.7 }
-            MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }   // the strip is not the viewport
-            Column {
-                id: stripCol; width: parent.width
-                Tools.Timeline { id: tline; width: parent.width; height: 40; visible: Store.timelineOpen && !!Store.project && !ws.sim; z: 2 }
-                Rectangle { visible: tline.visible; x: 12; width: parent.width - 24; height: 1; color: Theme.rule }
-                Pipeline { id: pipe; flat: true; width: parent.width; height: implicitHeight }
-            }
+        // ── top centre, under the stages: the revisions, while History is the tool ──
+        Glass {
+            id: history; objectName: "historyCapsule"
+            source: studio; z: 7
+            visible: Store.timelineOpen && !!Store.project && !ws.sim
+            width: Math.max(320, Math.min(760, insp.x - 82 - 24)); height: 48; radius: 24
+            x: Math.round(Math.max(82, Math.min((centre.width - 168 - width) / 2, insp.x - 12 - width))); y: 82 + (opts.height > 0 ? opts.height + 8 : 0)
+            MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }
+            Tools.Timeline { id: tline; x: 8; width: parent.width - 16; height: 40; anchors.verticalCenter: parent.verticalCenter }
+        }
+        // ── bottom right: where the artifacts of this revision stand ──
+        Glass {
+            id: strip; objectName: "pipelineCapsule"
+            source: studio; arrive: 6; z: 7
+            width: insp.width; height: pipe.implicitHeight; radius: Theme.rPane
+            x: centre.width - Theme.edge - width; y: centre.height - Theme.edge - height
+            MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }   // the pane is not the viewport
+            Pipeline { id: pipe; flat: true; grid: true; width: parent.width; height: implicitHeight }
         }
         Tools.ContextMenu { anchors.fill: parent; z: 8 }
     }
 
-    // ── right: the stage inspector ───────────────────────────
-    Rectangle {
+    // ── right: the Program, the stage's panel ────────────────
+    Glass {
         id: insp
-        anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom; width: 400
-        anchors.rightMargin: Theme.gap; anchors.bottomMargin: Theme.gap
-        color: Theme.plate1; radius: Theme.rPanel; border.width: 1; border.color: Theme.panelEdge
-        // arriving with the workspace: the inspector slides in from its own edge, a beat after the screen
-        transform: Translate { id: inspIn }
-        SequentialAnimation { id: inspArrive
-            PropertyAction { target: inspIn; property: "x"; value: Theme.shift(28) }
-            PropertyAction { target: insp; property: "opacity"; value: 0 }
-            PauseAnimation { duration: Theme.stagger * 2 }
-            ParallelAnimation {
-                NumberAnimation { target: insp; property: "opacity"; to: 1; duration: Theme.panel; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut }
-                NumberAnimation { target: inspIn; property: "x"; to: 0; duration: Theme.move(Theme.panel + 60); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } } }
-        Component.onCompleted: inspArrive.start()
+        objectName: "programPane"
+        source: studio; arrive: 5
+        width: 332; radius: Theme.rPane
+        x: ws.width - Theme.edge - width; y: 80
+        // as tall as what it holds, up to the pipeline under it
+        readonly property real room_: strip.y - Theme.gap - y
+        // In Design, with no feature open, that is the listing: the general parameters, colours and Explore are a scroll below it.
+        readonly property real listing: panel.item && panel.item.paneHeight !== undefined && panel.item.paneHeight > 0 && !foot.on ? panel.item.paneHeight : -1
+        height: Math.round(Math.max(120, Math.min(room_, stageHead.height + (listing > 0 ? listing + 8 : body.implicitHeight + 22) + foot.height)))
+        Behavior on height { enabled: insp.settled; NumberAnimation { duration: Theme.move(Theme.cross); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
+        property bool settled: false
+        Timer { interval: 700; running: true; onTriggered: insp.settled = true }
         readonly property int at: { for (var i = 0; i < Store.stages.length; i++) if (Store.stages[i].id === Store.stage) return i; return 0 }
-        // stage tabs: the lit tab slides to the stage you pick
-        // each tab is as wide as its words plus an equal share of the slack, so "Release" has the same air as "Fit"
-        Item { id: tabs; objectName: "stageTabs"; x: 8; y: 6; width: parent.width - 16; height: 52
-            property var needs: [0, 0, 0, 0, 0]
-            function setNeed(i, w) { if (needs[i] === w) return; var n = needs.slice(); n[i] = w; needs = n }
-            readonly property real needSum: { var t = 0; for (var i = 0; i < needs.length; i++) t += needs[i]; return t }
-            Rectangle { id: lit; y: 2; height: tabs.height - 4; radius: Theme.rMd; color: Theme.plate3
-                readonly property Item at: stageRep.count > insp.at ? stageRep.itemAt(insp.at) : null
-                property bool settled: false
-                x: at ? at.x + 2 : 0; width: at ? at.width - 4 : 0
-                Component.onCompleted: Qt.callLater(function () { lit.settled = true })
-                Behavior on x { enabled: lit.settled; NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
-                Behavior on width { enabled: lit.settled; NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
-                border.width: 1; border.color: Theme.rule
-                // the datum mark under the stage you are in: it travels with the lit tab
-                Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: -1; anchors.horizontalCenter: parent.horizontalCenter; width: 22; height: 2; radius: 1; color: Theme.datum } }
-            Row { anchors.fill: parent
-                Repeater {
-                    id: stageRep
-                    model: Store.stages
-                    Item {
-                        id: tab
-                        objectName: "stage-" + modelData.id
-                        required property var modelData
-                        required property int index
-                        readonly property bool on: Store.stage === modelData.id
-                        readonly property var note: ws.stageNote(modelData.id)
-                        readonly property real need: Math.ceil(Math.max(tr.implicitWidth, tn.implicitWidth))
-                        onNeedChanged: tabs.setNeed(index, need)
-                        Component.onCompleted: tabs.setNeed(index, need)
-                        width: tabs.needSum > 0 && tabs.needSum < tabs.width ? need + (tabs.width - tabs.needSum) / 5 : tabs.width / 5
-                        height: tabs.height
-                        Rectangle { anchors.fill: parent; anchors.margins: 2; radius: Theme.rMd; color: tab.on ? "transparent" : tm.pressed ? Theme.washPress : tm.containsMouse ? Theme.washHover : "transparent"
-                            Behavior on color { Tint {} } }
-                        Column { anchors.centerIn: parent; spacing: 2
-                            Row { id: tr; spacing: 5; anchors.horizontalCenter: parent.horizontalCenter
-                                Txt { mono: true; font.pixelSize: Theme.tFine; color: tab.on ? Theme.datum : Theme.ink4; text: "0" + (tab.index + 1); anchors.baseline: tl.baseline
-                                    Behavior on color { Tint {} } }
-                                Txt { id: tl; text: tab.modelData.title; font.weight: Theme.wSemi; font.pixelSize: 13; tone: tab.on ? 1 : 2 } }
-                            Txt { id: tn; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: Theme.tFine; text: tab.note[0]; color: ws.noteColor(tab.note[1]); wrapMode: Text.NoWrap } }
-                        MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.setStage(tab.modelData.id) }
-                        Tip { show: tm.containsMouse; below: true; text: tab.modelData.hint; keys: "Ctrl+" + Store.stageKey[tab.modelData.id] }
-                    }
-                }
-            }
-        }
-        // the stage's status in a sentence: stays put while the panel scrolls
+        MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }   // the pane is not the viewport
+        // the stage's status in a sentence: stays put while the panel scrolls. The Program listing has its own header.
         Item {
             id: stageHead
-            anchors.top: tabs.bottom; anchors.topMargin: 5; width: parent.width; height: say.implicitHeight + 24; z: 2
+            readonly property bool on: !(Store.stage === "shape" && !Store.feature && !Store.hasDraft)
+            width: parent.width; height: on ? say.implicitHeight + 26 : 6; z: 2; clip: true
             readonly property var s: ws.stageSay(Store.stage)
-            Rectangle { x: 1; width: parent.width - 2; height: parent.height; color: Theme.plate1 }
-            Rectangle { x: 1; width: parent.width - 2; height: 1; color: Theme.rule }
-            Rectangle { x: 20; y: 17; width: 6; height: 6; radius: 3; color: ws.noteColor(stageHead.s[1]) }
-            Txt { id: say; x: 36; y: 11; width: parent.width - 56; text: stageHead.s[0]; tone: 2 }
-            Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule; opacity: scroll.contentY > 2 ? 1 : 0
+            Rectangle { visible: stageHead.on; x: 18; y: 19; width: 6; height: 6; radius: 3; color: ws.noteColor(stageHead.s[1]) }
+            Txt { id: say; visible: stageHead.on; x: 34; y: 13; width: parent.width - 52; text: stageHead.s[0]; tone: 2 }
+            Rectangle { anchors.bottom: parent.bottom; x: 14; width: parent.width - 28; height: 1; color: Theme.rule; opacity: stageHead.on && scroll.contentY > 2 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Motion.quick } } }
         }
         Flickable {
@@ -645,11 +638,14 @@ Item {
             objectName: "inspector"
             anchors.top: stageHead.bottom; anchors.bottom: foot.top; anchors.left: parent.left; anchors.right: parent.right
             // while a toast is up, the last rows can still be scrolled clear of it
-            contentHeight: body.implicitHeight + 32 + (Store.toasts.length ? 24 + 72 * Store.toasts.length : 0); clip: true; boundsBehavior: Flickable.StopAtBounds
+            contentHeight: body.implicitHeight + 16; clip: true; boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { width: 6 }
+            // there is more below: a quiet mark at the foot of the pane
+            Rectangle { parent: scroll; z: 3; anchors.bottom: parent.bottom; anchors.bottomMargin: 5; anchors.horizontalCenter: parent.horizontalCenter; width: 28; height: 4; radius: 2; color: Theme.alpha(Theme.lineBase, 0.22)
+                opacity: scroll.contentHeight > scroll.height + 4 && scroll.contentY < 4 ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.base } } }
             Connections { target: Store; function onRevealInspector(y) { scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, y)) } }
             Column {
-                id: body; x: 20; y: 2; width: parent.width - 40; spacing: 14
+                id: body; x: Store.stage === "shape" ? 6 : 16; y: 0; width: parent.width - 2 * x; spacing: 14
                 Loader { id: panel; width: parent.width; active: !!Store.data
                     property int was: insp.at
                     source: ({ brief: "Brief.qml", shape: "Shape.qml", fit: "Fit.qml", prove: "Prove.qml", release: "Release.qml" })[Store.stage]
@@ -666,10 +662,8 @@ Item {
             id: foot
             anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
             readonly property bool on: Store.hasDraft || !!Store.draftError
-            height: on ? Math.min(draft.implicitHeight + 24, Math.round(insp.height * 0.46)) : 0
-            Rectangle { anchors.fill: parent; anchors.margins: 1; anchors.topMargin: 0; color: Theme.plate1; visible: foot.on; radius: Theme.rPanel - 1
-                Rectangle { width: parent.width; height: parent.radius; color: parent.color } }
-            Rectangle { x: 1; width: parent.width - 2; height: 1; color: Theme.rule; visible: foot.on }
+            height: on ? Math.min(draft.implicitHeight + 24, Math.round(insp.room_ * 0.46)) : 0
+            Rectangle { x: 14; width: parent.width - 28; height: 1; color: Theme.rule; visible: foot.on }
             Flickable {
                 anchors.fill: parent; anchors.topMargin: 12; anchors.bottomMargin: 12; clip: true; visible: foot.on
                 contentHeight: draft.implicitHeight; boundsBehavior: Flickable.StopAtBounds

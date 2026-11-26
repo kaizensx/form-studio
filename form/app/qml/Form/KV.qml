@@ -1,6 +1,7 @@
 import QtQuick
 
-// Key / value row. `sub` is a quiet second line; children sit on the right instead of `value`.
+// Key / value row. `sub` is a quiet second line; children sit on the right instead of `value`. Rows are set apart by
+// their own air, not by a line.
 Item {
     id: r
     property string k: ""
@@ -10,8 +11,7 @@ Item {
     property bool first: false
     default property alias content: right.data
     width: parent ? parent.width : 0
-    implicitHeight: Math.max(left.implicitHeight, right.implicitHeight, 18) + 14
-    Rectangle { visible: !r.first; width: parent.width; height: 1; color: Theme.rule }
+    implicitHeight: Math.max(left.implicitHeight, right.implicitHeight, 18) + 12
     Column {
         id: left; anchors.left: parent.left; anchors.right: right.left; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 1
         Txt { text: r.k; tone: 2; width: parent.width }

@@ -29,9 +29,9 @@ Grid {
             readonly property bool locked: c.level === "required"
             objectName: "capCard_" + c.id
             width: cc.columns === 2 ? (cc.width - cc.columnSpacing) / 2 : cc.width
-            height: Math.max(118, cb.implicitHeight + 28); radius: Theme.rMd
-            color: on ? Theme.alpha(Theme.datum, 0.07) : ma.containsMouse && !locked ? Theme.washHover : Theme.plate1
-            border.color: on ? Theme.datum : Theme.rule; border.width: on ? 1.5 : 1
+            height: Math.max(118, cb.implicitHeight + 28); radius: Theme.rMd + 2
+            color: on ? Theme.alpha(Theme.datum, Theme.dark ? 0.1 : 0.07) : ma.containsMouse && !locked ? Theme.glass2 : Theme.glass
+            border.color: on ? Theme.datum : Theme.dark ? Theme.glassEdge : Theme.rule; border.width: on ? 1.5 : 1
             Behavior on color { Tint {} }
             Column { id: cb; x: 16; y: 14; width: parent.width - 32; spacing: 5
                 Row { spacing: 8; width: parent.width

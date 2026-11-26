@@ -28,7 +28,6 @@ Item {
             pr.busy = false; pr.probe = r.probe; Store.refreshAgents(); pr.changed()
         }, function (e) { pr.busy = false; Store.fail(e) })
     }
-    Rectangle { visible: !pr.first; x: 16; width: parent.width - 32; height: 1; color: Theme.rule }
     Rectangle { x: 16; y: 17; width: 7; height: 7; radius: 3.5; color: pr.up ? Theme.pass : pr.a ? Theme.signal : Theme.ink4 }
     Column {
         id: body; x: 32; y: 11; width: parent.width - 48; spacing: 6
@@ -55,7 +54,7 @@ Item {
                     onClicked: Store.post("/providers/remove", { id: pr.p.id }).then(function () {
                         Store.toast("Removed " + pr.p.name, "Its key was deleted from this computer."); pr.confirm = false; Store.refreshAgents(); pr.changed() }, Store.fail) } } }
         // test one model: does it call tools, does it take images
-        Rectangle { visible: pr.testing; width: parent.width; height: tcol.implicitHeight + 20; radius: Theme.rSm; color: Theme.well; border.color: Theme.rule
+        Rectangle { visible: pr.testing; width: parent.width; height: tcol.implicitHeight + 20; radius: Theme.rMd; color: Theme.glassWell; border.color: Theme.rule
             Column { id: tcol; x: 10; y: 10; width: parent.width - 20; spacing: 8
                 Txt { kind: "fine"; width: parent.width
                     text: "Sends one short message to the model you pick (a few tokens, billed like any other). Form Studio's agent needs tool calls." }

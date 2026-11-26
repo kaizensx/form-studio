@@ -45,7 +45,7 @@ Column {
     ReplaceSteps { width: parent.width; done: rs.photos.length ? 1 : 0; active: rs.photos.length ? -1 : 0 }
 
     // ── 1. the photo ──
-    Rectangle { objectName: "replacePhotoWell"; width: parent.width; height: 188; radius: Theme.rMd; color: Theme.well; clip: true
+    Rectangle { objectName: "replacePhotoWell"; width: parent.width; height: 188; radius: Theme.rMd; color: Theme.glassWell; clip: true
         border.color: pm.containsMouse ? Theme.rule3 : Theme.rule2
         Behavior on border.color { Tint {} }
         Row { anchors.centerIn: parent; spacing: 10; visible: rs.photos.length > 0

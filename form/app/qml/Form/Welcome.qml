@@ -7,6 +7,8 @@ import FormNative
 // was chosen (form/installer.py AutoJob: every command in the log; it pauses only where the person must act).
 // Nothing is installed before step 3. 3D printing is optional and off unless it is ticked. The step reached is
 // remembered in the data folder; everything can be changed later in Settings › General › Set up for.
+// Lightdesk: the launcher stands in the room like every screen. The steps are on a pane of glass on the left; the
+// step itself is thin glass cards over the room (they scroll, so nothing in them is blurred).
 Rectangle {
     id: wl
     color: Theme.plate
@@ -100,16 +102,18 @@ Rectangle {
         else Store.closeWelcome("done")
     }
     MouseArea { anchors.fill: parent; hoverEnabled: true; onWheel: function (w) { w.accepted = true } }     // Home underneath stays inert
+    // the room: the key light falls where the step is read
+    Room { id: room; anchors.fill: parent; poolX: 0.6; poolY: 0.3; poolW: 1100; poolH: 620; breathe: true }
 
     // ── progress rail ────────────────────────────────────────
-    Rectangle {
+    Item {
         id: rail
-        width: 320; height: parent.height; color: Theme.plate1
-        Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.rule }
-        Column { x: 32; y: 44; width: parent.width - 64; spacing: 6
+        width: 320; height: parent.height
+        Glass { source: room; x: Theme.edge; y: 8; width: parent.width - Theme.edge; height: parent.height - 8 - Theme.edge; arrive: 0 }
+        Column { x: 48; y: 40; width: parent.width - 76; spacing: 6
             Logo { size: 24 }
             Item { width: 1; height: 22 }
-            Txt { kind: "cap"; text: "Set up Form Studio" }
+            Txt { kind: "cap"; color: Theme.datum; text: "Set up Form Studio" }
             Txt { kind: "h2"; text: "Describe it. Form Studio engineers it."; width: parent.width; wrapMode: Text.WordWrap }
             Item { width: 1; height: 18 }
             Repeater {
@@ -125,7 +129,7 @@ Rectangle {
                         color: rs.state_ === "done" ? Theme.alpha(Theme.pass, 0.5) : Theme.rule2
                         Behavior on color { ColorAnimation { duration: Theme.slow } } }
                     Rectangle { width: 26; height: 26; radius: 13
-                        color: rs.state_ === "done" ? Theme.alpha(Theme.pass, 0.16) : rs.current ? Theme.datum : Theme.plate3
+                        color: rs.state_ === "done" ? Theme.alpha(Theme.pass, 0.16) : rs.current ? Theme.datum : Theme.glass2
                         border.width: rs.current && rs.state_ === "done" ? 1 : 0; border.color: Theme.pass
                         Behavior on color { ColorAnimation { duration: Theme.slow } }
                         Icon { visible: rs.state_ === "done"; anchors.centerIn: parent; name: "check"; size: 14; color: Theme.pass }
@@ -141,7 +145,7 @@ Rectangle {
                 }
             }
         }
-        Column { x: 32; anchors.bottom: parent.bottom; anchors.bottomMargin: 28; width: parent.width - 64; spacing: 6
+        Column { x: 48; anchors.bottom: parent.bottom; anchors.bottomMargin: 28 + Theme.edge; width: parent.width - 76; spacing: 6
             Icon { name: "shield_check"; size: 16; color: Theme.ink3 }
             Txt { kind: "fine"; width: parent.width
                 text: "Nothing is downloaded until the last step, and only what you chose. Every command is in the log; Cancel stops it. Form Studio never asks for a password." } }
@@ -159,8 +163,8 @@ Rectangle {
             spacing: 20
             transform: Translate { id: bodyShift }
             Column { width: parent.width; spacing: 8
-                Txt { kind: "cap"; text: "Step " + (wl.step + 1) + " of 3" }
-                Txt { kind: "h1"; text: wl.here.title; width: parent.width; font.weight: Theme.wSemi }
+                Txt { kind: "cap"; color: Theme.datum; text: "Step " + (wl.step + 1) + " of 3" }
+                Txt { kind: "h1"; text: wl.here.title; width: parent.width; font.weight: Theme.wSemi; font.pixelSize: 34; font.letterSpacing: -1.4 }
                 Txt { kind: "lead"; tone: 2; width: parent.width; lineHeight: 1.35
                     text: wl.step === 0 ? "Describe a part, a product or a mechanism and Form Studio engineers it as real, editable CAD. Pick what to set up; only that is downloaded, and you can change it any time in Settings."
                         : wl.step === 1 ? "Chat works with the agent you choose. Each one designs with Form Studio's tools and runs on your own account or computer. You can change it per conversation."
@@ -169,7 +173,7 @@ Rectangle {
             // step 1: what do you want to make? capability cards, a live download total
             Column { visible: wl.step === 0; width: parent.width; spacing: 14
                 CapCards { width: parent.width; pick: wl.pick; onToggled: function (id, on) { wl.toggle(id, on) } }
-                Rectangle { objectName: "welcomeDownloadTotal"; width: parent.width; height: 44; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+                Rectangle { objectName: "welcomeDownloadTotal"; width: parent.width; height: 44; radius: 22; color: Theme.glass; border.color: Theme.dark ? Theme.glassEdge : Theme.rule
                     Row { x: 16; spacing: 10; anchors.verticalCenter: parent.verticalCenter
                         Icon { name: "cloud_download"; size: 15; color: Theme.ink2; anchors.verticalCenter: parent.verticalCenter }
                         Txt { font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
@@ -195,9 +199,9 @@ Rectangle {
                             readonly property bool on: wl.way === modelData.id
                             readonly property var found: wl.agentsOf(modelData.id).filter(function (a) { return a.available })
                             objectName: "agentWay_" + modelData.id
-                            width: (ways.width - 20) / 3; height: wc.implicitHeight + 26; radius: Theme.rMd
-                            color: on ? Theme.alpha(Theme.datum, 0.07) : wm.containsMouse ? Theme.washHover : Theme.plate1
-                            border.color: on ? Theme.datum : Theme.rule; border.width: on ? 1.5 : 1
+                            width: (ways.width - 20) / 3; height: wc.implicitHeight + 26; radius: Theme.rMd + 2
+                            color: on ? Theme.alpha(Theme.datum, Theme.dark ? 0.1 : 0.07) : wm.containsMouse ? Theme.glass2 : Theme.glass
+                            border.color: on ? Theme.datum : Theme.dark ? Theme.glassEdge : Theme.rule; border.width: on ? 1.5 : 1
                             Behavior on color { Tint {} }
                             Column { id: wc; x: 14; y: 13; width: parent.width - 28; spacing: 4
                                 Row { spacing: 8
@@ -212,8 +216,8 @@ Rectangle {
                 }
                 // an agent app: what is installed, and the agent apps Form Studio can install in the last step
                 Column { visible: wl.way === "cli"; width: parent.width; spacing: 16
-                    Rectangle { visible: wcli.children.length > 1; width: parent.width; height: wcli.implicitHeight; radius: Theme.rMd
-                        color: Theme.plate1; border.color: Theme.rule
+                    Rectangle { visible: wcli.children.length > 1; width: parent.width; height: wcli.implicitHeight; radius: Theme.rMd + 2
+                        color: Theme.glass; border.color: Theme.dark ? Theme.glassEdge : Theme.rule
                         Column { id: wcli; width: parent.width
                             Repeater {
                                 model: wl.step === 1 && wl.way === "cli" ? wl.agentsOf("cli").filter(function (a) { return a.available }) : []
@@ -234,7 +238,7 @@ Rectangle {
                 Column { visible: wl.way === "api"; width: parent.width; spacing: 10
                     Txt { kind: "fine"; tone: 2; width: parent.width
                         text: "Form Studio talks to the provider directly, with its own tools. Usage is billed to your account with that provider. A key you add is kept in a private file on this computer and sent only to its provider." }
-                    Rectangle { width: parent.width; height: wapi.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+                    Rectangle { width: parent.width; height: wapi.implicitHeight; radius: Theme.rMd + 2; color: Theme.glass; border.color: Theme.dark ? Theme.glassEdge : Theme.rule
                         Column { id: wapi; width: parent.width
                             Repeater {
                                 model: wl.step === 1 && wl.way === "api" ? wl.agentsOf("api") : []
@@ -250,7 +254,7 @@ Rectangle {
                             text: "Nothing leaves this computer. Start the server with a model that supports tool calls, then look again." }
                         Btn { small: true; kind: "quiet"; icon: "refresh_cw"; text: "Look again"; busy: Store.agentsChecking; anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter; onClicked: Store.refreshAgents() } }
-                    Rectangle { width: parent.width; height: wloc.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+                    Rectangle { width: parent.width; height: wloc.implicitHeight; radius: Theme.rMd + 2; color: Theme.glass; border.color: Theme.dark ? Theme.glassEdge : Theme.rule
                         Column { id: wloc; width: parent.width
                             Repeater {
                                 model: wl.step === 1 && wl.way === "local" ? wl.agentsOf("local") : []
@@ -261,7 +265,7 @@ Rectangle {
 
             // step 3: the install run of only what was chosen
             Column { visible: wl.step === 2; width: parent.width; spacing: 14
-                Rectangle { objectName: "welcomeInstallList"; width: parent.width; height: il.implicitHeight; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+                Rectangle { objectName: "welcomeInstallList"; width: parent.width; height: il.implicitHeight; radius: Theme.rMd + 2; color: Theme.glass; border.color: Theme.dark ? Theme.glassEdge : Theme.rule
                     Column { id: il; width: parent.width
                         Item { visible: wl.runRows.length === 0; width: parent.width; height: 62
                             Icon { x: 18; name: "circle_check"; size: 18; color: Theme.pass; anchors.verticalCenter: parent.verticalCenter }
@@ -303,7 +307,7 @@ Rectangle {
     Rectangle {
         id: logBox
         anchors.bottom: bar.top; anchors.left: rail.right; anchors.right: parent.right
-        height: lg.visible ? lg.implicitHeight + 20 : 0; color: Theme.plate
+        height: lg.visible ? lg.implicitHeight + 20 : 0; color: "transparent"
         Rectangle { visible: lg.visible; width: parent.width; height: 1; color: Theme.rule }
         InstallLog { id: lg; x: body.x; y: 10; width: body.width }
     }
@@ -311,8 +315,8 @@ Rectangle {
     // ── one primary button per step ───────────────────────────
     Rectangle {
         id: bar
-        anchors.bottom: parent.bottom; anchors.left: rail.right; anchors.right: parent.right; height: 68; color: Theme.plate
-        Rectangle { width: parent.width; height: 1; color: Theme.rule }
+        anchors.bottom: parent.bottom; anchors.left: rail.right; anchors.right: parent.right; height: 68 + Theme.edge - 8; color: "transparent"
+        Rectangle { x: body.x; width: body.width; height: 1; color: Theme.rule }
         Item { width: body.width; x: body.x; height: 32; anchors.verticalCenter: parent.verticalCenter
             Row { spacing: 8; anchors.verticalCenter: parent.verticalCenter
                 Btn { kind: "quiet"; icon: "arrow_left"; text: "Back"; visible: wl.step > 0; enabled: !Store.installing; onClicked: wl.go(wl.step - 1) }

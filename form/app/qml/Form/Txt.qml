@@ -12,7 +12,7 @@ Text {
     font.family: mono || kind === "cap" ? Theme.mono : Theme.sans      // captions are lettered like a drawing's: mono capitals
     font.pixelSize: ({ body: Theme.tBody, fine: Theme.tFine, cap: Theme.tCap, lead: Theme.tLead, h3: Theme.tH3, h2: Theme.tH2, h1: Theme.tH1, hero: Theme.tHero })[kind] || Theme.tBody
     font.weight: kind === "cap" ? Theme.wMedium : (kind === "h1" || kind === "h2" || kind === "h3" || kind === "hero") ? Theme.wSemi : Theme.wBody
-    font.letterSpacing: kind === "cap" ? 0.7 : kind === "hero" ? -1.4 : kind === "h1" ? -0.8 : kind === "h2" ? -0.4 : kind === "h3" ? -0.2 : mono ? -0.1 : 0
+    font.letterSpacing: kind === "cap" ? 1.2 : kind === "hero" ? -1.8 : kind === "h1" ? -1.0 : kind === "h2" ? -0.5 : kind === "h3" ? -0.3 : mono ? -0.1 : kind === "lead" ? -0.1 : 0
     font.capitalization: kind === "cap" ? Font.AllUppercase : Font.MixedCase
     lineHeight: kind === "fine" || kind === "body" ? 1.25 : kind === "lead" ? 1.3 : 1.1
     textFormat: Text.PlainText

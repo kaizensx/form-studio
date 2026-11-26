@@ -37,6 +37,14 @@ QtObject {
     property var sheet: null           // { kind, props }
     property var toasts: []
     property var viewer: null          // the Viewport item; set by it
+    property var backdrop: null        // the room behind the panes of the screen in front (what Glass blurs): the 3D view, or the window's Room
+    property bool floorGrid: false     // the 10 mm grid on the studio floor (the grid button beside the views)
+    property real barY: 100000         // the conversation bar in the window (Main.qml): its top edge, left edge and width
+    property real barX: 0
+    property real barW: 600
+    property int buildAt: 0            // the build-up playing in the workspace: which step of how many (0: none)
+    property int buildOf: 0
+    property var builtIds: []          // features already in place in the build that is playing (the Program listing ticks them)
     property var thumbTick: ({})       // pid → counter, bumps when a project's thumbnail should reload
 
     // chat: saved conversations with an agent, and the live feed of what any agent does (chat workstream)
@@ -1061,7 +1069,7 @@ QtObject {
         var first = !building || building.draft !== d.draft
         building = { draft: d.draft, project: _draftOf[d.draft] || "", feature: d.feature, label: d.label || _human(d.feature),
                      at: d.at || d.index, of: d.of || 0, index: d.index }
-        stageLog = stageLog.concat([{ draft: d.draft, feature: d.feature, at: building.at, of: building.of, t: Date.now() }]).slice(-40)
+        stageLog = stageLog.concat([{ draft: d.draft, feature: d.feature, label: building.label, at: building.at, of: building.of, t: Date.now() }]).slice(-40)
         vp.glideFrame()
         vp.setModel({ pid: old && old.pid ? old.pid : d.draft, rev: -1, stage: true, draft: d.draft, bbox: d.bbox, mesh: under.concat([piece]) }, "build")
         if (vp === stageViewer) {                 // the Designing screen frames the part as it grows

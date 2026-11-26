@@ -4,14 +4,33 @@ import QtQuick.Dialogs
 import FormNative
 import "F.js" as F
 
-// The agent column. Conversations are saved and switchable; each message runs the agent you chose (an agent app such
+// The conversation. In a workspace it is one bar under the part (`bar`): a status line, numbered suggestions, the
+// prompt. It opens upward into a glass transcript sheet with everything a conversation has (cards, revisions,
+// Compare, attachments, concepts, questions), and folds back to the bar while a build plays, so the part and its cue
+// have the room. On Home it is a glass column. Conversations are saved and switchable; each message runs the agent you chose (an agent app such
 // as Claude Code or Codex, a model provider's API, or a local model) with Form Studio's tools. The same column shows
 // what any other agent does to your designs.
 Rectangle {
     id: talk
     objectName: "talk"
     readonly property var attachFilters: pick.nameFilters     // what the attach dialog offers (tests/journeys/open_conv.py)
-    color: Theme.plate1
+    color: "transparent"
+    property bool bar: false                 // one bar under the part that opens upward (a workspace); false: a column (Home)
+    property real roomAbove: 600             // how tall something that opens upward from the bar may be (Main.qml)
+    // a build is playing: the bar is slim and the transcript waits, so the cue has the room
+    readonly property bool cueing: bar && (!!Store.building || Store.revealing.length > 0)
+    readonly property bool expanded: !bar || (((Store.talkOpen && !empty) || list.opened) && !cueing)
+    readonly property bool slim: bar && !expanded && (!empty || cueing)          // just the prompt, on one line
+    readonly property bool suggOn: bar && empty && !cueing && Store.chat.available && !!Store.project && forProject.length > 0
+    readonly property int leadH: bar ? 32 : 0
+    readonly property real barHeight: leadH + foot.height                          // folded
+    readonly property real popRoom: bar ? roomAbove : height
+    // what the open transcript wants above the prompt: its header, the strips under it, and what was said
+    readonly property real bodyWant: head.height + 8 + (rsteps.visible ? rsteps.height : 0) + (strip.visible ? strip.height : 0) + feed.contentHeight + feed.topMargin + feed.bottomMargin + 6
+    function pickSuggestion(m) { if (m.sheet) Store.openSheet(m.sheet); else if (m.review) Store.askReview(); else Store.send(m.prompt) }
+    function toggle() { if (empty) { ta.forceActiveFocus(); return } Store.talkOpen = !Store.talkOpen }
+    onXChanged: pane.place(); onYChanged: pane.place()
+    Glass { id: pane; source: Store.backdrop; z: -1; y: talk.leadH; width: parent.width; height: parent.height - talk.leadH; radius: talk.bar ? 26 : Theme.rPane }
     readonly property bool empty: Store.chatItems.length === 0 && !Store.chatBusy
     property var openGroups: ({})             // step group key → unfolded
     // suggestions for the open design, from its real state
@@ -143,13 +162,14 @@ Rectangle {
         nameFilters: ["Everything Form Studio reads (*.png *.jpg *.jpeg *.webp *.heic *.gif *.bmp *.pdf *.step *.stp *.stl *.3mf *.obj)",
                       "Parts and meshes (*.step *.stp *.stl *.3mf *.obj)", "Photos and pictures (*.png *.jpg *.jpeg *.webp *.heic *.gif *.bmp)", "Drawings (*.pdf)"]
         onAccepted: Store.attachFiles(selectedFiles) }
-    Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.rule }
 
     readonly property int branchCount: Store.convBranches.length
     readonly property int branchAt: { for (var i = 0; i < Store.convBranches.length; i++) if (Store.convBranches[i].id === Store.convId) return i; return -1 }
     // ── header: the conversation switcher ──
     Item {
-        id: head; width: parent.width; height: 40; z: 3
+        id: head; width: parent.width; height: 40; z: 3; y: talk.leadH + (talk.bar ? 4 : 0)
+        opacity: talk.expanded ? 1 : 0; visible: opacity > 0.01; enabled: talk.expanded
+        Behavior on opacity { NumberAnimation { duration: talk.expanded ? Theme.base : Theme.exit } }
         Item { id: sw; objectName: "convSwitch"; x: 8; width: parent.width - 16 - tools.width; height: 28; anchors.verticalCenter: parent.verticalCenter
             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: swm.pressed ? Theme.washPress : swm.containsMouse || list.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
             Rectangle { id: sdot; x: 8; width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter
@@ -174,10 +194,10 @@ Rectangle {
                                  run: function () { if (b.id !== Store.convId) Store.openConv(b.id) } } }) } }
             Btn { objectName: "talkNewChat"; kind: "quiet"; icon: "message_square_plus"; tip: "New conversation"; keys: "Ctrl+Shift+O"
                 visible: !talk.empty || Store.convId !== ""; onClicked: Store.newChat() } }
-        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule }
+        Rectangle { anchors.bottom: parent.bottom; x: 14; width: parent.width - 28; height: 1; color: Theme.rule }
         Pop {
             id: list; x: 8; y: head.height + 2; width: Math.max(talk.width - 17, 320); padding: 6; origin: Popup.TopLeft
-            height: Math.min(cl.implicitHeight + 12, talk.height - 90)
+            height: Math.min(cl.implicitHeight + 12, Math.max(200, talk.height - 90))
             onOpened: { Store.loadConvs(); cl.reset() }
             Flickable { anchors.fill: parent; clip: true; contentHeight: cl.implicitHeight; boundsBehavior: Flickable.StopAtBounds
                 ScrollBar.vertical: ScrollBar { width: 6 }
@@ -186,16 +206,16 @@ Rectangle {
     }
 
     // ── Replace a broken part: where the agent is in the four steps (Store.replaceProgress) ──
-    Rectangle { id: rsteps; visible: Store.replaceActive && !talk.empty; z: 2
-        anchors.top: head.bottom; width: parent.width - 1; height: visible ? 62 : 0; color: Theme.plate1
+    Rectangle { id: rsteps; visible: Store.replaceActive && !talk.empty && talk.expanded; z: 2
+        anchors.top: head.bottom; width: parent.width - 1; height: visible ? 62 : 0; color: "transparent"
         ReplaceSteps { x: 14; y: 9; width: parent.width - 28; done: Store.replaceProgress.done; active: Store.replaceProgress.active }
         Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule } }
 
     // ── the designs this conversation made, when it made more than one: click one to open it ──
     Rectangle {
         id: strip; objectName: "designStrip"; z: 2
-        visible: Store.designsHere.length > 1
-        anchors.top: rsteps.visible ? rsteps.bottom : head.bottom; width: parent.width - 1; height: visible ? 52 : 0; color: Theme.plate1
+        visible: Store.designsHere.length > 1 && talk.expanded
+        anchors.top: rsteps.visible ? rsteps.bottom : head.bottom; width: parent.width - 1; height: visible ? 52 : 0; color: "transparent"
         ListView {
             id: stripList; x: 10; y: 8; width: parent.width - 20; height: 36; orientation: ListView.Horizontal; spacing: 6; clip: true
             boundsBehavior: Flickable.StopAtBounds
@@ -227,7 +247,7 @@ Rectangle {
     // ── nothing open yet: what you can ask ──
     Column {
         id: intro
-        visible: talk.empty
+        visible: talk.empty && !talk.bar
         x: 16; width: parent.width - 2 * x; spacing: 10
         anchors.top: head.bottom; anchors.topMargin: 24
         Txt { kind: "h3"; width: parent.width; lineHeight: 1.08; font.weight: Theme.wSemi
@@ -240,7 +260,7 @@ Rectangle {
     // suggestions for the open design fill the space the feed will use
     Flickable {
         id: start
-        visible: talk.empty
+        visible: talk.empty && !talk.bar
         anchors.left: parent.left; anchors.right: parent.right
         anchors.top: intro.bottom; anchors.topMargin: 16
         anchors.bottom: foot.top
@@ -279,7 +299,9 @@ Rectangle {
         id: feed; objectName: "talkFeed"
         property bool stick: true              // follow the newest message unless the reader scrolled up
         property bool auto: false
-        visible: !talk.empty
+        visible: !talk.empty && opacity > 0.01; enabled: talk.expanded
+        opacity: talk.expanded ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: talk.expanded ? Theme.cross : Theme.exit } }
         anchors.top: strip.visible ? strip.bottom : rsteps.visible ? rsteps.bottom : head.bottom; anchors.bottom: foot.top; anchors.left: parent.left; anchors.right: parent.right
         topMargin: 16; bottomMargin: 12; clip: true; spacing: 14
         boundsBehavior: Flickable.StopAtBounds
@@ -483,15 +505,78 @@ Rectangle {
                     Txt { kind: "fine"; mono: true; tone: 4; visible: Store.chatSeconds >= 1; text: talk.secs(Store.chatSeconds) } } } }
     }
 
+    // ── the bar's status line: what the agent is doing, or what you can do; click it to open or fold the transcript ──
+    Item {
+        id: lead; objectName: "talkLead"; visible: talk.bar; width: parent.width; height: talk.leadH - 10; z: 3
+        readonly property string say: Store.chatAsking ? (Store.chatAsking.kind === "measure" ? "The agent is waiting for a measurement" : "The agent is waiting for your answer")
+            : Store.chatBusy ? talk.liveText()
+            : !Store.chat.available && !!Store.studio ? "No agent is connected. Everything can still be edited by hand."
+            : talk.empty ? (Store.project ? "Ask about this design, or describe a change." : "Describe a change, or a new part.")
+            : talk.expanded ? "Fold the conversation" : Store.convTitle() + " · " + F.plural(Store.chatItems.filter(function (e) { return e.t === "user" || e.t === "text" }).length, "message")
+        Row { id: leadRow; anchors.horizontalCenter: parent.horizontalCenter; anchors.verticalCenter: parent.verticalCenter; spacing: 9
+            Item { width: 14; height: 14; anchors.verticalCenter: parent.verticalCenter
+                readonly property color c: Store.chatAsking ? Theme.amber : Store.chatBusy ? Theme.datum : Store.chatReady ? Theme.pass : Theme.ink4
+                Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(parent.c, 0.18)
+                    SequentialAnimation on scale { running: Store.chatBusy && talk.bar && !Theme.reduced; loops: Animation.Infinite; alwaysRunToEnd: true
+                        NumberAnimation { to: 1.4; duration: 700; easing.type: Easing.InOutSine } NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutSine } } }
+                Rectangle { anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: parent.c; Behavior on color { Tint {} } } }
+            Txt { id: leadTxt; anchors.verticalCenter: parent.verticalCenter; tone: lm.containsMouse && !talk.empty ? 1 : 2; font.pixelSize: 13; wrapMode: Text.NoWrap
+                width: Math.min(implicitWidth, talk.width - 150); elide: Text.ElideRight; text: lead.say }
+            Icon { visible: !talk.empty; anchors.verticalCenter: parent.verticalCenter; size: 13; color: Theme.ink3; name: "chevron_up"
+                rotation: talk.expanded ? 180 : 0; Behavior on rotation { NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } } } }
+        MouseArea { id: lm; x: leadRow.x - 10; width: leadRow.width + 20; height: parent.height; hoverEnabled: true
+            cursorShape: talk.empty ? Qt.ArrowCursor : Qt.PointingHandCursor; onClicked: talk.toggle() }
+        Tip { show: lm.containsMouse && !talk.empty; keys: "Ctrl+J"; text: talk.cueing ? "The conversation opens again when the build is in" : talk.expanded ? "Fold the conversation" : "Open the conversation" }
+        // folded: the conversations and a new one stay one click away
+        Row { visible: !talk.expanded; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 0
+            Btn { objectName: "barConversations"; small: true; kind: "quiet"; icon: "history"; tip: "Conversations"; onClicked: talk.showList() }
+            Btn { objectName: "barNewChat"; small: true; kind: "quiet"; icon: "message_square_plus"; tip: "New conversation"; keys: "Ctrl+Shift+O"
+                visible: !talk.empty || Store.convId !== ""; onClicked: Store.newChat() } }
+    }
+
     // ── composer ──
     Item {
-        id: foot; width: parent.width; height: comp.height + 36; z: 2
+        id: foot; width: parent.width; height: comp.height + sugg.height + (talk.bar ? 12 : 36); z: 2
         y: talk.height - height
+        // numbered suggestions for the open design, from its real state; keys 1 to 4 pick them while the prompt is empty
+        Grid {
+            id: sugg; objectName: "talkSuggestions"; x: 8; y: 6; width: parent.width - 16; columns: width > 440 ? 2 : 1; columnSpacing: 4; rowSpacing: 0
+            visible: talk.suggOn; height: visible ? implicitHeight + 6 : 0
+            Repeater {
+                model: talk.suggOn ? talk.forProject : []
+                Item {
+                    id: idea; objectName: "talkSuggestion"
+                    required property var modelData
+                    required property int index
+                    width: (sugg.width - (sugg.columns - 1) * 4) / sugg.columns; height: 34
+                    // each one arrives a beat after the one before; under the pointer it lifts
+                    opacity: 0; Component.onCompleted: arrive.start()
+                    SequentialAnimation { id: arrive; PauseAnimation { duration: 60 + idea.index * Theme.stagger }
+                        Glide { target: idea; property: "opacity"; to: 1; duration: Theme.base } }
+                    Rectangle { anchors.fill: parent; radius: 12; color: im.pressed ? Theme.washPress : im.containsMouse ? Theme.glass2 : "transparent"
+                        Behavior on color { Tint {} }
+                        transform: Translate { y: im.containsMouse && !im.pressed ? -Theme.shift(1) : 0; Behavior on y { Glide { duration: Theme.fast } } }
+                        Rectangle { visible: im.containsMouse; x: parent.radius; width: parent.width - 2 * parent.radius; height: 1; color: Qt.rgba(1, 1, 1, Theme.dark ? 0.1 : 0.8) } }
+                    Kbd { id: key; x: 10; anchors.verticalCenter: parent.verticalCenter; keys: String(idea.index + 1) }
+                    Txt { x: 41; width: parent.width - 51; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 13; text: idea.modelData.label
+                        elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                    MouseArea { id: im; anchors.fill: parent; hoverEnabled: true; onClicked: talk.pickSuggestion(idea.modelData) }
+                }
+            }
+        }
         Rectangle {
-            id: comp; x: 12; y: 8; width: parent.width - 2 * x; height: inner.implicitHeight; radius: Theme.rLg
-            color: Theme.well; border.width: 1; border.color: ta.activeFocus ? Theme.alpha(Theme.datum, 0.7) : ch.hovered ? Theme.rule3 : Theme.rule2
+            id: comp; x: talk.bar ? 6 : 12; y: (talk.bar ? 6 : 8) + sugg.height; width: parent.width - 2 * x; height: inner.implicitHeight; radius: 20
+            color: Theme.glassWell; border.width: 1; border.color: ta.activeFocus ? Theme.alpha(Theme.datum, 0.55) : ch.hovered ? Theme.rule2 : Theme.rule
             Behavior on border.color { Tint {} }
             HoverHandler { id: ch }
+            // the prompt: an accent "›" before whatever is typed
+            Text { x: 16; y: sv.y + 9; visible: sv.contentItem.contentY < 4; text: "›"; color: Theme.datum; font.family: Theme.mono; font.pixelSize: 22; font.weight: Theme.wMedium; renderType: Text.NativeRendering }
+            // the caret, standing in the empty prompt while the keyboard is elsewhere (with it here, the field draws its own)
+            Rectangle { objectName: "promptCaret"; x: 38; y: sv.y + 14; width: 8; height: 19; radius: 2; color: Theme.datum
+                visible: !ta.activeFocus && ta.text === "" && ta.enabled
+                Rectangle { anchors.centerIn: parent; width: 20; height: 31; radius: 8; color: Theme.alpha(Theme.datum, 0.16) }
+                SequentialAnimation on opacity { running: parent.visible && talk.visible && !Theme.reduced; loops: Animation.Infinite
+                    NumberAnimation { to: 0.35; duration: 800; easing.type: Easing.InOutSine } NumberAnimation { to: 1; duration: 800; easing.type: Easing.InOutSine } } }
             Rectangle { anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3; border.color: Theme.alpha(Theme.datum, 0.13)
                 opacity: ta.activeFocus ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
             Column {
@@ -525,19 +610,26 @@ Rectangle {
                                 Btn { small: true; kind: "quiet"; icon: "x"; anchors.right: parent.right; anchors.rightMargin: 2; anchors.verticalCenter: parent.verticalCenter
                                     tip: "Remove"; onClicked: Store.dropLink(lchip.modelData.url) } } } } }
                 ScrollView {
-                    width: parent.width; clip: true
-                    height: Math.min(220, Math.max(2 * 19 + 18, ta.implicitHeight))
+                    id: sv; width: parent.width; clip: true
+                    height: Math.min(220, Math.max(talk.bar ? 44 : 2 * 19 + 18, ta.implicitHeight))
                     Behavior on height { NumberAnimation { duration: Theme.move(Theme.fast); easing.type: Easing.OutQuad } }
                     TextArea {
                         id: ta
                         objectName: "composer"
                         // "Ask about this feature…" from the viewport's context menu lands here
                         Connections { target: Store; function onChatPrefill(text) { Store.talkOpen = true; ta.text = text; ta.cursorPosition = text.length; ta.forceActiveFocus() } }
-                        wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: 13
-                        placeholderText: !Store.chat.available ? "No agent is connected" : Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure" ? "Answer the question above…" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to make…"
+                        wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: 15; font.letterSpacing: -0.1
+                        // the caret is the accent block of a command line: it breathes in an empty prompt and thins to a bar once you type
+                        cursorDelegate: Rectangle { id: cur; visible: ta.activeFocus; color: Theme.datum; radius: 2
+                            width: ta.text === "" ? 8 : 2; height: 19
+                            Behavior on width { NumberAnimation { duration: Theme.move(Theme.fast) } }
+                            SequentialAnimation on opacity { running: cur.visible && !Theme.reduced; loops: Animation.Infinite
+                                NumberAnimation { to: 0.3; duration: 620; easing.type: Easing.InOutSine } NumberAnimation { to: 1; duration: 620; easing.type: Easing.InOutSine } } }
+                        readonly property string placeholder: !Store.chat.available ? "No agent is connected" : Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure" ? "Answer the question above…" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to make…"
+                        placeholderText: "\u2003" + placeholder
                         placeholderTextColor: Theme.ink4; enabled: Store.chat.available
                         selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
-                        leftPadding: 12; rightPadding: 12; topPadding: 10; bottomPadding: 6; background: null; renderType: Text.NativeRendering
+                        leftPadding: 38; rightPadding: 14; topPadding: 13; bottomPadding: 6; background: null; renderType: Text.NativeRendering
                         function submit() {
                             if (!text.trim()) return
                             if (Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure") { Store.answerAsk(Store.chatAsking.id, text.trim(), []); text = ""; return }
@@ -545,6 +637,10 @@ Rectangle {
                         Keys.onTabPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
                         Keys.onBacktabPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.BacktabFocusReason)
                         Keys.onPressed: function (e) {
+                            // 1 to 4 pick a suggestion while nothing is typed
+                            if (talk.suggOn && text === "" && !(e.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) && e.text >= "1" && e.text <= "4") {
+                                var sg = talk.forProject[parseInt(e.text) - 1]
+                                if (sg) { e.accepted = true; talk.pickSuggestion(sg); return } }
                             if (e.matches(StandardKey.Paste)) {         // a pasted link is fetched like one added on Home; a pasted photo is attached
                                 var clip = String(Bridge.clipboardText()).trim()
                                 if (/^https?:\/\/\S+$/i.test(clip)) { e.accepted = true; Store.fetchLink(clip); return }
@@ -558,8 +654,8 @@ Rectangle {
                         }
                     }
                 }
-                Item { width: parent.width; height: 38
-                    Row { x: 6; anchors.verticalCenter: parent.verticalCenter; spacing: 2
+                Item { width: parent.width; height: 46
+                    Row { id: footRow; x: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 2
                         Btn { small: true; kind: "quiet"; icon: "paperclip"; tip: "Attach a photo, a PDF drawing, or a STEP, STL, 3MF or OBJ part. You can also drop files here, or paste a link."
                             enabled: Store.chat.available; onClicked: Store.ask(pick) }
                         // agent and model for this conversation
@@ -578,7 +674,7 @@ Rectangle {
                                 onClosed: Qt.callLater(function () {     // after a pick in the same moment has had its turn: it sends the message
                                     Store.retryAfterPick = false
                                     if (Store.pendingSend) { Store.chatPrefill(Store.pendingSend); Store.pendingSend = "" } })
-                                height: Math.min(mp.implicitHeight + 12, talk.height - 70)
+                                height: Math.min(mp.implicitHeight + 12, talk.popRoom - 70)
                                 y: -height - 6
                                 origin: Popup.BottomLeft
                                 Flickable { anchors.fill: parent; clip: true; contentHeight: mp.implicitHeight; boundsBehavior: Flickable.StopAtBounds
@@ -593,21 +689,32 @@ Rectangle {
                         readonly property bool stops: Store.chatBusy && !answering
                         readonly property bool can: Store.chatBusy || (Store.chatReady && ta.text.trim() !== "")
                         anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
-                        width: 28; height: 28; radius: 14
-                        color: stops ? (sbm.containsMouse ? Theme.plate4 : Theme.plate3) : can ? (sbm.containsMouse ? Theme.datumHi : Theme.datum) : Theme.plate3
-                        border.width: stops ? 1 : 0; border.color: Theme.rule2
+                        // send is the one filled thing in the bar; while a reply is written it turns into stop: the disc
+                        // goes to glass and the arrow gives way to a square
+                        width: 36; height: 36; radius: 18
+                        color: stops ? (sbm.containsMouse ? Theme.alpha(Theme.lineBase, 0.22) : Theme.glass2) : can || Store.chatReady ? (sbm.containsMouse ? Theme.sendHi : Theme.send) : Theme.alpha(Theme.lineBase, Theme.dark ? 0.1 : 0.07)
+                        border.width: 0
                         scale: sbm.pressed && can ? Theme.from(0.92) : 1
                         Behavior on scale { Glide { duration: Theme.press } }
                         Behavior on color { Tint {} }
-                        Icon { anchors.centerIn: parent; size: sendBtn.stops ? 11 : 15; name: sendBtn.stops ? "square" : "arrow_up"
-                            color: sendBtn.stops ? Theme.ink : sendBtn.can ? Theme.datumInk : Theme.ink4 }
-                        MouseArea { id: sbm; anchors.fill: parent; hoverEnabled: true; onClicked: sendBtn.stops ? Store.stopChat() : ta.submit() }
+                        Icon { anchors.centerIn: parent; size: 17; name: "corner_down_left"; color: sendBtn.can || Store.chatReady ? Theme.sendInk : Theme.ink4
+                            opacity: sendBtn.stops ? 0 : 1; scale: sendBtn.stops ? Theme.from(0.4) : 1; rotation: sendBtn.stops && !Theme.reduced ? -90 : 0
+                            Behavior on opacity { Glide { duration: Theme.base } } Behavior on scale { Glide { duration: Theme.base } } Behavior on rotation { Glide { duration: Theme.base } } }
+                        Rectangle { anchors.centerIn: parent; width: 11; height: 11; radius: 3; color: Theme.ink
+                            opacity: sendBtn.stops ? 1 : 0; scale: sendBtn.stops ? 1 : Theme.from(0.3)
+                            Behavior on opacity { Glide { duration: Theme.base } } Behavior on scale { NumberAnimation { duration: Theme.move(Theme.cross); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeSpring } } }
+                        // the ring that turns while it can be stopped
+                        Rectangle { anchors.fill: parent; radius: 18; color: "transparent"; border.width: 1; border.color: Theme.alpha(Theme.datum, 0.55); visible: sendBtn.stops }
+                        MouseArea { id: sbm; anchors.fill: parent; hoverEnabled: true; onClicked: { if (sendBtn.stops) Store.stopChat(); else if (ta.text.trim() === "") ta.forceActiveFocus(); else ta.submit() } }
                         Tip { show: sbm.containsMouse; keys: sendBtn.stops ? "" : "Return"
                             text: sendBtn.answering ? "Send your answer" : Store.chatBusy ? "Stop this reply. What was already committed stays." : sendBtn.can ? "Send" : !Store.chatReady ? "No agent is connected" : "Write a message first" } }
                 }
             }
         }
-        Txt { kind: "fine"; x: 16; anchors.top: comp.bottom; anchors.topMargin: 7; width: parent.width - 2 * x; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 3
+        Txt { id: hint; kind: "fine"; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 3
+            x: talk.bar ? comp.x + footRow.x + footRow.width + 14 : 16; width: talk.bar ? comp.width - (footRow.x + footRow.width + 14) - 56 : parent.width - 2 * x
+            y: talk.bar ? comp.y + comp.height - 23 - height / 2 : comp.y + comp.height + 7; horizontalAlignment: talk.bar ? Text.AlignRight : Text.AlignLeft
+            visible: !talk.bar || width > 150
             color: Store.chatAsking ? Theme.amber : Theme.ink3
             text: Store.chatAsking ? (Store.chatAsking.kind === "measure" ? "The agent is waiting for a measurement: answer on the card above." : "The agent is waiting for your answer. Enter sends it.")
                 : Store.chatBusy ? "Working. Other conversations can run meanwhile."
