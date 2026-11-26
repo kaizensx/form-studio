@@ -1,0 +1,8 @@
+Fonts used by the direction mockups. All are licensed under the SIL Open Font License 1.1
+(https://openfontlicense.org). Latin subsets as served by Google Fonts; Instrument Sans and Geist Mono are the
+copies the website already ships (site/fonts).
+
+Geist, Geist Mono      Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font)
+Fraunces               Copyright 2018 The Fraunces Project Authors (https://github.com/undercasetype/Fraunces)
+IBM Plex Sans, Mono    Copyright 2017 IBM Corp. with Reserved Font Name "Plex"
+Instrument Sans        Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans)

@@ -1,0 +1,44 @@
+/* Shared by the three direction mockups: reset, the part picture, the token sheet's layout.
+   Each direction sets the variables and draws everything else in its own style.css. */
+@import url(fonts.css);
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1440px; height: 900px; overflow: hidden; }
+body { background: var(--bg); color: var(--ink); font: 13px/1.45 var(--sans); -webkit-font-smoothing: antialiased; position: relative; }
+.ic { flex: none; display: block; }
+.mono, code { font-family: var(--mono); font-feature-settings: "zero" 0; }
+.logo, .mark { display: block; }
+
+.part { position: absolute; }
+.part img { position: absolute; left: 0; top: 0; display: block; }
+.part .cast { filter: brightness(0) blur(var(--cast-blur, 18px)); opacity: var(--cast, .55); transform: translate(var(--cast-x, 10px), var(--cast-y, 16px)); }
+.part .dimlines { position: absolute; left: 0; top: 0; overflow: visible; }
+.part .dimlines line { stroke: var(--dim); stroke-width: 1.6; }
+.part .dimlines circle { fill: var(--dim); }
+.part .dim { position: absolute; transform: translate(-50%, -50%); font: 500 11px/1 var(--mono); color: var(--dim-ink); background: var(--dim-bg);
+  padding: 4px 6px; border-radius: var(--dim-r, 4px); border: 1px solid var(--dim-edge, transparent); white-space: nowrap; }
+
+/* token sheet */
+body.sheet { height: 1200px; }
+html:has(body.sheet) { height: 1200px; }
+.tokens { padding: 56px 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px 56px; height: 1200px; align-content: start; }
+.tokens .col { display: grid; gap: 28px; align-content: start; }
+.tokens header { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: end; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+.tokens .over { font: 500 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 26px 0 10px; }
+.tokens h1 { font: var(--display-w, 600) 56px/1 var(--display); letter-spacing: var(--display-track, -.03em); }
+.tokens .why { font-size: 15px; line-height: 1.6; color: var(--ink2); }
+.tokens h2 { font: 500 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink3); margin: 0 0 14px; }
+.tokens .spec { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.tokens .spec code, .tokens .sw code { font-size: 11px; color: var(--ink3); white-space: nowrap; }
+.tokens .sws { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.tokens .sw { display: grid; gap: 3px; font-size: 12px; }
+.tokens .sw i { height: 44px; border-radius: var(--r, 8px); border: 1px solid var(--line); }
+.tokens .sw span { color: var(--ink3); font-size: 11px; }
+.tokens .lightrow { padding: 14px; border-radius: var(--r, 8px); background: var(--light-bg); color: var(--light-ink); }
+.tokens .lightrow .sw i { border-color: #0002; } .tokens .lightrow code, .tokens .lightrow span { color: #0008; }
+.tokens .depth { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.tokens .lvl { height: 92px; padding: 14px; display: grid; align-content: end; gap: 2px; font-size: 12px; }
+.tokens .lvl span { color: var(--ink3); font-size: 11px; }
+.tokens .note { color: var(--ink2); font-size: 13px; line-height: 1.6; }
+.tokens ul { list-style: none; display: grid; gap: 0; }
+.tokens li { display: flex; justify-content: space-between; gap: 24px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.tokens li span { color: var(--ink2); text-align: right; }
