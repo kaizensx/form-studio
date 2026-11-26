@@ -1,13 +1,13 @@
 /* The app, drawn. Lightdesk (docs/design/directions/h): a studio room with the part in a pool of warm light, every
    control a pane of glass, the features as a program listing that runs, one bar under the part.
    Logical size 1440 x 900, scaled to the frame (site/js/desk.js sets --s). Under 760 px the same parts are laid out
-   for a phone at 390 x 640. One accent, periwinkle, for one meaning: this is where you are. */
+   for a phone at 390 x 640. One accent, cyan, for one meaning: this is where you are. */
 :root {
   --d-bg: #0b0b0c; --d-ink: #f4f3f1; --d-ink2: #a9a8a5; --d-ink3: #7d7c78; --d-line: rgba(255,255,255,.09);
-  --d-accent: #a9b8ff; --d-pass: #86d9a8; --d-warn: #f2c36b;
+  --d-accent: #3ee6ff; --d-pass: #7bd88f; --d-warn: #f2c36b;
   --d-glass: rgba(255,255,255,.07); --d-glass2: rgba(255,255,255,.14); --d-edge: rgba(255,255,255,.11);
   --d-shadow: 0 24px 60px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.3); --d-key: 255,233,207;
-  --d-dim-ink: #dfe5ff; --d-dim-bg: rgba(14,15,20,.82); --d-dim-edge: rgba(169,184,255,.35);
+  --d-dim-ink: #d9f9ff; --d-dim-bg: rgba(14,15,20,.82); --d-dim-edge: rgba(62,230,255,.35);
   --d-send: #f4f3f1; --d-send-ink: #0b0b0c; --d-solid: rgba(22,22,23,.92); --d-light: 0;
   --d-room: radial-gradient(ellipse 62% 58% at 44% 52%, rgba(255,233,207,.13), transparent 70%), linear-gradient(180deg, #0a0a0b 0%, #131314 38%, #1b1b1c 60%, #0d0d0e 100%);
   --d-room-build: radial-gradient(ellipse 44% 44% at 44% 44%, rgba(255,233,207,.2), transparent 70%), linear-gradient(180deg, #070708 0%, #0f0f10 38%, #171718 58%, #09090a 100%);
@@ -16,10 +16,10 @@
 }
 :root[data-theme="light"] {
   --d-bg: #eeece8; --d-ink: #161616; --d-ink2: #5d5c59; --d-ink3: #7a7975; --d-line: rgba(0,0,0,.09);
-  --d-accent: #3d55d6; --d-pass: #1f8a52; --d-warn: #a86a00;
+  --d-accent: #06708d; --d-pass: #1a7a3a; --d-warn: #a86a00;
   --d-glass: rgba(255,255,255,.62); --d-glass2: rgba(255,255,255,.95); --d-edge: rgba(255,255,255,.9);
   --d-shadow: 0 24px 60px rgba(60,50,40,.16), 0 1px 3px rgba(60,50,40,.10); --d-key: 255,255,255;
-  --d-dim-ink: #2b3fb0; --d-dim-bg: rgba(255,255,255,.9); --d-dim-edge: rgba(61,85,214,.3);
+  --d-dim-ink: #055d76; --d-dim-bg: rgba(255,255,255,.9); --d-dim-edge: rgba(6,112,141,.3);
   --d-send: #161616; --d-send-ink: #fff; --d-solid: rgba(250,249,247,.94); --d-light: 1;
   --d-room: radial-gradient(ellipse 62% 58% at 44% 52%, #fff, transparent 70%), linear-gradient(180deg, #e6e3de 0%, #efede9 40%, #f6f5f2 62%, #e4e1dc 100%);
   --d-room-build: radial-gradient(ellipse 44% 44% at 44% 44%, #fff, transparent 70%), linear-gradient(180deg, #dedbd5 0%, #e9e6e1 40%, #f1efeb 60%, #dcd9d3 100%);
@@ -29,10 +29,10 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --d-bg: #eeece8; --d-ink: #161616; --d-ink2: #5d5c59; --d-ink3: #7a7975; --d-line: rgba(0,0,0,.09);
-    --d-accent: #3d55d6; --d-pass: #1f8a52; --d-warn: #a86a00;
+    --d-accent: #06708d; --d-pass: #1a7a3a; --d-warn: #a86a00;
     --d-glass: rgba(255,255,255,.62); --d-glass2: rgba(255,255,255,.95); --d-edge: rgba(255,255,255,.9);
     --d-shadow: 0 24px 60px rgba(60,50,40,.16), 0 1px 3px rgba(60,50,40,.10); --d-key: 255,255,255;
-    --d-dim-ink: #2b3fb0; --d-dim-bg: rgba(255,255,255,.9); --d-dim-edge: rgba(61,85,214,.3);
+    --d-dim-ink: #055d76; --d-dim-bg: rgba(255,255,255,.9); --d-dim-edge: rgba(6,112,141,.3);
     --d-send: #161616; --d-send-ink: #fff; --d-solid: rgba(250,249,247,.94); --d-light: 1;
     --d-room: radial-gradient(ellipse 62% 58% at 44% 52%, #fff, transparent 70%), linear-gradient(180deg, #e6e3de 0%, #efede9 40%, #f6f5f2 62%, #e4e1dc 100%);
     --d-room-build: radial-gradient(ellipse 44% 44% at 44% 44%, #fff, transparent 70%), linear-gradient(180deg, #dedbd5 0%, #e9e6e1 40%, #f1efeb 60%, #dcd9d3 100%);
@@ -70,7 +70,7 @@
 .d-cap { position: absolute; top: 16px; height: 44px; border-radius: 22px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 14px; white-space: nowrap; }
 .d-cap.tl { left: 20px; } .d-cap.tr { right: 20px; padding: 0 8px 0 16px; gap: 6px; }
 .d-cap b { font-weight: 600; letter-spacing: -.01em; } .d-cap .rev { color: var(--d-ink2); font-size: 12px; } .d-cap > .ic { color: var(--d-ink3); }
-.d-cap .mark { display: block; height: 18px; width: 18px; } .d-cap .mark .f { fill: color-mix(in srgb, var(--d-ink) calc(var(--d-light) * 100%), #d8d3c8); } .d-cap .mark .o { fill: var(--d-accent); }
+.d-cap .mark { display: block; height: 18px; width: 18px; } .d-cap .mark .f { fill: color-mix(in srgb, var(--d-ink) calc(var(--d-light) * 100%), #d8d3c8); } .d-cap .mark .o { fill: color-mix(in srgb, #0a8fb3 calc(var(--d-light) * 100%), #3ee6ff); }
 .d-tag { font: 500 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; padding: 5px 7px; border-radius: 999px; background: var(--d-glass2); color: var(--d-ink2); }
 .d-cap .printer { display: flex; gap: 8px; align-items: center; color: var(--d-ink2); font-size: 12.5px; } .d-cap.tr > i { width: 1px; height: 18px; background: var(--d-line); margin: 0 6px 0 8px; }
 .d-cap .d-b { height: 32px; min-width: 32px; padding: 0 9px; border-radius: 16px; display: flex; align-items: center; gap: 8px; color: var(--d-ink2); }
