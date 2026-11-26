@@ -37,6 +37,12 @@ if (nav && !nav.dataset.ready) {
     }
   }
 
+  // docs on a phone: the page list is one sliding row; bring the page you are on into it
+  {
+    const cur = document.querySelector(".docs-nav a[aria-current='page']"), row = cur && cur.closest("ul");
+    if (row && row.scrollWidth > row.clientWidth) row.scrollLeft = cur.offsetLeft - row.offsetLeft - (row.clientWidth - cur.offsetWidth) / 2;
+  }
+
   // a group in the bar (3D printing): hover or focus opens it; a click or tap keeps it open until you leave it
   const groups = [...nav.querySelectorAll(".grp-btn")];
   const closeGroups = (except) => groups.forEach((b) => { if (b !== except) b.setAttribute("aria-expanded", "false"); });
