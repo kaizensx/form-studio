@@ -33,6 +33,8 @@ Glass {
     readonly property int count: Store.stages.length
     readonly property real least: Math.max(64, Math.min(104, (room - 8 - 2 * (count - 1)) / Math.max(1, count)))
     function segW(i) { return Math.max(least, Math.min(needs[i] + 32, Math.max(least, (room - 8) / Math.max(1, count)))) }
+    // as wide as it is when every segment has its words in full (the top bar centres it when there is room for that)
+    readonly property real natural: { var t = 8; for (var i = 0; i < count; i++) t += Math.max(64, needs[i] + 32) + (i ? 2 : 0); return t }
     readonly property real total: { var t = 8; for (var i = 0; i < count; i++) t += segW(i) + (i ? 2 : 0); return t }
     width: Math.min(room, total); height: 52; radius: 26
 

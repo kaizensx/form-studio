@@ -45,6 +45,7 @@ Column {
             ["Ctrl+Shift+O", "New conversation"],
             ["Ctrl+J", "Show or hide the conversation"],
             ["Ctrl+Shift+H", "All designs"],
+            ["Ctrl+[", "Back to all designs"],
             ["Ctrl+,", "Settings"],
             ["Ctrl+1", "Describe"], ["Ctrl+2", "Design"], ["Ctrl+3", "Fit"], ["Ctrl+4", "Review"], ["Ctrl+5", "Make"],
             ["Ctrl+Return", "Commit the draft"],

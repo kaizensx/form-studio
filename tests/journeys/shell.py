@@ -545,6 +545,15 @@ def journey_every_listed_shortcut(ui):
         ui.key("Ctrl+J")
         ui.wait_until(lambda: ui.store.get("talkOpen") is t, 3, "Ctrl+J again")
 
+    def do_back():
+        ui.key("Ctrl+[")
+        ui.wait_until(lambda: ui.store.get("screen") == "home", 5, "Ctrl+[ to go back to all designs")
+        ui.settle(300)
+        ui.run_js("Store.open(%r)" % pid)
+        ui.wait_until(lambda: ui.store.get("screen") == "work", 30, "the design again")
+        ui.idle(300)
+        ui.settle(500)
+
     def do_home():
         ui.key("Ctrl+Shift+H")
         ui.wait_until(lambda: ui.store.get("screen") == "home", 5, "Ctrl+Shift+H to go Home")
@@ -666,7 +675,7 @@ def journey_every_listed_shortcut(ui):
         "1": lambda: (view("2", "front"), view("1", "iso")), "2": lambda: view("2", "front"), "3": lambda: view("3", "side"),
         "4": lambda: view("4", "top"), "5": lambda: (view("5", "under"), view("1", "iso")),
         ".": do_dot, "H": do_h, "Shift+H": do_shift_h, "Right-click": do_right_click,
-        "Ctrl+K": do_palette, "Ctrl+N": do_new, "Ctrl+Shift+O": do_new_chat, "Ctrl+J": do_j, "Ctrl+Shift+H": do_home, "Ctrl+,": do_settings,
+        "Ctrl+K": do_palette, "Ctrl+N": do_new, "Ctrl+Shift+O": do_new_chat, "Ctrl+J": do_j, "Ctrl+Shift+H": do_home, "Ctrl+[": do_back, "Ctrl+,": do_settings,
         "Ctrl+1": lambda: stage("Ctrl+1", "brief"), "Ctrl+2": lambda: stage("Ctrl+2", "shape"), "Ctrl+3": lambda: stage("Ctrl+3", "fit"),
         "Ctrl+4": lambda: stage("Ctrl+4", "prove"), "Ctrl+5": lambda: (stage("Ctrl+5", "release"), stage("Ctrl+2", "shape")),
         "Ctrl+Return": do_commit, "?": do_question,

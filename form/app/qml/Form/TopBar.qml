@@ -16,6 +16,9 @@ Item {
     property real inset: 0                    // room for the macOS window buttons
     readonly property int capY: 16            // where the capsules sit, and how tall they are
     readonly property int capH: 44
+    // macOS: where the close button starts. The three buttons (54 px) stand on the capsules' centre line, 24 px in
+    // from the side, and the title capsule begins 14 px after them: one row, evenly spaced.
+    readonly property int buttonsX: 24
     height: 44                                // what Home starts under; the capsules reach a little below it
     Item { id: grip; width: parent.width; height: bar.work ? bar.capY + bar.capH + 8 : bar.height      // on Home the column's header starts right under the bar
         // drag to move the window, double-click to zoom (macOS) or maximise. Buttons and chips take their own clicks first.
@@ -45,16 +48,20 @@ Item {
         visible: !Store.welcome               // the first run brings its own lockup
         width: lrow.implicitWidth + (bar.work ? 22 : 12)
         Row { id: lrow; x: bar.work ? 8 : 6; anchors.verticalCenter: parent.verticalCenter; spacing: 4
-            Item { id: logoBox; objectName: "homeButton"; width: mark.implicitWidth + 16; height: 30; anchors.verticalCenter: parent.verticalCenter
+            // the way back to all designs: in a design the mark carries a ‹, and the two are one button
+            Item { id: logoBox; objectName: "homeButton"; width: mark.implicitWidth + 16 + (bar.work ? 16 : 0); height: 30; anchors.verticalCenter: parent.verticalCenter
                 baselineOffset: mark.y + mark.baselineOffset
                 Rectangle { anchors.fill: parent; radius: height / 2; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
                 // the mark alone beside a design's name; the whole lockup on Home
-                Logo { id: mark; anchors.centerIn: parent; size: 18; word: !bar.work; opacity: bar.logoHeld ? 0 : 1 }
+                Icon { objectName: "backChevron"; visible: bar.work; x: 5; anchors.verticalCenter: parent.verticalCenter; name: "chevron_left"; size: 14
+                    color: hm.containsMouse ? Theme.ink : Theme.ink3; Behavior on color { Tint {} }
+                    transform: Translate { x: hm.containsMouse && !hm.pressed ? -Theme.shift(2) : 0; Behavior on x { Glide { duration: Theme.fast } } } }
+                Logo { id: mark; anchors.verticalCenter: parent.verticalCenter; x: parent.width - width - 8; size: 18; word: !bar.work; opacity: bar.logoHeld ? 0 : 1 }
                 MouseArea { id: hm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.home() }
-                Tip { show: hm.containsMouse && bar.work; below: true; text: "All designs"; keys: "Ctrl+Shift+H" } }
+                Tip { show: hm.containsMouse && bar.work; below: true; text: "Back to all designs"; keys: "Ctrl+[" } }
             Txt { id: pname; visible: bar.work && !!Store.project; text: Store.project ? Store.project.name : ""; font.weight: Theme.wSemi; font.pixelSize: 14; font.letterSpacing: -0.15
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(implicitWidth, Math.max(90, (bar.width - stages.width) / 2 - left.x - 210 - (partial.visible ? 60 : 0))); elide: Text.ElideRight; wrapMode: Text.NoWrap
+                width: Math.min(implicitWidth, Math.max(90, (bar.width - stages.natural) / 2 - left.x - (stateTag.visible ? 210 : 104) - (partial.visible ? 60 : 0))); elide: Text.ElideRight; wrapMode: Text.NoWrap
                 HoverHandler { id: ph }
                 Tip { show: ph.hovered && !!Store.recipe; below: true; text: Store.recipe && Store.project ? (String(Store.project.recipe).indexOf("src:") === 0 ? "Designed by an agent" : "Started from: " + Store.recipe.title) : "" } }
             Item { width: 5; height: 1; visible: pname.visible }
@@ -74,7 +81,9 @@ Item {
                     PauseAnimation { duration: 500 }
                     NumberAnimation { target: revTxt; property: "lit"; to: 0; duration: 700; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } } }
             Item { width: 5; height: 1; visible: stateTag.visible }
-            Tag { id: stateTag; visible: bar.work && !!Store.project && text !== ""; anchors.verticalCenter: parent.verticalCenter
+            // "unreleased" is how every design starts: it is said where there is room (1400 px and wider); a draft,
+            // a release and a superseded release are always said
+            Tag { id: stateTag; visible: bar.work && !!Store.project && text !== "" && (text !== "unreleased" || bar.width >= 1400); anchors.verticalCenter: parent.verticalCenter
                 kind: Store.hasDraft ? "draft" : bar.ap && bar.ap.state === "approved" ? "PASS" : bar.ap && bar.ap.state === "superseded" ? "WARN" : ""
                 text: !Store.project || !bar.ap ? "" : Store.hasDraft ? "draft" : bar.ap.state === "approved" ? "released"
                     : bar.ap.state === "superseded" ? F.pad(bar.ap.rev) + " released" : "unreleased"
@@ -120,8 +129,12 @@ Item {
         source: Store.backdrop; arrive: 1
         visible: bar.work && !!Store.data
         y: bar.capY - 4
-        room: Math.max(330, right.x - (left.x + left.width) - 24)
-        x: Math.round(Math.max(left.x + left.width + 12, Math.min((bar.width - width) / 2, right.x - 12 - width)))
+        // on the window's centre line whenever its words fit there between the two capsules; only when they do not
+        // does it take all the room between them, off the centre
+        readonly property real onLine: 2 * Math.min(bar.width / 2 - (left.x + left.width + 12), right.x - 12 - bar.width / 2)
+        readonly property bool centred: onLine >= natural
+        room: centred ? onLine : Math.max(330, right.x - (left.x + left.width) - 24)
+        x: Math.round(centred ? (bar.width - width) / 2 : Math.max(left.x + left.width + 12, Math.min((bar.width - width) / 2, right.x - 12 - width)))
     }
 
     // ── right: the printer, notices, search, settings ──
@@ -150,7 +163,7 @@ Item {
                 MouseArea { id: awm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.showElsewhere() }
                 Tip { show: awm.containsMouse; below: true; text: Store.agentElsewhere && Store.agentElsewhere.title ? "In “" + Store.agentElsewhere.title + "”. Click to open that conversation." : "Click to open it." } }
             // the printer a design made for printing prints on, in every stage (a 3D model has none)
-            PrinterChip { id: printer; anchors.verticalCenter: parent.verticalCenter; visible: Store.printUi && bar.work; roomy: bar.roomy }
+            PrinterChip { id: printer; anchors.verticalCenter: parent.verticalCenter; visible: Store.printUi && bar.work; roomy: bar.roomy; iconOnly: bar.width < 1400 }      // under 1400 px its name would push the stages off the window's centre line
             Item { visible: printer.visible || away.visible; width: 13; height: 18; anchors.verticalCenter: parent.verticalCenter
                 Rectangle { x: 6; width: 1; height: parent.height; color: Theme.rule } }
             StatusChips { anchors.verticalCenter: parent.verticalCenter; compact: bar.work ? !bar.roomy : bar.tight }      // setup / update notices

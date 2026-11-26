@@ -46,8 +46,12 @@ def _frame(view) -> _Rect:
     return _send(_Rect, view, "frame")
 
 
-def center_buttons(view_id: int, bar_height: float) -> bool:
-    """view_id: QWindow.winId() (an NSView). True when the buttons were moved."""
+def center_buttons(view_id: int, bar_height: float, left: float = 0.0) -> bool:
+    """view_id: QWindow.winId() (an NSView). True when the buttons were moved.
+
+    left > 0: the close button starts that far from the window's left edge and the other two keep their distance to
+    it. The buttons then stand as far from the side as they stand from the top of the taller bar, instead of in the
+    corner AppKit puts them in for its own 28 pt title bar."""
     if sys.platform != "darwin" or not view_id or bar_height <= 0:
         return False
     try:
@@ -71,14 +75,17 @@ def center_buttons(view_id: int, bar_height: float) -> bool:
             c.size.h = bar_height
             c.origin.y = outer.size.h - bar_height                     # the frame view is not flipped: y from the bottom
             _send(None, vp(container), "setFrame:", c, argtypes=(_Rect,))
+        # AppKit's own pitch between the buttons (20 pt) is kept: measured from where they are, close button first
+        x0 = _frame(vp(close)).origin.x
+        dx = (left - x0) if left > 0 else 0.0
         for kind in (0, 1, 2):                                         # close, minimise, zoom
             b = _send(vp, vp(win), "standardWindowButton:", ctypes.c_long(kind), argtypes=(ctypes.c_long,))
             if not b:
                 continue
             f = _frame(vp(b))
             y = round((bar_height - f.size.h) / 2)
-            if abs(f.origin.y - y) > 0.5:
-                _send(None, vp(b), "setFrameOrigin:", _Pt(f.origin.x, y), argtypes=(_Pt,))
+            if abs(f.origin.y - y) > 0.5 or abs(dx) > 0.5:
+                _send(None, vp(b), "setFrameOrigin:", _Pt(f.origin.x + dx, y), argtypes=(_Pt,))
         return True
     except Exception:
         return False

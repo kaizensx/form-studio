@@ -254,13 +254,14 @@ class Bridge(QObject):
             return self._flights.pop(key, None) or [rid]
 
     @Slot(QObject, float, result=bool)
-    def centerWindowButtons(self, window, bar_height: float) -> bool:
+    @Slot(QObject, float, float, result=bool)
+    def centerWindowButtons(self, window, bar_height: float, left: float = 0.0) -> bool:
         """macOS: the close, minimise and zoom buttons centred on the top bar (form/app/macwin.py)."""
         if sys.platform != "darwin" or window is None:
             return False
         from . import macwin
         try:
-            return macwin.center_buttons(int(window.winId()), float(bar_height))
+            return macwin.center_buttons(int(window.winId()), float(bar_height), float(left))
         except Exception:
             return False
 
