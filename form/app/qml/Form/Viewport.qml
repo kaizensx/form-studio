@@ -1014,7 +1014,8 @@ Item {
             }
 
             // overall dimensions, drawn like a drawing: extension lines, a dimension line, the number
-            Model { visible: vp.showDims && !!vp.model && vp.asmMode !== "exploded" && !vp.dimsHeld && vp._altMix < 0.5; pickable: false; castsShadows: false
+            // (only where the lit lines over the view are not drawn: the small views)
+            Model { visible: vp.lite && vp.showDims && !!vp.model && vp.asmMode !== "exploded" && !vp.dimsHeld && vp._altMix < 0.5; pickable: false; castsShadows: false
                 geometry: LineGeometry { points: {
                     var o = 7, t = 2.2, p = []
                     var x0 = vp.dimLo.x, x1 = vp.dimHi.x, y0 = vp.dimLo.y, y1 = vp.dimHi.y, z0 = vp.dimLo.z, z1 = vp.dimHi.z
@@ -1132,26 +1133,29 @@ Item {
     }
     FrameAnimation { running: vp.visible && (dimLabels.count + pinLabels.count + refLabels.count) > 0; onTriggered: vp._seatLabels() }
 
-    // the dimension lines, lit: over the faint lines of the scene, a 2 px line in the accent with a soft halo and a dot
-    // at each end. Drawn from the projected ends (dimPx), so nothing is blurred: a still view costs nothing.
+    // the dimension lines: a thin line in the accent with a dot at each end, as on a drawing. Nothing around them: the
+    // line is the light. Drawn from the projected ends (dimPx), so a still view costs nothing. When they come on, each
+    // line is drawn from its first end to its second and the number follows.
     Repeater {
         model: dimLabels.count > 0 && !vp.lite ? vp.dimPx.length : 0
         Item {
             id: dline; required property int index
             readonly property var e: vp.dimPx[index] || null
             readonly property real len: e ? Math.hypot(e[2] - e[0], e[3] - e[1]) : 0
+            property real k: 1                        // how much of it is drawn
             visible: !!e && len > 6; x: e ? e[0] : 0; y: e ? e[1] : 0; width: len; height: 1
             rotation: e ? Math.atan2(e[3] - e[1], e[2] - e[0]) * 180 / Math.PI : 0; transformOrigin: Item.Left
-            Rectangle { x: -6; y: -7; width: parent.width + 12; height: 14; radius: 7
-                gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.datum, 0) } GradientStop { position: 0.5; color: Theme.alpha(Theme.datum, Theme.dark ? 0.13 : 0.08) } GradientStop { position: 1; color: Theme.alpha(Theme.datum, 0) } } }
-            Rectangle { y: -0.75; width: parent.width; height: 1.5; radius: 1; color: Theme.datum; opacity: 0.85; antialiasing: true }
-            Rectangle { x: -3; y: -3; width: 6; height: 6; radius: 3; color: Theme.datum; antialiasing: true
-                Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(Theme.datum, 0.18) } }
-            Rectangle { x: parent.width - 3; y: -3; width: 6; height: 6; radius: 3; color: Theme.datum; antialiasing: true
-                Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(Theme.datum, 0.18) } }
+            Component.onCompleted: if (!Theme.reduced && vp.interactive) drawIn.start()
+            SequentialAnimation { id: drawIn
+                PropertyAction { target: dline; property: "k"; value: 0 }
+                PauseAnimation { duration: 90 * dline.index }
+                NumberAnimation { target: dline; property: "k"; to: 1; duration: 360; easing.type: Easing.OutCubic } }
+            Rectangle { y: -0.6; width: parent.width * dline.k; height: 1.2; color: Theme.datum; antialiasing: true }
+            Rectangle { x: -2.5; y: -2.5; width: 5; height: 5; radius: 2.5; color: Theme.datum; antialiasing: true; opacity: Math.min(1, dline.k * 6) }
+            Rectangle { x: parent.width * dline.k - 2.5; y: -2.5; width: 5; height: 5; radius: 2.5; color: Theme.datum; antialiasing: true; opacity: Math.min(1, dline.k * 6) }
         }
     }
-    // dimension numbers, on the 3D dimension lines
+    // dimension numbers, on the 3D dimension lines: small capsules, the number in mono
     Repeater {
         id: dimLabels
         model: vp.showDims && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
@@ -1163,11 +1167,11 @@ Item {
             property int cand: -1
             // what is drawn so far while a build-up runs (it counts up to each new value), else the whole part
             readonly property real mm: index === 0 ? vp.dimHi.x - vp.dimLo.x : index === 1 ? vp.dimHi.y - vp.dimLo.y : vp.dimHi.z - vp.dimLo.z
-            width: t.implicitWidth + 20; height: 24; radius: 12; color: Theme.dark ? Theme.alpha(Theme.well, 0.9) : Theme.alpha(Theme.plate3, 0.94); border.color: Theme.alpha(Theme.datum, 0.5)
-            Rectangle { z: -1; anchors.fill: parent; anchors.margins: -4; radius: height / 2; color: "transparent"; border.width: 4; border.color: Theme.alpha(Theme.datum, Theme.dark ? 0.12 : 0.08) }
+            width: Math.ceil(t.implicitWidth) + 14; height: 21; radius: height / 2
+            color: Theme.dark ? Qt.rgba(0.055, 0.059, 0.078, 0.82) : Qt.rgba(1, 1, 1, 0.9); border.width: 1; border.color: Theme.alpha(Theme.datum, Theme.dark ? 0.35 : 0.3)
             opacity: shown ? 1 : 0; visible: opacity > 0.01                // a label that loses its seat fades, never blinks
-            Behavior on opacity { NumberAnimation { duration: 120 } }
-            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.dark ? Qt.lighter(Theme.datum, 1.6) : Theme.datumHi; font.family: Theme.mono; font.pixelSize: Theme.tFine; font.weight: 500; renderType: Theme.textRender }
+            Behavior on opacity { NumberAnimation { duration: shown ? 220 : 120 } }
+            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.dark ? "#d9f9ff" : Theme.datumHi; font.family: Theme.mono; font.pixelSize: Theme.tFine; font.weight: 500; renderType: Theme.textRender }
         }
     }
 

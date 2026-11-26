@@ -4,6 +4,7 @@ singleton Icons 1.0 Icons.qml
 singleton Store 1.0 Store.qml
 Txt 1.0 Txt.qml
 Glass 1.0 Glass.qml
+Glow 1.0 Glow.qml
 StageTabs 1.0 StageTabs.qml
 Cue 1.0 Cue.qml
 Room 1.0 Room.qml

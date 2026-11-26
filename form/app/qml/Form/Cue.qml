@@ -72,7 +72,7 @@ Item {
                 NumberAnimation { target: old; property: "opacity"; from: 1; to: 0; duration: Theme.base; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut }
                 NumberAnimation { target: oldY; property: "y"; from: 0; to: -Theme.shift(18); duration: Theme.move(Theme.cross); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
         }
-        Item { width: 1; height: 22 }
+        Item { width: 1; height: 26 }
         // the track: one segment per step; a long build is one bar
         Item { id: track; width: parent.width; height: 5
             readonly property color rest: Theme.alpha(Theme.lineBase, Theme.dark ? 0.13 : 0.12)
@@ -82,10 +82,11 @@ Item {
                         readonly property bool done: !cue.running || index + 1 < cue.at
                         readonly property bool current: cue.running && index + 1 === cue.at
                         width: (track.width - 5 * (cue.of - 1)) / cue.of; height: 5; radius: 2.5; color: track.rest
-                        // the glow under the segment being built
-                        Rectangle { visible: seg.current; anchors.centerIn: parent; width: parent.width + 14; height: 19; radius: 9.5; color: Theme.alpha(Theme.datum, 0.16)
-                            SequentialAnimation on opacity { running: seg.current && cue.visible && !Theme.reduced; loops: Animation.Infinite
-                                NumberAnimation { to: 0.45; duration: 900; easing.type: Easing.InOutSine } NumberAnimation { to: 1; duration: 900; easing.type: Easing.InOutSine } } }
+                        // the segment being built is lit: light around the whole segment, which comes up as the step
+                        // starts and dies away once it is built
+                        Glow { blur: 16; strength: 0.95; opacity: seg.current ? 1 : 0
+                            visible: opacity > 0.01
+                            Behavior on opacity { NumberAnimation { duration: seg.current ? 220 : 420; easing.type: Easing.OutCubic } } }
                         Rectangle { height: 5; radius: 2.5; color: seg.done ? Theme.ink : Theme.datum
                             width: parent.width * k
                             // a segment fills when its step starts (to a little over half: the step is under way) and to the end when it is built

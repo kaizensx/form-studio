@@ -49,16 +49,24 @@ Column {
                     text: root.stepOf > 1 ? root.stepAt + " of " + root.stepOf : "building" } } }
         Item {
             id: listing; width: parent.width; height: lines.implicitHeight
-            // the gutter: the one drawn line of the pane. Lit from the top down to the line being built
-            Rectangle { x: 45; y: 4; width: 1; height: parent.height - 8; color: Theme.rule }
-            Rectangle { id: pc; objectName: "programGutter"; x: 44; y: 0; width: 2; radius: 1
+            // the gutter: the one drawn line of the pane, 39 px in: between the numbers and the marks, which stand
+            // beside it and are never crossed by it. Lit from the top down to the middle of the line being built.
+            Rectangle { x: 39; y: 4; width: 1; height: parent.height - 8; color: Theme.rule }
+            // the line being built is raised: one pane of glass that glides from line to line
+            Rectangle { id: nowBar; objectName: "programNow"; width: parent.width; height: 32; radius: 10; color: Theme.glass2
+                y: pc.at ? pc.at.y : 0; opacity: root.running && pc.at ? 1 : 0; visible: opacity > 0.01
+                Behavior on y { enabled: nowBar.opacity > 0.5; NumberAnimation { duration: Theme.move(220); easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: Theme.fast } }
+                Rectangle { x: parent.radius; width: parent.width - 2 * parent.radius; height: 1; color: Qt.rgba(1, 1, 1, Theme.dark ? 0.1 : 0) } }
+            Rectangle { id: pc; objectName: "programGutter"; x: 38.5; y: 0; width: 2; radius: 1
                 property Item at: null                    // the row being built
-                height: root.running && at ? at.y + 16 : 0; visible: height > 0.5
+                property real reach: root.running && at ? at.y + 16 : 0
+                height: reach; visible: height > 0.5
                 opacity: root.running ? 1 : 0
-                Behavior on height { NumberAnimation { duration: Theme.reduced ? 0 : 140; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
+                Behavior on reach { NumberAnimation { duration: Theme.reduced ? 0 : 220; easing.type: Easing.OutCubic } }
                 Behavior on opacity { NumberAnimation { duration: Theme.cross } }
                 gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.datum, 0.25) } GradientStop { position: 0.7; color: Theme.datum } }
-                Rectangle { anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter; width: 10; height: 14; radius: 5; color: Theme.alpha(Theme.datum, 0.22) } }
+                Glow { blur: 10; strength: 0.55 } }
             Column {
                 id: lines; width: parent.width
                 Repeater {
@@ -75,32 +83,38 @@ Column {
                         readonly property bool built: root.running && !arriving && root.builtNow.indexOf(modelData.id) >= 0
                         readonly property bool todo: root.running && !arriving && !built
                         onArrivingChanged: if (arriving) pc.at = fr
+                        onBuiltChanged: if (built && root.running) landed.restart()
                         width: lines.width; height: Math.max(32, why.visible ? why.implicitHeight + 30 : 0)
                         Rectangle { anchors.fill: parent; radius: 10
-                            color: fm.pressed ? Theme.washPress : fr.arriving ? Theme.glass2 : fm.containsMouse ? Theme.washHover : "transparent"
-                            Behavior on color { Tint {} }
-                            Rectangle { visible: fr.arriving; x: parent.radius; width: parent.width - 2 * parent.radius; height: 1; color: Qt.rgba(1, 1, 1, Theme.dark ? 0.1 : 0) } }
+                            color: fm.pressed ? Theme.washPress : fm.containsMouse && !fr.arriving ? Theme.washHover : "transparent"
+                            Behavior on color { Tint {} } }
                         Item { objectName: "featureArriving"; width: 1; height: 1; opacity: fr.arriving ? 1 : 0 }       // what the tree and tests read
                         // its number in the build order
-                        Txt { x: 0; y: 9; width: 30; horizontalAlignment: Text.AlignRight; mono: true; font.pixelSize: 11; wrapMode: Text.NoWrap
+                        Txt { x: 0; y: (32 - height) / 2; width: 30; horizontalAlignment: Text.AlignRight; mono: true; font.pixelSize: 11; wrapMode: Text.NoWrap
                             text: (fr.index < 9 ? "0" : "") + (fr.index + 1); color: fr.arriving ? Theme.datum : fr.out ? Theme.amber : Theme.ink3; opacity: fr.todo ? 0.7 : 1
                             Behavior on color { Tint {} } }
-                        // the gutter mark: ticked when built (it lands with a small spring), a pointer on the line being built
-                        Item { x: 34; y: 0; width: 26; height: 32
+                        // the mark, right of the gutter: ticked when built (the tick lands on a small spring and its
+                        // light flares once), a pointer on the line being built
+                        Item { x: 34; y: 0; width: 30; height: 32
+                            Rectangle { id: flare; anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: Theme.pass; opacity: 0
+                                Glow { color: Theme.pass; blur: 9; strength: 0.9 } }
                             Icon { id: tick; anchors.centerIn: parent; name: "check"; size: 13; color: Theme.pass
                                 opacity: fr.built ? 1 : 0; scale: fr.built ? 1 : Theme.from(0.3)
                                 Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-                                Behavior on scale { NumberAnimation { duration: Theme.move(Theme.slow); easing.type: Easing.OutBack; easing.overshoot: 2.2 } } }
-                            Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.plate3; visible: fr.arriving
-                                Icon { anchors.centerIn: parent; anchors.horizontalCenterOffset: 1; name: "play"; size: 9; color: Theme.datum } } }
-                        Txt { id: nameTxt; x: 66; y: 8; width: parent.width - 66 - kw.width - 22; elide: Text.ElideRight; wrapMode: Text.NoWrap; font.pixelSize: 13; font.letterSpacing: -0.05
+                                Behavior on scale { SpringAnimation { spring: 5.5; damping: 0.36; epsilon: 0.01 } } }
+                            Icon { anchors.centerIn: parent; name: "play"; size: 10; color: Theme.datum
+                                opacity: fr.arriving ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
+                            SequentialAnimation { id: landed
+                                NumberAnimation { target: flare; property: "opacity"; from: 0; to: Theme.reduced ? 0 : 0.9; duration: 90 }
+                                NumberAnimation { target: flare; property: "opacity"; to: 0; duration: 360; easing.type: Easing.OutCubic } } }
+                        Txt { id: nameTxt; x: 64; y: (32 - height) / 2; width: parent.width - 64 - kw.width - 22; elide: Text.ElideRight; wrapMode: Text.NoWrap; font.pixelSize: 13; font.letterSpacing: -0.05
                             text: fr.modelData.label + (fr.touched ? "  ●" : ""); font.weight: fr.arriving ? Theme.wSemi : Theme.wMedium
                             color: fr.touched ? Theme.datum : fr.out || fr.todo ? Theme.ink3 : fr.built ? Theme.ink2 : Theme.ink
                             Behavior on color { Tint {} } }
-                        Txt { id: why; objectName: "leftOutReason"; kind: "fine"; visible: !!fr.out; tone: 2; x: 66; y: 28; width: parent.width - 78; wrapMode: Text.WordWrap
+                        Txt { id: why; objectName: "leftOutReason"; kind: "fine"; visible: !!fr.out; tone: 2; x: 64; y: 28; width: parent.width - 78; wrapMode: Text.WordWrap
                             text: fr.out ? Store.leftOutReason(fr.out) : "" }
                         // its role, lettered in neutral mono; "building" on the line that runs
-                        Txt { id: kw; objectName: "featureRole"; anchors.right: parent.right; anchors.rightMargin: 12; y: 10; mono: true; font.pixelSize: 10; font.weight: Theme.wMedium; font.letterSpacing: 1.0
+                        Txt { id: kw; objectName: "featureRole"; anchors.right: parent.right; anchors.rightMargin: 12; y: (32 - height) / 2; mono: true; font.pixelSize: 10; font.weight: Theme.wMedium; font.letterSpacing: 1.0
                             font.capitalization: Font.AllUppercase; wrapMode: Text.NoWrap
                             text: fr.arriving ? "building" : fr.out ? "left out" : fr.modelData.role
                             color: fr.arriving ? Theme.datum : fr.out ? Theme.amber : Theme.ink3; opacity: fr.built ? 0.6 : fr.todo ? 0.5 : 1 }
