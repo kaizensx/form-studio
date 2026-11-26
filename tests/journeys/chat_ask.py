@@ -49,7 +49,7 @@ def run(ui):
     # ── an open question, answered from the composer ──
     send(ui, "ask me in words")
     asking(ui)
-    ui.wait_until(lambda: "Answer the question" in (ui.item("composer").property("placeholderText") or ""), 5, "the composer to offer the answer")
+    ui.wait_until(lambda: "Answer the question" in (ui.item("composer").property("placeholder") or ""), 5, "the composer to offer the answer")
     send(ui, "75.6 measured with calipers")
     idle(ui, "the reply after a typed answer")
     ui.expect("You answered: 75.6 measured with calipers")

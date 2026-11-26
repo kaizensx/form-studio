@@ -541,8 +541,8 @@ Rectangle {
         y: talk.height - height
         // numbered suggestions for the open design, from its real state; keys 1 to 4 pick them while the prompt is empty
         Grid {
-            id: sugg; objectName: "talkSuggestions"; x: 8; y: 6; width: parent.width - 16; columns: width > 440 ? 2 : 1; columnSpacing: 4; rowSpacing: 0
-            visible: talk.suggOn; height: visible ? implicitHeight + 6 : 0
+            id: sugg; objectName: "talkSuggestions"; x: 8; y: 8; width: parent.width - 16; columns: width > 440 ? 2 : 1; columnSpacing: 4; rowSpacing: 0
+            visible: talk.suggOn; height: visible ? implicitHeight + 8 : 0
             Repeater {
                 model: talk.suggOn ? talk.forProject : []
                 Item {
@@ -571,17 +571,22 @@ Rectangle {
             Behavior on border.color { Tint {} }
             HoverHandler { id: ch }
             // the prompt: an accent "›" before whatever is typed
-            Text { x: 16; y: sv.y + 9; visible: sv.contentItem.contentY < 4; text: "›"; color: Theme.datum; font.family: Theme.mono; font.pixelSize: 22; font.weight: Theme.wMedium; renderType: Theme.textRender }
+            // (22 px mono: its line box is 28.6 px; it stands on the middle of the first line of the prompt, as the caret does)
+            Text { x: 16; y: sv.y + ta.topPadding - 5; visible: sv.contentItem.contentY < 4; text: "›"; color: Theme.datum; font.family: Theme.mono; font.pixelSize: 22; font.weight: Theme.wBody; renderType: Theme.textRender }
             // the caret, standing in the empty prompt while the keyboard is elsewhere (with it here, the field draws its own)
-            Rectangle { id: restCaret; objectName: "promptCaret"; x: 38; y: sv.y + 14; width: 8; height: 19; radius: 2; color: Theme.datum
+            Rectangle { id: restCaret; objectName: "promptCaret"; x: 39; y: sv.y + ta.topPadding; width: 8; height: 19; radius: 2; color: Theme.datum
                 visible: !ta.activeFocus && ta.text === "" && ta.enabled
-                Rectangle { anchors.centerIn: parent; width: 20; height: 31; radius: 8; color: Theme.alpha(Theme.datum, 0.16) }
+                Glow { blur: 12; strength: 0.85; radius: 2 }
                 // stepped, like the room's light: a waiting prompt must not keep the window drawing at full rate
                 property real phase: 0
-                opacity: 0.675 + 0.325 * Math.cos(phase)
-                Timer { interval: 66; repeat: true; running: restCaret.visible && talk.visible && !Theme.reduced; onTriggered: restCaret.phase += 0.26 } }
+                opacity: 0.72 + 0.28 * Math.cos(phase)
+                Timer { interval: 100; repeat: true; running: restCaret.visible && talk.visible && !Theme.reduced; onTriggered: restCaret.phase += 0.39 } }
             Rectangle { anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3; border.color: Theme.alpha(Theme.datum, 0.13)
                 opacity: ta.activeFocus ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
+            // what an empty prompt says, after the caret: one line, cut with an ellipsis where the controls begin
+            Txt { objectName: "promptPlaceholder"; visible: ta.text === "" && ta.preeditText === ""; x: 56; y: sv.y + ta.topPadding + (ta.contentHeight - height) / 2
+                width: comp.width - x - ta.rightPadding; elide: Text.ElideRight; wrapMode: Text.NoWrap; lineHeight: 1
+                font.pixelSize: ta.font.pixelSize; font.letterSpacing: -0.1; color: Theme.ink3; text: ta.placeholder }
             Column {
                 id: inner; width: parent.width
                 // a file on its way in
@@ -614,26 +619,27 @@ Rectangle {
                                     tip: "Remove"; onClicked: Store.dropLink(lchip.modelData.url) } } } } }
                 ScrollView {
                     id: sv; width: parent.width; clip: true
-                    height: Math.min(220, Math.max(talk.bar ? 44 : 2 * 19 + 18, ta.implicitHeight))
+                    height: Math.min(220, Math.max(talk.slim ? 52 : talk.bar ? 44 : 2 * 19 + 18, ta.implicitHeight))
                     Behavior on height { NumberAnimation { duration: Theme.move(Theme.fast); easing.type: Easing.OutQuad } }
                     TextArea {
                         id: ta
                         objectName: "composer"
                         // "Ask about this feature…" from the viewport's context menu lands here
                         Connections { target: Store; function onChatPrefill(text) { Store.talkOpen = true; ta.text = text; ta.cursorPosition = text.length; ta.forceActiveFocus() } }
-                        wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: 15; font.letterSpacing: -0.1
+                        wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: talk.slim ? 14 : 15; font.letterSpacing: -0.1
                         // the caret is the accent block of a command line: it breathes in an empty prompt and thins to a bar once you type
                         cursorDelegate: Rectangle { id: cur; visible: ta.activeFocus; color: Theme.datum; radius: 2
                             width: ta.text === "" ? 8 : 2; height: 19
                             Behavior on width { NumberAnimation { duration: Theme.move(Theme.fast) } }
+                            Glow { blur: 12; strength: 0.85; radius: 2 }
                             property real phase: 0
-                            opacity: 0.65 + 0.35 * Math.cos(phase)
-                            Timer { interval: 66; repeat: true; running: cur.visible && !Theme.reduced; onTriggered: cur.phase += 0.33 } }
+                            opacity: 0.7 + 0.3 * Math.cos(phase)
+                            Timer { interval: 100; repeat: true; running: cur.visible && !Theme.reduced; onTriggered: cur.phase += 0.5 } }
                         readonly property string placeholder: !Store.chat.available ? "No agent is connected" : Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure" ? "Answer the question above…" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to make…"
-                        placeholderText: "\u2003" + placeholder
-                        placeholderTextColor: Theme.ink4; enabled: Store.chat.available
+                        enabled: Store.chat.available
                         selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
-                        leftPadding: 38; rightPadding: 14; topPadding: 13; bottomPadding: 6; background: null; renderType: Theme.textRender
+                        // on one line (slim) the controls stand right of the words, so the words stop before them
+                        leftPadding: 39; rightPadding: talk.slim ? footRow.width + 62 : 14; topPadding: talk.slim ? 17 : 13; bottomPadding: talk.slim ? 16 : 6; background: null; renderType: Theme.textRender
                         function submit() {
                             if (!text.trim()) return
                             if (Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure") { Store.answerAsk(Store.chatAsking.id, text.trim(), []); text = ""; return }
@@ -658,17 +664,21 @@ Rectangle {
                         }
                     }
                 }
-                Item { width: parent.width; height: 46
-                    Row { id: footRow; x: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 2
-                        Btn { small: true; kind: "quiet"; icon: "paperclip"; tip: "Attach a photo, a PDF drawing, or a STEP, STL, 3MF or OBJ part. You can also drop files here, or paste a link."
+                // attach, the agent, send: a row under the words, or right of them when the bar is one line
+                // (it lies at the foot of the well whatever the column above holds; the column only keeps its room)
+                Item { width: parent.width; height: talk.slim ? 0 : 46
+                  Item { id: ctl; parent: comp; z: 2; width: comp.width; height: talk.slim ? 52 : 46; y: comp.height - height
+                    Row { id: footRow; x: talk.slim ? parent.width - width - 52 : 8; anchors.verticalCenter: parent.verticalCenter; spacing: 2
+                        Btn { small: true; kind: "quiet"; icon: "paperclip"; iconSize: 16; width: 30; height: 30; anchors.verticalCenter: parent.verticalCenter; tip: "Attach a photo, a PDF drawing, or a STEP, STL, 3MF or OBJ part. You can also drop files here, or paste a link."
                             enabled: Store.chat.available; onClicked: Store.ask(pick) }
                         // agent and model for this conversation
-                        Item { id: mchip; objectName: "modelChip"; width: ml.width + 31; height: 24
-                            Rectangle { anchors.fill: parent; radius: Theme.rSm; color: mcm.pressed ? Theme.washPress : mcm.containsMouse || mpop.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
-                            Txt { id: ml; x: 7; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
-                                width: Math.min(implicitWidth, comp.width - 170); elide: Text.ElideRight
+                        Item { id: mchip; objectName: "modelChip"; width: ml.width + (talk.slim ? 42 : 55); height: 30; anchors.verticalCenter: parent.verticalCenter
+                            Rectangle { anchors.fill: parent; radius: height / 2; color: mcm.pressed ? Theme.washPress : mcm.containsMouse || mpop.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
+                            Icon { x: 9; name: "sparkles"; size: 15; color: Theme.ink2; anchors.verticalCenter: parent.verticalCenter }
+                            Txt { id: ml; x: 31; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
+                                width: Math.min(implicitWidth, comp.width - (talk.slim ? 300 : 190)); elide: Text.ElideRight
                                 text: Store.chatAgentLabel + " · " + Store.modelShort(Store.chatAgent, Store.chatModel) + (Store.chatEffort ? " · " + Store.chatEffort : "") }
-                            Icon { x: ml.width + 12; name: "chevron_down"; size: 12; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
+                            Icon { visible: !talk.slim; x: ml.x + ml.width + 7; name: "chevron_down"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
                             MouseArea { id: mcm; anchors.fill: parent; hoverEnabled: true; onClicked: mpop.opened ? mpop.close() : mpop.open() }
                             Tip { show: mcm.containsMouse && !mpop.opened; text: "Agent and model for this conversation" }
                             Pop {
@@ -712,13 +722,14 @@ Rectangle {
                         MouseArea { id: sbm; anchors.fill: parent; hoverEnabled: true; onClicked: { if (sendBtn.stops) Store.stopChat(); else if (ta.text.trim() === "") ta.forceActiveFocus(); else ta.submit() } }
                         Tip { show: sbm.containsMouse; keys: sendBtn.stops ? "" : "Return"
                             text: sendBtn.answering ? "Send your answer" : Store.chatBusy ? "Stop this reply. What was already committed stays." : sendBtn.can ? "Send" : !Store.chatReady ? "No agent is connected" : "Write a message first" } }
+                  }
                 }
             }
         }
         Txt { id: hint; kind: "fine"; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 3
             x: talk.bar ? comp.x + footRow.x + footRow.width + 14 : 16; width: talk.bar ? comp.width - (footRow.x + footRow.width + 14) - 56 : parent.width - 2 * x
             y: talk.bar ? comp.y + comp.height - 23 - height / 2 : comp.y + comp.height + 7; horizontalAlignment: talk.bar ? Text.AlignRight : Text.AlignLeft
-            visible: !talk.bar || width > 150
+            visible: !talk.slim && (!talk.bar || width > 150)
             color: Store.chatAsking ? Theme.amber : Theme.ink3
             text: Store.chatAsking ? (Store.chatAsking.kind === "measure" ? "The agent is waiting for a measurement: answer on the card above." : "The agent is waiting for your answer. Enter sends it.")
                 : Store.chatBusy ? "Working. Other conversations can run meanwhile."

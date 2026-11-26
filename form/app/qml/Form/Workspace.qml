@@ -335,7 +335,8 @@ Item {
             x: Theme.edge; y: 80; z: 6; width: 48; height: railCol.implicitHeight + 12; radius: 24
             visible: !!Store.view
             // while a build plays the tools step back: the part and its cue have the room
-            Item { anchors.fill: parent; opacity: ws.cueOn ? 0.45 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
+            // (as one picture while it is dimmed, so the filled disc and its icon fade together and not one through the other)
+            Item { anchors.fill: parent; opacity: ws.cueOn ? 0.45 : 1; layer.enabled: opacity < 0.999; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
             Column {
                 id: railCol; x: 6; y: 6; spacing: 2
                 RailBtn { icon: "mouse_pointer_2"; label: "Select"; keys: "V"; hint: "Click a feature to edit it. Drag to orbit, shift-drag to pan."
@@ -464,7 +465,7 @@ Item {
             x: Theme.edge; y: centre.height - Theme.edge - height; z: 5; visible: !ws.sim && !!Store.view
             width: vrow.implicitWidth + 12; height: 40; radius: 20
             readonly property var names: [{ value: "iso", text: "Iso" }, { value: "front", text: "Front" }, { value: "side", text: "Side" }, { value: "top", text: "Top" }, { value: "under", text: "Under" }]
-            Row { id: vrow; x: 6; anchors.verticalCenter: parent.verticalCenter; spacing: 2; opacity: ws.cueOn ? 0.45 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
+            Row { id: vrow; x: 6; anchors.verticalCenter: parent.verticalCenter; spacing: 2; opacity: ws.cueOn ? 0.45 : 1; layer.enabled: opacity < 0.999; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
                 // the grid: the build plate of a design made for printing while Describe or Design is open (Fit, Review and
                 // Make show it anyway); otherwise the 10 mm grid of the studio floor
                 Btn { objectName: "showPlate"; small: true; kind: "quiet"; height: 30; width: 32; icon: "grid_3x3"; anchors.verticalCenter: parent.verticalCenter
@@ -576,9 +577,9 @@ Item {
                                         : asm ? Store.assembly.bbox : (Store.shown ? Store.shown.bbox : null)
                 Row { spacing: 7; height: 16
                     Tick { font.pixelSize: 12; tone: 1; value: ro.bb ? ro.bb[1][0] - ro.bb[0][0] : 0; anchors.verticalCenter: parent.verticalCenter }
-                    Txt { text: "×"; tone: 3; mono: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { text: "×"; tone: 1; mono: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
                     Tick { font.pixelSize: 12; tone: 1; value: ro.bb ? ro.bb[1][1] - ro.bb[0][1] : 0; anchors.verticalCenter: parent.verticalCenter }
-                    Txt { text: "×"; tone: 3; mono: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { text: "×"; tone: 1; mono: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
                     Tick { font.pixelSize: 12; tone: 1; value: ro.bb ? ro.bb[1][2] - ro.bb[0][2] : 0; unit: " mm"; anchors.verticalCenter: parent.verticalCenter }
                     Txt { visible: !ro.sofar; text: "·"; tone: 3; leftPadding: 4; rightPadding: 4; anchors.verticalCenter: parent.verticalCenter }
                     Tick { visible: !ro.sofar; font.pixelSize: 12; tone: 1; value: Store.shown ? Store.shown.volume_mm3 / 1000 : 0; unit: " cm³"; anchors.verticalCenter: parent.verticalCenter } }

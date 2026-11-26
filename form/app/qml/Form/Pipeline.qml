@@ -13,7 +13,7 @@ Rectangle {
     readonly property bool narrow: !grid && width < 620          // labels only; the detail moves into the tooltip
     readonly property bool tiny: !grid && width < 470            // dots only, and one sentence for whatever is not current
     readonly property bool roomy: !grid && width >= 900          // room for the long form of each node's line; otherwise the short one
-    readonly property real cell: (width - 24 - 10) / 2
+    readonly property real cell: (width - 32 - 14) / 2
     // Each node is as wide as what it says, and the slack is shared out, so a short line never crowds a long one.
     property var needs: [0, 0, 0, 0, 0, 0]
     function setNeed(i, w) { if (needs[i] === w) return; var n = needs.slice(); n[i] = w; needs = n }
@@ -35,7 +35,7 @@ Rectangle {
         return rev + " · all current"
     }
     color: flat ? "transparent" : Theme.alpha(Theme.plate1, 0.9); radius: Theme.rLg; border.color: Theme.rule; border.width: flat ? 0 : 1
-    implicitHeight: grid ? row.implicitHeight + 20 : narrow ? 34 : 48
+    implicitHeight: grid ? row.implicitHeight + 24 : narrow ? 34 : 48
     readonly property var d: Store.data
     readonly property var st: d ? d.status : ({})
     readonly property string rev: d ? F.pad(d.project.head) : ""
@@ -69,8 +69,10 @@ Rectangle {
         .filter(function (n) { return n.id !== "slice" || Store.printUi })
     onNodesChanged: needs = nodes.map(function () { return 0 })
     Grid {
-        id: row; x: pl.grid ? 12 : 4; y: pl.grid ? 10 : 0; width: parent.width - 2 * x; height: pl.grid ? implicitHeight : parent.height
-        columns: pl.grid ? 2 : 99; columnSpacing: pl.grid ? 10 : 0; rowSpacing: pl.grid ? 4 : 0
+        // the capsule's grid: 16 px in, 12 from the top; two columns 14 apart, rows 10 apart; a cell is its name (13 px)
+        // and, 2 px under it, its value in mono, indented to stand under the name and not under the dot
+        id: row; x: pl.grid ? 16 : 4; y: pl.grid ? 12 : 0; width: parent.width - 2 * x; height: pl.grid ? implicitHeight : parent.height
+        columns: pl.grid ? 2 : 99; columnSpacing: pl.grid ? 14 : 0; rowSpacing: pl.grid ? 10 : 0
         Repeater {
             model: pl.nodes
             Item {
@@ -92,27 +94,27 @@ Rectangle {
                 onNeedChanged: pl.setNeed(index, need)
                 Component.onCompleted: { pl.setNeed(index, need); if (index === 0) pl.least0 = least }
                 width: pl.grid ? pl.cell : pl.tiny ? 16 : pl.widthOf(index, need, least, room)
-                height: pl.grid ? 40 : row.height
+                height: pl.grid ? 35 : row.height
                 // a node that has just been made for this revision settles: the dot lands, nothing else moves
                 onSChanged: if (s === "current" && was === "running") settle.restart()
                 property string was: s
                 Timer { interval: 0; running: nd.was !== nd.s; onTriggered: nd.was = nd.s }
-                Rectangle { anchors.fill: parent; anchors.margins: pl.grid ? 0 : 3; radius: Theme.rMd; color: nm.pressed ? Theme.washPress : nm.containsMouse ? Theme.washHover : "transparent"
+                Rectangle { anchors.fill: parent; anchors.margins: pl.grid ? -5 : 3; anchors.leftMargin: pl.grid ? -8 : 3; anchors.rightMargin: pl.grid ? -4 : 3; radius: Theme.rMd; color: nm.pressed ? Theme.washPress : nm.containsMouse ? Theme.washHover : "transparent"
                     Behavior on color { Tint {} } }
                 // the link from the node before: drawn in the state of this node, so the eye follows what is current
                 Rectangle { visible: nd.index > 0 && !pl.tiny && !pl.grid; x: -3; y: pl.narrow ? 16 : 15; width: 6; height: 1; color: nd.s === "current" ? Theme.alpha(Theme.pass, 0.5) : Theme.rule2 }
-                Column { x: pl.grid ? 8 : pl.tiny ? 5 : 11; anchors.verticalCenter: parent.verticalCenter; width: parent.width - (pl.grid ? 8 : pl.tiny ? 5 : 20); spacing: pl.grid ? 4 : 2
+                Column { x: pl.grid ? 0 : pl.tiny ? 5 : 11; anchors.verticalCenter: parent.verticalCenter; width: parent.width - (pl.grid ? 0 : pl.tiny ? 5 : 20); spacing: pl.grid ? 1 : 2
                     Row { spacing: 7
-                        Rectangle { id: dot; width: 6; height: 6; radius: 3; color: pl.tint(nd.s); anchors.verticalCenter: parent.verticalCenter
+                        Rectangle { id: dot; width: 6; height: 6; radius: 3; color: pl.grid && pl.tint(nd.s) === Theme.ink4 ? Theme.ink3 : pl.tint(nd.s); anchors.verticalCenter: parent.verticalCenter
                             Behavior on color { ColorAnimation { duration: Motion.ui } }
                             SequentialAnimation on opacity { running: nd.s === "running"; loops: Animation.Infinite; alwaysRunToEnd: true
                                 NumberAnimation { to: 0.25; duration: 450 } NumberAnimation { to: 1; duration: 450 } }
                             SequentialAnimation { id: settle
                                 NumberAnimation { target: dot; property: "scale"; from: Theme.from(1.9); to: 1; duration: Theme.cross; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } }
-                        Txt { id: lbl; visible: !pl.tiny; text: nd.modelData.label; font.weight: Theme.wSemi; font.pixelSize: pl.grid ? 13 : 12; font.letterSpacing: -0.1; wrapMode: Text.NoWrap
+                        Txt { id: lbl; visible: !pl.tiny; text: nd.modelData.label; font.weight: Theme.wSemi; font.pixelSize: pl.grid ? 13 : 12; font.letterSpacing: -0.1; wrapMode: Text.NoWrap; lineHeight: pl.grid ? 1.1 : 1.25
                             width: Math.min(implicitWidth, nd.width - 30); elide: Text.ElideRight } }
-                    Txt { id: sayTxt; visible: !pl.narrow; kind: "fine"; mono: pl.grid || nd.s === "current"; font.pixelSize: pl.grid ? 10 : 11; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
-                        leftPadding: pl.grid ? 13 : 0; font.letterSpacing: pl.grid ? -0.4 : 0
+                    Txt { id: sayTxt; visible: !pl.narrow; kind: "fine"; mono: pl.grid || nd.s === "current"; font.pixelSize: 11; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
+                        leftPadding: pl.grid ? 13 : 0; font.letterSpacing: pl.grid ? -0.4 : 0; lineHeight: pl.grid ? 1.1 : 1.25
                         color: nd.s === "failed" ? Theme.signal : nd.s === "stale" ? Theme.amber : pl.grid ? Theme.ink2 : Theme.ink3
                         text: nd.say } }
                 Rectangle { // running sweep
@@ -137,14 +139,14 @@ Rectangle {
         }
         Txt { visible: pl.tiny; width: row.width - auto.width - 16 * pl.nodes.length - 10; height: row.height; leftPadding: 10; verticalAlignment: Text.AlignVCenter
             font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; elide: Text.ElideRight; text: pl.summary }
-        Item { id: auto; objectName: "pipelineAuto"; width: pl.grid ? pl.cell : pl.narrow ? 44 : 78; height: pl.grid ? 40 : row.height
+        Item { id: auto; objectName: "pipelineAuto"; width: pl.grid ? pl.cell : pl.narrow ? 44 : 78; height: pl.grid ? 35 : row.height
             readonly property bool on: !!pl.d && pl.d.project.auto_run !== false
             Rectangle { visible: !pl.grid; x: 0; y: 10; width: 1; height: parent.height - 20; color: Theme.rule }
-            Txt { visible: !pl.narrow; kind: "cap"; text: "Auto"; anchors.verticalCenter: parent.verticalCenter; x: pl.grid ? 21 : Math.round((parent.width - width - 37) / 2) }
+            Txt { visible: !pl.narrow; kind: "cap"; text: "Auto"; anchors.verticalCenter: parent.verticalCenter; x: pl.grid ? 13 : Math.round((parent.width - width - 37) / 2) }
             Rectangle { id: sw; width: 30; height: 18; radius: 9; color: auto.on ? Theme.datum : Theme.alpha(Theme.lineBase, 0.2); anchors.verticalCenter: parent.verticalCenter
-                x: pl.grid ? parent.width - width - 8 : pl.narrow ? Math.round((parent.width - width) / 2) : Math.round((parent.width + 37) / 2 - 3)
+                x: pl.grid ? parent.width - width : pl.narrow ? Math.round((parent.width - width) / 2) : Math.round((parent.width + 37) / 2 - 3)
                 Behavior on color { ColorAnimation { duration: Motion.ui } }
-                Rectangle { y: 2; x: auto.on ? 14 : 2; width: 14; height: 14; radius: 7; color: auto.on ? Theme.datumInk : Theme.ink2
+                Rectangle { y: 2; x: auto.on ? 14 : 2; width: 14; height: 14; radius: 7; color: auto.on ? Theme.sendInk : Theme.ink2
                     Behavior on x { NumberAnimation { duration: Motion.move(Motion.ui); easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } } } }
             MouseArea { id: am; anchors.fill: parent; hoverEnabled: true; onClicked: Store.settings({ auto_run: !auto.on }) }
             Tip { show: am.containsMouse; text: "Auto: when on, every commit regenerates the solid, exports, checks and slice. When off they stay stale until you run them." } }

@@ -17,6 +17,7 @@ Item {
     property string icon: ""
     property string kind: "default"
     property bool small: false
+    property int iconSize: 0             // 0: the size that goes with the button's (13 small, 14 otherwise)
     property bool large: false
     property bool active: false
     property bool busy: false
@@ -98,7 +99,7 @@ Item {
     FocusRing { on: b.activeFocus; radius: face.radius + 3 }
     Row {
         id: row; anchors.centerIn: parent; spacing: b.small ? 5 : 6
-        Item { visible: b.icon !== "" || b._shown; width: b.small ? 13 : 14; height: width; anchors.verticalCenter: parent.verticalCenter
+        Item { visible: b.icon !== "" || b._shown; width: b.iconSize > 0 ? b.iconSize : b.small ? 13 : 14; height: width; anchors.verticalCenter: parent.verticalCenter
             Icon { anchors.centerIn: parent; visible: !b._shown; name: b.icon; size: parent.width
                 color: b.kind === "primary" ? Theme.sendInk : b.kind === "danger" ? Theme.signal : (b.active || ma.containsMouse) ? Theme.ink : Theme.ink2 }
             Spinner { objectName: "btnSpinner"; anchors.centerIn: parent; visible: b._shown; size: parent.width; color: b.kind === "primary" ? Theme.sendInk : Theme.ink2 } }
