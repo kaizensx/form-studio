@@ -27,12 +27,12 @@ Item {
                 readonly property bool on: v === g.value
                 width: tr.implicitWidth; height: row.height
                 Row { id: tr; spacing: 6; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -1
-                    Text { text: tab.modelData.text !== undefined ? tab.modelData.text : tab.modelData; renderType: Text.NativeRendering
+                    Text { text: tab.modelData.text !== undefined ? tab.modelData.text : tab.modelData; renderType: Theme.textRender
                         font.family: Theme.sans; font.pixelSize: 13; font.weight: tab.on ? Theme.wSemi : Theme.wMedium
                         color: tab.on ? Theme.ink : tm.containsMouse ? Theme.ink : Theme.ink2
                         Behavior on color { Tint {} } }
                     Rectangle { visible: !!tab.modelData.badge; width: bt.implicitWidth + 10; height: 16; radius: 8; color: Theme.alpha(Theme.amber, 0.14); anchors.verticalCenter: parent.verticalCenter
-                        Text { id: bt; anchors.centerIn: parent; text: tab.modelData.badge ? String(tab.modelData.badge) : ""; color: Theme.amber; font.family: Theme.mono; font.pixelSize: 10; renderType: Text.NativeRendering } } }
+                        Text { id: bt; anchors.centerIn: parent; text: tab.modelData.badge ? String(tab.modelData.badge) : ""; color: Theme.amber; font.family: Theme.mono; font.pixelSize: 10; renderType: Theme.textRender } } }
                 MouseArea { id: tm; anchors.fill: parent; anchors.leftMargin: -12; anchors.rightMargin: -12; hoverEnabled: true; onClicked: g.picked(tab.v) }
             }
         }

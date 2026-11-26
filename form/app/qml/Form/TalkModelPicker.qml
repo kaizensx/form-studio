@@ -88,7 +88,7 @@ Column {
     }
     readonly property var notSetUp: Store.chatAgents.filter(function (a) { return !a.available && !a.custom }).map(function (a) { return a.label })
 
-    Txt { visible: Store.retryAfterPick; kind: "fine"; x: 8; width: mp.width - 16; topPadding: 4; color: Theme.datum
+    Txt { visible: Store.retryAfterPick; kind: "fine"; x: 8; width: mp.width - 16; topPadding: 4 + lead; color: Theme.datum
         text: "Pick a model: your last message is sent again with it." }
     Repeater {
         model: mp.groups
@@ -96,7 +96,7 @@ Column {
             id: grp
             required property var modelData
             width: mp.width
-            Txt { kind: "cap"; text: grp.modelData.title; x: 8; topPadding: 4; bottomPadding: 2 }
+            Txt { kind: "cap"; text: grp.modelData.title; x: 8; topPadding: 4 + lead; bottomPadding: 2 - lead }
             Repeater {
                 model: grp.modelData.items
                 Rectangle {
@@ -189,7 +189,7 @@ Column {
             MouseArea { id: mm; visible: !row.modelData.head; anchors.fill: parent; hoverEnabled: true; onClicked: mp.choose(row.m) }
         }
     }
-    Txt { visible: mp.big && mp.matches === 0; kind: "fine"; x: 10; width: mp.width - 20; topPadding: 6; bottomPadding: 6
+    Txt { visible: mp.big && mp.matches === 0; kind: "fine"; x: 10; width: mp.width - 20; topPadding: 6 + lead; bottomPadding: 6 - lead
         text: "No model matches “" + mp.filter.trim() + "”. Type a full id below to use one this list does not show." }
     Item { width: mp.width; height: 36
         Field { id: cf; x: 6; width: parent.width - 12; anchors.verticalCenter: parent.verticalCenter; mono: true
@@ -199,7 +199,7 @@ Column {
         text: "Passed to " + Store.chatAgentLabel + " as typed. If it is not a model it knows, the message fails and says so." }
 
     Rectangle { visible: mp.efforts.length > 0; width: mp.width; height: 1; color: Theme.rule }
-    Txt { visible: mp.efforts.length > 0; kind: "cap"; text: "Effort"; x: 8; topPadding: 6; bottomPadding: 2 }
+    Txt { visible: mp.efforts.length > 0; kind: "cap"; text: "Effort"; x: 8; topPadding: 6 + lead; bottomPadding: 2 - lead }
     Flow { visible: mp.efforts.length > 0; x: 8; width: mp.width - 16; spacing: 4
         Repeater {
             model: [""].concat(mp.efforts)
@@ -215,7 +215,7 @@ Column {
     }
     Item { width: 1; height: 4 }
     Rectangle { width: mp.width; height: 1; color: Theme.rule }
-    Txt { kind: "fine"; x: 10; width: mp.width - 20; topPadding: 6; bottomPadding: 4
+    Txt { kind: "fine"; x: 10; width: mp.width - 20; topPadding: 6 + lead; bottomPadding: 4 - lead
         text: (Store.conv && Store.conv.resolved_model && Store.conv.agent === Store.chatAgent
                ? "Last reply came from " + Store.conv.resolved_model + " (as the agent reported it). " : "")
             + (mp.big ? "↑ ↓ to move, Return to pick. " : "") + "New conversations start with this choice." }

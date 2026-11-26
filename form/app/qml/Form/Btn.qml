@@ -104,7 +104,7 @@ Item {
             Spinner { objectName: "btnSpinner"; anchors.centerIn: parent; visible: b._shown; size: parent.width; color: b.kind === "primary" ? Theme.sendInk : Theme.ink2 } }
         Text { id: lbl; visible: b.text !== ""; text: b.shownText; anchors.verticalCenter: parent.verticalCenter
             width: b._textW; horizontalAlignment: b.icon !== "" || b._shown ? Text.AlignLeft : Text.AlignHCenter; elide: Text.ElideRight
-            font.family: Theme.sans; font.pixelSize: b.small ? 12 : b.large ? 14 : 13; font.letterSpacing: -0.1; font.weight: b.kind === "primary" ? Theme.wSemi : Theme.wMedium; renderType: Text.NativeRendering
+            font.family: Theme.sans; font.pixelSize: b.small ? 12 : b.large ? 14 : 13; font.letterSpacing: -0.1; font.weight: b.kind === "primary" ? Theme.wSemi : Theme.wMedium; renderType: Theme.textRender
             color: b.kind === "primary" ? Theme.sendInk : b.kind === "danger" ? Theme.signal : (b.kind === "quiet" && !b.active && !ma.containsMouse) ? Theme.ink2 : Theme.ink }
     }
     MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: b._shown ? Qt.BusyCursor : Qt.ArrowCursor; onClicked: b._press() }

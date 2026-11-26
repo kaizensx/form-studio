@@ -62,10 +62,10 @@ Item {
             Rectangle { id: key; x: 10; width: 20; height: 20; radius: 6; anchors.verticalCenter: parent.verticalCenter
                 color: Theme.glass2; border.width: Theme.dark ? 0 : 1; border.color: Theme.rule2
                 Rectangle { visible: Theme.dark; x: 5; width: 10; y: 0; height: 1; color: Theme.gleam }
-                Text { anchors.centerIn: parent; text: chip.k; color: Theme.ink2; renderType: Text.NativeRendering
+                Text { anchors.centerIn: parent; text: chip.k; color: Theme.ink2; renderType: Theme.textRender
                     font.family: Theme.mono; font.pixelSize: 11; font.weight: Theme.wMedium } }
             Text { id: lbl; x: 41; width: Math.max(0, parent.width - 41 - 12); anchors.verticalCenter: parent.verticalCenter
-                text: chip.text; elide: Text.ElideRight; renderType: Text.NativeRendering
+                text: chip.text; elide: Text.ElideRight; renderType: Theme.textRender
                 font.family: Theme.sans; font.pixelSize: 13; font.letterSpacing: -0.1
                 color: chip.quiet && !cm.containsMouse ? Theme.ink2 : Theme.ink
                 Behavior on color { Tint {} } } }
@@ -143,7 +143,7 @@ Item {
                     readonly property real textX: pad + gt.width + 12
                     readonly property bool empty: ta.text === "" && !ta.preeditText
                     Behavior on height { NumberAnimation { duration: Theme.move(Theme.fast); easing.type: Easing.OutQuad } }
-                    Text { id: gt; x: words.pad; y: 20 + Math.round((words.line - height) / 2) + 1; text: "›"; color: Theme.datum; renderType: Text.NativeRendering
+                    Text { id: gt; x: words.pad; y: 20 + Math.round((words.line - height) / 2) + 1; text: "›"; color: Theme.datum; renderType: Theme.textRender
                         font.family: Theme.mono; font.pixelSize: 24; font.weight: Theme.wMedium }
                     // the caret: a block of the accent that breathes while nothing is typed. With words in the field the
                     // field's own cursor takes over.
@@ -161,7 +161,7 @@ Item {
                             objectName: "startText"
                             wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: sc.narrow ? 16 : 19; font.letterSpacing: -0.2
                             selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
-                            leftPadding: words.textX; rightPadding: 22; topPadding: 21; bottomPadding: 8; background: null; renderType: Text.NativeRendering
+                            leftPadding: words.textX; rightPadding: 22; topPadding: 21; bottomPadding: 8; background: null; renderType: Theme.textRender
                             enabled: !!Store.studio
                             // while the field is empty the block is the cursor
                             cursorDelegate: Rectangle { id: cur; width: 2; radius: 1; color: Theme.datum; visible: ta.activeFocus && !words.empty
@@ -235,7 +235,7 @@ Item {
                         Behavior on color { Tint {} }
                         Rectangle { visible: go.lit; x: parent.radius; width: parent.width - 2 * parent.radius; y: 1; height: 1; color: Qt.rgba(1, 1, 1, Theme.dark ? 0.5 : 0.16) }
                         Row { id: gl; x: 22; anchors.verticalCenter: parent.verticalCenter; spacing: 8
-                            Text { text: "Design it"; color: go.lit ? Theme.sendInk : Theme.ink4; anchors.verticalCenter: parent.verticalCenter; renderType: Text.NativeRendering
+                            Text { text: "Design it"; color: go.lit ? Theme.sendInk : Theme.ink4; anchors.verticalCenter: parent.verticalCenter; renderType: Theme.textRender
                                 font.family: Theme.sans; font.pixelSize: 14; font.weight: Theme.wSemi; font.letterSpacing: -0.1 }
                             Icon { name: "corner_down_left"; size: 15; color: go.lit ? Theme.sendInk : Theme.ink4; anchors.verticalCenter: parent.verticalCenter } }
                         MouseArea { id: gm; anchors.fill: parent; hoverEnabled: true; cursorShape: go.lit ? Qt.PointingHandCursor : Qt.ArrowCursor

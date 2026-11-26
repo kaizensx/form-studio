@@ -171,7 +171,7 @@ Item {
                     readonly property bool head: index === 0 || st.sections[index - 1].group !== modelData.group
                     readonly property int pending: st.dirtyIn(modelData.value)
                     width: nav.width
-                    Txt { visible: ni.head; kind: "cap"; text: ni.modelData.group; leftPadding: 12; topPadding: ni.index === 0 ? 2 : 14; bottomPadding: 6 }
+                    Txt { visible: ni.head; kind: "cap"; text: ni.modelData.group; leftPadding: 12; topPadding: (ni.index === 0 ? 2 : 14) + lead; bottomPadding: 6 - lead }
                     Rectangle { id: navRow; objectName: "settingsNav_" + ni.modelData.value; width: parent.width; height: 32; radius: height / 2
                         color: !ni.on && nm.containsMouse ? Theme.washHover : "transparent"
                         readonly property bool on: ni.on
@@ -190,7 +190,7 @@ Item {
                             width: 6; height: 6; radius: 3; color: Theme.blueprint }
                         Rectangle { visible: !!ni.modelData.badge && ni.pending === 0; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
                             width: bt.implicitWidth + 10; height: 16; radius: 8; color: Theme.alpha(Theme.amber, 0.14)
-                            Text { id: bt; anchors.centerIn: parent; text: ni.modelData.badge ? String(ni.modelData.badge) : ""; color: Theme.amber; font.family: Theme.mono; font.pixelSize: 10; renderType: Text.NativeRendering } }
+                            Text { id: bt; anchors.centerIn: parent; text: ni.modelData.badge ? String(ni.modelData.badge) : ""; color: Theme.amber; font.family: Theme.mono; font.pixelSize: 10; renderType: Theme.textRender } }
                         MouseArea { id: nm; anchors.fill: parent; hoverEnabled: true; onClicked: st.go(ni.modelData.value) } }
                 }
             }

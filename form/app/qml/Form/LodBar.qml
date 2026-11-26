@@ -32,9 +32,9 @@ Rectangle {
                 border.width: on ? 1 : 0; border.color: Theme.rule
                 Behavior on color { Tint {} }
                 Column { id: col; anchors.centerIn: parent; spacing: 1
-                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: "LOD" + chip.modelData.lod; renderType: Text.NativeRendering
+                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: "LOD" + chip.modelData.lod; renderType: Theme.textRender
                         font.family: Theme.sans; font.pixelSize: 12; font.weight: Theme.wSemi; color: chip.on ? Theme.ink : Theme.ink2 }
-                    Text { anchors.horizontalCenter: parent.horizontalCenter; renderType: Text.NativeRendering
+                    Text { anchors.horizontalCenter: parent.horizontalCenter; renderType: Theme.textRender
                         text: F.trim(chip.modelData.triangles) + (chip.modelData.budget ? " / " + F.trim(chip.modelData.budget) : "") + " tris"
                         font.family: Theme.mono; font.pixelSize: 10; color: lb.over(chip.modelData) ? Theme.signal : chip.on ? Theme.ink2 : Theme.ink3 } }
                 MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor

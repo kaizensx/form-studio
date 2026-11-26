@@ -138,7 +138,7 @@ Column {
         Row { spacing: 8
             Txt { kind: "h2"; text: root.f ? root.f.label : "" }
             Tag { text: root.f ? root.f.role : ""; anchors.verticalCenter: parent.verticalCenter } }
-        Txt { tone: 2; width: parent.width; topPadding: 4; visible: text !== ""; text: root.f ? (root.f.doc || "") : "" }
+        Txt { tone: 2; width: parent.width; topPadding: 4 + lead; visible: text !== ""; text: root.f ? (root.f.doc || "") : "" }
         // its own parameters; a feature without any says what shapes it instead: values that follow from standards
         // (below), the design's general parameters and the features built before it (each one click away)
         Sec { id: drives; objectName: "featureDrives"

@@ -36,13 +36,13 @@ Rectangle {
         verticalAlignment: TextInput.AlignVCenter; horizontalAlignment: f.numeric ? TextInput.AlignRight : TextInput.AlignLeft
         color: Theme.ink; selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink
         font.family: f.mono ? Theme.mono : Theme.sans; font.pixelSize: f.mono ? 12 : 13; clip: true; selectByMouse: true
-        renderType: Text.NativeRendering; activeFocusOnTab: true
+        renderType: Theme.textRender; activeFocusOnTab: true
         inputMethodHints: f.numeric ? Qt.ImhFormattedNumbersOnly : Qt.ImhNone
         onAccepted: { f.accepted(text); if (f.numeric) focus = false }
         onTextEdited: f.edited(text)
         onActiveFocusChanged: if (!activeFocus && f.numeric) f.accepted(text)
         Text { visible: !input.text && !input.activeFocus || (!input.text && f.placeholder !== ""); text: f.placeholder; color: Theme.ink4; font: input.font
-            anchors.fill: parent; verticalAlignment: Text.AlignVCenter; horizontalAlignment: input.horizontalAlignment; elide: Text.ElideRight; renderType: Text.NativeRendering }
+            anchors.fill: parent; verticalAlignment: Text.AlignVCenter; horizontalAlignment: input.horizontalAlignment; elide: Text.ElideRight; renderType: Theme.textRender }
     }
     Txt { id: u; visible: f.unit !== ""; text: f.unit; kind: "fine"; mono: true; anchors.right: parent.right; anchors.rightMargin: 9; anchors.verticalCenter: parent.verticalCenter }
     Spinner { visible: f.busy; size: 13; anchors.right: parent.right; anchors.rightMargin: f.unit ? 13 + u.implicitWidth : 8; anchors.verticalCenter: parent.verticalCenter }

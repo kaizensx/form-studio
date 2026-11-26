@@ -175,7 +175,7 @@ Item {
         // the prompt: the well the command is typed into, as in the bar under the part
         Rectangle { x: 8; y: 8; width: parent.width - 16; height: 44; radius: Theme.rPane - 8; color: Theme.glassWell; border.width: 1; border.color: Theme.rule }
         Text { x: 22; y: 7; height: 44; verticalAlignment: Text.AlignVCenter; text: "›"; color: Theme.datum
-            font.family: Theme.mono; font.pixelSize: 20; font.weight: Theme.wMedium; renderType: Text.NativeRendering }
+            font.family: Theme.mono; font.pixelSize: 20; font.weight: Theme.wMedium; renderType: Theme.textRender }
         Field { id: q; x: 40; y: 14; width: parent.width - 62; height: 32; bare: true; placeholder: "Search commands, designs and conversations"
             onEdited: { pal.sel = 0; list.positionViewAtBeginning() }
             input.font.pixelSize: 15

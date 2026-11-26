@@ -15,8 +15,15 @@ Text {
     font.letterSpacing: kind === "cap" ? 1.2 : kind === "hero" ? -1.8 : kind === "h1" ? -1.0 : kind === "h2" ? -0.5 : kind === "h3" ? -0.3 : mono ? -0.1 : kind === "lead" ? -0.1 : 0
     font.capitalization: kind === "cap" ? Font.AllUppercase : Font.MixedCase
     lineHeight: kind === "fine" || kind === "body" ? 1.25 : kind === "lead" ? 1.3 : 1.1
+    // Qt puts all of a line's extra height (lineHeight > 1) under the glyphs, so a label centred by its box sat about
+    // 2 px high beside an icon, a dot or a tag. `lead` is half of that extra: moved from under the line to over it,
+    // the glyphs sit in the middle of their line box, as on paper and in CSS. The box keeps its height, and a
+    // paragraph only moves down by `lead`. A caller that sets its own paddings adds it: topPadding: 4 + lead.
+    readonly property real lead: Math.round((lineHeight - 1) * Theme.lineBox * font.pixelSize) / 2
+    topPadding: lead
+    bottomPadding: -lead
     textFormat: Text.PlainText
     wrapMode: Text.WordWrap
     elide: Text.ElideNone
-    renderType: Text.NativeRendering
+    renderType: Theme.textRender
 }

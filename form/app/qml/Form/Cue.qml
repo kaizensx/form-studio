@@ -30,9 +30,9 @@ Item {
                     SequentialAnimation on scale { running: cue.pulse && cue.visible && !Theme.reduced; loops: Animation.Infinite
                         NumberAnimation { to: 1.35; duration: 800; easing.type: Easing.InOutSine } NumberAnimation { to: 1; duration: 800; easing.type: Easing.InOutSine } } }
                 Rectangle { anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: Theme.datum } }
-            Text { objectName: "buildLedgerState"; anchors.verticalCenter: parent.verticalCenter; text: cue.running ? "BUILDING" : "BUILT"; color: Theme.datum; renderType: Text.NativeRendering
+            Text { objectName: "buildLedgerState"; anchors.verticalCenter: parent.verticalCenter; text: cue.running ? "BUILDING" : "BUILT"; color: Theme.datum; renderType: Theme.textRender
                 font.family: Theme.mono; font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 1.8 }
-            Text { objectName: "buildLedgerCount"; visible: cue.of > 1; anchors.verticalCenter: parent.verticalCenter; color: Theme.ink2; renderType: Text.NativeRendering
+            Text { objectName: "buildLedgerCount"; visible: cue.of > 1; anchors.verticalCenter: parent.verticalCenter; color: Theme.ink2; renderType: Theme.textRender
                 // read as "6 of 12" by tests and screen readers; set in capitals by the font
                 text: cue.at + " of " + cue.of; font.capitalization: Font.AllUppercase
                 font.family: Theme.mono; font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 1.8 } }
@@ -53,16 +53,16 @@ Item {
             Component.onCompleted: take()
             Row { id: now; objectName: "buildLedgerName"; property string text: title.shown; transform: Translate { id: nowY }
                 spacing: 14; anchors.horizontalCenter: parent.horizontalCenter
-                Text { visible: title.shownAt > 0; text: cue.nn(title.shownAt); color: Theme.datum; y: 8; renderType: Text.NativeRendering
+                Text { visible: title.shownAt > 0; text: cue.nn(title.shownAt); color: Theme.datum; y: 8; renderType: Theme.textRender
                     font.family: Theme.mono; font.pixelSize: 20; font.weight: Theme.wMedium }
-                Text { text: title.shown; color: Theme.ink; renderType: Text.NativeRendering
+                Text { text: title.shown; color: Theme.ink; renderType: Theme.textRender
                     width: Math.min(implicitWidth, cue.width + 220 - (title.shownAt > 0 ? 44 : 0)); elide: Text.ElideRight
                     font.family: Theme.sans; font.pixelSize: String(title.shown).length > 24 ? 38 : Theme.tCue; font.weight: Theme.wSemi; font.letterSpacing: -2 } }
             Row { id: old; opacity: 0; transform: Translate { id: oldY }
                 spacing: 14; anchors.horizontalCenter: parent.horizontalCenter
-                Text { visible: title.leavingAt > 0; text: cue.nn(title.leavingAt); color: Theme.datum; y: 8; renderType: Text.NativeRendering
+                Text { visible: title.leavingAt > 0; text: cue.nn(title.leavingAt); color: Theme.datum; y: 8; renderType: Theme.textRender
                     font.family: Theme.mono; font.pixelSize: 20; font.weight: Theme.wMedium }
-                Text { text: title.leaving; color: Theme.ink; renderType: Text.NativeRendering
+                Text { text: title.leaving; color: Theme.ink; renderType: Theme.textRender
                     width: Math.min(implicitWidth, cue.width + 220 - (title.leavingAt > 0 ? 44 : 0)); elide: Text.ElideRight
                     font.family: Theme.sans; font.pixelSize: String(title.leaving).length > 24 ? 38 : Theme.tCue; font.weight: Theme.wSemi; font.letterSpacing: -2 } }
             ParallelAnimation { id: come
@@ -103,14 +103,14 @@ Item {
         // built 05 PCB standoffs                                  next 07 USB-C openings
         Item { width: parent.width; height: 16; visible: cue.before !== "" || cue.after !== ""
             Row { visible: cue.before !== ""; spacing: 8
-                Text { text: "built"; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Text.NativeRendering }
-                Text { text: cue.nn(cue.at - 1); color: Theme.ink2; font.family: Theme.mono; font.pixelSize: 11; font.weight: Theme.wMedium; anchors.baseline: parent.children[0].baseline; renderType: Text.NativeRendering }
-                Text { objectName: "cueBefore"; text: cue.before; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Text.NativeRendering
+                Text { text: "built"; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Theme.textRender }
+                Text { text: cue.nn(cue.at - 1); color: Theme.ink2; font.family: Theme.mono; font.pixelSize: 11; font.weight: Theme.wMedium; anchors.baseline: parent.children[0].baseline; renderType: Theme.textRender }
+                Text { objectName: "cueBefore"; text: cue.before; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Theme.textRender
                     width: Math.min(implicitWidth, cue.width / 2 - 90); elide: Text.ElideRight } }
             Row { visible: cue.after !== ""; spacing: 8; anchors.right: parent.right
-                Text { text: "next"; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Text.NativeRendering }
-                Text { text: cue.nn(cue.at + 1); color: Theme.ink2; font.family: Theme.mono; font.pixelSize: 11; font.weight: Theme.wMedium; anchors.baseline: parent.children[0].baseline; renderType: Text.NativeRendering }
-                Text { objectName: "cueAfter"; text: cue.after; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Text.NativeRendering
+                Text { text: "next"; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Theme.textRender }
+                Text { text: cue.nn(cue.at + 1); color: Theme.ink2; font.family: Theme.mono; font.pixelSize: 11; font.weight: Theme.wMedium; anchors.baseline: parent.children[0].baseline; renderType: Theme.textRender }
+                Text { objectName: "cueAfter"; text: cue.after; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Theme.textRender
                     width: Math.min(implicitWidth, cue.width / 2 - 90); elide: Text.ElideRight } } }
     }
 }

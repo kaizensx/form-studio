@@ -46,7 +46,7 @@ Rectangle {
                 Component.onCompleted: if (on) g._cur = this
                 Behavior on color { Tint {} }
                 Row { id: lr; anchors.centerIn: parent; spacing: 5
-                    Text { id: l; anchors.verticalCenter: parent.verticalCenter; text: modelData.text !== undefined ? modelData.text : modelData; renderType: Text.NativeRendering
+                    Text { id: l; anchors.verticalCenter: parent.verticalCenter; text: modelData.text !== undefined ? modelData.text : modelData; renderType: Theme.textRender
                         font.family: Theme.sans; font.pixelSize: 12; font.weight: lr.parent.on ? Theme.wSemi : Theme.wMedium; color: lr.parent.on ? Theme.ink : lr.parent.off ? Theme.ink4 : sm.containsMouse ? Theme.ink : Theme.ink2 }
                     BetaTag { visible: !!modelData.badge; text: modelData.badge || ""; tip: ""; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 15 } }
                 MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; cursorShape: parent.off ? Qt.ArrowCursor : Qt.PointingHandCursor

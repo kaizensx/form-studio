@@ -63,7 +63,7 @@ Column {
     // heading
     Item { width: parent.width; height: 10 }
     Txt { kind: "h2"; width: parent.width; text: root.hasFit ? (root.f ? root.f.label : "Fit") : "Calibrate" }
-    Txt { tone: 2; width: parent.width; topPadding: 4
+    Txt { tone: 2; width: parent.width; topPadding: 4 + lead
         text: root.hasFit ? "Will it slide in without rattling? A model built from stated inputs, shown with where each came from."
                           : "Print this coupon on the profile below, measure each slot with caliper inside jaws, and enter what you read." }
 

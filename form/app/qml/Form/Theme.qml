@@ -93,6 +93,11 @@ QtObject {
     readonly property string sans: "Geist"
     readonly property string mono: "Geist Mono"
     readonly property string icons: "lucide"
+    // How glyphs are drawn. On macOS the system's own rasteriser thickens every stem ("font smoothing"), which set the
+    // whole interface about one weight heavier than it is drawn in the mockups; Qt's own renderer draws the outlines
+    // as they are. Elsewhere the system's hinted glyphs stay: they are the sharper ones on a 1x display.
+    readonly property int textRender: Bridge.platform === "darwin" ? Text.QtRendering : Text.NativeRendering
+    readonly property real lineBox: 1.3     // Geist and Geist Mono: ascent + descent, in em (1005 + 295 units of 1000)
 
     // type scale (ratio ~1.2 from 13)
     readonly property int tCap: 10

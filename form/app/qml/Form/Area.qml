@@ -26,7 +26,7 @@ Rectangle {
             wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: 13
             placeholderText: a.placeholder; placeholderTextColor: Theme.ink4
             selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
-            padding: 10; background: null; renderType: Text.NativeRendering
+            padding: 10; background: null; renderType: Theme.textRender
             // Tab moves on to the next control instead of typing a tab
             Keys.onTabPressed: function (e) { var n = nextItemInFocusChain(true); if (n) n.forceActiveFocus(Qt.TabFocusReason) }
             Keys.onBacktabPressed: function (e) { var n = nextItemInFocusChain(false); if (n) n.forceActiveFocus(Qt.BacktabFocusReason) }

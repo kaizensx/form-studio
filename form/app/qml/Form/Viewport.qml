@@ -1167,7 +1167,7 @@ Item {
             Rectangle { z: -1; anchors.fill: parent; anchors.margins: -4; radius: height / 2; color: "transparent"; border.width: 4; border.color: Theme.alpha(Theme.datum, Theme.dark ? 0.12 : 0.08) }
             opacity: shown ? 1 : 0; visible: opacity > 0.01                // a label that loses its seat fades, never blinks
             Behavior on opacity { NumberAnimation { duration: 120 } }
-            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.dark ? Qt.lighter(Theme.datum, 1.6) : Theme.datumHi; font.family: Theme.mono; font.pixelSize: Theme.tFine; font.weight: 500; renderType: Text.NativeRendering }
+            Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.dark ? Qt.lighter(Theme.datum, 1.6) : Theme.datumHi; font.family: Theme.mono; font.pixelSize: Theme.tFine; font.weight: 500; renderType: Theme.textRender }
         }
     }
 
@@ -1188,7 +1188,7 @@ Item {
             Behavior on opacity { NumberAnimation { duration: 120 } }
             z: pl.modelData.ann ? 3 : 0                 // an annotation's label is a button, above the orbit area
             Text { id: pt; anchors.centerIn: parent; text: pl.modelData.text; color: pl.modelData.tint; font.family: pl.modelData.ann ? Theme.sans : Theme.mono
-                font.pixelSize: Theme.tFine; font.weight: pl.modelData.ann ? 550 : 400; renderType: Text.NativeRendering }
+                font.pixelSize: Theme.tFine; font.weight: pl.modelData.ann ? 550 : 400; renderType: Theme.textRender }
             MouseArea { id: plm; anchors.fill: parent; enabled: !!pl.modelData.ann; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                 onClicked: vp.annotationClicked(pl.modelData.ann) }
         }

@@ -571,7 +571,7 @@ Rectangle {
             Behavior on border.color { Tint {} }
             HoverHandler { id: ch }
             // the prompt: an accent "›" before whatever is typed
-            Text { x: 16; y: sv.y + 9; visible: sv.contentItem.contentY < 4; text: "›"; color: Theme.datum; font.family: Theme.mono; font.pixelSize: 22; font.weight: Theme.wMedium; renderType: Text.NativeRendering }
+            Text { x: 16; y: sv.y + 9; visible: sv.contentItem.contentY < 4; text: "›"; color: Theme.datum; font.family: Theme.mono; font.pixelSize: 22; font.weight: Theme.wMedium; renderType: Theme.textRender }
             // the caret, standing in the empty prompt while the keyboard is elsewhere (with it here, the field draws its own)
             Rectangle { id: restCaret; objectName: "promptCaret"; x: 38; y: sv.y + 14; width: 8; height: 19; radius: 2; color: Theme.datum
                 visible: !ta.activeFocus && ta.text === "" && ta.enabled
@@ -633,7 +633,7 @@ Rectangle {
                         placeholderText: "\u2003" + placeholder
                         placeholderTextColor: Theme.ink4; enabled: Store.chat.available
                         selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
-                        leftPadding: 38; rightPadding: 14; topPadding: 13; bottomPadding: 6; background: null; renderType: Text.NativeRendering
+                        leftPadding: 38; rightPadding: 14; topPadding: 13; bottomPadding: 6; background: null; renderType: Theme.textRender
                         function submit() {
                             if (!text.trim()) return
                             if (Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure") { Store.answerAsk(Store.chatAsking.id, text.trim(), []); text = ""; return }
