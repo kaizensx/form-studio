@@ -54,6 +54,11 @@ notes (`scripts/ci/release_notes.py`). When a stable release is cut, `## Unrelea
 3. **Preview:** set the version to `X.Y.0-preview.N` in one commit on `dev`, tag it `vX.Y.0-preview.N` and push the tag,
    then set it back to `X.Y.0-dev` in the next commit. `app.yml` builds the four downloads and publishes a
    pre-release.
+   **A number is spent only when its release is published.** If the build fails and no release appears, fix the
+   cause on `dev`, move the same tag to the fixed commit (delete it locally and on `origin`, tag again, push) and
+   let it build again. Never skip to the next number for a release nobody could download. Before tagging, run the
+   release build's smoke set locally (`cd tests && python -m unittest test_studio test_mcp test_brepstore
+   test_packaging_data`) so a tag rarely fails.
 4. **Stable:** rename `## Unreleased` to `## X.Y.0`, set the version in `form/__init__.py` and `pyproject.toml`
    to `X.Y.0` (dropping `-dev`), commit on `dev`, fast-forward `main` to `dev`, tag `vX.Y.0` and push. Then set `dev`
    to the next one, `X.(Y+1).0-dev`, with a new empty `## Unreleased`. `app.yml` builds a draft release; publish it
