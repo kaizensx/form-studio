@@ -226,8 +226,11 @@ class Gear(unittest.TestCase):
     def test_flanks_stay_honest(self):
         """Spline flanks: the gear is recognised (18 teeth, module 2, 20 degrees), but the mesh's own facets are
         about 0.03 mm from the flanks it was made from, so at 0.02 mm no smooth gear can be within the tolerance and
-        the parametric gear is not offered; the feature tree keeps the toothed outline as reconstructed (frozen
-        facets) and puts the bore back as a feature. At 0.05 mm the parametric gear is within it."""
+        the parametric gear is not offered. The feature tree keeps the toothed outline as reconstructed (frozen
+        facets) under the bore, but only within its own limit (Layer 1's distance), which is outside the 0.02 mm
+        asked for; the mixed result (the exact solid with its faces as dimensions) is within it and makes more of the
+        surface editable, so it is the result and the tree is listed beside it. At 0.05 mm the parametric gear is
+        within the tolerance."""
         rep, out = run("gear")
         L2 = rep["layers"]["2"]
         gear = next(t for t in L2["also_tried"] if t.get("method") == "spur gear")
@@ -236,9 +239,13 @@ class Gear(unittest.TestCase):
         L1 = rep["layers"]["1"]
         self.assertTrue(L1["valid"])
         self.assertGreater(L1["by_kind"]["facet"]["area_mm2"], 0)
-        self.assertEqual(L2["base"], "embedded solid")
-        self.assertLess(L2["driven_by_params_pct"], 50)
-        self.assertEqual([h["diameter_mm"] for h in L2["holes"]], facts("gear")["holes"])
+        tree = next(t for t in L2["also_tried"] if t.get("method") == "feature tree")
+        self.assertEqual(tree["base"], "embedded solid")
+        self.assertLess(tree["driven_by_params_pct"], 50)
+        self.assertGreater(tree["hausdorff_mm"], TOL)                          # inside Layer 1's limit, not the 0.02
+        self.assertTrue(L2["method"].startswith("mixed"), L2.get("method"))
+        self.assertLessEqual(rep["result"]["hausdorff_mm"], TOL)
+        self.assertGreater(rep["result"]["feature_area_pct"], tree["driven_by_params_pct"])
         # with a looser tolerance the parametric gear is within it
         rep5, _ = run("gear", tolerance=0.05)
         g5 = rep5["layers"]["2"]
