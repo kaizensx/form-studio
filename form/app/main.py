@@ -147,7 +147,7 @@ def main(argv=None) -> int:
     # Tab reaches every control, not only text fields (macOS limits it to text fields unless "Keyboard navigation"
     # is on in System Settings). Sheets rely on this to keep the keyboard inside them.
     app.styleHints().setTabFocusBehavior(Qt.TabFocusBehavior.TabFocusAllControls)
-    for f in ("InstrumentSans.ttf", "GeistMono.ttf", "lucide.ttf"):
+    for f in ("Geist.ttf", "InstrumentSans.ttf", "GeistMono.ttf", "lucide.ttf"):
         QFontDatabase.addApplicationFont(str(HERE / "assets" / "fonts" / f))
 
     st, httpd = _engine(cfg)

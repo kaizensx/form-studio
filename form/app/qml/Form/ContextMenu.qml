@@ -31,28 +31,31 @@ Item {
     function go(it) { Store.ctxMenu = null; if (it && !it.off) it.run() }
 
     MouseArea { anchors.fill: parent; enabled: !!cm.m; acceptedButtons: Qt.AllButtons; onPressed: Store.ctxMenu = null; onWheel: function (w) { Store.ctxMenu = null; w.accepted = false } }
-    Rectangle {
+    Glass {
         id: box
         visible: !!cm.m
-        width: 268; height: head.height + col.implicitHeight + 10
+        source: Store.backdrop; radius: Theme.rMd + 3
+        onXChanged: place()
+        onYChanged: place()
+        width: 268; height: head.height + col.implicitHeight + 12
         x: cm.m ? Math.max(8, Math.min(cm.width - width - 8, cm.m.x + 2)) : 0
         y: cm.m ? Math.max(8, Math.min(cm.height - height - 8, cm.m.y + 2)) : 0
-        radius: Theme.rMd; color: Theme.plate3; border.color: Theme.rule2
+        Rectangle { anchors.fill: parent; radius: box.radius; color: Theme.alpha(Theme.plate3, box.blurred ? 0.46 : 0.85) }
         MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons }
-        Item { id: head; width: parent.width; height: cm.feat ? 34 : 6
-            Row { visible: !!cm.feat; x: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 6
+        Item { id: head; width: parent.width; height: cm.feat ? 36 : 6
+            Row { visible: !!cm.feat; x: 15; anchors.verticalCenter: parent.verticalCenter; spacing: 6
                 Txt { text: cm.feat ? cm.feat.label : ""; font.weight: 600; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
                 Tag { text: cm.feat ? cm.feat.role : ""; anchors.verticalCenter: parent.verticalCenter } }
-            Rectangle { visible: !!cm.feat; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule } }
-        Column { id: col; x: 4; y: head.height + 4; width: parent.width - 8
+ }
+        Column { id: col; x: 5; y: head.height; width: parent.width - 10
             Repeater { model: cm.items
                 Rectangle { id: row; required property var modelData
-                    width: parent.width; height: 28; radius: Theme.rXs; opacity: modelData.off ? 0.4 : 1
-                    color: rm.containsMouse && !modelData.off ? Theme.washHover : "transparent"
-                    Icon { x: 8; name: row.modelData.icon; size: 13; anchors.verticalCenter: parent.verticalCenter; color: rm.containsMouse ? Theme.datum : Theme.ink3 }
-                    Txt { x: 30; text: row.modelData.text; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
-                    Txt { visible: row.modelData.key !== ""; text: row.modelData.key; mono: true; font.pixelSize: 11; tone: 4
-                        anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter }
+                    width: parent.width; height: 30; radius: 10; opacity: modelData.off ? 0.4 : 1
+                    color: rm.containsMouse && !modelData.off ? Theme.glass2 : "transparent"
+                    Icon { x: 10; name: row.modelData.icon; size: 14; anchors.verticalCenter: parent.verticalCenter; color: rm.containsMouse ? Theme.datum : Theme.ink3 }
+                    Txt { x: 33; text: row.modelData.text; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
+                    Txt { visible: row.modelData.key !== ""; text: row.modelData.key; mono: true; font.pixelSize: 11; tone: 3
+                        anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter }
                     MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true; onClicked: cm.go(row.modelData) } } } }
     }
 

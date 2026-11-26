@@ -45,9 +45,10 @@ Item {
         // it has landed on the real logo: let go of it
         NumberAnimation { target: lock; property: "opacity"; to: 0; duration: Theme.exit } }
 
-    // the plate, a shade lighter towards the top as if lit from above; no glow, nothing that bands
-    Rectangle { id: plate; anchors.fill: parent
-        gradient: Gradient { GradientStop { position: 0; color: Theme.plate1 } GradientStop { position: 0.55; color: Theme.plate } GradientStop { position: 1; color: Theme.plate } }
+    // the room the app opens in: the key light falls on the mark. It fades to show Home, which stands in the same room.
+    Item { id: plate; anchors.fill: parent
+        Rectangle { anchors.fill: parent; color: Theme.plate }
+        Room { anchors.fill: parent; poolX: 0.5; poolY: 0.46; poolW: 820; poolH: 440; poolK: Theme.dark ? 0.16 : 1 }
         MouseArea { anchors.fill: parent; enabled: !sp.done; hoverEnabled: true; onWheel: function (w) { w.accepted = true } } }
 
     // everything that belongs to the splash only and leaves first: the construction lines and the status

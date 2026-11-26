@@ -15,8 +15,8 @@ Rectangle {
     property bool saving: false
     readonly property bool ok: !!result && result.ok
     width: parent ? parent.width : 600
-    height: col.implicitHeight + 32; radius: Theme.rMd
-    color: Theme.plate2; border.color: Theme.rule2
+    height: col.implicitHeight + 32; radius: 16
+    color: Theme.glass2
     opacity: 0; scale: Theme.from(0.985)
     Component.onCompleted: { opacity = 1; scale = 1; uf.input.forceActiveFocus() }
     Behavior on opacity { NumberAnimation { duration: Theme.pop; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
@@ -78,7 +78,7 @@ Rectangle {
                 Flow { width: parent.width; spacing: 4; topPadding: 2
                     Repeater { model: ed.result && ed.result.models ? ed.result.models.slice(0, 8) : []
                         Rectangle { required property var modelData
-                            height: 20; radius: Theme.rXs; width: ml.implicitWidth + (modelData.tools === true ? 26 : 14); color: Theme.alpha(Theme.ink, 0.06)
+                            height: 20; radius: 10; width: ml.implicitWidth + (modelData.tools === true ? 28 : 16); color: Theme.glass2
                             Txt { id: ml; x: 7; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 11; mono: true; tone: 2; text: parent.modelData.id }
                             Icon { visible: parent.modelData.tools === true; name: "wrench"; size: 10; color: Theme.pass; anchors.right: parent.right
                                 anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter } } }

@@ -1,8 +1,8 @@
 import QtQuick
 import FormNative
 
-// One card of settings rows in Settings: a label and what it does on the left, its control on the right, a hairline
-// between rows. `rows` are entries of GET /config (form/config_edit.py describe); `sheet` is the Settings sheet, which
+// One card of settings rows in Settings, on thin glass: a label and what it does on the left, its control on the
+// right; rows are set apart by their own air. `rows` are entries of GET /config (form/config_edit.py describe); `sheet` is the Settings sheet, which
 // keeps the pending edits (current, setEdit, isDefault, rangeError, the choices of agents, models and efforts, and the
 // file and folder pickers). A row with an unsaved change carries a blue bar at its left edge.
 Rectangle {
@@ -11,8 +11,8 @@ Rectangle {
     property var sheet: null
     visible: !!rows && rows.length > 0
     width: parent ? parent.width : 0
-    height: list.implicitHeight; radius: Theme.rLg; color: Theme.plate1; border.color: Theme.rule
-    Column { id: list; width: parent.width
+    height: list.implicitHeight + 8; radius: 16; color: Theme.glass
+    Column { id: list; y: 4; width: parent.width
         Repeater {
             model: rc.rows
             Item {
@@ -23,9 +23,8 @@ Rectangle {
                 readonly property var v: rc.sheet.current(r)
                 readonly property bool changed: rc.sheet.edits[r.key] !== undefined
                 readonly property bool wide: r.type === "path" || r.type === "str" || r.type === "agent" || r.type === "model" || r.type === "effort" || r.type === "vec3"
-                width: list.width; height: Math.max(left.implicitHeight, 28) + 28
-                Rectangle { visible: row.index > 0; x: 18; width: parent.width - 36; height: 1; color: Theme.rule }
-                Rectangle { visible: row.changed; x: 6; y: 15; width: 3; height: parent.height - 30; radius: 2; color: Theme.blueprint }
+                width: list.width; height: Math.max(left.implicitHeight, 28) + 24
+                Rectangle { visible: row.changed; x: 7; y: 14; width: 3; height: parent.height - 28; radius: 2; color: Theme.blueprint }
                 readonly property bool hasPath: typeof row.r.detected === "string"
                 readonly property string found: row.hasPath ? row.r.detected : ""
                 Column { id: left; x: 18; width: parent.width - 36 - ctl.width - 20; anchors.verticalCenter: parent.verticalCenter; spacing: 3

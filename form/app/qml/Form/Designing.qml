@@ -45,13 +45,21 @@ Item {
 
     // the stages of the design as they build (Store.showStage), before it is saved
     readonly property bool staged: !!Store.building && !Store.building.project
-    PlateFrame { z: 40 }
+    // the room: what the panes of this screen blur
+    Item { id: studio; anchors.fill: parent
     Viewport { id: dvp; objectName: "designingViewport"; anchors.fill: parent; lite: false; interactive: true; showDims: false; showCompanions: false
         showOrigin: dz.staged                    // the floor's cross belongs to a part; before there is one the words stand here
-        Component.onCompleted: { setModel(null); setView("iso", false); Store.stageViewer = dvp }
+        floorGrid: Store.floorGrid; insetTop: 84; insetLeft: 40; insetRight: dz.staged ? 396 : 40
+        insetBottom: Math.max(60, dz.height - (dz.staged ? stageCap.y - 10 : Store.barY) + 26)
+        Component.onCompleted: { setModel(null); setView("iso", false); Store.stageViewer = dvp; Store.backdrop = studio }
         Component.onDestruction: if (Store.stageViewer === dvp) Store.stageViewer = null }
-    Rectangle { anchors.fill: parent
-        gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.plate, 0.15) } GradientStop { position: 0.7; color: Theme.alpha(Theme.plate, 0.05) } GradientStop { position: 1; color: Theme.alpha(Theme.plate, 0.55) } } }
+    Room { anchors.fill: parent; wall: false; poolK: 0 }
+    }
+    // the key light: it breathes while the agent thinks, and narrows and warms once stages arrive
+    Room { anchors.fill: parent; wall: false; vignetteK: 0; poolX: 0.5; poolY: dz.staged ? 0.5 : 0.46
+        poolW: dz.staged ? 640 : 900; poolH: dz.staged ? 300 : 380; poolK: Theme.dark ? (dz.staged ? 0.11 : 0.06) : (dz.staged ? 0.5 : 0.3); breathe: !dz.staged
+        Behavior on poolW { NumberAnimation { duration: Theme.move(600); easing.type: Easing.InOutQuad } }
+        Behavior on poolK { NumberAnimation { duration: 600; easing.type: Easing.InOutQuad } } }
 
     // The part that does not exist yet: the logo's construction. Two datum hairlines, X in from the left and Y down
     // from the top, meet at an origin and breathe; what the agent is doing is written from that origin like the
@@ -59,7 +67,7 @@ Item {
     Item {
         id: origin; objectName: "designingOrigin"
         readonly property real col: Math.min(parent.width - 2 * Theme.s10, 560)        // the text column
-        x: Math.round((parent.width - col) / 2); y: Math.round(parent.height * 0.36)
+        x: Math.round((parent.width - col) / 2); y: Math.round(Math.min(parent.height * 0.3, Store.barY - 330))
         width: 1; height: 1
         visible: opacity > 0.01 && !dz.empty
         opacity: dz.staged ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
@@ -130,27 +138,61 @@ Item {
                 onClicked: run(function () { return Store.startBlock("") }) } }
     }
 
-    // the build's ledger while the stages arrive: "Building · Rim · 3 of 5", pinned top centre like the workspace's
+    // the cue while the stages arrive: the build's lower third above the bar, as in the workspace. A new design does
+    // not say what comes next (the agent is still writing it), so only what was built before is named.
     Item {
         id: stageCap; objectName: "stageCaption"; z: 6
         readonly property string caption: Store.buildingText
-        anchors.horizontalCenter: parent.horizontalCenter; y: 58
-        width: stageLedger.width; height: stageLedger.height
+        function before() {
+            var b = Store.building
+            for (var i = Store.stageLog.length - 1; b && i >= 0; i--) { var e = Store.stageLog[i]; if (e.draft === b.draft && e.at === b.at - 1) return e.label || "" }
+            return "" }
+        width: Math.max(360, Store.barW); x: Math.round(Store.barX + (Store.barW - width) / 2)
+        height: stageLedger.height; y: Math.round(Store.barY - height - 26)
         opacity: dz.staged ? 1 : 0; visible: opacity > 0.01
-        Behavior on opacity { NumberAnimation { duration: dz.staged ? Theme.fast : 420 } }
-        BuildLedger { id: stageLedger; pulse: true
-            label: Store.building ? Store.building.label : ""; at: Store.building ? Store.building.at : 0; of: Store.building ? Store.building.of : 0 }
+        Behavior on opacity { NumberAnimation { duration: dz.staged ? Theme.base : 420 } }
+        Cue { id: stageLedger; width: parent.width; pulse: true
+            label: Store.building ? Store.building.label : ""; at: Store.building ? Store.building.at : 0; of: Store.building ? Store.building.of : 0
+            before: stageCap.before() }
+    }
+    // the program so far: the stages this build has drawn, as the listing the design will have
+    Glass {
+        id: dprog; objectName: "designingProgram"; source: studio; z: 6
+        readonly property var rows: { var b = Store.building, out = []
+            for (var i = 0; b && i < Store.stageLog.length; i++) { var e = Store.stageLog[i]; if (e.draft === b.draft && !out.some(function (o) { return o.at === e.at })) out.push(e) }
+            return out }
+        width: 356; radius: Theme.rPane; x: dz.width - Theme.edge - width; y: 80
+        height: Math.min(dz.height - 80 - Theme.edge, 52 + rows.length * 32)
+        opacity: dz.staged && rows.length > 0 ? 1 : 0; visible: opacity > 0.01
+        Behavior on opacity { NumberAnimation { duration: Theme.base } }
+        Behavior on height { NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
+        Txt { id: dpt; x: 18; y: 13; text: "Program"; font.weight: Theme.wSemi; font.pixelSize: 14 }
+        Txt { anchors.right: parent.right; anchors.rightMargin: 18; anchors.baseline: dpt.baseline; mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 1.5; font.capitalization: Font.AllUppercase; color: Theme.datum
+            text: Store.building && Store.building.of > 1 ? Store.building.at + " of " + Store.building.of : "building" }
+        Rectangle { x: 51; y: 50; width: 1; height: Math.max(0, parent.height - 60); color: Theme.rule }
+        Rectangle { x: 50; y: 46; width: 2; radius: 1; height: Math.max(0, dprog.rows.length * 32 - 12); color: Theme.datum; opacity: 0.8
+            Behavior on height { NumberAnimation { duration: Theme.reduced ? 0 : 140 } } }
+        Column { x: 6; y: 46; width: parent.width - 12; clip: true; height: parent.height - 52
+            Repeater { model: dprog.rows
+                Item { id: dl; required property var modelData; required property int index
+                    readonly property bool now: !!Store.building && modelData.at === Store.building.at
+                    width: parent.width; height: 32
+                    Rectangle { anchors.fill: parent; radius: 10; color: dl.now ? Theme.glass2 : "transparent" }
+                    Txt { width: 30; y: 9; horizontalAlignment: Text.AlignRight; mono: true; font.pixelSize: 11; color: dl.now ? Theme.datum : Theme.ink3; text: (dl.modelData.at < 10 ? "0" : "") + dl.modelData.at }
+                    Icon { visible: !dl.now; x: 41; y: 10; name: "check"; size: 13; color: Theme.pass }
+                    Txt { x: 66; y: 8; width: parent.width - 150; elide: Text.ElideRight; wrapMode: Text.NoWrap; font.pixelSize: 13; font.weight: dl.now ? Theme.wSemi : Theme.wMedium; tone: dl.now ? 1 : 2; text: dl.modelData.label || dl.modelData.feature }
+                    Txt { visible: dl.now; anchors.right: parent.right; anchors.rightMargin: 12; y: 10; mono: true; font.pixelSize: 10; font.weight: Theme.wMedium; font.letterSpacing: 1.0; color: Theme.datum; text: "BUILDING" } } } }
     }
 
     // the blank canvas: the empty studio floor and the ways to put something on it
     Column {
         objectName: "blankCanvas"; visible: dz.empty
-        anchors.centerIn: parent; anchors.verticalCenterOffset: -20; spacing: 12; width: Math.min(parent.width - 80, 620)
+        anchors.centerIn: parent; anchors.verticalCenterOffset: -70; spacing: 12; width: Math.min(parent.width - 80, 620)
         Txt { kind: "cap"; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter; text: "Blank canvas" }
         Txt { kind: "h2"; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width
             text: "Nothing here yet" }
         Txt { kind: "body"; tone: 2; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width; wrapMode: Text.WordWrap
-            text: Store.chatReady ? "Say what goes here in the conversation on the left, draw it, or bring a part you have."
+            text: Store.chatReady ? "Say what goes here in the bar below, draw it, or bring a part you have."
                                   : "Draw it, bring a part you have, or start from a block you shape with sliders. Connect an agent in Settings › Agents & models to describe it in words." }
         Item { width: 1; height: 4 }
         Row { anchors.horizontalCenter: parent.horizontalCenter; spacing: 8
@@ -163,7 +205,7 @@ Item {
 
     // what you gave it, kept in view: the photo, the sketch, the part
     Row {
-        visible: dz.pics.length > 0; anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 20; spacing: 8
+        visible: dz.pics.length > 0; anchors.left: parent.left; anchors.top: parent.top; anchors.leftMargin: Theme.edge; anchors.topMargin: 84; spacing: 8
         Txt { kind: "cap"; text: "Working from"; anchors.verticalCenter: parent.verticalCenter; rightPadding: 4 }
         Repeater { model: dz.pics.slice(0, 5)
             Rectangle { required property var modelData; readonly property bool pic: modelData.kind === "image"

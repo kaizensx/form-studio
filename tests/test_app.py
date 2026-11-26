@@ -34,7 +34,7 @@ class AppFiles(unittest.TestCase):
 
     def test_fonts_and_icon_ship(self):
         assets = QML.parent / "assets"
-        for name in ("fonts/InstrumentSans.ttf", "fonts/GeistMono.ttf", "fonts/lucide.ttf", "icon.png", "icon.ico", "icon.icns"):
+        for name in ("fonts/Geist.ttf", "fonts/InstrumentSans.ttf", "fonts/GeistMono.ttf", "fonts/lucide.ttf", "icon.png", "icon.ico", "icon.icns"):
             self.assertTrue((assets / name).is_file(), name)
 
     def test_icon_names_used_are_defined(self):

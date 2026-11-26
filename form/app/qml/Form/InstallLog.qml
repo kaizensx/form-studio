@@ -55,8 +55,8 @@ Column {
                 HoverHandler { id: sh }
                 Tip { show: sh.hovered; text: lg.label(seg.modelData) + " · " + seg.modelData.state + (seg.modelData.message ? " · " + seg.modelData.message : "") } } } }
     // the one thing only the person can do; the engine checks every few seconds and continues by itself
-    Rectangle { objectName: "installYourTurn"; visible: !!lg.you; width: parent.width; height: yt.implicitHeight + 24; radius: Theme.rMd
-        color: Theme.alpha(Theme.amber, 0.07); border.color: Theme.alpha(Theme.amber, 0.35)
+    Rectangle { objectName: "installYourTurn"; visible: !!lg.you; width: parent.width; height: yt.implicitHeight + 24; radius: 14
+        color: Theme.alpha(Theme.amber, 0.09)
         Column { id: yt; x: 14; y: 12; width: parent.width - 28; spacing: 8
             Row { spacing: 8
                 Icon { name: lg.you && lg.you.action && lg.you.action.kind === "signin" ? "shield_check" : "download"; size: 14; color: Theme.amber; anchors.verticalCenter: parent.verticalCenter }
@@ -75,7 +75,7 @@ Column {
     Txt { visible: !lg.open && lg.lines.length > 0; width: parent.width; mono: true; font.pixelSize: 11; tone: 3
         elide: Text.ElideRight; wrapMode: Text.NoWrap
         text: lg.lines.length ? (lg.lines[lg.lines.length - 1].kind === "cmd" ? "$ " : "") + lg.lines[lg.lines.length - 1].text : "" }
-    Rectangle { visible: lg.open; width: parent.width; height: 168; radius: Theme.rSm; color: Theme.well; border.color: Theme.rule; clip: true
+    Rectangle { visible: lg.open; width: parent.width; height: 168; radius: Theme.rMd; color: Theme.glassWell; border.color: Theme.rule; clip: true
         ListView {
             id: list; anchors.fill: parent; anchors.margins: 8; model: lg.lines; clip: true; boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { width: 6 }

@@ -4,12 +4,28 @@
 
 ### New
 
-- **A new look for the workspace.** The conversation, the part and the inspector are three rounded panels with a
-  little room between them, and the top bar is part of the window instead of a strip across it. Captions and tags
-  are lettered like a drawing's. The stage you are in carries a mark that travels as you move between stages.
-- **A studio floor you can read.** The floor under the part is lit where the part stands and carries a true grid: a
-  line every 10 mm and a firmer one every 50 mm, fading with distance. The part now stands on the floor with a
-  soft shade under it, and its surface has a satin finish. In the light appearance the floor is paper white.
+- **A new look: Lightdesk.** The 3D view now fills the whole window and every control floats over it as a pane of
+  glass, in the dark studio or on paper. One colour, electric cyan, always means "this is where you are"; green only
+  means pass and amber only means review. The app is set in Geist and Geist Mono.
+- **The top of the window is three capsules.** The design, its revision and its state on the left; the stages
+  (Describe, Design, Fit, Review, Make) in the middle, each with one line that says where it stands; the printer (when
+  printing is on), search and Settings on the right.
+- **The features are a program.** In Design the feature list is a numbered listing in build order. While a design
+  builds it runs: a light travels down the margin to the line being built, built lines are ticked, and the header
+  counts the steps.
+- **A build has a title.** While a design builds, the lower part of the view names the feature being made in large
+  type, with its number, a track with one segment per step, and the feature before and after. The numbers are the
+  build's own.
+- **The conversation is one bar under the part.** A status line, up to four numbered suggestions (press 1 to 4 to
+  pick one while the prompt is empty), and the prompt. It opens upward into the whole conversation and folds back
+  with Ctrl/⌘ J or a click on its status line; it folds by itself while a build plays.
+- **The size is one small line.** Width × depth × height and volume sit above the view buttons, bottom left. During
+  a build they are the size of what is built so far.
+- **A calmer floor.** The part stands in a pool of warm light. The 10 mm grid is off until you ask for it with the
+  grid button beside the views.
+- **Glass you can turn off.** With "Reduce transparency" on, in Low Power Mode or without a graphics card the panes
+  are solid and nothing is blurred. Reduce Motion keeps only fades.
+- **Home, the first run, Settings, sheets, menus and messages** use the same glass, type and colours.
 
 - **A design is checked against what you asked for.** The numbers in a request (sizes, hole counts and diameters, a
   bolt circle, wall thickness, threads, the number of parts) become requirements that Form Studio measures on the

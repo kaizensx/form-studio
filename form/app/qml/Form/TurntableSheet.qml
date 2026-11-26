@@ -57,7 +57,7 @@ Column {
             Seg { model: [{ value: 10, text: "Low" }, { value: 24, text: "Eye" }, { value: 45, text: "High" }]
                 value: tt.elevation; onPicked: function (v) { tt.elevation = v; tt.out = null } } } }
 
-    Rectangle { width: parent.width; height: Math.round(width * 0.75); radius: Theme.rMd; color: Theme.well; clip: true
+    Rectangle { width: parent.width; height: Math.round(width * 0.75); radius: Theme.rMd; color: Theme.glassWell; clip: true
         border.color: Theme.rule2
         Spinner { anchors.centerIn: parent; size: 28; visible: tt.making }
         Txt { anchors.centerIn: parent; kind: "fine"; tone: 3; visible: !tt.making && !tt.out; text: "The part turns once, rendered from the CAD model." }

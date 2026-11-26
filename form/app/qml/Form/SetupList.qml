@@ -28,7 +28,7 @@ Rectangle {
     }
     width: parent ? parent.width : 0
     height: col.implicitHeight; visible: rows.length > 0 || !sw
-    radius: Theme.rLg; color: Theme.plate1; border.color: Theme.rule
+    radius: Theme.rLg; color: Theme.glass; border.color: Theme.dark ? Theme.glassEdge : Theme.rule
     function tint(st) { return st === "ok" ? Theme.pass : st === "warn" ? Theme.amber : st === "missing" ? Theme.ink3 : Theme.ink4 }
     function word(r) {
         var agent = r.id.indexOf("agent.") === 0

@@ -43,7 +43,7 @@ def journey_select_and_views(ui):
     ui.settle(500)
     # orbit by dragging: the camera moves, nothing is selected
     az0 = ui.item("viewport").property("az")
-    ui.drag("viewport", (140, 30), fx=0.8, fy=0.2)
+    ui.drag("viewport", (140, 30), fx=0.55, fy=0.25)             # in the open room, clear of the panes
     ui.check(abs(ui.item("viewport").property("az") - az0) > 1, "dragging orbits the camera")
     ui.eq(ui.store.get("feature"), "", "a drag does not select")
     # zoom with the wheel
@@ -61,6 +61,14 @@ def journey_select_and_views(ui):
     ui.wait_until(lambda: ui.store.get("dims") is True, 2, "dimensions to show")
 
 
+def room(ui, u, v):
+    """A point of the open room (the part of the 3D view no pane covers, where the camera keeps the part) as
+    fractions of the whole view: (0, 0) is its top left, (1, 1) its bottom right."""
+    vp = ui.item("viewport")
+    l, t, r, b = (float(vp.property(k)) for k in ("insetLeft", "insetTop", "insetRight", "insetBottom"))
+    return (l + u * (vp.width() - l - r)) / vp.width(), (t + v * (vp.height() - t - b)) / vp.height()
+
+
 def journey_measure(ui):
     ui.key("M")
     ui.wait_until(lambda: tool(ui) == "measure" and ui.store.get("measuring") is True, 3, "M to start measuring")
@@ -68,10 +76,10 @@ def journey_measure(ui):
     ui.wait_until(lambda: tool(ui) == "select" and ui.store.get("measuring") is False, 3, "V to go back to Select")
     ui.click_text("Measure")
     ui.wait_until(lambda: ui.store.get("measuring") is True, 3, "the Measure rail button")
-    ui.click("viewport", 0.40, 0.52)
+    ui.click("viewport", *room(ui, 0.45, 0.58))
     ui.wait_until(lambda: ui.store.get("measureFrom") is not None, 10, "the first point")
     ui.expect("Click the second point")
-    ui.click("viewport", 0.58, 0.60)
+    ui.click("viewport", *room(ui, 0.58, 0.68))
     m = ui.wait_until(lambda: ui.store.get("measures"), 10, "a measurement after two clicks")[0]
     ui.eq(m["kind"], "distance")
     mm = float(m["label"].split()[0])
@@ -83,8 +91,8 @@ def journey_measure(ui):
     ui.click_text("Face")
     ui.wait_until(lambda: ui.store.get("measureKind") == "face", 2, "face mode")
     # the enclosure is two parts laid out for printing; a single point can land in the gap between them
-    for fx, fy in ((0.42, 0.60), (0.45, 0.50), (0.36, 0.45)):
-        ui.click("viewport", fx, fy)
+    for u, v in ((0.45, 0.58), (0.58, 0.68), (0.47, 0.45)):
+        ui.click("viewport", *room(ui, u, v))
         try:
             ui.wait_until(lambda: len(ui.store.get("measures")) == 2, 5, "a face measurement")
             break

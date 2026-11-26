@@ -21,7 +21,7 @@ Column {
             else Store.toast("Could not reach GitHub", "Nothing changed. Try again later.") }) } } }
 
     Row { spacing: 16
-        Rectangle { width: 56; height: 56; radius: Theme.rLg; color: Theme.plate; border.color: Theme.rule2
+        Rectangle { width: 56; height: 56; radius: Theme.rLg; color: Theme.glass2
             Logo { word: false; size: 24; anchors.centerIn: parent; anchors.horizontalCenterOffset: 1 } }   // optical centre: the F leans on its stem
         Column { spacing: 3; anchors.verticalCenter: parent.verticalCenter
             Row { spacing: 10
@@ -41,7 +41,8 @@ Column {
             Repeater {
                 model: [
                     { id: "FORM", label: "Form Studio", what: "This program", lic: "MIT" },
-                    { id: "InstrumentSans", label: "Instrument Sans", what: "Interface typeface", lic: "SIL OFL 1.1" },
+                    { id: "Geist", label: "Geist", what: "Interface typeface", lic: "SIL OFL 1.1" },
+                    { id: "InstrumentSans", label: "Instrument Sans", what: "Lettering on share cards and renders", lic: "SIL OFL 1.1" },
                     { id: "GeistMono", label: "Geist Mono", what: "Numbers and code", lic: "SIL OFL 1.1" },
                     { id: "lucide", label: "Lucide", what: "Icons", lic: "ISC" },
                     { id: "", label: "Qt and PySide6", what: "Interface toolkit", lic: "LGPL-3.0", url: "https://doc.qt.io/qtforpython-6/licenses.html" },
@@ -60,7 +61,7 @@ Column {
                             onClicked: ab.shown = ab.shown === lr.modelData.id ? "" : lr.modelData.id }
                         Btn { small: true; kind: "quiet"; visible: !!lr.modelData.url; icon: "external_link"; tip: "Open its licence page"; anchors.verticalCenter: parent.verticalCenter
                             onClicked: Bridge.openLink(lr.modelData.url) } }
-                    Rectangle { visible: lr.modelData.id !== "" && ab.shown === lr.modelData.id; width: parent.width; height: visible ? 180 : 0; radius: Theme.rSm; color: Theme.well; border.color: Theme.rule; clip: true
+                    Rectangle { visible: lr.modelData.id !== "" && ab.shown === lr.modelData.id; width: parent.width; height: visible ? 180 : 0; radius: Theme.rMd; color: Theme.glassWell; border.color: Theme.rule; clip: true
                         Flickable { anchors.fill: parent; anchors.margins: 10; contentHeight: lt.implicitHeight; clip: true; boundsBehavior: Flickable.StopAtBounds
                             Txt { id: lt; width: parent.width; mono: true; font.pixelSize: 11; tone: 2
                                 text: parent.parent.parent.visible ? Bridge.licence(lr.modelData.id) : "" } } }

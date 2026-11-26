@@ -30,7 +30,7 @@ Column {
         text: "Cut the pocket ring under Fit first. This sheet opens by itself when the ring has been cut and sliced." }
 
     // what the slicer says: the one thing to read on this sheet
-    Rectangle { visible: !!rs.r; width: parent.width; height: est.implicitHeight + 28; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+    Rectangle { visible: !!rs.r; width: parent.width; height: est.implicitHeight + 28; radius: 14; color: Theme.glass
         Column { id: est; x: 16; y: 14; width: parent.width - 32; spacing: 12
             Item { width: parent.width; height: 17
                 Txt { kind: "cap"; text: "Slicer estimate"; anchors.verticalCenter: parent.verticalCenter }

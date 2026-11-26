@@ -77,7 +77,7 @@ Column {
     // the action bar: progress while Blender works, otherwise what the picture on screen is
     property Component footerLeft: Item { height: 28
         Row { visible: rs.busy; spacing: 12; anchors.verticalCenter: parent.verticalCenter
-            Rectangle { width: 180; height: 4; radius: 2; color: Theme.well; anchors.verticalCenter: parent.verticalCenter
+            Rectangle { width: 180; height: 4; radius: 2; color: Theme.glassWell; anchors.verticalCenter: parent.verticalCenter
                 Rectangle { width: Math.max(4, parent.width * rs.progress); height: parent.height; radius: 2; color: Theme.datum
                     Behavior on width { Glide { duration: Theme.move(200) } } } }
             Txt { kind: "fine"; mono: true; text: Math.round(rs.progress * 100) + " %"; width: 34; horizontalAlignment: Text.AlignRight; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter }
@@ -190,7 +190,7 @@ Column {
             id: pic
             width: parent.width - ctl.width - parent.spacing; spacing: 12
             Rectangle {
-                width: parent.width; height: Math.min(Math.round(width * 3 / 4), rs.picMax); radius: Theme.rMd; color: Theme.well; border.color: Theme.rule; clip: true
+                width: parent.width; height: Math.min(Math.round(width * 3 / 4), rs.picMax); radius: Theme.rMd; color: Theme.glassWell; border.color: Theme.rule; clip: true
                 Image { id: img; anchors.fill: parent; anchors.margins: 1; fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true; asynchronous: true
                     source: rs.shown ? rs.url(rs.shown.key) : ""; opacity: status === Image.Ready ? 1 : 0
                     Behavior on opacity { NumberAnimation { duration: Theme.base; easing.type: Easing.OutCubic } } }
@@ -207,7 +207,7 @@ Column {
                     Spinner { anchors.centerIn: parent; size: 20; running: parent.visible } }
                 // the label travels with the picture
                 Rectangle { visible: !!rs.shown && img.status === Image.Ready; anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 10
-                    width: lb.implicitWidth + 16; height: 24; radius: Theme.rSm; color: Theme.alpha(Theme.plate, 0.78)
+                    width: lb.implicitWidth + 16; height: 24; radius: 12; color: Theme.alpha(Theme.plate, 0.78)
                     Txt { id: lb; anchors.centerIn: parent; kind: "fine"; tone: 2; text: rs.st ? rs.st.label : "" } }
             }
             Column { width: parent.width; spacing: 2; visible: !!rs.shown
@@ -227,7 +227,7 @@ Column {
                         id: th
                         required property var modelData
                         readonly property bool on: !!rs.shown && rs.shown.key === modelData.key
-                        width: 72; height: 54; radius: Theme.rSm; color: Theme.well; clip: true
+                        width: 72; height: 54; radius: Theme.rMd; color: Theme.glassWell; clip: true
                         border.width: on ? 2 : 1
                         border.color: on ? Theme.datum : tm.containsMouse ? Theme.rule3 : Theme.rule
                         scale: tm.pressed ? Theme.from(0.97) : 1

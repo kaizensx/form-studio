@@ -79,7 +79,7 @@ Column {
 
     // the photo, with segments drawn over it
     Rectangle {
-        width: parent.width; height: ps.photoReady ? Math.max(160, frame.height) : 220; radius: Theme.rMd; color: Theme.well; border.color: Theme.rule; clip: true
+        width: parent.width; height: ps.photoReady ? Math.max(160, frame.height) : 220; radius: Theme.rMd; color: Theme.glassWell; border.color: Theme.rule; clip: true
         Item {
             id: frame
             readonly property real iw: img.sourceSize.width
@@ -123,7 +123,7 @@ Column {
             Txt { kind: "fine"; visible: img.status !== Image.Loading; anchors.horizontalCenter: parent.horizontalCenter
                 text: ps.ref.file ? "Attach it again under Describe › Reference photos." : "Attach a photo under Describe › Reference photos, then press Measure." } }
         // kept measurements, counted on the photo
-        Rectangle { visible: ps.photoReady && ps.list.length > 0; x: 10; y: 10; width: kept.implicitWidth + 16; height: 24; radius: Theme.rSm; color: Theme.alpha(Theme.plate, 0.78)
+        Rectangle { visible: ps.photoReady && ps.list.length > 0; x: 10; y: 10; width: kept.implicitWidth + 16; height: 24; radius: 12; color: Theme.alpha(Theme.plate, 0.78)
             Txt { id: kept; anchors.centerIn: parent; kind: "fine"; tone: 2; text: F.plural(ps.list.length, "measurement") + " kept" } }
     }
 
@@ -142,7 +142,7 @@ Column {
     Note { visible: ps.mode === "measure"; title: "Step 2 — measure"
         text: "Scale " + F.fmt(ps.mmPerPx, 4) + " mm per pixel. Click two points. Perspective and lens distortion are not corrected, so treat results as rough: ±0.6 mm or worse, never fit-critical." }
     // the reading: the one number this sheet is for
-    Rectangle { visible: ps.mode === "measure" && ps.px > 0; width: parent.width; height: 60; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+    Rectangle { visible: ps.mode === "measure" && ps.px > 0; width: parent.width; height: 60; radius: 14; color: Theme.glass
         Row { x: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 10
             Txt { mono: true; kind: "h2"; font.weight: Theme.wMedium; text: F.fmt(ps.mm, 1); wrapMode: Text.NoWrap; anchors.baseline: unit.baseline }
             Txt { id: unit; mono: true; tone: 2; text: "mm ±" + F.fmt(ps.sigma, 1); wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter }

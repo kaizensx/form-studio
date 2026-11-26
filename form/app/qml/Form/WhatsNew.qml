@@ -23,20 +23,18 @@ Column {
     // the version, large, on a quiet band that catches the light
     Rectangle {
         id: band
-        width: parent.width; height: 112; radius: Theme.rLg; color: Theme.plate1; border.color: Theme.rule; clip: true
-        // a datum grid fading out to the right: the same plate Home starts from
+        width: parent.width; height: 112; radius: Theme.rLg; color: Theme.glass; border.color: Theme.dark ? Theme.glassEdge : Theme.rule; clip: true
+        // a datum grid that fades in from the left, behind the number
         Repeater { model: 14
             Rectangle { required property int index; x: band.width - 18 - index * 22; y: 0; width: 1; height: band.height
-                color: Theme.alpha(Theme.datum, 0.05 + 0.004 * (14 - index)) } }
+                color: Theme.alpha(Theme.datum, Math.max(0, 0.085 - 0.006 * index)) } }
         Repeater { model: 5
             Rectangle { required property int index; x: band.width * 0.42; y: 18 + index * 22; width: band.width * 0.58; height: 1
-                color: Theme.alpha(Theme.datum, 0.05) } }
-        Rectangle { x: band.width * 0.42; width: 120; height: band.height
-            gradient: Gradient { orientation: Gradient.Horizontal
-                GradientStop { position: 0; color: Theme.plate1 } GradientStop { position: 1; color: Theme.alpha(Theme.plate1, 0) } } }
+                gradient: Gradient { orientation: Gradient.Horizontal
+                    GradientStop { position: 0; color: Theme.alpha(Theme.datum, 0) } GradientStop { position: 0.4; color: Theme.alpha(Theme.datum, 0.06) } GradientStop { position: 1; color: Theme.alpha(Theme.datum, 0.06) } } } }
         Column { x: 22; anchors.verticalCenter: parent.verticalCenter; spacing: 4
             Txt { kind: "cap"; text: "New in this version"; color: Theme.datum }
-            Txt { id: vtxt; font.pixelSize: 40; font.weight: Theme.wSemi; font.letterSpacing: -0.8; text: wn.n ? wn.n.version : Bridge.version
+            Txt { id: vtxt; font.pixelSize: 40; font.weight: Theme.wSemi; font.letterSpacing: -1.6; text: wn.n ? wn.n.version : Bridge.version
                 opacity: 0; Component.onCompleted: vin.start()
                 SequentialAnimation { id: vin; PauseAnimation { duration: 60 }
                     ParallelAnimation { Glide { target: vtr; property: "y"; from: Theme.shift(8); to: 0; duration: Theme.slow }
@@ -54,14 +52,14 @@ Column {
                 required property var modelData
                 required property int index
                 width: list.width; height: rc.implicitHeight + 24; radius: Theme.rMd
-                color: hm.containsMouse ? Theme.plate3 : Theme.plate2; border.color: Theme.rule
+                color: hm.containsMouse ? Theme.glass2 : Theme.glass; border.color: Theme.dark ? Theme.glassEdge : Theme.rule
                 Behavior on color { Tint {} }
                 opacity: 0; Component.onCompleted: arrive.start()
                 SequentialAnimation { id: arrive; PauseAnimation { duration: 120 + row.index * Theme.stagger }
                     ParallelAnimation { Glide { target: row; property: "opacity"; to: 1; duration: Theme.slow }
                         Glide { target: rtr; property: "y"; from: Theme.shift(8); to: 0; duration: Theme.slow } } }
                 transform: Translate { id: rtr }
-                Rectangle { x: 14; y: 15; width: 22; height: 22; radius: 11; color: Theme.alpha(Theme.datum, 0.12)
+                Rectangle { x: 14; y: 15; width: 22; height: 22; radius: 7; color: Theme.alpha(Theme.datum, 0.14)
                     Txt { anchors.centerIn: parent; mono: true; font.pixelSize: 11; text: row.index + 1; color: Theme.datum } }
                 Column { id: rc; x: 48; y: 12; width: parent.width - 62; spacing: 3
                     Row { spacing: 8; width: parent.width

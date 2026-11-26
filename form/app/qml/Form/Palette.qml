@@ -3,6 +3,7 @@ import FormNative
 import "F.js" as F
 
 // Command palette: every action, design and conversation, from the keyboard. No animation: it is used all day.
+// A pane of glass over the room with the command line's prompt (the accent "›") before the search field.
 // Results are grouped (Recent, Go to, Tools, Designs, Conversations, Settings); typing matches loosely — the letters in
 // order, not necessarily together — and the matched letters are lit. The commands you ran last come first.
 Item {
@@ -163,15 +164,19 @@ Item {
     function move(d) { sel = Math.max(0, Math.min(picks.length - 1, sel + d)); list.positionViewAtIndex(picks[sel], ListView.Contain) }
 
     Rectangle { anchors.fill: parent; color: Theme.scrim; MouseArea { anchors.fill: parent; onClicked: Store.paletteOpen = false; onWheel: function (w) { w.accepted = true } } }
-    Rectangle {
+    Glass {
         id: box
-        width: Math.min(620, parent.width - 80); anchors.horizontalCenter: parent.horizontalCenter; y: Math.max(64, Math.round(parent.height * 0.14))
-        height: 54 + Math.min(list.contentHeight, Math.min(440, parent.height - y - 120)) + 12 + 34
-        radius: Theme.rLg + 2; color: Theme.plate2; border.color: Theme.rule2
-        Shadow { radius: parent.radius; spread: 44; drop: 18; strength: 1.25 }
+        source: Store.backdrop; radius: Theme.rPane
+        width: Math.min(640, parent.width - 80); anchors.horizontalCenter: parent.horizontalCenter; y: Math.max(64, Math.round(parent.height * 0.14))
+        height: 58 + Math.min(list.contentHeight, Math.min(440, parent.height - y - 120)) + 12 + 36
+        onHeightChanged: place()
+        Rectangle { anchors.fill: parent; radius: box.radius; color: Theme.alpha(Theme.plate1, box.blurred ? 0.66 : 0.9) }
         MouseArea { anchors.fill: parent }
-        Icon { x: 18; y: 19; name: "search"; size: 16; color: Theme.ink3 }
-        Field { id: q; x: 42; y: 11; width: parent.width - 60; height: 32; bare: true; placeholder: "Search commands, designs and conversations"
+        // the prompt: the well the command is typed into, as in the bar under the part
+        Rectangle { x: 8; y: 8; width: parent.width - 16; height: 44; radius: Theme.rPane - 8; color: Theme.glassWell; border.width: 1; border.color: Theme.rule }
+        Text { x: 22; y: 7; height: 44; verticalAlignment: Text.AlignVCenter; text: "›"; color: Theme.datum
+            font.family: Theme.mono; font.pixelSize: 20; font.weight: Theme.wMedium; renderType: Text.NativeRendering }
+        Field { id: q; x: 40; y: 14; width: parent.width - 62; height: 32; bare: true; placeholder: "Search commands, designs and conversations"
             onEdited: { pal.sel = 0; list.positionViewAtBeginning() }
             input.font.pixelSize: 15
             input.Keys.onPressed: function (e) {
@@ -180,10 +185,9 @@ Item {
                 else if (e.key === Qt.Key_Escape) { Store.paletteOpen = false; e.accepted = true }
                 else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { pal.go(pal.sel); e.accepted = true }
             } }
-        Rectangle { y: 53; width: parent.width; height: 1; color: Theme.rule }
         ListView {
             id: list
-            x: 6; y: 58; width: parent.width - 12; height: parent.height - 58 - 34 - 4; clip: true; boundsBehavior: Flickable.StopAtBounds
+            x: 8; y: 60; width: parent.width - 16; height: parent.height - 60 - 36 - 4; clip: true; boundsBehavior: Flickable.StopAtBounds
             model: pal.rows
             delegate: Item {
                 id: row
@@ -191,12 +195,12 @@ Item {
                 required property int index
                 readonly property bool isHead: !!modelData.head
                 readonly property bool on: !isHead && pal.picks[pal.sel] === index
-                width: list.width; height: isHead ? 28 : 34
-                Txt { visible: row.isHead; kind: "cap"; x: 12; y: 11; text: row.modelData.head || "" }
-                Rectangle { visible: !row.isHead; anchors.fill: parent; radius: Theme.rSm; color: row.on ? Theme.washOn : "transparent" }
-                Icon { visible: !row.isHead; x: 12; name: row.modelData.icon || "dot"; size: 14; anchors.verticalCenter: parent.verticalCenter; color: row.on ? Theme.datum : Theme.ink3 }
-                Txt { visible: !row.isHead; x: 38; anchors.verticalCenter: parent.verticalCenter; textFormat: Text.StyledText; text: row.isHead ? "" : pal.lit(row.modelData.text, row.modelData.at)
-                    width: Math.min(implicitWidth, parent.width - 38 - 12 - (kb.visible ? kb.width + 10 : 0) - 60); elide: Text.ElideRight; wrapMode: Text.NoWrap; id: lab }
+                width: list.width; height: isHead ? 30 : 36
+                Txt { visible: row.isHead; kind: "cap"; x: 14; y: 13; color: Theme.datum; text: row.modelData.head || "" }
+                Rectangle { visible: !row.isHead; anchors.fill: parent; radius: Theme.rMd; color: row.on ? Theme.glass2 : "transparent" }
+                Icon { visible: !row.isHead; x: 14; name: row.modelData.icon || "dot"; size: 14; anchors.verticalCenter: parent.verticalCenter; color: row.on ? Theme.datum : Theme.ink3 }
+                Txt { visible: !row.isHead; x: 40; anchors.verticalCenter: parent.verticalCenter; textFormat: Text.StyledText; text: row.isHead ? "" : pal.lit(row.modelData.text, row.modelData.at)
+                    width: Math.min(implicitWidth, parent.width - 40 - 12 - (kb.visible ? kb.width + 10 : 0) - 60); elide: Text.ElideRight; wrapMode: Text.NoWrap; id: lab }
                 Txt { visible: !row.isHead; kind: "fine"; anchors.left: lab.right; anchors.leftMargin: 10; anchors.right: kb.visible ? kb.left : parent.right; anchors.rightMargin: 12
                     anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; tone: 3; text: row.modelData.hint || "" }
                 Kbd { id: kb; visible: !row.isHead && !!row.modelData.keys; keys: row.modelData.keys || ""; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter }
@@ -206,14 +210,13 @@ Item {
                     onClicked: pal.go(pal.picks.indexOf(row.index)) }
             }
         }
-        Txt { visible: pal.picks.length === 0; x: 18; y: 66; tone: 3; text: "Nothing matches “" + q.text.trim() + "”." }
+        Txt { visible: pal.picks.length === 0; x: 22; y: 72; tone: 3; text: "Nothing matches “" + q.text.trim() + "”." }
         // what the keys do
-        Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: 33; width: parent.width; height: 1; color: Theme.rule }
-        Row { anchors.bottom: parent.bottom; anchors.bottomMargin: 8; x: 16; spacing: 14
+        Row { anchors.bottom: parent.bottom; anchors.bottomMargin: 11; x: 22; spacing: 14
             Row { spacing: 5; Kbd { keys: "Up" } Kbd { keys: "Down" } Txt { kind: "fine"; text: "move"; anchors.verticalCenter: parent.verticalCenter } }
             Row { spacing: 5; Kbd { keys: "Return" } Txt { kind: "fine"; text: "run"; anchors.verticalCenter: parent.verticalCenter } }
             Row { spacing: 5; Kbd { keys: "Esc" } Txt { kind: "fine"; text: "close"; anchors.verticalCenter: parent.verticalCenter } } }
-        Txt { anchors.bottom: parent.bottom; anchors.bottomMargin: 10; anchors.right: parent.right; anchors.rightMargin: 16; kind: "fine"; tone: 4
+        Txt { anchors.bottom: parent.bottom; anchors.bottomMargin: 12; anchors.right: parent.right; anchors.rightMargin: 22; kind: "fine"; mono: true; tone: 3
             text: pal.all.length + " commands" }
     }
 }

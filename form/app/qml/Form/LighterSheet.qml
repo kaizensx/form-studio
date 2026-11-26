@@ -49,7 +49,7 @@ Column {
             model: [{ k: "Computed mass", v: ls.r ? ls.g(ls.r.baseline.mass_g) : "–", d: ls.r ? "volume × " + F.fmt(ls.r.baseline.density, 2) + " g/cm³ (" + ls.r.baseline.density_source + ")" : "from the solid" },
                     { k: "Slicer filament", v: ls.r ? (ls.r.baseline.slice_g === null ? "not sliced" : ls.g(ls.r.baseline.slice_g)) : "–", d: ls.r && ls.r.baseline.settings && ls.r.baseline.settings.infill ? "infill " + ls.r.baseline.settings.infill + (ls.r.baseline.settings.walls ? " · " + ls.r.baseline.settings.walls + " walls" : "") : "the slicer's simulation" },
                     { k: "Checks passing", v: ls.r ? ls.r.baseline.passed + " of " + ls.r.baseline.checks.length : "–", d: "each must still pass" }]
-            Rectangle { required property var modelData; width: (ls.width - 20) / 3; height: 80; radius: Theme.rMd; color: Theme.plate2; border.color: Theme.rule
+            Rectangle { required property var modelData; width: (ls.width - 20) / 3; height: 80; radius: 14; color: Theme.glass
                 Column { x: 12; y: 10; width: parent.width - 24; spacing: 2
                     Txt { kind: "fine"; text: modelData.k }
                     Txt { mono: true; font.pixelSize: 17; font.weight: Theme.wSemi; text: modelData.v }
@@ -75,7 +75,7 @@ Column {
                 property bool open: false
                 objectName: "lighterCandidate"
                 width: parent.width; height: cc.implicitHeight + 18; radius: Theme.rMd
-                color: on ? Theme.alpha(Theme.datum, 0.08) : cm.containsMouse ? Theme.plate3 : Theme.plate2
+                color: on ? Theme.alpha(Theme.datum, 0.08) : cm.containsMouse ? Theme.glass2 : Theme.glass
                 border.color: on ? Theme.datum : Theme.rule
                 Behavior on color { Tint {} }
                 opacity: 0; Component.onCompleted: rise.start()

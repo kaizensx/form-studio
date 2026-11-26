@@ -14,7 +14,8 @@ import "F.js" as F
 //   Updates              update checks and the channel, the version you run
 //   Advanced             limits and fallbacks, with the key each one has in studio.toml
 //
-// Every page has the same shape: a title and one line on what it holds, then titled cards of rows. Rows that edit
+// Every page has the same shape: a mono overline, a title and one line on what it holds, then titled cards of rows on
+// thin glass. The rail's pages are capsule rows; one highlight glides to the page you are on. Rows that edit
 // studio.toml collect in `edits` and are written by "Save changes": only the changed keys are rewritten, comments and
 // other keys stay, and the previous file is kept as a backup next to it (form/config_edit.py). Things that apply at
 // once say so and do not wait for Save: appearance, "Set up for" (form/capabilities.py: on installs what it needs,
@@ -145,11 +146,19 @@ Item {
     FileDialog { id: fileDlg; title: "Choose the program"; onAccepted: if (st.pathRow) st.setEdit(st.pathRow, st.localPath(selectedFile)) }
 
     // ── the rail: search, then the pages in their groups ─────────────────────────────────────────────────────────
-    Rectangle { id: rail; width: st.railW; height: parent.height; color: Theme.alpha(Theme.plate1, Theme.dark ? 0.6 : 0.75)
-        Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.rule }
-        Field { id: search; objectName: "settingsSearch"; x: 14; y: 16; width: parent.width - 29; placeholder: "Search settings"
+    Item { id: rail; width: st.railW; height: parent.height
+        property Item cur: null                // the row of the page in front: the highlight sits behind it
+        Rectangle { x: 12; y: 2; width: parent.width - 16; height: parent.height - 6; radius: 16; color: Theme.glass }
+        Field { id: search; objectName: "settingsSearch"; x: 22; y: 14; width: parent.width - 36; placeholder: "Search settings"
             onEdited: function (t) { st.query = t; pane.contentY = 0 } }
-        Column { id: nav; objectName: "settingsNav"; x: 10; y: 60; width: parent.width - 21; spacing: 2
+        // the one highlight: it glides from page to page (it jumps with Reduce Motion)
+        Rectangle { id: navHi; visible: !!rail.cur && !st.searching; radius: height / 2; color: Theme.glass2
+            x: nav.x; width: nav.width; height: 32
+            y: rail.cur && rail.cur.parent ? nav.y + rail.cur.parent.y + rail.cur.y : 0
+            property bool settled: false
+            Component.onCompleted: Qt.callLater(function () { navHi.settled = true })
+            Behavior on y { enabled: navHi.settled; Glide { duration: Theme.move(Theme.base) } } }
+        Column { id: nav; objectName: "settingsNav"; x: 20; y: 58; width: parent.width - 32; spacing: 2
             opacity: st.searching ? 0.55 : 1
             Behavior on opacity { NumberAnimation { duration: Theme.fast } }
             Repeater {
@@ -162,22 +171,23 @@ Item {
                     readonly property bool head: index === 0 || st.sections[index - 1].group !== modelData.group
                     readonly property int pending: st.dirtyIn(modelData.value)
                     width: nav.width
-                    Txt { visible: ni.head; kind: "cap"; text: ni.modelData.group; leftPadding: 10; topPadding: ni.index === 0 ? 2 : 14; bottomPadding: 6 }
-                    Rectangle { objectName: "settingsNav_" + ni.modelData.value; width: parent.width; height: 32; radius: Theme.rMd
-                        color: ni.on ? Theme.washOn : nm.containsMouse ? Theme.washHover : "transparent"
+                    Txt { visible: ni.head; kind: "cap"; text: ni.modelData.group; leftPadding: 12; topPadding: ni.index === 0 ? 2 : 14; bottomPadding: 6 }
+                    Rectangle { id: navRow; objectName: "settingsNav_" + ni.modelData.value; width: parent.width; height: 32; radius: height / 2
+                        color: !ni.on && nm.containsMouse ? Theme.washHover : "transparent"
+                        readonly property bool on: ni.on
+                        onOnChanged: if (on) rail.cur = navRow
+                        Component.onCompleted: if (on) rail.cur = navRow
                         activeFocusOnTab: true
                         Keys.onReturnPressed: st.go(ni.modelData.value)
                         Keys.onSpacePressed: st.go(ni.modelData.value)
                         Behavior on color { Tint {} }
                         FocusRing { on: parent.activeFocus; radius: parent.radius + 2 }
-                        Rectangle { x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: ni.on ? 16 : 0; radius: 1.5; color: Theme.datum
-                            Behavior on height { NumberAnimation { duration: Theme.move(Theme.fast) } } }
-                        Icon { x: 11; anchors.verticalCenter: parent.verticalCenter; name: ni.modelData.icon; size: 15; color: ni.on ? Theme.datum : Theme.ink3 }
-                        Txt { x: 36; anchors.verticalCenter: parent.verticalCenter; text: ni.modelData.text; wrapMode: Text.NoWrap
+                        Icon { x: 12; anchors.verticalCenter: parent.verticalCenter; name: ni.modelData.icon; size: 15; color: ni.on ? Theme.datum : Theme.ink3 }
+                        Txt { x: 37; anchors.verticalCenter: parent.verticalCenter; text: ni.modelData.text; wrapMode: Text.NoWrap
                             font.weight: ni.on ? Theme.wSemi : Theme.wMedium; color: ni.on ? Theme.ink : Theme.ink2 }
                         // unsaved changes on this page, or things that want attention
-                        Rectangle { visible: ni.pending > 0; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
-                            width: 7; height: 7; radius: 3.5; color: Theme.blueprint }
+                        Rectangle { visible: ni.pending > 0; anchors.right: parent.right; anchors.rightMargin: 13; anchors.verticalCenter: parent.verticalCenter
+                            width: 6; height: 6; radius: 3; color: Theme.blueprint }
                         Rectangle { visible: !!ni.modelData.badge && ni.pending === 0; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
                             width: bt.implicitWidth + 10; height: 16; radius: 8; color: Theme.alpha(Theme.amber, 0.14)
                             Text { id: bt; anchors.centerIn: parent; text: ni.modelData.badge ? String(ni.modelData.badge) : ""; color: Theme.amber; font.family: Theme.mono; font.pixelSize: 10; renderType: Text.NativeRendering } }
@@ -186,11 +196,20 @@ Item {
             }
         }
         // what you run
-        Row { x: 20; anchors.bottom: parent.bottom; anchors.bottomMargin: 14; spacing: 6
+        Row { x: 32; anchors.bottom: parent.bottom; anchors.bottomMargin: 18; spacing: 6
             Txt { kind: "fine"; tone: 3; text: "Form Studio"; anchors.verticalCenter: parent.verticalCenter }
             Txt { kind: "fine"; tone: 3; mono: true; text: Bridge.version; anchors.verticalCenter: parent.verticalCenter } }
     }
     function go(v) { search.text = ""; st.query = ""; st.tab = v }
+    // Bring something that just appeared on the page (the provider editor) into view at once, so its first field is
+    // under the pointer and never below the sheet's edge. The columns are laid out first: a new item has no place yet.
+    function reveal(it) {
+        if (!it) return
+        for (var p = it.parent; p && p !== pane.contentItem; p = p.parent) if (p.forceLayout) p.forceLayout()
+        var y = it.mapToItem(pane.contentItem, 0, 0).y
+        if (y < pane.contentY + 8 || y + it.height > pane.contentY + pane.height - 24)
+            pane.contentY = Math.max(0, Math.min(y - 20, Math.max(0, pane.contentHeight - pane.height)))
+    }
 
     // ── the page ─────────────────────────────────────────────────────────────────────────────────────────────────
     Flickable {
@@ -201,23 +220,25 @@ Item {
         contentHeight: page.implicitHeight + 56
         ScrollBar.vertical: ScrollBar { width: 6; policy: pane.contentHeight > pane.height + 1 ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
         Column {
-            id: page; x: 32; y: 24; width: pane.width - 64; spacing: 22
+            id: page; x: 28; y: 14; width: pane.width - 60; spacing: 22
             // the page's title and one line on what it holds
-            Column { width: parent.width; spacing: 5
+            Column { width: parent.width; spacing: 6
+                Txt { kind: "cap"; color: Theme.datum; text: st.searching ? "Settings" : st.section.group }
                 Txt { objectName: "settingsTitle"; kind: "h2"; text: st.searching ? "Search" : st.section.text }
                 Txt { tone: 2; width: parent.width; lineHeight: 1.35
                     text: st.searching ? (st.found.length ? F.plural(st.found.length, "setting") + " on every page match “" + st.query.trim() + "”."
                                                            : "No setting matches “" + st.query.trim() + "”.")
                                        : st.section.sub } }
+            // a page is laid out once the settings are read, so nothing on it moves under the pointer when they arrive
             Txt { visible: !st.cfg; tone: 2; text: "Reading the settings…" }
             SettingsRows { visible: st.searching && st.found.length > 0; sheet: st; rows: st.searching ? st.found : [] }
-            Loader { width: parent.width; active: !st.searching && st.tab === "general"; visible: active; sourceComponent: generalPage }
-            Loader { width: parent.width; active: !st.searching && st.tab === "chat"; visible: active; sourceComponent: agentsPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "general" && !!st.cfg; visible: active; sourceComponent: generalPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "chat" && !!st.cfg; visible: active; sourceComponent: agentsPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "software"; visible: active; sourceComponent: softwarePage }
-            Loader { width: parent.width; active: !st.searching && st.tab === "printer"; visible: active; sourceComponent: printingPage }
-            Loader { width: parent.width; active: !st.searching && st.tab === "apps"; visible: active; sourceComponent: appsPage }
-            Loader { width: parent.width; active: !st.searching && st.tab === "updates"; visible: active; sourceComponent: updatesPage }
-            Loader { width: parent.width; active: !st.searching && st.tab === "advanced"; visible: active; sourceComponent: advancedPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "printer" && !!st.cfg; visible: active; sourceComponent: printingPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "apps" && !!st.cfg; visible: active; sourceComponent: appsPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "updates" && !!st.cfg; visible: active; sourceComponent: updatesPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "advanced" && !!st.cfg; visible: active; sourceComponent: advancedPage }
         }
     }
     // the page slides under the title bar and the action bar
@@ -228,7 +249,7 @@ Item {
         Behavior on opacity { NumberAnimation { duration: Theme.fast } }
         gradient: Gradient { GradientStop { position: 0; color: "transparent" } GradientStop { position: 1; color: Theme.alpha(Theme.shade, Theme.dark ? 0.3 : 0.08) } } }
 
-    // a titled group on a page: a small caps title, one quiet line, then its card
+    // a titled group on a page: its title, a mono note for what applies at once, one quiet line, then its card
     component Group: Column {
         id: grp
         property string title: ""
@@ -238,8 +259,8 @@ Item {
         width: parent ? parent.width : 0; spacing: 9
         Column { width: parent.width; spacing: 2
             Row { spacing: 10
-                Txt { kind: "cap"; text: grp.title }
-                Txt { kind: "fine"; tone: 4; visible: text !== ""; text: grp.applies; anchors.verticalCenter: parent.verticalCenter } }
+                Txt { text: grp.title; font.weight: Theme.wSemi; font.letterSpacing: -0.1 }
+                Txt { kind: "fine"; mono: true; tone: 3; visible: text !== ""; text: grp.applies; anchors.verticalCenter: parent.verticalCenter } }
             Txt { kind: "fine"; tone: 3; width: Math.min(parent.width, 640); visible: text !== ""; text: grp.sub } }
         Column { id: inner; width: parent.width; spacing: 10 }
     }
@@ -258,9 +279,8 @@ Item {
                             required property var modelData
                             readonly property bool on: (Bridge.appearanceOverride || Theme.appearance) === modelData.value
                             objectName: "appearance_" + modelData.value
-                            width: Math.floor((looks.parent.width - 24) / 3); height: 104; radius: Theme.rLg
-                            color: on ? Theme.alpha(Theme.datum, 0.07) : lm.containsMouse ? Theme.washHover : Theme.plate1
-                            border.color: on ? Theme.datum : Theme.rule; border.width: on ? 1.5 : 1
+                            width: Math.floor((looks.parent.width - 24) / 3); height: 104; radius: 16
+                            color: on ? Theme.glass2 : lm.containsMouse ? Theme.washHover : Theme.glass
                             Behavior on color { Tint {} }
                             // a small picture of the bench in that appearance
                             Item { id: pic; x: 12; y: 12; width: parent.width - 24; height: 52; clip: true
@@ -271,11 +291,11 @@ Item {
                                         required property int index
                                         readonly property bool dk: modelData
                                         x: index * pic.width / 2; width: look.modelData.value === "system" ? pic.width / 2 : pic.width; height: pic.height
-                                        radius: Theme.rSm; color: dk ? "#0e1113" : "#eceeed"; border.color: dk ? "#262d32" : "#d4d9d6"; clip: true
-                                        Rectangle { x: 8; y: 8; width: 26; height: parent.height - 16; radius: 3; color: dk ? "#191e22" : "#fafbfa" }
-                                        Rectangle { x: 42; y: 10; width: Math.max(10, parent.width - 62); height: 5; radius: 2.5; color: dk ? "#e8edeb" : "#151a1b"; opacity: 0.8 }
-                                        Rectangle { x: 42; y: 21; width: Math.max(8, parent.width - 84); height: 4; radius: 2; color: dk ? "#717b78" : "#727d7a"; opacity: 0.7 }
-                                        Rectangle { x: 42; y: 33; width: 22; height: 9; radius: 4.5; color: dk ? "#b9e8d7" : "#17806a" } } } }
+                                        radius: Theme.rSm; color: dk ? "#0b0b0c" : "#eeece8"; border.color: dk ? "#2a2a2c" : "#d9d6d1"; clip: true
+                                        Rectangle { x: 8; y: 8; width: 26; height: parent.height - 16; radius: 5; color: dk ? "#1c1c1e" : "#ffffff" }
+                                        Rectangle { x: 42; y: 10; width: Math.max(10, parent.width - 62); height: 5; radius: 2.5; color: dk ? "#f4f3f1" : "#161616"; opacity: 0.8 }
+                                        Rectangle { x: 42; y: 21; width: Math.max(8, parent.width - 84); height: 4; radius: 2; color: dk ? "#74736f" : "#8b8a86"; opacity: 0.7 }
+                                        Rectangle { x: 42; y: 33; width: 22; height: 9; radius: 4.5; color: dk ? "#3ee6ff" : "#06708d" } } } }
                             Txt { x: 14; anchors.bottom: parent.bottom; anchors.bottomMargin: 12; text: look.modelData.text
                                 font.weight: look.on ? Theme.wSemi : Theme.wMedium; color: look.on ? Theme.ink : Theme.ink2 }
                             Icon { visible: look.on; name: "circle_check"; size: 15; color: Theme.datum; anchors.right: parent.right; anchors.rightMargin: 12
@@ -292,7 +312,7 @@ Item {
             Group { title: "Designing"; sub: "What happens to a design after it builds."
                 SettingsRows { sheet: st; rows: st.rowsOf("general", function (r) { return r.key.indexOf("refine.") === 0 }) }
                 // what design refinement learned on this computer (form/refine/ledger.py)
-                Rectangle { objectName: "settingsRefineLedger"; width: parent.width; height: 62; radius: Theme.rLg; color: Theme.plate1; border.color: Theme.rule
+                Rectangle { objectName: "settingsRefineLedger"; width: parent.width; height: 62; radius: 16; color: Theme.glass
                     Column { x: 18; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 36 - resetLedger.width - 12; spacing: 3
                         Txt { text: "What refinement learned"; font.weight: Theme.wMedium }
                         Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
@@ -316,8 +336,8 @@ Item {
                 SettingsRows { sheet: st; rows: st.rowsOf("chat", st.isDefaultsRow) } }
             Group { title: "Agent apps on this computer"
                 sub: "Each runs on its own account with Form Studio's tools. Install more under Engines & software."
-                Rectangle { visible: st.cliAgents.length > 0; width: parent.width; height: agList.implicitHeight; radius: Theme.rLg
-                    color: Theme.plate1; border.color: Theme.rule
+                Rectangle { visible: st.cliAgents.length > 0; width: parent.width; height: agList.implicitHeight; radius: 16
+                    color: Theme.glass
                     Column { id: agList; width: parent.width
                         Repeater {
                             model: st.cliAgents
@@ -328,8 +348,8 @@ Item {
                         } } } }
             Group { title: "Model provider APIs"
                 sub: "Form Studio talks to the provider directly, with its own tools; no other app is needed. A key set in your environment is found by itself. Keys you add are kept in a private file on this computer and sent only to their provider."
-                Rectangle { visible: st.apiAgents.length > 0; width: parent.width; height: apList.implicitHeight; radius: Theme.rLg
-                    color: Theme.plate1; border.color: Theme.rule
+                Rectangle { visible: st.apiAgents.length > 0; width: parent.width; height: apList.implicitHeight; radius: 16
+                    color: Theme.glass
                     Column { id: apList; width: parent.width
                         Repeater {
                             model: st.apiAgents
@@ -343,12 +363,13 @@ Item {
             // providers you added by address: any server in a format Form Studio speaks
             Group { title: "Your providers"
                 sub: "A model service that is not listed above, a company gateway or a server on your network. Give its address; Form Studio finds the format, the models and whether they call tools."
-                Loader { visible: active; width: parent.width; active: st.editingProvider !== undefined
+                Loader { id: editorLd; visible: active; width: parent.width; active: st.editingProvider !== undefined
+                    onLoaded: st.reveal(editorLd)
                     sourceComponent: ProviderEditor { width: parent ? parent.width : 600; editing: st.editingProvider
                         onClosed: st.editingProvider = undefined
                         onSaved: function (p) { st.editingProvider = undefined; st.loadProviders(); st.loadKeys(); Store.refreshAgents() } } }
-                Rectangle { visible: st.providers.length > 0; width: parent.width; height: cpList.implicitHeight; radius: Theme.rLg
-                    color: Theme.plate1; border.color: Theme.rule
+                Rectangle { visible: st.providers.length > 0; width: parent.width; height: cpList.implicitHeight; radius: 16
+                    color: Theme.glass
                     Column { id: cpList; width: parent.width
                         Repeater {
                             model: st.providers
@@ -362,8 +383,8 @@ Item {
                     onClicked: st.editingProvider = null } }
             Group { title: "Local models"
                 sub: "Servers on this computer, found on their usual ports. Nothing leaves this computer. The model must support tool calls."
-                Rectangle { visible: st.localAgents.length > 0; width: parent.width; height: loList.implicitHeight; radius: Theme.rLg
-                    color: Theme.plate1; border.color: Theme.rule
+                Rectangle { visible: st.localAgents.length > 0; width: parent.width; height: loList.implicitHeight; radius: 16
+                    color: Theme.glass
                     Column { id: loList; width: parent.width
                         Repeater {
                             model: st.localAgents
@@ -386,10 +407,10 @@ Item {
         Column { spacing: 26
             Group { title: "Default printer"; applies: "Applies at once"
                 Rectangle { id: dpCard; objectName: "settingsDefaultPrinter"
-                    width: parent.width; height: Math.max(dp.implicitHeight + 30, 72); radius: Theme.rLg; color: Theme.plate1; border.color: Theme.rule
+                    width: parent.width; height: Math.max(dp.implicitHeight + 30, 72); radius: 16; color: Theme.glass
                     readonly property var sl: Store.slicer || ({ available: false })
                     Rectangle { x: 18; anchors.verticalCenter: parent.verticalCenter; width: 38; height: 38; radius: Theme.rMd
-                        color: dpCard.sl.available ? Theme.alpha(Theme.datum, 0.1) : Theme.alpha(Theme.lineBase, 0.04); border.color: dpCard.sl.available ? Theme.alpha(Theme.datum, 0.32) : Theme.rule
+                        color: dpCard.sl.available ? Theme.alpha(Theme.datum, 0.12) : Theme.glass2
                         Icon { anchors.centerIn: parent; name: "printer"; size: 17; color: dpCard.sl.available ? Theme.datum : Theme.ink3 } }
                     Column { id: dp; x: 70; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 70 - 18 - chooseBtn.width - 12; spacing: 3
                         Txt { objectName: "settingsPrinterName"; font.weight: Theme.wSemi; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
@@ -433,8 +454,8 @@ Item {
     Component { id: updatesPage
         Column { spacing: 26
             Group { title: "This version"
-                Rectangle { objectName: "settingsVersion"; width: parent.width; height: 72; radius: Theme.rLg; color: Theme.plate1; border.color: Theme.rule
-                    Rectangle { x: 18; anchors.verticalCenter: parent.verticalCenter; width: 38; height: 38; radius: Theme.rMd; color: Theme.plate; border.color: Theme.rule2
+                Rectangle { objectName: "settingsVersion"; width: parent.width; height: 72; radius: 16; color: Theme.glass
+                    Rectangle { x: 18; anchors.verticalCenter: parent.verticalCenter; width: 38; height: 38; radius: Theme.rMd; color: Theme.glass2
                         Logo { word: false; size: 17; anchors.centerIn: parent; anchors.horizontalCenterOffset: 1 } }
                     Column { x: 70; anchors.verticalCenter: parent.verticalCenter; spacing: 3
                         Row { spacing: 8
@@ -462,7 +483,7 @@ Item {
             Group { title: "Limits and fallbacks"
                 SettingsRows { sheet: st; rows: st.rowsOf("advanced") } }
             Group { title: "The file"; sub: "Everything here is kept in one text file. Form Studio rewrites only the keys you change and keeps a backup."
-                Rectangle { width: parent.width; height: 48; radius: Theme.rLg; color: Theme.plate1; border.color: Theme.rule
+                Rectangle { width: parent.width; height: 48; radius: 16; color: Theme.glass
                     Txt { x: 18; anchors.verticalCenter: parent.verticalCenter; mono: true; kind: "fine"; tone: 2; width: parent.width - 36 - cpPath.width - 8
                         elide: Text.ElideMiddle; wrapMode: Text.NoWrap; text: st.cfg ? st.cfg.path_short + (st.cfg.exists ? "" : "   (not written yet)") : "" }
                     Btn { id: cpPath; small: true; kind: "quiet"; icon: "copy"; text: "Copy path"; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter

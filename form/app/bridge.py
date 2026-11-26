@@ -163,6 +163,35 @@ class _Call(QRunnable):
                 f.close()
 
 
+def _solid_glass() -> bool:
+    """True when panes should be solid instead of blurred glass: the OS "reduce transparency" preference, Low Power
+    Mode, a software renderer, or FORM_GLASS=solid/blur to force it. Never raises."""
+    import os
+    env = os.environ.get("FORM_GLASS", "").strip().lower()
+    if env:
+        return env in ("solid", "0", "off", "no", "false")
+    if os.environ.get("QT_QUICK_BACKEND", "").lower() == "software":
+        return True
+    try:
+        if sys.platform == "darwin":
+            out = subprocess.run(["defaults", "read", "com.apple.universalaccess", "reduceTransparency"],
+                                 capture_output=True, text=True, timeout=2).stdout.strip()
+            if out == "1":
+                return True
+            out = subprocess.run(["pmset", "-g"], capture_output=True, text=True, timeout=2).stdout
+            for line in out.splitlines():
+                if line.strip().startswith("lowpowermode"):
+                    return line.split()[-1] == "1"
+            return False
+        if sys.platform.startswith("win"):
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
+                return winreg.QueryValueEx(k, "EnableTransparency")[0] == 0
+    except Exception:
+        return False
+    return False
+
+
 def _reduced_motion() -> bool:
     """The OS "reduce motion" preference, or FORM_REDUCED_MOTION=1/0 to force it. Never raises."""
     import os
@@ -311,6 +340,14 @@ class Bridge(QObject):
 
     reducedMotion = Property(bool, _reduced, constant=True)
 
+    # -- glass: blurred panes over the 3D view, unless the system asks for solid ones or the machine saves power ----
+    def _solid(self) -> bool:
+        if not hasattr(self, "_sg"):
+            self._sg = _solid_glass()
+        return self._sg
+
+    solidGlass = Property(bool, _solid, constant=True)
+
     # -- appearance: what the system asks for (it can change while the app runs), and a one-run override ------------
     def _system_dark(self) -> bool:
         try:
@@ -345,14 +382,14 @@ class Bridge(QObject):
 
     @Slot(str, result=str)
     def licence(self, name: str) -> str:
-        """The licence text of a bundled font ("InstrumentSans", "GeistMono", "lucide") or of FORM itself ("FORM")."""
+        """The licence text of a bundled font ("Geist", "InstrumentSans", "GeistMono", "lucide") or of FORM itself ("FORM")."""
         here = Path(__file__).resolve().parent
         if name == "FORM":
             for p in (here.parent.parent / "LICENSE", here / "assets" / "LICENSE"):
                 if p.exists():
                     return p.read_text(encoding="utf-8", errors="replace")
             return "MIT License. The full text is in the LICENSE file of the form-studio repository."
-        if name in ("InstrumentSans", "GeistMono", "lucide"):
+        if name in ("Geist", "InstrumentSans", "GeistMono", "lucide"):
             p = here / "assets" / "fonts" / f"{name}-LICENSE.txt"
             if p.exists():
                 return p.read_text(encoding="utf-8", errors="replace")

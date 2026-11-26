@@ -15,7 +15,6 @@ Item {
     readonly property var sigmas: ({ measured: 0.03, specified: 0.1, assumed: 0.3, photo: 0.6 })
     width: parent ? parent.width : 0
     implicitHeight: col.implicitHeight + 14
-    Rectangle { width: parent.width; height: 1; color: Theme.rule }
     Rectangle { visible: r.changed || r.bad; x: -12; y: 8; width: 2; height: parent.height - 14; radius: 1; color: r.bad ? Theme.signal : Theme.blueprint }
     Column {
         id: col; y: 9; width: parent.width; spacing: 5

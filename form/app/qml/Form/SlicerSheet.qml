@@ -64,7 +64,7 @@ Column {
                 readonly property var s: modelData
                 width: parent.width; radius: Theme.rMd
                 implicitHeight: body.implicitHeight + 24
-                color: s.active ? Theme.alpha(Theme.datum, 0.06) : ch.hovered && s.installed ? Theme.plate3 : Theme.plate1
+                color: s.active ? Theme.alpha(Theme.datum, 0.06) : ch.hovered && s.installed ? Theme.glass2 : Theme.glass
                 border.color: s.active ? Theme.alpha(Theme.datum, 0.5) : ch.hovered && s.installed ? Theme.rule2 : Theme.rule
                 Behavior on color { Tint {} }
                 HoverHandler { id: ch }
@@ -93,13 +93,13 @@ Column {
                     Txt { kind: "fine"; width: parent.width; visible: card.s.installed && !card.s.available; color: Theme.amber; text: card.s.reason || "" }
                     Column { width: parent.width; spacing: 6; visible: !card.s.installed && !!card.s.install
                         Txt { kind: "fine"; width: parent.width; text: card.s.install ? "Not found on this computer. " + card.s.install.note + "." : "" }
-                        Rectangle { visible: !!card.s.install && card.s.install.cmds.length > 0; width: parent.width; height: cmds.implicitHeight + 16; radius: Theme.rSm; color: Theme.well; border.color: Theme.rule
+                        Rectangle { visible: !!card.s.install && card.s.install.cmds.length > 0; width: parent.width; height: cmds.implicitHeight + 16; radius: Theme.rMd; color: Theme.glassWell; border.color: Theme.rule
                             Column { id: cmds; x: 10; y: 8; width: parent.width - 20; spacing: 3
                                 Repeater { model: card.s.install ? card.s.install.cmds : []
                                     Txt { required property var modelData; mono: true; font.pixelSize: 11; tone: 3; width: parent.width; wrapMode: Text.WrapAnywhere; text: modelData } } } } } } } }
 
         // automatic: takes effect at once. Turning it off pins the slicer in use.
-        Rectangle { width: parent.width; height: 52; radius: Theme.rMd; color: Theme.plate1; border.color: Theme.rule
+        Rectangle { width: parent.width; height: 52; radius: 14; color: Theme.glass
             Column { x: 16; width: parent.width - 32 - 46; anchors.verticalCenter: parent.verticalCenter; spacing: 1
                 Txt { text: "Automatic"; font.weight: Theme.wMedium }
                 Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap; text: "Uses the first installed of Bambu Studio, OrcaSlicer, PrusaSlicer." } }

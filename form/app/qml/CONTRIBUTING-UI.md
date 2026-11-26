@@ -75,7 +75,7 @@ every screen you change in both.
 
 | Group | Tokens |
 |---|---|
-| The frame and its plates | `frame` (the window itself and the top bar) · `rPanel 12` · `gap 8` · `panelEdge`. A workspace's panels are plates on the frame; `PlateFrame {}` over a square view (the 3D view) rounds it and draws the registration ticks. See `docs/design/DIRECTION.md` |
+| The room and its panes | `frame` (the window and the 3D view's ground) · `edge 20` · `gap 12` · `rPane`/`rPanel 22` · `panelEdge`. Anything that floats is `Glass { source: Store.backdrop }` (`flat: true` inside something that scrolls); it uses `glass`, `glassTint`, `glassEdge`, and `glassSolid` when nothing can be blurred. Inside a pane: `glass2` (raised, selected), `glassWell` (the prompt). The one filled button is `send` / `sendInk`. See `docs/design/DIRECTION.md` |
 | Surfaces, low to high | `well` (inputs) `plate` (the bench) `plate1` (panels) `plate2` (cards, sheets) `plate3` (menus, buttons) `plate4` |
 | Ink | `ink` `ink2` `ink3` `ink4` (primary … muted) |
 | Edges | `rule` 7 % · `rule2` 12 % · `rule3` 20 % (hovered or raised) · `focus` (keyboard ring). A low-opacity white (dark) or near-black (light), never a solid grey |

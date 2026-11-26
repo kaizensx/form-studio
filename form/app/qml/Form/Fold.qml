@@ -16,8 +16,7 @@ Column {
     width: parent ? parent.width : 0
     Item {
         width: parent.width; height: 40
-        Rectangle { width: parent.width; height: 1; color: Theme.rule }
-        Rectangle { x: -8; y: 4; width: parent.width + 16; height: parent.height - 7; radius: Theme.rSm; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent"
+        Rectangle { x: -8; y: 4; width: parent.width + 16; height: parent.height - 7; radius: 10; color: hm.pressed ? Theme.washPress : hm.containsMouse ? Theme.washHover : "transparent"
             Behavior on color { Tint {} } }
         Icon { id: chev; y: 14; name: "chevron_right"; size: 12; color: hm.containsMouse ? Theme.ink2 : Theme.ink4
             rotation: f.open ? 90 : 0

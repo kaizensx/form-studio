@@ -82,7 +82,7 @@ Item {
     Rectangle {
         id: pad; objectName: "sketchPad"
         x: rail.width + 12; width: parent.width - x - side.width - 20; height: sk.sheetHeight - 8
-        radius: Theme.rLg; color: Theme.well; border.color: padArea.activeFocus ? Theme.alpha(Theme.datum, 0.45) : Theme.rule2; clip: true
+        radius: Theme.rLg; color: Theme.glassWell; border.color: padArea.activeFocus ? Theme.alpha(Theme.datum, 0.45) : Theme.rule2; clip: true
         // grid: 5 mm lines, 25 mm stronger, the axes in datum
         Canvas {
             id: gridC; anchors.fill: parent

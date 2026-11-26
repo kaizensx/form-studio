@@ -49,7 +49,7 @@ Item {
                     id: c; objectName: "conceptCard"; required property var modelData; required property int index
                     readonly property bool on: cs.hot === modelData.project
                     width: cards.cw; height: 420; radius: Theme.rLg + 2
-                    color: Theme.plate1; border.color: on ? Theme.alpha(Theme.datum, 0.7) : ch.hovered ? Theme.rule3 : Theme.rule
+                    color: on || ch.hovered ? Theme.glass2 : Theme.glass; border.color: on ? Theme.alpha(Theme.datum, 0.7) : "transparent"
                     Behavior on border.color { Tint {} }
                     opacity: 0; Component.onCompleted: cIn.start()
                     SequentialAnimation { id: cIn; PauseAnimation { duration: 60 + c.index * 90 }
@@ -81,7 +81,7 @@ Item {
         Note { visible: cs.failed.length > 0; width: parent.width; kind: "amber"; title: F.plural(cs.failed.length, "concept") + " did not build"
             text: cs.failed.map(function (m) { return m.letter + " " + m.title + ": " + m.error }).join("\n") }
         // a mix, in words
-        Rectangle { width: parent.width; height: 56; radius: Theme.rLg; color: Theme.plate1; border.color: mix.input.activeFocus ? Theme.alpha(Theme.datum, 0.5) : Theme.rule
+        Rectangle { width: parent.width; height: 56; radius: Theme.rLg; color: Theme.glass; border.color: mix.input.activeFocus ? Theme.alpha(Theme.datum, 0.5) : "transparent"
             Icon { x: 16; name: "merge"; size: 16; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
             Field { id: mix; objectName: "conceptMix"; bare: true; x: 42; width: parent.width - 42 - mixGo.width - 24; anchors.verticalCenter: parent.verticalCenter
                 placeholder: "Or mix them in words: the base of A with the hook of C, 10 mm taller"

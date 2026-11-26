@@ -7,8 +7,8 @@ Rectangle {
     property string text: ""
     property string kind: text
     property color tint: Theme.evidence(kind)
-    implicitHeight: 17; implicitWidth: lbl.implicitWidth + 12; radius: Theme.rXs
-    color: Theme.alpha(tint, 0.1); border.width: 1; border.color: Theme.alpha(tint, 0.16)
+    implicitHeight: 19; implicitWidth: lbl.implicitWidth + 14; radius: height / 2
+    color: tint === Theme.ink2 ? Theme.alpha(Theme.lineBase, Theme.dark ? 0.14 : 0.07) : Theme.alpha(tint, 0.14); border.width: 0
     Text { id: lbl; anchors.centerIn: parent; text: r.text; color: r.tint
-        font.family: Theme.mono; font.pixelSize: 10; font.weight: Theme.wMedium; font.letterSpacing: 0.4; font.capitalization: Font.AllUppercase; renderType: Text.NativeRendering }
+        font.family: Theme.mono; font.pixelSize: 10; font.weight: Theme.wMedium; font.letterSpacing: 1.0; font.capitalization: Font.AllUppercase; renderType: Text.NativeRendering }
 }

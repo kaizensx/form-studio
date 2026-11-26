@@ -1,6 +1,6 @@
 import QtQuick
 
-// Single-line text or number input. Inputs are inset wells: darker than their surroundings.
+// Single-line text or number input. Inputs are wells set into the glass: Theme.glassWell, a 1 px edge, the accent on focus.
 // `error` (a short sentence) turns the edge red and shows the sentence under the field; `busy` shows a spinner at the right.
 Rectangle {
     id: f
@@ -16,23 +16,23 @@ Rectangle {
     property bool bare: false                // no well, no edge, no halo: the field is part of a larger surface (the palette)
     signal accepted(string text)
     signal edited(string text)
-    implicitHeight: Theme.hMd; implicitWidth: 120; radius: Theme.rSm
+    implicitHeight: Theme.hMd; implicitWidth: 120; radius: Math.min(Theme.rMd, height / 2)
     opacity: enabled ? 1 : 0.5
-    // the well keeps its quiet rule2 edge under the pointer (the fill lifts a wash instead), so a form of fields stays
+    // the well keeps its quiet edge under the pointer (the fill lifts a wash instead), so a form of fields stays
     // calm on a sheet; the edge changes only for meaning: focus (datum) and a mistake (signal)
-    color: bare ? "transparent" : hh.hovered && !input.activeFocus ? Qt.tint(Theme.well, Theme.washHover) : Theme.well
+    color: bare ? "transparent" : hh.hovered && !input.activeFocus ? Qt.tint(Theme.glassWell, Theme.washHover) : Theme.glassWell
     border.width: bare ? 0 : 1
-    border.color: invalid ? Theme.signal : input.activeFocus ? Theme.datum : Theme.rule2
+    border.color: invalid ? Theme.signal : input.activeFocus ? Theme.datum : Theme.rule
     Behavior on color { Tint {} }
     Behavior on border.color { Tint {} }
     HoverHandler { id: hh; cursorShape: Qt.IBeamCursor }
     // the focus halo: a soft second edge, so focus reads from across the room
     Rectangle { visible: !f.bare; anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3
-        border.color: Theme.alpha(f.invalid ? Theme.signal : Theme.datum, 0.16); opacity: input.activeFocus ? 1 : 0
+        border.color: Theme.alpha(f.invalid ? Theme.signal : Theme.datum, 0.18); opacity: input.activeFocus ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
     TextInput {
         id: input
-        anchors.fill: parent; anchors.leftMargin: 9; anchors.rightMargin: (f.unit ? 9 + u.implicitWidth + 4 : 9) + (f.busy ? 20 : 0)
+        anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: (f.unit ? 10 + u.implicitWidth + 4 : 10) + (f.busy ? 20 : 0)
         verticalAlignment: TextInput.AlignVCenter; horizontalAlignment: f.numeric ? TextInput.AlignRight : TextInput.AlignLeft
         color: Theme.ink; selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink
         font.family: f.mono ? Theme.mono : Theme.sans; font.pixelSize: f.mono ? 12 : 13; clip: true; selectByMouse: true
@@ -44,7 +44,7 @@ Rectangle {
         Text { visible: !input.text && !input.activeFocus || (!input.text && f.placeholder !== ""); text: f.placeholder; color: Theme.ink4; font: input.font
             anchors.fill: parent; verticalAlignment: Text.AlignVCenter; horizontalAlignment: input.horizontalAlignment; elide: Text.ElideRight; renderType: Text.NativeRendering }
     }
-    Txt { id: u; visible: f.unit !== ""; text: f.unit; kind: "fine"; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter }
+    Txt { id: u; visible: f.unit !== ""; text: f.unit; kind: "fine"; mono: true; anchors.right: parent.right; anchors.rightMargin: 9; anchors.verticalCenter: parent.verticalCenter }
     Spinner { visible: f.busy; size: 13; anchors.right: parent.right; anchors.rightMargin: f.unit ? 13 + u.implicitWidth : 8; anchors.verticalCenter: parent.verticalCenter }
     Txt { visible: f.invalid; kind: "fine"; color: Theme.signal; text: f.error; y: parent.height + 4; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
 }

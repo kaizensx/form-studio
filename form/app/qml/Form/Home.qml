@@ -1,15 +1,19 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
+import QtQuick.Effects
+import QtQuick.Shapes
 import FormNative
 import "F.js" as F
 
-// Home: where a design starts, and where the work you already did waits.
-//   · the hero: the studio itself (a neutral floor, no plate) and one composer that takes
-//     words, a photo, a sketch, a part or a drawing, or a link. Make it for: Anything / My printer (only when 3D printing is on), or Start blank.
+// Home: where a design starts, and where the work you already did waits. Lightdesk: Home stands in the window's room
+// (Main.qml draws it), so nothing here paints a ground of its own.
+//   · the question, and one pane of glass that takes words, a photo, a sketch, a part or a drawing, or a link, with
+//     the numbered ways to start under it. Make it for: Anything / My printer (only when 3D printing is on) / Game asset.
 //   · concepts the agent proposed and you have not picked yet
-//   · your designs as live parts in the studio, one card per design family (a design with its copies, variants and
-//     picked concepts: they share lineage.root); a family opens under its row. Then your recent conversations.
+//   · the shelf: your designs as live parts, each standing in its own pool of light, one per design family (a design
+//     with its copies, variants and picked concepts: they share lineage.root); a family opens under its row. The first
+//     row shows what fits and "All N designs" shows the rest. Then your recent conversations.
 // Nothing pre-made: no recipes, no briefs, no example projects. Every design starts from what the person describes.
 Item {
     id: home
@@ -52,7 +56,8 @@ Item {
     readonly property var talks: { var seen = {}; return Store.convs.filter(function (c) {
         var t = c.thread || c.id; if (c.messages <= 0 || seen[t]) return false; seen[t] = true; return true }).slice(0, home.width > 1500 ? 4 : 3) }
     readonly property real cw: Math.min(width - (width < 1000 ? 48 : 96), 1200)          // content width
-    readonly property real heroH: fresh ? height : chatting ? Math.max(500, Math.min(620, height * 0.7)) : Math.max(440, Math.min(540, height * 0.6))
+    readonly property real heroH: hero.height
+    property bool showAll: false              // the shelf shows every row (off: the first row, and "All N designs")
     // a conversation is open in the column on the left: that is where you type, so the middle does not offer a second box
     readonly property bool chatting: Store.talkOpen && (Store.chatItems.length > 0 || Store.chatBusy)
     // the composer always sits in the middle; the bench behind it stays empty (the part you made last is in the list below)
@@ -116,82 +121,71 @@ Item {
     function openGroupMenu(g, item, x, y) { groupFor = g; gpm.openAt(item, Math.max(0, Math.min(x, item.width - gpm.width)), y) }
     function openMenu(p, item, x, y) { menuFor = p; pm.parent = item; pm.openAt(item, x, y) }
 
-    // ════ the bench: the studio floor behind the hero (no build plate: Home is about making, not printing) ════
-    Item {
-        id: bench
+    // ════ the first day: a real build turns beside the words. Its own floor fades into the room all round, so the
+    // part reads as an object standing in the room and not as a picture in it. Nothing is drawn here otherwise. ════
+    readonly property bool pieceShown: !!benchLd.item && benchLd.item.shown
+    Loader {
+        id: benchLd; active: home.split
         width: parent.width; height: home.heroH + 40
         y: -flick.contentY * 0.35                            // it scrolls away slower than the page: depth
-        opacity: 0; Component.onCompleted: benchIn.start()
-        NumberAnimation { id: benchIn; target: bench; property: "opacity"; to: 1; duration: 900; easing.type: Easing.OutCubic }
-        Item {
-            id: frame3d
-            // split: its own frame right of the words, so the camera frames the part there without any offset
-            // (the camera is drawn for frames wider than tall, so the frame reaches back under the words, which hide it)
-            readonly property real edge: home.side + hero.colW - 40
-            x: home.split ? Math.max(0, parent.width - Math.max(parent.width - edge, parent.height * 1.25)) : 0
-            width: parent.width - x
-            height: parent.height
-        Viewport {
-            id: stage; objectName: "homeStage"
-            anchors.fill: parent
-            insetLeft: home.split ? frame3d.edge - frame3d.x : 0
-            lite: true; floorGrid: true; interactive: false; showDims: false; showCompanions: false
-            showOrigin: !!stage.model                // an empty floor under the opening words has no cross through them
-            // the part turns slowly to and fro around the bench's three-quarter view, like a piece being looked over
-            SequentialAnimation on az { running: home.split && !!stage.model && !Theme.reduced && home.visible; loops: Animation.Infinite
-                NumberAnimation { from: -34; to: -8; duration: 7000; easing.type: Easing.InOutSine }
-                NumberAnimation { from: -8; to: -60; duration: 14000; easing.type: Easing.InOutSine }
-                NumberAnimation { from: -60; to: -34; duration: 7000; easing.type: Easing.InOutSine } }
-            property string showing: ""
-            function load() {
-                var id = home.split ? "showpiece" : ""       // narrow, or once there are designs: the bench alone
-                if (id === showing) return
-                showing = id
-                if (!id) { setModel(null); return }
-                if (home.showpiece) { stage.setModel(home.showpiece); stage.setView("iso", false); stage.dist *= 1.1; return }
-                Store.get("/projects/" + id + "/view").then(function (v) {
-                    if (stage.showing !== id) return
-                    v.companions = []
-                    stage.setModel(v); stage.setView("iso", false); stage.dist *= 1.1
-                }, function () {})
+        sourceComponent: Item {
+            id: bench
+            readonly property bool shown: !!stage.model
+            opacity: 0; Component.onCompleted: benchIn.start()
+            NumberAnimation { id: benchIn; target: bench; property: "opacity"; to: 1; duration: 900; easing.type: Easing.OutCubic }
+            Item {
+                id: frame3d
+                // its own frame right of the words, so the camera frames the part there without any offset
+                // (the camera is drawn for frames wider than tall, so the frame reaches back under the words)
+                readonly property real edge: home.side + hero.colW - 40
+                x: Math.max(0, parent.width - Math.max(parent.width - edge, parent.height * 1.25))
+                width: parent.width - x
+                height: parent.height
+                layer.enabled: true
+                layer.effect: MultiEffect { maskEnabled: true; maskSource: benchFade; maskThresholdMin: 0.5; maskSpreadAtMin: 1 }
+                Viewport {
+                    id: stage; objectName: "homeStage"
+                    anchors.fill: parent
+                    insetLeft: frame3d.edge - frame3d.x
+                    lite: true; floorGrid: false; interactive: false; showDims: false; showCompanions: false
+                    showOrigin: !!stage.model                // an empty floor under the opening words has no cross through them
+                    // the part turns slowly to and fro around the bench's three-quarter view, like a piece being looked over
+                    SequentialAnimation on az { running: !!stage.model && !Theme.reduced && home.visible; loops: Animation.Infinite
+                        NumberAnimation { from: -34; to: -8; duration: 7000; easing.type: Easing.InOutSine }
+                        NumberAnimation { from: -8; to: -60; duration: 14000; easing.type: Easing.InOutSine }
+                        NumberAnimation { from: -60; to: -34; duration: 7000; easing.type: Easing.InOutSine } }
+                    Component.onCompleted: if (home.showpiece) { stage.setModel(home.showpiece); stage.setView("iso", false); stage.dist *= 1.1 }
+                }
             }
-            Component.onCompleted: load()
-            Connections { target: home; function onLatestChanged() { stage.load() } function onSplitChanged() { stage.load() } }
+            // where the 3D view shows: full around the part, falling away to nothing before the words and the edges
+            Item { id: benchFade; x: frame3d.x; width: frame3d.width; height: frame3d.height; visible: false; layer.enabled: true
+                Shape { id: bf; anchors.fill: parent
+                    readonly property real free: frame3d.edge - frame3d.x
+                    ShapePath {
+                        strokeWidth: -1
+                        fillGradient: RadialGradient {
+                            centerX: bf.free + (bf.width - bf.free) / 2; centerY: bf.height * 0.52; focalX: centerX; focalY: centerY
+                            centerRadius: Math.max(260, Math.min(bf.width - bf.free, bf.height) * 0.62)
+                            GradientStop { position: 0; color: Qt.rgba(0, 0, 0, 1) }
+                            GradientStop { position: 0.5; color: Qt.rgba(0, 0, 0, 1) }
+                            GradientStop { position: 1; color: Qt.rgba(0, 0, 0, 0) } }
+                        startX: 0; startY: 0
+                        PathLine { x: bf.width; y: 0 } PathLine { x: bf.width; y: bf.height } PathLine { x: 0; y: bf.height } PathLine { x: 0; y: 0 }
+                    } } }
         }
-        }
-        // the light falls off towards the edges and under the composer, so the part reads as an object on the bench
-        // behind the page rather than a picture in it
-        Rectangle { anchors.fill: parent; visible: !home.split
-            gradient: Gradient { orientation: Gradient.Horizontal
-                GradientStop { position: 0.0; color: Theme.alpha(Theme.plate, 0.92) }
-                GradientStop { position: 0.28; color: Theme.alpha(Theme.plate, 0.35) }
-                GradientStop { position: 0.72; color: Theme.alpha(Theme.plate, 0.35) }
-                GradientStop { position: 1.0; color: Theme.alpha(Theme.plate, 0.92) } } }
-        // split: the words sit on a quiet bench; the bench brightens towards the part
-        Rectangle { visible: home.split; width: frame3d.x; height: parent.height; color: Theme.plate }
-        Rectangle { visible: home.split; x: frame3d.x - 1; width: Math.max(300, frame3d.edge - frame3d.x + 200); height: parent.height
-            gradient: Gradient { orientation: Gradient.Horizontal
-                GradientStop { position: 0.0; color: Theme.plate }
-                GradientStop { position: 0.45; color: Theme.alpha(Theme.plate, 0.7) }
-                GradientStop { position: 1.0; color: Theme.alpha(Theme.plate, 0.0) } } }
-        Rectangle { visible: home.split; x: parent.width - 220; width: 220; height: parent.height
-            gradient: Gradient { orientation: Gradient.Horizontal
-                GradientStop { position: 0.0; color: Theme.alpha(Theme.plate, 0.0) } GradientStop { position: 1.0; color: Theme.alpha(Theme.plate, 0.8) } } }
-        Rectangle { anchors.fill: parent
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: Theme.alpha(Theme.plate, 0.85) }
-                GradientStop { position: 0.32; color: Theme.alpha(Theme.plate, home.split ? 0.0 : 0.25) }
-                GradientStop { position: 0.62; color: Theme.alpha(Theme.plate, home.split ? 0.12 : 0.55) }
-                GradientStop { position: 1.0; color: Theme.plate } } }
-        // a scan line crossing the plate now and then: the bench is on
-        Rectangle { id: scanLine; width: parent.width; height: 120; opacity: 0.0
-            gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.datum, 0) } GradientStop { position: 0.5; color: Theme.alpha(Theme.datum, 0.035) } GradientStop { position: 1; color: Theme.alpha(Theme.datum, 0) } }
-            SequentialAnimation { running: !Theme.reduced && home.visible; loops: Animation.Infinite
-                PauseAnimation { duration: 2400 }
-                ParallelAnimation {
-                    NumberAnimation { target: scanLine; property: "y"; from: bench.height * 0.25; to: bench.height * 0.95; duration: 5200; easing.type: Easing.InOutSine }
-                    SequentialAnimation { NumberAnimation { target: scanLine; property: "opacity"; to: 1; duration: 1200 } PauseAnimation { duration: 2800 } NumberAnimation { target: scanLine; property: "opacity"; to: 0; duration: 1200 } } }
-                PauseAnimation { duration: 6000 } } }
+    }
+
+    // one block of Home arriving: a fade and a short rise, `beat` steps after the screen. Reduce Motion: the fade.
+    component Arrive: SequentialAnimation {
+        id: arr
+        property Item item: null
+        property Translate lift: null
+        property int beat: 0
+        running: true
+        PauseAnimation { duration: 40 + arr.beat * 2 * Theme.stagger }
+        ParallelAnimation {
+            NumberAnimation { target: arr.item; property: "opacity"; to: 1; duration: Theme.slow; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut }
+            NumberAnimation { target: arr.lift; property: "y"; from: Theme.shift(Theme.rise); to: 0; duration: Theme.move(Theme.slow + 80); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
     }
 
     Flickable {
@@ -201,73 +195,85 @@ Item {
         Column {
             id: col; x: Math.round((parent.width - width) / 2); width: home.cw; spacing: 0
 
-            // ════ hero ════
+            // ════ the question and the bar ════
             Item {
-                id: hero; width: parent.width; height: home.heroH
-                readonly property real colW: home.split ? Math.min(Math.round(parent.width * 0.6), 720) : Math.min(parent.width, 820)
+                id: hero; width: parent.width
+                height: home.fresh ? home.height : heroCol.y + heroCol.height + Math.round(Math.max(52, Math.min(95, home.height * 0.107)))
+                readonly property real colW: home.split ? Math.min(Math.round(parent.width * 0.6), 720) : Math.min(parent.width, 760)
+                readonly property bool big: home.width >= 900
                 Column {
                     id: heroCol
                     width: hero.colW; x: home.split ? 0 : Math.round((parent.width - width) / 2)
-                    y: home.fresh ? Math.max(40, Math.round((hero.height - height) * 0.42)) : Math.max(36, Math.round((hero.height - height) * 0.5) - 8)
+                    y: home.fresh ? Math.max(40, Math.round((hero.height - height) * 0.42)) : Math.round(Math.max(28, Math.min(48, home.height * 0.055)))
                     spacing: 0
-                    opacity: 0; Component.onCompleted: heroIn.start()
-                    ParallelAnimation { id: heroIn
-                        Glide { target: heroCol; property: "opacity"; to: 1; duration: 520 }
-                        Glide { target: heroTr; property: "y"; from: Theme.shift(14); to: 0; duration: 620 } }
-                    transform: Translate { id: heroTr }
-                    Txt { kind: "cap"; color: Theme.datum; x: home.split ? 2 : (parent.width - width) / 2; font.letterSpacing: 1.6
-                        text: home.fresh ? "Form Studio" : home.greeting() }
-                    Item { width: 1; height: 14 }
-                    Txt { objectName: "homeTitle"; width: parent.width; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
-                        font.pixelSize: home.cw > 900 ? Theme.tDisplay : 42; font.weight: Theme.wSemi; font.letterSpacing: home.cw > 900 ? -2.0 : -1.5; lineHeight: 1.0
-                        text: "What do you want to make?" }
-                    // the sentence under the question is for a first visit, or says where the conversation went; once there
-                    // are designs the composer's own words are enough
-                    Item { visible: lead.visible; width: 1; height: 14 }
-                    Txt { id: lead; visible: home.fresh || home.chatting
-                        width: Math.min(parent.width, 600); x: home.split ? 0 : (parent.width - width) / 2; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
-                        tone: 2; font.pixelSize: Theme.tLead; lineHeight: 1.4
-                        text: home.chatting ? "You are talking with " + Store.chatAgentLabel + " in the column on the left. Open one of your designs to work on it together, or start a new design."
-                            : Store.newPurpose === "game" ? "Describe it. Form Studio models it as real CAD, then makes it a game asset: levels of detail, UVs, baked textures and collision for your engine."
-                            : Store.printOn && Store.newPurposeEffective === "print" ? "Describe it. Form Studio engineers it: real, editable CAD, checked and sliced for your printer. Drop a photo, a part or a sketch too."
-                                                         : "Describe it. Form Studio engineers it: real, editable CAD you can check, render and export. Drop a photo, a part or a sketch too." }
-                    Item { width: 1; height: 30 }
+                    Column { id: ask; width: parent.width; spacing: 0
+                        opacity: 0; transform: Translate { id: askLift }
+                        Arrive { item: ask; lift: askLift; beat: 0 }
+                        Txt { mono: true; color: Theme.datum; x: home.split ? 2 : Math.round((parent.width - width) / 2); wrapMode: Text.NoWrap
+                            font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 2.2; font.capitalization: Font.AllUppercase; lineHeight: 1.0
+                            text: home.fresh ? "Form Studio" : home.greeting() }
+                        Item { width: 1; height: hero.big ? 8 : 12 }
+                        // one line when the window allows it (it may run wider than the bar under it), else it wraps
+                        Item { width: parent.width; height: title.height
+                            Txt { id: title; objectName: "homeTitle"
+                                readonly property bool oneLine: hero.big && !home.split
+                                width: oneLine ? implicitWidth : parent.width; x: oneLine ? Math.round((parent.width - width) / 2) : 0
+                                wrapMode: oneLine ? Text.NoWrap : Text.WordWrap; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
+                                font.pixelSize: hero.big ? Theme.tDisplay : 42; font.weight: Theme.wSemi; font.letterSpacing: hero.big ? -3 : -1.6; lineHeight: 1.0
+                                text: "What do you want to make?" } }
+                        // the sentence under the question is for a first visit, or says where the conversation went; once there
+                        // are designs the composer's own words are enough
+                        Item { visible: lead.visible; width: 1; height: 10 }
+                        Txt { id: lead; visible: home.fresh || home.chatting
+                            width: Math.min(parent.width, 600); x: home.split ? 0 : (parent.width - width) / 2; horizontalAlignment: home.split ? Text.AlignLeft : Text.AlignHCenter
+                            tone: 2; font.pixelSize: Theme.tLead; lineHeight: 1.4
+                            text: home.chatting ? "You are talking with " + Store.chatAgentLabel + " in the column on the left. Open one of your designs to work on it together, or start a new design."
+                                : Store.newPurpose === "game" ? "Describe it. Form Studio models it as real CAD, then makes it a game asset: levels of detail, UVs, baked textures and collision for your engine."
+                                : Store.printOn && Store.newPurposeEffective === "print" ? "Describe it. Form Studio engineers it: real, editable CAD, checked and sliced for your printer. Drop a photo, a part or a sketch too."
+                                                             : "Describe it. Form Studio engineers it: real, editable CAD you can check, render and export. Drop a photo, a part or a sketch too." }
+                        Item { width: 1; height: hero.big ? 24 : 26 }
+                    }
                     Row { objectName: "homeChatting"; visible: home.chatting; spacing: 8; anchors.horizontalCenter: parent.horizontalCenter
                         Btn { objectName: "homeNewDesign"; kind: "primary"; icon: "plus"; text: "New design"; keys: "Ctrl+N"; onClicked: Store.startNew() }
                         Btn { kind: "quiet"; icon: "panel_left_close"; text: "Hide the conversation"; onClicked: Store.talkOpen = false } }
                     StartComposer { id: composer; visible: !home.chatting
                         Component.onDestruction: if (Store.screen === "designing") {
                             var p = composer.mapToItem(null, 0, 0); Store.morphFrom(Qt.rect(p.x, p.y, composer.width, composer.height)) }
-                         width: parent.width; dragging: home.dropping; onSketchWanted: Store.openSheet("sketch") }
+                        width: parent.width; dragging: home.dropping; onSketchWanted: Store.openSheet("sketch")
+                        latest: home.fresh ? null : home.latest          // the design you were on, one key away
+                        opacity: 0; transform: Translate { id: barLift }
+                        Arrive { item: composer; lift: barLift; beat: 1 } }
                     Item { visible: !home.chatting; width: 1; height: Theme.s4 }
-                    // ── under the composer: what it is for and which printer on the left, the agent on the right, both
-                    // lined up with the composer's edges. Every item is one height (Theme.hMd) on one centre line, and the
+                    // ── under the bar: what it is for and which printer on the left, the agent on the right, both
+                    // lined up with the bar's edges. Every item is one height on one centre line, and the
                     // left group is measured with the printer chip whenever printing is on, so picking My printer only
                     // shows the chip in its reserved place: nothing moves, nothing wraps. The row wraps (the agent to a
-                    // second line) only when the composer itself is too narrow for both groups.
+                    // second line) only when the bar itself is too narrow for both groups.
                     Item { id: opts; objectName: "startOptions"; visible: !home.chatting; width: parent.width
-                        readonly property int h: Theme.hMd
-                        readonly property int inset: Theme.s2
+                        readonly property int h: 34
+                        readonly property int inset: 10
                         readonly property real leftMax: forLbl.implicitWidth + forRow.spacing + purposeSeg.implicitWidth
                                                         + (Store.printOn ? forRow.spacing + printerChip.implicitWidth : 0)
                         readonly property bool wrap: leftMax + Theme.s4 + modelChip.implicitWidth > width - 2 * inset
                         height: wrap ? 2 * h + Theme.s2 : h
-                        Row { id: forRow; x: opts.inset; height: opts.h; spacing: Theme.s2
+                        opacity: 0; transform: Translate { id: optsLift }
+                        Arrive { item: opts; lift: optsLift; beat: 2 }
+                        Row { id: forRow; x: opts.inset; height: opts.h; spacing: Theme.s3
                             // what the next design is made for. Anything is the default; saying "for my A1 mini" in the
                             // request does the same as picking My printer.
-                            Txt { id: forLbl; kind: "fine"; tone: 3; text: "Make it for"; height: opts.h; lineHeight: 1.0; verticalAlignment: Text.AlignVCenter; wrapMode: Text.NoWrap }
+                            Txt { id: forLbl; tone: 2; text: "Make it for"; height: opts.h; lineHeight: 1.0; verticalAlignment: Text.AlignVCenter; wrapMode: Text.NoWrap }
                             Seg { id: purposeSeg; objectName: "startPurpose"; anchors.verticalCenter: parent.verticalCenter; implicitHeight: opts.h
                                 value: Store.newPurpose === "print" || Store.newPurpose === "game" ? Store.newPurpose : "any"; onPicked: function (v) { Store.setNewPurpose(v) }
                                 model: [{ value: "any", text: "Anything", tip: "A 3D model: STEP, STL, 3MF and more, for any way of making it." + (Store.printOn ? " Say “for my printer” in the request, or pick My printer, to check and slice it." : "") }]
                                        .concat(Store.printOn ? [{ value: "print", text: "My printer", tip: Store.printerName ? "Checked and sliced for " + Store.printerName : "Checked for printing; slicing starts once a printer is set up" }] : [])
                                        .concat([{ value: "game", text: "Game asset", badge: "Beta", tip: "For a game engine: LODs at triangle budgets, UVs, baked textures and collision, for Godot, Unity or Unreal. In Beta: visual quality is still improving." }]) }
-                            Btn { id: printerChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startPrinter"; small: true; height: opts.h; kind: "quiet"; icon: "printer"
+                            Btn { id: printerChip; anchors.verticalCenter: parent.verticalCenter; objectName: "startPrinter"; small: true; height: Theme.hMd; kind: "quiet"; icon: "printer"
                                 visible: Store.printOn && Store.newPurposeEffective === "print"
                                 text: Store.printerName ? Store.printerName : "Choose a printer"
                                 tip: "The printer the next design is checked and sliced for. Click to change it."
                                 onClicked: Store.openSheet("printer") } }
-                        Btn { id: modelChip; objectName: "startModel"; small: true; height: opts.h; kind: "quiet"; icon: "sparkles"; active: homeModelPop.opened
-                            x: opts.wrap ? opts.inset : opts.width - opts.inset - width; y: opts.wrap ? opts.h + Theme.s2 : 0
+                        Btn { id: modelChip; objectName: "startModel"; height: Theme.hMd; kind: "quiet"; icon: "sparkles"; active: homeModelPop.opened
+                            x: opts.wrap ? opts.inset - 13 : opts.width - opts.inset - width + 13; y: (opts.wrap ? opts.h + Theme.s2 : 0) + Math.round((opts.h - height) / 2)
                             text: Store.chatReady ? Store.chatAgentLabel + " · " + Store.modelShort(Store.chatAgent, Store.chatModel) : "Connect an agent"
                             tip: Store.chatReady ? "The agent and model that design it. Click to change them." : "No agent is connected: add one in Settings › Agents & models"
                             onClicked: Store.chatReady ? (homeModelPop.opened ? homeModelPop.close() : homeModelPop.open()) : Store.openSettings("agents")
@@ -283,27 +289,12 @@ Item {
                                 Flickable { anchors.fill: parent; clip: true; contentHeight: hmp.implicitHeight; boundsBehavior: Flickable.StopAtBounds
                                     ScrollBar.vertical: ScrollBar { width: 6 }
                                     TalkModelPicker { id: hmp; width: parent.width; onDone: homeModelPop.close() } } } } }
-                    // other ways in: an empty studio, or a replacement for a broken part
-                    Item { visible: !home.chatting; width: 1; height: Theme.s3 }
-                    Row { id: alts; objectName: "startAlternatives"; visible: !home.chatting; x: home.split ? 0 : Math.round((parent.width - width) / 2); spacing: Theme.s1; height: Theme.hMd
-                        Btn { id: blank; anchors.verticalCenter: parent.verticalCenter; objectName: "startBlank"; small: true; height: Theme.hMd; kind: "quiet"; icon: "square_dashed"; text: "Start blank"
-                            tip: "An empty studio and the workspace. Describe, sketch or import what goes in it."
-                            onClicked: Store.startBlank() }
-                        Rectangle { width: 3; height: 3; radius: 1.5; color: Theme.ink4; anchors.verticalCenter: parent.verticalCenter }
-                        Btn { anchors.verticalCenter: parent.verticalCenter; objectName: "startReplace"; small: true; height: Theme.hMd; kind: "quiet"; icon: "wrench"; text: "Replace a broken part"
-                            tip: "From a photo: the agent estimates sizes, asks you for the ones that matter, then designs the new part."
-                            onClicked: Store.openSheet("replace") } }
-                    // the design you were on, one click away
-                    Item { visible: !home.chatting && !home.fresh && !!home.latest; width: 1; height: 14 }
-                    Txt { objectName: "homeContinue"; visible: !home.chatting && !home.fresh && !!home.latest; anchors.horizontalCenter: parent.horizontalCenter; kind: "fine"; tone: cm.containsMouse ? 1 : 3
-                        text: home.latest ? "Continue “" + home.latest.name + "” · " + F.pad(home.latest.head) + " · " + F.ago(home.latest.updated) + "  →" : ""
-                        MouseArea { id: cm; anchors.fill: parent; anchors.margins: -6; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.open(home.latest.id) } }
                     Note { visible: !!Store.fatal; width: parent.width; kind: "red"; title: Store.fatal ? Store.fatal.message : ""; text: Store.fatal ? (Store.fatal.hint || "") : "" }
                 }
                 // first day: what is turning on the bench, said honestly (kernel geometry, an example, not one of yours)
                 Row { id: pieceCap; objectName: "showpieceCaption"; visible: home.split; spacing: Theme.s2
                     x: Math.round(hero.colW + (hero.width - hero.colW) / 2 - width / 2 + 28); y: Math.round(hero.height * 0.8)
-                    opacity: stage.model ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.slow } }
+                    opacity: home.pieceShown ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.slow } }
                     Rectangle { width: 5; height: 5; radius: 2.5; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
                     Txt { kind: "cap"; tone: 3; font.letterSpacing: 0.8; anchors.verticalCenter: parent.verticalCenter
                         text: home.showpiece ? "An example build · " + home.showpiece.name + " · " + home.showpiece.features + " features · real CAD from the kernel" : "" } }
@@ -324,8 +315,8 @@ Item {
                 model: Store.concepts
                 Item { id: cg; required property var modelData; required property int index; width: col.width; height: cgc.height + 18
                     Rectangle {
-                        id: cgc; objectName: "conceptGroup"; width: parent.width; height: 132; radius: Theme.rLg + 2
-                        color: cgm.containsMouse ? Theme.plate2 : Theme.plate1; border.color: cgm.containsMouse ? Theme.alpha(Theme.datum, 0.5) : Theme.alpha(Theme.datum, 0.28)
+                        id: cgc; objectName: "conceptGroup"; width: parent.width; height: 132; radius: Theme.rPane
+                        color: cgm.containsMouse ? Theme.glass2 : Theme.glass; border.color: cgm.containsMouse ? Theme.alpha(Theme.datum, 0.5) : Theme.alpha(Theme.datum, 0.28)
                         Behavior on color { Tint {} }
                         Behavior on border.color { Tint {} }
                         Column { x: 22; anchors.verticalCenter: parent.verticalCenter; width: parent.width - thumbs.width - 60; spacing: 6
@@ -353,45 +344,75 @@ Item {
                 }
             }
 
-            // ════ the designs ════
-            Item { visible: home.everything.length > 0; width: 1; height: 8 }
-            Item { width: parent.width; height: 34; visible: home.everything.length > 0
-                Row { spacing: 12; anchors.verticalCenter: parent.verticalCenter
-                    Txt { kind: "h3"; text: "Designs" }
-                    Txt { mono: true; tone: 3; font.pixelSize: 12; text: home.everything.length + (home.grouped > 0 ? "  ·  " + home.families.length + (home.families.length === 1 ? " family" : " families") : "") + (home.released ? "  ·  " + home.released + " released" : ""); anchors.baseline: parent.children[0].baseline } }
-                Row { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 8
-                    Seg { visible: home.everything.length > 6; anchors.verticalCenter: parent.verticalCenter; value: home.filter; onPicked: function (v) { home.filter = v }
+            // ════ the shelf: the designs ════
+            Item { id: shelfHead; width: parent.width; height: 34; visible: home.everything.length > 0
+                opacity: 0; transform: Translate { id: shelfLift }
+                Arrive { item: shelfHead; lift: shelfLift; beat: 3 }
+                Row { spacing: 14; anchors.verticalCenter: parent.verticalCenter
+                    Txt { text: "Designs"; font.pixelSize: 20; font.weight: Theme.wSemi; font.letterSpacing: -0.4; lineHeight: 1.0 }
+                    Txt { mono: true; tone: 3; font.pixelSize: 12; text: home.everything.length + (home.grouped > 0 ? " · " + home.families.length + (home.families.length === 1 ? " family" : " families") : "") + (home.released ? " · " + home.released + " released" : ""); anchors.baseline: parent.children[0].baseline } }
+                Row { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 2
+                    Seg { visible: home.everything.length > 6; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 34; value: home.filter; onPicked: function (v) { home.filter = v }
                         model: [{ value: "all", text: "All" }, { value: "open", text: "In progress" }, { value: "released", text: "Released" }] }
-                    Btn { visible: home.everything.length > 6; kind: "quiet"; icon: "arrow_up_down"; text: home.order === "recent" ? "Last changed" : "Name"; tip: "Sort order"
+                    Item { visible: home.everything.length > 6; width: 10; height: 1 }
+                    Btn { visible: home.everything.length > 6; kind: "quiet"; icon: "arrow_up_down"; text: home.order === "recent" ? "Last changed" : "Name"; tip: "Sort order"; anchors.verticalCenter: parent.verticalCenter
                         onClicked: home.order = home.order === "recent" ? "name" : "recent" }
-                    Btn { kind: "quiet"; icon: "import"; text: "Import…"; tip: "A .formstudio project, a .formproj, or a conversation"; onClicked: Store.openSheet("import") }
-                    Btn { kind: "quiet"; icon: "folder_open"; tip: "Open the projects folder: " + Bridge.dataDirShort; onClicked: Bridge.openDataFolder() } } }
-            Item { visible: home.everything.length > 0; width: 1; height: 14 }
-            // rows of families; the family opened by its count sits under its own row, across the full width
+                    Btn { kind: "quiet"; icon: "import"; text: "Import…"; tip: "A .formstudio project, a .formproj, or a conversation"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.openSheet("import") }
+                    Btn { kind: "quiet"; icon: "folder_open"; tip: "Open the projects folder: " + Bridge.dataDirShort; anchors.verticalCenter: parent.verticalCenter; onClicked: Bridge.openDataFolder() } } }
+            Item { visible: home.everything.length > 0; width: 1; height: 8 }
+            // rows of families; the family opened by its count sits under its own row, across the full width. Until
+            // "All N designs" is picked only the first row shows, and its last place says how many more there are.
             Column {
-                id: grid; objectName: "designGrid"; width: parent.width; visible: home.everything.length > 0; spacing: 16
-                readonly property int columns: Math.max(2, Math.floor((width + 16) / 280))
-                readonly property real cw: Math.floor((width - (columns - 1) * 16) / columns)
-                readonly property var rows: { var out = [], f = home.families; for (var i = 0; i < f.length; i += columns) out.push(f.slice(i, i + columns)); return out }
+                id: grid; objectName: "designGrid"; width: parent.width; visible: home.everything.length > 0; spacing: 12
+                readonly property int gap: 20
+                readonly property int columns: Math.max(2, Math.floor((width + gap) / 285))
+                readonly property real cw: Math.floor((width - (columns - 1) * gap) / columns)
+                readonly property bool folded: !home.showAll && home.families.length > columns
+                readonly property var shown: folded ? home.families.slice(0, columns - 1) : home.families
+                readonly property var hidden: folded ? home.families.slice(columns - 1) : []
+                readonly property var rows: { var out = [], f = shown; for (var i = 0; i < f.length; i += columns) out.push(f.slice(i, i + columns)); return out }
                 Repeater {
                     model: grid.rows
                     Column {
                         id: band; required property var modelData; required property int index
-                        width: grid.width; spacing: 16
+                        width: grid.width; spacing: 12
                         readonly property var open: { for (var i = 0; i < modelData.length; i++) if (modelData[i].root === home.openFamily && modelData[i].count > 1) return modelData[i]; return null }
-                        readonly property int openAt: { for (var i = 0; i < modelData.length; i++) if (modelData[i].root === home.openFamily) return i; return 0 }
-                        Row { spacing: 16
+                        Row { spacing: grid.gap
                             Repeater { model: band.modelData
                                 DesignCard { required property var modelData; required property int index
                                     width: grid.cw; host: home; p: modelData.face; count: modelData.count; photo: home.photos[modelData.face.id] || null
                                     order: band.index * grid.columns + index
                                     opened: home.openFamily === modelData.root && modelData.count > 1
-                                    onToggled: home.openFamily = opened ? "" : modelData.root } } }
+                                    onToggled: home.openFamily = opened ? "" : modelData.root } }
+                            // the rest of the shelf: a round pane of glass with the count, and what is behind it
+                            Item { id: moreCell; objectName: "designsMore"; visible: grid.folded && band.index === 0; width: grid.cw; height: 264
+                                readonly property bool hot: mm.containsMouse || activeFocus
+                                activeFocusOnTab: true
+                                Keys.onPressed: function (e) { if (e.key === Qt.Key_Space || e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { e.accepted = true; home.showAll = true } }
+                                opacity: 0; Component.onCompleted: { if (home.entered) opacity = 1; else moreIn.start() }
+                                SequentialAnimation { id: moreIn; PauseAnimation { duration: 220 + grid.columns * Theme.stagger } Glide { target: moreCell; property: "opacity"; to: 1; duration: Theme.slow } }
+                                Item { id: disc; width: 132; height: 132; y: 34; anchors.horizontalCenter: parent.horizontalCenter
+                                    scale: mm.pressed ? Theme.from(0.97) : 1; Behavior on scale { Glide { duration: Theme.press } }
+                                    transform: Translate { y: moreCell.hot && !mm.pressed ? -Theme.shift(4) : 0; Behavior on y { Glide { duration: Theme.base } } }
+                                    Shadow { radius: 66; spread: 30; drop: 14; strength: Theme.dark ? 0.8 : 0.4 }
+                                    Glass { anchors.fill: parent; flat: true; radius: 66 }
+                                    Rectangle { anchors.fill: parent; radius: 66; color: Theme.washHover; opacity: moreCell.hot ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
+                                    Txt { anchors.centerIn: parent; mono: true; tone: 2; font.pixelSize: 22; font.weight: Theme.wMedium; text: "+" + grid.hidden.length }
+                                    FocusRing { on: moreCell.activeFocus; radius: 69 } }
+                                Column { y: 206; width: parent.width; spacing: 5
+                                    Row { anchors.horizontalCenter: parent.horizontalCenter; spacing: 9; height: 20
+                                        Txt { text: "All " + F.plural(home.everything.length, "design"); font.pixelSize: 15; font.weight: Theme.wSemi; font.letterSpacing: -0.15; lineHeight: 1.0; anchors.verticalCenter: parent.verticalCenter }
+                                        Icon { name: "arrow_right"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter } }
+                                    Txt { width: parent.width - 12; x: 6; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight; wrapMode: Text.NoWrap; font.pixelSize: 12; tone: 3; lineHeight: 1.0
+                                        text: grid.hidden.length ? grid.hidden[0].face.name + (grid.hidden.length > 1 ? " and " + (grid.hidden.length - 1) + " more" : "") : "" } }
+                                MouseArea { id: mm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: home.showAll = true }
+                            }
+                        }
                         // the opened family: every design that shares the origin, the first one first
                         Rectangle {
                             id: fam; objectName: "familyPanel"; visible: !!band.open; width: parent.width
-                            height: visible ? famCol.implicitHeight + 36 : 0; radius: Theme.rLg + 2
-                            color: Theme.plate1; border.color: Theme.rule
+                            height: visible ? famCol.implicitHeight + 36 : 0; radius: Theme.rPane
+                            color: Theme.glass; border.width: 1; border.color: Theme.dark ? Theme.glassEdge : Theme.rule
                             readonly property var members: band.open ? band.open.members.slice().sort(function (a, b) {
                                 var ar = !a.lineage || !a.lineage.parent, br = !b.lineage || !b.lineage.parent
                                 return ar !== br ? (ar ? -1 : 1) : b.updated - a.updated }) : []
@@ -402,13 +423,10 @@ Item {
                                 Glide { target: fam; property: "opacity"; to: 1; duration: Theme.base }
                                 Glide { target: famTr; property: "y"; from: Theme.shift(-6); to: 0; duration: Theme.base } }
                             transform: Translate { id: famTr }
-                            // a notch points at the card it belongs to
-                            Rectangle { width: 12; height: 12; rotation: 45; y: -6; x: Math.round(band.openAt * (grid.cw + 16) + 16); color: Theme.plate1; border.color: Theme.rule }
-                            Rectangle { y: 1; x: Math.round(band.openAt * (grid.cw + 16) + 11); width: 22; height: 9; color: Theme.plate1 }
-                            Column { id: famCol; x: 18; y: 16; width: parent.width - 36; spacing: 14
+                            Column { id: famCol; x: 18; y: 16; width: parent.width - 36; spacing: 8
                                 Item { width: parent.width; height: 22
                                     Row { spacing: 10; anchors.verticalCenter: parent.verticalCenter
-                                        Txt { kind: "cap"; text: "Design family"; anchors.verticalCenter: parent.verticalCenter }
+                                        Txt { kind: "cap"; color: Theme.datum; text: "Design family"; anchors.verticalCenter: parent.verticalCenter }
                                         Txt { kind: "fine"; tone: 2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
                                             text: F.plural(fam.members.length, "design") + " from one origin: the first design, then its copies, variants and picked concepts" } }
                                     Btn { objectName: "familyClose"; small: true; kind: "quiet"; icon: "x"; tip: "Close the family"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
@@ -421,12 +439,14 @@ Item {
                     }
                 }
             }
+            Btn { objectName: "designsFewer"; visible: home.showAll && home.families.length > grid.columns; anchors.horizontalCenter: parent.horizontalCenter
+                kind: "quiet"; small: true; icon: "chevron_up"; text: "Show fewer"; onClicked: { home.showAll = false; flick.contentY = 0 } }
             Txt { visible: home.everything.length > 0 && home.families.length === 0; tone: 3; text: home.filter === "released" ? "Nothing is released yet. A design is released from Make, its last stage." : "Every design here is released." }
 
             // ════ recent conversations ════
             Item { visible: home.talks.length > 0; width: 1; height: home.everything.length > 0 ? Theme.s12 : 8 }
             Item { visible: home.talks.length > 0; width: parent.width; height: 30
-                Txt { kind: "h3"; text: "Conversations"; anchors.verticalCenter: parent.verticalCenter }
+                Txt { text: "Conversations"; font.pixelSize: 20; font.weight: Theme.wSemi; font.letterSpacing: -0.4; lineHeight: 1.0; anchors.verticalCenter: parent.verticalCenter }
                 Btn { small: true; kind: "quiet"; icon: "history"; text: "All"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                     onClicked: { Store.talkOpen = true; if (home.talks.length) Store.openConv(home.talks[0].id) } } }
             Item { visible: home.talks.length > 0; width: 1; height: 12 }
@@ -437,8 +457,8 @@ Item {
                     Rectangle { id: tc; objectName: "homeConversation"; required property var modelData; required property int index
                         readonly property string convId: modelData.id
                         width: parent.tw; height: 84; radius: Theme.rLg
-                        color: tcm.pressed ? Theme.plate1 : tcm.containsMouse ? Theme.plate2 : Theme.alpha(Theme.plate1, 0.7)
-                        border.color: tcm.containsMouse ? Theme.rule3 : Theme.rule
+                        color: tcm.pressed ? Theme.glass : tcm.containsMouse ? Theme.glass2 : Theme.glass
+                        border.color: tcm.containsMouse ? Theme.rule3 : Theme.dark ? Theme.glassEdge : Theme.rule
                         Behavior on color { Tint {} }
                         opacity: 0; Component.onCompleted: { if (home.entered) opacity = 1; else tcIn.start() }
                         SequentialAnimation { id: tcIn; PauseAnimation { duration: 200 + tc.index * Theme.stagger } Glide { target: tc; property: "opacity"; to: 1; duration: Theme.slow } }
@@ -478,7 +498,7 @@ Item {
         }
         Rectangle { anchors.fill: parent; color: Theme.alpha(Theme.datum, 0.03); opacity: home.dropping ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.base } }
             border.width: 1; border.color: Theme.alpha(Theme.datum, 0.35)
-            Rectangle { anchors.horizontalCenter: parent.horizontalCenter; y: 22; width: dropTx.implicitWidth + 40; height: 36; radius: 18; color: Theme.plate3; border.color: Theme.alpha(Theme.datum, 0.5)
+            Rectangle { anchors.horizontalCenter: parent.horizontalCenter; y: 22; width: dropTx.implicitWidth + 40; height: 36; radius: 18; color: Theme.glassSolid; border.color: Theme.alpha(Theme.datum, 0.5)
                 Row { id: dropTx; anchors.centerIn: parent; spacing: 8
                     Icon { name: "import"; size: 14; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
                     Txt { text: "Drop to start from it · photos, STEP, STL, 3MF, PDF drawings, links"; font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter } } } }
