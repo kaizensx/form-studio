@@ -40,6 +40,8 @@ void MAIN()
     // with distance, so the part above it reads through and the view never turns into a black slab
     if (!gl_FrontFacing) {
         BASE_COLOR = vec4(0.0, 0.0, 0.0, uBelowAlpha * (1.0 - k));
-        EMISSIVE_COLOR = uColor.rgb;
+        // uBelowEmit: by night the ground's tone is added whole (it is dark); by day it is weighted like its alpha,
+        // or a pale ground over a pale background would burn out to white under the linear curve
+        EMISSIVE_COLOR = uColor.rgb * uBelowEmit;
     }
 }

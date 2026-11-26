@@ -1,6 +1,7 @@
 # Design brief
 
-How Form Studio's desktop app looks, is organised and moves, and why. The tokens live in
+How Form Studio's desktop app looks, is organised and moves, and why. The visual direction (plates on a frame,
+drawing lettering, the lit floor and its grid) is in `docs/design/DIRECTION.md`. The tokens live in
 `form/app/qml/Form/Theme.qml`; the rules for writing QML are in `form/app/qml/CONTRIBUTING-UI.md`. This page is the
 intent those two serve. Change it first, then the code.
 

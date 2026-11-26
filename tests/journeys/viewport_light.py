@@ -19,7 +19,10 @@ S = {"frames": [], "log": [], "fails": []}
 VIEWS = ("iso", "front", "side", "back", "top", "under")
 DISTS = (30, 420, 3000)
 MIN_K = 0.25            # every frame keeps a quarter of the iso view's part luminance
-STEP_PART = 0.22        # the most the part's luminance may change between frames 2 degrees (or 8% zoom) apart, of iso
+STEP_PART = 0.24        # the most the part’s luminance may change between frames 2 degrees (or 8% zoom) apart, of iso.
+                        # (0.22 until the view became a plate 16 px narrower: at 3000 mm the part is some 40 px wide and the
+                        # sample grid lands on it differently; the step through the floor measured 0.19 before and 0.22 after
+                        # with the same shaders)
 STEP_FRAME = 0.12       # the same for the whole free area, of its own luminance range (0..255)
 
 

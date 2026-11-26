@@ -44,6 +44,10 @@ def run(ui):                                   # or several functions named jour
 - A journey fails on any QML warning. `FORM_UITEST_WATCHDOG=120` prints every thread's stack if the event loop blocks.
 - A new shortcut goes in `ShortcutsSheet.qml`; `tests/journeys/shell.py` presses every key the sheet lists.
 
+To look at the app or run a journey without a window appearing on the desk, set `FORM_WINDOW_GHOST=1` (with `--shot`,
+`--check`, `--tree` or `--uitest`): the real window, drawn by the GPU as usual, but fully transparent, deaf to the
+real pointer and keyboard, and never the active app.
+
 ## Rules
 
 - **QML's JavaScript is ES2016.** No `async/await`, no object spread (`{...a}`; use `Object.assign`). Promises, arrow functions,
@@ -71,12 +75,13 @@ every screen you change in both.
 
 | Group | Tokens |
 |---|---|
+| The frame and its plates | `frame` (the window itself and the top bar) · `rPanel 12` · `gap 8` · `panelEdge`. A workspace's panels are plates on the frame; `PlateFrame {}` over a square view (the 3D view) rounds it and draws the registration ticks. See `docs/design/DIRECTION.md` |
 | Surfaces, low to high | `well` (inputs) `plate` (the bench) `plate1` (panels) `plate2` (cards, sheets) `plate3` (menus, buttons) `plate4` |
 | Ink | `ink` `ink2` `ink3` `ink4` (primary … muted) |
 | Edges | `rule` 7 % · `rule2` 12 % · `rule3` 20 % (hovered or raised) · `focus` (keyboard ring). A low-opacity white (dark) or near-black (light), never a solid grey |
 | Washes over any plate | `washHover` `washPress` `washOn` (selected) · `scrim` behind sheets |
 | Meaning | `datum` (+ `datumHi`, `datumInk`) `blueprint` `amber` `signal` `pass` `clay`; `Theme.evidence(kind)` |
-| The mark and the bench | `markPart` (the logo's arms) · `benchGround` `benchPlate` `benchGrid` `benchEdge` (the 3D bench) · `gleam` (light on a raised top edge) · `lineBase` (what edges and washes are an alpha of) |
+| The mark and the bench | `markPart` (the logo's arms) · `benchGround` `benchPool` `benchLine` `benchPlate` `benchGrid` `benchEdge` (the 3D bench: floor, its pool of light, its 10 mm grid, the printer's plate) · `gleam` (light on a raised top edge) · `lineBase` (what edges and washes are an alpha of) |
 | Space | `s1 4` `s2 8` `s3 12` `s4 16` `s5 20` `s6 24` `s8 32` `s10 40` `s12 48` `s16 64` |
 | Type | `tCap 10` `tFine 11` `tBody 13` `tLead 15` `tH3 18` `tH2 22` `tH1 30` `tHero 44` `tDisplay 52` · weights `wBody 420` `wMedium 520` `wSemi 620` `wBold 700` |
 | Radii | `rXs 4` `rSm 6` `rMd 9` `rLg 14` `rXl 18`. Nested radii are concentric: inner = outer − padding |

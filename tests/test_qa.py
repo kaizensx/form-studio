@@ -162,3 +162,37 @@ class WindowsConsole(unittest.TestCase):
                            capture_output=True, env=env, cwd=str(ROOT))
         self.assertEqual(r.returncode, 0, r.stderr.decode("utf-8", "replace"))
         self.assertIn("Δ 0.1 mm · 45°", r.stdout.decode("utf-8"))
+
+
+class DrawingSheetLook(unittest.TestCase):
+    """The visual direction (docs/design/DIRECTION.md) as things a refactor could silently lose."""
+
+    def test_every_value_the_floor_shader_reads_is_set_by_the_viewport(self):
+        frag = (QML / "shaders" / "ground.frag").read_text(encoding="utf-8")
+        vp = (QML / "Viewport.qml").read_text(encoding="utf-8")
+        floor = vp[vp.index('objectName: "floor"'):vp.index('objectName: "originCross"')]
+        for u in sorted(set(re.findall(r"\bu[A-Z][A-Za-z]+\b", frag))):
+            self.assertRegex(floor, r"property \w+ " + u + r"\b", f"ground.frag reads {u}, which the floor's material does not set")
+
+    def test_the_floor_grid_is_a_true_scale(self):
+        frag = (QML / "shaders" / "ground.frag").read_text(encoding="utf-8")
+        self.assertIn("gridLine(VAR_WORLD_POSITION.xz, 10.0)", frag)      # the docs and the changelog say 10 mm and 50 mm
+        self.assertIn("gridLine(VAR_WORLD_POSITION.xz, 50.0)", frag)
+
+    def test_the_tokens_the_direction_names_exist_in_both_appearances(self):
+        theme = (QML / "Theme.qml").read_text(encoding="utf-8")
+        doc = (ROOT / "docs" / "design" / "DIRECTION.md").read_text(encoding="utf-8")
+        for t in ("frame", "rPanel", "gap", "panelEdge", "benchPool", "benchLine"):
+            self.assertIn("`" + t + "`", doc)
+            self.assertRegex(theme, r"readonly property \w+ " + t + r":")
+        for t in ("frame", "benchPool"):
+            self.assertRegex(theme, r"readonly property color " + t + r": dark \? ")
+
+    def test_captions_and_tags_are_lettered_in_mono(self):
+        self.assertIn('mono || kind === "cap" ? Theme.mono', (QML / "Txt.qml").read_text(encoding="utf-8"))
+        self.assertIn("font.family: Theme.mono", (QML / "Tag.qml").read_text(encoding="utf-8"))
+
+    def test_the_unseen_window_is_for_development_runs_only(self):
+        main = (ROOT / "form" / "app" / "main.py").read_text(encoding="utf-8")
+        self.assertIn('os.environ.get("FORM_WINDOW_GHOST") == "1" and bool(args.shot or args.check or args.tree or args.uitest)', main)
+

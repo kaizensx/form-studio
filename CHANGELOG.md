@@ -4,6 +4,13 @@
 
 ### New
 
+- **A new look for the workspace.** The conversation, the part and the inspector are three rounded panels with a
+  little room between them, and the top bar is part of the window instead of a strip across it. Captions and tags
+  are lettered like a drawing's. The stage you are in carries a mark that travels as you move between stages.
+- **A studio floor you can read.** The floor under the part is lit where the part stands and carries a true grid: a
+  line every 10 mm and a firmer one every 50 mm, fading with distance. The part now stands on the floor with a
+  soft shade under it, and its surface has a satin finish. In the light appearance the floor is paper white.
+
 - **A design is checked against what you asked for.** The numbers in a request (sizes, hole counts and diameters, a
   bolt circle, wall thickness, threads, the number of parts) become requirements that Form Studio measures on the
   built solid. Each revision shows, per requirement, what was measured and whether it passed; one that fails blocks

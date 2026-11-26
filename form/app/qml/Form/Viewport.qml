@@ -35,6 +35,9 @@ Item {
     property bool showOrigin: true           // the faint origin cross on the floor; off where words sit over an empty floor
     property bool interactive: true
     property bool spin: false                // slow turntable (home screen)
+    // by day the frame is toned with a linear curve (the floor stays paper white), so the lights are turned down to match
+    readonly property real lightK: Theme.dark ? 1 : 0.48
+    property bool floorGrid: !lite           // the 10 mm drafting grid on the studio floor (off for thumbnails)
     property bool lite: false                // thumbnails: no shadow map, no AO, lighter MSAA (many on screen at once)
     property real plateSize: 180
     property string stageMode: "studio"      // studio: the neutral floor | plate: the printer's build plate on it
@@ -596,7 +599,7 @@ Item {
         environment: SceneEnvironment {
             clearColor: Theme.plate; backgroundMode: SceneEnvironment.Color
             antialiasingMode: SceneEnvironment.MSAA; antialiasingQuality: vp.lite ? SceneEnvironment.Medium : SceneEnvironment.VeryHigh
-            aoEnabled: !vp.lite; aoStrength: 85; aoDistance: 16; aoSoftness: 42; aoSampleRate: 4
+            aoEnabled: !vp.lite; aoStrength: 55; aoDistance: 6; aoSoftness: 30; aoSampleRate: 3
             tonemapMode: Theme.dark ? SceneEnvironment.TonemapModeFilmic : SceneEnvironment.TonemapModeLinear
         }
         PerspectiveCamera {
@@ -648,12 +651,12 @@ Item {
         }
         // key from the upper left front (casts the shadow), a warm fill, a cool rim from behind that draws the
         // far silhouette, and a little light from straight above so top faces separate from walls
-        DirectionalLight { eulerRotation: Qt.vector3d(-50, -34, 0); brightness: Theme.dark ? 2.0 : 1.6; color: "#fffaf2"
+        DirectionalLight { eulerRotation: Qt.vector3d(-50, -34, 0); brightness: 2.0 * vp.lightK; color: "#fffaf2"
             castsShadow: !vp.lite; shadowFactor: 92; shadowMapQuality: Light.ShadowMapQualityVeryHigh; softShadowQuality: Light.PCF32; pcfFactor: 7; shadowMapFar: cam.shadowFar; csmNumSplits: 1
             lockShadowmapTexels: true }       // the shadow map's texels stay put while the camera moves: no shimmering edges
-        DirectionalLight { eulerRotation: Qt.vector3d(-16, 112, 0); brightness: 0.62; color: "#ffeedd" }
-        DirectionalLight { eulerRotation: Qt.vector3d(-24, 164, 0); brightness: 0.9; color: "#c4dcff" }
-        DirectionalLight { eulerRotation: Qt.vector3d(-90, 0, 0); brightness: 0.22 }
+        DirectionalLight { eulerRotation: Qt.vector3d(-16, 112, 0); brightness: 0.62 * vp.lightK; color: "#ffeedd" }
+        DirectionalLight { eulerRotation: Qt.vector3d(-24, 164, 0); brightness: 0.9 * vp.lightK; color: "#c4dcff" }
+        DirectionalLight { eulerRotation: Qt.vector3d(-90, 0, 0); brightness: 0.22 * vp.lightK }
         // (four is Qt Quick 3D's limit for directional lights. The bounce from the bench that lights faces looking
         // down is an ambient term in shaders/clay.frag.)
 
@@ -669,6 +672,7 @@ Item {
                     sourceBlend: cam.under ? CustomMaterial.SrcAlpha : CustomMaterial.NoBlend
                     destinationBlend: cam.under ? CustomMaterial.OneMinusSrcAlpha : CustomMaterial.NoBlend
                     property real uBelowAlpha: 0.3 * cam.belowK
+                    property real uBelowEmit: Theme.dark ? 1 : uBelowAlpha
                     property color uColor: Theme.benchGround; property color uFar: Theme.plate; property real uFade: Math.max(vp.groundSpan * 1.6, vp.dist * 0.9)
                     // the pool of studio light under the part and the 10 mm drafting grid (scene space: x, -y of the design)
                     property color uPool: Theme.benchPool; property real uPoolR: Math.max(60, vp.groundSpan * 1.1)
@@ -676,9 +680,9 @@ Item {
                     property vector2d uBoxC: Qt.vector2d((vp.dimLo.x + vp.dimHi.x) / 2, -(vp.dimLo.y + vp.dimHi.y) / 2)
                     property vector2d uBoxH: Qt.vector2d(Math.max(0, (vp.dimHi.x - vp.dimLo.x) / 2 - uSoft * 0.2), Math.max(0, (vp.dimHi.y - vp.dimLo.y) / 2 - uSoft * 0.2))
                     property real uSoft: Math.max(4, vp.radius(vp.bounds) * 0.16)
-                    property real uContact: !vp.model ? 0 : Theme.dark ? 0.5 : 0.16
+                    property real uContact: !vp.model ? 0 : Theme.dark ? 0.5 : 0.12
                     property real uLift: Theme.dark ? 0 : 0.72
-                    property color uGrid: vp.lite ? "transparent" : Qt.rgba(Theme.lineBase.r, Theme.lineBase.g, Theme.lineBase.b, Theme.benchLine.a * (1 - vp.plateK)) } }
+                    property color uGrid: !vp.floorGrid ? "transparent" : Qt.rgba(Theme.lineBase.r, Theme.lineBase.g, Theme.lineBase.b, Theme.benchLine.a * (1 - vp.plateK)) } }
             // studio: a faint origin cross, the one fixed point on the floor (it gives way to the plate)
             Model { objectName: "originCross"; pickable: false; castsShadows: false; visible: vp.showOrigin && vp.plateK < 0.5; position: Qt.vector3d(vp.shift.x, vp.shift.y, 0)
                 geometry: LineGeometry { points: { var h = Math.max(6, Math.min(40, vp.radius(vp.bounds) * 0.22)); return [-h, 0, 0, h, 0, 0, 0, -h, 0, 0, h, 0] } }

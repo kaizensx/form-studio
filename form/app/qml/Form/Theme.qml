@@ -64,8 +64,8 @@ QtObject {
     readonly property color datumHi: dark ? "#cdf2e4" : "#1b9179"               // primary button, hovered
     readonly property color focus: alpha(datum, 0.6)                            // keyboard focus ring (datum)
     // the 3D bench (Viewport.qml): the ground to the horizon, the build plate on it, its 10 mm grid and its outline
-    readonly property color benchGround: dark ? "#1c2226" : "#e4e7e5"
-    readonly property color benchPool: dark ? "#333d43" : "#fbfbfa"             // the floor where the studio light falls, under the part
+    readonly property color benchGround: dark ? "#1d2327" : "#e4e7e5"
+    readonly property color benchPool: dark ? "#2f393e" : "#fbfbfa"             // the floor where the studio light falls, under the part
     readonly property color benchLine: alpha(lineBase, dark ? 0.075 : 0.2)     // the floor's 10 mm drafting grid, fading with distance
     readonly property color benchPlate: dark ? "#262d32" : "#c2c8c5"
     readonly property color benchGrid: dark ? "#2e363b" : "#b4bbb7"
