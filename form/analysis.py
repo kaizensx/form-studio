@@ -33,7 +33,7 @@ TOL = 0.05                       # tessellation tolerance (mm) every map and mes
 
 # colours (sRGB). The same values as the app's Theme: clay = fine, amber = review, signal = fail, datum = settled.
 CLAY, CLAY_DEEP = (216, 211, 200), (122, 148, 150)
-AMBER, SIGNAL, DATUM, BLUEPRINT = (233, 184, 96), (255, 111, 81), (185, 232, 215), (134, 168, 255)
+AMBER, SIGNAL, DATUM, BLUEPRINT = (233, 184, 96), (255, 111, 81), (169, 184, 255), (134, 168, 255)
 
 NAMED = {"as_modelled": (0, 0), "on_back": (90, 0), "on_front": (-90, 0), "on_left": (0, 90), "on_right": (0, -90), "inverted": (180, 0)}
 NAMED_LABEL = {"as_modelled": "Base down", "on_back": "On its back", "on_front": "On its front",

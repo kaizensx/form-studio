@@ -20,7 +20,7 @@ from .render import _font
 
 LABEL = "Simulated from the slicer's G-code. Not a print."
 PLATE, GRID, EDGE = (14, 17, 19), (30, 37, 41), (85, 97, 106)
-INK, INK2, INK3, DATUM, SIGNAL = (232, 237, 235), (168, 178, 175), (113, 123, 120), (185, 232, 215), (255, 111, 81)
+INK, INK2, INK3, DATUM, SIGNAL = (232, 237, 235), (168, 178, 175), (113, 123, 120), (169, 184, 255), (255, 111, 81)
 # the app's line-type colours (LayerView.qml typeColor)
 TYPE_RGB = {
     "Outer wall": (232, 237, 235), "Inner wall": (128, 138, 135), "Sparse infill": (233, 184, 96),
