@@ -316,8 +316,36 @@ def digest():
     say("github", "\n".join(lines))
 
 
+def retract(tag: str) -> int:
+    """Remove the bot's own post of a release that was taken back (a tag withdrawn before anyone got it, see
+    docs/RELEASING.md): in #releases and #announcements, every bot message from the minute around the one that
+    names the tag. Messages written by people are never touched."""
+    from datetime import datetime
+    gone = 0
+    for ch in ("releases", "announcements"):
+        try:
+            cid = channel(ch)
+        except SystemExit:
+            continue
+        msgs = d.call("GET", f"/channels/{cid}/messages?limit=100") or []
+        me = [m for m in msgs if (m.get("author") or {}).get("bot")]
+        at = [datetime.fromisoformat(m["timestamp"]) for m in me if tag in (m.get("content") or "")]
+        for m in me:
+            t = datetime.fromisoformat(m["timestamp"])
+            if any(abs((t - a).total_seconds()) <= 60 for a in at):
+                d.call("DELETE", f"/channels/{cid}/messages/{m['id']}")
+                gone += 1
+    print(f"retracted {tag}: {gone} bot message(s) removed")
+    return 0
+
+
 def main():
     what = sys.argv[1] if len(sys.argv) > 1 else "event"
+    if what == "retract":
+        tag = (sys.argv[2] if len(sys.argv) > 2 else os.environ.get("RELEASE_TAG", "")).strip()
+        if not tag:
+            raise SystemExit("which release? python scripts/discord/post.py retract v1.1.0-preview.2")
+        return retract(tag)
     if what == "digest":
         return digest()
     if what == "release":

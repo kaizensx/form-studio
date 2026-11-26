@@ -28,7 +28,7 @@ on:
       task:
         description: What to do
         type: choice
-        options: [setup, plan, snapshot, helpdesk, digest, release]
+        options: [setup, plan, snapshot, helpdesk, digest, release, retract]
         default: setup
       tag:
         description: "For release: the tag to post (v1.1.0). Previews go to #releases, stables also to #announcements"
@@ -76,6 +76,7 @@ jobs:
             snapshot) python scripts/discord/snapshot.py discord-snapshot.json ;;
             digest) python scripts/discord/post.py digest ;;
             release) python scripts/discord/post.py release "$RELEASE_TAG" ;;
+            retract) python scripts/discord/post.py retract "$RELEASE_TAG" ;;
             helpdesk) python scripts/discord/helpdesk.py ;;
             *) python scripts/discord/post.py event ;;
           esac
