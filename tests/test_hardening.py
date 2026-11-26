@@ -15,7 +15,7 @@ TMP = tempfile.mkdtemp(prefix="form-hard-")
 from form import config  # noqa: E402
 from form.agents.custom import _host_is  # noqa: E402
 from form.recipes import SCAD_PREFIX, SOURCE_PREFIX, RecipeBook, source_path  # noqa: E402
-from form.server import _attachment, make_handler  # noqa: E402
+from form.server import EngineServer, _attachment, make_handler  # noqa: E402
 from form.studio import Studio  # noqa: E402
 
 
@@ -87,6 +87,44 @@ class OtherWebsites(unittest.TestCase):
         self.assertEqual(code, 403)
         self.assertIn("other websites", body["error"]["message"])
         self.assertEqual(self._get("http://127.0.0.1.example.com")[0], 403)
+
+
+class Burst(unittest.TestCase):
+    """A screen that asks for many things at once (Settings) must not overflow the engine's accept queue: with
+    socketserver's default backlog of 5 macOS reset the extra connections and the app said the engine was not answering."""
+
+    def test_backlog_is_not_the_default_five(self):
+        self.assertGreaterEqual(EngineServer.request_queue_size, 64)
+        self.assertTrue(EngineServer.daemon_threads)
+
+    def test_sixty_requests_at_once_are_all_answered(self):
+        import http.client
+        os.environ["FORM_DATA"] = TMP
+        st = Studio(config.load())
+        httpd = EngineServer(("127.0.0.1", 0), make_handler(st))
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        port, out, gate = httpd.server_address[1], [], threading.Barrier(60)
+
+        def one():
+            gate.wait()
+            try:
+                c = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
+                c.request("GET", "/api/activity")
+                r = c.getresponse()
+                r.read()
+                c.close()
+                out.append(r.status)
+            except Exception as e:                      # noqa: BLE001
+                out.append(repr(e))
+        try:
+            ts = [threading.Thread(target=one) for _ in range(60)]
+            [t.start() for t in ts]
+            [t.join() for t in ts]
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            st.kernel.stop()
+        self.assertEqual(out, [200] * 60)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from PySide6.QtCore import Property, QObject, QRunnable, QStandardPaths, QThreadPool, QUrl, Signal, Slot
@@ -125,9 +126,20 @@ class _Call(QRunnable):
                     data, headers = self.raw, {"Content-Type": "application/octet-stream"}
                 else:
                     data, headers = json.dumps(self.body if self.body is not None else {}).encode(), {"Content-Type": "application/json"}
-            conn.request(self.method, "/api" + self.path, body=data, headers=headers)
-            res = conn.getresponse()
-            payload = res.read()
+            try:
+                conn.request(self.method, "/api" + self.path, body=data, headers=headers)
+                res = conn.getresponse()
+                payload = res.read()
+            except (ConnectionError, http.client.RemoteDisconnected):
+                # a read asked while the engine's accept queue was full: ask once more (never a POST: it may have run)
+                if self.method != "GET":
+                    raise
+                conn.close()
+                time.sleep(0.2)
+                conn = http.client.HTTPConnection(self.b.host, self.b.port, timeout=self.timeout)
+                conn.request("GET", "/api" + self.path)
+                res = conn.getresponse()
+                payload = res.read()
             conn.close()
             try:
                 obj = json.loads(payload)

@@ -942,6 +942,15 @@ def make_handler(st: Studio):
     return Handler
 
 
+class EngineServer(ThreadingHTTPServer):
+    """The engine's HTTP server. socketserver's default listen backlog is 5: the app opens one connection per request,
+    and a screen that asks for several things at once (Settings: the config, the software list, the agents, the keys,
+    next to the activity and job polls) overflowed it, so macOS reset the extra connections and the app reported
+    "The Form Studio engine is not answering." while the engine was fine."""
+    request_queue_size = 128
+    daemon_threads = True
+
+
 def _is_form(url: str, data_dir: str) -> bool:
     import urllib.request
     try:
@@ -964,7 +973,7 @@ def start_bench(st: Studio, tries: int = 10) -> dict:
     for p in range(port, port + tries):
         url = f"http://{host}:{p}"
         try:
-            httpd = ThreadingHTTPServer((host, p), make_handler(st))
+            httpd = EngineServer((host, p), make_handler(st))
         except OSError:
             if _is_form(url, str(st.root)):
                 return {"url": url, "shared": True}
@@ -1000,7 +1009,7 @@ def serve(cfg=None):
     httpd = None
     for p_try in range(port, port + 10):                 # a busy port is not a reason to fail
         try:
-            httpd = ThreadingHTTPServer((host, p_try), make_handler(st))
+            httpd = EngineServer((host, p_try), make_handler(st))
             port = p_try
             break
         except OSError:

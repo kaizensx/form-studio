@@ -12,7 +12,6 @@ import os
 import signal
 import sys
 import threading
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -20,12 +19,12 @@ HERE = Path(__file__).resolve().parent
 
 def _engine(cfg):
     """The engine API on a loopback port chosen by the OS, served from this process."""
-    from ..server import make_handler
+    from ..server import EngineServer, make_handler
     from ..studio import Studio
     from ..capabilities import migrate_safely
     migrate_safely(cfg)                                  # once: people who already print keep printing
     st = Studio(cfg)
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(st))
+    httpd = EngineServer(("127.0.0.1", 0), make_handler(st))
     httpd.daemon_threads = True
     threading.Thread(target=httpd.serve_forever, daemon=True, name="form-engine").start()
 
