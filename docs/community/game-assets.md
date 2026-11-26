@@ -6,7 +6,7 @@ Game assets are **Beta** and new in version 1.1 (in the Preview channel first). 
 
 ## What you need
 
-- **Blender.** The Game asset sheet builds the asset in Blender, run in the background by Form Studio. Install it from Settings › Software, or let Form Studio find the one you have.
+- **Blender.** The Game asset sheet builds the asset in Blender, run in the background by Form Studio. Install it from Settings › Engines & software, or let Form Studio find the one you have.
 - **Optional: CoACD** for tighter collision than one convex hull per part. See the guide **Optional engines**.
 
 ## Start a game asset

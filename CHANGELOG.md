@@ -62,6 +62,18 @@
   like a stamp, once. None of it moves with Reduce Motion on.
 ### Changed
 
+- **Settings, reorganised.** A rail on the left lists the pages (General, Agents & models, Engines & software,
+  Printing, Other apps, Updates, Advanced) and each page is a set of titled cards with one row per setting. The search
+  finds a setting on any page, a dot in the rail marks a page with unsaved changes, and appearance is picked from
+  small pictures of the dark and the light bench. "Software" is now "Engines & software" and "Agents" is "Agents &
+  models"; nothing moved out of Settings.
+- **Use in Form Studio: a switch for everything you install.** Each optional engine or app (CAD-Recode, CADFit, CoACD,
+  the CADEvolve corpus, Blender, FreeCAD, OpenSCAD and every slicer) now shows two separate things on its card:
+  whether it is installed, and whether Form Studio uses it. Switched off, it stays on your computer and is never
+  called. The card says in one line what the switch changes and shows the licence beside it. Defaults are what
+  happened before: CAD-Recode is used once installed, CADFit is off until you install it from Settings, everything
+  else is on. In `studio.toml`: `[recon] learned`, `[recon] cadfit` and `[use]`.
+
 - **The Mac app is now called Form Studio.app** (it was FORM.app). If you added Form Studio to Claude Code, Codex or
   another agent by the old app's path, add it again: `form setup` finds your agents and writes the entry.
 - **Creation first.** A new design is a 3D model; 3D printing is optional and turned on when you want it.
@@ -78,6 +90,10 @@
   the new one (at once with reduced motion). Text fields keep a quiet edge under the pointer.
 
 ### Fixed
+
+- **"The Form Studio engine is not answering" in Settings.** Opening Settings (most often Agents) asked the engine for
+  several things at the same moment, more than it accepted at once, so some requests were dropped and shown as that
+  message although the engine was fine. The engine now accepts them all, and the app asks again once before saying so.
 
 - A teal outline no longer crosses the window when a design is opened from Home. The frame that grows from the
   composer to the workspace now plays only when a request sent from the composer starts a design.

@@ -327,7 +327,7 @@ class Corpus(Base):
 
 
 class CardsSayWhatTheyDo(Base):
-    """Settings › Software: every optional engine says what it does and when you would want it, and what it gives
+    """Settings › Engines & software: every optional engine says what it does and when you would want it, and what it gives
     you; the texts name what the code really does (no fillets in CADFit, MIT CoACD, reference-only corpus)."""
 
     def test_every_engine_card_has_a_description_and_what_it_gives(self):

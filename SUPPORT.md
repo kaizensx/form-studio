@@ -13,7 +13,7 @@
 
 ## Before you ask
 
-1. Run `form setup --check` (or open **Settings › Software** in the app). It lists what Form Studio found on your
+1. Run `form setup --check` (or open **Settings › Engines & software** in the app). It lists what Form Studio found on your
    computer, which slicers and agents it can use, and how to fix each gap.
 2. Check [Compatibility](docs/VERIFICATION.md) for your platform, slicer and agent.
 3. Search existing [issues](https://github.com/kaizensx/form-studio/issues) and

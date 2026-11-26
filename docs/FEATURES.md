@@ -597,12 +597,12 @@ and what to do.
 
 ## Any model, any provider
 
-![Settings › Agents: agent apps, provider keys and local models in one place](images/settings-agents.webp)
+![Settings › Agents & models: agent apps, provider keys and local models in one place](images/settings-agents.webp)
 
 - **Model APIs:** Anthropic, OpenAI, Gemini, OpenRouter, Mistral, xAI, DeepSeek and Groq, found from your keys. No
   agent app is needed; Form Studio runs the conversation and gives the model its tools.
 - **Local models:** Ollama, LM Studio and llama.cpp, found from their running servers.
-- **Add any provider by its address.** Settings › Agents › Add a provider… (or `form providers add URL`) takes a base
+- **Add any provider by its address.** Settings › Agents & models › Add a provider… (or `form providers add URL`) takes a base
   URL and an optional key, finds the format (OpenAI-, Anthropic- or Gemini-compatible, with or without `/v1`, or
   Ollama), reads the models and which of them call tools, and shows what it found, for example "Connected:
   OpenAI-compatible, 374 models, tools supported by 323 of 374", before you save. The key is kept in Form Studio's private secrets file and never shown again. Saved
@@ -721,7 +721,9 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
 - **Setup by itself.** First start installs what Form Studio needs (the standard-parts libraries, a slicer if you
   print, an agent and its sign-in) and pauses only when you have to sign in or download something, then carries on.
   Every command is shown before it runs. `form setup --auto` does the same headless.
-- **Settings** (Ctrl/⌘ ,), with search: General, Printing, Agents, Other apps, Updates, Advanced and Software. Agent,
+- **Settings** (Ctrl/⌘ ,), with search: a rail of pages (General, Agents & models, Engines & software, Printing, Other
+  apps, Updates, Advanced), each a set of titled cards. Every optional engine or app that is installed has a **Use in
+  Form Studio** switch: off, it stays installed and Form Studio never calls it. Agent,
   model and effort are picked from what is set up; slicers and programs (Blender, OpenSCAD, FreeCAD, Claude Code) show
   whether and where they were found, with Browse as a fallback and what each one unlocks; numbers are checked as you
   type; every value can be reset to its default. Changes apply at once.

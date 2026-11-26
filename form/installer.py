@@ -109,7 +109,7 @@ class Software:
     licence: str = ""           # shown before anything is downloaded when it is not Form Studio's own (e.g. model weights)
     licence_url: str = ""
     noncommercial: bool = False # the app asks for the licence to be accepted (one line, then Install) before downloading
-    about: str = ""             # Settings › Software's card: what it does for the person and when they would want it
+    about: str = ""             # Settings › Engines & software's card: what it does for the person and when they would want it
     gives: str = ""             # the card's one line "What this gives you"
 
     def __post_init__(self):
@@ -975,7 +975,7 @@ def remove(sid: str, cfg: dict) -> dict:
     paths = removable_paths(sid, cfg)
     if not paths:
         raise InstallError(f"Form Studio has nothing of {sw.label} to remove here.",
-                           hint="Only what Form Studio downloaded itself can be removed from Settings › Software.")
+                           hint="Only what Form Studio downloaded itself can be removed from Settings › Engines & software.")
     from . import fsutil
     freed = 0
     for p in paths:

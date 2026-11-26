@@ -14,7 +14,7 @@ Both use the same engine, the same checks and the same refusals.
 - **Agent apps:** Claude Code, Codex, Gemini CLI, Cursor CLI, OpenCode, Qwen Code and GitHub Copilot CLI. Each runs on your own account.
 - **Model APIs:** Anthropic, OpenAI, Gemini, OpenRouter, Mistral, xAI, DeepSeek and Groq, found from your keys. No agent app is needed: Form Studio runs the conversation and gives the model its tools.
 - **Local models:** Ollama, LM Studio and llama.cpp, found from their running servers.
-- **Any other provider:** Settings › Agents › **Add a provider…** (or `form providers add URL`) takes a base URL and an optional key, finds the format (OpenAI-, Anthropic- or Gemini-compatible, or Ollama), reads the models and which of them call tools, and shows what it found before you save.
+- **Any other provider:** Settings › Agents & models › **Add a provider…** (or `form providers add URL`) takes a base URL and an optional key, finds the format (OpenAI-, Anthropic- or Gemini-compatible, or Ollama), reads the models and which of them call tools, and shows what it found before you save.
 
 Keys are kept in Form Studio's private secrets file and never shown again. Models without tool calls are left out of the model menu, because a model that cannot call tools cannot design here.
 
@@ -101,8 +101,8 @@ form tool            # every MCP tool with a one-line summary
 
 ## When the agent does not answer
 
-- Open **Settings › Software** (or run `form setup --check`): it shows whether the agent was found and whether it is signed in.
-- Sign in once in the agent's own terminal (for example `claude`, `codex`, `cursor-agent login`, `opencode auth login`) or add an API key in Settings › Agents.
+- Open **Settings › Engines & software** (or run `form setup --check`): it shows whether the agent was found and whether it is signed in.
+- Sign in once in the agent's own terminal (for example `claude`, `codex`, `cursor-agent login`, `opencode auth login`) or add an API key in Settings › Agents & models.
 - An agent that reached its plan's limit is named, with when it can work again and what is kept.
 - Still stuck: post in #help with the tag **Agents & models**, your agent, your model and what `form setup --check` printed.
 

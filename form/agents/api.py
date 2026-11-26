@@ -228,7 +228,7 @@ class ApiAdapter(Adapter):
         p = self.p
         key, _ = prov.credentials(p)
         if p.key and not key:
-            return {"message": f"No {p.label} key is set.", "hint": "Add one in Settings › Agents."}
+            return {"message": f"No {p.label} key is set.", "hint": "Add one in Settings › Agents & models."}
         base = prov.base_url(p, cfg)
         model = run.model if run.model and run.model != "default" else self.default_model(cfg)
         if not model:
@@ -648,7 +648,7 @@ def explain(p: prov.Provider, e: prov.ProviderError, model: str) -> dict:
     """A provider failure in plain words, with what to do in Form Studio."""
     s, msg = e.status, str(e)
     if s in (401, 403):
-        return {"message": f"{p.label} refused the key ({s}).", "hint": "Replace the key in Settings › Agents."}
+        return {"message": f"{p.label} refused the key ({s}).", "hint": "Replace the key in Settings › Agents & models."}
     if s == 404 or re.search(r"model.{0,40}(not found|does not exist|not exist|unknown)", msg, re.I):
         if p.local:
             return {"message": f"{p.label} has no model “{model}” loaded.", "hint": "Load it in " + p.label + ", or pick another model in the model menu."}

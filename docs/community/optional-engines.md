@@ -6,10 +6,11 @@ Optional engines installed in one click are new in version 1.1 (in the Preview c
 
 ## How installing works
 
-- **Settings › Software** lists everything Form Studio uses, what is installed, and an **Install** button for the rest. Each entry says what it does, what it gives you, its size and its licence before anything is downloaded.
+- **Settings › Engines & software** lists everything Form Studio uses, what is installed, and an **Install** button for the rest. Each entry says what it does, what it gives you, its size and its licence before anything is downloaded.
 - From a terminal: `form install --list` shows everything, `form install <id>` installs one item after showing its commands (`--dry-run` only shows them).
 - Engines that need Python libraries Form Studio does not carry get **a Python of their own**, kept in `.engines` inside your Form Studio data folder, and run out of the app. Form Studio downloads a pinned release of uv and checks its SHA-256 before using it.
 - An install is built in a temporary folder and moved into place only when every step worked. A failed or cancelled install leaves whatever was there before as it was.
+- **Use in Form Studio.** Once something is installed, its card has a switch that says whether Form Studio calls it. Installed and used are separate: switched off, it stays on your computer and is never started; switch it back on any time. The card says in one line what the switch changes, with the licence beside it. CAD-Recode is on once installed; CADFit is turned on when you install it from Settings. In `studio.toml` the switches are `[recon] learned`, `[recon] cadfit` and `[use] coacd`, `corpus`, `blender`, `freecad`, `openscad` and one per slicer (`bambu`, `orca`, `prusa`, ...).
 - **Remove** deletes only what Form Studio itself downloaded for an engine. Programs installed by another installer (a slicer, Blender, an agent app) are never removed by Form Studio.
 
 ## CAD-Recode: learned mesh to CAD
@@ -20,7 +21,7 @@ Optional engines installed in one click are new in version 1.1 (in the Preview c
 - **Size:** 3.09 GB of weights, plus about 1 GB of PyTorch and Transformers.
 - **Licence:** CC BY-NC 4.0, non-commercial use only. The download does not start until you accept it.
 - **Runs** on your computer, offline once downloaded.
-- **Install:** Settings › Software, or `form install recon.learned`.
+- **Install:** Settings › Engines & software, or `form install recon.learned`.
 - **Source:** [huggingface.co/filapro/cad-recode](https://huggingface.co/filapro/cad-recode)
 
 ## CADFit: mesh to CAD search
@@ -31,7 +32,7 @@ Optional engines installed in one click are new in version 1.1 (in the Preview c
 - **Size:** about 0.7 GB (its own Python 3.12 with build123d, trimesh, scikit-learn, SciPy and manifold3d).
 - **Licence:** CC BY-NC 4.0, non-commercial use only, included with its author's permission. Form Studio's MIT licence does not cover the `form/recon/cadfit/` folder.
 - **Off until installed.** Installing it sets `[recon] cadfit = true` in `studio.toml`.
-- **Install:** Settings › Software, or `form install recon.cadfit`.
+- **Install:** Settings › Engines & software, or `form install recon.cadfit`.
 - **Source:** [github.com/ghadinehme/CADFit](https://github.com/ghadinehme/CADFit)
 
 ## CoACD: collision for game assets
@@ -42,7 +43,7 @@ Optional engines installed in one click are new in version 1.1 (in the Preview c
 - **Size:** about 60 MB (its own Python 3.12 with CoACD and NumPy).
 - **Licence:** MIT.
 - **Off until** a game asset asks for `collision="coacd"`.
-- **Install:** Settings › Software, or `form install game.coacd`.
+- **Install:** Settings › Engines & software, or `form install game.coacd`.
 - **Source:** [github.com/SarahWeiii/CoACD](https://github.com/SarahWeiii/CoACD)
 
 ## The CADEvolve corpus: reference examples for the agent
@@ -52,7 +53,7 @@ Optional engines installed in one click are new in version 1.1 (in the Preview c
 - **Read as text, never run.** Designs are still written with Form Studio's own tools.
 - **Size:** a 4.73 GB download, of which only `CADEvolve-G/parametric_generators.json` is kept.
 - **Licence:** Apache-2.0.
-- **Install:** Settings › Software, or `form install exemplars.cadevolve`.
+- **Install:** Settings › Engines & software, or `form install exemplars.cadevolve`.
 - **Source:** [huggingface.co/datasets/kulibinai/cadevolve](https://huggingface.co/datasets/kulibinai/cadevolve)
 
 ## Blender

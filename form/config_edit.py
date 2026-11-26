@@ -35,7 +35,7 @@ SCHEMA: dict[str, dict] = {
     "general.printing": {"type": "bool", "tab": "general", "hidden": True, "label": "3D printing",
                          "help": "true turns the 3D printing capability on, false turns it off (general.capabilities)."},
     # CADFit as one more mesh-to-CAD candidate (form/recon/cadfit; CC BY-NC 4.0, included with its author's permission).
-    # Settings > Software turns it on when it installs it.
+    # Settings > Engines & software turns it on when it installs it.
     "recon.cadfit": {"type": "bool", "tab": "software", "hidden": True, "label": "CADFit mesh to CAD search",
                      "help": "true also tries CADFit's IoU search when a mesh is made editable (non-commercial licence)."},
     # "Use in Form Studio" (form/use.py): the switch on each card of Settings › Engines & software. Applied at once.

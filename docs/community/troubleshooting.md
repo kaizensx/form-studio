@@ -4,7 +4,7 @@ Most problems are one of five things: the app will not open, something was not f
 
 ## First: see what Form Studio found
 
-Open **Settings › Software**, or run:
+Open **Settings › Engines & software**, or run:
 
 ```bash
 form setup --check
@@ -22,8 +22,8 @@ It lists what Form Studio found on your computer, which slicers and agents it ca
 
 ## The agent does not answer
 
-- Settings › Software shows whether the agent app was found and whether it is signed in.
-- Sign in once in the agent's own terminal, or add an API key in **Settings › Agents**. Keys are stored privately and never shown again.
+- Settings › Engines & software shows whether the agent app was found and whether it is signed in.
+- Sign in once in the agent's own terminal, or add an API key in **Settings › Agents & models**. Keys are stored privately and never shown again.
 - A local model must be running: Form Studio finds Ollama, LM Studio and llama.cpp from their running servers.
 - A model that cannot call tools is left out of the model menu. If your model is missing, that is usually why.
 - An agent that reached its plan's limit is named, with when it can work again.
@@ -45,7 +45,7 @@ It lists what Form Studio found on your computer, which slicers and agents it ca
 
 ## An optional engine will not install
 
-- The install log in Settings › Software shows every command and where it stopped.
+- The install log in Settings › Engines & software shows every command and where it stopped.
 - A failed or cancelled install leaves nothing new behind, so it is safe to press Install again.
 - CAD-Recode needs about 4 GB free, and the CADEvolve corpus is a 4.73 GB download.
 

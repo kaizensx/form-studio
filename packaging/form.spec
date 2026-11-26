@@ -44,7 +44,7 @@ try:
 except Exception:
     pass
 # Optional engines with libraries the app does not carry (CAD-Recode: PyTorch; CADFit: trimesh and friends) run in an
-# environment of their own that Settings > Software makes (form/engines.py), out of the app's process. That interpreter
+# environment of their own that Settings > Engines & software makes (form/engines.py), out of the app's process. That interpreter
 # imports the engine's code from these files, shipped as plain source under engine_src/ (never on the app's own path).
 # CADFit (form/recon/cadfit, CC BY-NC 4.0, included with its author's permission) ships whole, LICENSE and
 # PERMISSION.md included; no compiled file.

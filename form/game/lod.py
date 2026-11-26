@@ -176,7 +176,7 @@ def coacd_parts(P: np.ndarray, T: np.ndarray, cfg: dict | None = None, threshold
         raise RuntimeError(use.off_reason(COACD_ENGINE))
     py = engines.python(COACD_ENGINE, cfg)
     if py is None:
-        raise RuntimeError("CoACD is not installed. Settings › Software › CoACD sets up its own Python in one click; "
+        raise RuntimeError("CoACD is not installed. Settings › Engines & software › CoACD sets up its own Python in one click; "
                            "a convex hull per part works without it.")
     import tempfile
     d = Path(work or tempfile.mkdtemp(prefix="form-coacd-"))

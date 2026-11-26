@@ -8,7 +8,7 @@ Each entry says what was taken and whether any code or material was copied. Most
 contain outside material, under their own licences: kulibinai/CADEvolve (exemplars hand-ported from its seed examples,
 Apache License 2.0) and CADFit (its code included and modified, CC BY-NC 4.0, with its author's permission). Each entry
 names the exact commit that was read. The last two sections list the libraries the app ships and the optional engines
-that Settings › Software installs only when you ask.
+that Settings › Engines & software installs only when you ask.
 
 ## nickpagz/stl2step
 
@@ -114,7 +114,7 @@ tables against the library.
 
 ## Optional engines, installed only when you ask
 
-None of these is bundled. Settings › Software (or `form install`) installs each one into an environment of its own
+None of these is bundled. Settings › Engines & software (or `form install`) installs each one into an environment of its own
 under the data folder (`form/engines.py`), showing its size and licence first. The versions are the pins in
 `form/engines.py`; licences are from each package's published metadata or the project's own licence file.
 

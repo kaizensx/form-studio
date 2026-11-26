@@ -149,7 +149,7 @@ def game_asset(st, project: str, action: str = "build", preset: str = "gltf", bu
         except pipeline.GameError as e:
             raise StudioError(str(e), e.hint)
         except BlenderMissing as e:
-            raise StudioError(str(e), "Install Blender (Settings › Software); the game pipeline bakes in Blender.",
+            raise StudioError(str(e), "Install Blender (Settings › Engines & software); the game pipeline bakes in Blender.",
                               status=424)
         except BlenderFailed as e:
             raise StudioError(str(e), getattr(e, "hint", ""), status=422, log=getattr(e, "log", "")[-3000:])

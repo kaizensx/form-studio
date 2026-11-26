@@ -374,7 +374,7 @@ def build() -> MCPServer:
                     "software": [{k: r[k] for k in ("id", "label", "why", "level", "status", "detail", "size", "installable", "manual")}
                                  | {"commands": (r["plan"] or {}).get("commands", [])} for r in rows],
                     **installer.summary(rows),
-                    "tell_the_user": "Form Studio's app installs these under Settings, Software. Headless: `form install <id>`, "
+                    "tell_the_user": "Form Studio's app installs these under Settings, Engines & software. Headless: `form install <id>`, "
                                      "or install_software(id, confirm=True) after the user agrees to the command shown."}
         return await _run(go)
 

@@ -56,7 +56,7 @@ DEFAULTS = {
     # FreeCADCmd, when found, re-imports each exported STEP as an extra check.
     "cad": {"openscad": "", "freecad": "", "timeout_s": 120},
     # Chat runs the agent you choose with Form Studio's tools: an agent CLI headless on your account, or a model
-    # provider's API (key in Settings › Agents), or a local model server. agent / model / effort are what a new
+    # provider's API (key in Settings › Agents & models), or a local model server. agent / model / effort are what a new
     # conversation starts with (the app's model picker writes them here); agent "" = the first one available.
     # model: an alias or id that agent accepts, or "default". effort: "" = the agent's own. cli: Claude Code's command.
     "chat": {"enabled": True, "cli": "claude", "model": "default", "web": True, "budget_usd_per_message": 3.0, "ask_timeout_s": 900,

@@ -14,7 +14,7 @@ Models are always read from the provider's own models endpoint. None are written
 model last used with it in Form Studio (or [chat] <id>_model, or the only model it lists, or what a local server has
 loaded); otherwise the picker asks for one. Nothing is chosen for the person from a list of hundreds.
 
-Providers the person adds by URL (Settings › Agents › Add a provider, `form providers add`) live in
+Providers the person adds by URL (Settings › Agents & models › Add a provider, `form providers add`) live in
 form/agents/custom.py and are merged in by `all_providers()`.
 """
 from __future__ import annotations
@@ -352,7 +352,7 @@ def _fetch(p: Provider, cfg: dict) -> dict:
             return {"available": False, "why": explain_failure(p, e), "models": [], "base": base, "where": where, "error": True}
         why = str(e)
         if e.status in (401, 403):
-            why = f"The {p.label} key was refused ({e.status}). Replace it in Settings › Agents."
+            why = f"The {p.label} key was refused ({e.status}). Replace it in Settings › Agents & models."
         return {"available": False, "why": why, "models": [], "base": base, "where": where, "error": True}
     models = _parse_models(p, d)
     if p.local and not models:

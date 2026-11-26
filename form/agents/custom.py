@@ -1,6 +1,6 @@
 """Model providers the person adds by URL: any server that speaks one of the wire formats Form Studio knows.
 
-Settings › Agents › "Add a provider…" and `form providers add` ask for a name (optional), a base URL and an API key
+Settings › Agents & models › "Add a provider…" and `form providers add` ask for a name (optional), a base URL and an API key
 (optional: a server on this computer often needs none), then `detect()` works out the rest without a model call:
 
 1. The models endpoint: GET <base>/models, trying the URL as typed, with and without /v1, and the usual prefixes
@@ -107,7 +107,7 @@ def _provider(r: dict) -> prov.Provider:
         r["id"], str(r.get("name") or _host(r["base"])), r["wire"], r["base"].rstrip("/"),
         key=name if r.get("has_key") else None, local=bool(r.get("local")), docs=r["base"], simple_schema=True,
         skip=prov._NOT_CHAT, custom=True, probed=dict(r.get("probed") or {}),
-        hint=f"Check {r.get('name') or _host(r['base'])} in Settings › Agents › Your providers (Test).",
+        hint=f"Check {r.get('name') or _host(r['base'])} in Settings › Agents & models › Your providers (Test).",
         verified=f"{FORMATS.get(r.get('format') or r['wire'], r['wire'])}; the connection was tested when you added it")
 
 
@@ -421,9 +421,9 @@ def _ollama_caps(base: str, key: str | None, models: list[dict], timeout: float)
 
 def explain_failure(p: prov.Provider, e: prov.ProviderError) -> str:
     if e.status in (401, 403):
-        return f"{p.label} refused the key ({e.status}). Edit it in Settings › Agents › Your providers."
+        return f"{p.label} refused the key ({e.status}). Edit it in Settings › Agents & models › Your providers."
     if e.status == 404:
-        return f"{p.label} no longer lists models at {p.base}. Edit its address in Settings › Agents."
+        return f"{p.label} no longer lists models at {p.base}. Edit its address in Settings › Agents & models."
     return f"{p.label} did not answer: {e}"
 
 

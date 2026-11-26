@@ -1,5 +1,5 @@
 """Managed engine environments: an optional engine that needs Python libraries Form Studio does not carry gets a Python
-of its own, made with one click from Settings > Software, and runs out of process with that interpreter.
+of its own, made with one click from Settings > Engines & software, and runs out of process with that interpreter.
 
     <data folder>/.engines/
         .uv/<version>/uv            a pinned uv release, its SHA-256 checked against the value below before it is used

@@ -53,7 +53,7 @@ start time are tracked on every change to `dev` and drawn as [benchmarks](https:
 |---|---|---|---|
 | Claude Code | Supported | Supported | Sign-in from the app |
 | Codex | Supported | Supported | |
-| Gemini CLI | Supported | Supported | Sign in, or paste an API key in Settings › Agents |
+| Gemini CLI | Supported | Supported | Sign in, or paste an API key in Settings › Agents & models |
 | Cursor CLI | Supported | Supported | |
 | OpenCode | Supported | Supported | |
 | Qwen Code | Supported | Supported | |

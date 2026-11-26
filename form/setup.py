@@ -307,7 +307,7 @@ def check(cfg: dict | None = None, studio=None) -> list[Item]:
                           "Not found. Chat in the app can run Claude Code on your account, or any other agent you choose "
                           "(Settings, Agents); everything else works without one.",
                           Fix("Install Claude Code", list(m.commands) if m else [], recommended=False,
-                              note="Then sign in: the app does it under Settings, Software; in a terminal run `claude auth login`. "
+                              note="Then sign in: the app does it under Settings, Engines & software; in a terminal run `claude auth login`. "
                                    f"Other ways to install: {installer.CLAUDE_DOCS}")))
     if not any(i.id.startswith("agent.") for i in items):
         items.append(Item("agent.none", "Coding agent", "info",
@@ -490,5 +490,5 @@ def _install_recommended(dry: bool) -> int:
         print("  (dry run: nothing was installed)")
     sign = by.get("claude.signin")
     if sign and sign["status"] == "missing":
-        print("\nClaude Code is not signed in. Sign in from the Form Studio app (Settings, Software), or run: claude auth login")
+        print("\nClaude Code is not signed in. Sign in from the Form Studio app (Settings, Engines & software), or run: claude auth login")
     return failed

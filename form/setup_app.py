@@ -390,7 +390,7 @@ def route_post(st, path: str, body):
         import os
         if os.environ.get("FORM_NO_AUTO_SETUP", "") == "1" and not os.environ.get("FORM_INSTALL_FAKE"):
             raise StudioError("Setup runs are turned off here (FORM_NO_AUTO_SETUP=1).",
-                              hint="Install single items under Settings › Software, or run `form setup`.", status=409)
+                              hint="Install single items under Settings › Engines & software, or run `form setup`.", status=409)
         job = _wrap(lambda: sa.installer.auto(ids))
         if job.steps:
             st.activity(None, "setup", "Setting up: " + ", ".join(s["label"] for s in job.steps), by="you")

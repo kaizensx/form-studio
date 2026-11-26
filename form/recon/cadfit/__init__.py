@@ -17,7 +17,7 @@ A candidate that does not verify is reported and never returned as the result. O
 (trimesh, manifold3d, scikit-learn, scipy: `pip install form-studio[cadfit]`), nothing changes. This module imports
 none of them: they are imported only in the child process.
 
-The packaged app carries none of those libraries. There, Settings > Software installs CADFit as an engine environment
+The packaged app carries none of those libraries. There, Settings > Engines & software installs CADFit as an engine environment
 of its own (form/engines.py: <data>/.engines/recon.cadfit, a Python 3.12 with the pinned libraries), and the child is
 that interpreter running this folder's code from the app's engine_src/ (packaging/form.spec). Once that environment is
 complete it is used in a source checkout too.
@@ -366,7 +366,7 @@ def candidate(mesh, budget_s: float, tol: float = 0.02, name: str = "part", limi
     try:
         st = status()
         if search is None and not st.get("bundled", True):
-            return done(error="CADFit is not installed: install it in Settings > Software (it gets its own Python), "
+            return done(error="CADFit is not installed: install it in Settings > Engines & software (it gets its own Python), "
                               "or run Form Studio from source with pip install form-studio[cadfit]")
         if search is None and not st["installed"]:
             return done(error=f"CADFit needs {', '.join(st['missing_libraries'])}: it needs form-studio[cadfit] "
