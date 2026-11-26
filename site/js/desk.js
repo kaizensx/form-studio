@@ -34,7 +34,7 @@ const P = {
   spark: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z",
 };
 const I = (n, s = 18, w = 1.6, cls = "") => `<svg class="ic ${cls}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[n]}"/></svg>`;
-const MARK = `<svg class="mark" viewBox="8 8 48 48" aria-hidden="true"><path d="M26 8H52V20H26Z M12 22H24V28H44V40H24V56H12Z" fill="#d8d3c8"/><path d="M12 8H24V20H12Z" fill="#b9e8d7"/></svg>`;
+const MARK = `<svg class="mark" viewBox="8 8 48 48" aria-hidden="true"><path class="f" d="M26 8H52V20H26Z M12 22H24V28H44V40H24V56H12Z" fill="#d8d3c8"/><path class="o" d="M12 8H24V20H12Z" fill="#a9b8ff"/></svg>`;
 const TOOLS = ["cursor", "sketch", "pin", "scissors", "scan", "boxes", "history", "layers", "camera", "expand", "ruler"];
 const VIEWS = { Iso: [-27, 33], Front: [0, 3], Side: [-90, 3], Top: [0, 89.5], Under: [-27, -55] };
 

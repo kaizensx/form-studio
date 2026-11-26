@@ -70,7 +70,7 @@
 .d-cap { position: absolute; top: 16px; height: 44px; border-radius: 22px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 14px; white-space: nowrap; }
 .d-cap.tl { left: 20px; } .d-cap.tr { right: 20px; padding: 0 8px 0 16px; gap: 6px; }
 .d-cap b { font-weight: 600; letter-spacing: -.01em; } .d-cap .rev { color: var(--d-ink2); font-size: 12px; } .d-cap > .ic { color: var(--d-ink3); }
-.d-cap .mark { display: block; height: 18px; width: 18px; filter: brightness(calc(1 - var(--d-light))); opacity: calc(1 - .15 * var(--d-light)); }
+.d-cap .mark { display: block; height: 18px; width: 18px; } .d-cap .mark .f { fill: color-mix(in srgb, var(--d-ink) calc(var(--d-light) * 100%), #d8d3c8); } .d-cap .mark .o { fill: var(--d-accent); }
 .d-tag { font: 500 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; padding: 5px 7px; border-radius: 999px; background: var(--d-glass2); color: var(--d-ink2); }
 .d-cap .printer { display: flex; gap: 8px; align-items: center; color: var(--d-ink2); font-size: 12.5px; } .d-cap.tr > i { width: 1px; height: 18px; background: var(--d-line); margin: 0 6px 0 8px; }
 .d-cap .d-b { height: 32px; min-width: 32px; padding: 0 9px; border-radius: 16px; display: flex; align-items: center; gap: 8px; color: var(--d-ink2); }
@@ -92,7 +92,7 @@
 .d-pipe .run b i { background: var(--d-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--d-accent) 22%, transparent); }
 .d-pipe span { font-size: 10.5px; letter-spacing: -.02em; color: var(--d-ink2); padding-left: 13px; white-space: nowrap; }
 .d-pipe .auto { grid-auto-flow: column; align-items: center; justify-content: space-between; } .d-pipe .auto b { font: 500 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--d-ink3); padding-left: 13px; }
-.d-switch { width: 30px; height: 18px; border-radius: 9px; background: var(--d-pass); padding: 0 !important; position: relative; } .d-switch::after { content: ""; position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+.d-switch { width: 30px; height: 18px; border-radius: 9px; background: var(--d-accent); padding: 0 !important; position: relative; } .d-switch::after { content: ""; position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--d-send-ink); }
 
 .d-views { position: absolute; left: 20px; bottom: 20px; height: 40px; border-radius: 20px; padding: 0 5px 0 13px; display: flex; align-items: center; gap: 2px; color: var(--d-ink2); font-size: 12.5px; transition: opacity 300ms; }
 .d-views .ic { margin-right: 6px; } .d-views button { height: 30px; padding: 0 11px; border-radius: 15px; display: grid; place-items: center; }
@@ -117,8 +117,7 @@
 .d-program header em { margin-left: auto; font-style: normal; font-size: 11.5px; color: var(--d-ink3); }
 .d-program header .run { display: none; color: var(--d-accent); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; align-items: center; gap: 9px; }
 .d-program.running header .run { display: flex; } .d-program.running header .rest { display: none; }
-.d-live { width: 6px; height: 6px; border-radius: 50%; background: var(--d-pass); box-shadow: 0 0 0 4px color-mix(in srgb, var(--d-pass) 18%, transparent); display: inline-block; flex: none; }
-.d-live.a { background: var(--d-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--d-accent) 22%, transparent); }
+.d-live { width: 6px; height: 6px; border-radius: 50%; background: var(--d-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--d-accent) 22%, transparent); display: inline-block; flex: none; }
 .d-program::before { content: ""; position: absolute; left: 45px; top: 50px; height: 408px; width: 1px; background: var(--d-line); }
 .d-pc { position: absolute; left: 44.5px; top: 46px; width: 2px; height: 0; border-radius: 1px; opacity: 0; background: linear-gradient(180deg, color-mix(in srgb, var(--d-accent) 25%, transparent), var(--d-accent) 70%);
   box-shadow: 0 0 10px color-mix(in srgb, var(--d-accent) 60%, transparent); transition: height 140ms var(--ease-out), opacity 300ms; }
