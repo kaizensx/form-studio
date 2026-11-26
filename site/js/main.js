@@ -32,6 +32,34 @@ document.querySelectorAll(".ba-frame").forEach((f) => {
 
 reveals();
 
+// ---------- the proof sheet: one real run in three moments. It plays once when it arrives; a click takes over ----------
+{
+  const win = $("#proof-win");
+  if (win) {
+    const tabs = [...win.querySelectorAll(".pf-tabs button")], rev = $("#pf-rev"), order = tabs.map((b) => b.dataset.at);
+    let timer = 0;
+    const show = (k) => {
+      win.dataset.at = k;
+      tabs.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.at === k)));
+      if (rev) rev.textContent = k === "brief" ? "brief" : k;
+    };
+    const stop = () => { clearTimeout(timer); win.classList.remove("pf-play"); };
+    tabs.forEach((b) => b.addEventListener("click", () => { stop(); show(b.dataset.at); }));
+    if (!reduced) {
+      const dwell = 3400;
+      win.style.setProperty("--dwell", `${dwell}ms`);
+      show(order[0]);
+      const io = new IntersectionObserver(([e]) => {
+        if (!e.isIntersecting) return; io.disconnect();
+        win.classList.add("pf-play");
+        const step = (i) => { show(order[i]); if (i < order.length - 1) timer = setTimeout(() => step(i + 1), dwell); else timer = setTimeout(stop, dwell); };
+        step(0);
+      }, { threshold: 0.55 });
+      io.observe(win);
+    }
+  }
+}
+
 // ---------- your agent: the numbers count up as they arrive ----------
 countUp($("#why-tools"), +$("#why-tools").dataset.count);     // docs/MCP.md: N tools (site/tools/check_site.py keeps it in step)
 countUp($("#why-skills"), +$("#why-skills").dataset.count);   // plugins/form/skills: one folder per skill

@@ -1137,3 +1137,187 @@ figure { margin: 0; }
   .gx-t.w4.p2 { grid-column: span 2; height: 62vw; }
   .gx-t.w4.p2 figcaption > span:last-child { display: block; }
 }
+
+/* =========================================================================================================
+   The proof sheet (site/tools/export_proof.py stamps it from a real run of scripts/proof_demo.py).
+   One drawn window, three moments of the same run: the brief audited, the first build, one edit. Dark in both
+   themes, like the app. Without script the last sheet is simply there.
+   ========================================================================================================= */
+.proof-win { margin: 0; border-radius: 14px; overflow: hidden; background: var(--plate); font-size: 13px; line-height: 1.45;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.09), 0 50px 120px -30px rgba(0,0,0,.75), 0 18px 40px -12px rgba(0,0,0,.5); }
+.proof-win .mtb { height: 40px; }
+.pf-tabs { display: none; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; padding: 8px; border-bottom: 1px solid var(--rule); background: var(--plate1); }
+.js .pf-tabs { display: grid; }
+.pf-tabs button { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 10px; align-items: baseline; text-align: left; padding: 9px 12px 10px; border: 0; border-radius: var(--r-md);
+  background: transparent; color: var(--ink3); cursor: pointer; overflow: hidden; transition: background-color var(--base) var(--ease-out), color var(--base) var(--ease-out), transform var(--press) var(--ease-out); }
+.pf-tabs button:hover { background: var(--wash-hover); color: var(--ink2); }
+.pf-tabs button:active { transform: scale(.985); }
+.pf-tabs button[aria-pressed="true"] { background: var(--plate3); color: var(--ink2); }
+.pf-tabs .mono { font-size: 11px; color: var(--ink4); grid-row: span 2; align-self: start; padding-top: 2px; transition: color var(--base); }
+.pf-tabs button[aria-pressed="true"] .mono { color: var(--datum); }
+.pf-tabs b { font-weight: 620; font-size: 13px; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-tabs button[aria-pressed="true"] b { color: var(--ink); }
+.pf-tabs em { font-style: normal; font-size: 11.5px; color: var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+/* while the run plays itself, the step in front fills along its lower edge */
+.pf-tabs button::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--datum); transform-origin: left; transform: scaleX(0); opacity: 0; }
+.proof-win.pf-play .pf-tabs button[aria-pressed="true"]::after { opacity: .9; animation: pf-fill var(--dwell, 3200ms) linear both; }
+@keyframes pf-fill { to { transform: scaleX(1); } }
+
+.pf-body { display: grid; background: radial-gradient(120% 90% at 50% 0%, var(--plate1), var(--plate) 70%); }
+.pf-pane { grid-area: 1 / 1; display: grid; align-content: start; gap: 12px; padding: 18px 18px 16px; min-width: 0; }
+.js .pf-pane { opacity: 0; visibility: hidden; transform: translateY(10px); transition: opacity 240ms var(--ease-out), transform 420ms var(--ease-expo), visibility 0s 240ms; }
+.pf-pane:not([data-pane="r02"]) { display: none; }
+.js .pf-pane:not([data-pane="r02"]) { display: grid; }
+.js .proof-win[data-at="brief"] .pf-pane[data-pane="brief"], .js .proof-win[data-at="r01"] .pf-pane[data-pane="r01"], .js .proof-win[data-at="r02"] .pf-pane[data-pane="r02"] { opacity: 1; visibility: visible; transform: none; transition-delay: 60ms, 60ms, 0s; }
+
+.pf-head, .pf-row { display: grid; grid-template-columns: 50px minmax(0, 1.15fr) minmax(0, 1.2fr) 72px 62px 80px; gap: 12px; align-items: center; }
+.pf-head { padding: 0 10px 2px; font-size: 10.5px; font-weight: 620; letter-spacing: .08em; text-transform: uppercase; color: var(--ink3-app); white-space: nowrap; }
+.pf-head span:last-child, .pf-row > .tag:last-child { justify-self: end; }
+.pf-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.pf-row { min-height: 40px; padding: 7px 10px; border-radius: 8px; background: color-mix(in srgb, var(--plate2) 60%, transparent); }
+.pf-row .tag { justify-self: start; }
+.pf-row.bad { background: color-mix(in srgb, var(--signal) 9%, var(--plate1)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--signal) 32%, transparent); }
+.pf-req { color: var(--ink); font-weight: 520; }
+.pf-why { display: block; margin-top: 2px; font-weight: 420; font-size: 11.5px; color: var(--signal); }
+.pf-meas { font-size: 11.5px; color: var(--ink2); }
+.pf-row.bad .pf-meas { color: var(--ink); }
+.pf-tol, .pf-feat { font-size: 11.5px; color: var(--ink3); white-space: nowrap; }
+.pf-feat { color: var(--datum); }
+.pf-sum { display: flex; align-items: center; gap: 10px; margin-top: 2px; padding: 0 10px; font-weight: 560; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pf-sum i { width: 7px; height: 7px; border-radius: 2px; background: var(--signal); flex: none; }
+.pf-sum.green i { background: var(--pass); box-shadow: 0 0 0 4px color-mix(in srgb, var(--pass) 16%, transparent); }
+.pf-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 9px 12px; border-radius: 8px; background: var(--well); border: 1px solid var(--rule); font-size: 12px; color: var(--ink2); }
+.pf-edit code { color: var(--datum); font-size: 12px; }
+.pf-edit .mono { color: var(--ink); font-size: 12px; }
+.pf-built { margin-left: auto; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.pf-goal { font-size: 15px; line-height: 1.5; color: var(--ink); padding: 2px 4px 0; max-width: 34rem; }
+.pf-asserts { list-style: none; margin: 0; padding: 0 2px; display: flex; flex-wrap: wrap; gap: 6px; }
+.pf-asserts li { height: 26px; display: inline-flex; align-items: center; padding: 0 10px; border-radius: 999px; border: 1px solid var(--rule2); font-family: var(--mono); font-size: 11.5px; color: var(--ink2); white-space: nowrap; }
+.pf-audit { display: grid; gap: 8px; justify-items: start; padding: 14px 14px 13px; border-radius: 10px; background: color-mix(in srgb, var(--signal) 8%, var(--plate1)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--signal) 30%, transparent); }
+.pf-audit p { color: var(--ink); line-height: 1.55; font-variant-numeric: tabular-nums; }
+.pf-ev { font-size: 11.5px; color: var(--ink3); }
+.proof-win figcaption { padding: 12px 18px 14px; border-top: 1px solid var(--rule); font-size: 12.5px; line-height: 1.5; color: var(--ink3); }
+.proof-win figcaption code { color: var(--ink2); }
+/* rows arrive one after another when their sheet comes to the front */
+@media (prefers-reduced-motion: no-preference) {
+  .js .proof-win[data-at="r01"] [data-pane="r01"] .pf-row, .js .proof-win[data-at="r02"] [data-pane="r02"] .pf-row { animation: pf-row 520ms var(--ease-expo) both; animation-delay: calc(90ms + var(--i) * 55ms); }
+  .js .proof-win[data-at="brief"] .pf-audit { animation: pf-row 620ms var(--ease-expo) 260ms both; }
+}
+@keyframes pf-row { from { opacity: 0; transform: translateY(8px); } }
+.reduce .pf-row, .reduce .pf-audit { animation: none !important; }
+@media (max-width: 1100px) {
+  .pf-head, .pf-row { grid-template-columns: 50px minmax(0, 1fr) minmax(0, 1.1fr) 48px; }
+  .pf-head span:nth-child(4), .pf-head span:nth-child(6), .pf-tol, .pf-row > .tag:last-child { display: none; }
+  .pf-head span:nth-child(5), .pf-feat { justify-self: end; }
+}
+@media (max-width: 899px) { .proof .proof-win { order: 0; } }
+@media (max-width: 560px) {
+  .pf-pane { padding: 14px 12px 14px; }
+  .pf-tabs { padding: 6px; }
+  .pf-tabs button { grid-template-columns: minmax(0, 1fr); padding: 8px 9px 9px; }
+  .pf-tabs .mono { display: none; }
+  .pf-tabs em { font-size: 10.5px; }
+  .pf-head { display: none; }
+  .pf-row { grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 10px; padding: 9px 10px; }
+  .pf-row .pf-meas { grid-column: 2 / -1; grid-row: 2; }
+  .pf-row .pf-feat { grid-column: 3; grid-row: 1; }
+  .pf-built { margin-left: 0; flex-basis: 100%; }
+  .pf-goal { font-size: 14px; }
+}
+
+/* =========================================================================================================
+   Craft pass: one type scale for section heads, the mark's datum square as the page's signature, seams between
+   chapters, instrument readouts, edges on pictures.
+   ========================================================================================================= */
+:root { --t-display: clamp(2.3rem, 5.2vw, 4.4rem); --t-side: clamp(2.05rem, 4.1vw, 3.5rem); --t-lead: 1.0625rem; }
+.how-head h2, .make-head h2, .why h2, .sec-title { font-size: var(--t-display); line-height: 1.0; letter-spacing: -.048em; }
+.fx-copy h2, .moves-copy h2 { font-size: var(--t-side); }
+.make-head > p:last-child, .get-head p, .fx-copy > p:not(.eyebrow), .moves-copy > p:not(.eyebrow), .why-copy > p:not(:last-child) { font-size: var(--t-lead); line-height: 1.6; }
+.fx-copy .beta-line { font-size: 15px !important; }
+
+/* the eyebrow carries the mark's datum square */
+.home section:not(.hero) .eyebrow { display: inline-flex; align-items: center; gap: 10px; justify-self: start; letter-spacing: .01em; }
+.how-head .eyebrow, .make-head .eyebrow, .why-head .eyebrow { justify-self: center !important; }
+.home section:not(.hero) .eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 1.5px; background: var(--datum); flex: none; }
+.hero .eyebrow .pip { border-radius: 1.5px; }
+@media (max-width: 640px) { .hero .eyebrow .launch i { display: none; } }
+.hero .eyebrow .launch i { font-style: normal; }
+
+/* a seam where a chapter begins: a hairline that fades at both ends, with one datum tick on the centre line */
+.make, .how, .why, .get { position: relative; }
+.make::before, .how::before, .why::before, .get::before { content: ""; position: absolute; left: 50%; top: clamp(34px, 6vh, 68px); width: min(var(--wrap), calc(100% - 2 * var(--gutter))); height: 1px; transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, var(--rule2) 18%, var(--rule2) 82%, transparent); pointer-events: none; }
+.make::after, .how::after, .why::after, .get::after { content: ""; position: absolute; left: 50%; top: calc(clamp(34px, 6vh, 68px) - 3px); width: 1px; height: 7px; background: var(--datum); opacity: .9; pointer-events: none; }
+.make { padding-top: clamp(110px, 17vh, 190px); }
+.why { padding-top: clamp(120px, 18vh, 200px); }
+
+/* readouts read like an instrument: columns ruled apart, numbers that do not jump */
+.readout { gap: 0 !important; }
+.readout > div { padding-right: 26px; }
+.readout > div + div { padding-left: 26px; border-left: 1px solid var(--rule2); }
+.readout dt { letter-spacing: .01em; }
+.readout dd { font-variant-numeric: tabular-nums; }
+@media (max-width: 899px) { .readout > div { padding-right: 16px; } .readout > div + div { padding-left: 16px; } }
+
+/* pictures get a neutral inner edge, so a dark render does not melt into the page */
+.gx-t::before, .ba-frame::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); z-index: 3; pointer-events: none; }
+.shot img, .lods img { outline: 1px solid rgba(255,255,255,.07); outline-offset: -1px; }
+.gx-t { transition: transform 700ms var(--ease-expo); }
+.gx-t figcaption { transition: transform 700ms var(--ease-expo); }
+@media (hover: hover) { .gx-t:hover figcaption { transform: translateY(-3px); } }
+
+/* the primary action: a lit top edge and a little of its own light on the bench */
+.btn.primary.big { box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 10px 36px -12px color-mix(in srgb, var(--datum) 60%, transparent); transition: background-color var(--fast) var(--ease-out), box-shadow var(--base) var(--ease-out), transform var(--press) var(--ease-out); }
+.btn.primary.big:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 14px 44px -12px color-mix(in srgb, var(--datum) 75%, transparent); }
+.btn.big.ghost { border-color: var(--rule2); backdrop-filter: none; }
+.btn.big.ghost:hover { background: var(--wash-hover); }
+
+/* scroll progress: the datum colour alone */
+.scrolled-bar { background: var(--datum) !important; height: 1.5px; }
+/* where you are on the home page */
+.nav-links a { position: relative; }
+.nav-links a.here { color: var(--ink); }
+.nav-links a::after { content: ""; position: absolute; left: 50%; bottom: 1px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 1px; background: var(--datum); opacity: 0; transform: translateY(3px) scale(.6); transition: opacity var(--base) var(--ease-out), transform var(--cross) var(--ease-out); }
+.nav-links a.here::after { opacity: 1; transform: none; }
+.grp-menu a::after { display: none; }
+
+/* reveals: a shorter rise, so text is readable sooner; the long ease stays */
+.js .rv { transform: translateY(22px); transition: opacity 720ms var(--ease-expo), transform 880ms var(--ease-expo); transition-delay: var(--d, 0ms); }
+.js .rv.in { transform: none; }
+@media (prefers-reduced-motion: reduce) { .js .rv { transform: none; transition: opacity 200ms linear; } .gx-t, .gx-t figcaption, .gx-t img { transition: none !important; transform: none !important; } .proof-win.pf-play .pf-tabs button::after { animation: none; opacity: 0; } .js .pf-pane { transform: none !important; } }
+
+/* download: the card for this visitor's system is lit, the rest wait */
+.dl a.yours { background: color-mix(in srgb, var(--datum) 5%, var(--plate1)); }
+.dl a { box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+
+/* footer: more air, a quiet last line */
+.foot { padding: 56px 0 44px; }
+.foot-top { padding-bottom: 40px; }
+.foot-top nav a { width: fit-content; transition: color var(--fast); }
+.foot-note { margin-top: 22px !important; color: var(--ink3); max-width: 60rem; }
+.foot .brand img { height: 24px; }
+@media (max-width: 860px) { .foot { padding-top: 40px; } }
+
+/* docs: the same seams and the same square */
+.docs-nav .cap, .foot-top nav .cap { display: flex; align-items: center; gap: 8px; }
+.docs-nav .cap::before { content: ""; width: 6px; height: 6px; border-radius: 1.5px; background: var(--datum); }
+.prose h1 { letter-spacing: -.04em; font-weight: 640; text-wrap: balance; }
+.prose h2 { scroll-margin-top: calc(var(--nav-h) + 16px); }
+.prose h2, .prose h3 { text-wrap: balance; }
+.prose table { font-variant-numeric: tabular-nums; }
+.gallery-head h1, .lost h1 { font-weight: 640; }
+.readout dt { white-space: nowrap; }
+.readout > div { padding-right: 20px; }
+.readout > div + div { padding-left: 20px; }
+.fx .readout dd { font-size: clamp(1.2rem, 1.75vw, 1.6rem); }
+/* docs on a phone: the page list is one row you can slide, so the page itself starts on the first screen */
+@media (max-width: 860px) {
+  .docs-nav ul { flex-wrap: nowrap; overflow-x: auto; gap: 6px; margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter) 6px; scrollbar-width: none; scroll-snap-type: x proximity;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--gutter), #000 calc(100% - 40px), transparent); mask-image: linear-gradient(90deg, transparent, #000 var(--gutter), #000 calc(100% - 40px), transparent); }
+  .docs-nav ul::-webkit-scrollbar { display: none; }
+  .docs-nav ul a { white-space: nowrap; scroll-snap-align: start; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--rule); }
+  .docs-nav ul a[aria-current="page"] { border-color: var(--rule3); }
+  .docs-nav .src { margin-top: 12px; }
+}
+@media (max-width: 860px) { .docs { grid-template-columns: minmax(0, 1fr); } .docs-nav { min-width: 0; } }
+.reduce .pf-pane { transform: none !important; }

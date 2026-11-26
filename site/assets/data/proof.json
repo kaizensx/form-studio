@@ -1,0 +1,143 @@
+{
+ "brief_goal": "A flange Ø68 with a Ø20 bore, 4 x Ø5.2 on a 60 mm bolt circle and 2.4 mm walls, 8 mm thick.",
+ "contract_trap": [
+  "Ø68 mm boss",
+  "Ø20 mm bore",
+  "4 x Ø5.2 mm on a Ø60 mm bolt circle",
+  "walls at least 2.4 mm"
+ ],
+ "audit_trap": {
+  "missing": [],
+  "conflicting": [
+   {
+    "between": [
+     "c3",
+     "c1",
+     "c4"
+    ],
+    "why": "between a hole and the Ø68 edge there is 1.40 mm ((68 - 60 - 5.2) / 2); the brief asks for walls of at least 2.4 mm, which needs an outside diameter of at least 70 mm"
+   }
+  ],
+  "impossible": [],
+  "ok": false,
+  "evidence": "arithmetic on the stated values; nothing measured",
+  "invalid": [],
+  "ask": "Conflict: between a hole and the Ø68 edge there is 1.40 mm ((68 - 60 - 5.2) / 2); the brief asks for walls of at least 2.4 mm, which needs an outside diameter of at least 70 mm."
+ },
+ "first": {
+  "summary": "3 of 4 requirements proved, 1 failed (r01)",
+  "green": false,
+  "rows": [
+   {
+    "id": "c1",
+    "requirement": "Ø70 mm boss",
+    "measured": "Ø70 mm (nearest)",
+    "tolerance": "±0.1 mm",
+    "evidence": "computed",
+    "status": "PASS",
+    "feature": "disc"
+   },
+   {
+    "id": "c2",
+    "requirement": "Ø20 mm bore",
+    "measured": "Ø20 mm (nearest)",
+    "tolerance": "±0.1 mm",
+    "evidence": "computed",
+    "status": "PASS",
+    "feature": "bore"
+   },
+   {
+    "id": "c3",
+    "requirement": "4 x Ø5.2 mm on a Ø60 mm bolt circle",
+    "measured": "0 hole(s) Ø5.2 (round holes found: Ø5, Ø20)",
+    "tolerance": "±0.1 mm",
+    "evidence": "computed",
+    "status": "FAIL",
+    "feature": "holes",
+    "why": "wanted 4 x Ø5.2",
+    "where": "not met when holes finished, nor after any later feature",
+    "repair": "holes"
+   },
+   {
+    "id": "c4",
+    "requirement": "walls at least 2.4 mm",
+    "measured": "2.5 mm thinnest of 10 samples",
+    "tolerance": "±0.1 mm",
+    "evidence": "computed",
+    "status": "PASS",
+    "feature": "edges"
+   }
+  ],
+  "note": "PASS and FAIL are measured on the kernel's solid of this revision; UNPROVEN was not measured and is never a pass. Nothing here is a physical result."
+ },
+ "repaired": {
+  "summary": "4 of 4 requirements proved (r02)",
+  "green": true,
+  "rows": [
+   {
+    "id": "c1",
+    "requirement": "Ø70 mm boss",
+    "measured": "Ø70 mm (nearest)",
+    "tolerance": "±0.1 mm",
+    "evidence": "computed",
+    "status": "PASS",
+    "feature": "disc"
+   },
+   {
+    "id": "c2",
+    "requirement": "Ø20 mm bore",
+    "measured": "Ø20 mm (nearest)",
+    "tolerance": "±0.1 mm",
+    "evidence": "computed",
+    "status": "PASS",
+    "feature": "bore"
+   },
+   {
+    "id": "c3",
+    "requirement": "4 x Ø5.2 mm on a Ø60 mm bolt circle",
+    "measured": "4 x Ø5.2 on Ø60",
+    "tolerance": "±0.1 mm",
+    "evidence": "computed",
+    "status": "PASS",
+    "feature": "holes"
+   },
+   {
+    "id": "c4",
+    "requirement": "walls at least 2.4 mm",
+    "measured": "2.4 mm thinnest of 10 samples",
+    "tolerance": "±0.1 mm",
+    "evidence": "computed",
+    "status": "PASS",
+    "feature": "edges"
+   }
+  ],
+  "note": "PASS and FAIL are measured on the kernel's solid of this revision; UNPROVEN was not measured and is never a pass. Nothing here is a physical result."
+ },
+ "repair_op": {
+  "op": "set_param",
+  "param": "hole_d",
+  "default": 5.2
+ },
+ "repair_edit": {
+  "changed": [
+   {
+    "feature": "holes",
+    "status": "built",
+    "s": 0.012,
+    "solids": 1,
+    "dvol": -679.589
+   },
+   {
+    "feature": "edges",
+    "status": "built",
+    "s": 0.006,
+    "solids": 1,
+    "dvol": -78.716
+   }
+  ],
+  "reused": 2,
+  "canonical": {
+   "mode": "features"
+  }
+ }
+}

@@ -18,6 +18,31 @@ if (nav && !nav.dataset.ready) {
   addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(draw); } }, { passive: true });
   draw();
 
+  // on the home page the bar says which chapter is on screen (links that point at a section of this page)
+  {
+    const here = [...nav.querySelectorAll(".nav-links a[href*='#']")].map((a) => [a, document.getElementById(a.hash.slice(1))]).filter(([a, el]) => el && a.pathname === location.pathname);
+    if (here.length) {
+      const all = [...document.querySelectorAll("main section[id]")];
+      const mark = () => {
+        const y = innerHeight * 0.4;
+        let cur = null;
+        for (const s of all) { if (s.getBoundingClientRect().top <= y) cur = s; }
+        const hit = cur && here.find(([, el]) => el === cur || el.id === cur.dataset.nav);
+        const lit = hit ? hit[0] : null;
+        here.forEach(([a]) => a.classList.toggle("here", a === lit));
+      };
+      let q = false;
+      addEventListener("scroll", () => { if (!q) { q = true; requestAnimationFrame(() => { q = false; mark(); }); } }, { passive: true });
+      mark();
+    }
+  }
+
+  // docs on a phone: the page list is one sliding row; bring the page you are on into it
+  {
+    const cur = document.querySelector(".docs-nav a[aria-current='page']"), row = cur && cur.closest("ul");
+    if (row && row.scrollWidth > row.clientWidth) row.scrollLeft = cur.offsetLeft - row.offsetLeft - (row.clientWidth - cur.offsetWidth) / 2;
+  }
+
   // a group in the bar (3D printing): hover or focus opens it; a click or tap keeps it open until you leave it
   const groups = [...nav.querySelectorAll(".grp-btn")];
   const closeGroups = (except) => groups.forEach((b) => { if (b !== except) b.setAttribute("aria-expanded", "false"); });

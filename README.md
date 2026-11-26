@@ -4,7 +4,8 @@
 
 <h1 align="center">Form Studio</h1>
 
-<p align="center"><b>Describe anything. An engineer-grade agent builds it as real, editable CAD.</b><br></p>
+<p align="center"><b>An engineer-grade agent builds what you describe as real, editable CAD.</b><br>
+Parametric build123d on OpenCascade, every requirement proved on the solid, on your computer.</p>
 
 <p align="center">
   <a href="https://github.com/kaizensx/form-studio/releases/latest/download/FORM-macos-arm64.zip"><img src="docs/readme/download-macos-arm64.svg" width="168" height="56" alt="Download for macOS, Apple silicon"></a>
@@ -18,6 +19,27 @@
 </p>
 
 <p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/building-dark.svg">
+    <img src="docs/readme/building-light.svg" width="828" alt="The Form Studio workspace while a design builds: a hinged box, feature 6 of 8, Cavity, arriving. The features made so far are solid, the rest of the design is a faint plot, and the list on the left ticks them off.">
+  </picture>
+</p>
+
+<p align="center">
+  <img src="docs/readme/made-planetary.jpg" width="202" alt="A planetary gear stage: a steel sun gear, three teal planets and a graphite ring gear.">
+  <img src="docs/readme/made-ratchet.jpg" width="202" alt="A ratchet wrench pulled apart into its handle, wheel, pawl and cover.">
+  <img src="docs/readme/made-vase.jpg" width="202" alt="A copper vase with spiral flutes.">
+  <img src="docs/readme/made-game-chest.jpg" width="202" alt="A stylised treasure chest as a textured game asset.">
+  <br>
+  <img src="docs/readme/made-cam.jpg" width="202" alt="A cam and follower mechanism on a base plate.">
+  <img src="docs/readme/made-shade.jpg" width="202" alt="A domed lampshade perforated with rows of holes that grow towards the rim.">
+  <img src="docs/readme/made-speaker.jpg" width="202" alt="A cube speaker with a perforated grille.">
+  <img src="docs/readme/made-bottle.jpg" width="202" alt="A clear bottle with a blue screw cap.">
+  <br>
+  <sub>Mechanisms, assemblies, organic shells, products and game assets (Beta): every picture is a real build, an original design written as parametric code. <a href="https://kaizensx.github.io/form-studio/#make">See what it makes</a> · <a href="https://kaizensx.github.io/form-studio/measure/">How we measure</a></sub>
+</p>
+
+<p align="center">
   <a href="https://github.com/kaizensx/form-studio/actions/workflows/ci.yml?query=branch%3Amain"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/kaizensx/form-studio/ci.yml?branch=main&label=CI&style=flat-square"></a>
   <a href="https://github.com/kaizensx/form-studio/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://img.shields.io/github/actions/workflow/status/kaizensx/form-studio/codeql.yml?branch=main&label=CodeQL&style=flat-square"></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/kaizensx/form-studio"><img alt="OpenSSF Scorecard" src="https://img.shields.io/ossf-scorecard/github.com/kaizensx/form-studio?label=OpenSSF%20Scorecard&style=flat-square"></a>
@@ -25,22 +47,6 @@
   <a href="https://github.com/kaizensx/form-studio/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/kaizensx/form-studio/total?style=flat-square"></a>
   <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/kaizensx/form-studio?label=licence&style=flat-square"></a>
   <a href="https://github.com/kaizensx/form-studio/discussions"><img alt="Discussions" src="https://img.shields.io/github/discussions/kaizensx/form-studio?style=flat-square"></a>
-</p>
-
-<br>
-
-<p align="center">
-  <img src="docs/readme/made-planetary.jpg" width="204" alt="A planetary gear stage: a steel sun gear, three teal planets and a graphite ring gear.">
-  <img src="docs/readme/made-ratchet.jpg" width="204" alt="A ratchet wrench pulled apart into its handle, wheel, pawl and cover.">
-  <img src="docs/readme/made-vase.jpg" width="204" alt="A copper vase with spiral flutes.">
-  <img src="docs/readme/made-game-chest.jpg" width="204" alt="A stylised treasure chest as a textured game asset.">
-  <br>
-  <img src="docs/readme/made-cam.jpg" width="204" alt="A cam and follower mechanism on a base plate.">
-  <img src="docs/readme/made-shade.jpg" width="204" alt="A domed lampshade perforated with rows of holes that grow towards the rim.">
-  <img src="docs/readme/made-speaker.jpg" width="204" alt="A cube speaker with a perforated grille.">
-  <img src="docs/readme/made-bottle.jpg" width="204" alt="A clear bottle with a blue screw cap.">
-  <br>
-  <sub>Mechanisms, assemblies, organic shells, products and game assets (Beta): every picture is a real build, an original design written as parametric code. <a href="https://kaizensx.github.io/form-studio/#make">See what it makes</a> · <a href="https://kaizensx.github.io/form-studio/measure/">How we measure</a></sub>
 </p>
 
 **Form Studio is the open-source AI CAD studio: describe anything, and an engineer-grade agent builds it as real, editable CAD.** Type what you need, drop a photo or a sketch, or bring a part. The agent of your choice writes a parametric design in [build123d](https://github.com/gumyr/build123d), and the OpenCascade kernel builds it as a B-rep solid while you watch: features you can click, parameters you can change, and every revision checked on the solid itself. Take it out as STEP for your CAD program or a CNC shop, as meshes for renders and the web, or to your own slicer if you print. Everything runs on your computer.
