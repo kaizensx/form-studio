@@ -97,7 +97,7 @@ Column {
                         // light flares once), a pointer on the line being built
                         Item { x: 34; y: 0; width: 30; height: 32
                             Rectangle { id: flare; anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: Theme.pass; opacity: 0
-                                Glow { color: Theme.pass; blur: 9; strength: 0.9 } }
+                                Glow { color: Theme.pass; blur: 9; strength: 0.9; on: flare.opacity > 0.01 } }
                             Icon { id: tick; anchors.centerIn: parent; name: "check"; size: 13; color: Theme.pass
                                 opacity: fr.built ? 1 : 0; scale: fr.built ? 1 : Theme.from(0.3)
                                 Behavior on opacity { NumberAnimation { duration: Theme.fast } }

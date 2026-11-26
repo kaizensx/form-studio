@@ -78,6 +78,7 @@ Window {
         id: talk
         z: 6
         bar: win.plates
+        onScreen: shown
         readonly property int minW: 300
         readonly property int maxW: Math.max(minW, Math.min(560, win.width - 760))
         property bool dragging: false

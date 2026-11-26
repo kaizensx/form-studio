@@ -149,11 +149,11 @@ Item {
                     // field's own cursor takes over.
                     Rectangle { id: caret; objectName: "startCaret"; visible: words.empty; x: words.textX; y: 21; width: 10; height: 24; radius: 2; color: Theme.datum
                         Glow { blur: 12; strength: 0.85; radius: 2 }
-                        // stepped eight times a second, not animated: a waiting Home does not draw at the display's rate.
+                        // stepped six times a second, not animated: a waiting Home does not draw at the display's rate.
                         // It breathes between full and about three quarters, so it is always plainly lit.
                         property real phase: 0
                         opacity: 0.86 + 0.14 * Math.cos(phase)
-                        Timer { interval: 125; repeat: true; running: caret.visible && sc.visible && !Theme.reduced; onTriggered: caret.phase += 0.49 } }
+                        Timer { interval: 166; repeat: true; running: caret.visible && sc.visible && !Theme.reduced; onTriggered: caret.phase += 0.65 } }
                     ScrollView { anchors.fill: parent; clip: true
                         TextArea {
                             id: ta

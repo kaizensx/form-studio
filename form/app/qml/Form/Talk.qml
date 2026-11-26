@@ -16,6 +16,7 @@ Rectangle {
     readonly property var attachFilters: pick.nameFilters     // what the attach dialog offers (tests/journeys/open_conv.py)
     color: "transparent"
     property bool bar: false                 // one bar under the part that opens upward (a workspace); false: a column (Home)
+    property bool onScreen: true             // false while it is parked beside the window (Home with no conversation open): nothing in it ticks
     property real roomAbove: 600             // how tall something that opens upward from the bar may be (Main.qml)
     // a build is playing: the bar is slim and the transcript waits, so the cue has the room
     readonly property bool cueing: bar && (!!Store.building || Store.revealing.length > 0)
@@ -580,7 +581,7 @@ Rectangle {
                 // stepped, like the room's light: a waiting prompt must not keep the window drawing at full rate
                 property real phase: 0
                 opacity: 0.86 + 0.14 * Math.cos(phase)        // it breathes between full and about three quarters: always plainly lit
-                Timer { interval: 125; repeat: true; running: restCaret.visible && talk.visible && !Theme.reduced; onTriggered: restCaret.phase += 0.49 } }
+                Timer { interval: 125; repeat: true; running: restCaret.visible && talk.visible && talk.onScreen && !Theme.reduced; onTriggered: restCaret.phase += 0.49 } }
             Rectangle { anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3; border.color: Theme.alpha(Theme.datum, 0.13)
                 opacity: ta.activeFocus ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
             // what an empty prompt says, after the caret: one line, cut with an ellipsis where the controls begin

@@ -20,10 +20,14 @@ Item {
     property real radius: Math.min(width, height) / 2
     property real grow: 0                    // the bloom starts this far outside the shape (CSS spread)
     anchors.fill: parent; z: -1
-    Rectangle { id: shape; x: -gl.grow; y: -gl.grow; width: gl.width + 2 * gl.grow; height: gl.height + 2 * gl.grow
-        radius: gl.radius + gl.grow; color: gl.color; antialiasing: true; visible: false; layer.enabled: true; layer.smooth: true }
-    MultiEffect { source: shape; x: shape.x; y: shape.y; width: shape.width; height: shape.height
-        visible: gl.visible && gl.strength > 0.001 && gl.width > 0 && gl.height > 0
-        blurEnabled: true; blur: 1; blurMax: Math.max(2, Math.round(gl.blur * 3)); autoPaddingEnabled: true
-        opacity: gl.strength }
+    property bool on: true                   // false while the lit thing is not lit: then nothing is made at all
+    // made only while it shows: a listing of thirteen lines, each with a flare that is dark nearly always, makes no
+    // textures and no effects for them
+    Loader { anchors.fill: parent; active: gl.on && gl.visible && gl.opacity > 0.001 && gl.strength > 0.001 && gl.width > 0 && gl.height > 0
+        sourceComponent: Item {
+            Rectangle { id: shape; x: -gl.grow; y: -gl.grow; width: gl.width + 2 * gl.grow; height: gl.height + 2 * gl.grow
+                radius: gl.radius + gl.grow; color: gl.color; antialiasing: true; visible: false; layer.enabled: true; layer.smooth: true }
+            MultiEffect { source: shape; x: shape.x; y: shape.y; width: shape.width; height: shape.height
+                blurEnabled: true; blur: 1; blurMax: Math.max(2, Math.round(gl.blur * 3)); autoPaddingEnabled: true
+                opacity: gl.strength } } }
 }
