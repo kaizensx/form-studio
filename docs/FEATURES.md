@@ -329,6 +329,14 @@ still not editable.
   verified result with the most editable surface wins. Several parts of one mechanism can have their meeting
   dimensions tied (walls facing across a gap, a pin in a hole) as one Param plus a clearance
   (`form.recon.assembly`).
+- **What is recognised is editable at once (beta).** Right after the exact solid, a floor is built on it: teeth
+  repeated round an axis are found first and become one tooth sketch, extruded and repeated as a polar pattern (its
+  pitch, first angle and levels are Params, its band cut from the solid), and the planes the solid has become
+  dimensions, largest first: a thickness to the opposite face, a width between two mirrored faces, or a level, each
+  kept only when moving it 0.5 mm still builds one valid solid. Everything else stays the solid's own faces, exactly.
+  So a part whose surfaces were recognised is never 0 % editable because one route failed somewhere else. Every later
+  route is a candidate against this floor and gets time in proportion to what it can still add (budget by predicted
+  gain); a sketch program that cannot beat it is not built. Details and measurements: `docs/RECON_EDITABILITY.md`.
 - **Layer 0: the mesh as an exact solid.** Vertices are welded, every triangle becomes a planar face, the faces
   are sewn into a solid and coplanar facets are merged. The two-sided Hausdorff distance to the mesh is at float
   precision. Open boundaries and non-manifold edges are reported; holes are closed only as a listed repair.
