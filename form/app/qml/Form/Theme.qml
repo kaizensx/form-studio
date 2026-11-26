@@ -37,7 +37,7 @@ QtObject {
     readonly property color glass: dark ? Qt.rgba(1, 1, 1, 0.07) : Qt.rgba(1, 1, 1, 0.62)
     readonly property color glass2: dark ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(1, 1, 1, 0.95)
     readonly property color glassEdge: dark ? Qt.rgba(1, 1, 1, 0.11) : Qt.rgba(1, 1, 1, 0.9)
-    readonly property color glassTint: dark ? Qt.rgba(0.075, 0.075, 0.08, 0.55) : Qt.rgba(0.96, 0.95, 0.93, 0.5)   // under `glass`, over the blur: keeps text legible on a bright part
+    readonly property color glassTint: dark ? Qt.rgba(0.04, 0.04, 0.045, 0.3) : Qt.rgba(0.96, 0.95, 0.93, 0.5)   // under `glass`, over the blur: keeps text legible on a bright part
     readonly property color glassSolid: dark ? Qt.rgba(0.098, 0.098, 0.106, 0.94) : Qt.rgba(0.972, 0.965, 0.953, 0.95)
     readonly property color glassWell: dark ? Qt.rgba(0.043, 0.043, 0.047, 0.66) : Qt.rgba(1, 1, 1, 0.82)        // the prompt inside the bar
     readonly property color send: dark ? "#f4f3f1" : "#161616"       // the one filled button: send, Design it, the active tool
@@ -46,7 +46,7 @@ QtObject {
     readonly property color key: dark ? "#ffe9cf" : "#ffffff"        // the key light, warm
     // the room behind everything: top, upper wall, the lit floor, the foot
     readonly property var room: dark ? ["#0a0a0b", "#131314", "#1b1b1c", "#0d0d0e"] : ["#e6e3de", "#efede9", "#f6f5f2", "#e4e1dc"]
-    readonly property color vignette: dark ? Qt.rgba(0, 0, 0, 0.55) : Qt.rgba(0.47, 0.41, 0.35, 0.16)
+    readonly property color vignette: dark ? Qt.rgba(0, 0, 0, 0.78) : Qt.rgba(0.47, 0.41, 0.35, 0.16)
     readonly property int edge: 20          // panes sit this far from the window's edge
     readonly property int rPane: 22         // panes; capsules are fully round
     // ink
@@ -83,8 +83,8 @@ QtObject {
     readonly property color datumHi: dark ? "#7ff0ff" : "#055d76"   // the accent, hovered
     readonly property color focus: alpha(datum, 0.6)                            // keyboard focus ring (datum)
     // the 3D bench (Viewport.qml): the ground to the horizon, the build plate on it, its 10 mm grid and its outline
-    readonly property color benchGround: dark ? "#0c0c0d" : "#e9e6e1"
-    readonly property color benchPool: dark ? "#3b342d" : "#fdfcfa"   // the floor where the key light falls, under the part: warm
+    readonly property color benchGround: dark ? "#070708" : "#e9e6e1"
+    readonly property color benchPool: dark ? "#2a231c" : "#fdfcfa"   // the floor where the key light falls, under the part: warm
     readonly property color benchLine: alpha(lineBase, dark ? 0.07 : 0.14)   // the floor's 10 mm grid, when it is asked for
     readonly property color benchPlate: dark ? "#232324" : "#cfcbc5"
     readonly property color benchGrid: dark ? "#2f2f31" : "#bfbab3"

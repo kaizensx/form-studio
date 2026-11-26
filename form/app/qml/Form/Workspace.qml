@@ -175,6 +175,8 @@ Item {
             id: vp
             objectName: "viewport"
             labelRight: dock.open ? dock.x : insp.x
+            slack: 0.98
+            scaleLeft: status.x; scaleFoot: status.y - 12
             floorGrid: Store.floorGrid
             anchors.fill: parent
             visible: !Store.layers
@@ -230,7 +232,7 @@ Item {
             poolX: (vp.insetLeft + (centre.width - vp.insetRight)) / 2 / Math.max(1, centre.width)
             poolY: Math.min(0.72, (vp.insetTop + (centre.height - vp.insetBottom)) / 2 / Math.max(1, centre.height) + 0.1)
             poolW: ws.cueOn ? 640 : 900; poolH: ws.cueOn ? 300 : 380
-            poolK: Theme.dark ? (ws.cueOn ? 0.11 : 0.05) : (ws.cueOn ? 0.5 : 0.25)
+            poolK: Theme.dark ? (ws.cueOn ? 0.16 : 0.09) : (ws.cueOn ? 0.5 : 0.25)
             breathe: !ws.cueOn && !Store.chatBusy && !Store.sheet && Window.active
             Behavior on poolW { NumberAnimation { duration: Theme.move(600); easing.type: Easing.InOutQuad } }
             Behavior on poolH { NumberAnimation { duration: Theme.move(600); easing.type: Easing.InOutQuad } }

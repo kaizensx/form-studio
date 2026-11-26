@@ -55,7 +55,7 @@ Item {
             fillGradient: RadialGradient {
                 centerX: vig.width * 0.46; centerY: vig.height * 0.5; centerRadius: vig.r; focalX: centerX; focalY: centerY
                 GradientStop { position: 0; color: Theme.alpha(Theme.vignette, 0) }
-                GradientStop { position: 0.5; color: Theme.alpha(Theme.vignette, 0) }
+                GradientStop { position: 0.38; color: Theme.alpha(Theme.vignette, 0) }
                 GradientStop { position: 1; color: Theme.alpha(Theme.vignette, Theme.vignette.a * room.vignetteK) } }
             startX: 0; startY: 0
             PathLine { x: vig.width; y: 0 } PathLine { x: vig.width; y: vig.height } PathLine { x: 0; y: vig.height } PathLine { x: 0; y: 0 }

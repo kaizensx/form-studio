@@ -22,7 +22,7 @@ Rectangle {
     readonly property bool expanded: !bar || (((Store.talkOpen && !empty) || list.opened) && !cueing)
     readonly property bool slim: bar && !expanded && (!empty || cueing)          // just the prompt, on one line
     readonly property bool suggOn: bar && empty && !cueing && Store.chat.available && !!Store.project && forProject.length > 0
-    readonly property int leadH: bar ? 32 : 0
+    readonly property int leadH: bar && !cueing ? 32 : 0      // while a build plays the cue says what is happening
     readonly property real barHeight: leadH + foot.height                          // folded
     readonly property real popRoom: bar ? roomAbove : height
     // what the open transcript wants above the prompt: its header, the strips under it, and what was said
@@ -507,7 +507,7 @@ Rectangle {
 
     // ── the bar's status line: what the agent is doing, or what you can do; click it to open or fold the transcript ──
     Item {
-        id: lead; objectName: "talkLead"; visible: talk.bar; width: parent.width; height: talk.leadH - 10; z: 3
+        id: lead; objectName: "talkLead"; visible: talk.bar && !talk.cueing; width: parent.width; height: 22; z: 3
         readonly property string say: Store.chatAsking ? (Store.chatAsking.kind === "measure" ? "The agent is waiting for a measurement" : "The agent is waiting for your answer")
             : Store.chatBusy ? talk.liveText()
             : !Store.chat.available && !!Store.studio ? "No agent is connected. Everything can still be edited by hand."
@@ -515,8 +515,9 @@ Rectangle {
             : talk.expanded ? "Fold the conversation" : Store.convTitle() + " · " + F.plural(Store.chatItems.filter(function (e) { return e.t === "user" || e.t === "text" }).length, "message")
         Row { id: leadRow; anchors.horizontalCenter: parent.horizontalCenter; anchors.verticalCenter: parent.verticalCenter; spacing: 9
             Item { width: 14; height: 14; anchors.verticalCenter: parent.verticalCenter
-                readonly property color c: Store.chatAsking ? Theme.amber : Store.chatBusy ? Theme.datum : Store.chatReady ? Theme.pass : Theme.ink4
-                Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(parent.c, 0.18)
+                // the accent: this is where the conversation is (amber while it waits for you, grey with no agent)
+                readonly property color c: Store.chatAsking ? Theme.amber : Store.chatReady || Store.chatBusy ? Theme.datum : Theme.ink4
+                Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(parent.c, 0.22)
                     SequentialAnimation on scale { running: Store.chatBusy && talk.bar && !Theme.reduced; loops: Animation.Infinite; alwaysRunToEnd: true
                         NumberAnimation { to: 1.4; duration: 700; easing.type: Easing.InOutSine } NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutSine } } }
                 Rectangle { anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: parent.c; Behavior on color { Tint {} } } }

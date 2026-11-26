@@ -292,7 +292,15 @@ Item {
                            Math.max(Math.min(0, c.z) - r, Math.min(c.z + r, t.z)))
     }
     onTargetChanged: if (!isFinite(target.x) || !isFinite(target.y) || !isFinite(target.z)) { tween = false; target = center(bounds) }
-    onDistChanged: if (!isFinite(dist) || dist <= 0) { tween = false; dist = frame(bounds, 1.5) }
+    // how much air the framing leaves around the part (1 = its bounding sphere touches the free area). A workspace
+    // frames the part large, as a product photograph does; thumbnails keep more air.
+    property real slack: 1.5
+    // where the scale cue sits (its left edge and its foot, in view pixels); -1: bottom right of the free area
+    property real scaleLeft: -1
+    property real scaleFoot: -1
+    // the ends of the three overall dimension lines in view pixels, for the lit lines drawn over the view
+    property var dimPx: []
+    onDistChanged: if (!isFinite(dist) || dist <= 0) { tween = false; dist = frame(bounds, slack) }
     onAzChanged: if (!isFinite(az)) { tween = false; az = -34 }
     onElChanged: if (!isFinite(el)) { tween = false; el = 28.4 }
     // the camera's last good placement: a frame whose numbers are not finite keeps the one before it
@@ -311,7 +319,7 @@ Item {
         tween = animate !== false
         // take the short way round
         var a = v[0]; while (a - az > 180) a -= 360; while (a - az < -180) a += 360
-        az = a; el = v[1]; target = center(b); dist = frame(b, box ? 1.25 : 1.5)
+        az = a; el = v[1]; target = center(b); dist = frame(b, box ? Math.min(1.25, slack) : slack)
     }
     function featureBox(id) {
         for (var k = 0; k < asmParts.count; k++) {          // assembly: transform the feature's box with its part
@@ -377,7 +385,7 @@ Item {
         _refitDue = false
         var k = _overshoot()
         tween = true; target = center(bounds)
-        dist = Math.min(3000, Math.max(frame(bounds, 1.5), k < 99 ? dist * Math.max(1, k) * 1.08 : dist))
+        dist = Math.min(3000, Math.max(frame(bounds, slack), k < 99 ? dist * Math.max(1, k) * 1.08 : dist))
         refitCheck.restart()
     }
     // once the camera has arrived: a part that is long across the view may still reach past it
@@ -393,7 +401,7 @@ Item {
             if (Math.abs(orad - r) < 0.04 * r) return
         }
         camCurve = Theme.easeMove; camBack.restart()
-        tween = true; target = center(bounds); dist = frame(bounds, 1.5)
+        tween = true; target = center(bounds); dist = frame(bounds, slack)
     }
     // the meshes drawn by the parts repeaters: replaced only when the geometry really changed
     property var _mesh: []
@@ -680,7 +688,7 @@ Item {
                     property vector2d uBoxC: Qt.vector2d((vp.dimLo.x + vp.dimHi.x) / 2, -(vp.dimLo.y + vp.dimHi.y) / 2)
                     property vector2d uBoxH: Qt.vector2d(Math.max(0, (vp.dimHi.x - vp.dimLo.x) / 2 - uSoft * 0.2), Math.max(0, (vp.dimHi.y - vp.dimLo.y) / 2 - uSoft * 0.2))
                     property real uSoft: Math.max(4, vp.radius(vp.bounds) * 0.16)
-                    property real uContact: !vp.model ? 0 : Theme.dark ? 0.5 : 0.12
+                    property real uContact: !vp.model ? 0 : Theme.dark ? 0.62 : 0.14
                     property real uLift: Theme.dark ? 0 : 0.72
                     property color uGrid: !vp.floorGrid ? "transparent" : Qt.rgba(Theme.lineBase.r, Theme.lineBase.g, Theme.lineBase.b, Theme.benchLine.a * (1 - vp.plateK)) } }
             // studio: a faint origin cross, the one fixed point on the floor (it gives way to the plate)
@@ -1017,7 +1025,7 @@ Item {
                     p.push(xe + sx * o, yf, z0, xe + sx * o, yf, z1, xe + sx, yf, z1, xe + sx * (o + t), yf, z1)
                     return p } }
                 materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
-                    property color uColor: Theme.alpha(Theme.datum, 0.72); property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                    property color uColor: Theme.alpha(Theme.datum, vp.lite ? 0.72 : 0.3); property vector3d uClipN; property real uClipD; property real uClip: 0 } }
         }
     }
     // the brush stroke or lasso outline being drawn, on top of the part
@@ -1058,8 +1066,8 @@ Item {
         visible: vp.interactive && !vp.lite && !!vp.model && vp.plateK < 0.5 && isFinite(px) && px > 8
         opacity: 1 - vp.plateK * 2
         width: px; height: 22
-        x: vp.width - vp.insetRight - width - 18
-        y: vp.height - Math.max(0, vp.insetBottom) + 6 - height
+        x: vp.scaleLeft >= 0 ? vp.scaleLeft : vp.width - vp.insetRight - width - 18
+        y: (vp.scaleFoot >= 0 ? vp.scaleFoot : vp.height - Math.max(0, vp.insetBottom) + 6) - height
         Behavior on width { NumberAnimation { duration: Motion.ui } }
         Rectangle { y: parent.height - 5; width: parent.width; height: 1; color: Theme.ink4 }
         Rectangle { y: parent.height - 9; width: 1; height: 9; color: Theme.ink4 }
@@ -1082,16 +1090,19 @@ Item {
              : i === 1 ? [Qt.vector3d(xs, b.lo.y, 0), Qt.vector3d(xs, b.hi.y, 0)]
              : [Qt.vector3d(xs, camFront ? b.hi.y : b.lo.y, b.lo.z), Qt.vector3d(xs, camFront ? b.hi.y : b.lo.y, b.hi.z)]
     }
+    property string _dimKey: ""
     function _seatLabels() {
-        var items = [], refs = [], i, k, it, w, h, p, c
+        var items = [], refs = [], i, k, it, w, h, p, c, lit = []
         for (i = 0; i < dimLabels.count; i++) {
             it = dimLabels.itemAt(i); if (!it) continue
             var ends = _dimLine(i), a = _px(ends[0]), e = _px(ends[1]), ts = [0.5, 0.3, 0.7, 0.16, 0.84]
+            lit.push(a && e ? [a.x, a.y, e.x, e.y] : null)
             w = it.width; h = it.height; c = []
             for (k = 0; a && e && k < ts.length; k++)
                 c.push({ x: Math.round(a.x + (e.x - a.x) * ts[k] - w / 2), y: Math.round(a.y + (e.y - a.y) * ts[k] - h / 2) })
             items.push({ kind: "dim", w: w, h: h, cands: c, prev: it.cand }); refs.push(it)
         }
+        var key = JSON.stringify(lit); if (key !== _dimKey) { _dimKey = key; dimPx = lit }
         for (i = 0; i < pinLabels.count; i++) {
             it = pinLabels.itemAt(i); if (!it) continue
             var q = it.modelData.p
@@ -1121,6 +1132,25 @@ Item {
     }
     FrameAnimation { running: vp.visible && (dimLabels.count + pinLabels.count + refLabels.count) > 0; onTriggered: vp._seatLabels() }
 
+    // the dimension lines, lit: over the faint lines of the scene, a 2 px line in the accent with a soft halo and a dot
+    // at each end. Drawn from the projected ends (dimPx), so nothing is blurred: a still view costs nothing.
+    Repeater {
+        model: dimLabels.count > 0 && !vp.lite ? vp.dimPx.length : 0
+        Item {
+            id: dline; required property int index
+            readonly property var e: vp.dimPx[index] || null
+            readonly property real len: e ? Math.hypot(e[2] - e[0], e[3] - e[1]) : 0
+            visible: !!e && len > 6; x: e ? e[0] : 0; y: e ? e[1] : 0; width: len; height: 1
+            rotation: e ? Math.atan2(e[3] - e[1], e[2] - e[0]) * 180 / Math.PI : 0; transformOrigin: Item.Left
+            Rectangle { x: -6; y: -7; width: parent.width + 12; height: 14; radius: 7
+                gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.datum, 0) } GradientStop { position: 0.5; color: Theme.alpha(Theme.datum, Theme.dark ? 0.13 : 0.08) } GradientStop { position: 1; color: Theme.alpha(Theme.datum, 0) } } }
+            Rectangle { y: -0.75; width: parent.width; height: 1.5; radius: 1; color: Theme.datum; opacity: 0.85; antialiasing: true }
+            Rectangle { x: -3; y: -3; width: 6; height: 6; radius: 3; color: Theme.datum; antialiasing: true
+                Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(Theme.datum, 0.18) } }
+            Rectangle { x: parent.width - 3; y: -3; width: 6; height: 6; radius: 3; color: Theme.datum; antialiasing: true
+                Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(Theme.datum, 0.18) } }
+        }
+    }
     // dimension numbers, on the 3D dimension lines
     Repeater {
         id: dimLabels
@@ -1133,7 +1163,8 @@ Item {
             property int cand: -1
             // what is drawn so far while a build-up runs (it counts up to each new value), else the whole part
             readonly property real mm: index === 0 ? vp.dimHi.x - vp.dimLo.x : index === 1 ? vp.dimHi.y - vp.dimLo.y : vp.dimHi.z - vp.dimLo.z
-            width: t.implicitWidth + 18; height: 22; radius: 11; color: Theme.dark ? Theme.alpha(Theme.well, 0.86) : Theme.alpha(Theme.plate3, 0.92); border.color: Theme.alpha(Theme.datum, 0.35)
+            width: t.implicitWidth + 20; height: 24; radius: 12; color: Theme.dark ? Theme.alpha(Theme.well, 0.9) : Theme.alpha(Theme.plate3, 0.94); border.color: Theme.alpha(Theme.datum, 0.5)
+            Rectangle { z: -1; anchors.fill: parent; anchors.margins: -4; radius: height / 2; color: "transparent"; border.width: 4; border.color: Theme.alpha(Theme.datum, Theme.dark ? 0.12 : 0.08) }
             opacity: shown ? 1 : 0; visible: opacity > 0.01                // a label that loses its seat fades, never blinks
             Behavior on opacity { NumberAnimation { duration: 120 } }
             Text { id: t; anchors.centerIn: parent; text: F.fmt(dl.mm, 1); color: Theme.dark ? Qt.lighter(Theme.datum, 1.6) : Theme.datumHi; font.family: Theme.mono; font.pixelSize: Theme.tFine; font.weight: 500; renderType: Text.NativeRendering }
