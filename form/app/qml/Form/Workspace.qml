@@ -254,7 +254,9 @@ Item {
                 for (var i = 0; st && i < fs.length; i++) if (fs[i].id === st.feature && i + 1 < fs.length) return fs[i + 1].label || ""
                 return "" }
             width: Math.max(360, Store.barW); x: Math.round(Store.barX + (Store.barW - width) / 2)
-            height: title.height; y: Math.round(Store.barY - height - 26 + lift)
+            // the lower third: it stands clear above the bar (116 px in a 900 px window, less in a low one), not on it
+            readonly property int clear: Math.round(Math.max(26, Math.min(116, centre.height * 0.129)))
+            height: title.height; y: Math.round(Store.barY - height - clear + lift)
             property real lift: shown ? 0 : Theme.shift(14)
             Behavior on lift { NumberAnimation { duration: Theme.move(Theme.panel); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
             opacity: shown ? 1 : 0; visible: opacity > 0.01

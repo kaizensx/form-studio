@@ -36,7 +36,7 @@ Item {
                 // read as "6 of 12" by tests and screen readers; set in capitals by the font
                 text: cue.at + " of " + cue.of; font.capitalization: Font.AllUppercase
                 font.family: Theme.mono; font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 1.8 } }
-        Item { width: 1; height: 12 }
+        Item { width: 1; height: 9 }
         // 06 Board screw holes — two lines of type hand over to each other
         Item { id: title; width: parent.width; height: 60; clip: false
             property string shown: ""

@@ -579,7 +579,7 @@ Rectangle {
                 Glow { blur: 12; strength: 0.85; radius: 2 }
                 // stepped, like the room's light: a waiting prompt must not keep the window drawing at full rate
                 property real phase: 0
-                opacity: 0.72 + 0.28 * Math.cos(phase)
+                opacity: 0.86 + 0.14 * Math.cos(phase)        // it breathes between full and about three quarters: always plainly lit
                 Timer { interval: 100; repeat: true; running: restCaret.visible && talk.visible && !Theme.reduced; onTriggered: restCaret.phase += 0.39 } }
             Rectangle { anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3; border.color: Theme.alpha(Theme.datum, 0.13)
                 opacity: ta.activeFocus ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
@@ -633,7 +633,7 @@ Rectangle {
                             Behavior on width { NumberAnimation { duration: Theme.move(Theme.fast) } }
                             Glow { blur: 12; strength: 0.85; radius: 2 }
                             property real phase: 0
-                            opacity: 0.7 + 0.3 * Math.cos(phase)
+                            opacity: 0.86 + 0.14 * Math.cos(phase)
                             Timer { interval: 100; repeat: true; running: cur.visible && !Theme.reduced; onTriggered: cur.phase += 0.5 } }
                         readonly property string placeholder: !Store.chat.available ? "No agent is connected" : Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure" ? "Answer the question above…" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to make…"
                         enabled: Store.chat.available
