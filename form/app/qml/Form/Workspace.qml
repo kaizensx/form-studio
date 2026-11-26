@@ -164,7 +164,7 @@ Item {
     Component.onDestruction: { Store.revealing = []; Store.builtIds = []; Store.buildAt = 0; Store.buildOf = 0 }
     // a build is playing: the stages an agent streams for this design, or the build-up of a new revision
     readonly property bool cueOn: (!!Store.building && Store.building.project === Store.pid) || build.running
-    property bool cueRoom: false             // a build-up is playing in the view: the camera keeps the cue's room clear
+    property bool cueRoom: false             // a build-up is playing in the view: the camera holds the framing of the finished part
 
     // ── centre: the part ─────────────────────────────────────
     Item {
@@ -195,12 +195,21 @@ Item {
             // colours and materials: re-made whenever the design's appearance or the catalogue changes
             colorOf: { var a = Store.appearance, c = Store.materialCat; return function (part) { return Store.look(part).color || "" } }
             // what the HUD covers: the rail and options, the dock when it is open, the strip and the readout
-            insetLeft: 84; insetTop: 84
+            insetLeft: 84; insetTop: 84 - cueLift - cueGrow
             insetRight: centre.width - insp.x + 12 + (dock.open && !ws.compact ? dock.width + 12 : 0)
             // the bar under the part (taller when the transcript is open), and the cue above it while a build plays
             // The cue's room is taken the moment a build-up starts, at once and before its first feature is drawn, so
             // the part never shrinks while it grows; it is given back with a glide when the cue has left.
-            insetBottom: Math.max(60, centre.height - (cue.shown || ws.cueRoom ? cue.rest - 10 : Math.min(Store.barY, status.y)) + 26)
+            // While a build plays the finished part is framed a little larger than it stands at rest, not shrunk into
+            // the room above the cue (a part half built would fill a quarter of the window; the mockup's fills a
+            // third). The free area is the one at rest (over the bar as it will be, Store.barRestY; at most 100 px
+            // past the cue's top), grown by 8 % and lifted so the last features end above the cue's first line. When
+            // the cue leaves the camera settles down by that lift and eases back by that 8 %; it never re-frames.
+            readonly property bool cueing: cue.shown || ws.cueRoom
+            readonly property real freeFoot: cueing ? Math.min(Store.barRestY, Store.barY, status.restY, cue.rest + 100) : Math.min(Store.barY, status.y)
+            readonly property real cueLift: cueing ? Math.round(centre.height * 0.045) : 0
+            readonly property real cueGrow: cueing ? Math.round(Math.max(0, freeFoot - 110) * 0.04) : 0
+            insetBottom: Math.max(60, centre.height - freeFoot + 26 + cueLift - cueGrow)
             onRevealingChanged: if (revealing && !ws.cueRoom && !Theme.reduced) { var g = vp.insetGlide; vp.insetGlide = false; ws.cueRoom = true; vp.insetGlide = g }
                                 else if (!revealing) ws.cueRoom = false
             onContextRequested: function (f, x, y) { Store.ctxMenu = { feature: f, x: x, y: y } }
@@ -549,7 +558,10 @@ Item {
         Column {
             id: status
             // above the view buttons; in a narrow window the bar reaches over here, so it stands above the bar instead
-            x: Theme.edge + 14; y: Math.round(Math.min(viewCtl.y - 14, ws.compact && width + x + 8 > Store.barX ? Store.barY - 10 : centre.height) - height); z: 4; spacing: 8; visible: !ws.sim && !!Store.shown
+            x: Theme.edge + 14; y: Math.round(Math.min(viewCtl.y - 14, ws.compact && width + x + 8 > Store.barX ? Store.barY - 10 : centre.height) - height); z: 4;
+            // where it stands once no build plays (the bar is then taller): the camera frames a build over this
+            readonly property real restY: Math.round(Math.min(viewCtl.y - 14, ws.compact && width + x + 8 > Store.barX ? Store.barRestY - 10 : centre.height) - height)
+            spacing: 8; visible: !ws.sim && !!Store.shown
             // notices: the picture is not simply "the head revision"
             Rectangle { visible: !!Store.scrub; width: sn.implicitWidth + 16; height: 28; radius: Theme.rSm
                 color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.alpha(Theme.blueprint, 0.4)

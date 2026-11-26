@@ -25,6 +25,10 @@ Rectangle {
     readonly property bool suggOn: bar && empty && !cueing && Store.chat.available && !!Store.project && forProject.length > 0
     readonly property int leadH: bar && !cueing ? 32 : 0      // while a build plays the cue says what is happening
     readonly property real barHeight: leadH + foot.height                          // folded
+    // how tall the folded bar is once no build plays (while one plays it is one line): the camera frames a part
+    // mid-build over this, so nothing moves when the build is in
+    readonly property real restHeight: 32 + (!empty ? 64 : 102 + (Store.chat.available && !!Store.project && forProject.length > 0
+                                             ? Math.ceil(forProject.length / (width - 16 > 440 ? 2 : 1)) * 34 + 8 : 0))
     readonly property real popRoom: bar ? roomAbove : height
     // what the open transcript wants above the prompt: its header, the strips under it, and what was said
     readonly property real bodyWant: head.height + 8 + (rsteps.visible ? rsteps.height : 0) + (strip.visible ? strip.height : 0) + feed.contentHeight + feed.topMargin + feed.bottomMargin + 6

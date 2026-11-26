@@ -40,6 +40,7 @@ QtObject {
     property var backdrop: null        // the room behind the panes of the screen in front (what Glass blurs): the 3D view, or the window's Room
     property bool floorGrid: false     // the 10 mm grid on the studio floor (the grid button beside the views)
     property real barY: 100000         // the conversation bar in the window (Main.qml): its top edge, left edge and width
+    property real barRestY: 100000     // its top edge once no build plays (during one the bar is one line)
     property real barX: 0
     property real barW: 600
     property int buildAt: 0            // the build-up playing in the workspace: which step of how many (0: none)

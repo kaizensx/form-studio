@@ -106,6 +106,7 @@ Window {
         // where the bar is, for the screen in front: the camera keeps the part clear of it, the cue sits above it
         onYChanged: if (bar) Store.barY = y
         onBarChanged: Store.barY = bar ? y : win.height
+        Binding { target: Store; property: "barRestY"; value: talk.bar ? win.height - 16 - talk.restHeight : win.height }
         onXChanged: if (bar) Store.barX = x
         onWidthChanged: if (bar) Store.barW = width
         Component.onCompleted: { Store.barY = bar ? y : win.height; Store.barX = x; Store.barW = width }
