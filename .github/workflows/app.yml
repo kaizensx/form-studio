@@ -53,6 +53,12 @@ jobs:
           # retried: a large wheel (cadquery-ocp) sometimes times out on the runner's network
           for i in 1 2 3; do uv pip install --python .venv -e ".[all]" pyinstaller && break
             [ "$i" = 3 ] && exit 1; echo "Install failed; retrying in 20 s."; sleep 20; done
+          # cryptography 49+ ships no Intel-Mac wheel: built from source it links Homebrew's OpenSSL, and the bundled
+          # libssl (Python's, older) then lacks its symbols, so the MCP server would not start. 48.0.1 is the last
+          # release with a universal2 wheel (OpenSSL linked in).
+          if [ "$RUNNER_OS" = "macOS" ] && [ "$RUNNER_ARCH" = "X64" ]; then
+            uv pip install --python .venv "cryptography==48.0.1"
+          fi
       - name: Engine smoke tests
         shell: bash
         timeout-minutes: 15        # a hang fails the build in minutes, not after the job's hour
