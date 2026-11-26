@@ -78,8 +78,20 @@ Column {
     property bool allRevs: false
     Column { width: parent.width; topPadding: 16; spacing: 12
         Row { width: parent.width; spacing: 14
-            Rectangle { id: seal; width: 48; height: 48; radius: 24; color: Theme.alpha(root.gateInk, 0.12); border.color: Theme.alpha(root.gateInk, 0.35)
-                Icon { anchors.centerIn: parent; size: 22; color: root.gateInk; name: root.approved ? "badge_check" : root.ready ? "shield_check" : "lock" } }
+            Rectangle { id: seal; objectName: "releaseSeal"; width: 48; height: 48; radius: 24; color: Theme.alpha(root.gateInk, 0.12); border.color: Theme.alpha(root.gateInk, 0.35)
+                Behavior on color { Tint {} }
+                Icon { anchors.centerIn: parent; size: 22; color: root.gateInk; name: root.approved ? "badge_check" : root.ready ? "shield_check" : "lock" }
+                // Approving is the one deliberate act of the app, so it is answered once: the seal comes down like a
+                // stamp and one ring leaves it. Only when you approve here, never when a released design opens.
+                Rectangle { id: ring; anchors.centerIn: parent; width: 48; height: 48; radius: 24; color: "transparent"; border.width: 1.5; border.color: Theme.pass; opacity: 0 }
+                property bool seen: false
+                Component.onCompleted: seen = true
+                Connections { target: root; function onApprovedChanged() { if (seal.seen && root.approved && !Theme.reduced) stamp.restart() } }
+                ParallelAnimation { id: stamp
+                    NumberAnimation { target: seal; property: "scale"; from: 1.22; to: 1; duration: Theme.slow; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeSpring }
+                    NumberAnimation { target: ring; property: "scale"; from: 1; to: 1.9; duration: 620; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut }
+                    SequentialAnimation { NumberAnimation { target: ring; property: "opacity"; from: 0; to: 0.7; duration: 90 }
+                        NumberAnimation { target: ring; property: "opacity"; to: 0; duration: 530; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } } } }
             Column { width: parent.width - 62; anchors.verticalCenter: seal.verticalCenter; spacing: 3
                 Txt { kind: "h2"; width: parent.width
                     text: root.approved ? "Released" : root.ready ? (root.allAcked ? "Ready to approve" : "Ready, with warnings")

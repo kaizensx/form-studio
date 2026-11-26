@@ -45,6 +45,21 @@
   and licence shown first. The learned mesh-to-CAD engine (CAD-Recode) is opt-in and non-commercial (CC BY-NC 4.0).
 - **A light appearance**, a new Home, concepts in the conversation, and links and every file type in chat.
 
+- **Home on the first day shows a real build.** With no designs yet, the question and the composer sit on the left and
+  a sensor enclosure (13 features, real geometry from the CAD kernel, labelled as an example) turns slowly beside
+  them. It is a picture of a build kept with the app, not a project: nothing is created. The four cards that repeated
+  the composer's buttons are gone.
+- **The conversation reads as a record of the design.** A step that changes the design is a compact card with an
+  icon, one sentence and a 64 px picture of the render the agent took, which opens large. A new revision posts a card
+  with its number, the features it changed as tags, the values as from → to, and Compare. The line that says how a
+  reply was made (steps, time, cost, model) is small and at the right.
+- **The engine's work is named in the middle of the top bar**, as one line, instead of a card that sat on the stage
+  tabs. During the first seconds after the app opens it waits 1.2 s before naming anything, so loading the cards of
+  Home is not announced.
+- **Small moments.** Design cards show a band of light while their geometry loads and the part cross-fades in; the
+  turntable under the pointer eases up to speed and coasts to a stop. A segmented control's selection glides to the
+  option you click. A commit lands on the revision number in the top bar; approving a release brings the seal down
+  like a stamp, once. None of it moves with Reduce Motion on.
 ### Changed
 
 - **The Mac app is now called Form Studio.app** (it was FORM.app). If you added Form Studio to Claude Code, Codex or
@@ -64,6 +79,11 @@
 
 ### Fixed
 
+- A teal outline no longer crosses the window when a design is opened from Home. The frame that grows from the
+  composer to the workspace now plays only when a request sent from the composer starts a design.
+- Settings opened from Home's "Connect an agent" showed an empty sheet (it asked for a tab that does not exist). It
+  opens on Agents, and an unknown tab opens General.
+- "Outputs are current" is no longer announced when the pipeline ran by itself as a design opened.
 - **Threaded holes have their thread.** A hole cut with the built-in internal thread could come out as a plain
   bore that no bolt held. The thread is now cut, and a thread that cannot be cut is reported instead of built plain.
 - **Saved conversations open with every message.** A long conversation could open as an empty column with only its

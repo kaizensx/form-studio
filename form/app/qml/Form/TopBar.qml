@@ -27,6 +27,9 @@ Rectangle {
     readonly property bool tight: width < 1260
     readonly property Item logo: mark         // where the opening screen's lockup lands (Splash.qml)
     property bool logoHeld: false             // while that lockup travels here, so there are never two logos on screen
+    // the empty middle of the bar, where the engine's work is named (ActivityBar.qml)
+    readonly property real freeX: left.x + left.width + 16
+    readonly property real freeW: Math.max(0, right.x - freeX - 16)
 
     Row { id: left; x: bar.inset + (bar.inset ? 4 : 10); anchors.verticalCenter: parent.verticalCenter; spacing: 4
         // elsewhere than macOS there is no menu bar at the top of the screen: the same actions live here
@@ -63,7 +66,20 @@ Rectangle {
             HoverHandler { id: ph }
             Tip { show: ph.hovered && !!Store.recipe; text: Store.recipe && Store.project ? (String(Store.project.recipe).indexOf("src:") === 0 ? "Designed by an agent" : "Started from: " + Store.recipe.title) : "" } }
         Item { width: 6; height: 1 }
-        Txt { visible: !!Store.project; mono: true; font.pixelSize: 12; tone: 2; text: Store.project ? F.pad(Store.project.head) : ""; anchors.baseline: logoBox.baseline }
+        // the revision. A commit lands here: the number takes the settled colour for a moment and comes to rest,
+        // so saving a revision is seen where the revision is named (not when another design opens).
+        Txt { id: revTxt; objectName: "topRevision"; visible: !!Store.project; mono: true; font.pixelSize: 12; text: Store.project ? F.pad(Store.project.head) : ""; anchors.baseline: logoBox.baseline
+            property real lit: 0
+            property string forPid: ""
+            property int was: 0
+            color: Qt.tint(Theme.ink2, Theme.alpha(Theme.pass, lit))
+            transformOrigin: Item.Left; scale: 1 + 0.12 * lit * (Theme.reduced ? 0 : 1)
+            readonly property int head: Store.project ? Store.project.head : 0
+            onHeadChanged: { var same = Store.pid === forPid && was > 0 && head > was; forPid = Store.pid; was = head; if (same) landed.restart() }
+            SequentialAnimation { id: landed
+                NumberAnimation { target: revTxt; property: "lit"; to: 1; duration: Theme.fast; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut }
+                PauseAnimation { duration: 500 }
+                NumberAnimation { target: revTxt; property: "lit"; to: 0; duration: 700; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } } }
         Item { width: 6; height: 1 }
         Tag { visible: !!Store.project && text !== ""; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: 1
             kind: Store.hasDraft ? "draft" : bar.ap && bar.ap.state === "approved" ? "PASS" : bar.ap && bar.ap.state === "superseded" ? "WARN" : ""

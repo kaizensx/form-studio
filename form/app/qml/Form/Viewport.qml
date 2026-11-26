@@ -584,7 +584,10 @@ Item {
         return l < 0.32 ? Qt.lighter(c, 2.1) : Qt.darker(c, 2.6)
     }
 
-    FrameAnimation { running: vp.spin && vp.visible; onTriggered: { vp.tween = false; vp.az += frameTime * 9 } }
+    // the turntable eases up to its speed and coasts to a stop, so a card under the pointer never jerks into motion
+    property real _spinV: spin && !Theme.reduced ? 7 : 0          // degrees per second
+    Behavior on _spinV { NumberAnimation { duration: 700; easing.type: Easing.InOutSine } }
+    FrameAnimation { running: vp._spinV > 0.02 && vp.visible; onTriggered: { vp.tween = false; vp.az += frameTime * vp._spinV } }
 
     View3D {
         id: view

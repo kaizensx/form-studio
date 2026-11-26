@@ -117,7 +117,7 @@ Shortcuts are written the Qt way everywhere (`"Ctrl+Shift+O"`) and shown the pla
 | `Area { text; placeholder; minLines; submitOnEnter; onSubmit(text); onBlurred(text) }` | multi-line input |
 | `Beam { from; to; step; value; base; tint; onMoved(value) }` | slider |
 | `Pick { model:[{value,text}]; value; onPicked(value) }` | dropdown (keyboard: Space/Down opens, arrows, Enter) |
-| `Seg { model; value; onPicked(value) }` | segmented control: a choice among a few options inside a panel |
+| `Seg { model; value; onPicked(value) }` | segmented control: a choice among a few options inside a panel. The selection is one thumb that glides to a clicked option and lands at once for the keys |
 | `Tabs { model:[{value,text,badge?}]; value; onPicked(value) }` | sections of a sheet or panel; the marker slides. Do not use `Seg` as tabs |
 | `Check { checked; onToggled(checked) }` | checkbox: a choice confirmed later by a button |
 | `Toggle { checked; onToggled(checked) }` | on/off switch: a setting that applies at once |
