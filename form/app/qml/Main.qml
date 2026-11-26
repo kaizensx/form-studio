@@ -12,7 +12,10 @@ Window {
     property bool headless: false
     readonly property bool mac: Bridge.platform === "darwin"
     readonly property bool full: visibility === Window.FullScreen
-    visible: true; color: Theme.plate
+    // a workspace is plates on the window's frame (the conversation, the part, the inspector); Home is one open bench
+    readonly property bool plates: Store.screen === "work" || Store.screen === "designing"
+    visible: true; color: plates ? Theme.frame : Theme.plate
+    Behavior on color { ColorAnimation { duration: Theme.screen } }
     // macOS draws the window title over our own top bar (the title bar is see-through), so it stays empty there;
     // the Dock, the app menu and Mission Control still say Form Studio. Windows and Linux show it in their frame.
     title: mac ? "" : Store.project ? Store.project.name + (Store.hasDraft ? " (draft)" : "") + " — Form Studio" : "Form Studio"
@@ -59,14 +62,13 @@ Window {
     // the native menu bar (macOS). Elsewhere the same actions are in the top bar's menu button and the palette.
     Loader { active: win.mac; sourceComponent: MacMenu { onFullScreen: win.visibility = win.full ? Window.Windowed : Window.FullScreen } }
 
-    TopBar { id: top; width: parent.width; inset: win.mac && !win.full ? 78 : 0; z: 10; logoHeld: splash.visible && splash.carrying }
+    TopBar { id: top; width: parent.width; inset: win.mac && !win.full ? 78 : 0; z: 10; logoHeld: splash.visible && splash.carrying; ground: win.color }
 
     // collapsed: a slim rail keeps the agent's state in sight
     Rectangle {
         id: rail
         visible: Store.screen === "work"
-        anchors.top: top.bottom; anchors.bottom: parent.bottom; width: 44; color: Theme.plate1
-        Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.rule }
+        anchors.top: top.bottom; anchors.bottom: parent.bottom; width: 44; color: "transparent"
         Column { y: 10; width: parent.width; spacing: 4
             Item { width: 28; height: 28; anchors.horizontalCenter: parent.horizontalCenter
                 Rectangle { anchors.fill: parent; radius: Theme.rSm; color: rm.pressed ? Theme.washPress : rm.containsMouse ? Theme.washHover : "transparent" }
@@ -87,14 +89,15 @@ Window {
         readonly property int minW: 300
         readonly property int maxW: Math.max(minW, Math.min(560, win.width - 760))
         property bool dragging: false
-        anchors.top: top.bottom; anchors.bottom: parent.bottom
+        anchors.top: top.bottom; anchors.bottom: parent.bottom; anchors.bottomMargin: Theme.gap
+        radius: Theme.rPanel; border.width: 1; border.color: Theme.panelEdge
         // Home is the start: the column appears there once a conversation is under way. While a design is being made
         // it is always there; in the workspace it can be folded away.
         readonly property bool shown: Store.screen === "designing" ? true
                                     : Store.screen === "home" ? Store.talkOpen && (Store.chatItems.length > 0 || Store.chatBusy)
                                     : Store.screen === "work" && Store.talkOpen
         width: Math.max(minW, Math.min(maxW, Store.talkWidth))
-        x: shown ? 0 : -width
+        x: shown ? Theme.gap : -width - Theme.gap
         Behavior on x { NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
         Behavior on width { enabled: !talk.dragging && win.restored; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
         // drag the edge to resize; double-click puts it back
@@ -115,7 +118,7 @@ Window {
     Item {
         id: stage
         anchors.top: top.bottom; anchors.bottom: parent.bottom
-        x: Math.max(rail.visible ? rail.width : 0, talk.x + talk.width); width: parent.width - x
+        x: Math.max(rail.visible ? rail.width - Theme.gap : 0, talk.x + talk.width); width: parent.width - x
         // One screen hands over to the next along one axis, depth: going deeper (Home -> designing -> the workspace)
         // the new screen pushes in from slightly small; coming back it settles from slightly large. Its panels then
         // arrive a beat apart (each screen staggers its own). Reduced motion: a plain fade.
@@ -136,7 +139,8 @@ Window {
             NumberAnimation { id: arriveScale; target: arrive.target; property: "scale"; to: 1; duration: Theme.move(Theme.screen); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
         Loader { id: homeLd; anchors.fill: parent; active: Store.screen === "home"; onLoaded: stage.enter(item); sourceComponent: Home {} }
         Loader { anchors.fill: parent; active: Store.screen === "work"; onLoaded: stage.enter(item); sourceComponent: Workspace {} }
-        Loader { anchors.fill: parent; active: Store.screen === "designing"; onLoaded: stage.enter(item); sourceComponent: Designing {} }
+        Loader { anchors.fill: parent; anchors.leftMargin: Theme.gap; anchors.rightMargin: Theme.gap; anchors.bottomMargin: Theme.gap
+            active: Store.screen === "designing"; onLoaded: stage.enter(item); sourceComponent: Designing {} }
     }
     Loader { anchors.top: top.bottom; anchors.bottom: parent.bottom; width: parent.width; z: 30; active: Store.welcome; sourceComponent: Welcome {} }
     // the opening screen: the mark is drawn on its origin while the engine starts, then travels to the top bar's logo.

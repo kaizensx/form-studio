@@ -166,6 +166,8 @@ Item {
     Item {
         id: centre
         anchors.left: parent.left; anchors.right: insp.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+        anchors.leftMargin: Theme.gap; anchors.rightMargin: Theme.gap; anchors.bottomMargin: Theme.gap
+        PlateFrame { z: 9 }
         Viewport {
             id: vp
             objectName: "viewport"
@@ -308,7 +310,8 @@ Item {
         Rectangle {
             id: rail
             x: 12; y: 12; z: 6; width: 40; height: railCol.implicitHeight + 8; radius: Theme.rMd
-            color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.rule
+            color: Theme.alpha(Theme.plate2, 0.94); border.color: Theme.rule2
+            Shadow { radius: parent.radius; spread: 14; drop: 5; strength: 0.7 }
             visible: !!Store.view
             Column {
                 id: railCol; x: 4; y: 4; spacing: 1
@@ -549,7 +552,8 @@ Item {
             id: strip
             anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 12; z: 7
             height: stripCol.height; radius: Theme.rLg
-            color: Theme.alpha(Theme.plate1, 0.95); border.color: Theme.rule
+            color: Theme.alpha(Theme.plate2, 0.94); border.color: Theme.rule2
+            Shadow { radius: parent.radius; spread: 16; drop: 6; strength: 0.7 }
             MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }   // the strip is not the viewport
             Column {
                 id: stripCol; width: parent.width
@@ -565,7 +569,8 @@ Item {
     Rectangle {
         id: insp
         anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom; width: 400
-        color: Theme.plate1
+        anchors.rightMargin: Theme.gap; anchors.bottomMargin: Theme.gap
+        color: Theme.plate1; radius: Theme.rPanel; border.width: 1; border.color: Theme.panelEdge
         // arriving with the workspace: the inspector slides in from its own edge, a beat after the screen
         transform: Translate { id: inspIn }
         SequentialAnimation { id: inspArrive
@@ -577,7 +582,6 @@ Item {
                 NumberAnimation { target: inspIn; property: "x"; to: 0; duration: Theme.move(Theme.panel + 60); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } } }
         Component.onCompleted: inspArrive.start()
         readonly property int at: { for (var i = 0; i < Store.stages.length; i++) if (Store.stages[i].id === Store.stage) return i; return 0 }
-        Rectangle { width: 1; height: parent.height; color: Theme.rule }
         // stage tabs: the lit tab slides to the stage you pick
         // each tab is as wide as its words plus an equal share of the slack, so "Release" has the same air as "Fit"
         Item { id: tabs; objectName: "stageTabs"; x: 8; y: 6; width: parent.width - 16; height: 52
@@ -590,7 +594,10 @@ Item {
                 x: at ? at.x + 2 : 0; width: at ? at.width - 4 : 0
                 Component.onCompleted: Qt.callLater(function () { lit.settled = true })
                 Behavior on x { enabled: lit.settled; NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
-                Behavior on width { enabled: lit.settled; NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } } }
+                Behavior on width { enabled: lit.settled; NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
+                border.width: 1; border.color: Theme.rule
+                // the datum mark under the stage you are in: it travels with the lit tab
+                Rectangle { anchors.bottom: parent.bottom; anchors.bottomMargin: -1; anchors.horizontalCenter: parent.horizontalCenter; width: 22; height: 2; radius: 1; color: Theme.datum } }
             Row { anchors.fill: parent
                 Repeater {
                     id: stageRep
@@ -611,7 +618,8 @@ Item {
                             Behavior on color { Tint {} } }
                         Column { anchors.centerIn: parent; spacing: 2
                             Row { id: tr; spacing: 5; anchors.horizontalCenter: parent.horizontalCenter
-                                Txt { mono: true; font.pixelSize: Theme.tFine; tone: 4; text: "0" + (tab.index + 1); anchors.baseline: tl.baseline }
+                                Txt { mono: true; font.pixelSize: Theme.tFine; color: tab.on ? Theme.datum : Theme.ink4; text: "0" + (tab.index + 1); anchors.baseline: tl.baseline
+                                    Behavior on color { Tint {} } }
                                 Txt { id: tl; text: tab.modelData.title; font.weight: Theme.wSemi; font.pixelSize: 13; tone: tab.on ? 1 : 2 } }
                             Txt { id: tn; anchors.horizontalCenter: parent.horizontalCenter; font.pixelSize: Theme.tFine; text: tab.note[0]; color: ws.noteColor(tab.note[1]); wrapMode: Text.NoWrap } }
                         MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.setStage(tab.modelData.id) }
@@ -625,8 +633,8 @@ Item {
             id: stageHead
             anchors.top: tabs.bottom; anchors.topMargin: 5; width: parent.width; height: say.implicitHeight + 24; z: 2
             readonly property var s: ws.stageSay(Store.stage)
-            Rectangle { x: 1; width: parent.width - 1; height: parent.height; color: Theme.plate1 }
-            Rectangle { width: parent.width; height: 1; color: Theme.rule }
+            Rectangle { x: 1; width: parent.width - 2; height: parent.height; color: Theme.plate1 }
+            Rectangle { x: 1; width: parent.width - 2; height: 1; color: Theme.rule }
             Rectangle { x: 20; y: 17; width: 6; height: 6; radius: 3; color: ws.noteColor(stageHead.s[1]) }
             Txt { id: say; x: 36; y: 11; width: parent.width - 56; text: stageHead.s[0]; tone: 2 }
             Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.rule; opacity: scroll.contentY > 2 ? 1 : 0
@@ -659,8 +667,9 @@ Item {
             anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
             readonly property bool on: Store.hasDraft || !!Store.draftError
             height: on ? Math.min(draft.implicitHeight + 24, Math.round(insp.height * 0.46)) : 0
-            Rectangle { anchors.fill: parent; color: Theme.plate1; visible: foot.on }
-            Rectangle { width: parent.width; height: 1; color: Theme.rule; visible: foot.on }
+            Rectangle { anchors.fill: parent; anchors.margins: 1; anchors.topMargin: 0; color: Theme.plate1; visible: foot.on; radius: Theme.rPanel - 1
+                Rectangle { width: parent.width; height: parent.radius; color: parent.color } }
+            Rectangle { x: 1; width: parent.width - 2; height: 1; color: Theme.rule; visible: foot.on }
             Flickable {
                 anchors.fill: parent; anchors.topMargin: 12; anchors.bottomMargin: 12; clip: true; visible: foot.on
                 contentHeight: draft.implicitHeight; boundsBehavior: Flickable.StopAtBounds

@@ -25,6 +25,7 @@ Column {
                 Rectangle {
                     id: fr
                     required property var modelData
+                    required property int index
                     objectName: "feature-" + modelData.id
                     readonly property bool touched: root.paramsOf(modelData.id).some(function (p) { return Store.draftValues[p.key] !== undefined })
                     readonly property var out: Store.leftOut(modelData.id)       // left out of a partial build
@@ -36,8 +37,10 @@ Column {
                     Behavior on color { Tint {} }
                     Rectangle { objectName: "featureArriving"; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 2; height: parent.height - 12; radius: 1; color: Theme.datum
                         opacity: fr.arriving ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
-                    Rectangle { x: 8; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 22; radius: 1.5; color: fr.out ? Theme.amber : Theme.evidence(fr.modelData.role); opacity: fr.out ? 0.45 : 0.8 }
-                    Column { id: fcol; x: 20; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 20 - tg.width - 30; spacing: 1
+                    // its item number, as on a drawing's parts list: the place in the build order, in the colour of its role
+                    Txt { x: 8; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: Theme.tFine; wrapMode: Text.NoWrap
+                        text: (fr.index < 9 ? "0" : "") + (fr.index + 1); color: fr.out ? Theme.amber : Theme.evidence(fr.modelData.role); opacity: fr.out ? 0.5 : 0.9 }
+                    Column { id: fcol; x: 34; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 34 - tg.width - 30; spacing: 1
                         Txt { text: fr.modelData.label + (fr.touched ? "  ●" : ""); font.weight: 550; color: fr.touched ? Theme.blueprint : fr.out ? Theme.ink3 : Theme.ink; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
                         Txt { kind: "fine"; visible: text !== "" && !fr.out; text: fr.modelData.doc || ""; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap }
                         Txt { id: why; objectName: "leftOutReason"; kind: "fine"; visible: !!fr.out; tone: 2; width: parent.width; wrapMode: Text.WordWrap

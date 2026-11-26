@@ -11,7 +11,7 @@ void MAIN()
     if (uWipe >= 0.0 && (FRAGCOORD.x - uWipe) * uWipeSide > 0.0)
         discard;
     BASE_COLOR = vec4(mix(uColor.rgb, VAR_COLOR.rgb, uMap), 1.0);
-    ROUGHNESS = 0.84;
+    ROUGHNESS = 0.76;
     METALNESS = 0.0;
     vec3 n = normalize(NORMAL);
     float edge = 1.0 - clamp(abs(dot(n, normalize(VIEW_VECTOR))), 0.0, 1.0);
@@ -20,7 +20,9 @@ void MAIN()
     // Scene space is Y-up: n.y = -1 faces the floor.
     float down = clamp(-n.y, 0.0, 1.0);
     vec3 ambient = BASE_COLOR.rgb * (0.06 + 0.34 * down * down);
-    EMISSIVE_COLOR = ambient + uGlow.rgb + uRim.rgb * pow(edge, 2.6) * (1.0 - uMap);
+    // a soft sheen at grazing angles, as a studio's walls give a satin surface (never on an analysis map)
+    vec3 sheen = BASE_COLOR.rgb * 0.05 * pow(edge, 3.0) * (1.0 - uMap);
+    EMISSIVE_COLOR = ambient + sheen + uGlow.rgb + uRim.rgb * pow(edge, 2.6) * (1.0 - uMap);
     if (!gl_FrontFacing) {
         BASE_COLOR = vec4(0.0, 0.0, 0.0, 1.0);
         EMISSIVE_COLOR = vec3(0.36, 0.56, 0.49);

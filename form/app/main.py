@@ -59,6 +59,42 @@ def _reduced_motion() -> bool:
     return False
 
 
+def _ghost(win) -> None:
+    """Keep a development window out of the way: fully transparent, above the others (so the system keeps drawing
+    it), deaf to the real pointer and keyboard. Synthetic events from a journey still reach it."""
+    from PySide6.QtCore import Qt
+    win.setOpacity(0.0)
+    win.setFlags(win.flags() | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.WindowTransparentForInput
+                 | Qt.WindowType.WindowDoesNotAcceptFocus)
+    win.setOpacity(0.0)
+
+
+def ghost_focus(win) -> bool:
+    """Tell Qt this window has the keyboard without asking the system for it (a ghost window never takes it from
+    the person at the desk). Qt Quick's Shortcuts fire only in Qt's focus window."""
+    import ctypes
+    try:
+        import shiboken6
+        from PySide6 import QtGui
+        from PySide6.QtCore import QCoreApplication
+        lib = None
+        for cand in (Path(QtGui.__file__).parent / "Qt" / "lib" / "QtGui.framework" / "Versions" / "A" / "QtGui",
+                     Path(QtGui.__file__).parent / "Qt" / "lib" / "libQt6Gui.so.6",
+                     Path(QtGui.__file__).parent / "Qt6Gui.dll"):
+            if cand.exists():
+                lib = ctypes.CDLL(str(cand))
+                break
+        if lib is None:
+            return False
+        fn = getattr(lib, "_ZN22QWindowSystemInterface24handleFocusWindowChangedINS_19SynchronousDeliveryEEEvP7QWindowN2Qt11FocusReasonE")
+        fn.argtypes, fn.restype = [ctypes.c_void_p, ctypes.c_int], None
+        fn(shiboken6.getCppPointer(win)[0], 7)          # Qt::OtherFocusReason
+        QCoreApplication.processEvents()
+        return True
+    except Exception:
+        return False
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="form app", description="Form Studio desktop app")
     ap.add_argument("--check", action="store_true", help="load the interface, report QML errors, quit")
@@ -97,6 +133,11 @@ def main(argv=None) -> int:
         uitest.prepare(cfg)          # its own window settings; a stand-in agent when $FORM_UITEST_AGENT is set
     QCoreApplication.setApplicationVersion(__version__)
     os.environ.setdefault("QT_QUICK_CONTROLS_STYLE", "Basic")
+    # FORM_WINDOW_GHOST=1 (development: screenshots and journeys on a desk someone is working at): the real window,
+    # rendered by the real GPU path, but never seen and never given the keyboard or the pointer. See _ghost().
+    ghost = os.environ.get("FORM_WINDOW_GHOST") == "1" and bool(args.shot or args.check or args.tree or args.uitest)
+    if ghost:
+        os.environ["QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM"] = "1"      # no Dock icon, never the active app
     app = QGuiApplication(sys.argv[:1])
     # the app icon (brand/build.py) in every size it ships in, so the dock, the taskbar and the title bar each pick a sharp one
     icon = QIcon()
@@ -123,8 +164,11 @@ def main(argv=None) -> int:
     engine.warnings.connect(lambda ws: errors.extend(w.toString() for w in ws))
     engine.addImportPath(str(HERE / "qml"))
     w, h = (int(x) for x in args.size.lower().split("x"))
-    engine.setInitialProperties({"startProject": args.project or "", "startStage": args.stage or "",
-                                 "headless": bool(args.shot or args.check or args.tree), "width": w, "height": h})
+    initial = {"startProject": args.project or "", "startStage": args.stage or "",
+               "headless": bool(args.shot or args.check or args.tree), "width": w, "height": h}
+    if ghost:
+        initial["opacity"] = 0.0
+    engine.setInitialProperties(initial)
     engine.load(QUrl.fromLocalFile(str(HERE / "qml" / "Main.qml")))
     code = {"rc": 0}
 
@@ -137,6 +181,8 @@ def main(argv=None) -> int:
         httpd.shutdown(); st.kernel.stop()
         return 1
     win: QQuickWindow = engine.rootObjects()[0]
+    if ghost:
+        _ghost(win)
 
     if args.check or args.shot or args.tree:
         def done():

@@ -548,6 +548,10 @@ class UI:
         focus back fails here, saying so, instead of as a shortcut that did nothing."""
         if self.win.isActive():
             return
+        if os.environ.get("FORM_WINDOW_GHOST") == "1":      # an unseen window: Qt's focus only, the desk keeps its own
+            from .main import ghost_focus
+            if ghost_focus(self.win) and self.win.isActive():
+                return
         t0 = time.time()
         while time.time() - t0 < limit:
             self.win.raise_()
