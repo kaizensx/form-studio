@@ -16,7 +16,7 @@
   "activeFocus": true,
   "children": [
    {
-    "className": "TopBar_QMLTYPE_395",
+    "className": "TopBar_QMLTYPE_103",
     "objectName": "topBar",
     "bounds": [
      0.0,
@@ -40,7 +40,7 @@
       "source": "Form/TopBar.qml",
       "children": [
        {
-        "className": "Btn_QMLTYPE_107",
+        "className": "Btn_QMLTYPE_40",
         "objectName": "",
         "bounds": [
          10.0,
@@ -55,7 +55,7 @@
         "source": "Form/TopBar.qml",
         "children": [
          {
-          "className": "QQuickRectangle_QML_109",
+          "className": "QQuickRectangle_QML_46",
           "objectName": "",
           "bounds": [
            10.0,
@@ -91,7 +91,7 @@
             "source": "Form/Btn.qml",
             "children": [
              {
-              "className": "Icon_QMLTYPE_25",
+              "className": "Icon_QMLTYPE_29",
               "objectName": "",
               "bounds": [
                16.0,
@@ -122,7 +122,7 @@
           "source": "Form/Btn.qml"
          },
          {
-          "className": "Tip_QMLTYPE_41",
+          "className": "Tip_QMLTYPE_43",
           "objectName": "",
           "bounds": [
            10.0,
@@ -151,7 +151,7 @@
         "source": "Form/TopBar.qml",
         "children": [
          {
-          "className": "QQuickRectangle_QML_403",
+          "className": "QQuickRectangle_QML_113",
           "objectName": "",
           "bounds": [
            40.0,
@@ -163,7 +163,7 @@
           "source": "Form/TopBar.qml"
          },
          {
-          "className": "Logo_QMLTYPE_401",
+          "className": "Logo_QMLTYPE_48",
           "objectName": "",
           "bounds": [
            48.0,
@@ -263,7 +263,7 @@
           "source": "Form/TopBar.qml"
          },
          {
-          "className": "Tip_QMLTYPE_41",
+          "className": "Tip_QMLTYPE_43",
           "objectName": "",
           "bounds": [
            40.0,
@@ -318,7 +318,7 @@
       "source": "Form/TopBar.qml",
       "children": [
        {
-        "className": "QQuickRectangle_QML_407",
+        "className": "QQuickRectangle_QML_117",
         "objectName": "",
         "bounds": [
          1228.0,
@@ -330,7 +330,7 @@
         "source": "Form/TopBar.qml",
         "children": [
          {
-          "className": "Icon_QMLTYPE_25",
+          "className": "Icon_QMLTYPE_29",
           "objectName": "",
           "bounds": [
            1237.0,
@@ -345,7 +345,7 @@
           "source": "Form/TopBar.qml"
          },
          {
-          "className": "Txt_QMLTYPE_29",
+          "className": "Txt_QMLTYPE_32",
           "objectName": "",
           "bounds": [
            1257.0,
@@ -360,7 +360,7 @@
           "source": "Form/TopBar.qml"
          },
          {
-          "className": "Kbd_QMLTYPE_32",
+          "className": "Kbd_QMLTYPE_27",
           "objectName": "",
           "bounds": [
            1362.4,
@@ -372,7 +372,7 @@
           "source": "Form/TopBar.qml",
           "children": [
            {
-            "className": "QQuickRectangle_QML_33",
+            "className": "QQuickRectangle_QML_28",
             "objectName": "",
             "bounds": [
              1362.4,
@@ -401,7 +401,7 @@
             ]
            },
            {
-            "className": "QQuickRectangle_QML_33",
+            "className": "QQuickRectangle_QML_28",
             "objectName": "",
             "bounds": [
              1383.4,
@@ -446,7 +446,7 @@
         ]
        },
        {
-        "className": "Btn_QMLTYPE_107",
+        "className": "Btn_QMLTYPE_40",
         "objectName": "",
         "bounds": [
          1404.0,
@@ -461,7 +461,7 @@
         "source": "Form/TopBar.qml",
         "children": [
          {
-          "className": "QQuickRectangle_QML_109",
+          "className": "QQuickRectangle_QML_46",
           "objectName": "",
           "bounds": [
            1404.0,
@@ -497,7 +497,7 @@
             "source": "Form/Btn.qml",
             "children": [
              {
-              "className": "Icon_QMLTYPE_25",
+              "className": "Icon_QMLTYPE_29",
               "objectName": "",
               "bounds": [
                1410.0,
@@ -528,7 +528,7 @@
           "source": "Form/Btn.qml"
          },
          {
-          "className": "Tip_QMLTYPE_41",
+          "className": "Tip_QMLTYPE_43",
           "objectName": "",
           "bounds": [
            1404.0,
@@ -549,7 +549,7 @@
     ]
    },
    {
-    "className": "Talk_QMLTYPE_126_QML_474",
+    "className": "Talk_QMLTYPE_280_QML_474",
     "objectName": "talk",
     "bounds": [
      -348.0,
@@ -601,7 +601,7 @@
         "source": "Form/Talk.qml",
         "children": [
          {
-          "className": "QQuickRectangle_QML_204",
+          "className": "QQuickRectangle_QML_347",
           "objectName": "",
           "bounds": [
            -340.0,
@@ -614,7 +614,7 @@
           "source": "Form/Talk.qml"
          },
          {
-          "className": "QQuickRectangle_QML_205",
+          "className": "QQuickRectangle_QML_348",
           "objectName": "",
           "bounds": [
            -332.0,
@@ -627,7 +627,7 @@
           "source": "Form/Talk.qml"
          },
          {
-          "className": "Txt_QMLTYPE_29",
+          "className": "Txt_QMLTYPE_32",
           "objectName": "",
           "bounds": [
            -317.0,
@@ -640,7 +640,7 @@
           "source": "Form/Talk.qml"
          },
          {
-          "className": "Icon_QMLTYPE_25",
+          "className": "Icon_QMLTYPE_29",
           "objectName": "",
           "bounds": [
            -206.6,
@@ -666,7 +666,7 @@
           "source": "Form/Talk.qml"
          },
          {
-          "className": "Tip_QMLTYPE_41",
+          "className": "Tip_QMLTYPE_43",
           "objectName": "",
           "bounds": [
            -340.0,
@@ -709,7 +709,7 @@
       "source": "Form/Talk.qml",
       "children": [
        {
-        "className": "Txt_QMLTYPE_29",
+        "className": "Txt_QMLTYPE_32",
         "objectName": "",
         "bounds": [
          -332.0,
@@ -722,7 +722,7 @@
         "source": "Form/Talk.qml"
        },
        {
-        "className": "Txt_QMLTYPE_29",
+        "className": "Txt_QMLTYPE_32",
         "objectName": "",
         "bounds": [
          -332.0,
@@ -762,7 +762,7 @@
         "enabled": true
        },
        {
-        "className": "ScrollBar_QMLTYPE_158",
+        "className": "ScrollBar_QMLTYPE_39",
         "objectName": "",
         "bounds": [
          -14.0,
@@ -816,7 +816,7 @@
           "source": "Form/Talk.qml",
           "children": [
            {
-            "className": "ScrollView_QMLTYPE_157_QML_240",
+            "className": "ScrollView_QMLTYPE_334_QML_383",
             "objectName": "",
             "bounds": [
              -336.0,
@@ -853,7 +853,7 @@
                 "enabled": true,
                 "children": [
                  {
-                  "className": "TextArea_QMLTYPE_186_QML_241",
+                  "className": "TextArea_QMLTYPE_312_QML_384",
                   "objectName": "composer",
                   "bounds": [
                    -336.0,
@@ -884,7 +884,7 @@
               ]
              },
              {
-              "className": "ScrollBar_QMLTYPE_158",
+              "className": "ScrollBar_QMLTYPE_39",
               "objectName": "",
               "bounds": [
                -30.0,
@@ -896,7 +896,7 @@
               "enabled": true
              },
              {
-              "className": "ScrollBar_QMLTYPE_158",
+              "className": "ScrollBar_QMLTYPE_39",
               "objectName": "",
               "bounds": [
                -336.0,
@@ -936,7 +936,7 @@
               "source": "Form/Talk.qml",
               "children": [
                {
-                "className": "Btn_QMLTYPE_107",
+                "className": "Btn_QMLTYPE_40",
                 "objectName": "",
                 "bounds": [
                  -330.0,
@@ -949,7 +949,7 @@
                 "source": "Form/Talk.qml",
                 "children": [
                  {
-                  "className": "QQuickRectangle_QML_109",
+                  "className": "QQuickRectangle_QML_46",
                   "objectName": "",
                   "bounds": [
                    -330.0,
@@ -988,7 +988,7 @@
                     "source": "Form/Btn.qml",
                     "children": [
                      {
-                      "className": "Icon_QMLTYPE_25",
+                      "className": "Icon_QMLTYPE_29",
                       "objectName": "",
                       "bounds": [
                        -326.0,
@@ -1018,7 +1018,7 @@
                   "source": "Form/Btn.qml"
                  },
                  {
-                  "className": "Tip_QMLTYPE_41",
+                  "className": "Tip_QMLTYPE_43",
                   "objectName": "",
                   "bounds": [
                    -330.0,
@@ -1046,7 +1046,7 @@
                 "source": "Form/Talk.qml",
                 "children": [
                  {
-                  "className": "QQuickRectangle_QML_243",
+                  "className": "QQuickRectangle_QML_386",
                   "objectName": "",
                   "bounds": [
                    -307.0,
@@ -1059,7 +1059,7 @@
                   "source": "Form/Talk.qml"
                  },
                  {
-                  "className": "Txt_QMLTYPE_29",
+                  "className": "Txt_QMLTYPE_32",
                   "objectName": "",
                   "bounds": [
                    -300.0,
@@ -1072,7 +1072,7 @@
                   "source": "Form/Talk.qml"
                  },
                  {
-                  "className": "Icon_QMLTYPE_25",
+                  "className": "Icon_QMLTYPE_29",
                   "objectName": "",
                   "bounds": [
                    -190.6,
@@ -1098,7 +1098,7 @@
                   "source": "Form/Talk.qml"
                  },
                  {
-                  "className": "Tip_QMLTYPE_41",
+                  "className": "Tip_QMLTYPE_43",
                   "objectName": "",
                   "bounds": [
                    -307.0,
@@ -1115,7 +1115,7 @@
               ]
              },
              {
-              "className": "QQuickRectangle_QML_244",
+              "className": "QQuickRectangle_QML_387",
               "objectName": "sendBtn",
               "bounds": [
                -56.0,
@@ -1128,7 +1128,7 @@
               "source": "Form/Talk.qml",
               "children": [
                {
-                "className": "Icon_QMLTYPE_25",
+                "className": "Icon_QMLTYPE_29",
                 "objectName": "",
                 "bounds": [
                  -50.0,
@@ -1154,7 +1154,7 @@
                 "source": "Form/Talk.qml"
                },
                {
-                "className": "Tip_QMLTYPE_41",
+                "className": "Tip_QMLTYPE_43",
                 "objectName": "",
                 "bounds": [
                  -56.0,
@@ -1175,7 +1175,7 @@
         ]
        },
        {
-        "className": "Txt_QMLTYPE_29",
+        "className": "Txt_QMLTYPE_32",
         "objectName": "",
         "bounds": [
          -332.0,
@@ -1229,7 +1229,7 @@
       "source": "Main.qml",
       "children": [
        {
-        "className": "Home_QMLTYPE_246",
+        "className": "Home_QMLTYPE_417",
         "objectName": "homeView",
         "bounds": [
          0.0,
@@ -1253,7 +1253,7 @@
           "source": "Form/Home.qml",
           "children": [
            {
-            "className": "QQuickItem_QML_270",
+            "className": "QQuickItem_QML_441",
             "objectName": "",
             "bounds": [
              320.0,
@@ -1265,7 +1265,7 @@
             "source": "Form/Home.qml",
             "children": [
              {
-              "className": "Viewport_QMLTYPE_39_QML_271",
+              "className": "Viewport_QMLTYPE_140_QML_442",
               "objectName": "homeStage",
               "bounds": [
                320.0,
@@ -1289,7 +1289,7 @@
                 "source": "Form/Viewport.qml"
                },
                {
-                "className": "QQuickMouseArea_QML_100",
+                "className": "QQuickMouseArea_QML_197",
                 "objectName": "",
                 "bounds": [
                  320.0,
@@ -1301,7 +1301,7 @@
                 "source": "Form/Viewport.qml"
                },
                {
-                "className": "FaceDrag_QMLTYPE_52",
+                "className": "FaceDrag_QMLTYPE_147",
                 "objectName": "faceDrag",
                 "bounds": [
                  320.0,
@@ -1416,7 +1416,7 @@
               "source": "Form/Home.qml",
               "children": [
                {
-                "className": "QQuickItem_QML_273",
+                "className": "QQuickItem_QML_444",
                 "objectName": "",
                 "bounds": [
                  120.0,
@@ -1440,7 +1440,7 @@
                   "source": "Form/Home.qml",
                   "children": [
                    {
-                    "className": "Txt_QMLTYPE_29",
+                    "className": "Txt_QMLTYPE_32",
                     "objectName": "",
                     "bounds": [
                      122.0,
@@ -1467,7 +1467,7 @@
                     "source": "Form/Home.qml"
                    },
                    {
-                    "className": "Txt_QMLTYPE_29",
+                    "className": "Txt_QMLTYPE_32",
                     "objectName": "homeTitle",
                     "bounds": [
                      120.0,
@@ -1494,7 +1494,7 @@
                     "source": "Form/Home.qml"
                    },
                    {
-                    "className": "Txt_QMLTYPE_29",
+                    "className": "Txt_QMLTYPE_32",
                     "objectName": "",
                     "bounds": [
                      120.0,
@@ -1521,7 +1521,7 @@
                     "source": "Form/Home.qml"
                    },
                    {
-                    "className": "StartComposer_QMLTYPE_247",
+                    "className": "StartComposer_QMLTYPE_418",
                     "objectName": "startComposer",
                     "bounds": [
                      120.0,
@@ -1533,7 +1533,7 @@
                     "source": "Form/Home.qml",
                     "children": [
                      {
-                      "className": "Shadow_QMLTYPE_34",
+                      "className": "Shadow_QMLTYPE_25",
                       "objectName": "",
                       "bounds": [
                        120.0,
@@ -1545,7 +1545,7 @@
                       "source": "Form/StartComposer.qml",
                       "children": [
                        {
-                        "className": "QQuickRectangle_QML_35",
+                        "className": "QQuickRectangle_QML_26",
                         "objectName": "",
                         "bounds": [
                          115.1,
@@ -1557,7 +1557,7 @@
                         "source": "Form/Shadow.qml"
                        },
                        {
-                        "className": "QQuickRectangle_QML_35",
+                        "className": "QQuickRectangle_QML_26",
                         "objectName": "",
                         "bounds": [
                          110.3,
@@ -1569,7 +1569,7 @@
                         "source": "Form/Shadow.qml"
                        },
                        {
-                        "className": "QQuickRectangle_QML_35",
+                        "className": "QQuickRectangle_QML_26",
                         "objectName": "",
                         "bounds": [
                          105.4,
@@ -1581,7 +1581,7 @@
                         "source": "Form/Shadow.qml"
                        },
                        {
-                        "className": "QQuickRectangle_QML_35",
+                        "className": "QQuickRectangle_QML_26",
                         "objectName": "",
                         "bounds": [
                          100.6,
@@ -1593,7 +1593,7 @@
                         "source": "Form/Shadow.qml"
                        },
                        {
-                        "className": "QQuickRectangle_QML_35",
+                        "className": "QQuickRectangle_QML_26",
                         "objectName": "",
                         "bounds": [
                          95.7,
@@ -1605,7 +1605,7 @@
                         "source": "Form/Shadow.qml"
                        },
                        {
-                        "className": "QQuickRectangle_QML_35",
+                        "className": "QQuickRectangle_QML_26",
                         "objectName": "",
                         "bounds": [
                          90.9,
@@ -1617,7 +1617,7 @@
                         "source": "Form/Shadow.qml"
                        },
                        {
-                        "className": "QQuickRectangle_QML_35",
+                        "className": "QQuickRectangle_QML_26",
                         "objectName": "",
                         "bounds": [
                          86.0,
@@ -1643,7 +1643,7 @@
                       "source": "Form/StartComposer.qml",
                       "children": [
                        {
-                        "className": "QQuickItem_QML_252",
+                        "className": "QQuickItem_QML_423",
                         "objectName": "",
                         "bounds": [
                          120.0,
@@ -1655,7 +1655,7 @@
                         "source": "Form/StartComposer.qml",
                         "children": [
                          {
-                          "className": "ScrollView_QMLTYPE_157",
+                          "className": "ScrollView_QMLTYPE_334",
                           "objectName": "",
                           "bounds": [
                            120.0,
@@ -1689,7 +1689,7 @@
                               "enabled": true,
                               "children": [
                                {
-                                "className": "TextArea_QMLTYPE_186",
+                                "className": "TextArea_QMLTYPE_312",
                                 "objectName": "startText",
                                 "bounds": [
                                  120.0,
@@ -1718,7 +1718,7 @@
                             ]
                            },
                            {
-                            "className": "ScrollBar_QMLTYPE_158",
+                            "className": "ScrollBar_QMLTYPE_39",
                             "objectName": "",
                             "bounds": [
                              830.0,
@@ -1729,7 +1729,7 @@
                             "enabled": true
                            },
                            {
-                            "className": "ScrollBar_QMLTYPE_158",
+                            "className": "ScrollBar_QMLTYPE_39",
                             "objectName": "",
                             "bounds": [
                              120.0,
@@ -1742,7 +1742,7 @@
                           ]
                          },
                          {
-                          "className": "Txt_QMLTYPE_29_QML_253",
+                          "className": "Txt_QMLTYPE_32_QML_424",
                           "objectName": "",
                           "bounds": [
                            142.0,
@@ -1783,7 +1783,7 @@
                           "source": "Form/StartComposer.qml",
                           "children": [
                            {
-                            "className": "Btn_QMLTYPE_107",
+                            "className": "Btn_QMLTYPE_40",
                             "objectName": "startAdd",
                             "bounds": [
                              132.0,
@@ -1799,7 +1799,7 @@
                             "source": "Form/StartComposer.qml",
                             "children": [
                              {
-                              "className": "QQuickRectangle_QML_109",
+                              "className": "QQuickRectangle_QML_46",
                               "objectName": "",
                               "bounds": [
                                132.0,
@@ -1835,7 +1835,7 @@
                                 "source": "Form/Btn.qml",
                                 "children": [
                                  {
-                                  "className": "Icon_QMLTYPE_25",
+                                  "className": "Icon_QMLTYPE_29",
                                   "objectName": "",
                                   "bounds": [
                                    143.0,
@@ -1881,7 +1881,7 @@
                               "source": "Form/Btn.qml"
                              },
                              {
-                              "className": "Tip_QMLTYPE_41",
+                              "className": "Tip_QMLTYPE_43",
                               "objectName": "",
                               "bounds": [
                                132.0,
@@ -1898,7 +1898,7 @@
                             ]
                            },
                            {
-                            "className": "Btn_QMLTYPE_107",
+                            "className": "Btn_QMLTYPE_40",
                             "objectName": "startSketch",
                             "bounds": [
                              249.0,
@@ -1914,7 +1914,7 @@
                             "source": "Form/StartComposer.qml",
                             "children": [
                              {
-                              "className": "QQuickRectangle_QML_109",
+                              "className": "QQuickRectangle_QML_46",
                               "objectName": "",
                               "bounds": [
                                249.0,
@@ -1950,7 +1950,7 @@
                                 "source": "Form/Btn.qml",
                                 "children": [
                                  {
-                                  "className": "Icon_QMLTYPE_25",
+                                  "className": "Icon_QMLTYPE_29",
                                   "objectName": "",
                                   "bounds": [
                                    260.0,
@@ -1996,7 +1996,7 @@
                               "source": "Form/Btn.qml"
                              },
                              {
-                              "className": "Tip_QMLTYPE_41",
+                              "className": "Tip_QMLTYPE_43",
                               "objectName": "",
                               "bounds": [
                                249.0,
@@ -2013,7 +2013,7 @@
                             ]
                            },
                            {
-                            "className": "Btn_QMLTYPE_107",
+                            "className": "Btn_QMLTYPE_40",
                             "objectName": "startLinkBtn",
                             "bounds": [
                              336.0,
@@ -2029,7 +2029,7 @@
                             "source": "Form/StartComposer.qml",
                             "children": [
                              {
-                              "className": "QQuickRectangle_QML_109",
+                              "className": "QQuickRectangle_QML_46",
                               "objectName": "",
                               "bounds": [
                                336.0,
@@ -2065,7 +2065,7 @@
                                 "source": "Form/Btn.qml",
                                 "children": [
                                  {
-                                  "className": "Icon_QMLTYPE_25",
+                                  "className": "Icon_QMLTYPE_29",
                                   "objectName": "",
                                   "bounds": [
                                    347.0,
@@ -2111,7 +2111,7 @@
                               "source": "Form/Btn.qml"
                              },
                              {
-                              "className": "Tip_QMLTYPE_41",
+                              "className": "Tip_QMLTYPE_43",
                               "objectName": "",
                               "bounds": [
                                336.0,
@@ -2128,7 +2128,7 @@
                             ]
                            },
                            {
-                            "className": "Btn_QMLTYPE_107",
+                            "className": "Btn_QMLTYPE_40",
                             "objectName": "",
                             "bounds": [
                              407.0,
@@ -2143,7 +2143,7 @@
                             "source": "Form/StartComposer.qml",
                             "children": [
                              {
-                              "className": "QQuickRectangle_QML_109",
+                              "className": "QQuickRectangle_QML_46",
                               "objectName": "",
                               "bounds": [
                                407.0,
@@ -2179,7 +2179,7 @@
                                 "source": "Form/Btn.qml",
                                 "children": [
                                  {
-                                  "className": "Icon_QMLTYPE_25",
+                                  "className": "Icon_QMLTYPE_29",
                                   "objectName": "",
                                   "bounds": [
                                    413.0,
@@ -2210,7 +2210,7 @@
                               "source": "Form/Btn.qml"
                              },
                              {
-                              "className": "Tip_QMLTYPE_41",
+                              "className": "Tip_QMLTYPE_43",
                               "objectName": "",
                               "bounds": [
                                407.0,
@@ -2241,7 +2241,7 @@
                           "source": "Form/StartComposer.qml",
                           "children": [
                            {
-                            "className": "QQuickRectangle_QML_254",
+                            "className": "QQuickRectangle_QML_425",
                             "objectName": "startSend",
                             "bounds": [
                              708.4,
@@ -2265,7 +2265,7 @@
                               "source": "Form/StartComposer.qml",
                               "children": [
                                {
-                                "className": "Txt_QMLTYPE_29",
+                                "className": "Txt_QMLTYPE_32",
                                 "objectName": "",
                                 "bounds": [
                                  730.4,
@@ -2280,7 +2280,7 @@
                                 "source": "Form/StartComposer.qml"
                                },
                                {
-                                "className": "Icon_QMLTYPE_25",
+                                "className": "Icon_QMLTYPE_29",
                                 "objectName": "",
                                 "bounds": [
                                  791.0,
@@ -2309,7 +2309,7 @@
                               "source": "Form/StartComposer.qml"
                              },
                              {
-                              "className": "Tip_QMLTYPE_41",
+                              "className": "Tip_QMLTYPE_43",
                               "objectName": "",
                               "bounds": [
                                708.4,
@@ -2346,7 +2346,7 @@
                     "source": "Form/Home.qml"
                    },
                    {
-                    "className": "QQuickItem_QML_274",
+                    "className": "QQuickItem_QML_445",
                     "objectName": "startOptions",
                     "bounds": [
                      120.0,
@@ -2370,7 +2370,7 @@
                       "source": "Form/Home.qml",
                       "children": [
                        {
-                        "className": "Txt_QMLTYPE_29",
+                        "className": "Txt_QMLTYPE_32",
                         "objectName": "",
                         "bounds": [
                          128.0,
@@ -2385,7 +2385,7 @@
                         "source": "Form/Home.qml"
                        },
                        {
-                        "className": "Seg_QMLTYPE_128",
+                        "className": "Seg_QMLTYPE_226",
                         "objectName": "startPurpose",
                         "bounds": [
                          188.9,
@@ -2397,7 +2397,7 @@
                         "source": "Form/Home.qml",
                         "children": [
                          {
-                          "className": "QQuickRectangle_QML_130",
+                          "className": "QQuickRectangle_QML_228",
                           "objectName": "",
                           "bounds": [
                            190.9,
@@ -2421,7 +2421,7 @@
                           "source": "Form/Seg.qml",
                           "children": [
                            {
-                            "className": "QQuickRectangle_QML_131",
+                            "className": "QQuickRectangle_QML_229",
                             "objectName": "",
                             "bounds": [
                              190.9,
@@ -2474,7 +2474,7 @@
                               "source": "Form/Seg.qml"
                              },
                              {
-                              "className": "Tip_QMLTYPE_41",
+                              "className": "Tip_QMLTYPE_43",
                               "objectName": "",
                               "bounds": [
                                190.9,
@@ -2491,7 +2491,7 @@
                             ]
                            },
                            {
-                            "className": "QQuickRectangle_QML_131",
+                            "className": "QQuickRectangle_QML_229",
                             "objectName": "",
                             "bounds": [
                              258.1,
@@ -2530,7 +2530,7 @@
                                 "source": "Form/Seg.qml"
                                },
                                {
-                                "className": "BetaTag_QMLTYPE_129",
+                                "className": "BetaTag_QMLTYPE_227",
                                 "objectName": "betaTag",
                                 "bounds": [
                                  336.0,
@@ -2572,7 +2572,7 @@
                                   "source": "Form/BetaTag.qml"
                                  },
                                  {
-                                  "className": "Tip_QMLTYPE_41",
+                                  "className": "Tip_QMLTYPE_43",
                                   "objectName": "",
                                   "bounds": [
                                    336.0,
@@ -2600,7 +2600,7 @@
                               "source": "Form/Seg.qml"
                              },
                              {
-                              "className": "Tip_QMLTYPE_41",
+                              "className": "Tip_QMLTYPE_43",
                               "objectName": "",
                               "bounds": [
                                258.1,
@@ -2623,7 +2623,7 @@
                       ]
                      },
                      {
-                      "className": "Btn_QMLTYPE_107",
+                      "className": "Btn_QMLTYPE_40",
                       "objectName": "startModel",
                       "bounds": [
                        692.0,
@@ -2639,7 +2639,7 @@
                       "source": "Form/Home.qml",
                       "children": [
                        {
-                        "className": "QQuickRectangle_QML_109",
+                        "className": "QQuickRectangle_QML_46",
                         "objectName": "",
                         "bounds": [
                          692.0,
@@ -2675,7 +2675,7 @@
                           "source": "Form/Btn.qml",
                           "children": [
                            {
-                            "className": "Icon_QMLTYPE_25",
+                            "className": "Icon_QMLTYPE_29",
                             "objectName": "",
                             "bounds": [
                              700.0,
@@ -2721,7 +2721,7 @@
                         "source": "Form/Btn.qml"
                        },
                        {
-                        "className": "Tip_QMLTYPE_41",
+                        "className": "Tip_QMLTYPE_43",
                         "objectName": "",
                         "bounds": [
                          692.0,
@@ -2764,7 +2764,7 @@
                     "source": "Form/Home.qml",
                     "children": [
                      {
-                      "className": "Btn_QMLTYPE_107",
+                      "className": "Btn_QMLTYPE_40",
                       "objectName": "startBlank",
                       "bounds": [
                        120.0,
@@ -2780,7 +2780,7 @@
                       "source": "Form/Home.qml",
                       "children": [
                        {
-                        "className": "QQuickRectangle_QML_109",
+                        "className": "QQuickRectangle_QML_46",
                         "objectName": "",
                         "bounds": [
                          120.0,
@@ -2816,7 +2816,7 @@
                           "source": "Form/Btn.qml",
                           "children": [
                            {
-                            "className": "Icon_QMLTYPE_25",
+                            "className": "Icon_QMLTYPE_29",
                             "objectName": "",
                             "bounds": [
                              128.0,
@@ -2862,7 +2862,7 @@
                         "source": "Form/Btn.qml"
                        },
                        {
-                        "className": "Tip_QMLTYPE_41",
+                        "className": "Tip_QMLTYPE_43",
                         "objectName": "",
                         "bounds": [
                          120.0,
@@ -2891,7 +2891,7 @@
                       "source": "Form/Home.qml"
                      },
                      {
-                      "className": "Btn_QMLTYPE_107",
+                      "className": "Btn_QMLTYPE_40",
                       "objectName": "startReplace",
                       "bounds": [
                        226.0,
@@ -2907,7 +2907,7 @@
                       "source": "Form/Home.qml",
                       "children": [
                        {
-                        "className": "QQuickRectangle_QML_109",
+                        "className": "QQuickRectangle_QML_46",
                         "objectName": "",
                         "bounds": [
                          226.0,
@@ -2943,7 +2943,7 @@
                           "source": "Form/Btn.qml",
                           "children": [
                            {
-                            "className": "Icon_QMLTYPE_25",
+                            "className": "Icon_QMLTYPE_29",
                             "objectName": "",
                             "bounds": [
                              234.0,
@@ -2989,7 +2989,7 @@
                         "source": "Form/Btn.qml"
                        },
                        {
-                        "className": "Tip_QMLTYPE_41",
+                        "className": "Tip_QMLTYPE_43",
                         "objectName": "",
                         "bounds": [
                          226.0,
@@ -3010,7 +3010,7 @@
                   ]
                  },
                  {
-                  "className": "QQuickRow_QML_275",
+                  "className": "QQuickRow_QML_446",
                   "objectName": "showpieceCaption",
                   "bounds": [
                    843.0,
@@ -3034,7 +3034,7 @@
                     "source": "Form/Home.qml"
                    },
                    {
-                    "className": "Txt_QMLTYPE_29",
+                    "className": "Txt_QMLTYPE_32",
                     "objectName": "",
                     "bounds": [
                      856.0,
@@ -3051,7 +3051,7 @@
                   ]
                  },
                  {
-                  "className": "Txt_QMLTYPE_29",
+                  "className": "Txt_QMLTYPE_32",
                   "objectName": "",
                   "bounds": [
                    516.0,
@@ -3066,7 +3066,7 @@
                   "source": "Form/Home.qml"
                  },
                  {
-                  "className": "Btn_QMLTYPE_107",
+                  "className": "Btn_QMLTYPE_40",
                   "objectName": "",
                   "bounds": [
                    1239.0,
@@ -3082,7 +3082,7 @@
                   "source": "Form/Home.qml",
                   "children": [
                    {
-                    "className": "QQuickRectangle_QML_109",
+                    "className": "QQuickRectangle_QML_46",
                     "objectName": "",
                     "bounds": [
                      1239.0,
@@ -3118,7 +3118,7 @@
                       "source": "Form/Btn.qml",
                       "children": [
                        {
-                        "className": "Icon_QMLTYPE_25",
+                        "className": "Icon_QMLTYPE_29",
                         "objectName": "",
                         "bounds": [
                          1247.0,
@@ -3164,7 +3164,7 @@
                     "source": "Form/Btn.qml"
                    },
                    {
-                    "className": "Tip_QMLTYPE_41",
+                    "className": "Tip_QMLTYPE_43",
                     "objectName": "",
                     "bounds": [
                      1239.0,
@@ -3187,7 +3187,7 @@
             ]
            },
            {
-            "className": "ScrollBar_QMLTYPE_158",
+            "className": "ScrollBar_QMLTYPE_39",
             "objectName": "",
             "bounds": [
              1434.0,
@@ -3255,7 +3255,7 @@
     "source": "Main.qml"
    },
    {
-    "className": "MorphFrame_QMLTYPE_394",
+    "className": "MorphFrame_QMLTYPE_389",
     "objectName": "",
     "bounds": [
      0.0,
@@ -3267,7 +3267,7 @@
     "source": "Main.qml"
    },
    {
-    "className": "SheetHost_QMLTYPE_295",
+    "className": "SheetHost_QMLTYPE_407",
     "objectName": "",
     "bounds": [
      0.0,
@@ -3279,7 +3279,7 @@
     "source": "Main.qml",
     "children": [
      {
-      "className": "QQuickRectangle_QML_301",
+      "className": "QQuickRectangle_QML_413",
       "objectName": "",
       "bounds": [
        0.0,
@@ -3305,7 +3305,7 @@
       ]
      },
      {
-      "className": "QQuickFocusScope_QML_302",
+      "className": "QQuickFocusScope_QML_414",
       "objectName": "sheetCard",
       "bounds": [
        180.0,
@@ -3342,7 +3342,7 @@
         "source": "Form/SheetHost.qml",
         "children": [
          {
-          "className": "Shadow_QMLTYPE_34",
+          "className": "Shadow_QMLTYPE_25",
           "objectName": "",
           "bounds": [
            180.0,
@@ -3354,7 +3354,7 @@
           "source": "Form/SheetHost.qml",
           "children": [
            {
-            "className": "QQuickRectangle_QML_35",
+            "className": "QQuickRectangle_QML_26",
             "objectName": "",
             "bounds": [
              173.7,
@@ -3366,7 +3366,7 @@
             "source": "Form/Shadow.qml"
            },
            {
-            "className": "QQuickRectangle_QML_35",
+            "className": "QQuickRectangle_QML_26",
             "objectName": "",
             "bounds": [
              167.4,
@@ -3378,7 +3378,7 @@
             "source": "Form/Shadow.qml"
            },
            {
-            "className": "QQuickRectangle_QML_35",
+            "className": "QQuickRectangle_QML_26",
             "objectName": "",
             "bounds": [
              161.1,
@@ -3390,7 +3390,7 @@
             "source": "Form/Shadow.qml"
            },
            {
-            "className": "QQuickRectangle_QML_35",
+            "className": "QQuickRectangle_QML_26",
             "objectName": "",
             "bounds": [
              154.9,
@@ -3402,7 +3402,7 @@
             "source": "Form/Shadow.qml"
            },
            {
-            "className": "QQuickRectangle_QML_35",
+            "className": "QQuickRectangle_QML_26",
             "objectName": "",
             "bounds": [
              148.6,
@@ -3414,7 +3414,7 @@
             "source": "Form/Shadow.qml"
            },
            {
-            "className": "QQuickRectangle_QML_35",
+            "className": "QQuickRectangle_QML_26",
             "objectName": "",
             "bounds": [
              142.3,
@@ -3426,7 +3426,7 @@
             "source": "Form/Shadow.qml"
            },
            {
-            "className": "QQuickRectangle_QML_35",
+            "className": "QQuickRectangle_QML_26",
             "objectName": "",
             "bounds": [
              136.0,
@@ -3490,7 +3490,7 @@
           "source": "Form/SheetHost.qml",
           "children": [
            {
-            "className": "Txt_QMLTYPE_29",
+            "className": "Txt_QMLTYPE_32",
             "objectName": "",
             "bounds": [
              204.0,
@@ -3521,7 +3521,7 @@
         "source": "Form/SheetHost.qml"
        },
        {
-        "className": "Btn_QMLTYPE_107",
+        "className": "Btn_QMLTYPE_40",
         "objectName": "",
         "bounds": [
          1220.0,
@@ -3536,7 +3536,7 @@
         "source": "Form/SheetHost.qml",
         "children": [
          {
-          "className": "QQuickRectangle_QML_109",
+          "className": "QQuickRectangle_QML_46",
           "objectName": "",
           "bounds": [
            1220.0,
@@ -3572,7 +3572,7 @@
             "source": "Form/Btn.qml",
             "children": [
              {
-              "className": "Icon_QMLTYPE_25",
+              "className": "Icon_QMLTYPE_29",
               "objectName": "",
               "bounds": [
                1226.0,
@@ -3603,7 +3603,7 @@
           "source": "Form/Btn.qml"
          },
          {
-          "className": "Tip_QMLTYPE_41",
+          "className": "Tip_QMLTYPE_43",
           "objectName": "",
           "bounds": [
            1220.0,
@@ -3707,7 +3707,7 @@
                   "source": "Form/SettingsSheet.qml"
                  },
                  {
-                  "className": "Field_QMLTYPE_27",
+                  "className": "Field_QMLTYPE_31",
                   "objectName": "settingsSearch",
                   "bounds": [
                    195.0,
@@ -3777,7 +3777,7 @@
                     "source": "Form/SettingsSheet.qml",
                     "children": [
                      {
-                      "className": "Txt_QMLTYPE_29",
+                      "className": "Txt_QMLTYPE_32",
                       "objectName": "",
                       "bounds": [
                        191.0,
@@ -3804,7 +3804,7 @@
                       "source": "Form/SettingsSheet.qml",
                       "children": [
                        {
-                        "className": "Icon_QMLTYPE_25",
+                        "className": "Icon_QMLTYPE_29",
                         "objectName": "",
                         "bounds": [
                          202.0,
@@ -3819,7 +3819,7 @@
                         "source": "Form/SettingsSheet.qml"
                        },
                        {
-                        "className": "Txt_QMLTYPE_29",
+                        "className": "Txt_QMLTYPE_32",
                         "objectName": "",
                         "bounds": [
                          227.0,
@@ -3886,7 +3886,7 @@
                         "source": "Form/SettingsSheet.qml"
                        },
                        {
-                        "className": "Icon_QMLTYPE_25",
+                        "className": "Icon_QMLTYPE_29",
                         "objectName": "",
                         "bounds": [
                          202.0,
@@ -3901,7 +3901,7 @@
                         "source": "Form/SettingsSheet.qml"
                        },
                        {
-                        "className": "Txt_QMLTYPE_29",
+                        "className": "Txt_QMLTYPE_32",
                         "objectName": "",
                         "bounds": [
                          227.0,
@@ -3956,7 +3956,7 @@
                       "source": "Form/SettingsSheet.qml",
                       "children": [
                        {
-                        "className": "Icon_QMLTYPE_25",
+                        "className": "Icon_QMLTYPE_29",
                         "objectName": "",
                         "bounds": [
                          202.0,
@@ -3971,7 +3971,7 @@
                         "source": "Form/SettingsSheet.qml"
                        },
                        {
-                        "className": "Txt_QMLTYPE_29",
+                        "className": "Txt_QMLTYPE_32",
                         "objectName": "",
                         "bounds": [
                          227.0,
@@ -4014,7 +4014,7 @@
                     "source": "Form/SettingsSheet.qml",
                     "children": [
                      {
-                      "className": "Txt_QMLTYPE_29",
+                      "className": "Txt_QMLTYPE_32",
                       "objectName": "",
                       "bounds": [
                        191.0,
@@ -4041,7 +4041,7 @@
                       "source": "Form/SettingsSheet.qml",
                       "children": [
                        {
-                        "className": "Icon_QMLTYPE_25",
+                        "className": "Icon_QMLTYPE_29",
                         "objectName": "",
                         "bounds": [
                          202.0,
@@ -4056,7 +4056,7 @@
                         "source": "Form/SettingsSheet.qml"
                        },
                        {
-                        "className": "Txt_QMLTYPE_29",
+                        "className": "Txt_QMLTYPE_32",
                         "objectName": "",
                         "bounds": [
                          227.0,
@@ -4099,7 +4099,7 @@
                     "source": "Form/SettingsSheet.qml",
                     "children": [
                      {
-                      "className": "Txt_QMLTYPE_29",
+                      "className": "Txt_QMLTYPE_32",
                       "objectName": "",
                       "bounds": [
                        191.0,
@@ -4126,7 +4126,7 @@
                       "source": "Form/SettingsSheet.qml",
                       "children": [
                        {
-                        "className": "Icon_QMLTYPE_25",
+                        "className": "Icon_QMLTYPE_29",
                         "objectName": "",
                         "bounds": [
                          202.0,
@@ -4141,7 +4141,7 @@
                         "source": "Form/SettingsSheet.qml"
                        },
                        {
-                        "className": "Txt_QMLTYPE_29",
+                        "className": "Txt_QMLTYPE_32",
                         "objectName": "",
                         "bounds": [
                          227.0,
@@ -4196,7 +4196,7 @@
                       "source": "Form/SettingsSheet.qml",
                       "children": [
                        {
-                        "className": "Icon_QMLTYPE_25",
+                        "className": "Icon_QMLTYPE_29",
                         "objectName": "",
                         "bounds": [
                          202.0,
@@ -4211,7 +4211,7 @@
                         "source": "Form/SettingsSheet.qml"
                        },
                        {
-                        "className": "Txt_QMLTYPE_29",
+                        "className": "Txt_QMLTYPE_32",
                         "objectName": "",
                         "bounds": [
                          227.0,
@@ -4256,7 +4256,7 @@
                   "source": "Form/SettingsSheet.qml",
                   "children": [
                    {
-                    "className": "Txt_QMLTYPE_29",
+                    "className": "Txt_QMLTYPE_32",
                     "objectName": "",
                     "bounds": [
                      201.0,
@@ -4271,7 +4271,7 @@
                     "source": "Form/SettingsSheet.qml"
                    },
                    {
-                    "className": "Txt_QMLTYPE_29",
+                    "className": "Txt_QMLTYPE_32",
                     "objectName": "",
                     "bounds": [
                      269.0,
@@ -4338,7 +4338,7 @@
                       "source": "Form/SettingsSheet.qml",
                       "children": [
                        {
-                        "className": "Txt_QMLTYPE_29",
+                        "className": "Txt_QMLTYPE_32",
                         "objectName": "settingsTitle",
                         "bounds": [
                          437.0,
@@ -4351,7 +4351,7 @@
                         "source": "Form/SettingsSheet.qml"
                        },
                        {
-                        "className": "Txt_QMLTYPE_29",
+                        "className": "Txt_QMLTYPE_32",
                         "objectName": "",
                         "bounds": [
                          437.0,
@@ -4430,7 +4430,7 @@
                               "source": "Form/SettingsSheet.qml",
                               "children": [
                                {
-                                "className": "Txt_QMLTYPE_29",
+                                "className": "Txt_QMLTYPE_32",
                                 "objectName": "",
                                 "bounds": [
                                  437.0,
@@ -4445,7 +4445,7 @@
                               ]
                              },
                              {
-                              "className": "Txt_QMLTYPE_29",
+                              "className": "Txt_QMLTYPE_32",
                               "objectName": "",
                               "bounds": [
                                437.0,
@@ -4473,7 +4473,7 @@
                             "source": "Form/SettingsSheet.qml",
                             "children": [
                              {
-                              "className": "SettingsRows_QMLTYPE_490",
+                              "className": "SettingsRows_QMLTYPE_485",
                               "objectName": "",
                               "bounds": [
                                437.0,
@@ -4499,7 +4499,7 @@
                                 "source": "Form/SettingsRows.qml",
                                 "children": [
                                  {
-                                  "className": "QQuickItem_QML_491",
+                                  "className": "QQuickItem_QML_486",
                                   "objectName": "",
                                   "bounds": [
                                    437.0,
@@ -4525,7 +4525,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -4538,7 +4538,7 @@
                                       "source": "Form/SettingsRows.qml"
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -4566,7 +4566,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        900.0,
@@ -4579,7 +4579,7 @@
                                       "source": "Form/SettingsRows.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          900.0,
@@ -4618,7 +4618,7 @@
                                           "source": "Form/Btn.qml",
                                           "children": [
                                            {
-                                            "className": "Icon_QMLTYPE_25",
+                                            "className": "Icon_QMLTYPE_29",
                                             "objectName": "",
                                             "bounds": [
                                              904.0,
@@ -4648,7 +4648,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          900.0,
@@ -4663,7 +4663,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Pick_QMLTYPE_340",
+                                      "className": "Pick_QMLTYPE_205",
                                       "objectName": "",
                                       "bounds": [
                                        929.0,
@@ -4676,7 +4676,7 @@
                                       "source": "Form/SettingsRows.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          938.0,
@@ -4689,7 +4689,7 @@
                                         "source": "Form/Pick.qml"
                                        },
                                        {
-                                        "className": "Icon_QMLTYPE_25",
+                                        "className": "Icon_QMLTYPE_29",
                                         "objectName": "",
                                         "bounds": [
                                          1190.0,
@@ -4721,7 +4721,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "QQuickItem_QML_491",
+                                  "className": "QQuickItem_QML_486",
                                   "objectName": "",
                                   "bounds": [
                                    437.0,
@@ -4760,7 +4760,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -4773,7 +4773,7 @@
                                       "source": "Form/SettingsRows.qml"
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -4801,7 +4801,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Pick_QMLTYPE_340",
+                                      "className": "Pick_QMLTYPE_205",
                                       "objectName": "",
                                       "bounds": [
                                        929.0,
@@ -4814,7 +4814,7 @@
                                       "source": "Form/SettingsRows.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          938.0,
@@ -4827,7 +4827,7 @@
                                         "source": "Form/Pick.qml"
                                        },
                                        {
-                                        "className": "Icon_QMLTYPE_25",
+                                        "className": "Icon_QMLTYPE_29",
                                         "objectName": "",
                                         "bounds": [
                                          1190.0,
@@ -4859,7 +4859,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "QQuickItem_QML_491",
+                                  "className": "QQuickItem_QML_486",
                                   "objectName": "",
                                   "bounds": [
                                    437.0,
@@ -4898,7 +4898,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -4911,7 +4911,7 @@
                                       "source": "Form/SettingsRows.qml"
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -4939,7 +4939,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Pick_QMLTYPE_340",
+                                      "className": "Pick_QMLTYPE_205",
                                       "objectName": "",
                                       "bounds": [
                                        929.0,
@@ -4952,7 +4952,7 @@
                                       "source": "Form/SettingsRows.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          938.0,
@@ -4965,7 +4965,7 @@
                                         "source": "Form/Pick.qml"
                                        },
                                        {
-                                        "className": "Icon_QMLTYPE_25",
+                                        "className": "Icon_QMLTYPE_29",
                                         "objectName": "",
                                         "bounds": [
                                          1190.0,
@@ -4997,7 +4997,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "QQuickItem_QML_491",
+                                  "className": "QQuickItem_QML_486",
                                   "objectName": "",
                                   "bounds": [
                                    437.0,
@@ -5036,7 +5036,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -5049,7 +5049,7 @@
                                       "source": "Form/SettingsRows.qml"
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -5077,7 +5077,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Toggle_QMLTYPE_417",
+                                      "className": "Toggle_QMLTYPE_55",
                                       "objectName": "",
                                       "bounds": [
                                        1179.0,
@@ -5091,7 +5091,7 @@
                                       "source": "Form/SettingsRows.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_418",
+                                        "className": "QQuickRectangle_QML_56",
                                         "objectName": "",
                                         "bounds": [
                                          1179.0,
@@ -5104,7 +5104,7 @@
                                         "source": "Form/Toggle.qml",
                                         "children": [
                                          {
-                                          "className": "QQuickRectangle_QML_419",
+                                          "className": "QQuickRectangle_QML_57",
                                           "objectName": "",
                                           "bounds": [
                                            1193.0,
@@ -5185,7 +5185,7 @@
                               "source": "Form/SettingsSheet.qml",
                               "children": [
                                {
-                                "className": "Txt_QMLTYPE_29",
+                                "className": "Txt_QMLTYPE_32",
                                 "objectName": "",
                                 "bounds": [
                                  437.0,
@@ -5200,7 +5200,7 @@
                               ]
                              },
                              {
-                              "className": "Txt_QMLTYPE_29",
+                              "className": "Txt_QMLTYPE_32",
                               "objectName": "",
                               "bounds": [
                                437.0,
@@ -5254,7 +5254,7 @@
                                 "source": "Form/SettingsSheet.qml",
                                 "children": [
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_504",
+                                  "className": "AgentRow_QMLTYPE_81_QML_504",
                                   "objectName": "agentRow",
                                   "bounds": [
                                    437.0,
@@ -5306,7 +5306,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -5319,7 +5319,7 @@
                                         "source": "Form/AgentRow.qml"
                                        },
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          539.6,
@@ -5334,7 +5334,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -5347,7 +5347,7 @@
                                       "source": "Form/AgentRow.qml"
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -5413,7 +5413,7 @@
                               "source": "Form/SettingsSheet.qml",
                               "children": [
                                {
-                                "className": "Txt_QMLTYPE_29",
+                                "className": "Txt_QMLTYPE_32",
                                 "objectName": "",
                                 "bounds": [
                                  437.0,
@@ -5428,7 +5428,7 @@
                               ]
                              },
                              {
-                              "className": "Txt_QMLTYPE_29",
+                              "className": "Txt_QMLTYPE_32",
                               "objectName": "",
                               "bounds": [
                                437.0,
@@ -5479,7 +5479,7 @@
                                 "source": "Form/SettingsSheet.qml",
                                 "children": [
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_505",
+                                  "className": "AgentRow_QMLTYPE_81_QML_505",
                                   "objectName": "secretRow",
                                   "bounds": [
                                    437.0,
@@ -5531,7 +5531,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -5546,7 +5546,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -5574,7 +5574,7 @@
                                     "source": "Form/AgentRow.qml",
                                     "children": [
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "secretField",
                                       "bounds": [
                                        913.0,
@@ -5617,7 +5617,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1119.0,
@@ -5630,7 +5630,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -5669,7 +5669,7 @@
                                           "source": "Form/Btn.qml",
                                           "children": [
                                            {
-                                            "className": "Icon_QMLTYPE_25",
+                                            "className": "Icon_QMLTYPE_29",
                                             "objectName": "",
                                             "bounds": [
                                              1123.0,
@@ -5699,7 +5699,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -5714,7 +5714,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1146.0,
@@ -5727,7 +5727,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -5796,7 +5796,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -5815,7 +5815,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_505",
+                                  "className": "AgentRow_QMLTYPE_81_QML_505",
                                   "objectName": "secretRow",
                                   "bounds": [
                                    437.0,
@@ -5880,7 +5880,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -5895,7 +5895,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -5923,7 +5923,7 @@
                                     "source": "Form/AgentRow.qml",
                                     "children": [
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "secretField",
                                       "bounds": [
                                        913.0,
@@ -5966,7 +5966,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1119.0,
@@ -5979,7 +5979,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -6018,7 +6018,7 @@
                                           "source": "Form/Btn.qml",
                                           "children": [
                                            {
-                                            "className": "Icon_QMLTYPE_25",
+                                            "className": "Icon_QMLTYPE_29",
                                             "objectName": "",
                                             "bounds": [
                                              1123.0,
@@ -6048,7 +6048,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -6063,7 +6063,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1146.0,
@@ -6076,7 +6076,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -6145,7 +6145,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -6164,7 +6164,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_505",
+                                  "className": "AgentRow_QMLTYPE_81_QML_505",
                                   "objectName": "secretRow",
                                   "bounds": [
                                    437.0,
@@ -6227,7 +6227,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -6242,7 +6242,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -6271,7 +6271,7 @@
                                     "source": "Form/AgentRow.qml",
                                     "children": [
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "secretField",
                                       "bounds": [
                                        913.0,
@@ -6317,7 +6317,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1119.0,
@@ -6332,7 +6332,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -6368,7 +6368,7 @@
                                           "source": "Form/Btn.qml",
                                           "children": [
                                            {
-                                            "className": "Icon_QMLTYPE_25",
+                                            "className": "Icon_QMLTYPE_29",
                                             "objectName": "",
                                             "bounds": [
                                              1123.0,
@@ -6399,7 +6399,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -6416,7 +6416,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1146.0,
@@ -6431,7 +6431,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -6499,7 +6499,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -6517,7 +6517,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_505",
+                                  "className": "AgentRow_QMLTYPE_81_QML_505",
                                   "objectName": "secretRow",
                                   "bounds": [
                                    437.0,
@@ -6577,7 +6577,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -6594,7 +6594,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -6623,7 +6623,7 @@
                                     "source": "Form/AgentRow.qml",
                                     "children": [
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "secretField",
                                       "bounds": [
                                        913.0,
@@ -6669,7 +6669,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1119.0,
@@ -6684,7 +6684,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -6720,7 +6720,7 @@
                                           "source": "Form/Btn.qml",
                                           "children": [
                                            {
-                                            "className": "Icon_QMLTYPE_25",
+                                            "className": "Icon_QMLTYPE_29",
                                             "objectName": "",
                                             "bounds": [
                                              1123.0,
@@ -6751,7 +6751,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -6768,7 +6768,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1146.0,
@@ -6783,7 +6783,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -6850,7 +6850,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -6868,7 +6868,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_505",
+                                  "className": "AgentRow_QMLTYPE_81_QML_505",
                                   "objectName": "secretRow",
                                   "bounds": [
                                    437.0,
@@ -6928,7 +6928,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -6945,7 +6945,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -6974,7 +6974,7 @@
                                     "source": "Form/AgentRow.qml",
                                     "children": [
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "secretField",
                                       "bounds": [
                                        913.0,
@@ -7020,7 +7020,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1119.0,
@@ -7035,7 +7035,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -7071,7 +7071,7 @@
                                           "source": "Form/Btn.qml",
                                           "children": [
                                            {
-                                            "className": "Icon_QMLTYPE_25",
+                                            "className": "Icon_QMLTYPE_29",
                                             "objectName": "",
                                             "bounds": [
                                              1123.0,
@@ -7102,7 +7102,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -7119,7 +7119,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1146.0,
@@ -7134,7 +7134,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -7201,7 +7201,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -7219,7 +7219,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_505",
+                                  "className": "AgentRow_QMLTYPE_81_QML_505",
                                   "objectName": "secretRow",
                                   "bounds": [
                                    437.0,
@@ -7279,7 +7279,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -7296,7 +7296,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -7325,7 +7325,7 @@
                                     "source": "Form/AgentRow.qml",
                                     "children": [
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "secretField",
                                       "bounds": [
                                        913.0,
@@ -7371,7 +7371,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1119.0,
@@ -7386,7 +7386,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -7422,7 +7422,7 @@
                                           "source": "Form/Btn.qml",
                                           "children": [
                                            {
-                                            "className": "Icon_QMLTYPE_25",
+                                            "className": "Icon_QMLTYPE_29",
                                             "objectName": "",
                                             "bounds": [
                                              1123.0,
@@ -7453,7 +7453,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -7470,7 +7470,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1146.0,
@@ -7485,7 +7485,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -7552,7 +7552,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -7570,7 +7570,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_505",
+                                  "className": "AgentRow_QMLTYPE_81_QML_505",
                                   "objectName": "secretRow",
                                   "bounds": [
                                    437.0,
@@ -7630,7 +7630,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -7647,7 +7647,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -7676,7 +7676,7 @@
                                     "source": "Form/AgentRow.qml",
                                     "children": [
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "secretField",
                                       "bounds": [
                                        913.0,
@@ -7722,7 +7722,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1119.0,
@@ -7737,7 +7737,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -7773,7 +7773,7 @@
                                           "source": "Form/Btn.qml",
                                           "children": [
                                            {
-                                            "className": "Icon_QMLTYPE_25",
+                                            "className": "Icon_QMLTYPE_29",
                                             "objectName": "",
                                             "bounds": [
                                              1123.0,
@@ -7804,7 +7804,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -7821,7 +7821,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1146.0,
@@ -7836,7 +7836,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -7903,7 +7903,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -7921,7 +7921,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_505",
+                                  "className": "AgentRow_QMLTYPE_81_QML_505",
                                   "objectName": "secretRow",
                                   "bounds": [
                                    437.0,
@@ -7981,7 +7981,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -7998,7 +7998,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -8027,7 +8027,7 @@
                                     "source": "Form/AgentRow.qml",
                                     "children": [
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "secretField",
                                       "bounds": [
                                        913.0,
@@ -8073,7 +8073,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1119.0,
@@ -8088,7 +8088,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -8124,7 +8124,7 @@
                                           "source": "Form/Btn.qml",
                                           "children": [
                                            {
-                                            "className": "Icon_QMLTYPE_25",
+                                            "className": "Icon_QMLTYPE_29",
                                             "objectName": "",
                                             "bounds": [
                                              1123.0,
@@ -8155,7 +8155,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1119.0,
@@ -8172,7 +8172,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1146.0,
@@ -8187,7 +8187,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -8254,7 +8254,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1146.0,
@@ -8319,7 +8319,7 @@
                               "source": "Form/SettingsSheet.qml",
                               "children": [
                                {
-                                "className": "Txt_QMLTYPE_29",
+                                "className": "Txt_QMLTYPE_32",
                                 "objectName": "",
                                 "bounds": [
                                  437.0,
@@ -8336,7 +8336,7 @@
                               ]
                              },
                              {
-                              "className": "Txt_QMLTYPE_29",
+                              "className": "Txt_QMLTYPE_32",
                               "objectName": "",
                               "bounds": [
                                437.0,
@@ -8378,7 +8378,7 @@
                               "source": "Form/SettingsSheet.qml",
                               "children": [
                                {
-                                "className": "ProviderEditor_QMLTYPE_486",
+                                "className": "ProviderEditor_QMLTYPE_481",
                                 "objectName": "",
                                 "bounds": [
                                  437.0,
@@ -8414,7 +8414,7 @@
                                     "source": "Form/ProviderEditor.qml",
                                     "children": [
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        453.0,
@@ -8429,7 +8429,7 @@
                                       "source": "Form/ProviderEditor.qml"
                                      },
                                      {
-                                      "className": "Btn_QMLTYPE_107",
+                                      "className": "Btn_QMLTYPE_40",
                                       "objectName": "",
                                       "bounds": [
                                        1190.0,
@@ -8444,7 +8444,7 @@
                                       "source": "Form/ProviderEditor.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_109",
+                                        "className": "QQuickRectangle_QML_46",
                                         "objectName": "",
                                         "bounds": [
                                          1190.0,
@@ -8480,7 +8480,7 @@
                                           "source": "Form/Btn.qml",
                                           "children": [
                                            {
-                                            "className": "Icon_QMLTYPE_25",
+                                            "className": "Icon_QMLTYPE_29",
                                             "objectName": "",
                                             "bounds": [
                                              1194.0,
@@ -8511,7 +8511,7 @@
                                         "source": "Form/Btn.qml"
                                        },
                                        {
-                                        "className": "Tip_QMLTYPE_41",
+                                        "className": "Tip_QMLTYPE_43",
                                         "objectName": "",
                                         "bounds": [
                                          1190.0,
@@ -8530,7 +8530,7 @@
                                     ]
                                    },
                                    {
-                                    "className": "Txt_QMLTYPE_29",
+                                    "className": "Txt_QMLTYPE_32",
                                     "objectName": "",
                                     "bounds": [
                                      453.0,
@@ -8545,7 +8545,7 @@
                                     "source": "Form/ProviderEditor.qml"
                                    },
                                    {
-                                    "className": "QQuickGrid_QML_487",
+                                    "className": "QQuickGrid_QML_482",
                                     "objectName": "",
                                     "bounds": [
                                      453.0,
@@ -8557,7 +8557,7 @@
                                     "source": "Form/ProviderEditor.qml",
                                     "children": [
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        453.0,
@@ -8572,7 +8572,7 @@
                                       "source": "Form/ProviderEditor.qml"
                                      },
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "providerUrl",
                                       "bounds": [
                                        557.0,
@@ -8618,7 +8618,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        453.0,
@@ -8633,7 +8633,7 @@
                                       "source": "Form/ProviderEditor.qml"
                                      },
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "providerKey",
                                       "bounds": [
                                        557.0,
@@ -8649,7 +8649,7 @@
                                       "source": "Form/ProviderEditor.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_30",
+                                        "className": "QQuickRectangle_QML_34",
                                         "objectName": "",
                                         "bounds": [
                                          554.0,
@@ -8679,7 +8679,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        453.0,
@@ -8694,7 +8694,7 @@
                                       "source": "Form/ProviderEditor.qml"
                                      },
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "providerName",
                                       "bounds": [
                                        557.0,
@@ -8754,7 +8754,7 @@
                                     "source": "Form/ProviderEditor.qml",
                                     "children": [
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        453.0,
@@ -8781,7 +8781,7 @@
                                       "source": "Form/ProviderEditor.qml",
                                       "children": [
                                        {
-                                        "className": "Btn_QMLTYPE_107",
+                                        "className": "Btn_QMLTYPE_40",
                                         "objectName": "",
                                         "bounds": [
                                          986.0,
@@ -8796,7 +8796,7 @@
                                         "source": "Form/ProviderEditor.qml",
                                         "children": [
                                          {
-                                          "className": "QQuickRectangle_QML_109",
+                                          "className": "QQuickRectangle_QML_46",
                                           "objectName": "",
                                           "bounds": [
                                            986.0,
@@ -8849,7 +8849,7 @@
                                           "source": "Form/Btn.qml"
                                          },
                                          {
-                                          "className": "Tip_QMLTYPE_41",
+                                          "className": "Tip_QMLTYPE_43",
                                           "objectName": "",
                                           "bounds": [
                                            986.0,
@@ -8863,7 +8863,7 @@
                                         ]
                                        },
                                        {
-                                        "className": "Btn_QMLTYPE_107",
+                                        "className": "Btn_QMLTYPE_40",
                                         "objectName": "providerCheck",
                                         "bounds": [
                                          1059.0,
@@ -8878,7 +8878,7 @@
                                         "source": "Form/ProviderEditor.qml",
                                         "children": [
                                          {
-                                          "className": "QQuickRectangle_QML_109",
+                                          "className": "QQuickRectangle_QML_46",
                                           "objectName": "",
                                           "bounds": [
                                            1059.0,
@@ -8928,7 +8928,7 @@
                                             "source": "Form/Btn.qml",
                                             "children": [
                                              {
-                                              "className": "Icon_QMLTYPE_25",
+                                              "className": "Icon_QMLTYPE_29",
                                               "objectName": "",
                                               "bounds": [
                                                1070.0,
@@ -8974,7 +8974,7 @@
                                           "source": "Form/Btn.qml"
                                          },
                                          {
-                                          "className": "Tip_QMLTYPE_41",
+                                          "className": "Tip_QMLTYPE_43",
                                           "objectName": "",
                                           "bounds": [
                                            1059.0,
@@ -9041,7 +9041,7 @@
                               "source": "Form/SettingsSheet.qml",
                               "children": [
                                {
-                                "className": "Txt_QMLTYPE_29",
+                                "className": "Txt_QMLTYPE_32",
                                 "objectName": "",
                                 "bounds": [
                                  437.0,
@@ -9058,7 +9058,7 @@
                               ]
                              },
                              {
-                              "className": "Txt_QMLTYPE_29",
+                              "className": "Txt_QMLTYPE_32",
                               "objectName": "",
                               "bounds": [
                                437.0,
@@ -9111,7 +9111,7 @@
                                 "source": "Form/SettingsSheet.qml",
                                 "children": [
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_507",
+                                  "className": "AgentRow_QMLTYPE_81_QML_507",
                                   "objectName": "localRow",
                                   "bounds": [
                                    437.0,
@@ -9159,7 +9159,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -9176,7 +9176,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -9195,7 +9195,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_507",
+                                  "className": "AgentRow_QMLTYPE_81_QML_507",
                                   "objectName": "localRow",
                                   "bounds": [
                                    437.0,
@@ -9255,7 +9255,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -9272,7 +9272,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -9291,7 +9291,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "AgentRow_QMLTYPE_444_QML_507",
+                                  "className": "AgentRow_QMLTYPE_81_QML_507",
                                   "objectName": "localRow",
                                   "bounds": [
                                    437.0,
@@ -9351,7 +9351,7 @@
                                       "source": "Form/AgentRow.qml",
                                       "children": [
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          469.0,
@@ -9368,7 +9368,7 @@
                                       ]
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        469.0,
@@ -9389,7 +9389,7 @@
                               ]
                              },
                              {
-                              "className": "Btn_QMLTYPE_107",
+                              "className": "Btn_QMLTYPE_40",
                               "objectName": "",
                               "bounds": [
                                437.0,
@@ -9402,7 +9402,7 @@
                               "source": "Form/SettingsSheet.qml",
                               "children": [
                                {
-                                "className": "QQuickRectangle_QML_109",
+                                "className": "QQuickRectangle_QML_46",
                                 "objectName": "",
                                 "bounds": [
                                  437.0,
@@ -9441,7 +9441,7 @@
                                   "source": "Form/Btn.qml",
                                   "children": [
                                    {
-                                    "className": "Icon_QMLTYPE_25",
+                                    "className": "Icon_QMLTYPE_29",
                                     "objectName": "",
                                     "bounds": [
                                      445.0,
@@ -9484,7 +9484,7 @@
                                 "source": "Form/Btn.qml"
                                },
                                {
-                                "className": "Tip_QMLTYPE_41",
+                                "className": "Tip_QMLTYPE_43",
                                 "objectName": "",
                                 "bounds": [
                                  437.0,
@@ -9542,7 +9542,7 @@
                               "source": "Form/SettingsSheet.qml",
                               "children": [
                                {
-                                "className": "Txt_QMLTYPE_29",
+                                "className": "Txt_QMLTYPE_32",
                                 "objectName": "",
                                 "bounds": [
                                  437.0,
@@ -9557,7 +9557,7 @@
                               ]
                              },
                              {
-                              "className": "Txt_QMLTYPE_29",
+                              "className": "Txt_QMLTYPE_32",
                               "objectName": "",
                               "bounds": [
                                437.0,
@@ -9585,7 +9585,7 @@
                             "source": "Form/SettingsSheet.qml",
                             "children": [
                              {
-                              "className": "SettingsRows_QMLTYPE_490",
+                              "className": "SettingsRows_QMLTYPE_485",
                               "objectName": "",
                               "bounds": [
                                437.0,
@@ -9611,7 +9611,7 @@
                                 "source": "Form/SettingsRows.qml",
                                 "children": [
                                  {
-                                  "className": "QQuickItem_QML_491",
+                                  "className": "QQuickItem_QML_486",
                                   "objectName": "",
                                   "bounds": [
                                    437.0,
@@ -9637,7 +9637,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -9650,7 +9650,7 @@
                                       "source": "Form/SettingsRows.qml"
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -9678,7 +9678,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Toggle_QMLTYPE_417",
+                                      "className": "Toggle_QMLTYPE_55",
                                       "objectName": "",
                                       "bounds": [
                                        1179.0,
@@ -9692,7 +9692,7 @@
                                       "source": "Form/SettingsRows.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_418",
+                                        "className": "QQuickRectangle_QML_56",
                                         "objectName": "",
                                         "bounds": [
                                          1179.0,
@@ -9705,7 +9705,7 @@
                                         "source": "Form/Toggle.qml",
                                         "children": [
                                          {
-                                          "className": "QQuickRectangle_QML_419",
+                                          "className": "QQuickRectangle_QML_57",
                                           "objectName": "",
                                           "bounds": [
                                            1193.0,
@@ -9739,7 +9739,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "QQuickItem_QML_491",
+                                  "className": "QQuickItem_QML_486",
                                   "objectName": "",
                                   "bounds": [
                                    437.0,
@@ -9778,7 +9778,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -9806,7 +9806,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Toggle_QMLTYPE_417",
+                                      "className": "Toggle_QMLTYPE_55",
                                       "objectName": "",
                                       "bounds": [
                                        1179.0,
@@ -9820,7 +9820,7 @@
                                       "source": "Form/SettingsRows.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_418",
+                                        "className": "QQuickRectangle_QML_56",
                                         "objectName": "",
                                         "bounds": [
                                          1179.0,
@@ -9833,7 +9833,7 @@
                                         "source": "Form/Toggle.qml",
                                         "children": [
                                          {
-                                          "className": "QQuickRectangle_QML_419",
+                                          "className": "QQuickRectangle_QML_57",
                                           "objectName": "",
                                           "bounds": [
                                            1193.0,
@@ -9867,7 +9867,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "QQuickItem_QML_491",
+                                  "className": "QQuickItem_QML_486",
                                   "objectName": "",
                                   "bounds": [
                                    437.0,
@@ -9906,7 +9906,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -9919,7 +9919,7 @@
                                       "source": "Form/SettingsRows.qml"
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -9947,7 +9947,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Toggle_QMLTYPE_417",
+                                      "className": "Toggle_QMLTYPE_55",
                                       "objectName": "",
                                       "bounds": [
                                        1179.0,
@@ -9961,7 +9961,7 @@
                                       "source": "Form/SettingsRows.qml",
                                       "children": [
                                        {
-                                        "className": "QQuickRectangle_QML_418",
+                                        "className": "QQuickRectangle_QML_56",
                                         "objectName": "",
                                         "bounds": [
                                          1179.0,
@@ -9974,7 +9974,7 @@
                                         "source": "Form/Toggle.qml",
                                         "children": [
                                          {
-                                          "className": "QQuickRectangle_QML_419",
+                                          "className": "QQuickRectangle_QML_57",
                                           "objectName": "",
                                           "bounds": [
                                            1193.0,
@@ -10008,7 +10008,7 @@
                                   ]
                                  },
                                  {
-                                  "className": "QQuickItem_QML_491",
+                                  "className": "QQuickItem_QML_486",
                                   "objectName": "",
                                   "bounds": [
                                    437.0,
@@ -10047,7 +10047,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -10060,7 +10060,7 @@
                                       "source": "Form/SettingsRows.qml"
                                      },
                                      {
-                                      "className": "Txt_QMLTYPE_29",
+                                      "className": "Txt_QMLTYPE_32",
                                       "objectName": "",
                                       "bounds": [
                                        455.0,
@@ -10088,7 +10088,7 @@
                                     "source": "Form/SettingsRows.qml",
                                     "children": [
                                      {
-                                      "className": "Field_QMLTYPE_27",
+                                      "className": "Field_QMLTYPE_31",
                                       "objectName": "",
                                       "bounds": [
                                        1089.0,
@@ -10114,7 +10114,7 @@
                                         "source": "Form/Field.qml"
                                        },
                                        {
-                                        "className": "Txt_QMLTYPE_29",
+                                        "className": "Txt_QMLTYPE_32",
                                         "objectName": "",
                                         "bounds": [
                                          1178.2,
@@ -10149,7 +10149,7 @@
                   ]
                  },
                  {
-                  "className": "ScrollBar_QMLTYPE_158",
+                  "className": "ScrollBar_QMLTYPE_39",
                   "objectName": "",
                   "bounds": [
                    1253.0,
@@ -10257,7 +10257,7 @@
           "source": "Form/SheetHost.qml",
           "children": [
            {
-            "className": "Txt_QMLTYPE_29",
+            "className": "Txt_QMLTYPE_32",
             "objectName": "",
             "bounds": [
              204.0,
@@ -10298,7 +10298,7 @@
             "source": "Form/SettingsSheet.qml",
             "children": [
              {
-              "className": "Btn_QMLTYPE_107",
+              "className": "Btn_QMLTYPE_40",
               "objectName": "",
               "bounds": [
                1156.0,
@@ -10313,7 +10313,7 @@
               "source": "Form/SettingsSheet.qml",
               "children": [
                {
-                "className": "QQuickRectangle_QML_109",
+                "className": "QQuickRectangle_QML_46",
                 "objectName": "",
                 "bounds": [
                  1156.0,
@@ -10363,7 +10363,7 @@
                   "source": "Form/Btn.qml",
                   "children": [
                    {
-                    "className": "Icon_QMLTYPE_25",
+                    "className": "Icon_QMLTYPE_29",
                     "objectName": "",
                     "bounds": [
                      1167.0,
@@ -10409,7 +10409,7 @@
                 "source": "Form/Btn.qml"
                },
                {
-                "className": "Tip_QMLTYPE_41",
+                "className": "Tip_QMLTYPE_43",
                 "objectName": "",
                 "bounds": [
                  1156.0,
