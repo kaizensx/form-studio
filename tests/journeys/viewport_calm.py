@@ -217,6 +217,11 @@ def _reveal(ui, start, what):
             ui.run_js(start)
         else:
             start()
+        if isinstance(start, str) and "open(" in start:
+            # the build-up that counts is the opened design's: a late refresh of the design in front before it (an
+            # agent's revision the app noticed a moment ago) may still be drawn first, with its own steps
+            ui.wait_until(lambda: ui.js("!!Store.viewer.model && Store.viewer.model.pid === Store.pid") is True, 30,
+                          "the opened design on the plate " + what)
         ui.wait_until(lambda: any(x["x"] and x["x"][1] for x in sm.samples), 30, "the build-up to start " + what)
         n = ui.js("Store.viewer._steps.length")
         if n >= 3:                        # a picture halfway: some features in place, one arriving, the rest still to come

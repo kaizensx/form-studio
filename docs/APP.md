@@ -43,7 +43,7 @@ uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizens
 
 | Area | What it holds |
 |---|---|
-| **Top bar** | The design and its revision, release state, search (Ctrl/⌘ K) and Settings. No printer and no purpose: the printer is named in Fit, Review and Make of a design made for printing (click it to choose another). A bar under it names any work that takes longer than 300 ms, with progress |
+| **Top bar** | The design and its revision, release state, search (Ctrl/⌘ K) and Settings. No printer and no purpose: the printer is named in Fit, Review and Make of a design made for printing (click it to choose another). Work that takes longer than 300 ms is named in the middle of the bar, on one line, with progress and a hairline under the bar |
 | **Conversation** (left) | The agent conversation for this design: messages, the agent's steps, the views it looked at, attachments. A conversation that made several designs shows them in a strip under its title; click one to open it. Paste a link to attach the file it points at. Resizable; Ctrl/⌘ J hides it |
 | **Viewport** (centre) | The kernel's geometry, one mesh per feature, with its dimensions, on a neutral studio floor with an origin cross and a scale cue. The printer's build plate appears only in Fit, Review and Make of a design made for printing, or with **Show build plate** in Describe and Design. The tool rail on its left edge holds Select, Measure, Annotate, Section, Analyze, Assembly, History, Simulate the print and Photo render |
 | **Stages** (right) | Describe, Design, Fit, Review and Make. Each tab shows where it stands: measured values, features, fit yield, checks to review, release readiness |
@@ -86,6 +86,10 @@ size and volume: continue with one, or ask in words for a mix ("the base of A wi
 real number, a **Measure this** card shows where to measure on a picture or a diagram, the tolerance that matters and
 what the design assumes now; the number you type is committed with how you measured it, and the part updates.
 
+**The conversation is a record of the design.** A step that changes the design is a compact card: an icon, one
+sentence and a small picture of the render the agent took, which opens large. Each new revision posts a card with
+its number, the features it changed, the values from → to, and **Compare** and go back.
+
 **Conversations lead to their designs.** Opening a conversation opens the design in front of it; one that made several
 shows a strip of them under its title, and one that made none says "No design yet" with **Continue the conversation**
 (never the Home question). A design moved to the trash is named as such. While you work on a design, an agent working
@@ -104,6 +108,10 @@ JSON.
 **Sketch pad.** Lines, rectangles, circles, arcs (centre, start, end), freehand strokes and dimensions, snapped to a
 5 mm grid and to the points already drawn (Alt draws freely), with undo and redo. A typed dimension is "stated" and
 overrides the drawn length. The agent receives the shapes as structured geometry in millimetres and the picture.
+
+On the first day, before there is a design, the question and the composer sit on the left and a real build turns
+slowly beside them: a sensor enclosure of 13 features, kernel geometry kept with the app and labelled as an example.
+It is not a project and nothing is created.
 
 ![Home on the first day: one composer, and what you can start from](images/home-empty.webp)
 
