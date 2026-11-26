@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parents[1]
 FONT = ROOT.parents[2] / "form/app/assets/fonts/InstrumentSans.ttf"
 COLS = [("a", "A  Lightbox", "full-bleed studio, floating glass"),
-        ("h", "H  Lightdesk", "A's room and light, B's readout, listing and command line"),
+        ("h", "H  Lightdesk", "A's room and light, B's program listing and command line"),
         ("b", "B  Console", "command line, program listing, readouts")]
 BG, INK, INK2 = (9, 9, 10), (240, 238, 234), (150, 148, 144)
 

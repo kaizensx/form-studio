@@ -1,4 +1,4 @@
-/* Direction H, "Lightdesk": A's room and glass, B's readout, listing and command line. Geist + Geist Mono (SIL OFL 1.1).
+/* Direction H, "Lightdesk": A's room and glass, B's program listing and command line. Geist + Geist Mono (SIL OFL 1.1).
    One accent: periwinkle (--accent). Pass and review stay as small state colours only. */
 :root { --sans: "Geist", sans-serif; --mono: "Geist Mono", monospace; --display: "Geist", sans-serif; --display-w: 600; --display-track: -.04em;
   --bg: #0b0b0c; --ink: #f4f3f1; --ink2: #a9a8a5; --ink3: #74736f; --line: rgba(255,255,255,.09); --accent: #a9b8ff; --pass: #86d9a8; --warn: #f2c36b;
@@ -96,8 +96,8 @@ figcaption .mono { font-size: 11px; color: var(--ink3); } figcaption em { flex-b
 
 /* ---- H: the three instruments, in glass ---- */
 header b { font-size: 13.5px; font-weight: 600; }
-.program header, .readout header { height: 40px; display: flex; align-items: center; gap: 8px; }
-.program header span { color: var(--ink3); font-size: 11px; } .program header em, .readout header em { margin-left: auto; font-style: normal; font-size: 11.5px; color: var(--ink3); }
+.program header { height: 40px; display: flex; align-items: center; gap: 8px; }
+.program header span { color: var(--ink3); font-size: 11px; } .program header em { margin-left: auto; font-style: normal; font-size: 11.5px; color: var(--ink3); }
 .program header .run { color: var(--accent); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; display: flex; align-items: center; gap: 9px; }
 .program header .run .live { background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
 
@@ -115,14 +115,9 @@ header b { font-size: 13.5px; font-weight: 600; }
 .ln.now { background: var(--glass2); box-shadow: inset 0 1px 0 rgba(255,255,255,.1); } .ln.now b { font-weight: 600; }
 .ln.now .no, .ln.now .gl, .ln.now .kw { color: var(--accent); }
 
-/* readout */
-.readout { position: absolute; left: 20px; bottom: 72px; width: 296px; border-radius: 22px; padding: 6px 18px 18px; }
-.cells { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 18px; margin-top: 4px; }
-.cells div { display: grid; gap: 7px; }
-.cells span { font-size: 10px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--ink2); display: flex; justify-content: space-between; align-items: baseline; }
-.cells small, .d7 small { font: 500 10.5px/1 var(--mono); letter-spacing: 0; text-transform: none; color: var(--ink3); }
-/* Geist, not Geist Mono: the mono's zero is slashed and reads as an 8 from across the room. Tabular figures keep the columns still. */
-.cells b, .tokens .d7 { font: 600 38px/1 var(--sans); letter-spacing: -.035em; font-feature-settings: "tnum"; }
+/* the size line, as A: small, above the view buttons. The dimensions are already on the part. */
+.readout { position: absolute; left: 34px; bottom: 74px; font-size: 12px; color: var(--ink); white-space: nowrap; } .readout i { margin: 0 8px; color: var(--ink3); font-style: normal; }
+.readout em { display: block; font: 400 12px var(--sans); color: var(--ink3); margin-top: 3px; }
 
 /* the bar: completions + prompt, one pane */
 .cmd { border-radius: 26px; padding: 6px; }
@@ -151,7 +146,6 @@ html.light .well { background: rgba(255,255,255,.82); }
 figcaption .no { color: var(--ink3); }
 
 /* token sheet */
-.tokens .d7 small { margin-left: 6px; }
 .tokens .d2 .mono { font-size: 12px; font-weight: 500; letter-spacing: 0; color: var(--accent); vertical-align: 9px; margin-right: 8px; }
 .tokens .type .spec { padding: 7px 0; }
 html.light .k { box-shadow: inset 0 0 0 1px rgba(0,0,0,.1); } html.light .cap .mark { filter: brightness(0); opacity: .85; }
