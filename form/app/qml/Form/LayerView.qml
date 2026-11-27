@@ -160,10 +160,9 @@ Item {
         onFailed: function (message) { sim.error = message }
     }
     // the plate falls away at the edges, as in the design viewport
-    Rectangle { anchors.fill: parent
-        gradient: Gradient { orientation: Gradient.Vertical
-            GradientStop { position: 0; color: Theme.alpha(Theme.plate, 0.55) } GradientStop { position: 0.16; color: "transparent" }
-            GradientStop { position: 0.8; color: "transparent" } GradientStop { position: 1; color: Theme.alpha(Theme.plate, 0.7) } } }
+    Fade { anchors.fill: parent; stops: 4
+        c0: Theme.alpha(Theme.plate, 0.55); c1: "transparent"; p1: 0.16
+        c2: "transparent"; p2: 0.8; c3: Theme.alpha(Theme.plate, 0.7); p3: 1 }
 
     // ── top left: way back, and what this is ─────────────────
     Column { x: sim.leftInset + 4; y: sim.topInset; spacing: 10

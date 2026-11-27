@@ -67,6 +67,7 @@ QtObject {
     readonly property color scrim: dark ? Qt.rgba(0.02, 0.02, 0.024, 0.62) : Qt.rgba(0.2, 0.17, 0.14, 0.3)   // behind sheets and the lightbox
     readonly property color shade: dark ? Qt.rgba(0, 0, 0, 0.5) : Qt.rgba(0.24, 0.2, 0.16, 0.16)   // drop shadow under floating layers
     readonly property real shadow: dark ? 1 : 0.3                              // how strong Shadow.qml draws
+    readonly property real under: dark ? 0.075 : 0.93                          // the room's tone, roughly: what a shadow or a scrim falls on (sizes their dither)
     readonly property color gleam: Qt.rgba(1, 1, 1, dark ? 0.08 : 0.9)   // the hairline of light on a raised top edge
     // meaning. Dark: pale tints that glow on graphite. Light: the same hues, deep enough to read on paper.
     readonly property color datum: dark ? "#3ee6ff" : "#06708d"

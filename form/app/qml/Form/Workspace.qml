@@ -722,9 +722,9 @@ Item {
             ScrollBar.vertical: ScrollBar { width: 6 }
             // there is more below: a quiet mark at the foot of the pane
             // (the rows under it fade out into the pane, so the mark never lies across a line of words)
-            Rectangle { parent: scroll; z: 2; anchors.bottom: parent.bottom; x: 1; width: parent.width - 2; height: 30
+            Fade { parent: scroll; z: 2; anchors.bottom: parent.bottom; x: 1; width: parent.width - 2; height: 30
                 opacity: scroll.contentHeight > scroll.height + 4 && scroll.contentY < scroll.contentHeight - scroll.height - 4 ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.base } }
-                gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.glassSolid, 0) } GradientStop { position: 0.75; color: Theme.glassSolid } } }
+                c0: Theme.alpha(Theme.glassSolid, 0); c1: Theme.glassSolid; p1: 0.75 }
             Rectangle { parent: scroll; z: 3; anchors.bottom: parent.bottom; anchors.bottomMargin: 5; anchors.horizontalCenter: parent.horizontalCenter; width: 28; height: 4; radius: 2; color: Theme.alpha(Theme.lineBase, 0.22)
                 opacity: scroll.contentHeight > scroll.height + 4 && scroll.contentY < 4 ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.base } } }
             Connections { target: Store; function onRevealInspector(y) { scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, y)) } }

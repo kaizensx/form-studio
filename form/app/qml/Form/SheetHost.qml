@@ -122,12 +122,12 @@ Item {
                 width: flick.width - (host.fills ? 2 : card.pad * 2); height: host.fills ? flick.height : undefined; source: host.file }
         }
         // scroll shadows: the body slides under the header and the action bar
-        Rectangle { x: 1; y: flick.y; width: parent.width - 2; height: 18; opacity: flick.atYBeginning ? 0 : 1
+        Fade { x: 1; y: flick.y; width: parent.width - 2; height: 18; opacity: flick.atYBeginning ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-            gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.shade, Theme.dark ? 0.26 : 0.07) } GradientStop { position: 1; color: "transparent" } } }
-        Rectangle { x: 1; y: flick.y + flick.height - 18; width: parent.width - 2; height: 18; opacity: flick.atYEnd || flick.contentHeight <= flick.height ? 0 : 1
+            c0: Theme.alpha(Theme.shade, Theme.dark ? 0.26 : 0.07); c1: "transparent" }
+        Fade { x: 1; y: flick.y + flick.height - 18; width: parent.width - 2; height: 18; opacity: flick.atYEnd || flick.contentHeight <= flick.height ? 0 : 1
             Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-            gradient: Gradient { GradientStop { position: 0; color: "transparent" } GradientStop { position: 1; color: Theme.alpha(Theme.shade, Theme.dark ? 0.3 : 0.08) } } }
+            c0: "transparent"; c1: Theme.alpha(Theme.shade, Theme.dark ? 0.3 : 0.08) }
 
         // action bar: secondary left, primary right
         Item {

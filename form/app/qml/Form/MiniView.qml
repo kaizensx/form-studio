@@ -22,11 +22,10 @@ Item {
     Item { id: wait; anchors.fill: parent; clip: true
         opacity: mv.loaded ? 0 : 1; visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: Theme.cross; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
-        Rectangle { id: band; visible: !mv.failed; width: parent.width * 0.6; height: parent.height * 2.2; y: -parent.height * 0.6; rotation: 18
-            gradient: Gradient { orientation: Gradient.Horizontal
-                GradientStop { position: 0; color: Theme.alpha(Theme.lineBase, 0) }
-                GradientStop { position: 0.5; color: Theme.alpha(Theme.lineBase, Theme.dark ? 0.045 : 0.06) }
-                GradientStop { position: 1; color: Theme.alpha(Theme.lineBase, 0) } }
+        Fade { id: band; visible: !mv.failed; width: parent.width * 0.6; height: parent.height * 2.2; y: -parent.height * 0.6; rotation: 18
+            across: true; stops: 3
+            c0: Theme.alpha(Theme.lineBase, 0); c1: Theme.alpha(Theme.lineBase, Theme.dark ? 0.045 : 0.06); p1: 0.5
+            c2: Theme.alpha(Theme.lineBase, 0); p2: 1
             x: Theme.reduced ? parent.width * 0.2 : -width
             SequentialAnimation on x { running: wait.visible && !mv.failed && !Theme.reduced; loops: Animation.Infinite
                 NumberAnimation { from: -band.width; to: wait.width; duration: 1300; easing.type: Easing.InOutSine }

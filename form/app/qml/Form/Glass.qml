@@ -43,12 +43,23 @@ Item {
                 textureSize: Qt.size(Math.max(8, Math.ceil(g.width / 4)), Math.max(8, Math.ceil(g.height / 4)))
                 live: true; smooth: true; recursive: false
             }
-            Rectangle { id: shape; anchors.fill: parent; radius: g.radius; visible: false; layer.enabled: true; antialiasing: true }
+            // The blur is kept in floating point at a quarter of the pane's size (it has no detail to lose) and only
+            // the last pass (shaders/glass.frag) writes it to the screen: cut to the pane's shape and dithered, so a
+            // blurred dark room shows no contour lines inside the pane. After changing glass.frag, build it again:
+            //   pyside6-qsb --glsl "100 es,120,150" --hlsl 50 --msl 12 -o shaders/glass.frag.qsb shaders/glass.frag
             MultiEffect {
                 anchors.fill: parent; source: grab
                 blurEnabled: true; blur: 1; blurMax: 32; blurMultiplier: 1.0; autoPaddingEnabled: false
                 saturation: 0.3
-                maskEnabled: true; maskSource: shape; maskThresholdMin: 0.5; maskSpreadAtMin: 1
+                layer.enabled: true; layer.format: ShaderEffectSource.RGBA16F; layer.smooth: true
+                layer.textureSize: grab.textureSize
+                layer.effect: ShaderEffect {
+                    fragmentShader: "shaders/glass.frag.qsb"
+                    property real radius: g.radius
+                    // the tint and the glass laid over the blur thin its dither: it is made that much stronger here
+                    property real grain: Math.min(6, 1 / Math.max(0.15, (1 - Theme.glassTint.a * g.strength) * (1 - Theme.glass.a)))
+                    property size size: Qt.size(g.width, g.height)
+                }
             }
         }
     }

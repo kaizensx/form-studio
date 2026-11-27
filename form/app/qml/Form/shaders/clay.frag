@@ -29,3 +29,30 @@ void MAIN()
         ROUGHNESS = 1.0;
     }
 }
+// The lit colour is dithered before it is written (uDither: how many 8-bit steps): a smooth face lit across a few
+// steps is otherwise drawn as bands. The noise is fixed to the pixels, so a still view is not redrawn for it. The
+// colour here is linear and the step is one of the display's, so it is scaled by the display curve's slope at this
+// tone; it is centred (two samples, triangular), so the tone is kept.
+float pixelHash(vec2 p)
+{
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+void POST_PROCESS()
+{
+    COLOR_SUM = vec4(DIFFUSE.rgb + SPECULAR + EMISSIVE, DIFFUSE.a);
+    vec3 x = max(COLOR_SUM.rgb, vec3(1e-4));
+    // how far one display step is in linear light at this tone: the display's gamma, and in the dark room the
+    // filmic curve before it (uFilmic), which flattens the bright tones
+    vec3 step1 = 2.2 * pow(x, vec3(0.545));
+    if (uFilmic > 0.5) {
+        vec3 num = x * (x + 0.0245786) - 0.000090537;
+        vec3 den = x * (0.983729 * x + 0.432951) + 0.238081;
+        vec3 f = num / den;
+        vec3 df = ((2.0 * x + 0.0245786) * den - num * (1.967458 * x + 0.432951)) / (den * den);
+        step1 = min(2.2 * pow(max(f, vec3(1e-4)), vec3(0.545)) / max(df, vec3(0.03)), vec3(12.0));
+    }
+    float n = pixelHash(gl_FragCoord.xy) + pixelHash(gl_FragCoord.xy + vec2(37.0, 17.0)) - 1.0;
+    COLOR_SUM.rgb += n * uDither / 255.0 * step1;
+}

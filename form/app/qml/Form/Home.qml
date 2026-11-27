@@ -142,7 +142,12 @@ Item {
                 width: parent.width - x
                 height: parent.height
                 layer.enabled: true
-                layer.effect: MultiEffect { maskEnabled: true; maskSource: benchFade; maskThresholdMin: 0.5; maskSpreadAtMin: 1 }
+                // (Veil: dithered, so the fall shows no rings; a software renderer masks it with the drawn ellipse below)
+                readonly property bool plain: GraphicsInfo.api === GraphicsInfo.Software
+                Component { id: benchVeil; Veil { full: 0.5; centre: Qt.point(bf.free + (bf.width - bf.free) / 2, bf.height * 0.52)
+                    readonly property real r: Math.max(260, Math.min(bf.width - bf.free, bf.height) * 0.62); radii: Qt.point(r, r) } }
+                Component { id: benchMask; MultiEffect { maskEnabled: true; maskSource: benchFade; maskThresholdMin: 0.5; maskSpreadAtMin: 1 } }
+                layer.effect: plain ? benchMask : benchVeil
                 Viewport {
                     id: stage; objectName: "homeStage"
                     anchors.fill: parent
@@ -158,7 +163,7 @@ Item {
                 }
             }
             // where the 3D view shows: full around the part, falling away to nothing before the words and the edges
-            Item { id: benchFade; x: frame3d.x; width: frame3d.width; height: frame3d.height; visible: false; layer.enabled: true
+            Item { id: benchFade; x: frame3d.x; width: frame3d.width; height: frame3d.height; visible: false; layer.enabled: frame3d.plain
                 Shape { id: bf; anchors.fill: parent
                     readonly property real free: frame3d.edge - frame3d.x
                     ShapePath {

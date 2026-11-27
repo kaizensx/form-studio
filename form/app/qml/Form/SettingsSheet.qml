@@ -242,12 +242,12 @@ Item {
         }
     }
     // the page slides under the title bar and the action bar
-    Rectangle { x: st.railW; width: pane.width; height: 16; opacity: pane.atYBeginning ? 0 : 1
+    Fade { x: st.railW; width: pane.width; height: 16; opacity: pane.atYBeginning ? 0 : 1
         Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-        gradient: Gradient { GradientStop { position: 0; color: Theme.alpha(Theme.shade, Theme.dark ? 0.26 : 0.07) } GradientStop { position: 1; color: "transparent" } } }
-    Rectangle { x: st.railW; y: parent.height - 16; width: pane.width; height: 16; opacity: pane.atYEnd || pane.contentHeight <= pane.height ? 0 : 1
+        c0: Theme.alpha(Theme.shade, Theme.dark ? 0.26 : 0.07); c1: "transparent" }
+    Fade { x: st.railW; y: parent.height - 16; width: pane.width; height: 16; opacity: pane.atYEnd || pane.contentHeight <= pane.height ? 0 : 1
         Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-        gradient: Gradient { GradientStop { position: 0; color: "transparent" } GradientStop { position: 1; color: Theme.alpha(Theme.shade, Theme.dark ? 0.3 : 0.08) } } }
+        c0: "transparent"; c1: Theme.alpha(Theme.shade, Theme.dark ? 0.3 : 0.08) }
 
     // a titled group on a page: its title, a mono note for what applies at once, one quiet line, then its card
     component Group: Column {

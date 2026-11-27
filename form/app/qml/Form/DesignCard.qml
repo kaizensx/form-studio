@@ -40,30 +40,24 @@ Item {
     transform: Translate { id: rise; y: 0 }
 
     // the pool of key light the part stands in: an ellipse on the floor that brightens under the pointer
-    Shape {
+    Fade {
         id: pool; x: Math.round(card.width * 0.08); width: card.width - 2 * x; height: 110; y: card.plinth - 6 - height
         opacity: card.asking ? 0.4 : card.hot ? 1 : 0.62
         Behavior on opacity { NumberAnimation { duration: Theme.base } }
-        ShapePath {
-            strokeWidth: -1
-            fillGradient: RadialGradient {
-                centerX: pool.width / 2; centerY: pool.width / 2; centerRadius: pool.width / 2; focalX: centerX; focalY: centerY
-                GradientStop { position: 0; color: Theme.alpha(Theme.key, Theme.dark ? 0.3 : 0.9) }
-                GradientStop { position: 1; color: Theme.alpha(Theme.key, 0) } }
-            startX: 0; startY: 0
-            PathLine { x: pool.width; y: 0 } PathLine { x: pool.width; y: pool.width } PathLine { x: 0; y: pool.width } PathLine { x: 0; y: 0 }
-        }
-        transform: Scale { yScale: pool.height / Math.max(1, pool.width) }
+        radial: true; c0: Theme.alpha(Theme.key, Theme.dark ? 0.3 : 0.9); c1: Theme.alpha(Theme.key, 0)
     }
 
     // the part on the studio floor, turning while you look at it. Its frame has no edge: the floor fades into the
-    // room all round (one small mask per card, drawn again only when the part itself changes).
+    // room all round (Veil: dithered, so the fall shows no rings; a software renderer masks it with a drawn ellipse).
     Item {
         id: stagePv; width: parent.width; height: card.plinth
         scale: cm.pressed ? Theme.from(0.985) : 1
         Behavior on scale { Glide { duration: Theme.press } }
         transform: Translate { y: card.hot && !cm.pressed ? -Theme.shift(4) : 0; Behavior on y { Glide { duration: Theme.base } } }
-        Item { id: fade; anchors.fill: parent; anchors.topMargin: card.member ? -10 : -22; anchors.bottomMargin: card.member ? -8 : -16; visible: false; layer.enabled: true
+        readonly property bool plain: GraphicsInfo.api === GraphicsInfo.Software
+        Component { id: veilFx; Veil { full: 0.55 } }
+        Component { id: maskFx; MultiEffect { maskEnabled: true; maskSource: fade; maskThresholdMin: 0.5; maskSpreadAtMin: 1 } }
+        Item { id: fade; anchors.fill: parent; anchors.topMargin: card.member ? -10 : -22; anchors.bottomMargin: card.member ? -8 : -16; visible: false; layer.enabled: stagePv.plain
             Shape { id: fs; width: parent.width; height: parent.width
                 transform: Scale { yScale: fade.height / Math.max(1, fade.width) }
                 ShapePath {
@@ -79,7 +73,7 @@ Item {
         MiniView { anchors.fill: parent; anchors.topMargin: card.member ? -10 : -22; anchors.bottomMargin: card.member ? -8 : -16; projectId: card.p.id || ""; turning: card.hot && !card.asking
             opacity: card.asking ? 0.35 : 1; Behavior on opacity { NumberAnimation { duration: Theme.base } }
             layer.enabled: true
-            layer.effect: MultiEffect { maskEnabled: true; maskSource: fade; maskThresholdMin: 0.5; maskSpreadAtMin: 1 } }
+            layer.effect: stagePv.plain ? maskFx : veilFx }
     }
     Rectangle { visible: !!card.photo && pim.status === Image.Ready; anchors.right: stagePv.right; anchors.bottom: stagePv.bottom; anchors.margins: 10
         width: 58; height: 44; radius: Theme.rSm; color: Theme.plate; border.color: phm.containsMouse ? Theme.rule3 : Theme.rule2; clip: true; z: 2

@@ -39,6 +39,9 @@ Item {
     readonly property real lightK: Theme.dark ? 1 : 0.48
     property bool floorGrid: !lite           // the 10 mm drafting grid on the studio floor (off for thumbnails)
     property bool lite: false                // thumbnails: no shadow map, no AO, lighter MSAA (many on screen at once)
+    // the part is dithered by this many 8-bit steps before it is written (clay.frag, game.frag): a smooth face lit
+    // across a few steps otherwise shows as bands. Fixed to the pixels: a still view is not redrawn for it.
+    readonly property real ditherK: 1
     property real plateSize: 180
     property string stageMode: "studio"      // studio: the neutral floor | plate: the printer's build plate on it
     // the plate fades in and out with its stage instead of cutting; plateShown is what a test reads
@@ -744,6 +747,7 @@ Item {
                         geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                         materials: CustomMaterial {
                             shadingMode: CustomMaterial.Shaded; cullMode: pmod.k < 1 ? Material.BackFaceCulling : Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                            property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                             property real uWipe: vp._wipePx; property real uWipeSide: 1
                             property real uMap: 0
                             property color uColor: vp.partColor(feature, "")
@@ -794,6 +798,7 @@ Item {
                                 geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                                 materials: CustomMaterial {
                                     shadingMode: CustomMaterial.Shaded; cullMode: amod.k < 1 ? Material.BackFaceCulling : Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                                    property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                                     property real uWipe: vp._wipePx; property real uWipeSide: 1
                                     property real uMap: 0
                                     property color uColor: vp.partColor(feature, pn.pid)
@@ -846,6 +851,7 @@ Item {
                         geometry: MeshGeometry { positions: xmod.modelData.positions; indices: xmod.modelData.indices }
                         materials: CustomMaterial {
                             shadingMode: CustomMaterial.Shaded; cullMode: vp.wipeOn || vp._altMix >= 1 ? Material.NoCulling : Material.BackFaceCulling; fragmentShader: "shaders/clay.frag"
+                            property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                             property real uWipe: vp._wipePx; property real uWipeSide: -1
                             property real uMap: 0
                             property color uColor: vp.partColor("\u0001other", "")          // the design's own colour, never the selection's
@@ -868,6 +874,7 @@ Item {
                 Model { objectName: "gameLod"; visible: !!vp.game; pickable: false; castsShadows: true; receivesShadows: true
                     geometry: GameGeometry { source: vp.game || ({}) }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Shaded; fragmentShader: "shaders/game.frag"; cullMode: Material.BackFaceCulling
+                        property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                         property real uMode: vp.gameMode === "checker" ? 1 : vp.gameMode === "channel" ? 2 : 0
                         property real uHasTex: vp.gameTex && vp.gameTex.base_color ? 1 : 0
                         property real uHasOrm: vp.gameTex && vp.gameTex.orm ? 1 : 0
@@ -948,6 +955,7 @@ Item {
                     geometry: MeshGeometry { id: ageo; source: vp._map }
                     materials: CustomMaterial {
                         shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                        property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                         property real uWipe: -1; property real uWipeSide: 1
                         property real uMap: vp.mapMix
                         property color uColor: Theme.clay
