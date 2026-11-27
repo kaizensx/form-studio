@@ -1,231 +1,202 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
+
+Form Studio 1.1 is the largest release since 1.0. The app has a new look and layout, Lightdesk: the 3D view fills
+the window, every control is a pane of glass, the conversation is a column on the left, and one colour, electric
+cyan, means "this is where you are". You can now bring anything (a mesh, a scan, a sculpt, a STEP, a photo, a PDF,
+a link or only words) and a triage step works out what it is and what to make of it. Designs are checked against
+the numbers you asked for, built one feature at a time while you watch, and refined after they build. Settings is
+reorganised, with a switch for every engine you install, and the agent and model are chosen right on Home.
 
 ### New
 
-- **Bring anything; Form Studio works out what it is.** A new triage step looks at whatever you attach or describe
-  (a mesh, a STEP, a photo, a sketch, a PDF, a link, or only words), says what it is and takes the right route by
-  itself. A mesh is classed mechanical, organic or mixed from its own surface, with its triangle count, defects, a
-  guess at its units and how many bodies it holds. `triage` is an MCP tool and `form triage FILE` in the terminal;
-  "Make editable" and `reconstruct` run it themselves. You are asked only when the answer changes the result, with
-  one question.
-- **Scans and sculpts become designs.** A figure, a scan or a sculpt no longer has to pretend to be a mechanical
-  part. A smooth closed sculpt becomes a surface body: NURBS faces over a cage you can edit, with a STEP export. One
-  with fine detail, handles or many triangles becomes a mesh body: the repaired mesh with a Scale and a Flat base
-  parameter, into which exact CAD features (holes, pockets, a split) are cut. The result says how far it is from
-  your file, as measured, and what it is not.
-- **Imperfect meshes are repaired, and every repair is listed.** Sliver triangles hanging off an edge, triangles
-  facing the wrong way, small holes, flat openings and loose debris are fixed before anything is refused; vertices
-  are never moved. A large opening that is not flat is never guessed: the file stays a reference and you are told.
-- **Heavy meshes are welcome.** A mesh with more triangles than a design can carry gets a lighter working copy
-  that stays closed, and the distance between the copy and your file is measured and shown. Your file is unchanged
-  and stays beside the design to compare with. A reference mesh above 400,000 triangles is drawn from a lighter
-  copy instead of being refused.
-- **While a design is being made, its words sit in the middle of the stage, and a long conversation moves to the
-  side.** The conversation starts as a small panel under the stage; when it grows (tool steps, a question with long
-  answers) it glides to the left column it has in the workspace, so the stage stays clear and a question card keeps
-  its reply buttons in view.
-- **A new look: Lightdesk.** The 3D view now fills the whole window and every control floats over it as a pane of
-  glass, in the dark studio or on paper. One colour, electric cyan, always means "this is where you are"; green only
-  means pass and amber only means review. The app is set in Geist and Geist Mono.
-- **A smooth room.** The dark studio's wall, its pool of light and the floor under the part are dithered, so their
-  slow gradients no longer show as bands on a display.
+- **Bring anything; Form Studio works out what it is.** A triage step looks at whatever you attach or describe (a
+  mesh, a STEP, a photo, a sketch, a PDF, a link, or only words), says what it is and takes the right route. A mesh
+  is classed mechanical, organic or mixed from its own surface, with its triangle count, defects, a guess at its
+  units and its bodies. `triage` is an MCP tool and `form triage FILE` in the terminal; "Make editable" and
+  `reconstruct` run it themselves. You are asked only when the answer changes the result, with one question.
+- **Scans and sculpts become designs.** A smooth closed sculpt becomes a surface body: NURBS faces over a cage you
+  can edit, with a STEP export. One with fine detail, handles or many triangles becomes a mesh body: the repaired
+  mesh with a Scale and a Flat base parameter, into which exact CAD features (holes, pockets, a split) are cut. The
+  result says how far it is from your file, as measured, and what it is not.
+- **Imperfect meshes are repaired, and every repair is listed.** Sliver triangles on an edge, triangles facing the
+  wrong way, small holes, flat openings and loose debris are fixed before anything is refused; vertices are never
+  moved. A large opening that is not flat is never guessed: the file stays a reference and you are told.
+- **Heavy meshes are welcome.** A mesh with more triangles than a design can carry gets a lighter working copy that
+  stays closed, with its distance from your file measured and shown; your file is unchanged. A reference mesh above
+  400,000 triangles is drawn from a lighter copy instead of being refused.
+- **Mesh to editable CAD.** Make editable turns an STL, OBJ or 3MF into a new design checked against the mesh, and
+  shows it: the mesh's outline stays on screen while the CAD grows inside it, with the largest distance between the
+  two counted beside it. Analytic and freeform faces and a feature tree from the mesh are Beta.
+- **A new look: Lightdesk.** The 3D view fills the whole window and every control floats over it as a pane of glass,
+  in the dark studio or on paper. One colour, electric cyan, always means "this is where you are"; green only means
+  pass and amber only means review. The app is set in Geist and Geist Mono, and Home, the first run, Settings,
+  sheets, menus and messages use the same glass, type and colours.
+- **The conversation is a column on the left.** Once something is said, the conversation is a glass column beside
+  the stage (drag its edge to resize it; the width is remembered) with the prompt at its foot. Ctrl/⌘ J or Fold
+  turns it into one bar under the part: a status line, up to four numbered suggestions (press 1 to 4) and the
+  prompt. The part, its dimension lines and the print simulation are framed in the stage that is left.
+- **Calm and Focus.** A click into the 3D view, or Esc, folds the conversation to its bar; taking up the prompt
+  brings it back. Focus (Ctrl/⌘ .) steps both side columns away and leaves the part alone. A tab on the pane's edge
+  folds the pane.
+- **The top of the window is three capsules.** The design, its revision and its state, with a way back to all
+  designs; the stages (Describe, Design, Fit, Review, Make) on the window's centre line, each with one line that
+  says where it stands; the printer (when printing is on), search and Settings.
+- **The features are a program.** In Design the features are a numbered listing in build order. While a design
+  builds it runs: a light travels down the margin to the line being built and built lines are ticked. The pipeline
+  is one line at the pane's foot: a dot for each step, what the checks found, and Auto.
+- **A build has a title.** While a design builds, a pane in the lower part of the stage names the feature being
+  made in large type, with its number, a track with one segment per step and the feature before and after. The part
+  stands as large as it will at rest, its edges traced before each solid rises, and its size so far is on thin lit
+  dimension lines and one small line above the view buttons.
+- **While a design is being made, its words sit in the middle of the stage.** The agent's real steps are written
+  there; a conversation that grows (tool steps, a question with long answers) glides to the left column, and a
+  question keeps its reply buttons in view.
+- **No bands anywhere.** The room, the floor, shadows, glows, glass, fades and the part itself are dithered, so
+  slow gradients no longer show as steps on a display. The part stands in a pool of warm light; the 10 mm grid is
+  off until you ask for it.
+- **A thin lit caret.** In every text field the caret is a thin line of cyan as tall as the text, lit while you
+  type and blinking once the field is still.
 - **The agent and model are chosen in Home's composer.** A chip beside Design it names the agent, the model and the
-  effort and opens the same picker as a conversation; what you pick is what the next design is made with. With no
-  agent connected it says so and opens Settings › Agents & models.
-- **The top of the window is three capsules.** The design, its revision and its state on the left; the stages
-  (Describe, Design, Fit, Review, Make) in the middle, each with one line that says where it stands; the printer (when
-  printing is on), search and Settings on the right.
-- **The features are a program.** In Design the feature list is a numbered listing in build order. While a design
-  builds it runs: a light travels down the margin to the line being built, built lines are ticked, and the header
-  counts the steps.
-- **A build has a title.** While a design builds, the lower part of the view names the feature being made in large
-  type, with its number, a track with one segment per step, and the feature before and after. The numbers are the
-  build's own.
-- **The conversation is one bar under the part.** A status line, up to four numbered suggestions (press 1 to 4 to
-  pick one while the prompt is empty), and the prompt. It opens upward into the whole conversation and folds back
-  with Ctrl/⌘ J or a click on its status line; it folds by itself while a build plays.
-- **The size is one small line.** Width × depth × height and volume sit above the view buttons, bottom left. During
-  a build they are the size of what is built so far.
-- **A calmer floor.** The part stands in a pool of warm light. The 10 mm grid is off until you ask for it with the
-  grid button beside the views.
-- **Glass you can turn off.** With "Reduce transparency" on, in Low Power Mode or without a graphics card the panes
-  are solid and nothing is blurred. Reduce Motion keeps only fades.
-- **Home, the first run, Settings, sheets, menus and messages** use the same glass, type and colours.
-- **Words sit where they belong.** Every label is now in the middle of its line, so text lines up with the icon, dot
-  or tag beside it everywhere in the app. On a Mac the text is also drawn at its real weight; it used to look a
-  little bold.
-- **Light that looks like light.** The margin of a running program, the step being built and the prompt's caret have
-  a soft glow around a sharp shape. The dimension lines on the part are thin lines with a dot at each end and a small
-  number, with nothing around them, and they are drawn in when they appear.
-- **The program's margin line no longer runs through its ticks.** The ticks and the pointer stand beside the line.
-  The line being built is one pane that glides from line to line, and a tick lands with a small spring.
-- **The bar is one line while a build plays** and while a conversation is folded: the prompt, attach, the agent and
-  send in a row. The build's title stands clear above it.
-- **The pipeline capsule is on a grid**: every value sits right under its name and the dots are level with the names.
-- **Menus are easier to read** over the part, and a button's tooltip no longer covers the menu it opened.
-- **A still window is quieter.** Home with an empty prompt used to redraw about 65 times a second; it now redraws
-  about 15 times a second or fewer, and so does a design that is open and still.
-
+  effort and opens the same picker as a conversation. With no agent connected it opens Settings › Agents & models.
+- **Home on the first day shows a real build.** With no designs yet, a sensor enclosure (13 features, real geometry
+  from the CAD kernel, labelled as an example) turns beside the composer. Nothing is created.
+- **The conversation reads as a record of the design.** A step that changes the design is a card with one sentence
+  and the render the agent took. A new revision posts its number, the features it changed, the values as from → to,
+  and Compare.
+- **Glass you can turn off, and a quieter window.** With "Reduce transparency" on, in Low Power Mode or without a
+  graphics card the panes are solid; Reduce Motion keeps only fades. A still window redraws about 15 times a second
+  or fewer (it was about 65).
 - **A design is checked against what you asked for.** The numbers in a request (sizes, hole counts and diameters, a
-  bolt circle, wall thickness, threads, the number of parts) become requirements that Form Studio measures on the
-  built solid. Each revision shows, per requirement, what was measured and whether it passed; one that fails blocks
-  release. Numbers that cannot all be true are reported before anything is designed.
-- **Faster, cheaper changes by an agent.** An agent now changes one feature or one parameter by name instead of
-  sending the whole design again, and only what changed is rebuilt. Common mistakes in design code are found before
-  the build starts, all at once.
-- **Designs are refined after they build.** Once a design builds, Form Studio looks for small improvements (edge
-  rounding, details, materials) and keeps only those that pass its checks. They arrive as one extra revision,
-  "Refined: N changes", that you can undo change by change or all at once, and refinement can be turned off per
-  design or for everything in Settings › General.
-- **Mesh to editable CAD.** Make editable turns an STL, OBJ or 3MF into a new design checked against the mesh.
-  Analytic and freeform faces and a feature tree from the mesh are Beta.
+  bolt circle, wall thickness, threads, the number of parts) become requirements measured on the built solid. Each
+  revision shows what was measured and whether it passed; one that fails blocks release. Numbers that cannot all be
+  true are reported before anything is designed.
 - **Designs built one feature at a time.** You watch the design take shape; a feature that fails no longer loses
   the work, and each feature is checked as it is made.
-- **The build, drawn like a drawing.** As a design builds, each feature's edges are traced first, then its solid
-  rises into place. The overall dimensions measure what is built so far and count up with it, a ledger over the
-  part names the feature and how far the build is ("6 of 12"), and the feature's row in the Design list lights
-  up while it is made. The camera frames the build once and then stays put.
-- **Compare is a wipe.** Comparing two revisions puts a line down the view: the head left of it, the other
-  revision right of it, each side tagged. Drag the line across the part; Done, Esc and Compare again still end it.
-- **Mesh to CAD, shown.** After Make editable, the mesh's outline stays on screen in blue while the CAD grows
-  inside it, with the largest distance between the two counted up beside it (computed). Then the outline fades.
-- **Refinement you can see.** Pointing at a refine change lights up its feature on the part, and holding
-  Before / After shows the design as it was before the refinement.
-- **The part stays in view.** A change that makes the part outgrow the view (a wider draft, a taller revision)
-  pulls the camera back instead of letting the part slide under the panels, and labels no longer draw over them.
-- **Waiting for a design reads like a drawing being started.** Two construction lines meet at an origin and
-  breathe; the agent's real steps are written from it as a ledger, and "Writing design code" shows the size of
-  the code as it grows. The floor's origin cross no longer runs through the words on an empty floor.
+- **Faster, cheaper changes by an agent.** An agent changes one feature or one parameter by name instead of sending
+  the whole design again, and only what changed is rebuilt. Common mistakes in design code are found before the
+  build starts, all at once.
+- **Designs are refined after they build.** Form Studio looks for small improvements (edge rounding, details,
+  materials) and keeps only those that pass its checks. They arrive as one extra revision, "Refined: N changes",
+  that you can undo change by change or all at once. Pointing at a change lights up its feature, Before / After
+  shows the design as it was, and refinement can be turned off per design or in Settings › General.
+- **Compare is a wipe.** Comparing two revisions puts a line down the view, the head on one side and the other
+  revision on the other. Drag the line across the part; Done and Esc end it.
 - **Drag a face to change the design**, constrained 2D sketches, and sculpted forms as exact NURBS.
 - **Real standard hardware.** ISO screws, nuts, washers, heat-set inserts and bearings built into designs, with
   their masses in the bill of materials.
-- **Engineering materials for models.** Aluminium, steel, brass, titanium, woods and engineering plastics for designs
-  that are machined, cast or rendered, with the design's computed mass.
+- **Engineering materials for models.** Aluminium, steel, brass, titanium, woods and engineering plastics for
+  designs that are machined, cast or rendered, with the design's computed mass.
 - **Game assets (Beta).** A design can be made ready for a game engine: LODs, UVs, baked maps and collision, with
   Blender as an optional modelling editor.
-- **Optional engines in one click.** Each engine in Settings › Software installs from its own button, with its size
-  and licence shown first. The learned mesh-to-CAD engine (CAD-Recode) is opt-in and non-commercial (CC BY-NC 4.0).
-- **A light appearance**, a new Home, concepts in the conversation, and links and every file type in chat.
+- **A light appearance**, concepts in the conversation, and links and every file type in chat.
 
-- **Home on the first day shows a real build.** With no designs yet, the question and the composer sit on the left and
-  a sensor enclosure (13 features, real geometry from the CAD kernel, labelled as an example) turns slowly beside
-  them. It is a picture of a build kept with the app, not a project: nothing is created. The four cards that repeated
-  the composer's buttons are gone.
-- **The conversation reads as a record of the design.** A step that changes the design is a compact card with an
-  icon, one sentence and a 64 px picture of the render the agent took, which opens large. A new revision posts a card
-  with its number, the features it changed as tags, the values as from → to, and Compare. The line that says how a
-  reply was made (steps, time, cost, model) is small and at the right.
-- **The engine's work is named in the middle of the top bar**, as one line, instead of a card that sat on the stage
-  tabs. During the first seconds after the app opens it waits 1.2 s before naming anything, so loading the cards of
-  Home is not announced.
-- **Small moments.** Design cards show a band of light while their geometry loads and the part cross-fades in; the
-  turntable under the pointer eases up to speed and coasts to a stop. A segmented control's selection glides to the
-  option you click. A commit lands on the revision number in the top bar; approving a release brings the seal down
-  like a stamp, once. None of it moves with Reduce Motion on.
 ### Changed
 
 - **Settings, reorganised.** A rail on the left lists the pages (General, Agents & models, Engines & software,
-  Printing, Other apps, Updates, Advanced) and each page is a set of titled cards with one row per setting. The search
-  finds a setting on any page, a dot in the rail marks a page with unsaved changes, and appearance is picked from
-  small pictures of the dark and the light bench. "Software" is now "Engines & software" and "Agents" is "Agents &
-  models"; nothing moved out of Settings.
-- **Use in Form Studio: a switch for everything you install.** Each optional engine or app (CAD-Recode, CADFit, CoACD,
-  the CADEvolve corpus, Blender, FreeCAD, OpenSCAD and every slicer) now shows two separate things on its card:
-  whether it is installed, and whether Form Studio uses it. Switched off, it stays on your computer and is never
-  called. The card says in one line what the switch changes and shows the licence beside it. Defaults are what
-  happened before: CAD-Recode is used once installed, CADFit is off until you install it from Settings, everything
-  else is on. In `studio.toml`: `[recon] learned`, `[recon] cadfit` and `[use]`.
-
-- **The Mac app is now called Form Studio.app** (it was FORM.app). If you added Form Studio to Claude Code, Codex or
-  another agent by the old app's path, add it again: `form setup` finds your agents and writes the entry.
+  Printing, Other apps, Updates, Advanced); each page is a set of titled cards with one row per setting. Search
+  finds a setting on any page and a dot marks a page with unsaved changes. "Software" is now "Engines & software"
+  and "Agents" is "Agents & models".
+- **Use in Form Studio: a switch for everything you install.** Each optional engine or app (CAD-Recode, CADFit,
+  CoACD, the CADEvolve corpus, Blender, FreeCAD, OpenSCAD and every slicer) shows whether it is installed and,
+  separately, whether Form Studio uses it. Switched off, it stays on your computer and is never called. Each
+  installs from its own button, with its size and licence shown first; CAD-Recode is opt-in and non-commercial
+  (CC BY-NC 4.0). In `studio.toml`: `[recon] learned`, `[recon] cadfit` and `[use]`.
+- **The Mac app is now called Form Studio.app** (it was FORM.app). If you added Form Studio to an agent by the old
+  app's path, add it again: `form setup` finds your agents and writes the entry.
 - **Creation first.** A new design is a 3D model; 3D printing is optional and turned on when you want it.
-- **Builds run side by side** in a kernel pool, and pipeline jobs survive a restart.
-- **A design is built once.** The solid a change builds is kept (on disk, for every Form Studio process) and reused
-  for the view, the exports, the checks and every render and analysis at any detail. Replaying a real session on the
-  shower holder: 1 build per change instead of 3 (update_design 22 to 33 s instead of 37 to 49 s), a render right after
-  the change 1.4 s, and a new window opening the same revision builds nothing (it built again for 8 to 9 s). Renders draw 4 to 8 times
-  faster, pixel for pixel the same. Kernel time limits follow how long the design takes to build.
+- **A design is built once.** The solid a change builds is kept and reused for the view, the exports, the checks
+  and every render: one build per change instead of three, and renders draw 4 to 8 times faster. Builds run side by
+  side in a kernel pool, and pipeline jobs survive a restart.
 - **Agents:** MCP 2026-07-28 throughout, long tools can run as tasks, and the design guidance is served as skills.
-- **Recipes are no longer a public library.** The engine still uses them as building blocks for agents; the website page, the Discord forum and the submission form are gone.
-- **A draft reads as a change, not an error.** What a draft does to each feature (resized, moved, added, removed) is
-  tagged in the draft's blue instead of the red used for failures, and its consequences count from the old value to
-  the new one (at once with reduced motion). Text fields keep a quiet edge under the pointer.
+- **Recipes are no longer a public library.** The engine still uses them as building blocks for agents.
+- **A draft reads as a change, not an error.** What a draft does to each feature is tagged in the draft's own
+  colour instead of the red used for failures.
 
 ### Fixed
 
-- A mesh with a few stray triangles was refused as "not closed (0 open boundaries…)": it is now repaired, and what is
-  open is counted correctly when a mesh really does not close.
-- A refusal names the next step to take, a long error from a design is cut short, and a refusal that comes back
-  unchanged says so, so an agent does not repeat a call that cannot work.
-- Designs with many faces (a mesh brought in as a body) build several times faster.
-- **The first click into the 3D view folds the conversation.** In a design that had just opened, a click on the part
-  did nothing to the conversation column until the keyboard had been somewhere else first. Any press on the view now
-  folds it.
-- **The prompt under the part is written in.** Clicking it and typing used to open the conversation column and move
-  the words there. It now stays where it is; sending the message brings the conversation back.
-- **The caret is a thin lit line that follows the words.** In every text field it stands at the cursor, as tall as
-  the line, stays lit while you type and blinks once the field is still.
-- **Refinement always opens.** In Describe, Fit, Review and Make a click on its header did nothing. It now opens and
-  folds from its header in every stage; the pane above gives it the room.
-- **The pane's fold tab stands on the middle of the pane's edge** and no longer sits half hidden at its corner.
-- **A build's title stands on glass.** The feature being built, its count and the track are on a pane that blurs the
-  part behind them, so they read whatever is under them.
-- **The part comes back to the middle.** A view you panned or zoomed is kept while you work; when a side column folds
-  or opens or is resized, the pane folds, Focus is switched or the window is resized, the camera glides back to the
-  whole part in the middle of the free stage. Orbiting never moved it away.
-- **"The Form Studio engine is not answering" in Settings.** Opening Settings (most often Agents) asked the engine for
-  several things at the same moment, more than it accepted at once, so some requests were dropped and shown as that
-  message although the engine was fine. The engine now accepts them all, and the app asks again once before saying so.
-
-- A teal outline no longer crosses the window when a design is opened from Home. The frame that grows from the
-  composer to the workspace now plays only when a request sent from the composer starts a design.
-- Settings opened from Home's "Connect an agent" showed an empty sheet (it asked for a tab that does not exist). It
-  opens on Agents, and an unknown tab opens General.
-- "Outputs are current" is no longer announced when the pipeline ran by itself as a design opened.
+- A mesh with a few stray triangles was refused as "not closed (0 open boundaries…)": it is now repaired, and what
+  is open is counted correctly when a mesh really does not close.
+- A refusal names the next step to take and says when it comes back unchanged, so an agent does not repeat a call
+  that cannot work. Designs with many faces (a mesh brought in as a body) build several times faster.
+- **The first click into the 3D view folds the conversation**, and the prompt under the part is written in where
+  it stands; sending the message brings the conversation back.
+- **Refinement always opens** from its header, in every stage.
+- **The part comes back to the middle** when a column folds, opens or is resized, the pane folds, Focus is switched
+  or the window is resized; it never shrinks while it is built.
+- **"The Form Studio engine is not answering" in Settings.** A burst of requests was dropped although the engine
+  was fine. The engine now accepts them all, and the app asks again once before saying so.
 - **Threaded holes have their thread.** A hole cut with the built-in internal thread could come out as a plain
-  bore that no bolt held. The thread is now cut, and a thread that cannot be cut is reported instead of built plain.
-- **Saved conversations open with every message.** A long conversation could open as an empty column with only its
-  last footer; every message is now drawn, and only what arrives while you watch fades in.
-- **Compare turns off.** Compare on a reply's change card is now a toggle, the viewport's Comparing chip has Done,
-  and Esc, another stage or showing another revision end it too.
-- **The Building caption goes when the build is saved**, even when the save arrives with the last stages, and it
-  moves aside so it never sits on the refinement panel.
-- **Agents can call the design workflow by name at once.** Every tool the server's instructions name first,
-  design_brief included, loads up front, so an agent no longer gets "No such tool available" for design_guide.
-
-### Fixed
-
-- **A decorative finish can no longer thin a wall below the print minimum.** Flutes, grooves, knurls, grip textures,
-  parting lines, recessed panels and ribbed lightening (added by an agent or by refinement) are measured as they are
-  made. A finish that would leave a wall under 1.2 mm on a 0.4 mm nozzle (three nozzle widths; a model uses its
-  process minimum) is left out, and the build log names the wall and where it is. Agents can use
-  `craft.finish_cut`, which makes each cut only as deep as the wall behind it allows. Before this, 0.5 mm flutes cut
-  a sofa-arm holder's corbel wall to 0.81 mm.
-- **A thin wall in a structural feature now fails the Thinnest-wall check.** A wall under three nozzle widths
-  (1.2 mm on a 0.4 mm nozzle) in a structural feature, such as a corbel, an arm or a clip's spine, is a FAIL. The
-  check gives the measured value, the feature, what thinned it and where. Decorative ridges between 2 and 3 nozzle
-  widths still show as a warning.
-- **STL export no longer hangs on a mesh that will not close.** The retries at finer settings now have a time limit.
-  A solid with sliver faces (from chamfering every edge of a fluted end) took 703 s to export and timed out. It now
-  exports in 1.8 s, and the mesh check reports the open edges.
-- **A fillet as large as an arc's own radius no longer crashes the geometry kernel.** `craft.safe_fillet` and
-  `craft.safe_chamfer` skip that size on those edges and try a smaller one. When the kernel does crash, the message
-  names the call and the line of the design source that caused it.
-- **Design guidance:** decorative finishes are added last, and only where the wall has room for them. Hollow
-  structural shells keep their stated wall all the way round: the cavity is an offset of the outside.
+  bore. The thread is now cut, and one that cannot be cut is reported.
+- **A decorative finish can no longer thin a wall below the print minimum.** Flutes, grooves, knurls and textures
+  are measured as they are made; one that would leave a wall under three nozzle widths (1.2 mm on a 0.4 mm nozzle)
+  is left out and named in the build log. A thin wall in a structural feature now fails the Thinnest-wall check.
+- **STL export no longer hangs on a mesh that will not close** (703 s became 1.8 s on the case that found it), and
+  a fillet as large as an arc's own radius no longer crashes the geometry kernel.
+- **Saved conversations open with every message**, Compare turns off (a toggle, Done, Esc), and the Building
+  caption goes when the build is saved.
+- Text sits in the middle of its line beside icons and tags, and on a Mac it is drawn at its real weight. Menus
+  are easier to read over the part, and a tooltip no longer covers the menu its button opened.
+- Settings opened from Home's "Connect an agent" no longer shows an empty sheet, no outline crosses the window
+  when a design is opened from Home, and "Outputs are current" is not announced when a design merely opens.
+- **Agents can call the design workflow by name at once**: the tools the server's instructions name first load up
+  front.
 
 ### Known limits
 
 - Game assets are Beta: every asset passes its technical checks, and its visual quality is still improving. They are
   refined only when you ask.
 - Mesh to CAD's freeform faces and feature tree are Beta; a feature that does not verify stays in the base solid, and
-  the report says so.
+  the report says so. A surface body is made only for a smooth closed sculpt; other scans become a mesh body.
 - Refinement adds a revision to your history. Undo it, or turn refinement off, if you would rather keep the design as
   you built it.
 
 ### Details
+
+- **Triage, in full** (`form/triage.py`). One step for any input. A mesh is read, repaired on a copy and measured:
+  triangles, size, a guess at the units, defects before and after repair, bodies, genus, and the share of the surface
+  that is flat or ruled. It is classed mechanical, organic or mixed and the route follows: parametric, surface body,
+  mesh body, assembly or reference only. `reconstruct` runs it and takes the route; when the parametric route fails on
+  a mesh that closes it keeps the mesh body and says so; a size that makes no sense in millimetres is asked about once
+  (`units=`, `--units`). `design_guide`, the skills, the server instructions and the chat prompt lead with triage.
+- **Mesh repair and lighter copies** (`form/meshrepair.py`). Safe, listed repairs: fins, extra triangles on an edge,
+  orientation, small holes, flat openings, debris. Vertices never move. A heavy mesh gets a lighter working copy that
+  stays closed, with the distance to the file measured both ways.
+- **The organic route** (`form/sculpt.py`). A smooth closed sculpt becomes NURBS faces over a cage within a time
+  limit, taken only when measured within 0.1 % of its size; anything else becomes a mesh body with Scale and Flat base
+  that exact CAD features are cut into. `MeshBody` has load, trim, scale, move, bounds and solid; a closed mesh becomes
+  a solid directly (2 s for 100,000 triangles instead of a minute of sewing), and its nearest-point search is exact.
+- **Many faces, faster.** Indexing a build123d ShapeList copied it for every face: a design with 100,000 faces built
+  in 72 s, now 22 s.
+- **The workspace's measures.** In a 1440 pt window the stage between the conversation column and the pane is 716 pt
+  wide (it was 560): the column is 340 px (300 to 480 by dragging its edge, remembered), the pane 300 px, the outer
+  gutters 12 px and the top row's capsules 40 px tall. The tool dock floats inside the stage at its left edge and takes
+  no column. Legends, measurements, the selection and the refinement's changes have their slot in the right column.
+  A window under 1200 px has room for the column or the panes: with the conversation open the panes fold to one
+  button. The smallest window is 1100 × 700.
+- **The top row.** On macOS the close, minimise and zoom buttons stand 24 px in, on the row's centre line. The mark in
+  the title capsule carries a chevron and goes back to all designs (also Ctrl/⌘ [). Under 1400 px the printer is its icon
+  and the default "unreleased" is not said, so the stages keep their words.
+- **The print simulation is laid out in the free stage.** Its transport stands at the foot of the stage between the
+  tool dock and the panes and folds to its row of controls when the stage is short; the print is framed in the
+  rectangle that is left and glides when that changes.
+- **The camera keeps the part in the free stage.** It pulls back until the part, with the dimension lines and numbers
+  outside its box, is clear of the tool dock and the pane. Its shift runs along the camera's own axes, so the part no
+  longer stands low with the column open. A part mid-build is framed as it will be at rest (at 1440 × 900, step 6 of 12
+  of the sensor case: 478 pt wide, was 363 pt).
+- **Dithering, in full.** The shadow under every floating layer is one smooth falloff worked out per pixel
+  (`shadow.frag`), a glow likewise (`glow.frag`), and the blur inside a glass pane is kept in floating point at a
+  quarter size until its last pass (`glass.frag`). Scroll shadows, plate fades and the loading shimmer share one
+  gradient; the part (`clay.frag`, `game.frag`) takes one display step of noise on its lit colour. The noise is fixed
+  to the pixels, so a still window is not redrawn for it. A software renderer keeps the plain gradients.
+- **One caret** (`Caret.qml`) in every text field: a 2 px lit line at the cursor, solid while the words change,
+  blinking in steps once they are still, so a resting prompt does not redraw the window. Glows exist only while lit.
+- **The accent is electric cyan**: #3ee6ff in the dark studio and #087f9f on paper, for the mark's origin, the stage
+  you are in, the line being built, the prompt, switches, focus, dimension lines and the cue. The brand mark, app
+  icons, the website, the README drawings and the engine's pictures (analysis, share card, print simulation) use it.
+- **The engine accepts a burst.** Its listen backlog is 128, and the app asks a read once more before reporting that
+  the engine is not answering.
 
 - **A design in several parts stays calm while you slide a parameter or orbit it.** Every draft (each step of a
   slider) used to destroy and re-make every part node of an assembled design, its edge lines and its meshes, some of
