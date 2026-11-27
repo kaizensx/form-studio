@@ -1150,6 +1150,19 @@ class Cage:
                 for c in range(4):
                     _, Su, Sv = _patch_point(P[k], t[c], t[r])
                     N[k, r, c] = np.cross(Su, Sv)
+            # at a corner where the patch's two derivatives are parallel (a cage vertex of valence 3 has such
+            # patches) the cross product is rounding noise, and its direction differs from one processor to the
+            # next (x86-64 turned a region's corner inwards): there the normal is read just inside the patch
+            scale = float(np.linalg.norm(N[k], axis=-1).max())
+            for r in range(4):
+                for c in range(4):
+                    if np.linalg.norm(N[k, r, c]) <= 1e-9 * scale:
+                        for step in (1e-3, 1e-2, 1e-1):
+                            _, Su, Sv = _patch_point(P[k], t[c] + step * (0.5 - t[c]), t[r] + step * (0.5 - t[r]))
+                            n = np.cross(Su, Sv)
+                            if np.linalg.norm(n) > 1e-9 * scale:
+                                N[k, r, c] = n
+                                break
         keys = np.round(P.reshape(-1, 3), 6)
         _, inv = np.unique(keys, axis=0, return_inverse=True)
         inv = inv.reshape(-1)

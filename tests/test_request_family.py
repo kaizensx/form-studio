@@ -224,7 +224,10 @@ class OverMCP(unittest.TestCase):
             store.append(c["id"], {"t": "user", "text": "a box, then a lid for it"})
             src = fake_agent._source("Block", fake_agent.TINY["Block"][0])
             lid = fake_agent._source("Disc", fake_agent.TINY["Disc"][0])
-            with mock.patch.dict(os.environ, {"FORM_DATA": d, conv_mod.ENV_CONVERSATION: c["id"]}):
+            # refinement off: it is not what this test is about, and the job a create_design starts in the
+            # background was still writing into the data folder while the test removed it
+            with mock.patch.dict(os.environ, {"FORM_DATA": d, conv_mod.ENV_CONVERSATION: c["id"],
+                                              "FORM_REFINE": "off"}):
                 mcp_server.S["studio"] = None
                 srv = mcp_server.build()
 

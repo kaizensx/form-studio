@@ -16,6 +16,7 @@ from unittest import mock
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import machine  # noqa: E402
 TMP = Path(tempfile.mkdtemp(prefix="form-recon-wp5-"))
 os.environ.setdefault("FORM_CADRECODE_DIR", str(TMP / "no-model-here"))
 
@@ -208,10 +209,13 @@ class Budget(unittest.TestCase):
     def test_small_budget_is_kept_and_says_what_was_cut(self):
         from form.recon import pipeline
         stl, _, _ = mesh("box_with_holes")
+        # 5 s on the machine the numbers were set on: too short for the program route (box_with_holes takes about
+        # 13 s with room), enough for the exact copy. A slower machine gets as many more seconds as it is slower
+        # (tests/machine.py), or its helper process would not even have loaded the kernel before the end
+        k = machine.speed(fresh=True)
         t = time.perf_counter()
-        # 5 s: too short for the program route on any machine (box_with_holes takes about 13 s with room)
-        rep = pipeline.reconstruct(stl, TMP / "tight", "box", 0.02, budget_s=5)
-        self.assertLess(time.perf_counter() - t, 5 + 10)
+        rep = pipeline.reconstruct(stl, TMP / "tight", "box", 0.02, budget_s=5 * k)
+        self.assertLess(time.perf_counter() - t, (5 + 10) * k)
         self.assertTrue(rep["cut_short"])
         self.assertIn("cut short", rep["result"]["note"])
         self.assertEqual(rep["result"]["layer"], 0)                      # the exact copy: the best found in time

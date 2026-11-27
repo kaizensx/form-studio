@@ -178,10 +178,15 @@ def recon_step(exe: Path, env: dict, tmp: Path, budget: float = 30.0) -> None:
     except json.JSONDecodeError:
         summ = {}
     secs = summ.get("seconds")
-    # a step in flight finishes before the budget is read again: on slow machines (CI's Intel Mac runner) that has
-    # overshot by about 20 %; more than a quarter over is a budget that is not kept
-    ok = r.returncode == 0 and secs is not None and float(secs) <= budget * 1.25 + 1.0
-    detail = (f"{secs} s of a {budget:g} s budget ({took:.0f} s with app start), layer {summ.get('layer')}, "
+    # a step in flight finishes before the budget is read again, so a quarter over is still a budget that is kept.
+    # On top of that comes what does not shrink with the budget: loading the CAD kernel, in the app and again in
+    # every helper that replaces one stopped at its limit. How long that takes on this machine is measured in this
+    # very run (the time the command took beyond the reconstruction it reports: 1 to 2 s on a fast machine, 9 s on
+    # CI's Intel Mac runner, where a 30 s budget ended at 36 to 41 s), and that much more is allowed
+    start = max(0.0, took - float(secs)) if secs is not None else 0.0
+    ok = r.returncode == 0 and secs is not None and float(secs) <= budget * 1.25 + 1.0 + start
+    detail = (f"{secs} s of a {budget:g} s budget ({took:.0f} s for the command, {start:.1f} s of it starting the app and saving; "
+              f"allowed {budget * 1.25 + 1.0 + start:.1f} s), layer {summ.get('layer')}, "
               f"editable {summ.get('editable_pct')}%" + (f", cut short: {', '.join(summ['cut_short'])}"
                                                           if summ.get("cut_short") else "")) if secs is not None \
         else r.stderr.strip()[-160:]

@@ -285,8 +285,10 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
         if pred is not None and not prog.get("source") and float(pred) > _share(floor):
             tp1 = time.perf_counter()
             cap = _gain_cap(floor, budget_s)
+            # both readings together keep to the route's share: the second has what the first left of it
+            mine = max(0.0, PROGRAM_SHARE * float(budget_s) - float(rep.get("program_seconds") or 0.0))
             again = _run_program(Vr, V, F, tol, name, out, say, rep, hard, fin, tp1,
-                                 min(PROGRAM_SHARE * float(budget_s), cap), float(budget_s), _floor_pct(floor),
+                                 min(mine, cap), float(budget_s), _floor_pct(floor),
                                  gain=_gain(floor))
             rep["program_seconds"] = round(rep.get("program_seconds", 0.0) + time.perf_counter() - tp1, 2)
             if gx.better(again, prog):

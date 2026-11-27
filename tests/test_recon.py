@@ -331,17 +331,29 @@ class SteppedBracket(_Edits, unittest.TestCase):
 class ShippedConfiguration(unittest.TestCase):
     def test_shipped_configuration_keeps_layer1_its_time(self):
         """The pipeline as the app runs it: the program route ON (no stub) and the default 240 s budget. The program
-        route is held to its share of the budget and the layers below start their own clock after it, so the
-        feature tree finds what it finds without the program route."""
+        route (both its readings together) is held to its share of the budget, so the floor, Layer 1 and the
+        feature search have their time and the part comes out editable.
+
+        A budget in seconds buys less work on a slower machine: 240 s is the default on the machine it was set on,
+        and a CI runner that does the same work two or three times slower gets that many times the seconds (the
+        same amount of work), or the result here would say how fast the runner is, not what the pipeline does."""
+        import machine
         from form.recon import pipeline
         stl = Path(TMP) / "stepped_bracket.stl"
         if not stl.exists():
             fx.export("stepped_bracket", TMP)
+        k = min(machine.speed(fresh=True), 2.5)
+        budget = round(240.0 * k)
+        print(f"\nshipped configuration: machine speed {k:.2f}, budget {budget} s")
         t = time.perf_counter()
-        rep = pipeline.reconstruct(stl, Path(TMP) / "out-shipped-stepped_bracket", "stepped_bracket", TOL, 2)
+        rep = pipeline.reconstruct(stl, Path(TMP) / "out-shipped-stepped_bracket", "stepped_bracket", TOL, 2,
+                                   budget_s=budget)
         took = time.perf_counter() - t
-        slack = 60 if "coverage" in sys.modules else 30   # the step running at the deadline finishes; slower under coverage
-        self.assertLessEqual(rep["program_seconds"], pipeline.PROGRAM_SHARE * 240 + slack, "the program route keeps to its share")
+        print(f"shipped configuration: {took:.0f} s, the program route {rep.get('program_seconds')} s")
+        # the route is stopped PROGRAM_SLACK after its share at the latest (bounded.py); starting and stopping its
+        # helper process is on top of that, and takes longer on a slower machine and under coverage
+        slack = pipeline.PROGRAM_SLACK + (35 if "coverage" in sys.modules else 5) * k
+        self.assertLessEqual(rep["program_seconds"], pipeline.PROGRAM_SHARE * budget + slack, "the program route keeps to its share")
         L1, L2 = rep["layers"]["1"], rep["layers"]["2"]
         self.assertNotIn("error", L1)
         self.assertEqual(rep["layer_achieved"], 2, L2.get("error"))
@@ -349,7 +361,7 @@ class ShippedConfiguration(unittest.TestCase):
         if L2.get("kind") != "program":                    # the feature tree won: it found every hole, as without
             self.assertEqual(sorted(h["diameter_mm"] for h in L2["holes"]), facts("stepped_bracket")["holes"])
         self.assertGreater(rep["result"]["editable_pct"], 0.0)
-        self.assertLess(took, 240 * 1.5, f"{took:.0f} s")
+        self.assertLess(took, budget * 1.5, f"{took:.0f} s of a {budget} s budget")
 
 
 class FlangedShaft(_Edits, unittest.TestCase):

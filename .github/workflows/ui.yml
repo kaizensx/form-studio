@@ -19,13 +19,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The journeys run in three shards per system (every third one, by name, so a journey and its small-window and
+  # light variants land in different shards): all of them in one job had grown past its 45 minutes.
   journeys:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.name }} (${{ matrix.shard }}/3)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
+        name: [Windows x64, Linux x64]
+        shard: [1, 2, 3]
         include:
           - { name: Windows x64, os: windows-latest }
           - { name: Linux x64, os: ubuntu-22.04 }
@@ -73,15 +77,19 @@ jobs:
         run: Set-DisplayResolution -Width 1920 -Height 1080 -Force
       - name: Use the app
         shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
         run: |
           PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
           RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a -s '-screen 0 1920x1200x24'"
           export FORM_UI_TESTS=1 FORM_UI_SHOTS="$RUNNER_TEMP/ui-shots" FORM_UI_STUDIO_TOML="$PWD/.github/ci-prusa.toml" FORM_NO_UPDATE_CHECK=1
-          eval "$RUN" '"$PY" -m unittest -v tests.test_ui_journeys'
+          TESTS=$("$PY" scripts/ci/ui_shards.py --shards 3 --index "$SHARD" | tr -d '\r')
+          echo "$TESTS" | tr ' ' '\n'
+          eval "$RUN" '"$PY" -m unittest -v $TESTS'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
-          name: ui-shots-${{ matrix.name }}
+          name: ui-shots-${{ matrix.name }}-${{ matrix.shard }}
           path: ${{ runner.temp }}/ui-shots
           if-no-files-found: ignore
 
@@ -100,7 +108,8 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         continue-on-error: true
         with:
-          name: ui-shots-Linux x64
+          pattern: ui-shots-Linux x64-*
+          merge-multiple: true
           path: ${{ runner.temp }}/shots
       - name: Keep the Linux screenshots as baselines
         env:

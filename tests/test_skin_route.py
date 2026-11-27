@@ -1,10 +1,14 @@
 """The skin route (subd.skin_from_sections), separate parts, splits with a lip, magnet stock and the hero helmet."""
 import json
 import os
+import sys
 import time
 import unittest
 
 from form import craft, exemplars
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import machine  # noqa: E402
 
 try:
     import build123d  # noqa: F401
@@ -100,21 +104,26 @@ class HeroHelmet(unittest.TestCase):
         cls.design = exemplars.load("hero_helmet")
         cls.v = cls.design.defaults()
         featureprog.begin()
+        before = machine.speed(fresh=True)
         t0 = time.perf_counter()
         cls.stages = cls.design.build(cls.v)
         cls.seconds = time.perf_counter() - t0
+        # how fast the machine was while it built (tests/machine.py): the slower of just before and just after
+        cls.speed = max(before, machine.speed(fresh=True))
         cls.report = featureprog.report()
         if TIMES:
             with open(TIMES, "w", encoding="utf-8") as f:
                 json.dump({"hero_helmet_build_s": round(cls.seconds, 2)}, f)
-        print(f"\nhero_helmet build: {cls.seconds:.2f} s")
+        print(f"\nhero_helmet build: {cls.seconds:.2f} s (machine speed {cls.speed:.2f})")
 
     def test_builds_four_valid_parts_in_time(self):
         out = self.stages[-1].shape
         self.assertTrue(out.is_valid)
         self.assertEqual(len(out.solids()), self.design.solids)
         self.assertEqual(sorted(craft.named_parts(out)), ["faceplate", "lens_l", "lens_r", "shell"])
-        self.assertLess(self.seconds, 45.0)
+        # 45 s on the machine the limit was set on (it builds in under 30 s there); as much more as this machine
+        # is slower at the same kind of work, so a slower runner passes and a slower build does not
+        self.assertLess(self.seconds, 45.0 * self.speed, f"machine speed {self.speed:.2f}")
 
     def test_is_a_feature_design_built_skeleton_first(self):
         from form.featureprog import FeatureDesign

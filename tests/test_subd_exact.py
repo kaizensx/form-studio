@@ -209,9 +209,14 @@ class OpenAndRegions(unittest.TestCase):
         self.assertEqual(pair.spec["stock"], "6x2")
         tool = cage.region_tool("lid", out=1.0, depth=4.0)
         self.assertTrue(tool.is_valid)
+        # the slab follows the skin at the region's four corners too (cage vertices of valence 3, where one patch has
+        # no normal of its own): the same solid on every processor, not one whose corners turn inwards
+        self.assertAlmostEqual(tool.volume, 18885.2, delta=2.0)
+        body = craft.cut(s, tool)
+        self.assertEqual(len(body.solids()), 1)
         piece = s & tool
         self.assertGreater(piece.volume, 0)
-        parts = craft.parts(lid=piece, body=craft.cut(s, tool), touching=[("lid", "body")])
+        parts = craft.parts(lid=piece, body=body, touching=[("lid", "body")])
         self.assertEqual(len(parts.solids()), 2)
         with self.assertRaises(Exception):
             cage.region_frame("nope")

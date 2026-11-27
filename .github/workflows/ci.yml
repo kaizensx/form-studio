@@ -114,7 +114,7 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5]      # five: as many macOS jobs as a free account runs at once
     runs-on: macos-latest
-    timeout-minutes: 25
+    timeout-minutes: 35      # five shards of about 19 minutes of tests each (tests/ci_timings.json), and the set-up
     permissions:
       contents: read
     env:
