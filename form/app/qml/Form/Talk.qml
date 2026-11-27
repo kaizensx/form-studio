@@ -17,6 +17,7 @@ Rectangle {
     color: "transparent"
     property bool bar: false                 // one bar under the part that opens upward (a workspace); false: a column (Home)
     property bool docked: false              // the column of a workspace (Main.qml): it folds to the bar under the part
+    property real veil: 1                    // 0..1: its words, while the pane travels between the bar and the column (Main.qml)
     property bool onScreen: true             // false while it is parked beside the window (Home with no conversation open): nothing in it ticks
     property real roomAbove: 600             // how tall something that opens upward from the bar may be (Main.qml)
     // a build is playing: the bar is slim and the transcript waits, so the cue has the room
@@ -177,8 +178,8 @@ Rectangle {
     // ── header: the conversation switcher ──
     Item {
         id: head; width: parent.width; height: 40; z: 3; y: talk.leadH + (talk.bar ? 4 : 0)
-        opacity: talk.expanded ? 1 : 0; visible: opacity > 0.01; enabled: talk.expanded
-        Behavior on opacity { NumberAnimation { duration: talk.expanded ? Theme.base : Theme.exit } }
+        opacity: (talk.expanded ? 1 : 0) * talk.veil; visible: opacity > 0.01; enabled: talk.expanded
+        Behavior on opacity { enabled: talk.veil === 1; NumberAnimation { duration: talk.expanded ? Theme.base : Theme.exit } }
         Item { id: sw; objectName: "convSwitch"; x: 8; width: parent.width - 16 - tools.width; height: 28; anchors.verticalCenter: parent.verticalCenter
             Rectangle { anchors.fill: parent; radius: Theme.rSm; color: swm.pressed ? Theme.washPress : swm.containsMouse || list.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
             Rectangle { id: sdot; x: 8; width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter
@@ -224,7 +225,7 @@ Rectangle {
 
     // ── the designs this conversation made, when it made more than one: click one to open it ──
     Rectangle {
-        id: strip; objectName: "designStrip"; z: 2
+        id: strip; objectName: "designStrip"; z: 2; opacity: talk.veil
         visible: Store.designsHere.length > 1 && talk.expanded
         anchors.top: rsteps.visible ? rsteps.bottom : head.bottom; width: parent.width - 1; height: visible ? 52 : 0; color: "transparent"
         ListView {
@@ -311,8 +312,8 @@ Rectangle {
         property bool stick: true              // follow the newest message unless the reader scrolled up
         property bool auto: false
         visible: !talk.empty && opacity > 0.01; enabled: talk.expanded
-        opacity: talk.expanded ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: talk.expanded ? Theme.cross : Theme.exit } }
+        opacity: (talk.expanded ? 1 : 0) * talk.veil
+        Behavior on opacity { enabled: talk.veil === 1; NumberAnimation { duration: talk.expanded ? Theme.cross : Theme.exit } }
         anchors.top: strip.visible ? strip.bottom : rsteps.visible ? rsteps.bottom : head.bottom; anchors.bottom: foot.top; anchors.left: parent.left; anchors.right: parent.right
         topMargin: 16; bottomMargin: 12; clip: true; spacing: 14
         boundsBehavior: Flickable.StopAtBounds
@@ -320,7 +321,10 @@ Rectangle {
         function toEnd() { if (!stick) return; auto = true; positionViewAtEnd(); auto = false }
         onContentHeightChanged: Qt.callLater(toEnd)
         onHeightChanged: Qt.callLater(toEnd)
-        onContentYChanged: if (!auto) stick = atYEnd || contentHeight <= height
+        onContentYChanged: if (!auto && talk.veil === 1) stick = atYEnd || contentHeight <= height      // (not while the pane travels: nobody scrolled)
+        // a question that waits is shown: the feed goes to it, wherever the reader had scrolled
+        Connections { target: Store; function onChatAskingChanged() { if (Store.chatAsking) { feed.stick = true; Qt.callLater(feed.toEnd) } } }
+        Connections { target: talk; function onVeilChanged() { if (talk.veil === 1) Qt.callLater(feed.toEnd) } }
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: 6 }
         delegate: Item {
             id: it
@@ -499,7 +503,9 @@ Rectangle {
                     Btn { small: true; kind: "quiet"; icon: "repeat"; text: "Try another model…"; onClicked: talk.tryAnother() } } } }
         }
         // what is being written right now
-        footer: Item { width: feed.width; visible: Store.chatBusy; height: Store.chatBusy ? lc.implicitHeight + 18 : 0
+        // (not while a question waits: its card says so, and in a column the card needs the room)
+        footer: Item { readonly property bool on: Store.chatBusy && !Store.chatAsking
+            width: feed.width; visible: on; height: on ? lc.implicitHeight + 18 : 0
             Column { id: lc; x: 16; y: 10; width: parent.width - 32; spacing: 10
                 // the reply as it is written: the block grows smoothly instead of jumping a line at a time
                 Item { visible: !!Store.chatLive && Store.chatLive.kind === "text" && Store.chatLive.text !== ""; width: parent.width; clip: true
@@ -518,7 +524,7 @@ Rectangle {
 
     // ── the bar's status line: what the agent is doing, or what you can do; click it to open or fold the transcript ──
     Item {
-        id: lead; objectName: "talkLead"; visible: talk.bar && !talk.cueing; width: parent.width; height: 22; z: 3
+        id: lead; objectName: "talkLead"; visible: talk.bar && !talk.cueing; width: parent.width; height: 22; z: 3; opacity: talk.veil
         readonly property string say: Store.chatAsking ? (Store.chatAsking.kind === "measure" ? "The agent is waiting for a measurement" : "The agent is waiting for your answer")
             : Store.chatBusy ? talk.liveText()
             : !Store.chat.available && !!Store.studio ? "No agent is connected. Everything can still be edited by hand."
@@ -548,7 +554,7 @@ Rectangle {
 
     // ── composer ──
     Item {
-        id: foot; width: parent.width; height: comp.height + sugg.height + (talk.bar ? 12 : talk.docked ? 42 : 36); z: 2
+        id: foot; width: parent.width; height: comp.height + sugg.height + (talk.bar ? 12 : talk.docked ? 42 : 36); z: 2; opacity: talk.veil
         y: talk.height - height
         // numbered suggestions for the open design, from its real state; keys 1 to 4 pick them while the prompt is empty
         Grid {

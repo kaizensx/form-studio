@@ -81,7 +81,38 @@ Window {
         // down to the foot of the window, with the gutters of the panes on the right. The stage is what is left
         // between the two. Folded (Ctrl+J, the column's own button) it is the bar under the part, as it is before
         // anything was said. (A window under 1200 px has room for the column or the panes, not both: Workspace.panesOff.)
-        readonly property bool col: Store.screen === "work" && Store.talkOpen && !empty && !Store.talkCalm && !Store.focusView
+        // While a design is being made the conversation starts as the panel under the stage. Once it holds more than
+        // that panel shows (tool results, errors, a question with its replies) it is the same column on the left, and
+        // stays it for this conversation: the stage keeps the rest of the window instead of being covered from below.
+        property bool grown: false
+        // (more than the panel shows by a few lines; a question that does not fit in it, at once)
+        readonly property real overflow: barHeight + bodyWant - sheetMax
+        readonly property bool outgrown: Store.screen === "designing" && bar && !cueing && !empty && (overflow > 120 || (!!Store.chatAsking && overflow > 1))
+        onOutgrownChanged: if (outgrown) grown = true
+        Connections { target: Store
+            function onConvIdChanged() { talk.grown = talk.outgrown }           // another conversation starts as the panel again
+            function onScreenChanged() { if (Store.screen === "home") talk.grown = false } }
+        onEmptyChanged: if (empty) grown = false
+        readonly property bool wantCol: !empty && Store.talkOpen && !Store.focusView
+                                        && (Store.screen === "work" ? !Store.talkCalm : Store.screen === "designing" && grown && win.width >= 1040)
+        // `col` follows `wantCol`: at once in a workspace (the column fades in where it stands), and while a design is
+        // being made by gliding there: the words fade, the pane travels to its new place and shape, the words return
+        property bool col: false
+        property bool gliding: false
+        onWantColChanged: {
+            if (wantCol === col) return
+            if (Store.screen === "designing" && win.restored && talk.shown) glide.restart()
+            else { glide.stop(); gliding = false; veil = 1; col = wantCol }
+        }
+        SequentialAnimation { id: glide
+            ScriptAction { script: talk.gliding = true }
+            NumberAnimation { target: talk; property: "veil"; to: 0; duration: Theme.fast; easing.type: Easing.OutCubic }
+            ScriptAction { script: talk.col = talk.wantCol }
+            PauseAnimation { duration: Theme.move(talk.glideMs) }
+            ScriptAction { script: talk.gliding = false }
+            NumberAnimation { target: talk; property: "veil"; to: 1; duration: Theme.base; easing.type: Easing.OutCubic }
+        }
+        readonly property int glideMs: 340
         // 340 px wide unless its edge was dragged (300 to 480, remembered with the window)
         readonly property int colW: Math.round(Math.max(300, Math.min(480, win.width - 700, Store.talkWidth)))
         bar: win.plates && !col
@@ -120,15 +151,17 @@ Window {
         NumberAnimation { id: swap; target: talk; property: "opacity"; from: 0; to: 1; duration: Theme.base; easing.type: Easing.OutCubic }
         // where the column ends, for the workspace: its tools and its stage begin right of it
         Binding { target: Store; property: "talkCol"; value: talk.col ? Theme.edge + talk.colW : 0 }
-        Behavior on x { enabled: !talk.bar && !talk.col; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
-        Behavior on width { enabled: !talk.bar && !talk.col && !talk.dragging && win.restored; NumberAnimation { duration: Theme.move(260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
+        Behavior on y { enabled: talk.gliding; NumberAnimation { duration: Theme.move(talk.glideMs); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
+        Behavior on height { enabled: talk.gliding; NumberAnimation { duration: Theme.move(talk.glideMs); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
+        Behavior on x { enabled: talk.gliding || (!talk.bar && !talk.col); NumberAnimation { duration: Theme.move(talk.gliding ? talk.glideMs : 260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
+        Behavior on width { enabled: talk.gliding || (!talk.bar && !talk.col && !talk.dragging && win.restored); NumberAnimation { duration: Theme.move(talk.gliding ? talk.glideMs : 260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
         // where the bar is, for the screen in front: the camera keeps the part clear of it, the cue sits above it
         onYChanged: if (bar) Store.barY = y
         onBarChanged: Store.barY = bar ? y : win.height
         Binding { target: Store; property: "barRestY"; value: talk.bar ? win.height - Theme.edge - talk.restHeight : win.height }
         onXChanged: if (bar) Store.barX = x
         onWidthChanged: if (bar) Store.barW = width
-        Component.onCompleted: { Store.barY = bar ? y : win.height; Store.barX = x; Store.barW = width }
+        Component.onCompleted: { col = wantCol; Store.barY = bar ? y : win.height; Store.barX = x; Store.barW = width }
         // the column on Home: drag the edge to resize; double-click puts it back
         MouseArea {
             visible: talk.shown && !talk.bar; z: 9

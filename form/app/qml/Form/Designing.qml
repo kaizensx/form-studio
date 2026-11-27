@@ -47,13 +47,23 @@ Item {
     readonly property bool staged: !!Store.building && !Store.building.project
     // The free stage, as in a workspace: the part stands on the bar's centre line (the window's) whenever there is room
     // on both sides of it (at least 60 % of the free width, left of the Program once stages arrive); else in the middle.
-    readonly property real freeL: 40
+    // Once the conversation is the column on the left (Main.qml: it outgrew the panel under the stage), the stage
+    // begins right of it and its centre line is the middle of what is left, as in a workspace.
+    readonly property bool col: Store.talkCol > 0
+    readonly property real freeL: col ? Store.talkCol + 40 : 40
     readonly property real freeR: width - (staged ? Theme.paneW + Theme.edge + 20 : 40)
-    readonly property real axisX: Store.barX + Store.barW / 2
+    readonly property real axisX: col ? (freeL + freeR) / 2 : Store.barX + Store.barW / 2
     readonly property real halfW: Math.min(axisX - freeL, freeR - axisX)
     readonly property bool centred: 2 * halfW >= 0.6 * (freeR - freeL)
     readonly property real stageL: centred ? axisX - halfW : freeL
     readonly property real stageR: centred ? axisX + halfW : freeR
+    // The middle of the free stage: what stands on the stage (the words while the agent works, the key light, the
+    // blank canvas, the cue) is centred on it. It glides when the stage changes (the column arrives or folds).
+    readonly property real midX: (stageL + stageR) / 2
+    property bool ready: false
+    Component.onCompleted: ready = true
+    property real cx: midX
+    Behavior on cx { enabled: dz.ready && !Theme.reduced; NumberAnimation { duration: 340; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
     onStageLChanged: dvp.layoutChanged(); onStageRChanged: dvp.layoutChanged()      // a view panned or zoomed goes back to the middle when the stage changes
     // the room: what the panes of this screen blur
     Item { id: studio; anchors.fill: parent
@@ -66,7 +76,7 @@ Item {
     Room { anchors.fill: parent; wall: false; poolK: 0 }
     }
     // the key light: it breathes while the agent thinks, and narrows and warms once stages arrive
-    Room { anchors.fill: parent; wall: false; vignetteK: 0; poolX: 0.5; poolY: dz.staged ? 0.5 : 0.46
+    Room { objectName: "designingLight"; anchors.fill: parent; wall: false; vignetteK: 0; poolX: dz.cx / Math.max(1, dz.width); poolY: dz.staged ? 0.5 : 0.46
         poolW: dz.staged ? 640 : 900; poolH: dz.staged ? 300 : 380; poolK: Theme.dark ? (dz.staged ? 0.11 : 0.06) : (dz.staged ? 0.5 : 0.3); breathe: !dz.staged
         Behavior on poolW { NumberAnimation { duration: Theme.move(600); easing.type: Easing.InOutQuad } }
         Behavior on poolK { NumberAnimation { duration: 600; easing.type: Easing.InOutQuad } } }
@@ -76,8 +86,18 @@ Item {
     // title block of a drawing: the line that matters large, its real steps as a ledger under it.
     Item {
         id: origin; objectName: "designingOrigin"
-        readonly property real col: Math.min(parent.width - 2 * Theme.s10, 560)        // the text column
-        x: Math.round((parent.width - col) / 2); y: Math.round(Math.min(parent.height * 0.3, Store.barY - 330))
+        readonly property real col: Math.min(dz.stageR - dz.stageL - 2 * Theme.s10, 560)        // the widest the words may be
+        // The words are one block, as wide as what is written (the steps' column at least), and that block stands in
+        // the middle of the free stage; the origin is its top left corner, one step out. A longer line widens the
+        // block about its middle, smoothly.
+        readonly property real want: Math.min(col - Theme.s5, Math.max(ledger.width, cap.implicitWidth, line.implicitWidth + (kb.visible ? kb.width : 0),
+                                                                       trashed.visible ? Math.min(trashed.implicitWidth, 420) : 0, ends.visible ? ends.implicitWidth : 0))
+        property real blockW: want
+        Behavior on blockW { enabled: dz.ready && !Theme.reduced; NumberAnimation { duration: Theme.cross; easing.type: Easing.OutCubic } }
+        // above the conversation: the panel under the stage while it is one, the foot of the window once it is a column
+        property real floorY: Store.barY
+        Behavior on floorY { enabled: dz.ready && !Theme.reduced; NumberAnimation { duration: 340; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
+        x: Math.round(dz.cx - blockW / 2) - Theme.s5; y: Math.round(Math.max(Theme.paneTop + 24, Math.min(parent.height * 0.3, floorY - 330)))
         width: 1; height: 1
         visible: opacity > 0.01 && !dz.empty
         opacity: dz.staged ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
@@ -105,20 +125,21 @@ Item {
     Column {
         objectName: "designingState"; visible: !dz.empty && opacity > 0.01
         opacity: dz.staged ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
-        x: origin.x + Theme.s5; y: origin.y + Theme.s5; spacing: Theme.s2; width: origin.col - Theme.s5
-        Txt { kind: "cap"; color: Theme.datum; objectName: "designingCaption"; text: dz.done ? "No design yet" : "Being designed" }
+        x: origin.x + Theme.s5; y: origin.y + Theme.s5; spacing: Theme.s2; width: Math.ceil(origin.blockW)
+        Txt { id: cap; kind: "cap"; color: Theme.datum; objectName: "designingCaption"; text: dz.done ? "No design yet" : "Being designed" }
         Row { spacing: 0; width: parent.width
-            Txt { objectName: "designingLine"; kind: "h2"; text: dz.liveLine(); width: Math.min(implicitWidth, parent.width - (kb.visible ? kb.width : 0)) }
+            Txt { id: line; objectName: "designingLine"; kind: "h2"; text: dz.liveLine(); width: Math.min(implicitWidth, parent.width - (kb.visible ? kb.width : 0)) }
             Tick { id: kb; objectName: "designingKb"; visible: dz.writing; font.pixelSize: Theme.tH2; font.weight: Theme.wMedium; font.letterSpacing: -0.4; tone: 2
                 leftPadding: Theme.s3; unit: " kB"; decimals: 1; value: dz.writing ? Store.chatLive.chars / 1000 : 0 } }
         // a conversation whose designs were all moved to the trash says so, rather than pretending it made none
-        Txt { visible: dz.done && Store.convNoDesign && Store.designsHere.length > 0; kind: "body"; tone: 2; width: parent.width; wrapMode: Text.WordWrap
+        Txt { id: trashed; visible: dz.done && Store.convNoDesign && Store.designsHere.length > 0; kind: "body"; tone: 2; width: parent.width; wrapMode: Text.WordWrap
             text: Store.designsHere.length === 1 ? "Its design, “" + Store.designsHere[0].name + "”, is in the trash (.trash in your projects folder)."
                 : F.plural(Store.designsHere.length, "design") + " it made are in the trash (.trash in your projects folder)." }
         // the ledger: the agent's real steps, in order, the newest last and marked while it runs
         Item { width: 1; height: Theme.s1; visible: ledger.visible }
         Column { id: ledger; objectName: "designingLedger"; width: 320; spacing: Theme.s1; visible: dz.steps.length > 0
             property int seen: 0                     // steps already written: only new lines arrive
+            function caughtUp() { Qt.callLater(function () { if (ledger && dz) ledger.seen = Math.max(ledger.seen, dz.steps.length) }) }
             readonly property int from: Math.max(0, dz.steps.length - 6)
             Repeater { model: dz.steps.slice(ledger.from)
                 Item { id: stepRow; required property string modelData; required property int index
@@ -128,19 +149,19 @@ Item {
                     property real k: 1
                     opacity: k; transform: Translate { y: (1 - stepRow.k) * Theme.shift(6) }
                     Component.onCompleted: if (n >= ledger.seen) { k = 0; arrive.delay = Math.max(0, n - ledger.seen) * Theme.stagger; arrive.start()
-                        Qt.callLater(function () { ledger.seen = Math.max(ledger.seen, dz.steps.length) }) }
+                        ledger.caughtUp() }
                     SequentialAnimation { id: arrive; property int delay: 0
                         PauseAnimation { duration: arrive.delay }
                         NumberAnimation { target: stepRow; property: "k"; to: 1; duration: Theme.slow; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
                     Txt { mono: true; kind: "fine"; tone: 4; text: (stepRow.n + 1 < 10 ? "0" : "") + (stepRow.n + 1); anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
                     Txt { x: 28; width: parent.width - 28 - 14; mono: true; kind: "fine"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; elide: Text.ElideRight
                         color: stepRow.now ? Theme.ink : Theme.ink3; text: stepRow.modelData }
-                    Rectangle { visible: stepRow.now; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 6; height: 6; radius: 3; color: Theme.datum
+                    Rectangle { objectName: stepRow.now ? "designingDot" : ""; visible: stepRow.now; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 6; height: 6; radius: 3; color: Theme.datum
                         SequentialAnimation on opacity { running: stepRow.now && !Theme.reduced; loops: Animation.Infinite
                             NumberAnimation { to: 0.35; duration: 700 } NumberAnimation { to: 1; duration: 700 } } }
                 } } }
         Item { width: 1; height: Theme.s2; visible: dz.done }
-        Row { visible: dz.done; spacing: 8
+        Row { id: ends; objectName: "designingEnds"; visible: dz.done; spacing: 8
             Btn { objectName: "designingContinue"; kind: "primary"; icon: "message_square"; text: "Continue the conversation"; visible: Store.chatReady && Store.convId !== ""
                 tip: "Say what to make; it appears here as it is built"; onClicked: { Store.talkOpen = true; Store.chatFocus++ } }
             Btn { objectName: "designingHome"; icon: "arrow_left"; text: "Back to Home"; onClicked: Store.leaveDesigning() }
@@ -157,7 +178,7 @@ Item {
             var b = Store.building
             for (var i = Store.stageLog.length - 1; b && i >= 0; i--) { var e = Store.stageLog[i]; if (e.draft === b.draft && e.at === b.at - 1) return e.label || "" }
             return "" }
-        width: Math.max(360, Store.barW); x: Math.round(Store.barX + (Store.barW - width) / 2)
+        width: Math.round(dz.col ? Math.max(360, Math.min(600, dz.stageR - dz.stageL)) : Math.max(360, Store.barW)); x: Math.round(dz.col ? dz.midX - width / 2 : Store.barX + (Store.barW - width) / 2)
         height: stageLedger.height; y: Math.round(Store.barY - height - Math.max(26, Math.min(116, dz.height * 0.129)))     // the lower third, as in a workspace
         onXChanged: stageLedger.place(); onYChanged: stageLedger.place()
         opacity: dz.staged ? 1 : 0; visible: opacity > 0.01
@@ -211,7 +232,7 @@ Item {
     // the blank canvas: the empty studio floor and the ways to put something on it
     Column {
         objectName: "blankCanvas"; visible: dz.empty
-        anchors.centerIn: parent; anchors.verticalCenterOffset: -70; spacing: 12; width: Math.min(parent.width - 80, 620)
+        x: Math.round(dz.midX - width / 2); y: Math.round((parent.height - height) / 2 - 70); spacing: 12; width: Math.min(dz.stageR - dz.stageL - 80, 620)
         Txt { kind: "cap"; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter; text: "Blank canvas" }
         Txt { kind: "h2"; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width
             text: "Nothing here yet" }
@@ -229,7 +250,8 @@ Item {
 
     // what you gave it, kept in view: the photo, the sketch, the part
     Row {
-        visible: dz.pics.length > 0; anchors.left: parent.left; anchors.top: parent.top; anchors.leftMargin: Theme.edge; anchors.topMargin: 84; spacing: 8
+        visible: dz.pics.length > 0; anchors.left: parent.left; anchors.top: parent.top; anchors.topMargin: 84; spacing: 8
+        anchors.leftMargin: dz.col ? Store.talkCol + Theme.gap : Theme.edge        // right of the conversation column once there is one
         Txt { kind: "cap"; text: "Working from"; anchors.verticalCenter: parent.verticalCenter; rightPadding: 4 }
         Repeater { model: dz.pics.slice(0, 5)
             Rectangle { required property var modelData; readonly property bool pic: modelData.kind === "image"

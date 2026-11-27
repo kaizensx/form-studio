@@ -19,6 +19,10 @@ Home's start flow (form/start.py, form/concepts.py), by words in the FIRST line 
               "You measured: nothing (<reason>)" when the question closed unanswered.
   "Replace a broken part: <name>."  (form/replace.py) creates a tiny Block design named <name> (create_design), adds
               "Replacement: <name>", then asks the measurement question above about it.
+  "statue"    plays a scan turned into CAD the hard way (the shape of a real run): mesh_preflight, design_guide, two
+              reconstruct calls that fail, a long ask_user question with four choices (it waits for the answer), more
+              guides, four create_design calls that fail, then a closing line. No design is made. FAKE_STATUE_PAUSE
+              (seconds, default 0.4) is the wait between steps.
 The end-of-run gate (form/chat.py, form/verdict.py), by words in the FIRST line:
   "failcheck"  reports a get_project result whose checks FAIL (Thinnest wall: 0.00 mm) for project "wall-test" and
                ends with "Designed." (FAIL not reported). With "ack" it says the wall check fails instead. With
@@ -100,6 +104,8 @@ def main():
     first0 = message.splitlines()[0] if message.strip() else ""
     if re.search(r"\bfailcheck\b", first0) or message.startswith("Form Studio check before this reply ends"):
         return failcheck(data, message, sid)
+    if re.search(r"\bstatue\b", first0):
+        return statue(data, message, sid)
     if re.search(r"\beditable\b", first0):
         return editable(data, message, sid)
     if re.search(r"\bstages\b", first0):
@@ -182,6 +188,79 @@ def main():
                   "```python\nform.run()\n```\n\n| Option | Yield |\n|---|--:|\n| Head | 66 % |\n")
     out({"type": "assistant", "message": {"content": [{"type": "text", "text": reply}]}})
     out({"type": "result", "total_cost_usd": session_total(data, sid, 0.25), "num_turns": 2, "session_id": sid})
+    return 0
+
+
+STATUE_Q = ("This file is a 3D scan of a statue (807 x 591 x 2211 mm, 554k triangles), not a mechanical part. The automatic "
+            "conversion refused it: the mesh has 5 non-manifold edges and 8 open edges, so it does not bound a solid. A "
+            "sculpted surface also has no dimensions to turn into parameters (drapery folds and a face are freeform). "
+            "What do you want to be able to do with it?")
+STATUE_CHOICES = ["Simplified parametric figure rebuilt from cross-sections", "Parametric plinth/base designed around the statue",
+                  "Exact solid of the scan (I will repair the mesh first)", "Something else"]
+STATUE_ERRORS = [
+    "Error executing tool create_design: The design's code failed on line 21 (Figure): AttributeError (type object 'MeshBody' "
+    "has no attribute 'load'). The code asks an object for something it does not have (a wrong method name, or a result that "
+    "is a different type than expected).",
+    "Error executing tool create_design: The shell on line 41 (Figure) could not be built: the wall is thicker than the "
+    "smallest inside radius of the body.\nHint: Use a thinner wall, or round the body's tight corners first.",
+    "Error executing tool create_design: Could not read statue.stl: The part has 554,416 triangles to draw; Form Studio "
+    "draws up to 400,000.\nHint: Export a simplified version of the part.",
+    "Error executing tool create_design: The geometry kernel did not answer within 243 s and was restarted. It was building "
+    "figure (243 s on it).\nHint: Nothing was saved from that attempt. Your last committed revision is intact.",
+]
+
+
+def statue(data: Path, message: str, sid: str) -> int:
+    pause = float(os.environ.get("FAKE_STATUE_PAUSE", "0.4"))
+    n = [0]
+
+    def tool(name, args, text, ok=True):
+        n[0] += 1
+        tid = f"s{n[0]}"
+        out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": tid, "name": "mcp__form__" + name, "input": args}]}})
+        time.sleep(pause)
+        out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": tid, **({} if ok else {"is_error": True}),
+                                                      "content": [{"type": "text", "text": text}]}]}})
+        time.sleep(pause / 2)
+
+    scan = "/tmp/statue.stl"
+    tool("mesh_preflight", {"path": scan}, json.dumps({"file": "statue.stl", "format": "stl (binary)", "triangles": 554416, "vertices": 277192}))
+    tool("design_guide", {"topic": "reference_parts"}, json.dumps({"topic": "reference_parts", "guide": "REFERENCE PARTS: meshes the person gives you"}))
+    refused = ("Error executing tool reconstruct: The mesh is not closed (0 open boundaries, 5 non-manifold edges), so it does not "
+               "bound a solid.\nHint: Close it in the program that made it, or reconstruct with hole filling on.")
+    tool("reconstruct", {"project_or_file": scan, "name": "Statue"}, refused, ok=False)
+    tool("reconstruct", {"project_or_file": scan, "name": "Statue", "layer": 1, "tolerance": 0.5}, refused, ok=False)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from form import ask
+    q = ask.question(STATUE_Q, STATUE_CHOICES, why="It decides whether I rebuild a simplified editable form, design editable parts "
+                                                   "around the scan, or wait for a repaired mesh.")
+    n[0] += 1
+    tid = f"s{n[0]}"
+    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": tid, "name": "mcp__form__ask_user",
+                                                       "input": {"question": q["question"], "choices": q["choices"]}}]}})
+    folder = os.environ.get(ask.ENV_DIR)
+    if not folder:
+        res = ask.unreachable(q)
+    else:
+        qid = ask.post(Path(folder), q, 120)
+        t0 = time.time()
+        while True:
+            st, extra = ask.state(Path(folder), qid)
+            if st != "open":
+                break
+            if time.time() - t0 > 120:
+                ask.close(Path(folder), qid, "timeout")
+            time.sleep(0.1)
+        res = ask.result(q, st, extra)
+    out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": tid, "content": [{"type": "text", "text": json.dumps(res)}]}]}})
+    for topic in ("core", "organic", "hybrid"):
+        tool("design_guide", {"topic": topic, "purpose": "model"}, json.dumps({"topic": topic, "guide": "…"}))
+    tool("design_examples", {"query": "organic scan sculpted mesh"}, json.dumps({"examples": [{"name": "helmet"}]}))
+    for e in STATUE_ERRORS:
+        tool("create_design", {"name": "Statue", "purpose": "model", "source": "<41 lines>"}, e, ok=False)
+    out({"type": "assistant", "message": {"content": [{"type": "text", "text": "You answered: " + (res.get("answer") or "no answer") +
+                                                       "\n\nThe scan could not be turned into a design in this run: four builds failed (listed above)."}]}})
+    out({"type": "result", "total_cost_usd": session_total(data, sid, 0.6), "num_turns": 14, "session_id": sid})
     return 0
 
 

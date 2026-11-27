@@ -38,8 +38,10 @@ Rectangle {
         Item { width: parent.width; height: 16
             Row { spacing: 6; anchors.verticalCenter: parent.verticalCenter
                 Icon { name: qa.confirm ? "shield_check" : "message_square"; size: 12; color: qa.open ? Theme.amber : Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
-                Txt { kind: "cap"; text: qa.confirm ? "Needs your approval" : "Question from " + Store.chatAgentLabel; anchors.verticalCenter: parent.verticalCenter } }
-            Row { visible: qa.open; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 6
+                // (in a narrow column a long agent name gives way to "Waiting for you", never runs into it)
+                Txt { kind: "cap"; text: qa.confirm ? "Needs your approval" : "Question from " + Store.chatAgentLabel; anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, col.width - 18 - (waits.visible ? waits.width + 12 : 0)); elide: Text.ElideRight; wrapMode: Text.NoWrap } }
+            Row { id: waits; visible: qa.open; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 6
                 Rectangle { width: 6; height: 6; radius: 3; color: Theme.amber; anchors.verticalCenter: parent.verticalCenter
                     SequentialAnimation on opacity { running: qa.open; loops: Animation.Infinite; alwaysRunToEnd: true
                         NumberAnimation { to: 0.3; duration: 700 } NumberAnimation { to: 1; duration: 700 } } }
@@ -63,7 +65,8 @@ Rectangle {
                     required property string modelData
                     objectName: "askChoice"
                     readonly property bool on: qa.picked.indexOf(modelData) >= 0
-                    width: Math.min(col.width, cl.implicitWidth + (qa.q.multi ? 40 : 24)); height: 28; radius: 14
+                    // a reply longer than the card is wide is written on two or more lines, never cut short
+                    width: Math.min(col.width, Math.ceil(cl.implicitWidth) + (qa.q.multi ? 40 : 24)); height: Math.max(28, cl.height + 12); radius: 14
                     color: on ? Theme.alpha(Theme.datum, 0.16) : cm.pressed ? Theme.washPress : cm.containsMouse ? Theme.plate4 : Theme.plate3
                     border.color: on ? Theme.alpha(Theme.datum, 0.7) : cm.containsMouse ? Theme.rule3 : Theme.rule2
                     scale: cm.pressed ? Theme.from(0.97) : 1
@@ -73,7 +76,7 @@ Rectangle {
                         color: chip.on ? Theme.datum : "transparent"; border.color: chip.on ? Theme.datum : Theme.ink4
                         Icon { visible: chip.on; anchors.centerIn: parent; name: "check"; size: 9; color: Theme.datumInk } }
                     Txt { id: cl; x: qa.q.multi ? 28 : 12; width: parent.width - x - 12; anchors.verticalCenter: parent.verticalCenter
-                        text: chip.modelData; font.pixelSize: 12; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: chip.on || cm.containsMouse ? 1 : 2 }
+                        objectName: "askChoiceLabel"; text: chip.modelData; font.pixelSize: 12; wrapMode: Text.WordWrap; tone: chip.on || cm.containsMouse ? 1 : 2 }
                     MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                         onClicked: qa.q.multi ? qa.toggle(chip.modelData) : qa.send("", [chip.modelData]) }
                 } } }

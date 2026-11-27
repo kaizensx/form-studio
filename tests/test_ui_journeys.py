@@ -100,6 +100,18 @@ class Journeys(unittest.TestCase):
     def test_stage_use_small(self):         # the same in the smallest window, on paper
         self.journey("stage_use.py", size="1100x700", env_extra={"FORM_APPEARANCE": "light"})
 
+    def test_designing_stage(self):         # while a design is made: the words in the middle of the free stage; the conversation glides to its column once it outgrows the panel; a long question with every reply in view
+        self.journey("designing_stage.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_designing_stage_mid(self):
+        self.journey("designing_stage.py", size="1280x800", env_extra={"FORM_APPEARANCE": "light"})
+
+    def test_designing_stage_small(self):   # the smallest window, on paper
+        self.journey("designing_stage.py", size="1100x700", env_extra={"FORM_APPEARANCE": "light"})
+
+    def test_designing_stage_wide(self):    # a wide window: the block is on the stage's middle, not left of it
+        self.journey("designing_stage.py", size="2000x1100", env_extra={"FORM_APPEARANCE": "dark"})
+
     def test_viewport_calm(self):           # orbit, zoom, rebuilds and slider drags never blink; a build grows in by feature
         self.journey("viewport_calm.py")
 
