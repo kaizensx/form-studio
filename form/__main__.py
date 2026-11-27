@@ -26,6 +26,7 @@
   form lighter <project> [--apply c1]                  lighter walls, pockets, infill; every passing check kept
   form replace --photo broken.jpg [--name X]           a replacement for a broken part, from a photo, in a chat
   form feature <project> boss --at x,y,z --normal ...  a screw boss or snap-fit hook in the code
+  form study list|run|show <project> [id] [--force]   the Bench: every study, route and document, with its state
   form verify <project> <release>    re-hash a release against its manifest
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
                                      one message to an agent with FORM's tools; streams the reply, saves the conversation
@@ -246,6 +247,9 @@ def main(argv=None):
     if argv[:1] == ["secrets"]:                    # agent keys (Gemini); values never on the command line
         from .secrets import main as secrets_main
         return secrets_main(argv[1:])
+    if argv[:1] == ["study"]:                      # the Bench: every study, route and document with its state (form/studies.py)
+        from .studies import main_cli as study_main
+        return study_main(argv[1:])
     if argv[:1] == ["tool"]:                       # any MCP tool, headless, with the same arguments and rules
         return _tool(argv[1:])
     if argv[:1] == ["capabilities"]:
