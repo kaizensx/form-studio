@@ -53,6 +53,25 @@ def summary(body: str, limit: int = NOTES_MAX) -> str:
     return short + ("\n\n" + more if m or cut else "")
 
 
+def unwrap(md: str) -> str:
+    """The changelog is wrapped at 120 columns; GitHub shows every newline of a release or discussion as a line
+    break, so a paragraph or a bullet becomes one line again. Headings, tables and code stay as written."""
+    out, fenced = [], False
+    for ln in md.split("\n"):
+        s = ln.strip()
+        if s.startswith("```"):
+            fenced = not fenced
+            out.append(ln)
+            continue
+        new = fenced or not s or s.startswith(("#", "|", ">")) or re.match(r"([-*+]|\d+\.)\s", s)
+        prev = out[-1].strip() if out else ""
+        if not new and prev and not prev.startswith(("#", "|", "```")):
+            out[-1] = out[-1].rstrip() + " " + s
+        else:
+            out.append(ln)
+    return "\n".join(out)
+
+
 def notes_for(tag: str, changelog: str) -> str:
     version = tag[1:] if tag.startswith("v") else tag
     base = version.split("-", 1)[0]
@@ -63,7 +82,7 @@ def notes_for(tag: str, changelog: str) -> str:
     if body is None:
         body = f"See the [changelog]({SERVER}/{REPO}/blob/main/CHANGELOG.md)."
     else:
-        body = summary(body)
+        body = unwrap(summary(body))
     head = "A preview from the `dev` branch, for the Preview update channel.\n\n" if pre else ""
     verify = (
         "\n\n### Verify the download\n\n"
