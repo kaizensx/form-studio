@@ -514,11 +514,16 @@ three agents the first eight waves take about four weeks; I, J, K and L follow.
 
 ## Owner decisions
 
-1. **Boards.** This plan stops at the board and enclosure loop and the person's own KiCad (wave K), and leaves
-   schematic and routing authoring out. Confirm, or ask for full board design as a later wave.
-2. **Supplier data.** This plan gives standard designations and keeps supplier numbers only when the person or a
-   link supplies them (wave G). The alternative is an optional catalogue service, which sends search words to a
-   third party. Confirm the first, or allow the second as an opt-in.
-3. **CNC G-code in a release.** This plan allows it after a current stock simulation and a person's approval,
-   labelled "simulated, not proven on a machine" (wave J). The stricter choice is to export toolpaths for review
-   only until a physical result is recorded. Choose one.
+Decided by the owner on 2026-11-27: Form Studio is to be the best open-source app in this field at all of it.
+
+1. **Boards: the full loop.** Wave K covers the board and enclosure loop and the person's own KiCad first. A later
+   wave K2 adds schematic capture and routing inside Form Studio (on KiCad's file formats, with its rule checks), so
+   a product's board and its enclosure are designed together.
+2. **Supplier data: both.** Standard designations always, and supplier numbers from the person or a link (wave G).
+   An optional catalogue service is added as an opt-in in Settings, off by default, which says before each search
+   what is sent and to whom.
+3. **CNC G-code in a release: simulated and approved.** G-code goes into a release after a current stock simulation
+   and a person's approval, labelled "simulated, not proven on a machine" until a physical result is recorded
+   (wave J).
+4. **Pace: three tracks at once.** Agents work in separate worktrees in the order of this plan. Each wave is tested,
+   reviewed and installed on the Mac before it merges into `dev`.
