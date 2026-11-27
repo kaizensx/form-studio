@@ -4,6 +4,28 @@
 
 ### New
 
+- **Bring anything; Form Studio works out what it is.** A new triage step looks at whatever you attach or describe
+  (a mesh, a STEP, a photo, a sketch, a PDF, a link, or only words), says what it is and takes the right route by
+  itself. A mesh is classed mechanical, organic or mixed from its own surface, with its triangle count, defects, a
+  guess at its units and how many bodies it holds. `triage` is an MCP tool and `form triage FILE` in the terminal;
+  "Make editable" and `reconstruct` run it themselves. You are asked only when the answer changes the result, with
+  one question.
+- **Scans and sculpts become designs.** A figure, a scan or a sculpt no longer has to pretend to be a mechanical
+  part. A smooth closed sculpt becomes a surface body: NURBS faces over a cage you can edit, with a STEP export. One
+  with fine detail, handles or many triangles becomes a mesh body: the repaired mesh with a Scale and a Flat base
+  parameter, into which exact CAD features (holes, pockets, a split) are cut. The result says how far it is from
+  your file, as measured, and what it is not.
+- **Imperfect meshes are repaired, and every repair is listed.** Sliver triangles hanging off an edge, triangles
+  facing the wrong way, small holes, flat openings and loose debris are fixed before anything is refused; vertices
+  are never moved. A large opening that is not flat is never guessed: the file stays a reference and you are told.
+- **Heavy meshes are welcome.** A mesh with more triangles than a design can carry gets a lighter working copy
+  that stays closed, and the distance between the copy and your file is measured and shown. Your file is unchanged
+  and stays beside the design to compare with. A reference mesh above 400,000 triangles is drawn from a lighter
+  copy instead of being refused.
+- **While a design is being made, its words sit in the middle of the stage, and a long conversation moves to the
+  side.** The conversation starts as a small panel under the stage; when it grows (tool steps, a question with long
+  answers) it glides to the left column it has in the workspace, so the stage stays clear and a question card keeps
+  its reply buttons in view.
 - **A new look: Lightdesk.** The 3D view now fills the whole window and every control floats over it as a pane of
   glass, in the dark studio or on paper. One colour, electric cyan, always means "this is where you are"; green only
   means pass and amber only means review. The app is set in Geist and Geist Mono.
@@ -133,6 +155,11 @@
 
 ### Fixed
 
+- A mesh with a few stray triangles was refused as "not closed (0 open boundaries…)": it is now repaired, and what is
+  open is counted correctly when a mesh really does not close.
+- A refusal names the next step to take, a long error from a design is cut short, and a refusal that comes back
+  unchanged says so, so an agent does not repeat a call that cannot work.
+- Designs with many faces (a mesh brought in as a body) build several times faster.
 - **The first click into the 3D view folds the conversation.** In a design that had just opened, a click on the part
   did nothing to the conversation column until the keyboard had been somewhere else first. Any press on the view now
   folds it.

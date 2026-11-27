@@ -204,6 +204,9 @@ def main(argv=None):
     if argv[:1] in (["fetch"], ["resolve"], ["mesh-preflight"]):   # inputs: model links and big meshes (JSON)
         from .start import main_inputs
         return main_inputs(argv)
+    if argv[:1] == ["triage"]:                    # what an input is and the route it takes (JSON)
+        from .triage import main as triage_main
+        return triage_main(argv[1:])
     if argv[:1] == ["concepts"]:                  # concepts first: open groups, one board, pick one
         from .concepts import main as concepts_main
         return concepts_main(argv[1:])
@@ -274,6 +277,8 @@ def main(argv=None):
     sub.add_parser("resolve", help="resolve URL: what a model link is (site, title, licence, files) without downloading")
     sub.add_parser("mesh-preflight", help="mesh-preflight FILE [--no-proxy]: triangles, size, closed, class, time "
                                           "estimate and a display proxy for a large STL/OBJ/3MF")
+    sub.add_parser("triage", help="triage FILE|LINK|WORDS: what the input is (mesh class, defects, units, bodies) and "
+                                  "the route Form Studio takes for it (JSON)")
     sub.add_parser("concepts", help="concept groups: [<group-or-project>] | pick <group> <project> [--keep-others]")
     sub.add_parser("install", help="install what Form Studio uses (--list, <id>, --yes, --dry-run)")
     sub.add_parser("config", help="get [key] | set <key> <value>: read or change studio.toml")
@@ -464,6 +469,11 @@ def main(argv=None):
                     help="0: exact solid only, 1: analytic and B-spline faces (beta), 2: feature tree recipe (beta)")
     rc.add_argument("--budget", type=float, default=240.0,
                     help="seconds the reconstruction may take in all; the best result found in that time is kept")
+    rc.add_argument("--route", choices=("auto", "parametric", "surface_body", "mesh_body"), default="auto",
+                    help="auto: the route the triage chooses (see `form triage FILE`); or force one")
+    rc.add_argument("--scale", type=float, default=1.0, help="multiply the file's coordinates (a mesh in metres: 1000)")
+    rc.add_argument("--units", choices=("auto", "mm", "cm", "m", "in"), default="auto",
+                    help="what the file's numbers are; auto: millimetres, and a size that makes no sense in mm is asked about")
     ar = sub.add_parser("analyze-reference", help="an imported mesh read like an engineer: sections with dimensions, features "
                                                   "with sizes, symmetry, walls: analyze-reference <project> <mesh> [--levels JSON]")
     ar.add_argument("project")
@@ -555,7 +565,8 @@ def main(argv=None):
                                                    tolerance=a.tolerance, layer=a.layer, on_progress=show))
             else:
                 _print(st.reconstruct(Path(a.file), name=a.name, tolerance=a.tolerance, layer=a.layer,
-                                      budget_s=a.budget, on_progress=show))
+                                      budget_s=a.budget, on_progress=show, route=a.route, scale=a.scale,
+                                      units=a.units))
         elif a.cmd in ("analyze-reference", "analyze-assembly", "compare-reference"):
             from .remodel import project as rp
             p = st.load(a.project)

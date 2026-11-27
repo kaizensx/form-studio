@@ -5,9 +5,12 @@ description: Start a new printable part in FORM. Use when the user asks for a ne
 
 # Intake: ask only what changes the result
 
-FORM tools: `form_overview()`, `brief_presets()`, `describe_recipe()`, `read_document()`, `get_project()`.
+FORM tools: `form_overview()`, `triage()`, `brief_presets()`, `describe_recipe()`, `read_document()`, `get_project()`.
 
 1. `form_overview()` first: printer, slicer, recipes, existing projects. Do not start a duplicate project.
+   Anything the person attached or linked, and their words when nothing is attached: `triage(source)`. It says what
+   the input is and the route (which calls, in order), what will be prepared, what the route cannot give, and `ask`:
+   one question, present only when the answer changes the result. Take the route; do not ask the person to pick it.
 2. If the part matches a template, `brief_presets(preset="...")` gives the questions worth asking, environment
    defaults, a starting material and the checks to plan for. Its defaults are **assumed** until the user confirms them.
    A project made from the app's "Start from a brief" already carries `brief.answers`; read them with `get_project()`.
@@ -28,6 +31,7 @@ FORM tools: `form_overview()`, `brief_presets()`, `describe_recipe()`, `read_doc
 
 Photos and scans: a photo with a marked scale gives a rough form dimension (the app's photo measuring treats it as
 ±0.6 mm or worse). Never derive a fit-critical or hidden dimension from a photo or an unaligned scan; ask for a
-measurement instead. To make an existing STL, OBJ, 3MF or STEP editable, use the remodel-from-mesh skill.
+measurement instead. To make an existing STL, OBJ, 3MF or STEP editable: `reconstruct(path)` (the remodel-from-mesh
+skill has the routes).
 
 Never invent a fit-critical value, and never treat silence as consent or as a measurement.

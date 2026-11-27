@@ -201,7 +201,7 @@ def _attribute(final, stages, tol):
     tol it was read on. A final face belongs to the last stage that created the surface under it."""
     from build123d import Vertex
     skins = [_Skin(s.shape) for s in stages[:-1]]
-    faces = final.faces()
+    faces = list(final.faces())             # a plain list: indexing a ShapeList copies it (O(n) per face)
     tess = _mesh_faces(final, faces, tol)
     feats: list = [None] * len(faces)
     for i, P, T, _area in tess:
@@ -235,7 +235,7 @@ def _attribute(final, stages, tol):
 
 def _finish_base(base) -> None:
     """The parts of a B-rep model that follow from its shape and face map: faces in order and faces per feature."""
-    faces = base["shape"].faces()
+    faces = list(base["shape"].faces())     # a plain list: indexing a ShapeList copies it (O(n) per face)
     base["_faces"] = faces
     by = {}
     for f, feat in zip(faces, base["face_features"]):
@@ -766,7 +766,7 @@ def op_view(key, recipe_id, values, tol=0.05, edges=True, dock_mass_g=None):
     for k, g in groups.items():
         P, T = np.concatenate(g["P"]), np.concatenate(g["T"])
         if facets:                                   # a faceted solid shades smooth, creases stay sharp
-            P, T = smooth_facets(P, T)
+            P, T = smooth_facets(P, T, float(getattr(model["recipe"], "crease_deg", FEATURE_EDGE_DEG)))
         mesh.append({"feature": k, "positions": _b64(P.astype(np.float32)), "indices": _b64(T.astype(np.uint32))})
     out = _summary(model, dock_mass_g)
     out["mesh"] = mesh
@@ -794,7 +794,8 @@ def op_view(key, recipe_id, values, tol=0.05, edges=True, dock_mass_g=None):
             # per-part meshes; the parts that carry a mesh texture keep it (the viewer and the render sheets)
             out["mesh"] = tm or asm.mesh(model, _b64, smooth_facets if facets else None)
     if edges:
-        out["edges"] = _b64(_mesh_edges(*_mesh_arrays(model)) if getattr(model["recipe"], "mesh", False)
+        out["edges"] = _b64(_mesh_edges(*_mesh_arrays(model), float(getattr(model["recipe"], "crease_deg", 30.0)))
+                            if getattr(model["recipe"], "mesh", False)
                             else _edges(model["shape"], facets))
     return out
 
@@ -1246,6 +1247,9 @@ def _tessellate(shape, tol):
     return np.concatenate(Ps), np.concatenate(Ts)
 
 
+DRAW_TRIANGLES = 400_000   # a reference mesh above this is drawn from a lighter copy (never refused)
+
+
 def op_reference(path, fmt, out):
     """Read an imported STEP or STL: measure it and write a display mesh (positions, indices, edges) to `out`.
 
@@ -1284,14 +1288,28 @@ def op_reference(path, fmt, out):
         a, b, c = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
         vol = float(np.einsum("ij,ij->i", a, np.cross(b, c)).sum() / 6.0)
         lo, hi = P.min(axis=0), P.max(axis=0)
+        n_file = int(len(T))
+        drawn = None
+        if n_file > DRAW_TRIANGLES:                  # a heavy mesh is drawn from a lighter copy; the file is unchanged
+            from . import meshprep
+            from .recon.mesh import weld
+            Vw, Fw, _w = weld(P.reshape(-1, 3, 3), 0.0)
+            Vd, Fd, cell = meshprep.decimate(Vw, Fw, DRAW_TRIANGLES // 2)
+            P, T = Vd[Fd].reshape(-1, 3), np.arange(3 * len(Fd), dtype=np.int64).reshape(-1, 3)
+            drawn = {"triangles": int(len(Fd)), "cell_mm": round(float(cell), 4),
+                     "note": f"Drawn from a lighter copy ({len(Fd):,} of {n_file:,} triangles, vertex clustering at "
+                             f"{cell:.3g} mm). The file itself is unchanged and is what every measurement uses."}
         E = _mesh_edges(P, T, FEATURE_EDGE_DEG)
         P, T = smooth_facets(P, T)                   # drawn smooth: no triangle edges, creases stay sharp
-        info = {"format": fmt[1:], "bbox": [lo.tolist(), hi.tolist()], "volume_mm3": abs(vol), "solids": None}
+        info = {"format": fmt[1:], "bbox": [lo.tolist(), hi.tolist()], "volume_mm3": abs(vol), "solids": None,
+                "triangles_in_file": n_file}
+        if drawn:
+            info["drawn"] = drawn
     else:
         raise RecipeError(f"Unsupported format {fmt}", "", "Import a STEP (.step/.stp) or STL file.")
-    if len(T) > 400_000:
-        raise RecipeError(f"The part has {len(T):,} triangles to draw; Form Studio draws up to 400,000.", "",
-                          "Export a simplified version of the part.")
+    if len(T) > 2 * DRAW_TRIANGLES:                  # a STEP whose tessellation is this heavy: say what to do next
+        raise RecipeError(f"The part has {len(T):,} triangles to draw; Form Studio draws up to {2 * DRAW_TRIANGLES:,}.", "",
+                          "Import the part's main bodies as separate STEP files, or leave out fasteners and threads.")
     info["triangles"] = int(len(T))
     view = {"positions": _b64(P.astype(np.float32)), "indices": _b64(T.astype(np.uint32)), "edges": _b64(E)}
     Path(out).write_text(json.dumps(view), encoding="utf-8")
@@ -1344,6 +1362,8 @@ from .instructions import KERNEL_OPS as _INSTR_OPS  # noqa: E402  (assembly inst
 OPS.update(_INSTR_OPS)
 from .recon import KERNEL_OPS as _RECON_OPS  # noqa: E402  (mesh to editable CAD)
 OPS.update(_RECON_OPS)
+from .sculpt import KERNEL_OPS as _SCULPT_OPS  # noqa: E402  (a sculpted mesh as a surface body or a mesh body)
+OPS.update(_SCULPT_OPS)
 from .critique import KERNEL_OPS as _CRITIQUE_OPS  # noqa: E402  (design critique metrics and section views)
 OPS.update(_CRITIQUE_OPS)
 from .appearance import KERNEL_OPS as _APPEARANCE_OPS  # noqa: E402  (material zones for photos)

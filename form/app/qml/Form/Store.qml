@@ -850,7 +850,14 @@ QtObject {
         return ppost("/reconstruct", { file: file }).then(function (r) {
             var m = r.summary || ({})
             var ed = Number(m.editable_pct || 0)
-            if (m.recipe_verified && ed > 0)           // "editable" only for a share of real dimensions (form/recon)
+            if (r.parts)                               // one file that held several bodies: one design, a part each
+                toast("“" + r.name + "”: " + r.parts.length + " parts", "The file held " + r.parts.length
+                      + " separate bodies; each is a part of one design, reconstructed and checked on its own.")
+            else if (m.tier)                           // a sculpt or a scan: a surface body or a mesh body (form/sculpt.py)
+                toast("“" + r.name + "”: " + (m.route === "surface_body" ? "a surface body" : "a mesh body"),
+                      F.fmt(m.hausdorff_mm, 3) + " mm from the file (measured) · "
+                      + (m.route === "surface_body" ? "edit its cage; exports STEP" : "Scale and Flat base; exact cuts; STL and 3MF"))
+            else if (m.recipe_verified && ed > 0)      // "editable" only for a share of real dimensions (form/recon)
                 toast("“" + r.name + "”: " + F.fmt(ed, 0) + "% editable", F.fmt(m.hausdorff_mm, 4) + " mm from the mesh"
                       + (m.within_tolerance === false ? " (outside the tolerance)" : "")
                       + " · " + (m.dimension_params || 0) + " dimensions you can change · "

@@ -34,6 +34,8 @@ import numpy as np
 TIER_SURFACE = "surface body (subdivision cage to NURBS)"
 TIER_MESH = "mesh body (sculpted; CAD features exact)"
 TIER_CAD = "parametric (CAD)"
+CAGE_MAX = 16               # the closed route's largest cage (6 n^2 quads): beyond it the fit takes minutes
+FIT_TRIANGLES = 60_000      # a heavier mesh is fitted through a lighter copy (and measured against itself)
 
 
 # ── mesh basics ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -145,27 +147,18 @@ def _frame(P, toward):
 # ── point to mesh distance ────────────────────────────────────────────────────────────────────────────────────────
 
 class Nearest:
-    """Closest points on a triangle mesh for many query points (candidates from a k-d tree of the triangles)."""
+    """Closest points on a triangle mesh for many query points: exact (form/recon/distance.MeshDistance). The
+    nearest triangle is searched for, not guessed from the nearest centroids: on a mesh with long or uneven
+    triangles (a simplified scan) the nearest centroid is often not the nearest triangle, and a distance read that
+    way is too large."""
 
     def __init__(self, V, F, k: int = 12):
-        from scipy.spatial import cKDTree
-        self.A, self.B, self.C = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]
-        self.tree = cKDTree((self.A + self.B + self.C) / 3)
-        self.k = min(k, len(F))
+        from .recon.distance import MeshDistance
+        self._d = MeshDistance(np.asarray(V, dtype=np.float64), np.asarray(F, dtype=np.int64))
 
     def __call__(self, Q):
-        from .analysis import closest_on_triangles
-        Q = np.asarray(Q, dtype=np.float64)
-        _, cand = self.tree.query(Q, k=self.k)
-        cand = cand.reshape(len(Q), -1)
-        best = np.full(len(Q), np.inf)
-        out = np.zeros_like(Q)
-        for j in range(cand.shape[1]):
-            t = cand[:, j]
-            p, d = closest_on_triangles(Q, self.A[t], self.B[t], self.C[t])
-            m = d < best
-            best[m], out[m] = d[m], p[m]
-        return out, best
+        D, P, _tri = self._d.closest(np.asarray(Q, dtype=np.float64))
+        return P, D
 
 
 # ── shell route ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -326,11 +319,19 @@ def organic_solid(T_or_VF, tol: float = 0.3, kind: str = "auto", verify: int = 2
         known = cg["_skin"]
         rim = cg["_rim"]
     else:
-        n = cage or 5
+        n = int(cage or 5)
+        if not 2 <= n <= CAGE_MAX:
+            raise ValueError(f"cage={n}: a closed cage is 2 to {CAGE_MAX} (6 n^2 quads; 12 already takes about a "
+                             "minute). A body that needs more is a mesh body: MeshBody.")
         Vq, Fq = subd.quad_sphere(n, 1.0)
         c = V.mean(0)
         ext = (V.max(0) - V.min(0)) / 2
-        near = Nearest(V, F)
+        Vn, Fn = V, F
+        if len(F) > FIT_TRIANGLES:                  # the cage is fitted to a lighter copy; the result is still
+            from . import meshrepair                # measured against the mesh as given, below
+            Vn, Fn, _wc = meshrepair.working_copy(V, F, FIT_TRIANGLES, measure=False)
+            rep["fitted_to_triangles"] = int(len(Fn))
+        near = Nearest(Vn, Fn)
         # start on the mesh: each cage point pushed along its direction to the mesh's surface
         Vq = c + Vq * ext
         Vq, _ = near(Vq)
@@ -542,6 +543,87 @@ class MeshBody:
         if self.man.status() != m3.Error.NoError:
             raise ValueError(f"The mesh is not a closed manifold body ({self.man.status()}); repair it first.")
         self.features: list[str] = []
+        self.source: dict = {}
+
+    @classmethod
+    def load(cls, name, target: int | None = None, repair: bool = True):
+        """A mesh file as a mesh body: a reference part of this design by name (`MeshBody.load("scan.stl")`, as
+        self.reference takes it) or an absolute path (STL, OBJ, 3MF). It is welded and, with repair=True, repaired
+        (form/meshrepair.py: fins, extra triangles on an edge, orientation, small holes, flat openings, debris); a
+        mesh above `target` triangles (default form.meshrepair.WORK_TRIANGLES) becomes a lighter working copy whose
+        measured distance from the file is in `.source`. Every step is listed in `.source["repairs"]` and noted on
+        the build. Raises ValueError when the mesh still does not close (a large opening that is not flat)."""
+        from pathlib import Path
+        from . import meshrepair
+        from .recon import mesh as meshmod
+        p = Path(str(name)).expanduser()
+        if not p.is_file():
+            from .recipes import meshsolid
+            known = meshsolid._paths.get(str(name))
+            if not known or not Path(known).is_file():
+                have = ", ".join(sorted(meshsolid._paths)) or "none"
+                raise ValueError(f"No mesh “{name}”: give an absolute path, or a reference part of this design "
+                                 f"(imported: {have}).")
+            p = Path(known)
+        T, info = meshmod.read_triangles(p)
+        V, F, w = meshmod.weld(T, 1e-6)
+        n_in = int(len(F))
+        repairs = []
+        if repair:
+            V, F, repairs, top = meshrepair.repair(V, F, cap_planar=True, drop_debris=True)
+        else:
+            top = meshmod.topology(V, F)
+        if not top["closed"]:
+            raise ValueError(f"{p.name} does not close into a body ({meshrepair.open_text(top)}"
+                             + (f"; {len(top['large_holes'])} opening(s) too large to fill without guessing"
+                                if top.get("large_holes") else "") + "). Use it as a reference only, or close it first.")
+        V, F, wc = meshrepair.working_copy(V, F, target or meshrepair.WORK_TRIANGLES)
+        body = cls(V, F)
+        body.source = {"file": p.name, "triangles_in": int(info.get("triangles_in", n_in)), "triangles": int(len(F)),
+                       "repairs": repairs, "working_copy": wc if wc.get("simplified") else None}
+        try:
+            from .craft._common import note
+            said = f"{p.name}: {body.source['triangles_in']:,} triangles"
+            if repairs:
+                said += "; repaired: " + ", ".join(r["repair"] for r in repairs)
+            if wc.get("simplified"):
+                said += (f"; working copy of {len(F):,} triangles, at most "
+                         f"{wc['deviation']['max_mm']:g} mm from the file (measured)")
+            note(said)
+        except Exception:                               # noqa: BLE001  (outside a build there is nowhere to note it)
+            pass
+        return body
+
+    def scale(self, factor: float, about=None) -> "MeshBody":
+        """Scale the body (1.0 = as it is) about a point (default: the origin)."""
+        f = float(factor)
+        m = self.man
+        if about is not None:
+            a = tuple(float(x) for x in about)
+            m = m.translate((-a[0], -a[1], -a[2])).scale((f, f, f)).translate(a)
+        else:
+            m = m.scale((f, f, f))
+        self.man = m
+        return self
+
+    def move(self, x: float = 0.0, y: float = 0.0, z: float = 0.0) -> "MeshBody":
+        self.man = self.man.translate((float(x), float(y), float(z)))
+        return self
+
+    def bounds(self):
+        """((xmin, ymin, zmin), (xmax, ymax, zmax))."""
+        b = self.man.bounding_box()
+        return tuple(b[:3]), tuple(b[3:])
+
+    def solid(self):
+        """The body as a kernel solid, one planar face per triangle (what a mesh design returns from a feature:
+        declare `mesh = True` on the design). Volume, sections, wall thickness and STL work on it; it is not written
+        to STEP, because facets are not the intended surfaces."""
+        from .recipes.meshsolid import solid_from_mesh
+        V, F = self.arrays()
+        from .recon.mesh import weld as _w
+        V, F, _ = _w(V[F], 1e-9)
+        return solid_from_mesh(V, F)
 
     @classmethod
     def from_shape(cls, shape, tol: float = 0.02):
@@ -565,6 +647,14 @@ class MeshBody:
         self.features.append(name)
         return self
 
+    def trim(self, origin, normal, name: str = "trim") -> "MeshBody":
+        """Keep the side of a plane its normal points to; the cut is closed with a flat face (exact)."""
+        n = np.asarray(normal, float)
+        n = n / np.linalg.norm(n)
+        self.man = self.man.trim_by_plane(tuple(float(x) for x in n), float(np.dot(n, np.asarray(origin, float))))
+        self.features.append(name)
+        return self
+
     def split(self, origin, normal) -> tuple["MeshBody", "MeshBody"]:
         n = np.asarray(normal, float)
         n = n / np.linalg.norm(n)
@@ -573,7 +663,7 @@ class MeshBody:
         out = []
         for m in (b, a):
             mb = MeshBody.__new__(MeshBody)
-            mb.m3, mb.man, mb.features = self.m3, m, list(self.features)
+            mb.m3, mb.man, mb.features, mb.source = self.m3, m, list(self.features), dict(self.source)
             out.append(mb)
         return out[0], out[1]
 

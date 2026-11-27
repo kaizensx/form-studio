@@ -63,13 +63,25 @@ Rules:
   client's form cannot reach the person, the result tells you to ask in your own interface.
 - A new idea that is not a precise specification: propose_concepts with 3-4 genuinely different structural
   approaches as real designs, a one-line rationale each; then stop and let the person pick. Do not offer recipes.
+- Anything the person brings (a mesh, a STEP, a photo, a sketch, a PDF, a link, or only words): triage(source)
+  first. It says what the input is (a mesh: mechanical, organic or mixed; triangles; defects; a guess at the units;
+  how many bodies), chooses the route and names the calls in order. Take that route; do not ask the person which
+  route to take. Ask only when triage returns "ask" (one question whose answer changes the result), and say what
+  "cannot" lists.
+- A mesh to make editable: reconstruct(path). It runs the triage itself, repairs what is safe (every repair is
+  listed), and takes the route: a mechanical part becomes sketches, holes and fillets verified against the mesh; a
+  sculpt or a scan becomes a surface body (NURBS over a cage) or a mesh body (the repaired mesh with a Scale and a
+  Flat base, exact features cut into it: design_guide(topic="organic"), SCULPTED MESHES); several bodies become one
+  design with a part each. Report its headline as it is: the measured distance from the file, and what it is not.
+- A refusal names the next call in its hint. Never repeat a call that failed with the same arguments: do what the
+  hint says. A design's exceptions are not a way to print: what a build has to say comes back in the result.
+- Rebuilding a mechanical mesh by hand (when reconstruct's result is not editable enough): never embed the mesh as
+  the design. design_guide(topic="reference_parts"): analyze_reference (analyze_assembly for several parts) ->
+  named features -> build123d with Params -> compare_to_reference until within tolerance (0.1 mm by default).
 - Photos: scale from a reference object (bank card 85.60 x 53.98 mm, a coin, a ruler); photo dimensions stay
-  assumed until measured. Form Studio sketches carry JSON that is authoritative over the picture. STEP/STL/3MF:
-  import_reference. PDF drawings: read_document. Links the person gives: fetch_link, never a shell; a large mesh:
-  mesh_preflight first. Download only what the person gave you.
-- Meshes to make editable: never embed them as the design. design_guide(topic="reference_parts"): analyze_reference
-  (analyze_assembly for several parts) -> named features -> build123d with Params -> compare_to_reference until
-  within tolerance (0.1 mm by default).
+  assumed until measured. Form Studio sketches carry JSON that is authoritative over the picture. A STEP is already
+  CAD: import_reference. PDF drawings: read_document. Links the person gives: fetch_link, never a shell. Download
+  only what the person gave you.
 - One request makes one design. Several files of one product are one design with several parts (reconstruct
   files=[...], create_design relation="part_of"). A second create_design in a conversation says its relation
   (replaces, part_of, alternative, new).
@@ -108,12 +120,36 @@ def _bench(path: str = "") -> str | None:
     return f"{url}/{path}" if url else None
 
 
+MESSAGE_MAX = 1200          # characters of an error's message a tool returns: a refusal is short and names what to do
+REPEAT_S = 900.0            # the same refusal again within this time is said to be the same
+
+
 def _fail(e: StudioError) -> ToolError:
+    """An engine error as a tool error: the message, the hint, the details. A message longer than MESSAGE_MAX is cut
+    (a design that raises its own long text does not fill the conversation), and a refusal that comes back unchanged
+    says so, so the same call is not tried a third time."""
     pub = e.public()
-    msg = pub.pop("message")
+    msg = str(pub.pop("message"))
     hint = pub.pop("hint", "")
+    if len(msg) > MESSAGE_MAX:
+        cut = len(msg) - MESSAGE_MAX
+        msg = msg[:MESSAGE_MAX].rstrip() + f"… ({cut:,} more characters cut)"
+        hint = (hint + " " if hint else "") + ("An exception is not a way to print from a design: return the solid, and "
+                                              "read what the build says in the tool's result (notes, checks, proof). "
+                                              "For an API, read design_guide(topic=...).")
     extra = {k: v for k, v in pub.items() if v not in (None, [], "")}
-    return ToolError(msg + (f"\nHint: {hint}" if hint else "") + (f"\nDetails: {json.dumps(extra, default=str)}" if extra else ""))
+    details = json.dumps(extra, default=str) if extra else ""
+    if len(details) > 4 * MESSAGE_MAX:
+        details = details[:4 * MESSAGE_MAX] + "…"
+    seen = S.setdefault("refusals", {})
+    now = time.time()
+    for k in [k for k, (_n, t) in seen.items() if now - t > REPEAT_S]:
+        del seen[k]
+    n = seen.get(msg, (0, now))[0] + 1
+    seen[msg] = (n, now)
+    again = (f"\nThis is the same refusal as {'before' if n == 2 else f'the last {n - 1} times'}: the same call will fail "
+             "again. Do what the hint says, or change the input.") if n > 1 else ""
+    return ToolError(msg + (f"\nHint: {hint}" if hint else "") + again + (f"\nDetails: {details}" if details else ""))
 
 
 async def _run(fn, *a, **kw):
@@ -696,6 +732,25 @@ def build() -> MCPServer:
                 raise StudioError(str(e), e.hint)
             r.pop("model_id", None)
             return r
+        return await _run(go)
+
+    @mcp.tool(annotations=RO, meta=ALWAYS)
+    async def triage(source: str, intent: str = "", tolerance: float = 0.02) -> dict:
+        """Assess anything the person brings and choose the route: call this first for a file, a link or a request
+        in words. source: an absolute file path (STL, OBJ, 3MF, STEP, a photo, a PDF, a sketch), a link, or the
+        person's words. For a mesh it reads the file, repairs a copy and measures it: triangles, size, a guess at
+        the units, open and non-manifold edges before and after the safe repairs, bodies, genus, and the share of the
+        surface that is flat or ruled (what CAD makes) against sculpted. It returns the class (mechanical, organic,
+        mixed), the route (parametric, surface_body, mesh_body, assembly, reference_only; cad_reference,
+        photo_reference, sketch, document, link, describe, concepts), why, the calls to make in order ("steps"),
+        what will be prepared first (repair, working_copy), "cannot" (what this route will not give: say it), and
+        "ask": one question, present only when the answer changes the result and is not in the file. Take the route
+        without asking the person to choose it. reconstruct runs this itself; call triage alone to explain or to
+        decide before a larger plan. Reads only; nothing is changed, moved or sent."""
+        from . import triage as tri
+
+        def go():
+            return tri.triage(source, intent=intent, tolerance=tolerance)
         return await _run(go)
 
     @mcp.tool(annotations=RO)
@@ -1716,29 +1771,37 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def reconstruct(project_or_file: str = "", tolerance: float = 0.02, layer: int = 2, name: str | None = None,
                           reference: str | None = None, files: list[str] | None = None,
-                          references: list[str] | None = None, ctx: Context = None) -> dict:
-        """Turn a mesh (STL, OBJ or 3MF) into editable CAD as a new design. project_or_file: an absolute path to the
-        mesh, or a project id whose imported mesh reference to use (reference: which one; default the first mesh).
+                          references: list[str] | None = None, route: str = "auto", scale: float = 1.0,
+                          units: str = "auto", ctx: Context = None) -> dict:
+        """Turn a mesh (STL, OBJ or 3MF) into a design, by the route its triage chooses. project_or_file: an absolute
+        path to the mesh, or a project id whose imported mesh reference to use (reference: which one; default the
+        first mesh). It first repairs what is safe (sliver triangles hanging off an edge, wrong-way triangles, small
+        holes, flat openings; each listed under repairs) and then, with route="auto":
+        - a mechanical or mixed part: the parametric reconstruction. The program route reads sketches extruded and
+          lofted between levels; Layer 0 is the mesh as an exact solid, Layer 1 (beta) replaces facets with planes,
+          cylinders, cones, spheres, tori and fitted B-spline surfaces within `tolerance` mm, Layer 2 (beta) writes
+          a build123d recipe with Params (a base, then fillets, chamfers, holes, patterns; a spur gear becomes a
+          parametric gear). Returns summary.headline: editable_pct and the two-sided Hausdorff distance first. Never
+          call a result with 0% editable "editable". A mesh above 300,000 triangles is simplified within a quarter
+          of the tolerance first, with the measured deviation listed.
+        - an organic mesh (a sculpt, a scan, a figure): a surface body (one closed body without handles or sharp
+          detail: NURBS faces over a cage you can edit, exports STEP; taken only when the measured distance is within
+          0.1 % of its size or the tolerance) or else a mesh body (the repaired mesh, a lighter working copy when
+          heavy with its measured distance from the file, with Scale and Flat base parameters; exact features are
+          cut with MeshBody; exports STL and 3MF, not STEP). Takes well under a minute for 500,000 triangles.
+        - a file with several separate closed bodies: ONE design with one part per body.
+        - a surface that does not close after the repairs: refused, and the hint names the next call
+          (import_reference: keep it as a reference). Do not call again with the same file.
+        If the parametric route fails on a mesh that closes, the mesh body is made instead (summary.fell_back_from).
+        route: "auto", or force "parametric", "surface_body" or "mesh_body". units: what the file's numbers are
+        ("mm", "cm", "m", "in"); with "auto" they are millimetres, and a file whose size makes no sense in
+        millimetres (0.08 across) is not built on a guess: the refusal is the one question to put to the person,
+        then call again with units. scale: a plain factor instead. The result carries "triage" (class, route
+        taken, why, cannot).
         Several meshes of ONE product (a base, a slider and a lid): pass them all at once, as files=[absolute paths]
         (or project_or_file=<project id> with references=[names]); they become ONE design with one part per mesh, in
         the positions the files give (parts that fail are listed in "failed", the others are kept). Never call this
-        once per part: that makes unrelated designs.
-        Layer 0 is always built: the mesh as an exact solid (Hausdorff at float precision). Layer 1 (beta) replaces
-        facets with planes, cylinders, cones, spheres and tori where they fit within `tolerance` mm, and smooth
-        organic regions with fitted B-spline surfaces ("freeform"); the rest stay frozen facets. Layer 2 (beta)
-        writes a build123d recipe with Params as a feature tree: a base (extrusion stack with steps and pockets, a
-        revolution, or the reconstructed solid itself) then fillets, chamfers and holes (counterbores, countersinks,
-        holes on any axis, snapped to standard sizes, patterns); a spur gear becomes a parametric gear (teeth, module,
-        pressure angle). A feature that does not verify stays in the base and is reported; the recipe is used only
-        if its rebuild is within the limit. Before any of these, the program route reads the part as sketches
-        extruded and lofted between levels, and keeps what does not read as a sketch as the mesh's own slices.
-        Returns the new project and the verification, led by summary.headline: editable_pct (the share of Params
-        that are real dimensions, lengths, diameters, radii, angles and levels rather than positions of sketch
-        corners, and that move 0.5 mm with the design still building) and the two-sided Hausdorff distance to
-        the mesh; then feature_area_pct (the share of the surface parametric features make), the volume delta and
-        the parametric, freeform and frozen area. Tell the person the editable share first and never call a result
-        with 0% editable "editable". Values are computed from the mesh; nothing is decimated and every repair is
-        listed. Large meshes take minutes."""
+        once per part: that makes unrelated designs. Values are computed from the mesh and every repair is listed."""
         st = studio()
         said = [0.0]
 
@@ -1758,6 +1821,7 @@ def build() -> MCPServer:
             kw = {"tolerance": tolerance, "layer": layer, "on_progress": progress}
             if name:
                 kw["name"] = name
+            one = {**kw, "route": route, "scale": scale, "units": units, "purpose": _purpose(None)}
             from . import multipart
             many = [str(f) for f in files or [] if str(f).strip()]
             if references:
@@ -1774,13 +1838,13 @@ def build() -> MCPServer:
             if len(many) >= 2:
                 return multipart.reconstruct_parts(st, many, purpose=_purpose(None), **kw)
             if len(many) == 1:
-                return st.reconstruct(Path(many[0]).expanduser(), **kw)
+                return st.reconstruct(Path(many[0]).expanduser(), **one)
             if not project_or_file:
                 raise StudioError("Give the mesh to reconstruct.", "project_or_file=<absolute path>, or files=[paths] "
                                   "for the parts of one product.")
             src = Path(project_or_file).expanduser()
             if src.suffix and src.is_file():
-                return st.reconstruct(src, **kw)
+                return st.reconstruct(src, **one)
             p = st.load(project_or_file)
             meshes = [r["file"] for r in st.references(p) if r.get("format") != "step"]
             if not meshes:
@@ -1793,11 +1857,15 @@ def build() -> MCPServer:
                                           f"{len(out['parts'])} parts", ctx)
         else:
             sm = out["summary"]
-            act(out["project"], "design", f"Reconstructed a mesh as CAD: {sm.get('editable_pct') or 0:g}% editable, "
-                f"{sm.get('hausdorff_mm') or 0:.4g} mm from the mesh (Layer {sm['layer']})", ctx)
+            if sm.get("tier"):                             # the organic route: a surface body or a mesh body
+                act(out["project"], "design", str(sm.get("headline") or sm["tier"])[:300], ctx)
+            else:
+                act(out["project"], "design", f"Reconstructed a mesh as CAD: {sm.get('editable_pct') or 0:g}% editable, "
+                    f"{sm.get('hausdorff_mm') or 0:.4g} mm from the mesh (Layer {sm['layer']})", ctx)
         _made(out["project"], "reconstruct")
         return {**out, "evidence": "computed (Form Studio's kernel compared the result with the mesh)",
-                "next": "get_project to read the design; get_design_source to edit the recipe or add features."}
+                "next": "get_project to read the design; get_design_source to edit the recipe or add features. "
+                        "Tell the person summary.headline as it is, and what triage.cannot lists."}
 
     # ---- reference parts an agent rebuilds as clean CAD (form/remodel) ------------------------------------------
     @mcp.tool(annotations=RO, structured_output=False)

@@ -2283,13 +2283,17 @@ class Studio:
         return H(sorted((r["file"], r.get("sha256")) for r in self.references(p)))
 
     def uses_references(self, rid: str) -> bool:
-        """Only designs that call self.reference(...) depend on imported parts (cheap text test, cached per source)."""
+        """Only designs that call self.reference(...) or MeshBody.load(...) depend on imported parts (cheap text test, cached per source)."""
         if not rid.startswith(SOURCE_PREFIX):
             return False
         cache = self.__dict__.setdefault("_uses_refs", {})
         if rid not in cache:
             f = source_path(self.sources, rid)
-            cache[rid] = f.exists() and "reference(" in f.read_text(encoding="utf-8")
+            if f.exists():
+                text = f.read_text(encoding="utf-8")
+                cache[rid] = "reference(" in text or "MeshBody.load(" in text   # a mesh body reads a reference too
+            else:
+                cache[rid] = False
         return cache[rid]
 
     def import_reference(self, p: dict, src: Path, name: str | None = None, data: bytes | None = None) -> dict:
@@ -2326,7 +2330,8 @@ class Studio:
         rec = {"file": name, "kind": "part", "format": "step" if name.endswith((".step", ".stp")) else Path(name).suffix[1:],
                "ts": time.time(), "sha256": sha_file(target), "bytes": target.stat().st_size,
                "bbox": info["bbox"], "volume_mm3": info["volume_mm3"], "solids": info.get("solids"),
-               "triangles": info.get("triangles"), "evidence": "computed", "imported_from": src.name if src else name}
+               "triangles": info.get("triangles_in_file", info.get("triangles")), "evidence": "computed",
+               "imported_from": src.name if src else name, **({"drawn": info["drawn"]} if info.get("drawn") else {})}
         with self.lock(p["id"]):
             p = self.load(p["id"])
             refs = [r for r in p["brief"]["references"] if not (r.get("kind") == "part" and r["file"] == name)]

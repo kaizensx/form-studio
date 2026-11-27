@@ -65,5 +65,38 @@ Face the product +X with Z up: critique compares its side, front and top silhoue
   craft.organic.split_with_magnets(body, x, organic.split_spots(body, x, heights, d), d, t)   front/back halves
   openings from a constrained sketch: from form.sketch2d import Sketch (lines, arcs, constraints, named dimensions
   that are Params; Sketch.face(v, plane=Plane.YZ)), never hand-typed coordinates for a shape that must keep intent.
- A sculpted MESH (a download, a scan): form.meshbody.organic_solid(triangles) gives a closed NURBS solid within a
- stated tolerance with its cage, or MeshBody keeps the mesh and cuts exact features into it. Say which tier it is.
+ SCULPTED MESHES (a scan, a sculpt, a downloaded figure): reconstruct(path) does this for you
+  Do not write this by hand first. reconstruct(path) runs the triage, repairs the mesh and makes the design: a
+  surface body or a mesh body. Read its headline (the measured distance from the file) and edit the design it made
+  with edit_design. Write the code below only to add features to that design.
+  Mesh body (from form.meshbody import MeshBody): the mesh stays a mesh; features are exact booleans. The whole API:
+   body = MeshBody.load("scan.stl")     a reference part of this design by name, or an absolute path (STL, OBJ, 3MF).
+                                        Welded and repaired; a heavy mesh becomes a lighter working copy; what was
+                                        done is in body.source and noted on the build. There is no other loader.
+   MeshBody(V, F)                       from arrays: vertices (n, 3) and triangles (m, 3) of a closed mesh
+   MeshBody.from_shape(shape, tol=0.02) a build123d shape's tessellation
+   body.cut(shape, "hole")              a build123d shape (or another MeshBody) cut out, exactly
+   body.add(shape, "boss")              a shape joined to it
+   body.trim(origin, normal, "base")    keep the side the normal points to; the cut is closed flat
+   front, back = body.split(origin, normal)
+   body.scale(factor, about=(x, y, z))  body.move(x, y, z)  body.bounds()  body.volume()  body.report()
+   body.solid()                         the kernel solid a feature returns (one planar face per triangle)
+  A mesh design declares `mesh = True` on its class (no STEP, no B-rep checks; STL and 3MF export) and keeps the
+  mesh in ONE feature: every stage of a mesh is rebuilt and compared triangle by triangle, so cut everything on the
+  MeshBody first and return body.solid() once. A complete one:
+   class Design(Recipe):
+       mesh = True
+       params = [Param("pin_d", "Pin hole", 6, 2, 20, 0.1, "mm", "form", "body")]
+       features = [Feature("body", "Body", "structure")]
+       def build(self, v):
+           body = MeshBody.load("scan_body.stl")
+           body.cut(Pos(0, 0, -1) * Cylinder(v["pin_d"] / 2, 30), "pin hole")
+           return [Stage("body", body.solid())]
+  Surface body: solid, report = form.meshbody.organic_solid(triangles_or_(V, F), tol=0.3, kind="auto", cage=None)
+   kind "shell" (a thick skin with an open rim: a helmet, a mask) or "closed" (one smooth body without handles).
+   cage: the closed route's cage size; 3, 5, 8 and 12 take about 6, 10, 26 and 62 s on 45,000 triangles and the time
+   grows with the square of it: never loop over cages or pass one above 12 in a design (the kernel stops a build at
+   its time limit). A mesh with handles (genus above 0) or sharp detail cannot be a surface body: use a mesh body.
+   report has the measured distance both ways (max_mm), faces, valid, closed; it is data, not an error: never raise
+   it. reconstruct(path, route="surface_body") does the fit within a time limit and writes the cage into the design.
+  Say which tier the result is ("surface body", "mesh body") and its measured distance from the file.

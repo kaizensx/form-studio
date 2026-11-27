@@ -57,13 +57,25 @@ Rules:
   client's form cannot reach the person, the result tells you to ask in your own interface.
 - A new idea that is not a precise specification: propose_concepts with 3-4 genuinely different structural
   approaches as real designs, a one-line rationale each; then stop and let the person pick. Do not offer recipes.
+- Anything the person brings (a mesh, a STEP, a photo, a sketch, a PDF, a link, or only words): triage(source)
+  first. It says what the input is (a mesh: mechanical, organic or mixed; triangles; defects; a guess at the units;
+  how many bodies), chooses the route and names the calls in order. Take that route; do not ask the person which
+  route to take. Ask only when triage returns "ask" (one question whose answer changes the result), and say what
+  "cannot" lists.
+- A mesh to make editable: reconstruct(path). It runs the triage itself, repairs what is safe (every repair is
+  listed), and takes the route: a mechanical part becomes sketches, holes and fillets verified against the mesh; a
+  sculpt or a scan becomes a surface body (NURBS over a cage) or a mesh body (the repaired mesh with a Scale and a
+  Flat base, exact features cut into it: design_guide(topic="organic"), SCULPTED MESHES); several bodies become one
+  design with a part each. Report its headline as it is: the measured distance from the file, and what it is not.
+- A refusal names the next call in its hint. Never repeat a call that failed with the same arguments: do what the
+  hint says. A design's exceptions are not a way to print: what a build has to say comes back in the result.
+- Rebuilding a mechanical mesh by hand (when reconstruct's result is not editable enough): never embed the mesh as
+  the design. design_guide(topic="reference_parts"): analyze_reference (analyze_assembly for several parts) ->
+  named features -> build123d with Params -> compare_to_reference until within tolerance (0.1 mm by default).
 - Photos: scale from a reference object (bank card 85.60 x 53.98 mm, a coin, a ruler); photo dimensions stay
-  assumed until measured. Form Studio sketches carry JSON that is authoritative over the picture. STEP/STL/3MF:
-  import_reference. PDF drawings: read_document. Links the person gives: fetch_link, never a shell; a large mesh:
-  mesh_preflight first. Download only what the person gave you.
-- Meshes to make editable: never embed them as the design. design_guide(topic="reference_parts"): analyze_reference
-  (analyze_assembly for several parts) -> named features -> build123d with Params -> compare_to_reference until
-  within tolerance (0.1 mm by default).
+  assumed until measured. Form Studio sketches carry JSON that is authoritative over the picture. A STEP is already
+  CAD: import_reference. PDF drawings: read_document. Links the person gives: fetch_link, never a shell. Download
+  only what the person gave you.
 - One request makes one design. Several files of one product are one design with several parts (reconstruct
   files=[...], create_design relation="part_of"). A second create_design in a conversation says its relation
   (replaces, part_of, alternative, new).
@@ -113,7 +125,7 @@ instead.
 
 ## Tools at a glance
 
-96 tools. Read-only tools never change a project.
+97 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -129,6 +141,7 @@ instead.
 | [`read_document`](#read_document) | read-only | Read a document such as a datasheet or drawing. |
 | [`fetch_link`](#fetch_link) | changes | Download what a link the person gave points to, from Form Studio's engine (use this instead of a shell: it works where your sandbox has no network). |
 | [`resolve_model_page`](#resolve_model_page) | read-only | Resolve a model page link. What a model link is, without downloading files: site, title, author, licence, pictures and the file list (Printables, Thingiverse with an app token), or why the files cannot be fetched and how the person gets them (MakerWorld, Thingiverse without a token). |
+| [`triage`](#triage) | read-only | Assess anything the person brings and choose the route: call this first for a file, a link or a request in words. |
 | [`mesh_preflight`](#mesh_preflight) | read-only | Preflight a mesh file. Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display proxy for a heavy one. |
 | [`create_design`](#create_design) | changes | Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass, built with build123d. |
 | [`update_design`](#update_design) | changes | Replace a design's code as a new revision (history keeps every version). |
@@ -169,7 +182,7 @@ instead.
 | [`open_bench`](#open_bench) | changes | Open the bench web page. The bench is the local web page where the user inspects the 3D model, compares revisions and approves releases. |
 | [`brief_presets`](#brief_presets) | read-only | List brief presets. Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure, car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a material to start from and the checks to plan for. |
 | [`import_reference`](#import_reference) | changes | Import an existing part (STEP or STL, e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's references. |
-| [`reconstruct`](#reconstruct) | changes | Turn a mesh (STL, OBJ or 3MF) into editable CAD as a new design. |
+| [`reconstruct`](#reconstruct) | changes | Turn a mesh (STL, OBJ or 3MF) into a design, by the route its triage chooses. |
 | [`analyze_reference`](#analyze_reference) | read-only | Read an imported mesh (STL, OBJ, 3MF) like an engineer before modelling it again as clean CAD (design_guide topic "reference_parts"). |
 | [`analyze_assembly`](#analyze_assembly) | read-only | Analyze an assembly of meshes. |
 | [`compare_to_reference`](#compare_to_reference) | read-only | Compare the design (or one part of its assembly) with an imported mesh, to iterate a remodel until it is within tolerance (default 0.1 mm for a remodel; say which you used). |
@@ -435,6 +448,28 @@ visual reference. Then fetch_link(url) downloads what can be downloaded.
 | Argument | Type | Required |
 |---|---|---|
 | `url` | string | yes |
+
+### `triage`
+
+*Read-only.*
+
+Assess anything the person brings and choose the route: call this first for a file, a link or a request
+in words. source: an absolute file path (STL, OBJ, 3MF, STEP, a photo, a PDF, a sketch), a link, or the
+person's words. For a mesh it reads the file, repairs a copy and measures it: triangles, size, a guess at
+the units, open and non-manifold edges before and after the safe repairs, bodies, genus, and the share of the
+surface that is flat or ruled (what CAD makes) against sculpted. It returns the class (mechanical, organic,
+mixed), the route (parametric, surface_body, mesh_body, assembly, reference_only; cad_reference,
+photo_reference, sketch, document, link, describe, concepts), why, the calls to make in order ("steps"),
+what will be prepared first (repair, working_copy), "cannot" (what this route will not give: say it), and
+"ask": one question, present only when the answer changes the result and is not in the file. Take the route
+without asking the person to choose it. reconstruct runs this itself; call triage alone to explain or to
+decide before a larger plan. Reads only; nothing is changed, moved or sent.
+
+| Argument | Type | Required |
+|---|---|---|
+| `source` | string | yes |
+| `intent` | string |  |
+| `tolerance` | number |  |
 
 ### `mesh_preflight`
 
@@ -1123,28 +1158,33 @@ self.reference("<name>") for clearance cuts. path: absolute local path. Re-impor
 
 ### `reconstruct`
 
-Turn a mesh (STL, OBJ or 3MF) into editable CAD as a new design. project_or_file: an absolute path to the
-mesh, or a project id whose imported mesh reference to use (reference: which one; default the first mesh).
+Turn a mesh (STL, OBJ or 3MF) into a design, by the route its triage chooses. project_or_file: an absolute
+path to the mesh, or a project id whose imported mesh reference to use (reference: which one; default the
+first mesh). It first repairs what is safe (sliver triangles hanging off an edge, wrong-way triangles, small
+holes, flat openings; each listed under repairs) and then, with route="auto":
+- a mechanical or mixed part: the parametric reconstruction. The program route reads sketches extruded and
+  lofted between levels; Layer 0 is the mesh as an exact solid, Layer 1 (beta) replaces facets with planes,
+  cylinders, cones, spheres, tori and fitted B-spline surfaces within `tolerance` mm, Layer 2 (beta) writes
+  a build123d recipe with Params (a base, then fillets, chamfers, holes, patterns; a spur gear becomes a
+  parametric gear). Returns summary.headline: editable_pct and the two-sided Hausdorff distance first. Never
+  call a result with 0% editable "editable". A mesh above 300,000 triangles is simplified within a quarter
+  of the tolerance first, with the measured deviation listed.
+- an organic mesh (a sculpt, a scan, a figure): a surface body (one closed body without handles or sharp
+  detail: NURBS faces over a cage you can edit, exports STEP; taken only when the measured distance is within
+  0.1 % of its size or the tolerance) or else a mesh body (the repaired mesh, a lighter working copy when
+  heavy with its measured distance from the file, with Scale and Flat base parameters; exact features are
+  cut with MeshBody; exports STL and 3MF, not STEP). Takes well under a minute for 500,000 triangles.
+- a file with several separate closed bodies: ONE design with one part per body.
+- a surface that does not close after the repairs: refused, and the hint names the next call
+  (import_reference: keep it as a reference). Do not call again with the same file.
+If the parametric route fails on a mesh that closes, the mesh body is made instead (summary.fell_back_from).
+route: "auto", or force "parametric", "surface_body" or "mesh_body". scale: multiply the file's
+coordinates (a mesh in metres: 1000). The result carries "triage" (class, route taken, why, cannot) and,
+when the file's size makes no sense in millimetres, "ask": put that one question to the person.
 Several meshes of ONE product (a base, a slider and a lid): pass them all at once, as files=[absolute paths]
 (or project_or_file=<project id> with references=[names]); they become ONE design with one part per mesh, in
 the positions the files give (parts that fail are listed in "failed", the others are kept). Never call this
-once per part: that makes unrelated designs.
-Layer 0 is always built: the mesh as an exact solid (Hausdorff at float precision). Layer 1 (beta) replaces
-facets with planes, cylinders, cones, spheres and tori where they fit within `tolerance` mm, and smooth
-organic regions with fitted B-spline surfaces ("freeform"); the rest stay frozen facets. Layer 2 (beta)
-writes a build123d recipe with Params as a feature tree: a base (extrusion stack with steps and pockets, a
-revolution, or the reconstructed solid itself) then fillets, chamfers and holes (counterbores, countersinks,
-holes on any axis, snapped to standard sizes, patterns); a spur gear becomes a parametric gear (teeth, module,
-pressure angle). A feature that does not verify stays in the base and is reported; the recipe is used only
-if its rebuild is within the limit. Before any of these, the program route reads the part as sketches
-extruded and lofted between levels, and keeps what does not read as a sketch as the mesh's own slices.
-Returns the new project and the verification, led by summary.headline: editable_pct (the share of Params
-that are real dimensions, lengths, diameters, radii, angles and levels rather than positions of sketch
-corners, and that move 0.5 mm with the design still building) and the two-sided Hausdorff distance to
-the mesh; then feature_area_pct (the share of the surface parametric features make), the volume delta and
-the parametric, freeform and frozen area. Tell the person the editable share first and never call a result
-with 0% editable "editable". Values are computed from the mesh; nothing is decimated and every repair is
-listed. Large meshes take minutes.
+once per part: that makes unrelated designs. Values are computed from the mesh and every repair is listed.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1155,6 +1195,8 @@ listed. Large meshes take minutes.
 | `reference` | string \| null |  |
 | `files` | array \| null |  |
 | `references` | array \| null |  |
+| `route` | string |  |
+| `scale` | number |  |
 
 ### `analyze_reference`
 

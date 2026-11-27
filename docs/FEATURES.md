@@ -309,6 +309,23 @@ workflow is `design_guide(topic="reference_parts")`; **Rebuild as editable CAD**
 ## Mesh to editable CAD
 
 Bring an STL, OBJ or 3MF and Form Studio rebuilds it as CAD, then measures how close the result is to the mesh.
+**Triage first.** Whatever is brought is assessed before anything is built: `form triage FILE` (MCP `triage`) reads a
+mesh, repairs a copy and measures it (triangles, size, a guess at the units, open and non-manifold edges before and
+after the safe repairs, bodies, genus, and how much of the surface is the flat and ruled geometry CAD makes), classes
+it mechanical, organic or mixed, and chooses the route. It also routes a STEP, a photo, a PDF, a link and plain words.
+
+| The mesh is | Route | Result |
+|---|---|---|
+| a mechanical or mixed part that closes | parametric | the reconstruction below, verified against the mesh |
+| a smooth sculpt, one body, no handles | surface body | NURBS faces over a cage to edit; STEP; taken only within 0.1 % of its size |
+| a scan or sculpt with detail, handles or many triangles | mesh body | the repaired mesh (a lighter working copy when heavy, its distance from the file measured) with Scale and Flat base; exact cuts; STL and 3MF |
+| several separate closed bodies | assembly | one design, one part per body |
+| a surface that does not close | reference only | kept to design around; nothing is guessed |
+
+Safe repairs run first and are listed: sliver triangles hanging off an edge, wrong-way triangles, small holes, flat
+openings, loose debris. Vertices are never moved. A file whose size makes no sense in millimetres is asked about once
+(`--units m`) before anything is built. `reconstruct` runs the triage itself; `--route` forces one.
+
 **Make editable** on an imported mesh (Describe › Reference parts), `form reconstruct FILE [--name] [--tolerance MM]
 [--layer 0|1|2]`, or the MCP tool `reconstruct`. The result is a new design; the original mesh stays beside it in
 blueprint, and the report, the deviation map and every solid are kept in the design's `reconstruction` folder.
@@ -549,7 +566,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 96 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 97 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

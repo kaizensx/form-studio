@@ -152,14 +152,17 @@ Column {
                     Btn { kind: "quiet"; small: true; icon: "box"; text: "Make editable"; visible: pr.modelData.format !== "step"
                           anchors.verticalCenter: parent.verticalCenter; onClicked: Store.makeEditable(pr.modelData.file) } } } }
         // the deterministic reconstruction did not reach a verified feature recipe: say so, and offer the agent remodel
-        Txt { kind: "fine"; width: parent.width; tone: 2; visible: root.recon !== null && !root.recon.recipe_verified
+        Txt { kind: "fine"; width: parent.width; tone: 2; visible: root.recon !== null && !root.recon.recipe_verified && !root.recon.tier
               text: root.recon ? "Make editable reached Layer " + root.recon.layer + " (" + F.fmt(root.recon.frozen_area_pct, 0)
                                  + "% frozen facets, no verified feature model). Rebuild as editable CAD has the agent model it again "
                                  + "with named features and Params, compared with the mesh until it is within 0.1 mm." : "" }
+        // the organic route (form/sculpt.py): what the body is and how far it is from the file, as measured
+        Txt { kind: "fine"; width: parent.width; tone: 2; visible: root.recon !== null && !!root.recon.tier
+              text: root.recon && root.recon.headline ? root.recon.headline + "." : "" }
         Row { spacing: 8
             Btn { text: "Import part…"; icon: "box"; onClicked: Store.ask(partDlg) }
             Btn { objectName: "rebuildCad"; text: "Rebuild as editable CAD"; icon: "sparkles"; visible: root.meshes.length > 0
-                  kind: root.recon !== null && !root.recon.recipe_verified ? "primary" : "default"
+                  kind: root.recon !== null && !root.recon.recipe_verified && !root.recon.tier ? "primary" : "default"
                   onClicked: Store.rebuildAsCad(root.meshes) } } }
 
     Fold { title: "Printer context"; key: "brief.printer"; openByDefault: !root.sl.available && Store.prints

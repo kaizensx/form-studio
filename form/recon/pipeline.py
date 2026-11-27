@@ -40,8 +40,9 @@ LIMITS = [
     "and any scan noise are part of the input.",
     "Scan noise is measured (input.noise); when there is any, the sketches are read from a copy with every vertex put "
     "back on its fitted plane, cylinder or cone, and the result is still measured against the mesh as given.",
-    "Small holes are filled (listed under repairs); a hole wider than half the part or larger than 2 % of its surface "
-    "is not guessed, and such a mesh is refused.",
+    "Safe repairs run first and are listed under repairs: sliver triangles hanging off an edge are removed, triangles "
+    "facing the wrong way are turned, small holes are filled; a hole wider than half the part or larger than 2 % of "
+    "its surface is not guessed, and such a mesh is refused with the route to take instead.",
     "Planes, cylinders, cones, spheres and tori are recognised as such. Smooth regions none of them explains are fitted "
     "with B-spline patches (freeform: smooth CAD within the tolerance, not a dimension you can change); what neither "
     "explains stays as frozen facets.",
@@ -137,30 +138,13 @@ def load(path: Path, fill: bool = True, weld_tol: float = 1e-6):
     if w["merged_near_vertices"]:
         repairs.append({"repair": "welded near vertices", "count": w["merged_near_vertices"], "within_mm": weld_tol})
     large = []
-    if top["boundary_loops"] and fill and not top["non_manifold_edges"]:
-        diag = float(np.linalg.norm(V.max(axis=0) - V.min(axis=0)))
-        V, F, rec = meshmod.fill_holes(V, F, top["_loops"], max_span=meshmod.HOLE_SPAN_FRAC * diag,
-                                       max_area=meshmod.HOLE_AREA_FRAC * top["area_mm2"])
-        large = [r for r in rec if not r.get("filled", True)]
-        filled = [r for r in rec if r.get("filled", True)]
-        if len(filled) > 12:                            # a scan with many small holes: one summary, the largest listed
-            how = {}
-            for r in filled:
-                how[r["method"]] = how.get(r["method"], 0) + 1
-            big = sorted(filled, key=lambda r: -r["span_mm"])[:5]
-            repairs.append({"repair": "filled holes", "count": len(filled), "by_method": how,
-                            "planar": sum(1 for r in filled if r["planar"]),
-                            "area_mm2": round(sum(r["area_mm2"] for r in filled), 4),
-                            "largest_span_mm": big[0]["span_mm"], "largest": big})
-        else:
-            repairs += filled
-        repairs += large
-        top2 = meshmod.topology(V, F)
-        top = {**top2, "before_repair": _round({k: v for k, v in top.items() if k in ("boundary_edges", "boundary_loops")})}
-    if top["volume_mm3"] < 0:                          # inside out as a whole
-        F = F[:, [0, 2, 1]]
-        repairs.append({"repair": "turned the whole mesh outside in (its volume was negative)"})
-        top = meshmod.topology(V, F)
+    if not top["closed"] or top["flipped_edges"] or top["volume_mm3"] < 0:
+        # every safe repair, each listed (form/meshrepair.py): fins and extra triangles on an edge, orientation, small
+        # holes, a mesh that is inside out. A large opening is never guessed: it stays open and the mesh is refused
+        from .. import meshrepair
+        V, F, more, top = meshrepair.repair(V, F, fill=fill, top=top)
+        repairs += more
+        large = top.get("large_holes") or []
     report = {**info, "weld": w, "topology": _round(top)}
     if large:
         report["topology"]["large_holes"] = large
@@ -204,18 +188,22 @@ def _reconstruct(path, out_dir, name, tolerance, layer, budget_s, progress, fill
            "layer_requested": int(layer), "layers": {}, "limits": list(LIMITS)}
     mvol = verify.mesh_volume(V, F)
     if not inp["topology"]["closed"]:
-        rep["error"] = ("The mesh is not closed (" + f"{inp['topology']['boundary_loops']} open boundaries, "
-                        f"{inp['topology']['non_manifold_edges']} non-manifold edges), so it does not bound a solid.")
+        from .. import meshrepair
+        rep["error"] = (f"The mesh is not closed ({meshrepair.open_text(inp['topology'])} after the safe repairs), "
+                        "so it does not bound a solid.")
         big = inp["topology"].get("large_holes") or []
         if big:
             b = max(big, key=lambda r: r["span_mm"])
             rep["error"] += (f" {len(big)} of its holes are too large to fill without guessing (the largest is "
                              f"{b['span_mm']:g} mm across, {b['area_mm2']:g} mm2, at {b['at']}); the small ones were "
                              "filled and are listed as repairs.")
-            rep["hint"] = "Rescan or close the large openings in the program that made the mesh."
+            rep["hint"] = ("Do not call this again with the same file. Next: import_reference(project, path) to use it "
+                           "as a reference to design around, or ask the person ONE question: the wall thickness to give "
+                           "the open surface, or a closed export.")
         else:
-            rep["hint"] = ("Close it in the program that made it, or reconstruct with hole filling on (it is listed as "
-                           "a repair).")
+            rep["hint"] = ("Do not call this again with the same file: the repairs already ran. Next: "
+                           "import_reference(project, path) to use it as a reference to design around.")
+        rep["next"] = "reference_only"
         return _finish(rep, out, name, t0)
 
     # scan noise, measured: when there is any, the program route reads a copy of the mesh with every vertex put back

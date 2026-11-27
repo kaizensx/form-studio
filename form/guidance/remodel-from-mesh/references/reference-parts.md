@@ -2,6 +2,10 @@ REFERENCE PARTS: meshes (STL, OBJ, 3MF) the person gives you to understand, make
 When someone brings meshes and wants them editable, understood or changed, rebuild them as clean CAD: named features
 and Params, like a part designed from scratch. The meshes stay blueprint references, never the design.
 
+FIRST: triage(path), or reconstruct(path), which runs it. This workflow is for a MECHANICAL part whose reconstruction
+was not editable enough. A sculpt, a scan or a figure (triage: organic) is not rebuilt as features: reconstruct makes
+it a surface body or a mesh body, and features are added to that (design_guide topic "organic", SCULPTED MESHES).
+
 NEVER
   * never embed the raw meshes as the design (self.reference("part.stl") as the body): nothing is editable, every
     triangle is a face, and the viewport is a wireframe of facets. A reference mesh is only for looking and comparing.

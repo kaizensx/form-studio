@@ -11,8 +11,70 @@ from pathlib import Path
 MAX_TRIANGLES = 200_000
 
 
+def solid_from_mesh(V, F):
+    """A closed, consistently oriented triangle mesh (welded: V (n, 3), F (m, 3)) as a solid, one planar face per
+    triangle, built directly: every vertex and edge is made once and shared, so nothing has to be searched for and
+    sewn (a 100,000-triangle mesh takes about 2 s; sewing it takes a minute). One solid per connected piece.
+    Raises ValueError when the mesh is not closed: the caller then sews (solid_from_triangles)."""
+    import numpy as np
+    from build123d import Compound, Solid
+    from OCP.BRep import BRep_Builder
+    from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeFace, BRepBuilderAPI_MakeVertex
+    from OCP.gp import gp_Dir, gp_Pln, gp_Pnt
+    from OCP.TopoDS import TopoDS, TopoDS_Shell, TopoDS_Solid, TopoDS_Wire
+    from ..recon import mesh as meshmod
+    V = np.asarray(V, dtype=np.float64)
+    F = np.asarray(F, dtype=np.int64)
+    top = meshmod.topology(V, F)
+    if not top["closed"] or top["flipped_edges"]:
+        raise ValueError("The mesh is not closed and consistently oriented.")
+    _E, _tri, eo, _he = meshmod.edges(F)
+    E = _E.tolist()
+    m = len(F)
+    eo = np.stack([eo[:m], eo[m:2 * m], eo[2 * m:]], axis=1).tolist()
+    fwd = np.stack([F[:, 0] < F[:, 1], F[:, 1] < F[:, 2], F[:, 2] < F[:, 0]], axis=1).tolist()
+    N = np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]])
+    L = np.linalg.norm(N, axis=1)
+    N = (N / np.maximum(L, 1e-300)[:, None]).tolist()
+    B = BRep_Builder()
+    pts = [gp_Pnt(x, y, z) for x, y, z in V.tolist()]
+    vs = [BRepBuilderAPI_MakeVertex(p).Vertex() for p in pts]
+    es = [BRepBuilderAPI_MakeEdge(vs[a], vs[b]).Edge() for a, b in E]
+    piece = top["_piece_of"]
+    shells = []
+    for _ in range(int(top["pieces"])):
+        sh = TopoDS_Shell()
+        B.MakeShell(sh)
+        shells.append(sh)
+    first = F[:, 0].tolist()
+    for t in range(m):
+        if L[t] <= 0:
+            continue
+        w = TopoDS_Wire()
+        B.MakeWire(w)
+        for k in range(3):
+            e = es[eo[t][k]]
+            B.Add(w, e if fwd[t][k] else TopoDS.Edge(e.Reversed()))
+        w.Closed(True)
+        f = BRepBuilderAPI_MakeFace(gp_Pln(pts[first[t]], gp_Dir(*N[t])), w, True)
+        if f.IsDone():
+            B.Add(shells[piece[t]], f.Face())
+    solids = []
+    for sh in shells:
+        sh.Closed(True)
+        so = TopoDS_Solid()
+        B.MakeSolid(so)
+        B.Add(so, sh)
+        s = Solid(so)
+        if s.volume < 0:
+            s = Solid(s.wrapped.Reversed())
+        solids.append(s)
+    return solids[0] if len(solids) == 1 else Compound(solids)
+
+
 def solid_from_triangles(tris, tol: float = 1e-4):
-    """Sew triangles into a solid (one face per triangle). Raises ValueError if they do not close."""
+    """Triangles as a solid (one face per triangle): built directly when they weld into a closed mesh
+    (solid_from_mesh), sewn otherwise. Raises ValueError if they do not close."""
     from build123d import Compound, Solid
     from OCP.BRepBuilderAPI import (BRepBuilderAPI_MakePolygon, BRepBuilderAPI_MakeFace, BRepBuilderAPI_MakeSolid,
                                     BRepBuilderAPI_Sewing)
@@ -22,6 +84,13 @@ def solid_from_triangles(tris, tol: float = 1e-4):
     from OCP.TopoDS import TopoDS
     if len(tris) > MAX_TRIANGLES:
         raise ValueError(f"The mesh has {len(tris):,} triangles; Form Studio handles up to {MAX_TRIANGLES:,}. Lower $fn or simplify.")
+    try:
+        import numpy as np
+        from ..recon.mesh import weld
+        V, F, _ = weld(np.asarray(tris, dtype=np.float64).reshape(-1, 3, 3), 1e-6)
+        return solid_from_mesh(V, F)
+    except ValueError:
+        pass
     sew = BRepBuilderAPI_Sewing(tol)
     added = 0
     for a, b, c in tris:

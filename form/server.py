@@ -706,7 +706,9 @@ def make_handler(st: Studio):
                     out = multipart.reconstruct_parts(st, [st.dir(pid) / "references" / f for f in files], **kw)
                     what = f"{len(out['parts'])} meshes"
                 else:
-                    out = st.reconstruct_reference(p, str(body.get("file") or (files[0] if files else "")), **kw)
+                    # in the app the mesh is on screen at the size its numbers give in millimetres: no units question
+                    out = st.reconstruct_reference(p, str(body.get("file") or (files[0] if files else "")),
+                                                   units=str(body.get("units") or "mm"), **kw)
                     what = str(body.get("file") or files[0])
                 # it comes from this design: same family, and the conversations about this design list it
                 st.adopt(out["project"], pid, "reconstruct")

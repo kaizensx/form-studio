@@ -17,6 +17,8 @@ import tempfile
 import time
 from pathlib import Path
 
+import numpy as np
+
 from .mesh import FORMATS
 
 WRAPPER = '''"""{title}: the solid reconstructed from {file} (Layer {layer}). Form Studio.
@@ -106,19 +108,181 @@ def summary(rep: dict) -> dict:
     return {k: v for k, v in out.items() if v is not None or k in ("layer", "hausdorff_mm")}
 
 
+ROUTES = ("auto", "parametric", "surface_body", "mesh_body")
+UNITS = {"auto": 1.0, "mm": 1.0, "cm": 10.0, "m": 1000.0, "in": 25.4}
+
+
 def reconstruct(st, src, name: str | None = None, tolerance: float = 0.02, layer: int = 2, purpose: str | None = None,
-                budget_s: float = 240.0, on_progress=None) -> dict:
-    """Reconstruct a mesh file as a new design. Returns {"project", "name", "summary", "files"}."""
+                budget_s: float = 240.0, on_progress=None, route: str = "auto", scale: float = 1.0,
+                units: str = "auto") -> dict:
+    """A mesh file as a new design, by the route its triage chooses (form/triage.py). Returns {"project", "name",
+    "summary", "files", "triage"}.
+
+    route="auto": a mechanical or mixed part goes through the parametric reconstruction (verified against the mesh);
+    an organic one becomes a surface body or a mesh body (form/sculpt.py); several bodies in one file become one
+    design with a part each; a surface that does not close is refused with the next call to make. A route can be
+    forced ("parametric", "surface_body", "mesh_body"). When the parametric route fails on a mesh that closes, the
+    mesh body is made instead and the result says so. units: what the file's numbers are ("mm", "cm", "m", "in";
+    "auto": millimetres, unless the size makes no sense in millimetres: then nothing is built and the one question to
+    put to the person comes back as the refusal). scale: multiply the file's coordinates by a number instead."""
     from ..studio import StudioError
+    from .. import triage as triage_mod
     src = Path(src).expanduser()
     if not src.is_file():
         raise StudioError(f"File not found: {src}", "Give the absolute path of an STL, OBJ or 3MF file.")
     if src.suffix.lower() not in FORMATS:
+        if src.suffix.lower() in (".step", ".stp"):
+            raise StudioError(f"{src.name} is already CAD (STEP): there is nothing to reconstruct.",
+                              "Next: create_design(..., references=[path]) and use it with self.reference(name).",
+                              next="cad_reference")
         raise StudioError(f"{src.name} is not a mesh Form Studio reads.", "Use an STL (binary or ASCII), OBJ or 3MF file.")
     if not (0.0005 <= float(tolerance) <= 5):
         raise StudioError("The tolerance must be between 0.0005 and 5 mm.")
     if int(layer) not in (0, 1, 2):
         raise StudioError("The layer must be 0, 1 or 2.")
+    if route not in ROUTES:
+        raise StudioError(f"Unknown route “{route}”.", "Use one of: " + ", ".join(ROUTES) + ".")
+    if units not in UNITS:
+        raise StudioError(f"Unknown units “{units}”.", "Use one of: " + ", ".join(UNITS) + ".")
+    if units != "auto":
+        scale = float(scale) * UNITS[units]
+    if not (1e-6 <= float(scale) <= 1e6):
+        raise StudioError("The scale must be a positive number (metres to millimetres: 1000).")
+    say = on_progress or (lambda d: None)
+    say({"stage": "triage", "text": f"Looking at {src.name}", "fraction": 0.0})
+    try:
+        tri = triage_mod.assess_mesh(src, float(tolerance))
+    except (ValueError, OSError) as e:
+        raise StudioError(f"Could not read {src.name} as a mesh: {e}", "Export it again as a binary STL, OBJ or 3MF.")
+    chosen = tri["route"] if route == "auto" else route
+    say({"stage": "triage", "text": f"{tri['class'].capitalize()} mesh: {chosen.replace('_', ' ')}", "fraction": 0.01})
+    extra = {"triage": _triage_brief(tri, chosen)}
+    if tri.get("ask") and units == "auto" and abs(float(scale) - 1.0) < 1e-12:
+        # the size makes no sense in millimetres and nobody said what the units are: every dimension of the result
+        # depends on the answer, so nothing is built on a guess
+        q = tri["ask"]
+        raise StudioError(q["question"],
+                          "Put this one question to the person (ask_user, choices: " + ", ".join(q["choices"]) + "), then "
+                          "call reconstruct again with units=\"m\" (or \"cm\", \"in\"), or units=\"mm\" when they "
+                          "confirm millimetres. Do not ask anything else first.",
+                          next="ask_units", ask=q, triage=extra["triage"])
+    if chosen == "reference_only" or (not tri["facts"]["after_repair"]["closed"] and chosen != "parametric"):
+        raise StudioError(tri["why"] if tri["route"] == "reference_only" else
+                          f"{src.name} does not close into a body, so it cannot be a {chosen.replace('_', ' ')}.",
+                          "Do not call reconstruct again with this file: the safe repairs already ran. Next: "
+                          "import_reference(project, path) keeps it as a reference to design around (create_design first "
+                          "when there is no project); tell the person the surface is open and what that leaves out.",
+                          next="reference_only", triage=extra["triage"])
+    if chosen in ("surface_body", "mesh_body"):
+        from .. import sculpt
+        out = sculpt.make(st, src, name=name, route=chosen, tolerance=float(tolerance), purpose=purpose,
+                          budget_s=min(float(budget_s), sculpt.BUDGET_S), on_progress=on_progress, scale=float(scale),
+                          tri=tri)
+        return {**out, **extra}
+    if chosen == "assembly":
+        return {**_bodies(st, src, tri, name, tolerance, layer, purpose, budget_s, on_progress, scale), **extra}
+    try:
+        out = _parametric(st, src, tri, name, tolerance, layer, purpose, budget_s, on_progress, scale)
+    except StudioError as e:
+        if route != "auto" or not tri["facts"]["after_repair"]["closed"] or e.extra.get("kind") == "cancelled":
+            raise
+        # the parametric route did not reach a result on a mesh that closes: the mesh body is safe, and says why
+        from .. import sculpt
+        say({"stage": "triage", "text": "No parametric result: keeping it as a mesh body", "fraction": 0.5})
+        out = sculpt.make(st, src, name=name, route="mesh_body", tolerance=float(tolerance), purpose=purpose,
+                          on_progress=on_progress, scale=float(scale), tri=tri)
+        out["summary"]["fell_back_from"] = {"route": "parametric", "error": str(e)[:300]}
+        out["summary"]["headline"] = ("The parametric reconstruction did not reach a result, so the part is kept as a "
+                                      "mesh body (not editable CAD). " + out["summary"]["headline"])
+        extra["triage"]["taken"] = "mesh_body"
+    return {**out, **extra}
+
+
+def _triage_brief(tri: dict, chosen: str) -> dict:
+    f = tri["facts"]
+    return {"class": tri["class"], "route": tri["route"], "taken": chosen, "why": tri["why"], "cannot": tri["cannot"],
+            "alternates": tri["alternates"], "prepare": tri["prepare"], "triangles": f["triangles"], "size_mm": f["size_mm"],
+            "mechanical_pct": f["mechanical_pct"], "as_given": f["as_given"], "after_repair": f["after_repair"],
+            "units": f["units"], "bodies": f["bodies"], "genus": f["genus"], "seconds": tri["seconds"]}
+
+
+def _prepared(src: Path, tri: dict, tolerance: float, scale: float, folder: Path) -> tuple[Path, list]:
+    """The file the parametric route reads: the file itself, or a prepared copy of it (scaled, and a heavy mesh
+    simplified within a quarter of the tolerance with the deviation measured). Returns (path, what was done)."""
+    from .. import meshrepair, triage as triage_mod
+    from . import mesh as meshmod
+    heavy = tri["facts"]["after_repair"]["triangles"] > triage_mod.PARAMETRIC_TRIANGLES
+    if not heavy and abs(scale - 1.0) < 1e-12:
+        return src, []
+    done = []
+    T, _info = meshmod.read_triangles(src)
+    if abs(scale - 1.0) > 1e-12:
+        T = T * scale
+        done.append({"repair": "scaled", "factor": scale})
+    V, F, _w = meshmod.weld(T, 1e-6)
+    if heavy:
+        V, F, _r, top = meshrepair.repair(V, F)
+        if top["closed"]:
+            V, F, wc = meshrepair.working_copy(V, F, triage_mod.PARAMETRIC_TRIANGLES, tol=tolerance / 4, max_tol=tolerance / 4)
+            if wc.get("simplified"):
+                wc["repair"] = "simplified before reconstruction"
+                done.append(wc)
+    dst = folder / (re.sub(r"[^A-Za-z0-9_\-]+", "_", src.stem).strip("_")[:50] + ".stl")
+    meshmod.write_stl(dst, V, F, "Form Studio prepared mesh")
+    return dst, done
+
+
+def _bodies(st, src, tri, name, tolerance, layer, purpose, budget_s, on_progress, scale) -> dict:
+    """A file that holds several separate closed bodies: one design with one part per body (form/multipart.py)."""
+    from .. import meshrepair, multipart
+    from . import mesh as meshmod
+    (st.root / ".recon").mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix="bodies-", dir=st.root / ".recon"))
+    try:
+        T, _info = meshmod.read_triangles(src)
+        V, F, _w = meshmod.weld(T * scale if abs(scale - 1.0) > 1e-12 else T, 1e-6)
+        V, F, repairs, top = meshrepair.repair(V, F, cap_planar=True, drop_debris=True)
+        lab = top["_piece_of"]
+        area = np.bincount(lab, weights=meshmod.tri_normals(V, F)[1])
+        stem = re.sub(r"[^A-Za-z0-9_\-]+", "_", src.stem).strip("_")[:40] or "mesh"
+        files = []
+        for k, i in enumerate(np.argsort(-area)):
+            if area[i] < 0.02 * area.sum():
+                continue
+            Fi = F[lab == i]
+            used = np.unique(Fi)
+            remap = -np.ones(len(V), np.int64)
+            remap[used] = np.arange(len(used))
+            f = work / f"{stem}_body{k + 1}.stl"
+            meshmod.write_stl(f, V[used], remap[Fi], "Form Studio body")
+            files.append(f)
+        out = multipart.reconstruct_parts(st, files, name=name, tolerance=tolerance, layer=layer, purpose=purpose,
+                                          budget_s=budget_s, on_progress=on_progress)
+        out["split"] = {"from": src.name, "bodies": len(files), "repairs": [r["repair"] for r in repairs]}
+        return out
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def _parametric(st, src, tri, name, tolerance, layer, purpose, budget_s, on_progress, scale) -> dict:
+    """The parametric reconstruction (the kernel's "reconstruct" op) as a new design."""
+    from ..studio import StudioError
+    orig = src
+    (st.root / ".recon").mkdir(parents=True, exist_ok=True)
+    prep = Path(tempfile.mkdtemp(prefix="prep-", dir=st.root / ".recon"))
+    try:
+        src, prepared = _prepared(orig, tri, float(tolerance), float(scale), prep)
+        out = _run(st, src, orig, name, tolerance, layer, purpose, budget_s, on_progress)
+        if prepared:
+            out["summary"]["prepared"] = prepared
+            out["summary"]["repairs"] = prepared + list(out["summary"].get("repairs") or [])
+        return out
+    finally:
+        shutil.rmtree(prep, ignore_errors=True)
+
+
+def _run(st, src, orig, name, tolerance, layer, purpose, budget_s, on_progress) -> dict:
+    from ..studio import StudioError
     stem = re.sub(r"[^A-Za-z0-9_\-]+", "_", src.stem).strip("_")[:50] or "mesh"
     (st.root / ".recon").mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="recon-", dir=st.root / ".recon"))
@@ -127,10 +291,11 @@ def reconstruct(st, src, name: str | None = None, tolerance: float = 0.02, layer
                     out_dir=str(work), name=stem, tolerance=float(tolerance), layer=int(layer), budget_s=float(budget_s))
         res = rep.get("result")
         if not res:
-            raise StudioError(rep.get("error") or "The mesh could not be reconstructed.", rep.get("hint", ""))
+            raise StudioError(rep.get("error") or "The mesh could not be reconstructed.", rep.get("hint", ""),
+                              **({"next": rep["next"]} if rep.get("next") else {}))
         summ = summary(rep)
-        title = (name or title_for(src.stem, res)).strip()
-        brief = (f"Reconstructed from the mesh {src.name}: {headline(res, float(tolerance))} (two-sided Hausdorff, computed). "
+        title = (name or title_for(orig.stem, res)).strip()
+        brief = (f"Reconstructed from the mesh {orig.name}: {headline(res, float(tolerance))} (two-sided Hausdorff, computed). "
                  f"Layer {res['layer']}" + (f", {res['method']}" if res.get("method") else "")
                  + f"; geometry: {res['parametric_area_pct']:g}% of the area on planes, cylinders, cones, spheres or tori"
                  + (f", {res['freeform_area_pct']:g}% freeform" if res.get("freeform_area_pct") else "")
@@ -141,7 +306,7 @@ def reconstruct(st, src, name: str | None = None, tolerance: float = 0.02, layer
                                  references=refs or None)
         else:
             step = work / res["step"]
-            text = WRAPPER.format(title=title, file=src.name, layer=res["layer"], step=res["step"],
+            text = WRAPPER.format(title=title, file=orig.name, layer=res["layer"], step=res["step"],
                                   summary=brief + (" " + summ["layer2"]["error"] if summ.get("layer2", {}).get("error") else ""))
             p = st.create_design(title, text, brief=brief, references=[str(step)], purpose=purpose)
         keep = st.dir(p["id"]) / "reconstruction"
@@ -151,12 +316,12 @@ def reconstruct(st, src, name: str | None = None, tolerance: float = 0.02, layer
             shutil.copyfile(f, keep / f.name)
             files.append(f.name)
         try:                                           # the mesh itself, drawn in blueprint for comparison
-            st.import_reference(p, src)
+            st.import_reference(p, orig)
         except StudioError:
             pass
         with st.lock(p["id"]):
             p = st.load(p["id"])
-            p["reconstruction"] = {"from": src.name, "ts": time.time(), "summary": summ, "files": files}
+            p["reconstruction"] = {"from": orig.name, "ts": time.time(), "summary": summ, "files": files}
             st.decide(p, "reconstruct", brief + (f" Repairs: {len(summ['repairs'])} (listed in the report)." if summ["repairs"] else ""))
             st.save(p)
         st.activity(p["id"], "reconstruct", brief, by="engine")
