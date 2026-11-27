@@ -232,7 +232,7 @@ def main(argv=None) -> int:
     httpd.shutdown()
     if getattr(st, "chat", None) is not None:        # end agent runs and their tool servers with the app
         st.chat.shutdown()
-    st.kernel.stop()
+    st.kernel.shutdown()                             # for good: a job still running in a thread starts no worker again
     return code["rc"]
 
 

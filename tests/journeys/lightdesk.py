@@ -53,8 +53,8 @@ def run(ui):
             ui.check(ui.sees("building", "programPane"), "the line being built says so in the program")
         ui.wait_until(lambda: ui.js("Store.viewer && !Store.viewer.revealing && Store.buildOf === 0") is True, 40, "the build-up to finish")
         ui.check(ui.js("Store.builtIds.length === 0 && Store.revealing.length === 0") is True, "nothing is marked as building once it is in")
-        ui.settle(1700)
-        ui.check(not ui.exists("buildCaption"), "the cue leaves when the build is in")
+        # (it holds its last line a moment, then fades: about 1.5 s, and longer where frames are slow)
+        ui.wait_until(lambda: not ui.exists("buildCaption"), 6, "the cue to leave when the build is in")
         print(f"  build pictured at step {shot_at} of {of}", flush=True)
 
     ui.shot("lightdesk-workspace")

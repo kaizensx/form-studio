@@ -117,6 +117,7 @@ class Kernel:
         self.restarts = 0
         self.last_failure = None
         self._crash_file = None
+        self._closed = False                       # shutdown(): no worker is started again
 
     def _start(self):
         import os
@@ -147,6 +148,9 @@ class Kernel:
     def call(self, op: str, timeout: float = 60, on_progress=None, **kwargs):
         """Run one kernel op. timeout covers the whole call; on_progress(dict) receives the op's progress reports."""
         with self._lock:
+            if self._closed:
+                raise KernelFailure({"kind": "closed", "message": "Form Studio is closing: the geometry kernel is stopped.",
+                                     "hint": "Nothing was saved from that attempt. Your last committed revision is intact."})
             if self._proc is None or not self._proc.is_alive():
                 self._start()
             try:
@@ -243,6 +247,23 @@ class Kernel:
             finally:
                 self._lock.release()
 
+    def shutdown(self):
+        """End the worker for good: the app is closing. A call that arrives later (a job still running in a thread)
+        is refused instead of starting a new worker, which would outlive the app's last moments: at interpreter
+        exit Python waits for multiprocessing's resource tracker, and that waits for every process that was started
+        with it, so one late worker kept the app from ever ending (a journey on Linux stood 15 minutes)."""
+        self._closed = True
+        self.stop()
+        if self._lock.acquire(timeout=5):          # a call that was starting a worker as stop() ran has it now
+            try:
+                proc = self._proc
+                if proc is not None and proc.is_alive():
+                    proc.kill()
+                    proc.join(5)
+                self._proc = self._conn = None
+            finally:
+                self._lock.release()
+
     def alive(self) -> bool:
         return self._proc is not None and self._proc.is_alive()
 
@@ -306,6 +327,7 @@ class KernelPool:
         self._workers: list[Kernel] = []
         self._busy: set[int] = set()
         self._keys: list[list[str]] = []
+        self._closed = False
 
     @property
     def restarts(self) -> int:
@@ -323,6 +345,7 @@ class KernelPool:
 
     def _add(self) -> int:
         self._workers.append(Kernel())
+        self._workers[-1]._closed = self._closed
         self._keys.append([])
         return len(self._workers) - 1
 
@@ -429,6 +452,18 @@ class KernelPool:
         for w in list(self._workers):
             try:
                 w.stop()
+            except Exception:
+                pass
+        with self._cv:
+            self._keys = [[] for _ in self._workers]
+            self._cv.notify_all()
+
+    def shutdown(self):
+        """End every worker for good (the app is closing): later calls are refused, none starts a worker again."""
+        self._closed = True
+        for w in list(self._workers):
+            try:
+                w.shutdown()
             except Exception:
                 pass
         with self._cv:
