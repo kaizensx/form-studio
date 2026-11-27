@@ -97,7 +97,8 @@ Item {
         // above the conversation: the panel under the stage while it is one, the foot of the window once it is a column
         property real floorY: Store.barY
         Behavior on floorY { enabled: dz.ready && !Theme.reduced; NumberAnimation { duration: 340; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
-        x: Math.round(dz.cx - blockW / 2) - Theme.s5; y: Math.round(Math.max(Theme.paneTop + 24, Math.min(parent.height * 0.3, floorY - 330)))
+        // the origin is the block's top middle: the datum stands on the centre line the words are set on
+        x: Math.round(dz.cx); y: Math.round(Math.max(Theme.paneTop + 24, Math.min(parent.height * 0.3, floorY - 330)))
         width: 1; height: 1
         visible: opacity > 0.01 && !dz.empty
         opacity: dz.staged ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
@@ -107,9 +108,12 @@ Item {
             SequentialAnimation on breath { running: !Theme.reduced && origin.visible && !dz.done; loops: Animation.Infinite
                 NumberAnimation { to: 0.35; duration: 1400; easing.type: Easing.InOutSine }
                 NumberAnimation { to: 0.8; duration: 1400; easing.type: Easing.InOutSine } }
-            Rectangle { y: 0; height: 1; width: Math.round(Math.min(origin.x - Theme.s6, 320)); x: -width
+            Rectangle { y: 0; height: 1; width: 240; x: -width
                 gradient: Gradient { orientation: Gradient.Horizontal
                     GradientStop { position: 0; color: Theme.alpha(Theme.datum, 0) } GradientStop { position: 1; color: Theme.datum } } }
+            Rectangle { y: 0; height: 1; width: 240; x: 1
+                gradient: Gradient { orientation: Gradient.Horizontal
+                    GradientStop { position: 0; color: Theme.datum } GradientStop { position: 1; color: Theme.alpha(Theme.datum, 0) } } }
             Rectangle { x: 0; width: 1; height: Math.round(Math.min(origin.y - Theme.s6, 240)); y: -height
                 gradient: Gradient {
                     GradientStop { position: 0; color: Theme.alpha(Theme.datum, 0) } GradientStop { position: 1; color: Theme.datum } } }
@@ -117,27 +121,29 @@ Item {
             Repeater { model: 5
                 Rectangle { required property int index; x: -(index + 1) * 24; y: -3; width: 1; height: 7; color: Theme.datum; opacity: 0.6 - index * 0.11 } }
             Repeater { model: 5
+                Rectangle { required property int index; x: (index + 1) * 24; y: -3; width: 1; height: 7; color: Theme.datum; opacity: 0.6 - index * 0.11 } }
+            Repeater { model: 5
                 Rectangle { required property int index; y: -(index + 1) * 24; x: -3; height: 1; width: 7; color: Theme.datum; opacity: 0.6 - index * 0.11 } }
         }
     }
 
     // what is happening, written from the origin
     Column {
-        objectName: "designingState"; visible: !dz.empty && opacity > 0.01
+        id: state; objectName: "designingState"; visible: !dz.empty && opacity > 0.01
         opacity: dz.staged ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
-        x: origin.x + Theme.s5; y: origin.y + Theme.s5; spacing: Theme.s2; width: Math.ceil(origin.blockW)
-        Txt { id: cap; kind: "cap"; color: Theme.datum; objectName: "designingCaption"; text: dz.done ? "No design yet" : "Being designed" }
-        Row { spacing: 0; width: parent.width
-            Txt { id: line; objectName: "designingLine"; kind: "h2"; text: dz.liveLine(); width: Math.min(implicitWidth, parent.width - (kb.visible ? kb.width : 0)) }
+        x: Math.round(dz.cx - origin.blockW / 2); y: origin.y + Theme.s5; spacing: Theme.s2; width: Math.ceil(origin.blockW)
+        Txt { id: cap; anchors.horizontalCenter: parent.horizontalCenter; kind: "cap"; color: Theme.datum; objectName: "designingCaption"; text: dz.done ? "No design yet" : "Being designed" }
+        Row { spacing: 0; anchors.horizontalCenter: parent.horizontalCenter
+            Txt { id: line; objectName: "designingLine"; kind: "h2"; text: dz.liveLine(); width: Math.min(implicitWidth, state.width - (kb.visible ? kb.width : 0)) }
             Tick { id: kb; objectName: "designingKb"; visible: dz.writing; font.pixelSize: Theme.tH2; font.weight: Theme.wMedium; font.letterSpacing: -0.4; tone: 2
                 leftPadding: Theme.s3; unit: " kB"; decimals: 1; value: dz.writing ? Store.chatLive.chars / 1000 : 0 } }
         // a conversation whose designs were all moved to the trash says so, rather than pretending it made none
-        Txt { id: trashed; visible: dz.done && Store.convNoDesign && Store.designsHere.length > 0; kind: "body"; tone: 2; width: parent.width; wrapMode: Text.WordWrap
+        Txt { id: trashed; visible: dz.done && Store.convNoDesign && Store.designsHere.length > 0; kind: "body"; tone: 2; width: parent.width; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter
             text: Store.designsHere.length === 1 ? "Its design, “" + Store.designsHere[0].name + "”, is in the trash (.trash in your projects folder)."
                 : F.plural(Store.designsHere.length, "design") + " it made are in the trash (.trash in your projects folder)." }
         // the ledger: the agent's real steps, in order, the newest last and marked while it runs
         Item { width: 1; height: Theme.s1; visible: ledger.visible }
-        Column { id: ledger; objectName: "designingLedger"; width: 320; spacing: Theme.s1; visible: dz.steps.length > 0
+        Column { id: ledger; objectName: "designingLedger"; width: 320; anchors.horizontalCenter: parent.horizontalCenter; spacing: Theme.s1; visible: dz.steps.length > 0
             property int seen: 0                     // steps already written: only new lines arrive
             function caughtUp() { Qt.callLater(function () { if (ledger && dz) ledger.seen = Math.max(ledger.seen, dz.steps.length) }) }
             readonly property int from: Math.max(0, dz.steps.length - 6)
@@ -153,15 +159,17 @@ Item {
                     SequentialAnimation { id: arrive; property int delay: 0
                         PauseAnimation { duration: arrive.delay }
                         NumberAnimation { target: stepRow; property: "k"; to: 1; duration: Theme.slow; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
+                    // number, words and the live dot as one line, centred under the title
+                    Row { anchors.horizontalCenter: parent.horizontalCenter; anchors.verticalCenter: parent.verticalCenter; spacing: 10
                     Txt { mono: true; kind: "fine"; tone: 4; text: (stepRow.n + 1 < 10 ? "0" : "") + (stepRow.n + 1); anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
-                    Txt { x: 28; width: parent.width - 28 - 14; mono: true; kind: "fine"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; elide: Text.ElideRight
+                    Txt { width: Math.min(implicitWidth, stepRow.width - 60); mono: true; kind: "fine"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; elide: Text.ElideRight
                         color: stepRow.now ? Theme.ink : Theme.ink3; text: stepRow.modelData }
-                    Rectangle { objectName: stepRow.now ? "designingDot" : ""; visible: stepRow.now; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 6; height: 6; radius: 3; color: Theme.datum
+                    Rectangle { objectName: stepRow.now ? "designingDot" : ""; visible: stepRow.now; anchors.verticalCenter: parent.verticalCenter; width: 6; height: 6; radius: 3; color: Theme.datum
                         SequentialAnimation on opacity { running: stepRow.now && !Theme.reduced; loops: Animation.Infinite
-                            NumberAnimation { to: 0.35; duration: 700 } NumberAnimation { to: 1; duration: 700 } } }
+                            NumberAnimation { to: 0.35; duration: 700 } NumberAnimation { to: 1; duration: 700 } } } }
                 } } }
         Item { width: 1; height: Theme.s2; visible: dz.done }
-        Row { id: ends; objectName: "designingEnds"; visible: dz.done; spacing: 8
+        Row { id: ends; objectName: "designingEnds"; anchors.horizontalCenter: parent.horizontalCenter; visible: dz.done; spacing: 8
             Btn { objectName: "designingContinue"; kind: "primary"; icon: "message_square"; text: "Continue the conversation"; visible: Store.chatReady && Store.convId !== ""
                 tip: "Say what to make; it appears here as it is built"; onClicked: { Store.talkOpen = true; Store.chatFocus++ } }
             Btn { objectName: "designingHome"; icon: "arrow_left"; text: "Back to Home"; onClicked: Store.leaveDesigning() }
