@@ -34,61 +34,52 @@ from .digest import digest as _digest
 from .studio import H, Studio, StudioError
 
 INSTRUCTIONS = """\
-Form Studio is an AI CAD studio: it designs parts, products and mechanisms as real, editable CAD (a parametric kernel)
-and keeps an honest record of what is known. 3D printing is optional and off unless the person turned it on
-(form_overview: has_printer).
+Form Studio is an AI CAD studio: it designs parts, products and mechanisms as real, editable CAD and keeps an honest
+record of what is known. 3D printing is optional: off unless form_overview says has_printer.
 
-Workflow: form_overview -> create_design from your own code (design_guide; design_brief first for a complex
-design), or create_project from a recipe (describe_recipe) -> render (look at it) -> preview_change ->
-commit_change, or edit_design (ops on one feature or parameter; update_design sends a whole file) -> get_project
-(checks, the proof sheet of the brief's requirements, next actions). Only for a design whose purpose is "print":
-run_pipeline (exports, print checks, a slice) -> request_release (a person approves in Form Studio).
-After every build, refinement runs in the background and lands as one more revision (refine_design shows, undoes
-or turns it off; game assets only when turned on). Long work answers with a job: get_job.
+Workflow: form_overview -> create_design from your own code (design_guide), or create_project from a recipe
+(describe_recipe) -> render -> preview_change -> commit_change, or edit_design (ops on one feature or parameter;
+update_design: a whole file) -> get_project (checks, the brief's proof sheet, next actions). Only for purpose "print":
+run_pipeline (exports, print checks, a slice) -> request_release. After a build, background refinement lands as one
+more revision (refine_design shows, undoes or turns it off). Long work answers with a job: get_job.
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
-- Always preview_change before commit_change; pass expect_head so you never overwrite a newer revision.
-- Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number.
-  Never invent physical results; record_physical_result is only for what the user reports.
-- For a print design: a slice is a simulation, not a print, and fit yield is a model. Say so when you report them.
-- You cannot approve a release. request_release returns a link that opens the release in Form Studio for the user.
-- Nothing here starts a print or sends files anywhere.
-- Every design has a purpose: "print" or "model" (just a 3D model: rendering, CAD exchange, CNC, laser cutting,
-  moulding). get_project reports it. For a model never ask about a printer, slicer, filament or orientation. Pass
-  purpose to create_project/create_design when the person says what it is for (default: form_overview
-  purpose_default). A "Purpose:" line in the message is binding: "just a 3D model" means no print talk.
-- Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time,
-  at most three per task; ask_measurement for a dimension they can measure. Where Form Studio's chat or your
-  client's form cannot reach the person, the result tells you to ask in your own interface.
-- A new idea that is not a precise specification: propose_concepts with 3-4 genuinely different structural
-  approaches as real designs, a one-line rationale each; then stop and let the person pick. Do not offer recipes.
-- Anything the person brings (a mesh, a STEP, a photo, a sketch, a PDF, a link, or only words): triage(source)
-  first. It says what the input is (a mesh: mechanical, organic or mixed; triangles; defects; a guess at the units;
-  how many bodies), chooses the route and names the calls in order. Take that route; do not ask the person which
-  route to take. Ask only when triage returns "ask" (one question whose answer changes the result), and say what
-  "cannot" lists.
-- A mesh to make editable: reconstruct(path). It runs the triage itself, repairs what is safe (every repair is
-  listed), and takes the route: a mechanical part becomes sketches, holes and fillets verified against the mesh; a
-  sculpt or a scan becomes a surface body (NURBS over a cage) or a mesh body (the repaired mesh with a Scale and a
-  Flat base, exact features cut into it: design_guide(topic="organic"), SCULPTED MESHES); several bodies become one
-  design with a part each. Report its headline as it is: the measured distance from the file, and what it is not.
-- A refusal names the next call in its hint. Never repeat a call that failed with the same arguments: do what the
-  hint says. A design's exceptions are not a way to print: what a build has to say comes back in the result.
-- Rebuilding a mechanical mesh by hand (when reconstruct's result is not editable enough): never embed the mesh as
-  the design. design_guide(topic="reference_parts"): analyze_reference (analyze_assembly for several parts) ->
-  named features -> build123d with Params -> compare_to_reference until within tolerance (0.1 mm by default).
-- Photos: scale from a reference object (bank card 85.60 x 53.98 mm, a coin, a ruler); photo dimensions stay
-  assumed until measured. Form Studio sketches carry JSON that is authoritative over the picture. A STEP is already
-  CAD: import_reference. PDF drawings: read_document. Links the person gives: fetch_link, never a shell. Download
-  only what the person gave you.
-- One request makes one design. Several files of one product are one design with several parts (reconstruct
-  files=[...], create_design relation="part_of"). A second create_design in a conversation says its relation
-  (replaces, part_of, alternative, new).
+- preview_change before commit_change; pass expect_head so a newer revision is never overwritten.
+- Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number. Never invent
+  physical results: record_physical_result is only for what the user reports.
+- Printing: a slice is a simulation, not a print, and fit yield is a model. Say so.
+- You cannot approve a release: request_release returns a link the user opens in Form Studio. Nothing here starts a
+  print or sends files anywhere.
+- Every design has a purpose, "print" or "model" (just a 3D model): get_project reports it. For a model never ask about
+  a printer, slicer, filament or orientation. Pass purpose to create_project/create_design when the person says it. A
+  "Purpose:" line in the message is binding.
+- Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time, at
+  most three a task; ask_measurement for a dimension. If the person cannot be reached, the result says to ask in your
+  own interface.
+- A new idea that is not a precise specification: propose_concepts with 3-4 structurally different real designs, one
+  line of rationale each; then stop: the person picks. Do not offer recipes.
+- Anything the person brings (mesh, STEP, photo, sketch, PDF, link, words): triage(source) first. It classes the input,
+  chooses the route and names the calls in order. Take that route. Ask the person only when triage returns "ask", and
+  say what "cannot" lists.
+- A mesh to make editable: reconstruct(path). It triages, repairs what is safe and takes the route (a mechanical part:
+  sketches, holes and fillets verified against the mesh; a sculpt or scan: a surface or mesh body,
+  design_guide(topic="organic"); several bodies: one design, a part each). Report its headline as it is: the measured
+  distance, and what it is not.
+- A refusal's hint names the next call. Never repeat a failed call with the same arguments. A design's exceptions are
+  not a way to print: what a build says comes back in the result.
+- Rebuilding a mechanical mesh by hand: never embed the mesh as the design. design_guide(topic="reference_parts"):
+  analyze_reference (analyze_assembly for several parts) -> named features -> build123d with Params ->
+  compare_to_reference until within tolerance (default 0.1 mm).
+- Photos: scale from a reference object (bank card 85.60 x 53.98 mm, coin, ruler); photo dimensions stay assumed until
+  measured. A Form Studio sketch's JSON overrides the picture. STEP: import_reference. PDF drawings: read_document.
+  Their links: fetch_link, never a shell. Download only what they gave.
+- One request makes one design. Several files of one product: one design, several parts (reconstruct files=[...],
+  create_design relation="part_of"). A second create_design in a conversation says its relation: replaces, part_of,
+  alternative or new.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
-  design_guide(topic=...) and design_examples -> plan_design -> create_design(plan=...) -> look at the sheet ->
-  critique -> update_design. The design_guide topics (and this server's skills, where your client lists them)
-  hold the full workflow for each kind of design.
+  design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
+  -> update_design. The design_guide topics and this server's skills hold each workflow.
 """
 
 S: dict[str, Any] = {"studio": None, "bench": {"url": None}, "lock": threading.Lock()}
@@ -333,7 +324,7 @@ async def _wait_job(st: Studio, jid: str, wait_s: float) -> dict:
 # agent to call before it has searched for anything is here: a deferred one answers "No such tool available" when
 # called by name. Kept small: each one costs context in every run.
 ALWAYS_LOAD = ("form_overview", "get_project", "create_design", "update_design", "render", "preview_change",
-               "commit_change", "design_guide", "design_brief", "ask_user", "get_job", "edit_design")
+               "commit_change", "design_guide", "design_brief", "ask_user", "get_job", "edit_design", "triage")
 ALWAYS = {"anthropic/alwaysLoad": True}
 
 

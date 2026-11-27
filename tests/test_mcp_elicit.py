@@ -239,7 +239,8 @@ class Elicitation(unittest.TestCase):
         first = {"form_overview", "design_guide", "design_brief", "create_design", "update_design", "get_project",
                  "render", "preview_change", "commit_change"}
         self.assertLessEqual(first, always)
-        self.assertLessEqual(len(always), 12)
+        self.assertIn("triage", always)     # the instructions' first call for anything the person brings
+        self.assertLessEqual(len(always), 13)
 
     def test_skills_and_tasks_extensions_register_when_present(self):
         import types

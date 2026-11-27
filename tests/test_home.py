@@ -403,7 +403,14 @@ class WhatsNew(Tmp):
             self.assertNotIn("Wall code", n["markdown"])
             self.assertNotIn("Details", n["markdown"])
             self.assertEqual([h["title"] for h in n["highlights"]], ["Lighter"])
-        real = whatsnew.notes("1.1.0-preview.1")                         # the bundled changelog's 1.1 summary
+        # a preview or dev build reads the section of the release it leads to, once that is written
+        rel = self.tmp / "CHANGELOG-rel.md"
+        rel.write_text(cl.read_text(encoding="utf-8").replace("## Unreleased", "## 1.1.0", 1), encoding="utf-8")
+        for v in ("1.1.0", "1.1.0-dev", "1.1.0-preview.2"):
+            self.assertEqual([h["title"] for h in whatsnew.notes(v, rel)["highlights"]], ["Lighter"], v)
+        self.assertFalse(whatsnew.notes("1.2.0-dev", rel)["found"])     # another release's notes are never shown
+        real = whatsnew.notes("1.1.0")                                   # the bundled changelog's 1.1 summary
+        self.assertEqual(real["markdown"], whatsnew.notes("1.1.0-preview.1")["markdown"])
         self.assertIn("Known limits", real["markdown"])
         self.assertLess(len(real["markdown"]), 20_000)
 

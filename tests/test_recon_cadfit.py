@@ -118,7 +118,12 @@ class ScriptReader(unittest.TestCase):
     def test_scratch_files_stay_in_the_work_folder(self):
         """CADFit's volume of a candidate writes a scratch script and STL with tempfile: the driver points tempfile at
         the work folder, so the export is allowed there and the volume is real."""
+        import importlib.util
+        from form.recon import cadfit
         from form.recon.cadfit import cqrun
+        if any(importlib.util.find_spec(m) is None for m in cadfit.LIBRARIES):
+            # CADFit's own module is imported in this Python here, and it needs its libraries (the "cadfit" extra)
+            self.skipTest("CADFit's libraries are not installed in this Python")
         from form.recon.cadfit.vendor import cadquery_ops
         acts = ["plane = cq.Plane(origin=(0, 0, 0), normal=(0, 0, 1), xDir=(1, 0, 0))", "sketch = cq.Workplane(plane)",
                 "sketch.moveTo(0, 0)", "sketch.circle(0.5)"]

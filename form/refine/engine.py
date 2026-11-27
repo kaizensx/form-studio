@@ -970,7 +970,8 @@ def refine(st, pid: str, refine=None, style: str | None = None, budget_s: float 
             record_revision(st, pid, q["head"], {"from_rev": head, "style": r.get("style"),
                                                  "steps": r["applied"], "base": r.get("base"), "final": r.get("final")})
         except Exception as e:                                   # noqa: BLE001 - the head moved, or it did not build
-            r["commit_error"] = {**getattr(e, "public", lambda: {"message": str(e)})(),
+            public = getattr(e, "public", None)
+            r["commit_error"] = {**(public() if callable(public) else {"message": str(e)}),
                                  "status": getattr(e, "status", None)}
     return r
 

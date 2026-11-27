@@ -164,11 +164,19 @@ class Engine(unittest.TestCase):
             t0 = time.perf_counter()
             try:
                 boolean.run(body, tool, "cut")
+                rep = boolean.last()
             except boolean.BooleanError as e:
-                self.assertIn("time bound", str(e)) if e.report.get("skipped") else None
-            # never far past the feature's budget: one OCCT call in flight cannot be stopped, and slow CI runners (x86-64
-            # macOS) take a few seconds for it
-            self.assertLessEqual(time.perf_counter() - t0, 3.0 + 4.0)
+                rep = e.report
+                self.assertIn("time bound", str(e)) if rep.get("skipped") else None
+            took = time.perf_counter() - t0
+            # never past the feature's budget by more than the one OCCT call in flight, which cannot be stopped. How
+            # long that call is depends on the machine (the plain cut here: 1 s on a fast laptop, 6 s and more on a
+            # CI runner), so the bound is the budget plus this run's own longest attempt, not a number of seconds
+            longest = max(x["seconds"] for x in rep["attempts"])
+            self.assertLessEqual(took, 3.0 + longest + 1.5, rep["attempts"])
+            if rep["attempts"][0]["seconds"] >= 2.0:    # the plain cut alone used the budget (the deadline less 1 s):
+                self.assertEqual(len(rep["attempts"]), 1, rep["attempts"])      # nothing was tried after it
+                self.assertLessEqual(took, longest + 1.5)
         finally:
             featureprog._DEADLINE.clear()
 

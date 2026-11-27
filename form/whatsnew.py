@@ -77,8 +77,11 @@ def notes(version: str, path: Path | None = None) -> dict:
         return {"version": version, "found": False, "markdown": "", "highlights": []}
     sec = sections(p.read_text(encoding="utf-8"))
     md = sec.get(version) or sec.get(version.lstrip("vV")) or ""
-    if not md and re.search(r"-(dev|preview)", version):   # a build of dev or a preview: what it has that the
-        md = sec.get("Unreleased", "")                     # last release does not
+    if not md and re.search(r"-(dev|preview)", version):
+        # a build of dev or a preview: the notes of the release it leads to (1.1.0-preview.2 and 1.1.0-dev read
+        # "## 1.1.0", as scripts/ci/release_notes.py does), or what is unreleased while that section is not written
+        base = version.lstrip("vV").split("-", 1)[0]
+        md = sec.get(base) or sec.get("Unreleased", "")
     md = summary(md)
     return {"version": version, "found": bool(md), "markdown": md, "highlights": highlights(md),
             "versions": list(sec)[:12]}
