@@ -505,6 +505,23 @@ class UI:
                         raise
                     self._pump(120)
             self._steady(target, fx, fy)
+            # the page can grow while the hand is on its way (cards that load a moment later push everything below
+            # them down, out of the panel): then the control is brought back into view, as a hand would scroll again.
+            # It was pressed below the window's edge instead, where nothing is
+            for _ in range(3):
+                try:
+                    it = self.item(target) if isinstance(target, str) else target
+                    fl = self._flick(it)
+                    if fl is None:
+                        break
+                    from PySide6.QtCore import QPointF
+                    y = it.mapToItem(fl, QPointF(0, it.height() * fy)).y()
+                    if 0 <= y <= fl.height():
+                        break
+                    self.scroll_to(target, fy)
+                    self._steady(target, fx, fy)
+                except RuntimeError:
+                    self._pump(120)
         p = self._pt(target, fx, fy)
         self.T.mouseMove(self.win, p)
         self._pump(15)

@@ -945,7 +945,15 @@ QtObject {
     function loadRefine() {
         if (!pid) { refine = null; return }
         var want = pid
-        pget("/refine").then(function (r) { if (s.pid === want && JSON.stringify(r) !== JSON.stringify(s.refine)) s.refine = r }, function () {})
+        pget("/refine").then(function (r) {
+            if (s.pid !== want) return
+            if (JSON.stringify(r) !== JSON.stringify(s.refine)) s.refine = r
+            // the refinement ended with a revision of its own: the window shows it. (It was shown only when
+            // something else happened to read the design again, so a refinement that ended after the conversation
+            // left its panel saying "1 change" over the revision before it.)
+            if (r && r.state === "done" && r.head && s.project && s.project.head < r.head && !(s.hasDraft && !s.draftAgent))
+                s.refresh(true)
+        }, function () {})
     }
     function _refinePost(body, label) {
         refineBusy = true

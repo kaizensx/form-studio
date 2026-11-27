@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tests"))
 os.environ.setdefault("FORM_SKIP_UI", "1")
 
 from form.craft._common import ok  # noqa: E402
@@ -59,6 +60,17 @@ class Classification(unittest.TestCase):
 
 
 class Engine(unittest.TestCase):
+    def setUp(self):
+        # the ladder's 25 s are for the machine they were set on: a runner that takes 25.1 s for the plain fuse alone
+        # ("slow", nothing tried after it) would say how fast it is, not which class the failure has. As many more
+        # seconds as this machine is slower (tests/machine.py); the tests of the bound itself pass their own budget
+        import machine
+        from unittest import mock
+        from form.craft import boolean
+        p = mock.patch.dict(os.environ, {"FORM_BOOLEAN_BUDGET": f"{boolean.BUDGET_S * machine.speed():.1f}"})
+        p.start()
+        self.addCleanup(p.stop)
+
     def test_touching_halves_fail_fast_with_the_right_hint(self):
         from form import craft
         from form.craft import boolean
