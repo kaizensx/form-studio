@@ -435,7 +435,10 @@ class WhatsNew(Tmp):
     def test_the_bundled_changelog_has_the_running_version(self):
         from form import __version__
         self.assertIsNotNone(whatsnew.changelog_path())
-        self.assertTrue(whatsnew.notes(__version__)["found"])
+        n = whatsnew.notes(__version__)
+        # a dev build right after a release has nothing unreleased yet, and shows no notes until a change lands
+        fresh = __version__.endswith("-dev") and "Unreleased" in n.get("versions", []) and not n["markdown"]
+        self.assertTrue(n["found"] or fresh)
         spec = (Path(__file__).resolve().parents[1] / "packaging" / "form.spec").read_text(encoding="utf-8")
         self.assertIn('"CHANGELOG.md"', spec)
 
