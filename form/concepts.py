@@ -212,7 +212,7 @@ def _mass(st, p: dict, compute: bool) -> dict:
     out = {"material": None, "mass_evidence": r["evidence"]}
     if len(mats) == 1:
         m = next(iter(mats.values()))
-        out["material"] = {"id": m["id"], "label": m["label"], "why": m["why"], "density_kg_m3": m["density_kg_m3"],
+        out["material"] = {"id": m["id"], "label": m["label"], "kind": m["kind"], "why": m["why"], "density_kg_m3": m["density_kg_m3"],
                            "source": m["density_source"]}
     elif mats:
         out["material"] = {"id": "mixed", "label": f"{len(mats)} materials", "why": "chosen per part"}

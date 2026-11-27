@@ -83,7 +83,7 @@ Item {
                             Tag { visible: parent.assumed; text: "assumed"; kind: "x"; tint: Theme.amber; anchors.verticalCenter: parent.verticalCenter }
                             Txt { kind: "fine"; tone: 2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; elide: Text.ElideRight
                                 width: parent.width - ctag.width - (parent.assumed ? 70 : 0) - 16
-                                text: parent.mat ? "in " + parent.mat.label + (parent.mat.density_kg_m3 ? " · " + F.fmt(parent.mat.density_kg_m3, 0) + " kg/m³" : "") + (parent.assumed ? ", solid" : "")
+                                text: parent.mat ? "in " + parent.mat.label + (parent.mat.density_kg_m3 ? " · " + F.fmt(parent.mat.density_kg_m3, 0) + " kg/m³" : "") + (parent.mat.kind === "filament" ? ", solid" : "")
                                     : "no material: no mass" } } }
                     Btn { objectName: "conceptPick"; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 14
                         kind: c.on ? "primary" : "default"; icon: "check"; text: "Continue with " + c.modelData.letter

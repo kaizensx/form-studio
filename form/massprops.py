@@ -357,7 +357,8 @@ def headline(res: dict) -> str:
     mats = {x["material"]["id"]: x["material"] for x in res["parts"] if x.get("material")}
     if len(mats) == 1:
         m = next(iter(mats.values()))
-        return f"{t['mass_g']:.4g} g · computed: volume × {m['density_kg_m3']:g} kg/m³ ({m['label']})"
+        name = m['label'] if '(' not in m['label'] else m['id']
+        return f"{t['mass_g']:.4g} g · computed: volume × {m['density_kg_m3']:g} kg/m³ ({name})"
     return f"{t['mass_g']:.4g} g · computed: volume × density of {len(mats)} materials"
 
 

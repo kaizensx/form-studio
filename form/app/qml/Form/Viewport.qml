@@ -80,6 +80,7 @@ Item {
     signal hoveredValue(real value, real x, real y, bool on)
     property bool measuring: false           // a click probes the surface instead of selecting a feature
     property var measures: []                // drawn by MeasureLayer; labels below
+    property var massTotal: null             // Store.mass.total while the centre of mass is shown (MassLayer)
     property var measureFrom: null
     signal probed(var hit, real reach)       // { at, shown, part, normal }: the surface point as printed (at) and as shown; snap radius in mm (about 10 px)
     signal probeMissed(real x, real y)       // a measuring click that found no surface
@@ -106,6 +107,7 @@ Item {
         for (i = 0; i < mk.length && i < 8; i++)
             out.push({ p: mk[i].at, text: mk[i].label, tint: mk[i].kind === "thin" || mk[i].severity === "fail" ? Theme.signal : Theme.amber })
         for (i = 0; i < shownMeasures.length; i++) out.push({ p: shownMeasures[i].label_at, text: shownMeasures[i].label, tint: Theme.datum })
+        if (massTotal) out.push({ p: massTotal.com_mm, text: "Centre of mass", tint: Theme.datum })
         var tag = frameTag
         for (i = 0; i < annotations.length && !lite; i++) {
             var a = annotations[i], q = annAnchor(a)
@@ -1119,6 +1121,8 @@ Item {
                         materials: PrincipledMaterial { baseColor: Theme.annotate; lighting: PrincipledMaterial.NoLighting } }
                 }
                 MeasureLayer { measures: vp.shownMeasures; from: vp.shownFrom; opacity: vp.asmTween ? 0 : 1; dot: vp.dist * 0.00004; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height)) }
+                MassLayer { total: vp.massTotal; opacity: vp.asmTween ? 0 : 1; dot: vp.dist * 0.00004; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height))
+                    reach: vp.model && vp.model.bbox ? 0.42 * Math.max(vp.model.bbox[1][0] - vp.model.bbox[0][0], vp.model.bbox[1][1] - vp.model.bbox[0][1], vp.model.bbox[1][2] - vp.model.bbox[0][2]) : 20 }
 
                 // a check pointing at a place: thin signal line between two points
                 Node {

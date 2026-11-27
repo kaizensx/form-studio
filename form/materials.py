@@ -325,7 +325,7 @@ def mass(p: dict, volume_mm3: float | None, part: str = "") -> dict | None:
         return None
     i = info(m)
     return {"grams": mass_g(volume_mm3, m), "material": m, "label": i["label"], "density_g_cm3": i["density_g_cm3"],
-            "evidence": "computed", "source": "modelled volume x typical density from "
+            "evidence": "computed", "source": "modelled volume x density from "
             + ("filament datasheets, if printed solid" if i["kind"] == "filament" else i["source"].split(" (")[0])}
 
 

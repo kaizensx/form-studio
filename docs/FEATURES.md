@@ -532,6 +532,28 @@ either. A real thin fin still fails.
 - **Picks the filament.** A material selects the printer's matching filament preset, one material per plate.
   `form appearance`, `form material`; MCP `set_appearance`.
 
+## Mass properties and engineering materials
+
+- **Mass, centre of mass, inertia tensor and principal axes, computed on the B-rep** (OCCT `BRepGProp`), per part
+  and for the whole design. An assembly is reported assembled, at any pose of its joints (`pose={"lid_hinge": 90}`);
+  each part's tensor is rotated with it and the parts are combined with the parallel-axis theorem. Units mm, g,
+  g·mm² (also kg·m²). Verified against closed-form solids (box, cylinder, hollow tube, hollow sphere, two offset
+  bodies, a hinged arm in three poses) to 1e-6 relative in `tests/test_massprops.py`.
+- **Every density says where it comes from.** A part's mass is its B-rep volume times its material's density, and the
+  result names the document the density was read from. A part without a material has no mass: the volume centroid
+  is given instead, never a default. A what-if material is computed without saving anything.
+- **A sourced materials library** (`form/material_data.py`, read through `form/material_library.py`): density,
+  Young's modulus, Poisson's ratio, yield and ultimate strength, elongation, thermal expansion and conductivity, heat
+  deflection, for 10 printing filaments and 18 engineering metals, plastics and woods. Every value carries its source
+  document, URL, the line it was read from and the date it was read (2026-11-28). Printed filaments carry the
+  manufacturer's X-Y and Z specimen values and the Z knock-down that follows from them (labelled modelled). A value no
+  source gave is reported as unsourced (PLA's Poisson's ratio, PTFE's tensile modulus, ...), never filled in.
+- **In the window:** the grams on the size line, pressed, show the centre of mass and the principal axes on the
+  part and a glass readout with the mass, its material and density source, the centre, the principal moments and one
+  line per part; the same toggle is in Analyze. Concept cards show each concept's mass and material.
+- MCP `mass_properties`; `form mass <project> [--part P] [--pose JSON] [--material M] [--frame as_built|assembled]`,
+  `form materials [ID]`.
+
 ## Pictures: renders, share cards, animations
 
 | | |
