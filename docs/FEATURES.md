@@ -53,7 +53,7 @@ starts next, or **Start blank** for an empty design in the workspace with no age
 5 mm grid and to the points already drawn (Alt draws freely), with undo and redo. A typed dimension is *stated* and
 overrides the drawn length. The agent extrudes or revolves the shapes faithfully.
 
-![The sketch pad: a rectangle, a circle and a stated 80 mm dimension](images/sketch.webp)
+![The sketch pad: a rectangle, a circle and a stated 70 mm dimension](images/sketch.webp)
 
 **The workspace opens at once.** Sending from Home shows the design being made, with what the agent is doing, and
 attaches the design the moment it exists. Each new build grows into the viewport feature by feature, in build order,
