@@ -622,6 +622,7 @@ class _Mesher:
         self.guard = (len(shape.faces()) > GUARD_FACES) if guard is None else guard
         self.brep = None
         self.hung: list = []
+        self.start_s = 0.0             # what starting the child processes took: not the mesher's time (meshguard.run)
         if self.guard:
             import tempfile
             from . import meshguard
@@ -647,11 +648,14 @@ class _Mesher:
                 out.append((V, len(miss)))
             return out
         from . import meshguard
+        stats: dict = {}
         try:
-            res = meshguard.run(self.brep, piece, tol, ang, faces_alone, timeout)
+            res = meshguard.run(self.brep, piece, tol, ang, faces_alone, timeout, stats)
         except Exception as e:                 # noqa: BLE001 - reported with the rung that could not run
             self.hung.append({"tolerance": tol, "error": f"{type(e).__name__}: {e}"[:200]})
             return None
+        finally:
+            self.start_s += float(stats.get("start_s") or 0.0)
         if res is None:
             self.hung.append({"tolerance": tol, "seconds": round(timeout, 1), "piece": piece})
         return res
@@ -678,7 +682,10 @@ def _close(M, shape, tol, ang, budget_s, t0, deadline):
     pieces = M.pieces
     reserve = min(12.0, budget_s * 0.35)          # kept for the mesh-side rungs (welded, repaired)
     mesh_by = deadline - reserve
-    left = lambda: max(1.0, mesh_by - time.time())   # noqa: E731
+    # the budget is time spent meshing and mending: what starting the mesher's child processes took on this machine
+    # (M.start_s) is not counted against it
+    now = lambda: time.time() - M.start_s            # noqa: E731
+    left = lambda: max(1.0, mesh_by - now())         # noqa: E731
     first = None
     used_tol = tol
     for t in (tol, 2 * tol, 4 * tol, 10 * tol):     # the whole shape: the asked-for settings, coarser if they hang
@@ -718,7 +725,7 @@ def _close(M, shape, tol, ang, budget_s, t0, deadline):
         settings = [(tol / 2, ang), (tol, ang * 2), (tol / 4, ang / 2), (tol / 10, ang / 2)]
         hung = min((h["tolerance"] for h in M.hung if "seconds" in h), default=0.0)
         for t, a in settings:                  # finer: the whole solid (never finer than a setting that ran over)
-            if done or time.time() > mesh_by:
+            if done or now() > mesh_by:
                 break
             if (t >= used_tol and a == ang) or t <= hung:
                 continue
@@ -727,14 +734,14 @@ def _close(M, shape, tol, ang, budget_s, t0, deadline):
                 break                          # finer than this hangs: no finer try
             V, n_missing = r[0]
             done = judge(V, "finer", max(t, 1e-6), {"tolerance": t, **({"faces_without_triangles": n_missing} if n_missing else {})})
-        if not done and time.time() < mesh_by and n_missing:   # finer: only the faces that still got no triangles
+        if not done and now() < mesh_by and n_missing:   # finer: only the faces that still got no triangles
             r = M.mesh(k, used_tol, ang, min(left(), max(5.0, budget_s * 0.25)), faces_alone=True)
             if r is not None:
                 V, n_missing = r[0]
                 done = judge(V, "finer", used_tol, {"faces_meshed_alone": True,
                                                     **({"faces_without_triangles": n_missing} if n_missing else {})})
         base_V = V
-        if not done and time.time() < mesh_by and hasattr(solid, "faces"):
+        if not done and now() < mesh_by and hasattr(solid, "faces"):
             try:
                 sew_tol = min(1e-3, used_tol / 10)
                 s2 = _sewn(solid, sew_tol)
@@ -743,6 +750,7 @@ def _close(M, shape, tol, ang, budget_s, t0, deadline):
                     try:
                         r = M2.mesh(-1, used_tol, ang, min(left(), max(5.0, budget_s * 0.25)))
                     finally:
+                        M.start_s += M2.start_s
                         M2.close()
                     if r is not None:
                         V2, missing2 = r[0]
@@ -752,26 +760,26 @@ def _close(M, shape, tol, ang, budget_s, t0, deadline):
                 tried.append({"rung": "sewn", "error": f"{type(e).__name__}: {e}"[:160]})
         welded_from = best["V"] if best is not None else base_V
         for eps in (tol / 4, tol / 2, tol):    # welded: cracks between faces (T-junctions stitched, then merged)
-            if done or time.time() > deadline:
+            if done or now() > deadline:
                 break
             P, F = cluster(welded_from, tol / 100)
             F, n_split = stitch(P, _drop_flat(P, _drop_degenerate(F)), eps)
             F = _drop_duplicates(_drop_degenerate(F))
             done = judge(P[F], "welded", (best["deviation_mm"] if best else tol) + eps + 2 * (tol / 100) * 3 ** 0.5,
                          {"weld_mm": tol / 100, "stitch_mm": eps, "t_junctions_split": n_split})
-        if not done and time.time() < deadline:   # repaired: the last resort, with its deviation stated
+        if not done and now() < deadline:   # repaired: the last resort, with its deviation stated
             src = best["V"] if best is not None else base_V
             P, F = cluster(src, tol / 10)
             F, _n = stitch(P, _drop_flat(P, _drop_degenerate(F)), tol / 2)
             before = set(map(tuple, np.sort(F, axis=1).tolist()))
-            P, F, info = repair(P, F, deadline + min(10.0, budget_s / 3), small=(10 * tol) ** 2)
+            P, F, info = repair(P, F, deadline + M.start_s + min(10.0, budget_s / 3), small=(10 * tol) ** 2)
             added = np.array([f for f in F.tolist() if tuple(sorted(f)) not in before], dtype=np.int64).reshape(-1, 3)
             # how far the new triangles are from the CAD surface, measured: centroids and edge midpoints
             T = P[added] if len(added) else np.zeros((0, 3, 3))
             pts = np.concatenate([T.mean(axis=1), (T[:, 0] + T[:, 1]) / 2, (T[:, 1] + T[:, 2]) / 2,
                                   (T[:, 2] + T[:, 0]) / 2]) if len(T) else np.zeros((0, 3))
             try:
-                meas, n_meas, at = surface_distance(solid, pts, deadline + min(10.0, budget_s / 3))
+                meas, n_meas, at = surface_distance(solid, pts, deadline + M.start_s + min(10.0, budget_s / 3))
             except Exception:                  # noqa: BLE001 - then the bound from the fill's flatness stands
                 meas, n_meas, at = None, 0, []
             base_dev = ((best["deviation_mm"] if best else tol) + 2 * (tol / 10) * 3 ** 0.5
@@ -802,7 +810,7 @@ def _close(M, shape, tol, ang, budget_s, t0, deadline):
             pass
         if not row["closed"]:
             row["open"] = {k2: t[k2] for k2 in ("boundary", "nonmanifold", "winding", "duplicate", "flat") if t.get(k2)}
-            row["why"] = _why(t, chosen, time.time() > deadline)
+            row["why"] = _why(t, chosen, now() > deadline)
         rows.append(row)
         out.append(chosen["V"])
     ok = all(r["closed"] for r in rows)

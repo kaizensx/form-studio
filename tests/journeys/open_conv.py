@@ -55,7 +55,7 @@ def journey_conversation_with_three_designs(ui):
     t0 = open_from_home(ui, S["three"])
     ui.wait_until(lambda: ui.store.get("screen") == "work" and ui.store.get("pid") == S["c"], 5, "the conversation's design")
     took = time.time() - t0
-    ui.check(took < 1.5, f"landed on the design in {took:.2f} s")
+    ui.check(took < 1.5 * ui.slow, f"landed on the design in {took:.2f} s (machine speed {ui.slow:.2f})")
     items = ui.wait_until(lambda: (lambda x: x if len(x) == 3 else None)(ui.find_all(name="designStripItem")), 5, "three designs in the strip")
     ui.eq([i.property("title") for i in items], ["Wallet base", "Wallet slider", "Wallet cascade"], "in the order they were made")
     ui.settle(800)

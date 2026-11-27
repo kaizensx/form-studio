@@ -133,6 +133,9 @@ def journey_sketch_is_structured(ui):
     ui.key("Return")
     text = reply(ui)
     ui.check("Sketch: 2 primitives" in text, f"the agent read the structured sketch: {text!r}")
+    # the way back is offered once the run has ended on the stage: a click before that lands on nothing
+    ui.wait_until(lambda: ui._shown(ui.item("designingHome")), 10, "Back to Home on the stage")
+    ui.settle(400)
     ui.click("designingHome")
     ui.wait_until(lambda: ui.store.get("screen") == "home", 10, "back on Home")
 

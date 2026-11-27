@@ -130,7 +130,11 @@ def run(ui):
         # the top of the question is one scroll away (the feed is pinned to its end)
         print(f"note the card ({c[3] - c[1]:.0f} px) is taller than the column's feed ({f[3] - f[1]:.0f} px) at {W}x{H}: {f[1] - c[1]:.0f} px of its top are a scroll away", flush=True)
         say(ui, c[3] <= f[3] + 0.5 and bool(feed.property("stick")), f"the card's foot (replies, answer field) is in view ({c[1]:.0f}..{c[3]:.0f} in {f[1]:.0f}..{f[3]:.0f}, atYEnd {feed.property('atYEnd')}, stick {feed.property('stick')})")
-        say(ui, f[1] - c[1] <= 130, f"the question still reads from near its start ({f[1] - c[1]:.0f} px)")
+        # how much of the top is a scroll away depends on the card's height, and that on the system's text
+        # rendering (the same card is 581 px high on Linux and 600 on Windows, over a 436 px feed): at most 30 % of the card
+        hidden = f[1] - c[1]
+        say(ui, hidden <= 0.3 * (c[3] - c[1]),
+            f"the question still reads from near its start ({hidden:.0f} px of {c[3] - c[1]:.0f} are a scroll away)")
     ui.shot("dz-ask")
 
     # ── answered: the run goes on (failed builds), the column stays, the block stays in the middle ──

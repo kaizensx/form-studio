@@ -36,19 +36,44 @@ def _read(path):
     return Compound(sh)
 
 
-def run(brep: Path, piece: int, tol: float, ang: float, faces_alone: bool, timeout: float):
+START_S = 180.0          # a child that has not loaded the kernel and read the shape by then is stopped
+
+
+def run(brep: Path, piece: int, tol: float, ang: float, faces_alone: bool, timeout: float, stats: dict | None = None):
     """[(triangles (n, 3, 3), faces without triangles)] for the requested solid(s), or None when the mesher did not
-    finish in `timeout` seconds (the child is killed)."""
+    finish in `timeout` seconds (the child is killed).
+
+    `timeout` is the mesher's time: it starts when the child has loaded the CAD kernel and read the shape (it
+    writes OUT_DIR/ready then). Starting a process and loading the kernel takes 1 s on one machine and 15 s on
+    another (a Windows machine with a virus scanner, a CI runner); counted against the mesher, every setting "did
+    not finish" there and no STL could be made. stats["start_s"] gets what the start took."""
+    import time
+
     import numpy as np
     out = Path(tempfile.mkdtemp(prefix="form-meshguard-"))
     cmd = [sys.executable, "-m", "form.meshguard", str(brep), str(out), repr(tol), repr(ang), str(piece),
            "1" if faces_alone else "0"]
     env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(Path(__file__).resolve().parents[1])] +
                                                        ([os.environ["PYTHONPATH"]] if os.environ.get("PYTHONPATH") else [])))
+    err = out / "stderr.txt"
+    p = None
     try:
-        p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=max(1.0, timeout), env=env)
+        t0 = time.monotonic()
+        with open(err, "wb") as ef:
+            p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=ef, env=env)
+            ready = out / "ready"
+            while p.poll() is None and not ready.exists():
+                if time.monotonic() - t0 > START_S:
+                    return None
+                time.sleep(0.02)
+            if stats is not None:
+                stats["start_s"] = time.monotonic() - t0
+            try:
+                p.wait(timeout=max(1.0, timeout))
+            except subprocess.TimeoutExpired:
+                return None
         if p.returncode != 0:
-            raise RuntimeError((p.stderr or b"").decode("utf-8", "replace").strip()[-300:] or f"exit {p.returncode}")
+            raise RuntimeError(err.read_bytes().decode("utf-8", "replace").strip()[-300:] or f"exit {p.returncode}")
         info = json.loads((out / "info.json").read_text(encoding="utf-8"))
         res = []
         for k, missing in enumerate(info["missing"]):
@@ -58,9 +83,13 @@ def run(brep: Path, piece: int, tol: float, ang: float, faces_alone: bool, timeo
                  .reshape(n, 3, 3).astype(np.float64)) if n else np.zeros((0, 3, 3))
             res.append((V, int(missing)))
         return res
-    except subprocess.TimeoutExpired:
-        return None
     finally:
+        if p is not None and p.poll() is None:
+            p.kill()
+            try:
+                p.wait(10)
+            except subprocess.TimeoutExpired:
+                pass
         import shutil
         shutil.rmtree(out, ignore_errors=True)
 
@@ -70,6 +99,7 @@ def main(argv) -> int:
     from form import meshclose
     shape = _read(brep)
     pieces = meshclose._pieces(shape)
+    (out / "ready").write_text("", encoding="utf-8")       # the kernel is loaded and the shape read: the mesher's time starts
     targets = pieces if piece < 0 else [pieces[piece]]
     if piece < 0:
         meshclose._mesh(shape, tol, ang)

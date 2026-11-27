@@ -34,6 +34,23 @@ def _why_not() -> str:
     return ""
 
 
+_SPEED: list[float] = []
+
+
+def _speed() -> float:
+    """How many times slower than the reference machine this one is (tests/machine.py), measured once; 1.0 when the
+    kernel is not there to measure with."""
+    if not _SPEED:
+        try:
+            sys.path.insert(0, str(HERE))
+            import machine
+            _SPEED.append(machine.speed())
+        except Exception:                                # noqa: BLE001
+            _SPEED.append(1.0)
+        print(f"interface journeys: machine speed {_SPEED[0]:.2f}", flush=True)
+    return _SPEED[0]
+
+
 def run_journey(script: str, size: str = "1440x900", env_extra: dict | None = None, timeout: int = 900):
     """Run one journey file (or file::function) in its own app process. Returns (returncode, output)."""
     path = JOURNEYS / script.partition("::")[0]
@@ -56,12 +73,23 @@ def run_journey(script: str, size: str = "1440x900", env_extra: dict | None = No
         if os.environ.get("FORM_UI_STUDIO_TOML"):      # CI: a studio.toml that pins a slicer and presets for every journey
             (Path(tmp) / "studio.toml").write_text(Path(os.environ["FORM_UI_STUDIO_TOML"]).read_text(encoding="utf-8"), encoding="utf-8")
         env.update(env_extra or {})
-        r = subprocess.run([sys.executable, "-m", "form.app", "--uitest", str(JOURNEYS / script), "--size", size],
-                           cwd=ROOT, env=env, capture_output=True, text=True, timeout=timeout)
+        env.setdefault("FORM_UITEST_SLOW", f"{_speed():.2f}")      # the waits follow the machine (form/app/uitest.py)
+        # the app's own watchdog ends a journey that hangs and prints every thread's stack; it goes first, so the
+        # stacks are in the output
+        env.setdefault("FORM_UITEST_WATCHDOG", str(max(60, timeout - 60)))
         sys.path.insert(0, str(ROOT))
         from form import fsutil
+        try:
+            r = subprocess.run([sys.executable, "-m", "form.app", "--uitest", str(JOURNEYS / script), "--size", size],
+                               cwd=ROOT, env=env, capture_output=True, text=True, timeout=timeout)
+            rc, out = r.returncode, r.stdout + r.stderr
+        except subprocess.TimeoutExpired as e:
+
+            def text(x):
+                return x.decode("utf-8", "replace") if isinstance(x, bytes) else (x or "")
+            rc, out = -1, text(e.stdout) + text(e.stderr) + f"\nThe journey did not end in {timeout} s and was stopped."
         fsutil.rmtree(data, 20)              # retried: on Windows a folder frees a moment after the last process in it ends
-        return r.returncode, (r.stdout + r.stderr)[-6000:]
+        return rc, out[-6000:]
 
 
 @unittest.skipIf(_why_not(), _why_not())
@@ -99,6 +127,15 @@ class Journeys(unittest.TestCase):
 
     def test_stage_use_small(self):         # the same in the smallest window, on paper
         self.journey("stage_use.py", size="1100x700", env_extra={"FORM_APPEARANCE": "light"})
+
+    def test_stage_frame(self):             # a tall part (vase, hook, box with its lid open or pulled apart) stands whole in the free stage over the bar's suggestions
+        self.journey("stage_frame.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_stage_frame_mid(self):         # the same in a 1280 x 800 window, on paper
+        self.journey("stage_frame.py", size="1280x800", env_extra={"FORM_APPEARANCE": "light"})
+
+    def test_stage_frame_small(self):       # and in the smallest window
+        self.journey("stage_frame.py", size="1100x700", env_extra={"FORM_APPEARANCE": "light"})
 
     def test_designing_stage(self):         # while a design is made: the words in the middle of the free stage; the conversation glides to its column once it outgrows the panel; a long question with every reply in view
         self.journey("designing_stage.py", env_extra={"FORM_APPEARANCE": "dark"})

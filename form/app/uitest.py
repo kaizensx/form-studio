@@ -226,6 +226,10 @@ class UI:
         self.store = StoreProxy(self)
         self.T = QTest
         self.timeout = float(os.environ.get("FORM_UITEST_TIMEOUT", "30"))
+        # how many times slower than the machine the journeys' waits were written on this one is (the test runner
+        # measures it: tests/machine.py). wait_until waits that much longer, and a journey that checks how long
+        # something took allows that much more (`1.5 * ui.slow`); what must happen is the same everywhere.
+        self.slow = max(1.0, float(os.environ.get("FORM_UITEST_SLOW") or 1.0))
         self.log: list[str] = []
 
     # -- time ----------------------------------------------------------------
@@ -243,7 +247,7 @@ class UI:
     def wait_until(self, cond, timeout: float | None = None, what: str = ""):
         """Pump the event loop until cond() is truthy. Returns its value; raises with `what` on timeout."""
         t0, last = time.time(), None
-        limit = self.timeout if timeout is None else timeout
+        limit = (self.timeout if timeout is None else timeout) * self.slow
         while True:
             try:
                 last = cond()

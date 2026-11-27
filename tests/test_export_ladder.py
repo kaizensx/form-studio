@@ -70,5 +70,60 @@ class Sidecar(unittest.TestCase):
         self.assertFalse((d / "two.stl.parts.json").exists())
 
 
+class GuardedMesher(unittest.TestCase):
+    """The mesher in a child process (form/meshguard.py), as a shape with many faces is meshed."""
+
+    def test_starting_the_child_is_not_the_meshers_time(self):
+        """The time limit is for the mesher. Loading the kernel in the child took longer than a rung's limit on a
+        Windows runner, so every rung "did not finish" and no STL was made: here the limit (1 s) is shorter than any
+        start, and the box is meshed all the same."""
+        try:
+            from build123d import Box
+        except Exception:                                   # pragma: no cover
+            self.skipTest("needs build123d")
+        from form import meshguard
+        d = Path(tempfile.mkdtemp())
+        meshguard.write_brep(Box(10, 20, 30), d / "box.brep")
+        stats: dict = {}
+        t = time.monotonic()
+        res = meshguard.run(d / "box.brep", -1, 0.01, 0.1, False, 1.0, stats)
+        took = time.monotonic() - t
+        self.assertIsNotNone(res)
+        V, missing = res[0]
+        self.assertEqual((len(V), missing), (12, 0))
+        self.assertGreater(stats["start_s"], 0.0)
+        self.assertLessEqual(stats["start_s"], took)
+
+    def test_the_budget_does_not_pay_for_the_start(self):
+        try:
+            from build123d import Box, Cylinder, Pos
+        except Exception:                                   # pragma: no cover
+            self.skipTest("needs build123d")
+        from form import meshguard
+        shape = Box(40, 40, 6)
+        for i in range(4):
+            for j in range(4):
+                shape = shape - Pos(-15 + 10 * i, -15 + 10 * j, 0) * Cylinder(2, 6)
+        self.assertGreater(len(shape.faces()), mc.GUARD_FACES // 4)
+        real = meshguard.run
+
+        def slow(*a, **k):                                  # a machine where the child takes 3 s longer to start
+            time.sleep(3.0)
+            r = real(*a, **k)
+            if len(a) > 6 and isinstance(a[6], dict):
+                a[6]["start_s"] = a[6].get("start_s", 0.0) + 3.0
+            return r
+        M = mc._Mesher(shape, guard=True)
+        meshguard.run = slow
+        try:
+            t0 = time.time()
+            out, rep = mc._close(M, shape, 0.01, 0.1, 4.0, t0, t0 + 4.0)     # a 4 s budget, less than one such start
+        finally:
+            meshguard.run = real
+            M.close()
+        self.assertTrue(rep["per_solid"][0]["closed"], rep)
+        self.assertGreaterEqual(M.start_s, 3.0)
+
+
 if __name__ == "__main__":
     unittest.main()
