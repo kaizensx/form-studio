@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests" / "journeys"))
-from _lib import has_slicer, make, open_project, wait_job  # noqa: E402
+from _lib import has_slicer, make, open_project, printing_on, wait_job  # noqa: E402
 
 DATA = "fresh"
 FPS = 30
@@ -80,7 +80,8 @@ def cam(ui, az, el=None, dist=None):
 
 def journey_setup(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 60, "Home")
-    S["box"] = make(ui, "hinged_box", "Hinged box", open=False)     # built, checked and sliced by the engine
+    printing_on(ui)                             # a design made for printing: the print clip needs its slice
+    S["box"] = make(ui, "hinged_box", "Hinged box", open=False, purpose="print")     # built, checked and sliced by the engine
     S["slicer"] = has_slicer(ui)
     open_project(ui, S["box"])
     wait_job(ui, S["box"])
@@ -94,7 +95,7 @@ def journey_orbit(ui):
         return
     ui.run_js("Store.setAsmMode('assembled'); Store.pose = ({})")
     ui.settle(1400)
-    pull_back(ui, 1.12, 6)
+    pull_back(ui, 1.7, 4)                      # the open lid stays under the top row, over the bar
     v = ui.js("[Store.viewer.az, Store.viewer.el, Store.viewer.dist]")
     az0, el0, d0 = v
     j = ui.js("Store.assembly.joints[0]")
@@ -104,14 +105,14 @@ def journey_orbit(ui):
     n = frames(7.0)
     for i in range(n + 1):
         t = ease(i / n)
-        lid = 0.8 * hi * ease((i / n - 0.6) / 0.4)          # the lid opens as the front comes round again
+        lid = 0.5 * hi * ease((i / n - 0.6) / 0.4)          # the lid opens as the front comes round again
         ui.run_js("Store.pose = ({%r: %f})" % (jid, lid))
         cam(ui, az0 + 360 * t, el0 - 6 * math.sin(math.pi * t), d0 * (1 - 0.05 * math.sin(math.pi * t)))
         c.grab()
     c.hold(0.5)
     n = frames(1.1)
     for i in range(n + 1):                                    # and closes, so the loop starts where it ends
-        ui.run_js("Store.pose = ({%r: %f})" % (jid, 0.8 * hi * (1 - ease(i / n))))
+        ui.run_js("Store.pose = ({%r: %f})" % (jid, 0.5 * hi * (1 - ease(i / n))))
         c.grab()
     c.hold(0.3)
     ui.run_js("Store.pose = ({})")
@@ -124,11 +125,11 @@ def journey_hinge(ui):
         return
     ui.run_js("Store.talkOpen = false; Store.setAsmMode('assembled'); Store.pose = ({})")
     ui.settle(1600)
-    pull_back(ui)
+    pull_back(ui, 1.65, 6)
     j = ui.js("Store.assembly.joints[0]")
     jid, lo, hi = j["id"], float(j["range"][0]), float(j["range"][1])
     x, y, w, h = item_rect(ui, "viewport")
-    crop = (x, y, w, h - 74)                       # without the pipeline strip at the bottom
+    crop = (x, y, w, h)                            # the whole stage: the 3D view fills the window
     for name, box in (("hinge", crop),):
         c = Clip(ui, name, box)
         c.hold(0.5)
@@ -144,7 +145,7 @@ def journey_hinge(ui):
         # pulled apart: the exploded view's spread from together to the design's offsets and back
         ui.run_js("Store.explode = 0; Store.setAsmMode('exploded')")
         ui.settle(1400)
-        pull_back(ui)
+        pull_back(ui, 1.9, 0)
         n = frames(1.6)
         for i in range(n + 1):
             ui.run_js("Store.explode = %f" % (1.15 * ease(i / n)))
