@@ -108,13 +108,21 @@ def create(st, name: str, concepts: list, brief: str = "", group: str | None = N
         except (TypeError, ValueError) as e:
             failed.append({"letter": letter, "title": title, "error": {"message": f"values: {e}", "hint": "Values are numbers."}})
             continue
+        mat_err = None
+        if c.get("material"):                       # the material it would be made in: its card shows the mass
+            from . import materials
+            try:
+                materials.set_appearance(st, p["id"], "", "keep", str(c["material"]), by=by)
+            except StudioError as e:
+                mat_err = e.public()
         info = {"group": g["id"], "letter": letter, "title": title, "rationale": why}
         with st.lock(p["id"]):
             q = st.load(p["id"])
             q["concept"] = info
             st.decide(q, "concept", f"Concept {letter} of “{g['name']}”: {title}." + (f" {why}" if why else ""))
             st.save(q)
-        built.append({"project": p["id"], "letter": letter, "title": title, "rationale": why, "trashed": False})
+        built.append({"project": p["id"], "letter": letter, "title": title, "rationale": why, "trashed": False,
+                      **({"material_error": mat_err} if mat_err else {})})
     if not built:
         raise StudioError("None of the concepts built.",
                           "; ".join(f"{f['letter']} ({f['title']}): {f['error'].get('message')}" for f in failed)[:1500]
@@ -182,9 +190,37 @@ def _numbers(st, p: dict, compute: bool) -> dict | None:
         out = {"size_mm": [round(b - a, 1) for a, b in zip(lo, hi)], "evidence": "computed"}
         if isinstance(s.get("volume_mm3"), (int, float)):
             out["volume_cm3"] = round(s["volume_mm3"] / 1000, 2)
+        out.update(_mass(st, p, compute))
         return out
     except Exception:
         return None
+
+
+def _mass(st, p: dict, compute: bool) -> dict:
+    """Mass and material for a card (form/massprops.py, on the B-rep): in the concept's material; a print concept with
+    none is shown in PLA, marked assumed; a model with none shows no mass. {} when it is not measured (and compute is
+    off) or cannot be."""
+    from . import massprops
+    from . import purpose as purpose_mod
+    if not compute and not massprops.stored(st, p):
+        return {}
+    try:
+        r = massprops.compute(st, p, assume=None if purpose_mod.is_model(p) else "PLA")
+    except Exception:                                  # noqa: BLE001 - the card keeps its size and volume
+        return {}
+    mats = {x["material"]["id"]: x["material"] for x in r["parts"] if x.get("material")}
+    out = {"material": None, "mass_evidence": r["evidence"]}
+    if len(mats) == 1:
+        m = next(iter(mats.values()))
+        out["material"] = {"id": m["id"], "label": m["label"], "why": m["why"], "density_kg_m3": m["density_kg_m3"],
+                           "source": m["density_source"]}
+    elif mats:
+        out["material"] = {"id": "mixed", "label": f"{len(mats)} materials", "why": "chosen per part"}
+    if r["total"]:
+        out["mass_g"] = round(r["total"]["mass_g"], 1)
+        out["mass_text"] = massprops.headline(r)
+        out["com_mm"] = [round(x, 1) for x in r["total"]["com_mm"]]
+    return out
 
 
 def board(st, gid: str, compute: bool = True) -> dict:

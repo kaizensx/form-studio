@@ -41,6 +41,9 @@
   form pack <project> --copies N [--spacing mm]   do N copies fit on one plate?
   form analyze <project> --map thickness|overhang|section|features [--json | --png out.png]
   form measure <project> --from x,y,z --to x,y,z   distance and its components; or --at x,y,z: what is at a point
+  form mass <project> [--part P] [--pose JSON] [--material M] [--frame as_built|assembled] [--library]
+                                     mass, centre of mass, inertia and principal axes from the B-rep, per part and assembled
+  form materials [ID]                the materials library: density and mechanical properties, each with its source
   form orient <project> [--apply [id]]   rank the ways the part can lie on the plate; --apply sets the best (or the id given)
   form variants list|save|promote|delete <project> [name] [k=v ...]   named variants of a design
   form share <project> [--out card.png] [--photo]      1600 x 900 share card of the head revision
@@ -526,11 +529,22 @@ def main(argv=None):
     an_.add_argument("project")
     an_.add_argument("verb", nargs="?", default="list", choices=["list", "show", "delete"])
     an_.add_argument("id", nargs="?")
+    ms = sub.add_parser("mass", help="mass, centre of mass, inertia tensor and principal axes from the B-rep: mass <project> "
+                                     "[--part P] [--pose JSON] [--material M] [--frame as_built|assembled] [--library]")
+    ms.add_argument("project")
+    ms.add_argument("--part", default="")
+    ms.add_argument("--pose", help='joint values as JSON, e.g. {"lid_hinge": 90}')
+    ms.add_argument("--material", help="a what-if material for every part (or --part), nothing saved")
+    ms.add_argument("--frame", choices=["as_built", "assembled"])
+    ms.add_argument("--rev", type=int)
+    ms.add_argument("--library", action="store_true", help="add the sourced record of each material used")
+    mt = sub.add_parser("materials", help="the materials library with sources: materials [ID]")
+    mt.add_argument("id", nargs="?")
     apx = sub.add_parser("appearance", help="colour and material of the design or one part: --color #rrggbb --material petg [--part ID]")
     apx.add_argument("project")
     apx.add_argument("--part", default="")
     apx.add_argument("--color")
-    apx.add_argument("--material", help="PLA, PETG, ABS, ASA, TPU, PA, PC, PLA-CF, PETG-CF, PA-CF")
+    apx.add_argument("--material", help="PLA, PETG, ABS, ASA, TPU, PA, PC, PLA-CF, PETG-CF, PA-CF; a model: AL-6061, STEEL, ... (form materials)")
     apx.add_argument("--clear", action="store_true", help="remove the colour and material of the design or that part")
     apx.add_argument("--3mf", dest="threemf", metavar="FILE", help="write a 3MF of the head with these colours")
     a = ap.parse_args(argv)
@@ -761,6 +775,25 @@ def main(argv=None):
                     if isinstance(x.get("edge"), dict):
                         x["edge"].pop("segments", None)
                 print(out["text"]) if a.text else _print(out)
+        elif a.cmd == "mass":
+            import json as _json
+            from . import material_library as ml, massprops
+            try:
+                pose = _json.loads(a.pose) if a.pose else None
+            except ValueError:
+                raise StudioError("--pose is JSON.", 'For example --pose \'{"lid_hinge": 90}\'')
+            r = massprops.compute(st, st.load(a.project), part=a.part, pose=pose, material=a.material, frame=a.frame,
+                                  rev=a.rev)
+            r["headline"] = massprops.headline(r)
+            if a.library:
+                r["library"] = {k: ml.record(k) for k in r["materials"]}
+            _print(r)
+        elif a.cmd == "materials":
+            from . import material_library as ml
+            try:
+                _print(ml.record(a.id) if a.id else {"materials": ml.library()})
+            except KeyError as e:
+                raise StudioError(str(e).strip("'\""), "`form materials` lists them.")
         elif a.cmd == "appearance":
             from . import materials
             if a.clear or a.color is not None or a.material is not None:
