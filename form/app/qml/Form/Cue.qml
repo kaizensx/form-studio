@@ -18,11 +18,21 @@ Item {
     readonly property real frac: !running ? 1 : of > 0 ? Math.max(0, Math.min(1, at / of)) : 0
     readonly property bool segmented: of > 1 && of <= 32
     function nn(i) { return (i < 10 ? "0" : "") + i }
+    // The backing: a pane of glass over the room (`source`: what it blurs, the 3D view), so the words read whatever
+    // of the part stands behind them and are set apart from it. The cue's width is the pane's; its height is still
+    // the words' (the pane reaches `padV` past them above and below), so whoever places the cue places the words.
+    property Item source: null
+    readonly property bool backed: !!source
+    readonly property int padH: backed ? 30 : 0
+    readonly property int padV: 22
+    function place() { back.place() }        // the cue was moved by its parent: the glass looks again at what is under it
     width: 600
     implicitHeight: col.implicitHeight; height: implicitHeight
 
+    Glass { id: back; objectName: "cueBacking"; visible: cue.backed; source: cue.source; radius: 30
+        y: -cue.padV; width: cue.width; height: cue.height + 2 * cue.padV }
     Column {
-        id: col; width: parent.width; spacing: 0
+        id: col; x: cue.padH; width: parent.width - 2 * cue.padH; spacing: 0
         // BUILDING  6 OF 12
         Row { id: over; anchors.horizontalCenter: parent.horizontalCenter; spacing: 10; height: 16
             Item { width: 14; height: 14; anchors.verticalCenter: parent.verticalCenter
@@ -56,14 +66,14 @@ Item {
                 Text { visible: title.shownAt > 0; text: cue.nn(title.shownAt); color: Theme.datum; y: 8; renderType: Theme.textRender
                     font.family: Theme.mono; font.pixelSize: 20; font.weight: Theme.wMedium }
                 Text { text: title.shown; color: Theme.ink; renderType: Theme.textRender
-                    width: Math.min(implicitWidth, cue.width + 220 - (title.shownAt > 0 ? 44 : 0)); elide: Text.ElideRight
+                    width: Math.min(implicitWidth, (cue.backed ? cue.width - 40 : cue.width + 220) - (title.shownAt > 0 ? 44 : 0)); elide: Text.ElideRight
                     font.family: Theme.sans; font.pixelSize: String(title.shown).length > 24 ? 38 : Theme.tCue; font.weight: Theme.wSemi; font.letterSpacing: -2 } }
             Row { id: old; opacity: 0; transform: Translate { id: oldY }
                 spacing: 14; anchors.horizontalCenter: parent.horizontalCenter
                 Text { visible: title.leavingAt > 0; text: cue.nn(title.leavingAt); color: Theme.datum; y: 8; renderType: Theme.textRender
                     font.family: Theme.mono; font.pixelSize: 20; font.weight: Theme.wMedium }
                 Text { text: title.leaving; color: Theme.ink; renderType: Theme.textRender
-                    width: Math.min(implicitWidth, cue.width + 220 - (title.leavingAt > 0 ? 44 : 0)); elide: Text.ElideRight
+                    width: Math.min(implicitWidth, (cue.backed ? cue.width - 40 : cue.width + 220) - (title.leavingAt > 0 ? 44 : 0)); elide: Text.ElideRight
                     font.family: Theme.sans; font.pixelSize: String(title.leaving).length > 24 ? 38 : Theme.tCue; font.weight: Theme.wSemi; font.letterSpacing: -2 } }
             ParallelAnimation { id: come
                 NumberAnimation { target: now; property: "opacity"; from: 0; to: 1; duration: Theme.cross; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut }
@@ -113,11 +123,11 @@ Item {
                 Text { text: "built"; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Theme.textRender }
                 Text { text: cue.nn(cue.at - 1); color: Theme.ink2; font.family: Theme.mono; font.pixelSize: 11; font.weight: Theme.wMedium; anchors.baseline: parent.children[0].baseline; renderType: Theme.textRender }
                 Text { objectName: "cueBefore"; text: cue.before; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Theme.textRender
-                    width: Math.min(implicitWidth, cue.width / 2 - 90); elide: Text.ElideRight } }
+                    width: Math.min(implicitWidth, col.width / 2 - 90); elide: Text.ElideRight } }
             Row { visible: cue.after !== ""; spacing: 8; anchors.right: parent.right
                 Text { text: "next"; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Theme.textRender }
                 Text { text: cue.nn(cue.at + 1); color: Theme.ink2; font.family: Theme.mono; font.pixelSize: 11; font.weight: Theme.wMedium; anchors.baseline: parent.children[0].baseline; renderType: Theme.textRender }
                 Text { objectName: "cueAfter"; text: cue.after; color: Theme.ink3; font.family: Theme.sans; font.pixelSize: 13; renderType: Theme.textRender
-                    width: Math.min(implicitWidth, cue.width / 2 - 90); elide: Text.ElideRight } } }
+                    width: Math.min(implicitWidth, col.width / 2 - 90); elide: Text.ElideRight } } }
     }
 }

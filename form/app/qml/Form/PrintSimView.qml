@@ -81,8 +81,14 @@ Item {
         var availH = freeSet ? Math.max(80, freeH - 24) : Math.max(120, height - footer - 70)
         var availW = freeSet ? Math.max(120, freeW - 24) : Math.max(160, width - 230 - 48)          // clear of the line-type list on the left
         zoom2 = Math.max(0.5, Math.min(availW / Math.max(1, box[1][0] - box[0][0] + 6), availH / Math.max(1, box[1][1] - box[0][1] + 6)))
-        framed = true
+        framed = true; _moved = false
     }
+    // A view the person panned or zoomed is theirs until the free stage changes (a side column folds or opens, the
+    // window is resized); then, once the stage has settled, the print is framed in its middle again.
+    property bool _moved: false
+    Timer { id: reframe; interval: Theme.move(Theme.camera) + 120; onTriggered: if (v._moved && !sma.pressed) v.frame(true) }
+    function _stageMoved() { if (_moved && framed) reframe.restart() }
+    onFreeXChanged: _stageMoved(); onFreeYChanged: _stageMoved(); onFreeWChanged: _stageMoved(); onFreeHChanged: _stageMoved()
     onBoxChanged: if (!framed) frame(false)
     onModeChanged: if (mode === "plate" || !framed) frame(true)
     onHeightChanged: if (!framed) frame(false)
@@ -234,15 +240,16 @@ Item {
 
     // ── input: drag to orbit (pan in 2D), right-drag or shift to pan, wheel or pinch to zoom ──
     MouseArea {
+        id: sma
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
         property point last
         cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-        onPressed: function (e) { last = Qt.point(e.x, e.y); v.tween = false }
+        onPressed: function (e) { last = Qt.point(e.x, e.y); v.tween = false; reframe.stop() }
         onPositionChanged: function (e) {
             var dx = e.x - last.x, dy = e.y - last.y
             last = Qt.point(e.x, e.y)
-            if (v.flat) { v.pan2 = Qt.point(v.pan2.x - dx / v.zoom2, v.pan2.y + dy / v.zoom2); return }
+            if (v.flat) { v.pan2 = Qt.point(v.pan2.x - dx / v.zoom2, v.pan2.y + dy / v.zoom2); v._moved = true; return }
             if ((e.buttons & Qt.LeftButton) && !(e.modifiers & Qt.ShiftModifier)) {
                 v.az -= dx * 0.4; v.el = Math.max(2, Math.min(89, v.el + dy * 0.4))
             } else {
@@ -250,7 +257,7 @@ Item {
                 var ra = v.az * Math.PI / 180, re = v.el * Math.PI / 180
                 var right = Qt.vector3d(Math.cos(ra), Math.sin(ra), 0)
                 var up = Qt.vector3d(-Math.sin(ra) * Math.sin(re), Math.cos(ra) * Math.sin(re), Math.cos(re))
-                v.target = v.target.minus(right.times(dx * k)).plus(up.times(dy * k))
+                v.target = v.target.minus(right.times(dx * k)).plus(up.times(dy * k)); v._moved = true
             }
         }
         onWheel: function (w) {
@@ -258,6 +265,7 @@ Item {
             var d = w.pixelDelta.y !== 0 ? w.pixelDelta.y * 0.0035 : w.angleDelta.y / 120 * 0.12
             if (v.flat) v.zoom2 = Math.max(0.4, Math.min(80, v.zoom2 * Math.exp(d)))
             else v.dist = Math.max(20, Math.min(3000, v.dist * Math.exp(-d)))
+            v._moved = true
         }
     }
     PinchHandler {
@@ -266,6 +274,7 @@ Item {
         onScaleChanged: (delta) => {
             if (v.flat) v.zoom2 = Math.max(0.4, Math.min(80, v.zoom2 * delta))
             else v.dist = Math.max(20, Math.min(3000, v.dist / delta))
+            v._moved = true
         }
     }
 }

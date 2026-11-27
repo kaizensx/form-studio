@@ -227,6 +227,20 @@ def journey_simulate(ui):
     if info.get("bridge_layers"):
         ui.click_text("Next bridge")
         ui.wait_until(lambda: sim.property("cur") in [int(x) for x in info["bridge_layers"]], 3, "Next bridge to jump to a bridge layer")
+    # (in 3D, as it was framed when it opened) a view panned and zoomed is the person's until the stage changes; then the print is framed in its middle again
+    view = ui.item("printSimView")
+    def cam():
+        t = view.property("target")
+        return (round(t.x(), 1), round(t.y(), 1), round(t.z(), 1), round(view.property("dist")))
+    home = cam()
+    ui.drag("printSimView", (70, 40), 0.5, 0.45, button="right")
+    ui.wheel("printSimView", 240, 0.5, 0.45)
+    ui.settle(500)
+    ui.check(cam() != home, "a pan and a zoom move the print simulation's camera")
+    ui.run_js("Store.paneFolded = true")
+    ui.wait_until(lambda: cam() == home, 6, "the print to be framed again once the pane has folded")
+    ui.run_js("Store.paneFolded = false")
+    ui.settle(900)
     for label, mode in (("Layer", "2d"), ("Copies", "plate"), ("3D", "3d")):
         ui.click_text(label, within=sim)
         ui.wait_until(lambda: sim.property("mode") == mode, 3, f"the {label} mode")

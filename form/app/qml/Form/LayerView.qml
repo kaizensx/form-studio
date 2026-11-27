@@ -138,7 +138,7 @@ Item {
     }
 
     PrintSimView {
-        id: view
+        id: view; objectName: "printSimView"
         anchors.fill: parent
         url: Store.pid ? Bridge.baseUrl + "/api/projects/" + Store.pid + "/toolpath" + Store.plateQuery : ""
         colors: sim.inks

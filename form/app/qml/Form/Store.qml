@@ -53,7 +53,8 @@ QtObject {
     // chat: saved conversations with an agent, and the live feed of what any agent does (chat workstream)
     property bool talkOpen: true
     // Calm: a click into the 3D view or Esc folds an open conversation column to the bar, without forgetting that it
-    // is open; typing in the prompt or clicking it brings the column back. Focus (Ctrl+.) hides both side columns.
+    // is open. The prompt under the part is written in as it is; sending a message, the bar's status line or Ctrl+J
+    // bring the column back. Focus (Ctrl+.) hides both side columns.
     property bool talkCalm: false
     property bool focusView: false
     property bool paneFolded: false    // the pane on the right folded to its button by hand (its tab), until it is asked back
@@ -1458,7 +1459,7 @@ QtObject {
         if (!id) _sendAt = Date.now() / 1000
         links = links.filter(function (l) { return text.indexOf(l.url) < 0 })      // a link already in the words is not listed twice
         if (links.length) text += "\n\nLinks:\n" + links.map(function (l) { return "- " + l.url }).join("\n")
-        chatBusy = true; talkOpen = true; chatAttach = []; chatLinks = []; chatLive = null
+        chatBusy = true; talkOpen = true; talkCalm = false; chatAttach = []; chatLinks = []; chatLive = null      // a message sent from the bar brings the conversation back
         chatItems = chatItems.concat([{ t: "user", text: text, attachments: att, local: true }])
         // a new design: what it is for goes with the conversation (form/start.py), so the agent reads it on every
         // message and the designs it creates get it; how a model will be made is said in words

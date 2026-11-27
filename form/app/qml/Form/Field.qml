@@ -37,6 +37,7 @@ Rectangle {
         color: Theme.ink; selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink
         font.family: f.mono ? Theme.mono : Theme.sans; font.pixelSize: f.mono ? 12 : 13; clip: true; selectByMouse: true
         renderType: Theme.textRender; activeFocusOnTab: true
+        cursorDelegate: Caret {}
         inputMethodHints: f.numeric ? Qt.ImhFormattedNumbersOnly : Qt.ImhNone
         onAccepted: { f.accepted(text); if (f.numeric) focus = false }
         onTextEdited: f.edited(text)

@@ -18,7 +18,7 @@ def hits(ui, n=34):
     out = []
     for j in range(n):
         for i in range(n):
-            x, y = l + w * (i + 0.5) / n, t + h * (j + 0.5) / n
+            x, y = float(int(l + w * (i + 0.5) / n)), float(int(t + h * (j + 0.5) / n))      # whole pixels: a press lands on one
             r = ui.js("JSON.stringify(Store.viewer.hitAt(%f, %f))" % (x, y))
             r = json.loads(r) if r and r != "null" else None
             if r:

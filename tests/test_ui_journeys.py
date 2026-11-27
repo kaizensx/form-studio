@@ -94,6 +94,12 @@ class Journeys(unittest.TestCase):
     def test_remodel(self):                 # a faceted solid drawn smooth; Rebuild as editable CAD starts the remodel brief
         self.journey("remodel.py")
 
+    def test_stage_use(self):               # the first click folds the column; the bar prompt is written in; the caret; Refinement; the tab; the cue's glass; the part stays centred
+        self.journey("stage_use.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_stage_use_small(self):         # the same in the smallest window, on paper
+        self.journey("stage_use.py", size="1100x700", env_extra={"FORM_APPEARANCE": "light"})
+
     def test_viewport_calm(self):           # orbit, zoom, rebuilds and slider drags never blink; a build grows in by feature
         self.journey("viewport_calm.py")
 

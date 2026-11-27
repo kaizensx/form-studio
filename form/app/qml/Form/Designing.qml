@@ -54,6 +54,7 @@ Item {
     readonly property bool centred: 2 * halfW >= 0.6 * (freeR - freeL)
     readonly property real stageL: centred ? axisX - halfW : freeL
     readonly property real stageR: centred ? axisX + halfW : freeR
+    onStageLChanged: dvp.layoutChanged(); onStageRChanged: dvp.layoutChanged()      // a view panned or zoomed goes back to the middle when the stage changes
     // the room: what the panes of this screen blur
     Item { id: studio; anchors.fill: parent
     Viewport { id: dvp; objectName: "designingViewport"; anchors.fill: parent; lite: false; interactive: true; showDims: false; showCompanions: false
@@ -158,9 +159,10 @@ Item {
             return "" }
         width: Math.max(360, Store.barW); x: Math.round(Store.barX + (Store.barW - width) / 2)
         height: stageLedger.height; y: Math.round(Store.barY - height - Math.max(26, Math.min(116, dz.height * 0.129)))     // the lower third, as in a workspace
+        onXChanged: stageLedger.place(); onYChanged: stageLedger.place()
         opacity: dz.staged ? 1 : 0; visible: opacity > 0.01
         Behavior on opacity { NumberAnimation { duration: dz.staged ? Theme.base : 420 } }
-        Cue { id: stageLedger; width: parent.width; pulse: true
+        Cue { id: stageLedger; width: parent.width; pulse: true; source: studio
             label: Store.building ? Store.building.label : ""; at: Store.building ? Store.building.at : 0; of: Store.building ? Store.building.of : 0
             before: stageCap.before() }
     }

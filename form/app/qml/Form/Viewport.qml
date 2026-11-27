@@ -324,7 +324,23 @@ Item {
         // take the short way round
         var a = v[0]; while (a - az > 180) a -= 360; while (a - az < -180) a += 360
         az = a; el = v[1]; target = center(b); dist = frame(b, box ? Math.min(1.25, slack) : slack)
+        _moved = !!box; if (!box) _homeDist = dist
     }
+    // ── the part stays in the middle of the free area ──
+    // Orbiting keeps it there. Panning, zooming and framing one feature (F) are the person's own view (_moved): it is
+    // kept until the layout changes (a side column folds or opens or is resized, the pane folds, Focus, the window is
+    // resized); then the camera glides back to the whole part in the middle of what is free. Whoever lays the view out
+    // calls layoutChanged() for the causes it knows; the view's own size is watched here.
+    property bool _moved: false
+    property real _homeDist: 0               // the distance of the last framing of the whole part (it may be pulled back to fit)
+    signal touched()                         // a press on the view (before it turns into an orbit, a pick or a pan)
+    function recentre() {
+        _moved = false
+        tween = true; target = center(bounds); dist = _homeDist > 0 ? _homeDist : frame(bounds, slack)
+    }
+    function layoutChanged() { if (_moved && interactive && !lite && !ma.pressed && !pinch.active && !faceDrag.active && !revealing) recentre() }
+    onWidthChanged: layoutChanged()
+    onHeightChanged: layoutChanged()
     function featureBox(id) {
         for (var k = 0; k < asmParts.count; k++) {          // assembly: transform the feature's box with its part
             var n = asmParts.objectAt(k)
@@ -349,6 +365,7 @@ Item {
     function focusFeature(id) {
         var b = featureBox(id); if (!b) return
         tween = true; target = center(b); dist = Math.max(14, radius(b)) / Math.sin(13 * Math.PI / 180) * 1.9
+        _moved = true
     }
     // ── a new model: drawn in place, in the same frame, with no snapshot on top ──
     // Drafts while a slider moves, commits, the timeline: the meshes are swapped directly, so moving, zooming and
@@ -390,11 +407,12 @@ Item {
         var k = _overshoot()
         tween = true; target = center(bounds)
         dist = Math.min(3000, Math.max(frame(bounds, slack), k < 99 ? dist * Math.max(1, k) * 1.08 : dist))
+        _moved = false; _homeDist = dist
         refitCheck.restart()
     }
     // once the camera has arrived: a part that is long across the view may still reach past it
     Timer { id: refitCheck; interval: Motion.camera + 60
-        onTriggered: { var k = vp._overshoot(); if (k > 1.0 && k < 99 && !ma.pressed) { vp.tween = true; vp.dist = Math.min(3000, vp.dist * k * 1.06) } } }
+        onTriggered: { var k = vp._overshoot(); if (k > 1.0 && k < 99 && !ma.pressed) { vp.tween = true; vp.dist = Math.min(3000, vp.dist * k * 1.06); vp._homeDist = vp.dist } } }
     Connections { target: faceDrag; function onActiveChanged() { if (!faceDrag.active && vp._refitDue) { if (vp._fits()) vp._refitDue = false; else vp._refit() } } }
     // The camera frames a new build once, as it starts, and then stays where it is while the features arrive. A build
     // of the same design at about the same size leaves the camera where the person put it.
@@ -406,6 +424,7 @@ Item {
         }
         camCurve = Theme.easeMove; camBack.restart()
         tween = true; target = center(bounds); dist = frame(bounds, slack)
+        _moved = false; _homeDist = dist
     }
     // the meshes drawn by the parts repeaters: replaced only when the geometry really changed
     property var _mesh: []
@@ -627,9 +646,14 @@ Item {
             // the look-at point, moved so the orbit centre lands in the middle of the free area
             readonly property real ox: (vp.insetLeft - vp.insetRight) / 2 * vp.mmPerPx
             readonly property real oy: (vp.insetTop - vp.insetBottom) / 2 * vp.mmPerPx
-            readonly property vector3d aim: Qt.vector3d(vp.target.x - Math.cos(ra) * ox - Math.sin(ra) * Math.sin(re) * oy,
-                                                        vp.target.y - Math.sin(ra) * ox + Math.cos(ra) * Math.sin(re) * oy,
-                                                        vp.target.z + Math.cos(re) * oy)
+            // (along the camera's own right and up, as lookAt turns it for this direction: it rolls the camera a few
+            // degrees, and a shift along the level right and the plain up lands the centre low when the free area is
+            // off to one side: 31 px for 200 px of offset)
+            readonly property quaternion look: Quaternion.lookAt(Qt.vector3d(0, 0, 0), vp.scene(Qt.vector3d(-Math.sin(ra) * Math.cos(re), Math.cos(ra) * Math.cos(re), -Math.sin(re))))
+            function plate(s) { return Qt.vector3d(s.x, -s.z, s.y) }                   // Qt Quick 3D's Y-up → Z-up millimetres
+            readonly property vector3d rightP: plate(look.times(Qt.vector3d(1, 0, 0)))
+            readonly property vector3d upP: plate(look.times(Qt.vector3d(0, 1, 0)))
+            readonly property vector3d aim: vp.target.minus(rightP.times(ox)).plus(upP.times(oy))
             readonly property real far: Math.max(1, vp._fin(vp.dist * vp.fitK, 420))
             readonly property vector3d zpos: Qt.vector3d(aim.x + far * Math.sin(ra) * Math.cos(re),
                                                          aim.y - far * Math.cos(ra) * Math.cos(re),
@@ -1291,7 +1315,7 @@ Item {
         }
         // a press on the part takes the keyboard from whatever text box had it, so V, M, F and the rest work again
         onPressed: function (e) {
-            vp.forceActiveFocus(); last = Qt.point(e.x, e.y); down = last; moved = false; vp.tween = false
+            vp.forceActiveFocus(); vp.touched(); last = Qt.point(e.x, e.y); down = last; moved = false; vp.tween = false
             if (vp.selecting && (vp.selectMode === "brush" || vp.selectMode === "lasso") && e.button === Qt.LeftButton && !(e.modifiers & Qt.AltModifier)) {
                 painting = true; _paint = []; vp.stroke = [Qt.point(e.x, e.y)]
                 if (vp.selectMode === "brush") sampleBrush(e.x, e.y)
@@ -1322,11 +1346,9 @@ Item {
             if ((e.buttons & Qt.LeftButton) && !(e.modifiers & Qt.ShiftModifier)) {
                 vp.az -= dx * 0.4; vp.el = Math.max(-89, Math.min(89, vp.el + dy * 0.4))
             } else {
-                var k = vp.mmPerPx
-                var ra = vp.az * Math.PI / 180, re = vp.el * Math.PI / 180
-                var right = Qt.vector3d(Math.cos(ra), Math.sin(ra), 0)
-                var up = Qt.vector3d(-Math.sin(ra) * Math.sin(re), Math.cos(ra) * Math.sin(re), Math.cos(re))
-                vp.target = vp.clampTarget(vp.target.minus(right.times(dx * k)).plus(up.times(dy * k)))
+                var k = vp.mmPerPx                           // along the camera's own right and up: the part follows the pointer
+                vp.target = vp.clampTarget(vp.target.minus(cam.rightP.times(dx * k)).plus(cam.upP.times(dy * k)))
+                vp._moved = true
             }
         }
         onReleased: function (e) {
@@ -1359,6 +1381,7 @@ Item {
             vp.tween = false
             var d = w.pixelDelta.y !== 0 ? w.pixelDelta.y * 0.0035 : w.angleDelta.y / 120 * 0.12
             vp.dist = Math.max(30, Math.min(3000, vp.dist * Math.exp(-d)))
+            vp._moved = true
         }
     }
     // Cmd-drag (Ctrl-drag) on a face changes the parameter that drives it (FaceDrag.qml, form/dragface.py)
@@ -1368,6 +1391,6 @@ Item {
         enabled: vp.interactive; target: null
         property real d0: 0
         onActiveChanged: if (active) { d0 = vp.dist; vp.tween = false }
-        onScaleChanged: (delta) => { vp.dist = Math.max(30, Math.min(3000, vp.dist / delta)) }
+        onScaleChanged: (delta) => { vp.dist = Math.max(30, Math.min(3000, vp.dist / delta)); vp._moved = true }
     }
 }

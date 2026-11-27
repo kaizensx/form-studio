@@ -60,8 +60,15 @@ Item {
     // A window under 1200 px has room for the conversation column or for the panes on the right, not both: while the
     // column is open the panes fold to one button in their corner (it folds the conversation and brings them back).
     readonly property bool panesOff: (col && ws.width < 1200) || Store.focusView || Store.paneFolded
-    // a click into the 3D view from the conversation folds its column to the bar (calm); the prompt brings it back
-    Connections { target: vp; function onActiveFocusChanged() { if (vp.activeFocus && ws.col && insp.settled) Store.talkCalm = true } }
+    // a click into the 3D view from the conversation folds its column to the bar (calm); a message sent from the bar,
+    // the bar's status line or Ctrl+J bring it back
+    // (a press, not the keyboard arriving: a design that has just opened already has the keyboard on the part, and
+    // the first click into the view must fold the column like any other)
+    Connections { target: vp; function onTouched() { if (ws.col) Store.talkCalm = true } }
+    // the part goes back to the middle of the free stage when the layout changes (Viewport.layoutChanged): a column
+    // folds, opens or is resized, the pane folds, Focus. A view the person panned or zoomed is theirs until then.
+    onPaneXChanged: vp.layoutChanged()
+    Connections { target: Store; function onTalkColChanged() { vp.layoutChanged() } }
     readonly property real colFoot: ws.height - Theme.edge        // the foot of the side columns
     readonly property real paneX: panesOff ? ws.width - Theme.edge - 44 : insp.x      // where the right column begins
     property real shift: col ? Store.talkCol + Theme.gap - Theme.edge : 0
@@ -112,7 +119,7 @@ Item {
         }
         function onAnalysisMapChanged() { if (Store.analysisMap && Ws.tool === "select") Ws.tool = "analyze" }
         function onAsmModeChanged() { if (Store.asmMode !== "print" && Ws.tool === "select" && Store.assembly) Ws.tool = "assembly" }
-        function onPidChanged() { Ws.tool = "select" }
+        function onPidChanged() { Ws.tool = "select"; Ws.refineWant = -1 }
         function onFadeTo(apply) { vp.swap(apply) }                 // the timeline and anything else that swaps the geometry
     }
     // a design that has just opened has the keyboard on the part, not in the conversation box Home left it in
@@ -306,11 +313,12 @@ Item {
             // the cue leaves, and the cue (and with it the camera) must not hop up for that moment.
             readonly property real rest: Math.round(centre.height - 16 - 64 - height - clear)
             height: title.height; y: rest + lift
+            onXChanged: title.place(); onYChanged: title.place()
             property real lift: shown ? 0 : Theme.shift(14)
             Behavior on lift { NumberAnimation { duration: Theme.move(Theme.panel); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
             opacity: shown ? 1 : 0; visible: opacity > 0.01
             Behavior on opacity { NumberAnimation { duration: cue.shown ? Theme.base : 420 } }
-            Cue { id: title; width: parent.width
+            Cue { id: title; width: parent.width; source: studio
                 label: cue.st ? cue.st.label : build.label
                 at: cue.st ? cue.st.at : build.at; of: cue.st ? cue.st.of : build.of
                 before: cue.st ? cue.stagedBefore() : build.running ? build.before : ""
@@ -585,10 +593,13 @@ Item {
                 maxHeight: dock.room - (dock.showMap ? 44 : 0); onToggled: dock.flip() }
             RefinePanel { width: dock.width; visible: opacity > 0.01; opacity: dock.showRefine ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Motion.ui; easing.type: Easing.OutCubic } }
-                // open in Design, where its changes are made; in the other stages it is its header, and the stage's pane keeps the column
-                collapsed: dock.folded || dock.showMap || dock.showMeasures || dock.showSel || Store.stage !== "shape"
+                // open in Design, where its changes are made; in the other stages it is its header, and the stage's pane
+                // keeps the column. A click on its header always answers: it opens wherever it is (the pane above
+                // gives it the room, insp.room_) and folds again, whatever the stage and whatever else the dock holds.
+                readonly property bool byStage: dock.folded || dock.showMap || dock.showMeasures || dock.showSel || Store.stage !== "shape"
+                collapsed: Ws.refineWant < 0 ? byStage : Ws.refineWant === 0
                 maxHeight: dock.room - (dock.showMap ? 44 : 0) - (dock.showMeasures ? 44 : 0) - (dock.showSel ? 44 : 0)
-                onToggled: dock.flip() }
+                onToggled: Ws.refineWant = collapsed ? 1 : 0 }
         }
 
         // ── bottom left: what you are looking at ─────────────
@@ -675,16 +686,8 @@ Item {
         MouseArea { id: pbm; anchors.fill: parent; hoverEnabled: true; onClicked: { if (Store.focusView) Store.focusView = false; else if (Store.paneFolded) Store.paneFolded = false; else Store.talkOpen = false } }
         Tip { show: pbm.containsMouse; below: true; text: Store.focusView ? "Leave Focus: bring the side columns back" : Store.paneFolded ? "Show the " + (Store.stage === "shape" ? "Program" : "stage's pane") : "Show the " + (Store.stage === "shape" ? "Program" : "stage's pane") + " (folds the conversation)"; keys: Store.focusView ? "Ctrl+." : "Ctrl+J" }
     }
-    // the pane's tab: a slim handle on its outer edge folds it to its button, for a wider stage
-    Rectangle {
-        id: paneTab; objectName: "paneTab"; z: 8
-        visible: insp.visible && !ws.sim; x: insp.x - 9; y: insp.y + 18; width: 14; height: 40; radius: 7
-        color: ptm.pressed ? Theme.plate4 : Theme.glassSolid; border.color: Theme.rule2
-        opacity: ptm.containsMouse ? 1 : 0.55; Behavior on opacity { NumberAnimation { duration: Theme.fast } }
-        Icon { anchors.centerIn: parent; name: "chevron_right"; size: 11; color: ptm.containsMouse ? Theme.ink : Theme.ink3 }
-        MouseArea { id: ptm; anchors.fill: parent; anchors.margins: -4; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.paneFolded = true }
-        Tip { show: ptm.containsMouse; text: "Fold this pane away" }
-    }
+    // the pane's tab: a handle on the middle of its outer edge folds it to its button, for a wider stage. It stands on
+    // the edge's line, half on the pane and half on the stage, and is drawn over the pane (declared after it, below).
     // ── right: the Program, the stage's panel ────────────────
     Glass {
         id: insp
@@ -763,5 +766,17 @@ Item {
                 DraftCard { id: draft; x: 12; width: parent.width - 24 }
             }
         }
+    }
+    Rectangle {
+        id: paneTab; objectName: "paneTab"; z: 8
+        visible: insp.visible && !ws.sim; width: 16; height: 48; radius: 8
+        x: Math.round(insp.x - width / 2); y: Math.round(insp.y + (insp.height - height) / 2)
+        color: ptm.pressed ? Theme.plate4 : ptm.containsMouse ? Theme.plate3 : Theme.glassSolid; border.color: ptm.containsMouse ? Theme.rule2 : Theme.rule
+        Behavior on color { Tint {} }
+        opacity: insp.opacity
+        Shadow { radius: parent.radius; spread: 10; drop: 3; strength: 0.5 }
+        Icon { anchors.centerIn: parent; name: "chevron_right"; size: 12; color: ptm.containsMouse ? Theme.ink : Theme.ink3 }
+        MouseArea { id: ptm; anchors.fill: parent; anchors.margins: -5; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.paneFolded = true }
+        Tip { show: ptm.containsMouse; text: "Fold this pane away" }
     }
 }

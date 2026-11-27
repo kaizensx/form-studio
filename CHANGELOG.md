@@ -133,6 +133,21 @@
 
 ### Fixed
 
+- **The first click into the 3D view folds the conversation.** In a design that had just opened, a click on the part
+  did nothing to the conversation column until the keyboard had been somewhere else first. Any press on the view now
+  folds it.
+- **The prompt under the part is written in.** Clicking it and typing used to open the conversation column and move
+  the words there. It now stays where it is; sending the message brings the conversation back.
+- **The caret is a thin lit line that follows the words.** In every text field it stands at the cursor, as tall as
+  the line, stays lit while you type and blinks once the field is still.
+- **Refinement always opens.** In Describe, Fit, Review and Make a click on its header did nothing. It now opens and
+  folds from its header in every stage; the pane above gives it the room.
+- **The pane's fold tab stands on the middle of the pane's edge** and no longer sits half hidden at its corner.
+- **A build's title stands on glass.** The feature being built, its count and the track are on a pane that blurs the
+  part behind them, so they read whatever is under them.
+- **The part comes back to the middle.** A view you panned or zoomed is kept while you work; when a side column folds
+  or opens or is resized, the pane folds, Focus is switched or the window is resized, the camera glides back to the
+  whole part in the middle of the free stage. Orbiting never moved it away.
 - **"The Form Studio engine is not answering" in Settings.** Opening Settings (most often Agents) asked the engine for
   several things at the same moment, more than it accepted at once, so some requests were dropped and shown as that
   message although the engine was fine. The engine now accepts them all, and the app asks again once before saying so.

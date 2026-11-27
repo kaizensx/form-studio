@@ -7,7 +7,7 @@ import "F.js" as F
 // Home's composer: the one place a design starts. Words, a photo, a sketch, a part or a drawing, a link; the agent
 // turns whatever is here into real CAD. Files and sketches attach to the conversation as soon as they are added, so
 // what the agent receives is exactly what is on the card. Sending opens the workspace at once (Store.startDesign).
-// Lightdesk: one pane of glass. In it the prompt well (a "›", a breathing caret, the words, the tools and Design it)
+// Lightdesk: one pane of glass. In it the prompt well (a "›", the caret, the words, the tools and Design it)
 // and, under the well, the numbered ways to start. 1, 2 and 3 pick them while the composer is empty.
 Item {
     id: sc
@@ -145,15 +145,8 @@ Item {
                     Behavior on height { NumberAnimation { duration: Theme.move(Theme.fast); easing.type: Easing.OutQuad } }
                     Text { id: gt; x: words.pad; y: 20 + Math.round((words.line - height) / 2) + 1; text: "›"; color: Theme.datum; renderType: Theme.textRender
                         font.family: Theme.mono; font.pixelSize: 24; font.weight: Theme.wMedium }
-                    // the caret: a block of the accent that breathes while nothing is typed. With words in the field the
-                    // field's own cursor takes over.
-                    Rectangle { id: caret; objectName: "startCaret"; visible: words.empty; x: words.textX; y: 21; width: 10; height: 24; radius: 2; color: Theme.datum
-                        Glow { blur: 12; strength: 0.85; radius: 2 }
-                        // stepped six times a second, not animated: a waiting Home does not draw at the display's rate.
-                        // It breathes between full and about three quarters, so it is always plainly lit.
-                        property real phase: 0
-                        opacity: 0.86 + 0.14 * Math.cos(phase)
-                        Timer { interval: 166; repeat: true; running: caret.visible && sc.visible && !Theme.reduced; onTriggered: caret.phase += 0.65 } }
+                    // the caret, standing in the empty field while the keyboard is elsewhere (with it here, the field draws its own)
+                    Caret { id: caret; objectName: "startCaret"; field: ta; resting: true; visible: words.empty && !ta.activeFocus; x: words.textX; y: 21; height: ta.cursorRectangle.height }
                     ScrollView { anchors.fill: parent; clip: true
                         TextArea {
                             id: ta
@@ -162,10 +155,8 @@ Item {
                             selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
                             leftPadding: words.textX; rightPadding: 22; topPadding: 21; bottomPadding: 8; background: null; renderType: Theme.textRender
                             enabled: !!Store.studio
-                            // while the field is empty the block is the cursor
-                            cursorDelegate: Rectangle { id: cur; width: 2; radius: 1; color: Theme.datum; visible: ta.activeFocus && !words.empty
-                                SequentialAnimation on opacity { running: cur.visible && !Theme.reduced; loops: Animation.Infinite
-                                    PauseAnimation { duration: 520 } NumberAnimation { to: 0; duration: 90 } PauseAnimation { duration: 420 } NumberAnimation { to: 1; duration: 90 } } }
+                            // the caret: the thin accent line of a command line, after the words and blinking once they are still
+                            cursorDelegate: Caret { objectName: "startCursor" }
                             Keys.onTabPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
                             Keys.onBacktabPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.BacktabFocusReason)
                             Keys.onPressed: function (e) {
@@ -182,7 +173,7 @@ Item {
                         }
                     }
                     // the placeholder: examples of what can be said, changing slowly while the field is empty
-                    Txt { id: ph; x: words.textX + 19; y: 20; height: words.line; width: parent.width - x - 22; visible: words.empty
+                    Txt { id: ph; x: words.textX + 9; y: 20; height: words.line; width: parent.width - x - 22; visible: words.empty
                         verticalAlignment: Text.AlignVCenter; lineHeight: 1.0
                         font.pixelSize: ta.font.pixelSize; font.letterSpacing: -0.2; color: Theme.ink3; wrapMode: Text.NoWrap; elide: Text.ElideRight
                         property int n: 0

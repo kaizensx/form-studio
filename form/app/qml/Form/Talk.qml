@@ -585,17 +585,12 @@ Rectangle {
             // (22 px mono: its line box is 28.6 px; it stands on the middle of the first line of the prompt, as the caret does)
             Text { x: 16; y: sv.y + ta.topPadding - 5; visible: sv.contentItem.contentY < 4; text: "›"; color: Theme.datum; font.family: Theme.mono; font.pixelSize: 22; font.weight: Theme.wBody; renderType: Theme.textRender }
             // the caret, standing in the empty prompt while the keyboard is elsewhere (with it here, the field draws its own)
-            Rectangle { id: restCaret; objectName: "promptCaret"; x: 39; y: sv.y + ta.topPadding; width: 8; height: 19; radius: 2; color: Theme.datum
-                visible: !ta.activeFocus && ta.text === "" && ta.enabled
-                Glow { blur: 12; strength: 0.85; radius: 2 }
-                // stepped, like the room's light: a waiting prompt must not keep the window drawing at full rate
-                property real phase: 0
-                opacity: 0.86 + 0.14 * Math.cos(phase)        // it breathes between full and about three quarters: always plainly lit
-                Timer { interval: 125; repeat: true; running: restCaret.visible && talk.visible && talk.onScreen && !Theme.reduced; onTriggered: restCaret.phase += 0.49 } }
+            Caret { id: restCaret; objectName: "promptCaret"; field: ta; resting: true; x: 39; y: sv.y + ta.topPadding; height: ta.cursorRectangle.height
+                visible: !ta.activeFocus && ta.text === "" && ta.enabled }
             Rectangle { anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3; border.color: Theme.alpha(Theme.datum, 0.13)
                 opacity: ta.activeFocus ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
             // what an empty prompt says, after the caret: one line, cut with an ellipsis where the controls begin
-            Txt { objectName: "promptPlaceholder"; visible: ta.text === "" && ta.preeditText === ""; x: 56; y: sv.y + ta.topPadding + (ta.contentHeight - height) / 2
+            Txt { objectName: "promptPlaceholder"; visible: ta.text === "" && ta.preeditText === ""; x: 48; y: sv.y + ta.topPadding + (ta.contentHeight - height) / 2
                 width: comp.width - x - ta.rightPadding; elide: Text.ElideRight; wrapMode: Text.NoWrap; lineHeight: 1
                 font.pixelSize: ta.font.pixelSize; font.letterSpacing: -0.1; color: Theme.ink3; text: ta.placeholder }
             Column {
@@ -635,19 +630,13 @@ Rectangle {
                     TextArea {
                         id: ta
                         objectName: "composer"
-                        // the prompt taken up again brings a calmed conversation back (Store.talkCalm)
-                        onActiveFocusChanged: if (activeFocus && (Store.talkCalm || Store.focusView) && !talk.empty) { Store.focusView = false; Store.talkCalm = false }
+                        // The prompt under the part is a place to write: taking it up leaves the column folded and the part
+                        // its room (Store.talkCalm, Focus). Sending brings the conversation back (Store.send).
                         // "Ask about this feature…" from the viewport's context menu lands here
                         Connections { target: Store; function onChatPrefill(text) { Store.talkOpen = true; ta.text = text; ta.cursorPosition = text.length; ta.forceActiveFocus() } }
                         wrapMode: TextArea.Wrap; color: Theme.ink; font.family: Theme.sans; font.pixelSize: talk.slim ? 14 : 15; font.letterSpacing: -0.1
-                        // the caret is the accent block of a command line: it breathes in an empty prompt and thins to a bar once you type
-                        cursorDelegate: Rectangle { id: cur; visible: ta.activeFocus; color: Theme.datum; radius: 2
-                            width: ta.text === "" ? 8 : 2; height: 19
-                            Behavior on width { NumberAnimation { duration: Theme.move(Theme.fast) } }
-                            Glow { blur: 12; strength: 0.85; radius: 2 }
-                            property real phase: 0
-                            opacity: 0.86 + 0.14 * Math.cos(phase)
-                            Timer { interval: 125; repeat: true; running: cur.visible && !Theme.reduced; onTriggered: cur.phase += 0.62 } }
+                        // the caret is the thin accent line of a command line: it stands after the words and blinks once they are still
+                        cursorDelegate: Caret { objectName: "composerCaret" }
                         readonly property string placeholder: !Store.chat.available ? "No agent is connected" : Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure" ? "Answer the question above…" : Store.project ? "Ask about " + Store.project.name + ", or describe a change…" : "Describe what you want to make…"
                         enabled: Store.chat.available
                         selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
