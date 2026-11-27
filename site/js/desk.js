@@ -1,6 +1,8 @@
 // The hero: Form Studio's window, drawn in code as Lightdesk (docs/design/directions/h). A studio room with the part
 // in a pool of warm light, glass capsules, the features as a program listing that runs line by line, a lower-third
-// title while a feature is built, and one bar under the part with numbered suggestions.
+// title while a feature is built, the pipeline as one line at the foot of the pane, and one bar under the part with
+// numbered suggestions. Once something is said the conversation is a glass column on the left and the part is framed
+// in the stage that is left, as in the app.
 //
 // Nothing here is typed by hand: the solid is the CAD kernel's own (case.glb, one mesh per feature), and every
 // number, check and sentence in the answers comes from case.json, written by site/tools/export_case.py from a real
@@ -30,7 +32,7 @@ const P = {
   search: "M11 4.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM20 20l-4.4-4.4", gear: "M4 7h9M17 7h3M4 17h3M11 17h9M15 4.5v5M9 14.5v5",
   clip: "M20 11.2l-8.4 8.4a5 5 0 01-7.1-7.1L13 4a3.3 3.3 0 014.7 4.7l-8.3 8.4a1.7 1.7 0 01-2.4-2.4L14.8 7",
   down: "M6 9l6 6 6-6", grid: "M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16", printer: "M7 8V4h10v4M7 17H4V9h16v8h-3M7 14h10v6H7z",
-  check: "M5 12.5l4.5 4.5L19 7.5", play: "M8 5l11 7-11 7z", enter: "M19 5v7a3 3 0 01-3 3H6M10 11l-4 4 4 4", x: "M6 6l12 12M18 6L6 18",
+  fold: "M4.5 5h15v14h-15zM9.5 5v14M15.5 9.5L13 12l2.5 2.5", check: "M5 12.5l4.5 4.5L19 7.5", play: "M8 5l11 7-11 7z", enter: "M19 5v7a3 3 0 01-3 3H6M10 11l-4 4 4 4", x: "M6 6l12 12M18 6L6 18",
   spark: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z",
 };
 const I = (n, s = 18, w = 1.6, cls = "") => `<svg class="ic ${cls}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[n]}"/></svg>`;
@@ -62,12 +64,12 @@ export async function initDesk() {
       <header><b>Program</b><span class="mono">${feats.length}</span><em class="rest">build order</em><em class="mono run"><i class="d-live a"></i><span id="d-run"></span></em></header>
       <i class="d-pc" id="d-pc"></i>
       ${feats.map((f, i) => `<button type="button" class="d-ln ${f.built ? "" : "off"}" data-i="${i}" ${f.built ? "" : "disabled"}><span class="mono no">${nn(i + 1)}</span><span class="gl">${I("check", 13, 2.2, "ck")}${I("play", 10, 2.4, "pl")}</span><b>${esc(f.label)}</b><span class="mono kw">${esc(f.built ? f.role : "off")}</span></button>`).join("")}
+      <footer class="d-pipe" id="d-pipe" aria-label="Pipeline">${["Parameters", "Solid", "Exports", "Checks", "Slice", "Release"].filter((n) => n !== "Slice" || d.slice).map((n) => `<i data-n="${n}" title="${n}"></i>`).join("")}<span class="mono" id="d-pipe-t"></span><span class="d-switch" title="Auto"></span></footer>
     </aside>
     <p class="d-readout mono" id="d-readout"></p>
     <div class="d-views d-glass" role="group" aria-label="View">${I("grid", 15)}${Object.keys(VIEWS).map((v, i) => `<button type="button" data-v="${v}" aria-pressed="${!i}">${v}</button>`).join("")}</div>
-    <div class="d-pipe d-glass" id="d-pipe" aria-label="Pipeline">${["Parameters", "Solid", "Exports", "Checks", "Slice", "Release"].filter((n) => n !== "Slice" || d.slice).map((n) => `<div data-n="${n}"><b><i></i>${n}</b><span class="mono"></span></div>`).join("")}<div class="auto"><b>Auto</b><span class="d-switch"></span></div></div>
     <p class="d-pick" id="d-pick"></p>
-    <section class="d-third" id="d-third" aria-live="polite">
+    <section class="d-third d-glass" id="d-third" aria-live="polite">
       <p class="over mono"><span class="d-live a"></span>Building<i id="d-of"></i></p>
       <h3 id="d-title"></h3>
       <div class="d-track" id="d-track" style="grid-template-columns:repeat(${of},1fr)">${run.map(() => "<i></i>").join("")}</div>
@@ -102,7 +104,7 @@ export async function initDesk() {
 
   // ---------- the 3D view ----------
   let scene = null;
-  const st = { az: VIEWS.Iso[0], el: VIEWS.Iso[1], building: false, t: 0, step: 0, sel: -1, k: 0, visible: false, need: true, tween: null, zoom: 0, drag: null };
+  const st = { az: VIEWS.Iso[0], el: VIEWS.Iso[1], building: false, t: 0, step: 0, sel: -1, k: 0, col: 0, visible: false, need: true, tween: null, zoom: 0, drag: null };
   const light = () => getComputedStyle(root).getPropertyValue("--d-light").trim() === "1";
 
   async function boot() {
@@ -159,11 +161,12 @@ export async function initDesk() {
       const a = st.az * Math.PI / 180, e = st.el * Math.PI / 180;
       const hf = 2 * Math.atan(Math.tan(cam.fov * Math.PI / 360) * cam.aspect);
       const fit = Math.max(R / Math.sin(cam.fov * Math.PI / 360), R / Math.sin(hf / 2));
-      const dist = fit * (compact ? 1.16 : 1.2) * (1 + (compact ? 0.1 : 0.16) * st.zoom);
+      const dist = fit * (compact ? 1.16 : 1.2) * (1 + (compact ? 0.1 : 0.16) * st.zoom) * (1 + 0.3 * st.col);
       cam.position.set(centre.x + dist * Math.cos(e) * Math.sin(a), centre.y - dist * Math.cos(e) * Math.cos(a), centre.z + dist * Math.sin(e));
       cam.lookAt(centre);
       // the part sits left of the listing and above the bar; while it builds it rises to leave room for the title
-      const ox = compact ? 0 : 88, oy = compact ? lerp(44, 64, st.zoom) : lerp(128, 168, st.zoom);
+      // with the conversation column open it stands in the middle of what the column and the listing leave
+      const ox = compact ? 0 : lerp(88, -40, st.col), oy = compact ? lerp(44, 64, st.zoom) : lerp(lerp(128, 168, st.zoom), 30, st.col);
       cam.setViewOffset(LW, LH, ox, oy, LW, LH);
       cam.updateMatrixWorld();
     }
@@ -243,6 +246,8 @@ export async function initDesk() {
     } else if (st.building) moving = false;
     const zt = st.building ? 1 : 0;
     if (Math.abs(st.zoom - zt) > 0.002) { st.zoom = RM ? zt : st.zoom + (zt - st.zoom) * (1 - Math.exp(-dt / 190)); moving = true; } else st.zoom = zt;
+    const ct = !compact && root.classList.contains("talking") ? 1 : 0;
+    if (Math.abs(st.col - ct) > 0.002) { st.col = RM ? ct : st.col + (ct - st.col) * (1 - Math.exp(-dt / 110)); moving = true; } else st.col = ct;
     if (st.tween) {
       const tw = st.tween, k = clamp((now - tw.t0) / tw.ms), e = easeInOut(k);
       st.az = lerp(tw.a0, tw.a1, e); st.el = lerp(tw.e0, tw.e1, e);
@@ -255,7 +260,7 @@ export async function initDesk() {
 
   // ---------- states ----------
   const stage = (i, text, cls = "") => { const el = $(`#d-st${i}`); el.textContent = text; el.className = cls; };
-  const pipe = (n, text, cls = "") => { const el = root.querySelector(`#d-pipe [data-n="${n}"]`); if (el) { el.className = cls; el.lastElementChild.textContent = text; } };
+  const pipe = (n, cls = "") => { const el = root.querySelector(`#d-pipe [data-n="${n}"]`); if (el) el.className = cls; };
   function readout(step) {
     const done = step >= of && !st.building, b = scene ? scene.bbs[Math.max(0, step - 1)] : null;
     const dims = b && !done ? [b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z].map((v) => v.toFixed(1)) : size(d.bbox);
@@ -267,12 +272,10 @@ export async function initDesk() {
     stage(2, done && d.fit ? `${Math.floor(d.fit.yield * 100)}% modelled` : "—", done ? "pass" : "");
     stage(3, done ? (warn ? `${warn} to review` : "All pass") : "—", done ? (warn ? "warn" : "pass") : "");
     stage(4, done ? (d.gate && d.gate.ready ? "Ready" : "Not ready") : "—");
-    pipe("Parameters", rev);
-    pipe("Solid", done ? `${d.faces} faces` : "building", done ? "" : "run");
-    pipe("Exports", done ? (d.exports || []).sort((a, b) => ["step", "stl", "obj", "glb"].indexOf(a) - ["step", "stl", "obj", "glb"].indexOf(b)).map((e) => "." + e).join(" ") : "waiting", done ? "" : "idle");
-    pipe("Checks", done ? `${pass} pass${warn ? ` · ${warn} review` : ""}` : "waiting", done ? "" : "idle");
-    pipe("Slice", done && d.slice ? d.slice.time : "waiting", done ? "" : "idle");
-    pipe("Release", done ? "ready" : "waiting", "idle");
+    pipe("Parameters"); pipe("Solid", done ? "" : "run");
+    for (const n of ["Exports", "Checks", "Slice"]) pipe(n, done ? "" : "idle");
+    pipe("Release", "idle");
+    $("#d-pipe-t").textContent = done ? `${rev} · ${warn ? `${warn} review` : `${pass} pass`}` : `${rev} · building`;
   }
   function cue(step) {
     st.step = step;
@@ -324,12 +327,12 @@ export async function initDesk() {
   function say(k) {
     root.querySelectorAll(".d-sugg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.k === String(k))));
     const on = !!answers[k];
-    answer.classList.toggle("on", on);
+    answer.classList.toggle("on", on); root.classList.toggle("talking", on); st.need = true; kick();
     prompt.classList.toggle("said", on);
     prompt.querySelector("p").textContent = on ? sugg[k - 1] : placeholder;
     if (!on) return;
     const [kick_, title, body, foot] = answers[k]();
-    answer.innerHTML = `<header><span class="mono">${esc(kick_)}</span><b>${esc(title)}</b><button type="button" class="x" aria-label="Close">${I("x", 15, 2)}</button></header>${body}${foot ? `<p>${foot}</p>` : ""}`;
+    answer.innerHTML = `<header class="col"><span class="d-live"></span><b>${esc(d.name)}</b><button type="button" class="x" aria-label="Fold the conversation">${I("fold", 16)}</button></header><p class="you">${esc(sugg[k - 1])}</p><header><span class="mono">${esc(kick_)}</span><b>${esc(title)}</b></header>${body}${foot ? `<p>${foot}</p>` : ""}`;
     answer.querySelector(".x").addEventListener("click", () => say(""));
   }
   function choose(k) {
@@ -378,7 +381,7 @@ export async function initDesk() {
   try { await boot(); } catch (err) { console.error(err); frame.classList.add("no-gl"); }
   readout(of);
   if (q.startsWith("build")) { const n = clamp(+(q.split(/[:-]/)[1] || 6), 1, of); st.visible = false; build((n - 1) * STEP + STEP * 0.6); scene && scene.draw(0); for (let i = 0; i < 60; i++) scene && scene.draw(0); return; }
-  if (q.startsWith("answer")) { say(+(q.split(/[:-]/)[1] || 1)); kick(); return; }
+  if (q.startsWith("answer")) { say(+(q.split(/[:-]/)[1] || 1)); st.col = compact ? 0 : 1; kick(); return; }
   if (q.startsWith("pick")) { pick(clamp(+(q.split(/[:-]/)[1] || 6), 1, feats.length) - 1); return; }
   const io = new IntersectionObserver(([e]) => {
     st.visible = e.isIntersecting && e.intersectionRatio > 0.35;

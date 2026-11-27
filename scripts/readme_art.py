@@ -791,14 +791,14 @@ def P(light: bool) -> dict:
                     edge="rgba(22,22,22,.62)", grid="rgba(22,22,22,.10)", amber="#a86a00", pass_="#1a7a3a",
                     signal="#c8452b", blueprint="#06708d", shadow="rgba(60,50,40,.16)", logo_part="#161616",
                     glass="rgba(255,255,255,.62)", glass2="rgba(255,255,255,.95)", glass_edge="rgba(255,255,255,.9)",
-                    well_glass="rgba(255,255,255,.82)", room=("#e6e3de", "#efede9", "#f6f5f2", "#e4e1dc"), key="#ffffff", key_a=0.95,
+                    well_glass="rgba(255,255,255,.82)", cue_glass="rgba(250,249,247,.78)", room=("#e6e3de", "#efede9", "#f6f5f2", "#e4e1dc"), key="#ffffff", key_a=0.95,
                     dim_bg="rgba(255,255,255,.92)", dim_ink="#055d76", send="#161616", send_ink="#ffffff", track="rgba(22,22,22,.13)")
     return dict(panel="#121213", panel2="#19191a", well="#070708", ink=T["ink"], ink2=T["ink2"], ink3=T["ink3"],
                 ink4=T["ink4"], datum=T["datum"], tint=T["datum"], mark=MARK_ORIGIN, tintInk=T["datumInk"], clay=T["clay"],
                 edge="rgba(16,16,16,.62)", grid="rgba(255,255,255,.09)", amber=T["amber"], pass_=T["pass"],
                 signal=T["signal"], blueprint=T["blueprint"], shadow="rgba(0,0,0,.45)", logo_part=T["clay"],
                 glass="rgba(255,255,255,.07)", glass2="rgba(255,255,255,.14)", glass_edge="rgba(255,255,255,.11)",
-                well_glass="rgba(11,11,12,.66)", room=("#0a0a0b", "#131314", "#1b1b1c", "#0d0d0e"), key=KEY, key_a=0.24,
+                well_glass="rgba(11,11,12,.66)", cue_glass="rgba(24,24,25,.74)", room=("#0a0a0b", "#131314", "#1b1b1c", "#0d0d0e"), key=KEY, key_a=0.24,
                 dim_bg="rgba(14,15,20,.86)", dim_ink="#d9f9ff", send="#f4f3f1", send_ink="#0b0b0c", track="rgba(255,255,255,.13)")
 
 
@@ -1058,7 +1058,15 @@ def building(data, light: bool):
 
     # the program: the features in build order; the gutter is lit down to the line that is running
     rows, rh = len(listing), 25.0
-    pane(PX, PY, PW, 38 + rows * rh + 8, 20)
+    pane(PX, PY, PW, 38 + rows * rh + 8 + 30, 20)
+    # the pipeline: one line at the pane's foot, a dot for each step, and where the revision stands
+    fy_ = PY + 38 + rows * rh + 6
+    svg.line(PX + 10, fy_, PX + PW - 10, fy_, p["grid"])
+    for i in range(5):
+        svg.circle(PX + 19 + i * 11, fy_ + 16, 2.3, p["pass_"] if i == 0 else acc if i == 1 else p["ink4"], cls=pulse if i == 1 else "")
+    svg.text(PX + 19 + 5 * 11 + 3, fy_ + 19.5, "%s · building" % ("r%02d" % d["state"]["head"]), 9.5, 450, p["ink2"], family="mono")
+    svg.rect(PX + PW - 14 - 24, fy_ + 9, 24, 14, 7, fill=acc)
+    svg.circle(PX + PW - 14 - 7, fy_ + 16, 5, p["send_ink"] if not light else "#ffffff")
     svg.text(PX + 16, PY + 24, "Program", 12.5, 600, p["ink"])
     svg.text(PX + 16 + text_w("Program", 12.5, 600) + 7, PY + 24, str(rows), 10, 450, p["ink3"], family="mono")
     cnt = ("%d of %d" % (at, n)).upper()
@@ -1123,6 +1131,7 @@ def building(data, light: bool):
 
     # the cue: a lower-third title for the feature being built, and the build as twelve segments
     ty = 356
+    pane(CX - 206, ty - 26, 412, 122, 20, fill=p["cue_glass"])
     over = "BUILDING"
     ow = text_w(over, 9, 500, "mono", 1.5)
     of_ = ("%d of %d" % (at, n)).upper()
@@ -1168,8 +1177,8 @@ def building(data, light: bool):
     pane(CX - bw_ / 2, by_, bw_, 40, 20)
     svg.rect(CX - bw_ / 2 + 5, by_ + 5, bw_ - 10, 30, 15, fill=p["well_glass"])
     svg.text(CX - bw_ / 2 + 18, by_ + 25.5, "›", 16, 500, acc, family="mono")
-    svg.rect(CX - bw_ / 2 + 32, by_ + 13, 6, 14, 1.5, fill=acc, cls=pulse)
-    svg.text(CX - bw_ / 2 + 46, by_ + 24.5, "Ask about %s, or describe a change…" % M["name"], 12, 450, p["ink3"])
+    svg.rect(CX - bw_ / 2 + 33, by_ + 12, 2, 16, 1, fill=acc, cls=pulse)      # the caret: a thin lit line (Caret.qml)
+    svg.text(CX - bw_ / 2 + 42, by_ + 24.5, "Ask about %s, or describe a change…" % M["name"], 12, 450, p["ink3"])
     svg.circle(CX + bw_ / 2 - 20, by_ + 20, 12, p["send"])
     svg.add('<path d="M%s %sv4a2 2 0 01-2 2h-6m2.6-2.6l-2.6 2.6 2.6 2.6" stroke="%s" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
             % (f1(CX + bw_ / 2 - 15.5), f1(by_ + 15), p["send_ink"]))

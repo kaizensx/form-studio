@@ -15,7 +15,7 @@ Parametric build123d on OpenCascade, every requirement proved on the solid, on y
 </p>
 
 <p align="center">
-  <sub><b>Version 1.0.0</b> &nbsp;·&nbsp; <a href="https://github.com/kaizensx/form-studio/releases/tag/v1.1.0-preview.1"><b>Preview 1.1</b>: refinement, mesh to editable CAD, game assets</a> &nbsp;·&nbsp; <a href="CHANGELOG.md">What is in it</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/#try">Try it in your browser</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/docs/">Docs</a> &nbsp;·&nbsp; <a href="https://discord.gg/b6ZgyndkmS">Discord</a></sub>
+  <sub><a href="https://github.com/kaizensx/form-studio/releases/latest"><b>Version 1.1.0</b></a>: a new look, bring anything, scans and sculpts as designs &nbsp;·&nbsp; <a href="CHANGELOG.md">What is in it</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/#try">Try it in your browser</a> &nbsp;·&nbsp; <a href="https://kaizensx.github.io/form-studio/docs/">Docs</a> &nbsp;·&nbsp; <a href="https://discord.gg/b6ZgyndkmS">Discord</a></sub>
 </p>
 
 <p align="center">
@@ -24,6 +24,8 @@ Parametric build123d on OpenCascade, every requirement proved on the solid, on y
     <img src="docs/readme/building-light.svg" width="828" alt="The Form Studio workspace, drawn, while a design builds: a sensor case, line 6 of 12 of the program, Board screw holes, being built. The part stands in a pool of light with its size so far on dimension lines; the features built so far are solid and the rest of the design is a faint plot. The program lists the 13 features in build order.">
   </picture>
 </p>
+
+<p align="center"><sub><b>New in 1.1.</b> Lightdesk: the 3D view fills the window, every control is a pane of glass, the conversation is a column beside the stage, and one colour, electric cyan, says where you are. Bring anything and a triage step works out what it is: scans and sculpts become designs, imperfect meshes are repaired, heavy ones are welcome. Every design is checked against the numbers you asked for and refined after it builds.</sub></p>
 
 <p align="center">
   <img src="docs/readme/made-planetary.jpg" width="202" alt="A planetary gear stage: a steel sun gear, three cyan planets and a graphite ring gear.">
@@ -141,7 +143,17 @@ A library of design helpers gives the agent proven building blocks for mechanism
 
 Bring the part you already have. A STEP or STL of a board, a phone or a motor becomes a reference the design is built around, with clearance cut from the real geometry. A photo of a broken part with a card or coin beside it starts **Replace a broken part**: sizes estimated from the photo stay *assumed* until you measure the ones that decide the fit, then the agent designs the replacement and strengthens it where it broke.
 
-**Make editable** turns a mesh (STL, 3MF or OBJ) into CAD you can change: it always builds an exact solid from the triangles, then fits planes, cylinders, cones, spheres and tori where the surface allows and, for a part that is one extrusion or one revolution, rebuilds the profile, holes and patterns as parameters. A report gives the two-sided deviation, the volume change and how much of the area became parametric; anything that does not fit within tolerance stays exact rather than being guessed.
+Whatever you bring is assessed first. **Triage** reads a mesh, a STEP, a photo, a sketch, a PDF, a link or plain words, says what it is and takes the right route by itself; `form triage FILE` prints the same assessment in a terminal. A mesh is repaired on a copy (sliver triangles, flipped faces, small holes, flat openings, loose debris; every repair is listed and no vertex is moved) and classed mechanical, organic or mixed from its own surface.
+
+| What you bring | What it becomes |
+|---|---|
+| A mechanical part that closes | Parametric CAD, verified against the mesh |
+| A smooth closed sculpt | A surface body: NURBS faces over a cage you can edit, with STEP |
+| A scan or sculpt with fine detail, handles or many triangles | A mesh body with Scale and Flat base, into which exact CAD features are cut |
+| Several closed bodies | One design, one part per body |
+| A surface that does not close | A reference to design around; nothing is guessed |
+
+**Make editable** turns a mechanical mesh (STL, 3MF or OBJ) into CAD you can change: it always builds an exact solid from the triangles, then fits planes, cylinders, cones, spheres and tori where the surface allows and, for a part that is one extrusion or one revolution, rebuilds the profile, holes and patterns as parameters. A report gives the two-sided deviation, the volume change and how much of the area became parametric; anything that does not fit within tolerance stays exact rather than being guessed.
 
 ## Review
 
@@ -177,7 +189,7 @@ One design, the output you need:
 | **Game engines (Beta)** | Four levels of detail inside triangle budgets, UVs, baked textures and collision, for Unreal, Unity, Godot and glTF. Every asset passes its technical checks; visual quality is still improving. |
 | **3D printing (optional)** | Your own slicer with your printer's presets, slices played back layer by layer, every printer you have compared, fits modelled against your printer's accuracy. Turn it on when you print; it stays out of the way when you do not. |
 
-Also in Form Studio: concepts that come back as several genuinely different designs, screw bosses and snap-fit hooks placed with a click, text on any flat face, what changed between two revisions on the solids, assembly instructions as a PDF and turntable videos. All of it is in the [changelog](CHANGELOG.md) and [docs/FEATURES.md](docs/FEATURES.md).
+Also in Form Studio: automatic refinement you can undo change by change, a switch in Settings for every engine you install, concepts that come back as several genuinely different designs, screw bosses and snap-fit hooks placed with a click, text on any flat face, what changed between two revisions on the solids, assembly instructions as a PDF and turntable videos. All of it is in the [changelog](CHANGELOG.md) and [docs/FEATURES.md](docs/FEATURES.md).
 
 > [!NOTE]
 > Nothing on this page is mocked up. The parts are the CAD kernel's own meshes and edges, and the gears turn by their own tooth counts. The two designs at the top are build123d code in [`scripts/readme_designs/`](scripts/readme_designs), built through the same `create_design` tool an agent calls; the checks, ratios, G-code layer, joint sweep and file hashes are what a real run of the engine produced. [`scripts/readme_art.py`](scripts/readme_art.py) draws every picture again from a fresh run.
@@ -245,7 +257,7 @@ Form Studio is an MCP server. Add it once and your agent can design, check, revi
 claude mcp add --scope user form -- form-mcp
 ```
 
-Thirteen design skills (intake, parametric design, industrial design, assemblies and mechanisms, design review and more) install as a plugin:
+Nineteen design skills (intake, parametric design, industrial design, assemblies and mechanisms, remodel from mesh, design review and more) install as a plugin:
 
 ```bash
 claude plugin marketplace add kaizensx/form-studio
@@ -308,6 +320,7 @@ form start --text "a hook for my headphones under the desk" --photo desk.jpg    
 form new "Desk stand" device_stand device_width=75.6                            # from a building block
 form commit desk-stand lean=18 --expect-head 1                                  # a new revision, rebuilt and checked
 form diff desk-stand 1 2 --png diff.png                                         # what changed in the solid
+form triage scan.stl                                                            # what a file is, and the route it takes
 form tool get_project '{"project": "desk-stand"}'                               # any MCP tool, from the shell
 ```
 
@@ -335,6 +348,6 @@ form tool get_project '{"project": "desk-stand"}'                               
 
 ## Licence
 
-MIT. Form Studio calls build123d (Apache-2.0), OpenCascade (LGPL-2.1), your slicer and other programs as separate programs; none of them is bundled into its code. py_gearworks (Apache-2.0) draws involute gears, bd_warehouse (Apache-2.0) builds standard hardware, and bd_materials and threejs-materials (Apache-2.0) give engineering materials their density and look. three.js (MIT) draws the website. Instrument Sans and Geist Mono (SIL OFL 1.1) are drawn in the app and in the pictures on this page, and Lucide icons (ISC) in the app. The Gridfinity system was created by Zack Freedman and SKÅDIS is a product of IKEA; Form Studio's building blocks follow their published dimensions and are not affiliated with either.
+MIT. Form Studio calls build123d (Apache-2.0), OpenCascade (LGPL-2.1), your slicer and other programs as separate programs; none of them is bundled into its code. py_gearworks (Apache-2.0) draws involute gears, bd_warehouse (Apache-2.0) builds standard hardware, and bd_materials and threejs-materials (Apache-2.0) give engineering materials their density and look. three.js (MIT) draws the website. Geist and Geist Mono (SIL OFL 1.1) are drawn in the app and in the pictures on this page, and Instrument Sans (SIL OFL 1.1) on share cards and renders, and Lucide icons (ISC) in the app. The Gridfinity system was created by Zack Freedman and SKÅDIS is a product of IKEA; Form Studio's building blocks follow their published dimensions and are not affiliated with either.
 
 One folder is not MIT: [`form/recon/cadfit/`](form/recon/cadfit/PERMISSION.md) holds code from CADFit (Nehme, Whalen, Ahmed), licensed CC BY-NC 4.0 and included and modified with its author's permission. It is an optional mesh-to-CAD candidate, off unless `[recon] cadfit = true`; see its [PERMISSION.md](form/recon/cadfit/PERMISSION.md) and [LICENSE](form/recon/cadfit/LICENSE). Optional engines installed from Settings › Engines & software keep their own licences, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

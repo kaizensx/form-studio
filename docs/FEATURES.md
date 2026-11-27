@@ -586,7 +586,11 @@ and what to do.
 - **Usage limits, calmly.** An agent that reaches its plan's limit is named with when it can work again and what is
   kept; the CLI's upgrade and purchase links are never shown.
 - **Many conversations.** Tied to a design or free-standing; searchable, pinnable, renamable. Opening a conversation
-  opens its design. The conversation column is resizable and hides with Ctrl/⌘ J.
+  opens its design. The conversation is a glass column on the left of the stage: drag its edge to resize it (the width
+  is remembered), fold it to one bar under the part with Ctrl/⌘ J, or click into the 3D view. **Focus** (Ctrl/⌘ .)
+  steps both side columns away and leaves the part alone.
+- **Chosen on Home too.** A chip beside Design it in Home's composer names the agent, the model and the effort the
+  next design is made with, and opens the same picker.
 - **One request, one design.** A conversation keeps every design it made or touched, in order, with its role (made,
   concept, continued) and whether it is still there or in the trash; each design records the conversation and request
   that made it. Designs one request makes share one family, so Home shows them as one card. In a conversation that

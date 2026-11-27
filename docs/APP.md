@@ -46,10 +46,13 @@ uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizens
 | **Tool dock** (left) | Select, Measure, Annotate, Section, Analyze, Assembly, History, Simulate the print and Photo render; the active tool's options sit beside it |
 | **Size and views** (bottom left) | Width × depth × height and volume of what is on screen, then Iso, Front, Side, Top and Under |
 | **Program** (right) | The panel of the stage you are in. In Design it is the features in build order as a numbered listing; click a line for its parameters. While a design builds, the line being built is lit and the built ones are ticked |
-| **Pipeline** (bottom right) | Parameters, Solid, Exports, Checks, Slice, Release, each with its value. A step is current only when it describes the revision on screen. A 3D model, or a design that is not sliced, has no Slice step |
-| **Conversation** (bottom centre) | One bar: what the agent is doing, numbered suggestions (keys 1 to 4), the prompt. It opens upward into the whole conversation: messages, the agent's steps, the views it looked at, attachments, and a strip of its designs when it made several. Ctrl/⌘ J or a click on its status line opens and folds it; it folds while a build plays. Paste a link to attach the file it points at |
+| **Pipeline** (the foot of the pane) | One line: a dot for each step (Parameters, Solid, Exports, Checks, Slice, Release), the revision and what its checks found, and Auto. A step is current only when it describes the revision on screen. A 3D model, or a design that is not sliced, has no Slice step |
+| **Conversation** (left) | Once something is said, a glass column on the left: the conversation picker, New and Fold at its head, the messages, the agent's steps, the views it looked at and attachments, and the prompt at its foot. Drag its edge to resize it (300 to 480 px, remembered). Ctrl/⌘ J or Fold turns it into one bar under the part: what the agent is doing, numbered suggestions (keys 1 to 4) and the prompt. A click into the 3D view, or Esc, folds it too, and taking up the prompt brings it back; it folds while a build plays. Paste a link to attach the file it points at |
+| **Stage** | What the column and the pane leave. The part, its dimension lines, the build's title and the print simulation are framed in it, and the camera returns the part to its middle when a column folds, opens or is resized. **Focus** (Ctrl/⌘ .) steps both side columns away; the tab on the pane's edge folds the pane alone. In a window under 1200 px, opening the conversation folds the panes to one button |
 
-While a design builds, the lower part of the view shows the feature being made, its number and how far the build is.
+While a design builds, a pane in the lower part of the stage shows the feature being made in large type, its number, a
+track with one segment per step and the features before and after. The caret in every text field is a thin lit line
+of the accent. Shadows, glows, glass and the room are dithered, so no gradient shows bands.
 
 ### The five stages
 
@@ -78,9 +81,12 @@ model page is passed to the agent as a link; a direct STL, STEP, 3MF, PDF or pic
 the composer). Drop files anywhere on Home or paste them. Under the composer: **Start blank** (an empty design in the
 workspace, no agent) and, only when 3D printing is on, **Make it for: Anything / My printer**. A new design is a 3D
 model unless you pick My printer or say so in the request ("for my A1 mini"); Settings › Printing › **New designs are
-made for** can make every new design a print.
+made for** can make every new design a print. A chip beside **Design it** names the agent, the model and the effort the
+next design is made with and opens the same picker as a conversation; with no agent connected it opens Settings ›
+Agents & models.
 
-Sending opens the workspace at once in a "being designed" state with what the agent is doing; the design is attached
+Sending opens the workspace at once in a "being designed" state with what the agent is doing written in the middle of
+the stage (a conversation that grows moves to the left column); the design is attached
 the moment it exists and builds up feature by feature in the viewport, in build order, each feature fading and rising
 into place as it is named; a later revision grows in only the features whose geometry changed. For a new idea
 the agent proposes three or four concepts as real CAD, side by side and turning, with a line on each and their computed
@@ -117,7 +123,7 @@ It is not a project and nothing is created.
 
 ![Home on the first day: one composer, and what you can start from](images/home-empty.webp)
 
-![Home with designs and recent conversations](images/home-designs.webp)
+![Home with your designs under the composer](images/home-designs.webp)
 
 ![The sketch pad](images/sketch.webp)
 
@@ -131,6 +137,8 @@ It is not a project and nothing is created.
 | Ctrl/⌘ N | New design: Home, with the composer ready |
 | Ctrl/⌘ Shift O | New conversation |
 | Ctrl/⌘ J | Show or hide the conversation |
+| Ctrl/⌘ . | Focus: the part alone, both side columns away |
+| Ctrl/⌘ [ | Back to all designs |
 | Ctrl/⌘ Shift H | All designs (Home) |
 | Ctrl/⌘ , | Settings |
 | Ctrl/⌘ 1 to 5 | Brief, Shape, Fit, Prove, Release |

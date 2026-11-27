@@ -1,5 +1,6 @@
 /* The app, drawn. Lightdesk (docs/design/directions/h): a studio room with the part in a pool of warm light, every
-   control a pane of glass, the features as a program listing that runs, one bar under the part.
+   control a pane of glass, the features as a program listing that runs, one bar under the part; a conversation is
+   a glass column on the left.
    Logical size 1440 x 900, scaled to the frame (site/js/desk.js sets --s). Under 760 px the same parts are laid out
    for a phone at 390 x 640. One accent, cyan, for one meaning: this is where you are. */
 :root {
@@ -86,13 +87,11 @@
 .d-dock span { width: 36px; height: 36px; border-radius: 18px; display: grid; place-items: center; color: var(--d-ink2); }
 .d-dock span.on { background: var(--d-send); color: var(--d-send-ink); } .d-dock hr { width: 20px; border: 0; border-top: 1px solid var(--d-line); margin: 4px 0; }
 
-.d-pipe { position: absolute; right: 20px; bottom: 20px; width: 316px; border-radius: 22px; padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
-.d-pipe div { display: grid; gap: 2px; } .d-pipe b { font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
-.d-pipe b i { width: 6px; height: 6px; border-radius: 50%; background: var(--d-pass); transition: background-color 220ms; } .d-pipe .idle b i { background: var(--d-ink3); }
-.d-pipe .run b i { background: var(--d-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--d-accent) 22%, transparent); }
-.d-pipe span { font-size: 10.5px; letter-spacing: -.02em; color: var(--d-ink2); padding-left: 13px; white-space: nowrap; }
-.d-pipe .auto { grid-auto-flow: column; align-items: center; justify-content: space-between; } .d-pipe .auto b { font: 500 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--d-ink3); padding-left: 13px; }
-.d-switch { width: 30px; height: 18px; border-radius: 9px; background: var(--d-accent); padding: 0 !important; position: relative; } .d-switch::after { content: ""; position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--d-send-ink); }
+.d-pipe { height: 40px; margin-top: 4px; padding: 0 10px 0 14px; border-top: 1px solid var(--d-line); display: flex; align-items: center; gap: 9px; }
+.d-pipe i { width: 6px; height: 6px; border-radius: 50%; background: var(--d-pass); transition: background-color 220ms; flex: none; } .d-pipe i.idle { background: var(--d-ink3); opacity: .7; }
+.d-pipe i.run { background: var(--d-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--d-accent) 22%, transparent); }
+.d-pipe .mono { font-size: 11.5px; letter-spacing: -.02em; color: var(--d-ink2); margin: 0 auto 0 6px; white-space: nowrap; }
+.d-switch { flex: none; width: 30px; height: 18px; border-radius: 9px; background: var(--d-accent); padding: 0 !important; position: relative; } .d-switch::after { content: ""; position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--d-send-ink); }
 
 .d-views { position: absolute; left: 20px; bottom: 20px; height: 40px; border-radius: 20px; padding: 0 5px 0 13px; display: flex; align-items: center; gap: 2px; color: var(--d-ink2); font-size: 12.5px; transition: opacity 300ms; }
 .d-views .ic { margin-right: 6px; } .d-views button { height: 30px; padding: 0 11px; border-radius: 15px; display: grid; place-items: center; }
@@ -122,7 +121,7 @@
 .d-pc { position: absolute; left: 44.5px; top: 46px; width: 2px; height: 0; border-radius: 1px; opacity: 0; background: linear-gradient(180deg, color-mix(in srgb, var(--d-accent) 25%, transparent), var(--d-accent) 70%);
   box-shadow: 0 0 10px color-mix(in srgb, var(--d-accent) 60%, transparent); transition: height 140ms var(--ease-out), opacity 300ms; }
 .d-program.running .d-pc { opacity: 1; }
-.d-ln { width: 100%; height: 32px; border-radius: 10px; display: flex; align-items: center; padding-right: 12px; position: relative; transition: background-color 140ms; }
+.desk .d-ln { width: 100%; height: 32px; border-radius: 10px; display: flex; align-items: center; padding-right: 12px; position: relative; transition: background-color 140ms; }
 .d-ln .no { width: 30px; text-align: right; font-size: 11px; color: var(--d-ink3); } .d-ln .gl { width: 34px; display: grid; place-items: center; padding-left: 4px; }
 .d-ln .gl .ic { opacity: 0; } .d-ln.done .gl .ck, .d-ln.now .gl .pl { opacity: 1; } .d-ln .gl .ic { grid-area: 1 / 1; }
 .d-ln b { flex: 1; font-weight: 500; font-size: 13px; letter-spacing: -.005em; }
@@ -146,7 +145,7 @@
 .d-well { border-radius: 20px; padding: 13px 8px 8px 16px; background: color-mix(in srgb, var(--d-bg) 66%, transparent); box-shadow: inset 0 0 0 1px var(--d-line); transition: padding 320ms var(--ease-out); }
 .d-prompt { display: flex; align-items: center; height: 26px; }
 .d-gt { color: var(--d-accent); font-size: 22px; font-weight: 500; line-height: 1; margin-right: 10px; transform: translateY(-1px); }
-.d-caret { width: 8px; height: 19px; border-radius: 2px; background: var(--d-accent); margin-right: 9px; box-shadow: 0 0 12px color-mix(in srgb, var(--d-accent) 55%, transparent); flex: none; }
+.d-caret { width: 2px; height: 20px; border-radius: 1px; background: var(--d-accent); margin-right: 8px; box-shadow: 0 0 7px color-mix(in srgb, var(--d-accent) 50%, transparent); flex: none; }
 .d-prompt p { font-size: 15px; color: var(--d-ink3); letter-spacing: -.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .d-prompt.said p { color: var(--d-ink); } .d-prompt.said .d-caret { order: 2; margin: 0 0 0 6px; }
 .d-well footer { display: flex; align-items: center; gap: 14px; color: var(--d-ink2); font-size: 12.5px; margin-top: 6px; }
@@ -163,6 +162,9 @@ html:not([data-theme="dark"]) .d-k { box-shadow: inset 0 0 0 1px color-mix(in sr
 .d-answer { position: absolute; left: -70px; right: -70px; bottom: calc(100% + 12px); border-radius: 22px; padding: 16px 18px 14px; display: grid; gap: 10px; opacity: 0; transform: translateY(8px); pointer-events: none;
   transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out); background: var(--d-solid); }
 .d-answer.on { opacity: 1; transform: none; pointer-events: auto; }
+.d-answer header:not(.col) { display: grid; gap: 5px; margin-top: 4px; }
+.d-answer header.col { height: 28px; } .d-answer header.col { display: flex; } .d-answer header.col b { font-size: 14px; } .d-answer header.col .d-live { margin: 0 3px 0 4px; background: var(--d-pass); box-shadow: none; }
+.d-answer .you { justify-self: end; max-width: 92%; padding: 8px 12px; border-radius: 14px 14px 4px 14px; background: var(--d-glass2); color: var(--d-ink); font-size: 13px; }
 .d-answer header { display: flex; align-items: center; gap: 10px; } .d-answer header b { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
 .d-answer header .mono { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--d-accent); }
 .d-answer .x { margin-left: auto; width: 28px; height: 28px; border-radius: 14px; display: grid; place-items: center; color: var(--d-ink2); } .d-answer .x:hover { background: var(--d-glass2); color: var(--d-ink); }
@@ -176,8 +178,24 @@ html:not([data-theme="dark"]) .d-k { box-shadow: inset 0 0 0 1px color-mix(in sr
 .d-answer .two li .v { font-size: 11px; color: var(--d-ink2); }
 .d-answer > p { font-size: 11.5px; color: var(--d-ink3); }
 
-/* the cue: a lower-third title over the room while a feature is being built */
-.d-third { position: absolute; left: 336px; width: 600px; top: 556px; text-align: center; opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity 260ms var(--ease-out), transform 260ms var(--ease-out); }
+/* the conversation, once something is said: a glass column on the left, the prompt at its foot. The dock, the size line
+   and the view buttons stand right of it, and the part is framed in the stage that is left (desk.js, st.col) */
+.d-dock, .d-readout, .d-views, .d-pick { transition: opacity 300ms, translate 340ms var(--ease-out); }
+.d-pool { transition: transform 600ms ease-in-out, opacity 600ms ease-in-out, translate 340ms var(--ease-out); }
+.desk-frame:not(.compact) .desk.talking .d-talk { left: 12px; top: 76px; bottom: 12px; width: 340px; display: flex; flex-direction: column; gap: 0; border-radius: 22px; background: var(--d-glass);
+  -webkit-backdrop-filter: blur(28px) saturate(1.3); backdrop-filter: blur(28px) saturate(1.3); border: 1px solid var(--d-edge); box-shadow: var(--d-shadow), inset 0 1px 0 rgba(255,255,255,.07); padding: 6px; }
+.desk-frame:not(.compact) .desk.talking .d-answer { position: static; flex: 1; min-height: 0; overflow: auto; align-content: start; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; border-radius: 16px; padding: 8px 10px 12px; scrollbar-width: none; }
+.desk-frame:not(.compact) .desk.talking .d-answer .two { grid-template-columns: 1fr; }
+.desk-frame:not(.compact) .desk.talking .d-lead { display: none; }
+.desk-frame:not(.compact) .desk.talking .d-cmd { background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; border-top: 1px solid var(--d-line); border-radius: 0 0 16px 16px; padding-top: 6px; }
+.desk-frame:not(.compact) .desk.talking .d-sugg { grid-template-columns: 1fr; max-height: 140px; padding: 0 0 6px; } .desk-frame:not(.compact) .desk.talking .d-sugg button { height: 30px; }
+.desk-frame:not(.compact) .desk.talking .d-well footer em { display: none; } .desk-frame:not(.compact) .desk.talking .d-well footer .d-send { margin-left: auto; }
+.desk-frame:not(.compact) .desk.talking .d-prompt p { font-size: 14px; }
+.desk-frame:not(.compact) .desk.talking :is(.d-dock, .d-views) { translate: 344px 0; } .desk-frame:not(.compact) .desk.talking :is(.d-readout, .d-pick) { translate: 352px 0; }
+.desk-frame:not(.compact) .desk.talking .d-pool { translate: 130px 20px; }
+
+/* the cue: a lower-third title on a pane of glass while a feature is being built */
+.d-third { position: absolute; left: 304px; width: 664px; top: 532px; padding: 24px 32px 20px; border-radius: 26px; text-align: center; opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity 260ms var(--ease-out), transform 260ms var(--ease-out); }
 .desk.building .d-third { opacity: 1; transform: none; }
 .d-third .over { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--d-accent); display: flex; align-items: center; justify-content: center; gap: 10px; }
 .d-third .over i { font-style: normal; color: var(--d-ink2); }
@@ -208,7 +226,7 @@ html:not([data-theme="dark"]) .d-k { box-shadow: inset 0 0 0 1px color-mix(in sr
 .compact .d-program:not(.running):not(.picked) { padding-bottom: 4px; }
 .compact .d-readout { left: 16px; bottom: auto; top: 112px; font-size: 11px; } .compact .d-readout em { font-size: 11px; }
 .compact .d-program.running ~ .d-readout, .compact .d-program.picked ~ .d-readout { top: 144px; }
-.compact .d-third { left: 16px; width: 358px; top: 404px; }
+.compact .d-third { left: 12px; width: 366px; top: 392px; padding: 14px 16px 12px; border-radius: 20px; }
 .compact .d-third h3 { font-size: 32px; margin: 10px 0 18px; } .compact .d-third h3 .mono { font-size: 14px; vertical-align: 12px; margin-right: 8px; }
 .compact .d-around { font-size: 11.5px; }
 .compact .d-talk { left: 12px; width: 366px; bottom: 12px; }

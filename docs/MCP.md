@@ -1178,9 +1178,11 @@ holes, flat openings; each listed under repairs) and then, with route="auto":
 - a surface that does not close after the repairs: refused, and the hint names the next call
   (import_reference: keep it as a reference). Do not call again with the same file.
 If the parametric route fails on a mesh that closes, the mesh body is made instead (summary.fell_back_from).
-route: "auto", or force "parametric", "surface_body" or "mesh_body". scale: multiply the file's
-coordinates (a mesh in metres: 1000). The result carries "triage" (class, route taken, why, cannot) and,
-when the file's size makes no sense in millimetres, "ask": put that one question to the person.
+route: "auto", or force "parametric", "surface_body" or "mesh_body". units: what the file's numbers are
+("mm", "cm", "m", "in"); with "auto" they are millimetres, and a file whose size makes no sense in
+millimetres (0.08 across) is not built on a guess: the refusal is the one question to put to the person,
+then call again with units. scale: a plain factor instead. The result carries "triage" (class, route
+taken, why, cannot).
 Several meshes of ONE product (a base, a slider and a lid): pass them all at once, as files=[absolute paths]
 (or project_or_file=<project id> with references=[names]); they become ONE design with one part per mesh, in
 the positions the files give (parts that fail are listed in "failed", the others are kept). Never call this
@@ -1197,6 +1199,7 @@ once per part: that makes unrelated designs. Values are computed from the mesh a
 | `references` | array \| null |  |
 | `route` | string |  |
 | `scale` | number |  |
+| `units` | string |  |
 
 ### `analyze_reference`
 
