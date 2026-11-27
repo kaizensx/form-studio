@@ -496,6 +496,18 @@ either. A real thin fin still fails.
   boss (M2 to M5, with the ISO tap drill, a heat-set insert hole or the ISO 273 clearance) or a cantilever snap-fit
   hook, checked against your nozzle and written into the design's code. `form feature`; MCP `add_feature`,
   `remove_feature`.
+- **Fillet, chamfer, hole, pattern and shell by picking.** In Annotate, **Fillet or chamfer…** on picked edges, or
+  **Hole or shell…** on a flat face (hole sizes from ISO 273, the tap drill table or an ISO 286 fit; plain,
+  counterbore or countersink); in the Program, a line's **Pattern…** repeats it in a line or around an axis.
+  **Preview** builds the draft in the kernel with its change in volume; **Add to design** writes one feature method
+  and its parameters into the design's code, so the agent, `optimize` and `geometry_diff` work on it like any other.
+  Picked edges and faces are stable queries (the features that made them, their kind, direction and place), not
+  indexes. `form model`; MCP `add_feature` (kinds `fillet`, `chamfer`, `hole`, `pattern`, `shell`).
+- **The feature tree by hand.** The Program's rollback bar shows the part as it stood after any feature, from the
+  checkpoints and without saving; each line's menu suppresses, restores, renames and moves it and says what it
+  depends on; a line dragged by its number moves it. A move that empties a feature, or puts one before a feature it
+  reads, is refused with the reason. `form tree`, `form render --upto`; MCP `edit_design` ops `suppress`, `restore`,
+  `move`, `rename`, `render(upto=)`, `get_design_source` (`tree`).
 - **Section (X):** a clipping plane through the solid with filled cut faces.
 - **Orientation finder:** ranks print orientations by overhang area, support, contact and height, with the numbers
   behind the ranking, and applies the one you choose.

@@ -30,6 +30,8 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Ask the person to measure a dimension | `ask_measurement` (where, tolerance, diagram; the answer is committed with how it was measured) | `form chat` prompts in the terminal |
 | Offer next steps | `suggest_replies` (up to three buttons under the reply) | — |
 | Put text on a flat face (a feature in the source) | `add_text`, `remove_text` | `form engrave <p> TEXT --at x,y,z --normal x,y,z` |
+| Work the feature tree: suppress, restore, move, rename; see the part up to one feature | `edit_design` ops `suppress`/`restore`/`move`/`rename`, `render(upto=)`, `get_design_source` (`tree`) | `form tree <p> [suppress\|restore\|move\|rename F]`, `form tree <p> --upto F` |
+| Fillet, chamfer, hole (ISO 273, tap drill, ISO 286), pattern or shell on picked geometry (one feature in the source) | `add_feature` kinds `fillet`, `chamfer`, `hole`, `pattern`, `shell` (`preview=True` saves nothing) | `form model <p> fillet --at x,y,z --radius 2` |
 | See what changed in the solid between revisions | `geometry_diff` | `form diff <p> 1 3 --png diff.png` |
 | Assess anything the person brings (mesh, STEP, photo, PDF, link, words) and get the route | `triage` | `form triage scan.stl` |
 | Turn an STL, OBJ or 3MF into a design by the route its triage chooses (parametric CAD, a surface body, a mesh body, parts) | `reconstruct` | `form reconstruct part.stl --tolerance 0.02` |

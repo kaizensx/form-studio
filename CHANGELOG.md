@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### New
+
+- **Model by hand, in the same code the agent writes.** The Program pane is a feature tree you can work in: drag
+  the rollback bar up to any feature and the part shows as it stood then, from the feature checkpoints (a few
+  milliseconds; nothing is saved); a line's menu suppresses and restores it, renames it in place, moves it up or
+  down, and says what it depends on (the parameters it reads, the features it names, what reads it); drag a line
+  by its number to reorder. A move that would make a feature do nothing, or come before one it reads, is refused
+  with the reason. Each action is one revision of the design's code, and the checks run again.
+- **Fillet, chamfer, hole, pattern and shell on what you pick.** Pick edges in Annotate for a fillet or a chamfer,
+  a flat face for a hole (ISO 273 clearance, tap drill, an ISO 286 fit such as H7, or a plain Ø; plain,
+  counterbore or countersink, each size with its source) or a shell open there, or a feature in the Program for a
+  linear or polar pattern. Preview builds it in the kernel and shows the draft over the head with the change in
+  volume; Add to design writes one named feature method and its parameters. Edges and faces are kept as stable
+  queries (the features that made them, their kind, direction and place), so a parameter change keeps them; a
+  rebuild that cannot find one leaves the feature out and says which. Fix with your agent puts a refusal in the
+  conversation.
+- **The same headless.** `edit_design` gains the ops `suppress`, `restore`, `move` and `rename`; `add_feature`
+  the kinds `fillet`, `chamfer`, `hole`, `pattern` and `shell` (with `preview`); `render(upto=)` and
+  `get_design_source`'s `tree`. In the terminal: `form tree <project>` (and `suppress|restore|move|rename`,
+  `--upto`), `form model <project> fillet|chamfer|hole|pattern|shell`, `form render --upto`.
+
 ## 1.1.0
 
 Form Studio 1.1 is the largest release since 1.0. The app has a new look and layout, Lightdesk: the 3D view fills

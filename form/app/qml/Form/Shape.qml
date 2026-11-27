@@ -33,6 +33,85 @@ Column {
         for (var i = 0; i < Store.stageLog.length; i++) if (Store.stageLog[i].draft === d && Store.stageLog[i].feature !== Store.building.feature) out.push(Store.stageLog[i].feature)
         return out
     }
+    // ── the tree by hand (form/modelling.py): roll back, suppress, reorder, rename, what a feature depends on ──
+    // Each action is an edit of the design's code (one revision, the checks run again); the rollback bar only shows
+    // the part as it stood after one feature, from the checkpoints, and saves nothing.
+    readonly property string rollTo: Store.scrub && Store.scrub.upto ? Store.scrub.upto : ""
+    readonly property int rollAt: {
+        if (!rollTo || !Store.recipe) return -1
+        var fs = Store.recipe.features
+        for (var i = 0; i < fs.length; i++) if (fs[i].id === rollTo) return i
+        return -1
+    }
+    property int _ask: 0
+    property var tree: null                    // GET /tree: what each feature reads
+    property string openId: ""                 // the line whose tool is open under it
+    property string openWhat: ""               // "rename" | "pattern" | "deps"
+    property int dragFrom: -1
+    property int dragTo: -1
+    property int rollDrag: -1
+    function featureIds() { return Store.recipe ? Store.recipe.features.map(function (f) { return f.id }) : [] }
+    function roll(fid) {
+        var ids = featureIds()
+        var ask = ++_ask
+        if (!fid || fid === ids[ids.length - 1]) { if (rollTo) Store.endScrub(); return }
+        var head = Store.project.head
+        Store.pget("/rollback?feature=" + fid).then(function (v) {
+            if (ask !== root._ask || !Store.viewer) return
+            Store.scrub = { rev: head, view: v, upto: fid }
+            Store.viewer.flagged = []; Store.viewer.setModel(v); Store.viewer.setGhost(null)
+        }, function (e) { Store.fail(e) })
+    }
+    function treeOp(op) {
+        if (rollTo) Store.endScrub()
+        return Store.ppost("/tree", { ops: [op], expect_head: Store.project ? Store.project.head : null }).then(function (r) {
+            Store.toast(r.said, "Written into the design's code as " + F.pad(r.head) + "; the checks run again.")
+            if (r.job) Store.track(r.job)
+            root.tree = null; root.openId = ""; root.openWhat = ""
+            Store.refresh(true)
+            return true
+        }, function (e) { Store.fail(e); return false })
+    }
+    function loadTree() { Store.pget("/tree").then(function (t) { root.tree = t }, function () { root.tree = null }) }
+    function treeRow(id) {
+        var rs = tree ? tree.features : []
+        for (var i = 0; i < rs.length; i++) if (rs[i].id === id) return rs[i]
+        return null
+    }
+    function label(id) { var f = Store.featureById(id); return f ? f.label : id }
+    function dependsText(id) {
+        var r = treeRow(id)
+        if (!r) return tree ? "Not read: open the tree again after the build." : "Reading the code…"
+        var vals = r.reads.values || {}, out = []
+        var ps = r.reads.params.map(function (k) { return k + (vals[k] !== undefined ? " = " + String(Number(Number(vals[k]).toFixed(3))) : "") })
+        out.push(ps.length ? "Reads " + ps.join(", ") + "." : "Reads no parameters.")
+        out.push(r.after ? "Starts from the solid " + root.label(r.after) + " leaves." : "Makes the first solid.")
+        if (r.reads.features.length) out.push("Names " + r.reads.features.map(root.label).join(", ") + " (picked geometry or the feature it repeats).")
+        if (r.reads.helpers.length) out.push("Calls " + r.reads.helpers.join(", ") + ".")
+        if (r.used_by.length) out.push("Read by " + r.used_by.map(root.label).join(", ") + ".")
+        return out.join(" ")
+    }
+    function rowAt(y) {                            // the index of the line under y (in the listing)
+        for (var i = 0; i < rep.count; i++) { var it = rep.itemAt(i); if (it && y < it.y + it.height) return i }
+        return rep.count - 1
+    }
+    function menuFor(i) {
+        var fs = Store.recipe ? Store.recipe.features : [], f = fs[i]
+        if (!f) return []
+        var sup = !!f.suppressed
+        return [{ text: "Roll back to here", icon: "history", run: function () { root.roll(f.id) } },
+                { text: sup ? "Restore" : "Suppress", icon: sup ? "eye" : "eye_off", enabled: i > 0,
+                  run: function () { root.treeOp({ op: sup ? "restore" : "suppress", feature: f.id }) } },
+                { text: "Rename…", icon: "pencil", run: function () { root.openId = f.id; root.openWhat = "rename" } },
+                { text: "Move up", icon: "chevron_up", enabled: i > 1, run: function () { root.treeOp({ op: "move", feature: f.id, before: fs[i - 1].id }) } },
+                { text: "Move down", icon: "chevron_down", enabled: i > 0 && i < fs.length - 1, run: function () { root.treeOp({ op: "move", feature: f.id, after: fs[i + 1].id }) } },
+                { sep: true },
+                { text: "Pattern…", icon: "repeat", enabled: i > 0 && !sup, run: function () { root.openId = f.id; root.openWhat = "pattern" } },
+                { text: "What it depends on", icon: "git_branch", run: function () { root.openId = f.id; root.openWhat = "deps"; root.loadTree() } }]
+    }
+    PopMenu { id: rowMenu; objectName: "featureMenu"; property int at: -1; model: root.menuFor(at) }
+    Connections { target: Store; function onPidChanged() { root.tree = null; root.openId = ""; root.openWhat = "" } }
+
     Column {
         id: program; objectName: "program"
         readonly property real listingHeight: 40 + listing.height + 6      // the pane is this tall; what follows is a scroll away
@@ -70,12 +149,18 @@ Column {
             Column {
                 id: lines; width: parent.width
                 Repeater {
+                    id: rep
                     model: Store.recipe ? Store.recipe.features : []
                     Item {
                         id: fr
                         required property var modelData
                         required property int index
                         objectName: "feature-" + modelData.id
+                        readonly property bool sup: !!modelData.suppressed
+                        readonly property bool later: root.rollAt >= 0 && index > root.rollAt     // after the rollback bar
+                        readonly property bool tools: root.openId === modelData.id && !!root.openWhat
+                        opacity: later ? 0.38 : 1
+                        Behavior on opacity { NumberAnimation { duration: Theme.fast } }
                         readonly property bool touched: root.paramsOf(modelData.id).some(function (p) { return Store.draftValues[p.key] !== undefined })
                         readonly property var out: Store.leftOut(modelData.id)       // left out of a partial build
                         // its step of a build is running in the viewport (Store.revealing, or the stage the agent streams)
@@ -84,8 +169,9 @@ Column {
                         readonly property bool todo: root.running && !arriving && !built
                         onArrivingChanged: if (arriving) pc.at = fr
                         onBuiltChanged: if (built && root.running) landed.restart()
-                        width: lines.width; height: Math.max(32, why.visible ? why.implicitHeight + 30 : 0)
-                        Rectangle { anchors.fill: parent; radius: 10
+                        readonly property real lineH: Math.max(32, why.visible ? why.implicitHeight + 30 : 0)
+                        width: lines.width; height: lineH + (ex.visible ? ex.implicitHeight + 10 : 0)
+                        Rectangle { width: parent.width; height: fr.lineH; radius: 10
                             color: fm.pressed ? Theme.washPress : fm.containsMouse && !fr.arriving ? Theme.washHover : "transparent"
                             Behavior on color { Tint {} } }
                         Item { objectName: "featureArriving"; width: 1; height: 1; opacity: fr.arriving ? 1 : 0 }       // what the tree and tests read
@@ -109,20 +195,83 @@ Column {
                                 NumberAnimation { target: flare; property: "opacity"; to: 0; duration: 360; easing.type: Easing.OutCubic } } }
                         Txt { id: nameTxt; x: 64; y: (32 - height) / 2; width: parent.width - 64 - kw.width - 22; elide: Text.ElideRight; wrapMode: Text.NoWrap; font.pixelSize: 13; font.letterSpacing: -0.05
                             text: fr.modelData.label + (fr.touched ? "  ●" : ""); font.weight: fr.arriving ? Theme.wSemi : Theme.wMedium
-                            color: fr.touched ? Theme.datum : fr.out || fr.todo ? Theme.ink3 : fr.built ? Theme.ink2 : Theme.ink
+                            font.strikeout: fr.sup
+                            color: fr.touched ? Theme.datum : fr.out || fr.todo || fr.sup ? Theme.ink3 : fr.built ? Theme.ink2 : Theme.ink
                             Behavior on color { Tint {} } }
                         Txt { id: why; objectName: "leftOutReason"; kind: "fine"; visible: !!fr.out; tone: 2; x: 64; y: 28; width: parent.width - 78; wrapMode: Text.WordWrap
                             text: fr.out ? Store.leftOutReason(fr.out) : "" }
                         // its role, lettered in neutral mono; "building" on the line that runs
                         Txt { id: kw; objectName: "featureRole"; anchors.right: parent.right; anchors.rightMargin: 12; y: (32 - height) / 2; mono: true; font.pixelSize: 10; font.weight: Theme.wMedium; font.letterSpacing: 1.0
                             font.capitalization: Font.AllUppercase; wrapMode: Text.NoWrap
-                            text: fr.arriving ? "building" : fr.out ? "left out" : fr.modelData.role
+                            text: fr.arriving ? "building" : fr.out ? "left out" : fr.sup ? "suppressed" : fr.modelData.role
+                            visible: !(fm.containsMouse || more.hovered) || root.running
                             color: fr.arriving ? Theme.datum : fr.out ? Theme.amber : Theme.ink3; opacity: fr.built ? 0.6 : fr.todo ? 0.5 : 1 }
-                        MouseArea { id: fm; anchors.fill: parent; hoverEnabled: true
-                            onClicked: Store.select(fr.modelData.id); onEntered: Store.hover(fr.modelData.id); onExited: Store.hover("") }
+                        MouseArea { id: fm; width: parent.width; height: fr.lineH; hoverEnabled: true; acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            onClicked: function (m) {
+                                if (m.button === Qt.RightButton && !root.running) { rowMenu.at = fr.index; rowMenu.openAt(fr, m.x, m.y) }
+                                else Store.select(fr.modelData.id) }
+                            onEntered: Store.hover(fr.modelData.id); onExited: Store.hover("") }
+                        // its tools: the line's menu (also on a right-click)
+                        Btn { id: more; objectName: "featureMore-" + fr.modelData.id; small: true; kind: "quiet"; icon: "ellipsis"
+                            anchors.right: parent.right; anchors.rightMargin: 4; y: (32 - height) / 2
+                            visible: (fm.containsMouse || hovered || (rowMenu.opened && rowMenu.at === fr.index)) && !root.running
+                            tip: "Roll back, suppress, rename, move, pattern"
+                            onClicked: { rowMenu.at = fr.index; rowMenu.openAt(more, 0, more.height + 4) } }
+                        // reorder by drag: press on the number and drag it to another line
+                        MouseArea { objectName: "featureDrag-" + fr.modelData.id; x: 0; width: 34; height: fr.lineH; enabled: fr.index > 0 && !root.running
+                            cursorShape: enabled ? Qt.SizeVerCursor : Qt.ArrowCursor; preventStealing: true
+                            onPressed: { root.dragFrom = fr.index; root.dragTo = fr.index }
+                            onPositionChanged: function (m) { if (pressed) root.dragTo = Math.max(1, root.rowAt(mapToItem(lines, m.x, m.y).y)) }
+                            onReleased: {
+                                var a = root.dragFrom, b = root.dragTo, fs = Store.recipe.features
+                                root.dragFrom = -1; root.dragTo = -1
+                                if (a < 1 || b < 1 || a === b) return
+                                root.treeOp(b < a ? { op: "move", feature: fs[a].id, before: fs[b].id } : { op: "move", feature: fs[a].id, after: fs[b].id }) }
+                            onCanceled: { root.dragFrom = -1; root.dragTo = -1 } }
                         Tip { show: fm.containsMouse && !!fr.modelData.doc && !fr.out; text: fr.modelData.doc || "" }
+                        // under the line: rename it, pattern it, or what it depends on
+                        Column { id: ex; objectName: "featureTools"; x: 64; y: fr.lineH + 2; width: parent.width - 76; spacing: 6; visible: fr.tools && !root.running
+                            Field { id: rn; objectName: "renameField"; width: parent.width; visible: root.openWhat === "rename"; text: fr.modelData.label
+                                placeholder: "Name of this feature"
+                                onVisibleChanged: if (visible) Qt.callLater(function () { rn.input.forceActiveFocus(); rn.input.selectAll() })
+                                onAccepted: function (t) { if (t.trim() && t.trim() !== fr.modelData.label) root.treeOp({ op: "rename", feature: fr.modelData.id, label: t.trim() }); else { root.openId = ""; root.openWhat = "" } }
+                                Keys.onEscapePressed: { root.openId = ""; root.openWhat = "" } }
+                            Txt { objectName: "featureDepends"; width: parent.width; kind: "fine"; tone: 2; visible: root.openWhat === "deps"; text: root.dependsText(fr.modelData.id) }
+                            ModelPanel { width: parent.width; visible: root.openWhat === "pattern"; kinds: root.openWhat === "pattern" ? ["pattern"] : []
+                                of: fr.modelData.id; onDone: { root.openId = ""; root.openWhat = "" } }
+                            Btn { small: true; kind: "quiet"; text: "Close"; visible: root.openWhat !== "pattern"; onClicked: { root.openId = ""; root.openWhat = "" } } }
                     }
                 }
+            }
+            // where a dragged line would go
+            Rectangle { objectName: "programDropLine"; visible: root.dragFrom >= 0 && root.dragTo >= 0 && root.dragTo !== root.dragFrom
+                x: 30; width: parent.width - 36; height: 2; radius: 1; color: Theme.datum
+                y: { var it = rep.itemAt(root.dragTo); return it ? (root.dragTo < root.dragFrom ? it.y - 1 : it.y + it.height - 1) : 0 } }
+            // the rollback bar: drag it up the listing to see the part as it stood after that feature (from its
+            // checkpoints, in milliseconds); nothing is saved. Below the last line it shows every feature.
+            Item {
+                id: rollBar; objectName: "rollBar"
+                readonly property int at: root.rollDrag >= 0 ? root.rollDrag : root.rollAt >= 0 ? root.rollAt : rep.count - 1
+                readonly property Item row: rep.count ? rep.itemAt(at) : null
+                visible: rep.count > 1 && !root.running && !Store.hasDraft
+                x: 4; width: parent.width - 8; height: 12
+                y: row ? row.y + row.lineH - 6 : listing.height - 6
+                Behavior on y { enabled: root.rollDrag < 0; NumberAnimation { duration: Theme.move(160); easing.type: Easing.OutCubic } }
+                Rectangle { x: 28; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 28; height: 1.5
+                    color: root.rollAt >= 0 || root.rollDrag >= 0 ? Theme.datum : Theme.alpha(Theme.datum, 0.35); opacity: grip.containsMouse || grip.pressed || root.rollAt >= 0 ? 1 : 0.55 }
+                Rectangle { objectName: "rollGrip"; x: 22; anchors.verticalCenter: parent.verticalCenter; width: 22; height: 10; radius: 5
+                    color: grip.pressed ? Theme.datum : Theme.glassSolid; border.color: Theme.datum
+                    Rectangle { anchors.centerIn: parent; width: 8; height: 1.5; radius: 1; color: grip.pressed ? Theme.glassSolid : Theme.datum } }
+                MouseArea { id: grip; x: 14; width: 40; height: parent.height + 8; y: -4; hoverEnabled: true; preventStealing: true
+                    cursorShape: Qt.SizeVerCursor
+                    onPositionChanged: function (m) {
+                        if (!pressed) return
+                        var i = root.rowAt(mapToItem(lines, m.x, m.y).y - 8)
+                        if (i !== root.rollDrag) { root.rollDrag = i; root.roll(Store.recipe.features[i].id) } }
+                    onReleased: root.rollDrag = -1
+                    onCanceled: root.rollDrag = -1 }
+                Tip { show: grip.containsMouse && !grip.pressed; text: root.rollAt >= 0 ? "Rolled back to " + root.label(root.rollTo) + ": drag down to the end to show every feature"
+                                                                                       : "Drag up to see the part as it stood after any feature" }
             }
         }
         Item { width: 1; height: 6 }

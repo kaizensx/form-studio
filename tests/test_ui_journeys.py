@@ -182,6 +182,12 @@ class Journeys(unittest.TestCase):
     def test_maker_tools(self):
         self.journey("maker_tools.py")
 
+    def test_modelling(self):               # the Program by hand: roll back, suppress, rename, depends, moves; a fillet on a picked edge
+        self.journey("modelling.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_modelling_light(self):         # the same on paper
+        self.journey("modelling.py", env_extra={"FORM_APPEARANCE": "light"})
+
     def test_new_tools(self):              # 12.3: a boss at a face, every printer compared, a turntable, Open in <Slicer>
         # real slicers where they are installed (macOS here); elsewhere a stand-in OrcaSlicer that copies a fixture G-code
         # and writes the project 3MF its CLI writes. Opening the slicer app is recorded, never done (FORM_FAKE_LAUNCH).
