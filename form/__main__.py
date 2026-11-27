@@ -26,6 +26,8 @@
   form lighter <project> [--apply c1]                  lighter walls, pockets, infill; every passing check kept
   form replace --photo broken.jpg [--name X]           a replacement for a broken part, from a photo, in a chat
   form feature <project> boss --at x,y,z --normal ...  a screw boss or snap-fit hook in the code
+  form tree <project> [suppress|restore|move|rename FEATURE] [--upto FEATURE]   the feature tree, by hand
+  form model <project> fillet|chamfer|hole|pattern|shell --at x,y,z ... [--preview]   a picked feature as code
   form verify <project> <release>    re-hash a release against its manifest
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
                                      one message to an agent with FORM's tools; streams the reply, saves the conversation
@@ -330,6 +332,7 @@ def main(argv=None):
             c.add_argument("--view", default="iso")
             c.add_argument("--highlight")
             c.add_argument("--out")
+            c.add_argument("--upto", metavar="FEATURE", help="the head as it stood after this feature (never saved)")
     o = sub.add_parser("optimize", help="goal seek over parameters")
     o.add_argument("project")
     o.add_argument("--vary", action="append", required=True, help="key:min:max (repeat)")
@@ -378,6 +381,41 @@ def main(argv=None):
     fe.add_argument("--list", action="store_true")
     fe.add_argument("--remove", metavar="ID")
     fe.add_argument("--expect-head", type=int)
+    # -- modelling by hand (form/modelling.py): the feature tree and picked features, written as the design's code --
+    tr = sub.add_parser("tree", help="the feature tree: tree <project> (build order, suppressed, what each reads) | "
+                                     "suppress|restore FEATURE | move FEATURE --after|--before F | rename FEATURE "
+                                     "[--label L] [--id I] | --upto FEATURE (the rollback view)")
+    tr.add_argument("project")
+    tr.add_argument("action", nargs="?", choices=["suppress", "restore", "move", "rename"])
+    tr.add_argument("feature", nargs="?")
+    tr.add_argument("--after")
+    tr.add_argument("--before")
+    tr.add_argument("--label")
+    tr.add_argument("--id", dest="new_id")
+    tr.add_argument("--upto", metavar="FEATURE", help="the head as it stood after this feature (never saved)")
+    tr.add_argument("--png", help="with --upto: write a picture of it here")
+    tr.add_argument("--preview", action="store_true", help="build and report, save nothing")
+    tr.add_argument("--expect-head", type=int)
+    mo = sub.add_parser("model", help="a picked feature as code: model <project> fillet|chamfer|hole|pattern|shell "
+                                      "[--at x,y,z ...] [options] [--preview]")
+    mo.add_argument("project")
+    mo.add_argument("kind", choices=["fillet", "chamfer", "hole", "pattern", "shell"])
+    mo.add_argument("--at", action="append", default=[], metavar="x,y,z", help="a point on an edge (fillet, chamfer) "
+                    "or on a face (hole, shell); repeat for several edges")
+    for k in ("radius", "length", "thickness", "nominal", "d", "depth", "pitch", "angle", "head_d", "head_depth"):
+        mo.add_argument("--" + k.replace("_", "-"), dest=k, type=float)
+    mo.add_argument("--count", type=int)
+    mo.add_argument("--standard", choices=["clearance", "tapped", "iso286", "plain"])
+    mo.add_argument("--size", help="hole screw size, M2 to M6")
+    mo.add_argument("--fit", help="close|normal|loose (clearance) or a hole tolerance such as H7 (iso286)")
+    mo.add_argument("--style", choices=["plain", "counterbore", "countersink"])
+    mo.add_argument("--of", help="pattern: the feature to repeat")
+    mo.add_argument("--mode", choices=["linear", "polar"])
+    mo.add_argument("--axis", help="x, y, z or x,y,z")
+    mo.add_argument("--origin", metavar="x,y,z", help="polar pattern: a point on the axis")
+    mo.add_argument("--after", help="the feature it goes after (default: last)")
+    mo.add_argument("--preview", action="store_true", help="build and report, save nothing")
+    mo.add_argument("--expect-head", type=int)
     # -- analysis on the model (form/analysis.py) --
     az = sub.add_parser("analyze", help="an analysis map: wall thickness, overhangs, layer cross-section, small features")
     az.add_argument("project")
@@ -615,12 +653,17 @@ def main(argv=None):
         elif a.cmd == "render":
             from . import render
             p = st.load(a.project)
-            v = st.view(p)
+            if a.upto:
+                from . import modelling
+                v = modelling.view_upto(st, p, a.upto)
+            else:
+                v = st.view(p)
             feats = [{"id": f.id, "label": f.label} for f in st.recipe(p).features]
             views = ["iso", "front", "top", "right"] if a.view == "sheet" else [a.view]
             size = (640, 460) if a.view == "sheet" else (960, 680)
-            pngs = [render.render_png(v, feats, vw, a.highlight, size=size, title=f"{p['name']} - r{p['head']:02d}") for vw in views]
-            out = a.out or f"{a.project}_r{p['head']:02d}_{a.view}.png"
+            title = f"{p['name']} - r{p['head']:02d}" + (f" up to {a.upto} (not saved)" if a.upto else "")
+            pngs = [render.render_png(v, feats, vw, a.highlight, size=size, title=title) for vw in views]
+            out = a.out or f"{a.project}_r{p['head']:02d}_{a.view}{'_upto-' + a.upto if a.upto else ''}.png"
             with open(out, "wb") as f:
                 f.write(pngs[0] if len(pngs) == 1 else render.contact_sheet(pngs))
             _print({"png": out})
@@ -693,6 +736,52 @@ def main(argv=None):
                 out = fh.add(st, p, a.kind, xyz(a.at), xyz(a.normal), a.expect_head, "cli", **o)
                 out["checks"] = fh.checks(out["features"][-1], st.slicer_info(p=p).get("nozzle_mm"), a.allow_strain)
                 _print(out)
+        elif a.cmd in ("tree", "model"):
+            from . import modelling
+            p = st.load(a.project)
+            xyz = lambda t: [float(x) for x in t.split(",")]
+            if a.cmd == "tree" and a.upto:
+                v = modelling.view_upto(st, p, a.upto)
+                out = {"upto": v["upto"], "volume_mm3": v["volume_mm3"], "bbox": v["bbox"], "faces": v["faces"]}
+                if a.png:
+                    from . import render
+                    feats = [{"id": f.id, "label": f.label} for f in st.recipe(p).features]
+                    with open(a.png, "wb") as fh_:
+                        fh_.write(render.render_png(v, feats, "iso", None, size=(960, 680),
+                                                    title=f"{p['name']} - r{p['head']:02d} up to {a.upto} (not saved)"))
+                    out["png"] = a.png
+                _print(out)
+            elif a.cmd == "tree" and not a.action:
+                _print(modelling.tree(st, p))
+            else:
+                if a.cmd == "tree":
+                    if not a.feature:
+                        raise StudioError(f"{a.action} needs a feature id.", "`form tree <project>` lists them.")
+                    op = {"op": a.action, "feature": a.feature}
+                    op.update({k: v for k, v in (("after", a.after), ("before", a.before), ("label", a.label),
+                                                 ("id", a.new_id)) if v})
+                    ops, planned = [op], None
+                else:
+                    o = {k: getattr(a, k) for k in ("radius", "length", "thickness", "nominal", "d", "depth", "pitch",
+                                                    "angle", "head_d", "head_depth", "count", "standard", "size", "fit",
+                                                    "style", "of", "mode", "after") if getattr(a, k) is not None}
+                    if a.axis:
+                        o["axis"] = a.axis if a.axis.lower().lstrip("+-") in ("x", "y", "z") else xyz(a.axis)
+                    if a.origin:
+                        o["origin"] = xyz(a.origin)
+                    planned = modelling.plan(st, p, a.kind, [{"at": xyz(t)} for t in a.at], **o)
+                    ops = planned["ops"]
+                if a.preview:
+                    pv = modelling.preview(st, p, ops)
+                    pv.pop("rid", None)
+                    _print({"saved": False, "ops": ops, "preview": pv,
+                            **({"summary": planned["summary"], "picked": planned["picked"]} if planned else {})})
+                else:
+                    r = modelling.commit(st, p, ops, a.expect_head, "cli", planned=planned)
+                    r.pop("project")
+                    st.activity(a.project, "commit", f"r{r['head']:02d}: {r['said']}", by="cli")
+                    job = st.run_sync(a.project)
+                    _print({**r, "pipeline": job_digest(job)})
         elif a.cmd == "analyze":
             from . import analysis
             p = st.load(a.project)

@@ -85,7 +85,8 @@ def _h(*parts) -> str:
 # ---- the feature decorator and the design base ---------------------------------------------------------------------
 
 def feature(label: str = "", role: str = "structure", doc: str = "", parts: int | None = None,
-            budget: float | None = None, stages: bool = False, expects: list | None = None):
+            budget: float | None = None, stages: bool = False, expects: list | None = None,
+            suppressed: bool = False):
     """Mark a method of a FeatureDesign as a feature: `@feature("Eye openings", role="access")`.
 
     parts: how many separate parts (solids) this feature adds (a lens feature that makes two lenses: parts=2; the
@@ -96,7 +97,9 @@ def feature(label: str = "", role: str = "structure", doc: str = "", parts: int 
     stage keeps its own feature (the class's declared features), and the body is the last stage's shape.
     expects: what the body must be when this feature is done, as kernel-checked assertions (form/contract.py):
     `expects=[contract.bolt_circle(4, 5.2, 60), contract.cylinder(70, "boss")]`. They are measured on the solid the
-    feature returns; a miss fails this feature, with measured against wanted, like any other failure of it."""
+    feature returns; a miss fails this feature, with measured against wanted, like any other failure of it.
+    suppressed: the feature stays in the source but is not built (the body passes through unchanged and the build
+    log says "suppressed"); the edit ops suppress and restore set and clear it (form/modelling.py)."""
     if parts is not None and (not isinstance(parts, int) or parts < 0):
         raise TypeError("feature(parts=) is a whole number of parts the feature adds (0 or more).")
     if budget is not None and not (isinstance(budget, (int, float)) and budget > 0):
@@ -107,7 +110,7 @@ def feature(label: str = "", role: str = "structure", doc: str = "", parts: int 
 
     def deco(fn):
         fn._form_feature = {"label": label, "role": role, "doc": doc, "parts": parts, "budget": budget,
-                            "stages": bool(stages), "expects": list(expects or [])}
+                            "stages": bool(stages), "expects": list(expects or []), "suppressed": bool(suppressed)}
         return fn
     return deco
 
@@ -166,6 +169,13 @@ class FeatureDesign(Recipe):
 
     def build(self, v: dict) -> list[Stage]:
         return _build_features(self, v)
+
+    def public(self) -> dict:
+        d = super().public()
+        meta = getattr(type(self), "_form_meta", {}) or {}
+        for f in d.get("features", []):
+            f["suppressed"] = bool((meta.get(f["id"]) or {}).get("suppressed"))
+        return d
 
 
 # ---- building a FeatureDesign: one feature at a time, each checked, timed and kept --------------------------------
@@ -492,8 +502,16 @@ def _build_features(self, v: dict) -> list[Stage]:
     body = None
     expect = 0
     rep = _REPORT
+    if (meta.get(steps[0]) or {}).get("suppressed"):
+        raise RecipeError(f"The first feature, {steps[0]}, cannot be suppressed: every later feature starts from it.",
+                          steps[0], f"Restore it: remove suppressed=True from @feature on {steps[0]}.")
     for i, fid in enumerate(steps):
         m = meta.get(fid) or {}
+        if m.get("suppressed"):                      # in the source, not built: the body passes through unchanged
+            n0, _v0 = _measure(body)
+            rep["log"].append({"feature": fid, "status": "suppressed", "s": 0.0, "solids": n0, "dvol": 0.0})
+            _emit({"kind": "feature_done", "feature": fid, "i": i, "status": "suppressed", "s": 0.0, "solids": n0})
+            continue
         idx = _h(up, fid, codes.get(fid, ""))
         budget = float(m.get("budget") or FEATURE_BUDGET) * max(1.0, float(STRETCH or 1.0))
         hang = hang_path(idx, v)
@@ -537,6 +555,7 @@ def _build_features(self, v: dict) -> list[Stage]:
                 out = None
                 tok = _alarm_on(budget, fid)
                 _DEADLINE.append(time.monotonic() + budget)
+                self._form_trail = list(stages)          # the solid as each feature before it left it (form/handfeat.py)
                 try:
                     try:
                         out = getattr(self, fid)(tv, body)
@@ -1300,6 +1319,19 @@ def save_prefix(origin: str, v: dict, stages: list) -> None:
 
 class _Stop(Exception):
     pass
+
+
+def rollback(cls, upto: str):
+    """The design class, changed to build its features up to and including `upto` (the rollback view of the
+    Program pane, form/modelling.py). Every feature it builds loads from its checkpoint: their keys do not change,
+    because Form Studio's blocks are left out of the code a checkpoint is keyed on."""
+    steps = list(getattr(cls, "_form_steps", None) or [])
+    if upto not in steps:
+        raise RecipeError(f"No feature “{upto}” to roll back to.", upto, "Features: " + ", ".join(steps) + ".")
+    cls._form_steps = steps[:steps.index(upto) + 1]
+    cls.assembly = lambda self, v: None              # the parts after it are not there yet
+    cls._form_rollback = {"upto": upto}
+    return cls
 
 
 def partial(cls, keep: int, solids: int, origin: str = "", failed: str = "", stages: list | None = None,
