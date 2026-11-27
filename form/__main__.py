@@ -905,7 +905,7 @@ def main(argv=None):
         _print({"error": {"message": str(e)}})
         return 2
     finally:
-        st.kernel.stop()
+        st.kernel.shutdown()          # the process ends: no worker is started again (form/worker.py)
     return 0
 
 

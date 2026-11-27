@@ -178,7 +178,7 @@ def main(argv=None) -> int:
 
     if not engine.rootObjects():
         print("Form Studio could not load its interface:", *errors, sep="\n  ", file=sys.stderr)
-        httpd.shutdown(); st.kernel.stop()
+        httpd.shutdown(); st.kernel.shutdown()
         return 1
     win: QQuickWindow = engine.rootObjects()[0]
     if ghost:

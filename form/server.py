@@ -1031,4 +1031,4 @@ def serve(cfg=None):
     except KeyboardInterrupt:
         pass
     finally:
-        st.kernel.stop()
+        st.kernel.shutdown()          # the process ends: no worker is started again (form/worker.py)

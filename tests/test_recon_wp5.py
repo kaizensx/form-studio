@@ -220,6 +220,18 @@ class Budget(unittest.TestCase):
         self.assertIn("cut short", rep["result"]["note"])
         self.assertEqual(rep["result"]["layer"], 0)                      # the exact copy: the best found in time
 
+    def test_a_budget_whose_share_is_too_small_for_the_program_route_says_so(self):
+        """Between about 10 and 16 s the budget leaves the program route less than its smallest stage: it is not
+        started, and that is said (it raised a TypeError on a number it did not have)."""
+        from form.recon import pipeline
+        stl, _, _ = mesh("box_with_holes")
+        allowed = 2 * pipeline.PROGRAM_SHARE * 12.5
+        self.assertLess(allowed, pipeline.MIN_STAGE_S)
+        prog = pipeline._run_program(None, None, None, 0.02, "box", TMP / "share", lambda d: None, {},
+                                     time.perf_counter() + 12.5, 0.0, time.perf_counter(),
+                                     pipeline.PROGRAM_SHARE * 12.5, 12.5, pipeline.PROGRAM_ENOUGH)
+        self.assertIn("its share of a 12.5 s budget", prog["report"]["error"])
+
 
 class Installer(unittest.TestCase):
     def test_size_and_licence_are_shown_before_any_download(self):

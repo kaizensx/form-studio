@@ -599,8 +599,11 @@ def _run_program(Vr, V, F, tol, name, out, say, rep, hard, fin, tstart, share, b
         return {"report": {"method": "sketches and extrusions",
                            "error": f"Not started: {max(in_time, 0.0):.1f} s were left for it"}}
     if allowed < MIN_STAGE_S:
+        # its first reading has no floor to gain over (gain is None): then it is the budget itself that is too
+        # small for the route's share (a budget of 10 to 16 s crashed here on the missing number)
         why = (f"Not started: it could add at most {gain:.3g}% of the surface to the floor, worth {allowed:.0f} s of "
-               f"the budget (less than {MIN_STAGE_S:g} s)")
+               f"the budget (less than {MIN_STAGE_S:g} s)") if gain is not None else \
+            (f"Not started: its share of a {budget_s:g} s budget is {allowed:.0f} s (less than {MIN_STAGE_S:g} s)")
         rep["program_skipped"] = why
         return {"report": {"method": "sketches and extrusions", "error": why}}
     say({"stage": "layer2", "text": "Reading the part as sketches and extrusions", "fraction": 0.02})

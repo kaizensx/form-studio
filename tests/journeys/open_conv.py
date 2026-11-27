@@ -62,7 +62,9 @@ def journey_conversation_with_three_designs(ui):
     ui.shot("open-conv-strip")
     for pid, name in ((S["a"], "Wallet base"), (S["b"], "Wallet slider"), (S["c"], "Wallet cascade")):
         it = next(i for i in ui.find_all(name="designStripItem") if i.property("title") == name)
-        ui.click(it)
+        # on its picture, at its left: the strip scrolls sideways, and the third design's right half is past the
+        # column's edge where the system's text is wider (Windows), so a click on its middle went to the stage
+        ui.click(it, fx=0.15)
         ui.wait_until(lambda: ui.store.get("pid") == pid and ui.js("!!Store.data && Store.data.project.id === %r" % pid), 10, f"{name} to open")
         ui.eq(ui.store.get("convId"), S["three"], "the conversation stays open")
 

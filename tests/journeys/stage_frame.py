@@ -23,6 +23,12 @@ return {bad:bad,rect:[r.l,r.t,r.r,r.b],dist:v.dist}})()"""
 
 
 def _inside(ui, what):
+    # the view glides to its new framing: where frames are slow (a runner drawing in software) the glide is still
+    # on its way after the settle, so the framing is waited for, then judged
+    try:
+        ui.wait_until(lambda: not ui.js(SPREAD)["bad"], 6, "the framing to come to rest")
+    except Exception:                                  # noqa: BLE001 - the check below says what is outside
+        pass
     s = ui.js(SPREAD)
     ui.check(not s["bad"], "%s: the part and its dimension lines stand inside the free stage %s (%s)"
              % (what, [round(x) for x in s["rect"]], "; ".join(s["bad"][:4])))

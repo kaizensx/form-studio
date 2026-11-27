@@ -2694,7 +2694,7 @@ def main(argv=None) -> int:
     try:
         mcp.run("stdio")
     finally:
-        st.kernel.stop()
+        st.kernel.shutdown()          # the process ends: no worker is started again (form/worker.py)
     return 0
 
 

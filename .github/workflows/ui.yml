@@ -19,17 +19,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The journeys run in three shards per system (every third one, by name, so a journey and its small-window and
-  # light variants land in different shards): all of them in one job had grown past its 45 minutes.
+  # The journeys run in four shards per system (every fourth one, by name, so a journey and its small-window and
+  # light variants land in different shards): all of them in one job had grown past its 45 minutes. The waits
+  # follow the runner's speed (tests/machine.py), so a slow runner takes longer instead of failing.
   journeys:
-    name: ${{ matrix.name }} (${{ matrix.shard }}/3)
+    name: ${{ matrix.name }} (${{ matrix.shard }}/4)
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         name: [Windows x64, Linux x64]
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
         include:
           - { name: Windows x64, os: windows-latest }
           - { name: Linux x64, os: ubuntu-22.04 }
@@ -83,7 +84,7 @@ jobs:
           PY=.venv/bin/python; [ -f "$PY" ] || PY=.venv/Scripts/python.exe
           RUN=""; [ "$RUNNER_OS" = "Linux" ] && RUN="xvfb-run -a -s '-screen 0 1920x1200x24'"
           export FORM_UI_TESTS=1 FORM_UI_SHOTS="$RUNNER_TEMP/ui-shots" FORM_UI_STUDIO_TOML="$PWD/.github/ci-prusa.toml" FORM_NO_UPDATE_CHECK=1
-          TESTS=$("$PY" scripts/ci/ui_shards.py --shards 3 --index "$SHARD" | tr -d '\r')
+          TESTS=$("$PY" scripts/ci/ui_shards.py --shards 4 --index "$SHARD" | tr -d '\r')
           echo "$TESTS" | tr ' ' '\n'
           eval "$RUN" '"$PY" -m unittest -v $TESTS'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

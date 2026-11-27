@@ -260,8 +260,9 @@ class UI:
             self._pump(25)
 
     def settle(self, ms: int = 250):
-        """Let running animations finish (sheets enter in 180 ms)."""
-        self._pump(ms)
+        """Let running animations finish (sheets enter in 180 ms), and what they wait for: up to twice as long where
+        the machine is that much slower (self.slow), since a layout that follows a glide follows it later there."""
+        self._pump(round(ms * min(self.slow, 2.0)))
 
     def idle(self, timeout: float | None = None):
         """Wait until no engine job is running and the project state has loaded."""
@@ -442,13 +443,19 @@ class UI:
                 return
             before = fl.property("contentY")
             self.wheel(fl, -240 if y > fl.height() - 90 else 240)
-            self._pump(30)
+            self._pump(round(30 * min(self.slow, 3.0)))
             if abs(fl.property("contentY") - before) < 0.5:        # at the end, or the wheel did nothing: place it
                 want = before + (y - fl.height() / 2)
                 top = max(0.0, float(fl.property("contentHeight")) - fl.height())
                 fl.setProperty("contentY", max(0.0, min(top, want)))
-                self._pump(30)
-                return
+                self._pump(round(30 * min(self.slow, 3.0)))
+                # looked at again: where frames are slow the wheel's glide starts after this and moves the panel
+                # on, and the control was then clicked where it was not (below the window's edge)
+                y = it.mapToItem(fl, QPointF(0, it.height() * fy)).y()
+                at_end = abs(float(fl.property("contentY")) - max(0.0, min(top, want))) < 0.5
+                if at_end and not fl.property("moving") and not fl.property("flicking") and \
+                        (0 <= y <= fl.height() or want <= 0 or want >= top):
+                    return
 
     def _steady(self, target, fx: float, fy: float, limit: float = 3.0) -> None:
         """Wait until the item stops moving: a panel sliding in, a popover growing, a strip changing height. A hand

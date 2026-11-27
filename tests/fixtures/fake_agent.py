@@ -386,7 +386,7 @@ def editable(data: Path, message: str, sid: str) -> int:
         asyncio.run(run())
     finally:
         try:
-            mcp_server.studio().kernel.stop()
+            mcp_server.studio().kernel.shutdown()
         except Exception:
             pass
     reply = "You said: " + first + "\n\nProjects: " + ", ".join(made) + "".join("\n\n" + x for x in notes)
@@ -462,7 +462,7 @@ def stages(data: Path, message: str, sid: str) -> int:
         text, err = asyncio.run(run())
     finally:
         try:
-            mcp_server.studio().kernel.stop()
+            mcp_server.studio().kernel.shutdown()
         except Exception:
             pass
     out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t20", "is_error": err,
@@ -519,7 +519,7 @@ def game_crate(data: Path, message: str, sid: str) -> int:
         text, err = asyncio.run(run())
     finally:
         try:
-            mcp_server.studio().kernel.stop()
+            mcp_server.studio().kernel.shutdown()
         except Exception:
             pass
     out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t30", "is_error": err,
@@ -549,7 +549,7 @@ def concepts(data: Path, message: str) -> str:
     try:
         board = concepts_mod.create(st, "Desk hook", items, "A hook for the desk.", purpose=_purpose(message), by="fake")
     finally:
-        st.kernel.stop()
+        st.kernel.shutdown()
     link(data, None, "propose_concepts", role="concept", group=board["id"])
     for m in board["members"]:
         link(data, m["project"], "propose_concepts", role="concept", group=board["id"])
@@ -582,7 +582,7 @@ def replacement(data: Path, message: str) -> str:
         p = st.create_design(name, _source("Block", TINY["Block"][0]), purpose=_purpose(message))
         st.activity(p["id"], "commit", f"Created {name} (r01)", by="fake")
     finally:
-        st.kernel.stop()
+        st.kernel.shutdown()
     link(data, p["id"], "create_design")
     out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t7",
                                                   "content": [{"type": "text", "text": json.dumps({"project": {"id": p["id"]}})}]}]}})

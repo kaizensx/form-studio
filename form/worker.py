@@ -254,7 +254,11 @@ class Kernel:
         with it, so one late worker kept the app from ever ending (a journey on Linux stood 15 minutes)."""
         self._closed = True
         self.stop()
-        if self._lock.acquire(timeout=5):          # a call that was starting a worker as stop() ran has it now
+        # a call that was starting a worker as stop() ran: wait for it (the start holds the lock), then end that
+        # worker too. A process that exits while a thread is half-way through starting a worker leaves a child that
+        # waits for its parent for ever, and on Linux the parent then waits for that child at exit: neither ends
+        # (the `form` command, the MCP server and the app all hung this way when they were closed at that moment)
+        if self._lock.acquire(timeout=60):
             try:
                 proc = self._proc
                 if proc is not None and proc.is_alive():
