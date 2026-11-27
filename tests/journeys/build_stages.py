@@ -137,7 +137,9 @@ def journey_stages_stream_then_the_saved_design(ui):
     ui.settle(400)
     ui.click("startText")
     ui.wait_until(lambda: ui.item("startText").property("activeFocus"), 3, "the composer to take the keyboard")
-    ui.type("A block with a bore and a tower, built in stages pause 1.6")
+    # the agent takes 1.6 s per feature on the machine the journey was written on, and as much longer as this one is
+    # slower: a stage has to be meshed and drawn before the next arrives, and that takes longer there too
+    ui.type("A block with a bore and a tower, built in stages pause %.1f" % (1.6 * ui.slow))
     ui.key("Return")
     ui.wait_until(lambda: ui.store.get("screen") == "designing", 5, "the workspace to open in its being-designed state")
     samples, shots = _stream(ui, "new")
@@ -177,7 +179,7 @@ def journey_a_new_design_while_one_is_open(ui):
     ui.run_js("Store.talkOpen = true")
     n0 = len(ui.js("Store.stageLog"))
     ui.wait_until(lambda: ui.exists("talk"), 5, "the conversation column")
-    ui.run_js("Store.send('Make another one built in stages pause 1.6')")
+    ui.run_js("Store.send('Make another one built in stages pause %.1f')" % (1.6 * ui.slow))
     samples, shots = _stream(ui, "open", pid_before=pid)
     pid2 = ui.store.get("pid")
     ui.check(pid2 and pid2 != pid, f"the new design is open: {pid2}")

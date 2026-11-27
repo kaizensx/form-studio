@@ -27,11 +27,12 @@ def journey_busy_feedback(ui):
                 t.triggered.connect(function () { res(true); t.destroy() }) })) })
         })""")
     btn = ui.item(SLOW)
+    at = ui.hover(btn)                                 # the hand is on it: what is timed is the click, not the aim
     t0 = time.time()
-    ui.click(btn)
+    ui.click((at.x(), at.y()))
     ui.wait_until(lambda: btn.property("showsBusy"), 1.0, "the spinner on the button")
     shown_after = time.time() - t0
-    ui.check(shown_after < 0.6, f"busy within {shown_after:.2f} s of the click")
+    ui.check(shown_after < 0.6 * ui.slow, f"busy within {shown_after:.2f} s of the click (machine speed {ui.slow:.2f})")
     ui.eq(btn.property("shownText"), "Running…")
     ui.check(ui.find(name="btnSpinner", within=btn) is not None, "a spinner replaces the icon")
     ui.click(btn)                                       # a second click while busy does nothing

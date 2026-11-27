@@ -433,29 +433,45 @@ class UI:
         fl = self._flick(it)
         if fl is None:
             return
+        step = round(30 * min(self.slow, 3.0))
+
+        def at_rest(limit_ms: int = 2000) -> bool:         # a press on a view that is still gliding only stops it
+            for _ in range(max(1, limit_ms // 25)):
+                if not fl.property("moving") and not fl.property("flicking"):
+                    return True
+                self._pump(25)
+            return False
+
+        def where() -> float:
+            return it.mapToItem(fl, QPointF(0, it.height() * fy)).y()
+
         for _ in range(60):
-            y = it.mapToItem(fl, QPointF(0, it.height() * fy)).y()
+            at_rest()
+            y = where()
             if 60 <= y <= fl.height() - 90:
-                for _ in range(80):                        # a press on a view that is still gliding only stops it
-                    if not fl.property("moving") and not fl.property("flicking"):
-                        break
-                    self._pump(25)
                 return
-            before = fl.property("contentY")
+            before = float(fl.property("contentY"))
             self.wheel(fl, -240 if y > fl.height() - 90 else 240)
-            self._pump(round(30 * min(self.slow, 3.0)))
-            if abs(fl.property("contentY") - before) < 0.5:        # at the end, or the wheel did nothing: place it
-                want = before + (y - fl.height() / 2)
+            # the wheel's glide starts a frame or more after the event (later where frames are slow): it is waited
+            # for, then let run out, before the place is read again. Reading it at once took a glide that had not
+            # started for a wheel that did nothing, placed the panel, and the late glide then moved it on: the
+            # control was clicked where it no longer was
+            for _ in range(6):
+                self._pump(step)
+                if fl.property("moving") or fl.property("flicking") or abs(float(fl.property("contentY")) - before) >= 0.5:
+                    break
+            at_rest()
+            if abs(float(fl.property("contentY")) - before) < 0.5:     # at the end, or the wheel did nothing: place it
                 top = max(0.0, float(fl.property("contentHeight")) - fl.height())
-                fl.setProperty("contentY", max(0.0, min(top, want)))
-                self._pump(round(30 * min(self.slow, 3.0)))
-                # looked at again: where frames are slow the wheel's glide starts after this and moves the panel
-                # on, and the control was then clicked where it was not (below the window's edge)
-                y = it.mapToItem(fl, QPointF(0, it.height() * fy)).y()
-                at_end = abs(float(fl.property("contentY")) - max(0.0, min(top, want))) < 0.5
-                if at_end and not fl.property("moving") and not fl.property("flicking") and \
-                        (0 <= y <= fl.height() or want <= 0 or want >= top):
-                    return
+                want = max(0.0, min(top, before + (where() - fl.height() / 2)))
+                fl.setProperty("contentY", want)
+                self._pump(step)
+                at_rest()
+                y = where()
+                if 0 <= y <= fl.height() and (want <= 0.0 or want >= top or 60 <= y <= fl.height() - 90):
+                    return                                  # in view: in the middle, or as far as the panel goes
+                if abs(float(fl.property("contentY")) - before) < 0.5:
+                    return                                  # it cannot be moved at all
 
     def _steady(self, target, fx: float, fy: float, limit: float = 3.0) -> None:
         """Wait until the item stops moving: a panel sliding in, a popover growing, a strip changing height. A hand
@@ -480,7 +496,14 @@ class UI:
 
     def hover(self, target, fx: float = 0.5, fy: float = 0.5):
         if not isinstance(target, (tuple, list)):
-            self.scroll_to(target, fy)
+            for attempt in range(4):
+                try:
+                    self.scroll_to(target, fy)
+                    break
+                except RuntimeError:                   # the item was replaced while the panel moved (a list that
+                    if not isinstance(target, str) or attempt == 3:      # was filled again): found again by its name
+                        raise
+                    self._pump(120)
             self._steady(target, fx, fy)
         p = self._pt(target, fx, fy)
         self.T.mouseMove(self.win, p)

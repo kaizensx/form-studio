@@ -132,6 +132,19 @@ def run(ui):
     # ── 7: the part is in the middle; a view of one's own goes back there when the layout changes ──
     def centred(what, tol=4):
         ui.settle(1300)
+        # the view glides to its framing: it is judged where it comes to rest (two looks 250 ms apart agree), which
+        # is later where frames are slow
+        seen = {"c": None}
+
+        def rested():
+            was, now = seen["c"], _centre(ui)
+            seen["c"] = now
+            ui.wait(250)
+            return was is not None and all(abs(a - b) < 0.5 for a, b in zip(was, now))
+        try:
+            ui.wait_until(rested, 6, "the view to come to rest")
+        except Exception:                              # noqa: BLE001 - the checks below say where it stands
+            pass
         c = _centre(ui)
         ui.check(abs(c[0]) <= tol and abs(c[1]) <= tol, "%s: the part is in the middle of the free stage (off by %.0f, %.0f)" % (what, c[0], c[1]))
         return c

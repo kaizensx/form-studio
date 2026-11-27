@@ -145,6 +145,17 @@ class GuideAndCandidates(unittest.TestCase):
             self.assertIn(words, g["guide"][:2600])
         self.assertTrue(featureprog.is_feature_design(g["example_source_features"]))
 
+    def test_the_examples_are_read_from_a_checkout_with_windows_line_ends(self):
+        from unittest import mock
+
+        from form import guidance
+        real = guidance.read_bytes
+        with mock.patch.object(guidance, "read_bytes", lambda skill, rel="SKILL.md": real(skill, rel).replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")):
+            for kind in guidance.EXAMPLES:
+                src = guidance.example(kind)
+                self.assertNotIn("\r", src)
+                compile(src, kind, "exec")
+
     def test_feature_example_builds_and_feature_candidates_share_upstream(self):
         from form import candidates
         st = self.st

@@ -73,7 +73,9 @@ def read_bytes(skill: str, rel: str = "SKILL.md") -> bytes:
 
 
 def read(skill: str, rel: str = "SKILL.md") -> str:
-    return read_bytes(skill, rel).decode("utf-8")
+    """The file as text, with \n line ends whatever the checkout wrote: a Windows checkout with autocrlf has \r\n in
+    every file, and the worked example's fenced block was not found in it (design_guide could not be loaded)."""
+    return read_bytes(skill, rel).decode("utf-8").replace("\r\n", "\n")
 
 
 def frontmatter(text: str) -> dict[str, str]:
